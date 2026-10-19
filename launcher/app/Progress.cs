@@ -205,6 +205,12 @@ namespace Thornswood
     /// shows its bytes against its size; several show which one of how many,
     /// with the fill moving through the one under way, so the fill never
     /// starts again at the next pack.
+    ///
+    /// Two pieces of work at once (#2210): an update may download while the
+    /// game folder is prepared. The button shows the folder: while it is
+    /// prepared (FolderFirst), what a thread marked Second reports (the
+    /// update's) is counted but not shown, and the update shows itself again
+    /// with its next report once the folder is done.
     /// </summary>
     public static class PlayProgress
     {
@@ -212,6 +218,17 @@ namespace Thornswood
 
         static readonly object gate = new object();
         static int open;
+        static bool folderFirst;
+        [ThreadStatic] static bool second;
+
+        /// <summary>The game folder is being made or prepared, so the button is its own.</summary>
+        public static void FolderFirst(bool on) { lock (gate) folderFirst = on; }
+
+        /// <summary>This thread's work is second to the folder's: an update beside a refresh. Set back to false when it ends.</summary>
+        public static void Second(bool on) { second = on; }
+
+        /// <summary>True when this thread's reports are kept off the button right now.</summary>
+        static bool Quiet { get { lock (gate) return second && folderFirst; } }
         static string partPhase = "", partUnit = "updates";
         static int parts, partsDone;
 
@@ -233,7 +250,7 @@ namespace Thornswood
                 parts = Math.Max(0, downloads);
                 partsDone = 0;
             }
-            Send(new ProgressStep { Phase = phase ?? "" });
+            if (!Quiet) Send(new ProgressStep { Phase = phase ?? "" });
         }
 
         /// <summary>The work is over. The last End puts the button back.</summary>
@@ -254,7 +271,7 @@ namespace Thornswood
 
         public static void Report(string phase, long bytesDone, long bytesTotal, long filesDone, long filesTotal, string unit)
         {
-            if (!Open) return;
+            if (!Open || Quiet) return;
             Send(new ProgressStep
             {
                 Phase = phase ?? "",
@@ -290,7 +307,7 @@ namespace Thornswood
                     s.Fraction = (partsDone + within) / parts;
                 }
             }
-            Send(s);
+            if (!Quiet) Send(s);
         }
 
         /// <summary>A download finished.</summary>
@@ -304,7 +321,7 @@ namespace Thornswood
                 if (parts > 1)
                     s = new ProgressStep { Phase = partPhase, FilesDone = partsDone, FilesTotal = parts, Unit = partUnit };
             }
-            if (s != null) Send(s);
+            if (s != null && !Quiet) Send(s);
         }
 
         static void Send(ProgressStep s)

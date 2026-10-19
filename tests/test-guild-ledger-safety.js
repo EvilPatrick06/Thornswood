@@ -11,7 +11,7 @@ let hold = 'whiterun', brokenWrite = false;
 const testFs = Object.create(fs);
 testFs.writeFileSync = (...args) => { if (brokenWrite) throw new Error('disk full'); return fs.writeFileSync(...args); };
 function make() {
-  const ctx = { env: { fs: testFs, path, dataDir: dir, atBox: () => hold,
+  const ctx = { env: { fs: testFs, path, privDir: dir, atBox: () => hold,
     roles: () => ({ business: true, account: 'a' }), nameOf: () => 'Ada', refresh: () => {} } };
   vm.createContext(ctx);
   vm.runInContext(block + '\nthis.api = thornswoodBooks(env);', ctx);
@@ -50,21 +50,18 @@ try {
   } finally { testFs.renameSync = rename; }
   const at = src.indexOf('  function holdStanding(');
   const fn = src.slice(at, src.indexOf('\n  /*', at)).trim();
-  let board = '', touched = 2;
-  const cells = { 1: 'a:Skyrim.esm', 2: 'a:Skyrim.esm' };
-  const pos = { 1: [0, 0, 0], 2: [400, 0, 0] };
-  const ctx = { boardHere: () => board, boxAt: () => touched, holdOfBox: () => 'whiterun',
-    mp: { get: (id, prop) => prop === 'pos' ? pos[id] : cells[id] } };
+  // Since #2298 the board is the only place a list is submitted: a container
+  // a steward once marked is no hold's box, so it authorizes nothing.
+  let board = null;
+  const ctx = { boardHere: () => board,
+    boxAt: () => { throw new Error('holdStanding asked for a marked container'); },
+    holdOfBox: () => { throw new Error('holdStanding asked for a marked container'); },
+    mp: { get: () => { throw new Error('holdStanding read the world itself'); } } };
   vm.createContext(ctx); vm.runInContext(fn, ctx);
-  assert.strictEqual(ctx.holdStanding(1), 'whiterun');
-  pos[1] = [-1, 0, 0];
-  assert.strictEqual(ctx.holdStanding(1), '', 'cached container cannot authorize a remote submission');
-  pos[1] = [0, 0, 0]; cells[1] = 'other:Skyrim.esm';
-  assert.strictEqual(ctx.holdStanding(1), '');
-  cells[1] = cells[2] = '';
-  assert.strictEqual(ctx.holdStanding(1), '');
+  assert.strictEqual(ctx.holdStanding(1), '', 'away from a board, no hold');
   board = 'riften';
-  assert.strictEqual(ctx.holdStanding(1), 'riften', 'actual board remains a drop box');
+  assert.strictEqual(ctx.holdStanding(1), 'riften', 'at a board, that board\'s hold');
+  assert(!/boxAt|holdOfBox|thornswoodBoxAt/.test(fn), 'holdStanding names no marked container');
   const saved = JSON.parse(goodFile);
   saved.ledgers.whiterun[id].prices[0].buy = -1;
   fs.writeFileSync(path.join(dir, 'books.json'), JSON.stringify(saved));
@@ -78,7 +75,7 @@ try {
   const initializer = src.slice(initStart, src.indexOf('})();', initStart) + 5);
   const reloadFs = Object.create(fs);
   reloadFs.readFileSync = (file, ...args) => file === 'server-settings.json'
-    ? JSON.stringify({ dataDir: dir }) : fs.readFileSync(file, ...args);
+    ? JSON.stringify({ dataDir: path.join(dir, 'served'), privDir: dir }) : fs.readFileSync(file, ...args);
   const reload = { __thornswoodBooks: { command: () => 'old writable API' }, __thornswoodBooksTimer: 4,
     require: name => name === 'fs' ? reloadFs : path, log: () => {},
     clearInterval: id => { assert.strictEqual(id, 4); reload.cleared = true; },

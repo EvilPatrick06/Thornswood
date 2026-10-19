@@ -44,9 +44,10 @@
      the menu puts a dead character in no slot, so that slot offers a new
      character, and will not play a dead or banned one.
   6. The launcher: Roster reads the site's pk and banned lists (the lifted C#
-     compiled with the .NET Framework csc), and Chars moves a dead character
-     out of its slot, never picks it and lets it be forgotten; and puts one an
-     admin brought back into the lowest free slot (RaiseRevived, compiled).
+     compiled with the build's compiler, tests/launcher-csc.js), and Chars
+     moves a dead character out of its slot, never picks it and lets it be
+     forgotten; and puts one an admin brought back into the lowest free slot
+     (RaiseRevived, compiled).
   7. Undoing a PK: /unpk in the game (by the character in the world, by name,
      by profile number), refused while every slot is held, refused to staff
      who are not an admin; Undo PK on the hub; pk.json keeps every PK and
@@ -105,9 +106,10 @@ fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
   botKey: KEY, admins: [STAFF_D, STAFF2_D], secret: SECRET, passKey: PASSKEY,
   gameCheckPort: 1, onlineFile: path.join(dir, 'online.json')
 }, null, 2));
-// The launcher feed the join pass holds a launcher's version to.
-fs.mkdirSync(path.join(dir, 'feed'), { recursive: true });
-fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
+// The launcher feed the join pass holds a launcher's version to, as its first
+// write-once generation (#2727).
+fs.mkdirSync(path.join(dir, 'feed', 'version'), { recursive: true });
+fs.writeFileSync(path.join(dir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
 const DATA = path.join(dir, 'data');
 fs.writeFileSync(path.join(DATA, 'linked.json'), JSON.stringify({
   [STAFF_D]: { id: STAFF_D, name: 'Aela', profiles: [1001] },
@@ -138,7 +140,13 @@ function request(port, method, where, headers, body) {
   // A browser names the page that sent a signed in write, and the site
   // refuses one that names no page (#1367). These come from its own pages.
     const signed = method !== 'GET' && Object.keys(headers || {}).some((k) => k.toLowerCase() === 'cookie');
-    const r = http.request({ host: '127.0.0.1', port, method, path: where,
+    // agent: false, a connection of its own for every request. Node keeps an
+    // idle connection to reuse, and the site closes one after five seconds
+    // idle; a request sent on it just as the site closes it is reset
+    // (ECONNRESET, measured 15 Oct when compiling the lifted C# with the
+    // Build Tools csc kept this process busy for longer than that, #498).
+    // Every request here stands alone, so none may lean on a pooled socket.
+    const r = http.request({ host: '127.0.0.1', port, method, path: where, agent: false,
       headers: Object.assign({ 'content-type': 'application/json',
                                'content-length': Buffer.byteLength(data) },
                              signed ? { origin: 'http://127.0.0.1:' + port } : {}, headers || {}) },
@@ -839,7 +847,7 @@ async function adminRoleOnly() {
     const readIds = lift(rosterCs, 'public static HashSet<int> ReadIds(string text, string key)');
     yes('Roster.cs reads the site\'s pk and banned lists', !!readIds &&
         /ReadIds\(text, "pk"\)/.test(rosterCs) && /ReadIds\(text, "banned"\)/.test(rosterCs));
-    const csc = path.join(process.env.WINDIR || 'C:\\Windows', 'Microsoft.NET', 'Framework64', 'v4.0.30319', 'csc.exe');
+    const csc = require('./launcher-csc').csc || path.join(require('os').tmpdir(), 'no-build-tools-roslyn-csc', 'csc.exe');
     if (readIds && fs.existsSync(csc)) {
       const prog = 'using System; using System.Collections.Generic; using System.Text.RegularExpressions;\n' +
         'static class T {\n ' + readIds + '\n static void Main() {\n' +
@@ -852,14 +860,14 @@ async function adminRoleOnly() {
       fs.writeFileSync(path.join(cdir, 'r.cs'), prog);
       let out = '';
       try {
-        cp.execFileSync(csc, ['/nologo', '/langversion:5', '/out:' + path.join(cdir, 'r.exe'), path.join(cdir, 'r.cs')], { stdio: 'pipe' });
+        cp.execFileSync(csc, ['/nologo', '/langversion:' + require('./launcher-csc').langVersion, '/out:' + path.join(cdir, 'r.exe'), path.join(cdir, 'r.cs')], { stdio: 'pipe' });
         out = cp.execFileSync(path.join(cdir, 'r.exe'), { encoding: 'utf8' });
       } catch (e) { out = 'ERROR ' + ((e.stdout || '') + (e.stderr || '') || e.message); }
-      yes('the lifted ReadIds compiles as C# 5 and reads pk [2003, 4002], banned [2002], and nothing from an answer without them',
+      yes('the lifted ReadIds compiles with the compiler the launcher builds with, and reads pk [2003, 4002], banned [2002], and nothing from an answer without them',
           /pk 2 True True/.test(out) && /banned 1 True/.test(out) && /none 0/.test(out));
       if (/ERROR/.test(out)) console.log(out);
     } else if (readIds) {
-      yes('the .NET Framework csc is on this machine (' + csc + ')', false);
+      yes('the Build Tools csc the launcher builds with is on this machine (' + csc + ')', false);
     }
     const bury = lift(charsCs, 'static string BuryDead(List<Row> rows)') || '';
     yes('Chars moves a dead character out of its slot to DeadSlot and saves',
@@ -907,10 +915,10 @@ async function adminRoleOnly() {
       fs.writeFileSync(path.join(cdir, 'r.cs'), prog);
       let out = '';
       try {
-        cp.execFileSync(csc, ['/nologo', '/langversion:5', '/out:' + path.join(cdir, 'r.exe'), path.join(cdir, 'r.cs')], { stdio: 'pipe' });
+        cp.execFileSync(csc, ['/nologo', '/langversion:' + require('./launcher-csc').langVersion, '/out:' + path.join(cdir, 'r.exe'), path.join(cdir, 'r.cs')], { stdio: 'pipe' });
         out = cp.execFileSync(path.join(cdir, 'r.exe'), { encoding: 'utf8' });
       } catch (e) { out = 'ERROR ' + ((e.stdout || '') + (e.stderr || '') || e.message); }
-      yes('the lifted RaiseRevived compiles as C# 5 and moves nobody when the site named nobody',
+      yes('the lifted RaiseRevived compiles with the compiler the launcher builds with, and moves nobody when the site named nobody',
           /none True 0 -1/.test(out));
       yes('and puts the one the site names as revived into the lowest free slot, leaves the other dead, and saves',
           /back 2 -1 1/.test(out) && /An admin undid the PK of a character, so it can be played again: profile 12 to slot 2\./.test(out));

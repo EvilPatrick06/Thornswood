@@ -158,7 +158,7 @@ Yes 'the blocks are plain ASCII, which the far end reads right with or without a
 # The narrowing on 17 September was a fix. The TCP port one above the game
 # port is 7778 on the live root, which is the voice service.
 Yes 'the stop is still by the UDP port and nothing else' (
-    $swapBlock -match 'Get-NetUDPEndpoint -LocalPort \$port' -and
+    $swapBlock.Contains('Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port }') -and
     $swapBlock -notmatch 'Get-NetTCPConnection' -and
     $swapBlock -notmatch 'Win32_Process' -and
     $swapBlock -notmatch 'CommandLine')
@@ -803,7 +803,12 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         catch { $threw = $_.Exception.Message }
         $script:lastFar = @($lines) + @($threw)
         return [pscustomobject]@{ Ok = ((-not $threw) -and $global:LASTEXITCODE -eq 0); Said = ($script:lastFar -join "`n"); Threw = $threw
-                                  Ssh = ($global:TsGm.Ssh.Count - $script:gmSshBefore); Scp = ($global:TsGm.Scp.Count - $script:gmScpBefore) }
+                                  Ssh = ($global:TsGm.Ssh.Count - $script:gmSshBefore); Scp = ($global:TsGm.Scp.Count - $script:gmScpBefore)
+                                  # What scp put anywhere but Send-Script.ps1's own script files: a read
+                                  # whose command line is past its limit goes up as a file, and that sends
+                                  # nothing to the server or the store (16 Oct: the -GamemodeOnly read is
+                                  # 7,020 characters encoded, past the 6,000 limit).
+                                  Sent = @($global:TsGm.Scp | Select-Object -Skip $script:gmScpBefore | Where-Object { $_ -notlike '*thornswood-remote-*' }).Count }
     }
     function Text([string]$path) { if (Test-Path -LiteralPath $path) { return [IO.File]::ReadAllText($path) }; return $null }
     function Prevs { return @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } | Sort-Object Name | ForEach-Object { $_.FullName }) }
@@ -854,8 +859,8 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         Yes '-GamemodeOnly onto a box whose server-build.json is not the commit''s record is refused, naming both builds' (
             (-not $r.Ok) -and $r.Said -match 'runs another server build \(commit fedcba09\)' -and $r.Said -match 'commit 12345678' -and
             $r.Said -match 'Nothing was sent and the server was not touched')
-        Yes '  after one read of the box and nothing sent: one ssh, no scp, no store, the live folder and the server as they were' (
-            $r.Ssh -eq 1 -and $r.Scp -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before -and (Owner $P) -eq $running)
+        Yes '  after reading the box and nothing sent: no file to the server or the store, the live folder and the server as they were' (
+            $r.Ssh -ge 1 -and $r.Sent -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before -and (Owner $P) -eq $running)
         if ($script:fail -gt $failed) { Show }
         Put (Join-Path $root 'server-build.json') $gmRecordLf.Replace("`n", "`r`n")
         $passOff = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json
@@ -866,7 +871,7 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $failed = $script:fail
         Yes '-GamemodeOnly onto a box whose join pass switch is neither true nor false is refused the same way (#1319)' (
             (-not $r.Ok) -and $r.Said -match 'thornswoodRequirePass is neither true nor false' -and
-            $r.Ssh -eq 1 -and $r.Scp -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before)
+            $r.Ssh -ge 1 -and $r.Sent -eq 0 -and -not (Test-Path -LiteralPath $gmStore) -and (Tree $root) -eq $before)
         if ($script:fail -gt $failed) { Show }
         [IO.File]::WriteAllBytes((Join-Path $root 'server-settings.json'), $ownSettings)
 
@@ -917,7 +922,7 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $kept = @()
         if ($new.Count -eq 1) { $kept = @(Get-ChildItem -LiteralPath $new[0] -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($new[0].Length + 1) } | Sort-Object) }
         Yes '-GamemodeOnly with our plugin the same bytes as the box''s sends it not, and swaps only the three' (
-            $r.Ok -and $said -match 'Thornswood-Content\.esp is on the VPS at the same bytes' -and $said -match 'swapped in 3 file\(s\)' -and
+            $r.Ok -and $said -match 'our plugins \(Thornswood-Content\.esp[^)]*\) are on the VPS at the same bytes' -and $said -match 'swapped in 3 file\(s\)' -and
             ($kept -join ',') -eq 'data\thornswood-deploy.json,gamemode.js,server-settings.json,thornswood-build.json' -and
             (Text (Join-Path $root 'gamemode.js')) -eq '// gamemode only, two')
         if ($script:fail -gt $failed) { Show }
@@ -937,6 +942,53 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
             (Text (Join-Path $root 'plugins\Thornswood-Content.esp')) -eq 'our plugin, one' -and
             [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
             (WaitUp $P) -and ((Owner $Q) -eq $otherPid))
+        if ($script:fail -gt $failed) { Show }
+
+        # ---- -FromStore, the whole script (#459) -------------------------------
+        # The server build the commit records, out of the box's store, with no
+        # build on this machine. The commit now records a build of every
+        # server file (ServerBuild.ps1); the box runs the earlier record.
+        . (Join-Path $Here 'scripts\deploy\ServerArtifact.ps1')
+        $sbDir = Join-Path $work 'store-build'
+        foreach ($kv in @(@('scam_native.node', 'the store''s binary'), @('dist_back\skymp5-server.js', '// the store''s JavaScript half'),
+                          @('dist_back\skymp5-server.js.map', '{ "version": 3 }'), @('package.json', '{ "name": "skymp5-server" }'),
+                          @('yarn.lock', '# yarn lockfile v1'), @('launch_server.bat', 'node dist_back/skymp5-server.js'),
+                          @('data\scripts\ActiveMagicEffect.pex', 'compiled papyrus'))) { Put (Join-Path $sbDir $kv[0]) $kv[1] }
+        $sbSums = Get-ThornswoodServerFolderSums $sbDir
+        $sbFiles = [ordered]@{}
+        foreach ($k in @($sbSums.Keys | Sort-Object)) { $sbFiles[$k] = [ordered]@{ sha256 = $sbSums[$k]; bytes = 1; commit = '1234567890abcdef1234567890abcdef12345678' } }
+        $sbRecord = ([ordered]@{ binary = 'scam_native.node'; sha256 = $sbSums['scam_native.node']; bytes = 1
+                                 source = [ordered]@{ commit = '1234567890abcdef1234567890abcdef12345678' }; files = $sbFiles } | ConvertTo-Json -Depth 5) + "`n"
+        Put (Join-Path $gmRepo 'records\server-build.json') $sbRecord
+        GmCommit
+        $sbArt = New-ThornswoodServerBuildArtifact -From $sbDir -Record (Join-Path $gmRepo 'records\server-build.json') -OutDir (Join-Path $work 'store-ci')
+
+        $before = Tree $root
+        $running = Owner $P
+        $r = GmDeploy @{ GamemodeOnly = $null; FromStore = $true }
+        $failed = $script:fail
+        Yes '-FromStore whose build the store does not keep is refused, saying so' (
+            (-not $r.Ok) -and $r.Said -match 'keeps no server build of 12345678 with the record this commit holds' -and $r.Said -match 'Nothing was sent and the server was not touched')
+        Yes '  after reading the box, with nothing sent: no file to the server or the store, the live folder and the server as they were' (
+            $r.Sent -eq 0 -and (Tree $root) -eq $before -and (Owner $P) -eq $running)
+        if ($script:fail -gt $failed) { Show }
+
+        $prevsBefore = Prevs
+        $r = GmDeploy @{ GamemodeOnly = $null; FromStore = $true; ServerBuild = $sbArt.Zip }
+        $said = $r.Said
+        $failed = $script:fail
+        Yes '-FromStore -ServerBuild sends the build to the store, takes it into the stage there, and is SWAP OK and PASS' (
+            $r.Ok -and $said -match ([regex]::Escape('STORED ' + $sbArt.Name)) -and $said -match 'SWAP OK' -and $said -match 'PASS\. The server is up at 127\.0\.0\.1')
+        Yes '  the build kept in the store by name, the bytes it was made with' ((Get-FileHash -LiteralPath (Join-Path $gmStore ('server\' + $sbArt.Name)) -Algorithm SHA256 -ErrorAction SilentlyContinue).Hash -eq $sbArt.Sha256.ToUpperInvariant())
+        $rootSums = Get-ThornswoodServerFolderSums $root
+        Yes '  every server file live is the build the commit records, and so is the record' (
+            @($sbFiles.Keys | Where-Object { $rootSums[$_] -ne $sbFiles[$_].sha256 }).Count -eq 0 -and (Text (Join-Path $root 'server-build.json')) -eq $sbRecord)
+        Yes '  and the settings live are the server''s own, byte for byte, with no key allowed to move' (
+            [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $root 'server-settings.json'))) -eq [Convert]::ToBase64String($ownSettings) -and
+            $said -match 'a server build out of the store changes none of them')
+        $new = @(Prevs | Where-Object { $prevsBefore -notcontains $_ })
+        Yes '  and what it replaced is in .prev, the old record among it' ($new.Count -eq 1 -and (Text (Join-Path $new[0] 'server-build.json')) -eq $gmRecordLf.Replace("`n", "`r`n"))
+        Yes '  the server answering as a new process, the other untouched' ((WaitUp $P) -and ((Owner $P) -ne $running) -and ((Owner $Q) -eq $otherPid))
         if ($script:fail -gt $failed) { Show }
     } finally {
         Remove-Item -Path function:global:ssh, function:global:scp, function:global:TsGmMap -ErrorAction SilentlyContinue

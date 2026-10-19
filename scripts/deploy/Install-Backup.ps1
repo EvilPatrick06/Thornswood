@@ -36,6 +36,9 @@ param(
   # on purpose: it must never be committed.
   [string]$KeyOut   = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
   [switch]$RunNow,
+  # Registers the task as it was before #2612, SYSTEM and Highest. The way
+  # back if LOCAL SERVICE ever cannot do the job; say why on the issue.
+  [switch]$AsSystem,
   [switch]$Status,
   [switch]$Remove,
   [switch]$NoPause
@@ -46,6 +49,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here 'ServiceAccount.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
@@ -122,8 +126,9 @@ Head 'Sending it up'
 # The folder holds the passphrase and every backup, and the backups hold every
 # secret on the box. Made under C:\, it would inherit the rule that lets
 # BUILTIN\Users read it, and every service account there is in Users (issue
-# #1173). So it takes nothing from C:\: SYSTEM, which the backup task runs as,
-# Administrators, and whoever runs this (Administrator over ssh). Any other
+# #1173). So it takes nothing from C:\: SYSTEM,
+# Administrators, and whoever runs this (Administrator over ssh); the task's
+# own SID is added once it is registered (#2612). Any other
 # rule set on it by name, a deny for the build runner, stays. Every run, so a
 # box set up before this is put right by the next one.
 $locked = Remote @"
@@ -186,15 +191,63 @@ if (-not (Test-Path -LiteralPath $KeyOut)) {
 }
 
 Head 'Registering the task'
-Remote @"
+# Issue #2612. LOCAL SERVICE, Limited, with a SID of the task's own, not
+# SYSTEM: the task reads the service folders and writes only its own, and
+# stops, starts and installs nothing. Every grant names that SID, never
+# LOCAL SERVICE, which the game, voice and Caddy tasks run as too (#2578)
+# and which must not read the backups or the passphrase. When the SID or a
+# grant cannot be made the task goes back on SYSTEM and says so. -AsSystem
+# registers it as it was, and is the way back.
+$sources = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev', 'C:\Thornswood-Docs', 'C:\Thornswood-Bot',
+             'C:\Thornswood-Caddy', 'C:\Thornswood-Voice', 'C:\Thornswood-Deletions')
+$registered = @(Remote @"
 `$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument '-NoProfile -ExecutionPolicy Bypass -File "$runner"'
+$(Get-ThornswoodServiceAccountScript)
 `$t = New-ScheduledTaskTrigger -Daily -At '$At'
-`$p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 `$s = New-ScheduledTaskSettingsSet -StartWhenAvailable -DontStopOnIdleEnd -ExecutionTimeLimit (New-TimeSpan -Hours 1)
-Register-ScheduledTask -TaskName '$TaskName' -Action `$a -Trigger `$t -Principal `$p -Settings `$s -Force | Out-Null
+`$asSystem = `$$([bool]$AsSystem)
+# The fail-safe, before the task is touched: nothing broad, and not LOCAL
+# SERVICE as a whole, may read the backups or the passphrase.
+`$bad = @(Test-ThornswoodServiceCannotReach @('$Root', '$keyFile'))
+if (`$bad.Count) { foreach (`$b in `$bad) { 'FAIL-SAFE ' + `$b } }
+else {
+  Register-ScheduledTask -TaskName '$TaskName' -Action `$a -Trigger `$t -Principal (New-ThornswoodServicePrincipal -AsSystem:`$asSystem) -Settings `$s -Force | Out-Null
+  if (`$asSystem) { 'on SYSTEM, Highest, as -AsSystem asked' }
+  else {
+    try {
+      `$sid = Get-ThornswoodTaskSid '$TaskName'
+      if (-not `$sid) { throw 'the task has no SID of its own' }
+      `$who = New-Object Security.Principal.SecurityIdentifier(`$sid)
+      `$tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+      `$acl = Get-Acl -LiteralPath '$Root'
+      `$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'FullControl', `$tree, 'None', 'Allow')))
+      Set-ThornswoodServiceAcl '$Root' `$acl
+      'full control of $Root'
+      foreach (`$src in @('$($sources -join "', '")')) {
+        if (-not (Test-Path -LiteralPath `$src)) { continue }
+        # The folder, and every folder under it that takes no rules from
+        # above (a server's private, which its installer locks).
+        `$dirs = @(Get-Item -LiteralPath `$src -Force) + @(Get-ChildItem -LiteralPath `$src -Directory -Recurse -Force -EA SilentlyContinue |
+                   Where-Object { `$_.FullName -notmatch '\\node_modules(\\|`$)' -and (Get-Acl -LiteralPath `$_.FullName).AreAccessRulesProtected })
+        foreach (`$d in `$dirs) {
+          `$r = Get-Acl -LiteralPath `$d.FullName
+          `$r.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'ReadAndExecute', `$tree, 'None', 'Allow')))
+          Set-ThornswoodServiceAcl `$d.FullName `$r
+        }
+        'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule)'
+      }
+      'on LOCAL SERVICE, Limited, as ' + `$sid
+    } catch {
+      Register-ScheduledTask -TaskName '$TaskName' -Action `$a -Trigger `$t -Principal (New-ThornswoodServicePrincipal -AsSystem) -Settings `$s -Force | Out-Null
+      'BACK ON SYSTEM: ' + `$_.Exception.Message
+    }
+  }
+}
 `$x = Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
 if (`$x) { 'registered, ' + `$x.State + ', next ' + (Get-ScheduledTaskInfo -TaskName '$TaskName').NextRunTime } else { 'REGISTER FAILED' }
-"@ | ForEach-Object { Say "  $_" }
+"@)
+$registered | ForEach-Object { Say "  $_" }
+if ("$registered" -match 'FAIL-SAFE') { Die "$Root can be read by more than it should, so the task was left as it was. Fix that and run this again." }
 
 if ($RunNow) {
   Head 'Taking one now'

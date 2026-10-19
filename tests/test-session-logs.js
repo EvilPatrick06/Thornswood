@@ -70,7 +70,7 @@ function sessionRows() { return ROWS; }
 
 eval([
   grab('slogFile'), grab('slogTrim'), grab('putSessionLogs'),
-  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogSlice')
+  grab('retentionSay'), grab('pruneSessionLogs'), grab('serverLogGenerations'), grab('serverLogSlice')
 ].join('\n'));
 
 let pass = 0, fail = 0;
@@ -191,38 +191,30 @@ const missing = serverLogSlice('dev', from, to);
 yes('a server log that is not on this box says so rather than throwing',
     missing.ok === false && missing.lines.length === 0 && String(missing.why).length > 0);
 
-// ---- the server log slice after a roll (entry 220) -------------------------
+// ---- the server log slice after a roll (entry 220, #2349) ------------------
 /*
-  roll-log.ps1 runs in front of the game server on every start, and moves a
-  server.log of 4 MB or more to server.log.1. Found in review, measured: a
-  crash with the log past 4 MB, the watcher's restart rolled it, and the page
-  then showed nothing for the crash session, because the slice read
-  server.log and nothing else. So this builds that log, rolls it with the
-  real Roll-Log.ps1 the way the task line runs it, and asks again.
+  The game server runs under server-log.js, which moves server.log aside into
+  server.log.<when> at a start when it is full or from another day, at
+  midnight, at 4 MB, and at every install whatever the size. Found in review
+  (entry 220), measured: a crash with the log past 4 MB, the watcher's restart
+  rolled it, and the page then showed nothing for the crash session, because
+  the slice read server.log and nothing else. So this builds that log, rolls
+  it with the real writer's own roll, and asks again.
 */
-const { spawnSync } = require('child_process');
-const ROLLER = path.join(REPO_DIR, 'scripts', 'vps', 'Roll-Log.ps1');
-const WINPS = path.join(process.env.SystemRoot || 'C:\\Windows',
-                        'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe');
-let rolledBy = 'Roll-Log.ps1';
+const WRITER = require(path.join(REPO_DIR, 'scripts', 'vps', 'Server-Log.js'));
+const rolledBy = 'Server-Log.js';
+/* A start's roll (only when full or from another day) or, forced, an
+   install's. The 30 days are left out on purpose: these lines are dated
+   22 September and the sweep is tests\test-2349-server-log.js's. Each roll
+   is a millisecond apart from the last, as a real one is, so no two rolled
+   files share a last-write time. */
+let rollClock = new Date(2026, 8, 22, 23, 0, 0).getTime();
 function rollLog(file, force) {
-  if (fs.existsSync(WINPS)) {
-    const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass',
-                  '-File', ROLLER, '-Path', file];
-    if (force) args.push('-Force');
-    const r = spawnSync(WINPS, args, { encoding: 'utf8' });
-    return String(r.stdout || '') + String(r.stderr || '');
-  }
-  /* No Windows PowerShell here, so the roll is done the way the roller does
-     it, and the run says so rather than passing as if the real one ran. */
-  rolledBy = 'a stand-in for Roll-Log.ps1';
-  if (!force && fs.statSync(file).size < 4 * 1024 * 1024) return '';
-  if (fs.existsSync(file + '.5')) fs.unlinkSync(file + '.5');
-  for (let i = 4; i >= 1; i--) {
-    if (fs.existsSync(file + '.' + i)) fs.renameSync(file + '.' + i, file + '.' + (i + 1));
-  }
-  fs.renameSync(file, file + '.1');
-  return 'rolled';
+  rollClock += 1000;
+  if (!force && !WRITER.rollAtStart(file, rollClock)) return '';
+  const to = WRITER.rollFile(file, rollClock);
+  if (to) fs.utimesSync(to, new Date(rollClock), new Date(rollClock));
+  return to ? 'rolled ' + path.basename(to) : '';
 }
 const has = (s, what) => s.lines.some(l => l.indexOf(what) >= 0);
 const at = (h, m) => new Date(2026, 8, 22, h, m, 0).getTime();
@@ -246,15 +238,15 @@ yes('before the restart, the crash session is on the page',
     has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
 
 const said = rollLog(SERVER_LOGS.main, false);
-yes('the roller moved the 4 MB log aside, as it does in front of every start',
+yes('the writer moved the 4 MB log aside, as it does at a start',
     said.indexOf('rolled') >= 0 && !fs.existsSync(SERVER_LOGS.main) &&
-    fs.existsSync(SERVER_LOGS.main + '.1'));
+    WRITER.rolledFiles(SERVER_LOGS.main).length === 1);
 
 const between = serverLogSlice('main', crashFrom, crashTo);
 yes('in the moment before the server opens a new server.log, the crash session is still found',
     between.ok && has(between, 'FATAL the server went down'));
 
-/* The restart, writing a fresh server.log the way cmd's >> does. */
+/* The restart, the writer opening a fresh server.log. */
 fs.writeFileSync(SERVER_LOGS.main,
   '[2026-09-22 22:07:00.000] [console] [info] the server is up again\n' +
   '[2026-09-22 22:30:00.000] [console] [info] a session after the restart\n');
@@ -273,11 +265,12 @@ const fi = across.lines.findIndex(l => l.indexOf('FATAL') >= 0);
 const ui = across.lines.findIndex(l => l.indexOf('the server is up again') >= 0);
 yes('a session across the restart has both halves, oldest first', fi >= 0 && ui > fi);
 
-/* An install rolls whatever the size, so the run before it can be a small .1
-   with the crash a generation further back in .2. */
+/* An install rolls whatever the size, so the run before it can be a small
+   rolled file with the crash a generation further back. */
 rollLog(SERVER_LOGS.main, true);
 fs.writeFileSync(SERVER_LOGS.main, '[2026-09-22 23:00:00.000] [console] [info] installed\n');
-yes('an install roll put the crash in server.log.2', fs.existsSync(SERVER_LOGS.main + '.2'));
+yes('an install roll put the crash a generation further back',
+    WRITER.rolledFiles(SERVER_LOGS.main).length === 2);
 yes('and the crash session is still found there',
     has(serverLogSlice('main', crashFrom, crashTo), 'FATAL the server went down'));
 
@@ -613,6 +606,11 @@ const TROUBLE_KEEP = 200;
 const jsonFile = (p, fb) => { try { return JSON.parse(fs.readFileSync(p, 'utf8')); } catch (e) { return fb; } };
 const putJson = (p, o) => { try { fs.writeFileSync(p, JSON.stringify(o, null, 2), 'utf8'); return true; } catch (e) { return false; } };
 eval(grab('noteTrouble'));
+// Since #2166 noteTrouble ages the file by the session window on the way in,
+// through freshTrouble, which reads which sessions are kept from the same
+// sessionRows stand-in as the log prune above.
+const SESSIONS_DAYS = 365;
+eval(grab('freshTrouble'));
 
 const started = new Date(2026, 8, 23, 20, 7, 0).getTime();
 const ended = new Date(2026, 8, 23, 21, 30, 0).getTime();
@@ -647,6 +645,73 @@ noteTrouble(
 const again = troubled().filter(r => r.session === 'late1111late1111');
 yes('a second note for the same session is not added twice', again.length === 1);
 
+// ---- what is said when it fails (#2736) ------------------------------------
+/*
+  The /api/play/logs handler stored the logs, then read the issues and the
+  trouble inside try { ... } with a catch that held nothing, and
+  putSessionLogs answered a set the folder would not take as 'nothing', so
+  the launcher was told 200 stored false and dropped the logs. Each failure is
+  said in the site's log now (the session key and the error code, never what
+  the logs hold) and answered for what it is.
+*/
+{
+  const said = [];
+  const wasError = console.error;
+  console.error = function () { said.push(Array.prototype.slice.call(arguments).join(' ')); };
+  try {
+    // A file where the folder should be: the set cannot be written.
+    const notAFolder = path.join(TMP, 'not-a-folder');
+    fs.writeFileSync(notAFolder, 'a file where the session-logs folder should be');
+    const putInto = new Function('fs', 'path', 'crypto', 'SLOGS', 'SLOG_ONE', 'SLOG_ALL', 'SLOG_NAMES',
+      grab('slogFile') + '\n' + grab('slogTrim') + '\n' + grab('putSessionLogs') + '\nreturn putSessionLogs;')(
+      fs, path, crypto, notAFolder, SLOG_ONE, SLOG_ALL, SLOG_NAMES);
+    const got = putInto('fail2736fail2736', '111', { 'launcher.log': 'a crash worth keeping\n' });
+    yes('a set the folder will not take answers failed, not nothing', got === 'failed');
+    const line = said.filter((l) => l.indexOf('session-logs ') >= 0 && l.indexOf('"write-failed"') >= 0)[0] || '';
+    yes('and is said in the site log as session-logs write-failed with its key and code',
+        /^\[thornswood-docs\] session-logs \{/.test(line) && line.indexOf('fail2736fail2736') >= 0 && /"code":"E[A-Z]+"/.test(line));
+    yes('and the line holds nothing the logs held', line.indexOf('a crash worth keeping') < 0);
+
+    // A first set that has gone bad on disk: a replay is still refused, the
+    // bad set is not written over, and both are said.
+    said.length = 0;
+    const BADK = 'bad27362736bad2';
+    fs.writeFileSync(slogFile(BADK), '{"logs": {"launcher.log": "truncat');
+    const before = fs.readFileSync(slogFile(BADK), 'utf8');
+    yes('a replay of a set that will not read is still refused', putSessionLogs(BADK, '111', { 'launcher.log': 'clean\n' }) === 'already');
+    yes('and the set that will not read is not written over', fs.readFileSync(slogFile(BADK), 'utf8') === before);
+    yes('and it is said as session-logs set-unreadable with its key',
+        said.some((l) => l.indexOf('session-logs ') >= 0 && l.indexOf('"set-unreadable"') >= 0 && l.indexOf(BADK) >= 0));
+    yes('and nothing it held is in the line', !said.some((l) => l.indexOf('truncat') >= 0));
+
+    // The bot's crash note: true when written, false and said when not.
+    said.length = 0;
+    const noteWith = (put) => new Function('jsonFile', 'putJson', 'freshTrouble', 'TROUBLE_FILE', 'TROUBLE_KEEP', 'path',
+      grab('noteTrouble') + '\nreturn noteTrouble;')(jsonFile, put, freshTrouble, path.join(TMP, 'trouble-2736.json'), TROUBLE_KEEP, path);
+    const crash = { why: 'the game crashed', file: 'crash.log', line: 'EXCEPTION', level: 'bad' };
+    yes('noteTrouble answers true when the bot\'s row is written',
+        noteWith(putJson)({ session: 'note2736note2736', who: '111', start: 1, end: 2 }, crash) === true);
+    yes('noteTrouble answers false when the row cannot be written',
+        noteWith(() => false)({ session: 'gone2736gone2736', who: '111', start: 1, end: 2 }, crash) === false);
+    yes('and says it as trouble write-failed with the session, never the line',
+        said.some((l) => /^\[thornswood-docs\] trouble \{/.test(l) && l.indexOf('"write-failed"') >= 0 && l.indexOf('gone2736gone2736') >= 0 && l.indexOf('EXCEPTION') < 0));
+  } finally {
+    console.error = wasError;
+  }
+
+  // The handler itself, read as text: no catch with nothing in it, a set
+  // that failed is a 500 the launcher sends again, and a row or a note that
+  // will not write is answered read false or noted false.
+  const from = src.indexOf("if (p === '/api/play/logs' && req.method === 'POST') {");
+  const to = src.indexOf('The character roster', from);
+  const handler = (from >= 0 && to > from) ? src.slice(from, to) : '';
+  yes('the /api/play/logs handler is found in server.js', handler.length > 0);
+  yes('and holds no catch with nothing in it', !/catch\s*(\([^)]*\))?\s*\{\s*\}/.test(handler));
+  yes('and answers a set that failed with 500, which the launcher sends again',
+      /what === 'failed'\) return sendJson\(res, 500/.test(handler));
+  yes('and answers a row that will not write with read false', /if \(!putSessions\(rows\)\)[\s\S]*?answer\.read = false/.test(handler));
+  yes('and a crash note that will not write with noted false', /!noteTrouble\(rows\[at\], found\)\) answer\.noted = false/.test(handler));
+}
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 try { fs.rmSync(TMP, { recursive: true, force: true }); } catch (e) { }

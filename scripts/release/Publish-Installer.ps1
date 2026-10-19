@@ -140,6 +140,27 @@ $zipOut = 'Thornswood-Setup.zip'
 
 '{0,-26} {1:N0} bytes' -f 'Thornswood-Setup.exe', $exeItem.Length | Write-Host
 if (-not $single) { '{0,-26} {1:N0} bytes' -f 'Thornswood-Setup.zip', $zipItem.Length | Write-Host }
+
+# files.json on the site lists every download with its hash, and the installer
+# is listed in it after it lands (below). It is read first (#2711): one that
+# does not read stops here, before the installer replaces the one people
+# download, so the site is never left with a new installer and a list that
+# cannot name it. Until 18 Oct a list that did not read became an empty one in
+# a try with an empty catch, and was written back naming the installer alone.
+$listCheck = @(Remote @"
+`$f = '$rootWin\files\files.json'
+if (-not (Test-Path -LiteralPath `$f)) { 'FILESJSON|none'; exit 0 }
+try { `$null = Get-Content -LiteralPath `$f -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop; 'FILESJSON|reads'; exit 0 }
+catch { 'FILESJSON|' + (`$_.Exception.Message -replace '[\r\n]+', ' '); exit 1 }
+"@)
+$listCode = $LASTEXITCODE
+$listSaid = @($listCheck | ForEach-Object { [string]$_ } | Where-Object { $_ -like 'FILESJSON|*' } | Select-Object -First 1)
+if ($listCode -ne 0 -or -not $listSaid.Count -or ($listSaid[0] -ne 'FILESJSON|none' -and $listSaid[0] -ne 'FILESJSON|reads')) {
+  $why = $(if ($listSaid.Count) { $listSaid[0].Substring(10) } else { (($listCheck | ForEach-Object { [string]$_ }) -join ' ').Trim() })
+  throw ("files.json on the site ($Root/files/files.json) does not read, exit $listCode" + $(if ($why) { ": $why" } else { '' }) +
+         ". Nothing was sent. It lists every download and its hash, and the Downloads page reads it too; fix it on the box, then run this again.")
+}
+
 Write-Host ''
 Write-Host '  Sending. This is about a gigabyte, so it takes a few minutes.'
 Write-Host ''
@@ -186,13 +207,16 @@ $b64 = [Convert]::ToBase64String(
   [Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
 
 Write-Host ''
-Remote @"
+$listWrite = @(Remote @"
 `$dir = '$rootWin\files'
 `$f = Join-Path `$dir 'files.json'
 `$all = @{}
 if (Test-Path `$f) {
-  try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$all[`$_.Name] = `$_.Value } } catch { }
+  # Read before the send as well; this is the read the list is written from,
+  # so one that does not read now leaves it as it is and says so.
+  try { (Get-Content `$f -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop).PSObject.Properties |
+        ForEach-Object { `$all[`$_.Name] = `$_.Value } }
+  catch { 'files.json does not read, so it was left as it is and the installer is not listed: ' + (`$_.Exception.Message -replace '[\r\n]+', ' '); exit 1 }
 }
 (([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$b64'))) |
   ConvertFrom-Json).PSObject.Properties | ForEach-Object { `$all[`$_.Name] = `$_.Value }
@@ -213,7 +237,13 @@ Get-ChildItem `$dir -Filter 'Thornswood-Setup-*.*' | ForEach-Object {
 # the error, so the downloads page silently goes empty.
 [IO.File]::WriteAllText(`$f, (`$all | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
 'published, ' + `$all.Count + ' files listed'
-"@ | ForEach-Object { "  $_" }
+"@)
+$listWriteCode = $LASTEXITCODE
+$listWrite | ForEach-Object { Write-Host "  $_" }
+if ($listWriteCode -ne 0) {
+  throw ("The installer is on the site, but files.json was not written (exit $listWriteCode): " + (($listWrite | ForEach-Object { [string]$_ }) -join ' ').Trim() +
+         ". The Downloads page still lists the installer before this one, so its hash does not match the file now served. Fix files.json on the box and run this again.")
+}
 
 Write-Host ''
 # The site answers on https://thornswood.net through Caddy. Port 3001 is

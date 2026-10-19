@@ -65,6 +65,29 @@ namespace Thornswood
         /// </summary>
         static readonly object folderWork = new object();
 
+        /// <summary>
+        /// Runs <paramref name="work"/> while nothing else writes into the game
+        /// folder or its records: a make or a refresh under way finishes first,
+        /// and none starts until the work is done (#2210). An update writes the
+        /// release it downloaded through this, so the download can run while
+        /// the folder is prepared and the writing waits for it, because both
+        /// keep records of the folder. <paramref name="waiting"/>, when given,
+        /// is called once before waiting, so the log can say why it waits.
+        /// The Monitor is the thread's own, so work that itself makes or
+        /// refreshes the folder runs on.
+        /// </summary>
+        public static void Alone(Action work, Action waiting)
+        {
+            bool held = System.Threading.Monitor.TryEnter(folderWork);
+            if (!held)
+            {
+                if (waiting != null) waiting();
+                System.Threading.Monitor.Enter(folderWork);
+            }
+            try { work(); }
+            finally { System.Threading.Monitor.Exit(folderWork); }
+        }
+
         // ------------------------------------------------------------ Skyrim's own
 
         static readonly object skyrimLock = new object();
@@ -225,6 +248,152 @@ namespace Thornswood
             return true;
         }
 
+        // ------------------------------------------------------------ from a folder that has them
+
+        /// <summary>
+        /// 1.6.1170's own files for Make, from <paramref name="from"/>, a
+        /// folder that already holds them (#2603): on the machine that ships,
+        /// the dev ship root's Game, which OwnGame made, when the Steam copy is
+        /// not on the pinned build and the Downgrade, a Steam download under
+        /// the person's account, cannot be run by a script. Throws with a
+        /// sentence naming the first file that is not the pinned build's, and
+        /// then nothing has been placed anywhere.
+        ///
+        /// WHICH FILES. Every listed file Make takes: not one Skip leaves out
+        /// of every folder (the Creation Club plugins the server does not
+        /// load, UnwantedCreation, which is why an OwnGame folder never holds
+        /// them), and not one Vortex deploys, whose copy goes in instead
+        /// (Gather). Each must be in the folder, with the size and the SHA-1
+        /// on the list, the archives too: OneFilePinned trusts an archive's
+        /// size from the Steam copy, but what is taken from here becomes the
+        /// new folder's own copy and is never compared with anything again.
+        /// The SHA-1 is the hash the list has: records\skyrim-files.json is
+        /// read out of Steam's own depot manifests, which give a SHA-1 for
+        /// each file and nothing else, so it is the one record of those bytes
+        /// that did not come from a machine's own copy.
+        ///
+        /// COPIED, NEVER LINKED (Found.Pinned, CopyOf). A hard link would make
+        /// the new folder's file the other folder's file under a second name,
+        /// and whatever writes into one in place (a tool, a copy over it)
+        /// would change both. Each file's stamp (OwnGameShare.cs StampOf: its
+        /// id, size and NTFS change time, which moves on every write) is taken
+        /// before it is hashed, in <paramref name="stamps"/>, and Make reads
+        /// them again once everything is placed (SkyrimFromMoved), so what was
+        /// copied is the bytes that were checked.
+        /// </summary>
+        static List<Found> SkyrimFrom(string from, HashSet<string> deployed, Action<string> say, out Dictionary<string, Stamp> stamps)
+        {
+            stamps = null;
+            string dir = from;  // whole already: Make made it so
+            if (!Directory.Exists(dir))
+                throw new Exception("There is no folder " + dir + ", so the game's own files were not taken from it, and nothing was made.");
+            SkyrimFiles();
+            if (!skyrimPinsBytes)
+                throw new Exception("This build's list of Skyrim's own files (records\\skyrim-files.json) has no SHA-1 for them, so the files in " + dir +
+                                    " cannot be checked against it, and nothing was made.");
+
+            var want = new List<string>();
+            foreach (string rel in SkyrimFiles())
+                if (Skip(rel) == null && (deployed == null || !deployed.Contains(rel))) want.Add(rel);
+            want.Sort(StringComparer.OrdinalIgnoreCase);
+
+            // The sizes first, which costs nothing, then the bytes.
+            var l = new List<Found>();
+            long total = 0;
+            foreach (string rel in want)
+            {
+                PinFile info = skyrimInfo[rel];
+                FileInfo fi;
+                try { fi = new FileInfo(Path.Combine(dir, rel)); }
+                catch (Exception ex) { throw new Exception(SkyrimFromRefused(dir, rel, "could not be read (" + ex.Message.TrimEnd('.') + ")")); }
+                if (!fi.Exists) throw new Exception(SkyrimFromRefused(dir, rel, "is not there"));
+                if (fi.Length != info.Bytes)
+                    throw new Exception(SkyrimFromRefused(dir, rel, "is " + fi.Length.ToString("n0") + " bytes and the build's is " + info.Bytes.ToString("n0")));
+                var f = new Found();
+                f.Rel = rel;
+                f.From = fi.FullName;
+                f.Size = fi.Length;
+                f.Ticks = fi.LastWriteTimeUtc.Ticks;
+                l.Add(f);
+                total += fi.Length;
+            }
+
+            var at = new Dictionary<string, Stamp>(StringComparer.OrdinalIgnoreCase);
+            long done = 0;
+            int shown = 0;
+            foreach (Found f in l)
+            {
+                Stamp before;
+                string sha;
+                try
+                {
+                    before = StampOf(f.From);
+                    sha = Sha1Whole(f.From, delegate(int n)
+                    {
+                        done += n;
+                        int pct = total > 0 ? (int)(done * 100 / total) : 100;
+                        if (say != null && pct >= shown + 10) { shown = pct - pct % 10; say("Checking Skyrim's own files in " + dir + ": " + shown + "%"); }
+                    });
+                }
+                catch (Exception ex) { throw new Exception(SkyrimFromRefused(dir, f.Rel, "could not be read (" + ex.Message.TrimEnd('.') + ")")); }
+                if (!string.Equals(sha, skyrimInfo[f.Rel].Sha1, StringComparison.OrdinalIgnoreCase))
+                    throw new Exception(SkyrimFromRefused(dir, f.Rel, "has the build's size but not its bytes (SHA-1 " + sha + ", the list's " + skyrimInfo[f.Rel].Sha1 + ")"));
+                at[f.Rel] = before;
+            }
+            if (say != null)
+                say("All " + l.Count + " of Skyrim " + (skyrimBuild.Length > 0 ? skyrimBuild : "1.6.1170") + "'s own files the folder takes are in " + dir +
+                    " byte for byte as records\\skyrim-files.json lists them, so they are copied from there.");
+            stamps = at;
+            return l;
+        }
+
+        static string SkyrimFromRefused(string dir, string rel, string what)
+        {
+            return Path.Combine(dir, rel) + " " + what + ", so it is not Skyrim " + (skyrimBuild.Length > 0 ? skyrimBuild : "1.6.1170") +
+                   "'s own file as records\\skyrim-files.json lists it. The game's own files are taken from " + dir +
+                   " only when every one the folder takes is, so nothing was made.";
+        }
+
+        /// <summary>
+        /// Null when every file SkyrimFrom checked still has the stamp it had
+        /// then, otherwise the sentence Make stops with before it writes any
+        /// record or puts the folder in place.
+        /// </summary>
+        static string SkyrimFromMoved(string dir, Dictionary<string, Stamp> stamps)
+        {
+            foreach (KeyValuePair<string, Stamp> kv in stamps)
+            {
+                string path = Path.Combine(dir, kv.Key);
+                bool same;
+                try { same = StampOf(path).Same(kv.Value); }
+                catch { same = false; }
+                if (!same)
+                    return path + " changed while the folder was being made from it, so what was copied may not be the bytes that were checked, and nothing was made. " +
+                           "Run it again once nothing is writing into " + dir + ".";
+            }
+            return null;
+        }
+
+        /// <summary>The SHA-1 of a whole file, read once in large blocks; <paramref name="read"/> is told each block's size.</summary>
+        static string Sha1Whole(string path, Action<int> read)
+        {
+            using (var sha = SHA1.Create())
+            using (var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete, 1 << 20, FileOptions.SequentialScan))
+            {
+                byte[] buf = new byte[1 << 20];
+                int n;
+                while ((n = fs.Read(buf, 0, buf.Length)) > 0)
+                {
+                    sha.TransformBlock(buf, 0, n, null, 0);
+                    if (read != null) read(n);
+                }
+                sha.TransformFinalBlock(buf, 0, 0);
+                var sb = new StringBuilder(40);
+                foreach (byte b in sha.Hash) sb.Append(b.ToString("x2"));
+                return sb.ToString();
+            }
+        }
+
         // ------------------------------------------------------------ Thornswood's own
 
         /// <summary>
@@ -287,9 +456,7 @@ namespace Thornswood
                 if (rel.Length > 0 && Tidy(rel)) all.Add(rel);
             }
             if (all.Count == before && File.Exists(InstalledKept)) return;
-            Directory.CreateDirectory(Dir);
-            var lines = new List<string>(all);
-            File.WriteAllLines(InstalledKept, lines.ToArray());
+            WriteRecord(InstalledKept, all);
         }
 
         /// <summary>

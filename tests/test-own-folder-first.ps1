@@ -66,7 +66,7 @@
   PowerShell on a pretend Steam copy, with Get-Process answered empty so no
   real Skyrim is ever closed, and LOCALAPPDATA pointed into the scratch folder.
   The launcher part compiles every file in launcher\app with a driver into one
-  program (C# 5, the .NET Framework csc Build-Launcher.ps1 uses, with the
+  program (the compiler the build runs, tests\Launcher-Csc.ps1, with the
   Thornswood.ini template and a client record for the pretend client
   embedded), points Steam.cs at the pretend Steam and runs the real code.
 
@@ -77,6 +77,7 @@
 param([string]$Repo, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Repo) { $Repo = Split-Path -Parent $Here }
@@ -254,46 +255,12 @@ Yes 'not-chosen, installer: with the list of what it wrote there' (
 Yes 'not-chosen, installer: no Profile\Payload' (-not (Test-Path -LiteralPath (Join-Path $r.Root 'Profile\Payload')))
 
 # ---- the launcher, compiled with a driver ---------------------------------------
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    $null
-}
-$builder = Join-Path $Repo 'scripts\release\Build-Launcher.ps1'
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
+foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
 if ($missing.Count -or $refs.Count -eq 0) { Done }
 
 $driver = @'
@@ -367,6 +334,15 @@ namespace Thornswood
             catch { return null; }
         }
         static string J(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
+
+        // The time Vortex's record gives a file is the file's own write time
+        // in milliseconds, as Vortex writes it; a refresh compares it with the
+        // last record's to tell which files moved (#2210).
+        static string VortexTime(string staged)
+        {
+            if (!File.Exists(staged)) return "1";
+            return ((long)(File.GetLastWriteTimeUtc(staged) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds).ToString();
+        }
 
         static Dictionary<string, string> Snap(string dir)
         {
@@ -458,7 +434,7 @@ namespace Thornswood
                 if (!File.Exists(staged)) Put(staged, files[i][2]);
                 string at = Path.Combine(s.Game, "Data\\" + files[i][0]);
                 if (!File.Exists(at)) { Directory.CreateDirectory(Path.GetDirectoryName(at)); CreateHardLink(at, staged, IntPtr.Zero); }
-                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": 1 }" + (i + 1 < files.Length ? "," : "") + "\n");
+                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": " + VortexTime(staged) + " }" + (i + 1 < files.Length ? "," : "") + "\n");
             }
             sb.Append("  ]\n}\n");
             string rec = Path.Combine(s.Game, "Data\\vortex.deployment.json");
@@ -969,7 +945,7 @@ $driverCs = Join-Path $build 'OwnFolderFirstTest.cs'
 [IO.File]::WriteAllText($driverCs, $driver, (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $build 'OwnFolderFirstTest.exe'
 $cs = @(Get-ChildItem (Join-Path $App '*.cs') -File | ForEach-Object { $_.FullName })
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langversion:5', '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.OwnFolderFirstTest')
+$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.OwnFolderFirstTest')
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 $cscArgs += ('/resource:' + (Join-Path $Repo 'launcher\Thornswood.ini') + ',Thornswood.ini')
 $cscArgs += ('/resource:' + $clientRecord + ',client-build.json')
@@ -984,10 +960,10 @@ $cscArgs += ('/resource:' + (Join-Path $Repo 'records\ui-gone.json') + ',ui-gone
 $cscArgs += $cs
 $cscArgs += $driverCs
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $rc = $LASTEXITCODE
 $ErrorActionPreference = $old
-Yes ('the launcher''s {0} source files and the driver compile as C# 5' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))
+Yes ('the launcher''s {0} source files and the driver compile with the build''s compiler' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))
 if ($rc -ne 0) { $said | Where-Object { "$_" -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; Done }
 
 # The webview2 assemblies beside the program, as beside the launcher.
@@ -1015,7 +991,7 @@ $ownSrc = [IO.File]::ReadAllText((Join-Path $App 'OwnGame.cs'))
 Yes 'a folder is not made while an install an older launcher synced has not kept its release''s file list (#1232)' ($ownSrc -match '(?s)if \(!made\)\s*\{.*?if \(!OursKnown\(\)\)\s*return "Thornswood is checking this install against its release first')
 $syncSrc = [IO.File]::ReadAllText((Join-Path $App 'Sync.cs'))
 Yes 'a sync keeps the release''s file list before it says it is on that release, and an install without the list is checked once more (#1232)' (
-    ($syncSrc -match '(?s)WriteReleaseFiles\(r, listed\);\s*state = ReadSyncState\(\);\s*state\.Synced = r\.sha256;') -and
+    ($syncSrc -match '(?s)WriteReleaseFiles\(r, listed\);\s*(SyncState )?state = ReadSyncState\(\);\s*state\.Synced = r\.sha256;') -and
     ($syncSrc -match 'if \(\(s\.Synced == r\.sha256 && ReleaseFilesSha\(\) == r\.sha256\) \|\| s\.PacksOnly == r\.sha256\) return null;'))
 $setup = [IO.File]::ReadAllText($SetupScript)
 Yes 'Setup-Thornswood.ps1 writes the installed-into-game list only when the Steam copy is used' ($setup -match 'if \(\$Collection -and -not \$OwnFirst -and -not \$MadeOwn\) \{\s*\$listed')

@@ -54,7 +54,26 @@
   install (main) or the install with -DevBuild on the end (dev): on a machine
   whose Vortex deploys into C:\Thornswood-DevBuild, the dev release folder is
   another one (docs\COLLECTION-REVISION-2.md step 8). A folder Vortex
-  deploys into is never recorded.
+  deploys into is never recorded. Since #2019 the folder is then made, or
+  brought up to date, by Update-ShipRoot.ps1, the step every Ship runs
+  first: the launcher's own OwnGame makes its game folder from Vortex's
+  deployment (a new root takes Thornswood's own files of the channel's
+  release from its feed, as an install does), and the recorded client goes
+  in from the engine build. So a main root of its own, such as
+  local\release-main in the repository, is one command, and no main Ship
+  packs C:\Thornswood, the install Patrick plays from. A new root takes the
+  game's own files from the Steam copy when it is on 1.6.1170; on a machine
+  whose Steam copy is not, -SkyrimFrom names a folder that holds them, such
+  as the other channel's root's Game (#2603).
+
+  WHICH ENGINE BUILD (#2019). -EngineBuild records the fork folder whose
+  build\dist is this machine's engine build, in the file Where.ps1
+  EngineBuilds names, beside ShipRoots. Where.ps1 ClientDist, ServerDist,
+  ServerSettings and ChangeForms are then under it for every clone and
+  worktree, instead of each checkout's own engine\skymp\build, which on
+  15 October was a stale 12 October build in the worktree a dev Ship ran
+  from (engine\README.md "One engine": each engine change is built in a
+  worktree of the fork). A folder with no build\dist in it is not recorded.
 
   WHAT IT NEVER DOES. It writes no secret anywhere, never turns signing off
   or writes "enabled": false, never edits an existing records\signing\signing.json,
@@ -62,8 +81,9 @@
   files it writes are the signing client under records\signing\client, a new
   records\signing\signing.json, the six client files in the build folder
   (Where.ps1 ClientDist), and its downloads under out\ship-machine, all
-  ignored by git, and with -Root the file Where.ps1 ShipRoots names, outside
-  the repository.
+  ignored by git, with -Root the file Where.ps1 ShipRoots names, outside
+  the repository, and the root's own folder (Update-ShipRoot.ps1), and with
+  -EngineBuild the file Where.ps1 EngineBuilds names, beside it.
 
   Any developer may run a main Ship from a machine that can sign
   (Developer-Guide.md): -Channel main checks that machine.
@@ -75,8 +95,20 @@
 
 .PARAMETER Root
   The folder this machine builds the channel's release from, recorded for
-  Ship, Check-ShipReady and Build-Generated to read (see WHICH FOLDER). With
-  -Check it is only used, not recorded.
+  Ship, Check-ShipReady and Build-Generated to read (see WHICH FOLDER), then
+  made or brought up to date by Update-ShipRoot.ps1. With -Check it is only
+  used, not recorded, and only asked whether it is current.
+
+.PARAMETER EngineBuild
+  The fork folder whose build\dist is this machine's engine build (see WHICH
+  ENGINE BUILD), recorded for Where.ps1. With -Check it is only shown.
+
+.PARAMETER SkyrimFrom
+  With -Root, for a root that has no game folder yet: the folder Skyrim
+  1.6.1170's own files are copied from instead of the Steam copy, passed to
+  Update-ShipRoot.ps1 (#2603). Every file the new folder takes is checked
+  against records\skyrim-files.json first, and the root is not made when
+  one is not the build's. A root that is made already does not use it.
 
 .PARAMETER Check
   Report only. Nothing is fetched or written; each step says what it would do.
@@ -114,6 +146,20 @@
   worktree. After moving a release folder, run
   .\scripts\mods\Build-Generated.ps1 -Channel dev once, because the
   generated files record the game folder they were built for.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -EngineBuild "C:\ThornswoodTemps&Worktrees\worktrees\claude-skymp-7feb5dc4"
+  Gives main a release folder of its own, made by Update-ShipRoot.ps1 from
+  Vortex's deployment and the main feed's release, and records the fork
+  folder whose build is this machine's engine build (#2019). Then
+  .\scripts\mods\Build-Generated.ps1 -Channel main builds its generated
+  files.
+
+.EXAMPLE
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+  The same on a machine whose Steam copy is not on 1.6.1170, as One's is
+  not since 16 Oct: the game's own files are copied from the dev root's
+  Game, each checked against records\skyrim-files.json first (#2603).
 #>
 [CmdletBinding()]
 param(
@@ -124,7 +170,9 @@ param(
   [switch]$NoVps,
   [switch]$NoPause,
   [string]$Site = 'https://thornswood.net',
-  [string]$Root = ''
+  [string]$Root = '',
+  [string]$EngineBuild = '',
+  [string]$SkyrimFrom = ''
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -272,7 +320,11 @@ function Test-SigningReach([string]$MetadataPath, [string[]]$Identities) {
   }
   $t = $null
   if ($status -eq 200) {
-    $ekus = @(); try { $ekus = @($body | ConvertFrom-Json) } catch { }
+    # An answer that is not the list of identities is not "answered without
+    # the identity": it says so, and why it did not read (#2711).
+    $ekus = @()
+    try { $ekus = @($body | ConvertFrom-Json) }
+    catch { return [pscustomobject]@{ Ok = $false; Why = ('profile ' + $meta.CertificateProfileName + ' answered HTTP 200 with something that is not a list of identities: ' + $_.Exception.Message) } }
     if (@($ekus | Where-Object { $Identities -contains $_ }).Count) {
       return [pscustomobject]@{ Ok = $true; Why = ('profile ' + $meta.CertificateProfileName + ' answers this sign in with the identity the launcher pins') }
     }
@@ -366,6 +418,19 @@ function Save-ShipRoot([string]$File, [string]$Channel, [string]$Root) {
   [IO.File]::WriteAllText($File, (ConvertTo-Json -InputObject $rec), (New-Object Text.UTF8Encoding($false)))
 }
 
+# Records $Fork as this machine's engine build, in $File (the one Where.ps1
+# EngineBuilds names, #2019). '' when it was written, else why not: a fork
+# folder with no build\dist in it is not an engine build, and recording it
+# would only move the stop to the next script that reads it.
+function Save-EngineBuild([string]$File, [string]$Fork) {
+  if (-not (Test-Path -LiteralPath (Join-Path $Fork 'build\dist'))) {
+    return ($Fork + ' has no build\dist in it, so it is not an engine build. Build it there first (engine\README.md, One engine).')
+  }
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
+  [IO.File]::WriteAllText($File, (ConvertTo-Json -InputObject ([ordered]@{ fork = $Fork })), (New-Object Text.UTF8Encoding($false)))
+  return ''
+}
+
 # signtool the way Sign-Artifact.ps1 looks for it: newest x64 in the SDK.
 function Find-Signtool {
   foreach ($r in @("${env:ProgramFiles(x86)}\Windows Kits\10\bin", "$env:ProgramFiles\Windows Kits\10\bin")) {
@@ -400,6 +465,26 @@ if ($Channel -eq 'main') {
 }
 
 $Work = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'ship-machine'
+
+# ------------------------------------------------------- the engine build --
+# See WHICH ENGINE BUILD above (#2019). First, because the client steps
+# below read Where.ps1 ClientDist, which is under it.
+Head 'The engine build this machine uses'
+$engineFile = & (Join-Path $Here 'Where.ps1') EngineBuilds
+if ($EngineBuild) {
+  $EngineBuild = [IO.Path]::GetFullPath($EngineBuild).TrimEnd('\')
+  $hasBuild = Test-Path -LiteralPath (Join-Path $EngineBuild 'build\dist')
+  Row 'it has a build in it' $hasBuild $EngineBuild $(if (-not $hasBuild) { 'Give -EngineBuild the fork folder Build-Engine.ps1 -Fork built into (engine\README.md, One engine)' } else { '' })
+  if ($Check -and $hasBuild) { Plan ('record ' + $EngineBuild + ' as this machine''s engine build, in ' + $engineFile) }
+  elseif ($hasBuild) {
+    $why = Save-EngineBuild $engineFile $EngineBuild
+    if ($why) { Say ('  ' + $why) 'Red' } else { Say ('  recorded in ' + $engineFile) 'Green' }
+  }
+} else {
+  $eb = ''
+  try { $eb = [string](& (Join-Path $Here 'Where.ps1') EngineBuild) } catch { $eb = $_.Exception.Message }
+  Say ('  ' + $eb + $(if (Test-Path -LiteralPath $engineFile) { ', as ' + $engineFile + ' says' } else { ', this checkout''s own engine; -EngineBuild records another' })) 'DarkGray'
+}
 
 # ------------------------------------------ the folder a release is built from --
 # See WHICH FOLDER above (#1692). -Root is recorded for this channel, beside
@@ -437,19 +522,12 @@ if (Has 'gh') {
 Row 'PowerShell 7' (Has 'pwsh') '' 'winget install --id Microsoft.PowerShell -e'
 Row 'node' (Has 'node') '' 'winget install --id OpenJS.NodeJS.LTS -e'
 Row 'ssh' (Has 'ssh') '' 'Settings, System, Optional features, add OpenSSH Client'
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-       Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Row 'the .NET Framework 4 compiler' ([bool]$csc) $csc 'Turn on .NET Framework 4.8 in Windows Features'
-# MSBuild (#498): not needed to Ship yet, so it is never a gap here. The
-# launcher builds with the compiler above until the switch to the project
-# files; this says now whether this machine is ready for that day.
+# MSBuild (#498): since the switch (15 Oct) the launcher is built only from
+# its project files, so a machine without it cannot Ship a launcher.
 . (Join-Path $Here 'Find-MSBuild.ps1') -Load
 $msb = Find-ThornswoodMSBuild
-if ($msb.MSBuild -and $msb.RefAssemblies) {
-  Say ('  yes   MSBuild and the .NET Framework 4.8.1 reference assemblies, for the launcher build after #498  (' + $msb.MSBuild + ')') 'Green'
-} else {
-  Say '  later MSBuild and the .NET Framework 4.8.1 reference assemblies are not here. Not needed to Ship yet; the launcher build moves to them (#498). Developer-Guide.md "Setting up a machine" has the install line.' 'Yellow'
-}
+Row 'MSBuild and the .NET Framework 4.8.1 reference assemblies, which build the launcher' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
+    'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 $signtool = Find-Signtool
 Row 'signtool, from the Windows SDK' ([bool]$signtool) $signtool 'winget install --id Microsoft.WindowsSDK.10.0.26100 -e   (its signing tools are what matter)'
 Row 'az, the Azure command line' (Has 'az') '' 'winget install --id Microsoft.AzureCLI -e'
@@ -567,6 +645,23 @@ if ((Test-Path -LiteralPath $game) -and ($inGame -ne $total)) {
   & (Join-Path $Here 'Sync-Client.ps1') -Check -NoPause -Game $game -Dist $dist -Record $record 6>$null | Out-Null
   $sc = $LASTEXITCODE
   Say ('  Sync-Client -Check says ' + $(switch ($sc) { 0 { 'the game folder holds it' } 2 { 'a matching build is here and Ship copies it in' } default { 'no (exit ' + $sc + ')' } })) $(if ($sc -eq 0 -or $sc -eq 2) { 'DarkGray' } else { 'Yellow' })
+}
+
+# --------------------------------------------- the release folder itself --
+# #2019: the folder is made or brought up to date the way every Ship does it
+# first, and only asked about with -Check.
+Head ('The ' + $Channel + ' release folder''s game folder and client')
+if (Test-Path -LiteralPath (Join-Path $shipRoot 'Game\Data\vortex.deployment.json')) {
+  Say '  not touched: it is a folder Vortex deploys into (see above)' 'Yellow'
+} else {
+  $upArgs = @{ Channel = $Channel; Root = $shipRoot; NoPause = $true }
+  if ($Check) { $upArgs['Check'] = $true }
+  elseif ($SkyrimFrom) { $upArgs['SkyrimFrom'] = $SkyrimFrom }
+  $global:LASTEXITCODE = 0
+  & (Join-Path $Here 'Update-ShipRoot.ps1') @upArgs
+  $upCode = $LASTEXITCODE
+  Row ('the release folder is current with Vortex''s deployment, with the recorded client in it') ($upCode -eq 0) $shipRoot `
+    $('.\scripts\release\Update-ShipRoot.ps1 -Channel ' + $Channel + ' says why above; then .\scripts\mods\Build-Generated.ps1 -Channel ' + $Channel)
 }
 
 # ---------------------------------------------------------- what is left --

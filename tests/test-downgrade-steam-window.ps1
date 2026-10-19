@@ -30,8 +30,8 @@
   HOW. Nothing here opens Steam, focuses a window or sends a key: Downgrade
   drives another program's window, and keys sent to the wrong one land
   somewhere else on the person's desktop. So the real methods are lifted out
-  of Downgrade.cs by brace match and compiled, with the same .NET Framework
-  csc that Build-Launcher.ps1 uses (C# 5), into a class whose EnumWindows,
+  of Downgrade.cs by brace match and compiled, with the compiler the build
+  runs (tests\Launcher-Csc.ps1), into a class whose EnumWindows,
   GetForegroundWindow, Process and clipboard are stand-ins for a made-up
   desktop. What is driven is the shipped text of ForegroundIsSteam,
   MainWindow and the clipboard lines, not a copy of them.
@@ -42,6 +42,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -237,12 +238,8 @@ if ($said.Success) { [void]$body.AppendLine($said.Value) }
 if ($appId.Success) { [void]$body.AppendLine($appId.Value) }
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-downgrade-window-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -250,9 +247,9 @@ try {
     $probeCs = Join-Path $work 'Probe.cs'
     [IO.File]::WriteAllText($probeCs, $probe)
     $dll = Join-Path $work 'Probe.dll'
-    $out = & $csc /nologo /target:library "/out:$dll" $probeCs 2>&1
+    $out = & $LauncherCsc /nologo /target:library "/out:$dll" $probeCs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes 'the lifted methods compile with the C# 5 compiler against the stand-in desktop' $built
+    Yes 'the lifted methods compile with the compiler the build runs against the stand-in desktop' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

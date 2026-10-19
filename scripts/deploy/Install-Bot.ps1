@@ -225,7 +225,8 @@ if (`$off) {
 try { Write-ThornswoodJsonFile `$f `$h }
 catch { 'NOT WRITTEN: ' + `$f + ' could not be written. Nothing else changed.'; return }
 `$back = `$null
-try { `$back = Read-ThornswoodJsonFile `$f } catch { }
+try { `$back = Read-ThornswoodJsonFile `$f }
+catch { 'NOT WRITTEN: ' + `$f + ' does not read back (' + `$_.Exception.Message + '). Put it right before the bot restarts.'; return }
 if (-not `$back) { 'NOT WRITTEN: ' + `$f + ' does not read back. Put it right before the bot restarts.'; return }
 if (`$off) {
   if (`$back.Contains('PING_URL')) { 'NOT WRITTEN: the ping address is still in ' + `$f; return }
@@ -467,6 +468,7 @@ $botHooks = @"
 if (`$log -eq `$otherLog) { `$otherLog = Join-Path (Join-Path '$rootWin' 'data') 'bot.log' }
 `$otherBefore = 0
 `$saidNothing = `$false
+`$freshWhy = ''
 `$followed = ''
 `$hasService = [bool](Get-Service -Name '$Service' -EA SilentlyContinue)
 if (-not `$hasService -and -not `$NoServiceOk) {
@@ -563,6 +565,10 @@ function FollowLog {
 # rolled, so all of it is this start.
 function Fresh {
   `$out = @()
+  # No log yet is no lines, which Healthy and Why read for themselves. One
+  # that is there and cannot be opened is said, in place of no lines.
+  `$script:freshWhy = ''
+  if (-not (Test-Path -LiteralPath `$log)) { return `$out }
   `$fs = `$null
   try {
     `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
@@ -574,7 +580,7 @@ function Fresh {
       `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
       `$sr.Close()
     }
-  } catch { }
+  } catch { `$script:freshWhy = `$log + ' could not be read: ' + `$_.Exception.Message }
   if (`$fs) { `$fs.Dispose() }
   return `$out
 }
@@ -607,6 +613,7 @@ function Answer {
   if (-not `$hasService) { return 'the files are in; the service is installed below' }
   `$s = 'service $Service is ' + (Get-Service -Name '$Service').Status
   if (`$followed) { `$s += ', writing its log to ' + `$followed }
+  if (`$saidNothing -and `$freshWhy) { return `$s + ', and the code is in, but ' + `$freshWhy + '. Read the bot''s own lines with Show-BotLog.ps1.' }
   if (`$saidNothing) { return `$s + ', and the code is in, but this start wrote nothing to ' + `$log + '. Read the bot''s own lines with Show-BotLog.ps1.' }
   return `$s + ', and the bot says it is watching its server'
 }
@@ -618,7 +625,7 @@ function Why {
     return
   }
   `$said = @(Fresh | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run|service)\]' -or `$_ -match 'Error|Traceback' })
-  if (`$said.Count) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
+  if (`$said.Count) { `$said | Select-Object -Last 25 } elseif (`$freshWhy) { `$freshWhy } else { 'nothing yet' }
 }
 
 "@
@@ -890,16 +897,21 @@ $settings = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Se
 `$ErrorActionPreference = 'Stop'
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
 `$p = `$null
-try { `$p = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+if (-not `$ThornswoodSecret) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
+# The parse error is not said: its text would quote what arrived, the token.
+try { `$p = `$ThornswoodSecret | ConvertFrom-Json }
+catch { `$ThornswoodSecret = `$null; 'SETTINGS NOT WRITTEN: what arrived on standard input is not the JSON Install-Bot.ps1 sends. Nothing written.'; return }
 `$ThornswoodSecret = `$null
 if (-not `$p) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 
 # The bot's own env file. Kept out of the repo and readable by this account only.
 `$f = '$rootWin\bot.env.json'
+# One that is there and does not read is not empty: written over, it would
+# lose the key the doors hold and the ping address, so nothing is written.
 `$env2 = @{}
 if (Test-Path `$f) {
-  try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$env2[`$_.Name] = `$_.Value } } catch { }
+  try { `$env2 = Read-ThornswoodJsonFile `$f }
+  catch { 'SETTINGS NOT WRITTEN: ' + `$_.Exception.Message + ', and it is left as it is. Put it right, or move it aside to start it over. Nothing written.'; return }
 }
 # The token is not written here. Write-ThornswoodBotToken writes it below,
 # into this file and the site's config.json together, once both exist.
@@ -932,13 +944,18 @@ if ('$($PSBoundParameters.ContainsKey('UpperStaffRoles'))' -eq 'True') {
 # Where Python looks for root certificates. ssl.set_default_verify_paths reads
 # this, and load_default_certs calls it on every platform, so pointing it at
 # certifi's bundle fixes the handshake without touching the Windows store.
-try {
-  `$ca = (& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1)
-  if (`$ca -and (Test-Path `$ca)) {
+# Said when it cannot be pointed, since the bot then cannot reach Discord.
+if (-not (Get-Command python -ErrorAction SilentlyContinue)) {
+  'NO SSL_CERT_FILE: python is not on the PATH here, so certifi''s bundle could not be found'
+} else {
+  `$eap = `$ErrorActionPreference; `$ErrorActionPreference = 'Continue'
+  try { `$ca = [string](& python -c "import certifi; print(certifi.where())" 2>&1 | Select-Object -Last 1) }
+  finally { `$ErrorActionPreference = `$eap }
+  if (`$ca -and (Test-Path -LiteralPath `$ca)) {
     `$env2['SSL_CERT_FILE']      = `$ca
     `$env2['REQUESTS_CA_BUNDLE'] = `$ca
-  }
-} catch { }
+  } else { 'NO SSL_CERT_FILE: certifi did not name its bundle (' + `$ca + ')' }
+}
 [IO.File]::WriteAllText(`$f, (`$env2 | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding(`$false)))
 # Locked down, but not so far that the thing meant to read it cannot: SYSTEM,
 # Administrators and this account, plus read for NT SERVICE\ThornswoodBot,
@@ -994,6 +1011,11 @@ if (`$changed -or `$tokenChanged) {
 "@)
 $payload = $null; $botKey = $null
 $settings | ForEach-Object { Say "  $_" }
+# Before the swap: new code over settings that were not written is a bot whose
+# settings nobody chose (#2711).
+if (@($settings | Where-Object { "$_" -like 'SETTINGS NOT WRITTEN*' }).Count) {
+  Die 'the settings on the box were not written (the line above says why), so the new code was not swapped in. The bot is running as it was, and the next run clears the stage.'
+}
 
 # ---------------------------------------------------------------- swap ---
 # The staged code in, with the old service stopped and started again by name,
@@ -1050,6 +1072,10 @@ if (-not `$r.Ok) { 'BOT SERVICE NOT INSTALLED'; return }
 # than before means it rolled, so all of it is this start.
 function Fresh {
   `$out = @()
+  # No log yet is no lines, which Healthy and Why read for themselves. One
+  # that is there and cannot be opened is said, in place of no lines.
+  `$script:freshWhy = ''
+  if (-not (Test-Path -LiteralPath `$log)) { return `$out }
   `$fs = `$null
   try {
     `$fs = New-Object IO.FileStream(`$log, 'Open', 'Read', 'ReadWrite')
@@ -1061,7 +1087,7 @@ function Fresh {
       `$out = @((`$sr.ReadToEnd()) -split "\r?\n")
       `$sr.Close()
     }
-  } catch { }
+  } catch { `$script:freshWhy = `$log + ' could not be read: ' + `$_.Exception.Message }
   if (`$fs) { `$fs.Dispose() }
   return `$out
 }
@@ -1079,7 +1105,7 @@ if (-not `$ready) {
 }
 '--- what the bot said this time ---'
 `$said = @(Fresh) | Where-Object { `$_ -match '^\s*\[(thornswood-bot|run)\]' }
-if (`$said) { `$said | Select-Object -Last 25 } else { 'nothing yet' }
+if (`$said) { `$said | Select-Object -Last 25 } elseif (`$freshWhy) { `$freshWhy } else { 'nothing yet' }
 "@))
 $running | ForEach-Object { Say "  $_" }
 if ("$running" -notmatch 'BOT SERVICE NOT INSTALLED' -and "$running" -match ('service ' + $Service + ': Running')) { Save-BotRecord }

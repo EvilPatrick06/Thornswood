@@ -115,6 +115,38 @@ try {
     [IO.File]::WriteAllBytes($f, [IO.File]::ReadAllBytes($f))
     Yes 'a WriteAllBytes put-back keeps the service''s read' ($null -ne (Get-SidReadRule $f $sid))
 
+    # #2711: the head of the settings step, from what arrived on standard input
+    # to the read of the bot.env.json already there. Both reads sat in a try
+    # with an empty catch: a bot.env.json that did not read became an empty
+    # table, and the file was written over with a new key and no ping address.
+    $hs = -1; $he = -1
+    for ($i = 0; $i -lt $lines.Count; $i++) {
+        if ($hs -lt 0 -and $lines[$i] -eq '`$p = `$null') { $hs = $i }
+        elseif ($hs -ge 0 -and $lines[$i] -match '^# The token is not written here') { $he = $i; break }
+    }
+    Yes 'found the head of the settings step in Install-Bot.ps1' ($hs -ge 0 -and $he -gt $hs)
+    $rootWin = $Scratch
+    $head = $ExecutionContext.InvokeCommand.ExpandString(($lines[$hs..($he - 1)] -join "`r`n") + "`r`n'READ ON'")
+    $f = Join-Path $Scratch 'bot.env.json'
+    $held = '{"THORNSWOOD_KEY":"not-a-real-key","PING_URL":"https://hc-ping.example/x"'
+    [IO.File]::WriteAllText($f, $held)
+    $ThornswoodSecret = '{"token":"not-a-real-token","key":""}'
+    $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+    Yes 'a bot.env.json that does not read stops the settings step, naming the file' (($said -join ' ') -match '^SETTINGS NOT WRITTEN: .*bot\.env\.json does not parse as JSON' -and ($said -notcontains 'READ ON'))
+    Yes '  and it is left exactly as it was' ([IO.File]::ReadAllText($f) -ceq $held)
+    [IO.File]::WriteAllText($f, '{"THORNSWOOD_KEY":"not-a-real-key"}')
+    $ThornswoodSecret = '{"token":"not-a-real-token", oops'
+    $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+    Yes 'what arrived that is not the JSON sent stops it, without repeating what arrived' (($said -join ' ') -match '^SETTINGS NOT WRITTEN: what arrived on standard input' -and -not (($said -join ' ') -match 'not-a-real-token|oops') -and ($said -notcontains 'READ ON'))
+    $ThornswoodSecret = '{"token":"not-a-real-token","key":""}'
+    $said = @(& ([scriptblock]::Create($head)) | ForEach-Object { "$_" })
+    Yes 'a bot.env.json that reads goes on' ($said -contains 'READ ON')
+    $inst = [IO.File]::ReadAllText($install)
+    $iSay = $inst.IndexOf('$settings | ForEach-Object { Say "  $_" }')
+    $iDie = $inst.IndexOf("Where-Object { ""`$_"" -like 'SETTINGS NOT WRITTEN*' }", $iSay)
+    $iSwap = $inst.IndexOf('# ---------------------------------------------------------------- swap ---', $iSay)
+    Yes '  and Install-Bot.ps1 stops on that line before the swap' ($iSay -gt 0 -and $iDie -gt $iSay -and $iSwap -gt $iDie)
+
     # A file that never had the rule gets it.
     $g = Join-Path $Scratch 'fresh.env.json'
     [IO.File]::WriteAllText($g, '{}')

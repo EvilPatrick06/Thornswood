@@ -7,8 +7,10 @@ Written 12 October 2026 from the scripts as they are on main. Every threshold
 below is one a check already uses, with its file and line. Where no check
 measures something, this page says "nothing measures this today", and any
 number it offers there is marked **Proposal**. Nothing here claims a service
-has met an objective: no check keeps a running availability figure yet (see
-"What is not measured").
+has met an objective. Since #2183 `scripts/vps/Read-Availability.ps1` turns the
+down and back lines into down minutes and availability per service (see
+"Availability"), but no baseline has been read with it yet (see "Baseline
+period").
 
 The owners below were **decided by Patrick on 12 October 2026**: he took the
 proposed list as written (issue #2183). Behind every row is still Patrick's
@@ -68,7 +70,7 @@ check calls it one.
 | Disk forecast | Days until free space on C: crosses 10% and 20%, a straight line through one sample a day over the last 30 days | 14 samples over at least 7 days before any forecast | Warning: 10% within 30 days, or 20% within 7. Critical: 10% within 7 days, or already under | `Forecast-Storage.ps1:$WarnDays = 30`, `Forecast-Storage.ps1:$CriticalDays = 7`; the `Thornswood Disk History` task, daily at 04:00 box time | Staff channel, once when the forecast turns and once when it is back | Daily | Warning: Installer lane. Critical: whoever is on staff |
 | Build runners | Every runner's service runs, and GitHub lists every runner online | 1 run on the box; 3 runs, 15 minutes from outside | Any runner not running or not online | `Watch-Services.ps1:$tellOnly`; `Watch-Outside.ps1:are not all online on GitHub` | Staff channel | 5 min | GitHub lane, with Patrick |
 | RPO (data that can be lost) | Hours between the newest backup and a failure | Per failure | 26 hours on the box and 26 hours off it (the two lines above) | See "RPO" below | As above | Daily | Patrick |
-| RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Nothing measures this today | See "RTO" below | None | Per rehearsal | Patrick |
+| RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Last rehearsed more than 35 days ago: the monthly hands-on rehearsal is overdue | `Check-RehearsalDue.ps1:$Days = 35`, reading RESTORING.md's Last rehearsed line; see "RTO" below | The board: the nightly checks fail and "Nightly checks failed" says so | Nightly | Patrick |
 
 ## Service by service
 
@@ -89,9 +91,12 @@ Response time is not recorded anywhere: the 213 ms in the outside watcher's
 header is one reading from 28 September.
 
 **Proposal:** availability of 99% a calendar month for the site from outside
-(about seven hours down). Nothing records availability today, so the number
-cannot be checked until something counts the down and back messages (see
-"What is not measured").
+(about seven hours down). The metric is the availability
+`Read-Availability.ps1` gives for `outside site` (what Watch-Outside sees) and
+`caddy` (the box asking over the public name) from `alerts.jsonl` (see
+"Availability"). `outside site` records nothing while One is off, so `caddy`
+is the half that runs all the time. The figure stays a proposal until the
+baseline has been read, and this page does not say the site meets it.
 
 ### Feed
 
@@ -177,13 +182,54 @@ back is not measured; only the restore step is.
 answering again, within one hour; a new box within one day. Both stay
 proposals until a rehearsal that starts the server and connects measures them.
 
+**Alert: a monthly rehearsal, overdue after 35 days.** Only a rehearsal
+measures this. Patrick ruled on 18 October 2026 (#1046) that the hands-on
+restore rehearsal, which starts the restored server and connects to it, runs
+monthly ([RESTORING.md](RESTORING.md), "Rehearsing it"). Its record is
+RESTORING.md's Last rehearsed line. `scripts/vps/Check-RehearsalDue.ps1` reads
+it every night in the nightly checks (`Check-RehearsalDue.ps1:$Days = 35`, a
+month with a few days' slack), and once the line is older than that the night
+fails, so the board's "Nightly checks failed" issue says the rehearsal is
+overdue until one is done and the date written. The proposal above stays a
+proposal until the first such rehearsal measures it.
+
+## Availability
+
+`scripts/vps/Read-Availability.ps1` reads `C:\Thornswood-Watch\alerts.jsonl`,
+or a copy brought down from the box with `-Path`, and pairs each service's
+down and back lines over a window, 28 days unless told otherwise
+(`Read-Availability.ps1:$Days = 28`, `Read-Availability.ps1:Get-Outages`). For
+each service with an outage in the window it prints the outages, the minutes
+down and the share of the window it was up. An outage open at either end of
+the window is cut to it. A service with no line in the window is not listed:
+no line is no recorded outage, not proof it was up. It only reads, and it
+judges nothing against a target. `tests/test-2183-availability.ps1` holds it to
+that on made-up lines.
+
+Two limitations, which it prints with every report:
+
+1. The times are the watchdog run that decided, not the moment a thing
+   failed or came back. A down line is written only after the check's window
+   has passed (one run for a port, two in a row for a health check, five
+   minutes a run), so down time is undercounted by up to that window
+   (`Read-Availability.ps1:so down time is undercounted by up to that window`).
+   A back line comes after two good runs, so an outage's end is late by up to
+   a run.
+2. Nothing is counted while the watchdog itself is off
+   (`Read-Availability.ps1:Nothing is counted while the watchdog itself is off`):
+   a box that is down, or a task that is not running, writes no down line, and
+   that time reads as up.
+
 ## Baseline period
 
-None yet. The checks above say when something is down, but nothing keeps the
-history as a figure. The baseline proposed here is the four weeks that start
-when something counts the down and back messages in `alerts.jsonl` per service,
-with the load record from `Watch-Load.ps1` over the same weeks, including at
-least one busy evening (as `Watch-Load.ps1` itself asks).
+No baseline has been recorded. The baseline period is the four weeks that
+start the first time `Read-Availability.ps1` is run on the box's
+`C:\Thornswood-Watch\alerts.jsonl`, with the load record from `Watch-Load.ps1`
+over the same weeks, including at least one busy evening (as `Watch-Load.ps1`
+itself asks). At the end of those weeks the reader, run with `-From` the date
+of that first run and `-To` four weeks later, gives the baseline. Until the
+first run's date is written here, this page has no baseline, and every figure
+on it stays as it is.
 
 ## What doing nothing costs
 
@@ -191,8 +237,8 @@ The checks and restarts above already run, so doing nothing keeps every alert
 and every restart. What it leaves:
 
 - **Restore:** one rehearsal, on 28 September, that stopped before starting
-  the server. With nothing scheduled, the time to come back stays unknown
-  until it is needed, and the 28 September rehearsal found three faults that
+  the server. The monthly rehearsal is scheduled now (the RTO alert above),
+  but until one has been done the time to come back stays unknown, and the 28 September rehearsal found three faults that
   would have been found during a real restore instead.
 - **Capacity:** the disk warns only once it is under 20%.
   `scripts/vps/Forecast-Storage.ps1` forecasts the day each line is crossed
@@ -202,8 +248,9 @@ and every restart. What it leaves:
   `load.csv` read over a week, a bigger box or a split is decided by guess.
 - **Off-box backups:** a week of One being off is a week of no off-box copy.
   Since #2183 staff are told once One is back on; while it is off, nobody is.
-- **Availability:** without a count, nobody can say whether the services are
-  more or less reliable than last month.
+- **Availability:** the reader exists, but until it is run on the box and the
+  four weeks have passed, nobody can say whether the services are more or less
+  reliable than last month.
 
 ## What is not measured
 
@@ -211,7 +258,7 @@ Each of these needs the box or a person, and none was read for this page:
 
 - The down and back history in `C:\Thornswood-Watch\alerts.jsonl` and
   `watch.log` on the VPS, which is where a first availability figure comes
-  from. Anybody with VPS access can read it.
+  from. Anybody with VPS access can read it with `Read-Availability.ps1`.
 - Whether `Thornswood Load` is installed and how much of `load.csv` exists.
   `.\scripts\vps\Watch-Load.ps1` with no switches brings it down and reads it.
 - Whether `PING_URL` is set in `bot.env.json` and which outside monitor it

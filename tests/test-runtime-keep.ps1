@@ -3,6 +3,7 @@
    installation is touched. Exercises the repair followed by Play sequence. #>
 param([string]$Repo = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-runtime-keep-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($work)
 try {
@@ -14,8 +15,7 @@ try {
     $recordPath = Join-Path $work 'client-build.json'
     [IO.File]::WriteAllText($recordPath, $record)
     $exe = Join-Path $work 'runtime-keep-test.exe'
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    & $csc /nologo /target:exe "/out:$exe" /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/resource:$recordPath,client-build.json" (Join-Path $Repo 'launcher\app\Keep.cs') (Join-Path $Repo 'launcher\app\ClientRuntime.cs') (Join-Path $Repo 'tests\fixtures\RuntimeKeepTest.cs')
+    & $LauncherCsc /nologo /target:exe "/out:$exe" /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/resource:$recordPath,client-build.json" (Join-Path $Repo 'launcher\app\Keep.cs') (Join-Path $Repo 'launcher\app\ClientRuntime.cs') (Join-Path $Repo 'tests\fixtures\RuntimeKeepTest.cs')
     if ($LASTEXITCODE) { throw 'Runtime/Keep fixture did not compile' }
     & $exe $work
     if ($LASTEXITCODE) { throw 'Runtime/Keep regression failed' }

@@ -33,22 +33,25 @@
        (none is 7, the default every Thornswood task on the VPS showed on
        5 October). It must be 1, HIGH_PRIORITY_CLASS in Microsoft's table,
        never 0, which is realtime. Its one task command line, $cmd, must
-       start node through start "" /b /wait /high.
+       start node through start "" /b /wait /high, running server-log.js,
+       which runs the server and writes its log (#2349).
     2. On Windows, that same call is run for real (it only builds the
        settings; nothing is registered by it), and a task with those settings
        and a made-up name is registered. Its principal is the installer's
        own call run for real (SYSTEM, as a service) when this shell is
        elevated, and otherwise the person running this, logged on
        interactively, so no admin and no password. Its action is the
-       installer's own command line, with Windows PowerShell sleeping in
-       place of node and a scratch log and roller, so what is measured is
-       what start /high starts under cmd.exe, as node is. It is started, and
-       that process is asked what Windows gave it: priority class
+       installer's own command line, with node and the real Server-Log.js,
+       and a stand-in server that sleeps in place of skymp5-server.js, in a
+       scratch folder, so what is measured is what start /high starts under
+       cmd.exe and what that starts, as on the VPS. It is started, and both
+       processes are asked what Windows gave them: priority class
        (GetPriorityClass), I/O priority (NtQueryInformationProcess,
        ProcessIoPriority) and memory priority (GetProcessInformation,
        ProcessMemoryPriority). They must be High, 2 and 5: high for the
        processor, and no lower on the disk or memory than a service on the
-       box. The task and its processes are removed again whatever happens,
+       box. Windows starts a child of a High process at Normal, so the
+       server is High only because server-log.js gives it its own class. The task and its processes are removed again whatever happens,
        and the test checks they are gone. Where a task cannot be registered
        or does not start for this account (a build runner's service account
        has no session to start it in), this part says SKIP and why.
@@ -61,8 +64,8 @@
 
   Registers and removes one task named Thornswood priority harness <guid> (for
   SYSTEM when elevated, else for the account running it), stops the cmd.exe
-  and Windows PowerShell it started, and removes the scratch folder in TEMP
-  that holds its log and roller; writes nothing else.
+  and the node processes it started, and removes the scratch folder in TEMP
+  that holds its log and the stand-in server; writes nothing else.
 #>
 [CmdletBinding()]
 param([string]$Installer)
@@ -130,8 +133,8 @@ if ($cmdAsts.Count -eq 1) {
         $n -is [System.Management.Automation.Language.BinaryExpressionAst] -and $n.Operator -eq 'Format' }, $true)
     if ($fmtAst -and $fmtAst.Left -is [System.Management.Automation.Language.StringConstantExpressionAst]) { $format = $fmtAst.Left.Value }
 }
-Yes 'it starts node through start "" /b /wait /high' ($format -and $format.Contains('start "" /b /wait /high "{0}" dist_back/skymp5-server.js'))
-Yes '  and hands node''s exit code back as the task''s' ($format -and $format.Contains('& call exit %^errorlevel%"'))
+Yes 'it starts node through start "" /b /wait /high, on server-log.js running the server' ($format -and $format.Contains('start "" /b /wait /high "{0}" "{1}" --log "{2}" --also thornswood.log dist_back/skymp5-server.js'))
+Yes '  and hands the server''s exit code back as the task''s' ($format -and $format.Contains('& call exit %^errorlevel%"'))
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------
 $onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
@@ -197,11 +200,12 @@ if ($admin -and $pCalls.Count -eq 1) {
     $who = $me + ', logged on interactively (not elevated, so not the installer''s SYSTEM principal)'
 }
 
-# The action is the installer's own command line: cmd.exe /c rolling the log,
-# then start /high starting the program, so the process measured is what
-# start starts under cmd, as node is on the VPS. Windows PowerShell sleeping
-# stands in for node, with a scratch log and an empty roller; the mark in its
-# command line is how its process is found.
+# The action is the installer's own command line: cmd.exe /c, start /high
+# starting node on server-log.js, which starts the server. node and the real
+# Server-Log.js run, with a stand-in server that sleeps, so the processes
+# measured are the log writer start starts under cmd and the server it
+# starts, as on the VPS. The mark in the scratch folder's name, on the
+# writer's command line, is how its process is found.
 # Not 'Thornswood Test...': test-deploy-swaps and test-install-server clear
 # away every task named 'Thornswood Test*' (names match without case), so one
 # of them running beside this deletes its task half way (on 5 October a
@@ -212,15 +216,20 @@ if ($admin -and $pCalls.Count -eq 1) {
 # test-site-account.ps1).
 $name = 'Thornswood priority harness ' + [Guid]::NewGuid().ToString('N')
 $mark = [Guid]::NewGuid().ToString('N')
-$ps51 = [IO.Path]::Combine($env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
 if (-not $format) { Write-Host 'SKIP  there is no task command line to run'; Done }
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue
+if (-not $nodeCmd) { Write-Host 'SKIP  node is not on this machine, and the task runs the server under it'; Done }
+$writerSrc = [IO.Path]::Combine($Repo, 'scripts', 'vps', 'Server-Log.js')
+if (-not (Test-Path -LiteralPath $writerSrc)) { Write-Host 'SKIP  there is no scripts\vps\Server-Log.js to run'; Done }
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-priority-' + $mark)
-New-Item -ItemType Directory -Force -Path $scratch | Out-Null
-$rollerAt = Join-Path $scratch 'roll-log.ps1'
-[IO.File]::WriteAllText($rollerAt, '')
-$line = $format.Replace('dist_back/skymp5-server.js', ('-NoProfile -NonInteractive -Command Start-Sleep -Seconds 90 #' + $mark)) -f $ps51, (Join-Path $scratch 'server.log'), $ps51, $rollerAt
+New-Item -ItemType Directory -Force -Path (Join-Path $scratch 'dist_back') | Out-Null
+$writerAt = Join-Path $scratch 'server-log.js'
+Copy-Item -LiteralPath $writerSrc -Destination $writerAt
+[IO.File]::WriteAllText((Join-Path $scratch 'dist_back\skymp5-server.js'), "setTimeout(function () { }, 90000);`n")
+$line = $format -f $nodeCmd.Source, $writerAt, (Join-Path $scratch 'server.log')
 $action = New-ScheduledTaskAction -Execute ([IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')) -Argument $line -WorkingDirectory $scratch
 $child = $null
+$server = $null
 $parent = $null
 $skip = $null
 Write-Host ("registering a scratch task, $name, for $who")
@@ -232,12 +241,15 @@ try {
     }
     if (-not $skip) {
         Start-ScheduledTask -TaskName $name
-        for ($i = 0; $i -lt 40 -and -not $child; $i++) {
+        for ($i = 0; $i -lt 40 -and -not $server; $i++) {
             Start-Sleep -Milliseconds 500
-            $child = @(Get-CimInstance Win32_Process -Filter "Name = 'powershell.exe'" |
-                       Where-Object { "$($_.CommandLine)" -like "*$mark*" }) | Select-Object -First 1
+            $child = @(Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" |
+                       Where-Object { "$($_.CommandLine)" -like "*$mark*" -and "$($_.CommandLine)" -like '*server-log.js*' }) | Select-Object -First 1
+            if ($child) {
+                $server = @(Get-CimInstance Win32_Process -Filter ("Name = 'node.exe' AND ParentProcessId = " + [int]$child.ProcessId)) | Select-Object -First 1
+            }
         }
-        if (-not $child) {
+        if (-not $server) {
             $info = Get-ScheduledTaskInfo -TaskName $name -ErrorAction SilentlyContinue
             $skip = 'the task was registered but no process of it appeared in 20 s (last result ' + $info.LastTaskResult + '); an account with no session cannot start an interactive task'
         }
@@ -246,21 +258,25 @@ try {
         $parent = Get-CimInstance Win32_Process -Filter ("ProcessId = " + [int]$child.ParentProcessId)
         $up = Measure-Priority ([int]$child.ParentProcessId)
         $got = Measure-Priority ([int]$child.ProcessId)
-        Write-Host ("the task's cmd.exe:          {0}, I/O priority {1}, memory priority {2}" -f $up.Class, $up.Io, $up.Memory)
-        Write-Host ("the program cmd.exe started: {0}, I/O priority {1}, memory priority {2}" -f $got.Class, $got.Io, $got.Memory)
-        Yes '  the program is cmd.exe''s child, as node is on the VPS' ($parent -and $parent.Name -eq 'cmd.exe')
+        $srv = Measure-Priority ([int]$server.ProcessId)
+        Write-Host ("the task's cmd.exe:            {0}, I/O priority {1}, memory priority {2}" -f $up.Class, $up.Io, $up.Memory)
+        Write-Host ("the log writer cmd.exe started: {0}, I/O priority {1}, memory priority {2}" -f $got.Class, $got.Io, $got.Memory)
+        Write-Host ("the server it started:          {0}, I/O priority {1}, memory priority {2}" -f $srv.Class, $srv.Io, $srv.Memory)
+        Yes '  the log writer is cmd.exe''s child, and the server is the writer''s, as on the VPS' ($parent -and $parent.Name -eq 'cmd.exe' -and [int]$server.ParentProcessId -eq [int]$child.ProcessId)
         Yes '  the task''s cmd.exe runs High, from priority 1' ($up.Class -eq 'High')
-        Yes '  the program runs at the High priority class (Normal under a priority 1 task without start /high, measured 12 October)' ($got.Class -eq 'High')
-        Yes '  issues its disk reads at normal I/O priority, 2 (1, low, was measured on 5 October)' ($got.Io -eq 2)
-        Yes '  has normal memory priority, 5 (2 was measured on 5 October)' ($got.Memory -eq 5)
+        Yes '  the log writer runs at the High priority class (Normal under a priority 1 task without start /high, measured 12 October)' ($got.Class -eq 'High')
+        Yes '  the server runs at the High priority class, the writer''s own (Windows starts a child of a High process at Normal)' ($srv.Class -eq 'High')
+        Yes '  both issue disk reads at normal I/O priority, 2 (1, low, was measured on 5 October)' ($got.Io -eq 2 -and $srv.Io -eq 2)
+        Yes '  both have normal memory priority, 5 (2 was measured on 5 October)' ($got.Memory -eq 5 -and $srv.Memory -eq 5)
     }
 }
 finally {
     Stop-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue
     Unregister-ScheduledTask -TaskName $name -Confirm:$false -ErrorAction SilentlyContinue
+    if ($server) { Stop-Process -Id ([int]$server.ProcessId) -Force -ErrorAction SilentlyContinue }
     if ($child) { Stop-Process -Id ([int]$child.ProcessId) -Force -ErrorAction SilentlyContinue }
     if ($parent) { Stop-Process -Id ([int]$parent.ProcessId) -Force -ErrorAction SilentlyContinue }
-    # Tried a few times: cmd.exe, stopped a moment ago, can still hold the
+    # Tried a few times: the writer, stopped a moment ago, can still hold the
     # log open, a file another program has open. Checked below either way.
     for ($i = 0; $i -lt 20 -and (Test-Path -LiteralPath $scratch); $i++) {
         Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
@@ -270,7 +286,8 @@ finally {
 if ($skip) { Write-Host ('SKIP  ' + $skip) }
 Yes 'the scratch task is gone again' (-not (Get-ScheduledTask -TaskName $name -ErrorAction SilentlyContinue))
 if ($child) {
-    Yes '  and so are its processes' (-not (Get-Process -Id ([int]$child.ProcessId), ([int]$child.ParentProcessId) -ErrorAction SilentlyContinue))
+    $ids = @([int]$child.ProcessId, [int]$child.ParentProcessId) + @(if ($server) { [int]$server.ProcessId })
+    Yes '  and so are its processes' (-not (Get-Process -Id $ids -ErrorAction SilentlyContinue))
 }
 Yes '  and its scratch folder' (-not (Test-Path -LiteralPath $scratch))
 Done

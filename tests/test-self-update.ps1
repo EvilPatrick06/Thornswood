@@ -10,9 +10,9 @@
   its first start, left somebody with no launcher at all. The entry: "An
   unsigned exe that Defender flags is exactly when a fallback is needed".
 
-  WHAT IT DOES. Compiles launcher\app\SelfSwap.cs on its own with the .NET
-  Framework 4 csc, the compiler the launcher is built with, which also proves
-  it is still C# 5. Compiles stub launchers around it:
+  WHAT IT DOES. Compiles launcher\app\SelfSwap.cs on its own with the
+  compiler the launcher is built with (tests\Launcher-Csc.ps1). Compiles stub
+  launchers around it:
 
       old         the launcher asking for the update, and the one put back
       new-good    starts, calls the real SelfSwap.Settle, stays up
@@ -52,6 +52,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -76,8 +77,11 @@ $haveSwap = Test-Path -LiteralPath $swapCs
 Yes 'launcher\app\SelfSwap.cs exists' $haveSwap
 
 $upd = Get-Content -LiteralPath (Join-Path $App 'Updater.cs') -Raw
-$at = $upd.IndexOf('public static void SelfUpdate(')
-Yes 'Updater.SelfUpdate is there' ($at -ge 0)
+# Since #2210 SelfUpdate is FetchLauncher then SwapIn, so an update can
+# download while the game folder is prepared; SwapIn is what writes the script.
+Yes 'Updater.SelfUpdate is FetchLauncher then SwapIn' ($upd -match 'public static void SelfUpdate\(Config cfg, VersionDoc v, Action<string> log\)\s*\{\s*SwapIn\(FetchLauncher\(cfg, v, log\), log\);\s*\}')
+$at = $upd.IndexOf('public static void SwapIn(')
+Yes 'Updater.SwapIn is there' ($at -ge 0)
 $body = ''
 if ($at -ge 0) {
     # To the brace that closes the method, at its own indentation.
@@ -105,17 +109,9 @@ Yes '#497: the updater asks SelfSwap for no other destination' ($upd -cnotmatch 
 Yes '#497: Icons repoints no shortcut aimed at another exe' ($icons -cnotmatch 'AimsAtOld|SelfSwap\.(OldName|NewName)')
 
 if (-not $haveSwap) { Finish }
-$swapSrc = Get-Content -LiteralPath $swapCs -Raw
-# The compile below is the real proof, since this csc stops at C# 5. This is
-# the same search the entry gives, so a failure names what it found.
-Yes 'SelfSwap.cs has no C# 6: no $", no ?., no nameof' (-not ($swapSrc -match '\$"|\?\.|nameof\('))
 
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 csc is on this machine' ([bool]$csc)
-if (-not $csc) { Finish }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
 
 # `find` in the script has to be Windows' own. A PATH with Git's usr\bin ahead
 # of System32 would hand it GNU find, and the wait would end at once.
@@ -226,16 +222,16 @@ class Driver
 [IO.File]::WriteAllText((Join-Path $bin 'Stub.cs'), $stubSrc)
 [IO.File]::WriteAllText((Join-Path $bin 'Driver.cs'), $driverSrc)
 
-# /noconfig and the one reference by name, the way Build-Launcher.ps1 compiles:
-# csc.rsp on a machine with the reference assemblies installed (the GitHub
-# runner) is what stopped the launcher build with CS1703.
+# /noconfig and the one reference by name, as the build compiles: csc.rsp
+# on a machine with the reference assemblies installed (the GitHub runner) is
+# what stopped the old launcher build with CS1703.
 function Build([string]$out, [string]$target, [string]$define, [string[]]$src) {
     $a = @('/noconfig', '/nologo', "/target:$target", "/out:$out", '/reference:System.dll')
     if ($define) { $a += "/define:$define" }
     $a += $src
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    $o = & $csc @a 2>&1
+    $o = & $LauncherCsc @a 2>&1
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     if ($rc -ne 0) { $o | Where-Object { $_ -match 'error' } | ForEach-Object { Write-Host "      $_" } }
@@ -245,7 +241,7 @@ function Build([string]$out, [string]$target, [string]$define, [string[]]$src) {
 $stubCs = Join-Path $bin 'Stub.cs'
 $driver = Join-Path $bin 'driver.exe'
 $built = Build $driver 'exe' '' @((Join-Path $bin 'Driver.cs'), $swapCs)
-Yes 'SelfSwap.cs compiles with the Framework csc, alone, into a driver' $built
+Yes 'SelfSwap.cs compiles with the build''s compiler, alone, into a driver' $built
 $kinds = [ordered]@{ 'old' = ''; 'new-good' = 'NEW;GOOD'; 'new-broken' = 'NEW;BROKEN'; 'new-late' = 'NEW;LATE'; 'new-hang' = 'NEW;HANG' }
 foreach ($k in $kinds.Keys) {
     $ok = Build (Join-Path $bin "$k.exe") 'winexe' $kinds[$k] @($stubCs, $swapCs)

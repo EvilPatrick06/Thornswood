@@ -40,8 +40,8 @@
 
   HOW. The real text of AskSteam, Stop, Progress, SizedLine, Percent,
   DepotBytes, ProgressLine, ClipboardLine, Next and Parts is lifted out of
-  Downgrade.cs by brace match and compiled with the .NET Framework csc the
-  launcher builds with, beside a Process that records what it was asked to
+  Downgrade.cs by brace match and compiled with the compiler the build runs
+  (tests\Launcher-Csc.ps1), beside a Process that records what it was asked to
   start instead of starting it, and a Steam install in a temp folder. Nothing
   opens Steam. The rest is read off Run's and TypeIntoConsole's text.
 
@@ -51,6 +51,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -234,12 +235,8 @@ foreach ($k in $lifted.Keys) { [void]$body.AppendLine($lifted[$k]) }
 if ($onProgress.Success) { [void]$body.AppendLine($onProgress.Value) }
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc -or $lifted.Count -lt $wanted.Count -or -not $onProgress.Success) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc) -or $lifted.Count -lt $wanted.Count -or -not $onProgress.Success) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-downgrade-why-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -247,9 +244,9 @@ try {
     $cs = Join-Path $work 'Probe.cs'
     [IO.File]::WriteAllText($cs, $probe)
     $dll = Join-Path $work 'Probe.dll'
-    $out = & $csc /nologo /target:library "/out:$dll" $cs 2>&1
+    $out = & $LauncherCsc /nologo /target:library "/out:$dll" $cs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes 'the lifted text compiles with the C# 5 compiler' $built
+    Yes 'the lifted text compiles with the compiler the build runs' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

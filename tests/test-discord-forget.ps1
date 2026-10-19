@@ -11,7 +11,7 @@
 
   Compiles the real Discord.cs with the real Secrets.cs and Swallow.cs, and
   a stand-in Paths that only supplies the two fields those files read.
-  The .NET Framework 4 csc is the one the launcher builds with.
+  The compiler is the one the launcher builds with (tests\Launcher-Csc.ps1).
 
   Read only apart from files under its own temp folder.
 #>
@@ -19,6 +19,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -35,18 +36,14 @@ function Done {
     if ($script:fail) { exit 1 } else { exit 0 }
 }
 
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) {
-    Write-Host 'SKIP  no .NET Framework 4 csc on this machine, so Discord.cs cannot be compiled here'
-    Done
-}
-$fw = Split-Path -Parent $csc
-$core = Join-Path $fw 'System.Core.dll'
-Yes 'System.Core.dll is there to compile against' (Test-Path -LiteralPath $core)
-if (-not (Test-Path -LiteralPath $core)) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+# The references the project names, from the reference assemblies the build
+# compiles against, with /noconfig below as the build has it.
+$refs = @(); $missing = @()
+foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
+if ($missing.Count -or $refs.Count -eq 0) { Done }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('discord-forget-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
@@ -129,8 +126,8 @@ $sources = @(
     (Join-Path $Repo 'launcher\app\Swallow.cs'),
     $driver
 )
-& $csc /nologo /t:exe /out:$exe /r:$core $sources
-Yes 'Discord.cs compiles with Forget under the C# 5 compiler' ($LASTEXITCODE -eq 0)
+& $LauncherCsc /noconfig /nologo /t:exe /out:$exe ($refs | ForEach-Object { '/r:' + $_ }) $sources
+Yes 'Discord.cs compiles with Forget under the compiler the build runs' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { Done }
 
 $profile = Join-Path $tmp 'Profile'

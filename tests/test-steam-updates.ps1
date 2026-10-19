@@ -58,8 +58,8 @@
   the start line says when a file has the mark and how to take it off by
   hand, and nothing in the launcher puts it back.
 
-  It compiles the shipped launcher\app\SteamUpdates.cs with the same .NET
-  Framework csc that Build-Launcher.ps1 uses, which is C# 5, and drives the
+  It compiles the shipped launcher\app\SteamUpdates.cs with the compiler the
+  build runs (tests\Launcher-Csc.ps1), and drives the
   real class. Where this machine has Steam and Skyrim, it also parses the
   real manifest, without writing to it.
 
@@ -69,6 +69,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -93,19 +94,15 @@ $src = Join-Path $AppPath 'SteamUpdates.cs'
 Yes 'launcher\app\SteamUpdates.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-steam-updates-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
 $dll = Join-Path $work 'SteamUpdates.dll'
-$said = & $csc /nologo /target:library "/out:$dll" $src 2>&1
+$said = & $LauncherCsc /nologo /target:library "/out:$dll" $src 2>&1
 $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-Yes 'it compiles on its own with the C# 5 compiler' $built
+Yes 'it compiles on its own with the compiler the build runs' $built
 if (-not $built) { $said | ForEach-Object { Write-Host "      $_" }; Done }
 
 $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
@@ -513,6 +510,12 @@ try {
     Yes 'No is remembered, and the log says how to do it in Steam' (($ask -match 'cfg\.SteamUpdatesDeclined = true;') -and ($ask -match 'SteamUpdates\.How'))
     Yes 'the question is SteamUpdates.Question, the one tested above' ($ask -match 'SteamUpdates\.Question\(manifest, steamUp\)')
     $again = Body $askSrc 'static void StartSteamAgain()'
+    # Since #2627 the start is Upkeep.StartSteam, which Fix also runs when
+    # Scan finds Steam not running; StartSteamAgain hands on to it.
+    $upkeepPath = Join-Path $AppPath 'Upkeep.cs'
+    if (($again -match 'Upkeep\.StartSteam\(') -and (Test-Path -LiteralPath $upkeepPath)) {
+        $again = Body (Get-Content -LiteralPath $upkeepPath -Raw) 'public static bool StartSteam(Action<string> say)'
+    }
     Yes 'Steam starts again in the tray, with its link as the fallback' (($again -match '"-silent"') -and ($again -match 'steam://open/main'))
     $cfgSrc = Get-Content -LiteralPath (Join-Path $AppPath 'Config.cs') -Raw
     Yes 'the remembered No is a config setting that starts off false' ($cfgSrc -match '\[DataMember\] public bool SteamUpdatesDeclined = false;')

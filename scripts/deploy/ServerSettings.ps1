@@ -329,10 +329,14 @@ $stageDir = Join-Path $Root $Stage
 $sp = Join-Path $stageDir 'server-settings.json'
 $run = $null
 $rel = $null
-try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-try { $rel = [IO.File]::ReadAllText($sp) | ConvertFrom-Json } catch { }
-if ($null -eq $run -or $null -eq $rel) {
+$unread = @()
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the settings the server runs on: ' + $_.Exception.Message) }
+try { $rel = [IO.File]::ReadAllText($sp) | ConvertFrom-Json } catch { $unread += ('the settings sent: ' + $_.Exception.Message) }
+if (-not $unread.Count -and $null -eq $run) { $unread += 'the settings the server runs on: the file is empty' }
+if (-not $unread.Count -and $null -eq $rel) { $unread += 'the settings sent: the file is empty' }
+if ($unread.Count) {
   'the settings the server runs on, or the ones sent, cannot be read, so nothing can be carried across'
+  foreach ($u in $unread) { '  ' + $u }
   Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
   'the stage is cleared and the server was not touched'
   'CARRY REFUSED'
@@ -386,8 +390,10 @@ if ($has -ne $WantRecord) {
            ', the commit ' + $WantRecord.Substring(0, 12) + '), so the server build running here is not the one this gamemode was committed with')
 }
 $run = $null
-try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-if ($null -eq $run) { $why += 'the settings the server runs on cannot be read' }
+$runWhy = ''
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $runWhy = $_.Exception.Message }
+if (-not $runWhy -and $null -eq $run) { $runWhy = 'the file is empty' }
+if ($runWhy) { $why += ('the settings the server runs on cannot be read: ' + $runWhy) }
 else {
   $passWhy = Get-ThornswoodPassSwitchProblem $run
   if ($passWhy) { $why += $passWhy }
@@ -400,6 +406,55 @@ if ($why.Count) {
 } else {
   Copy-Item -LiteralPath (Join-Path $Root 'server-settings.json') -Destination $sp -Force
   'the server keeps its own settings as they are: a gamemode-only deploy changes none of them'
+  'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
+}
+'@
+
+<#
+  Deploy-Server.ps1 -FromStore's settings (#459), in place of the carry: the
+  running server's own server-settings.json copied into the stage unchanged,
+  as for -GamemodeOnly. A server build out of the store moves the engine and
+  the gamemode, and the server keeps its load order, start point and every
+  switch, so no key may move at the swap (SwapVars with release keys @()).
+
+  It holds the stage to what the run read before it sent anything: the box's
+  server-build.json is still the record it read then ($WasRecord, its sum), so
+  a deploy that ran in between is not undone unseen, and the join pass switch
+  is true or false (#1319), which this run cannot set. Takes $Root and $Stage
+  from SwapVars, $WasRecord from the line Deploy-Server puts after it, this
+  file's functions and the record sum from the text in front. Ends with
+  CARRIED <sha256 of the copy> or CARRY REFUSED, the same last line as the
+  carry.
+#>
+$settingsStoreBlock = @'
+$ProgressPreference = 'SilentlyContinue'
+$stageDir = Join-Path $Root $Stage
+$sp = Join-Path $stageDir 'server-settings.json'
+$why = @()
+$rp = Join-Path $Root 'server-build.json'
+$has = 'none'
+if (Test-Path -LiteralPath $rp) { $has = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)) }
+if ($has -ne $WasRecord) {
+  $why += ('server-build.json on this server changed since this run read it (' + $has.Substring(0, [Math]::Min(12, $has.Length)) + ', read as ' +
+           $WasRecord.Substring(0, [Math]::Min(12, $WasRecord.Length)) + '), so another deploy ran in between; run this again to deploy over what is there now')
+}
+$run = $null
+$runWhy = ''
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $runWhy = $_.Exception.Message }
+if (-not $runWhy -and $null -eq $run) { $runWhy = 'the file is empty' }
+if ($runWhy) { $why += ('the settings the server runs on cannot be read: ' + $runWhy) }
+else {
+  $passWhy = Get-ThornswoodPassSwitchProblem $run
+  if ($passWhy) { $why += $passWhy }
+}
+if ($why.Count) {
+  foreach ($w in $why) { $w }
+  Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
+  'the stage is cleared and the server was not touched'
+  'CARRY REFUSED'
+} else {
+  Copy-Item -LiteralPath (Join-Path $Root 'server-settings.json') -Destination $sp -Force
+  'the server keeps its own settings as they are: a server build out of the store changes none of them'
   'CARRIED ' + (Get-FileHash -LiteralPath $sp -Algorithm SHA256).Hash.ToLowerInvariant()
 }
 '@

@@ -47,8 +47,8 @@
        untouched; one held open is tried again at the next start.
 
   HOW. It compiles the shipped launcher\app\OwnGame.cs, OwnGameShare.cs,
-  Downgrade.cs, Steam.cs, Paths.cs and Config.cs with the .NET Framework csc
-  Build-Launcher.ps1 uses (C# 5), with stand-ins for the few calls that touch
+  Downgrade.cs, Steam.cs, Paths.cs and Config.cs with the compiler the build
+  runs (tests\Launcher-Csc.ps1), with stand-ins for the few calls that touch
   the machine (Checks, Keep, Junction). A driver builds a pretend Steam, Steam
   copy and Vortex in a scratch folder, points Steam.cs at it through
   Steam.RootForTest, and runs the real code. Steam's console is never driven:
@@ -60,6 +60,7 @@
 param([string]$AppPath, [string]$Scratch)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Here = Split-Path -Parent $Here
@@ -79,28 +80,14 @@ function Done {
     exit 0
 }
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$fw = Split-Path -Parent $csc
-$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll') |
-    ForEach-Object { Join-Path $fw $_ }
-# Downgrade.cs puts a line on the clipboard through WPF. Found the way
-# Build-Launcher.ps1 finds it: the reference assemblies first, then the
-# framework's own WPF folder, then the GAC.
-$refDirs = @(Get-ChildItem -Path "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework" -Directory -Filter 'v4.*' -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending | ForEach-Object { $_.FullName }) + @((Join-Path $fw 'WPF'), $fw)
-foreach ($n in 'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') {
-    $hit = $refDirs | ForEach-Object { Join-Path $_ $n } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $hit) {
-        $hit = Get-ChildItem (Join-Path $env:WINDIR 'Microsoft.NET\assembly') -Filter $n -Recurse -File -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
-    }
-    $refs += $(if ($hit) { $hit } else { Join-Path $fw $n })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+# What the launcher compiles against, from the reference assemblies the
+# build uses (Launcher-Csc.ps1). Downgrade.cs puts a line on the clipboard
+# through WPF, so the WPF ones are here too.
+$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll',
+          'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') |
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
 foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
 
 $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
@@ -254,13 +241,22 @@ namespace Thornswood
 
         static string J(string s) { return s.Replace("\\", "\\\\").Replace("\"", "\\\""); }
 
+        // The time Vortex's record gives a file is the file's own write time
+        // in milliseconds, as Vortex writes it; a refresh compares it with the
+        // last record's to tell which files moved (#2210).
+        static string VortexTime(string staged)
+        {
+            if (!File.Exists(staged)) return "1";
+            return ((long)(File.GetLastWriteTimeUtc(staged) - new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc)).TotalMilliseconds).ToString();
+        }
+
         static void Record(string path, string staging, string target, string[][] files, DateTime when)
         {
             var sb = new StringBuilder();
             sb.Append("{\n  \"instance\": \"test\",\n  \"version\": 1,\n  \"deploymentMethod\": \"hardlink_activator\",\n  \"gameId\": \"skyrimse\",\n");
             sb.Append("  \"stagingPath\": \"" + J(staging) + "\",\n  \"targetPath\": \"" + J(target) + "\",\n  \"files\": [\n");
             for (int i = 0; i < files.Length; i++)
-                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": 1 }" + (i + 1 < files.Length ? "," : "") + "\n");
+                sb.Append("    { \"relPath\": \"" + J(files[i][0]) + "\", \"source\": \"" + J(files[i][1]) + "\", \"target\": \"\", \"time\": " + VortexTime(Path.Combine(staging, files[i][1] + "\\" + files[i][0])) + " }" + (i + 1 < files.Length ? "," : "") + "\n");
             sb.Append("  ]\n}\n");
             Put(path, sb.ToString());
             File.SetLastWriteTimeUtc(path, when);
@@ -667,11 +663,15 @@ namespace Thornswood
                 !File.Exists(Path.Combine(own, "Data\\PersonsOwn.esp")) && !File.Exists(Path.Combine(own, "Data\\NewBuild.bsa")) && NoneIn(own, Hand));
             string files = File.ReadAllText(Path.Combine(OwnGame.Dir, "files.txt"));
             Yes("the game's own files are still on record after the refresh", files.Contains("|O|") && files.Contains("|" + Master) && files.Contains("|" + Loose));
-            bool packC = false;
+            // Its entry in Vortex's record did not move, so since #2210 the
+            // refresh does not open it and its line keeps the L or C it had
+            // (decided by Patrick on 12 Oct; only the installed size Windows
+            // shows reads it). The file itself stays the pack's.
+            bool packOnRecord = false;
             foreach (string line in files.Split(new char[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
-                if (line.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) packC = line.StartsWith("C|");
-            Yes("a pack's file over a Vortex name is on record as C after a refresh",
-                packC && Text(packAt) == "TS-PACK" && Id(packAt) != Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
+                if (line.EndsWith("|Data\\TsOne.esp", StringComparison.OrdinalIgnoreCase)) packOnRecord = true;
+            Yes("a pack's file over a Vortex name stays the pack's own copy after a refresh, and on record",
+                packOnRecord && Text(packAt) == "TS-PACK" && Id(packAt) != Id(Path.Combine(s.Staging, "ModA\\TsOne.esp")));
             Yes("the check before Play still passes", OwnGame.CheckShared(OwnGame.Source(s.Cfg), null) == null);
         }
 
@@ -1011,10 +1011,10 @@ try {
     $cscArgs += $stubFile
     $cscArgs += $driverFile
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $compiled = & $csc @cscArgs 2>&1
+    $compiled = & $LauncherCsc @cscArgs 2>&1
     $ErrorActionPreference = $old
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'the real OwnGame.cs, OwnGameShare.cs and Downgrade.cs compile with the driver under the C# 5 compiler' $built
+    Yes 'the real OwnGame.cs, OwnGameShare.cs and Downgrade.cs compile with the driver under the build''s compiler' $built
     if (-not $built) { foreach ($l in @($compiled)) { Write-Host "      $l" }; Done }
 
     $scene = Join-Path $work 'machine'
@@ -1048,7 +1048,7 @@ Yes 'nothing asks for the Steam copy to be downgraded any more (SourceNeeded and
     (($all -notmatch 'SourceNeeded\(') -and ($all -notmatch 'Downgrade\.Target\('))
 Yes 'WhyNot no longer refuses a made folder over the Steam copy''s build' ($own -notmatch 'most likely because Steam updated it')
 Yes 'a refresh takes only Vortex''s files (Refresh calls Vortex, not Gather)' `
-    (($own -match 'List<Found> all = Vortex\(src, left, scope\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
+    (($own -match 'List<Found> all = Vortex\(src, left, scope, failed\);') -and ($own -notmatch 'List<Found> all = Gather\(src, left\);'))
 Yes 'the Downgrade puts its files only through OwnGame.TakePinned, and never names the Steam copy (OwnGame.Source)' `
     (($down -match 'OwnGame\.TakePinned\(') -and ($down -notmatch 'OwnGame\.Source') -and ($down -notmatch 'File\.Copy\('))
 $run = $down.Substring($down.IndexOf('static bool Run(Config cfg'))

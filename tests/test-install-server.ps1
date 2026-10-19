@@ -125,11 +125,39 @@ Yes 'the installer unpacks into a stage and checks the load order before it stop
     $iStage -gt 0 -and $iCheck -gt $iStage -and $iStop -gt $iCheck)
 Yes 'and no longer deletes the root' ($src -notmatch 'Remove-Item -LiteralPath \$Root -Recurse')
 Yes 'and sets nothing aside in %TEMP% any more' ($src -notmatch '\$env:TEMP')
+# #2711: the read back before the start said "which cannot be read" with no
+# file and no why; the two reads sat in a try with an empty catch.
+Yes 'the read back says which settings file did not read, and why' ($src.Contains("catch { `$unread += ('the server-settings.json the server had, which cannot be read: ' + `$_.Exception.Message) }") -and $src.Contains("catch { `$unread += ('the server-settings.json now in place, which cannot be read: ' + `$_.Exception.Message) }"))
 $pub = [IO.File]::ReadAllText($publish)
 Yes 'Publish-Server no longer stops the server before it copies' ($pub -notmatch 'Stop-ScheduledTask' -and $pub -notmatch 'stopRemote')
 Yes 'and no longer throws the world away over ssh before the install' ($pub -notmatch "Remove-Item -LiteralPath '\`$VpsRoot\\world'")
 Yes 'and sends the zip''s hash for the installer to check' ($pub -match '-ZipSha256 \$zipSum')
 Yes 'and hands the installer -RequirePass when it is given one (#1804)' ($pub -match '\$instArgs \+= " -RequirePass \$RequirePass"')
+
+# #2711: the port a root's settings name. Settings that did not read were a
+# try with an empty catch and came back 7777, the live server's port, so a
+# dev root's check could take the live server's answer for its own. Lifted
+# out and run: no file is the server's own default, one that does not read
+# stops the run naming it. The waits list every UDP port and filter, since
+# -LocalPort with nothing on it is an error, not an empty answer.
+$gpAst = [Management.Automation.Language.Parser]::ParseInput($src, [ref]$null, [ref]$null).Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'GamePortOf' }, $true)
+Yes 'the installer has one GamePortOf to lift' ($null -ne $gpAst)
+if ($gpAst) {
+    . ([scriptblock]::Create($gpAst.Extent.Text))
+    $gpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-gameport-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $gpDir | Out-Null
+    try {
+        Yes 'no server-settings.json is the server''s default port, 7777' ((GamePortOf $gpDir) -eq 7777)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"port":7787}')
+        Yes 'settings naming a port give it' ((GamePortOf $gpDir) -eq 7787)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"name":"x"}')
+        Yes 'settings naming none give 7777' ((GamePortOf $gpDir) -eq 7777)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"port":')
+        $why = ''; try { $null = GamePortOf $gpDir } catch { $why = $_.Exception.Message }
+        Yes 'settings that do not read stop it, naming the file, where they gave 7777' ($why -match 'server-settings\.json does not read, so the port this server answers on is not known')
+    } finally { Remove-Item -LiteralPath $gpDir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Yes 'the waits for the ports list them whole and filter, with no -LocalPort left to throw for nothing there' ($src -notmatch 'Get-NetUDPEndpoint -LocalPort' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$ids -contains' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$_\.LocalPort -eq \$port \}')
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
@@ -655,7 +683,9 @@ try {
         Yes "$label is INSTALL REFUSED" (($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0)
         Yes '  and it says why' (($out -join "`n") -match $case.Why)
         Yes '  and the root is byte for byte as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
-        Yes '  and the same server process is still answering' (((Owner $P) -eq $running) -and (Answers $P))
+        $ownerNow = Owner $P; $ans = Answers $P
+        # Which half failed, said in the line, so a failure on a runner is measured (#1273).
+        Yes ('  and the same server process is still answering (process ' + $ownerNow + ', was ' + $running + '; answers ' + $ans + ')') (($ownerNow -eq $running) -and $ans)
         if ($script:fail -gt $failed) { Show }
     }
 
@@ -715,7 +745,10 @@ try {
     Yes '  and the old root is kept beside it as .prev, with what it shipped' (
         $prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'gamemode.js')) -eq '// v1' -and
         (Get (Join-Path $prev[0] 'data\shipped.txt')) -eq 'shipped v1')
-    Yes '  and without the world, which moved rather than being copied' (-not (Test-Path -LiteralPath (Join-Path $prev[0] 'world')))
+    # Only with the one .prev there: a run that failed left none, and indexing
+    # it would end every case after this one (#1273).
+    Yes '  and without the world, which moved rather than being copied' (
+        $prev.Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $prev[0] 'world')))
     if ($script:fail -gt $failed) { Show }
 
     # ---- -PutBack --------------------------------------------------------------
@@ -753,8 +786,8 @@ try {
     Yes '  and the task is left as it was' (([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument -notlike '*/high*')
     $out = RunWrapped ($taskOnly + "`r`nexit `$LASTEXITCODE`r`n")
     Yes '-TaskOnly is INSTALL OK, answering as a new process' (($out -contains 'INSTALL OK') -and (WaitUp $P) -and ((Owner $P) -ne $running))
-    Yes '  and the task starts node through start /high again, and hands its exit code back' (
-        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" dist_back/skymp5-server.js >> *2>&1 & call exit %^errorlevel%"')
+    Yes '  and the task starts node through start /high again, on server-log.js running the server (#2349), and hands its exit code back' (
+        [string](([IO.File]::ReadAllText($taskFile) | ConvertFrom-Json).Argument) -like '*start "" /b /wait /high "*" "*\server-log.js" --log "*\server.log" --also thornswood.log dist_back/skymp5-server.js & call exit %^errorlevel%"')
     Yes '  and it reads node back at High' (($out -join "`n") -match 'node, pid \d+, runs at High priority')
     Yes '  and no file of the server changed, and nothing was set beside it' (
         (Get (Join-Path $root 'gamemode.js')) -eq $gmWas -and (Get (Join-Path $root 'server-settings.json')) -eq $setWas -and @(Beside '.*').Count -eq $besideWas)
@@ -862,7 +895,9 @@ try {
     Yes '  and says which switch, and how to give one' (
         (($out -join "`n") -match 'thornswoodRequirePass is missing on this server') -and (($out -join "`n") -match 'Publish-Server\.ps1 -RequirePass on, or off'))
     Yes '  and the root is byte for byte as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
-    Yes '  and the same server process is still answering' (((Owner $P) -eq $running) -and (Answers $P))
+    $ownerNow = Owner $P; $ans = Answers $P
+    # Which half failed, said in the line, so a failure on a runner is measured (#1273).
+    Yes ('  and the same server process is still answering (process ' + $ownerNow + ', was ' + $running + '; answers ' + $ans + ')') (($ownerNow -eq $running) -and $ans)
     if ($script:fail -gt $failed) { Show }
     $out = Install (Payload -Gamemode '// v7 pass on') @('-RequirePass on')
     $failed = $script:fail
@@ -918,7 +953,7 @@ try {
     $failed = $script:fail
     Yes '-FreshWorld is INSTALL OK and starts with no world' (($out -contains 'INSTALL OK') -and -not (Test-Path -LiteralPath (Join-Path $root 'world')))
     $prev = @(Beside '.prev-*')
-    Yes '  and the old world is kept in the .prev it left' ((Get (Join-Path $prev[-1] 'world\w.txt')) -eq 'every character')
+    Yes '  and the old world is kept in the .prev it left' ($prev.Count -and (Get (Join-Path $prev[-1] 'world\w.txt')) -eq 'every character')
     Yes '  and the roster still came across' ((Get (Join-Path $root 'private\door.json')) -match 'site')
     Yes '  and only the newest two .prev folders are kept, not three (#1121)' (
         $prev.Count -eq 2 -and -not (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Server.prev-20000101-000003')))
@@ -948,7 +983,7 @@ try {
         # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
         # VPS are real.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Roll-Log.ps1', 'C:\Thornswood-Server\',
+            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Server-Log.js', 'C:\Thornswood-Server\',
                            'C:\Thornswood-Deploys', 'C:\Thornswood-Docs', 'C:\Windows\Temp\thornswood-remote-') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
@@ -1146,6 +1181,80 @@ try {
         Yes 'Publish-Server -TaskOnly exits 0 and the dev server answers under the task again' ($code -eq 0 -and (WaitUp $D))
         Yes '  having changed no file and no record' ((Get (Join-Path $devRoot 'data\shipped.txt')) -eq $shippedWas -and (Get $devCur) -eq $curWas)
         Yes '  and node reads back at High' ((@($script:lastOut) -join "`n") -match 'node, pid \d+, runs at High priority')
+        if ($script:fail -gt $failed) { Show }
+
+        # ---- Publish-Server -FromStore (#459) -------------------------------------
+        # The recorded build out of the box's store, with no engine build here:
+        # no -Dist and no -SkipBuild, the payload made by the publish itself.
+        # The store has kept the 'binary v2' build since the first publish
+        # above. 'binary v3' is a build of the same commit made elsewhere (the
+        # way engine.yml makes one), sent with -ServerBuild.
+        function PublishStore([string]$record, [hashtable]$more = @{}) {
+            $a = @{ Channel = 'dev'; VpsRoot = $devRoot; TaskName = ($TaskPrefix + ' Dev'); VpsHost = '127.0.0.1'; VpsUser = 'nobody'
+                    Zip = (Join-Path $work 'store-payload.zip'); NoPause = $true; Wait = 8; Record = $record; NoNews = $true; NoPush = $true
+                    GamePort = $D; ResourcesPort = ($D + 1); FromStore = $true }
+            foreach ($k in $more.Keys) { $a[$k] = $more[$k] }
+            $global:TsSshSeen.Clear()
+            $global:LASTEXITCODE = 0
+            $said = @(& $publish @a *>&1 | ForEach-Object { "$_" })
+            $script:lastOut = $said
+            return $global:LASTEXITCODE
+        }
+        # A build folder and its record, and the artifact engine.yml would keep.
+        function StoreBuild([string]$binary, [switch]$Light) {
+            $b = Join-Path $work ('store-build-' + ($binary -replace '\W', ''))
+            Put (Join-Path $b 'scam_native.node') $binary
+            Put (Join-Path $b 'dist_back\skymp5-server.js') $stubJs
+            foreach ($k in $forkRest.Keys) { Put (Join-Path $b ($k -replace '/', '\')) $forkRest[$k] }
+            $r = RecordText $binary | ConvertFrom-Json
+            if ($Light) { $r | Add-Member -NotePropertyName lightPlugins -NotePropertyValue $true -Force }
+            $rp = Join-Path $b 'record.json'
+            Put $rp ($r | ConvertTo-Json -Depth 5)
+            $z = & { . (Join-Path $Here 'scripts\deploy\ServerArtifact.ps1'); New-ThornswoodServerBuildArtifact -From $b -Record $rp -OutDir (Join-Path $b 'ci') }
+            return [pscustomobject]@{ Record = $rp; Zip = $z.Zip; Name = $z.Name }
+        }
+        # What a stage and a root are held to (ServerBuild.ps1), to read the result.
+        . (Join-Path $Here 'scripts\deploy\ServerBuild.ps1')
+        $v3 = StoreBuild 'binary v3'
+        $devBefore = Tree $devRoot
+        $devPid = Owner $D
+        $orderWas = (Js (SettingsOf $devRoot).loadOrder)
+
+        $code = PublishStore $v3.Record
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore whose build the store does not keep exits 1, saying so (#459)' (
+            $code -ne 0 -and (($script:lastOut) -join "`n") -match 'keeps no server build of abcdef01 with the record this commit holds')
+        Yes '  naming the build of that commit it does keep' ((($script:lastOut) -join "`n") -match 'server-abcdef012345-[0-9a-f]{16}, from that commit with another record')
+        Yes '  before anything is sent: the installer never ran, the same process, the root as it was' (
+            @($global:TsSshSeen | Where-Object { $_ -match '-File' }).Count -eq 0 -and ((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
+        if ($script:fail -gt $failed) { Show }
+
+        $devOwn = SettingsOf $devRoot
+        $code = PublishStore $v3.Record @{ ServerBuild = $v3.Zip }
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore -ServerBuild sends the build to the store and puts it on: exit 0, answering' ($code -eq 0 -and (WaitUp $D))
+        Yes '  the build in the store by name, as it was made' (
+            (Test-Path -LiteralPath (Join-Path $deploys ('server\' + $v3.Name))) -and (Sha (Join-Path $deploys ('server\' + $v3.Name))) -eq (Sha $v3.Zip))
+        Yes '  the server runs it: the binary, and the record beside it' (
+            (Get (Join-Path $devRoot 'scam_native.node')) -eq 'binary v3' -and (Sha (Join-Path $devRoot 'server-build.json')) -eq (Sha $v3.Record))
+        Yes '  every other file the record lists is there as recorded' (
+            @(Get-ThornswoodServerBuildProblems (Rec $v3.Record) (Get-ThornswoodServerFolderSums $devRoot) 'the dev root' 'v3').Count -eq 0)
+        Yes '  the load order and the plugins it names are the running server''s' (
+            (Js (SettingsOf $devRoot).loadOrder) -eq $orderWas -and (Test-Path -LiteralPath (Join-Path $devRoot 'plugins\Skyrim.esm')) -and (Test-Path -LiteralPath (Join-Path $devRoot 'plugins\A.esp')))
+        Yes ('  and every setting of its own stays (#1222): ' + ((Carried $devOwn (SettingsOf $devRoot)) -join ', ')) ((Carried $devOwn (SettingsOf $devRoot)).Count -eq 0)
+        Yes '  and the box records the gamemode it runs and the engine (#459, #2303)' ((Get $devBeside) -eq (Get $devCur) -and (Rec $devCur).name -eq $art.Name -and (Rec $siteBuild).dev.commit -eq 'abcdef0123456789abcdef0123456789abcdef01')
+        if ($script:fail -gt $failed) { Show }
+
+        # An engine that reads light plugins another way than the running one
+        # would move every form id after the first light plugin (#1715).
+        $v4 = StoreBuild 'binary v4' -Light
+        $devBefore = Tree $devRoot
+        $devPid = Owner $D
+        $code = PublishStore $v4.Record @{ ServerBuild = $v4.Zip }
+        $failed = $script:fail
+        Yes 'Publish-Server -FromStore of an engine that reads light plugins another way is refused by the installer (#1715)' (
+            $code -ne 0 -and (($script:lastOut) -join "`n") -match 'written for an engine that does not load light plugins')
+        Yes '  with the server not stopped or changed' (((Owner $D) -eq $devPid) -and ((Tree $devRoot) -eq $devBefore))
         if ($script:fail -gt $failed) { Show }
     }
 

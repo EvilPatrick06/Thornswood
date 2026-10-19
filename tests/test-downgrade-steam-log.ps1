@@ -28,7 +28,7 @@
 
   HOW. The real text of SteamLog, LogStarted, LogHasCompletion, FailedLine,
   Refused, ByHand and DownloadedExe is lifted out of Downgrade.cs by brace
-  match and compiled with the .NET Framework csc the launcher builds with, and
+  match and compiled with the compiler the build runs (Launcher-Csc.ps1), and
   driven against a made-up Steam folder under a temp folder. Nothing opens
   Steam or touches the real one.
 
@@ -38,6 +38,7 @@
 param([string]$AppPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -169,12 +170,8 @@ $body = New-Object System.Text.StringBuilder
 foreach ($k in $lifted.Keys) { [void]$body.AppendLine($lifted[$k]) }
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-downgrade-log-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -182,9 +179,9 @@ try {
     $probeCs = Join-Path $work 'Probe.cs'
     [IO.File]::WriteAllText($probeCs, $probe)
     $dll = Join-Path $work 'Probe.dll'
-    $out = & $csc /nologo /target:library "/out:$dll" $probeCs 2>&1
+    $out = & $LauncherCsc /nologo /target:library "/out:$dll" $probeCs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes 'the lifted text compiles with the C# 5 compiler' $built
+    Yes 'the lifted text compiles with the compiler the build runs' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

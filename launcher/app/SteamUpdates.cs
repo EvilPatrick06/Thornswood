@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Runtime.InteropServices;
 using System.Text;
 
 namespace Thornswood
@@ -116,8 +117,15 @@ namespace Thornswood
     ///     written byte for byte, because a manifest Steam cannot parse is a
     ///     much worse failure than an unwanted update. Anything not laid out
     ///     the way Steam writes it is left alone;
-    ///   - goes through a temporary file and File.Replace, so a half-written
-    ///     manifest can never be left behind;
+    ///   - goes through a temporary file, flushed to the disk and renamed over
+    ///     the manifest in one call (MoveFileEx, MOVEFILE_REPLACE_EXISTING), so
+    ///     the manifest is the old one or the new one whole and never missing.
+    ///     Not File.Replace (#2591): it moves the old manifest aside first, so
+    ///     a launcher stopped inside it left no manifest at all, which Steam
+    ///     reads as Skyrim not being installed. Measured 16 Oct on One: a
+    ///     writer swapping a 17 KB file that way, killed 150 times, left it
+    ///     missing 6 times; through MoveFileEx, whole all 150
+    ///     (tests\test-2591-whole-records.ps1);
     ///   - leaves the file writable, so Steam can keep saving the game's
     ///     state in it (above). A file already on 1 that is only read only has
     ///     just the mark taken off, its bytes untouched.
@@ -456,12 +464,12 @@ namespace Thornswood
             bool readOnly = false;
             try
             {
-                File.WriteAllBytes(tmp, Bytes.GetBytes(after));
+                WriteWhole(tmp, Bytes.GetBytes(after));
                 attrs = File.GetAttributes(manifest);
                 readOnly = (attrs & FileAttributes.ReadOnly) != 0;
-                // File.Replace cannot take the place of a read-only file.
+                // A rename cannot take the place of a read-only file.
                 if (readOnly) File.SetAttributes(manifest, attrs & ~FileAttributes.ReadOnly);
-                File.Replace(tmp, manifest, null);
+                SwapIn(tmp, manifest);
             }
             catch (Exception ex)
             {
@@ -492,6 +500,35 @@ namespace Thornswood
                    " changed" + (readOnly ? ", and it is no longer marked read only, so Steam can save Skyrim's state in it again." : ".") +
                    " Steam's own Properties, Updates page shows it under Automatic Updates the next time Steam starts.";
         }
+
+        // ------------------------------------------------------------ writing
+        //
+        // Declared here rather than borrowed from OwnGame.WriteRecord, because
+        // tests\test-steam-updates.ps1 compiles this file on its own. The same
+        // call: a file flushed to the disk, then one rename over the manifest.
+
+        /// <summary>The bytes into path, flushed to the disk before it returns.</summary>
+        internal static void WriteWhole(string path, byte[] bytes)
+        {
+            using (var fs = new FileStream(path, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(true);
+            }
+        }
+
+        /// <summary>Renames next over path in one call, replacing it.</summary>
+        internal static void SwapIn(string next, string path)
+        {
+            if (!MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough))
+                throw new IOException(path + " could not be replaced by " + next + ": " +
+                                      new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+        }
+
+        const int MoveReplaceExisting = 0x1;
+        const int MoveWriteThrough = 0x8;
+        [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern bool MoveFileEx(string existing, string replacement, int flags);
 
         // ------------------------------------------------------------ reading
 

@@ -6,7 +6,8 @@
   notice board ... only wiithin their own hold".
 
   The real property block runs over a pretend engine with the ten boards it
-  seeds, a law register with a guard of Whiterun and a guard of Riften in it,
+  seeds, a guard of Whiterun and a guard of Riften (each by their Discord role
+  since #2551, which the door hands the block as __thornswoodOffices),
   and a Whiterun board already carrying a notice, a taken job, two letters
   and a haul. It checks:
     - the board panel says guard only to a guard of that board's hold, and the
@@ -62,30 +63,33 @@ const PEOPLE = [GUARD_W, GUARD_R, ALICE, BOB, CAROL];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-board-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } } } }));
 const T = clock.t - 3600000;
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
-  claims: {}, stewards: [], boxes: {},
+  claims: {}, boxes: {},
   // Two boards a steward placed, so the seeding leaves them where they are.
   boards: {
     whiterun: { cell: '3c:Skyrim.esm', pos: [0, 0, 0], where: 'Whiterun', placed: true },
     riften: { cell: '3c:Skyrim.esm', pos: [100000, 0, 0], where: 'Riften', placed: true }
   },
-  funds: { whiterun: 20 + 30 + 35 + 35 + 80, riften: 20 },
+  // A notice, a job with its 25 reward (#2554), two letters and a haul.
+  funds: { whiterun: 20 + 55 + 35 + 35 + 80, riften: 20 },
   notices: {
     whiterun: [
-      { by: ALICE.pid, name: 'Alice', text: 'Lost: a grey cat', at: T, job: false, taken: 0 },
-      { by: ALICE.pid, name: 'Alice', text: 'Mend my fence', at: T, job: true, taken: BOB.pid, takenName: 'Bob' },
+      { by: ALICE.pid, name: 'Alice', title: 'Lost: a grey cat', text: 'Grey, answers to Tib.', at: T, job: false, taken: 0 },
+      { by: ALICE.pid, name: 'Alice', title: 'Mend my fence', text: 'The north side, before the snow.', at: T, job: true,
+        pay: 25, taken: BOB.pid, takenName: 'Bob' },
       { by: ALICE.pid, name: 'Alice', text: 'the words of a letter', at: T, job: true, letter: true, to: 'Lydia', pay: 15, taken: 0 },
       { by: CAROL.pid, name: 'Carol', text: 'another sealed letter', at: T, job: true, letter: true, to: 'Ysolda', pay: 15, taken: 0 },
       { by: ALICE.pid, name: 'Alice', text: 'ten crates of mead', at: T, job: true, haul: true, dest: 'riften', pay: 50, taken: 0 }
     ],
     riften: [
-      { by: ALICE.pid, name: 'Alice', text: 'Selling a horse', at: T, job: false, taken: 0 }
+      { by: ALICE.pid, name: 'Alice', title: 'Selling a horse', text: 'A good one.', at: T, job: false, taken: 0 }
     ]
   }
-}));
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
-  guards: { '101': 'whiterun', '202': 'riften' }, cells: {}
 }));
 function inDir(f) {
   const was = process.cwd();
@@ -127,7 +131,12 @@ const box = {
   guard: function (n, f) { return f; },
   setInterval: function (f) { if (!tick) { tick = f; } return 1; }, clearInterval: function () { },
   log: function () { },
-  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } }
+  __thornswoodCharacter: { stateOf: function () { return { prof: 'cook' }; }, writeState: function () { } },
+  // The Guard of Whiterun and Guard of Riften roles (#2551).
+  __thornswoodOffices: function (pid) {
+    return { jarl: [], court: [], steward: [],
+             guard: pid === GUARD_W.pid ? ['whiterun'] : (pid === GUARD_R.pid ? ['riften'] : []) };
+  }
 };
 box.globalThis = box;
 inDir(function () { vm.runInNewContext(propBlock, box, { filename: 'gamemode.js property' }); });
@@ -209,12 +218,16 @@ yes('N1 a notice comes down: "' + r.mine + '"', r.mine === 'You take Alice\'s no
 yes('N2 Alice is told', (r.by[ALICE.pid] || []).join(' ') === 'A guard took your notice in whiterun down. The fee stays with whiterun.');
 yes('N3 the fee stays with the hold', W.funds().whiterun === fundsBefore);
 yes('N4 the log names the guard, the hold and the post', logged.some(function (l) {
-  return l.indexOf('law: a guard of whiterun (Hrongar, profile 101) took down Alice\'s notice 1 in whiterun: Lost: a grey cat') >= 0;
+  return l.indexOf('law: a guard of whiterun (Hrongar, profile 101) took down Alice\'s notice 1 in whiterun: Lost: a grey cat: Grey, answers to Tib.') >= 0;
 }));
 
+const aliceGold0 = gold(ALICE);
 r = word(GUARD_W, '/unpin', ['2']);
-yes('J1 a job somebody took comes down too: "' + r.mine + '"', r.mine === 'You take Alice\'s job down. The fee stays with whiterun.' &&
-    !!list('whiterun')[1].down);
+yes('J1 a job somebody took comes down too, and its reward goes back to Alice (#2554): "' + r.mine + '"',
+    r.mine === 'You take Alice\'s job down. The 25 gold reward goes back to them. The fee stays with whiterun.' &&
+    !!list('whiterun')[1].down && gold(ALICE) === aliceGold0 + 25 && W.funds().whiterun === fundsBefore - 25);
+yes('J1 and Alice is told it is back in her pack',
+    (r.by[ALICE.pid] || []).join(' ') === 'A guard took your job in whiterun down. The 25 gold reward is back in your pack. The fee stays with whiterun.');
 yes('J2 and Bob, who took it, is told it is off his list',
     (r.by[BOB.pid] || []).join(' ') === 'The job in whiterun you took was taken down by a guard. It is off your list.');
 yes('J3 it is off his list', W.notices().whiterun.length === 5 &&
@@ -224,7 +237,7 @@ const aliceGold = gold(ALICE);
 r = word(GUARD_W, '/unpin', ['3']);
 yes('L1 a letter comes down and its 15 goes back to Alice: "' + r.mine + '"',
     r.mine === 'You take Alice\'s letter down. The 15 gold for the courier goes back to them. The fee stays with whiterun.' &&
-    gold(ALICE) === aliceGold + 15 && W.funds().whiterun === fundsBefore - 15 && !!list('whiterun')[2].down);
+    gold(ALICE) === aliceGold + 15 && W.funds().whiterun === fundsBefore - 40 && !!list('whiterun')[2].down);
 yes('L2 Alice is told it is back in her pack',
     (r.by[ALICE.pid] || []).join(' ') === 'A guard took your letter in whiterun down. The 15 gold for the courier is back in your pack. The fee stays with whiterun.');
 yes('L3 the log does not carry the letter\'s words', logged.some(function (l) {
@@ -236,12 +249,12 @@ const carols = list('whiterun')[3];
 yes('A1 Carol is away, so her letter\'s 15 is held for her: "' + r.mine + '"',
     r.mine === 'You take Carol\'s letter down. The 15 gold for the courier goes back to them when they are next in the world. The fee stays with whiterun.' &&
     !!carols.down && carols.owed === 15 && Number(carols.owedTo) === CAROL.pid && carols.owedFor === 'letter' &&
-    W.funds().whiterun === fundsBefore - 15);
+    W.funds().whiterun === fundsBefore - 40);
 yes('A2 and the ledger keeps it held, so nothing else spends it', W.heldOn('whiterun') >= 15 + 50);
 online.push(CAROL.a);
 inDir(function () { W.haulTick(); });
 yes('A3 when Carol is back in the world it is in her pack and off the ledger',
-    gold(CAROL) === 115 && Number(list('whiterun')[3].owed) === 0 && W.funds().whiterun === fundsBefore - 30);
+    gold(CAROL) === 115 && Number(list('whiterun')[3].owed) === 0 && W.funds().whiterun === fundsBefore - 55);
 yes('A4 and she is told why', toasts.some(function (t) {
   return t[0] === CAROL.a && t[1] === 'While you were away, a guard took your letter for Ysolda in whiterun down. The 15 gold for the courier is back in your pack. The fee stays with whiterun.';
 }));

@@ -106,7 +106,7 @@ if (lib) {
   yes('an IPv6 address behind Caddy gets the same treatment',
       from('127.0.0.1', '2001:db8:1:2::1') === from('127.0.0.1', '2001:db8:1:2::abcd'));
 
-  // privacy.md: the sign-in log is the only thing here holding an address.
+  // privacy.md: the sign-in log is the only thing on the site holding an address.
   // The key is the block's HMAC of the address under a salt it makes at
   // start. This used to search the key for "203", and a fresh salt makes a
   // hash with those three digits in it about one start in 140 (#1738), so

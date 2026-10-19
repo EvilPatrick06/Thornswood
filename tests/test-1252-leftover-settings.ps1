@@ -38,7 +38,7 @@
        machine without them this part says so and is skipped.
 
   HOW. Compiles every file in launcher\app with a driver into one program
-  (C# 5, the .NET Framework csc Build-Launcher.ps1 uses), points Steam.cs at a
+  (the compiler the build runs, tests\Launcher-Csc.ps1), points Steam.cs at a
   pretend Steam in a scratch folder, and runs the real Leaks.Clean. For 2 to 6
   the driver gives each entry of the list planted bytes of its own, through
   reflection on the array, keeping the path; 7 leaves the list alone.
@@ -50,6 +50,7 @@
 param([string]$Repo, [string]$Scratch, [string]$Recorded)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Repo) { $Repo = Split-Path -Parent $Here }
@@ -108,46 +109,12 @@ Yes 'a match takes only this folder''s name for the file (OwnGame.DropName), not
     -not ([regex]::Match($src, '(?s)static string CleanSynced\(\).*?\n        \}').Value -match 'SetAttributes'))
 
 # ---- the launcher, compiled with a driver ---------------------------------------
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue | Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    $null
-}
-$builder = Join-Path $Repo 'scripts\release\Build-Launcher.ps1'
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
+foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $Repo ('launcher\lib\webview2\' + $n); if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($refs.Count -gt 0 -and $missing.Count -eq 0)
 if ($missing.Count -or $refs.Count -eq 0) { Done }
 
 $driver = @'
@@ -488,15 +455,15 @@ $driverCs = Join-Path $build 'LeftoverSettingsTest.cs'
 [IO.File]::WriteAllText($driverCs, $driver, (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $build 'LeftoverSettingsTest.exe'
 $cs = @(Get-ChildItem (Join-Path $App '*.cs') -File | ForEach-Object { $_.FullName })
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langversion:5', '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.LeftoverSettingsTest')
+$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", '/nowarn:0649,1701,0414,0169', "/out:$exe", '/main:Thornswood.LeftoverSettingsTest')
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 $cscArgs += $cs
 $cscArgs += $driverCs
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $rc = $LASTEXITCODE
 $ErrorActionPreference = $old
-Yes ('the launcher''s {0} source files and the driver compile as C# 5' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))
+Yes ('the launcher''s {0} source files and the driver compile with the build''s compiler' -f $cs.Count) ($rc -eq 0 -and (Test-Path -LiteralPath $exe))
 if ($rc -ne 0) { $said | Where-Object { "$_" -match 'error' } | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; Done }
 
 foreach ($r in $refs) { if ($r -like '*webview2*') { Copy-Item -LiteralPath $r -Destination $build -Force } }

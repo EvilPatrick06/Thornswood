@@ -33,13 +33,19 @@
     5. Restore-Backup.ps1 unpacks it there, and vps-restore-services.ps1 puts
        the site's data, config, uploads and feed store, the bot's settings and
        join record and the Caddyfile back.
-    6. Deletes C:\Thornswood-Restore, whatever happened above: it holds the
+    6. Delete-Person.ps1 -Reapply removes again everybody who asked to be
+       deleted (#2351): the people in the box's own record of completed
+       requests, C:\Thornswood-Deletions\requests.jsonl, and in the one the
+       backup carries, merged into it first. A backup holds the people who
+       asked after it was taken; nothing may start before they are gone.
+    7. Deletes C:\Thornswood-Restore, whatever happened above: it holds the
        bot token and the site keys.
 
   Starts nothing. Deploy-Docs.ps1, Install-Bot.ps1 -NoToken and starting the
   game servers come after it, in the order MOVING-THE-SERVER.md gives.
 
-  Prints RESTORE BOX OK and exits 0 only when all three restores said OK.
+  Prints RESTORE BOX OK and exits 0 only when all three restores and the
+  reapply said OK.
   Nothing secret is printed or put on a command line: the passphrase goes
   across as a file, and what the box says back is what the three scripts
   print, which never includes a value out of a config.
@@ -188,7 +194,7 @@ try {
   Invoke-ThornswoodNative { & scp @ssh $KeyFile "${target}:$farFwd/key.txt" }
   if ($LASTEXITCODE -ne 0) { throw 'scp could not send the passphrase file' }
   Say '  the passphrase file (not shown)' 'Green'
-  foreach ($s in 'Restore-Backup.ps1', 'Restore-Server.ps1', 'vps-restore-services.ps1') {
+  foreach ($s in 'Restore-Backup.ps1', 'Restore-Server.ps1', 'vps-restore-services.ps1', 'Delete-Person.ps1') {
     Invoke-ThornswoodNative { & scp @ssh (Join-Path $Here $s) "${target}:$farFwd/scripts/vps/$s" }
     if ($LASTEXITCODE -ne 0) { throw "scp could not send $s" }
     Say "  $s" 'Green'
@@ -217,6 +223,17 @@ else { 'KEY different' }
   $code = OnBox 'Restore-Backup.ps1' "-Backup $far\$name -KeyFile $far\key.txt -To $far\unpacked -NoPause"
   if ($code -eq 0) { $code = OnBox 'vps-restore-services.ps1' "-From $far\unpacked" }
   $results['site, bot and Caddy'] = $code
+
+  # Before anything starts, whatever came back above (#2351). The backup's
+  # own record is merged in when it has one; a backup from before the first
+  # request has none, and the box's own record is then the whole list.
+  Head 'Deletion requests, applied again'
+  $has = Remote "if (Test-Path -LiteralPath '$far\unpacked\deletions\requests.jsonl') { 'RECORD' } else { 'NONE' }"
+  if ($has -contains 'RECORD') { $results['deletions reapplied'] = (OnBox 'Delete-Person.ps1' "-Reapply -Delete -Merge $far\unpacked\deletions\requests.jsonl") }
+  else {
+    Say '  the backup carries no record of deletion requests, so the box''s own record is the list' 'DarkGray'
+    $results['deletions reapplied'] = (OnBox 'Delete-Person.ps1' '-Reapply -Delete')
+  }
 }
 catch {
   Say ("  " + $_.Exception.Message) 'Red'

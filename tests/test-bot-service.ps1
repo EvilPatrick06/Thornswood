@@ -478,6 +478,30 @@ if (-not $r.Ok) {
     Yes 'once the reader lets go it rolls, with nothing lost' ((Until { Test-Path -LiteralPath ($l + '.1') } 10) -and (Get-Item -LiteralPath ($l + '.1')).Length -ge $grown)
     $null = StopHost $h
 
+    # -- bot.log by age as well as by size (#2166) ----------------------------
+    # A rolled copy whose last write is past copySeconds goes, a newer one
+    # stays; the live file rolls once it is liveSeconds old, quiet, far under
+    # its size. On the box: 30 days and 59, looked at every hour.
+    $root = Box 'agedcopy' 'env' @{ liveSeconds = 3600; copySeconds = 3600; ageCheckSeconds = 1 }
+    $l = Join-Path $root 'data\bot.log'
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $root 'data')
+    [IO.File]::WriteAllText(($l + '.2'), 'an old rolled copy')
+    [IO.File]::SetLastWriteTimeUtc(($l + '.2'), [DateTime]::UtcNow.AddHours(-2))
+    [IO.File]::WriteAllText(($l + '.3'), 'a newer rolled copy')
+    $h = StartHost $root
+    $up = Until { (Log $root) -match 'watching 1 server' } 20
+    Yes 'a rolled bot.log past copySeconds is deleted, and a newer one stays (#2166)' ($up -and -not (Test-Path -LiteralPath ($l + '.2')) -and (Test-Path -LiteralPath ($l + '.3')))
+    Yes '  and bot.log says so' ((Log $root) -match '\[run\] by age: 1 rolled bot\.log copy past ')
+    $null = StopHost $h
+    $root = Box 'agedlive' 'env' @{ liveSeconds = 3; copySeconds = 3600; ageCheckSeconds = 1 }
+    $l = Join-Path $root 'data\bot.log'
+    $h = StartHost $root
+    $rolled = Until { Test-Path -LiteralPath ($l + '.1') } 20
+    Yes 'a bot.log whose first line is past liveSeconds is rolled while the bot runs, far under its size' (
+        $rolled -and (Get-Item -LiteralPath ($l + '.1')).Length -lt 20000 -and (ReadShared ($l + '.1')) -match 'watching 1 server')
+    Yes '  and the bot carries on, with bot.log there to write to' ((Alive (Join-Path $root 'bot.pid')) -and (Test-Path -LiteralPath $l))
+    $null = StopHost $h
+
     # -- what stops it before python starts -----------------------------------
     $root = Box 'notoken' 'env' @{} '{"THORNSWOOD_PROBE":"x"}'
     $h = StartHost $root

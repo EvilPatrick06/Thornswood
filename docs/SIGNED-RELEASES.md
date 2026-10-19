@@ -7,14 +7,16 @@ that checks that signed draft on a second machine. Until the switch-over the
 VPS still builds every release, unsigned, and Ship signs it on One as
 before; the hosted job runs only on a manual run that asks for it (section
 7 says why and what the switch-over waits on). Ship, Publish-Installer, the
-feed and every checksum check stay as they are. Patrick's answers are at the
-end, under "Decisions", and none is pending.
+feed and every checksum check stay as they are. Patrick's answers are in
+section 8, "Decisions", and none is pending. Section 9 sets doing nothing
+beside the change (Patrick, 15 Oct, #2168 A).
 
-This does not claim reproducible builds. Byte-identical local and runner
-builds are impossible with the Framework 4 csc (it stamps a build time and a
-fresh MVID). MSBuild with `-p:Deterministic=true` gave two byte-identical
-rebuilds on One (#498), but release.yml does not set it and nobody has
-measured runner against local. Provenance here means "this signed file came from this commit,
+This does not claim reproducible builds. The Framework 4 csc that built the
+launcher until 15 Oct stamped a build time and a fresh MVID into every build.
+Since #498 (#2550) every launcher is built by MSBuild. With
+`-p:Deterministic=true` two rebuilds on One were byte-identical (#498), but
+neither the project files nor release.yml set it, and nobody has measured
+runner against local. Provenance here means "this signed file came from this commit,
 this runner and these records", recorded and signed, not "anyone can rebuild
 the same bytes".
 
@@ -51,10 +53,10 @@ What is NOT covered today, which is what this issue is about:
 | --- | --- | --- | --- | --- |
 | Launcher `Thornswood.exe` | PE | Authenticode, embedded (today) | RSA certificate from Artifact Signing, SHA256 file digest, RFC 3161 SHA256 timestamp | Ship gate; installed launcher before swap (`Signature.cs`) |
 | Installer / setup-stub | PE | Authenticode, embedded (today) | same | Ship gate; Windows SmartScreen for the people installing |
-| Client runtime, packs, baseline, optional packs | zip | Covered by the signed release manifest (below), by sha256 | SHA256 entries in a signed manifest | Launcher (phase C), Ship gate |
-| Feed `version.json` | JSON | Covered by the signed release manifest: the manifest names the feed's own sha256 for that release | same | Launcher (phase C), `Check-ShipReady` |
-| Build records `client-build.json`, `server-build.json` | JSON | Covered by the signed release manifest | same | Ship gate, box deploy |
-| Release manifest `release-<id>.cat` (new) | Windows catalog (PKCS#7) | Authenticode via the SAME Artifact Signing profile (`signtool sign` signs `.cat` files) | as above | `Signature.cs` on the catalog, then each listed sha256 |
+| Client runtime, packs, optional packs, the baseline record (which names every file of the release by its sha256) | zip, JSON | Listed by sha256 in the signed release manifest (below), since phase B | SHA256 entries in a signed manifest | Launcher (phase C), Publish-Update's gate |
+| Feed `version.json` | JSON | Not signed itself. It names the manifest (`signedManifest`), and every asset in it is checked against the manifest. Its own bytes are not listed: Set-Server, Set-Collection, Dev-News, Publish-Discord, Rollback-Feed and Repair-Manifest rewrite it after a Ship, so a signature over it would go stale at the next edit. What it says outside the asset hashes (server address, collection, news, minLauncher) is not covered; see "Not covered" below | none | |
+| Build records `client-build.json`, `server-build.json` | JSON | Not yet. The manifest carries the commit and the fork commit; listing the records' hashes is for phase C | | |
+| Release manifest `release.json` and its catalog (new, phase B) | JSON, and a Windows catalog (PKCS#7) whose one member is `release.json` | Authenticode on the catalog via the SAME Artifact Signing profile. Measured 18 Oct on One: ThornswoodRelease signed a `New-FileCatalog` catalog with a timestamp, Authenticode reads it Valid, and `Signature.cs` accepts it | as above | `Signature.cs` on the catalog, `Test-FileCatalog` for `release.json`, then each listed sha256 |
 
 Why a catalog. It reuses the one signing identity the launcher already pins,
 the one tool chain (`Sign-Artifact.ps1`) and the one custody arrangement. No
@@ -65,10 +67,20 @@ is the fallback if catalogs prove awkward to build on the runner. A separate
 key (minisign, Sigstore keyless) was the alternative; Patrick kept the
 catalog (section 8, decision 1).
 
-The manifest also carries the provenance: source commit, engine/skymp pin,
-tag, release id, runner name, the hashes of `client-build.json` and
-`server-build.json`, and the sha256 of every asset. The pilot's
+The manifest also carries the provenance: release id, channel, source
+commit and branch, launcher version, the engine/skymp fork commit, when it
+was made, and the sha256 of every asset. Not the machine's name: the
+manifest is public on the site, and the signature already says who signed. The
+records' own hashes are not in it yet (phase C). The pilot's
 `records\signing\pilot-2163.json` is that shape for one test file.
+
+Not covered, by design: what `version.json` says outside asset hashes. A
+writer of the feed can still change the server address, the collection
+address, the news and minLauncher. The manifest stops that writer from
+handing out a pack, runtime, launcher or file the signer did not release;
+it does not stop a feed that sends launchers to another server. Signing
+those fields would mean every feed edit after a Ship signs again (the six
+scripts above), which is phase C's question to settle.
 
 ## 3. Owners, custody, rotation, recovery, revocation
 
@@ -139,12 +151,41 @@ the sha256 and keeps the sha256 check.
 
 - Phase A, pilot (this change): a TEST exe signed and verified on One with
   the real profile, an offline harness, this document. No live change.
-- Phase B, produce: Ship writes and signs the manifest and uploads it to the
-  feed store beside `version.json`; Ship's own gate verifies it. Launchers
-  ignore it. Rollback: stop writing it.
+- Phase B, produce: Ship writes and signs the manifest and puts it on the
+  site; its own gate verifies it. Launchers ignore it. Rollback: stop
+  writing it (a revert of the block below).
+  As built (#2163, 19 Oct): Publish-Update.ps1, on every run that uploads,
+  after the release record and the news and before `version.json` is
+  written. `Release-Manifest.ps1` lists every asset the feed names that
+  carries code or names files (the launcher, the client runtime, each pack
+  and optional pack, the baseline record) in `release.json`, and makes a
+  catalog over it. `Sign-ReleaseCatalog.ps1` signs the catalog with
+  `Sign-Artifact.ps1 -Required` and checks it with the publish gate and
+  `Signature.cs`. `Get-ReleaseManifestRefusal` checks the catalog still holds
+  `release.json` and that it lists every asset. Both files go to the site
+  as assets by their sha256, and the feed names them as `signedManifest`
+  (`url`, `sha256`, `catalogUrl`, `catalogSha256`). Any failure stops the
+  publish before `version.json` moves. So every Ship now signs once more,
+  dev included, and needs the signing setup and Azure to answer even when
+  it ships no launcher. A run that uploads nothing drops `signedManifest`
+  from the feed rather than name an older release's.
+  Left for phase C: `Rollback-Feed.ps1` should name the manifest the release
+  it goes back to had; `Scrub-Feed.ps1` rebuilds packs, so it must sign a
+  manifest for them; and the records' hashes go into the manifest.
 - Phase C, warn: a launcher that understands the manifest verifies it and
   reports a failure to the log and the site, but still installs on a good
   sha256. Measure for at least one main and several dev releases.
+  As built (#2163, 19 Oct): `launcher\app\ReleaseManifest.cs` and
+  `FeedManifest.cs`. On an update check that brings a different manifest or
+  different assets, the launcher fetches release.json and the catalog like
+  any asset, checks the catalog with `Signature.cs`, checks the catalog lists
+  release.json's sha256 (wintrust's catalog reader), and checks release.json
+  lists every asset the feed names. One line goes to launcher.log, which
+  reaches the site with a session's logs: the release and "lists all N of
+  the feed's assets, signed", or a line starting "WARNING: the release
+  manifest", or "names no signed release manifest". Nothing is refused on it.
+  What to read before phase D: those lines in the session logs the site
+  keeps, for one main and several dev releases.
 - Phase D, enforce: a new `minManifestLauncher` (or the next `minLauncher`)
   makes the launcher refuse a release with no manifest, a bad signature, or
   an asset not listed. From here an unsigned artifact is never silently
@@ -212,8 +253,8 @@ on a VPS runner, not a second hand-run machine.
 In release.yml since #2163's pull request: the hosted job ("launcher":
 windows-latest, MSBuild, the Azure sign in through the `release`
 environment, `Sign-Artifact.ps1 -Required`, `SHA256SUMS` of the signed
-bytes), the VPS job ("launcher-vps", the same steps by YAML anchor, csc,
-unsigned), the `verify` job, one draft per tag (section 6), and
+bytes), the VPS job ("launcher-vps", the same steps by YAML anchor, MSBuild
+since #2550, unsigned), the `verify` job, one draft per tag (section 6), and
 `tests\test-release-workflow.ps1`, which says which side of the switch-over
 the file is on.
 
@@ -241,16 +282,30 @@ The switch-over, the last step. It waits on three things, in this order:
 
 1. GitHub's hosted runner has usage that month. Patrick is not raising the
    Actions budget (#2393, 15 Oct): hosted first, the VPS when hosted has none.
+   `BUILD_RUNNER` still read `vps` on 16 Oct, so no workflow tries hosted
+   unless a manual run asks for it. Measured again 18 Oct, 9:02 PM MT (run
+   39192804622, pilot tag `v0.0.2163-pilot2` on main): GitHub still refused
+   the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
-   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`.
-   The hosted job's log says "building with msbuild on a github-hosted
+   `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
+   with `-f expected_sha=<commit>` added when the tag is not on main.
+   Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
+   main, and the run stops before it builds. A tag on main's own commit
+   needs no `expected_sha`. Pushing the tag starts the usual VPS build: let
+   it finish, never cancel it. Cancelling a VPS job during its checkout
+   leaves git lock files in that runner's workspace and every later job
+   there fails (#2751, 18 Oct). The hosted run then uploads into that one
+   draft and writes its notes again for its own files.
+   The hosted job's log says "building with MSBuild on a github-hosted
    runner", then the Azure sign in, then "signed by" the ThornswoodRelease
    certificate; `verify` passes; the draft's notes say signed. Then the
    pilot's draft and tag are deleted.
-3. A launcher built by MSBuild has been started on dev (#498 step 2, the
-   vault note `claude-queue\498-msbuild-dev-launcher.md`), because after the
-   switch-over every main launcher is built that way.
+3. A launcher built by MSBuild has been started on dev (#498 step 2),
+   because after the switch-over every main launcher is built that way.
+   Measured 16 Oct: dev carries launcher 1.2.4.5, built by MSBuild in the
+   dev release of 1:04 AM 16 Oct; #498 waits for somebody to start it once
+   and say it opened cleanly.
 
 Then one pull request: in release.yml the hosted job's `if` becomes
 `${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}` and the
@@ -276,8 +331,8 @@ decisions relayed by Smeagle; recorded on #2163). None is pending.
    waits on). The VPS stays the backup for every
    GitHub runner build: release.yml's fallback job runs there the way
    build.yml's does (BUILD_RUNNER = vps, a manual run asking for the box, or
-   the hosted job failing), with the in-box csc and unsigned until the VPS
-   has MSBuild and a signing path (#498), and Ship signs that draft on
+   the hosted job failing), with MSBuild like the hosted job (the VPS has the Build Tools since
+   #498) and unsigned until the VPS has a signing path, and Ship signs that draft on
    download as before (#921). The draft from the hosted job carries the
    signed launcher and a `SHA256SUMS` of the signed files. setup-stub.exe
    stays unsigned on purpose: Package signs the finished Setup after the
@@ -290,8 +345,144 @@ decisions relayed by Smeagle; recorded on #2163). None is pending.
    3 stays accepted.
 4. Signers holding Certificate Profile Signer on ThornswoodRelease: Patrick,
    Djinn and Four.
-5. Main builds are always signed. Dev builds stay unsigned to save signing
-   quota. Phase D runs only after Claude's signing pilot verifies on a clean
+5. Main builds are always signed, and so is every dev launcher: an installed
+   launcher refuses an unsigned one. (Until 16 Oct this line said dev builds
+   stay unsigned to save signing quota; Patrick took it out that day.) Phase
+   D runs only after Claude's signing pilot verifies on a clean
    machine (a signed draft from release.yml, checked away from One by its
    `verify` job, `Test-ReleaseFiles.ps1 -RequireSigned`), and its
    `minLauncher` is set to the first signed launcher.
+
+## 9. Doing nothing, set beside the change
+
+Decided by Patrick on 15 Oct 2026 (#2168, A): this doc sets what staying as
+we are costs and risks beside the change's own cost, migration and rollback.
+Read on 16 Oct 2026 from the repository, the GitHub API and the public feed
+unless it names another date. Nothing was signed, built or published for it.
+
+### 9.1 What checksums alone protect against, and what they do not
+
+They catch:
+- a download cut short or damaged on the way;
+- a cache or mirror that serves some other file;
+- an asset changed in the feed store while `version.json` stays as it was:
+  the launcher asks for `/feed[-dev]/assets/<sha256>` and refuses a file
+  whose hash is not that name;
+- a draft file that changed after the runner wrote `SHA256SUMS`: Ship
+  refuses it.
+
+They do not catch anyone who can write the record the hash is read from:
+- `version.json` names every pack and the client runtime by sha256, and
+  whoever writes `version.json` writes those names too. That is every
+  machine that Ships, and every Administrator ssh key on the VPS: five on
+  11 Oct, usable from any address (docs\DEPLOY-IDENTITIES.md section 1). On
+  16 Oct main's feed named its client runtime (the SkyMP client files that
+  load into the game on every tester's machine) by sha256 and nothing else.
+- A draft carries `Thornswood.exe` and `SHA256SUMS` side by side, so whoever
+  can replace one can replace the other. release.yml itself deletes and
+  uploads a draft's files, and three accounts can push to the repository
+  (the collaborators list: one admin, two write).
+
+A checksum says the bytes are the ones the record names. It never says who
+made the record. What Authenticode adds today covers the launcher and the
+installer only. An installed launcher takes a new launcher only when it is
+signed under ThornswoodRelease's durable identity (`Signature.cs`), and
+nothing on the VPS can sign. So someone who can write the feed cannot swap
+the launcher. Their cheapest way onto testers' machines is a pack or the
+client runtime, which only phases C and D (section 5) close.
+
+### 9.2 Today's signing on One against the hosted path
+
+| | Today: the VPS builds, Ship signs on One | The hosted path: release.yml signs on GitHub's runner |
+| --- | --- | --- |
+| Where a main launcher is built | A VPS runner, with MSBuild since #2550 | A fresh GitHub virtual machine for each job, thrown away after it |
+| What else runs on that machine | The same four runners build every pull request: `BUILD_RUNNER` is `vps` (set 12 Oct, still so on 16 Oct, when the two latest build checks skipped the hosted job and ran on `thornswood-vps-2` and `-3`). A job can leave files for the next one (docs\RUNNER-ISOLATION.md, F4) | Nothing |
+| Where it is signed | On the shipping machine, at Ship, after a checksum check of bytes that machine did not build | Inside the build job, before the draft exists |
+| What the draft says | `SHA256SUMS` of the unsigned bytes. Measured: v1.2.4's draft lists `Thornswood.exe` as `8f8aefc7...`; main's feed serves 1.2.4 as `e079f4e4...`, Authenticode Valid. Nothing public ties the two. All 14 releases on GitHub, v0.0.0-ci-trial-20260926 to v1.2.4, are still drafts; none was published | `SHA256SUMS` of the signed bytes, the same hash the feed will name, checked by the `verify` job on a VPS runner |
+| Who can cause a ThornswoodRelease signature | The three people with Certificate Profile Signer (Patrick, Djinn, Four), each through their own `az login` | Those three, plus anyone who can push a `v` tag and start release.yml with `runner: hosted`. The repository has no tag rules (the rulesets API answered an empty list), the `release` environment allows `v*` tags with no required reviewer, and a tag push, or a manual run with `expected_sha`, builds a commit that is not on main |
+| Signing left on people's machines | Every dev launcher (Build-Launcher signs it during a dev Ship; dev 1.2.4.5 reads Authenticode Valid) and every installer (`Package-Thornswood.ps1` signs the finished Setup) | The same. Only the main launcher's signature moves |
+| Packs, the client runtime, `version.json` | sha256 only | sha256 only. The signed manifest (phases B to D) is needed either way |
+
+Section 8, decision 5, said dev builds stay unsigned, while the dev feed's
+launcher, 1.2.4.5, was signed, as every dev launcher has to be. Patrick
+answered on 16 Oct: the line comes out (#2163).
+
+Who may start a signed run: Patrick, 16 Oct (#2163), "Anyone with repo
+access not just me". So no tag rule limits `v` tags to him and the `release`
+environment has no required reviewer; the accounts that can push start one,
+as the row above says.
+
+The hosted row's widening is not waiting on the switch-over. The federated
+credential has existed since 12 Oct (section 7), so a manual run on a `v`
+tag with `runner: hosted` can reach it today whenever GitHub starts a hosted
+job.
+
+### 9.3 Cost, migration and rollback of the change
+
+Cost:
+- GitHub hosted minutes. The repository is private, and GitHub's published
+  rate counts a Windows minute on a private repository as two. Hosted jobs
+  start only while the account has usage left that month; Patrick is not
+  raising the budget (#2393, closed 15 Oct). There were 11 `v` tags from
+  27 Sep to 12 Oct, one hosted run each. How long a hosted MSBuild release
+  run takes is not measured: none has run (the one asked for on 12 Oct was
+  refused on billing). The VPS release job took 10 to 20 seconds with csc
+  (runs 38281424727, 38182115117, 37420542587).
+- Signing. One signature for each tag run in release.yml. A main Ship then
+  leaves the already signed launcher alone, so a main release signs the
+  same number of times as today. Each pilot run is one more.
+- Work. One pull request (the hosted job's `if`, the runner input's default
+  and the two "until the switch-over" checks in
+  `tests\test-release-workflow.ps1`), after the pilot.
+
+Migration: the three conditions in section 7, in order. On 16 Oct: hosted
+usage this month is not known (below); the pilot has not run; dev carries
+the MSBuild launcher 1.2.4.5 and waits for someone to start it once.
+
+Rollback: the published bytes are signed by the same profile either way,
+so no installed launcher notices which path made them. To go back, revert
+the switch-over, or leave it and set `BUILD_RUNNER` to `vps` (or run with
+`-f runner=vps`). The VPS draft is unsigned, and Ship signs it on download
+as it does today (#921); that path stays in Ship.ps1. To stop hosted signing
+at once, Patrick deletes the federated credential or its role (section 3).
+
+### 9.4 Doing nothing
+
+Staying as we are costs nothing new: no hosted minutes, no pull request, no
+pilot signature. What it keeps:
+- the shipping machine signs a main launcher it did not build, trusting a
+  checksum written beside it on the same draft, by a runner that also runs
+  every pull request build;
+- the draft's hash never matches the published file, so no public record
+  names the launcher that shipped;
+- the hosted signing identity anyway: it exists, and any account that can
+  push a `v` tag can reach it with a manual run. Doing nothing on the
+  workflow does not remove that. Only a rule on who may start a signed run,
+  or deleting the credential, does;
+- the feed's reach onto testers' machines, which the hosted path does not
+  change either.
+
+### 9.5 What the comparison concludes
+
+- The switch-over is cheap, and a variable takes it back. It ends the
+  shipping machine signing bytes it did not build, and it gives a draft
+  whose hashes are the published ones. Doing nothing is not safer: it keeps
+  that gap and the new identity both.
+- Before the pilot, limit who can start a signed run: a tag rule letting
+  only the people who ship main create `v*` tags, or a required reviewer on
+  the `release` environment. That is a repository setting, so it is
+  Patrick's; the choice is written out on #2163.
+- Neither path protects packs, the client runtime or the feed. Phase B, the
+  signed manifest, is the step that does, and it is the larger risk.
+
+### 9.6 Not measured from here
+
+- Hosted minutes left this month and the account's rate for Windows: the
+  GitHub CLI's token on One lacks the `user` scope that the billing read
+  needs. Patrick, on GitHub's billing page.
+- The Artifact Signing account's tier and this month's signature count:
+  Patrick, in the Azure portal under ThornswoodSigning.
+- How long a hosted MSBuild release run takes: the first hosted pilot.
+- Whether the federated credential still reads as section 7 recorded on
+  12 Oct: anyone with `az` access to the app registration, which is
+  Patrick.

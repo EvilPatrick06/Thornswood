@@ -15,8 +15,8 @@
   What this drives:
 
     1. launcher\app\Progress.cs (PlayBar, PlayProgress, ProgressStep) with
-       Swallow.cs, compiled with the .NET Framework csc as C# 5, the way
-       Build-Launcher.ps1 compiles the launcher, into a small program that
+       Swallow.cs, compiled with the compiler and the C# version the build
+       uses (tests\Launcher-Csc.ps1), into a small program that
        feeds it the reports each piece of work makes, in the order they make
        them: an update synced to its release record (checking files, then the
        download), several packs, a self-update, the client download, the own
@@ -38,6 +38,7 @@
 param([string]$AppDir, [string]$Xaml)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -75,10 +76,8 @@ Yes 'Progress.cs is in the launcher source' (Test-Path -LiteralPath $progressPat
 if (-not (Test-Path -LiteralPath $progressPath)) { Done }
 
 # ---- 1. compile the real model and drive it ------------------------------------
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-    Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-play-progress-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -253,6 +252,40 @@ namespace Thornswood
             PlayProgress.End();
             Yes("the second puts it back", !bar.Active);
 
+            // ---- an update downloading while the folder is prepared (#2210) --
+            PlayProgress.FolderFirst(true);
+            PlayProgress.Begin("Preparing the game folder", 0);
+            PlayProgress.Files("Preparing the game folder", 300, 1000);
+            Is("the folder has the button", "Preparing the game folder 30%, 300 of 1,000 files");
+            var update = new System.Threading.Thread(delegate()
+            {
+                PlayProgress.Second(true);
+                PlayProgress.Begin("Updating", 1);
+                PlayProgress.Part(5 * MB, 20 * MB);
+                PlayProgress.Bytes("Updating", 5 * MB, 20 * MB);
+                PlayProgress.Second(false);
+            });
+            update.Start(); update.Join();
+            Is("the update's reports beside it stay off the button", "Preparing the game folder 30%, 300 of 1,000 files");
+            PlayProgress.Files("Preparing the game folder", 1000, 1000);
+            PlayProgress.FolderFirst(false);
+            PlayProgress.End();
+            Yes("the folder done, the update still holds the button", bar.Active);
+            update = new System.Threading.Thread(delegate()
+            {
+                PlayProgress.Second(true);
+                PlayProgress.Part(10 * MB, 20 * MB);
+                PlayProgress.Second(false);
+            });
+            update.Start(); update.Join();
+            Is("then the update shows itself with its next report", "Updating 50%, 10 of 20 MB");
+            PlayProgress.FolderFirst(true);
+            PlayProgress.Bytes("Updating", 15 * MB, 20 * MB);
+            Is("a thread not marked second still shows", "Updating 75%, 15 of 20 MB");
+            PlayProgress.FolderFirst(false);
+            PlayProgress.End();
+            Yes("and the last End puts the button back", !bar.Active);
+
             // ---- a failure ---------------------------------------------------
             PlayProgress.Begin("Updating", 1);
             PlayProgress.Part(10 * MB, 20 * MB);
@@ -282,12 +315,12 @@ namespace Thornswood
 $driverPath = Join-Path $tmp 'Drive.cs'
 [IO.File]::WriteAllText($driverPath, $driver, (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $tmp 'drive.exe'
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', '/langversion:5', "/out:$exe",
+$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$exe",
              '/reference:System.dll', $progressPath, (Join-Path $AppDir 'Swallow.cs'), $driverPath)
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
-Yes 'Progress.cs compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $exe) -and $LASTEXITCODE -eq 0)
+Yes 'Progress.cs compiles with the compiler the build runs' ((Test-Path -LiteralPath $exe) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $exe)) {
     $said | ForEach-Object { Write-Host "      $_" }
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -358,18 +391,25 @@ Yes 'Sync: Transfer reports as it writes' ((Body $sync 'static void Transfer(') 
 Yes 'Sync: packs after a record without its files are planned as downloads' ($sync -match 'PlayProgress\.Plan\("Updating", count, "updates"\)')
 
 $su = Read-Text (Join-Path $AppDir 'ShellUpdate.cs')
-$run = Body $su 'static void RunUpdate()'
+# Since #2627 RunUpdate() hands on to RunUpdate(after), which Fix calls
+# with what to do once the update is in, and that one does the work.
+$run = Body $su 'static void RunUpdate(Action after)'
 Yes 'RunUpdate opens the button with one download per pack' ($run -match 'PlayProgress\.Begin\("Updating", downloads\)')
-Yes 'RunUpdate: the self-update is its own phase' ($run -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')
+$stages = Read-Text (Join-Path $AppDir 'UpdateStages.cs')
+Yes 'the update''s download: the self-update is its own phase' ((Body $stages 'public static Fetched FetchUpdate(') -match 'PlayProgress\.Plan\("Updating the launcher", 1, "updates"\)')
+Yes 'RunUpdate marks its thread second, so a folder being prepared keeps the button (#2210)' ($run -match 'PlayProgress\.Second\(true\);' -and $run -match 'finally \{ PlayProgress\.Second\(false\); \}')
 Yes 'RunUpdate closes it when it finishes and when it fails, before DrawStatus' (([regex]::Matches($run, 'PlayProgress\.End\(\);\s*(updatePending = false;\s*)?DrawStatus\(\)')).Count -eq 2)
 
 $sog = Read-Text (Join-Path $AppDir 'ShellOwnGame.cs')
 # The overload that does the work. Since #1584 StartOwnGame(make, loud) only
 # hands on to StartOwnGame(make, loud, then), which runs a step once the
-# bring-up-to-date Play asked for has finished.
-$start = Body $sog 'static void StartOwnGame(bool make, bool loud, Action then)'
+# bring-up-to-date Play asked for has finished, and since #2627 that hands on
+# to the one that also takes what to do when it fails, for Fix.
+$start = Body $sog 'static bool StartOwnGame(bool make, bool loud, Action then, Action failed)'
 Yes 'StartOwnGame opens the button' ($start -match 'PlayProgress\.Begin\(OwnGame\.Phase, 0\)')
-Yes 'StartOwnGame closes it as soon as the work is over' ($start -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')
+$work = Body $sog 'static void FolderWork('
+Yes 'the folder work closes it as soon as the work is over' ($work -match 'ownGameBusy = false;\s*PlayProgress\.End\(\);')
+Yes 'the folder work holds the button while it runs and lets go before it finishes (#2210)' ($work -match 'PlayProgress\.FolderFirst\(true\);' -and $work -match 'PlayProgress\.FolderFirst\(false\);\s*try\s*\{\s*win\.Dispatcher\.BeginInvoke')
 
 $og = Read-Text (Join-Path $AppDir 'OwnGame.cs')
 Yes 'OwnGame: the phase is "Preparing the game folder"' ($og -match 'public const string Phase = "Preparing the game folder";')
@@ -383,10 +423,9 @@ $bytesBody = Body $ver 'public static List<Issue> Bytes('
 Yes 'Verify.Bytes counts the plugins it checks, full and light' (
     $bytesBody -match 'int all = mods\.Length \+ light\.Length;' -and $bytesBody -match 'PlayProgress\.Files\("Checking files", idx \+ 1, all\)')
 
-# C# 5 and the words, in the two new files.
+# The words, in the two new files.
 foreach ($n in @('Progress.cs', 'ShellProgress.cs')) {
     $t = Read-Text (Join-Path $AppDir $n)
-    Yes "$n is C# 5: no interpolation, ?., nameof or =>" (-not ($t -match '\$"' -or $t -match '\?\.' -or $t -match 'nameof\(' -or $t -match '\)\s*=>'))
     Yes "$n has no em dash and never says player" (-not ($t.Contains([string][char]0x2014) -or $t -match '(?i)player'))
 }
 

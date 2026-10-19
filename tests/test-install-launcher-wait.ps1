@@ -18,6 +18,7 @@
   it writes is under its own temp folder.
 #>
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $ErrorActionPreference = 'Stop'
 
 $Here = $PSScriptRoot
@@ -131,15 +132,11 @@ Yes 'Install-Launcher put the new exe bytes in place' ($after -eq 'NEW-LAUNCHER-
 Wait-Process -Id $holder4.Id -Timeout 10 -ErrorAction SilentlyContinue | Out-Null
 
 # ---- Closed only after writable when a real launcher process was closed -----
-$csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-if (-not (Test-Path -LiteralPath $csc)) {
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe'
-}
-Yes 'csc.exe is available for the stand-in launcher' (Test-Path -LiteralPath $csc)
+Yes 'the compiler the build runs is here for the stand-in launcher' (Test-Path -LiteralPath $LauncherCsc)
 $sleepSrc = Join-Path $work 'sleep.cs'
 $sleepExe = Join-Path $work 'sleep.exe'
 Set-Content -LiteralPath $sleepSrc -Value "using System; using System.Threading;`nclass P { static void Main() { Thread.Sleep(60000); } }`n" -Encoding ASCII
-& $csc /nologo /out:$sleepExe $sleepSrc | Out-Null
+& $LauncherCsc /nologo /out:$sleepExe $sleepSrc | Out-Null
 Yes 'stand-in sleeper exe compiled' (Test-Path -LiteralPath $sleepExe)
 
 Copy-Item -LiteralPath $sleepExe -Destination $destExe -Force

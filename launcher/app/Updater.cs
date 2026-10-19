@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.4";
+        public const string Version = "1.2.5";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -88,6 +88,19 @@ namespace Thornswood
             // plain header, and a compressed feed is a quarter of the size.
             public DateTime Since = DateTime.MinValue;
             public bool Gzip;
+            // The status of the last answer that WebClient returned from
+            // rather than threw on, which is every 2xx. 200 and 204 are both
+            // success to it and DownloadData gives back bytes either way (an
+            // empty array for 204), so a caller that has to tell them apart
+            // reads this (#2636). 0 until an answer arrives.
+            public int Status;
+            protected override WebResponse GetWebResponse(WebRequest request)
+            {
+                var r = base.GetWebResponse(request);
+                var h = r as HttpWebResponse;
+                if (h != null) Status = (int)h.StatusCode;
+                return r;
+            }
             protected override WebRequest GetWebRequest(Uri address)
             {
                 var r = base.GetWebRequest(address);
@@ -241,6 +254,88 @@ namespace Thornswood
             catch (Exception ex) { throw WrapFeedFail(ex, true); }
         }
 
+        /// <summary>
+        /// The long-poll tip beside version.json (#2440). Same host and channel
+        /// as FeedUrl: /feed/watch or /feed-dev/watch. A launcher keeps one of
+        /// these open so a Ship is seen without restarting or pressing Check now.
+        /// </summary>
+        public static string WatchUrl(Config cfg)
+        {
+            string feed = FeedUrl(cfg);
+            const string leaf = "/version.json";
+            if (feed.EndsWith(leaf, StringComparison.OrdinalIgnoreCase))
+                return feed.Substring(0, feed.Length - leaf.Length) + "/watch";
+            // FeedUrl always ends in version.json today; if a moved feed uses
+            // another leaf, tip at the same folder.
+            int slash = feed.LastIndexOf('/');
+            if (slash > 0) return feed.Substring(0, slash) + "/watch";
+            return feed + "/watch";
+        }
+
+        /// <summary>
+        /// Long-poll /feed/watch with the ETag of the copy already in hand
+        /// (#2440). True when the tip says the feed moved (HTTP 200); false
+        /// when the wait ran out unchanged (HTTP 204). Throws when the tip
+        /// cannot be reached, gives no answer in time, or answers anything
+        /// else, so the caller says so in launcher.log and backs off.
+        /// </summary>
+        public static bool WaitForFeedChange(Config cfg)
+        {
+            ServicePointManager.SecurityProtocol |= (SecurityProtocolType)3072; // Tls12 added, never replaced (#1360)
+            string tip = WatchUrl(cfg);
+            CheckUrl(tip);
+
+            Cached have = cached;
+            if (have == null && !cacheRead)
+            {
+                cacheRead = true;
+                have = ReadCache();
+                if (have != null) cached = have;
+            }
+            string tag = "";
+            if (have != null && !string.IsNullOrEmpty(have.Etag)
+                && string.Equals(have.Url, FeedUrl(cfg), StringComparison.Ordinal))
+                tag = have.Etag.Trim();
+
+            // The tip holds the socket for fifty seconds on the site and then
+            // answers 204 (measured 18 Oct: 204 after 50.7 s). Sixty here, so
+            // the site's own answer always arrives first; Quick's default ten
+            // would cut every quiet wait off before the site could answer.
+            return Tip(cfg, tip, tag, 60000);
+        }
+
+        /// <summary>
+        /// The long-poll request itself, apart from CheckUrl so a test can
+        /// point it at a server of its own (tests\test-2636-feed-watch-quiet.ps1),
+        /// the way Conditional is apart from FromSite.
+        ///
+        /// The site answers 200 when the feed moved and 204 when its wait ran
+        /// out unchanged. WebClient treats every 2xx as success: DownloadData
+        /// returns for a 204 with an empty array and never throws. Until #2636
+        /// this read any return from DownloadData as "moved" and looked for the
+        /// 204 in the catch, where it never arrives, so every quiet fifty
+        /// second wait ran a full update check, about seventy an hour for each
+        /// open launcher (Djinn's launcher.log, 17 Oct). The status is read
+        /// off the answer instead. A client timeout used to be read as
+        /// "unchanged" too; the site always answers inside the wait, so no
+        /// answer is a fault, and it now throws like any other.
+        /// </summary>
+        static bool Tip(Config cfg, string tip, string tag, int ms)
+        {
+            using (var q = (Quick)Client(cfg, false, tip))
+            {
+                q.Ms = ms;
+                q.Gzip = true;
+                if (tag.Length > 0) q.Headers["If-None-Match"] = tag;
+                try { q.DownloadData(tip); }
+                catch (WebException wex) { throw WrapFeedFail(wex, true); }
+                // 200: the feed moved, or there was no tag to compare.
+                if (q.Status == 200) return true;
+                // 204: the wait ran out and the feed is as it was.
+                if (q.Status == 204) return false;
+                throw new Exception("The update feed tip answered HTTP " + q.Status + ", which says neither that the feed moved nor that it did not.");
+            }
+        }
         /// <summary>
         /// version.json straight off the site feed, asking with the ETag of the
         /// copy already in hand so an unchanged document is not downloaded
@@ -1191,8 +1286,27 @@ namespace Thornswood
         /// <summary>Replaces the running exe and restarts, via a short detached script.</summary>
         public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)
         {
+            SwapIn(FetchLauncher(cfg, v, log), log);
+        }
+
+        /// <summary>
+        /// The new launcher, downloaded and checked against its checksum, in
+        /// the temp folder; nothing is replaced yet. Apart from SwapIn so an
+        /// update can download while the game folder is prepared (#2210).
+        /// </summary>
+        public static string FetchLauncher(Config cfg, VersionDoc v, Action<string> log)
+        {
             log("Downloading launcher " + v.launcherVersion + "...");
-            string tmp = Download(cfg, v.launcherUrl, v.launcherSha256, log);
+            return Download(cfg, v.launcherUrl, v.launcherSha256, log);
+        }
+
+        /// <summary>
+        /// Puts the launcher FetchLauncher downloaded into place once this one
+        /// has gone, after the signer check, and deletes the download either
+        /// way.
+        /// </summary>
+        public static void SwapIn(string tmp, Action<string> log)
+        {
             string exe = System.Reflection.Assembly.GetExecutingAssembly().Location;
             string neu = exe + ".new";
             // Before the copy, not after. Once a file is sitting at exe.new the
@@ -1209,7 +1323,7 @@ namespace Thornswood
             }
             finally
             {
-                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SelfUpdate, delete", ex); }
+                try { File.Delete(tmp); } catch (Exception ex) { Swallow.Note("Updater.SwapIn, delete", ex); }
             }
 
             int me = System.Diagnostics.Process.GetCurrentProcess().Id;

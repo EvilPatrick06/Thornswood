@@ -6,8 +6,9 @@
 
   #2298, the hold's drop box on the notice board. Patrick, 12 October:
     - Anybody may take back what they put in, rent included (then the rent is
-      owed again); that hold's officers (its Jarl, its guards, a steward) may
-      take anything; anybody else is refused.
+      owed again); that hold's officers (its Court, its Guards, its Jarl and
+      its Steward, 15 October, #2551) may take anything; anybody else is
+      refused, an officer of another hold included.
     - A person sees only what they put in, gold too, never the box's total;
       only officers see everything, and only they get Records.
     - Carriage and ferry fares go in as real gold, by themselves.
@@ -17,8 +18,10 @@
       steward.
 
   The real property block runs over a pretend engine, with Whiterun's and
-  Riften's boards placed, a guard of each, a steward, Whiterun's Jarl, and
-  people with gold, a claim with rent owed, and a sword. Each rule is driven
+  Riften's boards placed, a guard of each, Whiterun's Steward and Court,
+  Riften's Steward, both Jarls (every office by its Discord role, which the
+  door hands the block as __thornswoodOffices), and people with gold, a claim
+  with rent owed, and a sword. Each rule is driven
   through the same /dropbox lines the box's panel sends, and the real panel
   page draws what the server sent.
 */
@@ -60,31 +63,40 @@ const BOB = { a: 0xff000404, pid: 404, name: 'Bob' };            // anybody
 const CAROL = { a: 0xff000505, pid: 505, name: 'Carol' };        // a courier, leaves a sword for Dagny
 const GUARD_W = { a: 0xff000101, pid: 101, name: 'Hrongar' };    // a guard of Whiterun
 const GUARD_R = { a: 0xff000202, pid: 202, name: 'Maul' };       // a guard of Riften
-const STEWARD = { a: 0xff000606, pid: 606, name: 'Proventus' };  // a steward a Jarl named
+const STEWARD = { a: 0xff000606, pid: 606, name: 'Proventus' };  // Steward of Whiterun
 const JARL_W = { a: 0xff000707, pid: 707, name: 'Balgruuf' };    // Jarl of Whiterun
 const JARL_R = { a: 0xff000808, pid: 808, name: 'Laila' };       // Jarl of Riften
-const PEOPLE = [ALICE, BOB, CAROL, GUARD_W, GUARD_R, STEWARD, JARL_W, JARL_R];
+const COURT_W = { a: 0xff000909, pid: 909, name: 'Irileth' };    // on Whiterun's Court (#2551)
+const STEWARD_R = { a: 0xff000919, pid: 919, name: 'Anuriel' };  // Steward of Riften (#2551)
+const PEOPLE = [ALICE, BOB, CAROL, GUARD_W, GUARD_R, STEWARD, JARL_W, JARL_R, COURT_W, STEWARD_R];
+// Every office is a Discord role (#2551), read through the door.
+const ROLES = {
+  101: { guard: ['whiterun'] }, 202: { guard: ['riften'] }, 606: { steward: ['whiterun'] },
+  707: { jarl: ['whiterun'] }, 808: { jarl: ['riften'] }, 909: { court: ['whiterun'] }, 919: { steward: ['riften'] }
+};
+function officesOf(pid) {
+  const o = ROLES[pid] || {};
+  return { jarl: o.jarl || [], court: o.court || [], steward: o.steward || [], guard: o.guard || [] };
+}
 
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-2298-box-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'guard:whiterun': { 'p:101': { pid: 101, name: 'Hrongar' } }, 'guard:riften': { 'p:202': { pid: 202, name: 'Maul' } }, 'steward:whiterun': { 'p:606': { pid: 606, name: 'Proventus' } }, 'jarl:whiterun': { 'p:707': { pid: 707, name: 'Balgruuf' } }, 'jarl:riften': { 'p:808': { pid: 808, name: 'Laila' } }, 'court:whiterun': { 'p:909': { pid: 909, name: 'Irileth' } }, 'steward:riften': { 'p:919': { pid: 919, name: 'Anuriel' } } } }));
 fs.writeFileSync(path.join(dir, 'private', 'property.json'), JSON.stringify({
   claims: {
     '1234:Skyrim.esm': { by: ALICE.pid, name: 'Alice', at: clock.t - 86400000,
                          rent: { amount: 15, everyDays: 7, since: clock.t - 3600000, owed: 15 } }
   },
-  stewards: [STEWARD.pid], boxes: {},
+  boxes: {},
   boards: {
     whiterun: { cell: '3c:Skyrim.esm', pos: [0, 0, 0], where: 'Whiterun', placed: true },
     riften: { cell: '3c:Skyrim.esm', pos: [100000, 0, 0], where: 'Riften', placed: true }
   },
   funds: {}, notices: {}
-}));
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({
-  guards: { '101': 'whiterun', '202': 'riften' }, cells: {},
-  // Each Jarl holds their hold's seat (#502), which is what makes them its Jarl.
-  jarls: { whiterun: { pid: 707, actor: 0xff000707, name: 'Balgruuf' },
-           riften: { pid: 808, actor: 0xff000808, name: 'Laila' } }
 }));
 function inDir(f) {
   const was = process.cwd();
@@ -132,13 +144,9 @@ function makeBlock() {
     guard: function (n, f) { return f; },
     setInterval: function () { return 1; }, clearInterval: function () { },
     log: function () { },
-    __thornswoodIsJarl: function (pid) { return pid === JARL_W.pid || pid === JARL_R.pid; },
+    __thornswoodOffices: officesOf,
     __thornswoodCharacter: {
-      stateOf: function (a) {
-        if (a === JARL_W.a) { return { office: 'jarl', officeHold: 'whiterun' }; }
-        if (a === JARL_R.a) { return { office: 'jarl', officeHold: 'riften' }; }
-        return { prof: 'cook' };
-      },
+      stateOf: function () { return { prof: 'cook' }; },
       writeState: function () { }
     }
   };
@@ -194,7 +202,8 @@ r = box(ALICE, ['gold', '500']);
 yes('  and more than she carries is refused', /do not have 500 gold/.test(r.view.said) && gold(ALICE) === 60);
 
 // --------------------------------------------------------------- fees never go in
-inDir(function () { W.command('/notice', ['/notice', 'Lost', 'cat'], ALICE.a, ALICE.pid, function () { }); });
+// A post has a title and a body (#2554): the title, ::, then the body.
+inDir(function () { W.command('/notice', ['/notice', 'Lost', 'cat', '::', 'Grey,', 'answers', 'to', 'Tib.'], ALICE.a, ALICE.pid, function () { }); });
 yes('D2 a notice fee is taken and kept as a record (funds), not put in the box', gold(ALICE) === 40 &&
     W.funds().whiterun === 20 && W.dropbox().whiterun.items.length === 1);
 
@@ -231,11 +240,16 @@ r = box(GUARD_R, ['take', String(aliceRow.n)]);
 yes('D6 Riften\'s guard, at Whiterun\'s box, is anybody: refused', /not yours to take/.test(r.view.said) && gold(GUARD_R) === 100);
 r = box(JARL_R, ['take', String(aliceRow.n)]);
 yes('  so is Riften\'s Jarl', /not yours to take/.test(r.view.said) && gold(JARL_R) === 100);
+r = box(STEWARD_R, ['take', String(aliceRow.n)]);
+yes('  and Riften\'s Steward: a Steward is an officer only at their own hold\'s box (#2551)',
+    /not yours to take/.test(r.view.said) && gold(STEWARD_R) === 100);
 r = box(GUARD_W, ['take', String(aliceRow.n), '5']);
 yes('  Whiterun\'s guard may take Alice\'s gold', gold(GUARD_W) === 105 && /You took 5 Gold out/.test(r.view.said));
 yes('  and the rent stays as it is: an officer taking it is not Alice taking it back', rentOwed() === 15);
 r = box(JARL_W, ['take', String(fareRow.n), '10']);
 yes('  Whiterun\'s Jarl may take from the fares', gold(JARL_W) === 110);
+r = box(COURT_W, ['take', String(fareRow.n), '5']);
+yes('  and so may Whiterun\'s Court (#2551)', gold(COURT_W) === 105 && /You took 5 Gold out/.test(r.view.said));
 r = box(STEWARD, ['take', String(aliceRow.n)]);
 yes('  and a steward may take the rest of Alice\'s', gold(STEWARD) === 110 &&
     !W.dropbox().whiterun.items.some(function (x) { return x.n === aliceRow.n; }));

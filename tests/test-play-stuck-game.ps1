@@ -7,8 +7,8 @@
   CloseGameWaiting, ClearLeftovers and EnsureServer in launcher\app\Shell.cs and ShellPlay.cs.
 
   Each method is lifted out of the real Shell.cs (the brace-matched body, the
-  way test-play-progress.ps1 reads its wiring) and compiled with the .NET
-  Framework csc as C# 5, the way Build-Launcher.ps1 compiles the launcher,
+  way test-play-progress.ps1 reads its wiring) and compiled with the compiler
+  and the C# version the build uses (tests\Launcher-Csc.ps1),
   beside stand-ins for Checks, SkyMp, MessageBox, Waiting and Log. The
   stand-ins script every answer the real ones can give, so this fails if a
   guard starts closing somebody's other Skyrim, closes a visible game without
@@ -24,6 +24,7 @@
 param([string]$AppDir)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -69,10 +70,8 @@ foreach ($sig in $sigs) {
 }
 if ($script:fail) { Done }
 
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-    Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-play-stuck-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -219,8 +218,8 @@ $src = Join-Path $tmp 'drive.cs'
 $exe = Join-Path $tmp 'drive.exe'
 [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
 try {
-    $out = & $csc /nologo /langversion:5 /target:exe "/out:$exe" $src 2>&1
-    Yes 'the lifted guards compile as C# 5' ($LASTEXITCODE -eq 0)
+    $out = & $LauncherCsc /nologo "/langversion:$LauncherLangVersion" /target:exe "/out:$exe" $src 2>&1
+    Yes 'the lifted guards compile with the build''s compiler' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | Write-Host; Done }
     $lines = & $exe
     $code = $LASTEXITCODE

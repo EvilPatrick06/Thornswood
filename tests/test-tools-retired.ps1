@@ -153,7 +153,7 @@ $homes = @(
     @{ File = 'signing.json'; At = 'records/signing/signing.json'; Script = 'scripts\release\Ship.ps1'; Says = "'..\..\records\signing\signing.json'" },
     @{ File = 'signing.json'; At = 'records/signing/signing.json'; Script = 'scripts\release\Setup-ShipMachine.ps1'; Says = "Join-Path `$RepoDir 'records\signing\signing.json'" },
     @{ File = 'signing.json'; At = 'records/signing/signing.json'; Script = 'scripts\release\Check-ShipReady.ps1'; Says = "Join-Path `$RepoDir 'records\signing\signing.json'" },
-    @{ File = 'setup-stub.exe'; At = 'out/setup-stub.exe'; Script = 'scripts\release\Build-Launcher.ps1'; Says = "`$stubDir = Join-Path `$Here '..\..\out'" },
+    @{ File = 'setup-stub.exe'; At = 'out/setup-stub.exe'; Script = 'scripts\release\Build-Launcher.ps1'; Says = "`$stub = Join-Path (Join-Path `$Here '..\..\out') 'setup-stub.exe'" },
     @{ File = 'setup-stub.exe'; At = 'out/setup-stub.exe'; Script = 'scripts\release\Package-Thornswood.ps1'; Says = "Join-Path (& (Join-Path `$Here 'Where.ps1') Out) 'setup-stub.exe'" },
     @{ File = 'setup-stub.pdb'; At = 'out/setup-stub.pdb'; Script = 'scripts\release\Ship.ps1'; Says = "Join-Path (& (Join-Path `$Here 'Where.ps1') Out) 'setup-stub.pdb'" },
     @{ File = 'thornswood-front.zip'; At = 'local/thornswood-front.zip'; Script = 'scripts\release\Go.ps1'; Says = "'..\..\local\thornswood-front.zip'" },

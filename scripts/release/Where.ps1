@@ -60,12 +60,40 @@
   it does not name is the rule above. These three are this machine's, and
   only the PowerShell release scripts ask, so where.js does not answer them.
 
+  WHO NAMED THE FOLDER, issue #2662. ShipRootNamed and ShipRootNamedDev
+  answer only what ShipRoots names for the channel, and '' when it names
+  none, so a script can tell a recorded folder from the install rule's
+  answer, which ShipRoot and ShipRootDev give as one string. A dev Ship asks:
+  the install rule's <install>-DevBuild with no Launcher folder means the
+  main launcher never installed the dev build there, and Ship refuses it; a
+  recorded folder is made by Update-ShipRoot.ps1, which writes no Launcher
+  folder, and the Ship's own launcher step makes one, so it is not refused.
+
+  THE ENGINE BUILD, issue #2019. engine\README.md "One engine": there is one
+  engine, and an engine change is built in a worktree of the fork
+  (Build-Engine.ps1 -Fork, Build-Server.ps1 -Fork), not in a checkout's
+  engine\skymp. Until 16 October ServerDist, ClientDist, ServerSettings and
+  ChangeForms were always under the checkout's own engine\skymp\build, so
+  each clone and worktree read whatever its own folder last built: on
+  15 October a dev Ship from a worktree read that worktree's 12 October
+  client and refused against the 3bdf3d3c record, and the dev deploys needed
+  -Dist pointed at the right folder by hand (#2309). EngineBuild is the fork
+  folder this machine records as its engine build, in the file EngineBuilds
+  names ({"fork": "<folder>"}, this machine's own data like ShipRoots,
+  written by Setup-ShipMachine.ps1 -EngineBuild), and those four places are
+  under it. A machine that records none builds in its checkout
+  (engine\README.md "Building it on your machine"), and EngineBuild is then
+  Engine. A record naming a folder with no build in it stops with a sentence
+  and never falls back to another folder. where.js answers EngineBuild the
+  same way, so both read one engine build.
+
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
-  Which place: Repo, Engine, ServerDist, ClientDist, ServerSettings,
-  ChangeForms, Out, Dist, Package, Payload, ServerZip, Local, Backups,
-  Releases, ReleasesDev, ShipRoot, ShipRootDev or ShipRoots; or a top folder
+  Which place: Repo, Engine, EngineBuild, EngineBuilds, ServerDist,
+  ClientDist, ServerSettings, ChangeForms, Out, Dist, Package, Payload,
+  ServerZip, Local, Backups, Releases, ReleasesDev, ShipRoot, ShipRootDev,
+  ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
   from layout.json (docs, bot, voice, site, tests, game, launcher,
   installer, records, scripts).
 #>
@@ -121,20 +149,43 @@ function Find-InstallRoot {
     return $first
 }
 
+# The folder ShipRoots names for $channel, or '' when it names none (#2662,
+# see the header): what Setup-ShipMachine.ps1 -Root recorded, and nothing
+# the install rule would answer. Get-ShipRoot asks this first.
+function Get-NamedShipRoot([string]$channel) {
+    $file = Get-Place 'ShipRoots'
+    if (-not (Test-Path -LiteralPath $file)) { return '' }
+    $rec = $null
+    try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
+    catch { throw "$file does not read as JSON, so which folder a release is built from here is not known. Fix it, or write it again with .\scripts\release\Setup-ShipMachine.ps1 -Channel $channel -Root <folder>." }
+    return [string](Get-Named $rec $channel)
+}
+
 # The folder a release on $channel is built from on this machine (#1692, see
 # the header): what ShipRoots names for it, or the install rule.
 function Get-ShipRoot([string]$channel) {
-    $file = Get-Place 'ShipRoots'
-    if (Test-Path -LiteralPath $file) {
-        $rec = $null
-        try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
-        catch { throw "$file does not read as JSON, so which folder a release is built from here is not known. Fix it, or write it again with .\scripts\release\Setup-ShipMachine.ps1 -Channel $channel -Root <folder>." }
-        $named = [string](Get-Named $rec $channel)
-        if ($named) { return $named }
-    }
+    $named = Get-NamedShipRoot $channel
+    if ($named) { return $named }
     $root = Find-InstallRoot
     if ($channel -eq 'dev') { return ($root + '-DevBuild') }
     return $root
+}
+
+# The fork folder whose build\dist is this machine's engine build (#2019, see
+# the header): what EngineBuilds records, or the checkout's own engine.
+function Get-EngineBuild {
+    $file = Get-Place 'EngineBuilds'
+    if (-not (Test-Path -LiteralPath $file)) { return (Get-Place 'Engine') }
+    $rec = $null
+    try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
+    catch { throw "$file does not read as JSON, so which engine build this machine uses is not known. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>." }
+    $fork = [string](Get-Named $rec 'fork')
+    if (-not $fork) { throw "$file names no fork folder. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>." }
+    if (-not (Test-Path -LiteralPath (Join-Path $fork 'build\dist'))) {
+        throw ("$file names $fork as this machine's engine build, and there is no build\dist in it, so there is no engine build to read. " +
+               "Build it there (engine\README.md, One engine), or record the fork folder that has it: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>.")
+    }
+    return $fork
 }
 
 function Get-Place([string]$name) {
@@ -148,6 +199,12 @@ function Get-Place([string]$name) {
         'ShipRoots'   { return Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }
+        # Only what ShipRoots names, '' for the install rule (#2662).
+        'ShipRootNamed'    { return Get-NamedShipRoot 'main' }
+        'ShipRootNamedDev' { return Get-NamedShipRoot 'dev' }
+        # This machine's engine build, and the file that names it (#2019).
+        'EngineBuilds' { return Join-Path $env:LOCALAPPDATA 'Thornswood\engine-build.json' }
+        'EngineBuild'  { return Get-EngineBuild }
     }
     $place = Get-Named $layout.places $name
     if ($null -ne $place) { return Join-Under $repo ([string]$place) }
@@ -159,9 +216,9 @@ function Get-Place([string]$name) {
     return $null
 }
 
-$placeNames = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+$placeNames = @('Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
-                'ShipRoot', 'ShipRootDev', 'ShipRoots')
+                'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
 $folderNames = @($layout.folders.PSObject.Properties.Name)
 
 if ($placeNames -contains $What) {

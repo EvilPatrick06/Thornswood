@@ -1,0 +1,4837 @@
+{
+ "issue": 2553,
+ "decided": "Patrick, 15 October 2026, option B on #2177: no permission from the other server's makers is recorded, so the salvaged records are remade as Thornswood's own and the salvaged ones removed.",
+ "builtBy": "scripts/mods/List-SalvagedRecords.py",
+ "salvagedThrough": "b7c20293fb9fab4db317f3ff61dff3ea8bea1322",
+ "salvaged": "every record of the 13 September copy (0571ad9a) outside 0x05E80000 to 0x05E8FFFF, which Thornswood's own patch_esp.py added",
+ "hashed": "sha256 of the subrecords, inflated, editor id left out, one per distinct version",
+ "sources": [
+  {
+   "commit": "0571ad9a0d906030b9aecab03d39c7ff87c396ce",
+   "path": "tools/Thornswood-Content.esp",
+   "bytes": 158754,
+   "sha256": "71cedd37c226341eec1214fc3a67679ef4298324b7e938793ebb328b98a9e017"
+  },
+  {
+   "commit": "ef1ae5a637388fb5f4ef4ea8fd4b673afcb9a338",
+   "path": "tools/Thornswood-Content.esp",
+   "bytes": 141234,
+   "sha256": "3b3ecb3bda4b97e312df10a61191cdd2949286007ab03a948b323d4a749af2ae"
+  },
+  {
+   "commit": "35b19a45cead3a2ed1c51b460a6e099805fdb8fd",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 141442,
+   "sha256": "988b6d00e86d9e58b67a0da5f6ea145976a33a4ecee6bc814505fc98b6fcc112"
+  },
+  {
+   "commit": "9870453275ecdf3b28f0ea9bf459a7a7f0463624",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 143829,
+   "sha256": "338f1bb3df29f914ad10f1553fd00f2a74b2b3cd838825e90595322c03792ba3"
+  },
+  {
+   "commit": "7890f3389e8ebda91ec8e6508b92994b75124bae",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 144347,
+   "sha256": "ce167dc62b7184c2100e123d8b0da39fc5a9ebd08ec7d1e0a522d52ff598ed66"
+  },
+  {
+   "commit": "ca7ca0aa3fb1ba995dd91474b66669fa808a9879",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 145259,
+   "sha256": "6000b9010fbdb7cf8d0eca46addd59d12da83a45c51c70dea390294a5b887f56"
+  },
+  {
+   "commit": "fab1bdee1be1236f0afc92d6be7f27ecf268b738",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 146446,
+   "sha256": "b34abac05c6341087d7df35b095c52b7c8b79b9c6bb5f527cea607e653667e91"
+  },
+  {
+   "commit": "d62ce7145f36313c86d84cfb381da1780458963c",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 146381,
+   "sha256": "77e406a819fe8abe74ec19d80a60cec249a0dca1ee49c07d7cb5693dd0d32b13"
+  },
+  {
+   "commit": "f8527daa90b96a3098b843f57f6a5e5544333613",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 146941,
+   "sha256": "d05679e76d8dc930b236ebd906274a4c26b7959228d5ebca727cf5800469bf31"
+  },
+  {
+   "commit": "b992390120e0e82f9d64a81e2af69a8ed4aec3c0",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 147040,
+   "sha256": "b6bb2bf0454f256188da7eac44def4d6ef71af3884cd429e5a23bee817b1be53"
+  },
+  {
+   "commit": "4191fc11fd645440742dc9569c717e4fbfd5515c",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 147112,
+   "sha256": "644bb1c0afb885d852d894820f8519a0440bfba6d50d91fea2435733c6c93e2f"
+  },
+  {
+   "commit": "fc23f9e9d3cd05f56eb5b682b245adfeedb41d26",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 147259,
+   "sha256": "b67a156070ca586875978624bf23fa60fb531cb62ec3f2a40f2f5783c7282633"
+  },
+  {
+   "commit": "11d6bd02b77822b66f7edafe4c8372a65acac92a",
+   "path": "game/content/Thornswood-Content.esp",
+   "bytes": 151225,
+   "sha256": "37aa6a4531ae796d8e371afa4486305193c6e96a2e650abc55c93ed4542d80a8"
+  }
+ ],
+ "counts": {
+  "ACTI remade": 1,
+  "BOOK gone before #2553": 15,
+  "CELL Bethesda's": 5,
+  "CELL dropped": 96,
+  "COBJ remade": 6,
+  "CONT dropped": 1,
+  "FLOR remade": 1,
+  "FURN gone before #2553": 1,
+  "FURN remade": 3,
+  "KYWD remade": 2,
+  "MISC remade": 4,
+  "REFR dropped": 234,
+  "REFR gone before #2553": 1,
+  "WRLD Bethesda's": 1,
+  "WRLD dropped": 5
+ },
+ "records": [
+  {
+   "formId": "1547f:Thornswood-Content.esp",
+   "type": "KYWD",
+   "editorId": "ThornswoodCraftingCharcoalKiln",
+   "disposition": "remade",
+   "why": "the kiln keyword, the bench every charcoal recipe and the splint name",
+   "usedBy": [
+    "game/data/recipes.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "10cec9933b954488067fe3ca1487dd400996af09642eb7af8f6e96077ec89d37"
+   ]
+  },
+  {
+   "formId": "42e6b:Thornswood-Content.esp",
+   "type": "KYWD",
+   "editorId": "ThornswoodCraftingAlchemy",
+   "disposition": "remade",
+   "why": "the alchemy lab keyword, the bench of the poultice and the remedy",
+   "usedBy": [
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "10cec9933b954488067fe3ca1487dd400996af09642eb7af8f6e96077ec89d37"
+   ]
+  },
+  {
+   "formId": "593b:Thornswood-Content.esp",
+   "type": "ACTI",
+   "editorId": "ThornswoodMessageBoard",
+   "disposition": "remade",
+   "why": "the notice board, which the server stands in every town (#2516)",
+   "usedBy": [
+    "game/gamemode.js",
+    "tests/test-2516-server-boards.js",
+    "tests/test-516-woodworking-benches.js",
+    "tests/test-boards.js"
+   ],
+   "dataSha256": [
+    "d8edc874b8504bec9bbbaa2f01b320068b445d7a168705d0f582aa0c51aa674e",
+    "942567bfda55fb1bebccfe492cf8ae85c752d0889610ce70736620a6b152c104"
+   ]
+  },
+  {
+   "formId": "b276:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "8bb227046b80b023bb2652e6565ff254102a3a77c1f98bb5669e27024c76e2f1"
+   ]
+  },
+  {
+   "formId": "b277:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "76bf815cd7cbf99757d6871791bf6ee75154bb1908bdafcdb89e85cd6972cb30"
+   ]
+  },
+  {
+   "formId": "b278:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "9275031b0eb4b077299de019b17a8e84b0fde083ea795b6524fa740307a5521f"
+   ]
+  },
+  {
+   "formId": "b279:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "fe380f920c4a43c831bfb5dc4dcecd665e321fcf9a4ec77c13ba9f7e39dd8fe3"
+   ]
+  },
+  {
+   "formId": "b27a:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "971dc8f8bc17cc68c5d17936e4372c0df4bef2712dee10dee425f9901cb9f206"
+   ]
+  },
+  {
+   "formId": "b27b:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "0494b9eb842e7a66d5ae377999eb2f1e632d0e37205293627100fdc90ee0e4b0"
+   ]
+  },
+  {
+   "formId": "b27c:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "51b0ef3c59d91cef5822ff98c9791cfeef1cb54b59c3adb7200c1ece919ad196"
+   ]
+  },
+  {
+   "formId": "b27d:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "a081097dc66611dea0886c7197fbf2475f658c1992f9bffd7b555f0088f57ff7"
+   ]
+  },
+  {
+   "formId": "15489:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "6113ea89494a831b7c311c2f68c68164e50d5c3b4332b11efea7f6e315b363ad"
+   ]
+  },
+  {
+   "formId": "1548a:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "6104a16d3f88bc6e8ce551c55f61224c26f158b6282634794f2aae692d1c966c"
+   ]
+  },
+  {
+   "formId": "1548b:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "cb7ec3ca3f5aaebb946241416c1b1425473fa061aacd814dc5b9f29abda40c8a"
+   ]
+  },
+  {
+   "formId": "1548c:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "eba843a255849c0e7ceeea3355916affa0e4ed90451e257bda9ecb1aaa66d0e8"
+   ]
+  },
+  {
+   "formId": "47f6c:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "31c06b40fdca4c52fc812dc8c0511e314ac24645da41b89817964eb5690af572"
+   ]
+  },
+  {
+   "formId": "47f6d:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "0907eb4ac036a5b31e35b234b10fb0df306b1ff2f1d700eda7754ec8e8049f13"
+   ]
+  },
+  {
+   "formId": "47f6e:Thornswood-Content.esp",
+   "type": "BOOK",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "a skill manual, taken out by Remove-DeadRecords.ps1 before 25 September",
+   "dataSha256": [
+    "f95491b3cbf5494405840e504a6e7b5f0ac166bb33ccb84b6900160023298ae8"
+   ]
+  },
+  {
+   "formId": "1248:Thornswood-Content.esp",
+   "type": "CONT",
+   "editorId": "OreIngots",
+   "disposition": "dropped",
+   "why": "nothing in the repository names it",
+   "usedBy": [],
+   "dataSha256": [
+    "5abad120ca0aac5bd2622936da1fa7253f457eeaf6a7690c595a9906015cbbba"
+   ]
+  },
+  {
+   "formId": "15481:Thornswood-Content.esp",
+   "type": "MISC",
+   "editorId": "ThornswoodCharcoalTier1",
+   "disposition": "remade",
+   "why": "Poor Charcoal",
+   "usedBy": [
+    "game/data/items.json",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "4affa52973ba06125fefd2d5c30f82084e21da31928af1e2b2676132b6252b3d"
+   ]
+  },
+  {
+   "formId": "15482:Thornswood-Content.esp",
+   "type": "MISC",
+   "editorId": "ThornswoodCharcoalTier2",
+   "disposition": "remade",
+   "why": "Charcoal",
+   "usedBy": [
+    "game/data/items.json",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "68c54c4582bd9f6f99be2b745adfb2229aa55fa3376cc461a361f52d859eddbf"
+   ]
+  },
+  {
+   "formId": "15484:Thornswood-Content.esp",
+   "type": "MISC",
+   "editorId": "ThornswoodCharcoalTier3",
+   "disposition": "remade",
+   "why": "Charcoal Briquette",
+   "usedBy": [
+    "game/data/items.json",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "9a75bd2551ec0b2cbca8eac64d5e2aa5d8f6dfcca543e4202e300e25283ad1fa"
+   ]
+  },
+  {
+   "formId": "15485:Thornswood-Content.esp",
+   "type": "MISC",
+   "editorId": "ThornswoodCharcoalTier4",
+   "disposition": "remade",
+   "why": "Coke",
+   "usedBy": [
+    "game/data/items.json",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "71b37cbddd07774884658f7bdfcf15258ff05347d69227556e587934602ff057"
+   ]
+  },
+  {
+   "formId": "dbf8b3:Thornswood-Content.esp",
+   "type": "FLOR",
+   "editorId": "ThornswoodFloraBeehive",
+   "disposition": "remade",
+   "why": "the beehive, a farmer's (farmer.md)",
+   "usedBy": [
+    "docs/systems/classes/farmer.md",
+    "docs/systems/classes/gatherer.md",
+    "game/data/harvests.json",
+    "game/data/stations.json",
+    "game/gamemode.js",
+    "scripts/dev/Build-RecipeTable.ps1",
+    "tests/test-1377-season.js",
+    "tests/test-1378-shared-gather.js"
+   ],
+   "dataSha256": [
+    "07c04d0a664ceb54b756cf0d2c72607a7ee376ca5aab14b644d5c0c1c5a06387"
+   ]
+  },
+  {
+   "formId": "1547e:Thornswood-Content.esp",
+   "type": "FURN",
+   "editorId": "ThornswoodCraftingCharcoalKilnMarker",
+   "disposition": "remade",
+   "why": "the charcoal kiln, the Charburner's bench",
+   "usedBy": [
+    "game/data/stations.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "bddadde164418867ae2bc6f6a62d99f1d10ef01bcd39cac2ae7614d8553d6219"
+   ]
+  },
+  {
+   "formId": "42e69:Thornswood-Content.esp",
+   "type": "FURN",
+   "editorId": "ThornswoodCraftingAlchemyWorkbench",
+   "disposition": "remade",
+   "why": "the alchemy lab, the Physicker's bench",
+   "usedBy": [
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "93cd1bafb54c1f7050e57cab1ccab3e588482d3674692f95a78b9ebe97b9098b"
+   ]
+  },
+  {
+   "formId": "dde4ef:Thornswood-Content.esp",
+   "type": "FURN",
+   "editorId": "ThornswoodFurnitureSaltMine",
+   "disposition": "remade",
+   "why": "the salt quarry, a miner's (miner.md)",
+   "usedBy": [
+    "docs/systems/classes/miner.md",
+    "game/data/stations.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "6ca340303bb61a13ee8fc6211b41fc10373176eea60246d29e7000dc2ddd9ac7"
+   ]
+  },
+  {
+   "formId": "df7b34:Thornswood-Content.esp",
+   "type": "FURN",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "the Execution Block and its placement in Solitude, taken out in #954 (#400)",
+   "dataSha256": [
+    "6a06a076d6cb5a36611db7b2484a300cdfd24422960644932d0ed0b5df7f8050"
+   ]
+  },
+  {
+   "formId": "15480:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeCharcoalTier1",
+   "disposition": "remade",
+   "why": "Poor Charcoal at the kiln",
+   "sameByDesign": "docs/systems/professions/woodworker/charburner.md: Poor Charcoal, 2 firewood, makes 1, at the kiln",
+   "usedBy": [
+    "docs/systems/lists/woodworker-charburner.md",
+    "docs/systems/professions/woodworker/charburner.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "7dd83ee465280881ba1056b919091515b917e5a2db3f9ed9704089bb59f51bcc"
+   ]
+  },
+  {
+   "formId": "15486:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeCharcoalTier2",
+   "disposition": "remade",
+   "why": "Charcoal at the kiln",
+   "sameByDesign": "docs/systems/professions/woodworker/charburner.md: Charcoal, 4 firewood, makes 1, at the kiln",
+   "usedBy": [
+    "docs/systems/lists/woodworker-charburner.md",
+    "docs/systems/professions/woodworker/charburner.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "1fce356f1df77b7afff93fc2d744e64803438d68b6f623ba3b8393fbf7b852ab",
+    "e1633bf54815ec475b254b44393218ebe051f058c10a7804943dc19594e8d36d"
+   ]
+  },
+  {
+   "formId": "15487:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeCharcoalTier3",
+   "disposition": "remade",
+   "why": "Charcoal Briquette at the kiln",
+   "sameByDesign": "docs/systems/professions/woodworker/charburner.md: Charcoal Briquette, 7 firewood, makes 1, at the kiln",
+   "usedBy": [
+    "docs/systems/lists/woodworker-charburner.md",
+    "docs/systems/professions/woodworker/charburner.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "540a32d0929072beeac81ccc3e0eb171e8128a9565a1e613b865ffde4e3402a3",
+    "cd4cebbddf7ec446b95d6aab4bb8b3285c1ec37d69538fa1664e359107bed725"
+   ]
+  },
+  {
+   "formId": "15488:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeCharcoalTier4",
+   "disposition": "remade",
+   "why": "Coke at the kiln",
+   "sameByDesign": "docs/systems/professions/woodworker/charburner.md: Coke, 12 firewood, makes 1, at the kiln",
+   "usedBy": [
+    "docs/systems/lists/woodworker-charburner.md",
+    "docs/systems/professions/woodworker/charburner.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js",
+    "tests/test-2337-kiln-menu.js"
+   ],
+   "dataSha256": [
+    "e4a63c1c6bf49b2e89a2704a7cd41d8b6174ee91d1d4076898c6d2b1e465252e",
+    "d8c1460d93c11c88c60416012fb78bc5a15d1e87f5ae2b343dee83a1227eef6c"
+   ]
+  },
+  {
+   "formId": "1548d:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeWeaponPickaxe",
+   "disposition": "remade",
+   "why": "the pickaxe at a forge",
+   "sameByDesign": "docs/systems/professions/smith/edgewright.md: Pickaxe, 1 Iron Ingot and 1 Tool Handle, makes 1, at the forge",
+   "usedBy": [
+    "docs/systems/lists/smith-edgewright.md",
+    "docs/systems/professions/smith/edgewright.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "aeb2abdc28e96be7cecbeb797b367486a15f3e219aefab841f468c4b9f5d7eec",
+    "f347fd1972a7aa0fe0eca0213e4db1ade8a3931763c0008e58c4305047658ee6"
+   ]
+  },
+  {
+   "formId": "1548e:Thornswood-Content.esp",
+   "type": "COBJ",
+   "editorId": "ThornswoodRecipeWeaponAxe",
+   "disposition": "remade",
+   "why": "the woodcutter's axe at a forge",
+   "sameByDesign": "docs/systems/professions/smith/edgewright.md: Woodcutter's Axe, 1 Iron Ingot and 1 Tool Handle, makes 1, at the forge",
+   "usedBy": [
+    "docs/systems/lists/smith-edgewright.md",
+    "docs/systems/professions/smith/edgewright.md",
+    "game/data/merchant-role-tables.json",
+    "game/data/recipes.json",
+    "game/gamemode.js"
+   ],
+   "dataSha256": [
+    "13cb461ddb840c505aee7a64a321fa5b30ca78659477763d8fb711940cfc6b25",
+    "f28b298ac9f186ee0ab56ec682c75c264a04fdc6b8f07a455ceaca362b5ffe30"
+   ]
+  },
+  {
+   "formId": "1dba:Dawnguard.esm",
+   "type": "CELL",
+   "editorId": "DLC1DawnguardHQ01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "62f75f89b23ff12d6555fe6fdcd147eaa027fb9a1c5a4f58b30cb58b0ac768bf"
+   ]
+  },
+  {
+   "formId": "1020a:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0d:Skyrim.esm",
+   "cell": "1dba:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "nothing but the location ref type the editor writes"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "7bbd26bcd9d3018b7005550998fe19aba09dbca4a32ab136588f0dc518d371d9"
+   ]
+  },
+  {
+   "formId": "10341:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "1dba:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "8faa03ebd0d0e6a62893760f73148a35d4603c76ea3dc8f6a5db73c7cc527ef6"
+   ]
+  },
+  {
+   "formId": "1048a:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "1dba:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "nothing but the location ref type the editor writes"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "dd922683af167c2929b3d9a36d22cdb5f112a38a94d674bfafda676012bf6128"
+   ]
+  },
+  {
+   "formId": "dde4d9:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1dba:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "2c8271a424745964ef910e2915d726551fac917da4c659997edf70d63d4608c6"
+   ]
+  },
+  {
+   "formId": "dfd123:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "1dba:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "30d47a1ee9bb7157d76d13be428a9e91cbca0337f64beb1698ed4e9ffaa4beb3"
+   ]
+  },
+  {
+   "formId": "285a:Dawnguard.esm",
+   "type": "CELL",
+   "editorId": "DLC1VampireCastleDungeon02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "af9b494ddfb2fff645a2f67fb6ff925a4ca63d688b389e871b045a776e1748ca"
+   ]
+  },
+  {
+   "formId": "18841:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54173:Skyrim.esm",
+   "cell": "285a:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "6e4ea5bc39549dbb1a00498ddca6b07196675e19e3e55410dc28d853b29ff3be"
+   ]
+  },
+  {
+   "formId": "18844:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54181:Skyrim.esm",
+   "cell": "285a:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "3c3815d698ebffd716911446b43591af6cd4b86539ada15e30a017835521f9fc"
+   ]
+  },
+  {
+   "formId": "ddf7c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "AnisesCabin01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "bc15c2d61a78fed68bc5d73bc54a86d7edd0b4dd4b3561193382d35befe173c9"
+   ]
+  },
+  {
+   "formId": "ddfb5:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "ddf7c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9a9234e544b9768d4e695ee585572ce3b3f3023e84f8af932c82b50bdf867d6f"
+   ]
+  },
+  {
+   "formId": "de8778:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "ddf7c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "976a04c595d4be11f91d35a125c57acaf64a431d582269a1fad30acfb4232692"
+   ]
+  },
+  {
+   "formId": "1677f:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmNewGnisisCornerclub",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "7c84f1baa9574da8252701ec2517ed06a97068dae531b2f79ed1a6b68ff7eb2c"
+   ]
+  },
+  {
+   "formId": "10e3a8:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54175:Skyrim.esm",
+   "cell": "1677f:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "354260c5d457baa769c7da1869af9ee79cc0edffc6c4cd680265edf502875454"
+   ]
+  },
+  {
+   "formId": "ded8b5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1677f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "904a1bdb8ef4d4c3b1e9c8f836ebe9dedc1d4c5c9e226028979dccbeee6d2b9c"
+   ]
+  },
+  {
+   "formId": "ded8b6:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "1677f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "8be3082f331648f004e30110cc15110505cc317bed617ba624b5506e8f5bf738"
+   ]
+  },
+  {
+   "formId": "803:Dawnguard.esm",
+   "type": "CELL",
+   "editorId": "DLC1VampireCastleGuildhall",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "05d9989f09b3fd16dd38c1c07f7166edc5f5d1b2d4e5de2bce29102851315e97"
+   ]
+  },
+  {
+   "formId": "f462:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "803:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "111a94ba1835e2f87fdcb6110e8762503c0cdeec88a8e94085544cdaadaaa545"
+   ]
+  },
+  {
+   "formId": "c1b5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "803:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "883f45296751e0f05263faef30d157c905e3917c3c0df243c2491f364b02c1e6"
+   ]
+  },
+  {
+   "formId": "fcd4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "803:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "13ad0d794660c98c921ffc1babb148ad389f37d4f6f097de9104de4103733dd8"
+   ]
+  },
+  {
+   "formId": "97299:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmPalaceUpstairs01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "aeb0bef7e00b5610343a7dab8a716672dda86ebd362c730f0d30d2a07fd8395e"
+   ]
+  },
+  {
+   "formId": "10e3b6:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "97299:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1e731425cfb1004f00b5d1714a3318c9aaa144fe879a7c710945ccd5d3167e81"
+   ]
+  },
+  {
+   "formId": "4d073:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "97299:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "dc78e52fd620c47baf4a2c8a3365234d8ce08d82c3425102df24e0629aa31460"
+   ]
+  },
+  {
+   "formId": "36ed5:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WhiterunSeverioPelagiasHouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "5acb007fd90b0064b965342ee1b07ee42c900732f3e1a87829f6e5fe11f7b8fb"
+   ]
+  },
+  {
+   "formId": "10d98f:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "36ed5:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "71763b093974a1c795d91e7f7cff054b7da14662485ed0c283a42b42fe5a42ad"
+   ]
+  },
+  {
+   "formId": "11ac:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "36ed5:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "897ecc0c547c91311f7d6106737166dec923d020c7fb41972c588d9f233da5e1"
+   ]
+  },
+  {
+   "formId": "11ad:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10c73a:Skyrim.esm",
+   "cell": "36ed5:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "cbb2996dcd4395812081b4195f0ce657f6e6cae2251abd7c6962e8aece9c06be"
+   ]
+  },
+  {
+   "formId": "16776:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmArgonianAssemblage",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "6beb6a68f464895aa1eafa48ff9eb771ab5b340bf95b889539780e2e5a33a745"
+   ]
+  },
+  {
+   "formId": "c9302:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54181:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 271 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1aa7aa96877b93b36e7a72a01fd96cd6539be4dcfba728ee70652bb80bb155ec"
+   ]
+  },
+  {
+   "formId": "c9303:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54181:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 396 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "8333bad733d5da52bc9ed1cb5c556250636cccaf97affcb62ba18456196c2821"
+   ]
+  },
+  {
+   "formId": "c9304:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54181:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 195 units",
+    "turns it 90 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e246ba78ef0830993ad2ec196cd447aa1122c49b5dde8f66b1cc5cc0ad874898"
+   ]
+  },
+  {
+   "formId": "c9306:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54173:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 328 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9cc7138bdd1a3e805c8e8f2ffdc22bc43bd04dcf57e684aee59d6f7afe27bcda"
+   ]
+  },
+  {
+   "formId": "c935f:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 295 units",
+    "turns it 90 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "5157cc10e768597bd803ac742a66726d580405970940d4c27c3992da85c177c5"
+   ]
+  },
+  {
+   "formId": "10e397:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54174:Skyrim.esm",
+   "cell": "16776:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 249 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "ae78cf38d89655a6187532bb33dd859e91114923e38cd01a5bd98916615200fe"
+   ]
+  },
+  {
+   "formId": "c5aa0:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HonningbrewMeadery03",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "b8efbfa2d4ad846620a9fa1f56e2d5f3cb58eee024b99a1d613c3311c4913099"
+   ]
+  },
+  {
+   "formId": "5219f:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "c5aa0:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "577d6832fb404e1fa41fd41bf5b174101f2be61d55a60960d6fdd9db76d531b3"
+   ]
+  },
+  {
+   "formId": "dde4d4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "c5aa0:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "e007d91d10bc553e852bc753d81f656287d10c7b8f2c87c30ffbe8af8b6096ab"
+   ]
+  },
+  {
+   "formId": "1527c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "FortGreymoor01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ab671968d88c0c62234fa64fe764e57237b2bcf3f44260c9cf367fc8692be1e3"
+   ]
+  },
+  {
+   "formId": "6c338:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "2f590:Skyrim.esm",
+   "cell": "1527c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 76 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "09c19b37c6a0ead92e7951993706d18cfcfb1bc83b2efd896bfddcf483e12df5"
+   ]
+  },
+  {
+   "formId": "15286:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "FaldarsTooth01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ea35d8e7f8436c586f117c208d7ea114253a1a37ebdfdd61e105cea3752f636f"
+   ]
+  },
+  {
+   "formId": "aadd6:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "15286:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9d4799387270b2bf1410eabf6c36aee99daf5e98d0c71e71414245b6b63ed5c8"
+   ]
+  },
+  {
+   "formId": "152c3:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Alftand01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "300a62aecbdf7f2220cd14445e728acc97105a2aa24418aba7a2678e129107e7"
+   ]
+  },
+  {
+   "formId": "ab005:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "152c3:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "d9a167c9744c2f209eb7c18e34e719c7aa03855ab434ae4aedee738f49d4a408"
+   ]
+  },
+  {
+   "formId": "161ff:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "GoldenglowEstate01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "5bb6db9c2733e5c2af7092e7fbfb738c9de80f5dfb05f54494b0297c8e95c547"
+   ]
+  },
+  {
+   "formId": "ded8b4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "161ff:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "2c6a338abed0e640079a325e39cb3f99fbaba2c1ea3e5aefa093f3754bec2dbf"
+   ]
+  },
+  {
+   "formId": "15273:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "GallowsRock01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "847bc9d84467049649656c33e4a92757e02f1d72fb76c7b43cf3c4804c6b7a0b"
+   ]
+  },
+  {
+   "formId": "103a7c:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "15273:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "bde0d181fde7e18ba09b34cf2c9f237c555949d91c8ad8e4df32f4b9dbf6b118"
+   ]
+  },
+  {
+   "formId": "103a7b:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "15273:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "d016d41dd096e554cb612273246004048a252db227416891638317235414148b"
+   ]
+  },
+  {
+   "formId": "43fab:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HaltedStreamCamp01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "271086d46ccdb8c48192f980bda7142005f27f85e3ad715139f34dac6a976432"
+   ]
+  },
+  {
+   "formId": "53ae1:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "43fab:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 305 units",
+    "turns it 26 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "0862ad08aee352eea345e3976d393bea25f8bfcd2c1c55c2bff344f7b1a18d24"
+   ]
+  },
+  {
+   "formId": "aae2e:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "43fab:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "2664e2ff8fe9830258580b88f4d2fe265ccfebcc4b04d4a21b329d1271b18007"
+   ]
+  },
+  {
+   "formId": "d287e:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "5acdf:Skyrim.esm",
+   "cell": "43fab:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 17 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "62985699c9a81d1a8367f8fb1bd59ffea504b5ac2ae2f97d4d7c58eadd4508c7"
+   ]
+  },
+  {
+   "formId": "165b5:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WhiterunJorrvaskr",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "8a30acad089796b024052e87c9b17b33eb68d7d087ddf53519524080455c7051"
+   ]
+  },
+  {
+   "formId": "e631a8:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "68adb:Skyrim.esm",
+   "cell": "165b5:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "9003a50cac205dad7ce67ab3d823c97846e2fdce001886fe70a0c0015ddf7ce3"
+   ]
+  },
+  {
+   "formId": "16dfd:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "MarkarthEndonsHouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "4741967b67fd3551ea9878bf431817ada7f483c0a504fe54aeec05eadca4a10b"
+   ]
+  },
+  {
+   "formId": "76e75:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "16dfd:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "a7ce6bb42001ef4578ae3b909d12b0ee28e74ba3373b0652db121f83097f6819"
+   ]
+  },
+  {
+   "formId": "3ff10:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "FellglowKeep02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ca6375f4e10882b99a49c8cd55cbf37e7fab27bfbb86fcf069febcf109495d37"
+   ]
+  },
+  {
+   "formId": "73acf:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "3ff10:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "cfb5e669f937af8bc9fe06ddb222141c2a2e6d5d2e6988ebfcb6a66d2aa04bdb"
+   ]
+  },
+  {
+   "formId": "13a8c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DarkwaterCrossingVernersHouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "4146889c3e5018d1a774049d29248697c15db5b8037a9a4290dd964ef152a0d8"
+   ]
+  },
+  {
+   "formId": "e5558:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "5acdb:Skyrim.esm",
+   "cell": "13a8c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 10 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "123fb495ad03d0e48749924049d27b3177d5a03877cbfcb15a03c857b09d7676"
+   ]
+  },
+  {
+   "formId": "16782:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmSadrisUsedWares",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "2ef399113db7a5316242a9cff81f9b1b54687ea2e0a85baa2f398c11fc7b9315"
+   ]
+  },
+  {
+   "formId": "d6286:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad60:Skyrim.esm",
+   "cell": "16782:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "b014d67184fba1385d942a595c46ddde1478206dce87297bd9238c86f1642ad9"
+   ]
+  },
+  {
+   "formId": "d6293:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16782:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 32 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1f3766bc4c9530f89bb6e1afbe4ecab1d96e93b16382b5178df09d9e54253b0d"
+   ]
+  },
+  {
+   "formId": "10e3ae:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "16782:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 1156 units",
+    "turns it 88 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "d8d910475116a788f2a1e55a265ddb058c09b2e4191dbad21151ce6195f8251d"
+   ]
+  },
+  {
+   "formId": "10e3af:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10c73a:Skyrim.esm",
+   "cell": "16782:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 1156 units",
+    "turns it 88 degrees",
+    "changes its size"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e02ff640d38f64b3b0e9691c2817d29f38dc478172feaaca8a932baa01e6ef33"
+   ]
+  },
+  {
+   "formId": "16bce:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenElgrimsElixirs",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "862af51be639b0f2de501c48e2e48e653b1ad08bb20674247d0ba4f5c7ebd8fb"
+   ]
+  },
+  {
+   "formId": "16dc1:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "16bce:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "bc72064e75c0c523be3c00a325d28a36aa9eb3b4c509c6318cae2965f80a6aa1"
+   ]
+  },
+  {
+   "formId": "4d071:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16bce:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "c023d461a477678effc636dec869a04b85a7402e46194ba5479bdf09aaadcf10"
+   ]
+  },
+  {
+   "formId": "1678c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmWhitePhial",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "69375b69ab43b346f329060859fa4bdb8cedbe50aa356e9ff92d05ac01f8efad"
+   ]
+  },
+  {
+   "formId": "c6dff:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "1678c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 192 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "f128a2f4b9ada4cbae793e21519da4c39fa193abcfb301f867323718f21ddd49"
+   ]
+  },
+  {
+   "formId": "4d074:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1678c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "8e9cd034ff19298ed0c456e1de2b9ca80a210e9ba36fd1222d3d14c5f40cd42f"
+   ]
+  },
+  {
+   "formId": "15288:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DriftshadeSanctuary01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "a9e8f7c4326b6d350956d7690e63efb9a8abd13b9518ac49884fef4925687824"
+   ]
+  },
+  {
+   "formId": "103a73:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "15288:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e5b2c786a5eb94f2df25630e93f3e136fd3eeee2dfa7c3f4e16dc271df1cd024"
+   ]
+  },
+  {
+   "formId": "165b6:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WhiterunArcadiasCauldron",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "763ac39cfa02ebd886dda2e2527480e00276960e4727feaf3dff4403f07a291f"
+   ]
+  },
+  {
+   "formId": "c6e45:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "68766e9dc6b182a87d365ea3775fd8e8ec96d98c8f2eb7c6bf827266698f13e4"
+   ]
+  },
+  {
+   "formId": "10a7:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5f:Skyrim.esm",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "0d2908a0016db7f4c30117b617bbf80edd7bc023aa4d2d39eee2125a17327a0b"
+   ]
+  },
+  {
+   "formId": "10a8:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "9e67dc405a690197f446013ac8c515f94fc442a7bbeb97bbfd7a84defabc878c"
+   ]
+  },
+  {
+   "formId": "5993:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad60:Skyrim.esm",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "4cb87a6fc85f518fbf5558117db57deb73769764733d70efbaee540d3b7c0996"
+   ]
+  },
+  {
+   "formId": "59e9:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "e6430673ebceb95a838588883085a718bdae2739727b85c8a3fd7a23f76e7c32"
+   ]
+  },
+  {
+   "formId": "42e6a:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "165b6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "6ca84c4f02df9a038d9ff4f28f3a1ef374361ee04f9a987bcf45b70a5f4632fe"
+   ]
+  },
+  {
+   "formId": "13870:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RoriksteadFrostfruitInn",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ef0321c92dd4a21b7774675865b416d2c76d3eeae5f1e7291c0abc492409f9c0"
+   ]
+  },
+  {
+   "formId": "19f0a:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "68adb:Skyrim.esm",
+   "cell": "13870:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "cc16805a96a57ff5e5f04cc6fda3aee8d1b35bd22a950e1be966cd190095d8ca"
+   ]
+  },
+  {
+   "formId": "1f08a:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "13870:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "562df59472421eba410b74df7bec9f1b727e5f4830a5564c0a0f579296141818"
+   ]
+  },
+  {
+   "formId": "1f08b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "13870:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "fda97ed4ea62b2eb345f1d491cb7666e5b98e900d4543f8f309b38622b232a2a"
+   ]
+  },
+  {
+   "formId": "1f08c:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "13870:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "bb37d02e7e7f7b29b59b4b6450c906afa08b9bf25a0eb9c6f84bc2a5208bd0b4"
+   ]
+  },
+  {
+   "formId": "29401:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "13870:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "6e02d406b5b8ada5c29079acd92e514c76cd0537a9b81ea325b092a3bb680570"
+   ]
+  },
+  {
+   "formId": "15238:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "NarzulburMauhulakhsLonghouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "b06887e3f2f6df3f19329153069df005bc92c8ae516799c7c1988e0a57ea2584"
+   ]
+  },
+  {
+   "formId": "b0f94:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54175:Skyrim.esm",
+   "cell": "15238:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 18 units",
+    "changes its ragdoll"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1a7f8318f445ee2247695dfb5680e20129a558d6317f9918c7cc0a2821c4cff4"
+   ]
+  },
+  {
+   "formId": "521a5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "15238:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "73c8634647ee797da7a75a6622500f297a4af06d4a829a3ec9a2b0d71fb25dad"
+   ]
+  },
+  {
+   "formId": "16a0c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeBardsCollege",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "6ef075ffc140f7b9c1975e21b83d99e3b8d45bf713cf32c471b0c34d66e1757f"
+   ]
+  },
+  {
+   "formId": "10e32c:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54174:Skyrim.esm",
+   "cell": "16a0c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 37 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "664242054c41a03c6d0e13320234959712f8734825f2c4fa7e266b37c25561a0"
+   ]
+  },
+  {
+   "formId": "29071:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16a0c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "3fca25577f47b7bb85a529b99f3b8c994585dd25b4a6b2ba19ef6d7f36b1c5d9"
+   ]
+  },
+  {
+   "formId": "e0c55b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "16a0c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "d92cedd8dc9bb0642bfee7f633ed21c6d94de86ed1bb98171a57056a7edfbb1f"
+   ]
+  },
+  {
+   "formId": "2bcd7:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WinterholdCollegeMidden01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "6270d81dd612f597ca4120d5762ceb4dc84efeb079fc74cfbf7b1db34f2a3742"
+   ]
+  },
+  {
+   "formId": "208b3:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "2bcd7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "e5798af0478d00fc17e81f3bad266c2b6c3293466f53d325ea3e6462a89685e5"
+   ]
+  },
+  {
+   "formId": "79f9f:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "KnifepointRidge01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "32f4c98e932b2c3026cbda309b5e897e36bfc08f5d238045e870a3dd00a6bda5"
+   ]
+  },
+  {
+   "formId": "a66a3:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "79f9f:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "a1163a4228f63a96ebfcc377f219859b0580e53f5213db886dbd469f7254e26a"
+   ]
+  },
+  {
+   "formId": "a1bfd:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenRatway02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "c6bf027a83e4c02045f4c4cfae49acdb6107402ad6fe41a31ffcc8d20ba14062"
+   ]
+  },
+  {
+   "formId": "106a08:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "a1bfd:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "f3f3ea97d6279c4424bc33306aba9fa139b62f835740f667db1229bbac30b44c"
+   ]
+  },
+  {
+   "formId": "16bcf:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenRaggedFlagon",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "68284e2047e3f3a0f176807d890b873b09cba6dd649caf51242333dea217f0e4"
+   ]
+  },
+  {
+   "formId": "db776:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "16bcf:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "aa66c983388040109749f1e09490ceda4f1802a0bda3c17acce428c8ed805a0f"
+   ]
+  },
+  {
+   "formId": "5eab:Dawnguard.esm",
+   "type": "CELL",
+   "editorId": "DLC1RedwaterDen01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "7cb32d45faf476258d5dd3979e346c26c2a1283a76e90ccbe946b81c268a447f"
+   ]
+  },
+  {
+   "formId": "13e87:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a9191:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "a297a1e4884639100c6edbd2f726c775d7702a2dbde224bba713a2e924e47477"
+   ]
+  },
+  {
+   "formId": "13e8c:Dawnguard.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5f:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "63e168f7c5f4360ec1fff76753de955e19106aadad2aeb3ca8cf0239ed5205cd"
+   ]
+  },
+  {
+   "formId": "111f:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "49487e480aeb286201ac960277b4064ba220561157cad28b44dc25c29edf27c4"
+   ]
+  },
+  {
+   "formId": "1143:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "db835127ffbc12ec2c3f31dc4a85e1305e636036beca2bbcf6f95c4614f3f29e"
+   ]
+  },
+  {
+   "formId": "1144:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "3cc8c311fb3c8f16ebf4e06e476508fff50cfa190339de22339d280c31cd62d4"
+   ]
+  },
+  {
+   "formId": "1146:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10d3db:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "96685a14a09c3aeff284211289baab9121e064bcd33f5855867e2ea2c9ecd440"
+   ]
+  },
+  {
+   "formId": "1147:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10d3db:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "44fb06d122f4e4218bca75912d21a9d8fa7e03d155208185430a5caf4e360d57"
+   ]
+  },
+  {
+   "formId": "aabe:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10d3db:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "b3dd83b00e6d43fc4cff25f27bd42897245f9571ea807aaa59041b3b67306c3d"
+   ]
+  },
+  {
+   "formId": "dfd07d:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "5eab:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "ee9b2aebc2119ff414fec461cf830f49dd0e601f5b175626eebac1fef15cd695"
+   ]
+  },
+  {
+   "formId": "1527f:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Forelhost01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "4f13257e232c478269e33de56420609b0e315719d7620c556ae926925fb18320"
+   ]
+  },
+  {
+   "formId": "24191:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "1527f:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "39904f85c99146cbdd084468425efd7a0417badaa606e5fcc3c3328cb708680a"
+   ]
+  },
+  {
+   "formId": "165a3:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WhiterunDragonsreach",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fc25817672349cee0698f6478a405a8cc4f1878e41a08331df10014353557d1c"
+   ]
+  },
+  {
+   "formId": "10d982:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "165a3:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 594 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "bc35234e5e27cb4c9f73c114bddbe6e195fdeeb98e551ec5a62d13152fa30c10"
+   ]
+  },
+  {
+   "formId": "4d070:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "165a3:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "5d82b3b8cd3094cfe75700a31516e8e88efb8e7cefd9e771cad8e1457137e674"
+   ]
+  },
+  {
+   "formId": "4401b:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DruadachRedoubt01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "b1b8fcca54ee4937307dca33161e0fab7b7637df0fce09f1a0bc9811d46d509e"
+   ]
+  },
+  {
+   "formId": "83f7e:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "4401b:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9179480534d3300fd362277984ac7b1a5b09a457219e377e60f9b9bd02259530"
+   ]
+  },
+  {
+   "formId": "83f7f:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "48748:Skyrim.esm",
+   "cell": "4401b:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "aec37926d9c5b26b982157812ebe812b1bc0f5ad33886238869cda08159b00b5"
+   ]
+  },
+  {
+   "formId": "56c1b:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Alftand02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "278eec331257f7bffe11d360ec6596589baa2aaf294f0ba2a8b67271df0fc257"
+   ]
+  },
+  {
+   "formId": "10f39a:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "56c1b:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "cdb5ed9db56aa565d44d833b017bbb7b16dd183f51fbac2c1f2c981813692013"
+   ]
+  },
+  {
+   "formId": "15239:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Morvunskar01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "5ca679f32dfd4f7e4aa14211dae3a7894afc6289c88ab2c244badcb37b9626e3"
+   ]
+  },
+  {
+   "formId": "54185:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "15239:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "725c17fd02dfd4537d949fb2a2ec724546d298d9f1da16aeafd7a72ab7c90b93"
+   ]
+  },
+  {
+   "formId": "53c69:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "15239:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "c3416f6bcf283432458f8cbb940c03efe11c8c8b48ea0aeeebcbd0b82231d0c7"
+   ]
+  },
+  {
+   "formId": "16df5:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "MarkarthSmelterOverseersHouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "0a77a788d57f944957296effd7fb0da00e0d1d843602278c0548070b5d685b2f"
+   ]
+  },
+  {
+   "formId": "da599:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "16df5:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "13b2127f65e5c54aa9e7b8bdae87c7e5243e6e3582d29c10e90c9f974900007a"
+   ]
+  },
+  {
+   "formId": "1c080:Dragonborn.esm",
+   "type": "CELL",
+   "editorId": "DLC2DamphallMine01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "5aefe7d5f4e0fe022623fcd57cafe95c0dfbac8ccc981aa87aa823670e682109"
+   ]
+  },
+  {
+   "formId": "3b4ca:Dragonborn.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "1c080:Dragonborn.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "0f1f2823095eceedb689a9c485bebfb2cec086be464e406ea9c11e7543407efe"
+   ]
+  },
+  {
+   "formId": "16784:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmAretinoResidence",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fa83fe4ab81324aa457a26a6118c5ae4f020065227d789a9b798f12b5bf2fa88"
+   ]
+  },
+  {
+   "formId": "c7214:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54181:Skyrim.esm",
+   "cell": "16784:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "67a7ed80b40b30826fb889247923c7e98a64779df814e371bdf24befde78a044"
+   ]
+  },
+  {
+   "formId": "c722e:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16784:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "nothing but the location ref type the editor writes"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "dce009269206c9a22a02a34d4682f0e9f18ce7e1eacc8223af9eae05275e63f7"
+   ]
+  },
+  {
+   "formId": "13a5c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "IvarsteadVilemyrInn",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "19dde792403b9f5a3e43cf83d354b155668e2ce7acc9d233df02ee7eb0760179"
+   ]
+  },
+  {
+   "formId": "6bba:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "68adb:Skyrim.esm",
+   "cell": "13a5c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "e34cff436edc0c961e354f080b7213f5fed8609160ce265d2cb5fae2a7301b9f"
+   ]
+  },
+  {
+   "formId": "16a04:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeBluePalace",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "98969889f0f78fbab6cc596c3476d00e48dc3421ff1a40375e6f31250d49a8bd"
+   ]
+  },
+  {
+   "formId": "10e332:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54174:Skyrim.esm",
+   "cell": "16a04:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "97e6f60198ef5a2b1b2d54acaff09368209b61bda0dc0860f22e0d9533cc4ee3"
+   ]
+  },
+  {
+   "formId": "1efbd:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16a04:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "eab440f9e15584c5f7dbef3394f838d035cecb0721f6471e180b190ff1b92361"
+   ]
+  },
+  {
+   "formId": "1efc4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "16a04:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "1d728aa86060b7eb99d8e6cf5b98f026b596373e107f653a25134eb097d03be6"
+   ]
+  },
+  {
+   "formId": "1380e:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WinterholdCollegeHallofTheElements",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "e4a1792d1e06708f3f5c2a2229c05a9c6509095510202c9eb92e29f3e657e5da"
+   ]
+  },
+  {
+   "formId": "4d097:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "88ca104f71db8b1df114be938dad56fae56c5cecaedfd1ea686026cebc2b5449"
+   ]
+  },
+  {
+   "formId": "4d098:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "4e313a8df91b1a21f61d03d934377b23835271f1074cd31b9e7d7f6c0c3a7d36"
+   ]
+  },
+  {
+   "formId": "4d099:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "835cc0e1d96edc56c8fc48c8bc0f7538a865ea1f19e72baf778cd578fd29c641"
+   ]
+  },
+  {
+   "formId": "4d09b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1380e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "e5ae30ee03c34c781c50b5a6e6613e4f2936005b554279e162e78e7c9d5793b8"
+   ]
+  },
+  {
+   "formId": "16a0e:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeWinkingSkeever",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "dd8430d52903b727753fb8ceaedd9c6e463121f16ee7f4d164ab1d059303d815"
+   ]
+  },
+  {
+   "formId": "5219d:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16a0e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "007cba3d934bfc4db3c400869c32d3d9040fa7016e29cda15cb5d3fa38b15d74"
+   ]
+  },
+  {
+   "formId": "5219e:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "16a0e:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "66ab9cb7000d352a90ebbd913e3c16c413c32883c25313fb827776103d82fe6f"
+   ]
+  },
+  {
+   "formId": "213a0:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeCastleDour",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "d7dce01d9ba1f0c71d7b61697798a3d1369e81bb1cfb1820cdf259920fe044ef"
+   ]
+  },
+  {
+   "formId": "10e335:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "54174:Skyrim.esm",
+   "cell": "213a0:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 16 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "48aa0cdcd5f6c2fb3c4dfc37393ca171f4a2bc61056b215f45201bab067fd1ce"
+   ]
+  },
+  {
+   "formId": "aa4e:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "108230:Skyrim.esm",
+   "cell": "213a0:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "66cbe50657645c57a672be53be593f9cbc8633b88da740f6c842ec704417118e"
+   ]
+  },
+  {
+   "formId": "aa55:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "213a0:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "d3becd51561cbe85d7d02656034f5a43af3c04bfef3f1482eb044bae6e794c1f"
+   ]
+  },
+  {
+   "formId": "13a7c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DragonBridgeFourShieldsTavern",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ecac41ad59b68b6b811e97e044c14db9e9866e625873e5027b579be5e825feeb"
+   ]
+  },
+  {
+   "formId": "dfd105:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "13a7c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "3bc235069d80d9614935b2f8768d4b57aa6b69caa763c9480584bcc4ba739839"
+   ]
+  },
+  {
+   "formId": "b6be6:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "EmbershardMine01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "c4403803c9cbf3073f7c57ab4d5393a26fb4a284040a709dbdd0d71cccfade59"
+   ]
+  },
+  {
+   "formId": "b6e27:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "b6be6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e220cf65ee68861c98175170f3b925361da4157c8e84a61948cdddd604d61e42"
+   ]
+  },
+  {
+   "formId": "fcc67:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "b6be6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "b1ea48651befe5857e75246540f6ad41fca364b1652f36077390c0e5543a2ed0"
+   ]
+  },
+  {
+   "formId": "b6e28:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "b6be6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "b056f13588249fe925222da48ec0642f9fc803ed8bb3e6f6f51481b198c6c3a1"
+   ]
+  },
+  {
+   "formId": "16bd2:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenMistveilKeep",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "27b603addd9909352c51080690bf68fc373359fbdaf1016bdc0c5b9c7f84b074"
+   ]
+  },
+  {
+   "formId": "10d84c:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "16bd2:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "039556c0461a8af1ec82b3f1b9d898502d82fc8d81abc8e927d8f5b18beb817b"
+   ]
+  },
+  {
+   "formId": "e53d80:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16bd2:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "96e6675b61ae9442a60d39304108794873e29dd5993f6d22ee60b5b27c779563"
+   ]
+  },
+  {
+   "formId": "16bdc:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenBlackBriarMeadery",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fdf4997c3167563469d696a9962c6f8abd53f3dc7e4bf2b5c32104273b8e2882"
+   ]
+  },
+  {
+   "formId": "a6300:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 57 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9d0e0292a6ae8bcb4a1bf189a4f05f0bf9afda4272f167b22968643e434a2d48"
+   ]
+  },
+  {
+   "formId": "a6376:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "34cdf:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "ba2f886f007fbb3be457262b9d25e8a0d422523eaf3ec2f8be57a0f5444f797c"
+   ]
+  },
+  {
+   "formId": "1259:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "05c5897f505297ccc32f50d7c76e62b2194883cd74c63fcb8961a752cccaeaaf"
+   ]
+  },
+  {
+   "formId": "1268:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "1a1eee02249e82774e96906006e2574fb2921d445cfaff281fd51e26344af4c3"
+   ]
+  },
+  {
+   "formId": "126b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "5dbed6fa3904d3d1df17b87811dcde746023cabe9856e8d5091869c497844ef2"
+   ]
+  },
+  {
+   "formId": "1270:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5f:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "127c35b77e79c2b7d43f54be6b64cc3cec221ef4aafc66502ef308148c198d36"
+   ]
+  },
+  {
+   "formId": "1271:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad60:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "7e1ac1e101a73a8727fe6b04297739a65ee06f7aa791ef5d0166dbc5a9c906a1"
+   ]
+  },
+  {
+   "formId": "1272:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "8b88b9db57086f67cdd797cbc24f949033650c06c20408e93418fc0a641e88e2"
+   ]
+  },
+  {
+   "formId": "14d8d:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0d:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "9b3da53f6c1d21650d3d9aa482c58f326f28a587f4d5f9222b8f6f1f5d12635e"
+   ]
+  },
+  {
+   "formId": "14dcf:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "10d3db:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "833c215eb79e7fd17fc4665bf7a88de1145fcd5a95ced662b1f54849a1796d46"
+   ]
+  },
+  {
+   "formId": "e68733:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5f:Skyrim.esm",
+   "cell": "16bdc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "fb7fa441b8ab8abfcc86969e64053075ac0a584e6d60340d73792ae6be6fee77"
+   ]
+  },
+  {
+   "formId": "16a06:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeProudspireManor",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "73aae971bea5edf8430f90a01a30ef19ae616ec6e5ba02d080ed27201c75d878"
+   ]
+  },
+  {
+   "formId": "e2699:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0d:Skyrim.esm",
+   "cell": "16a06:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 15 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "5a3c5673070a0c8e063791fc5eeebe474368701a99a0615d50e943368a4b0905"
+   ]
+  },
+  {
+   "formId": "10c206:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "16a06:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 43 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "4b3f1035e62aa5963447855d9d3cc5e9aa7a921fb15f0318bc73b723bb72f6cf"
+   ]
+  },
+  {
+   "formId": "131b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "16a06:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "fffe4ce2793b7fc36177d750f78245ef01354e824fe00efca5dff677c9d5a238"
+   ]
+  },
+  {
+   "formId": "ad5a1:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DarkBrotherhoodSanctuary",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "3b43bc64a281616029c5faa789c9141ce6a6b98f517f1f4e521f5b333d0ef97d"
+   ]
+  },
+  {
+   "formId": "3a38c:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "ad5a1:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "a89f19a2994539ea8b4b71f92bec66107a6774faf2fdb647cce0c4488ea66044"
+   ]
+  },
+  {
+   "formId": "3a38b:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "ad5a1:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "2cb7d22df97107480af9e48b83abe2f4d92afe38d6b92c96516b3d07e783461d"
+   ]
+  },
+  {
+   "formId": "103641:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "ad5a1:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "bdc7d7ccbc59ae195241e2a20f61f0f6af11aed5d0c8f91c42136b7bf00e80df"
+   ]
+  },
+  {
+   "formId": "965b3:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmWarehouse",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "9689754579a4bd7c4f17af0bbf5b49518a417268b46a5702e6749e79b5836d39"
+   ]
+  },
+  {
+   "formId": "fc47:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1248:Thornswood-Content.esp",
+   "cell": "965b3:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "174565798a8c2e8a63bcd197d8c4c9b68b10104f4b8b1a120ceac8d06f010c72"
+   ]
+  },
+  {
+   "formId": "15233:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Orotheim01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "ad95bc21b27be6d667b61b076ed3689b01e6604313eca2ce07f6cadf46a2c36f"
+   ]
+  },
+  {
+   "formId": "f3113:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "15233:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "3f3870b674d012deeeeecd825ed43e95e8541d9a96067cd94fc25ea279d0fd2d"
+   ]
+  },
+  {
+   "formId": "f3114:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "15233:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "changes its links"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "20ef858b177c0511113ff11e20cc39b7bb87b43f046016cfb581d46200b59d75"
+   ]
+  },
+  {
+   "formId": "4761b:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "TrevasWatch02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "b7bb57462bd83a909e9fba093aca192c50e77aa4908e51abced1d28edc4977e8"
+   ]
+  },
+  {
+   "formId": "4d52b:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "4761b:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "f2c2d70e05fd0a27208601a36efccb941f4701d89fb11f5aa854bb456df50c5c"
+   ]
+  },
+  {
+   "formId": "16a11:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeAngelinesAromatics",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "cd291d0c3fc1ffa45e60e6823c9393f747572a6b42a234c3c917119ad897bd6e"
+   ]
+  },
+  {
+   "formId": "c6ce9:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "16a11:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "2fb97062b4b74c86110cf1da0f894a3057c9d8ebbed21e5314152fc4548e61b4"
+   ]
+  },
+  {
+   "formId": "4d072:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16a11:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "d6c9e0b51d76fbe3c31409db14c6205eb04c25f0a85f4d60a01bf3a084eb371c"
+   ]
+  },
+  {
+   "formId": "ba599:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "BrokenOarGrotto01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "cd3486f71fa7d8705be8ee203e41ad0feefcff9de57e985ff931063540b5da37"
+   ]
+  },
+  {
+   "formId": "ba987:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "ba599:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "c9fa2b9c830e7a1657ba227a0cbb790bdfdc687db5370a0a745377e6c9669489"
+   ]
+  },
+  {
+   "formId": "100dab:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "ba599:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e8388d494e2362e2fb8602b029ec9b0c1057583de2f5c333439480ab92673221"
+   ]
+  },
+  {
+   "formId": "ba98b:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "ba599:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "changes its links"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "277e721682bcd8bb5ebbcb0599f78ce017bcbb17add293c2313285bedbe3fd15"
+   ]
+  },
+  {
+   "formId": "3c:Skyrim.esm",
+   "type": "WRLD",
+   "editorId": "Tamriel",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "499fd2f9506ddafd80e3bd942ce7540d869047508fbad0cd821cc80c2c10e473"
+   ]
+  },
+  {
+   "formId": "d74:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "20f312d5579f51c1567443f0fe0ccae50e89d2b40ddc6bd2680e8baed224015d"
+   ]
+  },
+  {
+   "formId": "50be2:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "bedfbab997254c8a8c417830eeb42f5ca216a58b827a299c192930fde579ad7e"
+   ]
+  },
+  {
+   "formId": "53f53:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9ad82a5b6c94a7eef88f17e8f09dbeb80045fee3bdcf6ededc30e00fae667ad9"
+   ]
+  },
+  {
+   "formId": "5ac8d:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "4a81e37e921091a2d0c7e5a6979d41dad11368ab5aef8a449e4a9d736d3cbbee"
+   ]
+  },
+  {
+   "formId": "798aa:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "0c1805a20699cfc92c35956c3c5660bfdd71804bf12799fb8c2621e50c7d531a"
+   ]
+  },
+  {
+   "formId": "8e0fe:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "changes its links"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "b09839fbca16b86bfd31f361201704767d474d63bd39a40bc1791a0513e59d07"
+   ]
+  },
+  {
+   "formId": "8e101:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "2c5f12bd26f1d9c705c410446501b0ae47fc97c5238b469d38039b4a94547894"
+   ]
+  },
+  {
+   "formId": "8e113:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "cd218035184b41dc0f738e9310e1bec06f1d7568ff8bc6c1903a45e153ec5c8c"
+   ]
+  },
+  {
+   "formId": "98b83:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6df:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 86 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "6dfc96d2d8c091f91c0b21c63d151f65da6abd68218d0b8d1a436cfe9052be81"
+   ]
+  },
+  {
+   "formId": "c78d2:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bad0c:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e2a13aa6d7218b77072af50aa7dfd1eb923b15e72912045afff0701b64832744"
+   ]
+  },
+  {
+   "formId": "e76cb:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "d74:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "425327fbb07caab30d1f4f0385084e18d3f0ce26bae6e1831be2f0255abcb074"
+   ]
+  },
+  {
+   "formId": "9144:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HaltedStreamCampExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "00273b454379bb2c2ff28328b9dd453d4c4fdc0b9c3c9cd7f41fd998c0ef69ca"
+   ]
+  },
+  {
+   "formId": "aae2d:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "727a1:Skyrim.esm",
+   "cell": "9144:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 833 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "925adf6c93c8cda1226fc7ca3cb04d6cfb444ae039146ef0d88fe5cfc9d7f83f"
+   ]
+  },
+  {
+   "formId": "9101:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "LoreiusFarmExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "8e1d6affcc3cd2a40bed09a8ad3854df52af67de4c51106204216e8eea05eddf"
+   ]
+  },
+  {
+   "formId": "521a0:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6df:Skyrim.esm",
+   "cell": "9101:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "f0e836cb45bc8185461c597afc3297a1e991b8ba834336a32785220117017840"
+   ]
+  },
+  {
+   "formId": "90cc:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "db9733f82ab703ef3dfae6f3f54afae3859a3b3919f2f3c8d929487b151fa5a5"
+   ]
+  },
+  {
+   "formId": "dde4f2:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "90cc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "712ecc94cfcb1398d40ff8f361b30c494b9a107c69621551c3e9804272cad76e"
+   ]
+  },
+  {
+   "formId": "90eb:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "13efbaf50e5156185a40beb15853b63816150f9fb722ae702bc38424c1598c36"
+   ]
+  },
+  {
+   "formId": "dde4f3:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "90eb:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "0e233e2919c8c829b7e16564327395fa661e8a23bfdab0d37b9e15b8debcfca7"
+   ]
+  },
+  {
+   "formId": "9713:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Riverwood01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "94be3a98260db3ff8c35a8497350ce7036bfee0f423829be8925d65c89ac0aa9"
+   ]
+  },
+  {
+   "formId": "29891:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "9713:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "152996c81ee17673d177b7413edf55fe4e904c19baf4ee9d8fdbf34cf7866eb6"
+   ]
+  },
+  {
+   "formId": "9b4f:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "AnisesCabinExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "856d5c99e72aa08f73ba5a7b78471debfb3d5e9c8f1f45d444e7db43fe3308bc"
+   ]
+  },
+  {
+   "formId": "111fe:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d5501:Skyrim.esm",
+   "cell": "9b4f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "088d1684b69bf6faa39dc7f66c71161587672ba4e9ea3fa9044aca74197ff6d4"
+   ]
+  },
+  {
+   "formId": "1121a:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1018e3:Skyrim.esm",
+   "cell": "9b4f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "59970db58782c4bc2985a199da50db29d89bfa9fc866131c9957f1cf95e3ec2a"
+   ]
+  },
+  {
+   "formId": "1121c:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1010b3:Skyrim.esm",
+   "cell": "9b4f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "00782d2742d07dfe8efa46b4bbcad50bf40b1edfc455f7e50fe7183e672aa78f"
+   ]
+  },
+  {
+   "formId": "9618:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "ChillfurrowFarmExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "e24315e084e73aa83ce0048cec6be01c6394a341bb70853a3319d570a2d3ea15"
+   ]
+  },
+  {
+   "formId": "4d093:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6df:Skyrim.esm",
+   "cell": "9618:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "f4b6d518f69644459313161b28938cbb8d233f1ec1e00548c3d2babfe001c858"
+   ]
+  },
+  {
+   "formId": "dbf8b4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9618:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "43b3e7c71d8a782a84c8213fc27b41a1a1ebc5235481dc156cefda07d6cc538d"
+   ]
+  },
+  {
+   "formId": "dbf8b5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9618:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "f171db7953583a70c9992a9ba50fa6d006779f09c23768f5a712da1a6fdb8220"
+   ]
+  },
+  {
+   "formId": "dbf8c0:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "68adb:Skyrim.esm",
+   "cell": "9618:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "4f30f41a29662dd71c810c579f5ea1388495016eae3ef32d8593aab6d477fed6"
+   ]
+  },
+  {
+   "formId": "9656:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HonningbrewMeaderyExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "029969ecc036ecba547e833e3597f2280c088c04e3e9ddf4d9db880f127559c9"
+   ]
+  },
+  {
+   "formId": "20812:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9656:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "69ac0d7e71c3010f3e83bfefb59f31f4f289b540e5bf33ba505e3fe784e6f01f"
+   ]
+  },
+  {
+   "formId": "20813:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9656:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "40d3e29ceca0d6b134eae30c86b09509d28bead227daa92c9edea1df51fec6d7"
+   ]
+  },
+  {
+   "formId": "9781:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "IvarsteadExterior04",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "48cc10701bc8701e7f6e95f28f8be22f81fe23d57b36d8c201588627f691f2ae"
+   ]
+  },
+  {
+   "formId": "6bb5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "9781:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "f660a1f154cd26099dbd175ead8c47e495112b86a8897adbb937a9b96c014ca5"
+   ]
+  },
+  {
+   "formId": "96bc:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DarkwaterCrossingExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "d0cd9fa5917cca42503baf791ff8a55d042480882875d97e6d2288255d5a98b0"
+   ]
+  },
+  {
+   "formId": "10d3d3:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "727a1:Skyrim.esm",
+   "cell": "96bc:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 74 units",
+    "turns it 19 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "318af21468813a65cb5aad2922c36aba40ede36003430953c44e581bf7f82c75"
+   ]
+  },
+  {
+   "formId": "107a:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "96bc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "4a782a2895d96c0d804d4afdb156b17a254d2b5e0a2e66169379893e880a875f"
+   ]
+  },
+  {
+   "formId": "107b:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "96bc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "92c863b0ba0086738242864d19beb3bbb4f1a17e228a131be82a86f84601fbd5"
+   ]
+  },
+  {
+   "formId": "29896:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "96bc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "5f105678c2dbe4cb5377be1ee15307d7ad08a95524571d006a63435e65453e51"
+   ]
+  },
+  {
+   "formId": "95e5:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "5494afa5863d3b9516a0876e949923c8244225819ae607bbeb585bd470060b8a"
+   ]
+  },
+  {
+   "formId": "fe436:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "7022e:Skyrim.esm",
+   "cell": "95e5:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "nothing but the location ref type the editor writes"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "644f0d033b06b83442d241c782f301a6e918d28ef0a6eacf009af90af7ca0f9a"
+   ]
+  },
+  {
+   "formId": "95e6:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "MixwaterMillExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "588c74d33443df61bce2b874e4866b59f40e9545b5476f3a82a8d62c4bbb23e3"
+   ]
+  },
+  {
+   "formId": "20823:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "95e6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "53ef3ac0561e3a79cdffc4c1f7571123703169fafba2d84144e485c81732fc8e"
+   ]
+  },
+  {
+   "formId": "e77b02:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "7022e:Skyrim.esm",
+   "cell": "95e6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "645a0b5d9dd8dbbbdd09feabfdc77156dc5c568d7cad915663df90d53d011701"
+   ]
+  },
+  {
+   "formId": "b4dc:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmBridge04",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "43a92011316ca0d790bbf2ee8372fec9902b45953531cff678bd94b25c581a84"
+   ]
+  },
+  {
+   "formId": "dde4f0:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "b4dc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "1fc1544d58f8e4b2b2cf2ec22b90e35dad65e73d7e1513e0aa85d38ae86142a7"
+   ]
+  },
+  {
+   "formId": "dde4f1:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "b4dc:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "ebb4113be25024901456fadc7bb07db70fb087d0ffd7d314c29ae57c85fc009c"
+   ]
+  },
+  {
+   "formId": "b57b:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "NarzulburExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "0bdf950c88392b4df8cd299372618715438dee9e914d8bee0d2c3396f169a1ba"
+   ]
+  },
+  {
+   "formId": "ab4b1:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d54ff:Skyrim.esm",
+   "cell": "b57b:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "5f929ce554df5c131e673c3cabb0f0e22bab82cdac9d4746bb1480d9c53e9a62"
+   ]
+  },
+  {
+   "formId": "dde4e7:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "b57b:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 25 placements of Thornswood's alchemy lab, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "3b96f0ad240a4ad203d684a65931c552e206d45e22ed35fc5707d2848c85283a"
+   ]
+  },
+  {
+   "formId": "b580:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "Kynesgrove",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "af2235edaca61d162102728fb28c6d045ce75d1663922b623f601984a5c7d8fb"
+   ]
+  },
+  {
+   "formId": "de3637:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "b580:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "72338ea466b0a4f53bf283cbde206dd8addd878c4f8f0b1a1abb72f97e5369d1"
+   ]
+  },
+  {
+   "formId": "b59c:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "NarzulburExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "da17e2c02bb39ad2d7871cee5e0af1bafc7e49fa7dc1aec15178b367d4323604"
+   ]
+  },
+  {
+   "formId": "3f0a2:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "3f47035013d963dea3bf8204d932cf8f5f5b9f3e56f0a21bcaeefef6f89bf3ae"
+   ]
+  },
+  {
+   "formId": "ab4bd:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "0297b594572af048f94285316103069113ab6f25714617c83aececae97012b93"
+   ]
+  },
+  {
+   "formId": "ab4c2:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "0a98036e4d773547073f04eb89112efae811bb06a35c1b219a9f8c9ded7f3954"
+   ]
+  },
+  {
+   "formId": "b0ffc:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "5acdc:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "76e32c8482fc139e78a14c7ef939f6255ab12f4a605a0420771ae7b99430e0dd"
+   ]
+  },
+  {
+   "formId": "dfd109:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "e2b567ef31ea07405e69419bdc4d801f4025284cd51bcb59e424824e2da2fc5b"
+   ]
+  },
+  {
+   "formId": "e0c545:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "b59c:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "13c920581fe85b23dc672d02e4af838e87b1bc61661878af284d3d01bb6389e3"
+   ]
+  },
+  {
+   "formId": "b4b8:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HlaaluFarmExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "459b2a5befc03354528de775067f0224619e7232c38f6acbe698b328fa9c7f69"
+   ]
+  },
+  {
+   "formId": "521a1:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6df:Skyrim.esm",
+   "cell": "b4b8:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "62041faa5879c43bed0a6c2c6ecb0c8a4f5967b9faaf381bf9c9b177f778b219"
+   ]
+  },
+  {
+   "formId": "bcf7:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "GoldenglowEstateExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "00fa47f50bd0379262bcb30fe03ee4628210e6d7d1829670b09b50071134db7b"
+   ]
+  },
+  {
+   "formId": "25d95:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "f690b2b3236c743b9ad72e3bf53cd3cf139d4023b0d7efd1c705f2476f633bba"
+   ]
+  },
+  {
+   "formId": "25d97:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "c5d69c2d60768c03095bebe9213095afbffcef65cbb86ae95bb04822abcdc7ae"
+   ]
+  },
+  {
+   "formId": "9ec17:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "401112fdb47ef157360fd6d1fe74d65ef520ab47f3d126ac82966dcf79a8d746"
+   ]
+  },
+  {
+   "formId": "a31e5:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "102ce2b18c2a0bd44d76eac90849a4b651bd69fa2b25c322d8012108a52ffb7f"
+   ]
+  },
+  {
+   "formId": "a467d:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "c37b35b0e76a5c5c2a48eb4f90bd866c11bf2bb7971bf905fbb80be738ed3cb4"
+   ]
+  },
+  {
+   "formId": "a7c47:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "2fac7592bfe7d97bfbf7886101ed1ee00f39cfabeca9292df97dbf6d27e54eca"
+   ]
+  },
+  {
+   "formId": "a7c48:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "7d07121a101757fbf23ff698815c30b85f9e00a246603df5c0df143a2c04948b"
+   ]
+  },
+  {
+   "formId": "a7c4a:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "804416949c87b4a38343bae30faf15647e9509bd17f7e10c903e4d213f32b9fa"
+   ]
+  },
+  {
+   "formId": "dc9f5f:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "515fe0d6d62e070e391a3e073c36de22e1e108adea2785a0d86294b4dd2a15dc"
+   ]
+  },
+  {
+   "formId": "dc9f60:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "da4e340574efa1e8b06488e883b0187f174e1200359eaac71483899bf4afadc9"
+   ]
+  },
+  {
+   "formId": "dc9f61:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "0c148034056e75b65cba5f3165cd7b4b2b52143b67369b01c2eecf2fa884fc26"
+   ]
+  },
+  {
+   "formId": "dc9f62:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcf7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "ea3756bcc221b787782a932f76ef46de73ec4a9b25f9b8ce36ad8cf0a3f92688"
+   ]
+  },
+  {
+   "formId": "bd5e:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "LargashburExterior04",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fc733b9c4c95688c8938fc12340c96003812eb223f53aea2b3765a1a123cadf8"
+   ]
+  },
+  {
+   "formId": "596a0:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "bd5e:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its size"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "b30cfed8fb243e5d52c9d6078c59f51aba948b15a4e8e894a8c8bf859c9e2e1b"
+   ]
+  },
+  {
+   "formId": "bcd6:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "00803aea14f5a7cb79ebcdab428399cfb98594becca03bd620a77d671161d391"
+   ]
+  },
+  {
+   "formId": "a31e6:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "ac8b1ae472a855dcd8d69e553d1b78902a199b4f39a71b4759b7ffe279017e5b"
+   ]
+  },
+  {
+   "formId": "a31e7:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "25d94:Skyrim.esm",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "9c51c37584df2693b8fe7877aaf25358e525c813b55455c726c76a0a380e79ff"
+   ]
+  },
+  {
+   "formId": "a7c4b:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "7405fc2678f8acde51cc09e7fb267520ec6b2e0c7f4bb2b3851bf7e1cef11807"
+   ]
+  },
+  {
+   "formId": "a7c70:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "a7c45:Skyrim.esm",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "38fc5fcc8c8214a827fabb58bdb235446f087f02d40736f5f126d8fad527a355"
+   ]
+  },
+  {
+   "formId": "dc9f63:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "13f4499f5833576d487bb015944fb5ac7a18aae32b7edeeae2e0668f5b1ee143"
+   ]
+  },
+  {
+   "formId": "dc9f64:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bcd6:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "d005d7445df632318434708fa9cecc30dc2ce6a5409949c72cc1348d45f1b6ce"
+   ]
+  },
+  {
+   "formId": "bcda:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HeartwoodMillExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "4ef14a0bc6d2d12ff7ed3df1b0c06e33c29e2f3474df8f5281be15aad78b88a9"
+   ]
+  },
+  {
+   "formId": "e0c54c:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "7022e:Skyrim.esm",
+   "cell": "bcda:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "c08b62cc6669a6e2844c2ade2190d9a354540d2ac11f91b77f093470fa2d11ee"
+   ]
+  },
+  {
+   "formId": "e0c54e:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "bcda:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "86cea7fb379d056a2f05775948dfe0689c52b4f91ffa93276b4525a6c4985df2"
+   ]
+  },
+  {
+   "formId": "6f48:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "MorKhazgurExterior03",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "bcfab7faed79053a7f6c0fd5c3f077be7b02d4fa02602b7fee8ab6e9206d0701"
+   ]
+  },
+  {
+   "formId": "b96b2:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "6f48:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "8f3b93673156979f8e9c9cbb2885da081b16cc32a8c770e0a561a74c903f0f25"
+   ]
+  },
+  {
+   "formId": "5b147:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "6f48:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off",
+    "changes its scripts"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "cfcae5a3dd8659e1d99a5e3452d2672f5cc07e5e22f4922bedf61101166ecdf4"
+   ]
+  },
+  {
+   "formId": "7648:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "HagRockRedoubtExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "e0422681b7b68670a671758d859bf1b623652e6311be9d73dedb3090161e07a7"
+   ]
+  },
+  {
+   "formId": "103a66:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1a2ad:Skyrim.esm",
+   "cell": "7648:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "43404627efaf8b1eda80d639d62ad14cbbba7f1f74a59aed51060db51da44abc"
+   ]
+  },
+  {
+   "formId": "7660:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DushnikhYalExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "0ef60833c0731947a002d1dba451015e5f0803aa8f80d7e6a35064bc1c788ee7"
+   ]
+  },
+  {
+   "formId": "5a63f:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "7660:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1914842da13d1ff1bf9149f8821e5991cdd39f329e9561b2d5dd68273f5329c2"
+   ]
+  },
+  {
+   "formId": "9328:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DragonBridgeExterior01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "be5c9ca1de6ecaea73219cd823ccd4649fd44736ecbc694bfe1eb1a04355b4ae"
+   ]
+  },
+  {
+   "formId": "29897:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "9328:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "99de8d85c1e6287178752fd96fe1d5d96af01cb7ebd766888cd9a6d8b46e21c4"
+   ]
+  },
+  {
+   "formId": "9329:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "DragonBridgeExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "78331fdd3cba06eb53811f1d110466fb76cd098ce94fc888227b8acab0816631"
+   ]
+  },
+  {
+   "formId": "aa57:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "9329:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "1832df1bf12a66b29a5cc0d17c8abede6072bee5d3c2a6702442457380836d51"
+   ]
+  },
+  {
+   "formId": "9597:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RoriksteadExterior03",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "e75e33bcc27e881563b8a3534626b3615982a597ced1856bba5d764c04a78fef"
+   ]
+  },
+  {
+   "formId": "dc9f58:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9597:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 13 placements of Thornswood's beehive, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "19ba891c20d8c651f29f30d11e8b3c5492d048c3d7b67148ce2ad263f9fb8055"
+   ]
+  },
+  {
+   "formId": "92bf:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "KatlasFarmExterior",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
+   "dataSha256": [
+    "b30db61a20c3e9088eff098a4e2e5c71f6d18717e89171865d8a3cc7bfde562d"
+   ]
+  },
+  {
+   "formId": "521a2:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6df:Skyrim.esm",
+   "cell": "92bf:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "e4c2c8808ba72b79b5dc7b3944aac8b29c13fb5adb65cd0293b2aad6b5a3b6dd"
+   ]
+  },
+  {
+   "formId": "92df:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "65068e4b0ee3d6505e94025a8f7f6cf54bc95cc6bf2c7913e7d57f578fbe1a44"
+   ]
+  },
+  {
+   "formId": "dde4f4:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "92df:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "927021ec779bddb171f00bb9b7d46dd36017c2d4a1cc92dc89bc8988659d46dd"
+   ]
+  },
+  {
+   "formId": "dde4f5:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "92df:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "aef92c66971aa3c878785141c243fe80f5366428051a50238ca69fd040b531e1"
+   ]
+  },
+  {
+   "formId": "92fd:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "POITundra25",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "74c47d0a9ad36440afed9606538145b1ef2d8212ffe264ddb3a4473b46aa3118"
+   ]
+  },
+  {
+   "formId": "dde4f9:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "92fd:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "9ecb6123525c88f0ea0fed9451cbb5a93ccad5b6d15c3dced048211ca7150669"
+   ]
+  },
+  {
+   "formId": "dde4fa:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "92fd:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "bf43110f6a366ff3c344adaa88fcc2ad89ea04545dc9b4fc81866d4a7388a179"
+   ]
+  },
+  {
+   "formId": "931f:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "c279bded3b1c66588368a7a3248d4dd94d2c10e2a1fa1387de390014f7788805"
+   ]
+  },
+  {
+   "formId": "dde4f8:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "931f:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "f7d542bbf435bac80b23fa7a263f366aa3064d3e497d308773e0a575aa9a41fa"
+   ]
+  },
+  {
+   "formId": "9340:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "8259c73b2d9878d5d165584ba7489c8e0bcb0d321d36f4dbb52274eab091eda1"
+   ]
+  },
+  {
+   "formId": "dde4f7:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "9340:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 11 placements of Thornswood's salt quarry, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "475fef136f522423ff36e63039227cbed58e39fa9d6284d8a00619dc532278da"
+   ]
+  },
+  {
+   "formId": "99fc:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SerpentsBluffRedoubtExterior02",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "791fc2645a1cd2ab39cce12a45d9a681f27d6a5c77f4c4d481eab4308aba5cca"
+   ]
+  },
+  {
+   "formId": "8e111:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "48748:Skyrim.esm",
+   "cell": "99fc:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1168236a47d512ce7af26d043b5e5fe38e836076caa8e0d44c6189851bea57d2"
+   ]
+  },
+  {
+   "formId": "9a79:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "FortSungardExterior04",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "53645ea25ab21bb8d25d23b9d6ed3869e8682f7f0f3ca808a14c064a28fcb72e"
+   ]
+  },
+  {
+   "formId": "798ad:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "48748:Skyrim.esm",
+   "cell": "9a79:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "574db5900cf32cea0cbaed8b5b6e0d8dd8f09dafa0d1876c167b4a0e2d345888"
+   ]
+  },
+  {
+   "formId": "1691d:Skyrim.esm",
+   "type": "WRLD",
+   "editorId": "WindhelmWorld",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fc12a014361a75aefcb3008c6a1de9888bfc4e53efc3f27d1458ce78f2fcf96c"
+   ]
+  },
+  {
+   "formId": "38382:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WindhelmCandlehearthHallExterior",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "f96121eed112a72dee6ffbb62f7ce9a3d38c490d7d91d07eb52842c15b3fb945"
+   ]
+  },
+  {
+   "formId": "ff283:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "38382:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 49 units",
+    "turns it 45 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "445c02bf82d9cf78a8a31f1af87ef9945b40d8e27f688798420880c139bb9efe"
+   ]
+  },
+  {
+   "formId": "10e393:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "727a1:Skyrim.esm",
+   "cell": "38382:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 329 units",
+    "turns it 124 degrees",
+    "changes its size"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "857e7be1bffde7e78432ccb0820794b169768a9219404d30773acd20a5973d5c"
+   ]
+  },
+  {
+   "formId": "1170c:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "593b:Thornswood-Content.esp",
+   "cell": "38382:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "a notice board placed switched off; the server stands every board (#2516)",
+   "dataSha256": [
+    "9522878df87c19664f5069e9f1fa7b26bceaffc1bf7e7dcd38a73144fd4e6aa9"
+   ]
+  },
+  {
+   "formId": "16bb4:Skyrim.esm",
+   "type": "WRLD",
+   "editorId": "RiftenWorld",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "b7ade121dfd9b12c22b30d82b9b7785eb4f9326b70db4bb0e743d065dfeba740"
+   ]
+  },
+  {
+   "formId": "42244:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenCityWest",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "37067be1c0ec11ba3f2a75602048298fbbb62a489061e1e1c266277ca8ff2c84"
+   ]
+  },
+  {
+   "formId": "10d85e:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "727a1:Skyrim.esm",
+   "cell": "42244:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 515 units"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "e01f6575125780ad8901cd63dfbc3dae5ac795c70d1e0b162189f89fe2cc750f"
+   ]
+  },
+  {
+   "formId": "42247:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "RiftenOrigin",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "e754012a592121f3455a3e952b7698658fc7943c0eba9b652274ef9a6a8026b0"
+   ]
+  },
+  {
+   "formId": "53481:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "cae0b:Skyrim.esm",
+   "cell": "42247:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 101 units",
+    "turns it 92 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "7ef6b03cd6fb159fc3dcb81ed3dfdf9a015a7ce992fc0b544ebb1bfa7367531a"
+   ]
+  },
+  {
+   "formId": "53483:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "6e9c2:Skyrim.esm",
+   "cell": "42247:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 194 units",
+    "turns it 112 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "1c160be875e431156ff0f34db11f34a60810b2265a671b43692ed808e9267c33"
+   ]
+  },
+  {
+   "formId": "53484:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "d932f:Skyrim.esm",
+   "cell": "42247:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 241 units",
+    "turns it 91 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "81ff022ace10bb0015c1c498cf656fa2ae7be0cbf78980707550e19694d23745"
+   ]
+  },
+  {
+   "formId": "116fd:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "593b:Thornswood-Content.esp",
+   "cell": "42247:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "a notice board placed switched off; the server stands every board (#2516)",
+   "dataSha256": [
+    "c3586993b5749000dd85c34c4fe6185625a2f7dec5fe4fb456ce710a4a609bab"
+   ]
+  },
+  {
+   "formId": "1a26f:Skyrim.esm",
+   "type": "WRLD",
+   "editorId": "WhiterunWorld",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "476b62d7887bb20eef05554d7ab7fa2114725dd467ed2f02c691e5dfe3a1a2bc"
+   ]
+  },
+  {
+   "formId": "1a27a:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "WhiterunPLainsDistrict03",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "f50daa2f5901a108268b89079784cb391dcdb93a67e6ee2f521cda4bf07ad5bb"
+   ]
+  },
+  {
+   "formId": "593c:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "593b:Thornswood-Content.esp",
+   "cell": "1a27a:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "a notice board placed switched off; the server stands every board (#2516)",
+   "dataSha256": [
+    "02e981ccafbee7f78dff6d802ca693936c18c6fdb267e77a659d3338252dcaaa"
+   ]
+  },
+  {
+   "formId": "1a280:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "0fa6c817c809789ea09e5c48802e1b0ee7d990b96f37f231fd31195b72b114a2"
+   ]
+  },
+  {
+   "formId": "c430a:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "bf9e1:Skyrim.esm",
+   "cell": "1a280:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 111 units",
+    "turns it 45 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "6bb3f20ecac58f744c5385d93eab2e9ab38bcb9c46db0ba48ae3d183cb0a499a"
+   ]
+  },
+  {
+   "formId": "10e391:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "1a280:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "moves it 93 units",
+    "turns it 20 degrees"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "f78a72a0be78e6216a30c7c1fd9ab5eb668b1a547a736e879ece2b19383036f0"
+   ]
+  },
+  {
+   "formId": "37edf:Skyrim.esm",
+   "type": "WRLD",
+   "editorId": "SolitudeWorld",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "d368d82cc3d8e9c64761f54dc242b62a605806852983b5ddca4105b8623015be"
+   ]
+  },
+  {
+   "formId": "37ee6:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "fafc985d4e45519126e0a22655a5fe1bf8d8ff75dc579dbaa470e0264ddf7d88"
+   ]
+  },
+  {
+   "formId": "a6ce5:Skyrim.esm",
+   "type": "REFR",
+   "editorId": "",
+   "base": "2e8eb:Skyrim.esm",
+   "cell": "37ee6:Skyrim.esm",
+   "disposition": "dropped",
+   "did": [
+    "switches it off"
+   ],
+   "why": "the other server's change to Skyrim's own placement; no Thornswood design asks for it, so Skyrim's own stands again",
+   "dataSha256": [
+    "d3372263c1639ac66c606db1b019a6967c3e24a23ec75614515da4aede82c0c4"
+   ]
+  },
+  {
+   "formId": "37ee5:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeCastleDourDistrict01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "e133437ae2862b9b48ea4324f2f4b63526177ec851dfc7d15e2d4147bde41df4"
+   ]
+  },
+  {
+   "formId": "2e99e:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "9c6ce:Skyrim.esm",
+   "cell": "37ee5:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "fa3f0f5cfab820875d93406ce1eb73741ede9a338340f28bc7407d47ba42f88a"
+   ]
+  },
+  {
+   "formId": "37ee7:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeArch",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "6e036ff5f3f29a254f776ddd888bb57b730601a91366572185c0085c410b5a1a"
+   ]
+  },
+  {
+   "formId": "11704:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "593b:Thornswood-Content.esp",
+   "cell": "37ee7:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "a notice board placed switched off; the server stands every board (#2516)",
+   "dataSha256": [
+    "13cecbff26830866617f283524a645ea36a5036e6cbc7e8a447081867fe01ae2"
+   ]
+  },
+  {
+   "formId": "37ee9:Skyrim.esm",
+   "type": "CELL",
+   "editorId": "SolitudeOrigin",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "a6dfc0848578b5547903f83a594afe507d5c059e73f18abfa88ee1addcdf74c2"
+   ]
+  },
+  {
+   "formId": "dfcc75:Thornswood-Content.esp",
+   "type": "REFR",
+   "disposition": "gone before #2553",
+   "editorId": "",
+   "why": "the Execution Block and its placement in Solitude, taken out in #954 (#400)",
+   "dataSha256": [
+    "45514ebfd263968028496a7dc519f23808e20e4649d0826679e0d69e671c149c"
+   ]
+  },
+  {
+   "formId": "e022c7:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5e:Skyrim.esm",
+   "cell": "37ee9:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "50c0a8501c693508232dc0891faef6d8f9becad97fbd0b1baed5ee7f49dafbee"
+   ]
+  },
+  {
+   "formId": "e022c8:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "3ad5f:Skyrim.esm",
+   "cell": "37ee9:Skyrim.esm",
+   "disposition": "dropped",
+   "why": "an object of Skyrim's placed where the other server chose; no Thornswood design asks for it",
+   "dataSha256": [
+    "5ae828c7bf4c689d8a892d2212f92940409e7cad1b0924b6049a381fcebca4e2"
+   ]
+  },
+  {
+   "formId": "1db8:Dawnguard.esm",
+   "type": "WRLD",
+   "editorId": "DLC1HunterHQWorld",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "189f45e7317024b3afd60c030ab3b4b131414ebc766346b15a4826b1df5b84b6"
+   ]
+  },
+  {
+   "formId": "7bbf:Dawnguard.esm",
+   "type": "CELL",
+   "editorId": "DLC1HunterWorldFort01",
+   "disposition": "dropped",
+   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "dataSha256": [
+    "236a0d4a37f1d24afcb516a32caecce511eade577600a7cbcf6be4f702853241"
+   ]
+  },
+  {
+   "formId": "dde4d7:Thornswood-Content.esp",
+   "type": "REFR",
+   "editorId": "",
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "7bbf:Dawnguard.esm",
+   "disposition": "dropped",
+   "why": "one of the other server's 8 placements of Thornswood's charcoal kiln, at the spot it chose; Thornswood stands its own where game/data/station-sites.json measures (Patrick, A on #2553)",
+   "dataSha256": [
+    "a59c8fafbb511fda3d950a067722a5d8885b7ad6f0650e77641de2f43a60eb95"
+   ]
+  }
+ ]
+}

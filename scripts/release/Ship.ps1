@@ -159,6 +159,12 @@
   out, and puts them on the site. Twenty minutes or more. Not on a -DryRun,
   and a dev release never touches the installer.
 
+  The installer carries the launcher the feed offers. A Ship that builds one
+  puts it in <Root>\Launcher first. One that keeps the feed's (nothing it is
+  built from changed, or -ModsOnly) downloads the feed's launcher, checks it
+  against the feed's sha256 and its signature, and puts it there, before
+  anything is published (issue #2661).
+
 .PARAMETER Root
   The Thornswood install whose launcher is built and whose files are
   published. Left out, it is the folder this machine builds the channel's
@@ -168,7 +174,10 @@
   Launcher\Thornswood.exe in it, and for a dev release that folder with
   -DevBuild on the end, where the main launcher's Settings page installs the
   dev build. A folder Vortex deploys into is refused either way, before
-  anything is built.
+  anything is built. Then Update-ShipRoot.ps1 makes or brings its game
+  folder up to date with Vortex's deployment, with the launcher's own
+  OwnGame, and puts the recorded client in it, and the Ship stops there when
+  it cannot (#2019).
 
 .PARAMETER DistRoot
   Where releases are staged and zipped, passed straight through to
@@ -237,8 +246,6 @@
 
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
-.PARAMETER LauncherWith
-    Which build makes a dev release's launcher: csc, the in-box compiler and the default, or msbuild, launcher\app\Thornswood.csproj, to try the MSBuild launcher on dev before the switch (#498). A main release takes the exe CI built and refuses msbuild.
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
@@ -312,11 +319,6 @@ param(
     ,[switch]$AllowUncoveredBodies
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     ,[switch]$AllowStaleCheckout
-    # Which build makes a dev release's launcher: csc, the in-box compiler and
-    # the default, or msbuild, launcher\app\Thornswood.csproj (#498), so the
-    # MSBuild launcher can be tried on dev before the switch makes it the only
-    # build. A main release takes the exe CI built, so main refuses msbuild.
-    ,[ValidateSet('csc', 'msbuild')][string]$LauncherWith = 'csc'
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -351,10 +353,17 @@ function Get-LauncherExe([string]$dir) {
 # Which repository the release.yml draft is on: the source clone's origin, where
 # the workflow runs and creates it, not the releases clone the packs go to.
 function Get-SourceRepo([string]$repoDir) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    # No git on the path was the one thing the empty catch here took (#2711);
+    # it is asked for directly. Under Continue a git that cannot answer (no
+    # origin) gives nothing, and the fallback below is its answer.
     $remote = ''
-    try { $remote = (& git -C $repoDir remote get-url origin 2>$null | Select-Object -First 1) } catch { }
-    $ErrorActionPreference = $old
+    if (Get-Command git -ErrorAction SilentlyContinue) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $remote = (@(& git -C $repoDir remote get-url origin 2>$null) | Select-Object -First 1) }
+        finally { $ErrorActionPreference = $old }
+    } else {
+        Write-Host '  git is not on the path, so the launcher''s draft is looked for on EvilPatrick06/Thornswood' -ForegroundColor Yellow
+    }
     if ($remote -and $remote -match 'github\.com[:/](.+?)(?:\.git)?\s*$') { return $Matches[1] }
     return 'EvilPatrick06/Thornswood'
 }
@@ -791,6 +800,98 @@ function Test-KeepFeedLauncher($pub, [string]$inputs, [string]$current, [bool]$d
     if ([string]$mainPub.Version -ne [string]$pub.Version) { return $true }
     return ($mainPub.Inputs -and ([string]$mainPub.Inputs -eq [string]$pub.Inputs))
 }
+# THE FEED'S LAUNCHER, FOR THE INSTALLER, issue #2661. Package-Thornswood.ps1
+# packs <root>\Launcher\Thornswood.exe as it finds it. A Ship that builds a
+# launcher installs it there first; one that keeps the feed's
+# (Test-KeepFeedLauncher, or -ModsOnly) used to put nothing there, which held
+# only while main's root was Patrick's own install, whose launcher updated
+# itself to the feed's. Main's ship root local\release-main (#2448, #2603) is
+# never started, so it held no launcher, or whichever one a Ship last put
+# there, and -Package packed that or stopped at "MISSING the launcher" after
+# the release was out. So a main Ship with -Package that keeps the feed's
+# launcher puts that launcher there itself, before anything is published.
+#
+# Get-FeedLauncher downloads the launcher $pub names (Get-PublishedLauncher)
+# into $into\Thornswood.exe, checks it against the feed's launcherSha256 and
+# its signature against $expectedSigner (Get-PublishSignRefusal), and returns
+# '' when the checked exe is there, or a sentence saying why not, with nothing
+# half written left behind.
+function Get-FeedLauncher($pub, [string]$into, [string]$expectedSigner) {
+    if ($null -eq $pub -or -not $pub.Url -or ([string]$pub.Sha) -notmatch '^[0-9a-fA-F]{64}$') {
+        return ("Main's feed names no whole launcher (a launcherUrl and a 64 digit launcherSha256), so there is no launcher " +
+                'it offers to put in the installer. Nothing was published.')
+    }
+    if (-not $expectedSigner) {
+        return 'ExpectedSigner is empty, so the launcher from the feed cannot be checked. Nothing was published.'
+    }
+    $want = ([string]$pub.Sha).ToLowerInvariant()
+    New-Item -ItemType Directory -Force -Path $into | Out-Null
+    $exe = Join-Path $into 'Thornswood.exe'
+    $part = $exe + '.part'
+    foreach ($p in $exe, $part) { if (Test-Path -LiteralPath $p) { Remove-Item -LiteralPath $p -Force } }
+    # Not in a try (#2711): this cannot fail on the .NET Ship runs on, and if
+    # it ever did, Ship's Stop ends here, before anything is published.
+    [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
+    $wc = New-Object Net.WebClient
+    try { $wc.DownloadFile([string]$pub.Url, $part) }
+    catch {
+        Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
+        return ("The launcher main's feed offers, $($pub.Version), could not be downloaded from $($pub.Url) " +
+                "($($_.Exception.Message)). Run this same Ship again. Nothing was published.")
+    }
+    finally { $wc.Dispose() }
+    $got = (Get-FileHash -LiteralPath $part -Algorithm SHA256).Hash.ToLowerInvariant()
+    if ($got -ne $want) {
+        Remove-Item -LiteralPath $part -Force -ErrorAction SilentlyContinue
+        return ("The launcher downloaded from main's feed, $($pub.Version), does not match the feed's launcherSha256 " +
+                "(wanted $want, got $got). Do not ship it. Nothing was published.")
+    }
+    Move-Item -LiteralPath $part -Destination $exe -Force
+    $why = Get-PublishSignRefusal -Path $exe -ExpectedSigner $expectedSigner
+    if ($why) {
+        Remove-Item -LiteralPath $exe -Force -ErrorAction SilentlyContinue
+        return ("The launcher main's feed offers, $($pub.Version), is not signed by ExpectedSigner: $why")
+    }
+    return ''
+}
+
+# Puts the launcher main's feed offers into $root\Launcher: left alone when
+# the exe there already has the feed's sha256, else downloaded and checked
+# into $scratch (Get-FeedLauncher) and put in place by $installer
+# (Install-Launcher.ps1 -From), then read back. Returns Why ('' or the reason
+# to stop on) and Placed (whether it put one there).
+function Install-FeedLauncher($pub, [string]$root, [string]$scratch, [string]$expectedSigner, [string]$installer) {
+    $out = [pscustomobject]@{ Why = ''; Placed = $false }
+    if ($null -eq $pub -or -not $pub.Url -or ([string]$pub.Sha) -notmatch '^[0-9a-fA-F]{64}$') {
+        $out.Why = Get-FeedLauncher $pub $scratch $expectedSigner
+        return $out
+    }
+    $want = ([string]$pub.Sha).ToLowerInvariant()
+    $exe = Join-Path (Join-Path $root 'Launcher') 'Thornswood.exe'
+    if ((Test-Path -LiteralPath $exe -PathType Leaf) -and
+        (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() -eq $want) {
+        return $out
+    }
+    $why = Get-FeedLauncher $pub $scratch $expectedSigner
+    if ($why) { $out.Why = $why; return $out }
+    $global:LASTEXITCODE = 0
+    & $installer -Root $root -From $scratch -NoPause | Out-Host
+    $rc = $LASTEXITCODE
+    if ($rc -ne 0) {
+        $out.Why = ("Putting the launcher main's feed offers into $(Split-Path -Parent $exe) stopped with exit code $rc. " +
+                    'Nothing was published. The errors are above.')
+        return $out
+    }
+    $now = ''
+    if (Test-Path -LiteralPath $exe -PathType Leaf) { $now = (Get-FileHash -LiteralPath $exe -Algorithm SHA256).Hash.ToLowerInvariant() }
+    if ($now -ne $want) {
+        $out.Why = ("The launcher main's feed offers is not in place in $(Split-Path -Parent $exe) after installing it " +
+                    "(wanted $want, found $(if ($now) { $now } else { 'no exe' })). Nothing was published.")
+        return $out
+    }
+    $out.Placed = $true
+    return $out
+}
 # ==== end thornswood release launcher ====
 
 # The dev number a Ship chose, checked before anything is built, signed or sent.
@@ -869,7 +970,6 @@ $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # The release's one name and its tag (#444).
 . (Join-Path $Here 'Release-Name.ps1')
 $Dev = ($Channel -eq 'dev')
-if (-not $Dev -and $LauncherWith -ne 'csc') { Die 'A main release takes the launcher CI built, so -LauncherWith msbuild is for -Channel dev only (#498). Nothing was published.' }
 $ReleaseDir = Get-FeedStoreDir $Channel
 $MainReleaseDir = Get-FeedStoreDir 'main'
 
@@ -890,10 +990,34 @@ if (-not $PSBoundParameters.ContainsKey('Root')) {
 # The dev build has its own feed and baseline on the VPS (feed-dev), and its
 # own working folder here. Until #907 it was a git worktree of the dev branch
 # of Thornswood-Releases, made on first use.
+#
+# WHO NAMED THE FOLDER (#2662). A Launcher folder is asked of the install
+# rule's folder only, <install>-DevBuild, which Where.ps1 answers when no
+# -Root is given and ship-roots.json records no dev folder. There, no
+# Launcher folder means the main launcher's dev build was never installed,
+# and without this Update-ShipRoot.ps1 would make a whole new root in a folder
+# nobody chose. A folder named by -Root or recorded with Setup-ShipMachine.ps1
+# is a ship root that Update-ShipRoot.ps1 makes with Game, Profile and
+# config.json and no Launcher folder (local\release-main, 16 Oct), and nothing
+# in a dev Ship needs that folder beforehand: one that builds a launcher puts
+# it there with Install-Launcher.ps1, which makes the folder, and one that
+# keeps the feed's publishes no exe. Until 18 Oct every such folder was
+# refused, with fixes that were wrong for it. Main asks for none.
+# Returns '' or the sentence Ship stops with.
+function Get-DevRootRefusal([string]$Root, [bool]$RootGiven, [string]$Recorded) {
+    if ($RootGiven -or $Recorded) { return '' }
+    if (Test-Path -LiteralPath (Join-Path $Root 'Launcher') -PathType Container) { return '' }
+    return "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
+}
 if ($Dev) {
-    if (-not (Test-Path (Join-Path $Root 'Launcher'))) {
-        Die "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
+    $rootGiven = $PSBoundParameters.ContainsKey('Root')
+    $rootRecorded = ''
+    if (-not $rootGiven) {
+        try { $rootRecorded = [string](& (Join-Path $Here 'Where.ps1') 'ShipRootNamedDev') }
+        catch { Die ($_.Exception.Message + ' Nothing was built.') }
     }
+    $devRootWhy = Get-DevRootRefusal $Root $rootGiven $rootRecorded
+    if ($devRootWhy) { Die $devRootWhy }
 }
 
 # A folder Vortex deploys into is the collection's source, not a release
@@ -1085,6 +1209,25 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
     }
 }
 
+# ------------------------------------------------------------ the ship root
+# Issue #2019. The folder this release is built from is a launcher install
+# whose launcher is never started (Patrick, 15 Oct: his own installs stay
+# apart from the build folders), so nothing else brings its game folder up to
+# date. On 15 Oct One's dev root was still the folder made on 3 Oct, at old
+# rules, from another install's game folder, with the old 3BBB.esp and the
+# 12 Oct client, and two dev Ships refused on it. Update-ShipRoot.ps1 makes
+# or refreshes it with the launcher's own OwnGame, built from this checkout,
+# holds it to Vortex's deployment and the current rules, and puts the
+# recorded client in it from the configured engine build. A dry run too: it
+# changes nothing outside the root. Before the version moves and before
+# anything is built, so a refusal here leaves nothing to put back.
+Head 'The ship root'
+$global:LASTEXITCODE = 0
+& (Join-Path $Here 'Update-ShipRoot.ps1') -Channel $Channel -Root $Root -NoPause
+if ($LASTEXITCODE -ne 0) {
+    Die ('The folder this release is built from, ' + $Root + ', is not current: Update-ShipRoot.ps1 says why above. Nothing was built or published.')
+}
+
 # ------------------------------------------------------------ version
 $updaterCs = Join-Path $Here '..\..\launcher\app\Updater.cs'
 if (-not (Test-Path $updaterCs)) { Die "Could not find $updaterCs" }
@@ -1137,6 +1280,9 @@ if ($Dev -and -not $ModsOnly) {
     $MainEquivalent = [bool]$devLine.MainEquivalent
 }
 
+# What the channel's feed offers as its launcher, read here when a Ship asks
+# whether to keep it, and again for the installer below when it keeps it (#2661).
+$pubLauncher = $null
 if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
     $feedBranch = if ($Dev) { 'dev' } else { 'main' }
     $pubLauncher = Get-PublishedLauncher $ReleaseDir $feedBranch
@@ -1229,20 +1375,26 @@ elseif ($Dev) {
             Say "  could not read the $ch feed from the site ($($_.Exception.Message)), so this uses the copy last received here, which may be old" 'Yellow'
         }
         $f = Join-Path (Get-FeedStoreDir $ch) 'version.json'
-        if (-not (Test-Path -LiteralPath $f)) { return '' }
+        if (-not (Test-Path -LiteralPath $f)) { throw "the site did not answer and no copy of the $ch feed was ever received here" }
         return [string]((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $f -Raw) $f).launcherVersion)
     }
     function Read-EverPublished([string]$ch) {
         try { return @(Get-FeedStoreLaunchers $ch) }
-        catch {
-            Say "  could not read the launchers $ch has published from the VPS ($($_.Exception.Message)); the number climbs from the current feed only" 'Yellow'
-            return @()
-        }
+        catch { Die ("Could not read the launchers $ch has published from the VPS (" + $_.Exception.Message + "), so the dev number cannot be held above every one already out. Nothing was built.") }
     }
 
+    # What main and dev have published decides the number, and a dev Ship
+    # that cannot read it stops before anything is built (Patrick, 19 Oct,
+    # #2711 decision 1 B). Until then it went on from the branch's own number
+    # (tests\test-dev-version.ps1 S6, "dev fails open"), which could land below
+    # a number already out, the 1.1.76.1 case above, and no launcher is offered
+    # a lower one. Read-Published still says when the site does not answer
+    # and takes the copy received here; with neither, it is a stop.
     $base = $current
+    $mainWas = ''
     try {
         $mainWas = Read-Published 'main'
+        if (-not $mainWas) { throw "main's feed names no launcherVersion" }
         # Only the first three parts of main's number. Main never carries a
         # fourth, but reading defensively costs nothing and a 1.1.77.2 base
         # would produce a five part version nobody can read.
@@ -1254,11 +1406,12 @@ elseif ($Dev) {
                 $base = $mainWas
             }
         }
-    } catch { }
+    } catch { Die ("Could not read what main has published (" + $_.Exception.Message + "), so the dev number could land below main's. Nothing was built.") }
 
-    $seen = @()
-    try { $seen = @(Read-EverPublished 'dev') } catch { }
-    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } } catch { }
+    # Read-EverPublished says itself when the list cannot be read.
+    $seen = @(Read-EverPublished 'dev')
+    try { $was = Read-Published 'dev'; if ($was) { $seen += $was } }
+    catch { Die ("Could not read what dev has out now (" + $_.Exception.Message + "), so the dev number could land below it. Nothing was built.") }
     $n = 1
     foreach ($v in $seen) {
         if ($v.StartsWith("$base.")) {
@@ -1491,7 +1644,7 @@ if (-not $ModsOnly) {
     }
     else {
         Head 'Building the launcher'
-        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause -With $LauncherWith
+        & (Join-Path $Here 'Build-Launcher.ps1') -Root $Root -OutDir $buildOut -NoPause
         $buildCode = $LASTEXITCODE
 
         <#
@@ -1555,6 +1708,35 @@ if (-not $ModsOnly) {
         Write-UpdaterCs $back
         Say "  source put back to $current, the exe carries $target" 'DarkGray'
         $current = $target   # so nothing below tries to unbump a version the source no longer has
+    }
+}
+
+# ------------------------------------------------------------ the feed's launcher
+# A main release with -Package that keeps the feed's launcher (above, or
+# -ModsOnly) packs the launcher the feed offers, issue #2661, so it puts that
+# one into <root>\Launcher here: downloaded from the feed, checked against its
+# launcherSha256 and its signature, put in place by Install-Launcher.ps1, and
+# left alone when the folder already holds it. Where the launcher a Ship
+# builds is installed, in its place (the two never both run): after the
+# generated files and node checks, so nothing is installed for a release that
+# stops there (#1692), and before anything is published, so a release with no
+# launcher to package stops now and not after it is out (Package-Thornswood
+# runs after, #2243).
+if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
+    Head 'The launcher the feed offers, for the installer'
+    if ($null -eq $pubLauncher) { $pubLauncher = Get-PublishedLauncher $ReleaseDir 'main' }
+    try {
+        $feedSigner = Get-ExpectedSignerFragment -RepoRoot $RepoDir
+    } catch {
+        Die ($_.Exception.Message + ' Nothing was published.')
+    }
+    $feedLauncherDir = & (Join-Path $Here 'Get-ScratchDir.ps1') ('Thornswood-feedlauncher-' + (Split-Path -Leaf $Root.TrimEnd('\')))
+    $fed = Install-FeedLauncher $pubLauncher $Root $feedLauncherDir $feedSigner (Join-Path $Here 'Install-Launcher.ps1')
+    if ($fed.Why) { Die $fed.Why }
+    if ($fed.Placed) {
+        Say ("  $($pubLauncher.Version) from main's feed, sha256 and signature checked, put in " + (Join-Path $Root 'Launcher')) 'Green'
+    } else {
+        Say ("  " + (Join-Path $Root 'Launcher') + " already holds the $($pubLauncher.Version) main's feed offers") 'Green'
     }
 }
 
@@ -1990,15 +2172,23 @@ if ($DryRun) {
 # check used to stand in front of it for any Ship with a launcher, so that
 # block never ran for one. Anything else is a publisher that stopped, below too.
 if (-not $DryRun -and $published -eq 0) {
+    # A version.json here that does not read is said as that, not as one that
+    # names nothing (#2711: this was a try with an empty catch). Either way
+    # nothing here can say the launcher went out, so nobody is told.
     $landed = ''
-    try {
-        $vf = Join-Path $ReleaseDir 'version.json'
-        if (Test-Path $vf) {
-            $landed = [string]((Get-Content $vf -Raw | ConvertFrom-Json).launcherVersion)
-        }
-    } catch { }
+    $landedWhy = ''
+    $vf = Join-Path $ReleaseDir 'version.json'
+    if (Test-Path -LiteralPath $vf) {
+        try {
+            $vfDoc = Get-Content -LiteralPath $vf -Raw | ConvertFrom-Json
+            if ($vfDoc -and $vfDoc.PSObject.Properties['launcherVersion']) { $landed = [string]$vfDoc.launcherVersion }
+        } catch { $landedWhy = $_.Exception.Message }
+    }
     $notOut = ''
     if (-not $global:ThornswoodPublishedRelease) { $notOut = 'The publisher named no release it sent to the VPS.' }
+    elseif (-not $ModsOnly -and $landedWhy) {
+        $notOut = "$vf does not read ($landedWhy), so nothing says $target went out."
+    }
     elseif (-not $ModsOnly -and $landed -ne $target) {
         $notOut = "version.json still says $(if ($landed) { $landed } else { 'nothing at all' }), not $target."
     }

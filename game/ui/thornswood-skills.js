@@ -163,27 +163,42 @@
       reads as of the panel's last arrival; Read again sends 'skills:refresh'
       for a new one. Nothing on it is picked or sent.
 
-    officePage: { jarl, may, name, steward: <bool>,
-                  stewards: [ { pid, name } ], people: [ { pid, name } ],
-                  hold, where, giveUp, holds: [ { hold, where, by } ], guards: [ { pid, name } ],
-                  guardPeople: [ { pid, name } ], guardOf: { hold, where, jail } | null,
-                  door: { name, by, rent: { amount, every, owed } | null } | null,
-                  box: { hold } | null, boards: [ { hold, where } ] }
-      The offices (#1638), sent to a character that holds the Jarl office or
-      may take it, or is a steward, or guards a hold, and to nobody else. jarl: this character
-      holds it; may: it may take it; name: it names stewards; steward: it
-      evicts, sets rent, marks a box and moves a board. people are the ones
-      in the world a Jarl could name, by name with the profile id the button
-      sends. door and box are what the steward opened in the last minute.
-      hold and where are the Jarl office's hold (#502), and holds the ten to
-      press while the office has none: taking it sends /jarl <hold>. guards
-      are that hold's, guardPeople who could be named one (Name guard sends
-      /guard <pid>, Remove /guard -<pid>), and guardOf the hold this
-      character's account guards. A hold with a seated Jarl carries by, their name, and is not offered; giveUp draws Give up the office, which sends /jarl - (#502, one Jarl a hold).
+    officePage: { jarls: [ { hold, where, offices: { court | steward | guard:
+                    { role, label, holders: [ { pid, name, was, chosen } ], people: [ { pid, name } ] } } } ],
+                  toHold: [ { office, hold, where, role, by } ],
+                  clash: [ { hold, where } ], courtOf: [ { hold, where } ],
+                  stewardOf: [ { hold, where } ], guardOf: [ { hold, where, jail } ],
+                  steward: <bool>, staff: <bool>,
+                  door: { name, by, hold, where, ours, staff, rent: { amount, every, owed } | null } | null,
+                  boards: [ { hold, where } ] }
+      The offices (#1638), sent to anybody who holds one or is staff, and to
+      nobody else.
+      Every office is a Discord role on the account (#2551): jarls are the
+      holds whose Jarl role it holds, each with its Court, Steward and Guard:
+      holders (by a character in the world, or by profile with no name) and
+      people, the ones in the world who could be named, by name with the
+      profile id the button sends. clash are the holds whose Jarl role
+      another account holds too, so it does not act as their Jarl. courtOf,
+      stewardOf and guardOf are the offices it was given. steward: it keeps a
+      hold (Steward of it, or its Jarl), so it evicts, sets rent and moves
+      its own hold's board; boards are those boards only. door is the door
+      the steward opened in the last minute; door.where is the
+      town whose hold the building is in (null for none), and door.ours is
+      true when this character keeps it. staff (#2551, Patrick, 17 Oct): staff
+      hold no office, but end claims and set rent at any building, so they
+      get the door card at every door, with door.staff true where they act
+      as staff rather than as its steward; the server logs each press for
+      staff. The boards stay a steward's. An office is one
+      character's (Patrick, 16 Oct): a holder row is the character that
+      holds it, or chosen false for an account none of whose characters
+      does yet, and toHold are the offices this account's roles give that
+      this character does not hold, with by the character that does, and
+      Hold it here sends /office hold <office> <hold>.
       Its buttons send the server's own lines through the chat line, the way
-      the property page's Stop does: /jarl, /steward <pid>, /steward -<pid>,
-      /evict, /rent <gold>, /rent -, /box <hold> and /board move <hold>. The
-      answers come back in the chat, and the page is written again.
+      the property page's Stop does: /office <court|steward|guard> <hold>
+      <pid> (Name) and -<pid> (Remove), /evict, /rent <gold>, /rent - and
+      /board move <hold>. The answers come back in the chat,
+      and the page is written again.
 */
 
 (function () {
@@ -375,8 +390,8 @@
       rows: []
     },
     /*
-      The offices (#1638). Who holds what, and what is at the door and the
-      container are the server's, under mine.officePage; this is the title
+      The offices (#1638). Who holds what, and what is at the door, are the
+      server's, under mine.officePage; this is the title
       and the one sentence over the page.
     */
     /*
@@ -390,28 +405,33 @@
     },
     office: {
       title: 'Office',
-      lead: 'The office on this character. A Jarl is Jarl of one hold, and names the stewards and that hold\'s guards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves a hold\'s notice board. A guard keeps the cells of their hold\'s jail.',
+      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, and each press is logged for staff.',
       rows: []
     },
     home: {
       title: 'Home',
-      lead: 'Where you wake up. The inn keeps a room for you, and it is where you come back to.',
+      lead: 'The town you start in. You arrive at a quiet spot in or near it, not in its inn.',
       rows: []   // the server sends the towns while you are new
     },
     review: {
       title: 'Review',
-      lead: 'What you have chosen. Confirm sends all of it to the server and takes you to your inn. A profession without its half, or a mage short of two schools, is not sent; it can be picked in the world.',
+      lead: 'What you have chosen. Confirm sends all of it to the server and takes you to your home town. A profession without its half, or a mage short of two schools, is not sent; it can be picked in the world.',
       rows: []   // drawn from the choices, not from a table
     }
   };
   var REVIEW = DATA.review;   // kept beside a table the server might send without it
 
-  /* The inn in each town, by the server's town key. Display only. */
-  var INNS = {
-    whiterun: 'The Bannered Mare', riften: 'The Bee and Barb', solitude: 'The Winking Skeever',
-    windhelm: 'Candlehearth Hall', markarth: 'The Silver-Blood Inn', falkreath: 'Dead Man’s Drink',
-    morthal: 'Moorside Inn', dawnstar: 'The Windpeak Inn', winterhold: 'The Frozen Hearth'
-  };
+  /*
+    The hold each town is in, from the town list the server sends (#2622).
+    Until 17 Oct this was a table of inns, because a new character arrived
+    in the inn; since #2622 they arrive at the town's start spot, so the card
+    names the hold instead, the same name the welcome line says.
+  */
+  function holdOf(key) {
+    var towns = (mine && mine.towns) || [];
+    for (var i = 0; i < towns.length; i++) if (towns[i].key === key) return towns[i].hold || '';
+    return '';
+  }
 
   var RANK_NAMES = { novice: 'Novice', advanced: 'Advanced', expert: 'Expert', master: 'Master' };
   var CAP = 5;             // points that fill a skill; the server's LIMITS.skillCap, mirrored for the pips
@@ -1319,7 +1339,7 @@
     var p = picked.home;
     var towns = (mine && mine.towns) || [];
     for (var i = 0; i < towns.length; i++) {
-      if (p && towns[i].key === p.row) return { t: towns[i].name, inn: INNS[p.row] || '', c: 'chosen' };
+      if (p && towns[i].key === p.row) return { t: towns[i].name, hold: towns[i].hold || '', c: 'chosen' };
     }
     return null;
   }
@@ -1518,12 +1538,18 @@
       return bw.length ? { t: bw.join(', '), c: 'need' } : { t: 'fine', c: 'set' };
     }
     if (sec === 'office') {
-      var ov = officePage();
-      if (ov && ov.jarl) return { t: ov.where ? 'Jarl of ' + ov.where : 'Jarl, choose the hold', c: ov.where ? 'set' : 'need' };
-      if (ov && ov.may) return { t: 'may take the office', c: 'need' };
-      if (ov && ov.steward) return { t: 'steward', c: 'set' };
-      if (ov && ov.guardOf) return { t: 'guard of ' + (ov.guardOf.where || ov.guardOf.hold), c: 'set' };
-      return { t: 'steward', c: 'set' };
+      // The offices are Discord roles (#2551): the first one held names the row.
+      var ov = officePage() || {};
+      var first = function (list) { return (Array.isArray(list) && list.length) ? String(list[0].where || list[0].hold) : ''; };
+      if (first(ov.jarls)) return { t: 'Jarl of ' + first(ov.jarls), c: 'set' };
+      if (first(ov.clash)) return { t: 'Jarl of ' + first(ov.clash) + ', held twice', c: 'need' };
+      if (first(ov.stewardOf)) return { t: 'Steward of ' + first(ov.stewardOf), c: 'set' };
+      if (first(ov.courtOf)) return { t: first(ov.courtOf) + ' Court', c: 'set' };
+      if (first(ov.guardOf)) return { t: 'Guard of ' + first(ov.guardOf), c: 'set' };
+      if (Array.isArray(ov.toHold) && ov.toHold.length) return { t: String(ov.toHold[0].role) + ', not held here', c: 'need' };
+      // Staff hold no office, and settle any building as staff (#2551).
+      if (ov.staff) return { t: 'staff, at any door', c: 'set' };
+      return { t: 'an office', c: 'set' };
     }
     if (sec === 'staff') {
       var sl = staffLeft();
@@ -1982,24 +2008,31 @@
     THE OFFICE PAGE (#1638).
 
     Patrick, 4 Oct: no commands for things people do, and a Jarl and a
-    steward are people. So the offices are buttons here, on the character
-    that holds one: Take the office, name a steward by picking somebody in
-    the world, Remove beside a steward, and for a steward Evict and the rent
-    at the door they just opened, the container they just opened made a
-    hold's box, and a board moved to where they stand.
+    steward are people. So the offices are buttons here, for anybody who
+    holds one: the Jarl names and removes their hold's Court, Steward and
+    Guards by picking somebody in the world, and a steward has Evict and the
+    rent at the door they just opened, and their hold's board moved to where
+    they stand. A steward no longer marks a container as a hold's box: the
+    drop box on the board is the only one (#2298, Patrick, 15 Oct).
+
+    THE OFFICES ARE DISCORD ROLES (#2551). Patrick, 15 Oct: a Jarl's hold is
+    their "Jarl of <Hold>" role, and the Court, Steward and Guards are roles
+    the Jarl gives. Nothing here takes an office or picks a hold. Name and
+    Remove send /office <court|steward|guard> <hold> <id> (or -<id>); the
+    server asks the site, the bot's account sets the role in Discord, and the
+    page is written again once the game has read it back.
 
     EVERYTHING ON IT IS THE SERVER'S. Who holds what, who is in the world,
-    the door and the container are mine.officePage, and each button sends
+    the door are mine.officePage, and each button sends
     the server's own line through the chat line every panel uses, the way
     the property page's Stop does. The server checks it all again and
     answers in the chat, and writes the page again.
 
     A PERSON IS PICKED, NOT TYPED. Two characters can share a name, so a row
-    carries the profile id the server sent with the name, and Name steward
-    sends that id. The id is shown, small, so two of one name can be told
-    apart.
+    carries the profile id the server sent with the name, and Name sends that
+    id. The id is shown, small, so two of one name can be told apart.
 
-    THE TWO THAT CANNOT BE PUT BACK ASK TWICE. Evict ends somebody's claim
+    THE ONES THAT CANNOT BE PUT BACK ASK TWICE. Evict ends somebody's claim
     and moving a board leaves it wherever the steward is standing, so the
     first press says what a second press does, and the second sends it.
   */
@@ -2032,114 +2065,113 @@
     return row;
   }
 
+  /* A card saying an office this person holds, and what it lets them do. */
+  function officeHeld(wrap, title, desc) {
+    var card = el('div', 'card mine');
+    var head = el('div', 'name', title);
+    head.appendChild(el('span', 'tag', 'held'));
+    card.appendChild(head);
+    card.appendChild(el('div', 'desc', desc));
+    wrap.appendChild(card);
+    return card;
+  }
+
+  /*
+    One office of the Jarl's hold: who holds it, with Remove, and the people
+    in the world who do not, with Name. Remove takes the role in Discord, so
+    it asks twice.
+  */
+  function officeGiven(wrap, hold, office, o) {
+    var card = el('div', 'card');
+    var role = String(o.role || office);
+    card.appendChild(el('div', 'name', role));
+    var holders = Array.isArray(o.holders) ? o.holders : [];
+    if (!holders.length) card.appendChild(el('div', 'inn', 'Nobody holds it.'));
+    holders.forEach(function (w) {
+      var pid = Number(w.pid) || 0;
+      // The character that holds it (#2551), or an account whose role gives it and none of whose characters holds it yet.
+      var who = w.name ? String(w.name) : (w.was ? String(w.was) : 'Profile ' + pid);
+      var extra = w.chosen === false ? 'no character holds it yet' : (w.name ? 'profile ' + pid : 'not in the world now');
+      officeRow(card, who, extra,
+        [officeButton('Remove', '/office ' + office + ' ' + hold + ' -' + pid, 'Press again to take ' + role + ' back')]);
+    });
+    var people = Array.isArray(o.people) ? o.people : [];
+    card.appendChild(el('div', 'inn', people.length
+      ? 'Name somebody from the people in the world now:'
+      : 'Everybody in the world now holds it already, or nobody is in the world to name.'));
+    people.forEach(function (p) {
+      var pid = Number(p.pid) || 0;
+      officeRow(card, String(p.name || 'somebody'), 'profile ' + pid,
+        [officeButton('Name', '/office ' + office + ' ' + hold + ' ' + pid)]);
+    });
+    wrap.appendChild(card);
+  }
+
   function drawOffice() {
     var o = officePage();
     if (!o) return;
     var wrap = el('div', 'cards');
+    var list = function (x) { return Array.isArray(x) ? x : []; };
+    var town = function (h) { return String((h && (h.where || h.hold)) || ''); };
 
-    // The office on this character. The Jarl office is of one hold (#502):
-    // taking it, or choosing the hold of one taken before there was a hold,
-    // is a hold pressed twice, because it is not put back.
-    var holds = Array.isArray(o.holds) ? o.holds : [];
-    if (o.jarl || o.may || o.steward) {
-      var seat = el('div', 'card' + (o.jarl ? ' mine' : ''));
-      var head = el('div', 'name', o.jarl ? (o.where ? 'Jarl of ' + String(o.where) : 'Jarl')
-                                          : (o.may ? 'The Jarl office' : 'Steward'));
-      if (o.jarl) head.appendChild(el('span', 'tag', 'held'));
-      seat.appendChild(head);
-      seat.appendChild(el('div', 'desc', o.jarl
-        ? (o.where ? 'This character holds the Jarl office of ' + String(o.where) + ', and names its guards. Another character on the account stays as it is.'
-                   : 'This character holds the Jarl office, of no hold yet. Press the hold it is Jarl of, twice. It is chosen once.')
-        : (o.may ? 'This character may take the Jarl office of one hold. Press the hold, twice: it is chosen once. The office is on the character, not the account, so another character on the account stays as it is.'
-                 : 'A Jarl named you a steward.')));
-      if (holds.length) {
-        var pick = officeRow(seat, '', '', []);
-        var held = [];
-        holds.forEach(function (h) {
-          var where = String(h.where || h.hold);
-          // One Jarl a hold (#502): a seated hold is named, not offered.
-          if (h.by) { held.push(where + ' (' + String(h.by) + ')'); return; }
-          pick.appendChild(officeButton(where, '/jarl ' + String(h.hold), 'Press again to be Jarl of ' + where));
-        });
-        if (held.length) seat.appendChild(el('div', 'inn', 'Held by their Jarl: ' + held.join(', ') + '.'));
-      }
-      // Give up the office (#502), asked twice: the seat goes to the next Jarl.
-      if (o.giveUp) officeRow(seat, '', '', [officeButton('Give up the office', '/jarl -',
-        'Press again to give up the office' + (o.where ? ' of ' + String(o.where) : ''))]);
-      wrap.appendChild(seat);
-    }
-
-    // A guard's own office (#502).
-    if (o.guardOf) {
-      var gd = el('div', 'card mine');
-      var gh = el('div', 'name', 'Guard of ' + String(o.guardOf.where || o.guardOf.hold));
-      gh.appendChild(el('span', 'tag', 'held'));
-      gd.appendChild(gh);
-      gd.appendChild(el('div', 'desc', 'The Jarl of ' + String(o.guardOf.where || o.guardOf.hold) + ' named you a guard. ' +
-        'Every cell of ' + String(o.guardOf.jail || 'the jail') + ' opens for you, and the lock key at a cell door locks or unlocks it for everybody else. ' +
-        'At ' + String(o.guardOf.where || o.guardOf.hold) + '\'s notice board you can take down any post.'));
-      wrap.appendChild(gd);
-    }
-
-    // The guards of the Jarl's hold, and naming one (#502).
-    if (o.name) {
-      var gc = el('div', 'card');
-      gc.appendChild(el('div', 'name', o.where ? 'Guards of ' + String(o.where) : 'Guards'));
-      if (!o.hold) {
-        gc.appendChild(el('div', 'inn', 'A Jarl names the guards of their own hold. Take the office of a hold first.'));
-      } else {
-        var guards = Array.isArray(o.guards) ? o.guards : [];
-        if (!guards.length) gc.appendChild(el('div', 'inn', 'No guards yet.'));
-        guards.forEach(function (w) {
-          var gpid = Number(w.pid) || 0;
-          officeRow(gc, w.name ? String(w.name) : 'Profile ' + gpid, w.name ? 'profile ' + gpid : 'not in the world now',
-                    [officeButton('Remove', '/guard -' + gpid)]);
-        });
-        var gpeople = Array.isArray(o.guardPeople) ? o.guardPeople : [];
-        gc.appendChild(el('div', 'inn', gpeople.length
-          ? 'Name a guard from the people in the world now:'
-          : 'Nobody in the world now guards no hold, so there is nobody to name.'));
-        gpeople.forEach(function (p) {
-          var ppid = Number(p.pid) || 0;
-          officeRow(gc, String(p.name || 'somebody'), 'profile ' + ppid, [officeButton('Name guard', '/guard ' + ppid)]);
-        });
-      }
-      wrap.appendChild(gc);
-    }
-
-    // A guard who holds no other office has only the card above.
-    if (!o.jarl && !o.may && !o.steward) {
-      elBody.appendChild(wrap);
-      return;
-    }
-
-    // The stewards, and naming one.
-    var st = el('div', 'card');
-    st.appendChild(el('div', 'name', 'Stewards'));
-    var stewards = Array.isArray(o.stewards) ? o.stewards : [];
-    if (!stewards.length) st.appendChild(el('div', 'inn', 'No stewards yet.'));
-    stewards.forEach(function (w) {
-      var pid = Number(w.pid) || 0;
-      officeRow(st, w.name ? String(w.name) : 'Profile ' + pid, w.name ? 'profile ' + pid : 'not in the world now',
-                o.name ? [officeButton('Remove', '/steward -' + pid)] : []);
-    });
-    if (o.name) {
-      var people = Array.isArray(o.people) ? o.people : [];
-      st.appendChild(el('div', 'inn', people.length
-        ? 'Name a steward from the people in the world now:'
-        : 'Nobody else is in the world now to name a steward.'));
-      people.forEach(function (p) {
-        var pid = Number(p.pid) || 0;
-        officeRow(st, String(p.name || 'somebody'), 'profile ' + pid, [officeButton('Name steward', '/steward ' + pid)]);
+    // The Jarl of a hold (#2551): from their Jarl role, with its three offices.
+    list(o.jarls).forEach(function (j) {
+      var where = town(j);
+      officeHeld(wrap, 'Jarl of ' + where, 'This character is Jarl of ' + where + ', by your Discord role. You name and ' +
+        'remove its Court, its Steward and its Guards here, and the same roles change in Discord. The office is ' +
+        'this character\'s; your other characters are ordinary.');
+      var offices = (j && j.offices) || {};
+      ['court', 'steward', 'guard'].forEach(function (k) {
+        if (offices[k]) officeGiven(wrap, String(j.hold), k, offices[k]);
       });
-    }
-    wrap.appendChild(st);
+    });
 
-    if (o.steward) {
-      wrap.appendChild(officeDoor(o.door));
-      wrap.appendChild(officeBox(o.box, o.boards));
-      wrap.appendChild(officeBoards(o.boards));
+    // An office this account's role gives that this character does not hold
+    // (#2551, Patrick, 16 Oct: an office is one character's). Hold it here.
+    list(o.toHold).forEach(function (t) {
+      var card = el('div', 'card');
+      card.appendChild(el('div', 'name', String(t.role || t.office)));
+      card.appendChild(el('div', 'desc', (t.by
+        ? 'Your account holds the ' + String(t.role) + ' role, and ' + String(t.by) + ', another of your characters, holds the office.'
+        : 'Your account holds the ' + String(t.role) + ' role, and none of your characters holds the office yet.') +
+        ' One character holds it. Press Hold it here to make it this one.'));
+      officeRow(card, '', '', [officeButton('Hold it here', '/office hold ' + String(t.office) + ' ' + String(t.hold),
+        'Press again to hold ' + String(t.role) + ' with this character')]);
+      wrap.appendChild(card);
+    });
+
+    // A Jarl role another account holds too: neither acts (Patrick, 15 Oct).
+    list(o.clash).forEach(function (c) {
+      var card = el('div', 'card');
+      card.appendChild(el('div', 'name', 'Jarl of ' + town(c) + ', held twice'));
+      card.appendChild(el('div', 'desc', 'Another Discord account holds the Jarl of ' + town(c) + ' role too, so neither ' +
+        'of you acts as Jarl until staff take it from all but one. Staff have been told.'));
+      wrap.appendChild(card);
+    });
+
+    list(o.stewardOf).forEach(function (h) {
+      officeHeld(wrap, 'Steward of ' + town(h), 'The Jarl of ' + town(h) + ' made you its Steward. You end claims and ' +
+        'set rent at a door, move ' + town(h) + '\'s notice board, and take anything out of its drop box.');
+    });
+    list(o.courtOf).forEach(function (h) {
+      officeHeld(wrap, town(h) + ' Court', 'The Jarl of ' + town(h) + ' named you to its Court. You take anything ' +
+        'out of ' + town(h) + '\'s drop box and read its records.');
+    });
+    list(o.guardOf).forEach(function (h) {
+      officeHeld(wrap, 'Guard of ' + town(h), 'The Jarl of ' + town(h) + ' named you a guard. Every cell of ' +
+        String(h.jail || 'the jail') + ' opens for you, and the lock key at a cell door locks or unlocks it for ' +
+        'everybody else. At ' + town(h) + '\'s notice board you can take down any post, and you take anything out ' +
+        'of its drop box.');
+    });
+
+    // Staff (#2551, Patrick, 17 Oct): no office, and the door card at any building.
+    if (o.staff) {
+      officeHeld(wrap, 'Staff', 'Staff hold no office, but you end claims and set rent at any building, in any ' +
+        'hold or none. At a building whose hold you do not keep you act as staff, and every press goes in the ' +
+        'staff log with your name.');
     }
+    if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
+    if (o.steward) wrap.appendChild(officeBoards(o.boards));
     elBody.appendChild(wrap);
   }
 
@@ -2154,6 +2186,17 @@
     var r = d.rent;
     card.appendChild(el('div', 'desc', (d.by ? 'Held by ' + d.by + '. ' : 'Nobody holds it. ') +
       (r ? 'Rent ' + r.amount + ' gold every ' + r.every + ' days, ' + r.owed + ' owed.' : 'No rent on it.')));
+    // A steward settles only their own hold's buildings (#2551); the server says whose this one is.
+    // Staff settle any building, as staff, and the server logs it.
+    if (d.staff) {
+      card.appendChild(el('div', 'desc', (d.where ? 'It answers to ' + String(d.where) + '. ' : 'It answers to no hold. ') +
+        'You act as staff here: what you press goes in the staff log with your name.'));
+    } else if (!d.ours) {
+      card.appendChild(el('div', 'desc', d.where
+        ? 'It answers to ' + String(d.where) + '. Only the Steward of ' + String(d.where) + ' or its Jarl ends a claim or sets rent here.'
+        : 'It answers to no hold the server knows, so no steward ends a claim or sets rent here.'));
+      return card;
+    }
     if (!d.by) return card;
     officeRow(card, '', '', [officeButton('Evict', '/evict', 'Press again to end ' + d.by + '\'s claim')]);
     var input = document.createElement('input');
@@ -2171,27 +2214,6 @@
     var buttons = [input, set];
     if (r) buttons.push(officeButton('No rent', '/rent -'));
     officeRow(card, 'Rent every 7 days', '', buttons);
-    return card;
-  }
-
-  /* The container the steward opened in the last minute, made a hold's box. */
-  function officeBox(b, boards) {
-    var card = el('div', 'card');
-    card.appendChild(el('div', 'name', 'A hold\'s box'));
-    if (!b) {
-      card.appendChild(el('div', 'desc', 'Open a container, then open this page within a minute, to make it a hold\'s box. Only gold goes in a box. Each hold\'s notice board is its box already.'));
-      return card;
-    }
-    var list = Array.isArray(boards) ? boards : [];
-    var whose = b.hold ? String(b.hold) : '';
-    list.forEach(function (h) { if (h.hold === b.hold && h.where) whose = String(h.where); });
-    card.appendChild(el('div', 'desc', whose
-      ? 'The container you just opened is ' + whose + '\'s box. Press a hold to make it that hold\'s instead.'
-      : 'The container you just opened is nobody\'s box. Press a hold to make it that hold\'s.'));
-    var row = officeRow(card, '', '', []);
-    list.forEach(function (h) {
-      row.appendChild(officeButton(String(h.where || h.hold), '/box ' + String(h.hold)));
-    });
     return card;
   }
 
@@ -2540,7 +2562,7 @@
       if (haveHome() && mine.home === t.key) name.appendChild(el('span', 'tag', 'yours'));
       else if (p.row === t.key) name.appendChild(el('span', 'tag gold', 'chosen'));
       card.appendChild(name);
-      if (INNS[t.key]) card.appendChild(el('div', 'inn', INNS[t.key]));
+      if (t.hold) card.appendChild(el('div', 'inn', t.hold));
       card.onclick = function () { rowAt = i; if (!haveHome()) choose('home', t.key, []); draw(); };
       wrap.appendChild(card);
     });
@@ -2568,8 +2590,8 @@
     if (haveClass()) out.push({ k: 'Class', v: nameOf('class', mine['class']), c: 'set' });
     else if ((soft = softClass())) out.push({ k: 'Class', v: soft.t, c: 'chosen' });
     else out.push({ k: 'Class', v: later['class'] ? 'later' : 'not chosen yet', c: 'dim' });
-    if (haveHome()) out.push({ k: 'Home', v: cap(mine.home) + (INNS[mine.home] ? ', ' + INNS[mine.home] : ''), c: 'set' });
-    else if ((soft = softHome())) out.push({ k: 'Home', v: soft.t + (soft.inn ? ', ' + soft.inn : ''), c: 'chosen' });
+    if (haveHome()) out.push({ k: 'Home', v: cap(mine.home) + (holdOf(mine.home) ? ', ' + holdOf(mine.home) : ''), c: 'set' });
+    else if ((soft = softHome())) out.push({ k: 'Home', v: soft.t + (soft.hold ? ', ' + soft.hold : ''), c: 'chosen' });
     else out.push({ k: 'Home', v: 'not chosen yet', c: 'need' });
     return out;
   }
@@ -2751,7 +2773,7 @@
     }
     if (section === 'review') {
       if (!(haveHome() || softHome())) return 'Pick a home first. Confirm sends everything you chose to the server.';
-      return 'Confirm sends everything you chose to the server and takes you to your inn.';
+      return 'Confirm sends everything you chose to the server and takes you to your home town.';
     }
     // The later lines are creation's: the mark is only ever set there.
     if (section === 'class') {
@@ -2766,7 +2788,7 @@
       if (creating()) return 'Pick a profession and its half and move on, or choose later and pick it in the world. Nothing is sent until Confirm.';
       return 'Pick a profession and its half, then confirm.';
     }
-    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will wake up in and move on to Review. A home is the one thing you must choose before you leave the hall.';
+    if (section === 'home') return haveHome() ? 'Home is set.' : 'Pick the town you will start in and move on to Review. A home is the one thing you must choose before you leave the hall.';
     return '';
   }
 
@@ -2923,8 +2945,26 @@
     if (Date.now() - apprSent.at >= PENDING_MS) apprSent = null;
   }
 
+  /*
+    BEGIN WAITS FOR ITS ANSWER. Djinn, 17 Oct, on dev: one Confirm, then
+    "No: you already have a profession", "No: you already know that one"
+    twice, "No: you already have a class" and "No: your home is already
+    chosen" in the chat. His log shows the whole Begin sent twice, 462 ms
+    apart (18:24:49.104 and .566): a second press reached begin() before the
+    server's answer did, and begin() decides what is new from what the server
+    has already confirmed, so the second press sent everything again. While
+    the town pick is in flight Begin is dark; the answer or a refusal clears
+    it (pending), and so does PENDING_MS if neither ever comes, so a lost
+    answer never leaves the button dead.
+  */
+  function homeInFlight() {
+    for (var i = 0; i < pending.length; i++) {
+      if (pending[i].section === 'home' && Date.now() - pending[i].at < PENDING_MS) return true;
+    }
+    return false;
+  }
   function canConfirm() {
-    if (creating()) return section === 'review' && !!softHome();
+    if (creating()) return section === 'review' && !!softHome() && !homeInFlight();
     if (section === 'spells') return canLearn();
     if (section === 'staff') return canUnlockStaff();
     if (section === 'college') return !!collegeView() && !studyWaiting();
@@ -3004,6 +3044,8 @@
     if (softClass() && !haveClass()) send('class', 'class ' + picked['class'].row);
     send('home', 'town ' + picked.home.row);
     status = 'Sent. The server is checking.'; statusKind = '';
+    // Lit again when PENDING_MS is up, if no answer ever came.
+    setTimeout(function () { if (!homeInFlight()) draw(); }, PENDING_MS + 50);
     draw();
   }
 

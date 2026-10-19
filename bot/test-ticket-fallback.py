@@ -26,7 +26,7 @@ real one beside bot.py is never read or written.
 
 Read only. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import itertools
 import os

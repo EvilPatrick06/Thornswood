@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 5922590,
-  "sha256": "7457d64514b9cf122e805681732c7f850e41f50dbc6690f6960d3df6a47f44d7"
+  "size": 6024259,
+  "sha256": "66f5833bfe3b02a629feba127ef0adcc15736b2e9735ed42dd297e4af71f48b8"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -111,6 +111,518 @@
   "Water for ENB - Patch - Generic Landscape Patch.esp",
   "Playable Rieklings.esp"
  ],
+ "builtAgainst": [
+  {
+   "name": "Skyrim.esm",
+   "size": 249753412,
+   "sha256": "2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107"
+  },
+  {
+   "name": "Update.esm",
+   "size": 18874041,
+   "sha256": "c1795e0a1218da45dbfd523f064f1857b42805c49714c46091e75277e525aed9"
+  },
+  {
+   "name": "Dawnguard.esm",
+   "size": 25885111,
+   "sha256": "1bda804009a21228acf6b30aa6aa7a692b247ff8a0313fe9aa69b3617ed4a6c4"
+  },
+  {
+   "name": "HearthFires.esm",
+   "size": 3977420,
+   "sha256": "ad4ca9f32c81e7ddd3e39ec95e03b07841f20712989e598778442ea69b6e6a97"
+  },
+  {
+   "name": "Dragonborn.esm",
+   "size": 64663863,
+   "sha256": "5f44f343552688c04f73bf83de58b90f70c7376b133fbbcb56b6fe33acf8778b"
+  },
+  {
+   "name": "_ResourcePack.esl",
+   "size": 78418,
+   "sha256": "d231915a4bbfe6e89536dfb0a46c5adc8e4d2d23ce95d248dc24943776eb76fb"
+  },
+  {
+   "name": "Water for ENB.esm",
+   "size": 437882,
+   "sha256": "e043a0ab6136b861fa0117aef69a78a1ffbaf183c4862e196575977439601830"
+  },
+  {
+   "name": "Embers XD.esm",
+   "size": 64802,
+   "sha256": "83f635cb33fe3c9f1192d3bb5cfc97b219220cfcef859885d3a7b06d95b6cfea"
+  },
+  {
+   "name": "Expressive Facegen Morphs.esl",
+   "size": 132,
+   "sha256": "59240f0ead8e723dc2ed8d1e93e23ba4d8ecd962e11c615cb2b47bc8e53e1470"
+  },
+  {
+   "name": "AHZmoreHUDInventory.esl",
+   "size": 217,
+   "sha256": "ea9ce96cf1a8d174f8f2cfe22d938703dfdfcb3c3c572ee87e61427f51ec9aeb"
+  },
+  {
+   "name": "TrueHUD.esl",
+   "size": 582,
+   "sha256": "f799336b2b849f816a522631898ff54dc8c39bbccaccfe8a7023390be4e1d813"
+  },
+  {
+   "name": "RaceCompatibility.esm",
+   "size": 61105,
+   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2"
+  },
+  {
+   "name": "SkyUI_SE.esp",
+   "size": 2433,
+   "sha256": "61eb77164ed3632344ac2ccac4c8a4e69c62397999e7d8d558c162fd205616cf"
+  },
+  {
+   "name": "LSFX-SSE-Audiosettings.esp",
+   "size": 761,
+   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7"
+  },
+  {
+   "name": "I4IconAddon.esp",
+   "size": 234,
+   "sha256": "3672a25b61bd192eac550caabc2860619c66ae39d93b44183272d88bfed65866"
+  },
+  {
+   "name": "Immersive Sounds - Compendium.esp",
+   "size": 1048415,
+   "sha256": "5a1b36a7961d767c0937957767055dcf1bcb53b79b574003a40a66d382d3350e"
+  },
+  {
+   "name": "FNIS.esp",
+   "size": 180,
+   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03"
+  },
+  {
+   "name": "IcePenguinWorldMap.esp",
+   "size": 2748,
+   "sha256": "71e1679274ad76d596a6cbe3ae4899b23e3ed035f53acb45887157d6d8f2ef16"
+  },
+  {
+   "name": "JKs Skyrim.esp",
+   "size": 3157818,
+   "sha256": "6f0e2551017806ad9ab7acb074003a81457fa9606ab5e7b2833a862ce393f646"
+  },
+  {
+   "name": "JK's Castle Volkihar.esp",
+   "size": 950572,
+   "sha256": "45188a89845711d3047e0fa39ba3e5672078a1bc6822a0f323eb2641dada8514"
+  },
+  {
+   "name": "WindhelmSSE.esp",
+   "size": 2965984,
+   "sha256": "77ff48032f6479209e911e123ab5ecaf4c4dbf056e67eba0ef2f65a090c3d3e6"
+  },
+  {
+   "name": "CWE - JK - United.esp",
+   "size": 355277,
+   "sha256": "eeab8d8109be3c6f0de02841d9d3c5afbca566a6127d15873fe8fb1a7d999632"
+  },
+  {
+   "name": "JK's Markarth Outskirts.esp",
+   "size": 578111,
+   "sha256": "cf159c93b89b379ea7d91b29534f20e7b3194edf9ac5e1fb774ce33fd7df2b58"
+  },
+  {
+   "name": "JK's Whiterun's Outskirts.esp",
+   "size": 1075057,
+   "sha256": "c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04"
+  },
+  {
+   "name": "The Great City of Solitude.esp",
+   "size": 1167491,
+   "sha256": "8b52ce2fa6d21d95d16db3b4d630e05bae87eaaea1439a0b0bbdba0ef867af4e"
+  },
+  {
+   "name": "Embers XD.esp",
+   "size": 259127,
+   "sha256": "70e089e6841a63444aa96bc8bccc26351862c0512e139c575c91a14598f58ff3"
+  },
+  {
+   "name": "Riften Expansion.esp",
+   "size": 875191,
+   "sha256": "dad73d07cc6c05a2e4c91dcb1a6704a64e0521a4b4f96de0830b533c021bba99"
+  },
+  {
+   "name": "Odin - Skyrim Magic Overhaul.esp",
+   "size": 780438,
+   "sha256": "44a66b9696064eedec53a404251304ecf600b64df360dd068b7c947610114d70"
+  },
+  {
+   "name": "JK's Riften Outskirts.esp",
+   "size": 461558,
+   "sha256": "3129ec5357c6d6e0093957eea251706308f202a6c752aec98d77a0639b6a75f5"
+  },
+  {
+   "name": "Riften Expansion - JK's Skyrim Patch.esp",
+   "size": 115032,
+   "sha256": "2fb6d4ca7fe5e96343a040cb224182ce7e435cccfa2baa008df61c352fcda0fd"
+  },
+  {
+   "name": "Hothtrooper44_ArmorCompilation.esp",
+   "size": 1121002,
+   "sha256": "a5188649af4c74bb4366bd3bacafd78acf1a1545c0cf69d37a909fbb82ab0f01"
+  },
+  {
+   "name": "Guard Dialogue Overhaul.esp",
+   "size": 465412,
+   "sha256": "0c8c0fc2203e27813b2e7fc01a5f511685afac637fe7c37966d5e2de534cef4b"
+  },
+  {
+   "name": "Gourmet.esp",
+   "size": 226102,
+   "sha256": "813bbc2e270cba3db018abc586cb3659a9d54f26ce98bdcee95a220ee0969b61"
+  },
+  {
+   "name": "MoreCraftableEquipment.esp",
+   "size": 199987,
+   "sha256": "552fec4651e3b2a13c22c51e04268e5df1686fda5a539bbb949206479f087b19"
+  },
+  {
+   "name": "HIMBO.esp",
+   "size": 3432,
+   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a"
+  },
+  {
+   "name": "AnotherOakwood.esp",
+   "size": 844208,
+   "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264"
+  },
+  {
+   "name": "aaaGraniteHill.esp",
+   "size": 823125,
+   "sha256": "84e95cd443bd6611b61ce2a0b0d3da1390737658d70b332c3ba82ec37463ee6f"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Orc Strongholds.esp",
+   "size": 71023,
+   "sha256": "4a385ad880e5255dcf78a4b1ff12afd80b16cd42b8828d189dd6b35562379463"
+  },
+  {
+   "name": "ElysiumEstate.esp",
+   "size": 956423,
+   "sha256": "cd8c90917aa1e38597bb79882c1ec4196ba41695672492ad1dc683bec5e8c20e"
+  },
+  {
+   "name": "Triumvirate - Mage Archetypes.esp",
+   "size": 804064,
+   "sha256": "34bffbb81ed640806b348d5fd1ac1d03f8b3cb2dc5a4fa78e54a77fc7c3451b2"
+  },
+  {
+   "name": "Apocalypse - Magic of Skyrim.esp",
+   "size": 1446114,
+   "sha256": "b0a9632372f2117f7d96583e1522b42758f414129d3572f848b8f7ac65681384"
+  },
+  {
+   "name": "RaceMenu.esp",
+   "size": 578,
+   "sha256": "e949d05f1a0bbef5fe090ff85e276afab021276980cb49fc75926e17822aed37"
+  },
+  {
+   "name": "RaceMenuPlugin.esp",
+   "size": 328,
+   "sha256": "d36cd31e2472c1278d4ae9b7f2de89a305a4704b0838a0c89328431e739457de"
+  },
+  {
+   "name": "CommonClothes.esp",
+   "size": 105651,
+   "sha256": "f3f30b811401f4839a05b0e3a3164775cb57e074e179b68caf2806648de8a413"
+  },
+  {
+   "name": "Cloaks&Capes.esp",
+   "size": 36316,
+   "sha256": "dbc1aa28ba652c01d7be983473c2c95cd0e0a1203b11212824a39cc2c6b1cbfe"
+  },
+  {
+   "name": "XPMSE.esp",
+   "size": 1704,
+   "sha256": "a6379982646aaf634912b2d1eadb2bcb592dc312c22d06d9e39df1485b72efe1"
+  },
+  {
+   "name": "UIExtensions.esp",
+   "size": 1143,
+   "sha256": "f0d0ee6faf02518f67417cff8b338008d66c85f0bfd053d08c3594e5856d3fcc"
+  },
+  {
+   "name": "chfshVariousActions.esp",
+   "size": 19904,
+   "sha256": "68fca73ea1f2ff3938931227d3e743610a4e92f32d450fe5a7e6443491da7359"
+  },
+  {
+   "name": "DeadlySpellImpacts.esp",
+   "size": 22763,
+   "sha256": "90cd582950a6bb9f06c8e868b3e9ac293b69ead98ee62fdb060aa9a07f7bda26"
+  },
+  {
+   "name": "Cathedral Weathers.esp",
+   "size": 427522,
+   "sha256": "c7f27ceb0f20923bfe7396ab6cee0d9021b2f84554cef88a26b96f771a146070"
+  },
+  {
+   "name": "FishingInSkyrim.esp",
+   "size": 85303,
+   "sha256": "61f7a959e95c5eee6a86d86b2670522f6442ae0b601ed4ebe4baebb0b37b27df"
+  },
+  {
+   "name": "Thornswood-Content.esp",
+   "size": 110915,
+   "sha256": "491e5c78915a2dea1104ec44e4304728ac44ddfddf4ee594c7f81b5e8c2a7cb3"
+  },
+  {
+   "name": "Populated Cities Towns Villages Legendary.esp",
+   "size": 2065137,
+   "sha256": "bca3715242f4188566cd65764f494f707bb158ff4b883d4d02656f60b0ad6fb8"
+  },
+  {
+   "name": "SkyrimSewers.esp",
+   "size": 1607107,
+   "sha256": "2d2d3e1b78e32affc5b1979c0a165ba15cdcd6c21228ac9600ad030a8c76a47d"
+  },
+  {
+   "name": "Solitude Arena.esp",
+   "size": 997386,
+   "sha256": "8a4587ee0bf339493522459120b91a05f60f16b38211baed01a848a1f44fcae3"
+  },
+  {
+   "name": "ZIA_Complete Pack.esp",
+   "size": 339009,
+   "sha256": "b5c7f6cc2c4d4c9f2ef71648c6673f935f773f060ed8420d2a20aebbf7afaf3d"
+  },
+  {
+   "name": "CFTO.esp",
+   "size": 308797,
+   "sha256": "17581b6a701a90f0f8de71ab893b7d24f0baa39e8b35b9522df5fdc254b6710d"
+  },
+  {
+   "name": "Arena - Markarth Side.esp",
+   "size": 886405,
+   "sha256": "07a234e56d7c3e05b8ab976e5bc8e5f92642b9b8566be6f5e946fcec5d0ac395"
+  },
+  {
+   "name": "Immersive Weapons.esp",
+   "size": 408425,
+   "sha256": "bc084ae9f523c167eea11d1d7363314250b8fe7e7912607f58292e91e788e3c7"
+  },
+  {
+   "name": "DIS_Heavy_Legion.esp",
+   "size": 113640,
+   "sha256": "728a6a6ea1dd369469068f19db97f14fee07d2e72864d7acdc3343f29a6a0d37"
+  },
+  {
+   "name": "OarsRest.esp",
+   "size": 415931,
+   "sha256": "9b46a0882e34f4ee2bff4e87afa747d9a5aca141e032b46bd90776d043d77aaf"
+  },
+  {
+   "name": "North Keep.esp",
+   "size": 618213,
+   "sha256": "f3cf4a95e722fb04d86546fadffb7d094cc9106c56e410d4773be88747a3621d"
+  },
+  {
+   "name": "Immersive Patrols II.esp",
+   "size": 151863,
+   "sha256": "3b4758ed23fd0c195b9426f6e226ea66866da51c7f8edecab6af8b6007ff5e16"
+  },
+  {
+   "name": "AHZmoreHUD.esp",
+   "size": 6116,
+   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd"
+  },
+  {
+   "name": "HappyLittleTrees.esp",
+   "size": 15513,
+   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f"
+  },
+  {
+   "name": "BetterContainerControls.esp",
+   "size": 322,
+   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3"
+  },
+  {
+   "name": "GourmetTables.esp",
+   "size": 17849,
+   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f"
+  },
+  {
+   "name": "Embers XD - Fire Magick Add-On.esp",
+   "size": 8632,
+   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092"
+  },
+  {
+   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
+   "size": 6999,
+   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6"
+  },
+  {
+   "name": "Embers XD - Patch - Gourmet Tables.esp",
+   "size": 6000,
+   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a"
+  },
+  {
+   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
+   "size": 9103,
+   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363"
+  },
+  {
+   "name": "MCMHelper.esp",
+   "size": 100,
+   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc"
+  },
+  {
+   "name": "SkyHUD.esp",
+   "size": 333,
+   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca"
+  },
+  {
+   "name": "PlayFluteLuteDrum.esp",
+   "size": 17808,
+   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+   "size": 1325,
+   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0"
+  },
+  {
+   "name": "CFTO-JK-Patch.esp",
+   "size": 53631,
+   "sha256": "b3e710c0e575bd0e406157ed3d9ff8e6afe08ba29221e16623efd08cb22c7031"
+  },
+  {
+   "name": "YokuWeapons.esp",
+   "size": 211479,
+   "sha256": "ea8babc415473f21e91f6de3868e06deb4677b44b6261cda9f2fecef87ce42bb"
+  },
+  {
+   "name": "CFTO-Lanterns.esp",
+   "size": 55992,
+   "sha256": "31f02c5de531a2a2607d38dda5c95c594374cb6349c765708d660d335667ee84"
+  },
+  {
+   "name": "CFTO-CoveredCarriages.esp",
+   "size": 52462,
+   "sha256": "79f4d5667ccd3cdae309b72f549ad9fdeb6a10adcf748b4d24f9fdaf64376bd8"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
+   "size": 48202,
+   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c"
+  },
+  {
+   "name": "AwBaldandShavedHair.esp",
+   "size": 2701,
+   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a"
+  },
+  {
+   "name": "BetterThirdPersonSelection.esp",
+   "size": 413,
+   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e"
+  },
+  {
+   "name": "HammerHair.esp",
+   "size": 62849,
+   "sha256": "cb9ee383388dcbf147a87c9f6d132f29ac94dfe723a3ff5f4eeeac076c0e21bf"
+  },
+  {
+   "name": "McmRecorder.esp",
+   "size": 1903,
+   "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9"
+  },
+  {
+   "name": "RaceMenuMorphsHIMBO.esp",
+   "size": 375,
+   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b"
+  },
+  {
+   "name": "QuickLootIE.esp",
+   "size": 527,
+   "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4"
+  },
+  {
+   "name": "KhisartinBeards.esp",
+   "size": 29846,
+   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9"
+  },
+  {
+   "name": "IA CBBE Patch.esp",
+   "size": 66938,
+   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919"
+  },
+  {
+   "name": "Hothtrooper44_Armor_Ecksstra.esp",
+   "size": 171,
+   "sha256": "db0d748fad5258686aa65d2f598a9545c26ea80aac3a11cab68d891bd3c30637"
+  },
+  {
+   "name": "TrueDirectionalMovement.esp",
+   "size": 1248,
+   "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf"
+  },
+  {
+   "name": "AZ_IADistribution.esp",
+   "size": 43802,
+   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c"
+  },
+  {
+   "name": "Precision.esp",
+   "size": 783,
+   "sha256": "48bea576dadadb93f3af3701baf634e870fc4e0ce6c6ee94fa5f2072d2520790"
+  },
+  {
+   "name": "BeardMaskFix.esp",
+   "size": 3853,
+   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db"
+  },
+  {
+   "name": "3BBB.esp",
+   "size": 20257,
+   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549"
+  },
+  {
+   "name": "Skyrim Unbound.esp",
+   "size": 546655,
+   "sha256": "aed19403857a5efddefde0b05b1f9cbf90fd0ef3f7a00ebd758258ccbc7e6a77"
+  },
+  {
+   "name": "Skyrim Unbound - Capital Windhelm Expansion Patch.esp",
+   "size": 3045,
+   "sha256": "1b28552c12ef3e73a18cc51acd1c641ae634e4e43a990bf05937b71cda665fdd"
+  },
+  {
+   "name": "Skyrim Unbound - GDO Patch.esp",
+   "size": 47370,
+   "sha256": "0f6c8d4153eaef864f8104ec9cc7926d2f9a4008d72f255699421fdcb6562cb6"
+  },
+  {
+   "name": "Skyrim Unbound Addon - Thalmor.esp",
+   "size": 5452,
+   "sha256": "5a1d24a702316d887e48f2a0f6ed33ceda3c581ea94d56a906abc291a1367d04"
+  },
+  {
+   "name": "atlas map markers.esp",
+   "size": 305094,
+   "sha256": "e93c675baa5ed7d0825afc697209616d769d480d324d24e6e2d362ee8c6d4361"
+  },
+  {
+   "name": "Water for ENB (Shades of Skyrim).esp",
+   "size": 372774,
+   "sha256": "63e0893556515f8ebbf36b4199ebee1a441c9b8ed092a06551e315e6cc284204"
+  },
+  {
+   "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
+   "size": 133302,
+   "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e"
+  },
+  {
+   "name": "Playable Rieklings.esp",
+   "size": 468573,
+   "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1"
+  }
+ ],
  "masters": [
   "Skyrim.esm",
   "Update.esm",
@@ -146,17 +658,24 @@
   "Water for ENB (Shades of Skyrim).esp"
  ],
  "counts": {
-  "actorsOff": 6757,
-  "cells": 1212,
+  "actorsOff": 6946,
+  "cells": 1262,
   "worlds": 50,
-  "questsStopped": 2211,
-  "questsKept": 63
+  "questsStopped": 2226,
+  "modQuestsStopped": 16,
+  "questsKept": 48,
+  "placeLocations": 8,
+  "placeRooms": 3
  },
  "refs": {
   "disabled": [
    "512b:aaaGraniteHill.esp",
    "568f:aaaGraniteHill.esp",
    "5c0b:aaaGraniteHill.esp",
+   "5d16:aaaGraniteHill.esp",
+   "68b0:aaaGraniteHill.esp",
+   "7e5b:aaaGraniteHill.esp",
+   "8472:aaaGraniteHill.esp",
    "1c317:aaaGraniteHill.esp",
    "1c318:aaaGraniteHill.esp",
    "1c319:aaaGraniteHill.esp",
@@ -169,6 +688,13 @@
    "1c332:aaaGraniteHill.esp",
    "1c349:aaaGraniteHill.esp",
    "21482:aaaGraniteHill.esp",
+   "21612:aaaGraniteHill.esp",
+   "2b82e:aaaGraniteHill.esp",
+   "3abab:aaaGraniteHill.esp",
+   "3abac:aaaGraniteHill.esp",
+   "3abad:aaaGraniteHill.esp",
+   "3fcce:aaaGraniteHill.esp",
+   "44dd7:aaaGraniteHill.esp",
    "5925e:aaaGraniteHill.esp",
    "12423e:aaaGraniteHill.esp",
    "12423f:aaaGraniteHill.esp",
@@ -185,6 +711,8 @@
    "5bbbc0:aaaGraniteHill.esp",
    "5bbbc1:aaaGraniteHill.esp",
    "5bbcd8:aaaGraniteHill.esp",
+   "5f3a5c:aaaGraniteHill.esp",
+   "5f3a63:aaaGraniteHill.esp",
    "788dda:aaaGraniteHill.esp",
    "788ddb:aaaGraniteHill.esp",
    "788ddc:aaaGraniteHill.esp",
@@ -197,12 +725,16 @@
    "a515:AnotherOakwood.esp",
    "a517:AnotherOakwood.esp",
    "a543:AnotherOakwood.esp",
+   "a547:AnotherOakwood.esp",
+   "a553:AnotherOakwood.esp",
    "a557:AnotherOakwood.esp",
    "aadb:AnotherOakwood.esp",
    "aadc:AnotherOakwood.esp",
+   "aadd:AnotherOakwood.esp",
    "ab05:AnotherOakwood.esp",
    "ab0d:AnotherOakwood.esp",
    "ab11:AnotherOakwood.esp",
+   "ab16:AnotherOakwood.esp",
    "b07a:AnotherOakwood.esp",
    "b07d:AnotherOakwood.esp",
    "b081:AnotherOakwood.esp",
@@ -215,6 +747,7 @@
    "b094:AnotherOakwood.esp",
    "b095:AnotherOakwood.esp",
    "3cbaa:AnotherOakwood.esp",
+   "41dae:AnotherOakwood.esp",
    "41db0:AnotherOakwood.esp",
    "41db5:AnotherOakwood.esp",
    "4708b:AnotherOakwood.esp",
@@ -259,9 +792,13 @@
    "70a7f:Arena - Markarth Side.esp",
    "70aeb:Arena - Markarth Side.esp",
    "70aef:Arena - Markarth Side.esp",
+   "a3d26:Arena - Markarth Side.esp",
+   "b818c:Arena - Markarth Side.esp",
    "bc9ae:Arena - Markarth Side.esp",
+   "bd300:Arena - Markarth Side.esp",
    "c2427:Arena - Markarth Side.esp",
    "c2452:Arena - Markarth Side.esp",
+   "c7596:Arena - Markarth Side.esp",
    "10458b:Arena - Markarth Side.esp",
    "10458c:Arena - Markarth Side.esp",
    "10458d:Arena - Markarth Side.esp",
@@ -270,6 +807,10 @@
    "104590:Arena - Markarth Side.esp",
    "104591:Arena - Markarth Side.esp",
    "104592:Arena - Markarth Side.esp",
+   "109aa9:Arena - Markarth Side.esp",
+   "127bb6:Arena - Markarth Side.esp",
+   "136edc:Arena - Markarth Side.esp",
+   "13bffc:Arena - Markarth Side.esp",
    "146235:Arena - Markarth Side.esp",
    "146239:Arena - Markarth Side.esp",
    "146247:Arena - Markarth Side.esp",
@@ -677,6 +1218,8 @@
    "1aa90:Dawnguard.esm",
    "1aa91:Dawnguard.esm",
    "1aa92:Dawnguard.esm",
+   "177db:Dragonborn.esm",
+   "177dc:Dragonborn.esm",
    "177dd:Dragonborn.esm",
    "177de:Dragonborn.esm",
    "179b8:Dragonborn.esm",
@@ -701,6 +1244,7 @@
    "1828b:Dragonborn.esm",
    "1828d:Dragonborn.esm",
    "18295:Dragonborn.esm",
+   "182a0:Dragonborn.esm",
    "182ad:Dragonborn.esm",
    "1843d:Dragonborn.esm",
    "186ae:Dragonborn.esm",
@@ -709,7 +1253,9 @@
    "18fa0:Dragonborn.esm",
    "18fa1:Dragonborn.esm",
    "18fa8:Dragonborn.esm",
+   "18fac:Dragonborn.esm",
    "18fb2:Dragonborn.esm",
+   "18fb8:Dragonborn.esm",
    "18fbe:Dragonborn.esm",
    "18fc3:Dragonborn.esm",
    "18fce:Dragonborn.esm",
@@ -730,6 +1276,8 @@
    "1a512:Dragonborn.esm",
    "1a516:Dragonborn.esm",
    "1a519:Dragonborn.esm",
+   "1a51b:Dragonborn.esm",
+   "1a51d:Dragonborn.esm",
    "1a565:Dragonborn.esm",
    "1a566:Dragonborn.esm",
    "1a567:Dragonborn.esm",
@@ -777,10 +1325,12 @@
    "1e0fa:Dragonborn.esm",
    "1e0fc:Dragonborn.esm",
    "1e8c7:Dragonborn.esm",
+   "1eec1:Dragonborn.esm",
    "1f4c9:Dragonborn.esm",
    "1f999:Dragonborn.esm",
    "1f99a:Dragonborn.esm",
    "1f99c:Dragonborn.esm",
+   "1f9c2:Dragonborn.esm",
    "1f9c9:Dragonborn.esm",
    "1f9ca:Dragonborn.esm",
    "1f9cb:Dragonborn.esm",
@@ -1047,6 +1597,7 @@
    "2c11f:Dragonborn.esm",
    "2c16c:Dragonborn.esm",
    "2c16f:Dragonborn.esm",
+   "2c1ea:Dragonborn.esm",
    "2c407:Dragonborn.esm",
    "30d7a:Dragonborn.esm",
    "30e6f:Dragonborn.esm",
@@ -1071,6 +1622,7 @@
    "30f62:Dragonborn.esm",
    "31663:Dragonborn.esm",
    "31834:Dragonborn.esm",
+   "31861:Dragonborn.esm",
    "31beb:Dragonborn.esm",
    "31bec:Dragonborn.esm",
    "31ca3:Dragonborn.esm",
@@ -1285,6 +1837,7 @@
    "19419:ElysiumEstate.esp",
    "375b1:ElysiumEstate.esp",
    "35f652:ElysiumEstate.esp",
+   "25906:FishingInSkyrim.esp",
    "2a07d:FishingInSkyrim.esp",
    "81c:HearthFires.esm",
    "81d:HearthFires.esm",
@@ -1331,6 +1884,7 @@
    "3f54:HearthFires.esm",
    "3f5e:HearthFires.esm",
    "3f73:HearthFires.esm",
+   "4031:HearthFires.esm",
    "7888:HearthFires.esm",
    "8249:HearthFires.esm",
    "824a:HearthFires.esm",
@@ -1598,6 +2152,8 @@
    "38653:JK's Whiterun's Outskirts.esp",
    "3d79c:JK's Whiterun's Outskirts.esp",
    "51d8b:JK's Whiterun's Outskirts.esp",
+   "c7261:JK's Whiterun's Outskirts.esp",
+   "c7264:JK's Whiterun's Outskirts.esp",
    "d146f:JK's Whiterun's Outskirts.esp",
    "e07ed:JK's Whiterun's Outskirts.esp",
    "e07ef:JK's Whiterun's Outskirts.esp",
@@ -1629,6 +2185,7 @@
    "344b:JKs Skyrim.esp",
    "344c:JKs Skyrim.esp",
    "3b0f:JKs Skyrim.esp",
+   "418a:JKs Skyrim.esp",
    "4775:JKs Skyrim.esp",
    "4cfd:JKs Skyrim.esp",
    "5230:JKs Skyrim.esp",
@@ -1639,6 +2196,7 @@
    "5ef6:JKs Skyrim.esp",
    "5eff:JKs Skyrim.esp",
    "5f03:JKs Skyrim.esp",
+   "6311:JKs Skyrim.esp",
    "6456:JKs Skyrim.esp",
    "69ec:JKs Skyrim.esp",
    "69f0:JKs Skyrim.esp",
@@ -1670,6 +2228,7 @@
    "b5c0:JKs Skyrim.esp",
    "e1a2:JKs Skyrim.esp",
    "e1bc:JKs Skyrim.esp",
+   "e1c1:JKs Skyrim.esp",
    "fe8f:JKs Skyrim.esp",
    "fe91:JKs Skyrim.esp",
    "fe92:JKs Skyrim.esp",
@@ -1687,6 +2246,7 @@
    "23b40:JKs Skyrim.esp",
    "23b6b:JKs Skyrim.esp",
    "23fb4:JKs Skyrim.esp",
+   "24004:JKs Skyrim.esp",
    "24160:JKs Skyrim.esp",
    "243b2:JKs Skyrim.esp",
    "2448f:JKs Skyrim.esp",
@@ -1697,10 +2257,13 @@
    "8a7:MoreCraftableEquipment.esp",
    "6849c:North Keep.esp",
    "684a0:North Keep.esp",
+   "684a1:North Keep.esp",
    "6d71b:North Keep.esp",
    "6d71c:North Keep.esp",
    "6d71d:North Keep.esp",
    "6d8e5:North Keep.esp",
+   "6d8e8:North Keep.esp",
+   "6d8e9:North Keep.esp",
    "72b92:North Keep.esp",
    "72b93:North Keep.esp",
    "78010:North Keep.esp",
@@ -1725,10 +2288,17 @@
    "315f:OarsRest.esp",
    "3160:OarsRest.esp",
    "3161:OarsRest.esp",
+   "542f:OarsRest.esp",
    "81eb:OarsRest.esp",
+   "8751:OarsRest.esp",
    "8753:OarsRest.esp",
+   "8755:OarsRest.esp",
+   "8759:OarsRest.esp",
    "8cbf:OarsRest.esp",
    "8cc0:OarsRest.esp",
+   "9226:OarsRest.esp",
+   "922b:OarsRest.esp",
+   "33b45:OarsRest.esp",
    "4d082:OarsRest.esp",
    "521a6:OarsRest.esp",
    "521a7:OarsRest.esp",
@@ -1801,8 +2371,10 @@
    "9e9a:Populated Cities Towns Villages Legendary.esp",
    "9ea2:Populated Cities Towns Villages Legendary.esp",
    "9ea3:Populated Cities Towns Villages Legendary.esp",
+   "9ea8:Populated Cities Towns Villages Legendary.esp",
    "9eaa:Populated Cities Towns Villages Legendary.esp",
    "9eab:Populated Cities Towns Villages Legendary.esp",
+   "9eae:Populated Cities Towns Villages Legendary.esp",
    "9eb2:Populated Cities Towns Villages Legendary.esp",
    "9eb3:Populated Cities Towns Villages Legendary.esp",
    "9eb8:Populated Cities Towns Villages Legendary.esp",
@@ -1819,6 +2391,7 @@
    "a44e:Populated Cities Towns Villages Legendary.esp",
    "a44f:Populated Cities Towns Villages Legendary.esp",
    "a452:Populated Cities Towns Villages Legendary.esp",
+   "a453:Populated Cities Towns Villages Legendary.esp",
    "a454:Populated Cities Towns Villages Legendary.esp",
    "a455:Populated Cities Towns Villages Legendary.esp",
    "a457:Populated Cities Towns Villages Legendary.esp",
@@ -1857,7 +2430,9 @@
    "dd55:Populated Cities Towns Villages Legendary.esp",
    "e2c0:Populated Cities Towns Villages Legendary.esp",
    "e2d3:Populated Cities Towns Villages Legendary.esp",
+   "e2d7:Populated Cities Towns Villages Legendary.esp",
    "e2d8:Populated Cities Towns Villages Legendary.esp",
+   "e2d9:Populated Cities Towns Villages Legendary.esp",
    "e2da:Populated Cities Towns Villages Legendary.esp",
    "e2db:Populated Cities Towns Villages Legendary.esp",
    "e2dc:Populated Cities Towns Villages Legendary.esp",
@@ -1877,6 +2452,9 @@
    "e88c:Populated Cities Towns Villages Legendary.esp",
    "e88d:Populated Cities Towns Villages Legendary.esp",
    "e88e:Populated Cities Towns Villages Legendary.esp",
+   "e897:Populated Cities Towns Villages Legendary.esp",
+   "e898:Populated Cities Towns Villages Legendary.esp",
+   "e899:Populated Cities Towns Villages Legendary.esp",
    "e89a:Populated Cities Towns Villages Legendary.esp",
    "e89b:Populated Cities Towns Villages Legendary.esp",
    "e89c:Populated Cities Towns Villages Legendary.esp",
@@ -1893,10 +2471,13 @@
    "eedf:Populated Cities Towns Villages Legendary.esp",
    "eee1:Populated Cities Towns Villages Legendary.esp",
    "eee2:Populated Cities Towns Villages Legendary.esp",
+   "eee3:Populated Cities Towns Villages Legendary.esp",
    "eee4:Populated Cities Towns Villages Legendary.esp",
    "eee5:Populated Cities Towns Villages Legendary.esp",
    "eee6:Populated Cities Towns Villages Legendary.esp",
    "eee7:Populated Cities Towns Villages Legendary.esp",
+   "eee8:Populated Cities Towns Villages Legendary.esp",
+   "eee9:Populated Cities Towns Villages Legendary.esp",
    "eeea:Populated Cities Towns Villages Legendary.esp",
    "eeeb:Populated Cities Towns Villages Legendary.esp",
    "ffd6:Populated Cities Towns Villages Legendary.esp",
@@ -1909,6 +2490,7 @@
    "ffdd:Populated Cities Towns Villages Legendary.esp",
    "ffde:Populated Cities Towns Villages Legendary.esp",
    "ffdf:Populated Cities Towns Villages Legendary.esp",
+   "ffe0:Populated Cities Towns Villages Legendary.esp",
    "ffe1:Populated Cities Towns Villages Legendary.esp",
    "ffe2:Populated Cities Towns Villages Legendary.esp",
    "ffe3:Populated Cities Towns Villages Legendary.esp",
@@ -1920,10 +2502,13 @@
    "ffe9:Populated Cities Towns Villages Legendary.esp",
    "ffea:Populated Cities Towns Villages Legendary.esp",
    "ffeb:Populated Cities Towns Villages Legendary.esp",
+   "ffec:Populated Cities Towns Villages Legendary.esp",
    "ffed:Populated Cities Towns Villages Legendary.esp",
    "ffee:Populated Cities Towns Villages Legendary.esp",
    "ffef:Populated Cities Towns Villages Legendary.esp",
+   "fff0:Populated Cities Towns Villages Legendary.esp",
    "fff1:Populated Cities Towns Villages Legendary.esp",
+   "fff2:Populated Cities Towns Villages Legendary.esp",
    "fff3:Populated Cities Towns Villages Legendary.esp",
    "fff4:Populated Cities Towns Villages Legendary.esp",
    "fff6:Populated Cities Towns Villages Legendary.esp",
@@ -1934,6 +2519,7 @@
    "fffb:Populated Cities Towns Villages Legendary.esp",
    "fffc:Populated Cities Towns Villages Legendary.esp",
    "fffd:Populated Cities Towns Villages Legendary.esp",
+   "fffe:Populated Cities Towns Villages Legendary.esp",
    "ffff:Populated Cities Towns Villages Legendary.esp",
    "10000:Populated Cities Towns Villages Legendary.esp",
    "10001:Populated Cities Towns Villages Legendary.esp",
@@ -1945,6 +2531,7 @@
    "10007:Populated Cities Towns Villages Legendary.esp",
    "10008:Populated Cities Towns Villages Legendary.esp",
    "10009:Populated Cities Towns Villages Legendary.esp",
+   "1000a:Populated Cities Towns Villages Legendary.esp",
    "12633:Populated Cities Towns Villages Legendary.esp",
    "12634:Populated Cities Towns Villages Legendary.esp",
    "12636:Populated Cities Towns Villages Legendary.esp",
@@ -1954,6 +2541,8 @@
    "126ec:Populated Cities Towns Villages Legendary.esp",
    "126ed:Populated Cities Towns Villages Legendary.esp",
    "126ef:Populated Cities Towns Villages Legendary.esp",
+   "160715:Riften Expansion.esp",
+   "179c40:Riften Expansion.esp",
    "17ed79:Riften Expansion.esp",
    "17ed8d:Riften Expansion.esp",
    "17ed8e:Riften Expansion.esp",
@@ -1970,6 +2559,8 @@
    "1a2ba4:Riften Expansion.esp",
    "1a2ba5:Riften Expansion.esp",
    "1a2ba6:Riften Expansion.esp",
+   "1e9f92:Riften Expansion.esp",
+   "1e9f93:Riften Expansion.esp",
    "1e9fec:Riften Expansion.esp",
    "1e9fed:Riften Expansion.esp",
    "1ef0fa:Riften Expansion.esp",
@@ -1977,10 +2568,13 @@
    "1fe48b:Riften Expansion.esp",
    "ea7:Skyrim.esm",
    "132f0:Skyrim.esm",
+   "13482:Skyrim.esm",
    "13483:Skyrim.esm",
    "13484:Skyrim.esm",
    "13485:Skyrim.esm",
    "13486:Skyrim.esm",
+   "13487:Skyrim.esm",
+   "13488:Skyrim.esm",
    "13489:Skyrim.esm",
    "1348a:Skyrim.esm",
    "1348b:Skyrim.esm",
@@ -2005,6 +2599,7 @@
    "15cc5:Skyrim.esm",
    "15d0b:Skyrim.esm",
    "15d0f:Skyrim.esm",
+   "16acf:Skyrim.esm",
    "16c88:Skyrim.esm",
    "185f5:Skyrim.esm",
    "187dc:Skyrim.esm",
@@ -2032,11 +2627,15 @@
    "198a9:Skyrim.esm",
    "198aa:Skyrim.esm",
    "198ab:Skyrim.esm",
+   "198ad:Skyrim.esm",
    "198ae:Skyrim.esm",
+   "198af:Skyrim.esm",
    "198b0:Skyrim.esm",
    "198b2:Skyrim.esm",
+   "198b3:Skyrim.esm",
    "198b4:Skyrim.esm",
    "198b5:Skyrim.esm",
+   "198b6:Skyrim.esm",
    "198b7:Skyrim.esm",
    "198b8:Skyrim.esm",
    "198b9:Skyrim.esm",
@@ -2054,6 +2653,7 @@
    "198c6:Skyrim.esm",
    "198c7:Skyrim.esm",
    "198c8:Skyrim.esm",
+   "198c9:Skyrim.esm",
    "198ca:Skyrim.esm",
    "198cb:Skyrim.esm",
    "198cc:Skyrim.esm",
@@ -2062,6 +2662,9 @@
    "198cf:Skyrim.esm",
    "198d0:Skyrim.esm",
    "198d1:Skyrim.esm",
+   "198d3:Skyrim.esm",
+   "198d4:Skyrim.esm",
+   "198d5:Skyrim.esm",
    "198d6:Skyrim.esm",
    "198d7:Skyrim.esm",
    "198d9:Skyrim.esm",
@@ -2074,12 +2677,16 @@
    "198e6:Skyrim.esm",
    "198e7:Skyrim.esm",
    "198e9:Skyrim.esm",
+   "198ec:Skyrim.esm",
+   "198ed:Skyrim.esm",
    "198ee:Skyrim.esm",
    "198ef:Skyrim.esm",
    "198f0:Skyrim.esm",
    "198f1:Skyrim.esm",
+   "198f2:Skyrim.esm",
    "198f4:Skyrim.esm",
    "198f5:Skyrim.esm",
+   "198f8:Skyrim.esm",
    "198fa:Skyrim.esm",
    "198fb:Skyrim.esm",
    "198fc:Skyrim.esm",
@@ -2091,6 +2698,8 @@
    "19903:Skyrim.esm",
    "19904:Skyrim.esm",
    "19905:Skyrim.esm",
+   "19907:Skyrim.esm",
+   "19909:Skyrim.esm",
    "1990b:Skyrim.esm",
    "1990c:Skyrim.esm",
    "1990d:Skyrim.esm",
@@ -2103,7 +2712,9 @@
    "19917:Skyrim.esm",
    "19918:Skyrim.esm",
    "19928:Skyrim.esm",
+   "19929:Skyrim.esm",
    "1992a:Skyrim.esm",
+   "1992b:Skyrim.esm",
    "1992c:Skyrim.esm",
    "1992d:Skyrim.esm",
    "1992e:Skyrim.esm",
@@ -2126,6 +2737,8 @@
    "199b5:Skyrim.esm",
    "199b6:Skyrim.esm",
    "199b8:Skyrim.esm",
+   "199cf:Skyrim.esm",
+   "199d0:Skyrim.esm",
    "19a1e:Skyrim.esm",
    "19a21:Skyrim.esm",
    "19a23:Skyrim.esm",
@@ -2133,10 +2746,14 @@
    "19a2b:Skyrim.esm",
    "19a2d:Skyrim.esm",
    "19a2f:Skyrim.esm",
+   "19dc8:Skyrim.esm",
+   "19dc9:Skyrim.esm",
    "19dca:Skyrim.esm",
    "19dcb:Skyrim.esm",
    "19dcc:Skyrim.esm",
    "19dcd:Skyrim.esm",
+   "19dce:Skyrim.esm",
+   "19dcf:Skyrim.esm",
    "19dd1:Skyrim.esm",
    "19dd2:Skyrim.esm",
    "19dd3:Skyrim.esm",
@@ -2148,6 +2765,8 @@
    "19dd9:Skyrim.esm",
    "19dda:Skyrim.esm",
    "19ddb:Skyrim.esm",
+   "19ddc:Skyrim.esm",
+   "19ddd:Skyrim.esm",
    "19dde:Skyrim.esm",
    "19ddf:Skyrim.esm",
    "19de0:Skyrim.esm",
@@ -2163,19 +2782,26 @@
    "19deb:Skyrim.esm",
    "19dec:Skyrim.esm",
    "19dee:Skyrim.esm",
+   "19df3:Skyrim.esm",
    "19df4:Skyrim.esm",
    "19df5:Skyrim.esm",
    "19df7:Skyrim.esm",
    "19df8:Skyrim.esm",
+   "19df9:Skyrim.esm",
+   "19dfa:Skyrim.esm",
+   "19dfc:Skyrim.esm",
    "19dfd:Skyrim.esm",
    "19dfe:Skyrim.esm",
    "19e00:Skyrim.esm",
    "19e01:Skyrim.esm",
+   "19e02:Skyrim.esm",
+   "19e03:Skyrim.esm",
    "19e04:Skyrim.esm",
    "19e05:Skyrim.esm",
    "19e06:Skyrim.esm",
    "19e07:Skyrim.esm",
    "19e08:Skyrim.esm",
+   "19e09:Skyrim.esm",
    "19e0d:Skyrim.esm",
    "19e0e:Skyrim.esm",
    "19e0f:Skyrim.esm",
@@ -2184,6 +2810,7 @@
    "19e12:Skyrim.esm",
    "19e13:Skyrim.esm",
    "19e15:Skyrim.esm",
+   "19e19:Skyrim.esm",
    "19e1b:Skyrim.esm",
    "19e1d:Skyrim.esm",
    "19e1f:Skyrim.esm",
@@ -2207,6 +2834,7 @@
    "1a66b:Skyrim.esm",
    "1a66c:Skyrim.esm",
    "1a671:Skyrim.esm",
+   "1a675:Skyrim.esm",
    "1a676:Skyrim.esm",
    "1a677:Skyrim.esm",
    "1a678:Skyrim.esm",
@@ -2216,7 +2844,9 @@
    "1a67d:Skyrim.esm",
    "1a67e:Skyrim.esm",
    "1a67f:Skyrim.esm",
+   "1a680:Skyrim.esm",
    "1a682:Skyrim.esm",
+   "1a683:Skyrim.esm",
    "1a685:Skyrim.esm",
    "1a686:Skyrim.esm",
    "1a687:Skyrim.esm",
@@ -2232,14 +2862,17 @@
    "1a695:Skyrim.esm",
    "1a697:Skyrim.esm",
    "1a699:Skyrim.esm",
+   "1a69a:Skyrim.esm",
    "1a69c:Skyrim.esm",
    "1a69e:Skyrim.esm",
    "1a69f:Skyrim.esm",
    "1a6a1:Skyrim.esm",
    "1a6a3:Skyrim.esm",
    "1a6a4:Skyrim.esm",
+   "1a6a5:Skyrim.esm",
    "1a6a6:Skyrim.esm",
    "1a6a7:Skyrim.esm",
+   "1a6a8:Skyrim.esm",
    "1a6ab:Skyrim.esm",
    "1a6ac:Skyrim.esm",
    "1a6ad:Skyrim.esm",
@@ -2287,9 +2920,12 @@
    "1aa6b:Skyrim.esm",
    "1aa6c:Skyrim.esm",
    "1b084:Skyrim.esm",
+   "1b085:Skyrim.esm",
+   "1b086:Skyrim.esm",
    "1b087:Skyrim.esm",
    "1b089:Skyrim.esm",
    "1b08a:Skyrim.esm",
+   "1b08b:Skyrim.esm",
    "1b08e:Skyrim.esm",
    "1b08f:Skyrim.esm",
    "1b090:Skyrim.esm",
@@ -2297,12 +2933,17 @@
    "1b093:Skyrim.esm",
    "1b095:Skyrim.esm",
    "1b096:Skyrim.esm",
+   "1b097:Skyrim.esm",
    "1b098:Skyrim.esm",
+   "1b099:Skyrim.esm",
    "1b09b:Skyrim.esm",
    "1b09c:Skyrim.esm",
+   "1b116:Skyrim.esm",
    "1b117:Skyrim.esm",
+   "1b118:Skyrim.esm",
    "1b119:Skyrim.esm",
    "1b11b:Skyrim.esm",
+   "1b11c:Skyrim.esm",
    "1b11d:Skyrim.esm",
    "1b11e:Skyrim.esm",
    "1b11f:Skyrim.esm",
@@ -2312,15 +2953,19 @@
    "1b125:Skyrim.esm",
    "1b126:Skyrim.esm",
    "1b127:Skyrim.esm",
+   "1b128:Skyrim.esm",
+   "1b129:Skyrim.esm",
    "1b12a:Skyrim.esm",
    "1b12b:Skyrim.esm",
    "1b12c:Skyrim.esm",
    "1b12d:Skyrim.esm",
+   "1b12e:Skyrim.esm",
    "1b12f:Skyrim.esm",
    "1b130:Skyrim.esm",
    "1b131:Skyrim.esm",
    "1b133:Skyrim.esm",
    "1b134:Skyrim.esm",
+   "1b136:Skyrim.esm",
    "1b138:Skyrim.esm",
    "1b13c:Skyrim.esm",
    "1b13d:Skyrim.esm",
@@ -2329,6 +2974,7 @@
    "1b141:Skyrim.esm",
    "1b142:Skyrim.esm",
    "1b144:Skyrim.esm",
+   "1b145:Skyrim.esm",
    "1b5be:Skyrim.esm",
    "1b5c2:Skyrim.esm",
    "1b5ca:Skyrim.esm",
@@ -2397,11 +3043,17 @@
    "1c190:Skyrim.esm",
    "1c191:Skyrim.esm",
    "1c192:Skyrim.esm",
+   "1c1a1:Skyrim.esm",
    "1c1a2:Skyrim.esm",
    "1c1a3:Skyrim.esm",
    "1c1a4:Skyrim.esm",
+   "1c1a5:Skyrim.esm",
+   "1c1a6:Skyrim.esm",
+   "1c1a7:Skyrim.esm",
+   "1c1a8:Skyrim.esm",
    "1c1a9:Skyrim.esm",
    "1c1ab:Skyrim.esm",
+   "1c1b4:Skyrim.esm",
    "1c1b5:Skyrim.esm",
    "1c1b6:Skyrim.esm",
    "1c1b7:Skyrim.esm",
@@ -2437,6 +3089,7 @@
    "1ce86:Skyrim.esm",
    "1d218:Skyrim.esm",
    "1d4bb:Skyrim.esm",
+   "1d4bc:Skyrim.esm",
    "1d700:Skyrim.esm",
    "1da41:Skyrim.esm",
    "1e07f:Skyrim.esm",
@@ -2553,6 +3206,7 @@
    "1fc5a:Skyrim.esm",
    "20045:Skyrim.esm",
    "20050:Skyrim.esm",
+   "2005a:Skyrim.esm",
    "20475:Skyrim.esm",
    "20545:Skyrim.esm",
    "205c3:Skyrim.esm",
@@ -2572,6 +3226,7 @@
    "212b6:Skyrim.esm",
    "21cd3:Skyrim.esm",
    "21e94:Skyrim.esm",
+   "21ea6:Skyrim.esm",
    "220bb:Skyrim.esm",
    "22416:Skyrim.esm",
    "2241e:Skyrim.esm",
@@ -2648,6 +3303,7 @@
    "27f22:Skyrim.esm",
    "28115:Skyrim.esm",
    "2811c:Skyrim.esm",
+   "284ad:Skyrim.esm",
    "28938:Skyrim.esm",
    "28ad1:Skyrim.esm",
    "28ad5:Skyrim.esm",
@@ -2721,6 +3377,7 @@
    "2b99d:Skyrim.esm",
    "2ba30:Skyrim.esm",
    "2ba33:Skyrim.esm",
+   "2ba8d:Skyrim.esm",
    "2ba8f:Skyrim.esm",
    "2bf9e:Skyrim.esm",
    "2bfa2:Skyrim.esm",
@@ -3370,6 +4027,7 @@
    "4d650:Skyrim.esm",
    "4da76:Skyrim.esm",
    "4dd2c:Skyrim.esm",
+   "4e0b3:Skyrim.esm",
    "4e50f:Skyrim.esm",
    "4e510:Skyrim.esm",
    "4e518:Skyrim.esm",
@@ -3586,6 +4244,7 @@
    "558fb:Skyrim.esm",
    "558fc:Skyrim.esm",
    "5595f:Skyrim.esm",
+   "55a63:Skyrim.esm",
    "55b2d:Skyrim.esm",
    "55bef:Skyrim.esm",
    "55c09:Skyrim.esm",
@@ -3718,7 +4377,9 @@
    "5b33b:Skyrim.esm",
    "5b33c:Skyrim.esm",
    "5b683:Skyrim.esm",
+   "5b685:Skyrim.esm",
    "5b686:Skyrim.esm",
+   "5b687:Skyrim.esm",
    "5b688:Skyrim.esm",
    "5b689:Skyrim.esm",
    "5ba48:Skyrim.esm",
@@ -4013,11 +4674,14 @@
    "73e6c:Skyrim.esm",
    "73e6e:Skyrim.esm",
    "7433f:Skyrim.esm",
+   "74340:Skyrim.esm",
    "74341:Skyrim.esm",
    "74342:Skyrim.esm",
    "74344:Skyrim.esm",
+   "74345:Skyrim.esm",
    "74347:Skyrim.esm",
    "74348:Skyrim.esm",
+   "7434a:Skyrim.esm",
    "748cb:Skyrim.esm",
    "748cc:Skyrim.esm",
    "748d7:Skyrim.esm",
@@ -5286,6 +5950,7 @@
    "b87b5:Skyrim.esm",
    "b87b6:Skyrim.esm",
    "b87bd:Skyrim.esm",
+   "b882a:Skyrim.esm",
    "b8d42:Skyrim.esm",
    "b8db6:Skyrim.esm",
    "b8e97:Skyrim.esm",
@@ -5512,6 +6177,7 @@
    "d1241:Skyrim.esm",
    "d1244:Skyrim.esm",
    "d13e3:Skyrim.esm",
+   "d15b0:Skyrim.esm",
    "d15e0:Skyrim.esm",
    "d15e1:Skyrim.esm",
    "d15e2:Skyrim.esm",
@@ -5581,8 +6247,10 @@
    "d671a:Skyrim.esm",
    "d671b:Skyrim.esm",
    "d673d:Skyrim.esm",
+   "d6ad9:Skyrim.esm",
    "d74f7:Skyrim.esm",
    "d74fb:Skyrim.esm",
+   "d7505:Skyrim.esm",
    "d7790:Skyrim.esm",
    "d7792:Skyrim.esm",
    "d7794:Skyrim.esm",
@@ -6031,6 +6699,15 @@
    "fdb14:Skyrim.esm",
    "fdb1c:Skyrim.esm",
    "fdb22:Skyrim.esm",
+   "fe498:Skyrim.esm",
+   "fe4aa:Skyrim.esm",
+   "fe4bc:Skyrim.esm",
+   "fe4c1:Skyrim.esm",
+   "fe4c2:Skyrim.esm",
+   "fe4cb:Skyrim.esm",
+   "fe4e4:Skyrim.esm",
+   "fe4e7:Skyrim.esm",
+   "fe4f0:Skyrim.esm",
    "fe532:Skyrim.esm",
    "fe54b:Skyrim.esm",
    "ff0ae:Skyrim.esm",
@@ -6328,6 +7005,10 @@
    "59582:SkyrimSewers.esp",
    "59584:SkyrimSewers.esp",
    "59b31:SkyrimSewers.esp",
+   "5cbf8:SkyrimSewers.esp",
+   "5cc07:SkyrimSewers.esp",
+   "5d1b8:SkyrimSewers.esp",
+   "60752:SkyrimSewers.esp",
    "6239a:SkyrimSewers.esp",
    "62904:SkyrimSewers.esp",
    "62907:SkyrimSewers.esp",
@@ -6366,6 +7047,7 @@
    "dde:Solitude Arena.esp",
    "1016:Solitude Arena.esp",
    "1019:Solitude Arena.esp",
+   "1021:Solitude Arena.esp",
    "1034:Solitude Arena.esp",
    "1063:Solitude Arena.esp",
    "1108:Solitude Arena.esp",
@@ -6732,6 +7414,7 @@
    "1458b:Solitude Arena.esp",
    "1458c:Solitude Arena.esp",
    "1a66b:Solitude Arena.esp",
+   "8c5a:The Great City of Solitude.esp",
    "8ebd:The Great City of Solitude.esp",
    "8ebe:The Great City of Solitude.esp",
    "8ebf:The Great City of Solitude.esp",
@@ -6746,6 +7429,7 @@
    "af95:The Great City of Solitude.esp",
    "af96:The Great City of Solitude.esp",
    "af97:The Great City of Solitude.esp",
+   "d587:The Great City of Solitude.esp",
    "d594:The Great City of Solitude.esp",
    "daff:The Great City of Solitude.esp",
    "e326:The Great City of Solitude.esp",
@@ -6771,6 +7455,7 @@
    "102ad:The Great City of Solitude.esp",
    "102ae:The Great City of Solitude.esp",
    "11aec:The Great City of Solitude.esp",
+   "1aa35:The Great City of Solitude.esp",
    "1b39f:The Great City of Solitude.esp",
    "1b508:The Great City of Solitude.esp",
    "1c40f:The Great City of Solitude.esp",
@@ -6779,6 +7464,7 @@
    "1cd84:The Great City of Solitude.esp",
    "1cd85:The Great City of Solitude.esp",
    "1d224:The Great City of Solitude.esp",
+   "1d503:The Great City of Solitude.esp",
    "9a5:Update.esm",
    "9a6:Update.esm",
    "9a7:Update.esm",
@@ -6809,6 +7495,11 @@
    "303a:Update.esm",
    "48455:WindhelmSSE.esp",
    "4845a:WindhelmSSE.esp",
+   "4d53e:WindhelmSSE.esp",
+   "4d593:WindhelmSSE.esp",
+   "4d594:WindhelmSSE.esp",
+   "52e7f:WindhelmSSE.esp",
+   "52e81:WindhelmSSE.esp",
    "5d1b2:WindhelmSSE.esp",
    "622ee:WindhelmSSE.esp",
    "622fa:WindhelmSSE.esp",
@@ -6816,7 +7507,13 @@
    "6c6e5:WindhelmSSE.esp",
    "6c6e7:WindhelmSSE.esp",
    "6c6f9:WindhelmSSE.esp",
+   "6c730:WindhelmSSE.esp",
+   "80c5e:WindhelmSSE.esp",
+   "80c73:WindhelmSSE.esp",
+   "80c74:WindhelmSSE.esp",
+   "a4910:WindhelmSSE.esp",
    "a4962:WindhelmSSE.esp",
+   "a4982:WindhelmSSE.esp",
    "b8e72:WindhelmSSE.esp",
    "b8e7a:WindhelmSSE.esp",
    "d8419:WindhelmSSE.esp",
@@ -6838,7 +7535,9 @@
    "101549:WindhelmSSE.esp",
    "1342a1:WindhelmSSE.esp",
    "1342a7:WindhelmSSE.esp",
+   "135227:WindhelmSSE.esp",
    "149ac8:WindhelmSSE.esp",
+   "149aca:WindhelmSSE.esp",
    "149ad1:WindhelmSSE.esp",
    "14ebfa:WindhelmSSE.esp",
    "14ec0e:WindhelmSSE.esp",
@@ -6846,10 +7545,13 @@
    "153d97:WindhelmSSE.esp",
    "157b14:WindhelmSSE.esp",
    "158f66:WindhelmSSE.esp",
+   "15cfcd:WindhelmSSE.esp",
    "15e2b1:WindhelmSSE.esp",
    "163431:WindhelmSSE.esp",
+   "16d752:WindhelmSSE.esp",
    "171684:WindhelmSSE.esp",
    "172ca4:WindhelmSSE.esp",
+   "172ca7:WindhelmSSE.esp",
    "172cb7:WindhelmSSE.esp",
    "17da83:WindhelmSSE.esp",
    "181d07:WindhelmSSE.esp",
@@ -6873,8 +7575,10 @@
    "200a37:WindhelmSSE.esp",
    "200a39:WindhelmSSE.esp",
    "200a4d:WindhelmSSE.esp",
+   "207af8:WindhelmSSE.esp",
    "20cc18:WindhelmSSE.esp",
    "20fe64:WindhelmSSE.esp",
+   "2214de:WindhelmSSE.esp",
    "235b6d:WindhelmSSE.esp",
    "235b70:WindhelmSSE.esp",
    "235b71:WindhelmSSE.esp",
@@ -9785,6 +10489,10 @@
     "edid": "DLC1NPCMentalModel"
    },
    {
+    "quest": "2c09:Dawnguard.esm",
+    "edid": "DLC1Init"
+   },
+   {
     "quest": "2f65:Dawnguard.esm",
     "edid": "DLC1VQ02"
    },
@@ -10469,8 +11177,16 @@
     "edid": "DLC1VQ08HunterMove"
    },
    {
+    "quest": "1aa70:Dawnguard.esm",
+    "edid": "DLC1HireableDogs"
+   },
+   {
     "quest": "1aa71:Dawnguard.esm",
     "edid": "DLC1DialogueGuardsGeneral"
+   },
+   {
+    "quest": "16e02:Dragonborn.esm",
+    "edid": "DLC2Init"
    },
    {
     "quest": "16e1f:Dragonborn.esm",
@@ -11365,6 +12081,10 @@
     "edid": "DLC2MQ07"
    },
    {
+    "quest": "38566:Dragonborn.esm",
+    "edid": "DLC2HirelingQuest"
+   },
+   {
     "quest": "38c07:Dragonborn.esm",
     "edid": "DLC2RieklingRescue"
    },
@@ -11529,6 +12249,14 @@
     "edid": "BYOHHouseDialogueHousecarl"
    },
    {
+    "quest": "13e06:Skyrim.esm",
+    "edid": "VoicePowers"
+   },
+   {
+    "quest": "13eb3:Skyrim.esm",
+    "edid": "DialogueGeneric"
+   },
+   {
     "quest": "143af:Skyrim.esm",
     "edid": "DragonControl"
    },
@@ -11623,6 +12351,10 @@
    {
     "quest": "17e09:Skyrim.esm",
     "edid": "DialogueMarkarthArnleifLisbetImedhnainScene02"
+   },
+   {
+    "quest": "17f01:Skyrim.esm",
+    "edid": "DialogueCarriageSystem"
    },
    {
     "quest": "17f05:Skyrim.esm",
@@ -12693,6 +13425,10 @@
     "edid": "DialogueFalkreathDeadMansDrinkScene10"
    },
    {
+    "quest": "2ba16:Skyrim.esm",
+    "edid": "PlayerWerewolfQuest"
+   },
+   {
     "quest": "2bb38:Skyrim.esm",
     "edid": "DA10HauntingController"
    },
@@ -13519,6 +14255,10 @@
    {
     "quest": "39df7:Skyrim.esm",
     "edid": "DialogueRoriksteadSisselJouaneScene1"
+   },
+   {
+    "quest": "39f82:Skyrim.esm",
+    "edid": "WICourier"
    },
    {
     "quest": "3a156:Skyrim.esm",
@@ -14733,6 +15473,10 @@
     "edid": "MGRRogue"
    },
    {
+    "quest": "5a6dc:Skyrim.esm",
+    "edid": "DialogueFavorGeneric"
+   },
+   {
     "quest": "5a82c:Skyrim.esm",
     "edid": "CWMissionCatchEventTopA"
    },
@@ -15321,6 +16065,10 @@
     "edid": "FreeformFrostRiver"
    },
    {
+    "quest": "68d73:Skyrim.esm",
+    "edid": "stables"
+   },
+   {
     "quest": "69043:Skyrim.esm",
     "edid": "FreeformKynesgroveA"
    },
@@ -15683,6 +16431,10 @@
    {
     "quest": "74a83:Skyrim.esm",
     "edid": "FreeformRiverwood01"
+   },
+   {
+    "quest": "750ba:Skyrim.esm",
+    "edid": "DialogueFollower"
    },
    {
     "quest": "75399:Skyrim.esm",
@@ -17325,6 +18077,10 @@
     "edid": "DB01Objective"
    },
    {
+    "quest": "bcc94:Skyrim.esm",
+    "edid": "HirelingQuest"
+   },
+   {
     "quest": "bd750:Skyrim.esm",
     "edid": "WEDL10"
    },
@@ -18253,6 +19009,10 @@
     "edid": "TGDialogueHQScene20"
    },
    {
+    "quest": "eafd5:Skyrim.esm",
+    "edid": "PlayerVampireQuest"
+   },
+   {
     "quest": "eb9e2:Skyrim.esm",
     "edid": "dunRebelsCairnChangeLocationQST"
    },
@@ -18319,6 +19079,10 @@
    {
     "quest": "fc076:Skyrim.esm",
     "edid": "CWDialogueSoldiers02"
+   },
+   {
+    "quest": "fc1a2:Skyrim.esm",
+    "edid": "PlayerSleepQuest"
    },
    {
     "quest": "fc85d:Skyrim.esm",
@@ -18607,319 +19371,415 @@
   ],
   "kept": [
    {
-    "quest": "2c09:Dawnguard.esm",
-    "edid": "DLC1Init",
-    "why": "start-up: Dawnguard's set up"
-   },
-   {
     "quest": "9401:Dawnguard.esm",
     "edid": "CreatureDialogueChaurusInsect",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "f8b1:Dawnguard.esm",
     "edid": "CreatureDialogueGargoyle",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "11686:Dawnguard.esm",
     "edid": "CreatureDialogueDogDeathHound",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "11696:Dawnguard.esm",
     "edid": "CreatureDialogueDogHusky",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "11cd7:Dawnguard.esm",
     "edid": "CreatureDialogueMistman",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "1aa70:Dawnguard.esm",
-    "edid": "DLC1HireableDogs",
-    "why": "followers: hired dogs"
-   },
-   {
-    "quest": "16e02:Dragonborn.esm",
-    "edid": "DLC2Init",
-    "why": "start-up: Dragonborn's set up"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "1f17a:Dragonborn.esm",
     "edid": "CreatureDialogueScribx",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "20768:Dragonborn.esm",
     "edid": "CreatureDialogueFishman",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "24c30:Dragonborn.esm",
     "edid": "CreatureDialogueNetch",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "24c3f:Dragonborn.esm",
     "edid": "CreatureDialogueBristleback",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "33d8c:Dragonborn.esm",
     "edid": "CreatureDialogueAshGhoul",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "38566:Dragonborn.esm",
-    "edid": "DLC2HirelingQuest",
-    "why": "followers: Solstheim hirelings"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "3d47c:Dragonborn.esm",
     "edid": "CreatureDialogueSeeker",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "e46:Skyrim.esm",
     "edid": "CreatureDialogueWerewolf",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "13e06:Skyrim.esm",
-    "edid": "VoicePowers",
-    "why": "start-up: shouts and powers"
-   },
-   {
-    "quest": "13eb3:Skyrim.esm",
-    "edid": "DialogueGeneric",
-    "why": "barter: holds OfferServicesTopic, What have you got for sale?"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "17015:Skyrim.esm",
     "edid": "CreatureDialogueFrostbiteSpider",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "17cb2:Skyrim.esm",
     "edid": "CreatureDialogueTroll",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "17f01:Skyrim.esm",
-    "edid": "DialogueCarriageSystem",
-    "why": "carriages: the vanilla drivers' quest, named by CFTO's driver script"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "180c3:Skyrim.esm",
     "edid": "CreatureDialogueGoat",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "1920d:Skyrim.esm",
     "edid": "CreatureDialogueSabreCat",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "19fe4:Skyrim.esm",
     "edid": "CreatureDialogueSkeever",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "27e2a:Skyrim.esm",
     "edid": "CreatureDialogueMammoth",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "2afd7:Skyrim.esm",
     "edid": "CreatureDialogueFrostbiteSpiderGiant",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "2ba16:Skyrim.esm",
-    "edid": "PlayerWerewolfQuest",
-    "why": "start-up: lycanthropy"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "2ee39:Skyrim.esm",
     "edid": "CreatureDialogueDraugr",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "39259:Skyrim.esm",
     "edid": "CreatureDialogueDragon",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "39f82:Skyrim.esm",
-    "edid": "WICourier",
-    "why": "courier: the vanilla courier"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "3e8a5:Skyrim.esm",
     "edid": "CreatureDialogueMudcrab",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "46ed0:Skyrim.esm",
     "edid": "CreatureDialogueDragonPriest",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "4737f:Skyrim.esm",
     "edid": "CreatureDialogueHorker",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "4d2a6:Skyrim.esm",
     "edid": "CreatureDialogueCow",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "4d2a7:Skyrim.esm",
     "edid": "CreatureDialogueIceWraith",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "4e848:Skyrim.esm",
     "edid": "CreatureDialogueAtronachFrost",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "5a6dc:Skyrim.esm",
-    "edid": "DialogueFavorGeneric",
-    "why": "followers: favours and commands"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "5b1b7:Skyrim.esm",
     "edid": "CreatureDialogueDog",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "6399f:Skyrim.esm",
     "edid": "CreatureDialogueChaurus",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "6759b:Skyrim.esm",
     "edid": "CreatureDialogueFalmer",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "68d73:Skyrim.esm",
-    "edid": "stables",
-    "why": "carriages: the stables, named by 53 of CFTO's dialogue scripts"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "6abd7:Skyrim.esm",
     "edid": "CreatureDialogueGiant",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "750ba:Skyrim.esm",
-    "edid": "DialogueFollower",
-    "why": "followers: the follower system, carrying CFTO and Playable Rieklings lines"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "7a732:Skyrim.esm",
     "edid": "CreatureDialogueDwarvenSphere",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "7c727:Skyrim.esm",
     "edid": "CreatureDialogueDeer",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "8a3c3:Skyrim.esm",
     "edid": "CreatureDialogueBear",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "91509:Skyrim.esm",
     "edid": "CreatureDialogueDwarvenCenturion",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "93af4:Skyrim.esm",
     "edid": "CreatureDialogueDwarvenSpider",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "a85c9:Skyrim.esm",
     "edid": "CreatureDialogueWolf",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "a9209:Skyrim.esm",
     "edid": "CreatureDialogueSpriggan",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "abf3a:Skyrim.esm",
     "edid": "CreatureDialogueAtronachStorm",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "b5d84:Skyrim.esm",
     "edid": "CreatureDialogueAtronachFlame",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "bcc94:Skyrim.esm",
-    "edid": "HirelingQuest",
-    "why": "followers: hired followers"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "bfb2c:Skyrim.esm",
     "edid": "CreatureDialogueSkeleton",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "c9af5:Skyrim.esm",
     "edid": "CreatureDialogueHagraven",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "d78a9:Skyrim.esm",
     "edid": "CreatureDialogueWitchlight",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "d78ac:Skyrim.esm",
     "edid": "CreatureDialogueHare",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "d78b0:Skyrim.esm",
     "edid": "CreatureDialogueWisp",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "eafd5:Skyrim.esm",
-    "edid": "PlayerVampireQuest",
-    "why": "start-up: vampirism"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "f942a:Skyrim.esm",
     "edid": "CreatureDialogueHorse",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
-   },
-   {
-    "quest": "fc1a2:Skyrim.esm",
-    "edid": "PlayerSleepQuest",
-    "why": "start-up: sleeping"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "10aa5e:Skyrim.esm",
     "edid": "CreatureDialogueChicken",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
    },
    {
     "quest": "10f676:Skyrim.esm",
     "edid": "CreatureDialogueFox",
-    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps"
+    "why": "creature voices: the growls, barks and calls of the animals and creatures Thornswood keeps (Patrick, 12 Oct 2026, decision 6 on issue 2468)"
+   }
+  ],
+  "modStopped": [
+   {
+    "quest": "48bbc2:aaaGraniteHill.esp",
+    "edid": "aaaGraniteHillDungeonQuest"
+   },
+   {
+    "quest": "364757:ElysiumEstate.esp",
+    "edid": "EE_QuestKyne"
+   },
+   {
+    "quest": "37f320:Riften Expansion.esp",
+    "edid": "RTBearheartVampireQuest"
+   },
+   {
+    "quest": "6058:Solitude Arena.esp",
+    "edid": "LSDvaincrelechampion"
+   },
+   {
+    "quest": "a017:Solitude Arena.esp",
+    "edid": "LSDworld"
+   },
+   {
+    "quest": "18431:Solitude Arena.esp",
+    "edid": "FANAdetoi"
+   },
+   {
+    "quest": "1066c3:WindhelmSSE.esp",
+    "edid": "0WHQuestRieklings"
+   },
+   {
+    "quest": "1066c4:WindhelmSSE.esp",
+    "edid": "0WHQuestVampires"
+   },
+   {
+    "quest": "14ec74:WindhelmSSE.esp",
+    "edid": "0WindhelmDialogueGeneral"
+   },
+   {
+    "quest": "1ee2e4:WindhelmSSE.esp",
+    "edid": "0WHQuestTalosIntro"
+   },
+   {
+    "quest": "1f355a:WindhelmSSE.esp",
+    "edid": "0WHQuestPoetry"
+   },
+   {
+    "quest": "29178e:WindhelmSSE.esp",
+    "edid": "0WHQuestFurs"
+   },
+   {
+    "quest": "2c495c:WindhelmSSE.esp",
+    "edid": "0WHQuestBuyHouse"
+   },
+   {
+    "quest": "2ddff3:WindhelmSSE.esp",
+    "edid": "0WindhelmSceneGuardVampireAftermath"
+   },
+   {
+    "quest": "301e05:WindhelmSSE.esp",
+    "edid": "OWindhelmDecorationMurder"
+   },
+   {
+    "quest": "3ec170:WindhelmSSE.esp",
+    "edid": "0WHQuestArenaFightRepeating"
+   }
+  ]
+ },
+ "placeHolds": {
+  "locations": [
+   {
+    "location": "4c20:Dawnguard.esm",
+    "edid": "DLC1VampireCastleLocation",
+    "place": "Castle Volkihar",
+    "wonBy": "JK's Castle Volkihar.esp",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "16770:Skyrim.esm HaafingarHoldLocation",
+    "hold": "HaafingarHoldLocation"
+   },
+   {
+    "location": "39aa9:Skyrim.esm",
+    "edid": "NightingaleHallLocation",
+    "place": "Nightingale Hall",
+    "wonBy": "Skyrim.esm",
+    "parentWas": null,
+    "parent": "1676c:Skyrim.esm RiftHoldLocation",
+    "hold": "RiftHoldLocation"
+   },
+   {
+    "location": "350bc:Skyrim.esm",
+    "edid": "IronbindBarrowLocation",
+    "place": "Ironbind Barrow",
+    "wonBy": "Skyrim.esm",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "1676b:Skyrim.esm WinterholdHoldLocation",
+    "hold": "WinterholdHoldLocation"
+   },
+   {
+    "location": "1b261:The Great City of Solitude.esp",
+    "edid": "JakobsFarmInteriorLocation",
+    "place": "Jakob's House",
+    "wonBy": "The Great City of Solitude.esp",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "16770:Skyrim.esm HaafingarHoldLocation",
+    "hold": "HaafingarHoldLocation"
+   },
+   {
+    "location": "1b3c9:The Great City of Solitude.esp",
+    "edid": "FrederiksFarmInteriorLocation",
+    "place": "Frederik's House",
+    "wonBy": "The Great City of Solitude.esp",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "16770:Skyrim.esm HaafingarHoldLocation",
+    "hold": "HaafingarHoldLocation"
+   },
+   {
+    "location": "a87a:Dawnguard.esm",
+    "edid": "DLC1DarkfallCaveLocation",
+    "place": "Darkfall Cave",
+    "wonBy": "Dawnguard.esm",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "16769:Skyrim.esm ReachHoldLocation",
+    "hold": "ReachHoldLocation"
+   },
+   {
+    "location": "4c1f:Dawnguard.esm",
+    "edid": "DLC1HunterHQLocation",
+    "place": "Fort Dawnguard's valley",
+    "wonBy": "Dawnguard.esm",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "1676c:Skyrim.esm RiftHoldLocation",
+    "hold": "RiftHoldLocation"
+   },
+   {
+    "location": "19c8e:Dawnguard.esm",
+    "edid": "DLC1DeadDropFallsLocation",
+    "place": "Dead Drop Falls and Dead Drop Mine, caves of Fort Dawnguard's valley",
+    "wonBy": "Dawnguard.esm",
+    "parentWas": "130ff:Skyrim.esm TamrielLocation",
+    "parent": "4c1f:Dawnguard.esm DLC1HunterHQLocation",
+    "hold": "RiftHoldLocation"
+   }
+  ],
+  "rooms": [
+   {
+    "cell": "8e52:Dawnguard.esm",
+    "edid": "DLC1HunterValleyCave01",
+    "place": "Mossy Glen Cave, a cave of Fort Dawnguard's valley",
+    "wonBy": "Dawnguard.esm",
+    "locationWas": null,
+    "location": "4c1f:Dawnguard.esm DLC1HunterHQLocation",
+    "hold": "RiftHoldLocation"
+   },
+   {
+    "cell": "1a618:OarsRest.esp",
+    "edid": "ORUtility",
+    "place": "Oar's Rest's utility room",
+    "wonBy": "OarsRest.esp",
+    "locationWas": null,
+    "location": "3740:OarsRest.esp OR_Location_OarsRest",
+    "hold": "FalkreathHoldLocation"
+   },
+   {
+    "cell": "660d:Solitude Arena.esp",
+    "edid": "aamaisonchamp",
+    "place": "the Lost Hut",
+    "wonBy": "Solitude Arena.esp",
+    "locationWas": null,
+    "location": "16769:Skyrim.esm ReachHoldLocation",
+    "hold": "ReachHoldLocation"
    }
   ]
  },

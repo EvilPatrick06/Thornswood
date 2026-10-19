@@ -13,8 +13,9 @@
 // At the destination's board the poster or a steward presses Confirm: the
 // company keeps a tenth of the pay, rounded down, nothing under 10, and the
 // hauler is handed the rest out of the ledger. The ledger keeps
-// the fee and the tenth. An ordinary job is not a haul, and its taker is paid
-// nothing. The hauler's /dropjob, the poster's /unpin before anybody has
+// the fee and the tenth. An ordinary job is not a haul: its reward (#2554) is
+// paid by its poster on its own board, and a haul's Confirm pays it nothing
+// (tests/test-2554-board-posts.js has the reward). The hauler's /dropjob, the poster's /unpin before anybody has
 // taken it, or a steward's, hands the pay back and keeps the fee. Somebody
 // paid who is away is paid the next time they are in the world, and the gold
 // stays held on the ledger until then.
@@ -81,7 +82,7 @@ function fn(name) {
   return b < 0 ? null : prop.slice(a + 1, b + 4);
 }
 
-const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'post', 'board', 'take',
+const NAMES = ['takeGold', 'payOut', 'payHeld', 'sealed', 'nameIs', 'postWords', 'post', 'board', 'take',
                'jobsOf', 'dropJob', 'takedown', 'unpin', 'postLetter', 'deliver', 'letterReach',
                'boardHere', 'nearestBoard', 'wallOf', 'boardPanel', 'boardsView', 'moveBoard', 'command',
                'noticeHolds', 'heldOn', 'mayWithdraw', 'withdraw',
@@ -222,9 +223,13 @@ function boot(reg, w, opts) {
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); reg.saves = (reg.saves || 0) + 1; }',
     'function refreshPanel() { }',
     // Nobody guards these boards; a guard's take down (#502) is
-    // tests/test-502-guard-board.js.
+    // tests/test-502-guard-board.js. Nobody is a Jarl here either, and the
+    // stewards given are stewards of every board here (#2551, a steward is
+    // of one hold: tests/test-2551-hold-offices.js).
     'function isGuard() { return false; }',
-    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
+    'function isJarlOf() { return false; }',
+    'function isStewardOf(pid) { return isSteward(pid); }',
+    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'officeCmd',
      'evict', 'boxCmd', 'rentCmd', 'bedCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });
@@ -321,7 +326,7 @@ attempt('withdraw', function () {
     { by: 1, name: 'A', text: 'z', job: true, letter: true, to: 'M', pay: 0, taken: 0, down: 5 },
     { by: 1, name: 'A', text: 'w', job: true, taken: 0 }
   ];
-  yes('L5 what is held is the open letter\'s 15 and the open haul\'s pay, not a delivered letter or a plain job',
+  yes('L5 what is held is the open letter\'s 15 and the open haul\'s pay, not a delivered letter or a job holding no reward',
       s.heldOn('whiterun', null) === 55);
   yes('L6 a withdrawal that would leave less than is held is refused, and says why',
       s.withdraw('whiterun', 16, 'x') === false && s.funds().whiterun === 70 &&
@@ -540,12 +545,12 @@ attempt('an ordinary job', function () {
   const s = boot({}, w, { stewards: [ALICE.pid] });
   w.at(ALICE, 'whiterun', s);
   w.at(BOB, 'whiterun', s);
-  s.say(ALICE, '/job carry my crate to riften');
+  s.say(ALICE, '/job 20 Carry my crate :: To Riften, by the gate.');
   s.say(BOB, '/take 1');
   w.at(ALICE, 'riften', s);
   const said = s.say(ALICE, '/haul done whiterun 1');
-  yes('J1 /haul done on an ordinary job is refused, and the taker is paid nothing',
-      /That is not a haul/.test(said) && w.gold(BOB) === 10 && s.funds().whiterun === 30);
+  yes('J1 /haul done on an ordinary job is refused, and the taker is paid nothing by it',
+      /That is not a haul/.test(said) && w.gold(BOB) === 10 && s.funds().whiterun === 50);
   yes('J2 and the job is still up and still theirs', !s.notices().whiterun[0].down &&
       s.notices().whiterun[0].taken === BOB.pid);
 });
@@ -613,7 +618,7 @@ attempt('taking a haul down', function () {
   yes('U8 the company kept nothing on any of them, and the coin only moved',
       s.funds().whiterun === 90 && total(w, s, everybody) === start);
   yes('U9 a steward is not a steward of a plain notice', /not yours/.test((function () {
-    s.say(ALICE, '/notice hello'); return s.say(STEW, '/unpin 4');
+    s.say(ALICE, '/notice hello :: hello'); return s.say(STEW, '/unpin 4');
   })()));
   s.say(ALICE, '/haul 30 riften wool');
   s.say(BOB, '/take 5');
@@ -654,7 +659,7 @@ attempt('held pay', function () {
   w.at(BOB, 'riften', s);
   const said = s.say(ALICE, '/haul done whiterun 2');
   yes('P2 a haul is not paid out of a letter\'s held 15: on a short ledger it is refused and nothing moves',
-      /That did not work/.test(said) && /held for letters and hauls/.test(said) && w.gold(BOB) === 10 &&
+      /That did not work/.test(said) && /held for letters, hauls and jobs/.test(said) && w.gold(BOB) === 10 &&
       s.funds().whiterun === 80 && !s.notices().whiterun[1].down);
   w.at(BOB, 'whiterun', s);
   s.say(BOB, '/take 1');

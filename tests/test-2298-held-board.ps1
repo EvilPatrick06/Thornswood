@@ -11,15 +11,24 @@
   default: -Revision N, or -WhileContentNamesIt, which holds a mesh for exactly
   as long as game\content\Thornswood-Content.esp names it as a model.
 
+  Since #2298 the committed plugin's board is Thornswood's own mesh, so the
+  old board's line held nothing, and on 16 October it came out (#400,
+  decision C: the old mesh's folder carries the other server's short name,
+  which is named nowhere here). The way out stays for the next mesh the
+  plugin names that no revision carries, so the plugins built below prove it
+  on a held line made for the test, at a path of the same shape.
+
   This proves:
     a line with no way out, or with both, cannot be made;
-    the board's line has no revision, and since the committed plugin names
-      Thornswood's own board (#2298) the old mesh is let go at every
-      revision, while the new board and drop box are ours;
+    no line is held by the plugin while the committed plugin does not name its
+      mesh (a line that holds nothing); the committed plugin names
+      Thornswood's own board, the new board and drop box are ours, and a mesh
+      shaped like the old board is somebody else's file at every revision;
+    a plugin that names a held mesh holds it, at every revision;
     a plugin that no longer names it lets it go at once, at every revision;
     a model inside a compressed record is still read;
     a missing plugin stops rather than guessing;
-    every other line still leaves at its revision, as before.
+    every line in Ship-Rules leaves at its revision, as before.
   Plugins here are built in a scratch folder; nothing outside it is written.
 #>
 $ErrorActionPreference = 'Stop'
@@ -30,7 +39,10 @@ function Yes([string]$what, [bool]$cond) {
 }
 . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
 
-$board = 'Data\meshes\olivar-messageboard\missiveboardcotnd.nif'
+# A mesh of the old board's shape: MissiveBoardCOTND.nif in a folder of a
+# server's own under meshes.
+$board = 'Data\meshes\otherserver-messageboard\missiveboardcotnd.nif'
+$boardModel = 'otherserver-messageboard\MissiveBoardCOTND.nif'
 
 # ---- a line names exactly one way out -----------------------------------------
 $threw = $false; try { $null = New-ShipHeld 'Data\meshes\x\y.nif' 'some mod (1)' } catch { $threw = $true }
@@ -44,22 +56,19 @@ Yes '  and only under Data\meshes\, where a plugin''s models are' $threw
 $made = New-ShipHeld 'Data\meshes\A\B.nif' 'some mod (1)' -WhileContentNamesIt
 Yes 'the model it asks the plugin for is the path under meshes\' ($made.ContentModel -eq 'A\B.nif' -and $made.Revision -eq 0)
 
-# ---- the board's line, against the committed plugin ---------------------------
-$line = @($ShipHeldForCollection | Where-Object { [string]$_.Path -eq $board })
-Yes 'the board has one held line' ($line.Count -eq 1)
-Yes '  with no revision, because none carries it' ($line.Count -eq 1 -and [int]$line[0].Revision -eq 0)
-Yes '  held while the content plugin names it' ($line.Count -eq 1 -and [string]$line[0].ContentModel -eq 'olivar-messageboard\missiveboardcotnd.nif')
-# Since #2298 the committed plugin's board is Thornswood's own mesh, so the
-# old one leaves: no longer held at any revision, and somebody else's file.
-Yes 'the committed plugin no longer names the old board mesh' (-not (Test-ShipContentNames 'olivar-messageboard\MissiveBoardCOTND.nif'))
-Yes '  it names Thornswood''s own board, meshes\thornswood\noticeboard01.nif' (Test-ShipContentNames 'thornswood\noticeboard01.nif')
+# ---- the held lines, against the committed plugin -----------------------------
+$byPlugin = @($ShipHeldForCollection | Where-Object { [string]$_.ContentModel })
+$dead = @($byPlugin | Where-Object { -not (Test-ShipContentNames ([string]$_.ContentModel)) })
+Yes ('no line is held by the plugin while the plugin does not name its mesh ({0} held that way)' -f $byPlugin.Count) ($dead.Count -eq 0)
+foreach ($d in $dead) { Write-Host ('      holds nothing: ' + [string]$d.Path) }
+Yes 'the committed plugin names Thornswood''s own board, meshes\thornswood\noticeboard01.nif' (Test-ShipContentNames 'thornswood\noticeboard01.nif')
+Yes '  and not a mesh shaped like the old board' (-not (Test-ShipContentNames $boardModel))
 foreach ($rev in 0, 1, 2, 3, 99) {
-    Yes "so the old mesh is not held at revision $rev" (-not (Test-ShipHeld $board $rev))
+    Yes "a mesh shaped like the old board is not held at revision $rev" (-not (Test-ShipHeld $board $rev))
     Yes "  and does not ship at revision $rev" (Test-ShipNotOurs $board $rev)
 }
 Yes 'the new board and its drop box are ours at every revision' (
     -not (Test-ShipNotOurs 'Data\meshes\thornswood\noticeboard01.nif' 2) -and -not (Test-ShipNotOurs 'Data\meshes\thornswood\dropbox01.nif' 99))
-Yes 'a file beside the old one is not held' (-not (Test-ShipHeld 'Data\meshes\olivar-messageboard\other.nif' 2))
 
 # ---- plugins built here --------------------------------------------------------
 function Sub([string]$tag, [byte[]]$body) {
@@ -105,13 +114,16 @@ function Plugin([string]$path, [string]$model, [bool]$compress) {
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-2298-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 [void][IO.Directory]::CreateDirectory($T)
 $was = $ShipContentPlugin
+$wasHeld = $ShipHeldForCollection
 try {
+    # A line held while the plugin names the mesh, made for the test.
+    $ShipHeldForCollection = @($wasHeld) + @(New-ShipHeld $board 'none: a mesh no collection revision carries' -WhileContentNamesIt)
     $named = Join-Path $T 'names-it.esp'
     $moved = Join-Path $T 'repointed.esp'
     $packed = Join-Path $T 'compressed.esp'
-    Plugin $named 'olivar-messageboard\MissiveBoardCOTND.nif' $false
+    Plugin $named $boardModel $false
     Plugin $moved 'Clutter\Missives\MissiveBoardCOTND.nif' $false
-    Plugin $packed 'olivar-messageboard\MissiveBoardCOTND.nif' $true
+    Plugin $packed $boardModel $true
 
     $ShipContentPlugin = $named
     Yes 'a plugin built here that names the mesh holds it at revision 2' ((Test-ShipHeld $board 2) -and -not (Test-ShipNotOurs $board 2))
@@ -137,15 +149,19 @@ try {
     $ShipContentPlugin = $bad
     $threw = $false; try { $null = Test-ShipHeld $board 2 } catch { $threw = $true }
     Yes 'a file that is not a plugin stops too' $threw
+
+    $ShipContentPlugin = $named
+    Yes 'a file beside the held mesh is not held' (-not (Test-ShipHeld ($board -replace 'missiveboardcotnd\.nif$', 'other.nif') 2))
 }
 finally {
     $ShipContentPlugin = $was
+    $ShipHeldForCollection = $wasHeld
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-# ---- every other line, as before -----------------------------------------------
-$others = @($ShipHeldForCollection | Where-Object { [string]$_.Path -ne $board })
-Yes ('the other {0} lines each leave at a revision' -f $others.Count) ($others.Count -gt 0 -and @($others | Where-Object { [int]$_.Revision -lt 1 -or [string]$_.ContentModel }).Count -eq 0)
+# ---- every line in Ship-Rules, as before ----------------------------------------
+$others = @($ShipHeldForCollection)
+Yes ('the {0} lines in Ship-Rules each leave at a revision' -f $others.Count) ($others.Count -gt 0 -and @($others | Where-Object { [int]$_.Revision -lt 1 -or [string]$_.ContentModel }).Count -eq 0)
 foreach ($h in $others) {
     $p = [string]$h.Path
     $rel = $(if ($p.EndsWith('\')) { $p + 'x.nif' } else { $p })

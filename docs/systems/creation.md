@@ -14,7 +14,8 @@ do not fit a riekling (Patrick, 12 October 2026). The
 panel behind K opens on its own. On it:
 
 - **Home.** The town they wake in. This one is required before they leave
-  the hall. Confirming it sends them to the inn of that town.
+  the hall. Confirming it sends them to that town's start spot, not its inn
+  (#2622).
 - **Class.** Hunter, Fisher, Gatherer, Miner or Farmer. Can be left for
   later and picked in the world from the same panel. Until it is picked,
   every seam, carcass, plant, fishing spot and crop turns them away.

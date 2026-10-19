@@ -95,7 +95,7 @@ $trigger = New-ScheduledTaskTrigger -AtStartup
 $set     = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries `
              -DontStopIfGoingOnBatteries -StartWhenAvailable `
              -RestartCount 3 -RestartInterval (New-TimeSpan -Minutes 1)
-$p       = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -RunLevel Highest
+$p       = New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted  # #2578: never SYSTEM again
 
 Register-ScheduledTask -TaskName $name -Action $action -Trigger $trigger `
   -Settings $set -Principal $p -Force | Out-Null

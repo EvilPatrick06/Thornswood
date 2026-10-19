@@ -20,7 +20,7 @@
        with the first release that names a record, keeps the last pack of each,
        and is newest first
     2. the launcher's own Updater and VersionDoc compiled from launcher\app
-       with the .NET Framework csc, the way Build-Launcher.ps1 does, reading
+       with the compiler the build runs (tests\Launcher-Csc.ps1), reading
        that feed and applying its packs with Updater.Install into scratch
        installs: one that took every release as it came, one that was offline
        since the first, and a fresh install seeded like the installer seeds it
@@ -51,6 +51,7 @@ param()
 $env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $winps)) {
@@ -108,12 +109,17 @@ function Put-Asset([string]$file) {
     return $sha
 }
 function Url([string]$sha) { return "https://thornswood.net/feed-dev/assets/$sha" }
-function Read-Feed { return (([IO.File]::ReadAllText((Join-Path $feedDir 'version.json'))) -replace '^﻿', '') | ConvertFrom-Json }
+# The feed the site serves is the newest of its generations, and a feed put
+# there is the next one, the way the store sends it (Feed-Store.ps1, #2727).
+function Feed-File { return (Get-FeedVersionFile $feedDir) }
+function Read-Feed { return (([IO.File]::ReadAllText((Feed-File))) -replace '^﻿', '') | ConvertFrom-Json }
 # The list a rollback reads, the store's releases.json beside the feed since
 # #1050 (Release-Baseline.ps1), merged with any the feed still carries.
 function Read-Releases { return @(Get-StoreReleases $feedDir (Read-Feed)) }
-function Write-Feed($doc) { [IO.File]::WriteAllText((Join-Path $feedDir 'version.json'), ($doc | ConvertTo-Json -Depth 6), $utf8) }
-function Feed-Sha { return (Get-BaselineFileSha (Join-Path $feedDir 'version.json')) }
+function Write-Feed($doc) {
+    New-Item -ItemType Directory -Force -Path (Join-Path $feedDir 'version') | Out-Null
+    [IO.File]::WriteAllText((Join-Path (Join-Path $feedDir 'version') (Get-FeedVersionNext $feedDir)), ($doc | ConvertTo-Json -Depth 6), $utf8) }
+function Feed-Sha { return (Get-BaselineFileSha (Feed-File)) }
 # A pack the way Publish-Update builds one: delete.txt, game/<path>, and the
 # plugin list under profile/.
 function New-Pack([string]$path, [hashtable]$files, [string[]]$deletes, [string]$plugins) {
@@ -236,50 +242,21 @@ $lst = @(Add-FeedRelease $many (New-FeedBaselinePointer 'top' ('b' * 64) (Url ('
 Yes "the list keeps the newest $FeedReleasesKeep" ($lst.Count -eq $FeedReleasesKeep -and $lst[0].id -eq 'top' -and $lst[1].id -eq 'r1')
 
 # ---- the launcher, compiled ------------------------------------------------------
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-       Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
-        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
-               Sort-Object FullName -Descending | Select-Object -First 1
-        if ($hit) { return $hit.FullName }
-    }
-    return $null
-}
-# The references are read off Build-Launcher.ps1, as test-updater.ps1 does.
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\release\Build-Launcher.ps1'), [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
+foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 $dll = Join-Path $T 'Thornswood.dll'
 $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/out:$dll")
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in @(Get-ChildItem (Join-Path $app '*.cs') -File)) { $cscArgs += $f.FullName }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
-Yes 'the launcher compiles with the .NET Framework csc' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
+Yes 'the launcher compiles with the compiler the build runs' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $dll)) { foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 10)) { Write-Host "      $l" }; Done }
 $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
 $U = $asm.GetType('Thornswood.Updater'); $P = $asm.GetType('Thornswood.Paths'); $VD = $asm.GetType('Thornswood.VersionDoc')
@@ -322,7 +299,7 @@ function Use-Install([string]$root) {
 # bytes the feed names, checked against its sha256, through Updater.Install.
 function Update-Install([string]$root, [int]$only = -1) {
     Use-Install $root
-    $v = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+    $v = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
     $pending = @($mPending.Invoke($null, @($v)))
     # A launcher from #1050 on offers the record the feed names as one update.
     # These records do not say their files are on the site (':record:files'),
@@ -374,7 +351,7 @@ Yes 'a launcher applies the three releases as they come' ((Update-Install $A) -e
 $B = New-Install 'offline' $installer @()
 Yes '  and another took only the first before going quiet' ((Update-Install $B 1) -eq 1 -and (Test-Lands $B $records[$R1]))
 # The feed with the list in it still reads in the launcher, and offers no launcher.
-$vNow = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+$vNow = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
 Yes 'the launcher reads a feed carrying "releases" and "baseline"' ($null -ne $vNow -and @($vNow.packs).Count -eq 3)
 
 # ---- Rollback-Feed.ps1 ----------------------------------------------------------
@@ -442,7 +419,7 @@ Yes 'the one offline since the first takes the rest and the rollback, and lands 
 $C = New-Install 'fresh' @{} @($R1, $R2, $R3)
 foreach ($k in $state.Keys) { $f = Join-Path $C "Game\$k"; New-Item -ItemType Directory -Force -Path (Split-Path -Parent $f) | Out-Null; [IO.File]::WriteAllText($f, [string]$state[$k], $ascii) }
 Yes 'a fresh install built at the third release takes only the rollback and lands there too' ((Update-Install $C) -eq 1 -and (Test-Lands $C $wantB))
-$vB = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $feedDir 'version.json'))))
+$vB = $mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Feed-File))))
 Yes 'no launcher is offered: the version did not move' (-not [bool]$mNewer.Invoke($null, @([string]$vB.launcherVersion, '1.1.102.5')))
 
 # All the way back to the first: the installer's own files are in no pack, but

@@ -310,9 +310,10 @@ Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
 deployed through Vortex, the Thornswood launcher installed on any drive and
 signed in, git, the GitHub CLI (`gh`) signed in to an account that is a
-collaborator on the source repo, PowerShell 7, node, Python 3 with `discord.py`
-and `Pillow` for the bot scripts, and an SSH key the VPS knows. There is no
-releases clone any more: the feed and its baseline are on the VPS (#907).
+collaborator on the source repo, PowerShell 7, node, Python 3.11 or newer (the
+bot runs on 3.12) with `discord.py` and `Pillow` for the bot scripts, and an
+SSH key the VPS knows. There is no releases clone any more: the feed and its
+baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
@@ -344,7 +345,11 @@ at `<drive>:\Thornswood-DevBuild`, beside the main install. Then open it once an
 `<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
 has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
 dev build but without that folder it builds the dev release out of the Steam
-copy instead. `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
+copy instead. That refusal is for `<drive>:\Thornswood-DevBuild` only, the folder
+Ship finds for itself: a folder you name with `-Root`, or record once with
+`.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>`, is a release
+folder `Update-ShipRoot.ps1` makes with no `Launcher` folder, and the Ship's own
+launcher step makes one there (#2662). `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
 in place, without shipping anything.
 
 Then in `Thornswood-Repo`:
@@ -376,11 +381,13 @@ client from the site instead (Shipping from another machine, below). The
 release webhooks are on the VPS (`scripts\ops\Discord-Hook.ps1`) and every
 Ship reads them from there, so there is nothing to hand over.
 
-The launcher's build is moving to MSBuild (#498, decided by Patrick on
-11 Oct). A dev Ship builds the launcher on the machine that runs it, so
-every machine that Ships needs Visual Studio 2022 Build Tools with the
-MSBuild component and the .NET Framework 4.8.1 targeting pack before the
-switch. Nothing else is downloaded at build time: no .NET SDK, no NuGet. A
+The launcher builds with MSBuild (#498, decided by Patrick on 11 Oct,
+switched 15 Oct). A dev Ship builds the launcher on the machine that runs
+it, so every machine that Ships needs Visual Studio 2022 Build Tools with
+the MSBuild component and the .NET Framework 4.8.1 targeting pack. The VPS
+build runners get the same two parts from `Bootstrap-VPS.ps1
+-IncludeBuildTools`. Nothing else is downloaded at build time: no .NET SDK,
+no NuGet. A
 machine with no Build Tools yet, in PowerShell 7 (Windows asks for an
 administrator):
 
@@ -401,13 +408,14 @@ Studio 18). Then, from `Thornswood-Repo`:
 
 ```
 .\scripts\release\Find-MSBuild.ps1 -Report
-.\scripts\release\Build-Launcher.ps1 -With msbuild -Root $env:TEMP\msbuild-try -NoPause
+.\scripts\release\Build-Launcher.ps1 -Root $env:TEMP\msbuild-try -NoPause
 ```
 
 The first names MSBuild.exe and the 4.8.1 reference assemblies, or says
 which is missing. The second builds both exes into a scratch folder and
-ends with Done. Until the switch Ship still builds with the in-box csc, and
-`Setup-ShipMachine.ps1 -Check` lists MSBuild as "later", not as a gap.
+ends with Done. Since the switch (#498, 15 Oct) this is the only way the
+launcher builds, so `Setup-ShipMachine.ps1 -Check` and `Check-ShipReady.ps1`
+count a machine without it as a gap.
 
 The pack baseline lives on the VPS beside the feed, and every Ship receives it
 first, so there is nothing to pull. If the VPS has none for a channel, Ship
@@ -570,9 +578,10 @@ Any developer may run a main Ship from a machine that can sign (How work moves).
 
 Ship builds a channel's release from one folder on each machine: the main
 install for main and `<Root>-DevBuild` for dev, unless the machine has
-recorded another (issue #1692). On a machine whose Vortex deploys into the
-dev build's game folder (docs/COLLECTION-REVISION-2.md step 8), record the
-release folder once. On One it is `local\release-devbuild` in the
+recorded another (issue #1692). Vortex deploys into the Steam copy; the
+launcher refuses a Thornswood game folder as Vortex's folder since #2210
+(docs/COLLECTION-REVISION-2.md step 8). A machine that keeps its release
+folder apart from its installs records it once. On One it is `local\release-devbuild` in the
 repository folder since 5 Oct, because Thornswood work on One lives only in
 the repository, the vault and `C:\ThornswoodTemps&Worktrees` (Patrick); give
 the whole path, since every clone and worktree reads what is recorded:
@@ -773,9 +782,9 @@ What you run after the merge depends on what the pull request touched. A dev rel
 #### What this is
 
 Thornswood: a modded co-op Skyrim roleplay server on SkyMP, in alpha and
-open by application. This repo is the launcher (launcher\app, C# and WPF on the
-.NET Framework, built with the .NET Framework 4 csc and so C# 5 until the build
-moves to MSBuild, #498), the game plugins (game\plugins, Skyrim Platform
+open by application. This repo is the launcher (launcher\app, C# 13 and WPF on
+the .NET Framework 4.8.1, built with MSBuild from launcher\app\Thornswood.csproj,
+#498), the game plugins (game\plugins, Skyrim Platform
 JavaScript), the site (site, node), the Discord bot (bot,
 Python) and every script that ships or runs it. Owner: Patrick (EvilPatrick06).
 
@@ -851,8 +860,15 @@ Two names are in no tracked file at all, code, tests, records, data,
 comes back: the multiplayer mod this build replaced (#497,
 `tests\test-old-name-gone.js`), and the SkyMP server `Thornswood-Content.esp`
 was salvaged from (#400, Patrick, 12 Oct: "no records may keep it";
-`tests\test-other-server-name-gone.js`). Say "the other server" in prose and
-OtherServer in a file, folder or code name.
+`tests\test-other-server-name-gone.js`), along with that server's two short
+forms, the prefix its editor ids, scripts and folders carried (Patrick,
+15 Oct, decision C). Say "the other server" in prose and OtherServer in a
+file, folder or code name. A check that has to find that server's leftovers
+on a machine matches them by their shape, never by its name: its parking
+folder in Data is `_disabledBy` and a name, its backup and plugin list
+beside the game are `<name>-backup-<version>` and `_<name>-plugins-off`
+(`scripts\release\Ship-Rules.ps1`, Test-ShipOtherServer), and any other file
+of its is simply not on the list of ours.
 
 No machine checks these, so the person writing keeps them: plain, direct
 sentences with no filler; the text inside code (the launcher's messages, the
@@ -1055,7 +1071,9 @@ from the board, none of these three puts an issue aside:
   until the folder exists (tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
-  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  the Downgrade's download; for a ship root, also from a folder that holds
+  that build's files byte for byte, checked file by file first, #2603),
+  Vortex's deployed files by Vortex's own record,
   and Thornswood's own files. Skyrim's own is the pinned build's file list,
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
@@ -1096,26 +1114,28 @@ from the board, none of these three puts an issue aside:
   (issue #440), along with the forwarding copies in `tools\`. The files a
   machine kept in `tools\` moved on 29 Sep (signing.json to `records\signing`,
   the setup stub to `out`, the rest to `local`) and the folder is gone.
-- The launcher builds with MSBuild from project files, and its code may be
-  newer C# once it does. Decided by Patrick on 11 Oct: option C on #498,
-  switch the build fully, and in his words "also we can lift the C# 5
-  rule". The C# 5 rule was always about the compiler, never the framework
-  (#499): the .NET Framework 4 csc that ships inside Windows, which
-  `scripts\release\Build-Launcher.ps1` still builds every release with,
-  understands nothing newer. So until the switch, launcher code
-  (`launcher\app`, and the setup program in `installer\setup`) still
-  compiles as C# 5: no string interpolation, no ?., no nameof, no
-  expression bodied members, no out var.
-  `launcher\app\Thornswood.csproj` and `installer\setup\Setup.csproj`
-  already build the same two exes with MSBuild
-  (`Build-Launcher.ps1 -With msbuild`, held to the csc build by
-  `tests\test-498-msbuild.ps1` in every build check). The switch makes that
-  the only build and, in the same pull request, moves `LangVersion` to the
-  newest the Build Tools compiler offers for .NET Framework 4.8.1, once
-  every machine that builds the launcher has MSBuild; #498 says which do not
-  yet. C# inside PowerShell scripts (`Add-Type`, which Windows PowerShell
-  5.1 compiles with the Framework compiler, as in
-  `scripts\dev\Check-Secrets.ps1`) stays C# 5 after the switch too.
+- The launcher builds with MSBuild from its project files, at C# 13.
+  Decided by Patrick on 11 Oct: option C on #498, switch the build fully,
+  and in his words "also we can lift the C# 5 rule"; the switch went in on
+  15 Oct, once the VPS build runners had the Build Tools (option A, 12 Oct).
+  `scripts\release\Build-Launcher.ps1` runs MSBuild on
+  `launcher\app\Thornswood.csproj` and `installer\setup\Setup.csproj` and
+  has no other way; the in-box .NET Framework 4 csc it used to call, and
+  the C# 5 limit that came with it (the rule was always about that compiler,
+  never the framework, #499), are gone. `LangVersion` in both project files
+  is 13.0, the newest the Visual Studio 2022 Build Tools compiler offers.
+  The runtime is still .NET Framework 4.8.1, so the C# features that need a
+  newer runtime compile but do not work here: default interface methods,
+  static abstract interface members, Index and Range (`^1`, `a..b`), and
+  `init` or `required` members, whose attribute types Framework lacks. The
+  harnesses compile launcher files with the same compiler at the same
+  version (`tests\Launcher-Csc.ps1`). C# inside PowerShell scripts
+  (`Add-Type`, which Windows PowerShell 5.1 compiles with the Framework
+  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5. So do the two
+  launcher files a script compiles that way: `launcher\app\Signature.cs`
+  (`Assert-PublishSigned.ps1`) and `launcher\app\VortexProfileState.cs`
+  (`scripts\mods\LoadOrder.ps1`); `tests\test-signer-check.ps1` and
+  `tests\test-vortex-profile-state.ps1` compile them at C# 5.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1272,6 +1292,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
     the whole point of those".
   - Work goes into a pull request the day it is done, never left on a
     pushed branch without one. That is how the two above were lost track of.
+  - A pull request held back on purpose (a freeze, a decision it waits on)
+    carries the `held` label, with the reason in its body, and the label
+    comes off the day it is let go (Patrick, 18 Oct, #1273). The nightly lists
+    a held pull request and does not count it; any other pull request open
+    more than two days turns the night red. A word in the title is not the
+    mark: the nightly reads the label only.
   - At the start of a session, and before anything is shipped, look at what
     is open: `gh pr list --state open` and `git ls-remote --heads origin`.
     Everything there other than main, the current `hotfix/` branch and work
@@ -1307,9 +1333,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher, the launcher compiles with the .NET
-  Framework csc, and on GitHub's runner the launcher built with MSBuild
-  from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
+  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher builds
+  with MSBuild from its project files, and that build is held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
@@ -1370,8 +1396,8 @@ this is the long form.
   when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
-  client built from the fork and recorded, the launcher build (MSBuild, and
-  C# 5 until the switch to it, #498), one complete release at a time: changing any of these starts as a few lines in #staff-general, agreed by the
+  client built from the fork and recorded, the launcher build (MSBuild from
+  the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-general, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
   machine touches them.
@@ -1413,16 +1439,16 @@ The machine that runs `Ship.ps1` still has to sign the build. [Setting up a mach
 
 ### The content plugin goes to the server first
 
-The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
 
 ```powershell
 .\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -Note "The forge takes the new ores
 - Iron and silver ore smelt at every forge."
 ```
 
-`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: the content plugin from your checkout, the others from the collection. It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
+`-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: our two plugins from your checkout, the others from the collection. `Thornswood-Last.esp` is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
 
-Ship asks the dev server which content plugin it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
+Ship asks the dev server which of our plugins it holds, by size and sha256. When this release would send clients another one, Ship stops before it publishes, posts or tells the server anything, and names the command above. On 11 Oct a dev Ship sent a new content plugin while the dev server still had the old one, and for eight minutes every dev client that updated held a plugin the server did not (#2308).
 
 ### Say so, then write the note
 
@@ -1484,8 +1510,11 @@ The machine that runs `Ship.ps1` still has to sign the build. `records\signing\s
 | Dev gamemode | `.\scripts\deploy\Deploy-DevGamemode.ps1` | Dev server only |
 | Live gamemode | `.\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly`, from any machine, needs no server build | Live server |
 | Live server build, or the live settings Deploy-Gamemode writes | `.\scripts\deploy\Deploy-Gamemode.ps1`, then `.\scripts\deploy\Deploy-Server.ps1`, from a machine with the fork built | Live server |
+| The server build your commit records, already in the store on the box, with the gamemode | `.\scripts\deploy\Deploy-Server.ps1 -FromStore` for live, `.\scripts\release\Publish-Server.ps1 -Channel dev -FromStore` for dev, from any machine | Live or dev server |
 
 `Deploy-Server.ps1 -GamemodeOnly` sends the committed `game\gamemode.js`, its build stamp, and `game\content\Thornswood-Content.esp` when the live server's copy is not the same size and sha256. The live server keeps its own settings, and no setting may change. Before anything is sent it asks the live server which server build it runs, and refuses unless that is the build `records\server-build.json` names at your commit. A gamemode that needs a new server build, or a change to the live settings (the load order, the NPC, gear, reloot and damage settings, the join pass and the role lists), goes the full way, from a machine with the build. `-PutBack` puts back what either one replaced. Decided by Patrick on 5 Oct, #1089: any machine may put a gamemode live this way.
+
+`-FromStore` (#459) puts the server build `records\server-build.json` names onto the server from the box's own store, where every publish and full deploy has kept the build it sent since #2467, so any machine can deploy a recorded engine. Before anything is sent the box says which build its store keeps for that record, and with none the run stops there; `-ServerBuild <zip>` sends one first, such as the one the engine build in CI made, held to the record on both sides. The server keeps its own settings, load order and start point, so it is the engine and the gamemode that move. An engine that reads light plugins another way than the running one is refused, because the order it keeps would then mean something else; that one goes the full way.
 
 A dev release can run from any branch on any developer's machine. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub. The note shape is in [Say so, then write the note](#say-so-then-write-the-note). The command for each file is in [After a pull request is merged](#after-a-pull-request-is-merged). The restart warning is in [How a release goes out](#how-a-release-goes-out).
 
@@ -1515,13 +1544,13 @@ git pull
 
 ### The content plugin goes to the live server first
 
-When `game\content\Thornswood-Content.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
+When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last main release, the live server gets it before the Ship, from `main` after `git pull`:
 
 ```powershell
 .\scripts\deploy\Deploy-Server.ps1 -GamemodeOnly
 ```
 
-It sends the committed gamemode and the content plugin whenever the live server's copy is not the same size and sha256. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
+It sends the committed gamemode and our two plugins whenever the live server's copy is not the same size and sha256. The first time the live load order has to gain `Thornswood-Last.esp` as its last plugin, `-GamemodeOnly` refuses, because it changes no setting; that release goes the full way, `Deploy-Gamemode.ps1` then `Deploy-Server.ps1`. A main Ship asks the live server the same question and stops, with nothing published, posted or told to a server, while the answer is another plugin.
 
 ### Ship main
 
@@ -1737,7 +1766,7 @@ release, launcher, game files and server together, are in How work moves.
 | Source repo | github.com/EvilPatrick06/Thornswood (private), clone at `C:\Users\<you>\Downloads\Thornswood-Repo` | Launcher source, plugins, site, bot, every script |
 | Feed store | On the VPS beside the feed the site serves: `C:\Thornswood-Docs\feed\{version.json, published.json, launchers.txt, history\}` and the same under `feed-dev`. Each machine's working copy is `%LOCALAPPDATA%\Thornswood\feed\main` and `\dev` | `version.json` (the feed, served at `/feed[-dev]/version.json`), `published.json` (the pack baseline), every launcher version the channel published, and each replaced file, none of those three served. Ship receives and sends them through `scripts\release\Feed-Store.ps1` (#907). Until then they were the `Thornswood-Releases` GitHub repository and its two clones |
 | Downloads | On the VPS, `C:\Thornswood-Docs\feed\assets` and `feed-dev\assets`, served at `https://thornswood.net/feed[-dev]/assets/<sha256>` | Every pack, launcher exe and client runtime a feed names, one file per sha256, one folder per channel (`docs\FEED.md` "Downloads come from the site") |
-| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with the .NET Framework 4 csc, so C# 5, until the build moves to MSBuild and `launcher\app\Thornswood.csproj` (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
+| Launcher | `launcher\app\*.cs` + `launcher\ui.xaml`, built by `scripts\release\Build-Launcher.ps1` with MSBuild from `launcher\app\Thornswood.csproj`, C# 13 (#498) | WPF app at `<drive>:\Thornswood\Launcher\Thornswood.exe` (C: on most machines); profile, config and packs under that folder. The scripts find the install on whichever fixed drive holds it; `-Root` overrides |
 | Dev build | `<drive>:\Thornswood-DevBuild`, beside the main install, put there by the main launcher's Play page Server dropdown | Same exe, `config.json` says `Channel: dev`, `UpdateBranch: dev`, port 7787, voice 7789. Staff roles only (Owner, Dev, Gamemaster, Moderator, Loremaster) |
 | Game | `<Root>\Game`, Thornswood's own folder, which the launcher builds from the Steam copy of Skyrim Special Edition and what Vortex deployed from the Nexus collection (see One Skyrim of its own) | The launcher will not Play from the Steam copy itself. Thornswood's own loose files live in `Data\Platform` (plugins in `Plugins\thornswood-*.js`, page in `UI\`) and `Data\SKSE\Plugins\Thornswood.ini` |
 | Plugins | `game\plugins\thornswood-{front,emotes,mark,voice}.js`, UI in `game\ui` | Skyrim Platform JavaScript. Idle unless the client points at our server and the launcher left a fresh session note |
@@ -1932,6 +1961,44 @@ Vortex deploys files of the same names. Ship and `Check-ShipReady.ps1` stop
 when that record is missing or stale: the mod list, a file either tool reads,
 `records\generated.json`, or a built file changed since. The fix is to run it
 again.
+
+**The folder a release is built from (issue #2019).** Each channel's ship root
+(`Where.ps1 ShipRoot` and `ShipRootDev`, recorded by `Setup-ShipMachine.ps1
+-Root`) is a launcher install whose launcher is never started: Patrick's own
+installs stay apart from the build folders, so he has the same files as
+everybody else. So every Ship first runs `scripts\release\Update-ShipRoot.ps1`,
+which builds `Thornswood-ShipRoot.exe` from `scripts\release\ShipRoot`
+(all of `launcher\app` with its own entry point, so OwnGame has one
+implementation) and runs OwnGame's own Make or Refresh on the root: a new root
+takes Thornswood's own files of the channel's release from its feed, as an
+install does, and a root made at older rules or from another folder is brought
+up to date with Vortex's deployment. Then the recorded client goes in from the
+engine build (`engine\README.md` "One engine"), and the Ship stops with a
+sentence, before anything is built or published, when either step cannot be
+done. Main has its own root (`local\release-main` on One), so no Ship packs
+`C:\Thornswood`. After a refresh that changed the bodies' or the animations'
+sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
+`tests\test-2019-ship-roots.ps1` holds it.
+
+A new root takes the game's own files from the Steam copy only when that copy
+is on 1.6.1170, and an install's other way, the Downgrade, is a Steam
+download under the person's own account that a script cannot run. One's
+Steam copy is not on it since 16 Oct (another `bink2w64.dll` and
+`Dawnguard.esm`, and the Anniversary Edition's Creation Club files), so
+`-SkyrimFrom` on `Setup-ShipMachine.ps1` or `Update-ShipRoot.ps1` names a
+folder that holds them, such as the other root's `Game` (#2603):
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+```
+
+Every one of the game's own files the new folder takes is checked against
+`records\skyrim-files.json` by size and SHA-1, the archives too, before
+anything is placed, and the root is not made when one is missing or
+different; the sentence names it. They are copied, never linked, so the two
+roots share no file, and Make stops if one of them changed while it worked.
+`made.txt` names the folder on its `skyrim=` line. Only the ship root tool
+does this: an install's way to 1.6.1170's own files stays the Downgrade.
 
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made
@@ -2252,7 +2319,7 @@ In the main launcher, on the Play page, open the Server dropdown and choose Dev.
 .\scripts\release\Check-ShipReady.ps1 -Channel dev
 ```
 
-That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
+That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build, unless the folder was named with `-Root` or recorded with Setup-ShipMachine.ps1 (#2662). The publish steps are [section 3](#3-how-to-release-to-dev).
 
 #### The Play page
 
@@ -2478,11 +2545,11 @@ These are part of a normal week and do not each need a letter of their own. Pyth
 
 #### Python
 
-The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
+The bot scripts need Python 3.11 or newer (the bot runs on 3.12; Pillow 13 needs 3.11) with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
 
 #### The .NET Framework
 
-Launcher code is C#, built today with the .NET Framework 4 compiler that ships inside Windows, which stops at C# 5. The build is moving to MSBuild and `launcher\app\Thornswood.csproj` (#498); newer C# is allowed from that switch, by Patrick's decision of 11 Oct, and C# inside PowerShell scripts stays C# 5. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
+Launcher code is C# 13, built with MSBuild from `launcher\app\Thornswood.csproj` (#498, switched 15 Oct, by Patrick's decision of 11 Oct); the runtime is .NET Framework 4.8.1, so features that need a newer runtime are out (the list is under "Settled design"), and C# inside PowerShell scripts stays C# 5. The window is `launcher\ui.xaml`. How the launcher starts is `launcher\app\ARCHITECTURE.md`. The six shared files in `launcher\app` are named in [D. Visual Studio Code](#d-visual-studio-code).
 
 #### SkyMP
 

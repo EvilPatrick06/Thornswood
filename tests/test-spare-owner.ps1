@@ -21,8 +21,8 @@
 
   So Chars.EnsureSpare writes down which account a spare was minted under and
   mints a fresh one when the install is linked to another. This compiles the
-  real Chars.cs and Slots.cs with the .NET Framework 4 csc the launcher is
-  built with, so it is also a C# 5 check on both, against stand-ins for what
+  real Chars.cs and Slots.cs with the compiler the launcher is built with
+  (tests\Launcher-Csc.ps1), against stand-ins for what
   they call. Discord.AccountIdOf and the Field it reads with are lifted out of
   the real Discord.cs by brace match, so the ticket is read the way the
   launcher reads it. test-play-join.js is the site's half.
@@ -33,6 +33,7 @@
 param([string]$CharsPath, [string]$SlotsPath, [string]$DiscordPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $CharsPath) { $CharsPath = Join-Path $Here '..\launcher\app\Chars.cs' }
@@ -51,26 +52,12 @@ function Done {
     if ($script:fail) { exit 1 } else { exit 0 }
 }
 
-# ---- the compiler the launcher is built with --------------------------------
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) {
-    Write-Host 'SKIP  no .NET Framework 4 csc on this machine, so Chars.cs cannot be compiled here'
-    Done
-}
-$fw = Split-Path -Parent $csc
-$refs = @(
-    (Join-Path $fw 'System.dll'),
-    (Join-Path $fw 'System.Core.dll')
-)
-foreach ($r in $refs) {
-    if (-not (Test-Path -LiteralPath $r)) {
-        Write-Host "SKIP  $r is missing, so Chars.cs cannot be compiled here"
-        Done
-    }
-}
+# ---- the compiler the launcher is built with (tests\Launcher-Csc.ps1) -------
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+$refs = @('System.dll', 'System.Core.dll') | ForEach-Object { Join-Path $LauncherRefDir $_ }
+foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
+if (@($refs | Where-Object { -not (Test-Path -LiteralPath $_) }).Count) { Done }
 
 # ---- the real ticket reading, out of Discord.cs -----------------------------
 $discordSrc = Get-Content -LiteralPath $DiscordPath -Raw
@@ -356,17 +343,16 @@ try {
     $exe = Join-Path $tmp 'spare-owner-test.exe'
     $work = Join-Path $tmp 'install'
 
-    # /noconfig for the same reason Build-Launcher.ps1 gives: csc.rsp adds its
-    # own copies of the framework and a machine with the reference assemblies
-    # installed stops on CS1703.
+    # /noconfig, as the build does: csc.rsp adds its own copies of the
+    # framework, and beside the reference assemblies that stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     $cscArgs += (Resolve-Path -LiteralPath $CharsPath).Path
     $cscArgs += (Resolve-Path -LiteralPath $SlotsPath).Path
     $cscArgs += $driverFile
-    $compiled = & $csc @cscArgs
+    $compiled = & $LauncherCsc @cscArgs
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'Chars.cs and the lifted ticket reading compile with the .NET Framework 4 csc, which is C# 5' $built
+    Yes 'Chars.cs and the lifted ticket reading compile with the compiler the build runs' $built
     if (-not $built) {
         foreach ($l in @($compiled)) { Write-Host "      $l" }
         Done

@@ -50,6 +50,7 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
     if (-not (Test-Path -LiteralPath $winps)) {
@@ -139,50 +140,22 @@ Yes 'node is on PATH, for the copy of the site' ($null -ne $node)
 if ($null -eq $node) { Done }
 
 # ---- the launcher, compiled, as test-record-sync.ps1 does it ----------------------
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-       Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
-        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
-               Sort-Object FullName -Descending | Select-Object -First 1
-        if ($hit) { return $hit.FullName }
-    }
-    return $null
-}
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\release\Build-Launcher.ps1'), [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) | ForEach-Object { $_.Value })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @(); $missing = @()
-foreach ($n in @(ListIn 'needed')) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
-foreach ($n in @(ListIn 'wv2Managed')) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
-Yes ('every reference Build-Launcher.ps1 names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
+foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+foreach ($n in @($LauncherWv2Managed)) { $p = Join-Path $repo "launcher\lib\webview2\$n"; if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n } }
+Yes ('every reference Thornswood.csproj names is here' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0 -and $refs.Count -gt 5)
 if ($missing.Count) { Done }
 New-Item -ItemType Directory -Force -Path $T | Out-Null
 $dll = Join-Path $T 'Thornswood.dll'
-$cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', '/langversion:5', "/out:$dll")
+$cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$dll")
 foreach ($r in $refs) { $cscArgs += "/reference:$r" }
 foreach ($f in @(Get-ChildItem (Join-Path $app '*.cs') -File)) { $cscArgs += $f.FullName }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$said = & $csc @cscArgs 2>&1
+$said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
-Yes 'the launcher compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
+Yes 'the launcher compiles with the compiler the build runs' ((Test-Path -LiteralPath $dll) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $dll)) { foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 10)) { Write-Host "      $l" }; Done }
 $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
 $U = $asm.GetType('Thornswood.Updater'); $P = $asm.GetType('Thornswood.Paths'); $VD = $asm.GetType('Thornswood.VersionDoc')
@@ -318,8 +291,11 @@ $devDoc = [ordered]@{
     release = [ordered]@{ id = $IR3; channel = 'dev'; packs = @($PD); baseline = $IR3 }
 }
 $mainDoc = [ordered]@{ launcherVersion = '1.1.102'; launcherUrl = ''; launcherSha256 = ''; message = ''; news = @(); packs = @($mainPacks) }
-Put (Join-Path $site 'feed-dev\version.json') ($devDoc | ConvertTo-Json -Depth 6)
-Put (Join-Path $site 'feed\version.json') ($mainDoc | ConvertTo-Json -Depth 6)
+# Each feed is the first of its write-once generations, version\<8 digits>.json
+# in its channel's folder; the newest is the feed (#2727, Feed-Store.ps1).
+Put (Join-Path $site 'feed-dev\version\00000001.json') ($devDoc | ConvertTo-Json -Depth 6)
+Put (Join-Path $site 'feed\version\00000001.json') ($mainDoc | ConvertTo-Json -Depth 6)
+$devSeedSha = Get-BaselineFileSha (Join-Path $site 'feed-dev\version\00000001.json')
 Copy-Item -LiteralPath $rec['R3'].File -Destination (Join-Path $site 'feed-dev\published.json')
 # Main's baseline from before the feed named one: sizes and file times.
 Put (Join-Path $site 'feed\published.json') (@{ 'Data\Platform\UI\ours.esp' = '8:639260000000000000'; 'CreationKit.exe' = '16:639260534800000000'; 'Data\DialogueViews\0001.xml' = '15:1'; ':order:plugins' = 'abc'
@@ -331,7 +307,7 @@ if ($why) { Write-Host "      $why"; Done }
 
 # ---- installs, the launcher's own code ----------------------------------------------
 function Raw($x) { if ($x -is [Management.Automation.PSObject]) { return $x.PSObject.BaseObject }; return $x }
-function Parse-Feed([string]$prefix) { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $site "$prefix\version.json")))))) }
+function Parse-Feed([string]$prefix) { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Get-FeedVersionFile (Join-Path $site $prefix))))))) }
 function Pending-Of($v) { $a = New-Object 'object[]' 1; $a[0] = (Raw $v); return @($mPending.Invoke($null, $a) | ForEach-Object { Raw $_ }) }
 function New-Install([string]$name) {
     $root = Join-Path $T "inst\$name"
@@ -439,7 +415,7 @@ function Zip-Text([string]$zip, [string]$name) {
     try { $e = $z.GetEntry($name); if ($null -eq $e) { return $null }; $r = New-Object IO.StreamReader($e.Open()); try { return $r.ReadToEnd() } finally { $r.Dispose() } }
     finally { $z.Dispose() }
 }
-function Feed([string]$prefix) { return Read-Json (Join-Path $site "$prefix\version.json") }
+function Feed([string]$prefix) { return Read-Json (Get-FeedVersionFile (Join-Path $site $prefix)) }
 function Pack-Of($doc, [string]$id) { return @($doc.packs | Where-Object { $_.id -eq $id })[0] }
 
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -DryRun'
@@ -527,7 +503,13 @@ Yes 'the old records are off the site' (-not (Test-Path -LiteralPath (Join-Path 
 Yes '  and so is IED.psc, which only they named' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $ied))))
 Yes '  and the join pass and the mod menu settings they named, which went up loose' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $passText))) -and -not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $mcmText))))
 Yes '  while every file the new records name is still there' (@((Get-RecordFileShas $nR3).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $da $_)) }).Count -eq 0)
-Yes 'the feed store kept the feed it replaced in its history' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -Filter '*-version.json').Count -ge 1)
+# The feed's generations are its history: the one it replaced is still there,
+# unchanged, beside the newer, and history\ holds no copy of it.
+$gens = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\version') -File | Sort-Object Name)
+Yes ('the feed store kept the feed it replaced, unchanged, as the generation before ({0})' -f (($gens | ForEach-Object { $_.Name }) -join ', ')) (
+    $gens.Count -ge 2 -and $gens[0].Name -eq '00000001.json' -and (Get-BaselineFileSha $gens[0].FullName) -eq $devSeedSha -and
+    (Get-FeedVersionFile (Join-Path $site 'feed-dev')) -eq $gens[$gens.Count - 1].FullName -and
+    @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -Filter '*-version.json' -ErrorAction SilentlyContinue).Count -eq 0)
 
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel main'
 $r = Scrub 'main' @()
@@ -563,7 +545,7 @@ Write-Host ''; Write-Host 'a second run'
 $snap = Snapshot
 $r1 = Scrub 'dev' @(); $r2 = Scrub 'main' @()
 Yes 'finds nothing on either feed and changes nothing' ($r1.Code -eq 0 -and $r2.Code -eq 0 -and $r1.Out -match 'Nothing on the dev feed names' -and $r2.Out -match 'Nothing on the main feed names' -and
-    (@($snap.Keys | Where-Object { (Snapshot)[$_] -ne $snap[$_] }).Count -eq 0))
+    (@($snap.Keys | Where-Object { (Snapshot)[$_] -ne $snap[$_] }).Count -eq 0) -and (Snapshot).Count -eq $snap.Count)
 
 # ---- installs after it ---------------------------------------------------------------
 Write-Host ''; Write-Host 'installs after the scrub'
@@ -612,11 +594,38 @@ Yes '  and its record names none of Bethesda''s or one machine''s files' (@($rbR
 [void](Update $synced 'feed-dev')
 Yes '  and the synced install follows it to the older texture' ((Get-Game $synced)['Data\Platform\textures\ours.dds'] -eq 'a texture of ours, older')
 
+# ---- a baseline the other feed names that does not read (#2711) ------------------------
+# Before it deletes, a run reads both feeds' baselines for the files their
+# records name. The other feed's was read in a try with an empty catch, so a
+# pointer that did not read left those files unnamed, and they went. Now the
+# run stops there, before anything is deleted.
+Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev, with the main feed''s baseline unreadable'
+# The main feed changes the way the store sends one: as its next generation (#2727).
+$mainChan = Join-Path $site 'feed'
+$mainFeedWas = [IO.File]::ReadAllText((Get-FeedVersionFile $mainChan))
+$ledgerPath = Join-Path $work 'scrub-ledger.json'
+$ledgerWas = $(if (Test-Path -LiteralPath $ledgerPath) { [IO.File]::ReadAllText($ledgerPath) } else { $null })
+$stray = Put-Text $da 'a file only a ledger names, while the main baseline does not read'
+$led = [ordered]@{}
+if ($ledgerWas) { foreach ($p in (ConvertFrom-Json $ledgerWas).PSObject.Properties) { $led[$p.Name] = [string]$p.Value } }
+$led[$stray] = 'stand-in for a replaced file'
+[IO.File]::WriteAllText($ledgerPath, ($led | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding($false)))
+$mf = ConvertFrom-Json $mainFeedWas
+if ($mf.PSObject.Properties['baseline']) { $mf.baseline = [pscustomobject]@{ id = 'no-sha-no-url' } }
+else { $mf | Add-Member -NotePropertyName 'baseline' -NotePropertyValue ([pscustomobject]@{ id = 'no-sha-no-url' }) }
+[IO.File]::WriteAllText((Join-Path (Join-Path $mainChan 'version') (Get-FeedVersionNext $mainChan)), ($mf | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+$r = Scrub 'dev' @()
+Yes 'the run stops, saying the main feed''s baseline does not read' ($r.Code -ne 0 -and $r.Out -match 'The main feed names a baseline that does not read' -and $r.Out -match 'Nothing was deleted')
+Yes '  and deletes nothing' (Test-Path -LiteralPath (Join-Path $da $stray))
+[IO.File]::WriteAllText((Join-Path (Join-Path $mainChan 'version') (Get-FeedVersionNext $mainChan)), $mainFeedWas, (New-Object Text.UTF8Encoding($false)))
+if ($null -ne $ledgerWas) { [IO.File]::WriteAllText($ledgerPath, $ledgerWas, (New-Object Text.UTF8Encoding($false))) } else { Remove-Item -LiteralPath $ledgerPath -Force }
+Remove-Item -LiteralPath (Join-Path $da $stray) -Force
+
 # ---- the delete itself -----------------------------------------------------------------
 Write-Host ''; Write-Host 'Remove-FeedStoreAssets'
 $loose = Put-Text $da 'a stray file nothing names'
 $named = [string]$db.baseline.sha256
-$now = @{ main = (Get-BaselineFileSha (Join-Path $site 'feed\version.json')); dev = (Get-BaselineFileSha (Join-Path $site 'feed-dev\version.json')) }
+$now = @{ main = (Get-BaselineFileSha (Get-FeedVersionFile (Join-Path $site 'feed'))); dev = (Get-BaselineFileSha (Get-FeedVersionFile (Join-Path $site 'feed-dev'))) }
 $why = ''
 try { [void](Remove-FeedStoreAssets dev @($loose) @{ main = $now.main; dev = ('0' * 64) } -SiteDir $site) } catch { $why = $_.Exception.Message }
 Yes 'a delete refuses when a feed moved since it was read, and deletes nothing' ($why -match 'changed on the VPS' -and (Test-Path -LiteralPath (Join-Path $da $loose)))
@@ -636,7 +645,22 @@ $scrubPath = Join-Path $repo 'scripts\release\Scrub-Feed.ps1'
 $tk = $null; $er = $null
 $sast = [System.Management.Automation.Language.Parser]::ParseFile($scrubPath, [ref]$tk, [ref]$er)
 $own = @($sast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
-$loaded = @([regex]::Matches([IO.File]::ReadAllText($scrubPath), "(?m)^\. \(Join-Path \`$Here '([^']+)'\)") | ForEach-Object { $_.Groups[1].Value })
+# What it loads, and what each of those loads at its own top level, all the
+# way down: a function a loaded file brings in with it is loaded too.
+# Write-FeedVersionFile is the case (#1050, #2450): Feed-Store.ps1, which
+# Scrub-Feed loads, loads Feed-Json.ps1 that defines it, so counting only the
+# files Scrub-Feed names itself failed on something that works. Only lines at
+# column 0 count; an indented load is inside a function and may never run.
+$loadRx = "(?m)^\. \(Join-Path \`$(?:Here|PSScriptRoot) '([^'\\]+\.ps1)'\)"
+$loaded = @()
+$queue = @([regex]::Matches([IO.File]::ReadAllText($scrubPath), $loadRx) | ForEach-Object { $_.Groups[1].Value })
+while ($queue.Count) {
+    $next = $queue[0]; $queue = @($queue | Select-Object -Skip 1)
+    if ($loaded -contains $next) { continue }
+    $loaded += $next
+    $lp = Join-Path $repo ('scripts\release\' + $next)
+    if (Test-Path -LiteralPath $lp) { $queue += @([regex]::Matches([IO.File]::ReadAllText($lp), $loadRx) | ForEach-Object { $_.Groups[1].Value }) }
+}
 $definedIn = @{}
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $repo 'scripts\release') -Filter '*.ps1' -File)) {
     $t2 = $null; $e2 = $null

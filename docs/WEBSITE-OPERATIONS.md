@@ -41,14 +41,15 @@ verification provider needs its own necessity, retention and security review.
 
 | Asset | Existing evidence | Status |
 | --- | --- | --- |
-| `site/public/logo.png`, `favicon.ico`, `og.png` | Current branded files are tracked in the repository. | Creator, original licence and permission for public/promotional use remain unconfirmed. |
-| `site/public/banner.jpg`, `banner.mp4`, `banner.webm` | Current homepage art and animation are tracked in the repository. | Original source and rights to any underlying artwork, footage and animation remain unconfirmed. |
+| `site/public/logo.png`, `favicon.ico`, `og.png` | Current branded files are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSE` (Patrick, 15 Oct 2026, #2177). |
+| `site/public/banner.jpg`, `banner.mp4`, `banner.webm` | Current homepage art and animation are tracked in the repository. | Djinn made them for Thornswood, under the contributor terms in `LICENSE` (Patrick, 15 Oct 2026, #2177). |
 | Cinzel and Spectral font files | `site/public/fonts.css` identifies the authors, upstream projects and SIL Open Font License 1.1. | Preserve the licence notices with the distributed files. |
 | Community gallery media | Signed-in submissions, captions and moderation records; publication permissions described in Terms. | Staff must check permission and privacy before approving each submission. Submission alone is not proof of ownership of third-party material. |
 
 The register is `records/asset-provenance.json` (#2177), held to the files by
-`tests/test-asset-provenance.js` on every pull request; it records what is
-still unconfirmed for each asset above and who can answer.
+`tests/test-asset-provenance.js` on every pull request; it records who made
+each asset above, on what terms, and, for anything still unconfirmed, who can
+answer.
 
 For each brand asset, keep creator/source, permission or licence, permitted
 uses, attribution requirements, approval date and the file hash together.
@@ -74,12 +75,132 @@ the omission policy does not remove storage costs. A successful backup task
 is not proof of recovery; periodically run the existing encrypted check and
 rehearse recovery into a restricted disposable destination.
 
-Keep completed deletion requests in restricted staff records with only the
-identity and action needed to reapply them. Before restoring an older backup,
-apply those deletions before reopening service. Do not restore deleted
-gallery content into public use. Old encrypted recovery copies expire under
-the documented retention schedule rather than being silently advertised as
-immediately rewritten. Verify the local key copy exists without printing it.
+Completed deletion requests are kept in a restricted record with only the
+identity and action needed to reapply them (Deletion requests, below).
+Before restoring an older backup, those deletions are applied again before
+service reopens. Do not restore deleted gallery content into public use. Old
+encrypted recovery copies expire under the documented retention schedule
+rather than being silently advertised as immediately rewritten. Verify the
+local key copy exists without printing it.
+
+## Deletion requests
+
+The privacy page promises that somebody who asks in the Discord has their
+Discord link, session records, chat and character deleted, by a person, and
+is told when it is done. `scripts\vps\Delete-Person.ps1` is the one action
+that does it across every store on the box (issue #2351, decided by Patrick
+on 12 October 2026). Any staff member with VPS access runs it, from their own
+clone, in PowerShell 7.
+
+1. **The request comes from the account itself**, in a private ticket that
+   account opened (**I need help** in the Discord). Never act on a request
+   about somebody else's account. Do not ask for a government identity
+   document.
+2. **Their Discord id**: on the hub's Linked accounts page, or in Discord
+   with Developer Mode on, right click the person and Copy User ID. It is 17
+   to 20 digits.
+3. **The dry run** changes nothing and prints, for every store, how many of
+   their records are there, which a real run removes and which it keeps:
+   ```powershell
+   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id>'
+   ```
+   It ends `DRY RUN: nothing was changed` and names the services that take
+   the rest out of their own files as each next starts. Its `release` lines
+   count what the game's registers say about their characters (a house, a
+   farm, an office, a post on a board, a place on a roll or in a book, a
+   dungeon chest's record): the game server lets go of those itself as it
+   starts (below). A `waiting` line names a service that still has a request
+   for them from an earlier real run.
+4. **A faction or business book they own** is disbanded when the game
+   server lets go of their character, with its members' place in it. If the
+   dry run counts one (`faction and business books they own`) and the group
+   wants to keep it, a staff member hands it to another member in the game
+   first (Hand it on, on the book's tab, which only staff see), then runs the dry run
+   again.
+5. **The real run**, at any time; it stops nothing and drops nobody (issue
+   #2758, Patrick, 18 October 2026: "it should not restart everytime we want
+   to delete a person it should just fully apply the rest upon a server
+   restart"):
+   ```powershell
+   .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id> -Delete -By <your name>'
+   ```
+   It removes their records at once from every copy nothing runs from (the
+   folders a restore, a wipe, an install or a reset set aside), writes the
+   request into each service that holds something of theirs, and ends
+   `RECORDED, and written down in C:\Thornswood-Deletions\requests.jsonl`
+   with the services it asked. `NOT FINISHED` names a file it could not
+   change; run it again. Each service takes the request out of its own
+   files the next time it starts, before anything of theirs is open, and
+   says so in its own log with counts and never a name or a number:
+   - **the site** (`site.log`, `deletion requests:`) removes their link, rules
+     answer, sign-ins, sessions with their logs and alerts, roster rows,
+     tickets and gallery pictures;
+   - **each game server**: `server-log.js`, which its task starts it under,
+     deletes their characters' saves and takes them off the card, mod menu,
+     take count and last-left files before the engine starts (`server.log`,
+     `deletions:`); then the gamemode lets go of every entry the game's
+     registers hold through that register's own rule (issue #2351, Patrick's
+     option A of 16 October): their house and farm are free, an office their
+     character held ends, their posts come down with their words off, a job
+     they had taken goes back on the board, they leave every roll and book,
+     the bed nights end, and the drop box and the ledgers keep every coin and
+     every line with their name off it (`thornswood.log`, `release:`, ending
+     `every part is done, and the list is gone`). A save the server had not
+     finished when it last stopped, holding one of their characters, is
+     replayed by the engine first, so their saves go at the start after;
+   - **voice** (`voice.log`, `deletions:`) takes their chat lines out of every
+     day, except the ones inside a session staff kept;
+   - **the bot** (`bot.log`, `deletion requests:`) forgets their join number
+     and open ticket.
+
+   Nothing restarts on a schedule: a service starts again at a deploy or an
+   install of its own, after a crash and after a reboot. In October 2026 that
+   was about a day for the game servers and the site, and up to a week for
+   voice and the bot. Until then that service's copy still holds their
+   records. To see what still waits, run the dry run again: each `waiting`
+   line is a service that has not started since. When the person should not
+   wait, restart that service in a quiet hour (`Request-Restart` for a game
+   server, or its own deploy).
+6. **What the run cannot find**, by hand: a gallery picture of theirs
+   approved before 16 October 2026, removed in the hub by name. Until then the
+   site kept no account with a picture once it was approved, so nothing ties
+   those to them; the run finds every one sent since.
+7. **Tell them** in the ticket once the dry run shows nothing `waiting`, that
+   it is done, and what stays: staff's
+   records about them (bans, PKs, notes, the staff logs), reports they made or
+   that were made about them, and a session staff marked kept. In the game,
+   what somebody else wrote naming their character (a letter addressed to
+   them, a thing left in a drop box for them) is that person's and stays,
+   and gold that was held for them on a hold's ledger stays with the hold.
+   Logs age out by their own rule, and the encrypted backups expire on their
+   schedule; the record below is why a restore never brings the person back.
+8. **Then delete their ticket threads** in the Discord, which is the last
+   place on our side that holds what they wrote.
+
+**The record.** `C:\Thornswood-Deletions\requests.jsonl` on the box, one line
+for each request, written when it is made: the Discord id, the profile ids,
+when, who ran it, how many records each store held and which services it
+asked. Nothing else about the person. The
+folder is SYSTEM's and Administrators' only, with read for the nightly
+backup's own task (#2833). The nightly backup takes it as
+`deletions\requests.jsonl`, so it leaves the box with every backup and comes
+back with any of them. A request made after the last backup is only on the
+box until the next nightly run.
+
+**After a restore**, before anything starts, `Delete-Person.ps1 -Reapply`
+removes everybody in the record again from every copy nothing runs from, and
+asks every service again, so each takes them out of its restored files as it
+starts. `Restore-Box.ps1` does it as its last step;
+[RESTORING.md](RESTORING.md) has the commands for every other restore,
+putting back a folder an install or a wipe set aside among them.
+
+**What the game does not let go of yet.** The guild traders' ledger
+(`private\merchant-ledger.json`) keys a supply wait, and a trade still waiting
+on a character, by that character's form id and profile; the dry run counts
+those as `left`. The merchant code is the work on #1373, and #2351 says what
+its release has to do. A crop they sowed stays in the ground with their
+number as the one who sowed it, which nobody holds any more; whoever brings
+it in empties it, and a wipe takes it.
 
 ## Accessibility scope
 

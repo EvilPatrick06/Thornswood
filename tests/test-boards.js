@@ -232,7 +232,7 @@ if (block !== null) {
         flat.indexOf("SOLITUDE'S X WAS MISSING A DIGIT") !== -1 &&
         flat.indexOf('-64263') !== -1);
     yes('S6 and the seeding number moved with it, or nothing in the world would change',
-        /var BOARD_SEED = 4;/.test(src));
+        Number((/var BOARD_SEED = (\d+);/.exec(src) || [])[1]) >= 4);
     yes('the hold box is that town\'s notice board',
         /function holdStanding\(actorId\) \{[\s\S]*?boardHere\(actorId\)/.test(src));
     yes('S6 and a steward placing a board marks it so a deploy cannot undo it',
@@ -257,9 +257,11 @@ if (block !== null) {
         src.indexOf("var BOARD_BASE_DESC = '593b:Thornswood-Content.esp';") !== -1 &&
         /function standBoard\(hold, anchor\)/.test(src) &&
         front.indexOf('0x593B') === -1 && front.indexOf('ensureBoards') === -1);
+    // Make a post sends a notice or a job with its title and body (#2554).
     yes('the panel is how a notice, a job, and a price list go up',
-        page.indexOf("net('/notice ") !== -1 &&
-        page.indexOf("net('/job ") !== -1 &&
+        page.indexOf("line = '/notice ' + slashTitle(title)") !== -1 &&
+        page.indexOf("line = '/job ' + Number(reward) + ' ' + slashTitle(title)") !== -1 &&
+        page.indexOf("net('/job done ") !== -1 &&
         page.indexOf("net('/take ") !== -1 &&
         page.indexOf("net('/unpin ") !== -1 &&
         page.indexOf("net('/dropjob ") !== -1 &&

@@ -118,9 +118,11 @@ MADE.forEach(function (m) {
       JSON.stringify(ins) === JSON.stringify(m.inputs) && injury.indexOf(m.words) !== -1);
   yes('and $RECIPE_OWNER names it to ' + m.owner.join('/') + ', so the rebuilt table gates it',
       new RegExp("'" + m.edid + "'\\s*=\\s*@\\{ Owner = '" + m.owner[0] + "'; Half = '" + m.owner[1] + "'").test(recipeTable));
+  // Written by the tool from its own numbers (#2553): a writer call with the
+  // record's constant and its editor id.
   yes('and Add-ContentRecords.py is what adds both records',
-      adder.indexOf("('" + m.edid + "', ") !== -1 &&
-      adder.indexOf("('" + m.edid.replace('Recipe', 'Misc') + "', ") !== -1);
+      new RegExp("\\(\\s*[A-Z_]+,\\s*'" + m.edid + "',").test(adder) &&
+      new RegExp("\\(\\s*[A-Z_]+,\\s*'" + m.edid.replace('Recipe', 'Misc') + "',").test(adder));
 });
 yes('the loom is named through Update.esm, this plugin\'s master 01, as the injected MCE_CraftingLoom 6ce000',
     plugin.masters[1] === 'Update.esm' && /'6ce000:Update\.esm': 'the loom'/.test(src));

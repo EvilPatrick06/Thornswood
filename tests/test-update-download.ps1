@@ -23,8 +23,8 @@
                             the applied.txt bookkeeping the rollback leans on
 
   Each method is lifted out of the real Updater.cs (the brace-matched body,
-  the way test-play-stuck-game.ps1 does it) and compiled with the .NET
-  Framework csc as C# 5, the way Build-Launcher.ps1 compiles the launcher,
+  the way test-play-stuck-game.ps1 does it) and compiled with the compiler and
+  the C# version the build uses (tests\Launcher-Csc.ps1),
   beside stand-ins for Paths, PlayProgress, Swallow, Signature, VersionDoc,
   Install and SyncRecord. Downloads come from a stand-in WebClient that hands
   back scripted bytes, so nothing touches the network, and TMP points at a
@@ -37,6 +37,7 @@
 param([string]$AppDir)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -89,7 +90,9 @@ $sigs = @(
     'public static void ApplyPack(Config cfg, Pack p, Action<string> log)',
     'public static int Requeue()',
     'static void CheckSigner(string path, Action<string> log)',
-    'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)'
+    'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)',
+    'public static string FetchLauncher(Config cfg, VersionDoc v, Action<string> log)',
+    'public static void SwapIn(string tmp, Action<string> log)'
 )
 $bodies = @()
 foreach ($sig in $sigs) {
@@ -104,10 +107,8 @@ foreach ($c in @('const string CacheMagic', 'const string ListHeader')) {
 }
 if ($script:fail) { Done }
 
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-    Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-update-dl-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -477,8 +478,8 @@ namespace Thornswood
 $src = Join-Path $tmp 'drive.cs'
 [IO.File]::WriteAllText($src, $driver.Replace('/*BODIES*/', ($bodies -join "`r`n`r`n")), (New-Object Text.UTF8Encoding($false)))
 $exe = Join-Path $tmp 'drive.exe'
-$out = & $csc /nologo /langversion:5 /target:exe "/out:$exe" $src 2>&1
-Yes 'the lifted methods compile as C# 5 beside the stand-ins' ($LASTEXITCODE -eq 0)
+$out = & $LauncherCsc /nologo "/langversion:$LauncherLangVersion" /target:exe "/out:$exe" $src 2>&1
+Yes 'the lifted methods compile with the build''s compiler beside the stand-ins' ($LASTEXITCODE -eq 0)
 if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "    $_" }; Remove-Item -LiteralPath $tmp -Recurse -Force; Done }
 
 $oldTmp = $env:TMP; $oldTemp = $env:TEMP
@@ -495,7 +496,8 @@ Yes 'the driver ran to the end' (($lines | Where-Object { $_ -like 'DRIVER *' })
 
 # Order in the real SelfUpdate: the signer check comes before anything is put
 # at .new, and the swap script is only written after the copy.
-$self = Body $up 'public static void SelfUpdate(Config cfg, VersionDoc v, Action<string> log)'
+# Since #2210 SelfUpdate is FetchLauncher then SwapIn; the swap is SwapIn's.
+$self = Body $up 'public static void SwapIn(string tmp, Action<string> log)'
 $iSign = $self.IndexOf('CheckSigner(tmp'); $iCopy = $self.IndexOf('File.Copy(tmp, neu'); $iBat = $self.IndexOf('SelfSwap.Script(')
 Yes 'SelfUpdate checks the signer before the copy to .new' ($iSign -gt 0 -and $iCopy -gt $iSign)
 Yes 'SelfUpdate writes the swap script only after the copy' ($iBat -gt $iCopy)

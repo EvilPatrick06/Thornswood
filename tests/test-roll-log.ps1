@@ -19,18 +19,21 @@
     the roller: under 4 MB left alone, at 4 MB rolled, five kept and the
       oldest the only thing that goes, -Force, empty and missing files, and a
       file cmd still holds left exactly as it is, older ones included
-    the game server's task line (Install-ThornswoodServer.ps1): rolls, then
-      the server writes both streams to a fresh server.log, and it still
-      starts when the roller is missing
-    the voice task line (Install-Voice.ps1): the same, and the environment it
-      sets still reaches node
+    the game server's task line (Install-ThornswoodServer.ps1): since #2349
+      it runs the server under server-log.js rather than this roller, and
+      the line, run through cmd.exe, still rolls a full server.log at a start
+      and writes both streams to a fresh one
+    the voice task line (Install-Voice.ps1): since #2166 voice runs under
+      server-log.js too, with --days 90 --stamp; the line still rolls a full
+      voice.log at a start, stamps each line, and the environment it sets
+      still reaches node
     the dev voice run file (vps-dev-instance.ps1): the same
     the bot: its service rolls bot.log itself (issue #465, BotService.cs,
       tests\test-bot-service.ps1), so Install-Bot sends no roller; the
       read-back of what the bot said still finds this start's lines after a
       roll made the file shorter
     the server installer keeps the logs across the folder it deletes, and
-      each installer sends the roller up
+      both voice's installer and the server's send server-log.js
 
   Nothing here reaches the VPS or any service. Everything it writes is under
   its own temp folder.
@@ -197,9 +200,15 @@ try {
     Yes 'once the holder is gone it rolls' ((Size ($held + '.1')) -gt 0 -and (Get ($held + '.1')) -ne 'OLDER' -and (Get ($held + '.2')) -eq 'OLDER')
 
     # ======================================================= the game server task
+    # Since #2349 the server runs under server-log.js, which writes server.log
+    # itself and rolls it at midnight and at 4 MB; Roll-Log.ps1 is voice's
+    # only now. The line is still run through cmd.exe exactly as Task
+    # Scheduler runs it, because a quoting mistake there is a server that
+    # does not start. tests\test-2349-server-log.js proves the 30 days.
     $inst = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\deploy\Install-ThornswoodServer.ps1') -Raw
     $m = [regex]::Match($inst, '\$cmd = \(''(/c [^\r\n]*?skymp5-server\.js[^\r\n]*?)'' -f ([^\r\n]+)\)')
     Yes 'the server task line is in Install-ThornswoodServer.ps1' $m.Success
+    $writerSrc = Join-Path $RepoPath 'scripts\vps\Server-Log.js'
 
     if (-not $node) {
         Write-Host 'SKIP  node is not on this machine, so the task lines cannot be run'
@@ -207,28 +216,25 @@ try {
         $srv = Join-Path $tmp 'server'
         New-Item -ItemType Directory -Force -Path (Join-Path $srv 'dist_back') | Out-Null
         Put (Join-Path $srv 'dist_back\skymp5-server.js') ("console.log('stand-in server up');`nconsole.error('stand-in server on stderr');`n")
-        Copy-Item -LiteralPath $roller -Destination (Join-Path $srv 'roll-log.ps1')
+        Copy-Item -LiteralPath $writerSrc -Destination (Join-Path $srv 'server-log.js')
         $log = Join-Path $srv 'server.log'
         $line = FillLine $m.Groups[1].Value $m.Groups[2].Value @{
-            '$node.Source' = $node; '$log' = $log; '$psExe' = $winps; '$roller' = (Join-Path $srv 'roll-log.ps1')
+            '$node.Source' = $node; '$log' = $log; '$writer' = (Join-Path $srv 'server-log.js')
         }
         Yes 'the harness knows every value the installer puts in the server line' ($null -ne $line)
         if ($line) {
             Fill $log (4MB + 100)
             $p = RunCmd $line $srv
             Yes 'the server line runs to the end' $p.HasExited
-            Yes 'a server.log past 4 MB is rolled before the server starts' ((Size ($log + '.1')) -eq (4MB + 100))
+            $rolled = @(Get-ChildItem -LiteralPath $srv -Filter 'server.log.*' | Where-Object { $_.Name -match '^server\.log\.\d+$' })
+            Yes 'a server.log past 4 MB is rolled before the server starts' ($rolled.Count -eq 1 -and $rolled[0].Length -eq (4MB + 100))
             $t = Get $log
             Yes 'the server writes its stdout to a fresh server.log' ((Count $t 'stand-in server up') -eq 1 -and (Size $log) -lt 4096)
             Yes 'and its stderr' ((Count $t 'stand-in server on stderr') -eq 1)
-            Yes 'and nothing of the roller''s lands in it' ((Count $t 'rolled') -eq 0)
 
             [void](RunCmd $line $srv)
-            Yes 'the next start appends, under 4 MB' ((Count (Get $log) 'stand-in server up') -eq 2 -and -not (Test-Path -LiteralPath ($log + '.2')))
-
-            Remove-Item -LiteralPath (Join-Path $srv 'roll-log.ps1') -Force
-            [void](RunCmd $line $srv)
-            Yes 'with no roller the server still starts' ((Count (Get $log) 'stand-in server up') -eq 3)
+            Yes 'the next start appends, under 4 MB' ((Count (Get $log) 'stand-in server up') -eq 2 -and
+                @(Get-ChildItem -LiteralPath $srv -Filter 'server.log.*' | Where-Object { $_.Name -match '^server\.log\.\d+$' }).Count -eq 1)
         }
     }
 
@@ -240,7 +246,9 @@ try {
         $vr = Join-Path $tmp 'voice'
         New-Item -ItemType Directory -Force -Path $vr | Out-Null
         Put (Join-Path $vr 'voice-server.js') ("console.log('stand-in voice up on ' + process.env.THORNSWOOD_VOICE_PORT + ' auth ' + process.env.THORNSWOOD_VOICE_AUTH);`n")
-        Copy-Item -LiteralPath $roller -Destination (Join-Path $vr 'roll-log.ps1')
+        # Since #2166 voice runs under server-log.js, as the server does, so
+        # voice.log is aged; tests\test-2349-server-log.js proves the days.
+        Copy-Item -LiteralPath $writerSrc -Destination (Join-Path $vr 'server-log.js')
         $vlog = Join-Path $vr 'voice.log'
         # What the outer here-string fills in at install time. $turnSet is the
         # relay line, empty with no relay, which is every box today;
@@ -248,21 +256,23 @@ try {
         # the voice number (#481), read with one by tests\test-481-voice-most.ps1.
         $fmt = $m.Groups[1].Value.Replace('$Site', 'https://site.invalid').Replace('$Port', '7999').Replace('$Bind', '127.0.0.1').Replace('$ChatRange', 'off').Replace('$mostSet', '').Replace('$turnSet', '')
         $line = FillLine $fmt $m.Groups[2].Value @{
-            '$node.Source' = $node; '$log' = $vlog; '$psExe' = $winps; '$roll' = (Join-Path $vr 'roll-log.ps1')
+            '$node.Source' = $node; '$log' = $vlog; '$writer' = (Join-Path $vr 'server-log.js')
         }
         Yes 'the harness knows every value the installer puts in the voice line' ($null -ne $line)
         if ($line) {
             Fill $vlog (4MB + 7)
             $p = RunCmd $line $vr
-            Yes 'a voice.log past 4 MB is rolled before voice starts' ((Size ($vlog + '.1')) -eq (4MB + 7))
+            $vrolled = @(Get-ChildItem -LiteralPath $vr -Filter 'voice.log.*' | Where-Object { $_.Name -match '^voice\.log\.\d+$' })
+            Yes 'a voice.log past 4 MB is rolled before voice starts' ($vrolled.Count -eq 1 -and $vrolled[0].Length -eq (4MB + 7))
+            Yes 'each line voice writes is stamped, so it can be aged (#2166)' ((Get $vlog) -match '(?m)^\[\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}\] stand-in voice up on 7999 auth on')
             # Auth is on, written into the line since #1303 took -Auth away.
             Yes 'voice is still writing to voice.log afterwards, with its settings' ((Count (Get $vlog) 'stand-in voice up on 7999 auth on') -eq 1)
             Yes 'the command line still names the log, which is how the installer finds its own process' ($line -like ('*' + $vlog + '*'))
         }
     }
-    Yes 'Install-Voice sends the roller up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Roll-Log\.ps1''' -and $vtext.Contains("`$send['roll-log.ps1']"))
-    Yes 'Install-Voice rolls voice.log at install rather than deleting it' (
-        $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$roll -Path `\$log -Force')
+    Yes 'Install-Voice sends the log writer up beside the service' ($vtext -match 'Join-Path \$Here ''\.\.\\vps\\Server-Log\.js''' -and $vtext.Contains("`$send['server-log.js']"))
+    Yes 'Install-Voice rolls voice.log at install rather than deleting it, keeping 90 days' (
+        $vtext -notmatch 'Remove-Item -LiteralPath `\$log\b' -and $vtext -match '& `\$node\.Source `\$writer --log `\$log --days 90 --roll')
 
     # ============================================================ the dev voice
     $dtext = Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\vps\vps-dev-instance.ps1') -Raw
@@ -275,7 +285,7 @@ try {
         $psExe = $winps
         New-Item -ItemType Directory -Force -Path $devVoice | Out-Null
         Put (Join-Path $devVoice 'voice-server.js') ("console.log('stand-in dev voice up on ' + process.env.THORNSWOOD_VOICE_PORT);`n")
-        Copy-Item -LiteralPath $roller -Destination (Join-Path $devVoice 'roll-log.ps1')
+        Copy-Item -LiteralPath $writerSrc -Destination (Join-Path $devVoice 'server-log.js')
         $lines = $null
         . ([scriptblock]::Create($dtext.Substring($lb, $le - $lb + 6)))
         $run = Join-Path $devVoice 'run-dev-voice.cmd'
@@ -289,7 +299,8 @@ try {
         Yes 'the dev voice task line is in vps-dev-instance.ps1' $ta.Success
         $taskArg = if ($ta.Success) { ($ta.Groups[1].Value.Trim("'") -f $run) } else { '/c "' + $run + '"' }
         [void](RunCmd $taskArg $devVoice)
-        Yes 'the dev voice run file rolls voice.log before node' ((Size ($dlog + '.1')) -eq (4MB + 3))
+        $drolled = @(Get-ChildItem -LiteralPath $devVoice -Filter 'voice.log.*' | Where-Object { $_.Name -match '^voice\.log\.\d+$' })
+        Yes 'the dev voice run file rolls voice.log before node' ($drolled.Count -eq 1 -and $drolled[0].Length -eq (4MB + 3))
         Yes 'and dev voice writes to a fresh one' ((Count (Get $dlog) 'stand-in dev voice up on 7989') -eq 1)
     }
     # Every copy, the server's and voice's (program and page since #1083).
@@ -329,55 +340,14 @@ try {
         ([regex]::Matches($btext, [regex]::Escape('if (`$fs.Length -lt `$from) { `$from = 0 }'))).Count -eq 2)
 
     # ===================================================== the server installer
-    Yes 'Publish-Server sends the roller beside the installer' (
-        (Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$rollLog "\$\{target\}:C:/Roll-Log\.ps1"')
-    # Same folder first (Publish layout on C:\), then scripts\vps (repo layout).
-    $besideAt = $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'")
-    $vpsAt = $inst.IndexOf("Join-Path `$here '..\vps\Roll-Log.ps1'")
-    Yes 'the installer looks beside itself, then under scripts\vps, for Roll-Log.ps1' (
-        $besideAt -ge 0 -and $vpsAt -gt $besideAt -and $inst -match 'Join-Path \$Root ''roll-log\.ps1''')
-    Yes 'the installer rolls server.log at install rather than deleting it' (
-        $inst -notmatch 'Remove-Item -LiteralPath \$log\b' -and $inst -match '& \$roller -Path \$log -Force')
-
-    # Run the installer's own copy lines against both layouts and against neither.
-    $copyFrom = $inst.IndexOf('$rollSrc = $null')
-    $copyTo = $inst.IndexOf('# ---- end of the roller copy')
-    Yes 'the installer''s Roll-Log copy block is intact' ($copyFrom -ge 0 -and $copyTo -gt $copyFrom)
-    if ($copyFrom -ge 0 -and $copyTo -gt $copyFrom) {
-        $copyBody = $inst.Substring($copyFrom, $copyTo - $copyFrom)
-        function Invoke-RollCopy([string]$hereDir, [string]$rootDir) {
-            $here = $hereDir
-            $Root = $rootDir
-            . ([scriptblock]::Create($copyBody))
-            return (Test-Path -LiteralPath (Join-Path $Root 'roll-log.ps1'))
-        }
-        $marker = 'ROLL SOURCE MARKER ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
-        $pub = Join-Path $tmp 'pub-layout'
-        $pubRoot = Join-Path $tmp 'pub-root'
-        New-Item -ItemType Directory -Force -Path $pub, $pubRoot | Out-Null
-        Put (Join-Path $pub 'Roll-Log.ps1') $marker
-        Yes 'Publish layout: Roll-Log.ps1 beside the installer is copied' (Invoke-RollCopy $pub $pubRoot)
-        Yes 'Publish layout: the copied roller is the same-folder file' ((Get (Join-Path $pubRoot 'roll-log.ps1')) -eq $marker)
-
-        $repoDeploy = Join-Path $tmp 'repo\scripts\deploy'
-        $repoVpsDir = Join-Path $tmp 'repo\scripts\vps'
-        $repoRoot = Join-Path $tmp 'repo-root'
-        New-Item -ItemType Directory -Force -Path $repoDeploy, $repoVpsDir, $repoRoot | Out-Null
-        $marker2 = 'VPS LAYOUT MARKER ' + [Guid]::NewGuid().ToString('N').Substring(0, 8)
-        Put (Join-Path $repoVpsDir 'Roll-Log.ps1') $marker2
-        Yes 'repo layout: ..\vps\Roll-Log.ps1 is copied when same-folder is missing' (Invoke-RollCopy $repoDeploy $repoRoot)
-        Yes 'repo layout: the copied roller is the vps file' ((Get (Join-Path $repoRoot 'roll-log.ps1')) -eq $marker2)
-
-        $empty = Join-Path $tmp 'empty-layout'
-        $emptyRoot = Join-Path $tmp 'empty-root'
-        New-Item -ItemType Directory -Force -Path $empty, $emptyRoot | Out-Null
-        $here = $empty
-        $Root = $emptyRoot
-        . ([scriptblock]::Create($copyBody))
-        Yes 'with neither layout the roller is not planted' (-not (Test-Path -LiteralPath (Join-Path $emptyRoot 'roll-log.ps1')))
-        Yes 'with neither layout the yellow warning stays in the installer' (
-            $inst -match 'Write-Host "Roll-Log\.ps1 is not beside this installer, so server\.log will not be rolled at start\." -ForegroundColor Yellow')
-    }
+    # Since #2349 the installer sends and copies Server-Log.js for the server,
+    # not this roller (tests\test-2349-server-log.js).
+    Yes 'Publish-Server sends the log writer beside the installer, not the roller' (
+        (Get-Content -LiteralPath (Join-Path $RepoPath 'scripts\release\Publish-Server.ps1') -Raw) -match 'scp (@ssh )?\$serverLog "\$\{target\}:C:/Server-Log\.js"')
+    Yes 'the installer no longer copies or runs Roll-Log.ps1 for the server' (
+        $inst.IndexOf("Join-Path `$here 'Roll-Log.ps1'") -lt 0 -and $inst -notmatch '& \$roller ')
+    Yes 'the installer rolls server.log at install rather than deleting it, and ages thornswood.log with it (#2166)' (
+        $inst -notmatch 'Remove-Item -LiteralPath \$log\b' -and $inst -match '& \$node\.Source \$writer --log \$log --also \$gm --roll')
 
     # The folder every publish deleted held both logs. Since issue #446 the
     # old folder is not deleted: it is renamed aside and Carry moves the logs

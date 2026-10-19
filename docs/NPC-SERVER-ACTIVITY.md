@@ -16,9 +16,12 @@ every cut placed actor initially disabled, with no enable parent, built by
 skips a disabled reference too (measured on 12 Oct with the built server
 addon: 5,038 actors made with the plugin at the end of the load order, none
 of them a cut one, against 11,273 without it and without the cut list). The
-gamemode keeps handing the server the cut list until the plugin is in the
-servers' load order, and drops it in the same change that puts it there
-(`tests/test-2468-last-plugin.js`).
+plugin is the servers' last plugin and ships from this repository like the
+content plugin (#2486), so the gamemode no longer hands the server a cut list
+of its own (`tests/test-2468-last-plugin.js` holds the two together). The
+native acceptance run with the plugin and no list, 13 Oct: all 5,072 kept
+identities loaded and controlled before and after a gamemode reload, none of
+the 9,596 cut ones, peak 1,477 MiB.
 
 The 48-plugin catalogue contains 14,641 placements: 5,072 retained and 9,569
 excluded. Named pets and enemies are cut even without a Unique flag. Fourteen
@@ -77,6 +80,27 @@ and inside small home ranges. Dynamic encounters and farm births must pass habit
 and shared density checks before their creation is reported as successful.
 Destroyed dynamic identities release their slots; bodies awaiting return retain
 theirs.
+
+A creature made by `/spawn` or `/spawnat` is outside the habitat caps and is
+temporary unless the command ends in `keep` (#2623, Djinn, 17 Oct: "A creature
+spawned by a staff member should never be made permanent unless we want to
+make it permanent"). Its private marker `thornswoodNpcCommanded` is
+`{run}` for a temporary one, naming the run of the server it was made in
+(`serverRunId`, kept across a gamemode reload), or `{keep:true}`. A temporary
+one's body lies the normal time when it dies (a hunted animal
+`HUNT_TUNING.bodySeconds`, anything else the engine's 25 seconds, never a kept
+spawn's 45 minutes), so it can be skinned and looted; when the engine would
+stand it up, `mp.onRespawn` refuses that and it is taken out of the world. One
+still standing from an
+earlier run is not admitted at the next start: `removeSpawned` marks its
+record deleted, destroys it, and the population and the runtime (`forget`)
+let go of its id. The plain `true` every spawn carried before is read as
+temporary, since nobody chose to keep it, so those go the first time the
+gamemode loads with this change, a deploy included. Whether a creature that
+dies is temporary is read off its own marker (`isTemporarySpawn`), so one
+that dies in the seconds after a gamemode reload is removed too. Who may add
+`keep` to `/spawn` is the one switch `SPAWN_KEEP_WHO`: `'playtester'` (testers
+and staff, Djinn's choice on 17 Oct) or `'staff'`.
 
 Native inherited aggression, confidence, and current faction membership inform
 target selection. Common membership and ally or friend reactions suppress

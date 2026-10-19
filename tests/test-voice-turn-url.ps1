@@ -151,12 +151,11 @@ Write-Host 'the command line the scheduled task runs:'
 $root = Join-Path $script:temp 'root'
 New-Item -ItemType Directory -Force -Path $root | Out-Null
 $logPath = Join-Path $root 'voice.log'
-# The roller the task runs in front of node (entry 220, tests\test-roll-log.ps1
+# The log writer the task runs voice under (#2166, tests\test-roll-log.ps1
 # drives it). The real one, beside the stand-in, so the relay line is shown to
 # reach node through the whole line the box runs and not a line without it.
-$psExePath = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$rollPath = Join-Path $root 'roll-log.ps1'
-Copy-Item -LiteralPath (Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1') -Destination $rollPath
+$writerPath = Join-Path $root 'server-log.js'
+Copy-Item -LiteralPath (Join-Path $RepoPath 'scripts\vps\Server-Log.js') -Destination $writerPath
 # Stands in for the service: writes down what cmd.exe handed it and stops.
 $seenPath = Join-Path $root 'seen.json'
 Set-Content -LiteralPath (Join-Path $root 'voice-server.js') -Encoding ASCII -Value @'
@@ -168,6 +167,11 @@ require('fs').writeFileSync('seen.json', JSON.stringify({
   secret: e.THORNSWOOD_TURN_SECRET === undefined ? null : 'set' }));
 '@
 
+# The here-string calls Get-ThornswoodServiceAccountScript (#2578) to paste
+# ServiceAccount.ps1's functions in. Only the task line is read here, so it
+# stands in as nothing. Without it the expansion threw before any check after
+# it ran (found while checking the voice line for #2166).
+function Get-ThornswoodServiceAccountScript { return '' }
 # The service's command line, built the way the install builds it: the relay
 # lines lifted out of the script, then the remote here-string expanded, then
 # the line in it that the VPS runs.
@@ -182,8 +186,7 @@ function CommandFor([string]$url) {
     if ($line.Count -ne 1) { return $null }
     $node = [pscustomobject]@{ Source = $nodeExe }
     $log = $logPath
-    $psExe = $psExePath
-    $roll = $rollPath
+    $writer = $writerPath
     $cmd = $null
     . ([scriptblock]::Create($line[0]))
     return [pscustomobject]@{ Cmd = $cmd; Remote = $remote }
@@ -208,15 +211,16 @@ function RunCommand([string]$cmd) {
 
 # Every install before -TurnUrl existed sent exactly this. The chat range
 # came onto the line with local chat (tests\test-chat-range-install.ps1), and
-# off is what an install that does not mention it hands over. The roller in
-# front of node came with entry 220, so voice.log is rolled before each start.
+# off is what an install that does not mention it hands over. Since #2166
+# voice runs under server-log.js, which writes voice.log and keeps 90 days of
+# it, in place of the roller entry 220 put in front of node.
 # Auth is on whatever the install is given since #1303: there is no -Auth.
 # node goes through start /high since #2491, so voice runs High, and call
 # exit hands node's exit code back as the task's.
-$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=off&& "{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" voice-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f $nodeExe, $logPath, $psExePath, $rollPath
+$before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE_PORT=7778&& set THORNSWOOD_VOICE_BIND=0.0.0.0&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=off&&  start "" /b /wait /high "{0}" "{2}" --log "{1}" --days 90 --stamp voice-server.js & call exit %^errorlevel%"' -f $nodeExe, $logPath, $writerPath
 
 $none = CommandFor ''
-Yes 'with no relay the command line is the one every install sent before, to the character' (
+Yes 'with no relay the command line is the one every install sends, to the character' (
     $none -and $none.Cmd -ceq $before)
 $seen = if ($none) { RunCommand $none.Cmd } else { $null }
 Yes 'and the service it starts is handed no relay address' ($seen -and $null -eq $seen.url)
@@ -338,5 +342,25 @@ Yes 'an answer carrying something that is not a relay address is not put on the 
 $r = Probe $plain @{} 'none'
 Yes 'nothing running leaves every default as it was, local chat on' (
     $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.ChatRange -eq 'on')
+# #2711: /ice that did not answer was a try with an empty catch, and the relay
+# it served was dropped with nothing on the screen.
+$r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;ice=The operation has timed out.;relay=ephemeral;turn='
+Yes 'a service whose /ice does not answer keeps no relay, and says so with why' (
+    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.Said -match 'did not answer /ice \(The operation has timed out\.\)' -and $r.Said -match 'Pass -TurnUrl')
+$r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;ice=;relay=none;turn='
+Yes '  and one whose /ice answered says nothing about it' ($r.Said -notmatch '/ice')
+
+# And the build the check after the start holds the new service to: a
+# voice-server.js that does not read, or names no BUILD, stops the install
+# before anything on the box is stopped, where it used to leave the check
+# passing whatever answered (#2711).
+$installText = [IO.File]::ReadAllText($installPath)
+$iNoBuild = $installText.IndexOf('names no const BUILD, so there is no build to check the new service by')
+$iUnread = $installText.IndexOf('could not be read, so there is no build to check the new service by')
+$iStop = $installText.IndexOf('StopIt', [Math]::Max($iNoBuild, $iUnread))
+Yes 'a voice-server.js that names no BUILD, or does not read, stops the install with Die before the artifact is sent' (
+    $iNoBuild -gt 0 -and $iUnread -gt 0 -and $iStop -gt $iNoBuild -and $installText.IndexOf('Send-ThornswoodArtifact -Artifact $artifact') -gt $iNoBuild -and
+    $installText.Substring($iUnread - 260, 260) -match 'catch \{ Die' -and $installText -match 'if \(-not \$m\.Success\) \{ Die "\$vsPath names no const BUILD')
+Yes '  and the voice-server.js here names one, so an install today has its check' ([regex]::IsMatch([IO.File]::ReadAllText((Join-Path $RepoPath 'voice\voice-server.js')), "const\s+BUILD\s*=\s*'([^']+)'"))
 
 Done

@@ -29,12 +29,12 @@
       window reads it (ShellUpdate.cs), and the address a real launcher asks is
       still fenced by CheckUrl
 
-  HOW. Compiles launcher\app\*.cs into a library with the same csc and the same
-  references Build-Launcher.ps1 uses, as test-feed-conditional.ps1 does, and
-  calls Updater.NewsFile by reflection; that is what FillNews does after
-  CheckUrl, which only lets https to thornswood.net through. Paths points at a
-  temp folder. Nothing under C:\Thornswood is read or written, and nothing
-  leaves 127.0.0.1.
+  HOW. Compiles launcher\app\*.cs into a library with the same compiler and
+  the same references the build uses (tests\Launcher-Csc.ps1), as
+  test-feed-conditional.ps1 does, and calls Updater.NewsFile by reflection;
+  that is what FillNews does after CheckUrl, which only lets https to
+  thornswood.net through. Paths points at a temp folder. Nothing under
+  C:\Thornswood is read or written, and nothing leaves 127.0.0.1.
 
   Runs under Windows PowerShell 5.1 and restarts itself there from pwsh,
   because the launcher runs on the .NET Framework.
@@ -43,6 +43,7 @@
 param([string]$Src)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Here = Split-Path -Parent $Here
@@ -67,51 +68,10 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-# ---- the compiler and the references, the way Build-Launcher.ps1 finds them --
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
+# ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) {
-        $p = Join-Path $d $name
-        if (Test-Path $p) { return $p }
-    }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
-                   Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    $null
-}
-
-$builder = Join-Path $Here 'scripts\release\Build-Launcher.ps1'
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseFile($builder, [ref]$tokens, [ref]$errors)
-$assigns = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] }, $true))
-function ListIn([string]$name) {
-    $a = $assigns | Where-Object { $_.Left.Extent.Text -eq ('$' + $name) } | Select-Object -First 1
-    if (-not $a) { return @() }
-    return @($a.Right.FindAll({ param($n) $n -is [System.Management.Automation.Language.StringConstantExpressionAst] }, $true) |
-             ForEach-Object { $_.Value })
-}
-$needed = @(ListIn 'needed')
-$wv2 = @(ListIn 'wv2Managed')
+$needed = @($LauncherNeeded)
+$wv2 = @($LauncherWv2Managed)
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsnewsfile-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -196,10 +156,10 @@ function Note([string]$date, [string]$title, [string]$channel = '') {
 }
 
 function Run {
-    Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-    if (-not $csc -or $needed.Count -eq 0) { Yes 'Build-Launcher.ps1 names the references' $false; return }
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not (Test-Path -LiteralPath $LauncherCsc) -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; return }
     $refs = @(); $missing = @()
-    foreach ($n in $needed) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+    foreach ($n in $needed) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
     foreach ($n in $wv2) {
         $p = Join-Path $Here ('launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
@@ -209,15 +169,15 @@ function Run {
 
     $cs = @(Get-ChildItem (Join-Path $Src '*.cs') -File)
     $dll = Join-Path $tmp 'Thornswood.dll'
-    $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', '/langversion:5', "/out:$dll")
+    $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/langversion:$LauncherLangVersion", "/out:$dll")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     foreach ($f in $cs) { $cscArgs += $f.FullName }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $said = & $csc @cscArgs 2>&1
+    $said = & $LauncherCsc @cscArgs 2>&1
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes ('the launcher''s {0} source files compile as C# 5' -f $cs.Count) $built
+    Yes ('the launcher''s {0} source files compile with the compiler the build runs' -f $cs.Count) $built
     if (-not $built) {
         foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 20)) { Write-Host "      $l" }
         return
@@ -328,7 +288,8 @@ function Run {
     # ---- 6. where it is called, and the fence ---------------------------------------
     $su = Get-Content -LiteralPath (Join-Path $Src 'ShellUpdate.cs') -Raw
     Yes 'the update check fills the news on its own thread, before the window reads the document' (
-        $su -match '(?s)static void CheckUpdatesBackground\(bool loud\).*?VersionDoc v = Updater\.Check\(cfg\);.*?Updater\.FillNews\(cfg, v\);\s*win\.Dispatcher\.BeginInvoke\(new Action\(delegate \{ OnVersionDoc\(v, loud\); \}\)\);')
+        # The signed manifest's line (#2163) is worked out between the two, on the same thread.
+        $su -match '(?s)static void CheckUpdatesBackground\(bool loud\).*?VersionDoc v = Updater\.Check\(cfg\);.*?Updater\.FillNews\(cfg, v\);(\s*//[^\n]*)*\s*(string manifest = Updater\.ManifestLine\(cfg, v\);\s*)?win\.Dispatcher\.BeginInvoke\(new Action\(delegate\s*\{[^}]*?OnVersionDoc\(v, loud\);\s*\}\)\);')
     $fn = Get-Content -LiteralPath (Join-Path $Src 'FeedNews.cs') -Raw
     Yes 'FillNews runs CheckUrl on the file''s address before NewsFile fetches it' ($fn -match '(?s)public static void FillNews\(Config cfg, VersionDoc v\).*?CheckUrl\(v\.newsRef\.url\);.*?NewsFile\(cfg, v\.newsRef\)')
 }

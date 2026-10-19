@@ -2025,9 +2025,9 @@ $BENCH_OWNER = [ordered]@{
     'CraftingCookpot'         = @{ Owner = 'Cook';       Why = 'a cooking pot' }
     'BYOHCraftingOven'        = @{ Owner = 'Cook';       Why = 'the HearthFires oven' }
     'isGrainMill'             = @{ Owner = 'Cook';       Why = 'a grain mill, which makes the flour a kitchen runs on' }
-    # Renamed from KzlCraftingCharcoalKiln by scripts\mods\Rename-ContentRecords.ps1 on
-    # 21 September, which took another server's prefix off 33 records of
-    # Thornswood-Content.esp. That commit said no generated table moved, and
+    # Renamed on 21 September from the other server's prefix to Thornswood,
+    # with 32 more records of Thornswood-Content.esp, by a script that did that
+    # one job and is gone (#400). That commit said no generated table moved, and
     # this one did: the bench is matched here by its editor id, so from the
     # rename until 21 September the kiln stopped being the Charburner's bench
     # and all four charcoal rows fell through to 'a MISC off a bench nobody has
@@ -2035,6 +2035,7 @@ $BENCH_OWNER = [ordered]@{
     # with 'Woodworker/Charburner owns no recipes at all', and refused to write
     # game\data\recipes.json, which is the check doing its job.
     'ThornswoodCraftingCharcoalKiln' = @{ Owner = 'Woodworker'; Half = 'Charburner'; Why = 'the charcoal kiln Thornswood-Content.esp already ships. classes.md gives the Charburner firewood through to coke in as many words, and this bench is that chain.' }
+    'ThornswoodCraftingWoodworking' = @{ Owner = 'Woodworker'; Half = 'Woodwright'; Why = 'the woodworking bench Thornswood-Content.esp ships for #516. Bows, arrows, instruments and poles are made here; classes.md gives them to the Woodwright.' }
     'MCE_CraftingLoom'        = @{ Owner = 'Tailor';     Why = 'a loom, from MoreCraftableEquipment' }
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }

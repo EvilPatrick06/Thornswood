@@ -92,6 +92,7 @@ async function ask(linked, standings, devDoor) {
   const run = new Function(
     'route', 'devDoor', 'req', 'res', 'cfg', 'url', 'sameSecret', 'sendJson',
     'jsonFile', 'LINKED', 'standingCached', 'keyInAddress', 'standingsForDoor', 'activeBans', 'pkProfiles',
+    'officesForDoor',
     'return (async function () {\n' + route + '\n})();');
   await run(
     devDoor ? '/dev/api/allowed' : '/api/allowed', !!devDoor,
@@ -103,13 +104,15 @@ async function ask(linked, standings, devDoor) {
     // No staff bans here (#412); test-staff-bans.js runs them.
     standingCached, new Set(), standingsForDoor, function () { return []; },
     // Nobody killed for good here (#1010); test-bans-pk.js runs that.
-    function () { return []; });
+    function () { return []; },
+    // No hold offices here (#2551); test-2551-hold-offices.js runs them.
+    async function () { return []; });
   return sent;
 }
 
 // ---- the door's refresh ----------------------------------------------------
 const doorAt = game.indexOf('  var doorSaid = false;');
-const refreshAt = doorAt < 0 ? -1 : game.indexOf('  function refresh() {', doorAt);
+const refreshAt = doorAt < 0 ? -1 : game.indexOf('  function refresh(done) {', doorAt);
 const refreshEnd = refreshAt < 0 ? -1 : toClose(game, refreshAt);
 const door = (doorAt >= 0 && refreshEnd > refreshAt) ? game.slice(doorAt, refreshEnd) : '';
 yes('the door refresh is in gamemode.js',
@@ -148,12 +151,14 @@ function refreshWith(before, answer, status) {
     }
   };
   const run = new Function(
-    'fs', 'path', 'privDir', 'FILE', 'note', 'require', 'console',
+    'fs', 'path', 'privDir', 'FILE', 'note', 'require', 'console', 'mp',
     'var readAt = 0, listAt = 0;\n' + door + '\nrefresh();');
   run(fakeFs, path, PRIV, FILE,
       function (line) { said.push(line); },
       function (m) { return m === 'https' ? fakeHttps : require(m); },
-      { log: function (line) { said.push(line); } });
+      { log: function (line) { said.push(line); } },
+      // The engine's whole-file write (#2740), onto the fake disk.
+      { writeFileWhole: function (p, s) { fakeFs.writeFileSync(p, s); } });
   const now = Object.prototype.hasOwnProperty.call(disk, FILE) ? disk[FILE] : null;
   const changed = now !== null && now !== (before === undefined ? null : JSON.stringify(before));
   return { file: changed ? JSON.parse(now) : null, said: said };

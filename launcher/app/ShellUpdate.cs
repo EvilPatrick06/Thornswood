@@ -15,6 +15,10 @@ namespace Thornswood
         static bool selfUpdateOffered;
         static bool retryQueued;
         static bool checkingInPlay = false;
+        // #2440: one long-poll tip to /feed/watch while the shell is up.
+        static bool feedWatchStarted;
+        static volatile bool feedWatchStop;
+
         // Said once in launcher.log, not every thirty seconds: which feed the
         // checks read, and the first in play check that could not be made.
         // Both were invisible before (#445): the address was nowhere in the
@@ -25,6 +29,51 @@ namespace Thornswood
         static bool inPlayFailSaid;
         static bool notChangedSaid;
 
+        /// <summary>
+        /// Keeps one long-poll open against the site's /feed/watch (#2440).
+        /// When the tip says the feed moved, runs the same full check the
+        /// start path uses, so an open launcher shows a Ship without Restart
+        /// or Check now. Started once; stopped when the window closes.
+        /// </summary>
+        static void StartFeedWatch()
+        {
+            if (feedWatchStarted) return;
+            feedWatchStarted = true;
+            feedWatchStop = false;
+            ThreadPool.QueueUserWorkItem(delegate
+            {
+                int failSleep = 5000;
+                LogOnly("Watching " + Updater.WatchUrl(cfg) + " for a release while this launcher stays open.");
+                while (!feedWatchStop)
+                {
+                    try
+                    {
+                        bool changed = Updater.WaitForFeedChange(cfg);
+                        failSleep = 5000;
+                        if (feedWatchStop) break;
+                        if (changed)
+                        {
+                            LogOnly("The update feed tip said the feed moved; checking now.");
+                            CheckUpdatesBackground(false);
+                        }
+                        // 204, the wait ran out unchanged: tip again at once.
+                        // A timeout or any other answer threw, below.
+                    }
+                    catch (Exception ex)
+                    {
+                        if (feedWatchStop) break;
+                        LogOnly("The update feed tip could not be kept open (" + ex.Message + "). Trying again in " + (failSleep / 1000) + " seconds.");
+                        Thread.Sleep(failSleep);
+                        failSleep = Math.Min(failSleep * 2, 60000);
+                    }
+                }
+            });
+        }
+
+        static void StopFeedWatch()
+        {
+            feedWatchStop = true;
+        }
         static void CheckUpdatesBackground(bool loud)
         {
             try
@@ -35,6 +84,16 @@ namespace Thornswood
                 // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
                 win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
+                // Whether the release's signed manifest vouches for every
+                // asset the feed names (#2163, FeedManifest.cs). Only said in
+                // launcher.log for now (phase C), once per manifest, on a
+                // thread of its own after the feed was handed over, so a slow
+                // fetch never holds the update check or Play. Never throws.
+                ThreadPool.QueueUserWorkItem(delegate
+                {
+                    string manifest = Updater.ManifestLine(cfg, v);
+                    if (manifest != null) win.Dispatcher.BeginInvoke(new Action(delegate { LogOnly(manifest); }));
+                });
             }
             catch (Exception ex)
             {
@@ -189,6 +248,9 @@ namespace Thornswood
             pendingPacks = Updater.Pending(v);
             bool newLauncher = Updater.IsNewer(v.launcherVersion, Updater.Version)
                                && !string.IsNullOrEmpty(v.launcherUrl);
+            // Scan and Fix's card goes by the same answer (#2627), so the Fix
+            // button knows about an update waiting without Scan being pressed.
+            FeedOnCard(v);
 
             // Before a word is said about updates. An update into a build with
             // no mods in it cannot work, and reporting that it failed when the
@@ -369,10 +431,12 @@ namespace Thornswood
             });
         }
 
-        static void RunUpdate()
+        static void RunUpdate() { RunUpdate(null); }
+
+        /// <param name="after">Run on the window's thread when the update has gone in or failed without restarting the launcher, or null. Fix takes the update last and scans again after it (#2627).</param>
+        static void RunUpdate(Action after)
         {
             if (playing) { Log("Quit the game first."); return; }
-            if (ownGameBusy) { Log("Thornswood's own Skyrim folder is still being prepared. The update can go in when that is done."); return; }
             // An update writes into the build. A game still holding files open
             // down there turns that into a half written install.
             if (!ClearStuckGame(true)) return;
@@ -382,14 +446,24 @@ namespace Thornswood
             txtUpdateTitle.Text = "Updating";
             var doc = pendingDoc;
             var packs = pendingPacks;
+            bool withLauncher = selfUpdateOffered;
             // The Play button shows how far it has got (#1145). One download
             // per pack with a link; a release synced to its record says its
             // own counts from Sync.cs.
             int downloads = 0;
             foreach (Pack p in packs)
                 if (p != null && !string.IsNullOrEmpty(p.url) && p.url.Trim().Length > 0) downloads++;
-            PlayProgress.Begin("Updating", downloads);
+            // Second, so a folder being prepared keeps the button (#2210).
+            PlayProgress.Second(true);
+            try { PlayProgress.Begin("Updating", downloads); }
+            finally { PlayProgress.Second(false); }
             DrawStatus();
+            // Decided by Patrick on 12 Oct (#2210): the update downloads while
+            // Thornswood's own Skyrim folder is prepared, and goes in once that
+            // is done. Until then this refused here and the download waited
+            // for the whole refresh.
+            if (ownGameBusy)
+                Log("Thornswood's own Skyrim folder is being prepared. The update downloads now and goes in as soon as the folder is ready.");
 
             ThreadPool.QueueUserWorkItem(delegate
             {
@@ -397,36 +471,27 @@ namespace Thornswood
                 {
                     win.Dispatcher.BeginInvoke(new Action(delegate { Log(m); }));
                 };
+                Updater.Fetched got = null;
+                // What this thread reports stays off the Play button while the
+                // folder is being prepared (PlayProgress.FolderFirst).
+                PlayProgress.Second(true);
                 try
                 {
-                    // A pack published with no url is unusable and always will
-                    // be: there is nothing at the other end to download. It is
-                    // not a network problem and retrying never clears it, so
-                    // stopping the whole update on it means the Play button
-                    // stays off forever, for everyone, including whoever would
-                    // have to publish the fix. Skip it, say so, and let the
-                    // packs that do have somewhere to download from go in.
-                    int dead = 0;
-                    foreach (Pack p in packs)
-                    {
-                        if (p == null) continue;
-                        if (string.IsNullOrEmpty(p.url) || p.url.Trim().Length == 0)
-                        {
-                            dead++;
-                            log("Skipping " + p.id + ": it was published without a download link, so there is nothing to fetch. It will not be offered again.");
-                            Updater.Skip(p.id);
-                            continue;
-                        }
-                        Updater.ApplyPack(cfg, p, log);
-                    }
-                    if (dead > 0)
-                        log(dead + " update" + (dead == 1 ? " was" : "s were") + " published without a download link and had to be skipped. Whatever was in " + (dead == 1 ? "it" : "them") + " comes back in the next one.");
+                    // The download: nothing in the game folder or its records
+                    // changes, so it runs beside a refresh.
+                    got = Updater.FetchUpdate(cfg, packs, withLauncher ? doc : null, log);
+                    // The write: after a refresh under way, and none starts
+                    // until it is done (OwnGame.Alone).
+                    Updater.Fetched write = got;
+                    OwnGame.Alone(delegate { Updater.WriteUpdate(cfg, write, log); },
+                        delegate { log("The update is downloaded. It goes in as soon as Thornswood's own Skyrim folder is ready."); });
 
-                    if (selfUpdateOffered)
+                    string launcher = Updater.LauncherOf(got);
+                    if (launcher != null)
                     {
                         log("Updating the launcher. It will restart.");
-                        PlayProgress.Plan("Updating the launcher", 1, "updates");
-                        Updater.SelfUpdate(cfg, doc, log);
+                        got = null;
+                        Updater.SwapIn(launcher, log);
                         win.Dispatcher.BeginInvoke(new Action(delegate { win.Close(); }));
                         return;
                     }
@@ -443,10 +508,12 @@ namespace Thornswood
                         updatePending = false;
                         DrawStatus(); BuildModList();
                         Log("Update finished.");
+                        if (after != null) after();
                     }));
                 }
                 catch (Exception ex)
                 {
+                    Updater.Drop(got);
                     win.Dispatcher.BeginInvoke(new Action(delegate
                     {
                         Log("Update failed: " + ex.Message);
@@ -462,8 +529,10 @@ namespace Thornswood
                         PlayProgress.End();
                         DrawStatus();
                         Log("Play stays off until the update goes through, because the server is expecting the newer mod list.");
+                        if (after != null) after();
                     }));
                 }
+                finally { PlayProgress.Second(false); }
             });
         }
     }

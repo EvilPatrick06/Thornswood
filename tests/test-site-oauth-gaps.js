@@ -186,7 +186,9 @@ function listening(srv, port) {
     const twa = cs.filter((c) => c.indexOf('twa=') === 0)[0] || '';
     const tw = cs.filter((c) => c.indexOf('tw=') === 0)[0] || '';
     yes('the admin cookie is set, HttpOnly', !!twa && /HttpOnly/i.test(twa));
-    yes('the member cookie is set too', !!tw);
+    // #2166: a Discord sign-in sets only twa; tw is the password door's
+    // fallback, so this answer clears any old one instead of setting it.
+    yes('the member cookie is not set, and an old one is cleared', !!tw && /Max-Age=0\b/.test(tw) && pairOf(tw) === 'tw=');
     yes('the attempt cookie is cleared in the same answer', cs.some((c) => c.indexOf('twst_') === 0 && /Max-Age=0\b/.test(c)));
     const parts = decodeURIComponent(pairOf(twa).slice(4)).split('|');
     yes('the cookie is id|name|at|signature, signed with the site secret',

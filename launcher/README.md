@@ -2,9 +2,9 @@
 
 ## What it is
 
-Everything `Thornswood.exe` is built from. The C# is in `launcher\app`, in C# 5
-for the .NET Framework 4 csc until the build moves to MSBuild and
-`launcher\app\Thornswood.csproj` (#498), when newer C# is allowed, and `launcher\app\ARCHITECTURE.md` says what each
+Everything `Thornswood.exe` is built from. The C# is in `launcher\app`, in C# 13,
+built with MSBuild from `launcher\app\Thornswood.csproj` (#498), and
+`launcher\app\ARCHITECTURE.md` says what each
 class owns and how Play runs. The window's layout is `ui.xaml`, parsed at
 startup, so a control renamed there and not in the C# is found by
 `scripts\dev\Check-Controls.ps1` rather than by somebody pressing it. Beside them are
@@ -27,10 +27,11 @@ Updater.cs.
 
 ## On your machine
 
-`scripts\release\Build-Launcher.ps1` compiles the launcher with the .NET Framework 4 csc
-and puts the window, the art, the key template, the voice page and the
-client build record inside `Thornswood.exe` as resources, by name, and stops
-if one is missing. A build writes the exe into `<Root>\Launcher` and touches
+`scripts\release\Build-Launcher.ps1` builds the launcher with MSBuild from
+`launcher\app\Thornswood.csproj` (and the setup program from
+`installer\setup\Setup.csproj`), which put the window, the art, the key
+template, the voice page and the client build record inside `Thornswood.exe`
+as resources, by name, and stop if one is missing. A build writes the exe into `<Root>\Launcher` and touches
 nothing else; the shortcut and the icon are `scripts\release\Install-Launcher.ps1`,
 which Ship runs. To compile without replacing an installed launcher, build
 into a scratch root:
@@ -39,13 +40,12 @@ into a scratch root:
 .\scripts\release\Build-Launcher.ps1 -Root "$env:TEMP\ts-build" -NoPause
 ```
 
-The same build with MSBuild, from `launcher\app\Thornswood.csproj` and
-`installer\setup\Setup.csproj`, on a machine with Visual Studio 2022 Build
-Tools (`scripts\release\Find-MSBuild.ps1 -Report` says whether it has
-them), is `-With msbuild`. `tests\test-498-msbuild.ps1` builds both ways and
-compares the two exes. A resource added to the launcher goes into
-Build-Launcher.ps1 and into Thornswood.csproj until the switch (#498) leaves
-only the project file.
+It needs Visual Studio 2022 Build Tools with MSBuild and the .NET Framework
+4.8.1 targeting pack (`scripts\release\Find-MSBuild.ps1 -Report` says
+whether a machine has them; Developer-Guide.md "Setting up a machine" has the
+install line). A resource added to the launcher goes into Thornswood.csproj
+and into the list in `tests\test-498-msbuild.ps1`, which checks every
+resource in the built exe against its file byte for byte.
 
 What the launcher does is written to its own log, `Profile\launcher.log`,
 which is where to look first when anything about it is wrong, voice included.

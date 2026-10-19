@@ -76,11 +76,29 @@
   took out as <root>.undone-<stamp>. The renames keep every path the task and
   server-settings.json name the same, so nothing has to be rewritten.
 
+  -FromStore TAKES THE SERVER BUILD OUT OF THE BOX'S STORE (#459). The
+  payload Publish-Server.ps1 -FromStore sends carries no server build and no
+  plugins: the gamemode and its stamp, server-build.json (the record the
+  commit holds), the settings a release sets (how many it holds, and the
+  port, read only) and any plugin of ours the running order names. In step 1
+  the record's build is taken out of the store (-Store, C:\Thornswood-Deploys
+  \server) into the stage, held to the record exactly as a payload's own
+  files are (Expand-ThornswoodStoredServerBuild, ServerBuild.ps1), and every
+  plugin the running server's load order names under its plugins folder that
+  the payload did not bring is copied from the running root. The running
+  server keeps its own load order and start point, so it goes onto a running
+  server only, never a first install; an engine that reads light plugins
+  another way than the running one would move every form id in that order
+  (ServerOrder.ps1, #1715), so that is refused too; and a plugin of ours the
+  order does not name is refused, because changing the order is a full
+  publish's. Everything after is the same stage, swap and way back.
+
   -TaskOnly REGISTERS THE TASK AGAIN AND NOTHING ELSE (#2491). No zip, no
   stage, no swap, no setting: the server already in -Root is stopped, the
-  task is registered with this installer's action and settings, and the
-  server is started through it and given -Wait seconds to answer on both
-  ports. If it does not answer, the task it had goes back, exactly as it was
+  task is registered with this installer's action and settings, with the
+  log writer that action runs (server-log.js, #2349) put in the root beside
+  it, and the server is started through it and given -Wait seconds to
+  answer on both ports. If it does not answer, the task it had goes back, exactly as it was
   exported, and is started again: INSTALL ROLLED BACK. It is how a box takes a
   change to the task itself (its priority, #2491) without a release.
   Publish-Server.ps1 -TaskOnly sends this and runs it.
@@ -123,6 +141,16 @@ param(
     # Register the task again for the server already in -Root, stop it and
     # start it through the new task, and touch no file (#2491, the header).
     [switch]$TaskOnly,
+    # Take the server build out of the box's store instead of the payload, and
+    # the plugins from the running root (#459, the header). Publish-Server.ps1
+    # -FromStore passes it.
+    [switch]$FromStore,
+    # The store's server folder, for -FromStore.
+    [string]$Store = 'C:\Thornswood-Deploys\server',
+    # Register the task as SYSTEM, Highest, the way it was before #2578, and
+    # grant nothing. The way back if the server will not run as LOCAL SERVICE
+    # (ServiceAccount.ps1 says what it is given).
+    [switch]$AsSystem,
     # Lets tests\test-install-server.ps1 run this on a machine with the game on
     # it, against a scratch root. Nothing else passes it.
     [switch]$AllowGamingPc
@@ -188,6 +216,12 @@ if ($PutBack -and $askedKeys.Count) {
     Say '-PutBack sets no setting: it puts the previous folder back with the running server''s own settings. Run it without -RequirePass. Nothing was changed.' 'Red'
     Finish 'INSTALL REFUSED' 1
 }
+# -FromStore installs a build onto a running server (#459); a put-back and
+# -TaskOnly install none.
+if ($FromStore -and ($PutBack -or $TaskOnly)) {
+    Say '-FromStore installs a server build out of the store, and -PutBack and -TaskOnly install none. Nothing was changed.' 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 # -TaskOnly touches the task and nothing else (#2491), so a switch that
 # changes a folder, a setting or the world would do nothing, and is refused.
 if ($TaskOnly) {
@@ -236,6 +270,130 @@ if (-not (Test-Path -LiteralPath $waitLib)) {
     Finish 'INSTALL REFUSED' 1
 }
 . $waitLib
+# The account the task runs as and what it may reach (#2578). A copy of the
+# functions in ServiceAccount.ps1, kept here rather than sent beside this
+# installer, because every file Publish-Server.ps1 sends is a call in
+# records\remote-commands.json. tests\test-2578-service-principals.ps1 fails
+# when this copy and ServiceAccount.ps1 differ.
+# ---- ServiceAccount.ps1 (copy) ----
+function New-ThornswoodServicePrincipal {
+    param([switch]$AsSystem)
+    if ($AsSystem) {
+        return New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    }
+    return New-ScheduledTaskPrincipal -UserId 'NT AUTHORITY\LOCAL SERVICE' -LogonType ServiceAccount -RunLevel Limited `
+        -RequiredPrivilege 'SeChangeNotifyPrivilege' -ProcessTokenSidType Unrestricted
+}
+function Get-ThornswoodTaskSid {
+    param([string]$TaskName)
+    try {
+        return (New-Object Security.Principal.NTAccount('NT TASK', $TaskName)).Translate([Security.Principal.SecurityIdentifier]).Value
+    } catch { return '' }
+}
+function Get-ThornswoodServiceNeverReach {
+    param([string]$Own = '', [string]$Box = 'C:\')
+    $own = $Own.TrimEnd('\')
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
+        $r = Join-Path $Box $r
+        if ($r -ine $own) { $list += (Join-Path $r 'private') }
+    }
+    foreach ($r in 'Thornswood-Voice', 'Thornswood-Voice-Dev') {
+        $r = Join-Path $Box $r
+        if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
+    }
+    return $list
+}
+function Test-ThornswoodServiceCannotReach {
+    param([string[]]$Paths, [string[]]$Sids = @())
+    $who = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19') + @($Sids | Where-Object { $_ })
+    # ReadData (ListDirectory on a folder), GENERIC_READ and GENERIC_ALL.
+    $read = [long]0x90000001
+    $problems = @()
+    foreach ($p in @($Paths)) {
+        if (-not $p) { continue }
+        # A denied look is an error, not a no: without Stop, Test-Path says
+        # False and the path would be passed over as if it were not there.
+        try { if (-not (Test-Path -LiteralPath $p -ErrorAction Stop)) { continue } }
+        catch { $problems += ($p + ': whether it is there could not be checked (' + $_.Exception.Message + ')'); continue }
+        try { $acl = Get-Acl -LiteralPath $p }
+        catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
+        foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
+            if ([string]$r.AccessControlType -ne 'Allow') { continue }
+            if ($who -notcontains $r.IdentityReference.Value) { continue }
+            if (([long][int]$r.FileSystemRights -band $read) -eq 0) { continue }
+            $problems += ($p + ': ' + $r.IdentityReference.Value + ' may read it (' + $r.FileSystemRights + ')')
+        }
+    }
+    # Unrolled: callers wrap it in @(), so none is a count of 0.
+    return $problems
+}
+function Set-ThornswoodServiceAcl {
+    param([string]$Path, $Acl)
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') {
+        if ($item -is [IO.DirectoryInfo]) { [IO.FileSystemAclExtensions]::SetAccessControl([IO.DirectoryInfo]$item, [Security.AccessControl.DirectorySecurity]$Acl) }
+        else { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, [Security.AccessControl.FileSecurity]$Acl) }
+    } else { $item.SetAccessControl($Acl) }
+}
+function Grant-ThornswoodServiceFolder {
+    param([string]$Root, [string]$Sid, [string[]]$Writable = @(), [string[]]$Files = @())
+    if (-not $Root -or -not (Test-Path -LiteralPath $Root)) { throw ('not here: ' + $Root) }
+    if (-not $Sid) { throw 'no SID to grant to' }
+    $fsr  = [Security.AccessControl.FileSystemRights]
+    $inh  = [Security.AccessControl.InheritanceFlags]
+    $prop = [Security.AccessControl.PropagationFlags]
+    $tree = $inh::ContainerInherit -bor $inh::ObjectInherit
+    $who  = New-Object Security.Principal.SecurityIdentifier($Sid)
+    $made = New-Object Security.Principal.SecurityIdentifier('S-1-3-0')
+    $said = @()
+
+    $acl = Get-Acl -LiteralPath $Root
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::ReadAndExecute, $tree, $prop::None, 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, ($fsr::CreateFiles -bor $fsr::CreateDirectories), $inh::None, $prop::None, 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($made, $fsr::Modify, $tree, $prop::InheritOnly, 'Allow')))
+    Set-ThornswoodServiceAcl $Root $acl
+    $said += ('read and run in ' + $Root + ', make files there, change only what it made')
+
+    foreach ($w in @($Writable | Where-Object { $_ })) {
+        $d = Join-Path $Root $w
+        if (-not (Test-Path -LiteralPath $d)) { continue }
+        $a = Get-Acl -LiteralPath $d
+        $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::Modify, $tree, $prop::None, 'Allow')))
+        Set-ThornswoodServiceAcl $d $a
+        $said += ('change ' + $d)
+    }
+    foreach ($pat in @($Files | Where-Object { $_ })) {
+        foreach ($f in @(Get-ChildItem -LiteralPath $Root -File -Force -Filter $pat -ErrorAction SilentlyContinue)) {
+            $a = Get-Acl -LiteralPath $f.FullName
+            $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, $fsr::Modify, 'Allow')))
+            Set-ThornswoodServiceAcl $f.FullName $a
+            $said += ('change ' + $f.FullName)
+        }
+    }
+    return $said
+}
+# ---- end ServiceAccount.ps1 ----
+# The fail-safe (#2578), before anything is stopped or changed: the server
+# goes onto LOCAL SERVICE only where LOCAL SERVICE can read none of what no
+# service may.
+if (-not $AsSystem -and -not $NoTask) {
+    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)))
+    if ($cannot.Count) {
+        Say 'LOCAL SERVICE could read what no service may, so the server is not moved onto it:' 'Red'
+        foreach ($c in $cannot) { Say ('  ' + $c) 'Red' }
+        Say 'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Nothing was changed.' 'Red'
+        Finish 'INSTALL REFUSED' 1
+    }
+}
+# The log writer the task runs the server under (#2349): beside this script,
+# sent with it, or in scripts\vps from a checkout. Without it the task could
+# not start the server, so nothing runs.
+if (-not (Test-Path -LiteralPath (Join-Path $here 'Server-Log.js')) -and
+    -not (Test-Path -LiteralPath (Join-Path $here '..\vps\Server-Log.js'))) {
+    Say "Server-Log.js is not beside this installer, and the server's task runs the server under it. Nothing was changed." 'Red'
+    Finish 'INSTALL REFUSED' 1
+}
 if (-not $PSBoundParameters.ContainsKey('Wait')) {
     $Wait = Get-ThornswoodServerReadyWait
 }
@@ -244,11 +402,17 @@ $script:running = $null
 # The game port a root's settings name, and the resources port that follows
 # from it: skymp5-server/ts/ui.ts gives 3000 for 7777 and the game port plus
 # one otherwise. Publish-Server and Deploy-Server use the same rule.
+#
+# No settings file, or one with no port, is the server's own default, 7777.
+# One that is there and does not read stops the run: guessing 7777 for it
+# would have a dev root take the live server's answer for its own (#2711).
 function GamePortOf([string]$dir) {
-    try {
-        $cfg = [IO.File]::ReadAllText((Join-Path $dir 'server-settings.json')) | ConvertFrom-Json
-        if ($cfg.port) { return [int]$cfg.port }
-    } catch { }
+    $sp = Join-Path $dir 'server-settings.json'
+    if (-not (Test-Path -LiteralPath $sp)) { return 7777 }
+    $cfg = $null
+    try { $cfg = [IO.File]::ReadAllText($sp) | ConvertFrom-Json }
+    catch { throw ("$sp does not read, so the port this server answers on is not known: " + $_.Exception.Message) }
+    if ($null -ne $cfg -and $cfg.port) { return [int]$cfg.port }
     return 7777
 }
 
@@ -271,9 +435,10 @@ function MoveDir([string]$from, [string]$to) {
   running under this root is stopped outright and the handles are waited for.
 
   By this root and nothing else, because the live and the dev server are both
-  node. The task runs cmd.exe, which holds server.log open, and node under it
-  with a relative path on its command line, so cmd is found by the log path on
-  its line and node as cmd's child. The trailing backslash matters: C:\Thornswood-Server
+  node. The task runs cmd.exe, which starts server-log.js under node with this
+  root's paths on its line, and that node starts the server with a relative
+  path on its command line (#2349), so cmd and the writer are found by the
+  root on their lines and the server as the writer's child. The trailing backslash matters: C:\Thornswood-Server
   is a prefix of C:\Thornswood-Server-Dev.
 #>
 # Ours only: cmd.exe with this root's log on its line, the node it started
@@ -298,16 +463,25 @@ function ServerProcesses([string]$dir) {
 function StopServer([string]$dir) {
     # Found before the task is stopped.
     $ids = @(ServerProcesses $dir | ForEach-Object { [int]$_.ProcessId })
-    if (-not $NoTask) { try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop } catch { } }
-    $port = GamePortOf $dir
+    # No task yet is nothing to stop. One that is there and will not stop is
+    # said: its processes are stopped by id below whatever it does.
+    if (-not $NoTask -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+        try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
+        catch { Say ("the task {0} would not stop ({1}); its processes are stopped by id instead" -f $TaskName, $_.Exception.Message) 'Yellow' }
+    }
     foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
         Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
         Say ("stopped pid {0}" -f $id) 'Yellow'
     }
-    # The port let go, when it was ours that held it.
+    # The ports let go, every one the stopped processes held. Listed whole and
+    # filtered: -LocalPort with nothing on it is an error, and nothing there is
+    # what this waits for. A box that cannot list them says so and goes on: the
+    # processes are stopped by id above either way, and this is a rollback's
+    # path as well as an install's, so it does not stop half way.
     for ($i = 0; $i -lt 20; $i++) {
         $held = @()
-        try { $held = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) } catch { }
+        try { $held = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) }
+        catch { Say ("could not list the UDP ports to see them let go ({0}), going on without that wait" -f $_.Exception.Message) 'Yellow'; break }
         if (-not $held.Count) { break }
         Start-Sleep -Milliseconds 500
     }
@@ -321,20 +495,28 @@ function Answers([string]$dir) {
     $port = GamePortOf $dir
     $res = if ($port -eq 7777) { 3000 } else { $port + 1 }
     $until = (Get-Date).AddSeconds($Wait)
+    $why = ''
     while ($true) {
+        # Listed whole and filtered, as StopServer does: nothing on the port yet
+        # is what an empty list says, not an error. A list that cannot be had
+        # is not answering, and is said when the wait runs out.
         $udp = $false
-        try { $udp = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop).Count -gt 0 } catch { }
+        try { $udp = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $_.LocalPort -eq $port }).Count -gt 0 }
+        catch { $why = 'the UDP ports could not be listed: ' + $_.Exception.Message }
         $tcp = $false
         if ($udp) {
+            $c = New-Object Net.Sockets.TcpClient
             try {
-                $c = New-Object Net.Sockets.TcpClient
                 $null = $c.BeginConnect('127.0.0.1', $res, $null, $null).AsyncWaitHandle.WaitOne(500)
                 $tcp = $c.Connected
-                $c.Close()
-            } catch { }
+            } catch { $why = $_.Exception.Message }
+            finally { $c.Close() }
         }
         if ($tcp) { return $true }
-        if ((Get-Date) -gt $until) { return $false }
+        if ((Get-Date) -gt $until) {
+            if ($why) { Say ("not answering on {0} or {1}; the last try said: {2}" -f $port, $res, $why) 'Yellow' }
+            return $false
+        }
         Start-Sleep -Milliseconds 700
     }
 }
@@ -422,12 +604,18 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
         }
         if ($kept -gt 0) { Say ("kept $kept runtime file" + $(if ($kept -eq 1) { '' } else { 's' }) + ' in data, including the character book') 'Cyan' }
     }
+    # A log left behind is said, never passed over (#2349): server.log and
+    # its rolled copies hold the address of every connection, and the 30 days
+    # are kept by server-log.js in the folder the task runs, so one left in
+    # $from is outside them until somebody deletes it there. With the server
+    # stopped, only another program reading it can hold it.
     $moved = 0
     foreach ($f in @(Get-ChildItem -LiteralPath $from -File -Force -ErrorAction SilentlyContinue |
                      Where-Object { $_.Name -match '\.log(\.\d+)?$' })) {
         $dest = Join-Path $to $f.Name
         if (Test-Path -LiteralPath $dest) { continue }
-        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ } catch { }
+        try { Move-Item -LiteralPath $f.FullName -Destination $dest -Force -ErrorAction Stop; $moved++ }
+        catch { Say ("could not carry {0} across ({1}); it stays in {2}, where nothing keeps it to 30 days, so delete it there" -f $f.Name, $_.Exception.Message, $from) 'Yellow' }
     }
     if ($moved -gt 0) { Say 'logs carried across, to be rolled rather than deleted' 'Cyan' }
 }
@@ -441,32 +629,40 @@ function Prune([string]$kind, [int]$n) {
 
 # ---- the task --------------------------------------------------------------
 # What the task runs and how, registered over whatever task has the name.
-# $roller is roll-log.ps1 in the root.
-function Register-ServerTask([string]$roller) {
+# $writer is server-log.js in the root.
+function Register-ServerTask([string]$writer) {
     $existing = Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue
     if ($existing) { Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false }
 
-    # Through cmd rather than straight at node, purely so there is a log.
-    # A scheduled task throws its child's stdout and stderr away, so a server
-    # that refuses to start leaves nothing behind at all: the task reports it
-    # ran, the port never opens, and there is no way to find out why without
-    # sitting in an ssh session running it by hand. Redirecting is the whole
-    # reason cmd is in the chain.
+    # The server runs under server-log.js, which writes its log (#2349). A
+    # scheduled task throws its child's stdout and stderr away, so a server
+    # that refuses to start would leave nothing behind at all: the task
+    # reports it ran, the port never opens, and there is no way to find out
+    # why without sitting in an ssh session running it by hand. server-log.js
+    # starts the server with both streams piped to it and writes them to
+    # server.log, rolled at midnight and at 4 MB, and keeps no line in it or
+    # in any rolled copy for longer than 30 days (Patrick, 12 Oct 2026: the
+    # engine writes every connecting address there). Until then this was
+    # cmd's >> server.log 2>&1, which held the file open for as long as the
+    # server ran, so it could only be rolled by size in front of a start
+    # (Roll-Log.ps1) and never by age. See scripts\vps\Server-Log.js.
     #
-    # roll-log.ps1 goes first, because cmd holds server.log open for as long
-    # as node runs and nothing can move it until then (see Roll-Log.ps1). &
-    # rather than &&, so a roll that fails, or a roller that is not there,
-    # still starts the server.
+    # It goes through cmd's start /high, for the priority (below), and
+    # server-log.js gives the server its own priority as it starts it. /b
+    # keeps it in cmd's console and /wait keeps cmd, and so the task, running
+    # until the server ends. server-log.js ends with the server's exit code,
+    # and start leaves cmd's exit code 0 whatever that was, so call exit
+    # %^errorlevel% hands it back, and the task's last result says how the
+    # server ended, as it did before (measured 12 Oct: 3 for a node that
+    # exited 3, 0 without it). The log path is on the line, which is how
+    # ServerProcesses finds this root's cmd.exe.
     #
-    # node goes through cmd's start /high, for the priority (below). /b keeps
-    # it in cmd's console, so the redirection to server.log holds, and /wait
-    # keeps cmd, and so the task, running until node ends. start leaves cmd's
-    # exit code 0 whatever node's was, so call exit %^errorlevel% hands node's
-    # back, and the task's last result says how node ended, as it did before
-    # (measured 12 Oct: 3 for a node that exited 3, 0 without it).
+    # --also thornswood.log (#2166): the gamemode's own log, in this same
+    # folder (the task's working directory), names people too and used to
+    # roll by size only. server-log.js moves it aside daily and cuts every
+    # rolled copy of it to 90 days, so nothing in game\ had to change.
     $log = Join-Path $Root 'server.log'
-    $psExe = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    $cmd = ('/c ""{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" dist_back/skymp5-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f $node.Source, $log, $psExe, $roller)
+    $cmd = ('/c "start "" /b /wait /high "{0}" "{1}" --log "{2}" --also thornswood.log dist_back/skymp5-server.js & call exit %^errorlevel%"' -f $node.Source, $writer, $log)
     $action = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" `
                                       -Argument $cmd `
                                       -WorkingDirectory $Root
@@ -526,11 +722,61 @@ function Register-ServerTask([string]$roller) {
                                              -RestartInterval (New-TimeSpan -Minutes 1) `
                                              -ExecutionTimeLimit ([TimeSpan]::Zero) `
                                              -Priority 1
-    $principal = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
+    # LOCAL SERVICE, Limited, with a SID of its own, and the grants on its
+    # folder that go to that SID (#2578, ServiceAccount.ps1). -AsSystem is
+    # SYSTEM, Highest, as it was. A task whose SID cannot be looked up, or
+    # whose grants cannot be written, goes back on SYSTEM rather than start a
+    # server that cannot write its world.
+    $principal = New-ThornswoodServicePrincipal -AsSystem:$AsSystem
 
     Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
                            -Settings $settings -Principal $principal | Out-Null
+    if (-not $AsSystem) {
+        $why = ''
+        $sid = Get-ThornswoodTaskSid $TaskName
+        if (-not $sid) { $why = "the task's own SID, NT TASK\$TaskName, could not be looked up" }
+        else {
+            try {
+                foreach ($l in @(Grant-ThornswoodServiceFolder -Root $Root -Sid $sid -Writable 'world', 'data', 'private', 'for-bot' -Files '*.log', '*.log.*')) { Say $l 'DarkGray' }
+            } catch { $why = 'its folder could not be granted to it: ' + $_.Exception.Message }
+        }
+        if ($why) {
+            Say ("$why, so the task goes back on SYSTEM") 'Red'
+            Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false
+            Register-ScheduledTask -TaskName $TaskName -Action $action -Trigger $triggers `
+                                   -Settings $settings -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+        } else { Say "the task runs as LOCAL SERVICE, Limited, as NT TASK\$TaskName" 'Cyan' }
+    }
     Write-Host "scheduled task '$TaskName' registered, starts at boot, restarts every minute if it stops" -ForegroundColor Cyan
+}
+
+# ---- the log writer (#2349) -------------------------------------------------
+# Server-Log.js goes into the root as server-log.js, from beside this script
+# (Publish-Server sends the two together to C:\) or, run from a checkout,
+# from scripts\vps. The full path in the root, or '' when neither is there:
+# the task cannot start the server without it, so the callers refuse.
+function Copy-LogWriter {
+    $here = $PSScriptRoot
+    $src = $null
+    foreach ($cand in @((Join-Path $here 'Server-Log.js'), (Join-Path $here '..\vps\Server-Log.js'))) {
+        if (Test-Path -LiteralPath $cand) { $src = $cand; break }
+    }
+    if (-not $src) { return '' }
+    $to = Join-Path $Root 'server-log.js'
+    Copy-Item -LiteralPath $src -Destination $to -Force
+    return $to
+}
+
+# An install's roll: today's server.log moved aside whatever its size, so the
+# run this install starts has a file of its own and the tail read after it is
+# only this run, and every rolled file cut to the last 30 days. Never deleted
+# whole: deleting it is how the evidence for the last crash disappeared.
+# thornswood.log is aged with it, to 90 days (#2166).
+function Roll-ServerLog([string]$writer) {
+    $log = Join-Path $Root 'server.log'
+    $gm = Join-Path $Root 'thornswood.log'
+    & $node.Source $writer --log $log --also $gm --roll | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray }
+    if ($LASTEXITCODE -ne 0) { Say ("server-log.js could not roll server.log (exit {0}); the server appends to it and rolls it at midnight" -f $LASTEXITCODE) 'Yellow' }
 }
 
 # The priority node runs at under this root, read back after a start (#2491).
@@ -539,7 +785,9 @@ function Show-ServerPriority([string]$dir) {
     if (-not $nodes.Count) { Say "no node is running under $dir, so there is no priority to read" 'Yellow'; return }
     foreach ($p in $nodes) {
         $class = 'unreadable'
-        try { $class = [string](Get-Process -Id ([int]$p.ProcessId) -ErrorAction Stop).PriorityClass } catch { }
+        $proc = Get-Process -Id ([int]$p.ProcessId) -ErrorAction SilentlyContinue
+        if (-not $proc) { Say ("node, pid {0}, has already gone" -f $p.ProcessId) 'Yellow'; continue }
+        try { $class = [string]$proc.PriorityClass } catch { $class = 'unreadable (' + $_.Exception.Message + ')' }
         Say ("node, pid {0}, runs at {1} priority" -f $p.ProcessId, $class) $(if ($class -eq 'High') { 'Green' } else { 'Yellow' })
     }
 }
@@ -550,8 +798,7 @@ if ($TaskOnly) {
         Say "there is no server in $Root (no dist_back\skymp5-server.js), so there is nothing for the task to start. Nothing was changed." 'Red'
         Finish 'INSTALL REFUSED' 1
     }
-    $roller = Join-Path $Root 'roll-log.ps1'
-    if (-not (Test-Path -LiteralPath $roller)) { Say "$roller is not there, so server.log will not be rolled at start" 'Yellow' }
+    $writer = Copy-LogWriter
     # The task as it is now, for the way back.
     $oldXml = $null
     if (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue) { $oldXml = (Export-ScheduledTask -TaskName $TaskName | Out-String) }
@@ -559,12 +806,8 @@ if ($TaskOnly) {
     $resPort = if ($gamePort -eq 7777) { 3000 } else { $gamePort + 1 }
     Say 'stopping the server' 'Cyan'
     StopServer $Root
-    Register-ServerTask $roller
-    $log = Join-Path $Root 'server.log'
-    if (Test-Path -LiteralPath $roller) {
-        try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
-        catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
-    }
+    Register-ServerTask $writer
+    Roll-ServerLog $writer
     Start-ScheduledTask -TaskName $TaskName
     Say ("started through the new task, giving it {0} seconds to answer on UDP {1} and on {2}" -f $Wait, $gamePort, $resPort) 'DarkGray'
     if (Answers $Root) {
@@ -609,6 +852,34 @@ if (-not $PutBack) {
     New-Item -ItemType Directory -Path $stageDir -Force | Out-Null
     Expand-Archive -LiteralPath $Zip -DestinationPath $stageDir -Force
     Say "unpacked to $stageDir" 'Cyan'
+    # -FromStore (#459, the header): the record's build out of the store, into
+    # the stage, before what the payload brought into data is listed, so the
+    # compiled Papyrus counts as shipped. Onto a running server only.
+    if ($FromStore) {
+        $runSettings = Join-Path $Root 'server-settings.json'
+        if (-not (Test-Path -LiteralPath $runSettings)) {
+            Refuse @("-FromStore keeps the running server's load order, start point and plugins, and there is no server in $Root to keep them from. A first install takes a whole payload: Publish-Server.ps1 with -Dist.")
+        }
+        $rp = Join-Path $stageDir 'server-build.json'
+        $want = $null
+        try { $want = Read-ThornswoodRecord -Path $rp -Kind server-build } catch { Refuse @("the payload's server-build.json cannot be trusted, so nothing says which build to take out of the store: $($_.Exception.Message)") }
+        $got = Expand-ThornswoodStoredServerBuild -Store $Store -Record $want -RecordSum (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp))) -Into $stageDir
+        if ($got.Problem) { Refuse @($got.Problem) }
+        foreach ($l in $got.Said) { Say $l 'Cyan' }
+        # The light plugin rule of the engine the running order was written for
+        # (ServerOrder.ps1, #1715), against this one's: lightPlugins true or not.
+        $runRec = Join-Path $Root 'server-build.json'
+        $runLight = $false
+        if (Test-Path -LiteralPath $runRec) {
+            try { $rl = [IO.File]::ReadAllText($runRec) | ConvertFrom-Json; $runLight = ($rl.PSObject.Properties.Name -contains 'lightPlugins' -and $rl.lightPlugins -eq $true) } catch { $runLight = $false }
+        }
+        $newLight = ($want.PSObject.Properties.Name -contains 'lightPlugins' -and $want.lightPlugins -eq $true)
+        if ($runLight -ne $newLight) {
+            Refuse @(('the running server''s load order was written for an engine that ' + $(if ($runLight) { 'loads' } else { 'does not load' }) + ' light plugins, and this build ' +
+                      $(if ($newLight) { 'loads' } else { 'does not load' }) + ' them, so every form id after the first light plugin would move (ServerOrder.ps1, #1715). ' +
+                      'That goes with a load order written for it: Deploy-Gamemode.ps1, then Publish-Server.ps1 with -Dist.'))
+        }
+    }
     # What this payload brought into data, for Carry to leave alone.
     $sd = Join-Path $stageDir 'data'
     $shippedData = @()
@@ -667,6 +938,31 @@ if (-not $PutBack) {
         if ($first.Count) { Refuse $first }
         if ($askedKeys.Count) { [IO.File]::WriteAllText($settingsPath, (ConvertTo-Json -InputObject $s -Depth 30), (New-Object Text.UTF8Encoding($false))) }
         Say "there are no settings in $Root yet, so the payload's are its first" 'DarkGray'
+    }
+
+    # -FromStore (#459): the running server's plugins, by its own order, into
+    # the stage where the payload did not bring one (ours), and none of ours
+    # that the order does not name.
+    if ($FromStore) {
+        $plugDir = Join-Path $stageDir 'plugins'
+        $null = [IO.Directory]::CreateDirectory($plugDir)
+        $named = @{}
+        $taken = 0
+        foreach ($p in @($s.loadOrder)) {
+            $at = ([string]$p) -replace '/', '\'
+            $leaf = [IO.Path]::GetFileName($at)
+            if ($leaf) { $named[$leaf.ToLowerInvariant()] = $true }
+            if (-not $at.StartsWith($Root + '\plugins\', [StringComparison]::OrdinalIgnoreCase)) { continue }
+            $into = Join-Path $plugDir $leaf
+            if (Test-Path -LiteralPath $into) { continue }
+            $from = Join-Path (Join-Path $Root 'plugins') $leaf
+            if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $into -Force; $taken++ }
+        }
+        $brought = @(Get-ChildItem -LiteralPath $plugDir -File -Force | Where-Object { -not $named.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
+        if ($brought.Count) {
+            Refuse @(('the payload carries ' + ($brought -join ', ') + ', which the running server''s load order does not name, and -FromStore keeps that order. A change to the order goes with a full publish.'))
+        }
+        Say ("$taken plugin(s) the running server's load order names taken from $Root\plugins into the stage") 'Cyan'
     }
 
     # The load order resolves, against the stage. The paths in it are written
@@ -811,6 +1107,9 @@ function GoBack([string]$keptAs) {
         Say "COULD NOT MOVE $aside BACK TO $Root. The new one is in $failedAs. Look at the box." 'Red'
         Finish 'INSTALL FAILED' 1
     }
+    # The task this install registered runs the server under server-log.js
+    # in the root (#2349), and a folder from before it has none.
+    $null = Copy-LogWriter
     if ($StartNow -and -not $NoTask) {
         Start-ScheduledTask -TaskName $TaskName
         $gp = GamePortOf $Root
@@ -837,11 +1136,13 @@ function GoBack([string]$keptAs) {
 if ($hadRoot -and $null -ne $script:running) {
     $was = $null
     $now = $null
-    try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { }
-    try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-    $moved = @('server-settings.json, which cannot be read')
+    $unread = @()
+    try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the server-settings.json the server had, which cannot be read: ' + $_.Exception.Message) }
+    try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the server-settings.json now in place, which cannot be read: ' + $_.Exception.Message) }
+    if (-not $unread.Count -and ($null -eq $was -or $null -eq $now)) { $unread += 'server-settings.json, which is empty' }
+    $moved = $unread
     # What this run asked for (#1804) moved on purpose, as the release's keys did.
-    if ($null -ne $was -and $null -ne $now) { $moved = @(Compare-ThornswoodCarried $was $now @($ThornswoodInstallKeys + $askedKeys)) }
+    if (-not $unread.Count) { $moved = @(Compare-ThornswoodCarried $was $now @($ThornswoodInstallKeys + $askedKeys)) }
     if ($moved.Count) {
         Say ('read back: ' + ($moved -join ', ') + ' would not be what the server had, so nothing is started and the previous folder goes back') 'Red'
         GoBack 'the folder whose settings did not read back'
@@ -955,37 +1256,24 @@ if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '' }
 $siteTask = Get-ScheduledTask -TaskName 'Thornswood Docs' -ErrorAction SilentlyContinue
 if ($siteTask -and $siteTask.Principal.UserId -and $siteTask.Principal.UserId -notmatch '(?i)^(NT AUTHORITY\\)?SYSTEM$') {
     $siteSid = ''
-    try { $siteSid = (New-Object Security.Principal.NTAccount([string]$siteTask.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-    $has = @((Get-Acl -LiteralPath $Root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $siteSid })
-    if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
+    try { $siteSid = (New-Object Security.Principal.NTAccount([string]$siteTask.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { Say ("the site's task runs as {0}, which does not translate to an account here ({1}), so whether it may read server.log is not known" -f $siteTask.Principal.UserId, $_.Exception.Message) 'Yellow' }
+    if ($siteSid) {
+        $has = @((Get-Acl -LiteralPath $Root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $siteSid })
+        if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
+    }
 }
 
-# The roller the task runs in front of the server, from beside this script:
-# Publish-Server sends the two together, and run by hand from tools they are
-# already side by side. Without it the server still starts, the log just is
-# not rolled, so it is said here rather than stopped over.
-$here = $PSScriptRoot
-if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-# Publish-Server scp's Roll-Log.ps1 to C:\ beside this installer. Repo layout
-# keeps it under scripts\vps\. Prefer the same folder, then the repo path.
-$rollSrc = $null
-foreach ($cand in @(
-    (Join-Path $here 'Roll-Log.ps1'),
-    (Join-Path $here '..\vps\Roll-Log.ps1')
-)) {
-    if (Test-Path -LiteralPath $cand) { $rollSrc = $cand; break }
-}
-$roller  = Join-Path $Root 'roll-log.ps1'
-if ($rollSrc) {
-    Copy-Item -LiteralPath $rollSrc -Destination $roller -Force
-} else {
-    Write-Host "Roll-Log.ps1 is not beside this installer, so server.log will not be rolled at start." -ForegroundColor Yellow
-}
-# ---- end of the roller copy
+# The log writer the task runs the server under (#2349), into the root.
+# Found before anything changed (the refusal near the top), so it is there.
+$writer = Copy-LogWriter
+# A box that had the old roller in its root keeps nothing that runs it.
+$oldRoller = Join-Path $Root 'roll-log.ps1'
+if (Test-Path -LiteralPath $oldRoller) { Remove-Item -LiteralPath $oldRoller -Force }
 
 # ---- scheduled task --------------------------------------------------------
 # Register-ServerTask, above, says what the task is and why.
-if (-not $NoTask) { Register-ServerTask $roller }
+if (-not $NoTask) { Register-ServerTask $writer }
 
 function Tidy {
     Prune '.prev-*' $Keep
@@ -999,14 +1287,9 @@ if (-not ($StartNow -and -not $NoTask)) {
     Finish 'INSTALL OK' 0
 }
 
-# Rolled whatever its size rather than deleted, so the run before this
-# install is server.log.1 and the tail below reads only this one.
-# Deleting it is how the evidence for the last crash disappeared.
-$log = Join-Path $Root 'server.log'
-if (Test-Path -LiteralPath $roller) {
-    try { & $roller -Path $log -Force | ForEach-Object { Write-Host $_ -ForegroundColor DarkGray } }
-    catch { Write-Host ("could not roll server.log: {0}" -f $_.Exception.Message) -ForegroundColor Yellow }
-}
+# Rolled whatever its size rather than deleted (Roll-ServerLog), so the run
+# this install starts has a file of its own and the tail below reads only it.
+Roll-ServerLog $writer
 
 Start-ScheduledTask -TaskName $TaskName
 
@@ -1026,7 +1309,7 @@ if (Answers $Root) {
     Say ("the server is answering on {0}, game port {1}" -f $resPort, $gamePort) 'Green'
     Show-ServerPriority $Root
     Tidy
-    Say ("the task appends everything it prints to {0}\server.log, rolled at 4 MB before each start, five kept" -f $Root) 'DarkGray'
+    Say ("the task writes everything the server prints to {0}\server.log through server-log.js, rolled at midnight and at 4 MB, nothing kept past 30 days" -f $Root) 'DarkGray'
     Finish 'INSTALL OK' 0
 }
 

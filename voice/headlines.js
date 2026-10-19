@@ -47,6 +47,13 @@ const USAGE = {
 
 const MARK_METRES = { whisper: 7, local: 30, yell: 85 };
 
+/* Voice turned into words (#2475). A seventieth of a metre is a unit, as in
+   voice-server.js, so a caption reaches as far as the voice it came from:
+   7, 30 or 85 metres by the speaker's mode, the same distances the speaking
+   mark uses. */
+const UNITS_PER_METRE = 70;
+const CAPTION_CHARS = 200;
+
 function cut(text, n) {
   const s = String(text == null ? '' : text).replace(/\s+/g, ' ').trim();
   if (s.length <= n) return s;
@@ -99,6 +106,21 @@ function emoteHead(name) {
   return cut(s, FLOAT_CHARS);
 }
 
+/* What a caption says above a head: one line, cut to the same 80 as a
+   typed line. Nothing that can break a line, turn the text round or hide in
+   it survives, because the words come from the speaker's own machine. */
+function captionHead(text) {
+  const s = String(text == null ? '' : text)
+    .slice(0, CAPTION_CHARS)
+    .replace(/[\u0000-\u001f\u007f-\u009f\u061c\u200b-\u200f\u2028\u2029\u202a-\u202e\u2060-\u2069\ufeff]/g, ' ');
+  return cut(s, FLOAT_CHARS);
+}
+
+/* How far a caption reaches, in units, for the speaker's voice mode. */
+function captionReach(mode) {
+  return markMetres(mode) * UNITS_PER_METRE;
+}
+
 function sameCellWithin(a, b, reach) {
   if (!a || !b) return false;
   if (String(a.cell) !== String(b.cell)) return false;
@@ -138,5 +160,8 @@ module.exports = {
   emoteHead: emoteHead,
   sameCellWithin: sameCellWithin,
   markMetres: markMetres,
-  markVisible: markVisible
+  markVisible: markVisible,
+  CAPTION_CHARS: CAPTION_CHARS,
+  captionHead: captionHead,
+  captionReach: captionReach
 };

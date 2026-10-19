@@ -21,6 +21,7 @@ start the restored server and connect to it; see the end of that section.
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
 | `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
+| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore, from the copies nothing runs from at once and from each service's own files at its next start (#2758) (issue #2351, `docs\WEBSITE-OPERATIONS.md` "Deletion requests") |
 | `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
 | `tests\test-backup-streaming.ps1` | verifies large uploads, old archive compatibility, tampering, stream failures and publication collisions with disposable data |
@@ -39,7 +40,9 @@ folder: the character cards in `characters.json`, the door's `door.json`,
 site's `uploads` (the gallery's pictures) and each feed's store
 (`version.json`, `published.json`, `launchers.txt`, `releases.txt` and
 `history`, for `feed` and `feed-dev`), the bot's config and its join record
-(`joins.json`, which arrival each person was), and the Caddyfile. `NOTES.txt`
+(`joins.json`, which arrival each person was), the record of completed
+deletion requests (`deletions\requests.jsonl`, since issue #2351), and the
+Caddyfile. `NOTES.txt`
 in it counts the characters in each world and names any private file that was
 missing. The voice service's `owners.json` and `secret.txt` stopped being
 taken on 23 September, when the character register they belonged to was
@@ -66,11 +69,34 @@ another stream's cleanup fails. Publication refuses to overwrite a backup
 with the same timestamp. Neither a failed run nor retention considers an
 unrelated file for deletion.
 
-Before restoring a website backup into service, reapply any completed
-account or gallery deletion requests made after that backup. Restrict the
-rehearsal destination to the operators: an unpacked archive contains
-credentials and private records. A restore rehearsal must use a disposable
-destination, never the live service folder.
+Before anything restored goes back into service, the people who asked to be
+deleted are removed again (issue #2351): a backup still holds everybody who
+asked after it was taken. `Restore-Box.ps1` does it as its last step. After
+any other restore (Restore-Server.ps1 on its own, a folder copied back by
+hand), before the services start again, on the box:
+```powershell
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply'
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply -Delete'
+```
+The first is a dry run that counts what goes; the second removes it from
+every copy nothing runs from and asks each service again, stopping nothing:
+each takes the request out of its restored files as it starts, so run it
+before they start (#2758). When the backup
+being put back carries a record the box's own does not, add
+`-Merge <its deletions\requests.jsonl>` to both. The second writes
+`private\deleted-characters.json` again in each game server that holds
+something of theirs: as it starts, `server-log.js` deletes their saves before
+the engine loads them (`server.log` says `deletions:`), and the gamemode lets
+go of what its restored registers say about them (#2351): its
+`thornswood.log` says `release:` with counts, and the list is gone once every
+part is done. Putting back a folder an install or a
+wipe set aside (`C:\Thornswood-Server.prev-<date>`, `world-before-<date>`
+and the `*-before-<date>.json` registers in `private`) is a restore too: run
+the two lines above with that server still stopped, before it starts. "Deletion requests" in
+`docs\WEBSITE-OPERATIONS.md` is the whole procedure. Restrict the rehearsal
+destination to the operators: an unpacked archive contains credentials and
+private records. A restore rehearsal must use a disposable destination, never
+the live service folder.
 
 Before 18 September it held none of it. The world was never in the backup at
 all.
@@ -101,6 +127,9 @@ The common case, and it does not need the server stopped for long.
    ```powershell
    Get-ChildItem C:\restore-check\game\world\changeForms -Filter *.json | Where-Object { $_.BaseName -match '^\d+$' } | Where-Object { (Get-Content $_.FullName -Raw | ConvertFrom-Json).profileId -eq 1234567 } | Select-Object Name
    ```
+   Never put back a character whose profile id is in the record of deletion
+   requests, `C:\Thornswood-Deletions\requests.jsonl`: that person asked for
+   it to be gone (issue #2351).
    Confirm the live server's file with the same slot number holds the same
    profile id before copying anything: a slot belongs to one character for as
    long as it lives, but a character deleted and made again gets a new one.
@@ -159,8 +188,10 @@ rehearsal, or a real move, that loses it is acceptable. In short:
    lines it prints. The join pass switch and the written role lists
    (`thornswoodRequirePass`, `thornswoodDevs`, `thornswoodPlaytesters`) come
    from the backup too, since no build carries them (issue #1845); those
-   lines name each one and never its value. Then `vps-restore-services.ps1` puts the rest back, and
-   the copy on the box is deleted. By hand, from an unpacked backup, it is:
+   lines name each one and never its value. Then `vps-restore-services.ps1` puts the rest back,
+   `Delete-Person.ps1 -Reapply -Delete` removes again everybody in the record
+   of deletion requests, the backup's merged into the box's, and the copy on
+   the box is deleted. By hand, from an unpacked backup, it is:
    - `game\world` -> `C:\Thornswood-Server\world`
    - `game\private` -> `C:\Thornswood-Server\private`
    - `game\data` -> `C:\Thornswood-Server\data`
@@ -174,6 +205,10 @@ rehearsal, or a real move, that loses it is acceptable. In short:
    - `bot\joins.json` -> `C:\Thornswood-Bot\data\joins.json`, before the bot
      starts, or the join cards start counting again
    - `web\Caddyfile` -> `C:\Thornswood-Caddy\Caddyfile`
+   - `deletions\requests.jsonl` is not copied: with everything above in place
+     and nothing started, `Delete-Person.ps1 -Reapply -Delete -Merge
+     <unpacked>\deletions\requests.jsonl` adds its lines to the box's record
+     and removes those people again
 4. **The rest comes from the repository and Patrick's machine, not from the
    backup**, steps 14 to 25 there: `.\scripts\deploy\Deploy-Docs.ps1` (never
    `-SeedDocs`, which would flatten the restored documents),
@@ -204,6 +239,25 @@ rehearsal, or a real move, that loses it is acceptable. In short:
 
 Worth an hour, and it is the only thing that turns this file from a guess into
 a runbook.
+
+It is also the only measure of how long a restore takes, the RTO row of
+[SERVICE-OBJECTIVES.md](SERVICE-OBJECTIVES.md).
+
+**It is due monthly.** Patrick ruled on 18 October 2026 (#1046) that the
+hands-on rehearsal runs once a month: restore the newest backup with
+`Restore-Server.ps1 -Rehearse`, start the folder, connect, load a character
+from the backup, then delete the folder ("Not done yet: starting it and
+connecting", below). The record of when it last ran is the Last rehearsed
+line at the end of this section, written by hand only after a real run.
+`scripts\vps\Check-RehearsalDue.ps1` reads that line, and the nightly checks
+run it: once the line is more than 35 days old (a month with a few days'
+slack, `-Days`), the night fails and the board's "Nightly checks failed"
+issue says the rehearsal is overdue, until somebody does one and writes the
+date. Run it by hand to see when the next is due:
+
+```powershell
+.\scripts\vps\Check-RehearsalDue.ps1
+```
 
 `tests\test-backup-restore.ps1` does the scripted half every night on
 scratch folders: backs up a stand-in live and dev server, deletes the
@@ -260,7 +314,7 @@ the box has no repo:
 
 ```powershell
 scp .\scripts\deploy\Install-ThornswoodServer.ps1 .\scripts\deploy\ServerSettings.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/deploy/
-scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Roll-Log.ps1 Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
+scp .\scripts\vps\Restore-Server.ps1 .\scripts\vps\Restore-Backup.ps1 .\scripts\vps\Server-Log.js Administrator@192.135.112.23:C:/Thornswood-RestoreTest/scripts/vps/
 ```
 
 and then, on the box:
@@ -330,17 +384,51 @@ alone (`tests	est-install-server.ps1` holds it to that).
 
 ### Not done yet: starting it and connecting
 
-A restored folder has not been started and connected to. Before anybody does:
+A restored folder has not been started and connected to yet. A plain restore
+makes the folder be the server it came from, so starting it as restored is not
+safe:
 
-1. Give it free ports in its `server-settings.json` (`port`, and
+1. It has the live ports in its `server-settings.json` (`port`, and
    `thornswoodVoicePort`): Restore-Server has just set them to the live ones.
-2. Move `private\door.json` out of the folder. It names the live site and
-   holds the key the site trusts, so a test server started with it pushes its
-   roster to the live site and asks the live site who is allowed in.
-3. Start it by hand (`node dist_back/skymp5-server.js` in that folder), watch
-   `thornswood.log`, connect with a launcher pointed at that port and load a
-   character.
-4. Delete the folder.
+2. It has `private\door.json`. That file names the live site and holds the key
+   the site trusts, so a test server started with it pushes its roster to the
+   live site and asks the live site who is allowed in. It also holds the join
+   pass key (`passKey`).
+3. It is started by hand (`node dist_back/skymp5-server.js` in that folder),
+   with `thornswood.log` watched, a launcher pointed at that port, and a
+   character loaded.
+4. Then the folder is deleted.
+
+Since issue #1046, `Restore-Server.ps1 -Rehearse` does steps 1 and 2 and
+prints 3 and 4. It refuses `C:\Thornswood-Server` and
+`C:\Thornswood-Server-Dev`, and it acts only after every check above has
+passed:
+
+```powershell
+.\scripts\deploy\Install-ThornswoodServer.ps1 -Zip <payload> -Root C:\Thornswood-RestoreTest -NoTask -RequirePass on
+.\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-RestoreTest -Rehearse
+```
+
+- **Ports**: `port` and `thornswoodVoicePort` become free ones. That means the
+  first game port from 7800 up whose UDP and TCP are free and whose resources
+  port (port+1, which the server opens itself) is free, then the next free TCP
+  port for voice. They are never the live or dev ports, read from both server
+  folders and the backup, and never 7777, 7778, 3000, 7787 or 7788.
+  `-Port` and `-VoicePort` name them instead and are checked the same way.
+- **Door**: `private\door.json` is deleted from the throwaway folder. The
+  backup still holds it.
+- **Join pass**: `thornswoodRequirePass` is set to false, because the join pass
+  key left with `door.json`. So start a rehearsal only where its ports are not
+  open to the internet: on a PC behind its router, with a launcher on the same
+  machine pointed at `127.0.0.1`.
+- **Name**: ` (restore rehearsal)` goes on the end of the server's name.
+- **Record**: `rehearsal.json` in the folder says when, from which backup,
+  the ports and what was taken out.
+
+It ends `REHEARSAL READY` with the start line, the launcher's `ServerAddress`
+and `ServerPort` for its `config.json`, and the `Remove-Item` that ends it. It
+does not change the line below: that waits for somebody who has started the
+folder, connected and loaded a character from the backup.
 
 **Last rehearsed: 28 September 2026** (unpack and restore, on Patrick's machine
 and on the VPS; not started or connected to).

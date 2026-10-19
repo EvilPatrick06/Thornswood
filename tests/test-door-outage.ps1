@@ -17,8 +17,8 @@
 
   This compiles the real Door.cs, with the real Standing class lifted out of
   Discord.cs by brace match, against a stand-in Discord.Join that returns the
-  answer each case names. It compiles with the same .NET Framework 4 csc the
-  launcher is built with, so it is also a C# 5 check on Door.cs. Then it
+  answer each case names. It compiles with the compiler the build runs
+  (tests\Launcher-Csc.ps1). Then it
   drives Door.Check through a real WPF dispatcher, the way Shell does, and
   reads back whether Play went ahead, whether the box went up, what it said
   and what door.txt says afterwards. test-join-outage.js is the site's half.
@@ -29,6 +29,7 @@
 param([string]$DoorPath, [string]$DiscordPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -48,30 +49,13 @@ function Done {
     if ($script:fail) { exit 1 } else { exit 0 }
 }
 
-# ---- the compiler the launcher is built with --------------------------------
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) {
-    Write-Host 'SKIP  no .NET Framework 4 csc on this machine, so Door.cs cannot be compiled here'
-    Done
-}
-$fw = Split-Path -Parent $csc
-$refs = @(
-    (Join-Path $fw 'System.dll'),
-    (Join-Path $fw 'System.Core.dll'),
-    (Join-Path $fw 'System.Xaml.dll'),
-    (Join-Path $fw 'WPF\WindowsBase.dll'),
-    (Join-Path $fw 'WPF\PresentationCore.dll'),
-    (Join-Path $fw 'WPF\PresentationFramework.dll')
-)
-foreach ($r in $refs) {
-    if (-not (Test-Path -LiteralPath $r)) {
-        Write-Host "SKIP  $r is missing, so Door.cs cannot be compiled here"
-        Done
-    }
-}
+# ---- the compiler the launcher is built with (tests\Launcher-Csc.ps1) -------
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+$refs = @('System.dll', 'System.Core.dll', 'System.Xaml.dll', 'WindowsBase.dll', 'PresentationCore.dll', 'PresentationFramework.dll') |
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
+foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
+if (@($refs | Where-Object { -not (Test-Path -LiteralPath $_) }).Count) { Done }
 
 # ---- the real Standing, out of Discord.cs -----------------------------------
 $discordSrc = Get-Content -LiteralPath $DiscordPath -Raw
@@ -192,16 +176,15 @@ try {
     $exe = Join-Path $tmp 'door-outage-test.exe'
     $work = Join-Path $tmp 'profile'
 
-    # /noconfig for the same reason Build-Launcher.ps1 gives: csc.rsp adds its
-    # own copies of the framework and a machine with the reference assemblies
-    # installed stops on CS1703.
+    # /noconfig, as the build does: csc.rsp adds its own copies of the
+    # framework, and beside the reference assemblies that stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     $cscArgs += (Resolve-Path -LiteralPath $DoorPath).Path
     $cscArgs += $driverFile
-    $compiled = & $csc @cscArgs
+    $compiled = & $LauncherCsc @cscArgs
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'Door.cs compiles with the .NET Framework 4 csc, which is C# 5' $built
+    Yes 'Door.cs compiles with the compiler the build runs' $built
     if (-not $built) {
         foreach ($l in @($compiled)) { Write-Host "      $l" }
         Done
