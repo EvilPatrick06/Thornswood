@@ -44732,6 +44732,8 @@ log('gamemode loaded:',
     if (baseId === GOLD) { return true; }
     if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
+    // #2479: the cut rows (#1511) are held back the way a sword is.
+    if (isCutOut(baseId)) { return true; }
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
 
