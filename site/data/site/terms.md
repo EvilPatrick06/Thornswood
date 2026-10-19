@@ -105,10 +105,12 @@ GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.
 
 ## Supporting it
 
-The Patreon is a way to help with the server bill. It buys nothing in the
-world: no items, no ranks, no advantage, no priority. If that ever changes it
-will be announced before it does, not discovered. Patreon handles the payment
-and Thornswood never sees a card. Cancelling is done at Patreon.
+The Patreon pays for the server, the domain and the other expenses of keeping
+Thornswood running, and nothing else. It is not payment for anybody's time
+making mods, which Bethesda's terms for mods do not allow. It buys nothing in
+the world: no items, no ranks, no advantage, no priority. If that ever changes
+it will be announced before it does, not discovered. Patreon handles the
+payment and Thornswood never sees a card. Cancelling is done at Patreon.
 
 ## No promises about it working
 
