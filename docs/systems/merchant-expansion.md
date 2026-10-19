@@ -15,8 +15,11 @@ Deliver usable sections before the whole quest catalogue is complete. The
 first runtime section assigns the selected sixty merchants their role names,
 item tables and matching legacy quest offers. The next section applies the
 sixty-only roster to the population generator and the matching last plugin.
-It requires Claude's coordinated content/client/server release and a one-time
-alpha merchant-ledger reset. Neither section adds expanded quests. New offers
+It requires Claude's coordinated content/client/server release. Empty alpha
+merchant records initialize through ordinary first use, once per retained
+merchant; no pre-funding or reset is required. If old pending test work blocks
+admission, the explicit reset-data tool is available to Claude. Neither
+section adds expanded quests. New offers
 still need their own objective, eligibility and transaction checks.
 
 Each of the ten existing book holds, including Raven Rock, has exactly six

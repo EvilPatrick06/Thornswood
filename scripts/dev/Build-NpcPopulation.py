@@ -443,7 +443,7 @@ def activate_guild(payload):
     result = copy.deepcopy(payload)
     policy = json.loads((HERE.parent.parent / 'game/data/merchant-roster.json').read_text(encoding='utf-8'))
     result['merchantHistory'] = apply_roster(result['npcs'], policy)
-    result['merchantRoster'] = {'version': 1, 'worldMode': 'existing'}
+    result['merchantRoster'] = {'version': 1, 'worldMode': 'alpha'}
     kept = [row for row in result['npcs'] if row['keep']]
     counts = collections.Counter(row['role'] for row in kept)
     result['summary'].update(retained=len(kept), excluded=len(result['npcs'])-len(kept), retainedByRole=dict(counts))

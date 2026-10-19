@@ -28,6 +28,20 @@ for(const row of roster.merchants) {
 }
 assert.equal(writes,60);assert.deepEqual(copy(service.pendingRecords()),[],'discarded mirror transfers are not recovery authority');
 assert.equal(service.stats().initialized,0,'reset is not a recurring grant');service.shutdown();
+{
+  const alpha=copy(data);alpha.merchantRoster.worldMode='alpha';
+  let saved=0,ledger={version:1,entries:Object.fromEntries(roster.history.map(([ref])=>[ref,null]))};
+  mirrors.clear();
+  const storage={load:()=>copy(ledger),durable:true,namespace:{},save:next=>{saved++;ledger=copy(next);return true;}};
+  const admitted=context.createNpcMerchantPurses(native,alpha,storage);
+  assert.equal(saved,0,'an alpha cut with no saved merchant state needs no pre-funding or reset');
+  const selected=roster.merchants[0],id=ids.get(selected.reference);
+  assert.equal(admitted.prepare(id).purse,250);assert.equal(saved,1,'ordinary first use grants once to a retained merchant');
+  assert.equal(admitted.prepare(id).purse,250);assert.equal(saved,1);
+  const retired=roster.history.find(([ref])=>!roster.merchants.some(row=>row.reference===ref));
+  assert.equal(admitted.prepare(ids.get(retired[0])),null,'retired merchants never get an alpha grant');
+  assert.equal(saved,1);admitted.shutdown();
+}
 for(const change of [r=>r.history.pop(),r=>r.merchants.pop(),r=>r.merchants[0].role='Merchant',
   r=>r.merchants[0].base='dead:Skyrim.esm',r=>r.merchants[0].bookHold='riften']) {
  const bad=copy(roster);change(bad);assert.throws(()=>createAlphaMerchantLedger(bad,population),/cannot be verified/);

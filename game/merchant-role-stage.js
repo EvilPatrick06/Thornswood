@@ -14,7 +14,7 @@ function prepareMerchantRoleStage(population,catalog,stage,native) {
   if(!object(population) || !object(stage))fail();
   const retirement=population.merchantRoster!==undefined,count=retirement?60:249;
   if(retirement && (!object(population.merchantRoster) || population.merchantRoster.version!==1 ||
-      population.merchantRoster.worldMode!=='existing' || Object.keys(population.merchantRoster).length!==2 ||
+      !['existing','alpha'].includes(population.merchantRoster.worldMode) || Object.keys(population.merchantRoster).length!==2 ||
       JSON.stringify(population.merchantHistory)!==JSON.stringify(stage.history)))fail();
   if(!object(stage) || stage.version!==1 || !Array.isArray(stage.history) || stage.history.length!==249 ||
       !Array.isArray(stage.merchants) || stage.merchants.length!==60 || !object(stage.tables) ||
