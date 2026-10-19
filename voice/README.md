@@ -81,9 +81,16 @@ socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a
 join storm, the WebRTC signalling for every pair, walking and talk) and prints
 what the service cost at each size, which is where that number came from.
+It sends every message from its own one thread, so past a hundred or so
+people its signalling time is its own; `load-signalling.js` measures what the
+service itself takes to relay a full room's signalling (#2390).
 The joins and leaves one turn of the event loop handles share one roster, so
 a restart that brings every page back at once costs each socket a few
 rosters rather than one per arrival (#2332, `test-roster-once.js`).
+What one turn sends a socket goes to the kernel in writes of about 16 KB
+rather than one write a message (#2390): at 200 people, every pair trading an
+offer, an answer and six candidates each way took the service 5.5 to 6.0 s
+before and 2.4 to 2.6 s after, measured with `load-signalling.js`.
 `THORNSWOOD_CAPTIONS` (off when unset) is voice shown as words above the
 speaker's head (#2475). The words are made on the speaker's own machine and
 only the text comes here, as `{ t: 'caption', text }`; with it `on`, a
