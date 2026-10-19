@@ -136,7 +136,9 @@ function boot(opts) {
       return refs[id][prop];
     },
     getDescFromId: function (id) { return '0x' + id.toString(16); },
-    set: function (id, prop, v) { w.writes.push([id, prop, v]); }
+    set: function (id, prop, v) { w.writes.push([id, prop, v]); },
+    // The engine's whole-file write (#2740), as far as the gamemode can tell.
+    writeFileWhole: function (p, text) { fs.writeFileSync(p, text); }
   };
   const sandbox = {
     mp: mp,
