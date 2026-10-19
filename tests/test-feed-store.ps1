@@ -164,7 +164,7 @@ try {
     $said = @(Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site 6>&1)
     $r = @($said | Where-Object { $_ -is [hashtable] })[0]
     $note = (@($said | Where-Object { $_ -isnot [hashtable] } | ForEach-Object { [string]$_ }) -join ' ')
-    Yes 'a releases.txt that cannot take its line does not stop a feed that landed' ($null -ne $r -and @($r.Sent) -contains 'version.json' -and (Sha (Join-Path $site 'feed-dev\version.json')) -eq (Sha (Join-Path $dir 'version.json')))
+    Yes 'a releases.txt that cannot take its line does not stop a feed that landed' ($null -ne $r -and @($r.Sent) -contains 'version.json' -and (Sha (Feed (Join-Path $site 'feed-dev'))) -eq (Sha (Join-Path $dir 'version.json')))
     Yes '  and the send says which line was not added, and why' ($note -match 'NOTE: the feed went out, but feed-dev\\releases\.txt was not given this release''s line: ' -and $note -match 'Get-FeedStoreReleases will not name this one')
     Remove-Item -LiteralPath $relTxt -Recurse -Force
 

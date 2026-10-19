@@ -286,11 +286,12 @@ function ReadShared($p) {
 }
 function DropParts { foreach ($n in $names) { Remove-Item -LiteralPath (Join-Path $dir ($n + '.part')) -Force -ErrorAction SilentlyContinue } }
 # Where a store file is now, relative to $dir: version.json is the newest of
-# its generations (above), '' while it has none; the rest are by name.
+# its generations (above), '' while it has none; the rest are by name. With a
+# forward slash, so the same text is a path here and to scp.
 function Here([string]$n) {
   if ($n -ne 'version.json') { return $n }
   $g = Get-FeedVersionName $dir
-  if ($g) { return ('version\' + $g) } else { return '' }
+  if ($g) { return ('version/' + $g) } else { return '' }
 }
 # The same for a feed named from the root, 'feed\version.json'.
 function FromRoot([string]$k) {
@@ -494,7 +495,7 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
     $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     $remote = $v.User + '@' + $v.Vps + ':' + $v.Root.TrimEnd('/') + '/' + $prefix + '/'
     if ($Up) { Invoke-ThornswoodNative { & scp @ssh $from ($remote + $dest) } 2>&1 | Out-Null }
-    else { Invoke-ThornswoodNative { & scp @ssh ($remote + $from.Replace('\', '/')) $dest } 2>&1 | Out-Null }
+    else { Invoke-ThornswoodNative { & scp @ssh ($remote + $from) $dest } 2>&1 | Out-Null }
     $rc = $LASTEXITCODE
     if ($rc -ne 0) { throw ("scp could not " + $(if ($Up) { "send $from" } else { "fetch $from" }) + " (exit $rc). Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test.") }
 }
