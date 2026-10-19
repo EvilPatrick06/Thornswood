@@ -600,8 +600,9 @@ Yes '  and the synced install follows it to the older texture' ((Get-Game $synce
 # pointer that did not read left those files unnamed, and they went. Now the
 # run stops there, before anything is deleted.
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev, with the main feed''s baseline unreadable'
-$mainFeedPath = Join-Path $site 'feed\version.json'
-$mainFeedWas = [IO.File]::ReadAllText($mainFeedPath)
+# The main feed changes the way the store sends one: as its next generation (#2727).
+$mainChan = Join-Path $site 'feed'
+$mainFeedWas = [IO.File]::ReadAllText((Get-FeedVersionFile $mainChan))
 $ledgerPath = Join-Path $work 'scrub-ledger.json'
 $ledgerWas = $(if (Test-Path -LiteralPath $ledgerPath) { [IO.File]::ReadAllText($ledgerPath) } else { $null })
 $stray = Put-Text $da 'a file only a ledger names, while the main baseline does not read'
@@ -612,11 +613,11 @@ $led[$stray] = 'stand-in for a replaced file'
 $mf = ConvertFrom-Json $mainFeedWas
 if ($mf.PSObject.Properties['baseline']) { $mf.baseline = [pscustomobject]@{ id = 'no-sha-no-url' } }
 else { $mf | Add-Member -NotePropertyName 'baseline' -NotePropertyValue ([pscustomobject]@{ id = 'no-sha-no-url' }) }
-[IO.File]::WriteAllText($mainFeedPath, ($mf | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path (Join-Path $mainChan 'version') (Get-FeedVersionNext $mainChan)), ($mf | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
 $r = Scrub 'dev' @()
 Yes 'the run stops, saying the main feed''s baseline does not read' ($r.Code -ne 0 -and $r.Out -match 'The main feed names a baseline that does not read' -and $r.Out -match 'Nothing was deleted')
 Yes '  and deletes nothing' (Test-Path -LiteralPath (Join-Path $da $stray))
-[IO.File]::WriteAllText($mainFeedPath, $mainFeedWas, (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText((Join-Path (Join-Path $mainChan 'version') (Get-FeedVersionNext $mainChan)), $mainFeedWas, (New-Object Text.UTF8Encoding($false)))
 if ($null -ne $ledgerWas) { [IO.File]::WriteAllText($ledgerPath, $ledgerWas, (New-Object Text.UTF8Encoding($false))) } else { Remove-Item -LiteralPath $ledgerPath -Force }
 Remove-Item -LiteralPath (Join-Path $da $stray) -Force
 
