@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 205 of them, by area: `release` builds and
+Every `.ps1` under this folder, 207 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -163,6 +163,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/RecordShape.ps1](release/RecordShape.ps1) | The shape and version each high-risk JSON record must have, checked fail closed (#2180, first slice). docs\JSON-STATE-INVENTORY.md lists every critical JSON file, who writes it and who reads it. |
 | [release/Refresh-DevNews.ps1](release/Refresh-DevNews.ps1) | Marks the dev feed's notes DEV again against what main has published, and sets its mainVersion, with no release. |
 | [release/Release-Baseline.ps1](release/Release-Baseline.ps1) | What a release is diffed against, and the record each release publishes of what it left installed (#441). |
+| [release/Release-Manifest.ps1](release/Release-Manifest.ps1) | The signed release manifest, phase B of docs\SIGNED-RELEASES.md (#2163). |
 | [release/Release-Name.ps1](release/Release-Name.ps1) | One name for each release, recorded in the feed and the store, and a git tag on the commit it was built from (#444). |
 | [release/Repair-Manifest.ps1](release/Repair-Manifest.ps1) | Takes packs with no download url back out of version.json and sends the fix. |
 | [release/RepoPlugins.ps1](release/RepoPlugins.ps1) | The plugins this repository builds and ships itself, in one list (#2486). |
@@ -174,6 +175,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Ship-Stack.ps1](release/Ship-Stack.ps1) | One Dev or Main command that runs gamemode deploy, the installer package, and the host feed remirror. |
 | [release/Ship.ps1](release/Ship.ps1) | Builds the launcher and publishes everything that changed, launcher and mods both, in a single release, to the main build or the dev build. |
 | [release/Sign-Artifact.ps1](release/Sign-Artifact.ps1) | Signs a built binary, or says plainly that it is not signing and carries on. |
+| [release/Sign-ReleaseCatalog.ps1](release/Sign-ReleaseCatalog.ps1) | Signs the release manifest's catalog with ThornswoodRelease and checks it the way every installed launcher checks a launcher (#2163, phase B). |
 | [release/Source-Notice.ps1](release/Source-Notice.ps1) | The note and licence texts that go inside every download on the update feed that carries SkyMP files. |
 | [release/Sync-Client.ps1](release/Sync-Client.ps1) | Puts the client runtime built from the fork into the game folder, and refuses any file that is not the recorded build. |
 | [release/Test-ReleaseFiles.ps1](release/Test-ReleaseFiles.ps1) | Checks the files of a launcher release draft on any machine, with no signing setup: each against SHA256SUMS, and with -RequireSigned the launcher's signature the way an installed launcher checks it (issue #2163). |

@@ -645,7 +645,7 @@ jobs:
                  'test-site-render.js', 'test-site-discovery.js', 'test-998-patreon-copy.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
                  'test-download-button.js', 'test-gallery-ux.js', 'test-gallery.js', 'test-site-local.js',
-                 'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1',
+                 'test-release-baseline.ps1', 'test-publish-refusals.ps1', 'test-2513-every-harness-listed.ps1', 'test-release-workflow.ps1', 'test-2163-release-manifest.ps1',
                  'test-2460-winps-module-path.ps1',
                  'test-feed-watch.js', 'test-2636-feed-watch-quiet.ps1',
                  'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-known-issues.js', 'test-known-page.js', 'test-sunhelm-gone.js', 'test-known-npcs.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
