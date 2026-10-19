@@ -207,6 +207,9 @@ function Build {
     }
     Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"formDesc":"ff000a07","profileId":' + $P1 + '}')
     Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{}}')
+    # An old copy set aside with no private folder at all, only a discarded
+    # change form of theirs (the 18 Oct real run stopped on ENOENT here).
+    Put (Join-Path $Box 'Thornswood-Server.prev-20260930-000000\world-before-1\changeForms\_discarded-1\ff000a08.json') ('{"formDesc":"ff000a08","profileId":' + $P1 + '}')
     # A list the dev server has not let go of yet, part of it done.
     Put (Join-Path $Dev 'private\deleted-characters.json') '{"profiles":[9999],"actors":[4278199999],"done":{"property":1}}'
 
@@ -396,6 +399,9 @@ try {
     Yes 'the live server''s folder an install set aside loses their change form too' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
     $prevList = J (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\deleted-characters.json')
     Yes '  and gets the list, so it lets go of them too if it is ever put back' ((@($prevList.actors) -join ',') -eq '4278192647' -and (@($prevList.profiles) -join ',') -eq "$P1")
+    $old = Join-Path $Box 'Thornswood-Server.prev-20260930-000000'
+    Yes 'an old copy with no private folder loses their discarded change form' (-not (Test-Path (Join-Path $old 'world-before-1\changeForms\_discarded-1\ff000a08.json')))
+    Yes '  and is given no list, and no private folder is made for one' (-not (Test-Path (Join-Path $old 'private')))
     Yes 'the run says which game servers let go of the registers as they start, and not the copy set aside' (
         (Said 'registers are let go as each of these starts: dev game server, live game server\.') -and (Said 'thornswood\.log says release:'))
 
