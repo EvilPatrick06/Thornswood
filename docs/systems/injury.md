@@ -160,6 +160,7 @@ Not in yet:
 
 A broken arm makes a block cost twice the stamina and a broken leg
 refuses sprint, for as long as the break lasts, splinted or not.
-Neither one is an actor value. The server tells the client which limb
-is broken, the client shuts the sprint gate, and the stamina a blocked
-hit cost is taken once more (#1383).
+Neither one is an actor value. The server charges a blocked hit's
+stamina itself (see the warrior's Set), so it doubles that charge for a
+broken arm. For a leg it tells the client, and the client shuts the
+sprint gate (#1383).

@@ -320,7 +320,11 @@ function Test-SigningReach([string]$MetadataPath, [string[]]$Identities) {
   }
   $t = $null
   if ($status -eq 200) {
-    $ekus = @(); try { $ekus = @($body | ConvertFrom-Json) } catch { }
+    # An answer that is not the list of identities is not "answered without
+    # the identity": it says so, and why it did not read (#2711).
+    $ekus = @()
+    try { $ekus = @($body | ConvertFrom-Json) }
+    catch { return [pscustomobject]@{ Ok = $false; Why = ('profile ' + $meta.CertificateProfileName + ' answered HTTP 200 with something that is not a list of identities: ' + $_.Exception.Message) } }
     if (@($ekus | Where-Object { $Identities -contains $_ }).Count) {
       return [pscustomobject]@{ Ok = $true; Why = ('profile ' + $meta.CertificateProfileName + ' answers this sign in with the identity the launcher pins') }
     }

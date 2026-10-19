@@ -452,8 +452,17 @@ if ($PutBack) {
 # copy and the start point check without a word and stopped later inside
 # Export-ServerPayload with "server dist not found", which named neither
 # -Dist nor the build the record wants.
+# The record names the build, so one that is there and does not read stops
+# the publish here, before anything is built or sent, and says why (#2711).
+# Until 18 Oct it was read in a try with an empty catch, and the refusal came
+# only after the payload was built. No record is refused where it is copied.
 $recCommit = ''
-try { $recCommit = [string](([IO.File]::ReadAllText($Record) | ConvertFrom-Json).source.commit) } catch { }
+if (Test-Path -LiteralPath $Record) {
+    $recFirst = $null
+    try { $recFirst = [IO.File]::ReadAllText($Record) | ConvertFrom-Json }
+    catch { Die ("$Record does not read (" + $_.Exception.Message + "), so nothing says which build is to go. Nothing was built or sent.") }
+    if ($recFirst -and $recFirst.PSObject.Properties['source'] -and $recFirst.source -and $recFirst.source.PSObject.Properties['commit']) { $recCommit = [string]$recFirst.source.commit }
+}
 $recShort = if ($recCommit.Length -ge 8) { $recCommit.Substring(0, 8) } else { 'the one it names' }
 $distWhy = ''
 if ($FromStore) { }
@@ -752,7 +761,8 @@ if ($zipPort -ne [string]$wantPort) {
 }
 Say ("payload starts the $Channel server on port $wantPort") 'Green'
 $recObj = $null
-try { $recObj = [IO.File]::ReadAllText($Record) | ConvertFrom-Json } catch { }
+try { $recObj = [IO.File]::ReadAllText($Record) | ConvertFrom-Json }
+catch { Die ("$Record does not read (" + $_.Exception.Message + "), so nothing says which build is to go. Nothing was sent.") }
 if (-not $recObj -or -not $recObj.sha256) { Die "$Record cannot be read or names no sha256, so nothing says which build is to go. Nothing was sent." }
 $zipBuild = @(Get-ThornswoodServerBuildProblems $recObj $zipSums 'the payload' $Record)
 # -FromStore's payload carries none: the build comes out of the store (#459).
@@ -999,13 +1009,16 @@ $ResPort  = if ($ResourcesPort -gt 0) { $ResourcesPort } elseif ($GamePort -eq 7
 
 Head 'Checking it answers'
 $up = $false
+# A connect that throws (the name does not resolve, say) is not an answer,
+# and the last one is said below with the rest of what went wrong (#2711).
+$connectWhy = ''
 for ($i = 0; $i -lt 30; $i++) {
+    $c = New-Object Net.Sockets.TcpClient
     try {
-        $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect($VpsHost, $ResPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
         $up = $c.Connected
-        $c.Close()
-    } catch { }
+    } catch { $connectWhy = $_.Exception.Message }
+    finally { $c.Close() }
     if ($up) { break }
     Start-Sleep -Seconds 2
 }
@@ -1016,6 +1029,7 @@ if ($up) {
     Write-Host ''
 } else {
     Say "The install finished but nothing is answering on ${VpsHost}:${ResPort}." 'Red'
+    if ($connectWhy) { Say "  the last try to connect said: $connectWhy" 'Red' }
 
     # Rather than list what it might be, fetch what it actually said. The task
     # redirects everything the server prints into this file for exactly this.
@@ -1086,10 +1100,14 @@ if (-not $NoNews -and $up) {
             # people read are about what they will notice. The gamemode copy is
             # said above where it happens; the count is said here, on screen.
             if (-not $FromStore) {
+                # A line on screen for whoever runs this, not part of the
+                # entry, so settings that do not read are said and the entry
+                # goes on (#2711).
+                $ssPath = Join-Path $Dist 'server-settings.json'
                 try {
-                    $ss = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath (Join-Path $Dist 'server-settings.json') -Raw) (Join-Path $Dist 'server-settings.json')
-                    if ($ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
-                } catch { }
+                    $ss = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $ssPath -Raw -ErrorAction Stop) $ssPath
+                    if ($ss.PSObject.Properties['loadOrder'] -and $ss.loadOrder) { Say ('  load order: {0} plugins server side' -f @($ss.loadOrder).Count) 'DarkGray' }
+                } catch { Say ("  load order: not counted, $ssPath does not read: " + $_.Exception.Message) 'Yellow' }
             }
 
             if ($FreshWorld) { $details += 'The world was thrown away, so every character on the server is gone' }

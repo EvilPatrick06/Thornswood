@@ -88,4 +88,7 @@ hears a brewed bottle being drunk from engine fork PR #78 on (#1383).
 
 A cooked meal's help against disease halves every chance for 20
 minutes, and a feast's quarters it for 10. That half is in the server.
-Which meal gives that help rather than another is waiting on #2682.
+The guard comes only from a dish seasoned at the cooking pot with garlic
+(Patrick, 18 October, #2682). A cooked meal on its own gives only its
+temperature help, and there is no second guard. A later meal's warmth or
+stamina takes the guard off.

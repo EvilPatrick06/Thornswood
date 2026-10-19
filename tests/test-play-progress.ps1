@@ -15,8 +15,8 @@
   What this drives:
 
     1. launcher\app\Progress.cs (PlayBar, PlayProgress, ProgressStep) with
-       Swallow.cs, compiled with the .NET Framework csc as C# 5, the way
-       Build-Launcher.ps1 compiles the launcher, into a small program that
+       Swallow.cs, compiled with the compiler and the C# version the build
+       uses (tests\Launcher-Csc.ps1), into a small program that
        feeds it the reports each piece of work makes, in the order they make
        them: an update synced to its release record (checking files, then the
        download), several packs, a self-update, the client download, the own
@@ -76,10 +76,8 @@ Yes 'Progress.cs is in the launcher source' (Test-Path -LiteralPath $progressPat
 if (-not (Test-Path -LiteralPath $progressPath)) { Done }
 
 # ---- 1. compile the real model and drive it ------------------------------------
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-    Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-play-progress-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
@@ -322,7 +320,7 @@ $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/platform:anycpu', "/langve
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 $said = & $LauncherCsc @cscArgs 2>&1
 $ErrorActionPreference = $old
-Yes 'Progress.cs compiles with the .NET Framework csc, as C# 5' ((Test-Path -LiteralPath $exe) -and $LASTEXITCODE -eq 0)
+Yes 'Progress.cs compiles with the compiler the build runs' ((Test-Path -LiteralPath $exe) -and $LASTEXITCODE -eq 0)
 if (-not (Test-Path -LiteralPath $exe)) {
     $said | ForEach-Object { Write-Host "      $_" }
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -425,10 +423,9 @@ $bytesBody = Body $ver 'public static List<Issue> Bytes('
 Yes 'Verify.Bytes counts the plugins it checks, full and light' (
     $bytesBody -match 'int all = mods\.Length \+ light\.Length;' -and $bytesBody -match 'PlayProgress\.Files\("Checking files", idx \+ 1, all\)')
 
-# C# 5 and the words, in the two new files.
+# The words, in the two new files.
 foreach ($n in @('Progress.cs', 'ShellProgress.cs')) {
     $t = Read-Text (Join-Path $AppDir $n)
-    Yes "$n is C# 5: no interpolation, ?., nameof or =>" (-not ($t -match '\$"' -or $t -match '\?\.' -or $t -match 'nameof\(' -or $t -match '\)\s*=>'))
     Yes "$n has no em dash and never says player" (-not ($t.Contains([string][char]0x2014) -or $t -match '(?i)player'))
 }
 

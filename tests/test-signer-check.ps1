@@ -121,13 +121,11 @@ Yes 'nothing in the launcher decides a signer from CreateFromSignedFile any more
         [IO.File]::ReadAllText($_.FullName) -match 'CreateFromSignedFile\s*\(' }).Count))
 
 # ---- compile Signature.cs on its own ----------------------------------------
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 csc is on this machine' ([bool]$csc)
-if (-not $csc) { Finish }
-$fw = Split-Path -Parent $csc
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
+# Programs Microsoft signed that every Windows has, for the refusals below;
+# nothing is compiled with them.
+$fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tssigner-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -151,9 +149,12 @@ function Drop-Cert([string]$thumb) {
 
 try {
     $dll = Join-Path $tmp 'Signature.dll'
-    $ok = Compile @('/noconfig', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu',
-                    "/reference:$fw\System.dll", "/out:$dll", $sigCs)
-    Yes 'Signature.cs compiles on its own with the .NET Framework csc at C# 5' $ok
+    # At C# 5, not the project's version: Assert-PublishSigned.ps1 compiles
+    # this file with Add-Type, which in Windows PowerShell is the .NET
+    # Framework compiler and stops at C# 5 (Developer-Guide.md, Settled design).
+    $ok = Compile @('/noconfig', '/nologo', '/langversion:5', '/target:library', '/platform:anycpu',
+                    "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/out:$dll", $sigCs)
+    Yes 'Signature.cs compiles on its own at C# 5, for Add-Type in Assert-PublishSigned.ps1' $ok
     if (-not $ok) { Finish }
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
     $S = $asm.GetType('Thornswood.Signature')

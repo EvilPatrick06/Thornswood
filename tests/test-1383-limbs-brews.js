@@ -4,13 +4,13 @@
 //   - the record carries which limb is broken and the screen script hands it to
 //     the front plugin as thornswoodBrokenLimbs;
 //   - the front plugin's broken limbs block shuts the sprint gate on a broken
-//     leg and takes a blocked hit's stamina a second time on a broken arm;
+//     leg (a broken arm's dearer block is the server's, test-1386-warrior.js);
 //   - the mixtures list keys Cure Disease by its magic effect (0xAE722), not
 //     by the potion record (0xAE723);
 //   - a brewed bottle of cure disease cures when drunk, by the runtime id the
 //     alchemy gate told the injury block about;
 //   - a cooked meal's help against disease halves the chance (a quarter for a
-//     feast) while it lasts.
+//     feast) while it lasts, and unguarded() takes it off (#2682).
 //
 // It drives the REAL injury and needs blocks out of gamemode.js and the REAL
 // broken limbs block out of thornswood-front.js, over fakes. Read only.
@@ -125,11 +125,11 @@ if (NEEDS_SRC && HURT_SRC && P) {
     }
     const st = {};
     run({ show: ['Broken leg'], care: 1, limbs: { arm: 0, leg: 1 } }, st);
-    yes('the screen script hands a broken leg to the plugin', !!glob.thornswoodBrokenLimbs && glob.thornswoodBrokenLimbs.leg === 1 && glob.thornswoodBrokenLimbs.arm === 0);
-    run({ show: ['Broken leg', 'Broken arm'], care: 1, limbs: { arm: 1, leg: 1 } }, st);
-    yes('and a broken arm, when it changes', glob.thornswoodBrokenLimbs.arm === 1);
+    yes('the screen script hands a broken leg to the plugin', !!glob.thornswoodBrokenLimbs && glob.thornswoodBrokenLimbs.leg === 1);
+    run({ show: ['Broken arm'], care: 1, limbs: { arm: 1, leg: 0 } }, st);
+    yes('and hands nothing of an arm: the server charges its block', glob.thornswoodBrokenLimbs.leg === 0 && !('arm' in glob.thornswoodBrokenLimbs));
     run({ show: [], care: 0, limbs: { arm: 0, leg: 0 } }, st);
-    yes('and lets go of both once healed', glob.thornswoodBrokenLimbs.arm === 0 && glob.thornswoodBrokenLimbs.leg === 0);
+    yes('and lets go of the leg once healed', glob.thornswoodBrokenLimbs.leg === 0);
   }
 
   // ------------------------------------------------------- Cure Disease brew
@@ -154,7 +154,9 @@ if (NEEDS_SRC && HURT_SRC && P) {
     yes('another runtime bottle cures nothing', r.H.swallowed(me, 0xff000999) === '' && !!ill(r, me, 'fever'));
     r.H.brewed(me, bottle, [0x3eb15]);
     yes('the same id brewed again as something else forgets the cure', r.rec(me).brews.indexOf(bottle) === -1 && r.H.swallowed(me, bottle) === '' && !!ill(r, me, 'fever'));
-    yes('the potion record still cures as before', r.H.swallowed(me, 0xae723) !== null && !ill(r, me, 'fever'));
+    const feverBefore = !!ill(r, me, 'fever');
+    r.H.swallowed(me, 0xae723);
+    yes('the potion record still cures as before', feverBefore && !ill(r, me, 'fever'));
     for (let i = 0; i < r.H.BREWS_MOST + 5; i++) { r.H.brewed(me, 0xff100000 + i, [0xae722]); }
     yes('the record remembers at most BREWS_MOST bottles, newest kept', r.rec(me).brews.length === r.H.BREWS_MOST &&
       r.rec(me).brews.indexOf(0xff100000 + r.H.BREWS_MOST + 4) !== -1 && r.rec(me).brews.indexOf(0xff100000) === -1);
@@ -181,16 +183,46 @@ if (NEEDS_SRC && HURT_SRC && P) {
     r.minutes(10);
     yes('for 10 minutes', r.H.chanceFor(me, 0.4) === 0.4);
   }
+
+  // ------------------------------------------ the guard taken off (#2682)
+  {
+    const r = rig();
+    const me = r.person(0x61);
+    yes('unguarded is exported beside guarded', typeof r.H.unguarded === 'function' && typeof r.H.guarded === 'function');
+    yes('with no guard on the record, unguarded answers false', r.H.unguarded(me) === false);
+    yes('and writes nothing', r.raw(me) === undefined);
+    r.H.guarded(me, false);
+    yes('guarded still answers true and halves the chance', !!r.rec(me).guard && Math.abs(r.H.chanceFor(me, 0.4) - 0.2) < 1e-9);
+    yes('unguarded takes the guard off and answers true', r.H.unguarded(me) === true);
+    yes('the guard is gone from the record', r.rec(me).guard === null && r.raw(me).guard === null);
+    yes('and the chance is whole again before the 20 minutes are up', r.H.chanceFor(me, 0.4) === 0.4);
+    yes('a second unguarded answers false', r.H.unguarded(me) === false);
+    r.H.guarded(me, false);
+    yes('guarding again after it was taken off works', Math.abs(r.H.chanceFor(me, 0.4) - 0.2) < 1e-9);
+    r.minutes(20);
+    yes('and still runs out after 20 minutes', r.H.chanceFor(me, 0.4) === 0.4);
+    r.H.guarded(me, true);
+    yes('a feast\'s guard comes off the same way', r.H.unguarded(me) === true && r.H.chanceFor(me, 0.4) === 0.4);
+
+    // Bad ids: guarded() checks nothing and reads through read(), so does
+    // unguarded(). A bad id reads as a fresh record with no guard.
+    const other = r.person(0x62);
+    r.H.guarded(other, false);
+    let threw = false, answers = [];
+    try { answers = [undefined, null, 0, NaN, 'x', {}].map(function (bad) { return r.H.unguarded(bad); }); }
+    catch (e) { threw = true; }
+    yes('a bad id does not throw and answers false', !threw && answers.length === 6 && answers.every(function (a) { return a === false; }));
+    yes('and takes nobody else\'s guard off', Math.abs(r.H.chanceFor(other, 0.4) - 0.2) < 1e-9);
+    yes('and writes no record for a bad id', [undefined, null, 0, 'x', {}].every(function (bad) { return r.raw(bad) === undefined; }));
+  }
 }
 
 // ------------------------------------------------------- the front plugin
 if (LIMBS_SRC) {
   function fake() {
-    const s = { stamina: 100, sprinting: false, gate: true, events: [], damaged: 0, notes: [], hits: [], updates: [] };
+    const s = { sprinting: false, gate: true, events: [], notes: [], hooks: [] };
     const pc = {
       getFormID: function () { return 0x14; },
-      getActorValue: function () { return s.stamina; },
-      damageActorValue: function (av, n) { if (av === 'Stamina') { s.stamina -= n; s.damaged += n; } },
       getAnimationVariableBool: function () { return s.gate; },
       setAnimationVariableBool: function (k, v) { if (k === 'bSprintOK') { s.gate = v; } },
       isSprinting: function () { return s.sprinting; }
@@ -198,15 +230,16 @@ if (LIMBS_SRC) {
     const sp = {
       Game: { getPlayer: function () { return pc; } },
       Debug: { notification: function (t) { s.notes.push(t); }, sendAnimationEvent: function (a, ev) { s.events.push(ev); } },
-      on: function (name, f) { if (name === 'hit') { s.hits.push(f); } if (name === 'update') { s.updates.push(f); } }
+      on: function (name) { s.hooks.push(name); }
     };
     const glob = {};
-    const L = new Function('sp', 'say', 'guard', 'globalThis', LIMBS_SRC + '\nreturn brokenLimbs;')(sp, function () { }, function (n, f) { return f; }, glob);
+    const L = new Function('sp', 'globalThis', LIMBS_SRC + '\nreturn brokenLimbs;')(sp, glob);
     return { s: s, pc: pc, L: L, glob: glob };
   }
   {
     const f = fake();
-    yes('the plugin hears hits and frames for the arm', f.s.hits.length === 1 && f.s.updates.length === 1);
+    yes('the block hooks no hit and no frame: nothing of the arm is measured on the client', f.s.hooks.length === 0 &&
+      !/isHitBlocked|damageActorValue|BLOCK_WINDOW/.test(LIMBS_SRC));
     yes('a sound leg leaves the sprint gate alone', f.L.refuseSprint(f.pc) === false && f.s.gate === true);
     f.glob.thornswoodBrokenLimbs = { arm: 0, leg: 1 };
     f.s.sprinting = true;
@@ -218,30 +251,6 @@ if (LIMBS_SRC) {
     const gate = slice(FRONT, '  function holdSprintGate(pc) {', '\n  }\n');
     yes('holdSprintGate asks the broken leg before it holds the gate open',
       !!gate && gate.indexOf('brokenLimbs.refuseSprint(pc)') !== -1 && gate.indexOf('brokenLimbs.refuseSprint(pc)') < gate.indexOf("setAnimationVariableBool('bSprintOK', true)"));
-  }
-  {
-    const f = fake();
-    const realNow = Date.now;
-    let now = 1000000;
-    Date.now = function () { return now; };
-    try {
-      const hit = { isHitBlocked: true, target: f.pc };
-      f.s.updates[0](); f.s.hits[0](hit);
-      yes('a sound arm pays nothing extra for a block', f.s.damaged === 0);
-      f.glob.thornswoodBrokenLimbs = { arm: 1, leg: 0 };
-      f.s.updates[0]();                 // the frame before: 100
-      f.s.hits[0](hit);
-      f.s.stamina = 80; f.s.updates[0](); // the block took 20
-      yes('the extra is not taken before the window ends', f.s.damaged === 0);
-      now += f.L.BLOCK_WINDOW_MS; f.s.updates[0]();
-      yes('a broken arm pays the block\'s 20 stamina a second time', f.s.damaged === 20 && f.s.stamina === 60);
-      f.s.hits[0]({ isHitBlocked: false, target: f.pc });
-      now += 1000; f.s.updates[0]();
-      yes('an unblocked hit takes nothing extra', f.s.damaged === 20);
-      f.s.hits[0]({ isHitBlocked: true, target: { getFormID: function () { return 0x99; } } });
-      f.s.stamina = 50; now += 1000; f.s.updates[0]();
-      yes('somebody else\'s block costs this character nothing', f.s.damaged === 20);
-    } finally { Date.now = realNow; }
   }
 }
 

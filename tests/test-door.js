@@ -106,7 +106,9 @@ function rig(enforce, profiles) {
     getUserByActor: function (id) {
       return Object.prototype.hasOwnProperty.call(world.user, id) ? world.user[id] : -1;
     },
-    kick: function (u) { kicked.push(u); }
+    kick: function (u) { kicked.push(u); },
+    // The engine's whole-file write (#2740), onto the fake disk.
+    writeFileWhole: function (p, s) { fakeFs.writeFileSync(p, s); }
   };
 
   const timers = {};

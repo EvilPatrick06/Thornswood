@@ -58,8 +58,12 @@ if (-not $Vortex -and -not $PSBoundParameters.ContainsKey('Game')) {
 }
 if ($Vortex) {
   $roots = @()
+  # Either key may be missing (Steam writes one or the other), so each is
+  # tested for, and a key without SteamPath names nothing.
   foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
-    try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+    if (-not (Test-Path -LiteralPath $k)) { continue }
+    $kp = Get-ItemProperty -LiteralPath $k
+    if ($kp.PSObject.Properties['SteamPath'] -and $kp.SteamPath) { $roots += ([string]$kp.SteamPath -replace '/', '\') }
   }
   foreach ($r in @($roots)) {
     $vdf = Join-Path $r 'config\libraryfolders.vdf'
@@ -281,10 +285,9 @@ foreach ($pair in $menuPairs) {
 }
 
 # ------------------------------------------------ our own menu files --
-# The main menu with no Bethesda logo, the empty loading spinner, the
-# silent stand-in for the game's theme, SkyHUD's settings as Thornswood
-# set them, and the notice board's and drop box's meshes. From
-# game\ours, beside game\menu. Each path is
+# The empty loading spinner, the silent stand-in for the game's theme and
+# SkyHUD's settings as Thornswood set them. From game\ours, beside
+# game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
 # is removed before the copy: in an own game folder these can be hard
@@ -293,17 +296,9 @@ foreach ($pair in $menuPairs) {
 Head 'Our menu files'
 $oursSrc = Join-Path $Here '..\..\game\ours'
 $oursMenuFiles = @(
-  'Data\Interface\startmenu.swf',
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
-  'Data\Interface\skyhud\skyhud.txt',
-  # The notice board and the drop box of the hold beside it, the meshes
-  # Thornswood builds from vanilla pieces with scripts\mods\Build-NoticeBoard.py,
-  # issue 2298. The board and drop box of Thornswood-Content.esp name them.
-  # No brackets and no apostrophes in these comments: test-ship-rules.ps1
-  # reads this list up to the first closing bracket, quote by quote.
-  'Data\meshes\thornswood\noticeboard01.nif',
-  'Data\meshes\thornswood\dropbox01.nif'
+  'Data\Interface\skyhud\skyhud.txt'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -313,6 +308,32 @@ foreach ($rel in $oursMenuFiles) {
   if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
   Copy-Item -LiteralPath $src -Destination $dst -Force
   Note $rel
+}
+
+# ------------------------------------------------ made from the game --
+# The main menu with no Bethesda logo and no button list, and the notice
+# board's and drop box's meshes. Each is Bethesda's own file edited or put
+# together, so none of them ships (#2827, Ship-Rules $ShipMadeFromGame): they
+# are made here from this game's own archives by the launcher's own code,
+# launcher\app\FromGame*.cs with the recipes beside it, so this writes the
+# very bytes the launcher makes before every Play. Each is checked against
+# the sha256 it must have, and one that comes out different is not written;
+# the line says which of the game's files differs. Not a failed run: nothing
+# here ships, and the launcher says the same thing at Play. The destination is
+# removed first, for the hard link reason above.
+Head 'Made from the game'
+if (-not ('Thornswood.FromGame' -as [type])) {
+  $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |
+    ForEach-Object { $_.FullName })
+  Add-Type -Path $fromGameCs
+}
+foreach ($made in [Thornswood.FromGame]::Build((Join-Path $Game 'Data'))) {
+  if ($made.Problem) { Bad ($made.Rel + ' was not made: ' + $made.Problem); continue }
+  $dst = Join-Path $Game $made.Rel
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+  [System.IO.File]::WriteAllBytes($dst, $made.Bytes)
+  Note $made.Rel
 }
 
 # ---------------------------------------------------------- required data --
@@ -485,10 +506,18 @@ if (-not $SkipServer) {
   }
   $voiceUrl = 'https://thornswood.net/voice/health'
   $vh = VoiceUp $voiceUrl
+  # voice-server.js answers /health with JSON that counts its peers. Anything
+  # else answering 200 there is not the voice service (Caddy handing the path
+  # to the site, say), so it is said as such rather than counted as up.
+  $vhDoc = $null; $vhWhy = ''
   if ($vh) {
-    $peers = ''
-    try { $peers = '  ' + ([string](($vh | ConvertFrom-Json).peers)) + ' peer(s)' } catch { }
-    Note ('voice service: answering at /voice/' + $peers)
+    try { $vhDoc = $vh | ConvertFrom-Json } catch { $vhWhy = $_.Exception.Message }
+    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['peers'])) { $vhWhy = 'it names no peers' }
+  }
+  if ($vh -and $vhWhy) {
+    Bad "voice service: something answered at $voiceUrl, but not voice's health ($vhWhy)"
+  } elseif ($vh) {
+    Note ('voice service: answering at /voice/  ' + [string]$vhDoc.peers + ' peer(s)')
   } else {
     Bad "voice service: NOTHING at $voiceUrl"
     Bad '  that is Caddy or the service itself; the raw port is shut on purpose and proves nothing'
@@ -524,12 +553,13 @@ Get-CimInstance Win32_Process |
   Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*voice-server*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 for ($i = 0; $i -lt 20; $i++) {
-  $busy = $false
-  try {
-    $c = New-Object Net.Sockets.TcpClient
-    $null = $c.BeginConnect('127.0.0.1', 7778, $null, $null).AsyncWaitHandle.WaitOne(300)
-    $busy = $c.Connected; $c.Close()
-  } catch { }
+  # Asked of the port list rather than by connecting: a connect that throws
+  # read as free here, with nothing said. Every listener is listed and
+  # filtered, because -LocalPort with nothing on it is an error, not an
+  # empty answer. A list that cannot be read stops this run, said, before
+  # the task is started into a port that may still be taken.
+  try { $busy = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq 7778 }).Count -gt 0 }
+  catch { 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
   if (-not $busy) { break }
   Start-Sleep -Milliseconds 500
 }

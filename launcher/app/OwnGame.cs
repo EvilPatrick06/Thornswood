@@ -3474,6 +3474,9 @@ namespace Thornswood
             // or not: a refresh leaves it as built. Read without a catch: one
             // missed would be put back to Vortex's without a word.
             foreach (string rel in GeneratedFiles()) set.Add(rel);
+            // What the launcher makes from the game before every Play (#2827),
+            // which no pack names any more.
+            foreach (string rel in MadeInGame) set.Add(rel);
             return set;
         }
 

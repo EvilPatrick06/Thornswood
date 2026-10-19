@@ -98,6 +98,35 @@ is on [Factions and businesses](factions.md). It does not hide their
 name. The three switches above stay personal, and a personal mute
 does not lift a silence.
 
+## Voice as words (not on yet)
+
+The voice service can show what someone says as words above their
+head, the same line typed chat draws there. It is off. It stays off
+until staff turn it on with `THORNSWOOD_CAPTIONS=on`, and nothing
+sends it any words yet.
+
+When it is on, the words go to the people who can hear the speaker
+and nobody else: the same cell, out to 7 metres for a whisper, 30
+for ordinary speech and 85 for a yell. The speaker sees their own.
+The service never writes them down. A staff silence stops them.
+
+Staff can tune it without a release:
+
+| Setting | Default | What it does |
+| --- | --- | --- |
+| `THORNSWOOD_CAPTION_TAIL_MS` | 2000 | How long words still go after the talk key comes up |
+| `THORNSWOOD_CAPTION_BURST` | 3 | How many lines may go at once |
+| `THORNSWOOD_CAPTION_REFILL_MS` | 1000 | How often one more line is allowed after that |
+| `THORNSWOOD_CAPTION_REACH` | the voice reach | A shorter cap, never past the voice reach |
+| `THORNSWOOD_CAPTION_TEXT_MUTE` | on | `off` means only the Voice switch hides someone's words |
+
+`/health` on the voice service shows whether it is on, how many lines
+went out and how many were dropped, and each setting.
+
+Still waiting on Patrick's answers on #2475: turning speech into
+words in the launcher, whether the words are kept, and the switches
+for your own words and for seeing other people's.
+
 ## Where this is
 
 The three distances, V, O, B, and the voice mute are in the server.

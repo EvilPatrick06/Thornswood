@@ -24,7 +24,9 @@
 //   4. a derived file names a registered source, and a withheld one names the
 //      record that keeps it out, which holds what the entry says: a set in
 //      records\ui-gone.json, or a list in Ship-Rules.ps1 that holds every
-//      path the entry names (the five files nothing uses, #2177);
+//      path the entry names (the five files nothing uses, #2177); a file the
+//      launcher makes from the person's own game names the Ship-Rules.ps1
+//      list that keeps it out of every pack the same way (#2827);
 //   5. no permission is copied in: no email address anywhere in it;
 //   6. it stays operator only: nothing that builds a pack, the installer, the
 //      launcher or the site names it, and it is not under site\public;
@@ -105,15 +107,17 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (statuses.indexOf(a.status) < 0) bad.push(name + ': status "' + a.status + '" is not one the register defines');
     if (NEEDS_ASK.indexOf(a.status) >= 0 && !(typeof a.ask === 'string' && /^[^:]{2,}: \S/.test(a.ask))) bad.push(name + ': ' + a.status + ' with no ask naming who can answer ("Who: what")');
     if (a.status === 'no-licence-found' && !(Number.isInteger(a.issue) && a.issue > 0)) bad.push(name + ': no licence found, and no issue that carries it');
-    if (a.status === 'withheld') {
+    if (a.status === 'withheld' || a.status === 'made-from-game') {
       const m = /^records\/ui-gone\.json#(\w+)$/.exec(a.record || '');
       const r = /^scripts\/release\/Ship-Rules\.ps1#(\w+)$/.exec(a.record || '');
       if (r) {
         const list = shipList(shipRules, r[1]);
         const paths = Array.isArray(a.paths) ? a.paths : [];
         const out = paths.filter((x) => list.indexOf(x) < 0);
-        if (!list.length || !paths.length) bad.push(name + ': withheld by Ship-Rules.ps1 $' + r[1] + ', but that list or the entry\'s paths are empty');
-        else if (out.length) bad.push(name + ': withheld by Ship-Rules.ps1 $' + r[1] + ', which does not hold ' + out.join(', '));
+        if (!list.length || !paths.length) bad.push(name + ': ' + a.status + ' by Ship-Rules.ps1 $' + r[1] + ', but that list or the entry\'s paths are empty');
+        else if (out.length) bad.push(name + ': ' + a.status + ' by Ship-Rules.ps1 $' + r[1] + ', which does not hold ' + out.join(', '));
+      } else if (a.status === 'made-from-game') {
+        bad.push(name + ': made from the game, but names no Ship-Rules.ps1 list that keeps it out of packs');
       } else {
         const held = m && uiGone ? uiGone[m[1]] : null;
         const n = held ? (Array.isArray(held) ? held.length : Object.keys(held).length) : 0;
@@ -165,6 +169,10 @@ if (reg) {
     (reg.notInRepo || []).filter((a) => a.status === 'withheld' && a.record === 'scripts/release/Ship-Rules.ps1#ShipPlatformUnused')
       .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 5 &&
     shipList(shipRules, 'ShipPlatformUnused').length === 5);
+  yes('the three files the launcher makes from the game are registered, held out by the Ship-Rules.ps1 list (#2827)',
+    (reg.notInRepo || []).filter((a) => a.status === 'made-from-game' && a.record === 'scripts/release/Ship-Rules.ps1#ShipMadeFromGame')
+      .reduce((n, a) => n + (Array.isArray(a.paths) ? a.paths.length : 0), 0) === 3 &&
+    shipList(shipRules, 'ShipMadeFromGame').length === 3);
   yes('community uploads and the collection\'s mods are dispositioned', (reg.dispositions || []).length >= 2 && (reg.dispositions || []).some((d) => /gallery/i.test(d.what)) && (reg.dispositions || []).some((d) => /collection/i.test(d.what)));
 }
 
@@ -205,6 +213,9 @@ if (reg) {
   const f = copy(); f.notInRepo.find((a) => a.record === 'scripts/release/Ship-Rules.ps1#ShipPlatformUnused').paths.push('Data\\Platform\\Fonts\\Tavern.ttf');
   r = audit(f, files, hashOf, uiGone, shipRules);
   yes('a withheld entry naming a path its Ship-Rules list does not hold is caught', r.some((b) => /which does not hold Data\\Platform\\Fonts\\Tavern\.ttf/.test(b)));
+  const g = copy(); g.notInRepo.find((a) => a.status === 'made-from-game').paths.push('Data\\Interface\\map.swf');
+  r = audit(g, files, hashOf, uiGone, shipRules);
+  yes('a file said to be made from the game that its Ship-Rules list does not hold is caught', r.some((b) => /made-from-game by Ship-Rules\.ps1 \$ShipMadeFromGame, which does not hold Data\\Interface\\map\.swf/.test(b)));
 }
 
 console.log('');
