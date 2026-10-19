@@ -165,7 +165,7 @@ if (-not $bindExplicit -or -not $chatExplicit -or -not $turnExplicit) {
     # answer /ice still has its bind and chat range kept. The relay
     # comes last in the answer because its address is read to the end.
     $probe = @"
-try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
+try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; `$ie = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { `$ie = (`$_.Exception.Message -replace '[;\r\n]', ' ') }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';ice=' + `$ie + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
 "@
     $current = & (Join-Path $Here '..\vps\Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
     if ("$current" -match 'bind=([\d.]+);') {
@@ -178,6 +178,11 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
         $ChatRange = $Matches[1]
         if ($ChatRange -eq '0') { $ChatRange = 'off' }
         Say "  keeping the current chat range, $ChatRange, since -ChatRange was not passed" 'DarkGray'
+    }
+    # /ice that did not answer gives no relay to keep: said, so the relay is not
+    # dropped with nothing on the screen (#2711).
+    if (-not $turnExplicit -and "$current" -match ';ice=([^;]+);') {
+        Say "  the running service did not answer /ice ($($Matches[1].Trim())), so the relay it serves is not known and none is kept. Pass -TurnUrl to keep one." 'Yellow'
     }
     if (-not $turnExplicit -and "$current" -match ';turn=(\S+)') {
         $was = $Matches[1]
@@ -225,9 +230,23 @@ if (-not $PutBack -and -not $Remove -and -not $Restart) {
 # #1335). A file that is not that commit stops the install here, and nothing
 # is sent. The copies below are from its folder. -PutBack builds and sends
 # nothing.
+#
+# The build string out of the file being sent, read before it is sent. It is
+# checked on the far end after the start, because "the port answers" turned
+# out to prove nothing at all: an old process still holding the port answers
+# too (see StopIt below). Without it that check passes whatever answers, the
+# old process included, so a file that does not read or names no build stops
+# this here, before anything is sent (#2711).
+$expectBuild = ''
 $src = Join-Path $Here '..\..\voice'
 if (-not $PutBack -and -not $TaskOnly) {
 Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
+$vsPath = Join-Path $artifact.Folder 'voice\voice-server.js'
+$vsText = ''
+try { $vsText = [IO.File]::ReadAllText($vsPath) } catch { Die ("$vsPath could not be read, so there is no build to check the new service by. Nothing was sent: " + $_.Exception.Message) }
+$m = [regex]::Match($vsText, "const\s+BUILD\s*=\s*'([^']+)'")
+if (-not $m.Success) { Die "$vsPath names no const BUILD, so there is no build to check the new service by. Nothing was sent." }
+$expectBuild = $m.Groups[1].Value
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }
@@ -265,21 +284,6 @@ $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp
 $hashes    = [ordered]@{}
 
-<#
-  The build string out of the file being sent.
-
-  Checked on the far end after the start, because "the port answers" turned
-  out to prove nothing at all: an old process still holding the port answers
-  too. See StopIt below.
-#>
-$expectBuild = ''
-if (-not $PutBack -and -not $TaskOnly) {
-    try {
-        $m = [regex]::Match((Get-Content -LiteralPath (Join-Path $src 'voice-server.js') -Raw),
-                            "const\s+BUILD\s*=\s*'([^']+)'")
-        if ($m.Success) { $expectBuild = $m.Groups[1].Value }
-    } catch { }
-}
 
 # THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
 # The three routes it guarded refused every real caller, and they are out of
@@ -479,18 +483,22 @@ function StopIt {
     `$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
                 Where-Object { `$_.CommandLine -like '*voice-server.js*' })
     if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
+    # A try that throws has not looked, so it is not taken for a free port.
     `$free = `$false
+    `$why = ''
     for (`$i = 0; `$i -lt 30; `$i++) {
         `$busy = `$false
+        `$c = New-Object Net.Sockets.TcpClient
         try {
-            `$c = New-Object Net.Sockets.TcpClient
             `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
-            `$busy = `$c.Connected; `$c.Close()
-        } catch { }
-        if (-not `$busy) { `$free = `$true; break }
+            `$busy = `$c.Connected; `$why = ''
+        } catch { `$why = `$_.Exception.Message }
+        finally { `$c.Close() }
+        if (-not `$busy -and -not `$why) { `$free = `$true; break }
         Start-Sleep -Milliseconds 500
     }
-    if (-not `$free) { 'something is still holding port $Port up here and would not let go' }
+    if (-not `$free -and `$why) { 'could not tell whether port $Port up here is free: ' + `$why }
+    elseif (-not `$free) { 'something is still holding port $Port up here and would not let go' }
 }
 
 # Any other task that starts voice-server.js from this root (#2008). The
@@ -576,15 +584,17 @@ function Build {
 }
 
 # The port answering is not the test. Which build answers is the test.
+`$healthWhy = ''
 function Healthy {
     `$until = (Get-Date).AddSeconds(`$Wait)
     while (`$true) {
         `$up = `$false
+        `$c = New-Object Net.Sockets.TcpClient
         try {
-            `$c = New-Object Net.Sockets.TcpClient
             `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(500)
-            `$up = `$c.Connected; `$c.Close()
-        } catch { }
+            `$up = `$c.Connected
+        } catch { `$script:healthWhy = `$_.Exception.Message }
+        finally { `$c.Close() }
         if (`$up) {
             if (`$Rolling -or -not `$wantBuild) { return `$true }
             if ((Build) -eq `$wantBuild) { return `$true }
@@ -601,6 +611,7 @@ function Why {
     if (`$wantBuild -and `$seen -and `$seen -ne `$wantBuild) {
         "WRONG BUILD on $Port. sent `$wantBuild, running '" + `$seen + "'. That means an old process is still answering."
     }
+    if (`$healthWhy) { 'the last try to connect on $Port said: ' + `$healthWhy }
     'voice.log says:'
     if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
 }
@@ -626,7 +637,9 @@ if (Healthy) {
     $up = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -EA SilentlyContinue
     if (-not $up -or $up.CommandLine -notlike ('*' + $log + '*')) { continue }
     $class = 'unreadable'
-    try { $class = [string](Get-Process -Id $p.ProcessId -EA Stop).PriorityClass } catch { }
+    $proc = Get-Process -Id $p.ProcessId -EA SilentlyContinue
+    if (-not $proc) { 'node, pid ' + $p.ProcessId + ', has already gone'; continue }
+    try { $class = [string]$proc.PriorityClass } catch { $class = 'unreadable (' + $_.Exception.Message + ')' }
     'node, pid ' + $p.ProcessId + ', runs at ' + $class + ' priority'
   }
   'TASK OK'
@@ -674,13 +687,17 @@ Head 'Checking from here'
   So: on 0.0.0.0 the port must answer. On 127.0.0.1 it must NOT, and the
   service is reached through whatever is proxying instead.
 #>
+# A try that throws (a name that does not resolve) has not looked, so it is
+# said, and not taken for a port that is shut.
 $reachable = $false
+$reachWhy = ''
 for ($i = 0; $i -lt 15; $i++) {
+    $c = New-Object Net.Sockets.TcpClient
     try {
-        $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect($VpsHost, $Port, $null, $null).AsyncWaitHandle.WaitOne(1000)
-        $reachable = $c.Connected; $c.Close()
-    } catch { }
+        $reachable = $c.Connected; $reachWhy = ''
+    } catch { $reachWhy = $_.Exception.Message }
+    finally { $c.Close() }
     if ($reachable) { break }
     # On loopback we are waiting to be sure it stays shut, not for it to open,
     # so there is nothing to keep retrying for.
@@ -694,6 +711,8 @@ if ($Bind -eq '127.0.0.1') {
         Say "$VpsHost`:$Port IS STILL ANSWERING from outside, and it should not be." 'Red'
         Say '  The bind did not take, or the firewall rule is still open.' 'Red'
         Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
+    } elseif ($reachWhy) {
+        Say "Loopback only, and ${VpsHost}:$Port could not be tried from out here ($reachWhy), so whether it is shut is not known." 'Yellow'
     } else {
         Say "Loopback only, and ${VpsHost}:$Port is correctly shut from out here." 'Green'
         # The service is only useful if something is carrying it, so say whether
@@ -716,6 +735,7 @@ if ($Bind -eq '127.0.0.1') {
     Say 'Next:  .\Add-VoiceFeed.ps1   then  .\Publish-Server.ps1' 'Yellow'
 } else {
     Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
+    if ($reachWhy) { Say "  The last try to connect said: $reachWhy" 'Red' }
     Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
 }
 # The service's files are in place: the box records that it runs this

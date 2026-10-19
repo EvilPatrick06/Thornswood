@@ -298,6 +298,10 @@ try {
     $r = Get-DevRoom
     Yes 'a half written names file is no names, and the count still reads' (
         @($r.Names).Count -eq 0 -and $r.Online -eq 3)
+    Yes '  and is said in a note, which it was not in a try with an empty catch (#2711)' (@($r.Notes | Where-Object { $_ -match 'online-names\.json does not read' }).Count -eq 1)
+    Remove-Item -LiteralPath $namesFile -Force
+    $r = Get-DevRoom
+    Yes '  while no names file at all is no note' (@($r.Notes).Count -eq 0 -and $r.Online -eq 3)
     [IO.File]::WriteAllText($namesFile, '{"at":1790000000000,"names":["Ahlam","Brynjolf","Camilla"]}')
 
     Remove-Item -LiteralPath $online -Force

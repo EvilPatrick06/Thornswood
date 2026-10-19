@@ -348,20 +348,29 @@ $devRecordSum = Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($devRecordPath)
 # RecordShape.ps1 (#2180): the record must be a version this checkout knows,
 # with the fields read below, or the deploy stops here, before anything is sent.
 . (Join-Path $Here '..\release\RecordShape.ps1')
-$devRecordCommit = [string]((Read-ThornswoodRecord -Path $devRecordPath -Kind server-build).source.commit)
+$devRecord = Read-ThornswoodRecord -Path $devRecordPath -Kind server-build
+$devRecordCommit = [string]$devRecord.source.commit
+# Whether the engine loads light plugins, for the start point below: this
+# record's, which the check below holds the dev server's own record to.
+$devRecordLight = ($devRecord.PSObject.Properties.Name -contains 'lightPlugins' -and $devRecord.lightPlugins -eq $true)
 $devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
 `$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
 if (Test-Path -LiteralPath `$rp) {
   'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes(`$rp)))
-  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText(`$rp) | ConvertFrom-Json).source.commit) } catch { }
+  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText(`$rp) | ConvertFrom-Json).source.commit) }
+  catch { 'RECORDUNREADABLE ' + `$_.Exception.Message }
 } else { 'RECORD none' }
 "@) | ForEach-Object { "$_".Trim() })
-$devBoxSum = ''; $devBoxCommit = ''
+$devBoxSum = ''; $devBoxCommit = ''; $devBoxUnread = ''
 foreach ($l in $devBoxSaid) {
   if ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $devBoxSum = $Matches[1] }
   elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $devBoxCommit = $Matches[1] }
+  elseif ($l -match '^RECORDUNREADABLE (.*)$') { $devBoxUnread = $Matches[1] }
 }
 $devBuildProblem = Get-ThornswoodBoxBuildProblem $devBoxSum $devBoxCommit $devRecordSum $devRecordCommit 'dev server' 'scripts\release\Publish-Server.ps1 -Channel dev'
+# Its record that does not read sums to something else, so it is refused above
+# as "an unreadable one"; this says what reading it said.
+if ($devBuildProblem -and $devBoxUnread) { $devBuildProblem += ' Its server-build.json does not read: ' + $devBoxUnread }
 if ($devBuildProblem) {
   Write-Host ('  ' + $devBuildProblem) -ForegroundColor Red
   throw 'The dev server does not run the server build this gamemode is written for. Nothing was sent and the dev server was not touched.'
@@ -578,10 +587,11 @@ if ($LoadOrder) {
 function Read-DevRoom($lines) {
   # What the box answered, as the port, the data folder and a head count.
   # Online -1 means it could not tell, which is not the same thing as nobody.
-  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Names = @(); Said = @($lines) }
+  $room = @{ Port = 0; Data = ''; Online = -1; Up = $null; Stale = -1; Names = @(); Notes = @(); Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^PORT (\d+)$') { $room.Port = [int]$Matches[1] }
+    elseif ($t -match '^NOTE (.+)$') { $room.Notes += $Matches[1].Trim() }
     elseif ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
     elseif ($t -match '^NAME (.+)$') { $room.Names += $Matches[1].Trim() }
@@ -624,7 +634,7 @@ if (`$port -gt 0) {
   try {
     `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
     if (`$u.Count) { 'UP yes' } else { 'UP no' }
-  } catch { }
+  } catch { 'NOTE the box could not list its UDP ports (' + `$_.Exception.Message + '), so the count is online.json''s alone' }
 }
 `$o = Join-Path `$d 'online.json'
 if (-not (Test-Path `$o)) { 'ONLINE 0' }
@@ -638,10 +648,13 @@ else {
 # Names, for saying whose evening this interrupts. Kept in the private folder,
 # not the served one. A gamemode older than the file writes none, and then the
 # count is all there is to say.
-try {
-  `$n = Get-Content ([IO.Path]::Combine('$rootWin', `$p, 'online-names.json')) -Raw -EA Stop | ConvertFrom-Json
-  foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
-} catch { }
+`$nf = [IO.Path]::Combine('$rootWin', `$p, 'online-names.json')
+if (Test-Path -LiteralPath `$nf) {
+  try {
+    `$n = Get-Content `$nf -Raw -EA Stop | ConvertFrom-Json
+    foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
+  } catch { 'NOTE ' + `$nf + ' does not read (' + `$_.Exception.Message + '), so nobody is named' }
+}
 "@)
 }
 
@@ -666,6 +679,8 @@ function Warn-DevRoom {
   }
   $known = ($room.Port -gt 0 -and $room.Online -ge 0 -and $room.Data)
   $who = Format-DevNames $room.Names
+  # What the box could not read, though the count stands without it.
+  foreach ($n in @($room.Notes)) { Write-Host ('  ' + $n) -ForegroundColor Yellow }
 
   if ($Now) {
     if (-not $known) { Write-Host '  -Now: could not tell who is on the dev server, and nobody is warned' -ForegroundColor Yellow }
@@ -957,7 +972,6 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   }
   $lightTable = $lightRows -join '; '
   $fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
-  $boxRecord = $Root.Replace('/', '\') + '\server-build.json'
   & {
     # The block below edits the staged copy, never the running one: $rootWin
     # is the stage folder for as long as it runs (issue #446).
@@ -965,7 +979,13 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
 Remote @"
 `$p = '$rootWin\server-settings.json'
 if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
-`$s = Get-Content `$p -Raw | ConvertFrom-Json
+# Read once, as bytes, for the byte order mark below as well. A file that is
+# there and does not read stops the block before anything is written, and the
+# exit code stops the deploy.
+`$raw = `$null; `$s = `$null
+try { `$raw = [IO.File]::ReadAllBytes(`$p); `$s = Get-Content `$p -Raw -ErrorAction Stop | ConvertFrom-Json }
+catch { 'SETTINGS UNREADABLE on the stage: ' + `$_.Exception.Message + '. Nothing was written.'; exit 1 }
+if (`$null -eq `$s) { 'SETTINGS UNREADABLE on the stage: it is empty. Nothing was written.'; exit 1 }
 `$have = 0
 if (`$s.PSObject.Properties.Name -contains 'thornswoodVoicePort') { `$have = [int]`$s.thornswoodVoicePort }
 `$wantEquip = `$false
@@ -1002,8 +1022,7 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$startWant = 0
 `$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
 $fullIndexDef
-`$loadsLight = `$false
-try { `$loadsLight = ((Get-Content -LiteralPath '$boxRecord' -Raw -ErrorAction Stop | ConvertFrom-Json).lightPlugins -eq `$true) } catch { }
+`$loadsLight = `$$devRecordLight
 `$lightOf = @{ $lightTable }
 `$unread = @()
 `$isLight = `$null
@@ -1059,8 +1078,7 @@ if ('$Npcs' -and `$s.npcEnabled -ne `$npcOn) {
 # already right. The run on 18 September set the value AND wrote a mark, so
 # a second run that only compared the number would have said 'already 7789'
 # and left the server unable to parse its own settings.
-`$bom = `$false
-try { `$bom = ([IO.File]::ReadAllBytes(`$p)[0] -eq 0xEF) } catch { }
+`$bom = (`$raw.Length -gt 0 -and `$raw[0] -eq 0xEF)
 if (`$bom) { 'the settings file starts with a byte order mark, rewriting it without one' }
 if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$wantOrder -and -not `$wantStart -and -not `$wantMax -and -not `$wantNpc -and -not `$wantPeople -and -not `$wantRefuse -and -not `$wantPass -and -not `$wantServer -and -not `$wantNpcs) {
   'thornswoodVoicePort is already $VoicePort, both equipment checks are already off, and the load order is already right'
@@ -1131,6 +1149,7 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
 }
 "@ | ForEach-Object { "  $_" }
   }
+  if ($LASTEXITCODE -ne 0) { throw "the staged settings could not be edited on the dev box (exit $LASTEXITCODE), the lines above say why. The dev server has not been touched." }
 
   # The settings the block above left in the stage are hashed there, so the
   # check holds them to what was written, like every file sent from here.

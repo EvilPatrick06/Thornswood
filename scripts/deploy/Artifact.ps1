@@ -154,10 +154,22 @@ public static class ThornswoodArtifactZip {
                 output.ReadByte();
                 res[i] = buf;
             }
-        } finally {
-            try { input.Close(); } catch { }
+        } catch (Exception e) {
+            // A read that failed leaves git waiting on its input, so the input
+            // is closed to let it end. When git has already gone, closing a
+            // pipe with a write still buffered fails too; that is said beside
+            // the failure that caused it rather than put in its place.
+            string closing = "";
+            try { input.Close(); }
+            catch (IOException c) { closing = " (closing its input then failed as well: " + c.Message + ")"; }
             p.WaitForExit();
+            throw new InvalidOperationException("git cat-file --batch in " + repo + " failed: " + e.Message + closing, e);
         }
+        // Everything read: closing the input is what tells git to end, and a
+        // failure here, or git ending with an error, is a failure of the read.
+        input.Close();
+        p.WaitForExit();
+        if (p.ExitCode != 0) throw new InvalidOperationException("git cat-file --batch in " + repo + " ended with exit code " + p.ExitCode);
         return res;
     }
 
