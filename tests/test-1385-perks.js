@@ -625,9 +625,9 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   yes('so do Endurance and Agility: Tireless and the whole of Windwalker are in, on the person\'s own machine',
     K.spendLine(filled(['endurance']), 'endurance') === 'Endurance is full. Tireless: Running and swinging cost half stamina.' &&
     K.spendLine(filled(['agility']), 'agility') === 'Agility is full. Windwalker: +4 speed, and a fall deals no damage.');
-  yes('the point that fills Burden still says Pack Mule is not in the game yet',
-    /^Burden is full\. Pack Mule: Being overloaded does not slow you\. That is not in the game yet/.test(K.spendLine(filled(['burden']), 'burden')) &&
-    K.PERKS.packmule.none === true && !K.PERKS.unshakeable.none && !K.PERKS.tireless.none);
+  yes('the point that fills Burden names Pack Mule as the page says it, and no longer says it is not in the game',
+    K.spendLine(filled(['burden']), 'burden') === 'Burden is full. Pack Mule: Being overloaded does not slow you.' &&
+    !K.PERKS.packmule.none && !K.PERKS.packmule.not && !K.PERKS.unshakeable.none && !K.PERKS.tireless.none);
   const two = P.fresh(); two.tree = { might: 2 };
   yes('any other point says nothing more than the panel', K.spendLine(two, 'might') === '');
   states.set(AIM, filled(['precision', 'capacity']));
@@ -784,9 +784,10 @@ for (const field of ['life','runtime']) {
                  fSprintStaminaDrainMult: 7, fStaminaAttackWeaponBase: 20, fStaminaAttackWeaponMult: 1,
                  fStaminaBashBase: 35, fStaminaPowerBashBase: 55 };
   function front(settings, storage) {
-    const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false };
+    const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false, carry: [] };
     const sp = {
       storage: storage,
+      setOverEncumberedIgnored: function (formId, ignored) { g.carry.push(formId + '=' + ignored); },
       hooks: { sendAnimationEvent: { add: function (h, from, to, pattern) { g.hooks.push({ h: h, from: from, to: to, pattern: pattern }); } } },
       on: function (ev, fn) { if (ev === 'update') { g.updates.push(fn); } },
       Game: {
@@ -862,6 +863,21 @@ for (const field of ['life','runtime']) {
     yes('and a character who holds none of them has every setting the game\'s own',
       Object.keys(GAME).every(function (k) { return settings[k] === GAME[k]; }));
 
+    f.view(['windwalker', 'packmule']); f.frame();
+    yes('Pack Mule: your own character goes on the client\'s list of those not held to their carry weight',
+      f.carry.join(',') === '20=false,20=true' &&
+      f.said.some(function (l) { return l === 'perks: Pack Mule held, so carrying past your carry weight does not make you walk'; }));
+    yes('and it changes no game setting', settings.fJumpFallHeightMult === 0 && settings.fSprintStaminaDrainMult === 7);
+    f.view(['packmule', 'windwalker']); f.frame();
+    yes('the same perks again tell the client nothing', f.carry.length === 2);
+    f.view(['windwalker']); f.frame();
+    yes('dropping Pack Mule takes your character off the list, so the game\'s own walk is back',
+      f.carry.join(',') === '20=false,20=true,20=false' &&
+      f.said.some(function (l) { return l === 'perks: Pack Mule not held, so carrying past your carry weight makes you walk, as the game does'; }));
+    const reloaded = front(settings, storage);
+    reloaded.view(['windwalker']); reloaded.frame();
+    yes('a reloaded plugin tells the client at its first view, whatever an earlier copy left', reloaded.carry.join(',') === '20=false');
+
     const keys = /const PERK_SETTINGS = \{([\s\S]*?)\n  \};/.exec(block);
     yes('the page\'s table of game settings is the block\'s, at the same share',
       !!keys && /\| Windwalker, the fall \| `fJumpFallHeightMult` \| 0\.1 \| 0, so a fall comes to nothing \|/.test(page) &&
@@ -872,19 +888,19 @@ for (const field of ['life','runtime']) {
       /tireless: \{\s*fSprintStaminaDrainMult: 0\.5, fStaminaAttackWeaponBase: 0\.5, fStaminaAttackWeaponMult: 0\.5,\s*fStaminaBashBase: 0\.5, fStaminaPowerBashBase: 0\.5\s*\}/.test(keys[1]) &&
       !/packmule/.test(keys[1]));
   }
-  yes('the K panel says the three are in, and Pack Mule is not',
+  yes('the K panel says the four are in',
     panel.indexOf("perk: 'Unshakeable: nothing staggers you while you block.' }") !== -1 &&
     panel.indexOf("perk: 'Tireless: running and swinging cost half stamina.' }") !== -1 &&
     panel.indexOf("perk: 'Windwalker: +4 speed, and a fall deals no damage.' }") !== -1 &&
-    panel.indexOf("perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' }") !== -1);
+    panel.indexOf("perk: 'Pack Mule: being overloaded does not slow you.' }") !== -1);
   const where = {};
   page.split('\n').forEach(function (line) {
     const c = line.split('|').slice(1, -1).map(function (x) { return x.trim(); });
     if (c.length === 3 && Object.prototype.hasOwnProperty.call(K.PERKS, c[0].toLowerCase().replace(/[^a-z]/g, ''))) { where[c[0]] = c; }
   });
-  yes('the page\'s "Where this is" says Unshakeable, Tireless and Windwalker fire, and Pack Mule does not',
+  yes('the page\'s "Where this is" says Unshakeable, Tireless, Windwalker and Pack Mule fire',
     /^Yes/.test(where.Unshakeable[1]) && where.Unshakeable[2] === '' && /^Yes/.test(where.Tireless[1]) && where.Tireless[2] === '' &&
-    /^Yes/.test(where.Windwalker[1]) && where.Windwalker[2] === '' && where['Pack Mule'][1] === 'No');
+    /^Yes/.test(where.Windwalker[1]) && where.Windwalker[2] === '' && /^Yes, on your own machine/.test(where['Pack Mule'][1]) && where['Pack Mule'][2] === '');
 }
 
 console.log('');
