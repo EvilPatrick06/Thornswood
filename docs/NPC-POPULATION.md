@@ -1,9 +1,9 @@
 # NPC population catalogue
 
-Generated from the winning records in the 48-plugin dev load order.
-This is the policy release 1.2.3 runs on dev and main; release proof is recorded separately.
+Generated from the winning records in the 103-plugin load order.
+These are source policies and counts. Release proof is recorded separately.
 
-14,668 placements inspected; 5,072 retained; 9,596 excluded.
+14,668 placements inspected; 4,883 retained; 9,785 excluded.
 
 Named pets and named enemies are excluded even when their source record lacks the Unique flag.
 Merchant traders and exterior transport services remain available.
@@ -15,17 +15,17 @@ listed interval; the deadline persists through restart. A corpse yields one shar
 
 | Hold | Retained NPCs |
 |---|---:|
-| Eastmarch | 512 |
-| Falkreath | 432 |
-| Haafingar | 368 |
-| Hjaalmarch | 392 |
-| Solstheim | 462 |
-| Whiterun | 543 |
-| Winterhold | 512 |
-| no hold | 306 |
-| the Pale | 381 |
-| the Reach | 551 |
-| the Rift | 613 |
+| Eastmarch | 475 |
+| Falkreath | 401 |
+| Haafingar | 349 |
+| Hjaalmarch | 382 |
+| Solstheim | 451 |
+| Whiterun | 523 |
+| Winterhold | 505 |
+| no hold | 304 |
+| the Pale | 377 |
+| the Reach | 531 |
+| the Rift | 585 |
 
 City animals: at most six per location. Farm livestock: at most eight per location.
 Bandit camps: at most seven enemies, 45-minute returns. Giant camps: at most two giants
@@ -47,9 +47,9 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Stendarr's Beacon | the Rift | wilderness |  | 2 | 20 |
 | Forgotten Vale Cave | no hold | cave | 2 | 5 | 45 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 45 |
-| Markarth Side | Hjaalmarch | city |  | 12 | 20, 360 |
-| Solitude Sewers | Haafingar | sewer | 1 | 9 | 30, 360 |
-| Riverwood | Whiterun | city |  | 9 | 20, 360 |
+| Markarth Side | Hjaalmarch | city |  | 4 | 20, 360 |
+| Solitude Sewers | Haafingar | sewer | 1 | 8 | 30 |
+| Riverwood | Whiterun | city |  | 6 | 20 |
 | Redbelly Mine | the Rift | dungeon | 1 | 6 | 30 |
 | Fort Frostmoth | Solstheim | dungeon | 3 | 16 | 60 |
 | Beast Stone | Solstheim | wilderness |  | 1 | 45 |
@@ -75,47 +75,44 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Ashfallow Citadel | Solstheim | dungeon | 3 | 1 | 60 |
 | Northshore Landing | Solstheim | wilderness |  | 5 | 20 |
 | Strident Squall | Solstheim | bandit-camp |  | 5 | 45 |
-| Frostmoon Crag | Solstheim | dungeon | 2 | 1 | 360 |
 | Moesring Pass | Solstheim | dungeon | 1 | 6 | 30 |
 | Sun Stone | Solstheim | wilderness |  | 4 | 45 |
 | Water Stone | Solstheim | wilderness |  | 3 | 45 |
-| open ground in DLC2SolstheimWorld | Solstheim | wilderness |  | 16 | 20, 30, 45, 360 |
+| open ground in DLC2SolstheimWorld | Solstheim | wilderness |  | 15 | 20, 30, 45 |
 | Apocrypha | no hold | dungeon | 3 | 7 | 60 |
 | Apocrypha | no hold | dungeon | 3 | 10 | 60 |
-| Raven Rock | Solstheim | city |  | 7 | 45, 360 |
-| Skaal Village | Solstheim | city |  | 4 | 20, 360 |
-| Tel Mithryn | Solstheim | interior |  | 3 | 360 |
+| Raven Rock | Solstheim | city |  | 6 | 45, 360 |
+| Skaal Village | Solstheim | city |  | 2 | 20, 360 |
+| Tel Mithryn | Solstheim | interior |  | 1 | 360 |
 | Sea Cave | Winterhold | cave | 1 | 4 | 30 |
 | Kolskeggr Mine | the Reach | dungeon | 1 | 5 | 30 |
 | Glacial Crevice | no hold | interior |  | 1 | 20 |
-| WindhelmMarketplaceExterior | Eastmarch | city |  | 8 | 20, 360 |
-| RiftenCitySoutheast | the Rift | city |  | 5 | 20, 360 |
-| MarkarthKeep | the Reach | city |  | 1 | 360 |
-| Solstheim | Solstheim | wilderness |  | 4 | 45, 360 |
+| WindhelmMarketplaceExterior | Eastmarch | city |  | 6 | 20 |
+| RiftenCitySoutheast | the Rift | city |  | 2 | 20 |
+| Solstheim | Solstheim | wilderness |  | 3 | 45 |
 | Bloodlet Throne | Falkreath | dungeon | 1 | 8 | 30 |
 | Dockside Warehouse | Eastmarch | dungeon | 1 | 8 | 30 |
 | Hrothmund's Barrow | Solstheim | wilderness |  | 2 | 20 |
 | Highpoint Tower | Solstheim | dungeon | 3 | 16 | 60 |
-| Rorikstead | Whiterun | city |  | 9 | 20, 360 |
-| Granite Hill | Falkreath | city |  | 17 | 20, 360 |
-| Falkreath | Falkreath | city |  | 11 | 20, 45, 360 |
+| Rorikstead | Whiterun | city |  | 6 | 20 |
+| Granite Hill | Falkreath | city |  | 4 | 20, 360 |
+| Falkreath | Falkreath | city |  | 10 | 20, 45, 360 |
 | Helgen | Falkreath | interior |  | 6 | 20 |
-| Ivarstead | the Rift | city |  | 11 | 20, 45, 360 |
-| Shor's Stone | the Rift | city |  | 5 | 20, 360 |
+| Ivarstead | the Rift | city |  | 6 | 20, 45 |
+| Shor's Stone | the Rift | city |  | 4 | 20 |
 | Darkwater Crossing | Eastmarch | wilderness |  | 4 | 20 |
-| Kynesgrove | Eastmarch | wilderness |  | 8 | 20, 360 |
-| Nightgate Inn | the Pale | interior |  | 1 | 360 |
-| Dawnstar | the Pale | city |  | 13 | 20, 45, 360 |
+| Kynesgrove | Eastmarch | wilderness |  | 5 | 20 |
+| Dawnstar | the Pale | city |  | 12 | 20, 45, 360 |
 | Winterhold | Winterhold | city |  | 11 | 20, 45, 360 |
 | Stonehills | Hjaalmarch | wilderness |  | 1 | 20 |
-| Morthal | Hjaalmarch | city |  | 10 | 20, 45, 360 |
+| Morthal | Hjaalmarch | city |  | 9 | 20, 45, 360 |
 | Karthwasten | the Reach | city |  | 5 | 20 |
-| Old Hroldan | the Reach | interior |  | 3 | 20, 360 |
-| Whiterun | Whiterun | city |  | 20 | 20, 45, 360 |
-| Windhelm | Eastmarch | city |  | 36 | 45, 360 |
-| Riften | the Rift | city |  | 28 | 20, 45, 360 |
-| Markarth | the Reach | city |  | 23 | 20, 45, 360 |
-| Solitude | Haafingar | city |  | 21 | 45, 360 |
+| Old Hroldan | the Reach | wilderness |  | 1 | 20 |
+| Whiterun | Whiterun | city |  | 12 | 20, 45, 360 |
+| Windhelm | Eastmarch | city |  | 9 | 45, 360 |
+| Riften | the Rift | city |  | 11 | 20, 45, 360 |
+| Markarth | the Reach | city |  | 13 | 20, 45, 360 |
+| Solitude | Haafingar | city |  | 8 | 45, 360 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 45 |
 | Anga's Mill | the Pale | wilderness |  | 9 | 20 |
 | Barleydark Farm | Whiterun | wilderness |  | 2 | 20 |
@@ -190,7 +187,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Driftshade Sanctuary | Winterhold | dungeon | 1 | 1 | 30 |
 | Druadach Redoubt | the Reach | cave | 2 | 1 | 45 |
 | Red Eagle Redoubt | the Reach | dungeon | 1 | 8 | 30 |
-| Dushnikh Yal | the Reach | interior |  | 3 | 20, 360 |
+| Dushnikh Yal | the Reach | wilderness |  | 1 | 20 |
 | Duskglow Crevice | the Pale | dungeon | 2 | 11 | 45 |
 | Dustman's Cairn | the Reach | dungeon | 1 | 8 | 30 |
 | Evergreen Grove | Falkreath | dungeon | 1 | 2 | 30 |
@@ -237,32 +234,32 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Kilkreath Ruins | Haafingar | dungeon | 3 | 16 | 60 |
 | Korvanjund | the Pale | dungeon | 2 | 12 | 45 |
 | Labyrinthian | Hjaalmarch | dungeon | 3 | 16 | 60 |
-| Largashbur | the Rift | interior |  | 3 | 20, 360 |
+| Largashbur | the Rift | wilderness |  | 2 | 20 |
 | Liar's Retreat | the Reach | dungeon | 2 | 12 | 45 |
 | Ysgramor's Tomb | Winterhold | dungeon | 1 | 8 | 30 |
 | Lost Echo Cave | Falkreath | dungeon | 1 | 8 | 30 |
 | Lost Knife Hideout | Eastmarch | bandit-camp |  | 16 | 30, 45 |
 | Lost Valley Redoubt | the Reach | dungeon | 1 | 8 | 30 |
 | Bilegulch Mine | Falkreath | bandit-camp |  | 4 | 30, 45 |
-| Sons of Skyrim Military Camp | the Reach | dungeon | 1 | 5 | 30, 360 |
-| Imperial Military Camp | Eastmarch | dungeon | 1 | 3 | 30, 360 |
+| Sons of Skyrim Military Camp | the Reach | dungeon | 1 | 4 | 30 |
+| Imperial Military Camp | Eastmarch | dungeon | 1 | 2 | 30 |
 | Sons of Skyrim Military Camp | the Rift | dungeon | 1 | 1 | 30 |
-| Imperial Military Camp | the Rift | dungeon | 1 | 4 | 30, 360 |
-| Sons of Skyrim Military Camp | Falkreath | dungeon | 1 | 3 | 30, 360 |
+| Imperial Military Camp | the Rift | dungeon | 1 | 3 | 30 |
+| Sons of Skyrim Military Camp | Falkreath | dungeon | 1 | 2 | 30 |
 | Imperial Military Camp | Whiterun | dungeon | 1 | 1 | 30 |
-| Sons of Skyrim Military Camp | Haafingar | dungeon | 1 | 3 | 30, 360 |
-| Sons of Skyrim Military Camp | Hjaalmarch | dungeon | 1 | 4 | 30, 360 |
-| Imperial Military Camp | the Pale | dungeon | 1 | 5 | 30, 360 |
+| Sons of Skyrim Military Camp | Haafingar | dungeon | 1 | 2 | 30 |
+| Sons of Skyrim Military Camp | Hjaalmarch | dungeon | 1 | 3 | 30 |
+| Imperial Military Camp | the Pale | dungeon | 1 | 4 | 30 |
 | Sons of Skyrim Military Camp | the Pale | dungeon | 1 | 1 | 30 |
-| Imperial Military Camp | Winterhold | dungeon | 1 | 3 | 30, 360 |
+| Imperial Military Camp | Winterhold | dungeon | 1 | 2 | 30 |
 | Sons of Skyrim Military Camp | Winterhold | dungeon | 1 | 1 | 30 |
-| Mor Khazgur | the Reach | wilderness |  | 3 | 20, 360 |
+| Mor Khazgur | the Reach | wilderness |  | 1 | 20 |
 | Morvunskar | Eastmarch | dungeon | 1 | 8 | 30 |
 | Moss Mother Cavern | Falkreath | dungeon | 1 | 5 | 30 |
 | Mount Anthor | Winterhold | dungeon | 1 | 7 | 30 |
 | Mzinchaleft | Hjaalmarch | dungeon | 2 | 12 | 45 |
 | Mzulft | Eastmarch | dungeon | 2 | 12 | 45 |
-| Narzulbur | Eastmarch | wilderness |  | 5 | 20, 360 |
+| Narzulbur | Eastmarch | wilderness |  | 3 | 20 |
 | Nchuand-Zel | the Reach | dungeon | 2 | 12 | 45 |
 | Nilheim | the Rift | bandit-camp |  | 1 | 45 |
 | Northwatch Keep | Haafingar | dungeon | 2 | 2 | 45 |
@@ -325,12 +322,12 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Haafingar | wilderness |  | 4 | 45 |
 | open ground in Tamriel | Haafingar | wilderness |  | 4 | 45 |
 | Saering's Watch | Solstheim | wilderness |  | 4 | 45 |
-| WhiterunPLainsDistrict03 | Whiterun | city |  | 7 | 20, 360 |
-| DLC2BujoldsRetreatExterior01 | Solstheim | wilderness |  | 6 | 45, 360 |
-| Oakwood | Falkreath | city |  | 8 | 20, 360 |
+| WhiterunPLainsDistrict03 | Whiterun | city |  | 6 | 20 |
+| DLC2ThirskMeadHallExterior01 | Solstheim | wilderness |  | 4 | 45 |
+| Oakwood | Falkreath | city |  | 3 | 20 |
 | Movarth's Lair | Hjaalmarch | dungeon | 1 | 8 | 30 |
 | Ansilvund | Eastmarch | dungeon | 1 | 8 | 30 |
-| Warmaiden's | Whiterun | dungeon | 1 | 2 | 360 |
+| Warmaiden's | Whiterun | dungeon | 1 | 1 | 360 |
 | open ground in DLC1HunterHQWorld | no hold | wilderness |  | 1 | 20 |
 | Apocrypha | no hold | dungeon | 3 | 14 | 60 |
 | POIBlackreach07 | no hold | wilderness |  | 1 | 45 |
@@ -339,7 +336,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Dragon Bridge Farm | Haafingar | farm |  | 1 | 45 |
 | East Empire Company Warehouse | Haafingar | wilderness |  | 1 | 20 |
 | Northkeep | Falkreath | wilderness |  | 2 | 20, 45 |
-| The Drunken Huntsman | Whiterun | interior |  | 7 | 20, 360 |
+| open ground in Tamriel | Whiterun | wilderness |  | 1 | 20 |
 | Kagrenzel | Eastmarch | dungeon | 2 | 5 | 45 |
 | open ground in Blackreach | no hold | wilderness |  | 1 | 45 |
 | open ground in Blackreach | no hold | wilderness |  | 1 | 20 |
@@ -409,11 +406,8 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Bristleback Cave | Solstheim | cave | 1 | 8 | 30 |
 | Valthume | the Reach | dungeon | 3 | 16 | 60 |
 | open ground in BluePalaceWingWorld | no hold | wilderness |  | 1 | 45 |
-| Ramshackle Trading Post | Solstheim | wilderness |  | 1 | 360 |
 | Ironbind Barrow | Winterhold | dungeon | 1 | 8 | 30 |
 | Ebony Warrior's Camp | the Rift | wilderness |  | 1 | 30 |
-| Oars Rest | Falkreath | city |  | 4 | 360 |
-| SolitudeTemple | Haafingar | city |  | 3 | 360 |
 | Apocrypha | no hold | wilderness |  | 3 | 45 |
 | open ground in Tamriel | Winterhold | wilderness |  | 2 | 30 |
 | open ground in Tamriel | Winterhold | wilderness |  | 3 | 20, 30 |
@@ -431,8 +425,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Frozen Caverns | Eastmarch | cave | 1 | 8 | 30 |
 | Bloodskal Barrow | Solstheim | bandit-camp |  | 7 | 45 |
 | Colcinder Cave | Solstheim | cave | 3 | 7 | 60 |
-| Pripata Residence | Falkreath | interior |  | 1 | 360 |
-| North Colovian Company | Falkreath | interior |  | 2 | 360 |
 | The Estates' Edge | Falkreath | interior |  | 1 | 360 |
 | Apocrypha | no hold | dungeon | 3 | 6 | 60 |
 | The Ratway | the Rift | sewer | 1 | 2 | 30 |
@@ -467,8 +459,8 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | Darkfall Cave | the Reach | cave | 2 | 12 | 45 |
-| Whiterun Sewers | Whiterun | sewer | 1 | 9 | 30, 360 |
-| Windhelm Sewers | Eastmarch | sewer | 1 | 9 | 30, 360 |
+| Whiterun Sewers | Whiterun | sewer | 1 | 8 | 30 |
+| Windhelm Sewers | Eastmarch | sewer | 1 | 8 | 30 |
 | Bronze Water Cave | the Pale | cave | 1 | 2 | 30 |
 | Bannermist Tower | Falkreath | wilderness |  | 4 | 20, 45 |
 | Roadside Ruins | Falkreath | wilderness |  | 1 | 45 |
@@ -483,7 +475,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | Redwater Den | the Rift | dungeon | 1 | 8 | 30 |
 | Dimhollow Crypt | the Pale | cave | 1 | 8 | 30 |
 | Granite Hill Crawl Space | Falkreath | dungeon | 2 | 12 | 45 |
-| Markarth Sewers | the Reach | sewer | 1 | 9 | 30, 360 |
+| Markarth Sewers | the Reach | sewer | 1 | 8 | 30 |
 | open ground in BrinewaterGrottoWorld | no hold | wilderness |  | 1 | 20 |
 | BrinewaterGrottoStart | no hold | wilderness |  | 2 | 20 |
 | Windstad Manor | Hjaalmarch | wilderness |  | 5 | 20 |
@@ -626,7 +618,7 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Falkreath | wilderness |  | 2 | 20 |
 | open ground in Tamriel | the Reach | wilderness |  | 1 | 20 |
 | open ground in Tamriel | the Reach | wilderness |  | 1 | 20 |
-| Winterhold College | Winterhold | interior |  | 7 | 360 |
+| Winterhold College | Winterhold | interior |  | 1 | 360 |
 | Ruunvald Excavation | the Rift | dungeon | 2 | 3 | 45 |
 | Dainty Sload | Haafingar | wilderness |  | 2 | 45 |
 | open ground in DLC1HunterHQWorld | no hold | wilderness |  | 1 | 20 |
@@ -634,7 +626,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in DLC1HunterHQWorld | no hold | wilderness |  | 3 | 20, 45 |
 | open ground in DLC01FalmerValley | no hold | wilderness |  | 1 | 20 |
 | Stony Creek Cave | Eastmarch | cave | 1 | 5 | 30 |
-| CWGuardTemplates | no hold | interior |  | 2 | 360 |
 | Sharpslope Cave | no hold | cave | 2 | 5 | 45 |
 | open ground in Tamriel | Winterhold | wilderness |  | 6 | 20 |
 | open ground in Tamriel | Winterhold | wilderness |  | 1 | 30 |
@@ -946,7 +937,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 1 | 20 |
-| open ground in Tamriel | Haafingar | wilderness |  | 1 | 360 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Haafingar | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Hjaalmarch | wilderness |  | 2 | 30 |
@@ -1179,7 +1169,6 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Whiterun | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Whiterun | wilderness |  | 3 | 20 |
 | open ground in Tamriel | Whiterun | wilderness |  | 2 | 20 |
-| open ground in Tamriel | Whiterun | wilderness |  | 1 | 360 |
 | open ground in Tamriel | Whiterun | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Whiterun | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Eastmarch | wilderness |  | 1 | 20 |
@@ -1503,14 +1492,12 @@ and six of each other animal species per tile. Cave and dungeon caps are shared 
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 2 | 20 |
-| open ground in Tamriel | Falkreath | wilderness |  | 1 | 360 |
-| POITundra08 | Falkreath | wilderness |  | 5 | 20, 360 |
+| POITundra08 | Falkreath | wilderness |  | 4 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
-| POIPineForest30 | Falkreath | wilderness |  | 1 | 360 |
 | POIPineForest02 | Falkreath | wilderness |  | 2 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |
 | open ground in Tamriel | Falkreath | wilderness |  | 1 | 20 |

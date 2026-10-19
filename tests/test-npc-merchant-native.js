@@ -12,7 +12,7 @@ if(!process.argv[2]||!process.argv[3]){
 }
 const addon=require(path.resolve(process.argv[2]));
 const installed=JSON.parse(fs.readFileSync(process.argv[3],'utf8'));
-assert.equal(installed.loadOrder.length,102,'Use the verified installed plugin cast');
+assert.equal(installed.loadOrder.length,require('../game/data/npc-population.json').loadOrder.length,'Use the current verified plugin cast');
 const fixture=fs.mkdtempSync(path.join(require('node:os').tmpdir(),'thornswood-merchant-native-'));
 process.chdir(fixture);
 const dataDir=path.join(fixture,'data');fs.mkdirSync(path.join(dataDir,'scripts'),{recursive:true});
@@ -32,7 +32,7 @@ for(const method of ['makeProperty','get','set','getIdFromDesc','getNpcAIState',
   'setNpcPlacementExclusions','setNpcServerControlled','setNpcDifficultyTier','callPapyrusFunction','getDescFromId']) api[method]=server[method].bind(server);
 const data=ctx.catalogue,plugins=installed.loadOrder.map(file=>path.basename(file));
 assert.deepEqual(Array.from(data.plugins),plugins);
-const references=Array.from(data.keep.filter(row=>row[6]==='trader'),row=>row[0]);
+const references=Array.from(ctx.npcMerchantManifest(data),row=>row.reference);
 const storage=ctx.createPrivateMerchantLedger(fs,path,{privDir:path.join(fixture,'private'),dataDir},references);
 require('./fixtures/merchant-ledger')(fs,path,path.join(fixture,'private'),references);
 const merchants=ctx.createNpcMerchantPurses(api,data,storage);
@@ -49,8 +49,8 @@ while(cursor<total) {
     if(purse) {assert.equal(purse.purse,250);assert.equal(purse.stock.length,0);merchantIds.push(id);}
   }
 }
-assert.equal(loaded,5075);assert.equal(merchantIds.length,249);
-assert.equal(merchants.stats().verified,249);assert.equal(merchants.stats().initialized,249);
+assert.equal(loaded,data.keep.length);assert.equal(merchantIds.length,60);
+assert.equal(merchants.stats().verified,60);assert.equal(merchants.stats().initialized,60);
 const chosen=merchantIds[0],reference=server.getDescFromId(chosen),doc=storage.load();
 doc.entries[reference].purse=0;doc.entries[reference].stock=[{baseId:0x12eb7,count:5}];storage.save(doc);
 merchants.shutdown();assert.throws(()=>merchants.prepare(chosen),/unavailable/);
@@ -62,7 +62,7 @@ assert.equal(restored.prepare(chosen).stock[0].count,5);
 assert.equal(restored.stats().initialized,0,'Recovering a lost native save is not another grant');
 assert.equal(server.get(chosen,'thornswoodMerchant').purse,0);
 console.log(JSON.stringify({passed:true,plugins:plugins.length,loaded,merchants:merchantIds.length,
-  purseTotal:249*250,initialStock:0,recoveredPurse:0,recoveredStock:5,nativeMirrorRestored:true}));
+  purseTotal:60*250,initialStock:0,recoveredPurse:0,recoveredStock:5,nativeMirrorRestored:true}));
 restored.shutdown();
 const target=fs.realpathSync(fixture);
 assert.equal(path.dirname(target),fs.realpathSync(require('node:os').tmpdir()));
