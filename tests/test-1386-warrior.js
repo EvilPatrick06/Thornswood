@@ -903,6 +903,28 @@ yes('a creature that blocks pays nothing: the answer was for a person', world.ac
 heal(WOLF);
 heal(BUL);
 
+// A broken arm makes a block cost twice the stamina (docs/systems/injury.md,
+// #1383), read off the injury block's record of which limb is broken.
+yes('a broken arm doubles a block\'s charge', M.BLOCK.brokenArm === 2);
+const hurtSeen = [];
+box.__thornswoodHurt = {
+  read: function (id) { hurtSeen.push(id); return { id: id }; },
+  limbsOf: function (rec) { return { arm: rec.id === BUL ? 1 : 0, leg: 0 }; }
+};
+world.actors.get(BUL).p.stamina = 1;
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('with a broken arm the same blocked hit costs 9 stamina, twice the 4.5', stamina(BUL) === 0.91 && hurtSeen.indexOf(BUL) !== -1);
+box.__thornswoodHurt.limbsOf = function () { return { arm: 0, leg: 1 }; };
+heal(BUL);
+world.actors.get(BUL).p.stamina = 1;
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('a broken leg leaves the block\'s charge as it was', stamina(BUL) === 0.955);
+delete box.__thornswoodHurt;
+heal(WOLF);
+heal(BUL);
+
 // Set.
 world.actors.get(BUL).p.stamina = 1;
 yes('Set starts and says a block costs half the stamina',
