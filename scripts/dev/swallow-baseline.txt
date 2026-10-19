@@ -231,12 +231,16 @@ scripts\vps\Write-BotToken.ps1 1
 # call that does not throw. So site\server.js has no line below. The 52 left
 # are later work, each a catch that hides a failure; converting one lowers
 # its line.
+#
+# site\public went to none in the next #2736 pull request (19 Oct). The hub's
+# refresh after a staff action and the staff gallery read now say when they
+# fail, and Accept shows the site's refusal; home.js's localStorage catches
+# say in their braces why nothing more is done (the age cookie holds the
+# answer), and the rest were tries around calls that do not throw.
 bot\bot.py 3
 bot\Build-Discord.py 5
 bot\Build-Onboarding.py 1
 bot\card.py 5
-site\public\home.js 9
-site\public\hub.js 5
 voice\gamemode-voice.js 6
 voice\load-voice.js 5
 voice\voice-server.js 13
