@@ -99,8 +99,6 @@ try {
     $worker = Join-Path $tmp 'worker.ps1'
     $resultA = Join-Path $tmp 'result-a.txt'
     $resultB = Join-Path $tmp 'result-b.txt'
-    $errA = Join-Path $tmp 'err-a.txt'
-    $errB = Join-Path $tmp 'err-b.txt'
     $workerBody = @"
 param([string]`$Helper, [string]`$RepoDir, [string]`$OutDir, [string]`$Result, [int]`$DelayMs = 0)
 `$ErrorActionPreference = 'Stop'
@@ -122,16 +120,37 @@ try {
         '-Helper', $helper, '-RepoDir', $src, '-OutDir', $out2, '-Result', $resultA, '-DelayMs', '0')
     $argB = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $worker,
         '-Helper', $helper, '-RepoDir', $src, '-OutDir', $out2, '-Result', $resultB, '-DelayMs', '50')
-    $pA = Start-Process -FilePath $pwsh -ArgumentList $argA -PassThru -NoNewWindow `
-        -RedirectStandardOutput (Join-Path $tmp 'stdout-a.txt') -RedirectStandardError $errA
-    $pB = Start-Process -FilePath $pwsh -ArgumentList $argB -PassThru -NoNewWindow `
-        -RedirectStandardOutput (Join-Path $tmp 'stdout-b.txt') -RedirectStandardError $errB
-    Wait-Process -Id @($pA.Id, $pB.Id) -Timeout 120 -ErrorAction SilentlyContinue
-    if (-not $pA.HasExited) { Stop-Process -Id $pA.Id -Force -ErrorAction SilentlyContinue }
-    if (-not $pB.HasExited) { Stop-Process -Id $pB.Id -Force -ErrorAction SilentlyContinue }
-    Start-Sleep -Milliseconds 200
-    $codeA = if ($pA.HasExited) { $pA.ExitCode } else { -1 }
-    $codeB = if ($pB.HasExited) { $pB.ExitCode } else { -1 }
+    # Each worker is started by .NET's Process.Start, whose process object
+    # holds the worker's handle from the moment it starts, so its exit code is
+    # there once the worker has ended. Windows PowerShell 5.1's Start-Process
+    # -PassThru hands back one that holds no handle, and its ExitCode read
+    # empty once the worker had gone, so both workers failed there (#2739).
+    function Start-Worker([string[]]$a) {
+        $si = New-Object Diagnostics.ProcessStartInfo
+        $si.FileName = $pwsh
+        # Each argument quoted whole: the temp paths may hold a space, and
+        # none of them holds a quote or ends in a backslash.
+        $si.Arguments = (@($a | ForEach-Object { '"' + $_ + '"' }) -join ' ')
+        $si.UseShellExecute = $false
+        $si.RedirectStandardOutput = $true
+        $si.RedirectStandardError = $true
+        $p = [Diagnostics.Process]::Start($si)
+        [pscustomobject]@{ P = $p; Out = $p.StandardOutput.ReadToEndAsync(); Err = $p.StandardError.ReadToEndAsync() }
+    }
+    # The exit code once the worker ends, or -1 when it is still going at the
+    # two minutes both are given, which ends it.
+    function Wait-Worker($w, [DateTime]$by) {
+        $ms = [int][Math]::Max(0, ($by - [DateTime]::UtcNow).TotalMilliseconds)
+        if (-not $w.P.WaitForExit($ms)) { $w.P.Kill(); $w.P.WaitForExit(); return -1 }
+        # Without a timeout it also waits for the worker's output to be read to its end.
+        $w.P.WaitForExit()
+        return $w.P.ExitCode
+    }
+    $wA = Start-Worker $argA
+    $wB = Start-Worker $argB
+    $by = [DateTime]::UtcNow.AddSeconds(120)
+    $codeA = Wait-Worker $wA $by
+    $codeB = Wait-Worker $wB $by
     $textA = if (Test-Path -LiteralPath $resultA) { (Get-Content -LiteralPath $resultA -Raw).Trim() } else { 'MISSING' }
     $textB = if (Test-Path -LiteralPath $resultB) { (Get-Content -LiteralPath $resultB -Raw).Trim() } else { 'MISSING' }
     Yes ("worker A finished (exit $codeA)") ($codeA -eq 0 -and $textA.StartsWith('OK|'))
@@ -154,8 +173,8 @@ try {
         Yes 'no .unpacking-* staging dirs left behind' $false
         Write-Host ("  A result: $textA")
         Write-Host ("  B result: $textB")
-        if (Test-Path -LiteralPath $errA) { Get-Content -LiteralPath $errA -ErrorAction SilentlyContinue | Select-Object -Last 5 | ForEach-Object { Write-Host "  A stderr: $_" } }
-        if (Test-Path -LiteralPath $errB) { Get-Content -LiteralPath $errB -ErrorAction SilentlyContinue | Select-Object -Last 5 | ForEach-Object { Write-Host "  B stderr: $_" } }
+        @($wA.Err.Result -split "`r?`n" | Where-Object { $_ }) | Select-Object -Last 5 | ForEach-Object { Write-Host "  A stderr: $_" }
+        @($wB.Err.Result -split "`r?`n" | Where-Object { $_ }) | Select-Object -Last 5 | ForEach-Object { Write-Host "  B stderr: $_" }
     }
 
     # ---- 3. source still never Remove-Items the shared folder name ----------

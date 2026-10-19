@@ -56,6 +56,17 @@ function Put([string]$path, [string]$text) {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $path))
     [IO.File]::WriteAllText($path, $text, $utf8)
 }
+# What a PowerShell this starts writes, its errors as well, one string a line.
+# Under Windows PowerShell 5.1 a line the child writes to stderr comes back
+# through 2>&1 as an error record, and with Stop the first one ended this
+# harness before the refusal it carried was read (#2739); PowerShell 7 hands
+# it over as text. A child's refusal is what these checks read, so here, and
+# only inside this function, a stderr line is read rather than stopped on.
+# The child's exit code is still in $LASTEXITCODE afterwards.
+function Out-Child([string]$exe, [string[]]$a) {
+    $ErrorActionPreference = 'Continue'
+    @(& $exe @a 2>&1 | ForEach-Object { "$_" })
+}
 $commit = 'abcdef0123456789abcdef0123456789abcdef01'
 # A build folder: every file ServerBuild.ps1 counts as the fork's, $Binary the binary.
 function Build([string]$dir, [string]$Binary) {
@@ -206,10 +217,10 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
         $lib = Join-Path $Repo 'scripts\deploy\ServerBuild.ps1'
         $jsonLib = Join-Path $Repo 'scripts\release\Read-JsonFile.ps1'
         $i1 = Join-Path $T 'into51a'; $null = [IO.Directory]::CreateDirectory($i1)
-        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Json $jsonLib -Store $sA.Dir -Rec $recA2 -Into $i1 2>&1 | ForEach-Object { "$_" })
+        $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $probe, '-Lib', $lib, '-Json', $jsonLib, '-Store', $sA.Dir, '-Rec', $recA2, '-Into', $i1))
         Yes 'under 5.1, the store''s build is taken: its name, all seven files, no problem' ($o -contains ('NAME ' + $sA.A.Name) -and $o -contains 'PROBLEM ' -and $o -contains 'FILES 7')
         $i2 = Join-Path $T 'into51b'; $null = [IO.Directory]::CreateDirectory($i2)
-        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $probe -Lib $lib -Json $jsonLib -Store $sw -Rec $recA -Into $i2 2>&1 | ForEach-Object { "$_" })
+        $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $probe, '-Lib', $lib, '-Json', $jsonLib, '-Store', $sw, '-Rec', $recA, '-Into', $i2))
         Yes '  and a swapped zip is refused there too, writing nothing' (@($o | Where-Object { $_ -match '^PROBLEM .*is not the zip its name' }).Count -eq 1 -and $o -contains 'FILES 0')
     } else { Write-Host 'SKIP  no Windows PowerShell 5.1 on this machine' }
 
@@ -254,13 +265,13 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
     $shapeText = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Read-JsonFile.ps1')) + "`r`n" + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\RecordShape.ps1')) + "`r`n"
     [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
         "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sA.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
-    $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $block 2>&1 | ForEach-Object { "$_".Trim() })
+    $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
     Yes 'Deploy-Server''s store block takes the build into the stage and ends STORED <name> (5.1)' (
         $o -contains ('STORED ' + $sA.A.Name) -and (Test-Path -LiteralPath (Join-Path $root '.stage-x\scam_native.node')) -and
         (Test-Path -LiteralPath (Join-Path $root '.stage-x\data\scripts\ActiveMagicEffect.pex')))
     [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
         "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sB.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
-    $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $block 2>&1 | ForEach-Object { "$_".Trim() })
+    $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
     Yes '  and with no build for the record it ends STORE REFUSED, the stage cleared' ($o -contains 'STORE REFUSED' -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-x')))
 
     # ---- 6. Deploy-Server's settings block for -FromStore -------------------------
@@ -271,7 +282,7 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
         $f = Join-Path $T 'carry-block.ps1'
         [IO.File]::WriteAllText($f, ([IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
             "`$Root = '" + $root + "'`r`n`$Stage = '.stage-y'`r`n`$WasRecord = '" + $was + "'`r`n" + $settingsStoreBlock), $utf8)
-        return @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_".Trim() })
+        return @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $f) | ForEach-Object { $_.Trim() })
     }
     $live = '{ "port": 7777, "thornswoodRequirePass": true, "loadOrder": [ "C:/Thornswood-Server/plugins/Skyrim.esm" ] }'
     $o = StoreCarry (SumOf $recA) $live
@@ -289,7 +300,7 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
     $publish = Join-Path $Repo 'scripts\release\Publish-Server.ps1'
     $deploy = Join-Path $Repo 'scripts\deploy\Deploy-Server.ps1'
     function RunPs([string]$script, [string[]]$a) {
-        $o = @(& $pwsh -NoProfile -File $script @a 2>&1 | ForEach-Object { "$_" })
+        $o = @(Out-Child $pwsh (@('-NoProfile', '-File', $script) + $a))
         $code = $LASTEXITCODE
         # An error is printed wrapped at the window's width, each piece behind
         # a "| ": put the sentence back together before it is read.
@@ -323,7 +334,7 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
     }
     if ((Test-Path -LiteralPath $ps51) -and (Get-Command node -ErrorAction SilentlyContinue)) {
         $inst = Join-Path $Repo 'scripts\deploy\Install-ThornswoodServer.ps1'
-        $o = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $inst -FromStore -PutBack -AllowGamingPc -Root (Join-Path $T 'inst-root') 2>&1 | ForEach-Object { "$_".Trim() })
+        $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $inst, '-FromStore', '-PutBack', '-AllowGamingPc', '-Root', (Join-Path $T 'inst-root')) | ForEach-Object { $_.Trim() })
         Yes 'the installer refuses -FromStore with -PutBack, changing nothing' ($o -contains 'INSTALL REFUSED' -and (($o -join ' ') -match '-FromStore installs a server build out of the store'))
     }
 
