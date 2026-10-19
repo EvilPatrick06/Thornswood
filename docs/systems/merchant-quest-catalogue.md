@@ -25,7 +25,7 @@ buy, sell or supply permissions.
 The offering references are `1a684:Skyrim.esm` (base `13b9c:Skyrim.esm`,
 book hold `whiterun`) and `1e7d6:Skyrim.esm` (base `1e7d5:Skyrim.esm`,
 book hold `winterhold`). These are exact proposed roster bindings, not a
-change to the existing 249-trader population. The Advanced offers bind
+activation of these offers; the separate population source now retains60 guild traders. The Advanced offers bind
 `31efc3:Riften Expansion.esp` (base `1d0769:Riften Expansion.esp`, book hold
 `riften`) and `1a672:Skyrim.esm` (base `13ba1:Skyrim.esm`, book hold
 `whiterun`), respectively. Their saved profession gates require Advanced

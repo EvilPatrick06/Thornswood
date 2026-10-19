@@ -38,5 +38,5 @@ for(const row of transport) {
  counts[row.displayName]=(counts[row.displayName]||0)+1;
 }
 assert.deepEqual(counts,{'Ferry Operator':16,'Ship Captain':2,'Coach Driver':9});
-assert.equal(ctx.runtime.keep.filter(row=>row[13]!==undefined).length,27,'only transport names change before the guild roster activates');
+assert.equal(ctx.runtime.keep.filter(row=>row[13]!==undefined).length,87,'transport and sixty guild roles are named at initial admission');
 console.log('PASS descriptive NPC role titles use native names, correct instances and initial admission');

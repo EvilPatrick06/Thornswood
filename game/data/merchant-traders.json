@@ -1,139 +1,10 @@
 {
   "version": 1,
-  "count": 249,
+  "count": 60,
   "byRef": {
-    "1000a:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Rorikstead",
-      "cell": "9597:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -83681.125,
-        7565.1875,
-        -4220.984375
-      ]
-    },
-    "1021:Solitude Arena.esp": {
-      "name": "Chef of the Restaurant",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "SolitudeTemple",
-      "cell": "37ee4:Skyrim.esm",
-      "world": "37edf:Skyrim.esm",
-      "pos": [
-        -59069.3203125,
-        112568.546875,
-        -7363.8359375
-      ]
-    },
-    "109aa9:Arena - Markarth Side.esp": {
-      "name": "Nix Silverspoon",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "1096b5:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        480.0,
-        -48.0,
-        0.0
-      ]
-    },
-    "127bb6:Arena - Markarth Side.esp": {
-      "name": "Vixi",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "103e1d:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        752.0,
-        24.0,
-        0.0
-      ]
-    },
-    "13482:Skyrim.esm": {
-      "name": "Alvor",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Riverwood",
-      "cell": "133c8:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -515.1854248046875,
-        -153.69107055664062,
-        240.0
-      ]
-    },
-    "13487:Skyrim.esm": {
-      "name": "Lucan Valerius",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Riverwood",
-      "cell": "133c9:Skyrim.esm",
-      "world": null,
-      "pos": [
-        32.38584518432617,
-        -123.53012084960938,
-        0.0
-      ]
-    },
-    "13488:Skyrim.esm": {
-      "name": "Camilla Valerius",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Riverwood",
-      "cell": "133c9:Skyrim.esm",
-      "world": null,
-      "pos": [
-        18.921188354492188,
-        -251.0354461669922,
-        0.0
-      ]
-    },
-    "135227:WindhelmSSE.esp": {
-      "name": "Audmund",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "13502e:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        1543.1429443359375,
-        -5162.24609375,
-        67.30768585205078
-      ]
-    },
-    "136edc:Arena - Markarth Side.esp": {
-      "name": "Lilja",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "f9b2a:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        704.0,
-        176.0,
-        0.0
-      ]
-    },
-    "13bffc:Arena - Markarth Side.esp": {
-      "name": "Gunnr",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "f9a47:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        48.0,
-        -8.0,
-        0.0
-      ]
-    },
     "13c008:Arena - Markarth Side.esp": {
-      "name": "Hild",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Markarth Side",
@@ -145,86 +16,9 @@
         0.0
       ]
     },
-    "149aca:WindhelmSSE.esp": {
-      "name": "Hellte",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "12fba4:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -2132.254638671875,
-        1259.0950927734375,
-        -40.11399459838867
-      ]
-    },
-    "15cfcd:WindhelmSSE.esp": {
-      "name": "Tormund Tall-Tale",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "15cc6f:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        1860.81494140625,
-        -5032.67626953125,
-        64.00001525878906
-      ]
-    },
-    "160715:Riften Expansion.esp": {
-      "name": "Bjoruld",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "cc616:Riften Expansion.esp",
-      "world": null,
-      "pos": [
-        -91.23159790039062,
-        74.497802734375,
-        64.0
-      ]
-    },
-    "16acf:Skyrim.esm": {
-      "name": "Stormcloak Quartermaster",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Sons of Skyrim Military Camp",
-      "cell": "9305:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -91802.8828125,
-        88395.84375,
-        -12499.0546875
-      ]
-    },
-    "16d752:WindhelmSSE.esp": {
-      "name": "Brurid",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "12f61e:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -1729.3756103515625,
-        4209.54931640625,
-        -62.92679214477539
-      ]
-    },
-    "172ca7:WindhelmSSE.esp": {
-      "name": "Delmon",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "10665b:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -1117.6427001953125,
-        -1085.0047607421875,
-        -128.00009155273438
-      ]
-    },
     "177da:Dragonborn.esm": {
-      "name": "Neloth",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Tel Mithryn",
@@ -236,47 +30,9 @@
         -8.091889381408691
       ]
     },
-    "177db:Dragonborn.esm": {
-      "name": "Talvas Fathryon",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Tel Mithryn",
-      "cell": "17787:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        200.34228515625,
-        1152.60107421875,
-        -5.302620887756348
-      ]
-    },
-    "177dc:Dragonborn.esm": {
-      "name": "Elynea Mothren",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Tel Mithryn",
-      "cell": "1772a:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        298.970947265625,
-        -276.8332214355469,
-        0.0
-      ]
-    },
-    "179c40:Riften Expansion.esp": {
-      "name": "Sethesi",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "cc616:Riften Expansion.esp",
-      "world": null,
-      "pos": [
-        -283.3656005859375,
-        -21.51885986328125,
-        63.00001525878906
-      ]
-    },
     "1828f:Dragonborn.esm": {
-      "name": "Glover Mallory",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Raven Rock",
@@ -289,7 +45,8 @@
       ]
     },
     "18291:Dragonborn.esm": {
-      "name": "Geldis Sadri",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Raven Rock",
@@ -302,7 +59,8 @@
       ]
     },
     "18293:Dragonborn.esm": {
-      "name": "Fethis Alor",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Raven Rock",
@@ -314,21 +72,9 @@
         0.0
       ]
     },
-    "182a0:Dragonborn.esm": {
-      "name": "Garyn Ienth",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Raven Rock",
-      "cell": "18277:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        -64.05123138427734,
-        194.41407775878906,
-        0.0
-      ]
-    },
     "182a2:Dragonborn.esm": {
-      "name": "Milore Ienth",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Raven Rock",
@@ -340,34 +86,9 @@
         0.0
       ]
     },
-    "18fac:Dragonborn.esm": {
-      "name": "Morwen",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Skaal Village",
-      "cell": "18f46:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        -322.0987854003906,
-        781.871826171875,
-        1.4615297317504883
-      ]
-    },
-    "18fb8:Dragonborn.esm": {
-      "name": "Baldor Iron-Shaper",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Skaal Village",
-      "cell": "18f49:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        -173.83023071289062,
-        544.9551391601562,
-        -7.358676433563232
-      ]
-    },
     "18fc0:Dragonborn.esm": {
-      "name": "Edla",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Solstheim",
       "bookHold": "ravenrock",
       "locationName": "Skaal Village",
@@ -380,7 +101,8 @@
       ]
     },
     "1939ba:aaaGraniteHill.esp": {
-      "name": "Lova",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "Granite Hill",
@@ -393,7 +115,8 @@
       ]
     },
     "1981e:Skyrim.esm": {
-      "name": "Solaf",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "Falkreath",
@@ -406,7 +129,8 @@
       ]
     },
     "198a0:Skyrim.esm": {
-      "name": "Corpulus Vinius",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -419,7 +143,8 @@
       ]
     },
     "198ac:Skyrim.esm": {
-      "name": "Taarie",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -431,34 +156,9 @@
         0.0
       ]
     },
-    "198ad:Skyrim.esm": {
-      "name": "Endarie",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a0f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -35.81916809082031,
-        -431.54315185546875,
-        6.103515625e-05
-      ]
-    },
-    "198af:Skyrim.esm": {
-      "name": "Jala",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a05:Skyrim.esm",
-      "world": null,
-      "pos": [
-        432.0,
-        -960.0,
-        0.0
-      ]
-    },
     "198b1:Skyrim.esm": {
-      "name": "Fihada",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -470,34 +170,9 @@
         1.52587890625e-05
       ]
     },
-    "198b3:Skyrim.esm": {
-      "name": "Evette San",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a08:Skyrim.esm",
-      "world": null,
-      "pos": [
-        560.0,
-        -688.0,
-        0.0
-      ]
-    },
-    "198b6:Skyrim.esm": {
-      "name": "Vittoria Vici",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a07:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -7.1953125,
-        -384.15625,
-        4.4306640625
-      ]
-    },
     "198c5:Skyrim.esm": {
-      "name": "Sybille Stentor",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -509,21 +184,9 @@
         576.4193725585938
       ]
     },
-    "198c9:Skyrim.esm": {
-      "name": "Sayma",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a10:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -159.3194580078125,
-        -975.5235595703125,
-        0.0001068115234375
-      ]
-    },
     "198d2:Skyrim.esm": {
-      "name": "Angeline Morrard",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -535,47 +198,9 @@
         0.0
       ]
     },
-    "198d3:Skyrim.esm": {
-      "name": "Vivienne Onis",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a11:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -20.143760681152344,
-        -158.26580810546875,
-        3.814697265625e-06
-      ]
-    },
-    "198d4:Skyrim.esm": {
-      "name": "Addvar",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a0d:Skyrim.esm",
-      "world": null,
-      "pos": [
-        463.8466491699219,
-        -1004.7083740234375,
-        3.814697265625e-06
-      ]
-    },
-    "198d5:Skyrim.esm": {
-      "name": "Geimund",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "70469:Skyrim.esm",
-      "world": null,
-      "pos": [
-        475.1209716796875,
-        -1299.91552734375,
-        -3.814697265625e-06
-      ]
-    },
     "198d8:Skyrim.esm": {
-      "name": "Beirand",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Haafingar",
       "bookHold": "solitude",
       "locationName": "Solitude",
@@ -588,7 +213,8 @@
       ]
     },
     "198ea:Skyrim.esm": {
-      "name": "Lisbet",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -601,7 +227,8 @@
       ]
     },
     "198eb:Skyrim.esm": {
-      "name": "Imedhnain",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -613,47 +240,9 @@
         2.836996078491211
       ]
     },
-    "198ec:Skyrim.esm": {
-      "name": "Kleppr",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16dfe:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -6791.62548828125,
-        -1032.6207275390625,
-        144.0
-      ]
-    },
-    "198ed:Skyrim.esm": {
-      "name": "Frabbi",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16dfe:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -6858.62548828125,
-        -1032.6207275390625,
-        144.0
-      ]
-    },
-    "198f2:Skyrim.esm": {
-      "name": "Kerah",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16dfd:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1899.5155029296875,
-        339.3449401855469,
-        0.0
-      ]
-    },
     "198f7:Skyrim.esm": {
-      "name": "Bothela",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -665,21 +254,9 @@
         -112.0
       ]
     },
-    "198f8:Skyrim.esm": {
-      "name": "Muiri",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16df6:Skyrim.esm",
-      "world": null,
-      "pos": [
-        173.17724609375,
-        870.2454833984375,
-        -112.0
-      ]
-    },
     "19906:Skyrim.esm": {
-      "name": "Ghorza gra-Bagol",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -691,21 +268,9 @@
         6911.1318359375
       ]
     },
-    "19907:Skyrim.esm": {
-      "name": "Tacitus Sallustius",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16df2:Skyrim.esm",
-      "world": null,
-      "pos": [
-        434.6217346191406,
-        1860.99658203125,
-        6896.0
-      ]
-    },
     "19908:Skyrim.esm": {
-      "name": "Calcelmo",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -717,21 +282,9 @@
         6635.326171875
       ]
     },
-    "19909:Skyrim.esm": {
-      "name": "Aicantar",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "36a72:Skyrim.esm",
-      "world": null,
-      "pos": [
-        198.0,
-        3298.0,
-        0.0
-      ]
-    },
     "1990a:Skyrim.esm": {
-      "name": "Anton Virane",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "the Reach",
       "bookHold": "markarth",
       "locationName": "Markarth",
@@ -743,112 +296,9 @@
         6896.0
       ]
     },
-    "19929:Skyrim.esm": {
-      "name": "Murbul",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Dushnikh Yal",
-      "cell": "198e2:Skyrim.esm",
-      "world": null,
-      "pos": [
-        857.6615600585938,
-        -490.8791198730469,
-        0.0
-      ]
-    },
-    "1992b:Skyrim.esm": {
-      "name": "Gharol",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Dushnikh Yal",
-      "cell": "198e2:Skyrim.esm",
-      "world": null,
-      "pos": [
-        514.876708984375,
-        -36.48973846435547,
-        0.0
-      ]
-    },
-    "199cf:Skyrim.esm": {
-      "name": "Eydis",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Old Hroldan",
-      "cell": "16776:Skyrim.esm",
-      "world": null,
-      "pos": [
-        847.8201293945312,
-        -27.208759307861328,
-        0.0
-      ]
-    },
-    "199d0:Skyrim.esm": {
-      "name": "Skuli",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Old Hroldan",
-      "cell": "138be:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1309.1551513671875,
-        -696.7742919921875,
-        5.227327346801758e-05
-      ]
-    },
-    "19dc8:Skyrim.esm": {
-      "name": "Keerava",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bdf:Skyrim.esm",
-      "world": null,
-      "pos": [
-        657.87158203125,
-        -214.71763610839844,
-        64.0
-      ]
-    },
-    "19dc9:Skyrim.esm": {
-      "name": "Talen-Jei",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bdf:Skyrim.esm",
-      "world": null,
-      "pos": [
-        693.4588623046875,
-        -15.719537734985352,
-        64.0
-      ]
-    },
-    "19dce:Skyrim.esm": {
-      "name": "Indaryn",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bdc:Skyrim.esm",
-      "world": null,
-      "pos": [
-        2215.047119140625,
-        -4296.64794921875,
-        319.0
-      ]
-    },
-    "19dcf:Skyrim.esm": {
-      "name": "Drifa",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bd9:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -147.76100158691406,
-        10.519561767578125,
-        64.0
-      ]
-    },
     "19dd0:Skyrim.esm": {
-      "name": "Bersi Honey-Hand",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -860,34 +310,9 @@
         64.0
       ]
     },
-    "19ddc:Skyrim.esm": {
-      "name": "Brand-Shei",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bd4:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -283.684814453125,
-        -194.00802612304688,
-        64.0
-      ]
-    },
-    "19ddd:Skyrim.esm": {
-      "name": "Ungrien",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bd4:Skyrim.esm",
-      "world": null,
-      "pos": [
-        27.647171020507812,
-        404.66082763671875,
-        63.0
-      ]
-    },
     "19df0:Skyrim.esm": {
-      "name": "Wylandriah",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -900,7 +325,8 @@
       ]
     },
     "19df1:Skyrim.esm": {
-      "name": "Balimund",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -912,47 +338,9 @@
         64.0
       ]
     },
-    "19df3:Skyrim.esm": {
-      "name": "Asbjorn Fire-Tamer",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "53081:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -73.3221664428711,
-        -195.400634765625,
-        64.0
-      ]
-    },
-    "19df9:Skyrim.esm": {
-      "name": "Vekel the Man",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bcf:Skyrim.esm",
-      "world": null,
-      "pos": [
-        187.49066162109375,
-        2476.4599609375,
-        -123.60869598388672
-      ]
-    },
-    "19dfa:Skyrim.esm": {
-      "name": "Dirge",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bcf:Skyrim.esm",
-      "world": null,
-      "pos": [
-        17.521156311035156,
-        2593.78076171875,
-        -124.43700408935547
-      ]
-    },
     "19dfb:Skyrim.esm": {
-      "name": "Elgrim",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -964,60 +352,9 @@
         112.0
       ]
     },
-    "19dfc:Skyrim.esm": {
-      "name": "Hafjorg",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bce:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -96.0,
-        784.0,
-        112.0
-      ]
-    },
-    "19e02:Skyrim.esm": {
-      "name": "Wilhelm",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Ivarstead",
-      "cell": "13a5c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1451.5177001953125,
-        191.83848571777344,
-        8.392333984375e-05
-      ]
-    },
-    "19e03:Skyrim.esm": {
-      "name": "Lynly Star-Sung",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Ivarstead",
-      "cell": "13a5c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1548.2703857421875,
-        192.79067993164062,
-        6.103515625e-05
-      ]
-    },
-    "19e09:Skyrim.esm": {
-      "name": "Filnjar",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Shor's Stone",
-      "cell": "13856:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1189.831298828125,
-        -59.188446044921875,
-        240.0
-      ]
-    },
     "19e14:Skyrim.esm": {
-      "name": "Marise Aravel",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -1029,47 +366,9 @@
         176.0
       ]
     },
-    "19e19:Skyrim.esm": {
-      "name": "Atub",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Largashbur",
-      "cell": "1525c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        787.3623046875,
-        -587.6644897460938,
-        0.0
-      ]
-    },
-    "1a51b:Dragonborn.esm": {
-      "name": "Elmus",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "DLC2BujoldsRetreatExterior01",
-      "cell": "ee04:Dragonborn.esm",
-      "world": "800:Dragonborn.esm",
-      "pos": [
-        80597.8203125,
-        58660.40234375,
-        658.997314453125
-      ]
-    },
-    "1a51d:Dragonborn.esm": {
-      "name": "Halbarn Iron-Fur",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Thirsk Mead Hall",
-      "cell": "16feb:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        3506.53564453125,
-        1025.052001953125,
-        6634.30126953125
-      ]
-    },
     "1a66d:Skyrim.esm": {
-      "name": "Arcadia",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Whiterun",
@@ -1082,7 +381,8 @@
       ]
     },
     "1a66e:Skyrim.esm": {
-      "name": "Hulda",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Whiterun",
@@ -1095,7 +395,8 @@
       ]
     },
     "1a672:Skyrim.esm": {
-      "name": "Belethor",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Whiterun",
@@ -1107,21 +408,9 @@
         69.51840209960938
       ]
     },
-    "1a675:Skyrim.esm": {
-      "name": "Carlotta Valentia",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "165b1:Skyrim.esm",
-      "world": null,
-      "pos": [
-        50.630889892578125,
-        -218.3187713623047,
-        33.24507141113281
-      ]
-    },
     "1a67c:Skyrim.esm": {
-      "name": "Adrianne Avenicci",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Warmaiden's",
@@ -1133,21 +422,9 @@
         64.0
       ]
     },
-    "1a680:Skyrim.esm": {
-      "name": "Anoriath",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "The Drunken Huntsman",
-      "cell": "165b7:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -496.0,
-        -1264.0,
-        66.92522430419922
-      ]
-    },
     "1a681:Skyrim.esm": {
-      "name": "Elrindir",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Whiterun",
@@ -1159,21 +436,9 @@
         80.0
       ]
     },
-    "1a683:Skyrim.esm": {
-      "name": "Eorlund Gray-Mane",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "165b2:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -738.41455078125,
-        -310.5943298339844,
-        320.0
-      ]
-    },
     "1a684:Skyrim.esm": {
-      "name": "Fralia Gray-Mane",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Whiterun",
       "bookHold": "whiterun",
       "locationName": "Whiterun",
@@ -1185,47 +450,9 @@
         320.0
       ]
     },
-    "1a69a:Skyrim.esm": {
-      "name": "Ysolda",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "165ac:Skyrim.esm",
-      "world": null,
-      "pos": [
-        269.8266906738281,
-        -79.94212341308594,
-        69.47135925292969
-      ]
-    },
-    "1a6a5:Skyrim.esm": {
-      "name": "Ahlam",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "165b7:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -308.28973388671875,
-        -587.3578491210938,
-        320.06121826171875
-      ]
-    },
-    "1a6a8:Skyrim.esm": {
-      "name": "Mralki",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Rorikstead",
-      "cell": "13870:Skyrim.esm",
-      "world": null,
-      "pos": [
-        807.19677734375,
-        -163.96075439453125,
-        0.5329780578613281
-      ]
-    },
     "1a6b5:Skyrim.esm": {
-      "name": "Frida",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -1238,7 +465,8 @@
       ]
     },
     "1a6be:Skyrim.esm": {
-      "name": "Rustleif",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -1251,7 +479,8 @@
       ]
     },
     "1a6bf:Skyrim.esm": {
-      "name": "Seren",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -1264,7 +493,8 @@
       ]
     },
     "1a6c3:Skyrim.esm": {
-      "name": "Madena",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -1276,21 +506,9 @@
         0.0
       ]
     },
-    "1aa35:The Great City of Solitude.esp": {
-      "name": "Jytte",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "e1e6:The Great City of Solitude.esp",
-      "world": null,
-      "pos": [
-        404.8375549316406,
-        -1556.0911865234375,
-        6.103515625e-05
-      ]
-    },
     "1aa5e:Skyrim.esm": {
-      "name": "Falion",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Morthal",
@@ -1303,7 +521,8 @@
       ]
     },
     "1aa61:Skyrim.esm": {
-      "name": "Lami",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Morthal",
@@ -1316,7 +535,8 @@
       ]
     },
     "1aa62:Skyrim.esm": {
-      "name": "Jonna",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Morthal",
@@ -1328,73 +548,9 @@
         10.95335578918457
       ]
     },
-    "1b085:Skyrim.esm": {
-      "name": "Iddra",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Kynesgrove",
-      "cell": "13907:Skyrim.esm",
-      "world": null,
-      "pos": [
-        2404.942138671875,
-        -135.187744140625,
-        0.5329742431640625
-      ]
-    },
-    "1b086:Skyrim.esm": {
-      "name": "Kjeld",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Kynesgrove",
-      "cell": "13907:Skyrim.esm",
-      "world": null,
-      "pos": [
-        2328.049560546875,
-        -199.382568359375,
-        1.9073486328125e-05
-      ]
-    },
-    "1b08b:Skyrim.esm": {
-      "name": "Dravynea the Stoneweaver",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Kynesgrove",
-      "cell": "13907:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1712.6890869140625,
-        -738.410400390625,
-        7.62939453125e-06
-      ]
-    },
-    "1b097:Skyrim.esm": {
-      "name": "Bolar",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Narzulbur",
-      "cell": "15238:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -223.99969482421875,
-        -351.9990234375,
-        -16.000003814697266
-      ]
-    },
-    "1b099:Skyrim.esm": {
-      "name": "Dushnamub",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Narzulbur",
-      "cell": "15238:Skyrim.esm",
-      "world": null,
-      "pos": [
-        5.2290472984313965,
-        -297.620849609375,
-        -16.000003814697266
-      ]
-    },
     "1b115:Skyrim.esm": {
-      "name": "Nurelion",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1406,34 +562,9 @@
         72.77753448486328
       ]
     },
-    "1b116:Skyrim.esm": {
-      "name": "Quintus Navale",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "1678c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1483.6988525390625,
-        -4987.85107421875,
-        72.77753448486328
-      ]
-    },
-    "1b118:Skyrim.esm": {
-      "name": "Elda Early-Dawn",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "16789:Skyrim.esm",
-      "world": null,
-      "pos": [
-        128.0,
-        -3856.0,
-        320.0
-      ]
-    },
     "1b11a:Skyrim.esm": {
-      "name": "Nils",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1445,21 +576,9 @@
         320.0
       ]
     },
-    "1b11c:Skyrim.esm": {
-      "name": "Niranye",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "16788:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -960.8294067382812,
-        -3247.095947265625,
-        0.0
-      ]
-    },
     "1b123:Skyrim.esm": {
-      "name": "Revyn Sadri",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1472,7 +591,8 @@
       ]
     },
     "1b124:Skyrim.esm": {
-      "name": "Aval Atheron",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1484,47 +604,9 @@
         -448.0
       ]
     },
-    "1b128:Skyrim.esm": {
-      "name": "Ambarys Rendar",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "1677f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        2834.9716796875,
-        -2092.90380859375,
-        -512.0
-      ]
-    },
-    "1b129:Skyrim.esm": {
-      "name": "Malthyr Elenil",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "1677f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        2893.5712890625,
-        -1941.44189453125,
-        -1.239776611328125e-05
-      ]
-    },
-    "1b12e:Skyrim.esm": {
-      "name": "Hillevi Cruel-Sea",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "1677d:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -2452.187744140625,
-        -3370.1787109375,
-        1216.0
-      ]
-    },
     "1b132:Skyrim.esm": {
-      "name": "Wuunferth the Unliving",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1537,7 +619,8 @@
       ]
     },
     "1b135:Skyrim.esm": {
-      "name": "Oengul War-Anvil",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Eastmarch",
       "bookHold": "windhelm",
       "locationName": "Windhelm",
@@ -1549,34 +632,9 @@
         58.14128494262695
       ]
     },
-    "1b136:Skyrim.esm": {
-      "name": "Hermir Strong-Heart",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "7d033:Skyrim.esm",
-      "world": null,
-      "pos": [
-        1378.881591796875,
-        -5025.79541015625,
-        65.86392211914062
-      ]
-    },
-    "1b145:Skyrim.esm": {
-      "name": "Ulundil",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "16774:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -112.0,
-        -128.0,
-        64.0
-      ]
-    },
     "1c18c:Skyrim.esm": {
-      "name": "Birna",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold",
@@ -1589,7 +647,8 @@
       ]
     },
     "1c18d:Skyrim.esm": {
-      "name": "Dagur",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold",
@@ -1602,7 +661,8 @@
       ]
     },
     "1c18e:Skyrim.esm": {
-      "name": "Haran",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold",
@@ -1614,73 +674,9 @@
         3.4332275390625e-05
       ]
     },
-    "1c1a1:Skyrim.esm": {
-      "name": "Tolfdir",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "cab91:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -377.09039306640625,
-        -397.4307861328125,
-        -383.99993896484375
-      ]
-    },
-    "1c1a5:Skyrim.esm": {
-      "name": "Faralda",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "1380f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        403.2132568359375,
-        -356.6697998046875,
-        -384.0
-      ]
-    },
-    "1c1a6:Skyrim.esm": {
-      "name": "Drevis Neloren",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "1380f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        375.5077209472656,
-        379.20013427734375,
-        -384.0
-      ]
-    },
-    "1c1a7:Skyrim.esm": {
-      "name": "Phinis Gestor",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "1380f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -376.52850341796875,
-        394.60040283203125,
-        -384.0
-      ]
-    },
-    "1c1a8:Skyrim.esm": {
-      "name": "Colette Marence",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "1380f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -600.1836547851562,
-        109.60194396972656,
-        28.567283630371094
-      ]
-    },
     "1c1aa:Skyrim.esm": {
-      "name": "Enthir",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold College",
@@ -1692,47 +688,9 @@
         2.288818359375e-05
       ]
     },
-    "1c1b4:Skyrim.esm": {
-      "name": "Urag gro-Shub",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Winterhold College",
-      "cell": "13810:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -201.0,
-        404.0,
-        0.0
-      ]
-    },
-    "1d4bc:Skyrim.esm": {
-      "name": "Babette",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Dark Brotherhood Sanctuary",
-      "cell": "ad5a1:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -513.0843505859375,
-        -1120.0906982421875,
-        -940.701171875
-      ]
-    },
-    "1d503:The Great City of Solitude.esp": {
-      "name": "Tilda",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "1d235:The Great City of Solitude.esp",
-      "world": null,
-      "pos": [
-        -255.72314453125,
-        -2849.1650390625,
-        1.0403954982757568
-      ]
-    },
     "1e7d6:Skyrim.esm": {
-      "name": "Nelacar",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold",
@@ -1744,216 +702,9 @@
         7.62939453125e-06
       ]
     },
-    "1e9f92:Riften Expansion.esp": {
-      "name": "Rhanul",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "1e9e2b:Riften Expansion.esp",
-      "world": null,
-      "pos": [
-        -418.0,
-        935.0,
-        112.0
-      ]
-    },
-    "1e9f93:Riften Expansion.esp": {
-      "name": "Hirmond",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "1e9e2b:Riften Expansion.esp",
-      "world": null,
-      "pos": [
-        246.0,
-        881.0,
-        112.0
-      ]
-    },
-    "1eec1:Dragonborn.esm": {
-      "name": "Dremora Merchant",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Solstheim",
-      "cell": "1ee98:Dragonborn.esm",
-      "world": null,
-      "pos": [
-        275.79705810546875,
-        -308.63568115234375,
-        0.0
-      ]
-    },
-    "1f9c2:Dragonborn.esm": {
-      "name": "Majni",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Frostmoon Crag",
-      "cell": "ee2e:Dragonborn.esm",
-      "world": "800:Dragonborn.esm",
-      "pos": [
-        41464.1875,
-        57293.57421875,
-        6843.16162109375
-      ]
-    },
-    "2005a:Skyrim.esm": {
-      "name": "Hadring",
-      "hold": "the Pale",
-      "bookHold": "dawnstar",
-      "locationName": "Nightgate Inn",
-      "cell": "13a5d:Skyrim.esm",
-      "world": null,
-      "pos": [
-        840.364990234375,
-        -185.7938995361328,
-        6.198883056640625e-06
-      ]
-    },
-    "207af8:WindhelmSSE.esp": {
-      "name": "Manheim",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "12fcff:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -1759.7481689453125,
-        4241.83349609375,
-        -63.019248962402344
-      ]
-    },
-    "21612:aaaGraniteHill.esp": {
-      "name": "Sigrid",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "d9ac:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        299.77630615234375,
-        -101.0,
-        240.81759643554688
-      ]
-    },
-    "21ea6:Skyrim.esm": {
-      "name": "Madesi",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "42247:Skyrim.esm",
-      "world": "16bb4:Skyrim.esm",
-      "pos": [
-        173925.78125,
-        -97031.46875,
-        11104.0068359375
-      ]
-    },
-    "2214de:WindhelmSSE.esp": {
-      "name": "Vanadis",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "2210d9:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -786.0707397460938,
-        -3689.43603515625,
-        320.1373596191406
-      ]
-    },
-    "24004:JKs Skyrim.esp": {
-      "name": "Jauffre",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Ivarstead",
-      "cell": "3519:JKs Skyrim.esp",
-      "world": null,
-      "pos": [
-        1805.77734375,
-        1944.7269287109375,
-        104.44857025146484
-      ]
-    },
-    "25906:FishingInSkyrim.esp": {
-      "name": "Rybek Kupiecski",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "open ground in Tamriel",
-      "cell": "92df:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -73486.28125,
-        91281.8125,
-        -13911.423828125
-      ]
-    },
-    "284ad:Skyrim.esm": {
-      "name": "Hogni Red-Arm",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16dfe:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -4019.7138671875,
-        -1594.49951171875,
-        178.4000701904297
-      ]
-    },
-    "2b82e:aaaGraniteHill.esp": {
-      "name": "Roar",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "d9ac:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        512.0,
-        80.0,
-        0.0
-      ]
-    },
-    "2ba8d:Skyrim.esm": {
-      "name": "Sabjorn",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Honningbrew Meadery",
-      "cell": "15207:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -1371.0843505859375,
-        -767.385498046875,
-        0.0
-      ]
-    },
-    "2c1ea:Dragonborn.esm": {
-      "name": "Revus Sarvani",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "open ground in DLC2SolstheimWorld",
-      "cell": "142ec:Dragonborn.esm",
-      "world": "800:Dragonborn.esm",
-      "pos": [
-        68977.9375,
-        29583.716796875,
-        1154.5489501953125
-      ]
-    },
-    "31861:Dragonborn.esm": {
-      "name": "Falas Selvayn",
-      "hold": "Solstheim",
-      "bookHold": "ravenrock",
-      "locationName": "Ramshackle Trading Post",
-      "cell": "142ec:Dragonborn.esm",
-      "world": "800:Dragonborn.esm",
-      "pos": [
-        57780.578125,
-        44226.12890625,
-        4147.0263671875
-      ]
-    },
     "31efc3:Riften Expansion.esp": {
-      "name": "Wulfdis Thread-Weaver",
+      "name": "Tailor",
+      "role": "Tailor",
       "hold": "the Rift",
       "bookHold": "riften",
       "locationName": "Riften",
@@ -1966,7 +717,8 @@
       ]
     },
     "33a2:JKs Skyrim.esp": {
-      "name": "Balgus",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -1978,21 +730,9 @@
         228.70834350585938
       ]
     },
-    "33b45:OarsRest.esp": {
-      "name": "Yorgan",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "POIPineForest30",
-      "cell": "9b5a:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -42563.39453125,
-        -49189.28515625,
-        695.0947265625
-      ]
-    },
     "3a198:Skyrim.esm": {
-      "name": "Valga Vinicia",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "Falkreath",
@@ -2005,7 +745,8 @@
       ]
     },
     "3a19b:Skyrim.esm": {
-      "name": "Zaria",
+      "name": "Alchemist",
+      "role": "Alchemist",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "Falkreath",
@@ -2018,7 +759,8 @@
       ]
     },
     "3a19f:Skyrim.esm": {
-      "name": "Lod",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "Falkreath",
@@ -2031,7 +773,8 @@
       ]
     },
     "3a22:JKs Skyrim.esp": {
-      "name": "Anka",
+      "name": "Cook",
+      "role": "Cook",
       "hold": "the Pale",
       "bookHold": "dawnstar",
       "locationName": "Dawnstar",
@@ -2043,411 +786,9 @@
         228.7083740234375
       ]
     },
-    "3abab:aaaGraniteHill.esp": {
-      "name": "Tulia",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "83c1:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        304.0,
-        -80.0,
-        240.0
-      ]
-    },
-    "3abac:aaaGraniteHill.esp": {
-      "name": "Tolvier",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "8a43:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        12.0,
-        48.0,
-        240.0
-      ]
-    },
-    "3abad:aaaGraniteHill.esp": {
-      "name": "Aisha",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "8a43:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        111.0,
-        48.0,
-        240.0
-      ]
-    },
-    "3fcce:aaaGraniteHill.esp": {
-      "name": "Jennifer",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "30934:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        -128.0,
-        -64.0,
-        0.0
-      ]
-    },
-    "4031:HearthFires.esm": {
-      "name": "Sofie",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "16789:Skyrim.esm",
-      "world": null,
-      "pos": [
-        717.160888671875,
-        -3938.998046875,
-        63.9999885559082
-      ]
-    },
-    "418a:JKs Skyrim.esp": {
-      "name": "Cedric",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Rorikstead",
-      "cell": "3f78:JKs Skyrim.esp",
-      "world": null,
-      "pos": [
-        2187.60546875,
-        2131.94580078125,
-        318.93792724609375
-      ]
-    },
-    "41dae:AnotherOakwood.esp": {
-      "name": "Clebus Calvisius",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oakwood",
-      "cell": "41cd2:AnotherOakwood.esp",
-      "world": null,
-      "pos": [
-        178.9574737548828,
-        27.29453468322754,
-        203.7107391357422
-      ]
-    },
-    "44dd7:aaaGraniteHill.esp": {
-      "name": "John",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "30934:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        135.27828979492188,
-        50.352813720703125,
-        0.0
-      ]
-    },
-    "4d53e:WindhelmSSE.esp": {
-      "name": "Wilhelm",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4d3bb:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -160.23260498046875,
-        -40.78663635253906,
-        82.36285400390625
-      ]
-    },
-    "4d593:WindhelmSSE.esp": {
-      "name": "Hildevi",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4d45c:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        11.721552848815918,
-        -273.284912109375,
-        79.99999237060547
-      ]
-    },
-    "4d594:WindhelmSSE.esp": {
-      "name": "Old Hjolf",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4d45c:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        69.58196258544922,
-        -214.12110900878906,
-        80.0
-      ]
-    },
-    "4e0b3:Skyrim.esm": {
-      "name": "Grelka",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bd4:Skyrim.esm",
-      "world": null,
-      "pos": [
-        126.46509552001953,
-        396.2760009765625,
-        64.0
-      ]
-    },
-    "52e7f:WindhelmSSE.esp": {
-      "name": "Snowberry",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4dd75:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        2713.712158203125,
-        -2258.458740234375,
-        12.908853530883789
-      ]
-    },
-    "52e81:WindhelmSSE.esp": {
-      "name": "Olfand the World-Weary",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4dd75:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        2860.194580078125,
-        -2166.623046875,
-        4.57763671875e-05
-      ]
-    },
-    "542f:OarsRest.esp": {
-      "name": "Wulf Heavy-Hammer",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "POITundra08",
-      "cell": "9b3a:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -45910.41796875,
-        -45833.15625,
-        1026.8037109375
-      ]
-    },
-    "55a63:Skyrim.esm": {
-      "name": "Moth gro-Bagol",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "16df2:Skyrim.esm",
-      "world": null,
-      "pos": [
-        270.2900390625,
-        2007.3707275390625,
-        6898.6240234375
-      ]
-    },
-    "5b685:Skyrim.esm": {
-      "name": "Sharamph",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Mor Khazgur",
-      "cell": "5b5dd:Skyrim.esm",
-      "world": null,
-      "pos": [
-        960.632080078125,
-        -688.0978393554688,
-        9.661914825439453
-      ]
-    },
-    "5b687:Skyrim.esm": {
-      "name": "Shuftharz",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Mor Khazgur",
-      "cell": "5b5dd:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -451.7367248535156,
-        -549.9678955078125,
-        9.661856651306152
-      ]
-    },
-    "5cbf8:SkyrimSewers.esp": {
-      "name": "Peddler",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude Sewers",
-      "cell": "1d98:SkyrimSewers.esp",
-      "world": null,
-      "pos": [
-        -1287.0487060546875,
-        1583.4478759765625,
-        0.8705368041992188
-      ]
-    },
-    "5cc07:SkyrimSewers.esp": {
-      "name": "Peddler",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm Sewers",
-      "cell": "2ba8d:SkyrimSewers.esp",
-      "world": null,
-      "pos": [
-        1570.5234375,
-        2626.384521484375,
-        2064.0
-      ]
-    },
-    "5d16:aaaGraniteHill.esp": {
-      "name": "Privious",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "5c98:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        143.61802673339844,
-        83.21532440185547,
-        0.8153076171875
-      ]
-    },
-    "5d1b8:SkyrimSewers.esp": {
-      "name": "Peddler",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun Sewers",
-      "cell": "3b21f:SkyrimSewers.esp",
-      "world": null,
-      "pos": [
-        -1188.6650390625,
-        1978.4561767578125,
-        2082.087890625
-      ]
-    },
-    "5f3a5c:aaaGraniteHill.esp": {
-      "name": "Rhoda",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "8a43:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        -306.13446044921875,
-        42.180171966552734,
-        1.545440673828125
-      ]
-    },
-    "5f3a63:aaaGraniteHill.esp": {
-      "name": "Valdr",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "8a43:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        -254.3852081298828,
-        130.6094970703125,
-        2.1885986328125
-      ]
-    },
-    "60752:SkyrimSewers.esp": {
-      "name": "Peddler",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth Sewers",
-      "cell": "4bbac:SkyrimSewers.esp",
-      "world": null,
-      "pos": [
-        544.8438720703125,
-        2444.133544921875,
-        3105.0751953125
-      ]
-    },
-    "6311:JKs Skyrim.esp": {
-      "name": "Regner Winterfist",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "open ground in Tamriel",
-      "cell": "9598:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -86579.859375,
-        7467.91064453125,
-        -3534.5068359375
-      ]
-    },
-    "684a1:North Keep.esp": {
-      "name": "Scalbo Pripata",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Pripata Residence",
-      "cell": "3a985:North Keep.esp",
-      "world": null,
-      "pos": [
-        783.98974609375,
-        -983.8707275390625,
-        19.51117706298828
-      ]
-    },
-    "68b0:aaaGraniteHill.esp": {
-      "name": "Helana",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "626a:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        -2091.60302734375,
-        -73.32713317871094,
-        512.0
-      ]
-    },
-    "6c730:WindhelmSSE.esp": {
-      "name": "Mathendis",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4d912:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        -888.7623291015625,
-        -1561.365966796875,
-        -128.0
-      ]
-    },
-    "6d8e8:North Keep.esp": {
-      "name": "Glabo Sarata",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "North Colovian Company",
-      "cell": "3a987:North Keep.esp",
-      "world": null,
-      "pos": [
-        140.36898803710938,
-        -1226.2745361328125,
-        18.026222229003906
-      ]
-    },
-    "6d8e9:North Keep.esp": {
-      "name": "Murmea Sarata",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "North Colovian Company",
-      "cell": "3a987:North Keep.esp",
-      "world": null,
-      "pos": [
-        -124.81770324707031,
-        -1206.080078125,
-        19.58515167236328
-      ]
-    },
     "72c89:North Keep.esp": {
-      "name": "Psyshre",
+      "name": "Enchanter",
+      "role": "Enchanter",
       "hold": "Falkreath",
       "bookHold": "falkreath",
       "locationName": "The Estates' Edge",
@@ -2459,320 +800,9 @@
         15.826522827148438
       ]
     },
-    "74340:Skyrim.esm": {
-      "name": "Ri'saad",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "open ground in Tamriel",
-      "cell": "d74:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -161168.09375,
-        6435.263671875,
-        -5202.662109375
-      ]
-    },
-    "74345:Skyrim.esm": {
-      "name": "Ma'dran",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "open ground in Tamriel",
-      "cell": "d74:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        134817.828125,
-        24027.203125,
-        -12973.521484375
-      ]
-    },
-    "7434a:Skyrim.esm": {
-      "name": "Ahkari",
-      "hold": "the Pale",
-      "bookHold": "dawnstar",
-      "locationName": "open ground in Tamriel",
-      "cell": "d74:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        26529.052734375,
-        101839.90625,
-        -13265.4384765625
-      ]
-    },
-    "7e5b:aaaGraniteHill.esp": {
-      "name": "Laila",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "626a:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        -1247.61279296875,
-        52.23408126831055,
-        512.5894775390625
-      ]
-    },
-    "80c5e:WindhelmSSE.esp": {
-      "name": "Sten Stone-Fish",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "b4db:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        135174.609375,
-        29159.23828125,
-        -12563.2421875
-      ]
-    },
-    "80c73:WindhelmSSE.esp": {
-      "name": "Pelena",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "b4dc:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        135072.609375,
-        30676.673828125,
-        -12575.265625
-      ]
-    },
-    "80c74:WindhelmSSE.esp": {
-      "name": "Llathise",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "b4dc:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        134852.125,
-        30024.439453125,
-        -12552.486328125
-      ]
-    },
-    "8472:aaaGraniteHill.esp": {
-      "name": "Alex",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Granite Hill",
-      "cell": "83c1:aaaGraniteHill.esp",
-      "world": null,
-      "pos": [
-        528.0,
-        32.0,
-        0.0
-      ]
-    },
-    "8751:OarsRest.esp": {
-      "name": "Freya",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oars Rest",
-      "cell": "3cfa:OarsRest.esp",
-      "world": null,
-      "pos": [
-        431.0910339355469,
-        89.59657287597656,
-        0.8616886138916016
-      ]
-    },
-    "8755:OarsRest.esp": {
-      "name": "Wilbur",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oars Rest",
-      "cell": "59eb:OarsRest.esp",
-      "world": null,
-      "pos": [
-        -117.34032440185547,
-        -127.0096206665039,
-        240.0
-      ]
-    },
-    "8759:OarsRest.esp": {
-      "name": "Neith",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "open ground in Tamriel",
-      "cell": "9b39:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -42624.8203125,
-        -46833.32421875,
-        809.0692138671875
-      ]
-    },
-    "8c5a:The Great City of Solitude.esp": {
-      "name": "Aksel Trodirson",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "8afc:The Great City of Solitude.esp",
-      "world": null,
-      "pos": [
-        419.2315673828125,
-        -1468.463623046875,
-        6.103515625e-05
-      ]
-    },
-    "9226:OarsRest.esp": {
-      "name": "Candice",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oars Rest",
-      "cell": "6554:OarsRest.esp",
-      "world": null,
-      "pos": [
-        354.7676086425781,
-        160.29946899414062,
-        240.29757690429688
-      ]
-    },
-    "922b:OarsRest.esp": {
-      "name": "Rogan",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oars Rest",
-      "cell": "6554:OarsRest.esp",
-      "world": null,
-      "pos": [
-        544.6723022460938,
-        -63.587066650390625,
-        240.3957977294922
-      ]
-    },
-    "9ea8:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "WhiterunPlainsDistrict01",
-      "cell": "1a278:Skyrim.esm",
-      "world": "1a26f:Skyrim.esm",
-      "pos": [
-        21886.19140625,
-        -9056.4189453125,
-        -3632.357421875
-      ]
-    },
-    "9eae:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Servant",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "1605e:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -708.0775146484375,
-        -525.8494262695312,
-        68.00003051757812
-      ]
-    },
-    "a3d26:Arena - Markarth Side.esp": {
-      "name": "Brandi",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "103e1d:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        728.0,
-        280.0,
-        0.0
-      ]
-    },
-    "a453:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "1677f:Skyrim.esm",
-      "world": null,
-      "pos": [
-        3133.747802734375,
-        -1971.810546875,
-        -256.0
-      ]
-    },
-    "a4910:WindhelmSSE.esp": {
-      "name": "Tinos Drothan",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "WindhelmOrigin",
-      "cell": "3837e:Skyrim.esm",
-      "world": "1691d:Skyrim.esm",
-      "pos": [
-        137790.1875,
-        38238.38671875,
-        -12642.90234375
-      ]
-    },
-    "a4982:WindhelmSSE.esp": {
-      "name": "Ingjar",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Windhelm",
-      "cell": "4d674:WindhelmSSE.esp",
-      "world": null,
-      "pos": [
-        672.62451171875,
-        -1772.472412109375,
-        64.0
-      ]
-    },
-    "a547:AnotherOakwood.esp": {
-      "name": "Dragolf",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oakwood",
-      "cell": "4c37:AnotherOakwood.esp",
-      "world": null,
-      "pos": [
-        49.04106903076172,
-        33.375762939453125,
-        0.5
-      ]
-    },
-    "a553:AnotherOakwood.esp": {
-      "name": "Idir",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oakwood",
-      "cell": "4c3b:AnotherOakwood.esp",
-      "world": null,
-      "pos": [
-        213.50990295410156,
-        -91.9915771484375,
-        0.0
-      ]
-    },
-    "aadd:AnotherOakwood.esp": {
-      "name": "Birgo",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oakwood",
-      "cell": "4c38:AnotherOakwood.esp",
-      "world": null,
-      "pos": [
-        -143.28396606445312,
-        27.720430374145508,
-        239.99996948242188
-      ]
-    },
-    "ab16:AnotherOakwood.esp": {
-      "name": "Mirad",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Oakwood",
-      "cell": "4c3d:AnotherOakwood.esp",
-      "world": null,
-      "pos": [
-        -381.50689697265625,
-        32.36038589477539,
-        331.6473388671875
-      ]
-    },
     "b4a3:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Winterhold",
       "bookHold": "winterhold",
       "locationName": "Winterhold",
@@ -2784,21 +814,9 @@
         9.1552734375e-05
       ]
     },
-    "b818c:Arena - Markarth Side.esp": {
-      "name": "Azira",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "5c591:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        -247.96986389160156,
-        157.0489501953125,
-        264.53125
-      ]
-    },
     "b818d:Arena - Markarth Side.esp": {
-      "name": "Jaeger",
+      "name": "Woodworker",
+      "role": "Woodworker",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Markarth Side",
@@ -2810,138 +828,9 @@
         261.5469055175781
       ]
     },
-    "b882a:Skyrim.esm": {
-      "name": "Tonilia",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Riften",
-      "cell": "16bcf:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -673.4930419921875,
-        1759.600830078125,
-        -88.48727416992188
-      ]
-    },
-    "bd300:Arena - Markarth Side.esp": {
-      "name": "Olivia",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "5c591:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        464.0,
-        -40.0,
-        266.36419677734375
-      ]
-    },
-    "c7261:JK's Whiterun's Outskirts.esp": {
-      "name": "Ingrid",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "479d5:JK's Whiterun's Outskirts.esp",
-      "world": null,
-      "pos": [
-        2790.174072265625,
-        1811.1986083984375,
-        64.775146484375
-      ]
-    },
-    "c7264:JK's Whiterun's Outskirts.esp": {
-      "name": "Carol",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "479d5:JK's Whiterun's Outskirts.esp",
-      "world": null,
-      "pos": [
-        2808.031982421875,
-        1385.5802001953125,
-        65.775146484375
-      ]
-    },
-    "c7596:Arena - Markarth Side.esp": {
-      "name": "Varimo",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Markarth Side",
-      "cell": "801b3:Arena - Markarth Side.esp",
-      "world": null,
-      "pos": [
-        -136.0,
-        -776.0,
-        0.46243101358413696
-      ]
-    },
-    "d15b0:Skyrim.esm": {
-      "name": "Ulfberth War-Bear",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Warmaiden's",
-      "cell": "1db4e:Skyrim.esm",
-      "world": null,
-      "pos": [
-        20.610565185546875,
-        469.6237487792969,
-        318.54693603515625
-      ]
-    },
-    "d587:The Great City of Solitude.esp": {
-      "name": "Dra'kaleeja",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "afdb:The Great City of Solitude.esp",
-      "world": null,
-      "pos": [
-        113.09288787841797,
-        -3917.9052734375,
-        -3.0517578125e-05
-      ]
-    },
-    "d6ad9:Skyrim.esm": {
-      "name": "Aquillius Aeresius",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "Solitude",
-      "cell": "16a07:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -39.04411315917969,
-        -443.0608825683594,
-        0.423614501953125
-      ]
-    },
-    "d7505:Skyrim.esm": {
-      "name": "Saadia",
-      "hold": "Whiterun",
-      "bookHold": "whiterun",
-      "locationName": "Whiterun",
-      "cell": "1605e:Skyrim.esm",
-      "world": null,
-      "pos": [
-        -122.04067993164062,
-        -55.382999420166016,
-        64.0
-      ]
-    },
-    "e1c1:JKs Skyrim.esp": {
-      "name": "Ginda Ildram",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "open ground in WindhelmWorld",
-      "cell": "3837c:Skyrim.esm",
-      "world": "1691d:Skyrim.esm",
-      "pos": [
-        139274.046875,
-        39913.8359375,
-        -12470.2861328125
-      ]
-    },
     "e24:JKs Skyrim.esp": {
-      "name": "Avros",
+      "name": "Smith",
+      "role": "Smith",
       "hold": "Hjaalmarch",
       "bookHold": "morthal",
       "locationName": "Morthal",
@@ -2951,292 +840,6 @@
         -37173.703125,
         64145.35546875,
         -13940.6337890625
-      ]
-    },
-    "e2d7:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "SolitudeRow",
-      "cell": "37ef0:Skyrim.esm",
-      "world": "37edf:Skyrim.esm",
-      "pos": [
-        -54936.2578125,
-        105507.8828125,
-        -8703.9990234375
-      ]
-    },
-    "e2d9:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "SolitudeRow",
-      "cell": "37ef0:Skyrim.esm",
-      "world": "37edf:Skyrim.esm",
-      "pos": [
-        -53827.421875,
-        102994.1640625,
-        -9060.505859375
-      ]
-    },
-    "e897:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "RiftenCitySouth",
-      "cell": "42245:Skyrim.esm",
-      "world": "16bb4:Skyrim.esm",
-      "pos": [
-        172992.59375,
-        -98687.3984375,
-        11136.0
-      ]
-    },
-    "e898:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "RiftenCitySouth",
-      "cell": "42245:Skyrim.esm",
-      "world": "16bb4:Skyrim.esm",
-      "pos": [
-        174456.171875,
-        -99202.390625,
-        11140.8818359375
-      ]
-    },
-    "e899:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "RiftenOrigin",
-      "cell": "42247:Skyrim.esm",
-      "world": "16bb4:Skyrim.esm",
-      "pos": [
-        175629.4375,
-        -97007.171875,
-        11136.0
-      ]
-    },
-    "eee3:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "MarkarthKeep",
-      "cell": "20eea:Skyrim.esm",
-      "world": "16d71:Skyrim.esm",
-      "pos": [
-        -176757.40625,
-        5431.83642578125,
-        -2764.000244140625
-      ]
-    },
-    "eee8:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "20ee7:Skyrim.esm",
-      "world": "16d71:Skyrim.esm",
-      "pos": [
-        -173781.921875,
-        5562.46484375,
-        -3375.50830078125
-      ]
-    },
-    "eee9:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Markarth",
-      "cell": "20ee7:Skyrim.esm",
-      "world": "16d71:Skyrim.esm",
-      "pos": [
-        -173292.375,
-        4222.763671875,
-        -3618.896240234375
-      ]
-    },
-    "fe498:Skyrim.esm": {
-      "name": "Imperial Quartermaster",
-      "hold": "Haafingar",
-      "bookHold": "solitude",
-      "locationName": "CWGuardTemplates",
-      "cell": "1fa4c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        4271.35302734375,
-        -2862.42236328125,
-        -29.796730041503906
-      ]
-    },
-    "fe4aa:Skyrim.esm": {
-      "name": "Imperial Quartermaster",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "Imperial Military Camp",
-      "cell": "ba7e:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        173996.109375,
-        -20537.89453125,
-        -1990.7332763671875
-      ]
-    },
-    "fe4bc:Skyrim.esm": {
-      "name": "Imperial Quartermaster",
-      "hold": "Winterhold",
-      "bookHold": "winterhold",
-      "locationName": "Imperial Military Camp",
-      "cell": "8eee:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        52109.0390625,
-        96449.1875,
-        -6913.79248046875
-      ]
-    },
-    "fe4c1:Skyrim.esm": {
-      "name": "Imperial Quartermaster",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Imperial Military Camp",
-      "cell": "9859:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        81654.4765625,
-        -87402.796875,
-        10990.30859375
-      ]
-    },
-    "fe4c2:Skyrim.esm": {
-      "name": "Imperial Quartermaster",
-      "hold": "the Pale",
-      "bookHold": "dawnstar",
-      "locationName": "Imperial Military Camp",
-      "cell": "928c:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -3348.718505859375,
-        101647.984375,
-        -11282.109375
-      ]
-    },
-    "fe4cb:Skyrim.esm": {
-      "name": "Stormcloak Quartermaster",
-      "hold": "Eastmarch",
-      "bookHold": "windhelm",
-      "locationName": "CWGuardTemplates",
-      "cell": "1fa4c:Skyrim.esm",
-      "world": null,
-      "pos": [
-        3052.09619140625,
-        -2710.93017578125,
-        -30.927734375
-      ]
-    },
-    "fe4e4:Skyrim.esm": {
-      "name": "Stormcloak Quartermaster",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Sons of Skyrim Military Camp",
-      "cell": "9312:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -10768.4443359375,
-        83661.2421875,
-        -12778.0556640625
-      ]
-    },
-    "fe4e7:Skyrim.esm": {
-      "name": "Stormcloak Quartermaster",
-      "hold": "the Reach",
-      "bookHold": "markarth",
-      "locationName": "Sons of Skyrim Military Camp",
-      "cell": "9435:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -120746.53125,
-        50514.7890625,
-        -8515.9091796875
-      ]
-    },
-    "fe4f0:Skyrim.esm": {
-      "name": "Stormcloak Quartermaster",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Sons of Skyrim Military Camp",
-      "cell": "9806:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        38552.79296875,
-        -74665.203125,
-        13317.9541015625
-      ]
-    },
-    "ffe0:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "the Pale",
-      "bookHold": "dawnstar",
-      "locationName": "Dawnstar",
-      "cell": "8eb6:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        28668.31640625,
-        105343.28125,
-        -13927.4951171875
-      ]
-    },
-    "ffec:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Falkreath",
-      "bookHold": "falkreath",
-      "locationName": "Falkreath",
-      "cell": "9c80:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -29330.89453125,
-        -87964.515625,
-        -3034.863525390625
-      ]
-    },
-    "fff0:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Hunter",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Ivarstead",
-      "cell": "97a0:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        75663.2109375,
-        -62574.6875,
-        10544.0
-      ]
-    },
-    "fff2:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Pilgrim",
-      "hold": "the Rift",
-      "bookHold": "riften",
-      "locationName": "Ivarstead",
-      "cell": "97a0:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        75624.7578125,
-        -63265.63671875,
-        10549.6572265625
-      ]
-    },
-    "fffe:Populated Cities Towns Villages Legendary.esp": {
-      "name": "Merchant",
-      "hold": "Hjaalmarch",
-      "bookHold": "morthal",
-      "locationName": "Morthal",
-      "cell": "93be:Skyrim.esm",
-      "world": "3c:Skyrim.esm",
-      "pos": [
-        -39029.87109375,
-        65359.16796875,
-        -13942.884765625
       ]
     }
   }
