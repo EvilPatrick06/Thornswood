@@ -538,23 +538,15 @@ namespace $emptyNs {
     }
 }
 "@)
-    $csc = $null
-    if ($env:WINDIR) {
-        $csc = @(
-            (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-            (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-        ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    }
-    Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
     $emptyBuilt = $false
-    if ($csc) {
-        $fw = Split-Path -Parent $csc
+    if (Test-Path -LiteralPath $LauncherCsc) {
         $cscArgs = @(
             '/noconfig', '/nologo', '/target:exe', '/warn:0',
             "/out:$emptyExe",
             "/resource:$emptyRes,ui-gone.json",
-            "/reference:$(Join-Path $fw 'System.dll')",
-            "/reference:$(Join-Path $fw 'System.Core.dll')",
+            "/reference:$(Join-Path $LauncherRefDir 'System.dll')",
+            "/reference:$(Join-Path $LauncherRefDir 'System.Core.dll')",
             $csFile,
             $driverFile
         )

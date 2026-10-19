@@ -185,9 +185,7 @@ namespace Thornswood
         static string Summary(Config cfg, string launcherVersion)
         {
             var s = new StringBuilder();
-            // A local function would read better, but this is compiled by the
-            // .NET Framework csc that ships with Windows, which predates them.
-            Action<string, string> Add = delegate(string k, string v) { s.AppendLine(k.PadRight(22) + v); };
+            void Add(string k, string v) { s.AppendLine(k.PadRight(22) + v); }
 
             s.AppendLine("ThornsWood - report");
             s.AppendLine("===================");

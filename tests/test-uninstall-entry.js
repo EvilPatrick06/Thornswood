@@ -361,14 +361,6 @@ yes('a game still running is noticed, so closing the window does not unpark plug
 yes('the uninstall is scrolled into view, not focused', /btnUninstall\s*\.\s*BringIntoView\s*\(/.test(opener) &&
     !/btnUninstall\s*\.\s*Focus\s*\(/.test(opener));
 
-// C# 5 only, in what this change added.
-(function () {
-  const r = shell.OpenForUninstall ? shell.OpenForUninstall.raw : '';
-  const c = shell.OpenForUninstall ? shell.OpenForUninstall.code : '';
-  yes('OpenForUninstall is C# 5: no interpolation, no ?., no nameof, no =>, no out var',
-      r.length > 0 && !/\$"/.test(r) && !/\?\./.test(c) && !/\bnameof\s*\(/.test(c) && !/=>/.test(c) && !/\bout\s+var\b/.test(c));
-})();
-
 // ---- a normal start keeps all of it ------------------------------------------
 const play = walk(shell, false);
 const MUST = ['CheckUpdatesBackground', 'StartPing', 'RunScan', 'HealClientBackground', 'BuildModList',

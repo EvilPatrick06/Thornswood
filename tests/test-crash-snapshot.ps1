@@ -51,12 +51,8 @@ function Done {
 function Read([string]$rel) { Get-Content -LiteralPath (Join-Path $root $rel) -Raw }
 
 # ------------------------------------------------------------------ compile
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) { Write-Host 'SKIP  no .NET Framework 4 csc on this machine, so CrashDump.cs cannot be compiled here'; Done }
-$fw = Split-Path -Parent $csc
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $driver = @'
 using System;
@@ -119,15 +115,15 @@ try {
     $driverFile = Join-Path $tmp 'CrashSnapshotTest.cs'
     [IO.File]::WriteAllText($driverFile, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $tmp 'crash-snapshot-test.exe'
-    # /noconfig, as Build-Launcher.ps1 does: csc.rsp adds its own framework
-    # copies and a machine with the reference assemblies stops on CS1703.
+    # /noconfig, as the build does: csc.rsp adds its own framework copies,
+    # and beside the reference assemblies that stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:4', "/out:$exe",
-                 "/reference:$(Join-Path $fw 'System.dll')", "/reference:$(Join-Path $fw 'System.Core.dll')",
+                 "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/reference:$(Join-Path $LauncherRefDir 'System.Core.dll')",
                  (Join-Path $app 'CrashDump.cs'), (Join-Path $app 'Enforce.cs'), $driverFile)
     $out = & $LauncherCsc @cscArgs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" } }
-    Yes 'CrashDump.cs and Enforce.cs compile with the launcher''s .NET Framework 4 csc (C# 5)' $built
+    Yes 'CrashDump.cs and Enforce.cs compile with the compiler the build runs' $built
     if (-not $built) { Done }
 
     function Run([string[]]$argv) {
