@@ -376,7 +376,7 @@ if ($VersionOverride) { $now = $VersionOverride }
 # With the release record the real one writes (#444): one name, 20990101-0000,
 # for the pack, the launcher it offers and the commit it was built from.
 $ch = if ($Channel -eq 'dev') { 'dev' } else { 'main' }
-[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000"}],' +
+[IO.File]::WriteAllText($vf, '{"launcherVersion":"' + $now + '","launcherInputs":"' + $inputsNow + '","packs":[{"id":"20990101-0000","url":"https://example.invalid/20990101-0000.zip","sha256":"' + ('d' * 64) + '"}],' +
     '"release":{"id":"20990101-0000","channel":"' + $ch + '","launcherVersion":"' + $now + '","packs":["20990101-0000"],' +
     '"baseline":"","commit":"' + ('ab12' * 10) + '","branch":"main","uncommitted":0,"tag":"release/' + $ch + '/20990101-0000"}}')
 [IO.File]::WriteAllText((Join-Path $ReleaseDir 'published.json'), '{"written":"by the publisher"}')

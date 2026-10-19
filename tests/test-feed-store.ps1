@@ -124,7 +124,7 @@ try {
 
     # ---- 2. send ------------------------------------------------------------
     Write-Host ''; Write-Host 'send'
-    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x"}]}'
+    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x","url":"https://thornswood.net/feed-dev/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}'
     $r = Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site
     Yes 'the new feed is on the site' ((Sha (Join-Path $site 'feed-dev\version.json')) -eq (Sha (Join-Path $dir 'version.json')))
     Yes 'and the send says it sent it' (@($r.Sent) -contains 'version.json')
@@ -138,7 +138,7 @@ try {
     Put (Join-Path $dir 'published.json') '{"a":"dev baseline after 35"}'
     $r = Send-FeedStore 'dev' $dir @('published.json') -SiteDir $site
     Yes 'the baseline goes up the same way' ((Sha (Join-Path $site 'feed-dev\published.json')) -eq (Sha (Join-Path $dir 'published.json')))
-    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x"},{"id":"y"}]}'
+    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x","url":"https://thornswood.net/feed-dev/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"id":"y","url":"https://thornswood.net/feed-dev/assets/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}'
     [void](Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site)
     $lv = @(Get-FeedStoreLaunchers 'dev' -SiteDir $site)
     Yes 'a version already in launchers.txt is not written twice' (@($lv | Where-Object { $_ -eq '1.1.101.35' }).Count -eq 1)

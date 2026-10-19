@@ -25,10 +25,10 @@ The JSON files Thornswood's release, deploy, game, site, bot and voice trust, wh
 
 | File | Written by | Read by | Risk | Check today |
 | --- | --- | --- | --- | --- |
-| `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); box-side reads unchecked |
+| `server-settings.json` (built, and on each server) | Deploy-Gamemode, Export-ServerPayload; ServerSettings.ps1 carries settings on the box | the engine, Deploy-Server, Deploy-DevGamemode, Swap (on the box), site | High: port, load order, seats | named on a local bad read (#2154); **held** on the box (`server-settings`, Swap and Install-ThornswoodServer, #2404) |
 | `thornswood-build.json` (build stamp) | BuildStamp.ps1 | Deploy-Server, Deploy-DevGamemode, Publish-Server (held to the payload's gamemode, #459) | Medium | named on a bad read (#2154) |
 | `deployed-build.json` | DeployedBuild.ps1 (on the box), from Deploy-Server and Publish-Server | site | Low | none |
-| `version.json`, `published.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed | every launcher, site | High: what every launcher installs | named on a bad read (#2119) |
+| `version.json`, `published.json`, `releases.json` (feed store) | Publish-Update, Publish-Server, Rollback-Feed, Scrub-Feed, Dev-News, Set-Server, Set-Collection, Repair-Manifest, Remirror-Site-Feed | every launcher, site, the next Ship and rollback | High: what every launcher installs | **held** (`feed-version`, `feed-published`, `feed-releases`): Send-FeedStore, the one way they reach the VPS, refuses a file out of shape before anything goes up (#2180); `Check-Records -Feed` reads a store folder (#2420) |
 | launcher `config.json` | launcher, Set-Server, Set-Collection | launcher, Deploy-Gamemode, Ship-Rules | Medium | named on a bad read; Deploy-Gamemode falls back |
 
 ## Site, bot and voice state (on the box)
@@ -83,7 +83,6 @@ How each kind of JSON state takes a format change today, and how it is put back.
 - **More clash checks.** Extend the board's revision idea to the other files #2188 names (`notes.json`, `inbox.json`, `open-tickets.json`, `trouble.json`). A file lock is not needed while one Node process writes them.
 ## Next slices, in order
 
-1. **Authorization state:** `bans.json` and `pk.json` fail closed on a malformed file (#2186; site lane).
-2. **Box-side reads:** `server-settings.json` and `server-build.json`, inside the text Swap.ps1 and Install-ThornswoodServer run on the box. The helper has to travel with the payload first.
-3. **Feed:** `version.json` gets a contract in RecordShape.ps1. (`skyrim-pin.json`, `skyrim-files.json`, `ui-gone.json` and `generated.json` were held in slice 3.)
-4. **Site identity state:** `linked.json`, `sessions.json` and `signins.json` get a startup check with a readiness signal.
+Done: the box-side reads (#2404), the feed store's contracts (#2420) and holding every feed send to them (#2180), and `bans.json` failing closed (#2186).
+
+1. **Site authorization and identity state:** `pk.json` fails closed the way `bans.json` does, and `linked.json`, `sessions.json` and `signins.json` get a startup check with a readiness signal, so a file that is there and will not read is never taken as empty and written over.
