@@ -49145,16 +49145,9 @@ log('gamemode loaded:',
   percentages. Some of the rows are the game's to do on somebody's own machine
   and the server cannot reach them from here. Each start line says which, so
   nobody is told an effect is on when it is not, and the issue lists them:
-    Set     halving what a block costs. Only the stamina and the clocks are
-            real. Measured on 11 Oct (#1386): a block costs no stamina here
-            at all. The engine's hit (ActionListener::OnWeaponHit) decides
-            the block and writes health and nothing else, and every other
-            actor on a person's machine deals that machine no damage
-            (skymp5-client formView.ts sets attackDamageMult 0), so the
-            game's own cost, fStaminaBlockDmgMult 0.25 of the damage
-            blocked with fStaminaBlockBase 0 (Skyrim.esm, overridden by
-            nothing in the load order), comes to nothing. There is nothing
-            to halve until blocks cost stamina, which is Patrick's to decide.
+    Set     a block costs half the stamina for 8 seconds. Applied here: a
+            block costs stamina only because this block charges it (A BLOCK
+            COSTS STAMINA, beside hit), and Set halves that charge.
     Plant   not being staggered. A stagger is an animation on the machine that
             animates you, so the server refuses the staggers it sends itself
             (Break and Wreck), and the front plugin refuses every other one
@@ -49557,7 +49550,7 @@ log('gamemode loaded:',
   }
 
   var STARTED = {
-    set: 'Set, for 8 seconds. Halving what a block costs is not in the game yet, so for now this spends the stamina and starts the wait.',
+    set: 'Set, for 8 seconds. A block costs you half the stamina.',
     plant: 'Plant, for 8 seconds. Nothing staggers you.',
     wall: 'Wall, for 10 seconds. You, and your party within 3 metres of you, take 20% less damage.',
     rush: 'Rush: +4 speed for 5 seconds.',
@@ -49753,6 +49746,66 @@ log('gamemode loaded:',
     return false;
   }
 
+  /*
+    A BLOCK COSTS STAMINA (#1386). Patrick's A of 12 October: "blocking costs
+    stamina, charged by the server, and Set halves it". Measured on 11
+    October, nothing took stamina for a block: the engine decides a block and
+    writes health and nothing else (ActionListener::OnWeaponHit), and on a
+    person's own machine nobody else's blow does damage (skymp5-client
+    formView.ts sets attackDamageMult 0), so the game's own charge there comes
+    to nothing.
+
+    So it is charged here, by the game's own rule: fStaminaBlockBase (0) plus
+    fStaminaBlockDmgMult (0.25) times the damage the block stopped (Skyrim.esm,
+    overridden by nothing in the load order). What the block stopped is
+    measured like every other hit in this block: the health share the hit
+    took, times the engine's own most health (the most the engine divided the
+    damage by, CalculateCurrentHealthPercentage), is what came through, and
+    the engine lets a blocked hit through at a tenth (TES5DamageFormula,
+    damage *= 0.1), so the block stopped nine times that. A hit the engine
+    threw away took nothing and costs nothing. The stamina comes off the
+    person's real most, the way spend() takes a maneuver's, and stops at
+    nothing: a block with no stamina left still blocks, as in the game. Set
+    halves the charge for a hit that lands while it runs.
+
+    A person's block only, which is what was decided ("when a hit lands
+    blocked on a person"). A spell is not one: the engine's spell damage
+    (OnSpellHit) has no block in it. blocked is the flag the OnHit event
+    carries. The engine pinned now sends the event before it decides a block,
+    so the flag is the client's alone, and a block only the server saw, which
+    is every block against a server NPC, costs nothing; fork PR 84
+    decides the block first, and the pin move that takes it in changes this
+    line and the list of the fork's events at the end of this file.
+  */
+  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5 };
+
+  /** The stamina a blocked hit costs, in points: took is the health share it
+      took, mult 1, or Set's half. NaN when the most health cannot be read. */
+  function blockCost(target, took, mult) {
+    var most = engineMost(target, 'health');
+    if (!(most > 0)) { return NaN; }
+    var stopped = took * most * (1 - BLOCK.through) / BLOCK.through;
+    return (BLOCK.base + BLOCK.perStopped * stopped) * mult;
+  }
+
+  /** Takes that many points of stamina off a person, down to nothing. */
+  function tire(target, points) {
+    if (!(points > 0) || deadOf(target)) { return; }
+    var most = mostStamina(target);
+    if (isNaN(most)) { mlog('no most stamina for', target.toString(16) + ', so a block cost nothing'); return; }
+    // Hunger, thirst, tiredness and cold together can take the whole of it.
+    if (!(most > 0)) { return; }
+    try {
+      var p = mp.get(target, 'percentages');
+      var before = Number(p.stamina);
+      if (!(before > 0)) { return; }
+      mp.set(target, 'percentages', { health: Number(p.health), magicka: Number(p.magicka),
+                                      stamina: Math.max(0, before - points / most) });
+    } catch (e) {
+      mlog('could not take a block\'s stamina from', target.toString(16) + ':', e);
+    }
+  }
+
   function hit(targetId, aggressor, source, power, blocked) {
     var target = Number(targetId) || 0;
     if (!target) { return; }
@@ -49762,14 +49815,19 @@ log('gamemode loaded:',
       open[open.length - 1].after = share(target, 'health');
     }
     var lined = wovenArmour(target);
-    if (!lined && !anyOn()) { return; }
+    var guarded = !!blocked && personOf(target) && !isSpell(source);
+    if (!lined && !guarded && !anyOn()) { return; }
     var t = now();
     var by = idOfForm(aggressor);
     // A bulwark's own blocked hit is a block seen.
     if (blocked && has(ST.on, target) && ST.on[target].cover) { ST.block[target] = true; }
 
     var identity = by ? MERCHANT_TRADING.actorIdentity(mp, by) : null;
-    var e = { before: -1, after: null, by: by, identity: identity, more: 0, less: 0, stagger: false, used: [] };
+    var e = { before: -1, after: null, by: by, identity: identity, more: 0, less: 0, stagger: false, used: [], block: 0 };
+    if (guarded) {
+      var mine = has(ST.on, target) ? ST.on[target] : null;
+      e.block = (mine && mine.set && mine.set > t) ? BLOCK.set : 1;
+    }
     var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
       if (power && a.wreck && a.wreck > t) {
@@ -49787,7 +49845,7 @@ log('gamemode loaded:',
     // A woven garment's 10% is on top of a Wall's or a Cover's 20%: the two
     // add, 30% back (the question to Patrick on #1398).
     e.less = shielded(target, t) + lined;
-    if (!e.more && !e.less && !e.stagger) { return; }
+    if (!e.more && !e.less && !e.stagger && !e.block) { return; }
     e.target = targetLife(target);
     e.before = share(target, 'health');
     if (!(e.before > 0)) { rearm(e); return; }
@@ -49896,12 +49954,18 @@ log('gamemode loaded:',
       if (!list.length) { continue; }
       var h = share(target, 'health');
       if (list.length && list[list.length - 1].after === null) { list[list.length - 1].after = h; }
-      var change = 0, killer = 0, stagger = false;
+      var change = 0, killer = 0, stagger = false, tired = 0;
       for (var i = 0; i < list.length; i++) {
         var e = list[i];
         var took = e.before - e.after;
         if (!(e.after >= 0) || !(took > 0)) { rearm(e); continue; }
         if (e.less) { change += took * e.less; }
+        // The block's stamina is the defender's, like the reduction.
+        if (e.block) {
+          var cost = blockCost(target, took, e.block);
+          if (cost > 0) { tired += cost; }
+          else if (isNaN(cost)) { mlog('no most health for', target.toString(16) + ', so a block cost nothing'); }
+        }
         // The reduction belongs to the defender, regardless of who now owns
         // the attacker's ID. Only the attacker's effects need this identity.
         if (!e.identity || MERCHANT_TRADING.actorIdentity(mp, e.by) !== e.identity) { continue; }
@@ -49909,6 +49973,7 @@ log('gamemode loaded:',
         if (e.stagger) { stagger = true; }
       }
       if (h > 0 && change !== 0) { setHealth(target, h, change, killer); }
+      if (tired > 0) { tire(target, tired); }
       if (stagger) { staggerOf(target); }
     }
   }
@@ -49967,7 +50032,7 @@ log('gamemode loaded:',
   g.__thornswoodManeuverTimer = setInterval(guard('maneuverTick', tick), 100);
 
   g.__thornswoodManeuvers = {
-    MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour,
+    MANEUVERS: MANEUVERS, ORDER: ORDER, WOVEN: WOVEN, wovenArmour: wovenArmour, BLOCK: BLOCK,
     held: held, takenOn: takenOn, whyNot: whyNot, mostStamina: mostStamina, engineMost: engineMost,
     use: use, effects: effects, view: view, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     state: ST

@@ -872,9 +872,80 @@ yes('Cover with nobody within 3 metres is refused before any stamina is spent',
   M.use(alone, 'cover') === 'Cover is for one person within 3 metres of you, and nobody is.' &&
   world.actors.get(alone).p.stamina === staminaAlone);
 
-// Set says what it is and what is not in the game.
-yes('Set spends the stamina and says the half-cost block is not in the game yet',
-  /^Set, for 8 seconds\. Halving what a block costs is not in the game yet/.test(M.use(BUL, 'set')));
+// A block costs stamina, and Set halves it (Patrick's A of 12 October). The
+// game's own rule: 0 plus 0.25 of what the block stopped, and the engine lets
+// a blocked hit through at a tenth, so 2 health through is 18 stopped and
+// 4.5 stamina. The person's most health and stamina are both 100 here.
+function stamina(id) { return Math.round(world.actors.get(id).p.stamina * 100000) / 100000; }
+yes('the block rule is the game\'s: nothing to start, a quarter of what was stopped, a tenth through, Set halves',
+  M.BLOCK.base === 0 && M.BLOCK.perStopped === 0.25 && M.BLOCK.through === 0.1 && M.BLOCK.set === 0.5);
+heal(BUL);
+world.actors.get(BUL).p.stamina = 1;
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('a blocked hit that let 2 health through costs 4.5 stamina', stamina(BUL) === 0.955 && health(BUL) === 0.98);
+strike(WOLF, BUL, 0.02, {});
+settle();
+yes('the same hit not blocked costs no stamina', stamina(BUL) === 0.955);
+const blockCalls = world.calls.length;
+strike(WOLF, BUL, 0, { blocked: true });
+settle();
+yes('a blocked hit the engine threw away costs nothing and writes nothing',
+  stamina(BUL) === 0.955 && world.calls.slice(blockCalls).indexOf('set percentages ' + BUL.toString(16)) === -1);
+strike(WOLF, BUL, 0.02, { blocked: true, spell: true });
+settle();
+yes('a blocked spell costs no stamina: the engine\'s spell damage has no block in it', stamina(BUL) === 0.955);
+heal(WOLF);
+world.actors.get(WOLF).p.stamina = 1;
+strike(BUL, WOLF, 0.02, { blocked: true });
+settle();
+yes('a creature that blocks pays nothing: the answer was for a person', world.actors.get(WOLF).p.stamina === 1);
+heal(WOLF);
+heal(BUL);
+
+// Set.
+world.actors.get(BUL).p.stamina = 1;
+yes('Set starts and says a block costs half the stamina',
+  M.use(BUL, 'set') === 'Set, for 8 seconds. A block costs you half the stamina.' && stamina(BUL) === 0.85);
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('while Set runs, the same blocked hit costs 2.25 stamina', stamina(BUL) === 0.8275);
+strike(WOLF, BUL, 0.04, { blocked: true });
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('two blocked hits before the engine is done are each measured, and each is halved', stamina(BUL) === 0.76);
+later(8100);
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('after 8 seconds Set is over and a block costs the whole 4.5 again', stamina(BUL) === 0.715);
+heal(BUL);
+
+// The real most: the skill tree's Endurance counts, and it stops at nothing.
+effectsMaps.set(BUL, { stamina: 100 });
+world.actors.get(BUL).p.stamina = 1;
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('with 100 more stamina from the skill tree, 4.5 is a smaller share of the bar', stamina(BUL) === 0.9775);
+effectsMaps.delete(BUL);
+heal(BUL);
+world.actors.get(BUL).p.stamina = 0.01;
+strike(WOLF, BUL, 0.1, { blocked: true });
+settle();
+yes('a block with too little stamina left takes it to nothing, and the hit still came through at a tenth',
+  stamina(BUL) === 0 && health(BUL) === 0.9);
+heal(BUL);
+world.actors.get(BUL).p.stamina = 1;
+// A blocked hit on somebody under a Wall still pays for the block, on what
+// the engine took, before the Wall gives its fifth back.
+later(200000);
+yes('Wall starts again', /^Wall, for 10 seconds\./.test(M.use(BUL, 'wall')) && stamina(BUL) === 0.6);
+strike(WOLF, BUL, 0.02, { blocked: true });
+settle();
+yes('under a Wall the block is paid on what the engine took, and the fifth comes back',
+  stamina(BUL) === 0.555 && health(BUL) === 0.984);
+later(11000);
+heal(BUL);
+world.actors.get(BUL).p.stamina = 1;
 world.actors.get(BUL).dead = true;
 later(50000);
 yes('nobody starts a maneuver while down', M.use(BUL, 'set') === 'Not while you are down.');
