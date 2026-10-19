@@ -76,12 +76,15 @@ changed for these drafts.
 
 Commission payment is the future accepted submitted hold price multiplied
 by the original quantity, from the merchant's finite purse. No default price,
-fixed bonus or new gold is granted here. Missing price, insufficient purse
-or unavailable goods must explain why the commission cannot be accepted;
-ordinary stock for sale remains visible. The future transaction must reserve
-the promised purse amount and preserve the accepted quote through its exact
-conserved pending-transfer protocol. This source slice implements none of
-that runtime protocol.
+fixed bonus or new gold is granted here. Missing price, unsupported goods or
+insufficient unreserved purse must explain why new acceptance is refused.
+Customers need not own the goods when accepting work. The future transaction
+must reserve the promised purse amount and preserve the accepted quote
+through its exact conserved pending-transfer protocol. At delivery, missing
+matching inventory refuses completion while keeping the work and its purse
+reservation. A changed current price or lack of other spendable purse money
+must not invalidate that accepted promise. Ordinary stock for sale remains
+visible. This source slice implements none of that runtime protocol.
 
 Authored commissions need an explicit source-derived authority keyed by
 their exact reviewed quest and merchant, plus their own conserved transfer
