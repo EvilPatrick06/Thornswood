@@ -246,7 +246,13 @@ scripts\vps\Write-BotToken.ps1 1
 # gamemode-voice.js was a copy of the gamemode's position feed that nothing
 # ran, so it went with the script that wrote it in; the feed's catches are
 # in game\gamemode.js, which #2784 is about.
-bot\bot.py 3
-bot\Build-Discord.py 5
-bot\Build-Onboarding.py 1
-bot\card.py 5
+#
+# bot\ went to none in the fourth (19 Oct), so this section has no lines
+# left. Build-Discord.py names a role it could not move, a topic, old posts it
+# could not remove and a pin under "did not manage", and -Check no longer
+# moves roles. Build-Onboarding.py passes a refused read of the bot's own
+# member to its caller instead of reading it as no permissions. bot.py needs
+# certifi as it needs discord.py. card.py's font probes say in a comment on
+# the except line what they expect, and a glyph or avatar that will not draw
+# fails the card, which on_member_join logs. The rest were tries around code
+# that does not throw.
