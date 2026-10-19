@@ -21,6 +21,11 @@ const rules = require('../game/quest-eligibility').createQuestEligibility({table
 const recipes = JSON.parse(read('game/data/recipes.json')).recipes;
 const tables = JSON.parse(read('game/data/merchant-role-tables.json')).tables;
 const proofFields = ['owner', 'half', 'rank', 'out', 'makes', 'bench', 'inputItems', 'needs'];
+// Settled class-Novice slots. Recipe/output authority stays in the catalogue.
+const beginnerClasses = new Map([
+  ['1a67c:Skyrim.esm', 'miner'], ['19dd0:Skyrim.esm', 'fisher'],
+  ['1939ba:aaaGraniteHill.esp', 'hunter'], ['198a0:Skyrim.esm', 'farmer']
+]);
 
 function validate(catalogue, source = {recipes, tables}) {
   assert.deepEqual(Object.keys(catalogue).sort(), ['active', 'complete', 'quests', 'version']);
@@ -67,7 +72,11 @@ function validate(catalogue, source = {recipes, tables}) {
     if (row.kind === 'commission') {
       assert.equal(row.tier, 'novice', 'Higher commissions need their own producer/cadence review');
       assert.equal(row.cooldownHours, 6);
-      assert.equal(gate.profession, row.merchant.role.toLowerCase());
+      if (gate.classKey !== undefined) {
+        assert.equal(gate.classKey, beginnerClasses.get(row.merchant.reference), 'Reserved class allocation');
+      } else {
+        assert.equal(gate.profession, row.merchant.role.toLowerCase());
+      }
       assert.deepEqual(row.reward, {source: 'merchant-purse', pricing: 'submitted-hold-price'});
       assert.ok(Array.isArray(row.goods) && row.goods.length > 0 && row.goods.length <= 5);
       const items = new Set();
@@ -81,7 +90,7 @@ function validate(catalogue, source = {recipes, tables}) {
           recipe.roll === undefined && recipe.race === '', 'Commission needs a public firing recipe');
         assert.equal(recipe.owner, row.merchant.role);
         assert.equal(recipe.rank, row.tier);
-        assert.equal(gate.half, recipe.half.toLowerCase());
+        if (gate.classKey === undefined) assert.equal(gate.half, recipe.half.toLowerCase());
         assert.equal(good.item, recipe.out);
         assert.ok(source.tables[row.merchant.role].buy.includes(good.item), 'Commission output needs ordinary buy permission too');
         for (const field of proofFields) assert.deepEqual(good.recipe[field], recipe[field], 'Recipe evidence/' + field);
@@ -168,5 +177,35 @@ const forbidden = clone(tables); forbidden.Smith.buy = forbidden.Smith.buy.filte
 assert.throws(() => validate(one(commission), {recipes, tables: forbidden}), /buy permission/); refusals++;
 const repeated = clone(commission); repeated.id = 'q-another-name'; repeated.goods[0].count++;
 assert.throws(() => validate({...one(commission), quests: [commission, repeated]}), /quantity change alone/); refusals++;
+const classCommission = clone(commission);
+classCommission.gate = {classKey: 'miner', rank: 'novice'};
+assert.doesNotThrow(() => validate(one(classCommission)), 'Delivery class is independent of crafting profession');
+let classRefusals = 0, classEligibility = 0;
+function rejectsClass(edit, expected) {
+  const row = clone(classCommission); edit(row);
+  assert.throws(() => validate(one(row)), expected); classRefusals++;
+}
+rejectsClass(row => {row.gate.classKey = 'fisher';}, /Reserved class allocation/);
+rejectsClass(row => {row.merchant = roster.merchants.find(m => m.bookHold === 'riften' && m.role === 'Smith');}, /Reserved class allocation/);
+rejectsClass(row => {row.gate.classKey = 'unknown';}, /Invalid quest gate/);
+rejectsClass(row => {row.gate.half = 'platewright';}, /Invalid quest gate/);
+rejectsClass(row => {row.gate.profession = 'smith';}, /Invalid quest gate/);
+rejectsClass(row => {row.goods[0].item = '5ace4:Skyrim.esm';});
+rejectsClass(row => {row.goods[0].recipe.half = 'edgewright';}, /Recipe evidence\/half/);
+rejectsClass(row => {
+  row.goods[0] = {item: recipes['1549c:Thornswood-Content.esp'].out, count: 1,
+    recipe: proof('1549c:Thornswood-Content.esp')};
+});
+for (const classKey of ['miner', 'fisher', 'hunter', 'farmer']) {
+  const gate = {classKey, rank: 'novice'};
+  const state = {v: 1, cls: classKey, prof: 'alchemist', ranks: {[classKey]: 'novice'}};
+  for (const [snapshot, allowed] of [[state, true],
+    [{...state, ranks: {[classKey]: 'master'}}, true],
+    [{...state, cls: 'gatherer'}, false], [{...state, ranks: {}}, false],
+    [{...state, ranks: {[classKey]: 'invalid'}}, false]]) {
+    assert.equal(rules.allows(gate, snapshot), allowed); classEligibility++;
+  }
+}
 console.log('PASS ' + ids.size + ' inactive quest candidates, exact source bindings and real gates; ' + dailyBound + ' gold cooldown-only 24h bound, 0 enabled');
 console.log('PASS explicit commission source authority and ' + refusals + ' malformed-source/permission/quantity/bundle refusals');
+console.log('PASS ' + classRefusals + ' class-allocation/source refusals and ' + classEligibility + ' cross-profession class eligibility cases');

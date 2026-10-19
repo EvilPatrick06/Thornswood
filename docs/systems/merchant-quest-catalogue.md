@@ -1,13 +1,13 @@
 # Draft merchant quest catalogue
 
-There are **9 authored draft definitions** in
+There are **13 authored draft definitions** in
 `game/data/merchant-quests.json`, toward the required 240 or more distinct
 offers for the 60 retained merchants. All are inactive. The file is marked
 `active:false` and `complete:false` and is not imported into the gamemode.
 The current runtime still has the 23 legacy definitions and ten bound routes.
 These candidates are not available in the game.
 
-Four scenes give Novice and Advanced Warriors and Mages different work. Five
+Four scenes give Novice and Advanced Warriors and Mages different work. Nine
 drafts request goods for specific trades and holds. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -66,8 +66,9 @@ not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Draft finite-purse commissions
 
-All five require the named Novice profession half and propose a six-hour
-completion cooldown. Each row copies its complete offering roster identity
+The five profession deliveries require the named Novice half. Four additional
+deliveries require a Novice class, independently of crafting profession.
+All nine propose a six-hour completion cooldown. Each row copies its complete offering roster identity
 and the selected public recipe's owner, half, rank, output, amount, bench,
 inputs and conditions. Their goods already belong to that trade's ordinary
 buy table. That does not grant legacy supply or commission permission.
@@ -79,6 +80,34 @@ buy table. That does not grant legacy supply or commission permission.
 | Thread for mourning cloth | Falkreath Tailor `1939ba:aaaGraniteHill.esp` | Haberdasher | 4 Thread `6ce001:Update.esm` | `84a:MoreCraftableEquipment.esp` |
 | A supper for the docks | Haafingar Cook `198a0:Skyrim.esm` | Hearthcook | 2 Salmon Steak `64b3b:Skyrim.esm` | `f4310:Skyrim.esm` |
 | Poultices for the marsh road | Hjaalmarch Alchemist `1aa61:Skyrim.esm` | Physicker | 2 Poultice `154c2:Thornswood-Content.esp` | `154c6:Thornswood-Content.esp` |
+
+These four class offers are additional work at the same merchants. A class
+has no profession half. Delivering goods from another craftsperson is valid;
+the customer need not be a Smith, Woodworker, Tailor or Cook.
+
+| Work | Offering reference and trade | Required class | Delivery | Recipe reference |
+| --- | --- | --- | --- | --- |
+| A spare pick for the mine | Whiterun Smith `1a67c:Skyrim.esm` | Novice Miner | 1 Pickaxe `e3c16:Skyrim.esm` | `1548d:Thornswood-Content.esp` |
+| A spare pole for the lake | Rift Woodworker `19dd0:Skyrim.esm` | Novice Fisher | 1 Crude Fishing Pole `15498:Thornswood-Content.esp` | `1549c:Thornswood-Content.esp` |
+| Boots for the trail | Falkreath Tailor `1939ba:aaaGraniteHill.esp` | Novice Hunter | 1 Boots `d1921:Skyrim.esm` | `928:MoreCraftableEquipment.esp` |
+| Soup for the field hands | Haafingar Cook `198a0:Skyrim.esm` | Novice Farmer | 2 Potato Soup `353d:HearthFires.esm` | `3542:HearthFires.esm` |
+
+The source checker preserves these four exact merchant/class allocations.
+Recipe ownership and buy permission still belong to the merchant's trade.
+For profession deliveries the named half must still match the recipe.
+The class allocation is separate from the exact authored goods in the JSON;
+the future compiler must derive commission authority from that reviewed
+catalogue, never from every item that could pass a source check. Hjaalmarch's
+Novice Gatherer reservation and the remaining class/Master coverage are
+unfinished. These four additions do not complete the class catalogue.
+
+The pickaxe recipe makes one from one Iron Ingot and one Tool Handle. The
+pole makes one from two Firewood, one Leather Strips and two Tundra Cotton.
+The boots make one from one Leather and one Thread. Potato Soup makes one
+from one Salt Pile, one Potato and one Leek; two bowls need two batches.
+Their complete copied recipe proof retains the owning half, bench and
+Novice input supply provenance. The boots use a vanilla output, without
+adding any permission-held armor assets or changing creation equipment.
 
 Leather's selected recipe produces two from one Novice Deer Hide. Iron
 Arrows produce 24 from one Firewood and one Iron Ingot. Thread produces one
@@ -93,7 +122,10 @@ The copied recipe conditions matter. Leather requires at least one
 `MAG_FoodUpgradePerk03`. Their `canBeMadeOnDayOne:false` flag does not mean
 their ingredients have no Novice producer. It also does not prove every
 qualified customer can personally run that recipe. No condition or rank is
-changed for these drafts.
+changed for these drafts. Potato Soup also retains its requirement for
+`MAG_RecipePerkPotatoSoup` and exclusion of `MAG_FoodUpgradePerk03`. Novice
+Farmer standing alone does not establish those recipe conditions; this is
+a delivery request and does not require personal crafting.
 
 Commission payment is the future accepted submitted hold price multiplied
 by the original quantity, from the merchant's finite purse. No default price,
@@ -127,7 +159,7 @@ purchases from a finite purse. The separate unbundled scene-accounting
 proposal reserves rewards within 150 gold per character per rolling 24 hours,
 but is not integrated here. That proposal is a further limit, not a reason
 to call the 400-gold cooldown bound actual earnings or an account/world cap.
-The five commissions transfer existing purse
+The nine commissions transfer existing purse
 money at their future accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
