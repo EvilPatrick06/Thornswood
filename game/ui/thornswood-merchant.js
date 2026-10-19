@@ -86,7 +86,8 @@
     shown = true;
     root.querySelector('#' + ID + '-title').textContent =
       (data.trader || 'Trader') + (data.place ? ' at ' + data.place : '');
-    root.querySelector('#' + ID + '-purse').textContent = 'Purse ' + (data.purse == null ? '' : data.purse);
+    root.querySelector('#' + ID + '-purse').textContent = 'Purse ' + (data.purse == null ? '' : data.purse)+
+      (data.reservedPurse?' ('+data.reservedPurse+' promised for work)':'');
     var body = '';
     if (data.note) body += '<p class="note" role="status">' + esc(data.note) + '</p>';
     var quests = data.quests || [];
@@ -97,11 +98,13 @@
         return gem + ': ' + quest.locations[gem];
       }).join('; ');
       if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
-      var status = quest.state === 'open' ? (quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
+      var status = quest.state === 'open' ? (quest.waiting?'Waiting for the saved trade.':quest.kind==='commission'?'Accepted; payment reserved.':quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
         'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
         quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
         quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
-      var terms=quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
+      var terms=quest.kind==='commission'?'Deliver '+quest.count+' '+quest.item+'. '+
+        (quest.gold===null?'No submitted payment is available.':'Payment '+quest.gold+' gold.')+
+        ' Return to this specialist. This work rests for six hours after the trade settles.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
         (quest.exactMerchant?'Return to this specialist.':'Return to a guild trader in this hold.')+' Returns after '+quest.hours+' hours.' :
         'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
@@ -110,7 +113,7 @@
       if (quest.state === 'open') {
         var token=Number.isSafeInteger(quest.token) && quest.token>0 ? ' data-token="'+esc(quest.token)+'"' : '';
         body += '<button data-quest="' + esc(quest.id) + '" data-action="return"'+token + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
-          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"'+token + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'?'Leave work':'Give back and leave')+'</button>';
+          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"'+token + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'||quest.kind==='commission'?'Leave work':'Give back and leave')+'</button>';
       } else {
         var gems = quest.gems || [], chosen = gemChoices[quest.id] || '';
         if (gems.length) {
@@ -118,7 +121,8 @@
           for (var g = 0; g < gems.length; g++) body += '<option value="' + esc(gems[g]) + '"' + (chosen === gems[g] ? ' selected' : '') + '>' + esc(gems[g]) + '</option>';
           body += '</select>';
         }
-        body += '<button data-quest="' + esc(quest.id) + '" data-action="take" data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
+        var quote=quest.kind==='commission'&&Number.isSafeInteger(quest.quotedUnit)&&quest.quotedUnit>=0?' data-token="'+esc(quest.quotedUnit)+'"':'';
+        body += '<button data-quest="' + esc(quest.id) + '" data-action="take"'+quote+' data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
           (quest.canTake && (!gems.length || chosen) ? '' : ' disabled') + '>Take work</button>';
       }
       body += '</div>';
