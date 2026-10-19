@@ -16,8 +16,9 @@
     gamemode.js           so a restore is a working server and not a puzzle
     the site's uploads    the gallery's pictures and what staff put up;
                           every upload, including larger recordings
-    the feed's store      each channel's version.json, published.json,
-                          launchers.txt, releases.txt and history, not assets
+    the feed's store      each channel's feed generations (version\, #2727),
+                          published.json, launchers.txt, releases.txt and
+                          history, not assets
     the site's data       linked Discord accounts, the boards, the documents
     the bot's config      bot.env.json
     the bot's join record joins.json, which arrival each person was
@@ -278,9 +279,10 @@ Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
 # Issue #454: a restore onto a new box came back without these. uploads is
 # the gallery's pictures and everything staff put up through the site, which
 # gallery.json in data only names. The feed's store is each channel's
-# version.json, the baseline the next Ship compares against, the launcher and
-# release lists and their history (#907), which live nowhere else since the
-# releases repository went. Not the feed's assets: they are every release's
+# feed, every generation of it (version\, #2727), the baseline the next Ship
+# compares against, the launcher and release lists and their history (#907),
+# which live nowhere else since the releases repository went. Not the feed's
+# assets: they are every release's
 # downloads, and Remirror-Site-Feed.ps1 sends them again from the machine that
 # shipped them.
 # The old budget omitted larger recordings. Encryption now streams, so size
@@ -295,7 +297,7 @@ if ($upBytes -gt ([long]$MaxUploadsMB * 1MB)) {
 }
 Grab $up 'site\uploads' -Complete
 foreach ($feed in 'feed', 'feed-dev') {
-  foreach ($n in 'version.json', 'published.json', 'launchers.txt', 'releases.txt', 'history') {
+  foreach ($n in 'version', 'published.json', 'launchers.txt', 'releases.txt', 'history') {
     Grab (Join-Path $SiteRoot "$feed\$n")         "site\$feed\$n"
   }
 }

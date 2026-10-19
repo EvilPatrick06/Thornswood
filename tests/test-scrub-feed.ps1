@@ -291,8 +291,11 @@ $devDoc = [ordered]@{
     release = [ordered]@{ id = $IR3; channel = 'dev'; packs = @($PD); baseline = $IR3 }
 }
 $mainDoc = [ordered]@{ launcherVersion = '1.1.102'; launcherUrl = ''; launcherSha256 = ''; message = ''; news = @(); packs = @($mainPacks) }
-Put (Join-Path $site 'feed-dev\version.json') ($devDoc | ConvertTo-Json -Depth 6)
-Put (Join-Path $site 'feed\version.json') ($mainDoc | ConvertTo-Json -Depth 6)
+# Each feed is the first of its write-once generations, version\<8 digits>.json
+# in its channel's folder; the newest is the feed (#2727, Feed-Store.ps1).
+Put (Join-Path $site 'feed-dev\version\00000001.json') ($devDoc | ConvertTo-Json -Depth 6)
+Put (Join-Path $site 'feed\version\00000001.json') ($mainDoc | ConvertTo-Json -Depth 6)
+$devSeedSha = Get-BaselineFileSha (Join-Path $site 'feed-dev\version\00000001.json')
 Copy-Item -LiteralPath $rec['R3'].File -Destination (Join-Path $site 'feed-dev\published.json')
 # Main's baseline from before the feed named one: sizes and file times.
 Put (Join-Path $site 'feed\published.json') (@{ 'Data\Platform\UI\ours.esp' = '8:639260000000000000'; 'CreationKit.exe' = '16:639260534800000000'; 'Data\DialogueViews\0001.xml' = '15:1'; ':order:plugins' = 'abc'
@@ -304,7 +307,7 @@ if ($why) { Write-Host "      $why"; Done }
 
 # ---- installs, the launcher's own code ----------------------------------------------
 function Raw($x) { if ($x -is [Management.Automation.PSObject]) { return $x.PSObject.BaseObject }; return $x }
-function Parse-Feed([string]$prefix) { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Join-Path $site "$prefix\version.json")))))) }
+function Parse-Feed([string]$prefix) { return (Raw ($mParse.Invoke($null, @(, [IO.File]::ReadAllBytes((Get-FeedVersionFile (Join-Path $site $prefix))))))) }
 function Pending-Of($v) { $a = New-Object 'object[]' 1; $a[0] = (Raw $v); return @($mPending.Invoke($null, $a) | ForEach-Object { Raw $_ }) }
 function New-Install([string]$name) {
     $root = Join-Path $T "inst\$name"
@@ -412,7 +415,7 @@ function Zip-Text([string]$zip, [string]$name) {
     try { $e = $z.GetEntry($name); if ($null -eq $e) { return $null }; $r = New-Object IO.StreamReader($e.Open()); try { return $r.ReadToEnd() } finally { $r.Dispose() } }
     finally { $z.Dispose() }
 }
-function Feed([string]$prefix) { return Read-Json (Join-Path $site "$prefix\version.json") }
+function Feed([string]$prefix) { return Read-Json (Get-FeedVersionFile (Join-Path $site $prefix)) }
 function Pack-Of($doc, [string]$id) { return @($doc.packs | Where-Object { $_.id -eq $id })[0] }
 
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -DryRun'
@@ -500,7 +503,13 @@ Yes 'the old records are off the site' (-not (Test-Path -LiteralPath (Join-Path 
 Yes '  and so is IED.psc, which only they named' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $ied))))
 Yes '  and the join pass and the mod menu settings they named, which went up loose' (-not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $passText))) -and -not (Test-Path -LiteralPath (Join-Path $da (Sha-Text $mcmText))))
 Yes '  while every file the new records name is still there' (@((Get-RecordFileShas $nR3).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $da $_)) }).Count -eq 0)
-Yes 'the feed store kept the feed it replaced in its history' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -Filter '*-version.json').Count -ge 1)
+# The feed's generations are its history: the one it replaced is still there,
+# unchanged, beside the newer, and history\ holds no copy of it.
+$gens = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\version') -File | Sort-Object Name)
+Yes ('the feed store kept the feed it replaced, unchanged, as the generation before ({0})' -f (($gens | ForEach-Object { $_.Name }) -join ', ')) (
+    $gens.Count -ge 2 -and $gens[0].Name -eq '00000001.json' -and (Get-BaselineFileSha $gens[0].FullName) -eq $devSeedSha -and
+    (Get-FeedVersionFile (Join-Path $site 'feed-dev')) -eq $gens[$gens.Count - 1].FullName -and
+    @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -Filter '*-version.json' -ErrorAction SilentlyContinue).Count -eq 0)
 
 Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel main'
 $r = Scrub 'main' @()
@@ -536,7 +545,7 @@ Write-Host ''; Write-Host 'a second run'
 $snap = Snapshot
 $r1 = Scrub 'dev' @(); $r2 = Scrub 'main' @()
 Yes 'finds nothing on either feed and changes nothing' ($r1.Code -eq 0 -and $r2.Code -eq 0 -and $r1.Out -match 'Nothing on the dev feed names' -and $r2.Out -match 'Nothing on the main feed names' -and
-    (@($snap.Keys | Where-Object { (Snapshot)[$_] -ne $snap[$_] }).Count -eq 0))
+    (@($snap.Keys | Where-Object { (Snapshot)[$_] -ne $snap[$_] }).Count -eq 0) -and (Snapshot).Count -eq $snap.Count)
 
 # ---- installs after it ---------------------------------------------------------------
 Write-Host ''; Write-Host 'installs after the scrub'
@@ -615,7 +624,7 @@ Remove-Item -LiteralPath (Join-Path $da $stray) -Force
 Write-Host ''; Write-Host 'Remove-FeedStoreAssets'
 $loose = Put-Text $da 'a stray file nothing names'
 $named = [string]$db.baseline.sha256
-$now = @{ main = (Get-BaselineFileSha (Join-Path $site 'feed\version.json')); dev = (Get-BaselineFileSha (Join-Path $site 'feed-dev\version.json')) }
+$now = @{ main = (Get-BaselineFileSha (Get-FeedVersionFile (Join-Path $site 'feed'))); dev = (Get-BaselineFileSha (Get-FeedVersionFile (Join-Path $site 'feed-dev'))) }
 $why = ''
 try { [void](Remove-FeedStoreAssets dev @($loose) @{ main = $now.main; dev = ('0' * 64) } -SiteDir $site) } catch { $why = $_.Exception.Message }
 Yes 'a delete refuses when a feed moved since it was read, and deletes nothing' ($why -match 'changed on the VPS' -and (Test-Path -LiteralPath (Join-Path $da $loose)))

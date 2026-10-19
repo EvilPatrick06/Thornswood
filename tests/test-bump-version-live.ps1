@@ -49,9 +49,10 @@ function Run([string]$current, [string]$live, [string[]]$extra) {
     # The site's root, standing in for thornswood.net (Feed-Store.ps1's test
     # variable), so the live feed is read from a file and nothing is fetched.
     $site = Join-Path $root 'site'
-    New-Item -ItemType Directory -Path (Join-Path $site 'feed') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $site 'feed\version') -Force | Out-Null
     if ($live) {
-        [IO.File]::WriteAllText((Join-Path $site 'feed\version.json'), '{"launcherVersion":"' + $live + '","packs":[]}')
+        # The feed's newest generation (Feed-Store.ps1, #2727).
+        [IO.File]::WriteAllText((Join-Path $site 'feed\version\00000001.json'), '{"launcherVersion":"' + $live + '","packs":[]}')
     }
     $args2 = @('-NoProfile', '-File', (Join-Path $repo 'scripts\release\Bump-Version.ps1'), '-WhatIf', '-NoPause') + $extra
     $oldSite = $env:THORNSWOOD_TEST_SITE_DIR

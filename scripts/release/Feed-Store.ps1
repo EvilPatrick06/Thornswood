@@ -15,7 +15,10 @@
   we won't be using it anymore". So the store moved to the VPS, beside the feed
   the site already serves:
 
-      C:\Thornswood-Docs\feed\version.json      the live feed (served)
+      C:\Thornswood-Docs\feed\version\<8 digits>.json
+                                                every feed sent, one new file each,
+                                                never replaced; the newest is the
+                                                live feed (served, #2727)
       C:\Thornswood-Docs\feed\published.json    the live baseline (not served)
       C:\Thornswood-Docs\feed\launchers.txt     every launcher version this
                                                 channel has published (not served)
@@ -28,7 +31,7 @@
                                                 as "releases" until #1050 (not
                                                 served). Received and sent by
                                                 name, like published.json
-      C:\Thornswood-Docs\feed\history\          each file as it was before it
+      C:\Thornswood-Docs\feed\history\          each other file as it was before it
                                                 was replaced, <utc stamp>-<name>
                                                 (not served)
 
@@ -139,10 +142,14 @@ function Get-FeedStoreVps([hashtable]$To) {
 # SHIPPED because a launcher asked for the feed at that moment. Measured 18
 # Oct on One, 2000 swaps beside a node loop doing server.js's statSync and
 # readFileSync: MoveFileEx refused 1616 of them, this rename none. A reader
-# that opened the file with share-delete keeps reading the old bytes, and
-# the name is the new file at once. A handle opened WITHOUT share-delete
-# still refuses it, with "being used by another process"; every reader in
-# this file and the site's node open with share-delete. Needs NTFS on
+# that opened the file with share-delete keeps reading the old bytes. A
+# handle opened WITHOUT share-delete still refuses it, with "being used by
+# another process"; every reader in this file and the site's node open with
+# share-delete. What no rename gives is a name that is always there: for a
+# moment inside every replace, POSIX or not, the old name is gone and the
+# new one not yet in (measured 19 Oct, #2727, on the box and on One). So
+# the file the site serves, version.json, is never replaced at all: each
+# one is a new file (the feed's own generations, below). Needs NTFS on
 # Windows 10 1709 or Windows Server 2019 or later: the VPS is Windows Server
 # 2022, and the working folder is under LOCALAPPDATA on the system drive.
 # Windows PowerShell 5.1, which runs this on the VPS, has no such call in
@@ -210,11 +217,48 @@ namespace Thornswood
 '@
 . ([scriptblock]::Create($script:FeedStoreSwap))
 
+# ------------------------------------------------------------ the feed's generations
+# version.json, the one store file the public reads, is never replaced
+# (#2727). Each feed sent is a new file, version\<8 digits>.json in the
+# channel's folder, numbered one past the newest, and none is ever replaced
+# or deleted: the newest is the feed, and the rest are its history. Windows
+# has no way to put a file in place of another by name without a moment
+# where the name is missing: measured 19 Oct on the box (Windows Server
+# 2022) with 6 swappers and 6 readers for 10 s a run, the POSIX rename left
+# 363 to 4791 opens of 300k finding nothing, MoveFileEx 801 to 4127, a
+# replacing hard link up to 1487, and One showed it too. site\server.js
+# opens the feed for every launcher's check and every /watch tick, so a
+# request in a Ship's swap answered 404. A new name only ever appears, and
+# the one before it stays, so a reader that lists the folder and opens the
+# newest always finds a whole feed. site\server.js reads it the same way
+# (feedFile there). The same block runs on the box and here.
+$script:FeedStoreGenerations = @'
+function Get-FeedVersionName([string]$channelDir) {
+  $v = Join-Path $channelDir 'version'
+  if (-not (Test-Path -LiteralPath $v -PathType Container)) { return '' }
+  $last = @(Get-ChildItem -LiteralPath $v -File | Where-Object { $_.Name -match '^\d{8}\.json$' } | Sort-Object Name | Select-Object -Last 1)
+  if (-not $last.Count) { return '' }
+  return $last[0].Name
+}
+function Get-FeedVersionFile([string]$channelDir) {
+  $n = Get-FeedVersionName $channelDir
+  if (-not $n) { return '' }
+  return (Join-Path (Join-Path $channelDir 'version') $n)
+}
+function Get-FeedVersionNext([string]$channelDir) {
+  $n = Get-FeedVersionName $channelDir
+  $k = if ($n) { [int64]$n.Substring(0, 8) + 1 } else { 1 }
+  return ('{0:D8}.json' -f $k)
+}
+'@
+. ([scriptblock]::Create($script:FeedStoreGenerations))
+
 # ------------------------------------------------------------ the one script
 # Everything that happens up there is this one script, run by ssh on the VPS
 # or in place on -SiteDir, so the tests run exactly what the VPS runs. It takes
 # its inputs as the variables set in front of it and answers in lines:
-#   HAVE|<name>|<sha>|<bytes>   NONE|<name>      (look)
+#   HAVE|<name>|<sha>|<bytes>|<file>   NONE|<name>   (look; <file> is
+#                                  where it is in the channel's folder)
 #   L|<version>                                  (launchers)
 #   R|<id><tab>...                               (releases)
 #   MOVED|<what>   SHORT|<name>   SAME|<name>   SENT|<name>|<sha>   (swap)
@@ -230,7 +274,7 @@ function OpenShared($p) {
   return New-Object IO.FileStream((Resolve-Path -LiteralPath $p).ProviderPath, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
 }
 function Sha($p) {
-  if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { return '' }
+  if (-not $p -or -not (Test-Path -LiteralPath $p -PathType Leaf)) { return '' }
   $h = [Security.Cryptography.SHA256]::Create()
   $s = OpenShared $p
   try { return (-join ($h.ComputeHash($s) | ForEach-Object { $_.ToString('x2') })) }
@@ -241,10 +285,23 @@ function ReadShared($p) {
   try { return $r.ReadToEnd() } finally { $r.Dispose() }
 }
 function DropParts { foreach ($n in $names) { Remove-Item -LiteralPath (Join-Path $dir ($n + '.part')) -Force -ErrorAction SilentlyContinue } }
+# Where a store file is now, relative to $dir: version.json is the newest of
+# its generations (above), '' while it has none; the rest are by name.
+function Here([string]$n) {
+  if ($n -ne 'version.json') { return $n }
+  $g = Get-FeedVersionName $dir
+  if ($g) { return ('version\' + $g) } else { return '' }
+}
+# The same for a feed named from the root, 'feed\version.json'.
+function FromRoot([string]$k) {
+  if ((Split-Path -Leaf $k) -ne 'version.json') { return (Join-Path $root $k) }
+  return (Get-FeedVersionFile (Join-Path $root (Split-Path -Parent $k)))
+}
 if ($op -eq 'look') {
   foreach ($n in $names) {
-    $p = Join-Path $dir $n
-    if (Test-Path -LiteralPath $p -PathType Leaf) { 'HAVE|' + $n + '|' + (Sha $p) + '|' + (Get-Item -LiteralPath $p).Length }
+    $h = Here $n
+    $p = if ($h) { Join-Path $dir $h } else { '' }
+    if ($p -and (Test-Path -LiteralPath $p -PathType Leaf)) { 'HAVE|' + $n + '|' + (Sha $p) + '|' + (Get-Item -LiteralPath $p).Length + '|' + $h }
     else { 'NONE|' + $n }
   }
   'DONE'
@@ -272,7 +329,7 @@ if ($op -eq 'forget') {
   # either baseline still spells out is kept whatever the caller thought.
   $moved = @()
   foreach ($k in @($expect.Keys)) {
-    $now = Sha (Join-Path $root $k)
+    $now = Sha (FromRoot $k)
     if ($now -ne [string]$expect[$k]) { $moved += ($k + ' was ' + ([string]$expect[$k]).Substring(0, 12) + ' and is ' + $(if ($now) { $now.Substring(0, 12) } else { 'absent' })) }
   }
   if ($moved.Count) { 'MOVED|' + ($moved -join '; '); return }
@@ -285,8 +342,8 @@ if ($op -eq 'forget') {
   # the bytes on the site.
   $said = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
   foreach ($f in @('feed\version.json', 'feed-dev\version.json', 'feed\releases.json', 'feed-dev\releases.json')) {
-    $p = Join-Path $root $f
-    if (-not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
+    $p = FromRoot $f
+    if (-not $p -or -not (Test-Path -LiteralPath $p -PathType Leaf)) { continue }
     foreach ($m in [regex]::Matches((ReadShared $p), '[0-9a-fA-F]{64}')) { [void]$said.Add($m.Value.ToLowerInvariant()) }
   }
   foreach ($f in @('feed\published.json', 'feed-dev\published.json')) {
@@ -313,7 +370,8 @@ if ($op -eq 'ready') {
 if ($op -eq 'swap') {
   $moved = @()
   foreach ($n in $names) {
-    $now = Sha (Join-Path $dir $n)
+    $h = Here $n
+    $now = if ($h) { Sha (Join-Path $dir $h) } else { '' }
     if ($now -ne [string]$expect[$n]) {
       $was = if ([string]$expect[$n]) { ([string]$expect[$n]).Substring(0, 12) } else { 'absent' }
       $is = if ($now) { $now.Substring(0, 12) } else { 'absent' }
@@ -330,18 +388,29 @@ if ($op -eq 'swap') {
   if (-not (Test-Path -LiteralPath $hist)) { New-Item -ItemType Directory -Path $hist -Force | Out-Null }
   foreach ($n in $names) {
     if (-not $sizes.ContainsKey($n)) { 'SAME|' + $n; continue }
-    $p = Join-Path $dir $n
-    $part = $p + '.part'
-    if (Test-Path -LiteralPath $p -PathType Leaf) {
-      $keep = Join-Path $hist ($stamp + '-' + $n)
-      $k = 2
-      while (Test-Path -LiteralPath $keep) { $keep = Join-Path $hist ($stamp + '-' + $k + '-' + $n); $k++ }
-      Copy-Item -LiteralPath $p -Destination $keep -Force
+    $part = (Join-Path $dir $n) + '.part'
+    if ($n -eq 'version.json') {
+      # A new generation, never in place of one (the feed's generations,
+      # above): the site goes on reading the one before until this name is
+      # there, whole. File.Move refuses a name that is already there, so two
+      # sends that both got past the check above cannot land on one number.
+      $vdir = Join-Path $dir 'version'
+      if (-not (Test-Path -LiteralPath $vdir)) { New-Item -ItemType Directory -Path $vdir -Force | Out-Null }
+      $p = Join-Path $vdir (Get-FeedVersionNext $dir)
+      [IO.File]::Move((Resolve-Path -LiteralPath $part).ProviderPath, $p)
+    } else {
+      $p = Join-Path $dir $n
+      if (Test-Path -LiteralPath $p -PathType Leaf) {
+        $keep = Join-Path $hist ($stamp + '-' + $n)
+        $k = 2
+        while (Test-Path -LiteralPath $keep) { $keep = Join-Path $hist ($stamp + '-' + $k + '-' + $n); $k++ }
+        Copy-Item -LiteralPath $p -Destination $keep -Force
+      }
+      # One rename over the old file, so a send stopped here leaves the old
+      # file or the new one whole (FeedStoreSwap, above). Nothing reads these
+      # while a Ship sends them but the store's own ops.
+      Move-FeedStoreInto $part $p
     }
-    # One rename over the old file, so the site never answers 404 between
-    # the old feed and the new one, and a send stopped here leaves the old
-    # file or the new one whole (FeedStoreSwap, above).
-    Move-FeedStoreInto $part $p
     if ($n -eq 'version.json') {
       $m = [regex]::Match((ReadShared $p), '"launcherVersion"\s*:\s*"([^"]+)"')
       if ($m.Success) {
@@ -388,7 +457,7 @@ function New-FeedStoreScript([string]$root, [string]$prefix, [string]$op, [strin
     $lines += ('$expect = @{ ' + ($e -join '; ') + ' }')
     $s = @(); if ($sizes) { foreach ($k in $sizes.Keys) { $s += ((Q $k) + ' = ' + [int64]$sizes[$k]) } }
     $lines += ('$sizes = @{ ' + ($s -join '; ') + ' }')
-    return (($lines -join "`r`n") + "`r`n" + $script:FeedStoreSwap + "`r`n" + $script:FeedStoreBody)
+    return (($lines -join "`r`n") + "`r`n" + $script:FeedStoreSwap + "`r`n" + $script:FeedStoreGenerations + "`r`n" + $script:FeedStoreBody)
 }
 
 # Runs the one script, up there or on -SiteDir, and hands back its lines.
@@ -425,7 +494,7 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
     $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
     $remote = $v.User + '@' + $v.Vps + ':' + $v.Root.TrimEnd('/') + '/' + $prefix + '/'
     if ($Up) { Invoke-ThornswoodNative { & scp @ssh $from ($remote + $dest) } 2>&1 | Out-Null }
-    else { Invoke-ThornswoodNative { & scp @ssh ($remote + $from) $dest } 2>&1 | Out-Null }
+    else { Invoke-ThornswoodNative { & scp @ssh ($remote + $from.Replace('\', '/')) $dest } 2>&1 | Out-Null }
     $rc = $LASTEXITCODE
     if ($rc -ne 0) { throw ("scp could not " + $(if ($Up) { "send $from" } else { "fetch $from" }) + " (exit $rc). Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test.") }
 }
@@ -437,16 +506,23 @@ function Copy-FeedStoreFile([string]$Channel, [string]$from, [string]$dest, [swi
 # edits the feed receives it and every send checks it did not move meanwhile,
 # the same as published.json.
 function Get-FeedStoreThere([string]$Channel, [string[]]$Files = @('version.json', 'published.json', 'releases.json'), [string]$SiteDir, [hashtable]$To) {
+    return (Get-FeedStoreLook $Channel $Files $SiteDir $To).Sha
+}
+
+# The same, with where each file is in the channel's folder (At), which for
+# version.json is its newest generation (#2727): Receive fetches that file,
+# which is never replaced, rather than a name that is.
+function Get-FeedStoreLook([string]$Channel, [string[]]$Files = @('version.json', 'published.json', 'releases.json'), [string]$SiteDir, [hashtable]$To) {
     $lines = @(Invoke-FeedStoreOp $Channel 'look' $Files @{} @{} $SiteDir $To)
     if ($lines -notcontains 'DONE') {
         throw ("The VPS did not say what the " + (Get-FeedStorePrefix $Channel) + " store holds: " + (($lines | Select-Object -Last 3) -join ' ').Trim() +
                ". Check the ssh key with scripts\vps\Setup-SshKey.ps1 -Test.")
     }
-    $o = @{}
+    $o = @{ Sha = @{}; At = @{} }
     foreach ($l in $lines) {
         $p = $l.Split('|')
-        if ($p[0] -eq 'HAVE' -and $p.Count -ge 4) { $o[$p[1]] = $p[2] }
-        elseif ($p[0] -eq 'NONE' -and $p.Count -ge 2) { $o[$p[1]] = '' }
+        if ($p[0] -eq 'HAVE' -and $p.Count -ge 5) { $o.Sha[$p[1]] = $p[2]; $o.At[$p[1]] = $p[4] }
+        elseif ($p[0] -eq 'NONE' -and $p.Count -ge 2) { $o.Sha[$p[1]] = '' }
     }
     return $o
 }
@@ -484,7 +560,8 @@ function Write-FeedStoreRead([string]$Dir, [string]$Channel, [hashtable]$there) 
 function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @('version.json', 'published.json', 'releases.json'), [string]$SiteDir, [hashtable]$To) {
     if (-not $Dir) { $Dir = Get-FeedStoreDir $Channel }
     New-Item -ItemType Directory -Force -Path $Dir | Out-Null
-    $there = Get-FeedStoreThere $Channel $Files $SiteDir $To
+    $look = Get-FeedStoreLook $Channel $Files $SiteDir $To
+    $there = $look.Sha
     $read = Read-FeedStoreRead $Dir
     if ($null -eq $read) { $read = @{} }
     $backup = Join-Path $Dir 'backup'
@@ -501,7 +578,7 @@ function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @(
             continue
         }
         $down = $local + '.down'
-        Copy-FeedStoreFile $Channel $n $down -SiteDir $SiteDir -To $To
+        Copy-FeedStoreFile $Channel ([string]$look.At[$n]) $down -SiteDir $SiteDir -To $To
         $got = Get-FeedStoreSha $down
         if ($got -ne $there[$n]) {
             Remove-Item -LiteralPath $down -Force -ErrorAction SilentlyContinue
@@ -653,8 +730,8 @@ function Read-SiteFeed([string]$Channel, [string]$SiteDir, [string]$SiteUrl = 'h
     $prefix = Get-FeedStorePrefix $Channel
     $sd = Get-FeedStoreSiteDir $SiteDir
     if ($sd) {
-        $f = Join-Path (Join-Path $sd $prefix) 'version.json'
-        if (-not (Test-Path -LiteralPath $f)) { return $null }
+        $f = Get-FeedVersionFile (Join-Path $sd $prefix)
+        if (-not $f) { return $null }
         return (ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($f)) $f)
     }
     [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12

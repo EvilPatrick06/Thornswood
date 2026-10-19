@@ -13,15 +13,18 @@
   runs, run in place):
 
     1. receive: both files arrive, read.json records their sha256, backup\ a copy
-    2. send: the file is replaced, the old one kept in history\, launchers.txt
-       grows, .part never left behind, and an unchanged file is not sent
+    2. send: version.json goes up as the next generation and the one before
+       stays (#2727); the baseline is replaced, the old one kept in history\;
+       launchers.txt grows, .part never left behind, and an unchanged file is
+       not sent
     3. two publishers: a send refuses, replacing nothing, when the feed OR the
        baseline changed up there after this machine received them
     4. a baseline missing up there is taken out of the working folder too
     5. a short .part is refused and nothing is replaced
     6. a copy of site\server.js serving that folder answers version.json and
-       the assets, and 404 for published.json, launchers.txt, history\, .part
-       and read.json; Read-SiteFeed reads the feed from it
+       the assets, and 404 for published.json, launchers.txt, history\, .part,
+       read.json and a generation by its own name; Read-SiteFeed reads the
+       feed from it
     7. scripts\oneoff\Move-FeedStore-ToVps.ps1 against scratch clones: -Check
        sends nothing, the real run puts each clone's published.json up byte for
        byte with every launcher version its history named, a second run sends
@@ -64,6 +67,11 @@ function Put([string]$path, [string]$text) {
     [IO.File]::WriteAllText($path, $text, $utf8)
 }
 function Sha([string]$path) { return (Get-FeedStoreSha $path) }
+# The feed a stand-in site serves is the newest of its generations, and a
+# feed put there is the next one, as the store sends it (#2727).
+function Feed([string]$chan) { return (Get-FeedVersionFile $chan) }
+function Put-Feed([string]$chan, [string]$text) { Put (Join-Path (Join-Path $chan 'version') (Get-FeedVersionNext $chan)) $text }
+function Gens([string]$chan) { return ,@(Get-ChildItem -LiteralPath (Join-Path $chan 'version') -File | Sort-Object Name) }
 function Threw([scriptblock]$b) { try { & $b | Out-Null; return '' } catch { return $_.Exception.Message } }
 # The port came from the system and was let go, so another run beside this one
 # can take it before the child binds it, the fault #1727 fixed in the .js
@@ -104,9 +112,9 @@ $procs = @()
 try {
     New-Item -ItemType Directory -Force -Path $site, $appdata | Out-Null
     $env:LOCALAPPDATA = $appdata
-    Put (Join-Path $site 'feed\version.json') '{"launcherVersion":"1.1.101","packs":[]}'
+    Put-Feed (Join-Path $site 'feed') '{"launcherVersion":"1.1.101","packs":[]}'
     Put (Join-Path $site 'feed\published.json') '{"a":"main baseline"}'
-    Put (Join-Path $site 'feed-dev\version.json') '{"launcherVersion":"1.1.101.34","packs":[]}'
+    Put-Feed (Join-Path $site 'feed-dev') '{"launcherVersion":"1.1.101.34","packs":[]}'
     Put (Join-Path $site 'feed-dev\published.json') '{"a":"dev baseline"}'
 
     # ---- 1. receive ---------------------------------------------------------
@@ -115,10 +123,10 @@ try {
     Yes 'the dev working folder is under LOCALAPPDATA, not a clone beside the repo' ($dir -eq (Join-Path $appdata 'Thornswood\feed\dev'))
     Yes 'and main has its own' ((Get-FeedStoreDir 'main') -eq (Join-Path $appdata 'Thornswood\feed\main'))
     $read = Receive-FeedStore 'dev' $dir -SiteDir $site
-    Yes 'both files arrive byte for byte' ((Sha (Join-Path $dir 'version.json')) -eq (Sha (Join-Path $site 'feed-dev\version.json')) -and
+    Yes 'both files arrive byte for byte' ((Sha (Join-Path $dir 'version.json')) -eq (Sha (Feed (Join-Path $site 'feed-dev'))) -and
                                           (Sha (Join-Path $dir 'published.json')) -eq (Sha (Join-Path $site 'feed-dev\published.json')))
     $rj = Read-FeedStoreRead $dir
-    Yes 'read.json records the sha256 of each as received' ($rj['version.json'] -eq (Sha (Join-Path $site 'feed-dev\version.json')) -and $rj['published.json'] -eq (Sha (Join-Path $site 'feed-dev\published.json')))
+    Yes 'read.json records the sha256 of each as received' ($rj['version.json'] -eq (Sha (Feed (Join-Path $site 'feed-dev'))) -and $rj['published.json'] -eq (Sha (Join-Path $site 'feed-dev\published.json')))
     Yes 'and a copy of each is kept in backup' (@(Get-ChildItem -LiteralPath (Join-Path $dir 'backup') -File).Count -eq 2)
     Yes 'the working folder is not a git repository' (-not (Test-Path -LiteralPath (Join-Path $dir '.git')))
 
@@ -126,23 +134,25 @@ try {
     Write-Host ''; Write-Host 'send'
     Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x","url":"https://thornswood.net/feed-dev/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}]}'
     $r = Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site
-    Yes 'the new feed is on the site' ((Sha (Join-Path $site 'feed-dev\version.json')) -eq (Sha (Join-Path $dir 'version.json')))
+    Yes 'the new feed is on the site' ((Sha (Feed (Join-Path $site 'feed-dev'))) -eq (Sha (Join-Path $dir 'version.json')))
     Yes 'and the send says it sent it' (@($r.Sent) -contains 'version.json')
-    $hist = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File)
-    Yes 'the one it replaced is kept in history' ($hist.Count -eq 1 -and $hist[0].Name -like '*-version.json' -and ([IO.File]::ReadAllText($hist[0].FullName)) -like '*1.1.101.34*')
+    $g = Gens (Join-Path $site 'feed-dev')
+    Yes 'it went up as the next generation, and the one before stays as it was' ($g.Count -eq 2 -and $g[1].Name -eq '00000002.json' -and ([IO.File]::ReadAllText($g[0].FullName)) -like '*1.1.101.34*')
+    Yes '  and nothing went into history for it' (-not (Test-Path -LiteralPath (Join-Path $site 'feed-dev\history')) -or @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -Filter '*-version.json').Count -eq 0)
     Yes 'no .part is left behind' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev') -Filter '*.part').Count -eq 0)
     Yes 'launchers.txt names the version just published' (@(Get-FeedStoreLaunchers 'dev' -SiteDir $site) -contains '1.1.101.35')
     Yes 'read.json now holds what was sent' ((Read-FeedStoreRead $dir)['version.json'] -eq (Sha (Join-Path $dir 'version.json')))
     $r = Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site
-    Yes 'an unchanged file is not sent again, nor copied into history' (@($r.Sent).Count -eq 0 -and @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File).Count -eq 1)
+    Yes 'an unchanged file is not sent again, nor made a new generation' (@($r.Sent).Count -eq 0 -and (Gens (Join-Path $site 'feed-dev')).Count -eq 2)
     Put (Join-Path $dir 'published.json') '{"a":"dev baseline after 35"}'
     $r = Send-FeedStore 'dev' $dir @('published.json') -SiteDir $site
-    Yes 'the baseline goes up the same way' ((Sha (Join-Path $site 'feed-dev\published.json')) -eq (Sha (Join-Path $dir 'published.json')))
+    Yes 'the baseline replaces the one up there' ((Sha (Join-Path $site 'feed-dev\published.json')) -eq (Sha (Join-Path $dir 'published.json')))
+    Yes '  and the old one is kept in history' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File -Filter '*-published.json').Count -eq 1)
     Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x","url":"https://thornswood.net/feed-dev/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"id":"y","url":"https://thornswood.net/feed-dev/assets/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}]}'
     [void](Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site)
     $lv = @(Get-FeedStoreLaunchers 'dev' -SiteDir $site)
     Yes 'a version already in launchers.txt is not written twice' (@($lv | Where-Object { $_ -eq '1.1.101.35' }).Count -eq 1)
-    Yes 'main was not touched by any of it' ((Sha (Join-Path $site 'feed\version.json')) -eq (Sha (Join-Path $site 'feed\version.json')) -and -not (Test-Path -LiteralPath (Join-Path $site 'feed\history')))
+    Yes 'main was not touched by any of it' ((Gens (Join-Path $site 'feed')).Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $site 'feed\history')))
 
     # releases.txt that cannot take its line (#2711). The swap added it in a
     # try with an empty catch, so a line that was never written was never said.
@@ -163,14 +173,14 @@ try {
     $mdir = Get-FeedStoreDir 'main'
     [void](Receive-FeedStore 'main' $mdir -SiteDir $site)
     Put (Join-Path $site 'feed\published.json') '{"a":"another machine shipped"}'
-    $siteFeed = Sha (Join-Path $site 'feed\version.json')
+    $siteFeed = Sha (Feed (Join-Path $site 'feed'))
     Put (Join-Path $mdir 'version.json') '{"launcherVersion":"1.1.102","packs":[]}'
     $why = Threw { Send-FeedStore 'main' $mdir @('version.json') -SiteDir $site }
     Yes 'a feed send refuses when the baseline moved up there after it was received' ($why -like '*changed on the VPS after this machine read it*' -and $why -like '*published.json*')
-    Yes '  and replaces nothing' ((Sha (Join-Path $site 'feed\version.json')) -eq $siteFeed)
+    Yes '  and sends nothing' ((Sha (Feed (Join-Path $site 'feed'))) -eq $siteFeed -and (Gens (Join-Path $site 'feed')).Count -eq 1)
     Yes '  and leaves no .part behind' (@(Get-ChildItem -LiteralPath (Join-Path $site 'feed') -Filter '*.part').Count -eq 0)
     [void](Receive-FeedStore 'main' $mdir -SiteDir $site)
-    Put (Join-Path $site 'feed\version.json') '{"launcherVersion":"1.1.101","packs":[],"news":[{"title":"server moved"}]}'
+    Put-Feed (Join-Path $site 'feed') '{"launcherVersion":"1.1.101","packs":[],"news":[{"title":"server moved"}]}'
     Put (Join-Path $mdir 'published.json') '{"a":"mine"}'
     $why = Threw { Send-FeedStore 'main' $mdir @('published.json') -SiteDir $site }
     Yes 'a baseline send refuses when the feed moved up there' ($why -like '*version.json was*')
@@ -191,11 +201,12 @@ try {
 
     # ---- 5. a short part ---------------------------------------------------------
     Write-Host ''; Write-Host 'a short part'
-    $before = Sha (Join-Path $site 'feed\version.json')
+    $before = Sha (Feed (Join-Path $site 'feed'))
+    $had = (Gens (Join-Path $site 'feed')).Count
     Put (Join-Path $site 'feed\version.json.part') '{"trunc'
     $lines = @(Invoke-FeedStoreOp 'main' 'swap' @('version.json') @{ 'version.json' = $before } @{ 'version.json' = 999 } $site $null)
     Yes 'a .part shorter than what was sent is refused' (@($lines | Where-Object { $_ -like 'SHORT|version.json*' }).Count -eq 1)
-    Yes '  replacing nothing and deleting the .part' ((Sha (Join-Path $site 'feed\version.json')) -eq $before -and -not (Test-Path -LiteralPath (Join-Path $site 'feed\version.json.part')))
+    Yes '  sending nothing and deleting the .part' ((Sha (Feed (Join-Path $site 'feed'))) -eq $before -and (Gens (Join-Path $site 'feed')).Count -eq $had -and -not (Test-Path -LiteralPath (Join-Path $site 'feed\version.json.part')))
 
     # ---- 6. what the site serves -------------------------------------------------
     Write-Host ''; Write-Host 'what the site serves'
@@ -243,6 +254,7 @@ try {
         $histName = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed-dev\history') -File)[0].Name
         foreach ($path in '/feed/published.json', '/feed-dev/published.json', '/feed/launchers.txt', '/feed-dev/launchers.txt',
                           '/feed/history/', "/feed-dev/history/$histName", '/feed/version.json.part', '/feed/read.json',
+                          '/feed/version/00000001.json', '/feed/version/',
                           '/feed/../feed/published.json', '/feed/%2e%2e/feed/published.json', '/feed/assets/../published.json',
                           '/feed/published.json%00', '/feed-dev/history') {
             Yes "  $path answers 404" ((Code $path) -eq 404)
@@ -283,8 +295,8 @@ try {
     }
     Gq -C $devClone push -q -u origin dev
     # What the last clone-based Ship's remirror left on the site: the feeds, no baseline.
-    Put (Join-Path $site2 'feed\version.json') ([IO.File]::ReadAllText((Join-Path $mainClone 'version.json')))
-    Put (Join-Path $site2 'feed-dev\version.json') ([IO.File]::ReadAllText((Join-Path $devClone 'version.json')))
+    Put-Feed (Join-Path $site2 'feed') ([IO.File]::ReadAllText((Join-Path $mainClone 'version.json')))
+    Put-Feed (Join-Path $site2 'feed-dev') ([IO.File]::ReadAllText((Join-Path $devClone 'version.json')))
     $ps = (Get-Process -Id $PID).Path
     function Run-Move([string[]]$more) {
         $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $move, '-MainClone', $mainClone, '-DevClone', $devClone,
@@ -303,8 +315,9 @@ try {
     if ($m.Code -ne 0) { Write-Host $m.Out }
     Yes '  main''s baseline on the VPS is byte for byte the clone''s' ((Sha (Join-Path $site2 'feed\published.json')) -eq (Sha (Join-Path $mainClone 'published.json')))
     Yes '  and dev''s' ((Sha (Join-Path $site2 'feed-dev\published.json')) -eq (Sha (Join-Path $devClone 'published.json')))
-    Yes '  the feeds were not rewritten' ((Sha (Join-Path $site2 'feed\version.json')) -eq (Sha (Join-Path $mainClone 'version.json')) -and
-                                      (Sha (Join-Path $site2 'feed-dev\version.json')) -eq (Sha (Join-Path $devClone 'version.json')))
+    Yes '  the feeds were not rewritten' ((Sha (Feed (Join-Path $site2 'feed'))) -eq (Sha (Join-Path $mainClone 'version.json')) -and
+                                      (Sha (Feed (Join-Path $site2 'feed-dev'))) -eq (Sha (Join-Path $devClone 'version.json')) -and
+                                      (Gens (Join-Path $site2 'feed')).Count -eq 1 -and (Gens (Join-Path $site2 'feed-dev')).Count -eq 1)
     $ld = @(Get-FeedStoreLaunchers 'dev' -SiteDir $site2)
     Yes ('  dev''s launchers.txt has every version its history named, oldest first: ' + ($ld -join ',')) (($ld -join ',') -eq '1.1.99,1.1.100,1.1.101,1.1.101.1,1.1.101.2,1.1.101.3')
     Yes '  and main''s' ((@(Get-FeedStoreLaunchers 'main' -SiteDir $site2) -join ',') -eq '1.1.99,1.1.100,1.1.101')
@@ -327,11 +340,11 @@ try {
     Yes 'a baseline already moved on up there is refused, not overwritten' ($m.Code -ne 0 -and $m.Out -like '*already holds a different feed/published.json*' -and
                                                                            ([IO.File]::ReadAllText((Join-Path $site2 'feed\published.json'))) -like '*new store*')
     Remove-Item -LiteralPath (Join-Path $site2 'feed\published.json')
-    Put (Join-Path $site2 'feed\version.json') '{"launcherVersion":"1.1.98"}'
+    Put-Feed (Join-Path $site2 'feed') '{"launcherVersion":"1.1.98"}'
     $m = Run-Move @('-Channel', 'main')
     Yes 'a site feed that is not the clone''s is refused, and says how to put it right' ($m.Code -ne 0 -and $m.Out -like '*different feed/version.json*Remirror-Site-Feed.ps1 -FeedDir*' -and
                                                                                        -not (Test-Path -LiteralPath (Join-Path $site2 'feed\published.json')))
-    Put (Join-Path $site2 'feed\version.json') ([IO.File]::ReadAllText((Join-Path $mainClone 'version.json')))
+    Put-Feed (Join-Path $site2 'feed') ([IO.File]::ReadAllText((Join-Path $mainClone 'version.json')))
     Put (Join-Path $mainClone 'published.json') '{"main":"not committed"}'
     $m = Run-Move @('-Channel', 'main')
     Yes 'a clone with an uncommitted baseline is refused' ($m.Code -ne 0 -and $m.Out -like '*uncommitted*')

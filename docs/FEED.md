@@ -104,12 +104,12 @@ the VPS now, beside the feed the site already serves:
 
 | On the VPS | What | Served |
 | --- | --- | --- |
-| `C:\Thornswood-Docs\feed\version.json` | the live feed | yes, `/feed/version.json` |
+| `C:\Thornswood-Docs\feed\version\<8 digits>.json` | every feed ever sent, one new file each, never replaced or deleted; the newest is the live feed (#2727) | the newest, as `/feed/version.json` |
 | `C:\Thornswood-Docs\feed\published.json` | the live baseline | no |
 | `C:\Thornswood-Docs\feed\launchers.txt` | every launcher version the channel has published, oldest first | no |
 | `C:\Thornswood-Docs\feed\releases.txt` | every release the feed has named, oldest first, one tab separated line each: id, channel, launcher, packs, baseline, commit, tag (#444, `Get-FeedStoreReleases`) | no |
 | `C:\Thornswood-Docs\feed\releases.json` | the record of each of the last thirty releases, newest first, which `Rollback-Feed.ps1` goes back to (#442); `"releases"` in version.json until #1050. Received and sent by name beside the feed (`Get-StoreReleases`, `Save-StoreReleases` in `Release-Baseline.ps1`) | no |
-| `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of those files as it was before it was replaced | no |
+| `C:\Thornswood-Docs\feed\history\<utc stamp>-<name>` | each of the other files as it was before it was replaced (version.json's history is `version\`) | no |
 | `C:\Thornswood-Docs\feed\assets\<sha256>` | the downloads | yes |
 
 and the same under `feed-dev` for dev. `site\server.js` answers only
@@ -125,11 +125,13 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   each against the sha256 the VPS gave for it, writes `read.json` with those
   sha256s, and keeps the last twenty of each in `backup\`. `Send-FeedStore`
   sends a file back to `<name>.part` and, in one step on the VPS, checks that
-  every file this folder read still has the sha256 it had, copies the one it
-  replaces into `history\`, and renames the `.part` over it in one call
-  (`Move-FeedStoreInto`), so the
-  site never answers 404 in between and a send stopped there leaves the old
-  file or the new one whole. Until #2591 (16 Oct) it was `File.Replace`, which
+  every file this folder read still has the sha256 it had, then puts each in.
+  `version.json` goes in as a new file, `version\<8 digits>.json` one past the
+  newest, renamed to a name that is not there yet, and the one before stays;
+  nothing ever replaces or deletes a generation, and the site and the store
+  read the newest (#2727). The other files are copied into `history\` and
+  the `.part` renamed over them in one call (`Move-FeedStoreInto`), so a send
+  stopped there leaves the old file or the new one whole. Until #2591 (16 Oct) it was `File.Replace`, which
   moves the old file aside first and left it missing when stopped between
   the two. From #2591 to #2727 (18 Oct) it was MoveFileEx with
   MOVEFILE_REPLACE_EXISTING, which Windows refuses with "Access is denied"
@@ -138,9 +140,17 @@ process write to both folders (#923), so only a publisher over ssh writes them.
   because somebody's launcher asked at that moment. The rename now keeps
   POSIX semantics (SetFileInformationByHandle, FileRenameInfoEx): a reader
   that opened the file with share-delete, as the site's node does, keeps the
-  old bytes it is reading and the name is the new file at once. A handle
-  opened without share-delete still refuses it, so every read of a store
-  file in `Feed-Store.ps1` shares delete. If anything moved up there it
+  old bytes it is reading. A handle opened without share-delete still
+  refuses it, so every read of a store file in `Feed-Store.ps1` shares
+  delete. What no rename gives is a name that is always there: measured 19
+  Oct on the VPS with 6 swappers and 6 readers for 10 s a run, the POSIX
+  rename left 363 to 4791 opens of about 300k finding nothing, MoveFileEx
+  801 to 4127, a replacing hard link up to 1487, and One showed it too, less
+  often. The site opens the feed for every launcher's check, every `/watch`
+  tick and every join pass, so a request in a Ship's swap found no feed.
+  That is why version.json is never replaced: a generation's name only ever
+  appears, and the one before it stays (`feedFile` in `site\server.js`,
+  `tests\test-2727-feed-swap-readers.ps1`). If anything moved up there it
   replaces nothing and throws: that is two publishers at once, the push git
   used to refuse.
 - **Who uses it.** Ship and Publish-Update receive both files at the start
