@@ -178,6 +178,7 @@ try {
         return [pscustomobject][ordered]@{
             launcherVersion = '1.2.0'
             launcherUrl = 'https://thornswood.net/feed-dev/assets/' + ('e' * 64)
+            launcherSha256 = ('e' * 64)
             packs = @([pscustomobject]@{ id = '20261011-221215-dev'; url = 'https://thornswood.net/feed-dev/assets/' + ('f' * 64); sha256 = ('f' * 64) })
             news = $news
             mainVersion = '1.1.106'
