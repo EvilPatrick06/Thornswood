@@ -249,9 +249,8 @@ There is no custom packet. Two paths:
 The voice feed (`gamemode.js:path: '/positions'`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
-Do not run `scripts\deploy\Add-VoiceFeed.ps1`: it writes the older
-`voice\gamemode-voice.js` over this block, with 7778 written in and no
-party field (`voice\README.md:the dev service, where this file still has 7778 written in`).
+This block is the only copy: the older one beside the voice service, and the
+deploy script that wrote it in, went in #2736.
 
 ## Where its data lives on the VPS
 

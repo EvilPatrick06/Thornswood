@@ -237,10 +237,16 @@ scripts\vps\Write-BotToken.ps1 1
 # fail, and Accept shows the site's refusal; home.js's localStorage catches
 # say in their braces why nothing more is done (the age cookie holds the
 # answer), and the rest were tries around calls that do not throw.
+#
+# voice\ went to none in the third (19 Oct). In voice-server.js every one was
+# a try around a call that does not throw (Sock.send and ping close the
+# socket themselves when a write fails, and a socket's write and destroy
+# report on its error event). load-voice.js counts a feed post the service
+# refused, an unreadable probe line and an unread /health in its result.
+# gamemode-voice.js was a copy of the gamemode's position feed that nothing
+# ran, so it went with the script that wrote it in; the feed's catches are
+# in game\gamemode.js, which #2784 is about.
 bot\bot.py 3
 bot\Build-Discord.py 5
 bot\Build-Onboarding.py 1
 bot\card.py 5
-voice\gamemode-voice.js 6
-voice\load-voice.js 5
-voice\voice-server.js 13
