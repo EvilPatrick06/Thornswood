@@ -36338,7 +36338,11 @@ log('gamemode loaded:',
 
   THE TERMS IN FORCE are kept in private/company-terms.json beside war.json
   and season.json, so a restart or a deploy keeps them: the terms, every
-  confirmed change (when, who, from and to), and the one proposal waiting.
+  confirmed change (when, from and to), and the one proposal waiting. The
+  file names nobody: who proposed, confirmed or dropped a change is in the
+  staff log, which keeps it for the staff log's own time (#2353). Who made
+  the proposal waiting now is held in memory for the card and the log lines,
+  and after a restart the card says only when it was made.
   With no file they are the shipped terms. A file that does not read, or
   terms in it that do not check, are logged and left on disk, and the
   shipped terms stand until the next confirm writes a good file (it puts the
@@ -36549,21 +36553,22 @@ function proposeTerms(current, next, openHauls) {
 }
 
 /*
-  Staff confirm a proposal. state is { terms, history }. by is the confirming
-  staff member as the server names them; at is the time. Refused when the
+  Staff confirm a proposal. state is { terms, history }; at is the time. The
+  history keeps when and what changed, never who: who proposed and who
+  confirmed are in the staff log, which keeps them for its own time, and the
+  terms file is not a place that names people (#2353). Refused when the
   proposal was not ok, changes nothing, or was made against other terms.
 */
-function adoptTerms(state, proposal, by, at) {
+function adoptTerms(state, proposal, at) {
   if (!object(state)) { throw new Error('There are no company terms to change.'); }
   must(state.terms);
   if (!object(proposal) || proposal.ok !== true) { throw new Error('That proposal was refused.'); }
   if (!proposal.changes.length) { throw new Error('That proposal changes nothing.'); }
   if (proposal.base !== canonical(state.terms)) { throw new Error('The terms changed since that proposal. Propose again.'); }
-  if (by === undefined || by === null || by === '') { throw new Error('A confirm names who confirmed it.'); }
   if (!Number.isInteger(at) || at < 0) { throw new Error('A confirm says when.'); }
   must(proposal.next);
   var history = Array.isArray(state.history) ? state.history.slice() : [];
-  history.push({ at: at, by: by, changes: copy(proposal.changes) });
+  history.push({ at: at, changes: copy(proposal.changes) });
   return { terms: copy(proposal.next), history: history };
 }
 
@@ -36622,20 +36627,18 @@ module.exports = {
   function historyOf(rows) {
     var out = [];
     (Array.isArray(rows) ? rows : []).forEach(function (r) {
-      if (r && typeof r === 'object' && Number.isInteger(r.at) && typeof r.by === 'string' && Array.isArray(r.changes)) {
-        var row = { at: r.at, by: r.by, changes: copy(r.changes) };
-        if (typeof r.proposedBy === 'string' && r.proposedBy) { row.proposedBy = r.proposedBy; }
-        out.push(row);
+      if (r && typeof r === 'object' && Number.isInteger(r.at) && Array.isArray(r.changes)) {
+        out.push({ at: r.at, changes: copy(r.changes) });
       }
     });
     return out;
   }
 
   function pendingOf(p) {
-    if (!p || typeof p !== 'object' || !Number.isInteger(p.at) || typeof p.by !== 'string' ||
+    if (!p || typeof p !== 'object' || !Number.isInteger(p.at) ||
         typeof p.base !== 'string' || !Array.isArray(p.changes) || !p.changes.length) { return null; }
     if (LIB.checkTerms(p.next).length) { return null; }
-    return { at: p.at, by: p.by, base: p.base, next: copy(p.next), changes: copy(p.changes),
+    return { at: p.at, base: p.base, next: copy(p.next), changes: copy(p.changes),
              openHaulsKeepTerms: Number(p.openHaulsKeepTerms) || 0 };
   }
 
@@ -36667,6 +36670,9 @@ module.exports = {
   }
 
   var state = readState();
+  // Who made the proposal waiting now, as the staff log names them. Memory
+  // only: the file names nobody, so after a restart this is ''.
+  var proposedBy = '';
 
   /* Writes the next state whole, or nothing. Answers true when it is on disk. */
   function write(next) {
@@ -36712,14 +36718,16 @@ module.exports = {
     if (!p.ok) { return { ok: false, why: p.why.join(' ') }; }
     if (!p.changes.length) { return { ok: false, why: 'Those are the terms in force already.' }; }
     var was = state.pending;
-    var row = { at: Date.now(), by: who, base: p.base, next: p.next, changes: p.changes,
+    var wasBy = proposedBy;
+    var row = { at: Date.now(), base: p.base, next: p.next, changes: p.changes,
                 openHaulsKeepTerms: p.openHaulsKeepTerms };
     if (was && row.at <= was.at) { row.at = was.at + 1; }
     if (!write({ terms: state.terms, history: state.history, pending: row })) {
       return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
     }
+    proposedBy = who;
     clog(who, 'proposed', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
-    return { ok: true, pending: pending(), replaced: was ? copy(was) : null };
+    return { ok: true, pending: pending(), replaced: was ? copy(was) : null, replacedBy: was ? wasBy : '' };
   }
 
   /** Adopts the proposal made at at, as a change by whoever confirms it. */
@@ -36732,17 +36740,17 @@ module.exports = {
     var adopted;
     try {
       adopted = LIB.adoptTerms({ terms: state.terms, history: state.history },
-                               { ok: true, base: p.base, next: p.next, changes: p.changes }, who, Date.now());
+                               { ok: true, base: p.base, next: p.next, changes: p.changes }, Date.now());
     } catch (e) {
       return { ok: false, why: String((e && e.message) || e) };
     }
-    var last = adopted.history[adopted.history.length - 1];
-    last.proposedBy = p.by;
     if (!write({ terms: adopted.terms, history: adopted.history, pending: null })) {
       return { ok: false, why: 'The new terms could not be written, so nothing changed.' };
     }
-    clog(who, 'confirmed', p.by + '\'s proposal:', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
-    return { ok: true, terms: terms(), changes: copy(p.changes), proposedBy: p.by };
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'confirmed', (byWas || 'an earlier') + '\'s proposal:', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
+    return { ok: true, terms: terms(), changes: copy(p.changes), proposedBy: byWas };
   }
 
   /** Clears the proposal made at at, and changes nothing else. */
@@ -36755,8 +36763,10 @@ module.exports = {
     if (!write({ terms: state.terms, history: state.history, pending: null })) {
       return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
     }
-    clog(who, 'dropped', p.by + '\'s proposal');
-    return { ok: true, dropped: copy(p) };
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'dropped', (byWas || 'an earlier') + '\'s proposal');
+    return { ok: true, dropped: copy(p), proposedBy: byWas };
   }
 
   /* ------------------------------------------------------- the staff card */
@@ -36794,11 +36804,10 @@ module.exports = {
         if (f.choices) { row.choices = f.choices.slice(); }
         return row;
       }),
-      pending: p ? { at: p.at, by: p.by, openHaulsKeepTerms: p.openHaulsKeepTerms,
+      pending: p ? { at: p.at, by: proposedBy, openHaulsKeepTerms: p.openHaulsKeepTerms,
                      changes: p.changes.map(function (c) { return { term: c.term, label: labelOf(c.term), from: c.from, to: c.to }; }) } : null,
       openHauls: openHauls().length,
-      changed: state.history.length ? { at: state.history[state.history.length - 1].at,
-                                        by: state.history[state.history.length - 1].by } : null
+      changed: state.history.length ? { at: state.history[state.history.length - 1].at } : null
     };
   }
 
@@ -36867,7 +36876,7 @@ module.exports = {
       r = propose(n.next, by);
       if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
       log.record('companypropose', pid, name, 0, 'the company\'s terms',
-                 said(r.pending.changes) + (r.replaced ? ', in place of ' + r.replaced.by + '\'s proposal' : ''),
+                 said(r.pending.changes) + (r.replaced ? ', in place of ' + (r.replacedBy || 'an earlier') + '\'s proposal' : ''),
                  0, { changes: r.pending.changes });
       toProfile(profileId, 'You propose new terms for the company: ' + said(r.pending.changes) + '. They change only ' +
                 'when staff confirm them on this page. ' + r.pending.openHaulsKeepTerms +
@@ -36881,20 +36890,21 @@ module.exports = {
       var at = parts && parts[2];
       var p = state.pending;
       r = verb === 'confirm' ? confirm(at, by) : drop(at, by);
+      var from = r.proposedBy ? 'proposed by ' + r.proposedBy : 'proposed before the last restart';
       if (!r.ok) {
         toProfile(profileId, r.why + (/waiting now/.test(r.why) ? ' Open the page again to see the one that is.' : '') +
                   ' Nothing changed.');
         return true;
       }
       if (verb === 'drop') {
-        log.record('companydrop', pid, name, 0, 'the company\'s terms', 'proposed by ' + p.by + ': ' + said(p.changes),
-                   0, { changes: p.changes, proposedBy: p.by });
+        log.record('companydrop', pid, name, 0, 'the company\'s terms', from + ': ' + said(p.changes),
+                   0, { changes: p.changes, proposedBy: r.proposedBy });
         toProfile(profileId, 'You drop the proposal. The company\'s terms stay as they are. It is in the staff log.');
         redrawStaff();
         return true;
       }
-      log.record('companyconfirm', pid, name, 0, 'the company\'s terms', 'proposed by ' + p.by + ': ' + said(r.changes),
-                 0, { changes: r.changes, proposedBy: p.by });
+      log.record('companyconfirm', pid, name, 0, 'the company\'s terms', from + ': ' + said(r.changes),
+                 0, { changes: r.changes, proposedBy: r.proposedBy });
       toProfile(profileId, 'The company\'s terms change: ' + said(r.changes) + '. Hauls already posted keep the ' +
                 'terms they were posted under. It is in the staff log.');
       redrawStaff();

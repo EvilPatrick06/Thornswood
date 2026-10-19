@@ -135,16 +135,15 @@ ok('a proposal changes nothing; staff confirm it', () => {
   assert.equal(JSON.stringify(state), before, 'proposing touched nothing');
   next.haulFee = 999;
   assert.equal(p.next.haulFee, 40, 'the proposal is its own copy');
-  const after = tc.adoptTerms(state, p, 'staff:1', 1000);
+  const after = tc.adoptTerms(state, p, 1000);
   assert.equal(after.terms.haulFee, 40);
   assert.equal(after.history.length, 1);
-  assert.deepEqual(after.history[0], { at: 1000, by: 'staff:1', changes: p.changes });
+  assert.deepEqual(after.history[0], { at: 1000, changes: p.changes }, 'the history names nobody (#2353)');
   assert.equal(JSON.stringify(state), before, 'adopting returns new state');
-  assert.throws(() => tc.adoptTerms(after, p, 'staff:1', 1001), /changed since/, 'a stale proposal');
-  assert.throws(() => tc.adoptTerms(state, p, '', 1001), /names who/);
-  assert.throws(() => tc.adoptTerms(state, p, 'staff:1', -1), /says when/);
+  assert.throws(() => tc.adoptTerms(after, p, 1001), /changed since/, 'a stale proposal');
+  assert.throws(() => tc.adoptTerms(state, p, -1), /says when/);
   const same = tc.proposeTerms(state.terms, state.terms, []);
-  assert.throws(() => tc.adoptTerms(state, same, 'staff:1', 1), /changes nothing/);
+  assert.throws(() => tc.adoptTerms(state, same, 1), /changes nothing/);
   const refused = tc.proposeTerms(state.terms, Object.assign({}, state.terms, { haulFee: -3 }), []);
   assert.equal(refused.ok, false);
   assert.ok(refused.why.length > 0);
@@ -287,8 +286,9 @@ ok('a staff member proposes on the card; nothing changes until a confirm; a rest
   assert.equal(s3.c.haulFee(), 40, 'the confirmed terms survive a restart');
   const h = s3.c.history();
   assert.equal(h.length, 1);
-  assert.equal(h[0].proposedBy, p.by);
-  assert.match(h[0].by, /Staffer \(profile 7\)/);
+  deq(Object.keys(h[0]).sort(), ['at', 'changes'], 'the kept history names nobody: who is in the staff log (#2353)');
+  assert.equal(p.by, undefined, 'nor does the kept proposal');
+  assert.match(s2.records[0][5], /^proposed before the last restart: /, 'a confirm after a restart says the proposer is not known here');
   assert.equal(s3.c.haulCut(notices.whiterun[0]), 5, 'a haul posted before keeps its cut');
 });
 

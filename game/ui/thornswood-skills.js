@@ -2054,14 +2054,14 @@
     card.appendChild(el('div', 'name', 'The company\'s terms'));
     var fields = Array.isArray(c && c.fields) ? c.fields : [];
     card.appendChild(el('div', 'desc', (c && c.changed)
-      ? 'Last changed ' + whenOpens(Number(c.changed.at) || 0) + ', by ' + String(c.changed.by || 'staff') + '.'
+      ? 'Last changed ' + whenOpens(Number(c.changed.at) || 0) + '. Who changed it is in the staff log.'
       : 'These are the terms the company shipped with.'));
     var p = c && c.pending;
     if (p) {
       var list = (Array.isArray(p.changes) ? p.changes : []).map(function (ch) {
         return String(ch.label || ch.term) + ' from ' + String(ch.from) + ' to ' + String(ch.to);
       }).join('; ');
-      officeRow(card, 'Proposed: ' + list, 'by ' + String(p.by || 'somebody') + ', ' + whenOpens(Number(p.at) || 0), [
+      officeRow(card, 'Proposed: ' + list, (p.by ? 'by ' + String(p.by) + ', ' : '') + whenOpens(Number(p.at) || 0), [
         officeButton('Confirm', '/companyterms confirm ' + String(Number(p.at) || 0), 'Press again to change the company\'s terms'),
         officeButton('Drop', '/companyterms drop ' + String(Number(p.at) || 0))
       ]);

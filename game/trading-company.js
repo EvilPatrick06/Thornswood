@@ -163,21 +163,22 @@ function proposeTerms(current, next, openHauls) {
 }
 
 /*
-  Staff confirm a proposal. state is { terms, history }. by is the confirming
-  staff member as the server names them; at is the time. Refused when the
+  Staff confirm a proposal. state is { terms, history }; at is the time. The
+  history keeps when and what changed, never who: who proposed and who
+  confirmed are in the staff log, which keeps them for its own time, and the
+  terms file is not a place that names people (#2353). Refused when the
   proposal was not ok, changes nothing, or was made against other terms.
 */
-function adoptTerms(state, proposal, by, at) {
+function adoptTerms(state, proposal, at) {
   if (!object(state)) { throw new Error('There are no company terms to change.'); }
   must(state.terms);
   if (!object(proposal) || proposal.ok !== true) { throw new Error('That proposal was refused.'); }
   if (!proposal.changes.length) { throw new Error('That proposal changes nothing.'); }
   if (proposal.base !== canonical(state.terms)) { throw new Error('The terms changed since that proposal. Propose again.'); }
-  if (by === undefined || by === null || by === '') { throw new Error('A confirm names who confirmed it.'); }
   if (!Number.isInteger(at) || at < 0) { throw new Error('A confirm says when.'); }
   must(proposal.next);
   var history = Array.isArray(state.history) ? state.history.slice() : [];
-  history.push({ at: at, by: by, changes: copy(proposal.changes) });
+  history.push({ at: at, changes: copy(proposal.changes) });
   return { terms: copy(proposal.next), history: history };
 }
 
