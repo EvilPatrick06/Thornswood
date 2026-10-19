@@ -49803,7 +49803,11 @@ log('gamemode loaded:',
     threw away took nothing and costs nothing. The stamina comes off the
     person's real most, the way spend() takes a maneuver's, and stops at
     nothing: a block with no stamina left still blocks, as in the game. Set
-    halves the charge for a hit that lands while it runs.
+    halves the charge for a hit that lands while it runs. A broken arm
+    doubles it while the break lasts, splinted or set (docs/systems/injury.md,
+    #1383): the injury block's record says which limb is broken (limbsOf), so
+    the charge is decided here with the rest of it, never measured off the
+    client's stamina afterwards.
 
     A person's block only, which is what was decided ("when a hit lands
     blocked on a person"). A spell is not one: the engine's spell damage
@@ -49813,7 +49817,7 @@ log('gamemode loaded:',
     and a block only the server saw, which is every block against a server
     NPC, costs stamina like any other.
   */
-  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5 };
+  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5, brokenArm: 2 };
 
   /** The stamina a blocked hit costs, in points: took is the health share it
       took, mult 1, or Set's half. NaN when the most health cannot be read. */
@@ -49863,6 +49867,8 @@ log('gamemode loaded:',
     if (guarded) {
       var mine = has(ST.on, target) ? ST.on[target] : null;
       e.block = (mine && mine.set && mine.set > t) ? BLOCK.set : 1;
+      var hurt = globalThis.__thornswoodHurt;
+      if (hurt && hurt.limbsOf(hurt.read(target)).arm) { e.block *= BLOCK.brokenArm; }
     }
     var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
@@ -60428,9 +60434,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       skills panel already carries. attackDamageMult is a multiplier, which is
       why its numbers are small (see TUNING.perPoint). "A block costs twice the
       stamina" and "sprint is refused" are not actor values: the record carries
-      limbs (write, below), the screen script hands it to the front plugin as
-      thornswoodBrokenLimbs, and the plugin shuts the sprint gate and takes a
-      blocked hit's stamina a second time (#1383).
+      limbs (write, below). The maneuvers block reads it when it charges a
+      block's stamina and doubles the charge for a broken arm (BLOCK.brokenArm),
+      and the screen script hands it to the front plugin as
+      thornswoodBrokenLimbs, which shuts the sprint gate on a broken leg (#1383).
     */
     broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
     crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
@@ -60628,10 +60635,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   }
 
   /*
-    WHICH LIMB IS BROKEN, for the client (#1383). injury.md: a broken arm
-    makes a block cost twice the stamina and a broken leg refuses sprint.
-    Neither is an actor value, so the record carries the answer and the
-    screen script hands it to the front plugin. As long as the break lasts,
+    WHICH LIMB IS BROKEN (#1383). injury.md: a broken arm makes a block cost
+    twice the stamina and a broken leg refuses sprint. Neither is an actor
+    value, so the record carries the answer: the maneuvers block reads the arm
+    when it charges a block, and the screen script hands the leg to the front
+    plugin for the sprint gate. As long as the break lasts,
     splinted or set, the same as the -8 speed and the -0.15 melee in forNeeds.
   */
   function limbsOf(rec) {
@@ -62026,9 +62034,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // is something to tend (#1383). The globalThis a plugin sees; see the
       // note over thornswoodCatchFire.
       '    try { globalThis.thornswoodHurtCare = (v && v.care) ? 1 : 0; } catch (e) { }',
-      // And which limb is broken (#1383): the plugin shuts the sprint gate on a
-      // broken leg and takes a blocked hit's stamina twice on a broken arm.
-      '    try { globalThis.thornswoodBrokenLimbs = { arm: limbs.arm ? 1 : 0, leg: limbs.leg ? 1 : 0 }; } catch (e) { }',
+      // And whether a leg is broken (#1383): the plugin shuts the sprint gate.
+      // A broken arm's dearer block is charged by the server (BLOCK.brokenArm).
+      '    try { globalThis.thornswoodBrokenLimbs = { leg: limbs.leg ? 1 : 0 }; } catch (e) { }',
       '    var html = "";',
       '    for (var i = 0; i < show.length; i++) {',
       '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
