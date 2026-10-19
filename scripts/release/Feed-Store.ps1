@@ -73,6 +73,7 @@
 
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 . (Join-Path $PSScriptRoot 'Feed-Json.ps1')       # Write-FeedVersionFile: the one way version.json is written (#1050)
+. (Join-Path $PSScriptRoot 'RecordShape.ps1')     # the feed contracts every send is held to (#2180)
 function Get-FeedStorePrefix([string]$Channel) {
     if ($Channel -eq 'dev') { return 'feed-dev' }
     if ($Channel -eq 'main' -or -not $Channel) { return 'feed' }
@@ -516,6 +517,16 @@ function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @(
     return $read
 }
 
+# The RecordShape kind a store file is held to, or '' for a file with no
+# contract (announced.json, Publish-Discord's record).
+function Get-FeedStoreKind([string]$Name) {
+    foreach ($k in @($script:ThornswoodRecordKinds.Keys)) {
+        $v = $script:ThornswoodRecordKinds[$k]
+        if ($v.ContainsKey('Feed') -and $v['Feed'] -eq $Name) { return $k }
+    }
+    return ''
+}
+
 # Sends the named files back, each only when it differs from what was read.
 # Every file this folder has read is checked, not only the ones sent: a feed
 # edit must not land on top of a baseline another Ship has just moved, and a
@@ -523,7 +534,8 @@ function Receive-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files = @(
 # replaces read.json as the answer to "what should be up there now"; Remirror
 # passes what it saw itself when handed a folder that was never received.
 # Returns @{ Sent = names; Same = names }. Throws, with nothing replaced, when
-# anything moved up there or a file did not arrive whole.
+# a feed file it names is out of shape, anything moved up there or a file did
+# not arrive whole.
 function Send-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files, [string]$SiteDir, [hashtable]$To, [hashtable]$Expect) {
     if (-not $Dir) { $Dir = Get-FeedStoreDir $Channel }
     $read = if ($null -ne $Expect) { $Expect } else { Read-FeedStoreRead $Dir }
@@ -534,6 +546,19 @@ function Send-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files, [strin
     foreach ($n in $Files) {
         if (-not (Test-Path -LiteralPath (Join-Path $Dir $n) -PathType Leaf)) { throw "No $n in $Dir to send. Nothing was sent." }
         if (-not $read.ContainsKey($n)) { throw "$n in $Dir was never received from the VPS, so there is nothing to check it against. Nothing was sent." }
+    }
+    # Every feed file goes up only in the shape its readers need (#2180).
+    # This is the one way a feed file reaches the VPS, so Publish-Update,
+    # Rollback-Feed, Scrub-Feed and every other writer are held here, not each
+    # on its own. A version.json the launcher cannot read (Config.cs
+    # VersionDoc throws on one member of the wrong type) shuts Play for every
+    # launcher on the channel; a published.json or releases.json out of shape
+    # stops the next Ship or rollback. RecordShape.ps1 names every field.
+    foreach ($n in $Files) {
+        $kind = Get-FeedStoreKind $n
+        if (-not $kind) { continue }
+        try { $null = Read-ThornswoodRecord -Path (Join-Path $Dir $n) -Kind $kind }
+        catch { throw ($_.Exception.Message + '. Nothing was sent, and the feed on the VPS is as it was.') }
     }
     $check = @($read.Keys | Sort-Object)
     $sizes = @{}
