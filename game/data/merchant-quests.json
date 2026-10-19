@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "active": false,
+  "complete": false,
+  "quests": [
+    {
+      "id": "q-whiterun-tailor-cloth-road",
+      "name": "A clear road for cloth",
+      "text": "The Tailor needs the approach to Redoran's Retreat made safer for the next cloth delivery. Defeat the marked bandit inside the retreat, then return.",
+      "tier": "novice",
+      "gate": { "profession": "warrior", "rank": "novice" },
+      "merchant": {
+        "reference": "1a684:Skyrim.esm",
+        "base": "13b9c:Skyrim.esm",
+        "role": "Tailor",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "kind": "kill",
+      "count": 1,
+      "targets": [
+        {
+          "ref": "36ce1:Skyrim.esm",
+          "base": "1e79d:Skyrim.esm",
+          "cell": "15224:Skyrim.esm",
+          "world": null,
+          "pos": [-2136.4208984375, 1534.8690185546875, -212.0419921875],
+          "leash": 2048,
+          "role": "enemy",
+          "species": "nord",
+          "location": "19295:Skyrim.esm",
+          "locationName": "Redoran's Retreat",
+          "hold": "Whiterun",
+          "habitat": "bandit-camp",
+          "tier": null,
+          "returnMinutes": 45
+        }
+      ],
+      "rewardGold": 15,
+      "cooldownHours": 6
+    },
+    {
+      "id": "q-winterhold-enchanter-coast",
+      "name": "Coastal preparations",
+      "text": "The Enchanter needs the marked stretch of Winterhold's coast cleared before taking measurements there. Defeat its skeever and report back.",
+      "tier": "novice",
+      "gate": { "profession": "mage", "rank": "novice" },
+      "merchant": {
+        "reference": "1e7d6:Skyrim.esm",
+        "base": "1e7d5:Skyrim.esm",
+        "role": "Enchanter",
+        "hold": "Winterhold",
+        "bookHold": "winterhold"
+      },
+      "kind": "kill",
+      "count": 1,
+      "targets": [
+        {
+          "ref": "ef60f:Skyrim.esm",
+          "base": "23ab7:Skyrim.esm",
+          "cell": "8dea:Skyrim.esm",
+          "world": "3c:Skyrim.esm",
+          "pos": [99232, 128672, -13824],
+          "leash": 1536,
+          "role": "animal",
+          "species": "skeever",
+          "location": "8dea:Skyrim.esm",
+          "locationName": "POINorthernCoast18",
+          "hold": "Winterhold",
+          "habitat": "wilderness",
+          "tier": null,
+          "returnMinutes": 20
+        }
+      ],
+      "rewardGold": 10,
+      "cooldownHours": 6
+    }
+  ]
+}
