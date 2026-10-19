@@ -15,14 +15,12 @@ never passes through it. The `test-*.js` files beside it are its harnesses.
 It serves no page of its own: its two clients are the launcher's voice page
 and the game's overlay, both loaded off disk. The plain browser page it used
 to serve at `/` went in #1822, because it had no way to get a join token and
-so could never get in. `gamemode-voice.js` is the gamemode's half of the
-position feed as `Add-VoiceFeed.ps1` first added it.
-The copy between the voice feed markers in `game\gamemode.js` has moved on
-since: it reads its port from `server-settings.json`, so the dev server feeds
-the dev service, where this file still has 7778 written in.
-`Add-VoiceFeed.ps1` would write this file over that block and redeploy the
-live gamemode, undoing that, so it stops when the two differ; `-Force` is the
-only way past.
+so could never get in. The game server's half of the position feed is the
+block between the voice feed markers in `game\gamemode.js`. It reads its port
+from `server-settings.json`, so the dev server feeds the dev service. The
+older copy of that block that sat here went in #2736, with the deploy script
+that wrote it into the gamemode: nothing ran the copy, and the script could
+only put the older block back.
 
 A socket opened by a browser has to come from a page loaded off disk, which
 says `null` or `file://`: the game's pages and the launcher's voice page. A
@@ -83,9 +81,16 @@ socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a
 join storm, the WebRTC signalling for every pair, walking and talk) and prints
 what the service cost at each size, which is where that number came from.
+It sends every message from its own one thread, so past a hundred or so
+people its signalling time is its own; `load-signalling.js` measures what the
+service itself takes to relay a full room's signalling (#2390).
 The joins and leaves one turn of the event loop handles share one roster, so
 a restart that brings every page back at once costs each socket a few
 rosters rather than one per arrival (#2332, `test-roster-once.js`).
+What one turn sends a socket goes to the kernel in writes of about 16 KB
+rather than one write a message (#2390): at 200 people, every pair trading an
+offer, an answer and six candidates each way took the service 5.5 to 6.0 s
+before and 2.4 to 2.6 s after, measured with `load-signalling.js`.
 `THORNSWOOD_CAPTIONS` (off when unset) is voice shown as words above the
 speaker's head (#2475). The words are made on the speaker's own machine and
 only the text comes here, as `{ t: 'caption', text }`; with it `on`, a

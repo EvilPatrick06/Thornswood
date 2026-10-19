@@ -97,7 +97,6 @@ import datetime
 import json
 import os
 import re
-import ssl
 import time
 import traceback
 import sys
@@ -108,16 +107,15 @@ import urllib.request
 # Windows Server ships with an empty root certificate store and the automatic
 # update for it switched off, so Python cannot verify discord.com and the
 # handshake dies with "unable to get local issuer certificate". Install-Bot
-# normally sets SSL_CERT_FILE for us; this is the belt to that braces, so a bot
-# copied somewhere by hand still connects.
+# sets SSL_CERT_FILE for the service; a bot started any other way points it at
+# certifi's bundle here. certifi is in requirements.txt beside discord.py, so
+# a bot without it is missing its libraries and stops on this import, saying
+# so, rather than connecting without its roots (#2736). Each SSL context made
+# from here on reads the variable.
 if not os.environ.get('SSL_CERT_FILE'):
-    try:
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
-        ssl.create_default_context()      # picked up on the next context made
-    except Exception:
-        pass
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 
 import discord
 
@@ -700,6 +698,17 @@ def thread_block(guild, ch):
 JOINS = os.path.join(DATA_DIR, 'joins.json')
 JOIN_FLOOR = _int_env('JOIN_NUMBER_FLOOR', 28)
 
+# HOW LONG A NUMBER IS KEPT (#2353). It was kept for ever, after its person
+# left too, and the privacy page did not name it. Decided by Patrick on 12
+# October: a keeping time for each store, enforced in code. A number is kept
+# while its person is in the Discord, and for JOIN_KEEP_DAYS after they leave,
+# so coming back within a year still keeps it; then it goes. 'left' in each
+# server's part of the record says when each numbered person was first seen
+# gone, in milliseconds. 'last' is never aged: it is a count, not a person,
+# and it is what stops a number being handed out twice.
+JOIN_KEEP_DAYS = 365
+JOIN_KEEP_EVERY = 60 * 60
+
 
 def _joins_read():
     """
@@ -745,6 +754,85 @@ def _joins_number(ids, member_id):
     return had if type(had) is int and had > 0 else None
 
 
+def joins_age(rec, now_ms, here):
+    """
+    Ages the record in place and returns (marked, dropped).
+
+    here is {server id as text: set of member ids as text} for each server
+    whose member list is whole. Somebody numbered there and not in it is
+    marked left at now_ms, unless already marked; somebody marked and in it
+    again is unmarked. Then, on every server, a number whose person left more
+    than JOIN_KEEP_DAYS ago goes with its mark. A mark that is not a time is
+    a corrupt one and is left as it is, with its number, rather than guessed
+    at. A server not in here (its list not whole, or the bot not in it) is
+    never marked, only aged.
+    """
+    cut = now_ms - JOIN_KEEP_DAYS * 86400000
+    marked = dropped = 0
+    for gid, g in rec.items():
+        if not isinstance(g, dict):
+            continue
+        ids = g.get('members')
+        if not isinstance(ids, dict):
+            continue
+        left = g.get('left')
+        if not isinstance(left, dict):
+            left = {}
+        if gid in here:
+            for k in ids:
+                if k not in here[gid] and k not in left:
+                    left[k] = now_ms
+                    marked += 1
+            for k in [k for k in left if k in here[gid]]:
+                del left[k]
+                marked += 1
+        for k in [k for k, t in left.items()
+                  if type(t) in (int, float) and t < cut]:
+            del left[k]
+            ids.pop(k, None)
+            dropped += 1
+        if left:
+            g['left'] = left
+        else:
+            g.pop('left', None)
+    return marked, dropped
+
+
+async def watch_join_numbers():
+    """
+    Marks who has left and drops the numbers past JOIN_KEEP_DAYS, as the bot
+    comes up and every JOIN_KEEP_EVERY seconds. On the event loop and not in
+    an executor, like arrival_number, so a join cannot write the record
+    between this reading and writing it. A record that cannot be read or
+    written is said in bot.log and left as it is; the next pass tries again.
+    Nothing in here may end the loop.
+    """
+    await client.wait_until_ready()
+    partial = set()
+    while not client.is_closed():
+        try:
+            here = {}
+            for gd in client.guilds:
+                if gd.chunked:
+                    here[str(gd.id)] = set(str(m.id) for m in gd.members)
+                    partial.discard(gd.id)
+                elif gd.id not in partial:
+                    partial.add(gd.id)
+                    log('join numbers: the member list of "%s" is not whole yet, '
+                        'so nobody there is marked as gone until it is' % gd.name)
+            rec = _joins_read()
+            marked, dropped = joins_age(rec, int(time.time() * 1000), here)
+            if marked or dropped:
+                _joins_write(rec)
+            if dropped:
+                log('join numbers: %d dropped, their people gone more than %d days'
+                    % (dropped, JOIN_KEEP_DAYS))
+        except Exception:
+            log('join numbers: could not age %s, so it is as it was until the '
+                'next pass:\n%s' % (JOINS, traceback.format_exc()))
+        await asyncio.sleep(JOIN_KEEP_EVERY)
+
+
 def joins_given(guild):
     """
     {member id: number} for everybody the record has numbered on this server,
@@ -783,6 +871,11 @@ def arrival_number(guild, member):
         had = _joins_number(ids, member.id)
         if had is not None:
             n, said = had, 'came back and keeps number %d' % had
+            left = g.get('left')
+            if isinstance(left, dict) and str(member.id) in left:
+                del left[str(member.id)]
+                rec[str(guild.id)] = g
+                _joins_write(rec)
         else:
             last = g.get('last')
             if type(last) is not int:
@@ -1987,21 +2080,20 @@ async def ensure_panel(guild):
     # channel. The server owner bypasses every overwrite, so /close looked
     # fine to the one person who could never have been blocked by it while
     # staff saw nothing at all. Named here rather than left to be discovered.
-    try:
-        blocked = []
-        for r in guild.roles:
-            if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
-                    or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
-                continue
-            if not getattr(ch.permissions_for(r), 'use_application_commands', True):
-                blocked.append(r.name)
-        if blocked:
-            log('%s cannot use /close in #%s: Use Application Commands is off '
-                'for them there. Turn it on in that channel\'s permissions. The '
-                'Close button on the ticket works for them either way.'
-                % (', '.join(blocked), ch.name))
-    except Exception:
-        pass
+    # Read from the cache with no request, so nothing here waits on Discord or
+    # throws: it is no longer in a try that dropped any error unsaid (#2736).
+    blocked = []
+    for r in guild.roles:
+        if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
+                or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
+            continue
+        if not getattr(ch.permissions_for(r), 'use_application_commands', True):
+            blocked.append(r.name)
+    if blocked:
+        log('%s cannot use /close in #%s: Use Application Commands is off '
+            'for them there. Turn it on in that channel\'s permissions. The '
+            'Close button on the ticket works for them either way.'
+            % (', '.join(blocked), ch.name))
 
     book = await log_channel(guild)
     if book is not None:
@@ -5060,23 +5152,22 @@ def ping_once(url, timeout=None):
             why = 'it answered %d' % code
         else:
             why = '%s: %s' % (type(e).__name__, getattr(e, 'reason', None) or e)
-    try:
-        if ok:
-            if _ping['down']:
-                log('uptime ping: the outside monitor hears from this bot again')
-            elif not _ping['ok_once']:
-                log('uptime ping: reached the outside monitor, and pings it every '
-                    '%ds while on Discord' % PING_EVERY)
-            _ping['down'] = False
-            _ping['ok_once'] = True
-        else:
-            if not _ping['down']:
-                log('uptime ping FAILED (%s). The outside monitor alerts if it '
-                    'hears nothing past its grace. Said once until it works '
-                    'again.' % _ping_scrub(why, url))
-            _ping['down'] = True
-    except Exception:
-        pass
+    # Only the log lines and the record of what was said, none of which
+    # throws, so they sit outside the try (#2736).
+    if ok:
+        if _ping['down']:
+            log('uptime ping: the outside monitor hears from this bot again')
+        elif not _ping['ok_once']:
+            log('uptime ping: reached the outside monitor, and pings it every '
+                '%ds while on Discord' % PING_EVERY)
+        _ping['down'] = False
+        _ping['ok_once'] = True
+    else:
+        if not _ping['down']:
+            log('uptime ping FAILED (%s). The outside monitor alerts if it '
+                'hears nothing past its grace. Said once until it works '
+                'again.' % _ping_scrub(why, url))
+        _ping['down'] = True
     return ok
 
 
@@ -5253,6 +5344,7 @@ async def on_ready():
         asyncio.create_task(watch_reports())
         asyncio.create_task(watch_moderation())
         asyncio.create_task(watch_known_issues())
+        asyncio.create_task(watch_join_numbers())
 
     log('up as %s' % client.user)
 
@@ -5424,7 +5516,7 @@ def apply_deletion_requests():
                 raise ValueError(OPEN_TICKETS + ' is not a JSON object')
     except (OSError, ValueError) as e:
         return said('the records could not be read (%s), so nothing was removed and the request waits for the next start' % type(e).__name__)
-    numbers = 0
+    numbers = marks = 0
     for g in joins.values():
         members = g.get('members') if isinstance(g, dict) else None
         if isinstance(members, dict):
@@ -5432,11 +5524,18 @@ def apply_deletion_requests():
                 if i in members:
                     del members[i]
                     numbers += 1
+        # And when they left (#2353), which is about them as much as the number.
+        left = g.get('left') if isinstance(g, dict) else None
+        if isinstance(left, dict):
+            for i in ids:
+                if i in left:
+                    del left[i]
+                    marks += 1
     gone = [k for k in tickets if k.split(':')[-1] in ids]
     for k in gone:
         del tickets[k]
     try:
-        if numbers:
+        if numbers or marks:
             _joins_write(joins)
         if gone:
             tmp = OPEN_TICKETS + '.tmp'

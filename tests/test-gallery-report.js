@@ -28,7 +28,7 @@
     - Play's GalleryCard has no Report or Manage chrome;
     - the Gallery page and NavGallery exist and Shell wires them;
     - a 403 with no why on a staff door is named as an old site;
-    - the words follow the house rules and the C# is C# 5.
+    - the words follow the house rules.
 
   Read only. It reads launcher\app\*.cs, launcher\ui.xaml and site\server.js.
 */
@@ -244,22 +244,13 @@ for (const door of ['/api/gallery/reports', '/api/gallery/report/dismiss']) {
   yes('nothing in the launcher calls ' + door, hits === 0);
 }
 
-// ---- words + C# 5 -----------------------------------------------------------
+// ---- words ------------------------------------------------------------------
 const words = literals(report) + '\n' + literals(submit) + '\n' +
               literals(body(SHELL, 'static void GallerySendChosen()')) + '\n' +
               literals(body(SHELL, 'static void OpenGalleryReport(Gallery.Shot shot)'));
 yes('no "player" in gallery copy', !/\bplayers?\b/i.test(words));
 yes('no em or en dash in gallery copy', !/[\u2013\u2014]/.test(words));
 yes('Thornswood is spelt Thornswood', !/ThornsWood/.test(words + GALLERY + XAML + SHELL));
-
-for (const [name, src] of [['Gallery.Report', report], ['Gallery.Submit', submit],
-                           ['Gallery.Trouble', trouble],
-                           ['BuildGalleryPage', body(SHELL, 'static void BuildGalleryPage()')],
-                           ['GallerySendChosen', body(SHELL, 'static void GallerySendChosen()')]]) {
-  yes(name + ' is C# 5: no interpolated strings', src.length > 0 && !/\$"/.test(src));
-  yes(name + ' is C# 5: no ?.', !/\?\./.test(src));
-  yes(name + ' is C# 5: no nameof, no out var', !/\bnameof\s*\(/.test(src) && !/\bout var\b/.test(src));
-}
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

@@ -732,7 +732,7 @@ if ($Bind -eq '127.0.0.1') {
 } elseif ($reachable) {
     Say "Voice is up at http://${VpsHost}:$Port" 'Green'
     Write-Host ''
-    Say 'Next:  .\Add-VoiceFeed.ps1   then  .\Publish-Server.ps1' 'Yellow'
+    Say 'The position feed is part of game\gamemode.js, so nothing else needs running for it.' 'Gray'
 } else {
     Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
     if ($reachWhy) { Say "  The last try to connect said: $reachWhy" 'Red' }

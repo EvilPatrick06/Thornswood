@@ -231,12 +231,28 @@ scripts\vps\Write-BotToken.ps1 1
 # call that does not throw. So site\server.js has no line below. The 52 left
 # are later work, each a catch that hides a failure; converting one lowers
 # its line.
-bot\bot.py 3
-bot\Build-Discord.py 5
-bot\Build-Onboarding.py 1
-bot\card.py 5
-site\public\home.js 9
-site\public\hub.js 5
-voice\gamemode-voice.js 6
-voice\load-voice.js 5
-voice\voice-server.js 13
+#
+# site\public went to none in the next #2736 pull request (19 Oct). The hub's
+# refresh after a staff action and the staff gallery read now say when they
+# fail, and Accept shows the site's refusal; home.js's localStorage catches
+# say in their braces why nothing more is done (the age cookie holds the
+# answer), and the rest were tries around calls that do not throw.
+#
+# voice\ went to none in the third (19 Oct). In voice-server.js every one was
+# a try around a call that does not throw (Sock.send and ping close the
+# socket themselves when a write fails, and a socket's write and destroy
+# report on its error event). load-voice.js counts a feed post the service
+# refused, an unreadable probe line and an unread /health in its result.
+# gamemode-voice.js was a copy of the gamemode's position feed that nothing
+# ran, so it went with the script that wrote it in; the feed's catches are
+# in game\gamemode.js, which #2784 is about.
+#
+# bot\ went to none in the fourth (19 Oct), so this section has no lines
+# left. Build-Discord.py names a role it could not move, a topic, old posts it
+# could not remove and a pin under "did not manage", and -Check no longer
+# moves roles. Build-Onboarding.py passes a refused read of the bot's own
+# member to its caller instead of reading it as no permissions. bot.py needs
+# certifi as it needs discord.py. card.py's font probes say in a comment on
+# the except line what they expect, and a glyph or avatar that will not draw
+# fails the card, which on_member_join logs. The rest were tries around code
+# that does not throw.

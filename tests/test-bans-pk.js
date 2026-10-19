@@ -44,9 +44,10 @@
      the menu puts a dead character in no slot, so that slot offers a new
      character, and will not play a dead or banned one.
   6. The launcher: Roster reads the site's pk and banned lists (the lifted C#
-     compiled with the .NET Framework csc), and Chars moves a dead character
-     out of its slot, never picks it and lets it be forgotten; and puts one an
-     admin brought back into the lowest free slot (RaiseRevived, compiled).
+     compiled with the build's compiler, tests/launcher-csc.js), and Chars
+     moves a dead character out of its slot, never picks it and lets it be
+     forgotten; and puts one an admin brought back into the lowest free slot
+     (RaiseRevived, compiled).
   7. Undoing a PK: /unpk in the game (by the character in the world, by name,
      by profile number), refused while every slot is held, refused to staff
      who are not an admin; Undo PK on the hub; pk.json keeps every PK and
