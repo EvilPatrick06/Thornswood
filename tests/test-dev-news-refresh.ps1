@@ -388,7 +388,7 @@ try {
     # already has that client runtime, as a real dev feed does, so this run does
     # not stage the six runtime files the stand-in game folder never had.
     $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    Put (Join-Path $pSite 'feed-dev\version.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","notice":1}}')
+    Put (Join-Path $pSite 'feed-dev\version.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","notice":1}}')
     Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
     function Publish([string[]]$extra) {
         $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
