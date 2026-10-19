@@ -77,6 +77,6 @@ the taking of one handle are in the server. The forge, the skyforge,
 and the smelter burn the grade the table above names, and nothing is
 taken when the grade or the handle is missing. The ingredient column
 on the recipe pages still omits the handle, because the plugin record
-does. A temper is refused at the grindstone and the armour table, and
-it is not counted as work. The 120% repair waits on the Weapon Kit and
+does. The grindstone and the armour table do not open, and a temper that
+reaches the server anyway is refused and not counted as work. The 120% repair waits on the Weapon Kit and
 the Armor Kit, which are not records in the plugin yet.

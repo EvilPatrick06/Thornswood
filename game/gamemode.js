@@ -26869,8 +26869,10 @@ function raceGate(actorId, row) {
      anyone  the professions page calls it open furniture, or it holds a recipe
              nobody owns, so it opens for everybody
      halves  each half that owns something here, at the LOWEST rank it owns
-             something at, because that is the rank the door asks for. */
-const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"novice","woodwright":"novice"},"name":"CraftingSmithingSharpeningWheel"},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","platewright":"novice"},"name":"CraftingSmithingArmorTable"},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
+             something at, because that is the rank the door asks for
+     shut    nothing can be made here by anybody (SHUT_BENCHES), and this is
+             what the gate says instead of opening it */
+const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingSharpeningWheel","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingArmorTable","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
 // ==== end BENCH_ACCESS ====
 
 /**
@@ -26891,6 +26893,11 @@ function benchGate(actorId, baseDesc) {
     return null;
   }
   const bench = BENCH_ACCESS[key];
+  // A bench nothing can be made at, by anybody, says why and does not open,
+  // so its menu never lists a thing (SHUT_BENCHES in Build-BenchTable.py: the
+  // sharpening wheel and the armour table, where tempering is cut, #1384).
+  // Asked before the character, because it is the same answer for everybody.
+  if (bench.shut) { return String(bench.shut); }
   if (bench.anyone) { return null; }
 
   const C = globalThis.__thornswoodCharacter;
@@ -44732,6 +44739,8 @@ log('gamemode loaded:',
     if (baseId === GOLD) { return true; }
     if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
+    // #2479: the cut rows (#1511) are held back the way a sword is.
+    if (isCutOut(baseId)) { return true; }
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
 
@@ -48308,9 +48317,13 @@ log('gamemode loaded:',
     Windwalker         +4 speed, through the tree's totals. The fall is the
                        game's own sum on your own machine, so the front plugin
                        holds its multiplier at nothing there.
-    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
-                       walk you, on your own machine, and no game setting
-                       changes that. What it should be is Patrick's (#1385).
+    Pack Mule          Being overloaded makes the game walk you, on your own
+                       machine, and no game setting changes that. So the
+                       engine fork's client keeps a list of characters the
+                       game does not hold to their carry weight (Patrick, 12
+                       Oct: the engine change), and the front plugin puts your
+                       own character on it while Pack Mule is held. Nothing
+                       here reads carry weight.
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -48394,9 +48407,8 @@ log('gamemode loaded:',
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
                          say: '+4 speed, and a fall deals no damage.' },
-    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
-                         say: 'Being overloaded does not slow you.',
-                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden',
+                         say: 'Being overloaded does not slow you.' },
     lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
                          say: 'An arrow ignores half the armour it hits.' }
   };
@@ -62880,7 +62892,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
     if (!j) { return 'No such journal.'; }
-    var body = String(text || '').slice(0, SOCIAL.pageChars);
+    /*
+      TOO LONG IS REFUSED, NOT CUT (#2563). A cut page was saved short and the
+      writer was never told. The panel holds the text box to pageChars and the
+      chat socket carries a page this long whole, so a longer one only comes
+      from a hand typed line, and it is told how long it is.
+    */
+    var body = String(text || '');
+    if (body.length > SOCIAL.pageChars) {
+      return 'That page is too long: ' + body.length + ' characters, and a page holds ' +
+             SOCIAL.pageChars + '. Nothing was saved.';
+    }
     var page = null;
     for (var i = 0; i < j.pages.length; i++) {
       if (j.pages[i].id === pageId) { page = j.pages[i]; break; }

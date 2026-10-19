@@ -284,7 +284,7 @@
             { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina.' },
             { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
             { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed, and a fall deals no damage.' },
-            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
+            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you.' },
             { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]
     },
