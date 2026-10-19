@@ -6894,9 +6894,12 @@ async function handle(req, res) {
        It used to answer yes whatever the write did, and a linked.json that
        will not read is never written over (#2180), so the launcher went on
        to a door that would turn the character away with no reason given. */
-    if (!putJson(LINKED, linked)) return sendJson(res, 503, { ok: false, why: 'not recorded', message:
-      'The site could not record this character against your account, so the game would not let it in. ' +
-      'Staff can see why in the site log. Try again later.' });
+    if (!putJson(LINKED, linked)) {
+      console.error('[thornswood-docs] check in for Discord ' + t.d + ' not recorded: linked.json was not written');
+      return sendJson(res, 503, { ok: false, why: 'not recorded', message:
+        'The site could not record this character against your account, so the game would not let it in. ' +
+        'Try again later, and tell staff if it keeps happening.' });
+    }
 
     return sendJson(res, 200, {
       ok: true,
