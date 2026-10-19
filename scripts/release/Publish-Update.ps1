@@ -207,10 +207,13 @@ if (-not (Test-Path -LiteralPath $DistDir)) {
 # do quietly.
 $OldDist = Join-Path $Root '_dist'
 if (Test-Path -LiteralPath $OldDist) {
-    $oldMb = 0
-    try { $oldMb = ((Get-ChildItem -LiteralPath $OldDist -Recurse -File -EA SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB) } catch { }
+    # A count for the person, never a reason to stop: what could not be read
+    # is said as an "at least" rather than left out of the number unsaid.
+    $oldUnread = @()
+    $oldMb = ([double](@(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum).Sum) / 1MB
     Write-Host ("  releases stage in $DistDir now, not in $OldDist") -ForegroundColor DarkGray
-    Write-Host ("  the old one still holds {0:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $oldMb) -ForegroundColor Yellow
+    Write-Host ("  the old one still holds {0}{1:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $(if ($oldUnread.Count) { 'at least ' } else { '' }), $oldMb) -ForegroundColor Yellow
+    if ($oldUnread.Count) { Write-Host ("  {0} part(s) of it could not be read to count: {1}" -f $oldUnread.Count, $oldUnread[0].Exception.Message) -ForegroundColor DarkGray }
 }
 
 # Profile\developer.flag was written here until 25 September, so the machine
@@ -253,8 +256,12 @@ $VersionFile = Join-Path $ReleaseDir 'version.json'
 # Skyrim they are looking at.
 function Get-SkyrimPath {
     $roots = @()
+    # Either key may be missing (Steam writes one or the other), so each is
+    # tested for, and a key without SteamPath names nothing.
     foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
-        try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+        if (-not (Test-Path -LiteralPath $k)) { continue }
+        $kp = Get-ItemProperty -LiteralPath $k
+        if ($kp.PSObject.Properties['SteamPath'] -and $kp.SteamPath) { $roots += ([string]$kp.SteamPath -replace '/', '\') }
     }
     foreach ($r in @($roots)) {
         $vdf = Join-Path $r 'config\libraryfolders.vdf'
@@ -708,23 +715,31 @@ function Read-Pending([string]$stateFile) {
     } catch { return $null }
 }
 
+# Each hands back '' when it did what it says, or a sentence saying what it
+# could not do (#2711): until 18 Oct both ran in a try with an empty catch, so
+# a note that was never written still let Done say the next run finishes this
+# release, and one that was never removed was left to name a release already
+# out. The caller says the sentence; the send it follows stands either way.
 function Write-Pending([string]$stateFile, [string]$id, [string]$why) {
     $f = Get-PendingFile $stateFile
-    if (-not $f) { return }
+    if (-not $f) { return 'there is no place to keep the note' }
     try {
         [ordered]@{
             id  = $id
             why = $why
             at  = (Get-Date).ToUniversalTime().ToString('s') + 'Z'
-        } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $f -Encoding UTF8
-    } catch { }
+        } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $f -Encoding UTF8 -ErrorAction Stop
+        return ''
+    } catch { return ("the note that would finish $id could not be written to ${f}: " + $_.Exception.Message) }
 }
 
 function Clear-Pending([string]$stateFile) {
     $f = Get-PendingFile $stateFile
     if ($f -and (Test-Path -LiteralPath $f)) {
-        try { Remove-Item -LiteralPath $f -Force } catch { }
+        try { Remove-Item -LiteralPath $f -Force -ErrorAction Stop }
+        catch { return ("$f, the note of an unfinished release, could not be removed: " + $_.Exception.Message) }
     }
+    return ''
 }
 # ==== end thornswood publish resume ====
 
@@ -2547,11 +2562,12 @@ if (-not $NoPush) {
 }
 
 # THE BASELINE MOVES ONLY WHEN THE RELEASE IS REALLY OUT.
+$pendingWhy = ''
 if ($pushFailed) {
-    Write-Pending $StateFile $Id $pushFailed
+    $pendingWhy = Write-Pending $StateFile $Id $pushFailed
 } else {
     Save-State
-    Clear-Pending $StateFile
+    $pendingWhy = Clear-Pending $StateFile
     Send-Baseline $Id
     # What Ship tags, and only once the feed is on the VPS (#444). Global, the
     # way Publish-Discord hands back its result, because Ship runs this script
@@ -2565,14 +2581,24 @@ if ($pushFailed) {
     Say "NOT SHIPPED. $pushFailed" 'Red'
     Say 'The assets are on the site but version.json is not, so no launcher' 'Red'
     Say 'will see this update. Fix the line above and run Ship again.' 'Red'
-    Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
-    Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
+    if ($pendingWhy) {
+        Say "The baseline was NOT moved, but $pendingWhy." 'Red'
+        Say "So the next run starts a new release instead of finishing $Id; its assets" 'Red'
+        Say "stay on the site unnamed. To finish it, run this script again with -Id $Id." 'Red'
+    } else {
+        Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
+        Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
+    }
 }
 elseif ($NoPush) {
     Say "-NoPush: $Id was not sent, so no launcher will see it." 'Yellow'
 }
 else {
     Say "Everyone's launcher will offer update $Id on next start." 'Green'
+    if ($pendingWhy) {
+        Say "But $pendingWhy." 'Red'
+        Say "It names a release that is out now: delete it before the next Ship, or that Ship goes out under $Id again." 'Red'
+    }
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

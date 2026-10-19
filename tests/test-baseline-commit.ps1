@@ -39,7 +39,7 @@ function Yes([string]$what, [bool]$ok) {
 
 $m = [regex]::Match($src, '(?s)# ==== thornswood baseline send ====.*?# ==== end thornswood baseline send ====')
 Yes 'the baseline send block is in Publish-Update.ps1' $m.Success
-Yes 'it runs after the release is saved' ($src -match '(?s)Save-State\s+Clear-Pending \$StateFile\s+Send-Baseline \$Id')
+Yes 'it runs after the release is saved' ($src -match '(?s)Save-State\s+\$pendingWhy = Clear-Pending \$StateFile\s+Send-Baseline \$Id')
 $send = [regex]::Match($src, '(?s)# ==== thornswood feed send ====.*?# ==== end thornswood feed send ====')
 Yes 'the feed send block is in Publish-Update.ps1' $send.Success
 if ($send.Success) {
@@ -49,7 +49,7 @@ if ($send.Success) {
     $feedAt = $b.IndexOf("Send-FeedStore `$Channel `$ReleaseDir `$feedFiles")
     $listAt = $b.IndexOf("`$feedFiles = @('version.json')")
     Yes 'the feed goes to the VPS before the baseline moves' ($listAt -ge 0 -and $listAt -lt $feedAt -and $feedAt -lt $b.IndexOf('Save-State'))
-    Yes 'and a feed that did not go leaves the baseline where it was, with a note to finish it' ($b -match '(?s)if \(\$pushFailed\) \{\s+Write-Pending')
+    Yes 'and a feed that did not go leaves the baseline where it was, with a note to finish it' ($b -match '(?s)if \(\$pushFailed\) \{\s+\$pendingWhy = Write-Pending')
 }
 Yes 'nothing in Publish-Update commits or pushes a baseline any more' (-not ($src -match 'git -C \$ReleaseDir (add|commit|push|pull)'))
 

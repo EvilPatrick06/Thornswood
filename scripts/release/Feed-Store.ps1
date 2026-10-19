@@ -352,7 +352,9 @@ if ($op -eq 'swap') {
       }
       # releases.txt (#444): one line a release, tab separated, its id first,
       # then channel, launcher, packs, baseline, commit, tag, so its one name
-      # finds the rest. Never a reason to fail a send that has already landed.
+      # finds the rest. Never a reason to fail a send that has already landed,
+      # so a line that could not be added is said (NOTE|, which Send-FeedStore
+      # prints) and the send goes on.
       try {
         $rd = ((ReadShared $p) -replace '^\uFEFF', '') | ConvertFrom-Json
         if ($rd.PSObject.Properties['release'] -and $rd.release -and [string]$rd.release.id) {
@@ -364,7 +366,7 @@ if ($op -eq 'swap') {
           $hadR = @(); if (Test-Path -LiteralPath $rel) { $hadR = @(Get-Content -LiteralPath $rel | ForEach-Object { ($_ -split "`t")[0] }) }
           if ($hadR -notcontains $f[0]) { Add-Content -LiteralPath $rel -Value ($f -join "`t") -Encoding ASCII }
         }
-      } catch { }
+      } catch { 'NOTE|' + $prefix + '\releases.txt was not given this release''s line: ' + ($_.Exception.Message -replace '[\r\n|]+', ' ') }
     }
     'SENT|' + $n + '|' + (Sha $p)
   }
@@ -577,6 +579,11 @@ function Send-FeedStore([string]$Channel, [string]$Dir, [string[]]$Files, [strin
     $short = @($lines | Where-Object { $_ -like 'SHORT|*' })
     if ($short.Count) { throw ("A file did not arrive whole (" + $short[0].Substring(6) + "). Nothing was replaced. Run it again.") }
     if ($lines -notcontains 'DONE') { throw ("The VPS did not confirm the send: " + (($lines | Select-Object -Last 3) -join ' ').Trim() + ". Nothing is known to have been replaced; run it again.") }
+    # What the swap could not do after the feed landed (releases.txt), said
+    # here; the send itself stands.
+    foreach ($n in @($lines | Where-Object { $_ -like 'NOTE|*' })) {
+        Write-Host ('  NOTE: the feed went out, but ' + $n.Substring(5) + '. That file is the store''s list of releases by id (Release-Name.ps1), and Get-FeedStoreReleases will not name this one.') -ForegroundColor Yellow
+    }
     $sent = @(); $same = @()
     foreach ($l in $lines) {
         $p = $l.Split('|')

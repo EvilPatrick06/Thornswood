@@ -585,6 +585,32 @@ Yes '  and its record names none of Bethesda''s or one machine''s files' (@($rbR
 [void](Update $synced 'feed-dev')
 Yes '  and the synced install follows it to the older texture' ((Get-Game $synced)['Data\Platform\textures\ours.dds'] -eq 'a texture of ours, older')
 
+# ---- a baseline the other feed names that does not read (#2711) ------------------------
+# Before it deletes, a run reads both feeds' baselines for the files their
+# records name. The other feed's was read in a try with an empty catch, so a
+# pointer that did not read left those files unnamed, and they went. Now the
+# run stops there, before anything is deleted.
+Write-Host ''; Write-Host 'Scrub-Feed.ps1 -Channel dev, with the main feed''s baseline unreadable'
+$mainFeedPath = Join-Path $site 'feed\version.json'
+$mainFeedWas = [IO.File]::ReadAllText($mainFeedPath)
+$ledgerPath = Join-Path $work 'scrub-ledger.json'
+$ledgerWas = $(if (Test-Path -LiteralPath $ledgerPath) { [IO.File]::ReadAllText($ledgerPath) } else { $null })
+$stray = Put-Text $da 'a file only a ledger names, while the main baseline does not read'
+$led = [ordered]@{}
+if ($ledgerWas) { foreach ($p in (ConvertFrom-Json $ledgerWas).PSObject.Properties) { $led[$p.Name] = [string]$p.Value } }
+$led[$stray] = 'stand-in for a replaced file'
+[IO.File]::WriteAllText($ledgerPath, ($led | ConvertTo-Json -Depth 3), (New-Object Text.UTF8Encoding($false)))
+$mf = ConvertFrom-Json $mainFeedWas
+if ($mf.PSObject.Properties['baseline']) { $mf.baseline = [pscustomobject]@{ id = 'no-sha-no-url' } }
+else { $mf | Add-Member -NotePropertyName 'baseline' -NotePropertyValue ([pscustomobject]@{ id = 'no-sha-no-url' }) }
+[IO.File]::WriteAllText($mainFeedPath, ($mf | ConvertTo-Json -Depth 20), (New-Object Text.UTF8Encoding($false)))
+$r = Scrub 'dev' @()
+Yes 'the run stops, saying the main feed''s baseline does not read' ($r.Code -ne 0 -and $r.Out -match 'The main feed names a baseline that does not read' -and $r.Out -match 'Nothing was deleted')
+Yes '  and deletes nothing' (Test-Path -LiteralPath (Join-Path $da $stray))
+[IO.File]::WriteAllText($mainFeedPath, $mainFeedWas, (New-Object Text.UTF8Encoding($false)))
+if ($null -ne $ledgerWas) { [IO.File]::WriteAllText($ledgerPath, $ledgerWas, (New-Object Text.UTF8Encoding($false))) } else { Remove-Item -LiteralPath $ledgerPath -Force }
+Remove-Item -LiteralPath (Join-Path $da $stray) -Force
+
 # ---- the delete itself -----------------------------------------------------------------
 Write-Host ''; Write-Host 'Remove-FeedStoreAssets'
 $loose = Put-Text $da 'a stray file nothing names'
