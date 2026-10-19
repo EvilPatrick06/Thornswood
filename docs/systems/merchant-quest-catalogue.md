@@ -238,7 +238,8 @@ operational steps after their source prerequisites are complete.
 The four published scene IDs and their full authored hashes are pinned in
 `merchant-quest-activation.json`. Published definitions are immutable; new
 deeds or rewards need new IDs while the old definitions remain available
-for accepted work. Only these four IDs enter the hot-reload bundle.
+for accepted work. These are the four scene IDs admitted to the hot-reload bundle;
+the ten commissions have their separate permanent publication contract above.
 
 At acceptance, the server reserves the original reward in the same character
 property transaction as its objective and copied terms. At completion,
@@ -256,7 +257,7 @@ reservation, without releasing a different job's token or removing payout
 history. Structurally corrupt payment evidence refuses changes and needs
 trusted staff recovery; it is never erased or rebuilt by a retry.
 
-There are at most three open expanded jobs. This first runtime section has
+There are at most three open expanded combat jobs. This first runtime section has
 20 owned target references in total, including the14 legacy references. The
 complete representative character property with three original-term jobs,
 all20 maximum-generation histories,23 legacy cooldowns, the largest valid
