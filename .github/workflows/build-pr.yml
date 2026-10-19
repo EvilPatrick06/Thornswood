@@ -219,6 +219,13 @@ jobs:
           & python scripts/dev/Build-MerchantRoleTables.py --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Check the join number's keeping time
+        shell: pwsh
+        run: |
+          # Issue #2353: joins_age lifted out of bot\bot.py, no discord.py needed.
+          & python tests/test-2353-join-keeping.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
       - name: Run the harnesses that went red unseen
         shell: pwsh
         run: |
@@ -343,6 +350,13 @@ jobs:
           # session's alert stays) and a Discord sign-in no longer sets the
           # member cookie tw; test-chat-log.js holds the hourly chat prune.
           # A second.
+          # Issue #2353: tests\test-2353-keeping-times.js holds a keeping
+          # time for every store the privacy page names: the site's rules on
+          # their own, a scratch site that ages each store as it comes up
+          # (inbox, bans, PKs, notes, its moderation.log, gallery reports and
+          # the gallery queue with its files), the game server's moderation.log
+          # and door.log, and the page saying each time. A few seconds.
+          # tests\test-2353-join-keeping.py holds the bot's join number.
           # Issue #2183: tests\test-2183-availability.ps1 holds
           # Read-Availability.ps1, the reader of the watchdog's down and back
           # lines, to its counting on made-up lines, under pwsh and Windows
@@ -617,6 +631,7 @@ jobs:
                  'test-2351-wipe-registers.ps1',
                  'test-2758-start-deletions.js',
                  'test-2166-retention-fixes.js',
+                 'test-2353-keeping-times.js',
                  'test-2166-kept-chat-and-logs.js',
                  'test-missing-files-stop.ps1',
                  'test-ship-launcher-drift.ps1',
