@@ -244,13 +244,20 @@ The switch-over, the last step. It waits on three things, in this order:
 1. GitHub's hosted runner has usage that month. Patrick is not raising the
    Actions budget (#2393, 15 Oct): hosted first, the VPS when hosted has none.
    `BUILD_RUNNER` still read `vps` on 16 Oct, so no workflow tries hosted
-   unless a manual run asks for it.
+   unless a manual run asks for it. Measured again 18 Oct, 9:02 PM MT (run
+   39192804622, pilot tag `v0.0.2163-pilot2` on main): GitHub still refused
+   the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
    `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
-   with `-f expected_sha=<commit>` added when the tag is not on main (a
-   pilot tag usually is not). Without it `Resolve-ReleaseTag.ps1` refuses a
-   tag whose commit is not on main, and the run stops before it builds.
+   with `-f expected_sha=<commit>` added when the tag is not on main.
+   Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
+   main, and the run stops before it builds. A tag on main's own commit
+   needs no `expected_sha`. Pushing the tag starts the usual VPS build: let
+   it finish, never cancel it. Cancelling a VPS job during its checkout
+   leaves git lock files in that runner's workspace and every later job
+   there fails (#2751, 18 Oct). The hosted run then uploads into that one
+   draft and writes its notes again for its own files.
    The hosted job's log says "building with MSBuild on a github-hosted
    runner", then the Azure sign in, then "signed by" the ThornswoodRelease
    certificate; `verify` passes; the draft's notes say signed. Then the
