@@ -537,7 +537,8 @@ Yes "Artifact.ps1 names the store ($storeLine)" ($storeLine -eq 'C:/Thornswood-D
 $siteSrc = Get-Content -LiteralPath (Join-Path $Repo 'site\server.js') -Raw
 Yes "the site reads current\ in that store by default" ($siteSrc.Contains('process.env.THORNSWOOD_DEPLOYS_DIR || ''C:\\Thornswood-Deploys\\current'''))
 $docsSrc = Get-Content -LiteralPath (Join-Path $Repo 'scripts\deploy\Deploy-Docs.ps1') -Raw
-Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('C:\Thornswood-Deploys\current', '(OI)(NP)R')"))
+# Named from the folder the site's root is in, C: on the box (#1273).
+Yes "Deploy-Docs grants the site's account read on it" ($docsSrc.Contains("@('`$boxWin\Thornswood-Deploys\current', '(OI)(NP)R')"))
 
 
 foreach ($rel in @('scripts\deploy\Deploy-Docs.ps1', 'scripts\deploy\Install-Voice.ps1')) {
