@@ -44,10 +44,11 @@ try {
     $locked=Join-Path $Scratch 'compressed\Vortex\state.v2\MANIFEST-000002'
     $handle=[IO.File]::Open($locked,[IO.FileMode]::Open,[IO.FileAccess]::ReadWrite,[IO.FileShare]::None)
     try{Check 'compressed' $null 'Thornswood' $true}finally{$handle.Dispose()}
-    # Compile the same helper with the launcher's C# 5 compiler as well.
-    $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    # Compile the same helper at C# 5 as well: scripts\mods\LoadOrder.ps1
+    # loads this file with Add-Type, which in Windows PowerShell is the .NET
+    # Framework compiler and stops at C# 5 (Developer-Guide.md, Settled design).
     $dll=Join-Path $Scratch 'VortexProfileState.dll'
-    & $LauncherCsc /noconfig /nologo /target:library "/langversion:$LauncherLangVersion" ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
+    & $LauncherCsc /noconfig /nologo /target:library "/langversion:5" ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
     if($LASTEXITCODE -or -not(Test-Path -LiteralPath $dll)){throw 'Framework compilation failed'}
     Write-Host ($count.ToString()+' profile cases and framework compilation passed')
 } finally {$env:APPDATA=$oldAppData}

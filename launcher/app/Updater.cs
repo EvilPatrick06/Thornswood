@@ -10,7 +10,7 @@ namespace Thornswood
 {
     static partial class Updater
     {
-        public const string Version = "1.2.4";
+        public const string Version = "1.2.5";
 
         /// <summary>
         /// The collection revision the last feed named, or 0 when it named
@@ -88,6 +88,19 @@ namespace Thornswood
             // plain header, and a compressed feed is a quarter of the size.
             public DateTime Since = DateTime.MinValue;
             public bool Gzip;
+            // The status of the last answer that WebClient returned from
+            // rather than threw on, which is every 2xx. 200 and 204 are both
+            // success to it and DownloadData gives back bytes either way (an
+            // empty array for 204), so a caller that has to tell them apart
+            // reads this (#2636). 0 until an answer arrives.
+            public int Status;
+            protected override WebResponse GetWebResponse(WebRequest request)
+            {
+                var r = base.GetWebResponse(request);
+                var h = r as HttpWebResponse;
+                if (h != null) Status = (int)h.StatusCode;
+                return r;
+            }
             protected override WebRequest GetWebRequest(Uri address)
             {
                 var r = base.GetWebRequest(address);
@@ -262,8 +275,9 @@ namespace Thornswood
         /// <summary>
         /// Long-poll /feed/watch with the ETag of the copy already in hand
         /// (#2440). True when the tip says the feed moved (HTTP 200); false
-        /// when the wait timed out unchanged (HTTP 204). Throws when the tip
-        /// cannot be reached, so the caller backs off and tries again.
+        /// when the wait ran out unchanged (HTTP 204). Throws when the tip
+        /// cannot be reached, gives no answer in time, or answers anything
+        /// else, so the caller says so in launcher.log and backs off.
         /// </summary>
         public static bool WaitForFeedChange(Config cfg)
         {
@@ -283,31 +297,43 @@ namespace Thornswood
                 && string.Equals(have.Url, FeedUrl(cfg), StringComparison.Ordinal))
                 tag = have.Etag.Trim();
 
-            // The tip holds the socket for up to fifty seconds on the site.
-            // Ten seconds (Quick's default) would make every quiet tip look
-            // like a failure and hammer reconnects.
-            using (var wc = Client(cfg, false, tip))
+            // The tip holds the socket for fifty seconds on the site and then
+            // answers 204 (measured 18 Oct: 204 after 50.7 s). Sixty here, so
+            // the site's own answer always arrives first; Quick's default ten
+            // would cut every quiet wait off before the site could answer.
+            return Tip(cfg, tip, tag, 60000);
+        }
+
+        /// <summary>
+        /// The long-poll request itself, apart from CheckUrl so a test can
+        /// point it at a server of its own (tests\test-2636-feed-watch-quiet.ps1),
+        /// the way Conditional is apart from FromSite.
+        ///
+        /// The site answers 200 when the feed moved and 204 when its wait ran
+        /// out unchanged. WebClient treats every 2xx as success: DownloadData
+        /// returns for a 204 with an empty array and never throws. Until #2636
+        /// this read any return from DownloadData as "moved" and looked for the
+        /// 204 in the catch, where it never arrives, so every quiet fifty
+        /// second wait ran a full update check, about seventy an hour for each
+        /// open launcher (Djinn's launcher.log, 17 Oct). The status is read
+        /// off the answer instead. A client timeout used to be read as
+        /// "unchanged" too; the site always answers inside the wait, so no
+        /// answer is a fault, and it now throws like any other.
+        /// </summary>
+        static bool Tip(Config cfg, string tip, string tag, int ms)
+        {
+            using (var q = (Quick)Client(cfg, false, tip))
             {
-                var q = wc as Quick;
-                if (q != null) { q.Ms = 60000; q.Gzip = true; }
-                if (tag.Length > 0) wc.Headers["If-None-Match"] = tag;
-                try
-                {
-                    wc.DownloadData(tip);
-                    // 200: feed moved, or the tip had no prior tag to compare.
-                    return true;
-                }
-                catch (WebException wex)
-                {
-                    HttpWebResponse resp = wex.Response as HttpWebResponse;
-                    if (resp != null && (int)resp.StatusCode == 204)
-                        return false;
-                    // A quiet tip that hits the client timeout is "unchanged,
-                    // try again", not a hard fail.
-                    if (wex.Status == WebExceptionStatus.Timeout)
-                        return false;
-                    throw WrapFeedFail(wex, true);
-                }
+                q.Ms = ms;
+                q.Gzip = true;
+                if (tag.Length > 0) q.Headers["If-None-Match"] = tag;
+                try { q.DownloadData(tip); }
+                catch (WebException wex) { throw WrapFeedFail(wex, true); }
+                // 200: the feed moved, or there was no tag to compare.
+                if (q.Status == 200) return true;
+                // 204: the wait ran out and the feed is as it was.
+                if (q.Status == 204) return false;
+                throw new Exception("The update feed tip answered HTTP " + q.Status + ", which says neither that the feed moved nor that it did not.");
             }
         }
         /// <summary>

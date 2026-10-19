@@ -1191,7 +1191,7 @@
   */
   function lineHand(id) {
     const from = lineId;
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',{quiet:true});}catch(e){}');
     log('menu: profile', from, 'hands its place in line to profile', id);
     lineStart(id, null);
   }
@@ -1256,15 +1256,15 @@
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
-      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',{quiet:true});}catch(e){}');
     }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",{quiet:true});}catch(e){}');
   }
 
   /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",{quiet:true});}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
@@ -2797,11 +2797,11 @@
   const toServer = [];
 
   /*
-    The true after the line marks it as the plugin's own, so the chat page
-    queues it without saying "Not connected yet" over it. Patrick, 24
-    September, over a tester in the creation hall who had typed nothing: "it
-    says mulitple trimes he wasnt connected yet". A page from before the
-    marker ignores it and says what it always said.
+    say marks every line as pressed rather than typed (#2251, #2732), and
+    quiet asks the chat page to queue it without saying "Not connected yet"
+    over it. Patrick, 24 September, over a tester in the creation hall who
+    had typed nothing: "it says mulitple trimes he wasnt connected yet". The
+    two are separate answers in thornswood-chat.js (TWO ANSWERS, over send).
   */
   function tellServer(line) {
     if (line) { toServer.push(line); }
@@ -2809,7 +2809,7 @@
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',{quiet:true});}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -4292,15 +4292,21 @@
   /*
     Resolved a slice at a time as well (#976): sixty odd lookups in one frame
     is its own hitch. fireIdAt is how far through FIRE_BASES the resolving
-    has got and fireIdOut what it has found so far. A pass that finds nothing
-    at all is the world not being up yet, and it is not tried again for
-    FIRE_IDS_RETRY, so a world that never answers costs a slice every few
-    seconds rather than one every frame.
+    has got and fireIdOut what it has found so far.
+
+    ONE PASS, AND ITS ANSWER STANDS (#2590, 16 Oct). Only the walk resolves,
+    and the walk starts only once somebody stands in a cell. Skyrim reads
+    every plugin's records before its main menu, so by then each base either
+    exists or never will this session: there is nothing for a second pass to
+    wait for. The pass that found nothing used to be asked again every
+    FIRE_IDS_RETRY (4 s), in case "the world" was "not up yet"; nothing was
+    ever measured behind that, and both sessions in the front logs on One
+    (5 and 15 Oct) resolved 67 of 67 on the first pass. A pass that finds
+    none now says so once, with the first error, and the probe stands down
+    for the session rather than asking again.
   */
   let fireIdAt = 0;
   let fireIdOut = [];
-  let fireIdFailedAt = 0;
-  const FIRE_IDS_RETRY = 4000;
 
   /** The runtime ids of FIRE_BASES, or [] until the walk has resolved them. */
   function fireIdList() {
@@ -4314,7 +4320,6 @@
    */
   function resolveFireIds(from) {
     if (fireIds) { return fireIds; }
-    if (fireIdAt === 0 && fireIdFailedAt && Date.now() - fireIdFailedAt < FIRE_IDS_RETRY) { return []; }
     let did = 0;
     while (fireIdAt < FIRE_BASES.length) {
       if (did > 0 && sliceNow() - from >= FIRE_SLICE_MS) { return []; }
@@ -4340,14 +4345,13 @@
     const out = fireIdOut;
     fireIdAt = 0;
     fireIdOut = [];
-    // Nothing at all means the world is not up yet, so it is worth asking
-    // again rather than remembering an empty answer for the session.
-    if (!out.length) { fireIdFailedAt = Date.now(); return []; }
     fireIds = out;
     fireWant = {};
     for (let i = 0; i < out.length; i++) { fireWant[out[i]] = true; }
     log('fires: ' + out.length + ' of ' + FIRE_BASES.length +
-        ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)');
+        ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)' +
+        (out.length ? '' : ', so no fire warms or burns anybody this session' +
+          (fireWhy ? '; the first one threw: ' + fireWhy : '')));
     return fireIds;
   }
 
@@ -4377,23 +4381,39 @@
     deal.
   */
   /*
-    HOW LONG AN EMPTY WALK IS BELIEVED.
+    WHEN A WALK IS BELIEVED: ONCE THE CELL HAS SAID IT IS IN (#2590).
 
-    fireHere = [] is truthy in JavaScript. The first version cached an empty
-    list the same way it cached a full one, so the first probe after a cell
-    change that found nothing (bases not resolved yet, cell not fully loaded,
-    or a forge room whose FX had not appeared) was the answer for the rest of
-    the stay. Patrick, #608: chilly standing in a burning forge, no warmth
-    next to one. A non-empty list is still kept for the cell; an empty one is
-    retried until something shows up or FIRE_EMPTY_RETRY has not yet run out
-    since the last empty walk with bases already resolved.
+    A cell is walked when somebody first stands in it. If it has not finished
+    loading by then, the walk can miss what is still coming in, so when the
+    engine says the cell underfoot is fully loaded (cellFullyLoaded, the event
+    behind Papyrus's OnCellLoad, "every object in this cell is loaded and
+    ready") it is walked again, and that walk's list is kept for the stay,
+    empty or not. A cell that had finished loading before anybody stood in it
+    (an exterior cell loads with the grid around you, ahead of you) sends
+    nothing more, and its first walk is the one kept.
+
+    This replaces a retry on a clock. #608 (27 Sep) kept a full list for the
+    cell and walked an empty one again every FIRE_EMPTY_RETRY (8 s) for as
+    long as it stayed empty, against "bases not resolved yet, cell not fully
+    loaded, or a forge room whose FX had not appeared", none of it measured.
+    What the front logs on One show (5 and 15 Oct): the first walk of the
+    race menu room looked at 49 things and the ones 11 s later at 58, so a
+    walk does run before a cell is in; and every walk of a cell already
+    walked found as many fires as the first one had (five walks of one room
+    found 0 each time, two of an exterior cell 0, and others 4 and 4, 11 and
+    11, 6 and 6). The retry only ever walked empty rooms again, and a full
+    list from a walk run too soon was never redone at all.
   */
-  const FIRE_EMPTY_RETRY = 8000;
-  let fireEmptyAt = 0;
   // The walk under way, { cell, t, i, n, walked, out }, or null. See
   // walkCellSlice. The 'fire walk' handler below the place tick carries it on
-  // a slice a frame; the place tick reads whatever list is finished.
+  // a slice a frame; the place tick reads whatever list is finished. While a
+  // cell is walked again, the list from its first walk stands until the new
+  // one is done.
   let fireWalk = null;
+
+  function newFireWalk(cellId) {
+    return { cell: cellId, t: 0, i: 0, n: -1, walked: 0, out: [] };
+  }
 
   function fireSpotsHere(pc) {
     let cellId = 0;
@@ -4402,23 +4422,14 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireEmptyAt = 0; fireWalk = null; }
-    // A non-empty list is good for the cell. An empty one is not final.
-    if (fireHere && fireHere.length) { return fireHere; }
-    if (fireHere && fireHere.length === 0) {
-      const ready = fireIdList().length > 0;
-      if (ready && (Date.now() - fireEmptyAt) < FIRE_EMPTY_RETRY) {
-        return fireHere;
-      }
-      fireHere = null;
-    }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireWalk = null; }
     if (!cell) { return []; }
 
-    // Start a walk, or carry the one under way on by a slice, and answer
-    // with what is known now: nothing until the walk is done, which is a
-    // few frames in a busy cell.
-    if (!fireWalk) { fireWalk = { cell: cellId, t: 0, i: 0, n: -1, walked: 0, out: [] }; }
-    fireWalkStep(cell);
+    // Start the cell's walk, or carry the one under way on by a slice, and
+    // answer with what is known now: nothing until the first walk is done,
+    // which is a few frames in a busy cell.
+    if (!fireHere && !fireWalk) { fireWalk = newFireWalk(cellId); }
+    if (fireWalk) { fireWalkStep(cell); }
     return fireHere || [];
   }
 
@@ -4434,6 +4445,8 @@
       if (!fireIds) { return; }
     }
     fireBases = fireIds.length;
+    // No base resolved: there is nothing to look for in any cell.
+    if (!fireIds.length) { fireWalk = null; fireHere = []; fireHits = 0; return; }
     const done = walkCellSlice(cell, w, fireWant, function (e) {
       fireThrew++;
       if (!fireWhy) { fireWhy = String((e && e.message) || e); }
@@ -4444,7 +4457,6 @@
     fireWalk = null;
     fireHere = w.out;
     fireHits = w.out.length;
-    if (!w.out.length) { fireEmptyAt = Date.now(); }
     // fireWalked, not walked: naming the walk's own counter here threw on
     // every cell change from #184 on, 80 times in the dev log of 23
     // September, and the place report for that tick never went.
@@ -4467,6 +4479,24 @@
       if (!cell || cell.getFormID() !== fireWalk.cell) { fireWalk = null; return; }
     } catch (e) { fireWalk = null; return; }
     fireWalkStep(cell);
+  }
+
+  /**
+   * The 'fire cell loaded' handler, on cellFullyLoaded. Only the cell
+   * somebody is standing in, and only once it has been walked or is being
+   * walked: a cell that finishes loading before anybody stands in it is
+   * walked whole when they do. The line says what the walk before it had
+   * seen, so the log shows what loading late cost.
+   */
+  function fireCellLoaded(event) {
+    let id = 0;
+    try { id = (event && event.cell) ? event.cell.getFormID() : 0; } catch (e) { id = 0; }
+    if (!id || id !== fireCell) { return; }
+    log('fires: cell ' + id.toString(16) + ' finished loading after it was walked (' +
+        (fireHere ? fireHere.length + ' of ours, out of ' + fireWalked + ' thing(s) looked at'
+                  : 'that walk was not done, at ' + fireWalked + ' thing(s)') +
+        '), so it is walked again');
+    fireWalk = newFireWalk(id);
   }
 
   // Runtime ids of the 'craft' rows: warmth only, never the catch (#2259).
@@ -4566,6 +4596,8 @@
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
   sp.on('update', guard('fire walk', fireWalkTick));
+  // The cell underfoot finished loading after its walk: walk it again (#2590).
+  sp.on('cellFullyLoaded', guard('fire cell loaded', fireCellLoaded));
 
   sp.on('update', guard('place', () => {
     const now = Date.now();
@@ -5142,7 +5174,8 @@
     if (!lookingAt) { return false; }
     const line = '/' + cmd + ' ' + lookingAt;
     if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
-    // These are deliberate actions; chat reports an offline queued request.
+    // These are deliberate actions: say marks the line as a key press, and
+    // with no quiet the chat says when it is queued offline (#2732).
     const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
       'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
       'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');
@@ -9620,14 +9653,16 @@
     nothing however far the fall, for this character and nobody else.
 
     TIRELESS. Running costs nothing in this game and neither does a plain
-    swing. A sprint and a power attack do, and both are the game's own sums
-    from game settings (Skyrim.esm, overridden by nothing in the load order;
-    skymp5-server's attack costs are SweetPie's only, and this server does
-    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
-    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
-    weapon's weight for a power attack. Each is held at half while Tireless
-    is held. These have no second set for everybody else, so an NPC this
-    machine runs pays half as well; #1385 says so for Patrick.
+    swing. A sprint, a power attack and a shield bash do, and each is the
+    game's own sum from game settings (Skyrim.esm, overridden by nothing in
+    the load order; skymp5-server's attack costs are SweetPie's only, and
+    this server does not load SweetPie): fSprintStaminaDrainMult for a
+    sprint, fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack, and fStaminaBashBase and
+    fStaminaPowerBashBase for a bash and a power bash. A bash counts as a
+    swing (Patrick, 12 Oct: one rule for every attack). Each is held at half
+    while Tireless is held. These have no second set for everybody else, so
+    an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
     PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
     game setting changes that; #1385 has it for Patrick.
@@ -9646,7 +9681,10 @@
   /* perk -> { game setting: the share of the game's own value it is held at }. */
   const PERK_SETTINGS = {
     windwalker: { fJumpFallHeightMult: 0 },
-    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+    tireless: {
+      fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5,
+      fStaminaBashBase: 0.5, fStaminaPowerBashBase: 0.5
+    }
   };
 
   let perksHeld = {};               // perk -> true, the view's list

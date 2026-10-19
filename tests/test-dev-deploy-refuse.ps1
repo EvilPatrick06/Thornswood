@@ -66,7 +66,7 @@ function Run-Block([string]$value, $settings, [string]$npcValue = '') {
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
     $lightTable = ''
-    $boxRecord = Join-Path $tmp 'server-build.json'
+    $devRecordLight = $false
     $VoicePort = 7789
     $maxOnline = 0
     $seats = 0
@@ -107,6 +107,31 @@ try {
 
     $r = Run-Block '' $base
     Yes 'no switch on a box without it adds nothing' (-not ($r.after.PSObject.Properties.Name -contains 'thornswoodLoadOrderRefuse'))
+
+    # #2711: the block read the byte order mark in a try with an empty catch,
+    # after a read of the settings whose failure went on to write. Stage
+    # settings that do not read now stop it before it writes, with an exit
+    # code, and the deploy throws on that code before the stage is hashed.
+    $p = Join-Path $tmp 'server-settings.json'
+    foreach ($bad in @('{ "port": 77', '')) {
+        Get-ChildItem $tmp -Filter 'server-settings.json.before-*' | Remove-Item -Force
+        [IO.File]::WriteAllText($p, $bad)
+        $rootWin = $tmp; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $fullIndexDef = $script:fullIndexDef
+        $lightTable = ''; $devRecordLight = $false; $VoicePort = 7789; $maxOnline = 0; $seats = 0
+        $LoadOrderRefuse = 'on'; $RequirePass = ''; $Npcs = ''
+        $file = Join-Path $tmp 'block.ps1'
+        [IO.File]::WriteAllText($file, $ExecutionContext.InvokeCommand.ExpandString($body), (New-Object Text.UTF8Encoding $true))
+        $said = (& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }) -join "`n"
+        $code = $LASTEXITCODE
+        Yes ('stage settings that are ' + $(if ($bad) { 'not JSON' } else { 'empty' }) + ' stop the block with exit 1, writing nothing') (
+            $code -eq 1 -and $said -match 'SETTINGS UNREADABLE on the stage' -and [IO.File]::ReadAllText($p) -eq $bad -and
+            -not @(Get-ChildItem $tmp -Filter 'server-settings.json.before-*').Count)
+    }
+    $after = $text.IndexOf('"@ | ForEach-Object { "  $_" }', $open)
+    $stop = $text.IndexOf('if ($LASTEXITCODE -ne 0) { throw "the staged settings could not be edited on the dev box', $after)
+    $hash = $text.IndexOf('Get-FileHash -LiteralPath', $after)
+    Yes '  and the deploy throws on that exit code before the stage is hashed or checked' ($after -gt 0 -and $stop -gt $after -and $hash -gt $stop)
+    Get-ChildItem $tmp -Filter 'server-settings.json.before-*' | Remove-Item -Force
 
     # -Npcs on|off, the before and after for #385.
     $npcParam = $ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Npcs' }

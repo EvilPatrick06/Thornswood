@@ -189,13 +189,15 @@ foreach ($dest in $places) {
     if ($isDevRoot) {
         $stale = Join-Path $dest 'Thornswood.lnk'
         if (Test-Path -LiteralPath $stale) {
+            # A tidy up of a shortcut an older build left: one that cannot be
+            # read or removed is said, and the install goes on.
             try {
                 $old = $ws.CreateShortcut($stale)
                 if ($old.TargetPath -and $old.TargetPath.StartsWith($Root.TrimEnd('\'), [StringComparison]::OrdinalIgnoreCase)) {
-                    Remove-Item -LiteralPath $stale -Force -ErrorAction SilentlyContinue
+                    Remove-Item -LiteralPath $stale -Force -ErrorAction Stop
                     Say "  removed a Thornswood.lnk in $dest that pointed at the dev build" 'Yellow'
                 }
-            } catch { }
+            } catch { Say "  could not read or remove the Thornswood.lnk in $dest that may point at the dev build: $($_.Exception.Message)" 'Yellow' }
         }
     }
 
@@ -230,17 +232,20 @@ public static extern void SHChangeNotify(int eventId, uint flags, System.IntPtr 
         }
         [Thornswood.Shell32]::SHChangeNotify(0x08000000, 0x0000, [IntPtr]::Zero, [IntPtr]::Zero)
         Say '  Explorer told to redraw' 'DarkGray'
-    } catch { }
+    } catch { Say "  Explorer could not be told to redraw, so the icon may look old until it does: $($_.Exception.Message)" 'Yellow' }
 
-    try {
-        $ie4 = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
-        if (Test-Path $ie4) {
+    $ie4 = Join-Path $env:SystemRoot 'System32\ie4uinit.exe'
+    if (Test-Path -LiteralPath $ie4) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try {
             $global:LASTEXITCODE = 0
             & $ie4 -show 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) { & $ie4 -ClearIconCache 2>&1 | Out-Null }
-            Say '  Icon cache asked to refresh' 'DarkGray'
-        }
-    } catch { }
+            $ie4Code = $LASTEXITCODE
+            if ($ie4Code -ne 0) { & $ie4 -ClearIconCache 2>&1 | Out-Null; $ie4Code = $LASTEXITCODE }
+        } finally { $ErrorActionPreference = $old }
+        if ($ie4Code -eq 0) { Say '  Icon cache asked to refresh' 'DarkGray' }
+        else { Say "  ie4uinit did not refresh the icon cache (exit $ie4Code), so the icon may look old until Explorer redraws it" 'Yellow' }
+    }
 }
 
 # The belt and braces pass, only when the artwork itself is new. Clearing the
@@ -258,21 +263,33 @@ if (Test-Path $stamp) { $lastIcon = "$(Get-Content $stamp -Raw -ErrorAction Sile
 # Explorer twice in as many minutes.
 if ($lastIcon -ne $iconHash -and -not $isScratch) {
     Say '  New artwork, clearing the cache properly' 'Yellow'
-    try {
-        taskkill /f /im explorer.exe 2>&1 | Out-Null
-        $caches = @(
-            (Join-Path $env:LocalAppData 'IconCache.db'),
-            (Join-Path $env:LocalAppData 'Microsoft\Windows\Explorer\iconcache_*.db')
-        )
-        foreach ($c in $caches) {
-            foreach ($f in @(Get-ChildItem $c -Force -ErrorAction SilentlyContinue)) {
-                Remove-Item $f.FullName -Force -ErrorAction SilentlyContinue
-            }
+    # No cache file is the ordinary case (Test-Path, and a wildcard that
+    # matches nothing), so only one that is there and will not go is said.
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try { taskkill /f /im explorer.exe 2>&1 | Out-Null } finally { $ErrorActionPreference = $old }
+    $kept = @()
+    $caches = @(
+        (Join-Path $env:LocalAppData 'IconCache.db'),
+        (Join-Path $env:LocalAppData 'Microsoft\Windows\Explorer\iconcache_*.db')
+    )
+    foreach ($c in $caches) {
+        if (-not (Test-Path -Path $c)) { continue }
+        foreach ($f in @(Get-ChildItem -Path $c -Force -File)) {
+            try { Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop }
+            catch { $kept += ($f.Name + ' (' + $_.Exception.Message + ')') }
         }
-    } catch { }
-    try { Start-Process explorer.exe } catch { }
+    }
+    if ($kept.Count) {
+        Say ('  {0} icon cache file(s) could not be removed, so the old icon may still show: {1}' -f $kept.Count, ($kept -join '; ')) 'Yellow'
+    }
     Set-Content -Path $stamp -Value $iconHash -Encoding ASCII
-    Say '  Explorer restarted, icon is the new one' 'Green'
+    try {
+        Start-Process explorer.exe -ErrorAction Stop
+        Say '  Explorer restarted, icon is the new one' 'Green'
+    } catch {
+        Say "  Explorer did not start again: $($_.Exception.Message)" 'Red'
+        Say '  Start it from Task Manager: File, Run new task, explorer.' 'Red'
+    }
 }
 
 Head 'Done'

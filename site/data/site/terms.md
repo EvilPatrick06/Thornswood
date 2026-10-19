@@ -3,7 +3,7 @@
 The agreement between you and Thornswood, in the shortest form that is still
 honest.
 
-Last changed: 29 September 2026.
+Last changed: 19 October 2026.
 
 Thornswood is a free fan project run by two people in their own time. Using the
 site, the launcher, the Discord or the server means you accept what is below.
@@ -26,8 +26,14 @@ belong to somebody under eighteen is removed rather than warned.
 
 Thornswood contains sexual content between adult characters, violence, and language that is not written for children. Confirming on the download or join page, and the checkbox in the installer, are kept as a record of a statement somebody made, not as verification of age.
 
-You also need to own Skyrim Special Edition on Steam. Thornswood ships no game
-files and cannot be played without it.
+You also need to own Skyrim Special Edition on Steam. Thornswood hands on one
+of the game's own files and no other: the main menu's interface file,
+`Data\Interface\startmenu.swf`, which is Bethesda's, edited so the menu shows
+no Bethesda logo and no button list. Two of its meshes, the notice board
+(`noticeboard01.nif`) and the drop box (`dropbox01.nif`), are put together from
+pieces of Skyrim's own. Everything else it ships is its own, or other people's
+work that the [credits](/credits) page names, and none of it can be played
+without the game.
 
 ## The rules of the world are part of this
 
@@ -68,8 +74,8 @@ Do not try to get around a ban with another account.
 - Anything illegal where you are, or anything that makes Thornswood a party to
   it.
 
-Finding a bug and telling us is the opposite of this and is always welcome.
-`SECURITY.md` in the repository says how to report a security one.
+Finding a bug and telling us is the opposite of this and is always welcome. A
+security one goes to the owner as a Discord direct message, never in a channel.
 
 ## What you make here
 
@@ -92,12 +98,19 @@ It is a fan project. It is not made by, endorsed by or affiliated with
 Bethesda Softworks, ZeniMax or any mod author. It costs nothing to play and
 nothing on it is sold.
 
+Bethesda's [terms for mods](https://store.steampowered.com/eula/1946180_eula_0)
+say a mod is free and only for people who own the game, and Thornswood is both.
+They ask every mod to say this, in their words: THIS MOD IS NOT MADE,
+GUARANTEED OR SUPPORTED BY ZENIMAX OR ITS AFFILIATES.
+
 ## Supporting it
 
-The Patreon is a way to help with the server bill. It buys nothing in the
-world: no items, no ranks, no advantage, no priority. If that ever changes it
-will be announced before it does, not discovered. Patreon handles the payment
-and Thornswood never sees a card. Cancelling is done at Patreon.
+The Patreon pays for the server, the domain and the other expenses of keeping
+Thornswood running, and nothing else. It is not payment for anybody's time
+making mods, which Bethesda's terms for mods do not allow. It buys nothing in
+the world: no items, no ranks, no advantage, no priority. If that ever changes
+it will be announced before it does, not discovered. Patreon handles the
+payment and Thornswood never sees a card. Cancelling is done at Patreon.
 
 ## No promises about it working
 

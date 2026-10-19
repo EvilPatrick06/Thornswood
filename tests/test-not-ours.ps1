@@ -129,8 +129,12 @@ Yes 'the BodySlide builds shipped for now are listed beside Ship-Rules' (Test-Pa
 $builtText = $(if (Test-Path -LiteralPath $builtList) { Get-Content -LiteralPath $builtList -Raw } else { '' })
 Yes '  and the list says it is for now, until #1259 replaces it' ($builtText -match '#1259' -and $builtText -match 'FOR NOW')
 Yes ('  140 of them, the count measured on 29 September ({0})' -f $ShipBuiltUntil1259.Count) ($ShipBuiltUntil1259.Count -eq 140)
-$builtOut = @($ShipBuiltUntil1259 | Where-Object { -not (Test-ShipOurs $_) -or (Test-ShipNotOurs $_) })
-Yes '  every one ships as ours' ($builtOut.Count -eq 0)
+# Except what is never handed on (#2454,
+# permission-held.txt, tests\test-ship-permission-held.ps1): listed, not shipped.
+$builtHeld = @($ShipBuiltUntil1259 | Where-Object { Test-ShipPermissionHeld $_ })
+$builtOut = @($ShipBuiltUntil1259 | Where-Object { -not (Test-ShipPermissionHeld $_) } | Where-Object { -not (Test-ShipOurs $_) -or (Test-ShipNotOurs $_) })
+Yes ('  every one ships as ours, but the {0} never handed on' -f $builtHeld.Count) ($builtOut.Count -eq 0)
+Yes '  and a held one does not ship' (@($builtHeld | Where-Object { -not (Test-ShipNotOurs $_) }).Count -eq 0)
 $builtWhere = @($ShipBuiltUntil1259 | ForEach-Object { ($_ -split '\\')[0..3] -join '\' } | Sort-Object -Unique)
 Yes ('  all in the three folders BodySlide built ({0})' -f ($builtWhere -join ', ')) (
     @($builtWhere | Where-Object { $_ -notin @('Data\meshes\armor\travel clothes', 'Data\meshes\armor\bosmerarmormaty743', 'Data\meshes\MCE\clothes') }).Count -eq 0)

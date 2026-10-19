@@ -28,7 +28,7 @@ Runbooks do the same by hand (`docs\IT-IS-DOWN.md`, `docs\RESTORING.md`,
 | Local admins | `Administrator`, `cloudbase-init` (the provider's first-boot agent account, enabled) |
 | Other accounts | `thornswood-runner`, `-runner2`, `-runner3`, `-runner4`: Users plus their GitHub runner groups, not admins; run the four `actions.runner.*` services |
 | Services | `sshd` LocalSystem; `ThornswoodBot` as `NT SERVICE\ThornswoodBot` |
-| Tasks | Thornswood Server, Dev Server, Voice, Dev Voice, Web, Backup, Load, Watch, Maint Update, Dev Crash Capture: SYSTEM, Highest. Thornswood Docs: LOCAL SERVICE, Limited |
+| Tasks | Thornswood Server, Dev Server, Voice, Dev Voice, Web (#2578) and Backup (#2612): LOCAL SERVICE, Limited, each with a SID of its own. Load, Watch, Maint Update, Dev Crash Capture: SYSTEM, Highest. Thornswood Docs: LOCAL SERVICE, Limited. The one-shot sshd restart and rollback tasks of vps-harden.ps1 and vps-ssh-scope.ps1 stay SYSTEM: they need administrator and must outlive the session they cut (#2612) |
 
 So: one identity, full admin, reachable from anywhere on port 22 with any of
 five keys, used for everything from a site file copy to a firewall change.
@@ -295,4 +295,5 @@ narrow port 22. No lane makes any of these changes.
 Moving the SYSTEM tasks (game servers, voice, web, backup) to per-service
 virtual accounts with only the folders they need, the way the site and bot
 already run. Its own issue since 16 Oct, #2578, because section 6 found the
-deploy identity buys little until it is done.
+deploy identity buys little until it is done. Done for the game servers,
+voice and web by #2578 and for the backup by #2612.

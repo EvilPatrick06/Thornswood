@@ -77,6 +77,10 @@ Yes 'Swap.ps1 loads the shared wait, and Answering waits $Wait seconds not a lit
     $swapText.Contains(". (Join-Path `$PSScriptRoot 'ServerReadyWait.ps1')") -and
     $swapText.Contains('(Get-Date).AddSeconds($Wait)') -and
     $swapText -notmatch 'AddSeconds\(\s*60\s*\)')
+Yes 'Swap.ps1 lists the UDP ports whole, and says a list it could not have rather than reading it as a free port' (
+    $swapText -notmatch 'Get-NetUDPEndpoint -LocalPort' -and
+    $swapText.Contains('catch { $script:heldWhy = $_.Exception.Message; return $true }') -and
+    ([regex]::Matches($swapText, [regex]::Escape('if ($blindWhy) { $blindWhy }'))).Count -eq 2)
 
 $callers = @(
     'scripts\deploy\Deploy-Server.ps1',
@@ -121,9 +125,13 @@ Yes 'Swap.ps1 gives SwapVars and the swap block' (
     [bool]$swapBlock -and [bool](Get-Command SwapVars -EA SilentlyContinue))
 
 $rand = New-Object Random
+# The ports, listed whole and filtered as Swap.ps1 does: -LocalPort with
+# nothing on it is an error, and a list that cannot be had stops the run
+# instead of reading as a free port (#2466).
+function UdpOn([int]$p) { return @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $p }) }
+function TcpOn([int]$p) { return @(Get-NetTCPConnection -EA Stop | Where-Object { $_.LocalPort -eq $p }) }
 function Free([int]$p) {
-    (-not @(Get-NetUDPEndpoint -LocalPort $p -EA SilentlyContinue).Count) -and
-    (-not @(Get-NetTCPConnection -LocalPort $p -EA SilentlyContinue).Count)
+    (-not @(UdpOn $p).Count) -and (-not @(TcpOn $p).Count)
 }
 function PickPort {
     do { $script:P = $rand.Next(41000, 48000) } until ((Free $script:P) -and (Free ($script:P + 1)))
@@ -148,7 +156,7 @@ function SettingsJson([int]$port) {
     return (@{ port = $port; name = 'Thornswood Test'; loadOrder = @('Skyrim.esm') } | ConvertTo-Json -Compress)
 }
 function Owner([int]$port) {
-    $e = @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)
+    $e = @(UdpOn $port)
     if ($e.Count) { return [int]$e[0].OwningProcess }
     return 0
 }
@@ -197,7 +205,7 @@ function Get-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Set-ScheduledTask { [CmdletBinding()] param([Parameter(ValueFromPipeline = `$true)]`$InputObject) }
 function Stop-ScheduledTask { [CmdletBinding()] param([string]`$TaskName) }
 function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
-  Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" "$root" "$pidLog"'
+  Start-Process -FilePath '$($node.Source)' -WindowStyle Hidden -ArgumentList '"$stub" watch "$root" "$pidLog"'
 }
 
 "@
@@ -218,52 +226,96 @@ function Show {
 $stubJs = @'
 const fs = require('fs');
 const path = require('path');
+const cp = require('child_process');
 const dgram = require('dgram');
 const net = require('net');
-const root = process.argv[2];
-fs.appendFileSync(process.argv[3], process.pid + '\n');
-function log(m) { fs.appendFileSync(path.join(root, 'server.log'), m + '\n'); }
-const gm = fs.readFileSync(path.join(root, 'gamemode.js'), 'utf8');
-const s = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
-const res = s.port === 7777 ? 3000 : s.port + 1;
-dgram.createSocket('udp4').bind(s.port, '127.0.0.1');
-function listen() {
-  const srv = net.createServer(function (c) { c.end(); });
-  srv.on('error', function (e) { log('resources port ' + res + ' taken: ' + e.code); process.exit(1); });
-  srv.listen(res, '127.0.0.1');
-}
-if (gm.indexOf('udp-only') >= 0) {
-  log('listening on ' + s.port + ' only');
-} else if (gm.indexOf('slow-start-past-60') >= 0) {
-  setTimeout(listen, 61000);
-  log('listening on ' + s.port + ', resources after 61 s');
+const mode = process.argv[2];
+const root = process.argv[3];
+const pidLog = process.argv[4];
+fs.appendFileSync(pidLog, process.pid + '\n');
+// Every line carries its time and the pid that wrote it, so a stand-in that
+// went can be told from one that never answered, and when (#2466).
+function log(m) { fs.appendFileSync(path.join(root, 'server.log'), new Date().toISOString() + ' pid ' + process.pid + ' ' + m + '\n'); }
+if (mode === 'watch') {
+  // The stand-in runs as this process's child, so how it ended is written
+  // down even when it could not write that itself: its exit code, and the
+  // last of what it said on stderr. Stop-Process ends a process with -1
+  // (0xffffffff); a crash ends it with an NTSTATUS code such as 0xc0000005.
+  const err = path.join(path.dirname(pidLog), 'stand-in-' + process.pid + '.err');
+  const c = cp.spawn(process.execPath, [__filename, 'serve', root, pidLog],
+                     { stdio: ['ignore', 'ignore', fs.openSync(err, 'w')], windowsHide: true });
+  c.on('error', function (e) { log('the stand-in did not start: ' + e.message); });
+  c.on('exit', function (code, signal) {
+    if (!fs.existsSync(root)) { return; }
+    const said = fs.readFileSync(err, 'utf8').split(/\r?\n/).filter(Boolean).slice(-4).join(' | ');
+    log('stand-in pid ' + c.pid + ' ended: ' +
+        (code === null ? 'signal ' + signal : 'exit code ' + code + ' (0x' + (code >>> 0).toString(16) + ')') +
+        (said ? ', it said: ' + said : ''));
+  });
 } else {
-  listen();
-  log('listening on ' + s.port + ' and ' + res);
+  let why = '';
+  process.on('exit', function (code) { if (fs.existsSync(root)) { log('exit ' + code + (why ? ', ' + why : '')); } });
+  const gm = fs.readFileSync(path.join(root, 'gamemode.js'), 'utf8');
+  const s = JSON.parse(fs.readFileSync(path.join(root, 'server-settings.json'), 'utf8'));
+  const res = s.port === 7777 ? 3000 : s.port + 1;
+  const udp = dgram.createSocket('udp4');
+  udp.on('listening', function () { log('UDP ' + s.port + ' bound'); });
+  udp.on('error', function (e) { why = 'UDP ' + s.port + ' taken: ' + e.code; process.exit(1); });
+  udp.bind(s.port, '127.0.0.1');
+  function listen() {
+    const srv = net.createServer(function (c) { c.end(); });
+    srv.on('listening', function () { log('resources port ' + res + ' open'); });
+    srv.on('error', function (e) { why = 'resources port ' + res + ' taken: ' + e.code; process.exit(1); });
+    srv.listen(res, '127.0.0.1');
+  }
+  if (gm.indexOf('udp-only') >= 0) {
+    log('listening on ' + s.port + ' only');
+  } else if (gm.indexOf('slow-start-past-60') >= 0) {
+    setTimeout(listen, 61000);
+    log('listening on ' + s.port + ', resources after 61 s');
+  } else {
+    listen();
+    log('listening on ' + s.port + ' and ' + res);
+  }
+  setInterval(function () { if (!fs.existsSync(root)) { process.exit(0); } }, 1000);
+  setTimeout(function () { why = 'its 600 s were up'; process.exit(0); }, 600000);
 }
-setInterval(function () { if (!fs.existsSync(root)) { process.exit(0); } }, 1000);
-setTimeout(function () { process.exit(0); }, 600000);
 '@
+
+# What the stand-ins wrote to server.log from $from bytes on: when each one
+# started, bound and opened its ports, and how each one ended.
+function LogSince([long]$from) {
+    $logPath = Join-Path $root 'server.log'
+    if (-not (Test-Path -LiteralPath $logPath)) { return @() }
+    $all = [IO.File]::ReadAllText($logPath)
+    if ($all.Length -le $from) { return @() }
+    return @($all.Substring([int]$from) -split "`r?`n" | Where-Object { $_ })
+}
+function LogLength {
+    $logPath = Join-Path $root 'server.log'
+    if (Test-Path -LiteralPath $logPath) { return (Get-Item -LiteralPath $logPath).Length }
+    return 0
+}
 
 try {
     Put $stub $stubJs
     Put (Join-Path $root 'gamemode.js') '// old gamemode'
     Put (Join-Path $root 'plugins\Skyrim.esm') 'skyrim'
-    function StartOld {
-        $up = $false
-        for ($try = 0; $try -lt 5 -and -not $up; $try++) {
-            PickPort
-            Put (Join-Path $root 'server-settings.json') (SettingsJson $script:P)
-            $oldPid = (Start-Process -FilePath $node.Source -WindowStyle Hidden -PassThru `
-                                     -ArgumentList ('"' + $stub + '" "' + $root + '" "' + $pidLog + '"')).Id
-            $up = WaitUp $script:P
-            if (-not $up) { Stop-Process -Id $oldPid -Force -EA SilentlyContinue }
-        }
-        return $up
-    }
-    $up = StartOld
+    # One start, on ports free when they were picked. Until 19 Oct this was up
+    # to five starts on fresh ports, and the slow case below was set up again
+    # on a fresh port up to three times (#2534): retries for a port another
+    # process might take. Over 524 runs on the VPS runners from 12 to 19 Oct
+    # neither ever ran (the stand-in always answered within 3.5 s, and no
+    # "taken" line was ever written), and the two slow-case failures in that
+    # time had nothing to do with a port being taken. A port that is taken
+    # now fails the run, and the stand-in's own line says which and how.
+    PickPort
+    Put (Join-Path $root 'server-settings.json') (SettingsJson $script:P)
+    $null = Start-Process -FilePath $node.Source -WindowStyle Hidden `
+                          -ArgumentList ('"' + $stub + '" watch "' + $root + '" "' + $pidLog + '"')
+    $up = WaitUp $P
     Yes ("the stand-in server is answering on UDP {0} and TCP {1}" -f $P, ($P + 1)) $up
-    if (-not $up) { throw 'no stand-in server came up, so there is nothing to deploy over' }
+    if (-not $up) { throw ('no stand-in server came up, so there is nothing to deploy over. It wrote: ' + ((LogSince 0) -join ' / ')) }
     $before = (Get-FileHash -LiteralPath (Join-Path $root 'gamemode.js') -Algorithm SHA256).Hash
 
     # A start that never becomes ready still rolls back within the ceiling.
@@ -284,34 +336,18 @@ try {
     if ($script:fail -gt $failed) { Show }
 
     # A slow-but-healthy start past 60 s is kept.
-    # The stand-in opens its resources port 61 s after it starts. Nobody holds
-    # that port in between, and the VPS runners share one box, so another
-    # harness can take it; the stand-in then says so in server.log. That is
-    # the box, not the wait, so the case is set up again on a fresh port, at
-    # most three times, and says so (#2466).
-    $logPath = Join-Path $root 'server.log'
-    for ($slowTry = 1; $slowTry -le 3; $slowTry++) {
-        $logFrom = if (Test-Path -LiteralPath $logPath) { (Get-Item -LiteralPath $logPath).Length } else { 0 }
-        $running = Ident $P
-        $w = MakeStage '.stage-slow' '// new gamemode, slow-start-past-60'
-        $sw = [Diagnostics.Stopwatch]::StartNew()
-        $out = RunFar '.stage-slow' '.prev-slow' (Get-ThornswoodServerReadyWait) $w
-        $sw.Stop()
-        $newLog = ''
-        if (Test-Path -LiteralPath $logPath) {
-            $all = [IO.File]::ReadAllText($logPath)
-            if ($all.Length -gt $logFrom) { $newLog = $all.Substring([int]$logFrom) }
-        }
-        if ($out -contains 'SWAP OK' -or $newLog -notmatch 'resources port \d+ taken: ') { break }
-        Write-Host ('NOTE  try {0}: another process took TCP {1} during the 61 s, setting the case up again on a fresh port' -f $slowTry, ($P + 1))
-        $owner = Owner $P
-        if ($owner) { Stop-Process -Id $owner -Force -EA SilentlyContinue }
-        Start-Sleep -Milliseconds 500
-        if (-not (StartOld)) { throw 'no stand-in server came up again after the resources port was taken' }
-    }
-    if ($newLog -match 'resources port \d+ taken: ') {
-        Write-Host 'NOTE  the resources port was taken on all three tries, so the box was too busy to judge the wait'
-    }
+    # On the VPS runners this took 63.7 to 68.5 s in 522 of 524 runs from 12
+    # to 19 Oct, and all 170 s in the other two (12 Oct, 19 Oct), one of them
+    # with no other job on the box: the stand-in was gone or the swap could
+    # not see it, not slow. Which of those it was is what the lines printed on
+    # a failure say: the stand-ins' own log with times, how each one ended,
+    # and the swap's own word on a UDP list it could not have (#2466).
+    $logFrom = LogLength
+    $running = Ident $P
+    $w = MakeStage '.stage-slow' '// new gamemode, slow-start-past-60'
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $out = RunFar '.stage-slow' '.prev-slow' (Get-ThornswoodServerReadyWait) $w
+    $sw.Stop()
     $said = $out -join "`n"
     $failed = $script:fail
     Yes 'a start that answers after 61 s, past the old 60 s wait, is SWAP OK' ($out -contains 'SWAP OK')
@@ -322,7 +358,11 @@ try {
     Yes '  and the new gamemode is the one answering' (
         ([IO.File]::ReadAllText((Join-Path $root 'gamemode.js'))) -match 'slow-start-past-60' -and
         (Answers $P) -and ((Ident $P) -ne $running))
-    if ($script:fail -gt $failed) { Show }
+    if ($script:fail -gt $failed) {
+        Show
+        Write-Host '        --- what the stand-ins wrote while this case ran ---'
+        foreach ($l in (LogSince $logFrom)) { Write-Host ('        ' + $l) }
+    }
 }
 catch {
     Yes ('the runs finished without an error: ' + $_.Exception.Message) $false

@@ -5,18 +5,17 @@
   aurora behind the title. Paused here instead, which leaves the poster frame
   showing: the same picture, holding still.
 
-  Wrapped because a page that throws here loses everything below it, and this
-  is decoration.
+  Nothing here throws: matchMedia is asked only where it exists (narrow()
+  below asks it unguarded), and pause and removeAttribute do not throw on a
+  video, so no try is needed (#2736).
 */
-try {
-  var m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-  if (m && m.matches) {
-    document.addEventListener('DOMContentLoaded', function () {
-      var v = document.querySelector('video.art');
-      if (v) { try { v.pause(); v.removeAttribute('autoplay'); } catch (e) { } }
-    });
-  }
-} catch (e) { }
+var m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
+if (m && m.matches) {
+  document.addEventListener('DOMContentLoaded', function () {
+    var v = document.querySelector('video.art');
+    if (v) { v.pause(); v.removeAttribute('autoplay'); }
+  });
+}
 
 var bannerVideo = document.querySelector('video.art'), bannerMotion = document.getElementById('bannerMotion');
 if (bannerVideo && bannerMotion) {
@@ -179,7 +178,13 @@ function show(html) {
    and a bit away (a clock set back, or a value typed in) is dropped and the
    gate asks. MIGRATION: the old bare "1" is honoured only while the old
    cookie still is, since the cookie is the copy that had a year on it; then
-   it is restamped in the new shape. Without the cookie it is dropped. */
+   it is restamped in the new shape. Without the cookie it is dropped.
+
+   localStorage throws where the browser will not let this site use it
+   (blocked site data, some private windows), and setItem throws when the
+   store is full. Each of those catches says so in its braces: the cookie is
+   the answer the gate reads last, so a store that cannot be used is read as
+   one with nothing in it and nothing else is lost (#2736). */
 var AGE_KEY = 'tw-age-18';
 var AGE_PATHS = { '/downloads': 1, '/join': 1 };
 var AGE_POLICY = 1;
@@ -189,18 +194,22 @@ function ageCookie() {
   return new RegExp('(?:^|;\\s*)tw-age-18=' + AGE_POLICY + '(?:;|$)').test(document.cookie || '');
 }
 function ageStore(until) {
-  try { localStorage.setItem(AGE_KEY, JSON.stringify({ v: AGE_POLICY, until: until })); } catch (e) {}
+  try { localStorage.setItem(AGE_KEY, JSON.stringify({ v: AGE_POLICY, until: until })); }
+  catch (e) { /* blocked or full: the cookie written beside it holds the answer */ }
 }
 function ageOk() {
   var now = Date.now(), raw = null;
-  try { raw = localStorage.getItem(AGE_KEY); } catch (e) {}
+  try { raw = localStorage.getItem(AGE_KEY); }
+  catch (e) { /* blocked: read as nothing stored, and the cookie decides */ }
   if (raw !== null) {
     var rec = null;
-    try { rec = JSON.parse(raw); } catch (e) {}
+    try { rec = JSON.parse(raw); }
+    catch (e) { /* not JSON, so not a value this page wrote: dropped below */ }
     if (rec && typeof rec === 'object' && rec.v === AGE_POLICY && typeof rec.until === 'number' &&
         rec.until > now && rec.until <= now + (AGE_DAYS + 2) * AGE_DAY_MS) return true;
     if (raw === '1' && ageCookie()) { ageStore(now + AGE_DAYS * AGE_DAY_MS); return true; }
-    try { localStorage.removeItem(AGE_KEY); } catch (e) {}
+    // getItem just answered, so the store can be used and this does not throw.
+    localStorage.removeItem(AGE_KEY);
   }
   return ageCookie();
 }
@@ -229,7 +238,7 @@ function showAgeGate() {
       ageRemember();
       location.reload();
     });
-    try { yes.focus(); } catch (e) {}
+    yes.focus();
   }
 }
 
@@ -263,12 +272,10 @@ if (AGE_PATHS[here] && !ageOk()) {
     // Rendered by the server, like the written pages.
     if (b.introHtml) out += b.introHtml;
     else if (b.intro) out += '<p>' + esc(b.intro) + '</p>';
-    // Finished work is not a roadmap. The Done column stays on the board in
-    // the hub so the record is kept, it just does not belong on the public
-    // page, where the only question anybody has is what is coming next.
-    var live = (b.sections || []).filter(function (sec) {
-      return !/^\s*done\s*$/i.test(sec.name || '');
-    });
+    // Every section is drawn, Done included (#2560). Done used to be hidden
+    // here, so the finished work #2561 moved into it never reached the page.
+    // Done is last in the data, so it is drawn last.
+    var live = b.sections || [];
     live.forEach(function (sec) {
       var cols = sec.columns || [], rows = sec.rows || [];
       if (!rows.length) return;
@@ -443,9 +450,8 @@ if (AGE_PATHS[here] && !ageOk()) {
     var previewUrls = [];
 
     function clearPreviews() {
-      previewUrls.forEach(function (u) {
-        try { URL.revokeObjectURL(u); } catch (e) {}
-      });
+      // revokeObjectURL does not throw, even for a URL already revoked.
+      previewUrls.forEach(function (u) { URL.revokeObjectURL(u); });
       previewUrls = [];
     }
 
@@ -1103,10 +1109,7 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
         cap.innerHTML = (shots[i].by ? esc(shots[i].by) + ' \u00b7 ' : '') +
           '<a href="/gallery">Open the gallery</a>';
       }
-      var reduce = false;
-      try {
-        reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
-      } catch (e) {}
+      var reduce = !!(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
       var timer = null;
       var paused = false;
       function stopFlip() {

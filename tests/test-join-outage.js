@@ -78,7 +78,8 @@ async function discordGet(p) {
   return hit ? { ok: true, status: 200, body: hit } : { ok: false, status: 404, body: null, why: 'not found' };
 }
 const jsonFile = (f, def) => (f in files ? JSON.parse(JSON.stringify(files[f])) : def);
-const putJson = (f, v) => { files[f] = v; };
+// The real putJson answers whether the write landed; the check in refuses one that did not (#2180).
+const putJson = (f, v) => { files[f] = v; return true; };
 // standing() reads bans through bansNow() since #2186; this stand-in never
 // reports a broken file (tests/test-bans-broken.js runs that on the real site).
 const bansNow = () => ({ table: jsonFile(BANS, {}) || {}, broken: '' });
