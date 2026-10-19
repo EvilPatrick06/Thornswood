@@ -1851,7 +1851,9 @@ async def close_here(interaction, why=None):
     Archived and locked rather than deleted. A ticket is the record of what
     somebody was told and when, and the one time anybody goes looking for it
     is the argument afterwards, so nothing here removes anything. Locked means
-    it takes a staff member to open it again, not a stray message.
+    it takes a staff member to open it again, not a stray message. It is
+    deleted TICKET_KEEP_DAYS after it closes, by watch_closed_tickets and not
+    here (#2353).
 
     Only in a ticket's own thread (is_ticket_thread), refused before anything
     is said, archived or written down.
@@ -1874,8 +1876,9 @@ async def close_here(interaction, why=None):
     line = 'Closed by %s.' % interaction.user.mention
     if why:
         line += ' ' + why.strip()
-    line += ('\nNothing is deleted. Everybody who was in here can still read it, '
-             'and staff can open it again.')
+    line += ('\nEverybody who was in here can still read it, and staff can open '
+             'it again. It is deleted %d days after it was last closed.'
+             % TICKET_KEEP_DAYS)
     await interaction.response.send_message(line[:1900])
 
     # Archiving drops a thread out of the sidebar and out of the channel's
@@ -1923,6 +1926,110 @@ class TicketTools(discord.ui.View):
 async def close_cmd(interaction: discord.Interaction,
                     why: typing.Optional[str] = None):
     await close_here(interaction, why)
+
+
+# HOW LONG A CLOSED TICKET IS KEPT (#2353). Closing archived and locked the
+# thread and nothing ever deleted it, so it was the one store with no keeping
+# time. Decided by Patrick on 19 Oct: the bot deletes a ticket thread
+# TICKET_KEEP_DAYS after it closes, the same 365 days the site keeps its copy
+# of the application (INBOX_DAYS in site/server.js). Discord cannot undo it.
+#
+# When it closed is Discord's own archive_timestamp, not a record of ours. It
+# is set for every archived thread, so the tickets closed before this was
+# written are aged too, and so is one staff archived by hand. Opening a ticket
+# again and closing it moves the time on, so the year starts over. A ticket
+# nobody closed is archived by Discord after a week with nothing said in it
+# (auto_archive_duration in TicketModal), and the bot already counts it as
+# closed: _open_thread lets its person open another. So it ages from then.
+#
+# Only threads the bot opened off a TICKET_CHANNEL channel: a private thread
+# a Gamemaster opened there by hand (see the note in TicketModal) is not a
+# ticket and is never touched.
+TICKET_KEEP_DAYS = 365
+TICKET_KEEP_EVERY = 60 * 60
+
+
+def ticket_past_keeping(thread, bot_id, cut):
+    """
+    True when this thread is a ticket the bot opened, archived, and archived
+    before cut, an aware datetime. A thread whose close time is not an aware
+    datetime, or whose opener cannot be read, is kept rather than guessed at.
+    """
+    if bot_id is None or getattr(thread, 'owner_id', None) != bot_id:
+        return False
+    if getattr(thread, 'archived', None) is not True:
+        return False
+    at = getattr(thread, 'archive_timestamp', None)
+    if not isinstance(at, datetime.datetime) or at.tzinfo is None:
+        return False
+    return at < cut
+
+
+async def age_closed_tickets(guild, bot_id, now):
+    """
+    Deletes this server's ticket threads closed more than TICKET_KEEP_DAYS
+    before now, and returns (deleted, failed). Each one deleted is a line in
+    bot.log with its id and when it closed; the staff record's Closed line
+    carries the same id in its link. A list that cannot be read, or a delete
+    Discord refuses, is a line with Discord's reason, and that thread stays
+    until the next pass.
+    """
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        if (getattr(ch, 'name', '') or '').lower() not in TICKETS:
+            continue
+        due = []
+        try:
+            # Discord lists them newest closed first and, given before, only
+            # those closed before it. ticket_past_keeping still checks each.
+            async for t in ch.archived_threads(private=True, limit=None,
+                                               before=cut):
+                if ticket_past_keeping(t, bot_id, cut):
+                    due.append(t)
+        except Exception as e:
+            failed += 1
+            log('closed tickets: could not list the closed threads in #%s of '
+                '"%s", so none of them was deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        for t in due:
+            try:
+                await t.delete()
+            except Exception as e:
+                failed += 1
+                log('closed tickets: could not delete thread %s in #%s, closed '
+                    '%s: %s: %s' % (t.id, ch.name,
+                                    t.archive_timestamp.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            deleted += 1
+            log('closed tickets: deleted thread %s in #%s, closed %s, more '
+                'than %d days ago' % (t.id, ch.name,
+                                      t.archive_timestamp.date().isoformat(),
+                                      TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
+async def watch_closed_tickets():
+    """
+    Runs age_closed_tickets on every server as the bot comes up and every
+    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
+    end the loop: a pass that fails is said in bot.log, and the threads it
+    did not reach are there for the next one.
+    """
+    await client.wait_until_ready()
+    while not client.is_closed():
+        now = datetime.datetime.now(datetime.timezone.utc)
+        bot_id = getattr(client.user, 'id', None)
+        for gd in list(client.guilds):
+            try:
+                await age_closed_tickets(gd, bot_id, now)
+            except Exception:
+                log('closed tickets: the pass on "%s" stopped part way, so '
+                    'what it did not reach waits for the next one:\n%s'
+                    % (gd.name, traceback.format_exc()))
+        await asyncio.sleep(TICKET_KEEP_EVERY)
 
 
 class TicketPanel(discord.ui.View):
@@ -5345,6 +5452,7 @@ async def on_ready():
         asyncio.create_task(watch_moderation())
         asyncio.create_task(watch_known_issues())
         asyncio.create_task(watch_join_numbers())
+        asyncio.create_task(watch_closed_tickets())
 
     log('up as %s' % client.user)
 
