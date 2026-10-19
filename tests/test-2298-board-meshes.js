@@ -5,19 +5,25 @@
 // #2298: the notice board and the hold's drop box are Thornswood's own meshes,
 // built from vanilla pieces by scripts/mods/Build-NoticeBoard.py, and
 // Patrick's rule (12 Oct) is that clicking the board does only the board and
-// clicking the box does only the box. This proves, without the game:
+// clicking the box does only the box. Since #2827 neither mesh is in the
+// repository or ships: each machine makes them from its own game
+// (launcher/app/FromGame.cs), from the recipe Build-NoticeBoard.py writes,
+// launcher/app/FromGameBoard.cs. Build-NoticeBoard.py checks each mesh it
+// builds (a whole NIF, every texture in the game's own archives) before it
+// writes the recipe, the launcher writes a mesh only when it is the sha256
+// the recipe names, and tests/test-2827-from-game.ps1 holds the launcher's
+// build to the script's. This proves, from the recipe, without the game:
 //
-//   1. Both meshes are whole Skyrim SE NIFs: the header's version, the block
-//      table adding up to the end of the file, one root, a BSFadeNode.
-//   2. Every texture they name is one of the vanilla paths the build read, and
-//      nothing in either file is the Missives board's (no missive). The other
+//   1. The meshes it makes are the ones that shipped until #2827 (their
+//      sha256 and size), from vanilla meshes only.
+//   2. Nothing in the recipe is the Missives board's (no missive). The other
 //      server's short names, which its folder carried, are refused in every
 //      tracked file by tests/test-other-server-name-gone.js.
-//   3. Each has its own static collision, and none of the board's reaches over
-//      the box where it stands beside the board; the box's covers only the box.
+//   3. Each has its own collision, and none of the board's reaches over the
+//      box where it stands beside the board; the box's covers only the box.
 //   4. Thornswood-Content.esp's board names the new mesh, the drop box is a
 //      separate object naming its own, and no record names the old mesh.
-//   5. Go.ps1 writes both meshes and Ship-Rules.ps1 calls both ours.
+//   5. Go.ps1 makes both meshes, and Ship-Rules.ps1 never ships them.
 //   6. E on the board or the box is the server's to answer, on its own
 //      references (#2516): the client answers neither, so a press on the box
 //      can never open the board. tests/test-2516-server-boards.js drives the
@@ -37,108 +43,53 @@ function yes(what, cond) {
 }
 const read = rel => fs.readFileSync(path.join(REPO, rel));
 const HAVOK = 69.99125;
-const BOARD = 'game/ours/Data/meshes/thornswood/noticeboard01.nif';
-const BOX = 'game/ours/Data/meshes/thornswood/dropbox01.nif';
+const RECIPE = 'launcher/app/FromGameBoard.cs';
 // Where the box's origin stands in the board's own space (Build-NoticeBoard.py says it).
 const BOX_AT = [-134.52, 4.0, 80.0];
 
-// ------------------------------------------------------------- a nif reader --
-function readNif(b) {
-  let o = b.indexOf(10) + 1;
-  const nif = { b, version: b.readUInt32LE(o), user: b.readUInt32LE(o + 5), bsver: b.readUInt32LE(o + 13),
-    types: [], blocks: [], strings: [] };
-  const count = b.readUInt32LE(o + 9);
-  o += 17;
-  for (let i = 0; i < 3; i++) { o += 1 + b[o]; }
-  const ntypes = b.readUInt16LE(o); o += 2;
-  for (let i = 0; i < ntypes; i++) { const n = b.readUInt32LE(o); o += 4; nif.types.push(b.toString('latin1', o, o + n)); o += n; }
-  const kinds = [];
-  for (let i = 0; i < count; i++) { kinds.push(nif.types[b.readUInt16LE(o)]); o += 2; }
-  const sizes = [];
-  for (let i = 0; i < count; i++) { sizes.push(b.readUInt32LE(o)); o += 4; }
-  const nstr = b.readUInt32LE(o); o += 8;
-  for (let i = 0; i < nstr; i++) { const n = b.readUInt32LE(o); o += 4; nif.strings.push(b.toString('latin1', o, o + n)); o += n; }
-  o += 4 + 4 * b.readUInt32LE(o);
-  for (let i = 0; i < count; i++) { nif.blocks.push({ type: kinds[i], at: o, size: sizes[i] }); o += sizes[i]; }
-  nif.roots = b.readUInt32LE(o);
-  nif.root = b.readInt32LE(o + 4);
-  nif.ends = o + 8 === b.length;
-  return nif;
+// ------------------------------------------------------------ the recipe --
+const recipe = read(RECIPE).toString().replace(/\r\n/g, '\n');
+// A C# string the recipe writes as base64 in pieces joined with +.
+const blob = text => Buffer.from([...text.matchAll(/"([A-Za-z0-9+/=]*)"/g)].map(m => m[1]).join(''), 'base64');
+function field(name) {
+  const m = new RegExp('\\n\\s*' + name + ' = ([\\s\\S]*?),\\n\\s*([A-Z][A-Za-z0-9]* = |\\})').exec(recipe);
+  return m ? m[1] : null;
 }
-
-function textures(nif) {
-  const out = [];
-  for (const k of nif.blocks.filter(x => x.type === 'BSShaderTextureSet')) {
-    let o = k.at;
-    const n = nif.b.readUInt32LE(o); o += 4;
-    for (let i = 0; i < n; i++) {
-      const len = nif.b.readUInt32LE(o); o += 4;
-      const s = nif.b.toString('latin1', o, o + len); o += len;
-      if (s) { out.push(s.toLowerCase()); }
-    }
-    yes('  a texture set reads to its size', o === k.at + k.size);
+function blobs(name) {
+  const m = new RegExp('\\n\\s*' + name + ' = new\\[\\]\\s*\\{([\\s\\S]*?)\\n\\s*\\},').exec(recipe);
+  return m ? m[1].split(/,\n/).map(t => t.trim()).filter(Boolean).map(blob) : [];
+}
+// Corners of a bhkConvexVerticesShape block, in game units.
+function corners(b) {
+  let o = 32;
+  const n = b.readUInt32LE(o); o += 4;
+  const v = [];
+  for (let i = 0; i < n; i++) {
+    v.push([0, 1, 2].map(j => b.readFloatLE(o + 4 * j) * HAVOK));
+    o += 16;
   }
-  return out;
+  return v;
 }
 
-// Corners of every bhkConvexVerticesShape, in game units.
-function hulls(nif) {
-  return nif.blocks.filter(x => x.type === 'bhkConvexVerticesShape').map(k => {
-    let o = k.at + 32;
-    const n = nif.b.readUInt32LE(o); o += 4;
-    const v = [];
-    for (let i = 0; i < n; i++) {
-      v.push([0, 1, 2].map(j => nif.b.readFloatLE(o + 4 * j) * HAVOK));
-      o += 16;
-    }
-    return v;
-  });
-}
-
-const VANILLA = new Set([
-  'textures\\clutter\\stockade\\stockadeplanks01.dds', 'textures\\clutter\\stockade\\stockadeplanks01_n.dds',
-  'textures\\clutter\\stockade\\stockadeextra01.dds', 'textures\\clutter\\stockade\\stockadeextra01_n.dds',
-  'textures\\clutter\\stockade\\stockadewood01.dds', 'textures\\clutter\\stockade\\stockadewood01_n.dds',
-  'textures\\architecture\\windhelm\\whwoodboardsinterior01.dds', 'textures\\architecture\\windhelm\\whwoodbase01_n.dds',
-  'textures\\dungeons\\ships\\shiproof01.dds', 'textures\\dungeons\\ships\\shiproof01_n.dds',
-  'textures\\dungeons\\ships\\shipwoodside01.dds', 'textures\\dungeons\\ships\\shipwoodside01_n.dds',
-  'textures\\architecture\\edgetrim\\woodedgetrim01.dds', 'textures\\architecture\\edgetrim\\woodedgetrim01_n.dds',
-  'textures\\clutter\\common\\lampgeneric01.dds', 'textures\\clutter\\common\\lampgeneric01_n.dds',
-  'textures\\dungeons\\candles01.dds', 'textures\\dungeons\\candles01_n.dds', 'textures\\dungeons\\candles01_g.dds',
-  'textures\\clutter\\books\\note01.dds', 'textures\\clutter\\books\\note01_n.dds', 'textures\\clutter\\books\\note02.dds',
-  'textures\\clutter\\books\\note03.dds', 'textures\\clutter\\books\\note03_n.dds', 'textures\\clutter\\books\\note04.dds',
-  'textures\\clutter\\books\\tornpage.dds', 'textures\\clutter\\books\\tornpage_n.dds', 'textures\\clutter\\books\\tornpagetext.dds',
-  'textures\\architecture\\solitude\\snail01.dds', 'textures\\architecture\\solitude\\snail01_n.dds',
-  'textures\\clutter\\common\\strongbox.dds', 'textures\\clutter\\common\\strongbox_n.dds'
-]);
-const norm = t => (t.startsWith('textures\\') ? t : 'textures\\' + t);
-
-// ------------------------------------------------------------- 1, 2 and 3 --
-const meshes = {};
-for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
-  const b = read(rel);
-  const nif = readNif(b);
-  meshes[name] = nif;
-  yes(name + ' is a Skyrim SE NIF (20.2.0.7, user 12, stream 100)',
-      nif.version === 0x14020007 && nif.user === 12 && nif.bsver === 100);
-  yes(name + ': its block table adds up to the end of the file, one root at block 0',
-      nif.ends && nif.roots === 1 && nif.root === 0 && nif.blocks[0].type === 'BSFadeNode');
-  yes(name + ' has static collision of its own',
-      ['bhkCollisionObject', 'bhkRigidBody', 'bhkConvexVerticesShape'].every(t => nif.types.includes(t)) &&
-      nif.b.readUInt8(nif.blocks.find(x => x.type === 'bhkRigidBody').at + 4) === 1);
-  const tex = textures(nif);
-  const odd = tex.filter(t => !VANILLA.has(norm(t)));
-  yes(name + ' names only vanilla textures (' + tex.length + ' paths)', tex.length > 0 && odd.length === 0);
-  if (odd.length) { console.log('      not on the list: ' + odd.join(', ')); }
-  const low = b.toString('latin1').toLowerCase();
-  yes(name + ' carries nothing of the Missives board', low.indexOf('missive') < 0);
-}
-
+// ---------------------------------------------------------------- 1 and 2 --
 {
-  const boardHulls = hulls(meshes['the board']);
-  const boxHulls = hulls(meshes['the drop box']);
-  yes('the board has a collision box for each part but the notices (11)', boardHulls.length === 11);
-  yes('the box has one, covering only the box', boxHulls.length === 1);
+  yes('the board it makes is the one that shipped until #2827 (155,907 bytes)',
+      field('BoardSha256') === '"47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216"' && field('BoardSize') === '155907');
+  yes('and so is the drop box (29,665 bytes)',
+      field('BoxSha256') === '"09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e"' && field('BoxSize') === '29665');
+  const meshes = [...recipe.matchAll(/new Board(?:Part|Source)\("[^"]*", "([^"]+)"|new BoardSource\("([^"]+)"/g)].map(m => (m[1] || m[2]));
+  const named = [...recipe.matchAll(/"(meshes\\\\[^"]+)"/g)].map(m => m[1].replace(/\\\\/g, '\\'));
+  yes('every piece is one of the game\'s own meshes (' + new Set(named).size + ' of them), none of Thornswood\'s',
+      named.length > 0 && named.every(p => /^meshes\\/.test(p) && !/^meshes\\thornswood\\/.test(p)) && meshes.length > 0);
+  yes('the recipe carries nothing of the Missives board', recipe.toLowerCase().indexOf('missive') < 0);
+}
+
+// ---------------------------------------------------------------------- 3 --
+{
+  const boardHulls = blobs('BoardHulls').map(corners);
+  const boxHulls = blobs('BoxHulls').map(corners);
+  yes('the board has a collision box for each part but the notices (11), in one list', boardHulls.length === 11 && field('BoardList') !== 'null');
+  yes('the box has one, covering only the box', boxHulls.length === 1 && field('BoxList') === 'null');
   const bx = boxHulls[0].map(v => [v[0] + BOX_AT[0], v[1] + BOX_AT[1], v[2] + BOX_AT[2]]);
   const lo = [0, 1, 2].map(i => Math.min(...bx.map(v => v[i])));
   const hi = [0, 1, 2].map(i => Math.max(...bx.map(v => v[i])));
@@ -214,9 +165,13 @@ for (const [name, rel] of [['the board', BOARD], ['the drop box', BOX]]) {
 {
   const go = read('scripts/release/Go.ps1').toString();
   const rules = read('scripts/release/Ship-Rules.ps1').toString();
+  yes('Go.ps1 makes the meshes from the game with the launcher\'s own code',
+      go.indexOf('[Thornswood.FromGame]::Build(') >= 0 && go.indexOf("'FromGame*.cs'") >= 0);
   for (const p of ['Data\\meshes\\thornswood\\noticeboard01.nif', 'Data\\meshes\\thornswood\\dropbox01.nif']) {
-    yes('Go.ps1 writes ' + p + ' and Ship-Rules.ps1 calls it ours',
-        go.indexOf("'" + p + "'") >= 0 && /\$ShipOursFiles = @\(([\s\S]*?)\n\)/.exec(rules)[1].indexOf("'" + p + "'") >= 0);
+    yes(p + ' is made from the game in Ship-Rules.ps1 and never ours to ship',
+        /\$ShipMadeFromGame = @\(([\s\S]*?)\n\)/.exec(rules)[1].indexOf("'" + p + "'") >= 0 &&
+        /\$ShipOursFiles = @\(([\s\S]*?)\n\)/.exec(rules)[1].indexOf("'" + p + "'") < 0 &&
+        !fs.existsSync(path.join(REPO, 'game', 'ours', ...p.split('\\'))));
   }
 }
 
