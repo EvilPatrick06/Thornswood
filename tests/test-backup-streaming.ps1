@@ -46,7 +46,7 @@ try {
     $expected = (Get-FileHash -LiteralPath $large -Algorithm SHA256).Hash
     $common = @('-GameRoot', $game, '-DevGameRoot', (Join-Path $root 'no-dev'), '-SiteRoot', $site,
         '-BotRoot', (Join-Path $root 'no-bot'), '-CaddyRoot', (Join-Path $root 'no-web'),
-        '-VoiceRoot', (Join-Path $root 'no-voice'), '-MaxUploadsMB', '1', '-MaxFileMB', '1')
+        '-VoiceRoot', (Join-Path $root 'no-voice'), '-DeletionRoot', (Join-Path $root 'no-del'), '-MaxUploadsMB', '1', '-MaxFileMB', '1')
     $out = Join-Path $root 'encrypted'
     $code = Run $nightly ($common + @('-Out', $out, '-KeyFile', $key))
     Yes 'backup succeeds with uploads above both old size limits' ($code -eq 0)
