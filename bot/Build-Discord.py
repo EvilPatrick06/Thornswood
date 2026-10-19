@@ -615,6 +615,12 @@ KEEP = (
 )
 
 
+def refused(e):
+    """Discord's answer to a request it turned down, for the "did not
+       manage" list: the status and its own words."""
+    return ('%s %s' % (getattr(e, 'status', ''), getattr(e, 'text', '') or e)).strip()
+
+
 def say(mark, what):
     print('  %-9s %s' % (mark, what))
 
@@ -920,21 +926,24 @@ async def ensure_roles(guild):
                           'the role list than the roles it makes)')
     # Highest first, under whatever the bot's own role is. One at a time, and
     # a refusal on one is not allowed to leave the rest of the list unsorted:
-    # Discord refuses to move a role something else manages, and Server
-    # Booster and Patreon are both managed.
-    try:
-        top = guild.me.top_role.position
-        order = [out[n] for n, _, _, _ in ROLES if n in out]
-        for i, role in enumerate(order):
-            want = max(1, top - 1 - i)
-            if role.position == want or getattr(role, 'managed', False):
-                continue
-            try:
-                await role.edit(position=want)
-            except Exception:
-                pass
-    except Exception:
-        pass
+    # each is asked, and one Discord will not move is named under "did not
+    # manage" with Discord's answer (#2736; it used to be dropped unsaid, and
+    # -Check moved roles it only meant to look at). A role something else
+    # manages, as Server Booster and Patreon are, Discord never moves, so it
+    # is not asked.
+    top = guild.me.top_role.position
+    order = [out[n] for n, _, _, _ in ROLES if n in out]
+    for i, role in enumerate(order):
+        want = max(1, top - 1 - i)
+        if role.position == want or getattr(role, 'managed', False):
+            continue
+        if CHECK:
+            say('would move', 'role ' + role.name)
+            continue
+        try:
+            await role.edit(position=want)
+        except discord.HTTPException as e:
+            failed.append('role %s could not be moved to its place (%s)' % (role.name, refused(e)))
     return out
 
 
@@ -1011,14 +1020,14 @@ async def ensure_channel(guild, cat, spec, roles, found):
                 say('note', '#' + want + ' is a text channel where a forum was '
                     'wanted. The only fix for that deletes it, so ask first')
         kept.append('#' + want)
-        try:
-            if spec.get('topic') and getattr(existing, 'topic', None) != spec['topic']:
-                if CHECK:
-                    say('would change', 'a server or channel setting')
-                else:
+        if spec.get('topic') and getattr(existing, 'topic', None) != spec['topic']:
+            if CHECK:
+                say('would change', 'a server or channel setting')
+            else:
+                try:
                     await existing.edit(topic=spec['topic'])
-        except Exception:
-            pass
+                except discord.HTTPException as e:
+                    failed.append('#%s kept its old topic (%s)' % (want, refused(e)))
         await keep_bot(existing, bot_needs(spec))
         await keep_extra(existing, spec, roles)
 
@@ -1051,12 +1060,21 @@ async def post(channel, text, found):
     import re
     text = re.sub(r'<#([A-Z]+)>', lambda m: '#' + m.group(1).lower(), text)
 
+    # The old posts go first, or the new ones would sit under them twice
+    # over. A channel whose old posts cannot be read or removed is left as it
+    # is and named under "did not manage" (#2736): writing beside them is how
+    # a channel came to say its rules twice.
     try:
         async for old in channel.history(limit=50):
             if old.author.id == client.user.id:
-                await old.delete()
-    except Exception:
-        pass
+                try:
+                    await old.delete()
+                except discord.NotFound:
+                    pass  # gone already, which is what this wanted
+    except discord.HTTPException as e:
+        failed.append('#%s was not rewritten: its old posts could not be removed (%s)'
+                      % (channel.name, refused(e)))
+        return
 
     chunks, cur = [], ''
     for para in text.split('\n\n'):
@@ -1071,11 +1089,11 @@ async def post(channel, text, found):
     for c in chunks:
         m = await channel.send(c)
         first = first or m
-    try:
-        if first:
+    if first:
+        try:
             await first.pin()
-    except Exception:
-        pass
+        except discord.HTTPException as e:
+            failed.append('#%s: its first post could not be pinned (%s)' % (channel.name, refused(e)))
     say('wrote', '#' + channel.name)
 
 
