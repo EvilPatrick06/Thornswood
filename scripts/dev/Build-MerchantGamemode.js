@@ -16,8 +16,9 @@ const sites = JSON.parse(fs.readFileSync(path.join(root, 'game/data/guild-sites.
 const traders = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-traders.json'), 'utf8'));
 const roster = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-roster.json'), 'utf8'));
 const roles = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-role-tables.json'), 'utf8'));
+const roleItems = new Set(Object.values(roles.tables).flatMap(table => Object.values(table).flat()));
 const stage = {version:1,history:roster.history,merchants:roster.merchants,tables:roles.tables,
-  types:Object.fromEntries(Object.entries(roles.records).map(([desc,row])=>[desc,row.type]))};
+  types:Object.fromEntries(Array.from(roleItems,desc=>[desc,roles.records[desc].type]))};
 const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (function () {\n' +
   'const module = { exports: {} };\nconst MERCHANT_GUILD_SITES = ' + JSON.stringify(sites) + ';\n' +
   'const MERCHANT_SETTLEMENT = (function () { const module = {exports:{}};\n' + settlementSource.trimEnd() + '\nreturn module.exports;})();\n' +

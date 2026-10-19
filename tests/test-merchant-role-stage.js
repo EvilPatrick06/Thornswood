@@ -5,6 +5,8 @@ const copy=value=>JSON.parse(JSON.stringify(value));
 const {prepareMerchantRoleStage}=require('../game/merchant-role-stage');
 const roster=read('merchant-roster'),catalog=read('merchant-traders'),roleDoc=read('merchant-role-tables'),tables=roleDoc.tables;
 const source=fs.readFileSync(path.join(root,'game/gamemode.js'),'utf8'),context={};vm.createContext(context);
+assert.ok(!source.slice(source.indexOf('// MERCHANT TRADING BUNDLE BEGIN'),source.indexOf('// MERCHANT TRADING BUNDLE END'))
+  .includes('"f:Skyrim.esm"'),'unused currency evidence must not enter a role bundle');
 vm.runInContext(source.slice(source.indexOf('// NPC POPULATION DATA BEGIN'),source.indexOf('// NPC POPULATION DATA END'))+'\nglobalThis.data=NPC_POPULATION_DATA;',context);
 const population=copy(context.data),stage={version:1,history:roster.history,merchants:roster.merchants,tables,types:Object.fromEntries(Object.entries(roleDoc.records).map(([d,r])=>[d,r.type]))};
 function fixture() {
@@ -40,6 +42,7 @@ for(const change of [
   f=>f.population.keep.push(copy(f.population.keep[0])),f=>f.population.merchantRoster={version:1,worldMode:'existing'},
   f=>delete f.stage.tables.Smith,f=>f.stage.tables.Smith.buy.push(f.stage.tables.Smith.buy[0]),
   f=>f.stage.tables.Smith.supply.push('dead:Skyrim.esm'),
+  f=>f.stage.tables.Smith.buy.push('f:Skyrim.esm'),
   f=>f.stage.tables.Smith.sell.push('ff000001:Skyrim.esm')]) {
   const f=fixture();change(f);let reads=0;f.resolve=()=>{reads++;return 1;};
   assert.throws(()=>prepare(f),/Merchant role stage/);assert.equal(reads,0,'bad source refuses before native callbacks');

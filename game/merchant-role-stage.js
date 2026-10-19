@@ -47,7 +47,7 @@ function prepareMerchantRoleStage(population,catalog,stage,native) {
       const values=table[direction];
       if(!Array.isArray(values) || new Set(values).size!==values.length)fail();
       for(const desc of values) {
-        if(!identity(desc) || desc==='f:Skyrim.esm' || !own(stage.types,desc) ||
+        if(!identity(desc) || parseInt(desc,16)===15 && desc.split(':')[1].toLowerCase()==='skyrim.esm' || !own(stage.types,desc) ||
             !['ALCH','AMMO','ARMO','BOOK','INGR','KEYM','MISC','SCRL','SLGM','WEAP'].includes(stage.types[desc]))fail();
         items.add(desc);
       }
