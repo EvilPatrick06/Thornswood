@@ -100,8 +100,9 @@ light plugins. Take one out and every light plugin after it shifts.
 This was measured, not assumed. `atlas map markers.esp` was FE (025) in the
 morning and FE (027) after two light plugins were added ahead of it.
 
-SkyMP syncs appearance as form ids: raceId, isFemale, weight, hairColor,
-skinColor, headpartIds, tints. A beard from Khisartin or a hairstyle from
+SkyMP syncs appearance mostly as form ids: raceId and headpartIds are form ids,
+while hairColor, skinColor and the tint colours are plain RGB values, so load order
+cannot change them (#491). A beard from Khisartin or a hairstyle from
 HammerHair is a form id in that FE space. Two people with different optional
 choices therefore see each other wearing the wrong face, and the server's
 plugin check never catches it because light plugins are not in its list.

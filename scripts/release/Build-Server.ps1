@@ -111,6 +111,12 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 
 if (-not $BuildDir) { $BuildDir = Join-Path $Fork 'build' }
 
+# The fork's own vcpkg on a build runner too (#459): this generates the build
+# again over its cache, and with CI=true in the environment the fork's
+# CMakeLists would switch that cache to C:/vcpkg (EngineJobs.ps1 says why).
+$ciSaid = Clear-EngineCiSwitch
+if ($ciSaid) { Say ('  ' + $ciSaid) 'DarkGray' }
+
 Head 'Where the source is'
 
 if (-not (Test-Path -LiteralPath $Fork)) {
@@ -120,25 +126,40 @@ Say ("  fork        " + $Fork)
 
 # The branch is reported and never changed. A build off the wrong branch is a
 # thing to notice, not a thing for a script to quietly correct.
-$branch = ''
-try { $branch = (& git -C $Fork rev-parse --abbrev-ref HEAD 2>$null | Select-Object -First 1) } catch { }
-$commit = ''
-try { $commit = (& git -C $Fork rev-parse --short HEAD 2>$null | Select-Object -First 1) } catch { }
+# Each git question is asked through Invoke-ReleaseGit (Release-Name.ps1),
+# which reads git's exit code rather than stopping on its stderr under Windows
+# PowerShell 5.1. One git cannot answer is said, never read as an answer: a
+# status that failed is not a clean fork.
+. (Join-Path $Here 'Release-Name.ps1')
+$branch = ''; $commit = ''; $pinned = ''; $dirty = @()
+if (-not (Get-Command git -ErrorAction SilentlyContinue)) {
+    Say '  NOTE: git is not on the path, so nothing here says which branch and commit the fork is on, or what in it is not committed.' 'Yellow'
+} else {
+    $gb = Invoke-ReleaseGit $Fork @('rev-parse', '--abbrev-ref', 'HEAD')
+    $gc = Invoke-ReleaseGit $Fork @('rev-parse', '--short', 'HEAD')
+    if ($gb.Code -eq 0) { $branch = $gb.First }
+    if ($gc.Code -eq 0) { $commit = $gc.First }
+    if ($gb.Code -ne 0 -or $gc.Code -ne 0) {
+        Say ("  NOTE: git could not say which branch and commit $Fork is on (exit {0} and {1}), so this build's commit is not shown here." -f $gb.Code, $gc.Code) 'Yellow'
+    }
+    # The commit this repository pins. The record names the commit built, and
+    # tests\test-one-engine.js holds the two to each other.
+    $gp = Invoke-ReleaseGit (Join-Path $Here '..\..') @('ls-tree', 'HEAD', 'engine/skymp')
+    if ($gp.Code -eq 0 -and $gp.First) { $pinned = [string](($gp.First -split '\s+')[2]) }
+    elseif ($gp.Code -ne 0) { Say ("  NOTE: git could not say which engine commit this repository pins (exit {0}), so it is not compared with the fork's." -f $gp.Code) 'Yellow' }
+    $gs = Invoke-ReleaseGit $Fork @('status', '--porcelain')
+    if ($gs.Code -eq 0) { $dirty = @($gs.Lines | Where-Object { $_ }) }
+    else { Say ("  NOTE: git status could not run in $Fork (exit {0}), so nothing here says whether files not committed will be in this build." -f $gs.Code) 'Yellow' }
+}
 if ($branch) {
     Say ("  branch      " + $branch + '  ' + $commit)
     if ($branch -ne 'thornswood/engine-changes' -and $branch -ne 'HEAD') {
         Say '  NOTE: that is not thornswood/engine-changes, which is the branch our engine changes live on.' 'Yellow'
     }
 }
-# The commit this repository pins. The record names the commit built, and
-# tests\test-one-engine.js holds the two to each other.
-$pinned = ''
-try { $pinned = [string](((& git -C (Join-Path $Here '..\..') ls-tree HEAD engine/skymp 2>$null | Select-Object -First 1) -split '\s+')[2]) } catch { }
 if ($pinned -and $commit -and -not $pinned.StartsWith($commit)) {
     Say ("  NOTE: this repository pins {0}. A record of this build names {1}, and the build check fails until the pin moves to it (engine\README.md, One engine)." -f $pinned.Substring(0, 8), $commit) 'Yellow'
 }
-$dirty = @()
-try { $dirty = @(& git -C $Fork status --porcelain 2>$null | Where-Object { $_ }) } catch { }
 if ($dirty.Count) {
     Say ("  {0} file(s) in the fork are not committed, and they WILL be in this build:" -f $dirty.Count) 'Yellow'
     foreach ($d in $dirty) { Say ('    ' + $d) 'Yellow' }

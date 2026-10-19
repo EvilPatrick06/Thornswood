@@ -147,8 +147,8 @@ fs.copyFileSync(SITE, path.join(dir, 'server.js'));
 fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
 fs.mkdirSync(path.join(dir, 'public'), { recursive: true });
 fs.copyFileSync(path.join(__dirname, '..', 'site', 'public', 'home.html'), path.join(dir, 'public', 'home.html'));
-fs.mkdirSync(path.join(dir, 'feed'), { recursive: true });
-fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1.1.102', minLauncher: '1.1.100' }));
+fs.mkdirSync(path.join(dir, 'feed', 'version'), { recursive: true });
+fs.writeFileSync(path.join(dir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1.1.102', minLauncher: '1.1.100' }));
 fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
   password: crypto.randomBytes(12).toString('hex'),
   discord: { clientId: 'harness-client', clientSecret: 'harness-secret',

@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 
@@ -67,6 +68,78 @@ namespace Thornswood
             }
             try { if (had) File.Delete(Paths.StateFile); } catch (Exception ex) { Swallow.Note("Swap.Restore, the state file", ex); }
             return did || had;
+        }
+
+        /// <summary>
+        /// True when Windows' Skyrim folders are still pointed at this build,
+        /// or one is still moved aside, which is what a game that fell over
+        /// leaves behind: a junction where the folder was, a .st-backup beside
+        /// an empty or missing folder, or Profile\swap.json. Reads only. Scan
+        /// asks it while Skyrim is not running, and Fix then runs Restore
+        /// (#2627). While the game runs the redirect is the point of it.
+        /// </summary>
+        public static bool LeftRedirected()
+        {
+            try
+            {
+                if (File.Exists(Paths.StateFile)) return true;
+                string[] ours;
+                foreach (string win in Pairs(out ours))
+                {
+                    if (IsLink(win)) return true;
+                    string bak = win + ".st-backup";
+                    if (Directory.Exists(bak) && (!Directory.Exists(win) || IsEmpty(win))) return true;
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Swap.LeftRedirected", ex); }
+            return false;
+        }
+
+        /// <summary>
+        /// The shipped settings files RepairConfigs would put back because
+        /// they are missing, by name, and nothing written (#2627). The plugin
+        /// lists are Verify's, so they are not named here. Empty under the
+        /// collection, where none of this is the launcher's.
+        /// </summary>
+        public static List<string> MissingConfigs()
+        {
+            var l = new List<string>();
+            if (Paths.Collection) return l;
+            try
+            {
+                if (!Directory.Exists(Paths.Golden)) return l;
+                foreach (string f in Directory.GetFiles(Paths.Golden))
+                {
+                    string name = Path.GetFileName(f);
+                    if (Path.GetExtension(f).ToLowerInvariant() != ".ini") continue;
+                    if (!File.Exists(Path.Combine(Paths.MyGames, name))) l.Add(name);
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Swap.MissingConfigs", ex); }
+            return l;
+        }
+
+        /// <summary>
+        /// Fix's half of MissingConfigs (#2627): the shipped settings files
+        /// that are missing, copied back, and nothing else. Not RepairConfigs,
+        /// which also lays the shipped plugin lists over the live ones and
+        /// would take the server's order back out of a list Fix had put it
+        /// into. Returns how many were copied.
+        /// </summary>
+        public static int PutBackMissingConfigs()
+        {
+            int n = 0;
+            foreach (string name in MissingConfigs())
+            {
+                try
+                {
+                    Directory.CreateDirectory(Paths.MyGames);
+                    File.Copy(Path.Combine(Paths.Golden, name), Path.Combine(Paths.MyGames, name), false);
+                    n++;
+                }
+                catch (Exception ex) { Swallow.Note("Swap.PutBackMissingConfigs, " + name, ex); }
+            }
+            return n;
         }
 
         /// <summary>

@@ -3,7 +3,8 @@
 
   The faction and business book from docs/systems/factions.md, run as the
   real thornswoodBooks() taken out of game/gamemode.js. A book is kept for
-  the group in the server's data folder. It is not a page on one character.
+  the group in the server's private folder (#2582). It is not a page on one
+  character.
 */
 const fs = require('fs');
 const os = require('os');
@@ -46,7 +47,7 @@ function make(dir, extra) {
     env: {
       fs: fs,
       path: path,
-      dataDir: dir,
+      privDir: dir,
       now: function () { return extra.now ? extra.now() : Date.now(); },
       roles: extra.roles || rolesFor,
       silenced: extra.silenced || function () { return false; },

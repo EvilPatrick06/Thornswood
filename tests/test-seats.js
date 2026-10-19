@@ -99,7 +99,9 @@ yes('the door writes it into allowed.json, and keeps it for a profile Discord co
     /staffRoleProfiles: Array\.isArray\(doc\.staffRoleProfiles\) \? doc\.staffRoleProfiles : \[\]/.test(src) &&
     /staffRoleProfiles: merged\(doc\.staffRoleProfiles, had\.staffRoleProfiles\)/.test(src) &&
     /doc\.staffRoleProfiles = kept\.staffRoleProfiles;/.test(src));
-yes('the seats block no longer borrows the chat commands staff check', !/g\.__thornswoodIsStaff = isStaff;/.test(src));
+// The chat block publishes isStaff again since #2551, for the property block's staff at any door; the seats keep to the role.
+yes('the seats block no longer borrows the chat commands staff check',
+    !/__thornswoodIsStaff/.test(block.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/.*$/gm, '')));
 yes('the online count file carries max, how many wait, and whether it is full',
     /restarting: restarting, max: max, line: line, full: full/.test(src));
 yes('and max is every seat, the number and the staff seats over it, from the seats block',
@@ -511,7 +513,7 @@ yes('the front joins the relay only with this character own voice token, and ask
     /function tokenProfile\(tok\) \{ return Number\(String\(tok \|\| ''\)\.split\('\.'\)\[1\]\) \|\| 0; \}/.test(front) &&
     /askToken\(lineId\)/.test(front));
 yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
-    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",true\)/.test(front) &&
+    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",\{quiet:true\}\)/.test(front) &&
     /'\/joinpass ' \+ pass/.test(front) && /sendMessage\("thornswood","stay"\)/.test(front));
 yes('closing the game from the page gives the place up', /log\('menu: closing the game, asked from the character choice page'\);[\s\S]{0,80}try \{ lineLeave\(\); \} catch \(e\) \{ \}/.test(front));
 yes('the words on the page have no em dash and never the forbidden word',
@@ -549,7 +551,8 @@ yes('standing() sets staffRole from the roles in both of its paths, the hand wri
     (site.match(/out\.staffRole = holdsStaffRole\(out\.roles\);/g) || []).length === 2);
 yes('/api/allowed sends staffRoleProfiles from staffRole, and a ban takes a profile off it',
     /if \(st\.staffRole\) \{\s*for \(const n of profiles\) if \(!seenStaffRole\.has\(n\)\) \{ seenStaffRole\.add\(n\); out\.staffRoleProfiles\.push\(n\); \}/.test(site) &&
-    /\['profiles', 'devProfiles', 'adminProfiles', 'jarlProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
+    // jarlProfiles went in #2551: the hold offices are a map by profile now.
+    /\['profiles', 'devProfiles', 'adminProfiles', 'staffRoleProfiles', 'failedProfiles'\]/.test(site));
 yes('the count poll reads max, line and full out of online.json',
     /o\.max > 0\) max = o\.max/.test(site) && /o\.line > 0\) line = o\.line/.test(site) && /o\.full === true\) full = true/.test(site));
 yes('/api/public carries max from the server, or else from the record, and the line',
@@ -558,19 +561,26 @@ yes('/api/play/join says how many are in the world, not the seats, when it says 
     /message: wait \? worldFull\(gameStatus\.online\) : '',/.test(site));
 
 // The fallback number: records\most-online.json, then the main feed's maxOnline.
+// The main feed is the newest of feed\version\<8 digits>.json (#2727), found by
+// the generations block lifted with it.
 (function () {
   const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'seats-'));
   try {
     const siteDir = path.join(tmp, 'site');
-    fs.mkdirSync(path.join(siteDir, 'feed'), { recursive: true });
+    fs.mkdirSync(path.join(siteDir, 'feed', 'version'), { recursive: true });
+    const genAt = site.indexOf('const feedNewest = {};');
+    const genFn = site.indexOf('\nfunction feedFile(', genAt);
+    const generations = genAt < 0 || genFn < 0 ? '' : site.slice(genAt, genFn + 1) + grabFn('feedFile');
+    yes('server.js has the feed generations block (feedFile)', !!generations && /function feedFile\(/.test(generations));
     const make = function () {
       return new Function('fs', 'path', 'ROOT',
+        generations + '\n' +
         'const MOST_ONLINE_RECORD = path.join(ROOT, "..", "records", "most-online.json");\n' +
         'let mostOnlineSeen = { file: "", mtime: -1, size: -1, v: 0 };\n' +
         grabFn('mostOnlineFallback') + '\nreturn mostOnlineFallback;')(fs, path, siteDir);
     };
     yes('no record and no feed: no number', make()() === 0);
-    fs.writeFileSync(path.join(siteDir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1', maxOnline: 25 }));
+    fs.writeFileSync(path.join(siteDir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1', maxOnline: 25 }));
     yes('on the VPS (no records folder) it is the feed maxOnline: 25, which is what live serves today', make()() === 25);
     fs.mkdirSync(path.join(tmp, 'records'));
     fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'), '﻿' + JSON.stringify({ people: 30, staffSeats: 5 }));
@@ -619,7 +629,7 @@ async function join(standing, status, channel) {
     within: new Function(grabFn('within') + '\nreturn within;')(),
     standingLate: function () { throw new Error('Discord answered here'); },
     jsonFile: function (f, fallback) { return f === 'linked.json' ? {} : fallback; },
-    putJson: function () { },
+    putJson: function () { return true; },
     LINKED: 'linked.json',
     slotsFor: function () { return 2; },
     sendJson: function (r, c, obj) { sent = { code: c, obj: obj }; return sent; },

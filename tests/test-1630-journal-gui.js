@@ -124,7 +124,7 @@ function makeBooks(dir) {
   const box = {
     globalThis: null,
     env: {
-      fs: fs, path: path, dataDir: dir,
+      fs: fs, path: path, privDir: dir,
       now: function () { return 1700000000000; },
       roles: function (pid) {
         if (Number(pid) === 1) { return { business: true, faction: true, staff: false, account: 'acct-a' }; }

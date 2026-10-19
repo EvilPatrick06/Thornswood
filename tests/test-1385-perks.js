@@ -781,7 +781,8 @@ for (const field of ['life','runtime']) {
   yes('the view the server sends carries the perks held', /\n      perks: P\.perks\(s\),\n/.test(gm));
 
   const GAME = { fJumpFallHeightMult: 0.1, fJumpFallHeightMin: 600, fJumpFallHeightMultNPC: 0.1,
-                 fSprintStaminaDrainMult: 7, fStaminaAttackWeaponBase: 20, fStaminaAttackWeaponMult: 1 };
+                 fSprintStaminaDrainMult: 7, fStaminaAttackWeaponBase: 20, fStaminaAttackWeaponMult: 1,
+                 fStaminaBashBase: 35, fStaminaPowerBashBase: 55 };
   function front(settings, storage) {
     const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false };
     const sp = {
@@ -846,6 +847,8 @@ for (const field of ['life','runtime']) {
     yes('Tireless: a sprint and a power attack cost half, from the game\'s own 7, 20 and 1',
       settings.fSprintStaminaDrainMult === 3.5 && settings.fStaminaAttackWeaponBase === 10 &&
       settings.fStaminaAttackWeaponMult === 0.5 && settings.fJumpFallHeightMult === 0);
+    yes('and a shield bash and a power bash, from the game\'s own 35 and 55: a bash is a swing (Patrick, 12 Oct)',
+      settings.fStaminaBashBase === 17.5 && settings.fStaminaPowerBashBase === 27.5);
 
     // A plugin reload in the same game: the settings are still this file's,
     // and the game's own are what the storage kept.
@@ -853,7 +856,8 @@ for (const field of ['life','runtime']) {
     again.view(['windwalker']); again.frame();
     yes('after a reload, dropping Tireless puts the game\'s own back, not this file\'s half',
       settings.fSprintStaminaDrainMult === 7 && settings.fStaminaAttackWeaponBase === 20 &&
-      settings.fStaminaAttackWeaponMult === 1 && settings.fJumpFallHeightMult === 0);
+      settings.fStaminaAttackWeaponMult === 1 && settings.fStaminaBashBase === 35 &&
+      settings.fStaminaPowerBashBase === 55 && settings.fJumpFallHeightMult === 0);
     again.view([]); again.frame();
     yes('and a character who holds none of them has every setting the game\'s own',
       Object.keys(GAME).every(function (k) { return settings[k] === GAME[k]; }));
@@ -863,8 +867,9 @@ for (const field of ['life','runtime']) {
       !!keys && /\| Windwalker, the fall \| `fJumpFallHeightMult` \| 0\.1 \| 0, so a fall comes to nothing \|/.test(page) &&
       /\| Tireless, a sprint \| `fSprintStaminaDrainMult` \| 7 \| half \|/.test(page) &&
       /\| Tireless, a power attack \| `fStaminaAttackWeaponBase` and `fStaminaAttackWeaponMult` \| 20 and 1 \| half of each \|/.test(page) &&
+      /\| Tireless, a shield bash \| `fStaminaBashBase` and `fStaminaPowerBashBase` \| 35 and 55 \| half of each \|/.test(page) &&
       /windwalker: \{ fJumpFallHeightMult: 0 \}/.test(keys[1]) &&
-      /tireless: \{ fSprintStaminaDrainMult: 0\.5, fStaminaAttackWeaponBase: 0\.5, fStaminaAttackWeaponMult: 0\.5 \}/.test(keys[1]) &&
+      /tireless: \{\s*fSprintStaminaDrainMult: 0\.5, fStaminaAttackWeaponBase: 0\.5, fStaminaAttackWeaponMult: 0\.5,\s*fStaminaBashBase: 0\.5, fStaminaPowerBashBase: 0\.5\s*\}/.test(keys[1]) &&
       !/packmule/.test(keys[1]));
   }
   yes('the K panel says the three are in, and Pack Mule is not',

@@ -1,0 +1,196 @@
+"""
+test-2353-ticket-keeping.py
+
+    python tests/test-2353-ticket-keeping.py
+
+Issue #2353: closing a ticket archived and locked its Discord thread and
+nothing ever deleted it, so it was the one store with no keeping time.
+Decided by Patrick on 19 Oct: the bot deletes a ticket thread
+TICKET_KEEP_DAYS (365) after it closes, checked every hour like the join
+numbers.
+
+ticket_past_keeping and age_closed_tickets are lifted out of bot/bot.py by
+their source and run on their own against made-up servers, channels and
+threads, so this needs neither discord.py nor a token and runs on every pull
+request. It proves:
+  - a ticket the bot opened and that closed 366 days ago is deleted, with a
+    line in the log, and one that closed 364 days ago stays;
+  - a thread still open, one a Gamemaster opened by hand, and one in a
+    channel that is not a ticket channel are never touched;
+  - a thread whose close time cannot be read is kept, not guessed at;
+  - Discord is asked for the private closed threads closed before the cut;
+  - a delete Discord refuses is said with its reason, and the rest still go;
+  - a channel whose list cannot be read is said with its reason, and the
+    next channel is still aged;
+and that the bot starts the hourly watch when it is ready, the close message
+and the privacy page say the year, and the bot is still allowed to delete
+threads. Synthetic ids only. Read only.
+"""
+import ast
+import asyncio
+import datetime
+import pathlib
+import sys
+
+ROOT = pathlib.Path(__file__).resolve().parents[1]
+SRC = (ROOT / 'bot' / 'bot.py').read_text(encoding='utf-8')
+TREE = ast.parse(SRC)
+
+PASS, FAIL = [], []
+
+
+def yes(what, cond):
+    (PASS if cond else FAIL).append(what)
+    print(('PASS  ' if cond else 'FAIL  ') + what)
+
+
+def lift(name):
+    for node in TREE.body:
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)) and node.name == name:
+            return ast.get_source_segment(SRC, node)
+    return ''
+
+
+def constant(name):
+    for node in TREE.body:
+        if isinstance(node, ast.Assign) and any(getattr(t, 'id', '') == name for t in node.targets):
+            # Arithmetic on numbers only (60 * 60), nothing named.
+            return eval(compile(ast.Expression(node.value), name, 'eval'), {'__builtins__': {}})
+    return None
+
+
+DAYS = constant('TICKET_KEEP_DAYS')
+yes('a closed ticket is kept 365 days', DAYS == 365)
+yes('and the tickets are looked at every hour', constant('TICKET_KEEP_EVERY') == 3600)
+
+LOGGED = []
+space = {'datetime': datetime, 'TICKET_KEEP_DAYS': DAYS,
+         'TICKETS': ['tickets-and-applications', 'applications'],
+         'log': lambda *a: LOGGED.append(' '.join(str(x) for x in a))}
+for name in ('ticket_past_keeping', 'age_closed_tickets'):
+    code = lift(name)
+    yes('bot.py has ' + name, bool(code))
+    exec(code, space)
+past = space['ticket_past_keeping']
+age = space['age_closed_tickets']
+
+BOT = 5000
+UTC = datetime.timezone.utc
+NOW = datetime.datetime(2027, 11, 1, 12, 0, tzinfo=UTC)
+DAY = datetime.timedelta(days=1)
+
+
+class Refused(Exception):
+    pass
+
+
+class Thread:
+    def __init__(self, tid, closed, owner=BOT, archived=True, refuse=False):
+        self.id = tid
+        self.archive_timestamp = closed
+        self.owner_id = owner
+        self.archived = archived
+        self.refuse = refuse
+        self.deleted = False
+
+    async def delete(self):
+        if self.refuse:
+            raise Refused('Missing Permissions')
+        self.deleted = True
+
+
+class Channel:
+    def __init__(self, name, threads, refuse=False):
+        self.name = name
+        self.threads = threads
+        self.refuse = refuse
+        self.asked = []
+
+    async def archived_threads(self, private=False, joined=False, limit=100, before=None):
+        self.asked.append({'private': private, 'joined': joined, 'limit': limit, 'before': before})
+        if self.refuse:
+            raise Refused('Forbidden (status code: 403)')
+        # The whole channel, so the function's own check is what is tested,
+        # not Discord's before.
+        for t in self.threads:
+            yield t
+
+
+class Guild:
+    def __init__(self, channels):
+        self.name = 'Test server'
+        self.text_channels = channels
+
+
+old = Thread(101, NOW - 366 * DAY)
+young = Thread(102, NOW - 364 * DAY)
+still_open = Thread(103, NOW - 400 * DAY, archived=False)
+by_hand = Thread(104, NOW - 400 * DAY, owner=7)
+no_time = Thread(105, None)
+naive = Thread(106, (NOW - 400 * DAY).replace(tzinfo=None))
+refused = Thread(107, NOW - 500 * DAY, refuse=True)
+old2 = Thread(108, NOW - 700 * DAY)
+tickets = Channel('Tickets-and-Applications',
+                  [old, young, still_open, by_hand, no_time, naive, refused, old2])
+other_old = Thread(201, NOW - 400 * DAY)
+general = Channel('general-chat', [other_old])
+locked_out = Channel('applications', [Thread(301, NOW - 400 * DAY)], refuse=True)
+guild = Guild([locked_out, general, tickets])
+
+deleted, failed = asyncio.run(age(guild, BOT, NOW))
+
+yes('a ticket closed 366 days ago is deleted', old.deleted and old2.deleted)
+yes('one closed 364 days ago stays', not young.deleted)
+yes('a thread still open is never touched', not still_open.deleted)
+yes('a thread a Gamemaster opened by hand is never touched', not by_hand.deleted)
+yes('a thread whose close time is missing is kept', not no_time.deleted)
+yes('and one whose close time has no time zone is kept', not naive.deleted)
+yes('a thread off a channel that is not a ticket channel is never touched',
+    not other_old.deleted and not general.asked)
+yes('Discord is asked for the private closed threads closed before the cut, all of them',
+    tickets.asked == [{'private': True, 'joined': False, 'limit': None,
+                       'before': NOW - DAYS * DAY}])
+yes('the counts say what happened: two deleted, one refused, one list unread',
+    (deleted, failed) == (2, 2))
+yes('each deletion is a line with its id and the day it closed',
+    any('deleted thread 101' in s and (NOW - 366 * DAY).date().isoformat() in s for s in LOGGED))
+yes('a refused delete is said with Discord\'s reason, and the rest still went',
+    any('could not delete thread 107' in s and 'Missing Permissions' in s for s in LOGGED)
+    and old2.deleted)
+yes('a list that cannot be read is said with its reason, and the next channel is still aged',
+    any('could not list' in s and '#applications' in s and '403' in s for s in LOGGED)
+    and old.deleted)
+yes('nothing is said for what was kept',
+    not any(('thread 102' in s or 'thread 104' in s or 'thread 105' in s) for s in LOGGED))
+
+LOGGED[:] = []
+again = asyncio.run(age(Guild([Channel('tickets-and-applications', [young])]), BOT, NOW))
+yes('a pass with nothing past its time deletes nothing and says nothing', again == (0, 0) and not LOGGED)
+yes('with no bot id nothing is deleted',
+    not past(Thread(401, NOW - 400 * DAY), None, NOW - DAYS * DAY))
+
+watch = lift('watch_closed_tickets')
+yes('the hourly watch ages every server and sleeps TICKET_KEEP_EVERY between passes',
+    'age_closed_tickets(gd, bot_id, now)' in watch and 'asyncio.sleep(TICKET_KEEP_EVERY)' in watch)
+yes('the bot starts the watch when it is ready',
+    'asyncio.create_task(watch_closed_tickets())' in lift('on_ready'))
+yes('a ticket is opened with the week Discord closes an idle one after',
+    'auto_archive_duration=10080' in SRC)
+close = lift('close_here')
+yes('the close message says when it is deleted, and no longer that nothing is',
+    'deleted %d days after it was last closed' in close and 'TICKET_KEEP_DAYS' in close
+    and 'Nothing is deleted' not in close)
+
+build = (ROOT / 'bot' / 'Build-Discord.py').read_text(encoding='utf-8')
+yes('the bot is still given Manage Threads, which deleting a thread needs',
+    "('Manage Threads',           34)" in build)
+
+page = (ROOT / 'site' / 'data' / 'site' / 'privacy.md').read_text(encoding='utf-8')
+page = ' '.join(page.split())
+yes('the privacy page says a closed ticket goes after 365 days',
+    'closed, for 365 days, then the bot deletes it' in page)
+yes('and when one nobody closed goes', 'A ticket nobody closes is closed by Discord after a week' in page)
+yes('and no longer that it stays until staff delete it', 'until staff delete it' not in page)
+
+print('\n%d passed, %d failed' % (len(PASS), len(FAIL)))
+sys.exit(1 if FAIL else 0)

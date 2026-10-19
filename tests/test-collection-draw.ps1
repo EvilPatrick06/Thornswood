@@ -50,7 +50,6 @@ namespace Thornswood {
 $source=Join-Path $Scratch 'CollectionDrawFixture.cs'
 [IO.File]::WriteAllText($source,$harness.Replace('__METHODS__',$methods),(New-Object Text.UTF8Encoding($false)))
 $dll=Join-Path $Scratch 'CollectionDrawFixture.dll'
-$csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
 & $LauncherCsc /noconfig /nologo /target:library "/langversion:$LauncherLangVersion" ("/out:"+$dll) $source
 if($LASTEXITCODE){throw 'Real collection method compilation failed'}
 $assembly=[Reflection.Assembly]::LoadFrom($dll)

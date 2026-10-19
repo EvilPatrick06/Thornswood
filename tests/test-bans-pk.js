@@ -44,9 +44,10 @@
      the menu puts a dead character in no slot, so that slot offers a new
      character, and will not play a dead or banned one.
   6. The launcher: Roster reads the site's pk and banned lists (the lifted C#
-     compiled with the .NET Framework csc), and Chars moves a dead character
-     out of its slot, never picks it and lets it be forgotten; and puts one an
-     admin brought back into the lowest free slot (RaiseRevived, compiled).
+     compiled with the build's compiler, tests/launcher-csc.js), and Chars
+     moves a dead character out of its slot, never picks it and lets it be
+     forgotten; and puts one an admin brought back into the lowest free slot
+     (RaiseRevived, compiled).
   7. Undoing a PK: /unpk in the game (by the character in the world, by name,
      by profile number), refused while every slot is held, refused to staff
      who are not an admin; Undo PK on the hub; pk.json keeps every PK and
@@ -105,9 +106,10 @@ fs.writeFileSync(path.join(dir, 'config.json'), JSON.stringify({
   botKey: KEY, admins: [STAFF_D, STAFF2_D], secret: SECRET, passKey: PASSKEY,
   gameCheckPort: 1, onlineFile: path.join(dir, 'online.json')
 }, null, 2));
-// The launcher feed the join pass holds a launcher's version to.
-fs.mkdirSync(path.join(dir, 'feed'), { recursive: true });
-fs.writeFileSync(path.join(dir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
+// The launcher feed the join pass holds a launcher's version to, as its first
+// write-once generation (#2727).
+fs.mkdirSync(path.join(dir, 'feed', 'version'), { recursive: true });
+fs.writeFileSync(path.join(dir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1.1.200', minLauncher: '1.1.200' }));
 const DATA = path.join(dir, 'data');
 fs.writeFileSync(path.join(DATA, 'linked.json'), JSON.stringify({
   [STAFF_D]: { id: STAFF_D, name: 'Aela', profiles: [1001] },

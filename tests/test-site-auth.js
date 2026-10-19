@@ -189,7 +189,8 @@ function grabRefresh() {
   const src = fs.readFileSync(GAME_SRC, 'utf8');
   const door = src.indexOf('// ==== thornswood door ====');
   if (door < 0) throw new Error('gamemode.js has no door block');
-  const at = src.indexOf('function refresh()', door);
+  // done since #2551: an office change in the game waits on one read.
+  const at = src.indexOf('function refresh(done)', door);
   if (at < 0) throw new Error('the door block has no refresh()');
   const b = src.indexOf('{', at);
   let d = 0;
@@ -203,6 +204,8 @@ function grabRefresh() {
 function runRefresh(refreshSrc, privDir, FILE, sent, notes) {
   let doorSaid = false, readAt = 0, listAt = 0;
   const note = (line) => { notes.push(String(line)); };
+  // The engine's whole-file write (#2740), as far as the door can tell.
+  const mp = { writeFileWhole: (p, text) => fs.writeFileSync(p, text) };
   // The scratch site is plain http, so the door's https is http here, with
   // every call written down on the way past.
   const require = (m) => {
