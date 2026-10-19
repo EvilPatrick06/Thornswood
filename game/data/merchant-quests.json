@@ -522,6 +522,335 @@
       ],
       "rewardGold": 40,
       "cooldownHours": 6
+    },
+    {
+      "id": "q-whiterun-smith-spare-pick",
+      "name": "A spare pick for the mine",
+      "text": "A spare pick keeps a mining crew working when a tool breaks. Bring one pickaxe for the Whiterun Smith's reserve.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "miner",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "1a67c:Skyrim.esm",
+        "base": "13bb9:Skyrim.esm",
+        "role": "Smith",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "e3c16:Skyrim.esm",
+          "count": 1,
+          "recipe": {
+            "reference": "1548d:Thornswood-Content.esp",
+            "owner": "Smith",
+            "half": "Edgewright",
+            "rank": "novice",
+            "out": "e3c16:Skyrim.esm",
+            "makes": 1,
+            "bench": "88105:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "5ace4:Skyrim.esm",
+                "name": "Iron Ingot",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotIron"
+              },
+              {
+                "item": "15490:Thornswood-Content.esp",
+                "name": "Tool Handle",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "woodworker",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "ThornswoodRecipeToolHandle"
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
+    },
+    {
+      "id": "q-rift-woodworker-spare-pole",
+      "name": "A spare pole for the lake",
+      "text": "Bring one crude fishing pole to the Rift Woodworker, to replace poles lost or broken around the lake.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "fisher",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "19dd0:Skyrim.esm",
+        "base": "1334d:Skyrim.esm",
+        "role": "Woodworker",
+        "hold": "the Rift",
+        "bookHold": "riften"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "15498:Thornswood-Content.esp",
+          "count": 1,
+          "recipe": {
+            "reference": "1549c:Thornswood-Content.esp",
+            "owner": "Woodworker",
+            "half": "Woodwright",
+            "rank": "novice",
+            "out": "15498:Thornswood-Content.esp",
+            "makes": 1,
+            "bench": "154e1:Thornswood-Content.esp",
+            "inputItems": [
+              {
+                "item": "6f993:Skyrim.esm",
+                "name": "Firewood",
+                "type": "MISC",
+                "count": 2,
+                "producedBy": "woodworker",
+                "producedAt": "novice",
+                "suppliedBy": "woodworker",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "800e4:Skyrim.esm",
+                "name": "Leather Strips",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 2,
+                "suppliedVia": "RecipeLeatherStrips"
+              },
+              {
+                "item": "3f7f8:Skyrim.esm",
+                "name": "Tundra Cotton",
+                "type": "INGR",
+                "count": 2,
+                "producedBy": "gatherer",
+                "producedAt": "novice",
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 0
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
+    },
+    {
+      "id": "q-falkreath-tailor-trail-boots",
+      "name": "Boots for the trail",
+      "text": "Bring one pair of boots to Falkreath's Tailor for hunters setting out along the forest trails.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "hunter",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "1939ba:aaaGraniteHill.esp",
+        "base": "18e8b6:aaaGraniteHill.esp",
+        "role": "Tailor",
+        "hold": "Falkreath",
+        "bookHold": "falkreath"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "d1921:Skyrim.esm",
+          "count": 1,
+          "recipe": {
+            "reference": "928:MoreCraftableEquipment.esp",
+            "owner": "Tailor",
+            "half": "Haberdasher",
+            "rank": "novice",
+            "out": "d1921:Skyrim.esm",
+            "makes": 1,
+            "bench": "6ce000:Update.esm",
+            "inputItems": [
+              {
+                "item": "db5d2:Skyrim.esm",
+                "name": "Leather",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "RecipeLeatherFoxSnowHide"
+              },
+              {
+                "item": "6ce001:Update.esm",
+                "name": "Thread",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "MCERecipeThreadTundraCotton"
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
+    },
+    {
+      "id": "q-haafingar-cook-field-soup",
+      "name": "Soup for the field hands",
+      "text": "Bring two bowls of potato soup to Haafingar's Cook for field hands after their work.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "farmer",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "198a0:Skyrim.esm",
+        "base": "13266:Skyrim.esm",
+        "role": "Cook",
+        "hold": "Haafingar",
+        "bookHold": "solitude"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "353d:HearthFires.esm",
+          "count": 2,
+          "recipe": {
+            "reference": "3542:HearthFires.esm",
+            "owner": "Cook",
+            "half": "Hearthcook",
+            "rank": "novice",
+            "out": "353d:HearthFires.esm",
+            "makes": 1,
+            "bench": "a5cb3:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "34cdf:Skyrim.esm",
+                "name": "Salt Pile",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "miner",
+                "producedAt": "novice",
+                "suppliedBy": "miner",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "64b41:Skyrim.esm",
+                "name": "Potato",
+                "type": "ALCH",
+                "count": 1,
+                "producedBy": "farmer",
+                "producedAt": "novice",
+                "suppliedBy": "farmer",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "669a5:Skyrim.esm",
+                "name": "Leek",
+                "type": "ALCH",
+                "count": 1,
+                "producedBy": "farmer",
+                "producedAt": "novice",
+                "suppliedBy": "farmer",
+                "suppliedAt": "novice",
+                "hops": 0
+              }
+            ],
+            "needs": [
+              {
+                "asks": "HasPerk(MAG_RecipePerkPotatoSoup) == 1",
+                "function": 448,
+                "of": "MAG_RecipePerkPotatoSoup",
+                "ofType": "PERK",
+                "serverSees": false
+              },
+              {
+                "asks": "HasPerk(MAG_FoodUpgradePerk03) == 0",
+                "function": 448,
+                "of": "MAG_FoodUpgradePerk03",
+                "ofType": "PERK",
+                "serverSees": false
+              }
+            ]
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
+    },
+    {
+      "id": "q-hjaalmarch-alchemist-cotton-dressings",
+      "name": "Cotton for marsh-road dressings",
+      "text": "Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "gatherer",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "1aa61:Skyrim.esm",
+        "base": "135ef:Skyrim.esm",
+        "role": "Alchemist",
+        "hold": "Hjaalmarch",
+        "bookHold": "morthal"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "3f7f8:Skyrim.esm",
+          "count": 3,
+          "harvest": {
+            "reference": "bb947:Skyrim.esm",
+            "produce": "3f7f8:Skyrim.esm",
+            "name": "Tundra Cotton",
+            "rank": "novice"
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
     }
   ]
 }
