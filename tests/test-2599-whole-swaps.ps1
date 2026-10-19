@@ -84,11 +84,15 @@ Yes 'no File.Move is left in OwnGameShare.cs' ($share -notmatch 'File\.Move\(')
 # ---- 2 and 3: the real code, compiled -----------------------------------------------
 $region = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
 $block = [regex]::Match($og, '(?s)\n(        // ---- #2599: one name of the game folder replaced whole.*?        // ---- end #2599[^\n]*\n)')
+$linksDecl = [regex]::Match($og, '(?s)\n(        \[StructLayout\(LayoutKind\.Sequential\)\]\n        struct FileInfoByHandle\n.*?        const uint BackupSemantics = 0x02000000;\n)')
+$linksFn = [regex]::Match($og, '(?s)\n(        static int Links\(string path\)\n        \{\n.*?\n        \}\n)')
 Yes 'ReplaceName and the record writers, with the MoveFileEx they call, are in OwnGame.cs' ($region.Success -and $region.Groups[1].Value -match 'internal static void ReplaceName\(string next, string path, bool clearReadOnly\)')
 Yes 'DeleteName, SwapCopyIn and SwapNameIn are in OwnGame.cs' ($block.Success -and $block.Groups[1].Value -match 'internal static void DeleteName\(' -and $block.Groups[1].Value -match 'internal static void SwapCopyIn\(' -and $block.Groups[1].Value -match 'internal static void SwapNameIn\(')
 Yes 'the records keep their own SwapIn, a different name from ReplaceName' ($og -match 'static void SwapIn\(string next, string path\)' -and $og -notmatch 'static void SwapIn\(string next, string path, bool')
 Yes 'ReplaceName flushes next before the rename and renames with write through' ($region.Success -and $region.Groups[1].Value -match 'FlushToDisk\(next\);\s*int err = MoveOver\(next, path\);' -and $region.Groups[1].Value -match 'fs\.Flush\(true\)' -and $region.Groups[1].Value -match 'MoveReplaceExisting \| MoveWriteThrough')
-if (-not ($region.Success -and $block.Success)) { Done }
+Yes 'FlushToDisk leaves a file with another name alone: a link to the Steam copy is never opened for writing' ($region.Success -and $region.Groups[1].Value -match '(?s)static void FlushToDisk\(string file\)\s*\{[^}]*if \(Links\(file\) > 1\) return;')
+Yes 'Links and what it asks the file system with are in OwnGame.cs' ($linksDecl.Success -and $linksFn.Success)
+if (-not ($region.Success -and $block.Success -and $linksDecl.Success -and $linksFn.Success)) { Done }
 
 $work = Join-Path $Scratch ('thornswood-2599-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -100,6 +104,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
+using Microsoft.Win32.SafeHandles;
 
 namespace Thornswood
 {
@@ -109,6 +114,8 @@ namespace Thornswood
     {
 __REGION__
 __BLOCK__
+__LINKSDECL__
+__LINKSFN__
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool CreateHardLink(string name, string existing, IntPtr security);
 
@@ -138,6 +145,13 @@ __BLOCK__
             if (mode == "copyin") return Try(delegate { SwapCopyIn(path, args[2]); });
             if (mode == "delname") return Try(delegate { DeleteName(path); });
             if (mode == "link") return CreateHardLink(args[2], path, IntPtr.Zero) ? 0 : 4;
+            if (mode == "steamheld")
+            {
+                // The Steam copy's file held open the way a reader that lets
+                // others rename but not write holds it; next is a link to it.
+                using (var held = new FileStream(args[3], FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete))
+                    return Try(delegate { ReplaceName(args[2], path, false); });
+            }
             if (mode == "lockedswap" || mode == "lockednamein")
             {
                 Lock(path, int.Parse(args[3]), new ManualResetEvent(false));
@@ -167,7 +181,8 @@ __BLOCK__
     }
 }
 '@
-    $driver = $driver.Replace('__REGION__', $region.Groups[1].Value.TrimEnd()).Replace('__BLOCK__', $block.Groups[1].Value.TrimEnd())
+    $driver = $driver.Replace('__REGION__', $region.Groups[1].Value.TrimEnd()).Replace('__BLOCK__', $block.Groups[1].Value.TrimEnd()).
+        Replace('__LINKSDECL__', $linksDecl.Groups[1].Value.TrimEnd()).Replace('__LINKSFN__', $linksFn.Groups[1].Value.TrimEnd())
     $src = Join-Path $work 'WholeSwapTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-swap-test.exe'
@@ -196,6 +211,9 @@ __BLOCK__
     $g = Join-Path $work 'b.esp'; Put $n 'fresh'
     Yes '...where there was no file, it is put in place' ((Run @('swap', $g, $n, 'keep')) -eq 0 -and (Text $g) -eq 'fresh')
 
+    $steam = Join-Path $work 'steamcopy.bsa'; Put $steam 'STEAM'; $sharedAt = Join-Path $work 'shared.bsa'; Put $sharedAt 'OLD COPY'
+    $null = Run @('link', $steam, $n)
+    Yes 'a link to the Steam copy goes in while Steam reads that file, with no write handle asked of it' ((Run @('steamheld', $sharedAt, $n, $steam)) -eq 0 -and (Text $sharedAt) -eq 'STEAM' -and (Text $steam) -eq 'STEAM')
     $r = Join-Path $work 'r.ini'; Put $r 'old'; SetRO $r; Put $n 'new'
     Yes 'a read only file, not told to clear the mark: refused, and left as it was, mark and all' ((Run @('swap', $r, $n, 'keep')) -eq 3 -and (Text $r) -eq 'old' -and (RO $r))
     Yes '...told to clear the mark: replaced' ((Run @('swap', $r, $n, 'clear')) -eq 0 -and (Text $r) -eq 'new' -and -not (Test-Path -LiteralPath $n))

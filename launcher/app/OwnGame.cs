@@ -255,12 +255,16 @@ namespace Thornswood
 
         /// <summary>
         /// Flushes a file's bytes to the disk (FlushFileBuffers, through
-        /// FileStream.Flush(true)). A read only file here is a link to a file
-        /// already on the disk (the share step), so there is nothing to flush.
+        /// FileStream.Flush(true)). A file with another name is a link to bytes
+        /// already on the disk under that name (the share step links the Steam
+        /// copy's own file, read only or not), so there is nothing to flush, and
+        /// a write handle on it would be a write handle on Steam's file, which
+        /// Steam reading it refuses. Only a fresh copy, one name, is flushed.
         /// </summary>
         static void FlushToDisk(string file)
         {
             if ((File.GetAttributes(file) & FileAttributes.ReadOnly) != 0) return;
+            if (Links(file) > 1) return;
             using (var fs = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
                 fs.Flush(true);
         }
