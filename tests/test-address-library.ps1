@@ -30,9 +30,9 @@
   the build is right and the row must not send somebody the other way.
 
   This lifts class Check and the three AddressLibrary methods out of the
-  shipped Checks.cs by text and compiles them with the same .NET Framework csc
-  Build-Launcher.ps1 uses, so what runs is the shipped code under C# 5 rather
-  than a copy of it. The fake game folders get a SkyrimSE.exe built by that
+  shipped Checks.cs by text and compiles them with the compiler the build runs
+  (tests\Launcher-Csc.ps1), so what runs is the shipped code rather than a
+  copy of it. The fake game folders get a SkyrimSE.exe built by that
   csc with a version resource of the build under test.
 
   Read only apart from files under its own temp folder. It reads
@@ -100,12 +100,8 @@ if (-not ($checkClass -and $row -and $file -and $name)) {
   Done
 }
 
-$csc = @(
-  (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-  (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) {
-  Yes 'the .NET Framework csc the launcher is built with is here' $false
+if (-not (Test-Path -LiteralPath $LauncherCsc)) {
+  Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' $false
   Done
 }
 
@@ -162,7 +158,7 @@ namespace TsTest264
 "@
   $dll = Join-Path $root 'lifted.dll'
   $compiled = Csc $lifted $dll
-  Yes 'the lifted launcher code compiles with the .NET Framework csc (C# 5)' $compiled
+  Yes 'the lifted launcher code compiles with the compiler the build runs' $compiled
   if (-not $compiled) { Done }
   # Loaded from bytes so the temp folder can still be removed afterwards.
   $null = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

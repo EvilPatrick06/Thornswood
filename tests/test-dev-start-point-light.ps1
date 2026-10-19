@@ -14,7 +14,7 @@
 
   HOW. The same as test-dev-deploy-pass.ps1: the settings block is lifted out
   of the script, expanded here with the values the script would have (its
-  counting function from ServerOrder.ps1, a light table and the box's record),
+  counting function from ServerOrder.ps1, a light table and whether the record says the engine loads light plugins),
   and run in Windows PowerShell, what sshd runs on the box, against a
   server-settings.json in a temp folder. Nothing connects to anything.
 
@@ -58,20 +58,18 @@ Yes 'and the script builds the light table with Test-ThornswoodPluginLight, the 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-dev-start-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
-# $light maps a plugin name to whether it is light; $loads is the box's record
-# (true, false, or $null for no record at all).
+# $light maps a plugin name to whether it is light; $loads is whether the
+# engine loads light plugins, which the block takes from the record this
+# commit holds (the check before anything is sent holds the box's to it).
 function Run-Block($settings, [hashtable]$light, $loads) {
     $p = Join-Path $tmp 'server-settings.json'
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
-    $rec = Join-Path $tmp 'server-build.json'
-    Remove-Item -LiteralPath $rec -Force -ErrorAction SilentlyContinue
-    if ($null -ne $loads) { [IO.File]::WriteAllText($rec, ('{"commit":"x","lightPlugins":' + $(if ($loads) { 'true' } else { 'false' }) + '}')) }
     $rootWin = $tmp
     $farOrder = ''
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
     $lightTable = ((@($light.Keys) | ForEach-Object { "'{0}' = {1}" -f $_.ToLowerInvariant().Replace("'", "''"), $(if ($light[$_]) { '$true' } else { '$false' }) }) -join '; ')
-    $boxRecord = $rec
+    $devRecordLight = [bool]$loads
     $VoicePort = 7789
     $maxOnline = 0
     $seats = 0
@@ -110,8 +108,9 @@ try {
 
     $r = Run-Block (Settings $order '0x0219BAD4') $light $false
     Yes 'on a box whose engine does not load light plugins every entry counts: 0x0419BAD4' ($r.start -eq '0x0419BAD4')
-    $r = Run-Block (Settings $order '0x0219BAD4') $light $null
-    Yes '  and the same with no record on the box' ($r.start -eq '0x0419BAD4')
+    # #2711: the block read the box's record itself, in a try with an empty
+    # catch, so a record that did not read counted as no light plugins.
+    Yes '  and the block reads no record on the box, so there is none to misread' ($body -notmatch 'server-build\.json' -and $body.Contains('$loadsLight = `$$devRecordLight'))
 
     $odd = @('Skyrim.esm', 'Mystery.esp', 'Skyrim Unbound.esp')
     $r = Run-Block (Settings $odd '0x0919BAD4') $light $true

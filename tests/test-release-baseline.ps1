@@ -357,7 +357,7 @@ try {
     foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Feed-Json.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
-                   'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1',
+                   'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1', 'scripts\release\Release-Manifest.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json') {
@@ -371,6 +371,8 @@ try {
         Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Force
     }
     Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+    # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+    Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
     $Shell = (Get-Process -Id $PID).Path
     $inst = Join-Path $T 'install'
     $site6 = Join-Path $T 'site6'
@@ -410,7 +412,9 @@ try {
         $gone = [regex]::Match($r.Out, '(?m)^\s*(\d+) removed')
         return ($r.Out -match '(?m)^\s*0 added or changed' -and $gone.Success -and [int]$gone.Groups[1].Value -eq 0)
     }
-    function Feed6([string]$json) { Put (Join-Path $site6 'feed\version.json') $json; Put (Join-Path $rel6 'version.json') $json }
+    # The site's feed is the newest of its generations; a feed put there is the
+    # next one, the way the store sends it (Feed-Store.ps1, #2727).
+    function Feed6([string]$json) { Put (Join-Path (Join-Path $site6 'feed\version') (Get-FeedVersionNext (Join-Path $site6 'feed'))) $json; Put (Join-Path $rel6 'version.json') $json }
 
     # This machine records the build: a feed that names no record, no store
     # copy yet, -Baseline.

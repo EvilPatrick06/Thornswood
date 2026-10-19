@@ -170,10 +170,12 @@ try {
     $text = Get-Content -LiteralPath $installer -Raw
     $carry = $text.IndexOf('if ($hadRoot) { Carry $aside $Root ([bool]$FreshWorld) }')
     $lock = $text.IndexOf('Lock-ServerRoot $Root $(if ($hadRoot) { $aside } else { '''' })')
-    $task = $text.IndexOf('Register-ScheduledTask -TaskName $TaskName')
+    # The call, not the definition: since #2608 the task is registered by
+    # Register-ServerTask, whose body sits above the lock in the file.
+    $task = $text.IndexOf('if (-not $NoTask) { Register-ServerTask $writer }')
     $start = $text.IndexOf("`nStart-ScheduledTask -TaskName `$TaskName")
     Yes 'the installer locks the root after the world and the roster are carried across' ($carry -gt 0 -and $lock -gt $carry)
-    Yes 'and before the server''s task is registered or started' ($lock -lt $task -and $lock -lt $start)
+    Yes 'and before the server''s task is registered or started' ($task -gt 0 -and $lock -lt $task -and $lock -lt $start)
     Yes 'and locks what it replaced' ($text -match [regex]::Escape('if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '''' }'))
     Yes 'the installer carries for-bot across whole, as it does private' ($text -match [regex]::Escape("foreach (`$name in 'world', 'private', 'for-bot')"))
     $mk = $text.IndexOf('$forBotDir = Join-Path $Root ''for-bot''')

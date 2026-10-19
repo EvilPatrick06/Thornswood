@@ -2,8 +2,9 @@
 <!--
   The setup program as an MSBuild project (issue #498). Since the switch
   (15 Oct) this is the only way it is built: scripts\release\Build-Launcher.ps1
-  runs MSBuild on it. It holds Bootstrap.cs and the launcher's WindowFit.cs,
-  the emblem as logo.png, the launcher's icon, Setup.manifest stamped with
+  runs MSBuild on it. It holds Bootstrap.cs, the launcher's WindowFit.cs
+  and the launcher's Themes.cs (the window is drawn in Forge, #2851), the
+  emblem as logo.png, the launcher's icon, Setup.manifest stamped with
   the launcher's version, and
   FileVersion and ProductVersion from Updater.cs. Title, Product, Company and
   Copyright stay in Bootstrap.cs.
@@ -75,6 +76,7 @@
   <ItemGroup>
     <Compile Include="Bootstrap.cs" />
     <Compile Include="..\..\launcher\app\WindowFit.cs"><Link>WindowFit.cs</Link></Compile>
+    <Compile Include="..\..\launcher\app\Themes.cs"><Link>Themes.cs</Link></Compile>
     <Compile Include="$(ThornswoodSetupVersionFile)" />
   </ItemGroup>
 

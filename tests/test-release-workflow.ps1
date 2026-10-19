@@ -16,8 +16,8 @@
   the wrong machine, or an id-token handed to a run that is not a release.
 
   BEFORE THE SWITCH-OVER. Until a hosted run has been proven (GitHub refuses
-  hosted jobs on billing, #2393) and a launcher built by MSBuild has been
-  started on dev (#498), the box still builds every release and the hosted
+  hosted jobs on billing, #2393; the launcher itself has been built by MSBuild
+  since 1.2.4.5, #498), the box still builds every release and the hosted
   job runs only on a manual run that asks for it. This checks that state.
   The switch-over changes the hosted job's "if" and the runner input's
   default (release.yml header, WHERE IT RUNS); this test's two "until the
@@ -113,6 +113,8 @@ Yes 'it never looks a draft up by /releases/tags/ (that endpoint never returns a
 Yes '  it reads the releases list page by page instead' ($draft.Contains('releases?per_page=100&page=$page') -and $draft.Contains('$_.tag_name -eq $tag'))
 Yes '  and stops when the tag has more than one release, naming them' ($draft.Contains('if ($same.Count -gt 1)') -and $draft.Contains('gh api -X DELETE repos/$repo/releases/<id>'))
 Yes '  and never replaces the files of a published release' ($draft.Contains('if (-not $release.draft)'))
+Yes '  and rewrites an existing draft''s notes with the files it uploads (a signed rebuild kept saying UNSIGNED)' ($draft.Contains('-Method Patch -Uri "$api/releases/$($release.id)"') -and $draft.Contains('@{ body = $notes }'))
+Yes '  and the VPS notes name MSBuild, not the csc #498 retired' ($draft.Contains("'built on the VPS runner with MSBuild (#498)") -and -not $draft.Contains('csc'))
 Yes '  and writes release_id and signed for the verify job' ($draft.Contains('"release_id=" + $release.id') -and $draft.Contains('("signed=" +'))
 
 # ---- the VPS job --------------------------------------------------------------

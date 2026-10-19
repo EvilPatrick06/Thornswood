@@ -1,0 +1,454 @@
+'use strict';
+/*
+  test-2351-release-registers.js
+
+      node tests/test-2351-release-registers.js
+
+  #2351, Patrick's A of 16 October: "Delete-Person.ps1 writes a list, and the
+  gamemode releases those entries at its next start." This starts the real
+  blocks of game\gamemode.js that keep a register naming a character, in the
+  order the server loads them, in a scratch server folder with a stand-in of
+  every register and a stand-in list (private\deleted-characters.json), the
+  way a game server starts after a deletion:
+
+    R  the release of deleted characters: the list read once, each part let
+       go as its block loads, marked done, the list gone at the end
+    F  farming: their farm claim and seed are gone, the others' stay
+    P  property: their claim is free, a master key record cut for them comes
+       off another's claim, their office is let go, before rolesRead could
+       name them; their posts come down with their words off; a job they took
+       goes back on the board; gold owed to them stops being held; the drop
+       box keeps every coin with their name off; their bed nights and takings
+       go
+    B  the books stay balanced: every hold's ledger (funds) is the same coin
+       for coin, never less than what is still held, and the drop box holds
+       the same gold
+    E  the embassy and remnant rolls, by profile and by form id
+    D  the dungeon chests' record: the character off, the reservation kept,
+       the file still verifies and loads again
+    K  the books: a book they own is disbanded with its ledger entries, their
+       membership and their chat lines go, and when they last left
+    L  the log says counts and nothing else
+    W  a part that cannot write waits, alone, for the next start; a list that
+       is not one releases nothing and is left
+
+  Nothing leaves this machine. The scratch folder goes at the end.
+*/
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const vm = require('vm');
+const crypto = require('crypto');
+
+const REPO = path.join(__dirname, '..');
+const gm = fs.readFileSync(path.join(REPO, 'game', 'gamemode.js'), 'utf8').split(String.fromCharCode(13)).join('');
+
+let pass = 0, fail = 0;
+function yes(what, cond) {
+  if (cond) { pass++; console.log('PASS  ' + what); }
+  else { fail++; console.log('FAIL  ' + what); }
+}
+function slice(start, end, withEnd) {
+  const a = gm.indexOf(start);
+  if (a < 0) { return null; }
+  const b = gm.indexOf(end, a + start.length);
+  if (b < 0) { return null; }
+  return gm.slice(a, withEnd ? b + end.length : b);
+}
+
+const parts = {
+  release: slice('// ==== thornswood release of deleted characters ====', '// ==== end thornswood release of deleted characters ====', true),
+  crops: slice('// ==== CROPS_BY_BASE, generated ====', 'var CROPS = mergeCrops();', true),
+  farming: slice('// ==== thornswood farming ====', '// ==== end thornswood farming ===='),
+  property: slice('// ==== thornswood property ====', '// ==== end thornswood property ===='),
+  embassy: slice('// ==== thornswood embassy and remnant ====', '// ==== end thornswood embassy and remnant ===='),
+  ledger: slice('function createPrivateMerchantLedger(', 'function npcMerchantManifest('),
+  dungeon: slice('// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ===='),
+  books: slice('/* BOOKS-START */', '// ==== thornswood chat commands ====')
+};
+for (const k of Object.keys(parts)) { yes('R0 ' + k + ' is in gamemode.js where this harness looks', !!parts[k]); }
+if (Object.keys(parts).some(function (k) { return !parts[k]; })) { done(); }
+
+// The release block comes before the first register block, and every block asks it.
+yes('R1 the release block loads before farming, the first register block',
+    gm.indexOf('// ==== thornswood release of deleted characters ====') < gm.indexOf('// ==== thornswood farming ===='));
+for (const [part, where] of [['farms', parts.farming], ['property', parts.property], ['embassy', parts.embassy], ['dungeon', parts.dungeon]]) {
+  yes('R2 the ' + part + ' block asks for its part once, as it loads',
+      where.indexOf("g.__thornswoodRelease('" + part + "', release)") >= 0);
+}
+yes('R2 the books ask for theirs as they start', parts.books.indexOf("g.__thornswoodRelease('books', api.release)") >= 0);
+yes('R3 property lets go before rolesRead, which would name the character in the log',
+    parts.property.indexOf("g.__thornswoodRelease('property', release)") < parts.property.lastIndexOf('rolesRead();'));
+yes('R4 and every part waiting is said once the books have loaded',
+    parts.books.indexOf('__thornswoodReleaseWaiting();') > parts.books.indexOf("g.__thornswoodRelease('books'"));
+
+// ------------------------------------------------------------- stand-ins --
+const ME = '111111111111111111', YOU = '222222222222222222';
+const P1 = 5001, P2 = 5002, PY = 6001, PZ = 6002;     // P1 and P2 are theirs; PY and PZ are not
+const A1 = 0xff000a01, A2 = 0xff000a02, AY = 0xff000a09;  // form ids: theirs, theirs, yours
+const NOW = Date.now();
+const GOLD = 15;
+
+function checksum(doc) {
+  return crypto.createHash('sha256').update(JSON.stringify([doc.version, doc.entries])).digest('hex');
+}
+
+function registers(dir) {
+  const P = path.join(dir, 'private');
+  fs.mkdirSync(P, { recursive: true });
+  fs.mkdirSync(path.join(dir, 'data'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private', thornswoodServer: 'dev' }));
+  const w = function (f, v) { fs.writeFileSync(path.join(P, f), JSON.stringify(v, null, 1)); };
+  w('property.json', {
+    claims: {
+      'b1:Skyrim.esm': { by: P1, name: 'Mine', at: NOW, touched: NOW, rent: { amount: 10, everyDays: 7, owed: 10, since: NOW } },
+      'b2:Skyrim.esm': { by: PY, name: 'Yours', at: NOW, touched: NOW, master: { for: P1, no: 3 } },
+      'b3:Skyrim.esm': { by: PZ, name: 'Theirs', at: NOW, touched: NOW, master: { for: PZ, no: 4 } }
+    },
+    funds: { whiterun: 200, riften: 50 },
+    notices: {
+      whiterun: [
+        { by: P1, name: 'Mine', title: 'Lost cat', text: 'Grey and old.', at: NOW, job: false, taken: 0 },
+        { by: P1, name: 'Mine', title: 'Fetch water', text: 'From the well.', at: NOW, job: true, pay: 20, taken: PY, takenName: 'Yours' },
+        { by: PY, name: 'Yours', text: 'Meet me at dusk.', at: NOW, job: true, letter: true, to: 'Lydia', pay: 15, taken: P1, takenName: 'Mine' },
+        { by: PY, name: 'Yours', text: 'a crate of iron', at: NOW, job: true, haul: true, dest: 'riften', pay: 0, taken: P1,
+          takenName: 'Mine', down: NOW, downBy: PY, done: NOW, doneBy: PY, owed: 40, owedTo: P1, owedFor: 'hauled', paid: 40, kept: 4 },
+        { by: PY, name: 'Yours', text: 'For you.', at: NOW, job: true, letter: true, to: 'Mine', pay: 0, taken: PZ,
+          takenName: 'Theirs', down: NOW, downBy: P1, delivered: NOW, deliveredTo: P1 },
+        { by: PZ, name: 'Theirs', title: 'Selling a horse', text: 'A good one.', at: NOW, job: false, taken: 0 }
+      ]
+    },
+    dropbox: {
+      whiterun: {
+        items: [
+          { n: 1, by: P1, name: 'Mine', kind: 'gold', baseId: GOLD, count: 30, what: 'Gold', at: NOW, rent: [{ building: 'b1:Skyrim.esm', amount: 10 }] },
+          { n: 2, by: PY, name: 'Yours', kind: 'gold', baseId: GOLD, count: 7, what: 'Gold', at: NOW }
+        ],
+        log: [
+          { act: 'in', n: 1, who: P1, whoName: 'Mine', by: P1, byName: 'Mine', what: 'Gold', count: 30, at: NOW },
+          { act: 'out', n: 3, who: PY, whoName: 'Yours', by: P1, byName: 'Mine', what: 'Gold', count: 5, at: NOW },
+          { act: 'in', n: 2, who: PY, whoName: 'Yours', by: PY, byName: 'Yours', what: 'Gold', count: 7, at: NOW }
+        ],
+        next: 4
+      }
+    },
+    // The jail rule ran long ago, as on every server, so a start writes nothing of its own.
+    steps: { jailRule: NOW },
+    boards: {
+      whiterun: { cell: '3c:Skyrim.esm', pos: [0, 0, 0], where: 'Whiterun', placed: true },
+      riften: { cell: '3c:Skyrim.esm', pos: [100000, 0, 0], where: 'Riften', placed: true }
+    }
+  });
+  w('law.json', { cells: {}, held: {
+    'jarl:whiterun': { [ME]: { pid: P1, name: 'Mine', at: NOW } },
+    'guard:riften': { [YOU]: { pid: PY, name: 'Yours', at: NOW } },
+    'court:solitude': { [ME]: { pid: P2, name: 'Also mine', at: NOW }, [YOU]: { pid: PY, name: 'Yours', at: NOW } }
+  } });
+  w('beds.json', {
+    guests: {
+      'b2:Skyrim.esm': { [P1]: { by: PY, at: NOW, name: 'Mine' }, [PZ]: { by: PY, at: NOW, name: 'Theirs' } },
+      'b1:Skyrim.esm': { [PY]: { by: P1, at: NOW, name: 'Yours' } }
+    },
+    takings: { [P1]: 10, [PY]: 4 }
+  });
+  w('farm-claims.json', { at: NOW, claims: {
+    [P1]: { by: P1, name: 'Mine', at: NOW, cell: '3c:Skyrim.esm', x: 0, y: 0 },
+    [PY]: { by: PY, name: 'Yours', at: NOW, cell: '3c:Skyrim.esm', x: 9000, y: 0 }
+  }, seeded: { [P1]: NOW, [PY]: NOW } });
+  w('embassy.json', {
+    embassy: [
+      { actor: A1, profile: 0, name: 'Mine', at: NOW, armed: true },
+      { actor: AY, profile: PY, name: 'Yours', at: NOW, armed: false }
+    ],
+    remnant: [
+      { actor: A2, profile: P2, name: 'Also mine', at: NOW },
+      { actor: A1 + 100, profile: PY, name: 'Yours too', at: NOW }
+    ]
+  });
+  const dungeon = { version: 1, entries: {
+    '1a2b3:Skyrim.esm': { at: NOW, actor: A1, tier: 1, gold: 9, items: [] },
+    '1a2b4:Skyrim.esm': { at: NOW, actor: AY, tier: 2, gold: 20, items: [] },
+    '1a2b5:Skyrim.esm': { kind: 'body', at: NOW, taken: false, gold: 3, items: [], camp: false }
+  } };
+  fs.writeFileSync(path.join(P, 'dungeon-rewards-ledger.json'), JSON.stringify({ version: dungeon.version, entries: dungeon.entries, sha256: checksum(dungeon) }));
+  fs.writeFileSync(path.join(P, 'dungeon-rewards-ledger.initialized'), '1');
+  w('books.json', {
+    books: [
+      { id: 'b1', kind: 'faction', name: 'The Grey Cloaks', account: ME, owner: P1,
+        members: [{ pid: P1, name: 'Mine', role: 'Member' }, { pid: PY, name: 'Yours', role: 'Member' }],
+        roles: [{ name: 'Member', perms: ['Read'] }], chat: [{ pid: PY, name: 'Yours', text: 'hi', at: NOW }], prices: [] },
+      { id: 'b2', kind: 'business', name: 'Iron and Oak', account: YOU, owner: PY,
+        members: [{ pid: PY, name: 'Yours', role: 'Member' }, { pid: P1, name: 'Mine', role: 'Member' }, { pid: PZ, name: 'Theirs', role: 'Member' }],
+        roles: [{ name: 'Member', perms: ['Read'] }],
+        chat: [{ pid: P1, name: 'Mine', text: 'my words', at: NOW }, { pid: PZ, name: 'Theirs', text: 'theirs', at: NOW }],
+        prices: [{ name: 'Iron Ingot', buy: 5, sell: 8 }] }
+    ],
+    ledgers: {
+      whiterun: {
+        b1: { book: 'b1', kind: 'faction', name: 'The Grey Cloaks', at: NOW, prices: [] },
+        b2: { book: 'b2', kind: 'business', name: 'Iron and Oak', at: NOW, prices: [{ name: 'Iron Ingot', buy: 5, sell: 8 }] }
+      }
+    }
+  });
+  w('last-left.json', { [P1]: NOW, [PY]: NOW });
+  w('benches.json', { whiterun: 4278190081 });
+  // Its saves already taken by server-log.js before the engine started (#2758).
+  w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2], done: { saves: NOW } });
+  return P;
+}
+
+/*
+  One start of the server's blocks, in their order in gamemode.js, in one
+  context, from the scratch folder, as the game server would. Answers the
+  context and the log.
+*/
+function start(dir, opt) {
+  opt = opt || {};
+  const logged = [];
+  const mp = {
+    makeProperty: function () { },
+    get: function (id, key) {
+      if (id === 0 && key === 'onlinePlayers') { return []; }
+      throw new Error('no reference ' + id);
+    },
+    set: function () { },
+    getDescFromId: function (id) { return Number(id).toString(16) + ':Skyrim.esm'; },
+    getIdFromDesc: function () { return 0; },
+    lookupEspmRecordById: function () { return null; },
+    getNeighborsByPosition: function () { return []; },
+    callPapyrusFunction: function () { return null; },
+    getServerSettings: function () { return { thornswoodServer: 'dev', privDir: 'private', dataDir: 'data' }; }
+  };
+  const tstart = gm.indexOf('    farming: {');
+  const tend = gm.indexOf('\n    }', tstart);
+  const farmingTuning = eval('({' + gm.slice(tstart, tend + 6) + '})').farming;
+  const box = {
+    console: { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } },
+    require: require, mp: mp, Buffer: Buffer,
+    setInterval: function () { return 1; }, clearInterval: function () { },
+    setTimeout: function () { return 1; }, clearTimeout: function () { },
+    log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); },
+    BUILDING_BY_DOOR: {}, BUILDING_NAME: {}, WAY_OUT: {}, BENCH_BY_BASE: {}, RECIPES_BY_ID: {}, ADMIN_ITEMS: {},
+    idOf: function () { return 0; }, notify: function () { }, say: function () { },
+    guard: function (n, f) { return f; },
+    toolGate: function () { return null; }, wearTool: function () { return null; }, rankStep: function () { return 0; },
+    creditWork: function () { return null; }, addItem: function () { return true; }, takeItem: function () { return true; },
+    classGate: function () { return null; }, wornNow: function () { return []; },
+    isCarcass: function () { return false; }, withinResourceReach: function () { return true; },
+    addItemsAtomic: function () { return true; },
+    __thornswoodProgression: { has: function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); },
+                               TABLE: { tuning: { farming: farmingTuning } } },
+    __thornswoodCharacter: { stateOf: function () { return null; }, writeState: function () { } },
+    // The door has read its list, and no account holds any role: rolesRead at
+    // this start ends every office held, and says each one in the log.
+    __thornswoodRolesKnown: function () { return true; },
+    __thornswoodOffices: function () { return { jarl: [], court: [], steward: [], guard: [] }; },
+    __thornswoodOfficesOnRecord: function (pid) {
+      return pid === PY ? { jarl: [], court: ['solitude'], steward: [], guard: ['riften'] } : { jarl: [], court: [], steward: [], guard: [] };
+    },
+    __thornswoodAccountOf: function (pid) { return pid === PY ? YOU : (pid === P1 || pid === P2 ? ME : ''); }
+  };
+  if (opt.before) { opt.before(box); }
+  box.globalThis = box;
+  vm.createContext(box);
+  const was = process.cwd();
+  process.chdir(dir);
+  try {
+    for (const k of ['release', 'crops', 'farming', 'property', 'embassy', 'ledger', 'dungeon', 'books']) {
+      vm.runInContext(parts[k], box, { filename: 'gamemode.js (' + k + ')' });
+    }
+  } finally { process.chdir(was); }
+  return { box: box, logged: logged };
+}
+
+function j(dir, f) { return JSON.parse(fs.readFileSync(path.join(dir, 'private', f), 'utf8')); }
+function held(n) {
+  if (!n || !n.job) { return 0; }
+  const owed = Math.floor(Number(n.owed)) || 0;
+  if (owed > 0) { return owed; }
+  if (n.down) { return 0; }
+  return Math.max(0, Math.floor(Number(n.pay)) || 0);
+}
+
+const scratch = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-2351-release-'));
+function done() {
+  try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { }
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+
+try {
+  // ============================================================ one start
+  const dir = path.join(scratch, 'server');
+  registers(dir);
+  const before = {};
+  for (const f of fs.readdirSync(path.join(dir, 'private'))) { before[f] = fs.readFileSync(path.join(dir, 'private', f), 'utf8'); }
+  const run = start(dir);
+  const L = run.logged.filter(function (l) { return /^release: /.test(l); });
+
+  yes('R5 the list is read once and every part is let go at this start (' + L.length + ' lines)',
+      L.length === 7 && /a list of 2 profile\(s\) and 2 character\(s\) to let go, at server start/.test(L[0]));
+  yes('R6 in the order the blocks load', ['farms', 'property', 'embassy', 'dungeon', 'books'].every(function (p, i) {
+    return new RegExp('^release: ' + p + ': ').test(L[i + 1]);
+  }));
+  yes('R7 and then the list is gone', /every part is done, and the list is gone/.test(L[6]) &&
+      !fs.existsSync(path.join(dir, 'private', 'deleted-characters.json')));
+
+  // ---- F
+  const farm = j(dir, 'farm-claims.json');
+  yes('F1 their farm claim is free and the other stays', !farm.claims[P1] && !!farm.claims[PY]);
+  yes('F2 when they were handed seed is forgotten, the other is kept', !farm.seeded[P1] && !!farm.seeded[PY]);
+
+  // ---- P
+  const prop = j(dir, 'property.json');
+  yes('P1 the building they held is free', !prop.claims['b1:Skyrim.esm']);
+  yes('P2 the master key record cut for them comes off another\'s claim, which stays',
+      !!prop.claims['b2:Skyrim.esm'] && prop.claims['b2:Skyrim.esm'].by === PY && !prop.claims['b2:Skyrim.esm'].master);
+  yes('P3 a claim and master key of somebody else\'s are as they were',
+      JSON.stringify(prop.claims['b3:Skyrim.esm'].master) === JSON.stringify({ for: PZ, no: 4 }));
+  const law = j(dir, 'law.json');
+  yes('P4 the offices their characters held are let go, the others\' stay',
+      !law.held['jarl:whiterun'] && !!law.held['guard:riften'] && !!law.held['guard:riften'][YOU] &&
+      !law.held['court:solitude'][ME] && !!law.held['court:solitude'][YOU]);
+  yes('P5 rolesRead found nothing of theirs to end and name', !run.logged.some(function (l) { return /no longer on the account of/.test(l) && /Mine/.test(l); }));
+  const wr = prop.notices.whiterun;
+  yes('P6 every post keeps its number (the board\'s numbers do not move)', wr.length === 6);
+  yes('P7 their notice comes down with their name and words off it',
+      !!wr[0].down && wr[0].by === 0 && wr[0].name === 'somebody' && wr[0].title === undefined && wr[0].text === undefined);
+  yes('P8 their job comes down too, with its words off, though somebody had taken it',
+      !!wr[1].down && wr[1].by === 0 && wr[1].title === undefined && wr[1].text === undefined && wr[1].takenName === 'Yours');
+  yes('P9 a letter of somebody else\'s they had taken goes back on the board, untaken, its pay still held',
+      !wr[2].down && wr[2].taken === 0 && wr[2].takenName === null && wr[2].pay === 15 && wr[2].to === 'Lydia');
+  yes('P10 gold owed to them stops being held for them, and the haul\'s record keeps its numbers',
+      wr[3].owed === 0 && wr[3].owedTo === 0 && wr[3].taken === 0 && wr[3].takenName === 'somebody' && wr[3].paid === 40 && wr[3].kept === 4);
+  yes('P11 a letter delivered to them, and taken down by them, names them no more',
+      wr[4].deliveredTo === 0 && wr[4].downBy === 0 && wr[4].to === 'Mine' && wr[4].by === PY);
+  yes('P12 somebody else\'s notice is as it was', JSON.stringify(wr[5]) === JSON.stringify(JSON.parse(before['property.json']).notices.whiterun[5]));
+  const box = prop.dropbox.whiterun;
+  yes('P13 their gold stays in the drop box with their name and the rent it paid off it',
+      box.items[0].count === 30 && box.items[0].by === 0 && box.items[0].name === 'somebody' && box.items[0].rent === undefined);
+  yes('P14 somebody else\'s gold in the box is as it was', box.items[1].by === PY && box.items[1].count === 7);
+  yes('P15 the box\'s record keeps every line, with their name off each',
+      box.log.length === 3 && box.log[0].who === 0 && box.log[0].whoName === 'somebody' && box.log[0].byName === 'somebody' &&
+      box.log[1].who === PY && box.log[1].whoName === 'Yours' && box.log[1].by === 0 && box.log[1].byName === 'somebody' &&
+      box.log[2].byName === 'Yours' && box.log.every(function (l, i) { return l.count === JSON.parse(before['property.json']).dropbox.whiterun.log[i].count; }));
+  const beds = j(dir, 'beds.json');
+  yes('P16 their night, and the guests of the building they held, end; somebody else\'s guest stays',
+      !beds.guests['b2:Skyrim.esm'][P1] && !!beds.guests['b2:Skyrim.esm'][PZ] && !beds.guests['b1:Skyrim.esm']);
+  yes('P17 the takings kept for them go, the others\' stay', beds.takings[P1] === undefined && beds.takings[PY] === 4);
+
+  // ---- B
+  const was = JSON.parse(before['property.json']);
+  const heldBefore = was.notices.whiterun.reduce(function (s, n) { return s + held(n); }, 0);
+  const heldAfter = wr.reduce(function (s, n) { return s + held(n); }, 0);
+  yes('B1 every hold\'s ledger is the same, coin for coin', JSON.stringify(prop.funds) === JSON.stringify(was.funds));
+  yes('B2 what is held for somebody drops by what was held for them, the job\'s 20 and the 40 owed (' + heldBefore + ' to ' + heldAfter + ')',
+      heldBefore === 75 && heldAfter === 15);
+  yes('B3 the ledger is never less than what it still holds', prop.funds.whiterun >= heldAfter);
+  const gold = function (b) { return b.items.reduce(function (s, it) { return s + (it.baseId === GOLD ? it.count : 0); }, 0); };
+  yes('B4 the drop box holds the same gold', gold(box) === gold(was.dropbox.whiterun));
+  yes('B5 the in-memory register is what was written', JSON.stringify(run.box.__thornswoodProperty.funds()) === JSON.stringify(prop.funds) &&
+      !run.box.__thornswoodProperty.claims()['b1:Skyrim.esm']);
+
+  // ---- E
+  const rolls = j(dir, 'embassy.json');
+  yes('E1 a row of theirs from before rows kept a profile goes by its form id', rolls.embassy.length === 1 && rolls.embassy[0].actor === AY);
+  yes('E2 a row of theirs goes by its profile', !rolls.remnant.some(function (r) { return r.profile === P2; }));
+  yes('E3 a row whose form id is not theirs, on another profile, stays', rolls.remnant.length === 1 && rolls.remnant[0].profile === PY);
+
+  // ---- D
+  const raw = j(dir, 'dungeon-rewards-ledger.json');
+  yes('D1 the chest their character opened keeps its reservation with the character off it',
+      raw.entries['1a2b3:Skyrim.esm'].actor === 0 && raw.entries['1a2b3:Skyrim.esm'].gold === 9 && raw.entries['1a2b3:Skyrim.esm'].at === NOW);
+  yes('D2 somebody else\'s and a body\'s are as they were',
+      raw.entries['1a2b4:Skyrim.esm'].actor === AY && raw.entries['1a2b5:Skyrim.esm'].kind === 'body');
+  yes('D3 the record still verifies', raw.sha256 === checksum(raw));
+
+  // ---- K
+  const books = j(dir, 'books.json');
+  yes('K1 the book they own is disbanded, with its ledger entry', books.books.length === 1 && books.books[0].id === 'b2' &&
+      !books.ledgers.whiterun.b1 && !!books.ledgers.whiterun.b2);
+  yes('K2 they are off the other book, its owner and the rest stay',
+      JSON.stringify(books.books[0].members.map(function (m) { return m.pid; })) === JSON.stringify([PY, PZ]));
+  yes('K3 the lines they wrote in its chat go, the others\' stay',
+      books.books[0].chat.length === 1 && books.books[0].chat[0].pid === PZ);
+  const left = j(dir, 'last-left.json');
+  yes('K4 when they last left goes', left[P1] === undefined && left[PY] === NOW);
+
+  // ---- untouched
+  yes('R8 a register that names nobody is not written', fs.readFileSync(path.join(dir, 'private', 'benches.json'), 'utf8') === before['benches.json']);
+
+  // ---- L
+  const all = run.logged.join('\n');
+  yes('L1 the log says counts: property ' + (L[2] || '').replace('release: property: ', ''),
+      /^release: property: claims 1, masterKeys 1, offices 2, posts 2, handedBack 1, owed 1, lines 5, box 1, boxRecord 2, guests 2, takings 1$/.test(L[2] || ''));
+  yes('L2 and never a name, a profile id or a form id of theirs, in any line of this start',
+      !/Mine|Also mine|my words/.test(all) &&
+      [P1, P2, A1, A2].every(function (n) { return !new RegExp('\\b(' + n + '|' + n.toString(16) + ')\\b', 'i').test(all); }));
+
+  // ---- the next start, with no list
+  const again = start(dir);
+  yes('R9 the next start has no list and lets go of nothing', !again.logged.some(function (l) { return /^release: /.test(l); }));
+  const D2 = again.logged.filter(function (l) { return /^\[dungeon\]/.test(l); });
+  yes('R10 the dungeon record with a released character loads again', !D2.some(function (l) { return /unavailable/.test(l); }) &&
+      typeof again.box.__thornswoodDungeonLoot.onChest === 'function');
+  yes('R11 so do the books, the rolls and the register', !!again.box.__thornswoodBooks && again.box.__thornswoodEmbassy.rolls().embassy.length === 1 &&
+      !again.box.__thornswoodProperty.claims()['b1:Skyrim.esm']);
+
+  // ============================================================ W: a part waits
+  const dir2 = path.join(scratch, 'waits');
+  registers(dir2);
+  fs.writeFileSync(path.join(dir2, 'private', 'embassy.json'), 'not a roll file');
+  const w1 = start(dir2);
+  const list1 = j(dir2, 'deleted-characters.json');
+  yes('W1 a roll file that cannot be read keeps the embassy\'s part waiting, said in the log',
+      w1.logged.some(function (l) { return l === 'release: embassy could not write what it let go, so its part waits for the next start'; }) &&
+      w1.logged.some(function (l) { return l === 'release: embassy did not let go at this start, so the list waits for the next one'; }));
+  yes('W2 the list stays with the other four parts marked done',
+      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'dungeon', 'farms', 'property', 'saves']) &&
+      JSON.stringify(list1.profiles) === JSON.stringify([P1, P2]));
+  // A claim made by a listed profile after the first start is not a released one.
+  const p2 = j(dir2, 'property.json');
+  p2.claims['b9:Skyrim.esm'] = { by: P1, name: 'New', at: NOW, touched: NOW };
+  fs.writeFileSync(path.join(dir2, 'private', 'property.json'), JSON.stringify(p2));
+  fs.writeFileSync(path.join(dir2, 'private', 'embassy.json'), before['embassy.json']);
+  const w2 = start(dir2);
+  const W = w2.logged.filter(function (l) { return /^release: /.test(l); });
+  yes('W3 at the next start only the embassy runs, and then the list is gone',
+      W.length === 3 && /^release: embassy: embassy 1, remnant 1$/.test(W[1]) && /the list is gone/.test(W[2]) &&
+      !fs.existsSync(path.join(dir2, 'private', 'deleted-characters.json')));
+  yes('W4 a part done once never runs again: the claim made since stays', !!j(dir2, 'property.json').claims['b9:Skyrim.esm']);
+
+  // ============================================================ W: not a list
+  const dir3 = path.join(scratch, 'not-a-list');
+  registers(dir3);
+  fs.writeFileSync(path.join(dir3, 'private', 'deleted-characters.json'), '{"profiles":[5001,"x"]}');
+  const keep = {};
+  for (const f of fs.readdirSync(path.join(dir3, 'private'))) { keep[f] = fs.readFileSync(path.join(dir3, 'private', f), 'utf8'); }
+  // The door knows no roles here, so rolesRead ends nothing and only the list is measured.
+  const n1 = start(dir3, { before: function (b) { b.__thornswoodRolesKnown = function () { return false; }; } });
+  let same = true;
+  for (const f of Object.keys(keep)) {
+    if (f === 'dungeon-rewards-ledger.json' || f === 'dungeon-rewards-ledger.initialized') { continue; }
+    if (fs.readFileSync(path.join(dir3, 'private', f), 'utf8') !== keep[f]) { same = false; console.log('      changed: ' + f); }
+  }
+  yes('W5 a list that is not one lets go of nothing and is left as it is, said in the log',
+      same && n1.logged.some(function (l) { return /is not a list of deleted characters, so nothing was let go and it is left as it is/.test(l); }));
+
+  // ============================================================ S: saves not taken yet
+  // A list whose saves server-log.js has not taken (#2758): the registers go,
+  // and the list stays for the start that takes the saves, said in the log.
+  const dir4 = path.join(scratch, 'saves-wait');
+  registers(dir4);
+  fs.writeFileSync(path.join(dir4, 'private', 'deleted-characters.json'), JSON.stringify({ profiles: [P1, P2], actors: [A1, A2] }));
+  const s1 = start(dir4);
+  const list4 = j(dir4, 'deleted-characters.json');
+  yes('S1 with the saves not taken, every register part is done and the list stays',
+      JSON.stringify(Object.keys(list4.done).sort()) === JSON.stringify(['books', 'dungeon', 'embassy', 'farms', 'property']));
+  yes('S2 and the log says the saves wait for the next start',
+      s1.logged.some(function (l) { return l === 'release: saves did not let go at this start, so the list waits for the next one'; }));
+} catch (e) {
+  yes('the harness ran to the end: ' + (e && e.stack || e), false);
+}
+done();

@@ -69,6 +69,7 @@ function RunHere($text) {
     return @(& $winPs -NoProfile -NonInteractive -EncodedCommand $e 2>&1 | ForEach-Object { [string]$_ })
 }
 function Remote($text) { return RunHere $text }
+function L2([string[]]$lines) { return ($lines -join "`r`n") }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-online-' + [Guid]::NewGuid().ToString('N'))
 $box = Join-Path $work 'Thornswood-Server'
@@ -147,6 +148,54 @@ try {
         $room = Get-LiveOnline
         Yes 'and Get-LiveOnline reports that same full data path' (
             ($room.Data -replace '\\','/') -eq ($elsewhere -replace '\\','/'))
+
+        # #2711: settings that did not read were a try with an empty catch, so the
+        # port went unasked (counted as up) and the data folder was the default,
+        # with nothing said, and the warning went where the gamemode may not look.
+        [IO.File]::WriteAllText($settings, '{"port":')
+        $room = Get-LiveOnline
+        Yes 'settings that do not read are said, with what reading them said' ($room.Settings -and (@($room.Said) -join "`n") -match 'SETTINGS unreadable: ')
+        # Warn-LiveRoom stops on them before it warns or stops anything. The stop
+        # is an exit, so it runs in a shell of its own.
+        $block = Join-Path $work 'warn-block.ps1'
+        [IO.File]::WriteAllText($block, $src.Substring($a, $b - $a))
+        $calls = Join-Path $work 'remote-calls.txt'
+        function Run-Warn([bool]$now) {
+            Remove-Item -LiteralPath $calls -Force -ErrorAction SilentlyContinue
+            $child = Join-Path $work 'warn-child.ps1'
+            $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }
+            $text = (L2 @(
+                ('$Root = ' + (& $q $Root)), ('$rootWin = ' + (& $q $box)), '$stageName = ''.stage-test''',
+                ('$Here = ' + (& $q (Join-Path $work 'no-scripts-here'))),
+                ('$Now = $' + $now), '$Minutes = 1', '$Mode = ''notice''', '$Why = ''a test''', '$Vps = ''box''', '$User = ''u''',
+                'function Remote($text) {',
+                ('  if ($text -like ''Remove-Item*'') { Add-Content -LiteralPath ' + (& $q $calls) + ' -Value $text; return }'),
+                '  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))',
+                ('  return @(& ' + (& $q $winPs) + ' -NoProfile -NonInteractive -EncodedCommand $e 2>&1 | ForEach-Object { [string]$_ })'),
+                '}',
+                ('Invoke-Expression ([IO.File]::ReadAllText(' + (& $q $block) + '))'),
+                'Warn-LiveRoom', 'Write-Host ''AFTER WARN'''))
+            [IO.File]::WriteAllText($child, $text)
+            $out = @(& $winPs -NoProfile -ExecutionPolicy Bypass -File $child 2>&1 | ForEach-Object { [string]$_ })
+            return @{ Code = $LASTEXITCODE; Said = ($out -join "`n"); Calls = $(if (Test-Path -LiteralPath $calls) { [IO.File]::ReadAllText($calls) } else { '' }) }
+        }
+        $w = Run-Warn $false
+        Yes 'and Warn-LiveRoom stops on them, exit 1, saying so' ($w.Code -eq 1 -and $w.Said -match "THE LIVE SERVER'S SETTINGS DO NOT READ" -and $w.Said -notmatch 'AFTER WARN')
+        Yes '  before any warning goes out, and clears its stage' ($w.Said -notmatch 'THE WARNING DID NOT GO OUT|giving them' -and $w.Calls -match '\.stage-test')
+        $w = Run-Warn $true
+        Yes '  -Now, which warns nobody, says it and goes on' ($w.Code -eq 0 -and $w.Said -match "-Now: the live server's settings do not read" -and $w.Said -match 'AFTER WARN')
+
+        # The box that cannot list its ports says so, and the count stands.
+        Yes 'a box that cannot list its UDP ports says so in a NOTE the warning prints' ($src -match "catch \{ 'NOTE the box could not list its UDP ports" -and $src -match 'foreach \(\$n in @\(\$room\.Notes\)\) \{ Write-Host')
+        # A names file that is there and does not read is said; none is nothing.
+        [IO.File]::WriteAllText($settings, ('{"port":' + $upPort + ',"dataDir":"data"}'))
+        [IO.File]::WriteAllText($online, '{"now":2}')
+        [IO.File]::WriteAllText((Join-Path $priv 'online-names.json'), '{"names":[')
+        $room = Get-LiveOnline
+        Yes 'an online-names.json that does not read is a NOTE, and the count stands' ($room.Online -eq 2 -and @($room.Names).Count -eq 0 -and @($room.Notes | Where-Object { $_ -match 'online-names\.json does not read' }).Count -eq 1)
+        Remove-Item -LiteralPath (Join-Path $priv 'online-names.json') -Force
+        $room = Get-LiveOnline
+        Yes '  and no names file at all is no note' (@($room.Notes).Count -eq 0)
     }
 
     $a2 = $lib.IndexOf('# ==== deploy-server remote blocks ====')
@@ -157,6 +206,10 @@ try {
         $swapBlock = $null
         Invoke-Expression $lib.Substring($a2, $b2 - $a2)
         Yes 'the swap block defines StopOurs' ($swapBlock -match 'function StopOurs')
+        # #2711: the read back before the start, and the check that the new one
+        # answers, kept what failed in a try with an empty catch. Both say it now.
+        Yes 'the read back says which settings file did not read, and why' ($swapBlock.Contains("catch { `$drift += ('the server-settings.json the server had, which cannot be read (' + `$_.Exception.Message + ')') }") -and $swapBlock.Contains("catch { `$drift += ('the server-settings.json now in place, which cannot be read (' + `$_.Exception.Message + ')') }"))
+        Yes 'and a connect that throws while waiting for the server is said with FAIL' ($swapBlock.Contains('} catch { $script:answerWhy = $_.Exception.Message }') -and @([regex]::Matches($swapBlock, "if \(\`$answerWhy\) \{ 'the last try at '")).Count -eq 2)
 
         $standIns = "function Stop-ScheduledTask { }`r`n" +
                     "function Stop-Process { 'stand-in asked to stop ' + (`$args -join ' ') }`r`n" +
@@ -194,6 +247,15 @@ try {
             Yes 'a dataDir full path is where restart.json is removed from' (
                 -not (Test-Path -LiteralPath $elseReq) -and
                 (@($said | Where-Object { $_ -match 'removed a restart.json' }).Count -eq 1))
+
+            # #2711: settings that do not read named no data folder, and the
+            # default was taken for it in a try with an empty catch.
+            [IO.File]::WriteAllText($request, '{"seconds":60}')
+            [IO.File]::WriteAllText($settings, '{"port":')
+            $said = @(StopOurs)
+            Yes 'settings that do not read: no data folder is guessed, and that is said' (
+                (Test-Path -LiteralPath $request) -and
+                (@($said | Where-Object { $_ -match '^COULD NOT READ .*server-settings\.json for its data folder' }).Count -eq 1))
         }
     }
 }

@@ -372,12 +372,12 @@ namespace ThornswoodSetup
                 letter.Text = d.Name.TrimEnd('\\');
                 letter.FontFamily = new FontFamily("Cascadia Mono, Consolas");
                 letter.FontSize = 14;
-                letter.Foreground = B("#EDE5D8");
+                letter.Foreground = B("Ink");
 
                 var room = new TextBlock();
                 room.Text = Gb(free) + " free";
                 room.FontSize = 11;
-                room.Foreground = B("#9C8D79");
+                room.Foreground = B("Muted");
                 room.Margin = new Thickness(0, 3, 0, 0);
 
                 var sp = new StackPanel();
@@ -392,7 +392,7 @@ namespace ThornswoodSetup
                     var mark = new TextBlock();
                     mark.Text = "Skyrim is here";
                     mark.FontSize = 11;
-                    mark.Foreground = B("#C8763A");
+                    mark.Foreground = B("Accent");
                     mark.Margin = new Thickness(0, 2, 0, 0);
                     sp.Children.Add(mark);
                 }
@@ -405,9 +405,9 @@ namespace ThornswoodSetup
                 b.MinWidth = 104;
                 b.HorizontalContentAlignment = HorizontalAlignment.Left;
                 b.Tag = captured.Name;
-                b.BorderBrush = B("#2C251D");
-                b.Background = B("#0A0807");
-                b.Foreground = B("#EDE5D8");
+                b.BorderBrush = B("Line");
+                b.Background = B("Deep");
+                b.Foreground = B("Ink");
                 b.Click += delegate { SetRoot(Path.Combine(captured.Name, "Thornswood")); };
                 driveRow.Children.Add(b);
             }
@@ -427,8 +427,8 @@ namespace ThornswoodSetup
                 var b = o as Button;
                 if (b == null) continue;
                 bool on = string.Equals((string)b.Tag, root, StringComparison.OrdinalIgnoreCase);
-                b.Background = B(on ? "#262019" : "#0A0807");
-                b.BorderBrush = B(on ? "#C8763A" : "#2C251D");
+                b.Background = B(on ? "CardHover" : "Deep");
+                b.BorderBrush = B(on ? "Accent" : "Line");
             }
 
             SaySkyrim(root);
@@ -452,19 +452,19 @@ namespace ThornswoodSetup
             {
                 txtRoom.Text = "Only " + Gb(free) + " free there, and this " + about + Gb(want) +
                                ". Pick another drive.";
-                txtRoom.Foreground = B("#BC5039");
+                txtRoom.Foreground = B("Bad");
             }
             else if (free < want)
             {
                 txtRoom.Text = Gb(free) + " free, and this " + about + Gb(want) +
                                ". That is close, so it may not fit.";
-                txtRoom.Foreground = B("#8A7A5E");
+                txtRoom.Foreground = B("Warn");
             }
             else
             {
                 txtRoom.Text = Gb(free) + " free, and this " + about + Gb(want) +
                                ". Everything is unpacked on the same drive, so nothing lands on C: unless you choose it.";
-                txtRoom.Foreground = B("#66594A");
+                txtRoom.Foreground = B("Faint");
             }
         }
 
@@ -485,7 +485,7 @@ namespace ThornswoodSetup
                                  "say which drive it is on. Thornswood has to go on the same drive as Skyrim, " +
                                  "because it builds its game folder out of your Steam copy with hard links and a " +
                                  "link cannot cross a drive.";
-                txtSkyrim.Foreground = B("#8A7A5E");
+                txtSkyrim.Foreground = B("Warn");
                 return;
             }
 
@@ -496,7 +496,7 @@ namespace ThornswoodSetup
                 txtSkyrim.Text = "Skyrim is on " + Letter(sky) + ", and Thornswood has to go on that same drive. " +
                                  "It builds its game folder out of your Steam copy with hard links, and a link " +
                                  "cannot cross a drive.";
-                txtSkyrim.Foreground = B("#8A7A5E");
+                txtSkyrim.Foreground = B("Warn");
                 return;
             }
 
@@ -505,7 +505,7 @@ namespace ThornswoodSetup
                 txtSkyrim.Text = "Skyrim is on " + Letter(sky) + ", which is this drive. Thornswood builds its game " +
                                  "folder out of your Steam copy with hard links, which take no extra space, and that " +
                                  "only works on one drive.";
-                txtSkyrim.Foreground = B("#66594A");
+                txtSkyrim.Foreground = B("Faint");
                 return;
             }
 
@@ -513,7 +513,7 @@ namespace ThornswoodSetup
                              ". Thornswood has to share Skyrim's drive: it builds a game folder of its own out of " +
                              "your Steam copy with hard links, and a link cannot cross a drive. Installed here, the " +
                              "launcher cannot build that folder and will not let you play. Pick " + Letter(sky) + ".";
-            txtSkyrim.Foreground = B("#BC5039");
+            txtSkyrim.Foreground = B("Bad");
         }
 
         // --------------------------------------- Thornswood's own Skyrim folder
@@ -593,7 +593,7 @@ namespace ThornswoodSetup
                 text += "\nVortex's folder is set to " + vortexGame + ". Forget the chosen folder to have Thornswood look for it again.";
 
             txtOwn.Text = text;
-            txtOwn.Foreground = B(apart ? "#BC5039" : "#66594A");
+            txtOwn.Foreground = B(apart ? "Bad" : "Faint");
             if (btnVortexForget != null)
                 btnVortexForget.Visibility = vortexGame.Length > 0 ? Visibility.Visible : Visibility.Collapsed;
         }
@@ -895,9 +895,13 @@ namespace ThornswoodSetup
         }
         // ==== end the three pages a person accepts ====
 
-        static SolidColorBrush B(string hex)
+        // A colour of the window by its name in the launcher's Themes.cs
+        // (Ink, Faint, Bad and the rest), never a literal: the window is drawn
+        // in Forge from there (#2851), so the setup program's text reaches the
+        // same 4.5 to 1 as the launcher's and cannot fall behind it again.
+        static Brush B(string name)
         {
-            return new SolidColorBrush((Color)ColorConverter.ConvertFromString(hex));
+            return (Brush)win.FindResource(name);
         }
 
         // Built from markup rather than by hand, because a WPF Button keeps its
@@ -910,19 +914,9 @@ namespace ThornswoodSetup
         Title=""Thornswood Setup"" Width=""700"" Height=""800""
         MinWidth=""560"" MinHeight=""520""
         ResizeMode=""CanResize"" WindowStartupLocation=""Manual""
-        Background=""#100D0A"" FontFamily=""Segoe UI""
+        Background=""{DynamicResource Bg}"" FontFamily=""Segoe UI""
         TextOptions.TextFormattingMode=""Display"">
   <Window.Resources>
-    <SolidColorBrush x:Key=""Ink""    Color=""#EDE5D8""/>
-    <SolidColorBrush x:Key=""Muted""  Color=""#9C8D79""/>
-    <SolidColorBrush x:Key=""Faint""  Color=""#66594A""/>
-    <SolidColorBrush x:Key=""Line""   Color=""#2C251D""/>
-    <SolidColorBrush x:Key=""Card""   Color=""#1D1813""/>
-    <SolidColorBrush x:Key=""Deep""   Color=""#0A0807""/>
-    <SolidColorBrush x:Key=""Panel""  Color=""#171310""/>
-    <SolidColorBrush x:Key=""Accent"" Color=""#C8763A""/>
-    <SolidColorBrush x:Key=""Bad""    Color=""#BC5039""/>
-
     <DrawingBrush x:Key=""Hatch"" TileMode=""Tile"" Viewport=""0,0,9,9"" ViewportUnits=""Absolute"">
       <DrawingBrush.Drawing>
         <GeometryDrawing>
@@ -960,7 +954,7 @@ namespace ThornswoodSetup
     </Style>
   </Window.Resources>
 
-  <Border BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
+  <Border BorderBrush=""{DynamicResource Line}"" BorderThickness=""1"">
     <Grid>
       <Grid.RowDefinitions>
         <RowDefinition Height=""Auto""/>
@@ -968,21 +962,21 @@ namespace ThornswoodSetup
         <RowDefinition Height=""Auto""/>
       </Grid.RowDefinitions>
 
-      <Border Grid.Row=""0"" Background=""{StaticResource Panel}""
-              BorderBrush=""{StaticResource Line}"" BorderThickness=""0,0,0,1"">
+      <Border Grid.Row=""0"" Background=""{DynamicResource Panel}""
+              BorderBrush=""{DynamicResource Line}"" BorderThickness=""0,0,0,1"">
         <Grid>
           <Rectangle Fill=""{StaticResource Hatch}"" Opacity=""0.85""/>
           <StackPanel Margin=""36,24,36,22"" Orientation=""Horizontal"">
             <Image x:Name=""Logo"" Width=""78"" Height=""78"" Margin=""0,0,22,0"" VerticalAlignment=""Center""
                    RenderOptions.BitmapScalingMode=""HighQuality"" Visibility=""Collapsed""/>
             <StackPanel VerticalAlignment=""Center"">
-            <TextBlock Text=""Setup"" Foreground=""{StaticResource Faint}"" FontSize=""13""
+            <TextBlock Text=""Setup"" Foreground=""{DynamicResource Faint}"" FontSize=""13""
                        FontFamily=""Constantia, Georgia"" Typography.Capitals=""SmallCaps""
                        TextOptions.TextFormattingMode=""Ideal"" Margin=""1,0,0,4""/>
-            <TextBlock x:Name=""TxtHead"" Text=""Thornswood"" Foreground=""{StaticResource Ink}""
+            <TextBlock x:Name=""TxtHead"" Text=""Thornswood"" Foreground=""{DynamicResource Ink}""
                        FontSize=""30"" FontFamily=""Constantia, Georgia""
                        Typography.Capitals=""SmallCaps"" TextOptions.TextFormattingMode=""Ideal""/>
-            <Rectangle Height=""2"" Width=""42"" Fill=""{StaticResource Accent}""
+            <Rectangle Height=""2"" Width=""42"" Fill=""{DynamicResource Accent}""
                        HorizontalAlignment=""Left"" Margin=""2,12,0,0""/>
             </StackPanel>
           </StackPanel>
@@ -1005,12 +999,12 @@ namespace ThornswoodSetup
           <StackPanel>
 
         <TextBlock x:Name=""TxtBody""
-                   Foreground=""{StaticResource Muted}"" FontSize=""13"" LineHeight=""21""
+                   Foreground=""{DynamicResource Muted}"" FontSize=""13"" LineHeight=""21""
                    TextWrapping=""Wrap""
                    Text=""This puts the launcher and Thornswood's own content on your PC. With Thornswood's own Skyrim folder chosen below, it does not install into the Skyrim you already have on Steam, and that copy is left as it is, for you to play and mod however you like. Without it, Thornswood's own content goes into that copy until you turn the folder on in the launcher, which then takes it back out.&#10;&#10;Thornswood runs from its own game folder. The launcher builds it out of your Steam copy and what Vortex has deployed there, most of it as hard links that take no extra space, and copies of the few files other programs rewrite. Hard links only work inside one drive, so Thornswood goes on the same drive as Skyrim.&#10;&#10;The mods themselves come from a collection on Nexus. Vortex installs them into a profile of their own, so switching back to your usual profile and running Purge Mods leaves your Skyrim where you started. The launcher has the link and walks you through it.&#10;&#10;Nothing of Bethesda's is renamed or deleted. You need Steam running and Skyrim on build 1.6.1170.""/>
 
         <Border x:Name=""RootBox"" Grid.Row=""1"" Margin=""0,20,0,0"" Padding=""17,14"" CornerRadius=""2""
-                Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
+                Background=""{DynamicResource Card}"" BorderBrush=""{DynamicResource Line}"" BorderThickness=""1"">
           <StackPanel>
             <Grid>
               <Grid.ColumnDefinitions>
@@ -1018,21 +1012,21 @@ namespace ThornswoodSetup
                 <ColumnDefinition Width=""Auto""/>
               </Grid.ColumnDefinitions>
               <StackPanel Grid.Column=""0"">
-                <TextBlock Text=""Install to"" Foreground=""{StaticResource Faint}"" FontSize=""12""
+                <TextBlock Text=""Install to"" Foreground=""{DynamicResource Faint}"" FontSize=""12""
                            FontFamily=""Constantia, Georgia"" Typography.Capitals=""SmallCaps""
                            TextOptions.TextFormattingMode=""Ideal"" Margin=""0,0,0,6""/>
-                <TextBlock x:Name=""TxtRoot"" Foreground=""{StaticResource Ink}"" FontSize=""14""
+                <TextBlock x:Name=""TxtRoot"" Foreground=""{DynamicResource Ink}"" FontSize=""14""
                            FontFamily=""Cascadia Mono, Consolas"" TextTrimming=""CharacterEllipsis""/>
               </StackPanel>
               <Button x:Name=""BtnPick"" Grid.Column=""1"" Style=""{StaticResource Btn}"" Content=""Another folder""
                       Padding=""16,7"" FontSize=""12"" VerticalAlignment=""Bottom""
-                      Background=""{StaticResource Deep}"" BorderBrush=""{StaticResource Line}""
-                      Foreground=""{StaticResource Ink}""/>
+                      Background=""{DynamicResource Deep}"" BorderBrush=""{DynamicResource Line}""
+                      Foreground=""{DynamicResource Ink}""/>
             </Grid>
             <WrapPanel x:Name=""DriveRow"" Margin=""0,13,0,0""/>
-            <TextBlock x:Name=""TxtSkyrim"" Foreground=""{StaticResource Faint}"" FontSize=""11.5""
+            <TextBlock x:Name=""TxtSkyrim"" Foreground=""{DynamicResource Faint}"" FontSize=""11.5""
                        TextWrapping=""Wrap"" LineHeight=""18"" Margin=""0,11,0,0""/>
-            <TextBlock x:Name=""TxtRoom"" Foreground=""{StaticResource Faint}"" FontSize=""11.5""
+            <TextBlock x:Name=""TxtRoom"" Foreground=""{DynamicResource Faint}"" FontSize=""11.5""
                        TextWrapping=""Wrap"" Margin=""0,8,0,0""/>
           </StackPanel>
         </Border>
@@ -1042,45 +1036,45 @@ namespace ThornswoodSetup
              panel's own, launcher\ui.xaml PnlOwnGame, so the two say the same
              thing. -->
         <Border x:Name=""OwnBox"" Margin=""0,14,0,0"" Padding=""17,14"" CornerRadius=""2""
-                Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
+                Background=""{DynamicResource Card}"" BorderBrush=""{DynamicResource Line}"" BorderThickness=""1"">
           <StackPanel>
-            <TextBlock Text=""Thornswood's own Skyrim folder"" Foreground=""{StaticResource Faint}"" FontSize=""12""
+            <TextBlock Text=""Thornswood's own Skyrim folder"" Foreground=""{DynamicResource Faint}"" FontSize=""12""
                        FontFamily=""Constantia, Georgia"" Typography.Capitals=""SmallCaps""
                        TextOptions.TextFormattingMode=""Ideal"" Margin=""0,0,0,6""/>
-            <TextBlock x:Name=""TxtOwnAbout"" Foreground=""{StaticResource Muted}"" FontSize=""11.5"" LineHeight=""18""
+            <TextBlock x:Name=""TxtOwnAbout"" Foreground=""{DynamicResource Muted}"" FontSize=""11.5"" LineHeight=""18""
                        TextWrapping=""Wrap""
                        Text=""Runs Thornswood from a Skyrim folder of its own, made from what Vortex has deployed while the Thornswood profile is on. Any other Vortex profile can then use the Steam copy without reaching Thornswood, and switching profiles in Vortex no longer takes Thornswood's mods away. The big files are links to Vortex's copies, so the collection is not on the disk twice. When Vortex deploys a newer Thornswood collection, the launcher brings it in by itself the next time it starts.""/>
-            <CheckBox x:Name=""ChkOwnGame"" Margin=""0,12,0,0"" Foreground=""{StaticResource Ink}"">
-              <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" LineHeight=""18""
+            <CheckBox x:Name=""ChkOwnGame"" Margin=""0,12,0,0"" Foreground=""{DynamicResource Ink}"">
+              <TextBlock Foreground=""{DynamicResource Ink}"" FontSize=""12.5"" LineHeight=""18""
                          TextWrapping=""Wrap"" Margin=""4,0,0,0""
                          Text=""Give Thornswood a Skyrim folder of its own""/>
             </CheckBox>
-            <TextBlock x:Name=""TxtOwnGame"" Foreground=""{StaticResource Faint}"" FontSize=""11.5"" LineHeight=""18""
+            <TextBlock x:Name=""TxtOwnGame"" Foreground=""{DynamicResource Faint}"" FontSize=""11.5"" LineHeight=""18""
                        TextWrapping=""Wrap"" Margin=""0,8,0,0""/>
-            <TextBlock Foreground=""{StaticResource Faint}"" FontSize=""11.5"" LineHeight=""18""
+            <TextBlock Foreground=""{DynamicResource Faint}"" FontSize=""11.5"" LineHeight=""18""
                        TextWrapping=""Wrap"" Margin=""0,12,0,0""
                        Text=""The launcher finds the folder Vortex deploys into when it is in a Steam library. If it is somewhere else, choose it here: in Vortex, Mods, Open, Open Game Folder shows which one. Only the files Vortex lists in it are used, and the game itself always comes from the Steam copy.""/>
             <StackPanel Orientation=""Horizontal"" Margin=""0,9,0,0"">
               <Button x:Name=""BtnVortexPick"" Style=""{StaticResource Btn}"" Content=""Choose Vortex's folder""
                       Padding=""16,7"" FontSize=""12"" Margin=""0,0,8,0""
-                      Background=""{StaticResource Deep}"" BorderBrush=""{StaticResource Line}""
-                      Foreground=""{StaticResource Ink}""/>
+                      Background=""{DynamicResource Deep}"" BorderBrush=""{DynamicResource Line}""
+                      Foreground=""{DynamicResource Ink}""/>
               <Button x:Name=""BtnVortexForget"" Style=""{StaticResource Btn}"" Content=""Forget the chosen folder""
                       Padding=""16,7"" FontSize=""12"" Visibility=""Collapsed""
-                      Background=""{StaticResource Deep}"" BorderBrush=""{StaticResource Line}""
-                      Foreground=""{StaticResource Ink}""/>
+                      Background=""{DynamicResource Deep}"" BorderBrush=""{DynamicResource Line}""
+                      Foreground=""{DynamicResource Ink}""/>
             </StackPanel>
           </StackPanel>
         </Border>
 
         <Border x:Name=""FoundBox"" Margin=""0,14,0,0"" Padding=""17,14""
-                CornerRadius=""2"" Background=""{StaticResource Card}""
-                BorderBrush=""{StaticResource Line}"" BorderThickness=""1"">
+                CornerRadius=""2"" Background=""{DynamicResource Card}""
+                BorderBrush=""{DynamicResource Line}"" BorderThickness=""1"">
           <StackPanel>
-            <TextBlock Text=""Installing from"" Foreground=""{StaticResource Faint}"" FontSize=""12""
+            <TextBlock Text=""Installing from"" Foreground=""{DynamicResource Faint}"" FontSize=""12""
                        FontFamily=""Constantia, Georgia"" Typography.Capitals=""SmallCaps""
                        TextOptions.TextFormattingMode=""Ideal"" Margin=""0,0,0,6""/>
-            <TextBlock x:Name=""TxtFound"" Foreground=""{StaticResource Ink}"" FontSize=""13""
+            <TextBlock x:Name=""TxtFound"" Foreground=""{DynamicResource Ink}"" FontSize=""13""
                        TextWrapping=""Wrap"" LineHeight=""20"" Text=""Looking...""/>
           </StackPanel>
         </Border>
@@ -1090,24 +1084,24 @@ namespace ThornswoodSetup
         <TextBox x:Name=""TxtLog"" Margin=""0,16,0,0"" Height=""330"" Visibility=""Collapsed""
                  IsReadOnly=""True"" TextWrapping=""Wrap"" VerticalScrollBarVisibility=""Auto""
                  FontFamily=""Cascadia Mono, Consolas"" FontSize=""11.5"" Padding=""10,8""
-                 Background=""{StaticResource Deep}"" Foreground=""{StaticResource Muted}""
-                 BorderBrush=""{StaticResource Line}"" BorderThickness=""1""/>
+                 Background=""{DynamicResource Deep}"" Foreground=""{DynamicResource Muted}""
+                 BorderBrush=""{DynamicResource Line}"" BorderThickness=""1""/>
 
           </StackPanel>
         </ScrollViewer>
 
         <StackPanel Grid.Row=""1"" VerticalAlignment=""Bottom"" Margin=""0,0,0,4"">
           <ProgressBar x:Name=""Bar"" Height=""5"" Minimum=""0"" Maximum=""1000""
-                       Foreground=""{StaticResource Accent}"" Background=""{StaticResource Deep}""
+                       Foreground=""{DynamicResource Accent}"" Background=""{DynamicResource Deep}""
                        BorderThickness=""0"" Margin=""0,20,0,0"" Visibility=""Collapsed""/>
-          <TextBlock x:Name=""TxtStat"" Foreground=""{StaticResource Faint}"" FontSize=""11.5""
+          <TextBlock x:Name=""TxtStat"" Foreground=""{DynamicResource Faint}"" FontSize=""11.5""
                      FontFamily=""Cascadia Mono, Consolas"" Margin=""0,11,0,0""
                      TextTrimming=""CharacterEllipsis""/>
         </StackPanel>
       </Grid>
 
-      <Border Grid.Row=""2"" Background=""{StaticResource Panel}""
-              BorderBrush=""{StaticResource Line}"" BorderThickness=""0,1,0,0"" Padding=""36,18"">
+      <Border Grid.Row=""2"" Background=""{DynamicResource Panel}""
+              BorderBrush=""{DynamicResource Line}"" BorderThickness=""0,1,0,0"" Padding=""36,18"">
         <Grid>
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width=""*""/>
@@ -1120,44 +1114,44 @@ namespace ThornswoodSetup
                box, not inside it, so opening the page does not tick it, and
                goes under it on a narrow window, where the words wrap. -->
           <StackPanel Grid.Column=""0"" VerticalAlignment=""Center"" Margin=""0,0,24,0"">
-            <CheckBox x:Name=""ChkAge"" Foreground=""{StaticResource Ink}"">
-              <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" LineHeight=""18""
+            <CheckBox x:Name=""ChkAge"" Foreground=""{DynamicResource Ink}"">
+              <TextBlock Foreground=""{DynamicResource Ink}"" FontSize=""12.5"" LineHeight=""18""
                          TextWrapping=""Wrap"" Margin=""4,0,0,0""
                          Text=""I am 18 or over. Thornswood is an adult server.""/>
             </CheckBox>
             <WrapPanel Margin=""0,7,0,0"">
-              <CheckBox x:Name=""ChkTerms"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+              <CheckBox x:Name=""ChkTerms"" Foreground=""{DynamicResource Ink}"" VerticalAlignment=""Center""
                         MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
-                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                <TextBlock Foreground=""{DynamicResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
                            Text=""I have read and accept the Terms and Conditions""/>
               </CheckBox>
               <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
                 <Hyperlink x:Name=""LnkTerms"" NavigateUri=""https://thornswood.net/terms""
-                           Foreground=""{StaticResource Accent}""
+                           Foreground=""{DynamicResource Accent}""
                            ToolTip=""Opens thornswood.net/terms in your browser"">Read them</Hyperlink>
               </TextBlock>
             </WrapPanel>
             <WrapPanel Margin=""0,7,0,0"">
-              <CheckBox x:Name=""ChkPrivacy"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+              <CheckBox x:Name=""ChkPrivacy"" Foreground=""{DynamicResource Ink}"" VerticalAlignment=""Center""
                         MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
-                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                <TextBlock Foreground=""{DynamicResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
                            Text=""I have read and accept the Privacy Policy""/>
               </CheckBox>
               <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
                 <Hyperlink x:Name=""LnkPrivacy"" NavigateUri=""https://thornswood.net/privacy""
-                           Foreground=""{StaticResource Accent}""
+                           Foreground=""{DynamicResource Accent}""
                            ToolTip=""Opens thornswood.net/privacy in your browser"">Read it</Hyperlink>
               </TextBlock>
             </WrapPanel>
             <WrapPanel Margin=""0,7,0,0"">
-              <CheckBox x:Name=""ChkRules"" Foreground=""{StaticResource Ink}"" VerticalAlignment=""Center""
+              <CheckBox x:Name=""ChkRules"" Foreground=""{DynamicResource Ink}"" VerticalAlignment=""Center""
                         MaxWidth=""{Binding ActualWidth, RelativeSource={RelativeSource AncestorType=StackPanel}}"">
-                <TextBlock Foreground=""{StaticResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
+                <TextBlock Foreground=""{DynamicResource Ink}"" FontSize=""12.5"" Margin=""4,0,0,0"" TextWrapping=""Wrap""
                            Text=""I have read and agree to the Rules""/>
               </CheckBox>
               <TextBlock FontSize=""12.5"" Margin=""10,0,0,0"" VerticalAlignment=""Center"">
                 <Hyperlink x:Name=""LnkRules"" NavigateUri=""https://thornswood.net/rules""
-                           Foreground=""{StaticResource Accent}""
+                           Foreground=""{DynamicResource Accent}""
                            ToolTip=""Opens thornswood.net/rules in your browser"">Read them</Hyperlink>
               </TextBlock>
             </WrapPanel>
@@ -1165,11 +1159,11 @@ namespace ThornswoodSetup
           <StackPanel Grid.Column=""1"" Orientation=""Horizontal"" HorizontalAlignment=""Right""
                       VerticalAlignment=""Bottom"">
             <Button x:Name=""BtnClose"" Style=""{StaticResource Btn}"" Content=""Not now""
-                    Background=""{StaticResource Card}"" BorderBrush=""{StaticResource Line}""
-                    Foreground=""{StaticResource Ink}"" Margin=""0,0,10,0""/>
+                    Background=""{DynamicResource Card}"" BorderBrush=""{DynamicResource Line}""
+                    Foreground=""{DynamicResource Ink}"" Margin=""0,0,10,0""/>
             <Button x:Name=""BtnGo"" Style=""{StaticResource Btn}"" Content=""Install"" IsEnabled=""False""
-                    Background=""{StaticResource Accent}"" BorderBrush=""{StaticResource Accent}""
-                    Foreground=""#1B1205"" FontWeight=""SemiBold""/>
+                    Background=""{DynamicResource Accent}"" BorderBrush=""{DynamicResource Accent}""
+                    Foreground=""{DynamicResource AccentInk}"" FontWeight=""SemiBold""/>
           </StackPanel>
         </Grid>
       </Border>
@@ -1180,6 +1174,10 @@ namespace ThornswoodSetup
         static void Run()
         {
             win = (Window)XamlReader.Parse(Ui);
+            // Every colour in the markup is a DynamicResource by name, filled
+            // in here from the launcher's Forge (#2851) before anything is
+            // drawn or reads one.
+            Thornswood.Themes.Apply(win, "Forge");
 
             txtHead  = (TextBlock)win.FindName("TxtHead");
             txtBody  = (TextBlock)win.FindName("TxtBody");
@@ -1312,8 +1310,8 @@ namespace ThornswoodSetup
 
             if (found == null)
             {
-                foundBox.BorderBrush = (Brush)win.FindResource("Bad");
-                txtFound.Foreground = (Brush)win.FindResource("Bad");
+                foundBox.BorderBrush = B("Bad");
+                txtFound.Foreground = B("Bad");
                 // Not an error any more. There is nothing beside this program
                 // and nothing in it, so it fetches Thornswood's own files itself when Install is
                 // pressed. Saying so up front stops the wait being a surprise.

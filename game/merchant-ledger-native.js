@@ -51,6 +51,15 @@ function createLedgerNativeValidators(mp) {
     try {if(call('validateInventoryTransaction',snapshot)!==true)fail();return true;}
     catch(error) {fail();}
   }
-  return Object.freeze({resolveMerchant,validateInventory});
+  function resolveItem(description,type) {
+    try {
+      if(!['ALCH','AMMO','ARMO','BOOK','INGR','KEYM','MISC','SCRL','SLGM','WEAP'].includes(type))fail();
+      const id=resolve(description),record=winner(id,type).record;
+      if(id===15 || !Number.isInteger(record.flags) || record.flags<0 || record.flags>0xffffffff || record.flags & 0x20 ||
+          ['ARMO','WEAP'].includes(type) && record.flags & 4)fail();
+      return id;
+    } catch(error) {fail();}
+  }
+  return Object.freeze({resolveMerchant,resolveItem,validateInventory});
 }
 module.exports={createLedgerNativeValidators};

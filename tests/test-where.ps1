@@ -159,7 +159,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev: scripts\oneoff is parked history.
     $named = @()
-    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'EngineBuild', 'EngineBuilds')
+    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev', 'EngineBuild', 'EngineBuilds')
     $badKeys = @()
     $callers = 0
     $scriptsDir = Join-Path $realRepo 'scripts'
