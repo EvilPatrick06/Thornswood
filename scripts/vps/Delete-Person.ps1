@@ -112,8 +112,12 @@
   process still running from its folder is ended, the files are changed, and
   the service is started again, then the watchdog. A game server with anybody
   online is refused unless -Now: they would be dropped. A game server with an
-  unfinished save (.pending-batch in changeForms) is refused: the engine
-  replays it at its next start and could write a deleted character back.
+  unfinished save (.pending-batch in changeForms) once it is stopped is
+  refused: the engine replays it at its next start and could write a deleted
+  character back. While a server runs, a .pending-batch is its own save in
+  flight, there for a moment at every save, so the look before anything is
+  stopped does not refuse on a running server's batch; the look after the
+  stop does (#2351, refused on 18 Oct by a running dev server's save).
   Every file is read and checked before any is written, and each JSON file is
   written to a file beside it and swapped in, the way the site writes its own.
 
@@ -607,7 +611,10 @@ for (const person of people) {
         const dirs = [forms].concat(names(forms).filter((n) => /^_discarded-/.test(n)).map((n) => path.join(forms, n)));
         for (const dir of dirs) {
           const fl = names(dir);
-          if (P.size && fl.indexOf('.pending-batch') >= 0) {
+          // A running server's own save in flight is not left over: the look
+          // after it is stopped (apply) is the one that counts for it.
+          const inFlight = a.mode !== 'apply' && g.writer && (a.running || []).indexOf(g.writer) >= 0;
+          if (P.size && fl.indexOf('.pending-batch') >= 0 && !inFlight) {
             stop(path.join(dir, '.pending-batch') + ' is an unfinished save, which the server replays at its next start and which could write a character back. ' +
                  'Start that server once and stop it, then run this again. Nothing was changed');
           }
@@ -801,6 +808,9 @@ function Run-Core([string]$mode) {
         servers = @(@{ tag = 'live'; root = $GameRoot }, @{ tag = 'dev'; root = $DevGameRoot })
         voices  = @(@{ tag = 'live'; root = $VoiceRoot }, @{ tag = 'dev'; root = $DevVoiceRoot })
         bot     = $BotRoot
+        # The writers running now, for the plan's look at unfinished saves.
+        # With -NoServices nothing is stopped, so nothing is taken as running.
+        running = @(if ($mode -ne 'apply' -and -not $NoServices) { $svc.Keys | Where-Object { Running $svc[$_] } })
     }
     $af = Join-Path $work ($mode + '.json')
     [IO.File]::WriteAllText($af, (ConvertTo-Json -InputObject $plan -Depth 6), $utf8)
