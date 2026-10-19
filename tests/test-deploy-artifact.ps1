@@ -231,6 +231,18 @@ try {
     try { $null = New-ThornswoodArtifact -Component site -RepoDir $src -Paths 'site/nothing-here' -OutDir (Join-Path $tmp 'out7') } catch { $threw = $true }
     Yes 'a path the commit lacks stops the build' $threw
 
+    # #2711: the blob reader closed git's input in a try with an empty catch.
+    # Now a read that fails closes it and says so beside the failure, and a
+    # read that finished is held to git ending cleanly.
+    $gitExe = (Get-Command git -CommandType Application | Select-Object -First 1).Source
+    $blobId = ((& git -C $src rev-parse 'HEAD:site/server.js') | Out-String).Trim()
+    $treeId = ((& git -C $src rev-parse 'HEAD:site') | Out-String).Trim()
+    $got = [ThornswoodArtifactZip]::ReadBlobs($gitExe, $src, [string[]]@($blobId))
+    Yes 'the blob reader gives a blob''s exact bytes' ((Hex $got[0]) -eq (Hex ([IO.File]::ReadAllBytes((Join-Path $src 'site\server.js')))))
+    $why = ''
+    try { $null = [ThornswoodArtifactZip]::ReadBlobs($gitExe, $src, [string[]]@($blobId, $treeId)) } catch { $why = $_.Exception.InnerException.Message; if (-not $why) { $why = $_.Exception.Message } }
+    Yes 'a read that fails stops, naming git and the repository, and git is let go' ($why -match 'git cat-file --batch in .+ failed: git cat-file answered: [0-9a-f]{40} tree')
+
     $params = @((Get-Command New-ThornswoodArtifact).Parameters.Keys | Where-Object { [System.Management.Automation.PSCmdlet]::CommonParameters -notcontains $_ })
     Yes 'New-ThornswoodArtifact takes no file from elsewhere and no switch past the refusal' (
         ((($params | Sort-Object) -join ',') -eq 'AlsoSends,Component,OutDir,Paths,RepoDir'))

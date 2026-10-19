@@ -377,10 +377,11 @@ function Lock-RunnerRoot([string]$root, [string]$acct) {
     throw ($root + ' is still open: ' + $(if (-not $acl.AreAccessRulesProtected) { 'it takes rules from C:\' } else { (@($open | ForEach-Object { $_.IdentityReference.Value }) -join ', ') + ' may read it' }))
   }
   # By name where Windows still knows the account, by SID where it does not
-  # (a runner taken off since leaves its deny behind).
-  $who = @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
-           Where-Object { "$($_.AccessControlType)" -eq 'Allow' } |
-           ForEach-Object { $n = $_.IdentityReference.Value; try { $n = ("$($_.IdentityReference.Translate([Security.Principal.NTAccount]))" -split '\\')[-1] } catch { }; $n } | Sort-Object -Unique)
+  # (a runner taken off since leaves its deny behind). A collection translates
+  # without throwing for one it cannot name, and hands that one back as its SID.
+  $ids = New-Object Security.Principal.IdentityReferenceCollection
+  foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Allow' })) { $ids.Add($r.IdentityReference) }
+  $who = @($ids.Translate([Security.Principal.NTAccount], $false) | ForEach-Object { ("$($_.Value)" -split '\\')[-1] } | Sort-Object -Unique)
   $root + ' is locked: only ' + ($who -join ', ') + ' may use it'
 }
 # Shuts the account out of every C:\Thornswood-* folder but its own, and says
@@ -398,7 +399,10 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
   $ErrorActionPreference = 'Continue'
   $sid = ''
   if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
-  else { try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { } }
+  else {
+    try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { throw ('there is no account called ' + $acct + ' on this box: ' + $_.Exception.Message) }
+  }
   if (-not $sid) { throw ('there is no account called ' + $acct + ' on this box') }
   $had = 0; $shut = 0; $wasOpen = @()
   $dirs = @(@(Get-ChildItem -LiteralPath $parent -Directory -Filter $filter -EA SilentlyContinue) +
@@ -418,7 +422,10 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
       continue
     }
     $rules = $null
-    try { $rules = @((Get-Acl -LiteralPath $d.FullName).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) } catch { }
+    # Rules that cannot be read are taken as open, so the folder is denied and
+    # named with those it could read, and why they could not be read is said.
+    try { $rules = @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier])) }
+    catch { $acct + ': the rules on ' + $d.FullName + ' could not be read (' + $_.Exception.Message + '), so it is counted as one it could read' }
     if ($null -ne $rules -and @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }).Count) { $had++; continue }
     $open = ($null -eq $rules) -or @($rules | Where-Object { "$($_.AccessControlType)" -eq 'Allow' -and ($broadSids -contains $_.IdentityReference.Value -or $_.IdentityReference.Value -eq $sid) }).Count
     $null = & icacls.exe $d.FullName /deny ($acct + ':(OI)(CI)F') /C /Q 2>&1

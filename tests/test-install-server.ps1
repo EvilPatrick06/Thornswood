@@ -125,11 +125,39 @@ Yes 'the installer unpacks into a stage and checks the load order before it stop
     $iStage -gt 0 -and $iCheck -gt $iStage -and $iStop -gt $iCheck)
 Yes 'and no longer deletes the root' ($src -notmatch 'Remove-Item -LiteralPath \$Root -Recurse')
 Yes 'and sets nothing aside in %TEMP% any more' ($src -notmatch '\$env:TEMP')
+# #2711: the read back before the start said "which cannot be read" with no
+# file and no why; the two reads sat in a try with an empty catch.
+Yes 'the read back says which settings file did not read, and why' ($src.Contains("catch { `$unread += ('the server-settings.json the server had, which cannot be read: ' + `$_.Exception.Message) }") -and $src.Contains("catch { `$unread += ('the server-settings.json now in place, which cannot be read: ' + `$_.Exception.Message) }"))
 $pub = [IO.File]::ReadAllText($publish)
 Yes 'Publish-Server no longer stops the server before it copies' ($pub -notmatch 'Stop-ScheduledTask' -and $pub -notmatch 'stopRemote')
 Yes 'and no longer throws the world away over ssh before the install' ($pub -notmatch "Remove-Item -LiteralPath '\`$VpsRoot\\world'")
 Yes 'and sends the zip''s hash for the installer to check' ($pub -match '-ZipSha256 \$zipSum')
 Yes 'and hands the installer -RequirePass when it is given one (#1804)' ($pub -match '\$instArgs \+= " -RequirePass \$RequirePass"')
+
+# #2711: the port a root's settings name. Settings that did not read were a
+# try with an empty catch and came back 7777, the live server's port, so a
+# dev root's check could take the live server's answer for its own. Lifted
+# out and run: no file is the server's own default, one that does not read
+# stops the run naming it. The waits list every UDP port and filter, since
+# -LocalPort with nothing on it is an error, not an empty answer.
+$gpAst = [Management.Automation.Language.Parser]::ParseInput($src, [ref]$null, [ref]$null).Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'GamePortOf' }, $true)
+Yes 'the installer has one GamePortOf to lift' ($null -ne $gpAst)
+if ($gpAst) {
+    . ([scriptblock]::Create($gpAst.Extent.Text))
+    $gpDir = Join-Path ([IO.Path]::GetTempPath()) ('ts-gameport-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $gpDir | Out-Null
+    try {
+        Yes 'no server-settings.json is the server''s default port, 7777' ((GamePortOf $gpDir) -eq 7777)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"port":7787}')
+        Yes 'settings naming a port give it' ((GamePortOf $gpDir) -eq 7787)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"name":"x"}')
+        Yes 'settings naming none give 7777' ((GamePortOf $gpDir) -eq 7777)
+        [IO.File]::WriteAllText((Join-Path $gpDir 'server-settings.json'), '{"port":')
+        $why = ''; try { $null = GamePortOf $gpDir } catch { $why = $_.Exception.Message }
+        Yes 'settings that do not read stop it, naming the file, where they gave 7777' ($why -match 'server-settings\.json does not read, so the port this server answers on is not known')
+    } finally { Remove-Item -LiteralPath $gpDir -Recurse -Force -ErrorAction SilentlyContinue }
+}
+Yes 'the waits for the ports list them whole and filter, with no -LocalPort left to throw for nothing there' ($src -notmatch 'Get-NetUDPEndpoint -LocalPort' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$ids -contains' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$_\.LocalPort -eq \$port \}')
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1

@@ -267,10 +267,14 @@ function Get-StageDirectories([string]$stageRoot, [string[]]$relativePaths) {
 function Read-LiveOnline($lines) {
   # Online stays a courtesy count: unreadable or missing is nobody, not a gate.
   # Data is where restart.json must land so the gamemode sees it.
-  $room = @{ Data = ''; Online = 0; Up = $null; Names = @(); Said = @($lines) }
+  # Settings is why the box's server-settings.json did not read: then neither
+  # its port nor its data folder is known, so Data is only the default.
+  $room = @{ Data = ''; Online = 0; Up = $null; Names = @(); Notes = @(); Settings = ''; Said = @($lines) }
   foreach ($line in @($lines)) {
     $t = "$line".Trim()
     if ($t -match '^DATA (.+)$') { $room.Data = $Matches[1].Trim() }
+    elseif ($t -match '^SETTINGS unreadable: (.*)$') { $room.Settings = $Matches[1].Trim() }
+    elseif ($t -match '^NOTE (.+)$') { $room.Notes += $Matches[1].Trim() }
     elseif ($t -match '^NAME (.+)$') { $room.Names += $Matches[1].Trim() }
     elseif ($t -match '^ONLINE (\d+)$') { $room.Online = [int]$Matches[1] }
     elseif ($t -match '^UP (yes|no)$') { $room.Up = ($Matches[1] -eq 'yes') }
@@ -291,10 +295,11 @@ function Get-LiveOnline {
 `$p = 'private'
 try {
   `$s = Get-Content (Join-Path `$root 'server-settings.json') -Raw -EA Stop | ConvertFrom-Json
+  if (`$null -eq `$s) { throw 'it is empty' }
   `$port = [int]`$s.port
   if (`$s.dataDir) { `$d = [string]`$s.dataDir }
   if (`$s.privDir) { `$p = [string]`$s.privDir }
-} catch { }
+} catch { 'SETTINGS unreadable: ' + `$_.Exception.Message }
 `$dataPath = [IO.Path]::Combine(`$root, `$d)
 'DATA ' + `$dataPath.Replace('\', '/')
 `$up = `$true
@@ -303,7 +308,7 @@ if (`$port -gt 0) {
     `$u = @(Get-NetUDPEndpoint -EA Stop | Where-Object { `$_.LocalPort -eq `$port })
     `$up = (`$u.Count -gt 0)
     if (`$up) { 'UP yes' } else { 'UP no' }
-  } catch { }
+  } catch { 'NOTE the box could not list its UDP ports (' + `$_.Exception.Message + '), so the count is online.json''s alone' }
 }
 if (-not `$up) { 'ONLINE 0' }
 else {
@@ -312,10 +317,13 @@ else {
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE 0' }
-  try {
-    `$n = Get-Content ([IO.Path]::Combine(`$root, `$p, 'online-names.json')) -Raw -EA Stop | ConvertFrom-Json
-    foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
-  } catch { }
+  `$nf = [IO.Path]::Combine(`$root, `$p, 'online-names.json')
+  if (Test-Path -LiteralPath `$nf) {
+    try {
+      `$n = Get-Content `$nf -Raw -EA Stop | ConvertFrom-Json
+      foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
+    } catch { 'NOTE ' + `$nf + ' does not read (' + `$_.Exception.Message + '), so nobody is named' }
+  }
 }
 "@)
 }
@@ -342,6 +350,26 @@ function Warn-LiveRoom {
   $room = Get-LiveOnline
   $on = [int]$room.Online
   $who = Format-Names $room.Names
+  foreach ($n in @($room.Notes)) { Write-Host ('  ' + $n) -ForegroundColor Yellow }
+
+  # #2711: this read sat in a try with an empty catch, so settings that did not
+  # read left the port unasked (counted as up) and the data folder as the
+  # default, and the warning below went to a restart.json the gamemode may
+  # never look at. -Now warns nobody, so it needs neither.
+  if ($room.Settings) {
+    if ($Now) {
+      Write-Host ("  -Now: the live server's settings do not read ({0}), so who is on it is not known" -f $room.Settings) -ForegroundColor Yellow
+      return
+    }
+    Write-Host ''
+    Write-Host ("  THE LIVE SERVER'S SETTINGS DO NOT READ: {0}" -f $room.Settings) -ForegroundColor Red
+    Write-Host '  Without them there is no telling whether it is up, or where its gamemode' -ForegroundColor Red
+    Write-Host '  looks for the warning, so nobody could be warned. Nothing has been swapped' -ForegroundColor Red
+    Write-Host '  in and the server is still running exactly as it was. Look at its' -ForegroundColor Red
+    Write-Host '  server-settings.json, or pass -Now to take it down without telling anybody.' -ForegroundColor Red
+    Remote "Remove-Item -LiteralPath '$rootWin\$stageName' -Recurse -Force -EA SilentlyContinue" | Out-Null
+    exit 1
+  }
 
   if ($Now) {
     if ($on -gt 0) {
@@ -701,7 +729,7 @@ if ($noBuild) {
   # the plugins on its disk, as it does for every deploy.
   $boxRead = @'
 $s = $null
-try { $s = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json } catch { }
+try { $s = [IO.File]::ReadAllText((Join-Path $root 'server-settings.json')) | ConvertFrom-Json } catch { 'SETTINGSWHY ' + $_.Exception.Message }
 if ($null -eq $s) { 'SETTINGS unreadable' }
 else {
   'PORT ' + [int]$s.port
@@ -712,8 +740,14 @@ else {
 $rp = Join-Path $root 'server-build.json'
 if (Test-Path -LiteralPath $rp) {
   'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes($rp)))
-  try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText($rp) | ConvertFrom-Json).source.commit) } catch { }
-  try { $rj = [IO.File]::ReadAllText($rp) | ConvertFrom-Json; 'RECORDLIGHT ' + [bool]($rj.PSObject.Properties.Name -contains 'lightPlugins' -and $rj.lightPlugins -eq $true) } catch { }
+  $rj = $null; $rjWhy = ''
+  try { $rj = [IO.File]::ReadAllText($rp) | ConvertFrom-Json } catch { $rjWhy = $_.Exception.Message }
+  if (-not $rjWhy -and $null -eq $rj) { $rjWhy = 'it is empty' }
+  if ($rjWhy) { 'RECORDUNREADABLE ' + $rjWhy }
+  else {
+    'RECORDCOMMIT ' + [string]$rj.source.commit
+    'RECORDLIGHT ' + [bool]($rj.PSObject.Properties.Name -contains 'lightPlugins' -and $rj.lightPlugins -eq $true)
+  }
 } else { 'RECORD none' }
 '@
   # The content plugin the box holds, by size and sha256, rides in the same
@@ -725,8 +759,12 @@ if (Test-Path -LiteralPath $rp) {
   $boxRecord = ''
   $boxRecordCommit = ''
   $boxLight = $false
+  $boxSettingsWhy = ''
+  $boxRecordUnread = ''
   foreach ($l in $boxSaid) {
     if ($l -match '^PORT (\d+)$') { $livePort = [int]$Matches[1] }
+    elseif ($l -match '^SETTINGSWHY (.*)$') { $boxSettingsWhy = $Matches[1] }
+    elseif ($l -match '^RECORDUNREADABLE (.*)$') { $boxRecordUnread = $Matches[1] }
     elseif ($l -match '^PASS (set|missing|neither)$') { $boxPass = $Matches[1] }
     elseif ($l -match '^RECORD ([0-9a-f]{64}|none)$') { $boxRecord = $Matches[1] }
     elseif ($l -match '^RECORDCOMMIT ([0-9a-f]*)$') { $boxRecordCommit = $Matches[1] }
@@ -737,7 +775,7 @@ if (Test-Path -LiteralPath $rp) {
   if (-not $boxRecord -or -not $boxContent.Answered -or ($boxSaid -notcontains 'SETTINGS unreadable' -and -not $boxPass)) {
     $refusals += ('the box did not answer what it runs: ' + (($boxSaid | Where-Object { $_ }) -join ' | '))
   } else {
-    if ($boxSaid -contains 'SETTINGS unreadable') { $refusals += ('the settings in ' + $Root + ' cannot be read, so there is no telling which process is this server') }
+    if ($boxSaid -contains 'SETTINGS unreadable') { $refusals += ('the settings in ' + $Root + ' cannot be read' + $(if ($boxSettingsWhy) { ' (' + $boxSettingsWhy + ')' } else { '' }) + ', so there is no telling which process is this server') }
     elseif ($livePort -le 0) { $refusals += 'the live server''s settings name no port' }
     # The join pass hold fails closed (#1319): a switch that is neither true
     # nor false holds, and would start doing so the moment this gamemode
@@ -747,7 +785,12 @@ if (Test-Path -LiteralPath $rp) {
     elseif ($boxPass -eq 'neither') { $refusals += (Get-ThornswoodPassSwitchProblem ([pscustomobject]@{ thornswoodRequirePass = $null })) }
     $ours8 = ([string]$rec.source.commit)
     if ($ours8.Length -gt 8) { $ours8 = $ours8.Substring(0, 8) }
-    if ($FromStore) {
+    # #2711: a record on the box that did not read gave no RECORDLIGHT line, so
+    # -FromStore took its load order as written for an engine that loads no
+    # light plugins and could pass. Whatever the way, it is refused here.
+    if ($boxRecordUnread) {
+      $refusals += ('the live server''s server-build.json does not read (' + $boxRecordUnread + '), so there is no telling which server build it runs, or whether its load order was written for an engine that loads light plugins. A full deploy, from a machine with the build, puts a record there.')
+    } elseif ($FromStore) {
       # The engine moves; the load order the live server keeps must still mean
       # what it meant (ServerOrder.ps1, #1715).
       $ourLight = ($rec.PSObject.Properties.Name -contains 'lightPlugins' -and $rec.lightPlugins -eq $true)
@@ -1157,14 +1200,17 @@ $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 # the one a firewall rule shows up in.
 $port = if ($noBuild) { $livePort } else { [int]$settings.port }
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
+# A connect that throws (a name that does not resolve, say) is said in the
+# FAIL line, so that line names its cause and not only the port.
 $seen = $false
+$connectWhy = ''
 for ($i = 0; $i -lt 10; $i++) {
+  $c = New-Object Net.Sockets.TcpClient
   try {
-    $c = New-Object Net.Sockets.TcpClient
     $null = $c.BeginConnect($Vps, $resPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
     $seen = $c.Connected
-    $c.Close()
-  } catch { }
+  } catch { $connectWhy = $_.Exception.Message }
+  finally { $c.Close() }
   if ($seen) { break }
   Start-Sleep -Seconds 2
 }
@@ -1173,6 +1219,7 @@ if ($seen) {
   Write-Host ("  PASS. The server is up at {0}:{1}, resources on {2}, from here as well." -f $Vps, $port, $resPort) -ForegroundColor Green
 } else {
   Write-Host ("  FAIL. The box says the server is up, and {0}:{1} does not answer from here." -f $Vps, $resPort) -ForegroundColor Red
+  if ($connectWhy) { Write-Host ("  The last try to connect said: {0}" -f $connectWhy) -ForegroundColor Red }
   Write-Host '  The new files stay in place: this is the network or the firewall, and' -ForegroundColor Red
   Write-Host '  putting the old files back would not change it.' -ForegroundColor Red
   exit 1

@@ -153,23 +153,13 @@
 # Check-Records.ps1 one), which is why none of them is listed. tests\ is not
 # read. Each line below is somebody's catch that hides a failure; converting
 # one lowers its line.
+#
+# 18 Oct, the deploy scripts (#2711, the second part): every one of the 58
+# in scripts\deploy now stops the deploy before anything is swapped, tests
+# for what may rightly be missing, or says in words what it could not read or
+# clean. Two of the 58 were comments that quoted an empty catch
+# (SiteConfigSet.ps1, Rotate-ServerPassword.ps1), reworded. 125 are left.
 installer\Setup-Thornswood.ps1 7
-scripts\deploy\Artifact.ps1 1
-scripts\deploy\Deploy-DevGamemode.ps1 5
-scripts\deploy\Deploy-Docs.ps1 4
-scripts\deploy\Deploy-Gamemode.ps1 1
-scripts\deploy\Deploy-Server.ps1 7
-scripts\deploy\DeployedBuild.ps1 1
-scripts\deploy\Install-Bot.ps1 6
-scripts\deploy\Install-Runner.ps1 3
-scripts\deploy\Install-ThornswoodServer.ps1 9
-scripts\deploy\Install-Voice.ps1 6
-scripts\deploy\Rotate-ServerPassword.ps1 1
-scripts\deploy\ServerSettings.ps1 4
-scripts\deploy\Set-DiscordLogin.ps1 2
-scripts\deploy\Setup-Domain.ps1 2
-scripts\deploy\SiteConfigSet.ps1 1
-scripts\deploy\Swap.ps1 5
 scripts\dev\Check-Outside.ps1 6
 scripts\dev\Close-Launcher.ps1 8
 scripts\dev\Start-Thornswood.ps1 3
