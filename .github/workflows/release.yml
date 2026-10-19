@@ -276,7 +276,7 @@ jobs:
           $stub = Join-Path $out 'setup-stub.exe'
           $sums = Join-Path $out 'SHA256SUMS'
           $signed = (Get-AuthenticodeSignature -LiteralPath $exe).Status -eq 'Valid'
-          $how = 'built on the VPS runner with the in-box csc, UNSIGNED: Ship signs it on download (#921)'
+          $how = 'built on the VPS runner with MSBuild (#498), UNSIGNED: Ship signs it on download (#921)'
           if ($env:RUNNER_KIND -eq 'github-hosted') { $how = 'built on GitHub''s runner with MSBuild (#498)' }
           if ($signed) { $how += ', the launcher signed by ThornswoodRelease (#2163)' }
           elseif ($env:RUNNER_KIND -eq 'github-hosted') { $how += ', UNSIGNED (not a v tag ref): Ship signs it on download (#921)' }
@@ -315,6 +315,12 @@ jobs:
               exit 1
             }
             Write-Host ("uploading into the draft {0} that tag {1} already has" -f $release.id, $tag)
+            # Its notes were written by the run that made it, and this run's
+            # files replace that run's: a VPS draft rebuilt signed on GitHub's
+            # runner kept saying UNSIGNED. The notes say how THESE files were
+            # built, so they are written again with them.
+            $patch = @{ body = $notes } | ConvertTo-Json
+            $release = Invoke-RestMethod -Method Patch -Uri "$api/releases/$($release.id)" -Headers $headers -ContentType 'application/json' -Body $patch -ErrorAction Stop
           }
           if (-not $release) {
             $payload = @{
