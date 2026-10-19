@@ -292,11 +292,14 @@ jobs:
           & python scripts/dev/Build-MerchantRoleTables.py --check
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
-      - name: Check the join number's keeping time
+      - name: Check the bot's keeping times
         shell: pwsh
         run: |
-          # Issue #2353: joins_age lifted out of bot\bot.py, no discord.py needed.
+          # Issue #2353: joins_age, ticket_past_keeping and age_closed_tickets
+          # lifted out of bot\bot.py, no discord.py needed.
           & python tests/test-2353-join-keeping.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python tests/test-2353-ticket-keeping.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run the harnesses that went red unseen
@@ -429,7 +432,8 @@ jobs:
           # (inbox, bans, PKs, notes, its moderation.log, gallery reports and
           # the gallery queue with its files), the game server's moderation.log
           # and door.log, and the page saying each time. A few seconds.
-          # tests\test-2353-join-keeping.py holds the bot's join number.
+          # tests\test-2353-join-keeping.py holds the bot's join number, and
+          # tests\test-2353-ticket-keeping.py its closed ticket threads.
           # Issue #2183: tests\test-2183-availability.ps1 holds
           # Read-Availability.ps1, the reader of the watchdog's down and back
           # lines, to its counting on made-up lines, under pwsh and Windows
