@@ -83,7 +83,15 @@ namespace Thornswood
                 // The news file the feed names, if any, here on the check's own
                 // thread, so the News tab has it (#1050, FeedNews.cs). Never throws.
                 Updater.FillNews(cfg, v);
-                win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));
+                // Whether the release's signed manifest vouches for every
+                // asset the feed names (#2163, FeedManifest.cs). Only said in
+                // launcher.log for now (phase C), once per manifest. Never throws.
+                string manifest = Updater.ManifestLine(cfg, v);
+                win.Dispatcher.BeginInvoke(new Action(delegate
+                {
+                    if (manifest != null) LogOnly(manifest);
+                    OnVersionDoc(v, loud);
+                }));
             }
             catch (Exception ex)
             {

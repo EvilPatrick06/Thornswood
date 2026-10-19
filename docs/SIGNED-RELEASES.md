@@ -175,6 +175,17 @@ the sha256 and keeps the sha256 check.
 - Phase C, warn: a launcher that understands the manifest verifies it and
   reports a failure to the log and the site, but still installs on a good
   sha256. Measure for at least one main and several dev releases.
+  As built (#2163, 19 Oct): `launcher\app\ReleaseManifest.cs` and
+  `FeedManifest.cs`. On an update check that brings a different manifest or
+  different assets, the launcher fetches release.json and the catalog like
+  any asset, checks the catalog with `Signature.cs`, checks the catalog lists
+  release.json's sha256 (wintrust's catalog reader), and checks release.json
+  lists every asset the feed names. One line goes to launcher.log, which
+  reaches the site with a session's logs: the release and "lists all N of
+  the feed's assets, signed", or a line starting "WARNING: the release
+  manifest", or "names no signed release manifest". Nothing is refused on it.
+  What to read before phase D: those lines in the session logs the site
+  keeps, for one main and several dev releases.
 - Phase D, enforce: a new `minManifestLauncher` (or the next `minLauncher`)
   makes the launcher refuse a release with no manifest, a bad signature, or
   an asset not listed. From here an unsigned artifact is never silently
