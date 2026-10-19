@@ -73,7 +73,9 @@ Yes 'Signature.cs and ReleaseManifest.cs compile on their own with the build''s 
 if ($cscRc -ne 0) { $cscSaid | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; exit 1 }
 $RM = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $build 'm.dll'))).GetType("$ns.ReleaseManifest")
 Remove-Item -LiteralPath $build -Recurse -Force -ErrorAction SilentlyContinue
-$Signer = 'Gavin Knotts'
+# The name on the signing certificate, written once, in Updater.cs (#1052).
+$Signer = [regex]::Match([IO.File]::ReadAllText((Join-Path $App 'Updater.cs')), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
+Yes 'ExpectedSigner is read from launcher\app\Updater.cs' ([bool]$Signer)
 
 function Assets([string[]]$pairs) {
     $l = New-Object 'System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string,string]]'

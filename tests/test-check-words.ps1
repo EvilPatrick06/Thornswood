@@ -102,7 +102,10 @@ $updater = Join-Path $repoRoot 'launcher\app\Updater.cs'
 $signer = [regex]::Match([System.IO.File]::ReadAllText($updater), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
 Yes 'ExpectedSigner is read from launcher\app\Updater.cs' ([bool]$signer)
 if ($signer -and (Get-Command git -ErrorAction SilentlyContinue) -and (Test-Path -LiteralPath (Join-Path $repoRoot '.git'))) {
-    $named = @(& git -C $repoRoot grep -l -i -F -e $signer -- . ':!docs/archive' 2>$null | ForEach-Object { "$_" })
+    # Text files only (-I): a file signed with ThornswoodRelease, such as
+    # tests\fixtures\2163-manifest\release.cat, carries the name inside its
+    # certificate, and that is the signature, not anybody writing the name.
+    $named = @(& git -C $repoRoot grep -l -I -i -F -e $signer -- . ':!docs/archive' 2>$null | ForEach-Object { "$_" })
     foreach ($n in $named) { Write-Host ("      " + $n) }
     Yes ('the name on the signing certificate is in Updater.cs and in no other file git holds, docs\archive apart (' + $named.Count + ' file(s))') (
         $named.Count -eq 1 -and $named[0] -eq 'launcher/app/Updater.cs')
