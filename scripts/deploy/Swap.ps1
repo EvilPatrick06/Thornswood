@@ -214,7 +214,22 @@ $port     = [int]$new.port
 $resPort  = if ($port -eq 7777) { 3000 } else { $port + 1 }
 $clean    = $true
 
-function Held { @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue).Count -gt 0 }
+# What holds UDP $port, listed whole and filtered as the installer's waits do
+# (#2711): -LocalPort with nothing on it is an error, and nothing there is what
+# most of these looks are for. A list that cannot be had is not a free port.
+# Held says it is held and leaves why in $heldWhy, and each caller says so.
+# Until 19 Oct this was -LocalPort with -EA SilentlyContinue, which made a box
+# that could not list its ports look exactly like a server that never started
+# (#2466).
+$heldWhy = ''
+$heldBy  = @()
+function Held {
+  $script:heldWhy = ''
+  $script:heldBy = @()
+  try { $script:heldBy = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port } | ForEach-Object { [int]$_.OwningProcess }) }
+  catch { $script:heldWhy = $_.Exception.Message; return $true }
+  return $script:heldBy.Count -gt 0
+}
 
 function StopOurs {
   Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
@@ -223,7 +238,8 @@ function StopOurs {
   # and only started the live one back up.
   'stopping whatever holds UDP ' + $port
   $pids = @()
-  $pids += @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
+  try { $pids = @(Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port } | ForEach-Object { [int]$_.OwningProcess }) }
+  catch { 'COULD NOT LIST the UDP ports to find what holds ' + $port + ', so nothing was stopped by its port: ' + $_.Exception.Message }
   # Only the UDP port. The line that also stopped whatever listened on the TCP
   # port one above it was copied from the dev script, where that port is the
   # server's own HTTP and belongs to the same process. On the live root it is
@@ -266,11 +282,24 @@ function StopOurs {
 # native server has been built without throwing. $Wait is the shared ceiling
 # unless the caller passed -Wait (ServerReadyWait.ps1, #1938).
 $answerWhy = ''
+# A look that could not list the UDP ports is not answering, and how many of
+# the looks were like that is said with the FAIL line (#2466).
+$blindWhy = ''
 function Answering {
   $until = (Get-Date).AddSeconds($Wait)
+  $looks = 0
+  $blind = 0
+  $script:blindWhy = ''
   while ($true) {
     $tcp = $false
-    if (Held) {
+    $looks++
+    $udp = Held
+    if ($heldWhy) {
+      $udp = $false
+      $blind++
+      $script:blindWhy = 'the UDP ports could not be listed on ' + $blind + ' of ' + $looks + ' looks, the last saying: ' + $heldWhy
+    }
+    if ($udp) {
       # A try that throws is kept for the FAIL line, which says it.
       $c = New-Object Net.Sockets.TcpClient
       try {
@@ -321,7 +350,8 @@ if (-not $port) {
 }
 StopOurs
 if (Held) {
-  'UDP ' + $port + ' is still held by pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess + ' after the stop, so nothing was swapped'
+  if ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
+  else { 'UDP ' + $port + ' is still held by pid ' + ($heldBy -join ', ') + ' after the stop, so nothing was swapped' }
   Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
   'SWAP REFUSED'
   exit 1
@@ -377,7 +407,7 @@ if ($moved) {
   Start-ScheduledTask -TaskName $Task -EA SilentlyContinue
   'started, giving it ' + $Wait + ' seconds to answer on UDP ' + $port + ' and on ' + $resPort
   if (Answering) {
-    'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)[0].OwningProcess
+    'PASS: the server is answering on ' + $resPort + ', game port ' + $port + ', pid ' + ($heldBy -join ', ')
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
     # The last two sets of replaced files stay, newest first by their stamp,
     # and the last two a -PutBack took out.
@@ -391,6 +421,7 @@ if ($moved) {
   }
   'FAIL: nothing answered on UDP ' + $port + ' and ' + $resPort + ' within ' + $Wait + ' seconds'
   if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
+  if ($blindWhy) { $blindWhy }
   if (Test-Path -LiteralPath $log) { '--- server.log, last 30 ---'; Get-Content -LiteralPath $log -Tail 30 }
   StopOurs
 }
@@ -403,6 +434,7 @@ if (Answering) { 'the previous files are back and the server is answering on ' +
 else {
   'THE PREVIOUS FILES ARE BACK AND THE SERVER STILL IS NOT ANSWERING on ' + $resPort
   if ($answerWhy) { 'the last try at ' + $resPort + ' said: ' + $answerWhy }
+  if ($blindWhy) { $blindWhy }
 }
 if ($clean) {
   # A put-back's stage is the .prev folder it was putting back, full again.
