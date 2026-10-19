@@ -9916,8 +9916,15 @@
     while Tireless is held. These have no second set for everybody else, so
     an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
-    PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
-    game setting changes that; #1385 has it for Patrick.
+    PACK MULE, "being overloaded does not slow you". Being overloaded has
+    one effect here: the game makes you walk, on your own machine, and no
+    game setting changes that. The engine fork's client keeps a list of
+    characters the game does not hold to their carry weight (Patrick chose
+    the engine change on 12 Oct, #1385): for one on it, the game's own
+    Actor::IsOverEncumbered answers no, so it never makes you walk, and the
+    fork's movement sends your run to everybody else as it plays. While Pack
+    Mule is held, your own character is on that list. The inventory still
+    shows your real carry weight.
 
     SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
     setting read before this file first touched it is kept in sp.storage,
@@ -9947,6 +9954,7 @@
   let unshakeableOpen = 0;          // staggers that played with the block down, for the log
   let unshakeableSaid = 0;
   let unshakeableOpenSaid = 0;
+  let packMuleKept = null;          // what the client's list was last told, null until a view has said
 
   /* The whole panel view, as treeFromView takes it. Only its perks are read. */
   function perksFromView(json) {
@@ -10010,6 +10018,24 @@
     if (said.length) { log('perks: ' + said.join('; ')); }
   }
 
+  /* Your own character on the client's list while Pack Mule is held, and off
+     it while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the list whatever an earlier copy left in it. */
+  function packMuleNow() {
+    const on = !!perksHeld.packmule;
+    if (packMuleKept === on) { return; }
+    packMuleKept = on;
+    try {
+      sp.setOverEncumberedIgnored(0x14, on);
+      log('perks: Pack Mule ' + (on ? 'held, so carrying past your carry weight does not make you walk'
+                                    : 'not held, so carrying past your carry weight makes you walk, as the game does'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Pack Mule:', e);
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
@@ -10028,6 +10054,7 @@
     if (perksDirty) {
       perksDirty = false;
       perkSettingsNow();
+      packMuleNow();
     }
     if (perksHeld.unshakeable) {
       let pc = null;
