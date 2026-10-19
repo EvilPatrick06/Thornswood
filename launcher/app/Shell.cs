@@ -3670,6 +3670,28 @@ namespace Thornswood
             }
             themeEditor.Children.Add(grid);
 
+            // Text these colours would make hard to read, said under the boxes
+            // while it is so (#2771). The colours on screen are the ones
+            // measured, so it updates on Use these colours.
+            List<string> low = Themes.LowContrast(cur);
+            if (low.Count > 0)
+            {
+                var warn = new TextBlock();
+                warn.Text = "Some text would be hard to read with these colours: " + string.Join(", ", low.ToArray())
+                          + ". Text needs at least 4.5 to 1 against what it sits on, so people with low vision can read it. "
+                          + "Make that text lighter or the surface darker, the other way round for a light theme.";
+                warn.FontSize = 11.5; warn.Foreground = Res("Ink");
+                warn.TextWrapping = TextWrapping.Wrap; warn.LineHeight = 17;
+
+                var bar = new Border();
+                bar.BorderBrush = Res("Warn");
+                bar.BorderThickness = new Thickness(3, 0, 0, 0);
+                bar.Padding = new Thickness(10, 4, 0, 4);
+                bar.Margin = new Thickness(2, 0, 14, 14);
+                bar.Child = warn;
+                themeEditor.Children.Add(bar);
+            }
+
             themeLightBox = new CheckBox();
             themeLightBox.Content = "This is a light theme, so the launcher shades its own graphics for a light background";
             themeLightBox.IsChecked = cur.Light;
@@ -3713,6 +3735,10 @@ namespace Thornswood
             Themes.Apply(win, Themes.Resolve(cfg));
             Redraw();
             Log("Your own theme is on. Change the colours any time, or pick a preset to leave DIY.");
+            List<string> low = Themes.LowContrast(Themes.Resolve(cfg));
+            if (low.Count > 0)
+                Log("Some text is hard to read with these colours (" + string.Join(", ", low.ToArray())
+                    + "). The colour editor says what to change.");
         }
 
         // Everything that paints itself from the theme brushes rather than
