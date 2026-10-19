@@ -14,9 +14,10 @@ function memoryPurses(seed) {
   for (const [id, state] of seed) states.set(id, JSON.parse(JSON.stringify(state)));
   return {
     namespace:'dev:test-ledger',
+    callerGuard:true,
     read(id) { return this.prepare(id); },
     pendingRecords() { return Array.from(states,([merchantId,state])=>({merchantId,reference:state.reference,state:JSON.parse(JSON.stringify(state))})).filter(x=>x.state.pending); },
-    compareAndCommit(id,rev,next) { if ((states.get(id).revision || 0)!==rev) return null; return this.commit(id,next); },
+    compareAndCommit(id,rev,next,caller) { if ((states.get(id).revision || 0)!==rev || caller && !caller()) return null; return this.commit(id,next); },
     prepare(id) {
       const state = states.get(id);
       return state ? JSON.parse(JSON.stringify(state)) : null;
@@ -889,9 +890,10 @@ finalCase('later validation cannot retain an earlier replaced view',()=>{
 });
 finalCase('production publication checks after serialization',()=>{
   const b=service({on:true},250);let armed=false;
-  const quests=[];quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
+  const quests=[];
   b.deps.quests=()=>({describe:()=>quests});
   const view=open(b.api).view;
+  view.quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
   const source=fs.readFileSync(path.join(__dirname,'../game/merchant-trading.js'),'utf8');
   const push=source.slice(source.indexOf('  trading.push = function'),source.indexOf('  var timers=env.timers'));
   const writes=[];vm.runInNewContext(push,{trading:b.api,mp:{set:(...args)=>writes.push(args)},property:'view',log:()=>{}});
