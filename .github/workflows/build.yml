@@ -460,6 +460,12 @@ jobs:
           # a panel button goes with press and is told when it is queued, the
           # plugin's own lines go with press and quiet, and only the chat
           # box sends a line as typed. Under a second.
+          # Issue #2792: tests\test-2792-terms-game-files.js holds the terms
+          # page to the pack list: every file $ShipOursFiles ships that the
+          # asset register says is Bethesda's, or built from Bethesda's, is
+          # named there, the count of the game's own files it says it hands
+          # on matches, and it and the credits page carry the notice line
+          # Bethesda's terms for mods ask for. Under a second.
           # Issue #2742: tests\test-2459-artifact-unpack-race.ps1 puts a whole
           # second build of one artifact in the moment before a run names its
           # zip, its record and its unpacked folder, holds a different file at
@@ -471,6 +477,7 @@ jobs:
                  'test-docs-index.js',
                  'test-third-party.js',
                  'test-asset-provenance.js',
+                 'test-2792-terms-game-files.js',
                  'test-ship-rules.ps1',
                  'test-ship-permission-held.ps1',
                  'test-chargen-gone.ps1',
