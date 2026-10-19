@@ -20,8 +20,8 @@
        carry every case the build meets, and the archives every way an
        archive stores a file (the fixture's header says which).
     2. The recipes beside the fixture are what those two tools write from it
-       (their --check), when this machine's Python has numpy and lz4 for
-       Build-NoticeBoard.py. Both tools must agree with the launcher, or a
+       (their --check), when this machine's Python has numpy and lz4, which
+       both read the archives with. Both tools must agree with the launcher, or a
        recipe written on One would make something else here.
     3. A game that differs makes nothing, and the reason names the file of
        the game that differs: one byte changed in a notice mesh, one in the
@@ -111,25 +111,30 @@ try {
         ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $noMenu }
 
     # ---- 2. the recipes beside the fixture are what the two tools write ----------
+    # Both tools read the game's archives with Build-NoticeBoard.py's reader,
+    # which needs lz4 (Skyrim's archives are LZ4 packed) and numpy. The VPS
+    # runner's Python has neither (measured 19 Oct, #2855), so there they are
+    # not run; the launcher's build below is still held to the recipes they
+    # wrote, which is the part that ships.
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $menuCheck = & $python -I (Join-Path $Repo 'scripts\mods\Build-StartMenu.py') --data $game --edited (Join-Path $game 'edited-startmenu.swf') `
-        --recipe (Join-Path $Fixture 'FixtureMenu.cs') --name Fixture --check 2>&1
-    $menuRc = $LASTEXITCODE
     & $python -I -c 'import numpy, lz4.frame' 2>&1 | Out-Null
-    $hasBoardTools = ($LASTEXITCODE -eq 0)
-    if ($hasBoardTools) {
+    $hasTools = ($LASTEXITCODE -eq 0)
+    if ($hasTools) {
+        $menuCheck = & $python -I (Join-Path $Repo 'scripts\mods\Build-StartMenu.py') --data $game --edited (Join-Path $game 'edited-startmenu.swf') `
+            --recipe (Join-Path $Fixture 'FixtureMenu.cs') --name Fixture --check 2>&1
+        $menuRc = $LASTEXITCODE
         $boardCheck = & $python -I (Join-Path $Repo 'scripts\mods\Build-NoticeBoard.py') --data $game `
             --recipe (Join-Path $Fixture 'FixtureBoard.cs') --name Fixture --check 2>&1
         $boardRc = $LASTEXITCODE
     }
     $ErrorActionPreference = $old
-    Yes 'Build-StartMenu.py writes FixtureMenu.cs from the made-up game, packing it again byte for byte' ($menuRc -eq 0)
-    if ($menuRc -ne 0) { $menuCheck | ForEach-Object { Write-Host "      $_" } }
-    if ($hasBoardTools) {
+    if ($hasTools) {
+        Yes 'Build-StartMenu.py writes FixtureMenu.cs from the made-up game, packing it again byte for byte' ($menuRc -eq 0)
+        if ($menuRc -ne 0) { $menuCheck | ForEach-Object { Write-Host "      $_" } }
         Yes 'Build-NoticeBoard.py writes FixtureBoard.cs from the made-up game' ($boardRc -eq 0)
         if ($boardRc -ne 0) { $boardCheck | ForEach-Object { Write-Host "      $_" } }
     } else {
-        Write-Host 'SKIP  this Python has no numpy or lz4, so Build-NoticeBoard.py was not run; the board recipe is held by the launcher''s build below'
+        Write-Host 'SKIP  this Python has no numpy or lz4, which Build-StartMenu.py and Build-NoticeBoard.py read archives with, so neither was run; the launcher''s build below is held to the recipes they wrote'
     }
 
     # ---- 1, 3, 4 and 5: the launcher's own code, with a driver ------------------

@@ -40,6 +40,10 @@ Usage, on a machine with the game (the archive is read, never written):
     --recipe <file> and --name <C# name>: where the recipe goes and what it is
                       called (tests\\fixtures\\2827 uses these for its made-up game)
 Exit 1 when a check fails or a file cannot be read.
+
+It reads the archive with Build-NoticeBoard.py's reader, so it needs the same
+Python: lz4 (the game's archives are LZ4 packed) and numpy. On One that is
+Python 3.9, which has both; One's 3.12 has neither (measured 19 Oct).
 """
 
 import argparse
