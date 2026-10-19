@@ -39,5 +39,5 @@ numbers, and what the server does with each, are on
 The half can be picked, the Resilience point lands, kills of world
 creatures credit the half by how hard they were, and its four
 maneuvers are in. Plant refuses every stagger, the ones your own game
-plays as well as the server's. Halving what a block costs is not in:
-a block costs no stamina here yet, so there is nothing to halve.
+plays as well as the server's. A block costs stamina, and Set halves
+it; how much a block costs is on [Warrior](../warrior.md).

@@ -3112,6 +3112,19 @@
    ],
    "ownLocation": "AlftandLocation"
   },
+  "154d5:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar East Tower",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "DLC1VampireCastleCourtyard 0,0"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleDungeonLocation"
+  },
   "15cc6f:WindhelmSSE.esp": {
    "hold": "windhelm",
    "how": "doors",
@@ -5247,6 +5260,19 @@
    ],
    "ownLocation": "0WindhelmThaneHouseLocation"
   },
+  "181c8:Dawnguard.esm": {
+   "hold": "riften",
+   "how": "doors",
+   "name": "Dead Drop Mine",
+   "opensOnto": [
+    {
+     "hold": "riften",
+     "location": "DLC1DeadDropFallsLocation",
+     "place": "DLC1HunterCave01"
+    }
+   ],
+   "ownLocation": "DLC1DeadDropFallsLocation"
+  },
   "18276:Dragonborn.esm": {
    "hold": "ravenrock",
    "how": "doors",
@@ -5661,6 +5687,19 @@
    ],
    "ownLocation": "RiftenRethanHoldingsVaultLocation"
   },
+  "19dfe:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar Cathedral",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleGuildhallLocation",
+     "place": "DLC1VampireCastleGuildhall"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleGuildhallLocation"
+  },
   "1a337:Skyrim.esm": {
    "hold": "windhelm",
    "how": "doors",
@@ -5673,6 +5712,17 @@
     }
    ],
    "ownLocation": "LostKnifeHideoutLocation"
+  },
+  "1a618:OarsRest.esp": {
+   "hold": "falkreath",
+   "how": "own location",
+   "name": "ORUtility",
+   "opensOnto": [
+    {
+     "place": "Tamriel -10,-12"
+    }
+   ],
+   "ownLocation": "OR_Location_OarsRest"
   },
   "1a7a8:Dragonborn.esm": {
    "hold": "ravenrock",
@@ -5738,6 +5788,28 @@
     }
    ],
    "ownLocation": "BilegulchMineLocation"
+  },
+  "1b262:The Great City of Solitude.esp": {
+   "hold": "solitude",
+   "how": "own location",
+   "name": "Jakob's House",
+   "opensOnto": [
+    {
+     "place": "Tamriel -16,22"
+    }
+   ],
+   "ownLocation": "JakobsFarmInteriorLocation"
+  },
+  "1b3cc:The Great City of Solitude.esp": {
+   "hold": "solitude",
+   "how": "own location",
+   "name": "Frederik's House",
+   "opensOnto": [
+    {
+     "place": "Tamriel -14,26"
+    }
+   ],
+   "ownLocation": "FrederiksFarmInteriorLocation"
   },
   "1b7c0:Skyrim.esm": {
    "hold": "markarth",
@@ -5958,6 +6030,29 @@
     }
    ],
    "ownLocation": "WhiterunWarmaidensLocation"
+  },
+  "1dba:Dawnguard.esm": {
+   "hold": "riften",
+   "how": "doors",
+   "name": "Fort Dawnguard",
+   "opensOnto": [
+    {
+     "hold": "riften",
+     "location": "DLC1DeadDropFallsLocation",
+     "place": "DLC1HunterCave01"
+    },
+    {
+     "hold": "riften",
+     "location": "DLC1HunterHQLocation",
+     "place": "DLC1HunterHQWorld 0,-1"
+    },
+    {
+     "hold": "riften",
+     "location": "DLC1HunterHQLocation",
+     "place": "DLC1HunterHQWorld 1,0"
+    }
+   ],
+   "ownLocation": "DLC1HunterHQLocationInterior"
   },
   "1dd03:Dragonborn.esm": {
    "hold": "ravenrock",
@@ -6732,6 +6827,42 @@
      "place": "WhiterunDrunkenHuntsman"
     }
    ]
+  },
+  "285a:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar Ruins",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "DLC1VampireCastleCourtyard 0,0"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "Tamriel -42,36"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleDungeonLocation"
+  },
+  "285b:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar Undercroft",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "DLC1VampireCastleCourtyard 0,0"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "Tamriel -42,37"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleDungeonLocation"
   },
   "285d:Dawnguard.esm": {
    "hold": "whiterun",
@@ -7704,6 +7835,19 @@
    ],
    "ownLocation": "BonechillPassageLocation"
   },
+  "35604:Skyrim.esm": {
+   "hold": "winterhold",
+   "how": "doors",
+   "name": "Ironbind Barrow",
+   "opensOnto": [
+    {
+     "hold": "winterhold",
+     "location": "IronbindBarrowLocation",
+     "place": "Tamriel 17,14"
+    }
+   ],
+   "ownLocation": "IronbindBarrowLocation"
+  },
   "35a22:Dragonborn.esm": {
    "hold": "ravenrock",
    "how": "doors",
@@ -8143,6 +8287,19 @@
     }
    ],
    "ownLocation": "DLC2ColdcinderCaveLocation"
+  },
+  "39850:Skyrim.esm": {
+   "hold": "riften",
+   "how": "doors",
+   "name": "Nightingale Hall",
+   "opensOnto": [
+    {
+     "hold": "riften",
+     "location": "NightingaleHallLocation",
+     "place": "Tamriel 42,-27"
+    }
+   ],
+   "ownLocation": "NightingaleHallLocation"
   },
   "399d1:Skyrim.esm": {
    "hold": "markarth",
@@ -8740,6 +8897,21 @@
     }
    ],
    "ownLocation": "MistwatchLocation"
+  },
+  "4346:Dawnguard.esm": {
+   "hold": "markarth",
+   "how": "own location",
+   "name": "Darkfall Cave",
+   "opensOnto": [
+    {
+     "location": "DLC1DarkfallPassageLocation",
+     "place": "DLC1DarkfallPassageWorld -38,15"
+    },
+    {
+     "place": "Tamriel -38,17"
+    }
+   ],
+   "ownLocation": "DLC1DarkfallCaveLocation"
   },
   "439e7:SkyrimSewers.esp": {
    "hold": "windhelm",
@@ -10230,6 +10402,20 @@
    ],
    "ownLocation": "CrackedTuskKeepLocation"
   },
+  "660d:Solitude Arena.esp": {
+   "hold": "markarth",
+   "how": "own location",
+   "name": "Lost Hut",
+   "opensOnto": [
+    {
+     "place": "Tamriel -38,4"
+    },
+    {
+     "place": "Tamriel -38,5"
+    }
+   ],
+   "ownLocation": "ReachHoldLocation"
+  },
   "67f2a:Skyrim.esm": {
    "hold": "windhelm",
    "how": "doors",
@@ -10459,6 +10645,24 @@
     }
    ],
    "ownLocation": "SolitudeBluePalaceLocation"
+  },
+  "7203:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar North Tower",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "DLC1VampireCastleCourtyard 0,0"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "Tamriel -43,37"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleDungeonLocation"
   },
   "7284e:Skyrim.esm": {
    "hold": "markarth",
@@ -10779,6 +10983,34 @@
    ],
    "ownLocation": "MarkarthSideMagicShopLocation"
   },
+  "803:Dawnguard.esm": {
+   "hold": "solitude",
+   "how": "doors",
+   "name": "Volkihar Keep",
+   "opensOnto": [
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleGuildhallLocation",
+     "place": "DLC1VampireCastleBossRoom"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "DLC1VampireCastleCourtyard -1,0"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "Tamriel -43,36"
+    },
+    {
+     "hold": "solitude",
+     "location": "DLC1VampireCastleLocation",
+     "place": "Tamriel -43,37"
+    }
+   ],
+   "ownLocation": "DLC1VampireCastleGuildhallLocation"
+  },
   "80c6a:Skyrim.esm": {
    "hold": "whiterun",
    "how": "doors",
@@ -10973,6 +11205,24 @@
    ],
    "ownLocation": "ValthumeLocation"
   },
+  "8e52:Dawnguard.esm": {
+   "hold": "riften",
+   "how": "doors",
+   "name": "Mossy Glen Cave",
+   "opensOnto": [
+    {
+     "hold": "riften",
+     "location": "DLC1HunterHQLocation",
+     "place": "DLC1HunterHQWorld -1,0"
+    },
+    {
+     "hold": "riften",
+     "location": "DLC1HunterHQLocation",
+     "place": "DLC1HunterHQWorld 2,1"
+    }
+   ],
+   "ownLocation": "DLC1HunterHQLocation"
+  },
   "8e906:Skyrim.esm": {
    "hold": "markarth",
    "how": "doors",
@@ -11164,6 +11414,24 @@
     }
    ],
    "ownLocation": "BluePalaceWingLocation"
+  },
+  "9bde:Dawnguard.esm": {
+   "hold": "riften",
+   "how": "doors",
+   "name": "Dead Drop Falls",
+   "opensOnto": [
+    {
+     "hold": "riften",
+     "location": "DLC1DeadDropFallsLocation",
+     "place": "DLC1HunterCave02"
+    },
+    {
+     "hold": "riften",
+     "location": "DLC1HunterHQLocationInterior",
+     "place": "DLC1DawnguardHQ01"
+    }
+   ],
+   "ownLocation": "DLC1DeadDropFallsLocation"
   },
   "9ccdd:Skyrim.esm": {
    "hold": "riften",
@@ -12820,8 +13088,8 @@
   },
   {
    "name": "Thornswood-Last.esp",
-   "sha256": "ebcfbe2562a1a999d06cfe90fd740ce46265201687ff834c0bc9d96558b9c77f",
-   "size": 5984128
+   "sha256": "66f5833bfe3b02a629feba127ef0adcc15736b2e9735ed42dd297e4af71f48b8",
+   "size": 6024259
   },
   {
    "name": "Thornswood-WoodworkerTrail.esp",
@@ -12837,13 +13105,13 @@
  },
  "counts": {
   "buildings": 850,
-  "byDoors": 775,
+  "byDoors": 787,
   "byDoorsOwnLocationPicks": 7,
-  "byOwnLocation": 29,
+  "byOwnLocation": 34,
   "doorsNotPlaced": 54,
   "doorsOverOwnLocation": 1,
-  "measured": 811,
-  "refused": 39
+  "measured": 828,
+  "refused": 22
  },
  "holdLocations": {
   "DLC2SolstheimLocation": {
@@ -12918,80 +13186,6 @@
    "ownLocation": "DLC2Book07DungeonLocationNEW",
    "why": "its doors open onto nowhere the game places a door, which no hold's location covers, and its own location, DLC2Book07DungeonLocationNEW, is in no hold"
   },
-  "154d5:Dawnguard.esm": {
-   "name": "Volkihar East Tower",
-   "opensOnto": [
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard 0,0"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleDungeonLocation",
-   "why": "its doors open onto DLC1VampireCastleCourtyard 0,0, which no hold's location covers, and its own location, DLC1VampireCastleDungeonLocation, is in no hold"
-  },
-  "181c8:Dawnguard.esm": {
-   "name": "Dead Drop Mine",
-   "opensOnto": [
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 0,-1"
-    },
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 1,0"
-    }
-   ],
-   "ownLocation": "DLC1DeadDropFallsLocation",
-   "why": "its doors open onto DLC1HunterHQWorld 0,-1, DLC1HunterHQWorld 1,0, which no hold's location covers, and its own location, DLC1DeadDropFallsLocation, is in no hold"
-  },
-  "19dfe:Dawnguard.esm": {
-   "name": "Volkihar Cathedral",
-   "opensOnto": [
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard -1,0"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -43,36"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -43,37"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleGuildhallLocation",
-   "why": "its doors open onto DLC1VampireCastleCourtyard -1,0, Tamriel -43,36, Tamriel -43,37, which no hold's location covers, and its own location, DLC1VampireCastleGuildhallLocation, is in no hold"
-  },
-  "1a618:OarsRest.esp": {
-   "name": "ORUtility",
-   "opensOnto": [
-    {
-     "place": "Tamriel -10,-12"
-    }
-   ],
-   "why": "its doors open onto Tamriel -10,-12, which no hold's location covers, and it has no location of its own"
-  },
-  "1b262:The Great City of Solitude.esp": {
-   "name": "Jakob's House",
-   "opensOnto": [
-    {
-     "place": "Tamriel -16,22"
-    }
-   ],
-   "ownLocation": "JakobsFarmInteriorLocation",
-   "why": "its doors open onto Tamriel -16,22, which no hold's location covers, and its own location, JakobsFarmInteriorLocation, is in no hold"
-  },
-  "1b3cc:The Great City of Solitude.esp": {
-   "name": "Frederik's House",
-   "opensOnto": [
-    {
-     "place": "Tamriel -14,26"
-    }
-   ],
-   "ownLocation": "FrederiksFarmInteriorLocation",
-   "why": "its doors open onto Tamriel -14,26, which no hold's location covers, and its own location, FrederiksFarmInteriorLocation, is in no hold"
-  },
   "1c09:Dawnguard.esm": {
    "name": "Glacial Crevice",
    "opensOnto": [
@@ -13007,60 +13201,11 @@
    "ownLocation": "DLC1GlacialCreviceLocation",
    "why": "its doors open onto DLC01FalmerValley -7,0, DLC01FalmerValley -9,-4, which no hold's location covers, and its own location, DLC1GlacialCreviceLocation, is in no hold"
   },
-  "1dba:Dawnguard.esm": {
-   "name": "Fort Dawnguard",
-   "opensOnto": [
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 0,-1"
-    },
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 1,0"
-    }
-   ],
-   "ownLocation": "DLC1HunterHQLocationInterior",
-   "why": "its doors open onto DLC1HunterHQWorld 0,-1, DLC1HunterHQWorld 1,0, which no hold's location covers, and its own location, DLC1HunterHQLocationInterior, is in no hold"
-  },
   "1ede2:Dragonborn.esm": {
    "name": "Apocrypha",
    "opensOnto": [],
    "ownLocation": "DLC2Book02DungeonLocationNEW",
    "why": "its doors open onto nowhere the game places a door, which no hold's location covers, and its own location, DLC2Book02DungeonLocationNEW, is in no hold"
-  },
-  "285a:Dawnguard.esm": {
-   "name": "Volkihar Ruins",
-   "opensOnto": [
-    {
-     "location": "DLC1SoulCairnLocation",
-     "place": "DLC01SoulCairn -6,-5"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard 0,0"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -42,36"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleDungeonLocation",
-   "why": "its doors open onto DLC01SoulCairn -6,-5, DLC1VampireCastleCourtyard 0,0, Tamriel -42,36, which no hold's location covers, and its own location, DLC1VampireCastleDungeonLocation, is in no hold"
-  },
-  "285b:Dawnguard.esm": {
-   "name": "Volkihar Undercroft",
-   "opensOnto": [
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard 0,0"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -42,37"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleDungeonLocation",
-   "why": "its doors open onto DLC1VampireCastleCourtyard 0,0, Tamriel -42,37, which no hold's location covers, and its own location, DLC1VampireCastleDungeonLocation, is in no hold"
   },
   "2f99:Update.esm": {
    "name": "Quick Test Cell",
@@ -13149,20 +13294,6 @@
    "ownLocation": "DLC2Book01DungeonLocation",
    "why": "its doors open onto DLC2ApocryphaWorld 0,1, DLC2ApocryphaWorld 11,4, which no hold's location covers, and its own location, DLC2Book01DungeonLocation, is in no hold"
   },
-  "35604:Skyrim.esm": {
-   "name": "Ironbind Barrow",
-   "opensOnto": [
-    {
-     "location": "IronbindBarrowLocation",
-     "place": "Tamriel 17,14"
-    },
-    {
-     "place": "Tamriel 19,15"
-    }
-   ],
-   "ownLocation": "IronbindBarrowLocation",
-   "why": "its doors open onto Tamriel 17,14, Tamriel 19,15, which no hold's location covers, and its own location, IronbindBarrowLocation, is in no hold"
-  },
   "384f:Dawnguard.esm": {
    "name": "Inner Sanctum",
    "opensOnto": [
@@ -13177,17 +13308,6 @@
    ],
    "ownLocation": "DLC1FalmerValleyTempleLocation",
    "why": "its doors open onto DLC01FalmerValley -4,-3, DLC01FalmerValley -6,-4, which no hold's location covers, and its own location, DLC1FalmerValleyTempleLocation, is in no hold"
-  },
-  "39850:Skyrim.esm": {
-   "name": "Nightingale Hall",
-   "opensOnto": [
-    {
-     "location": "NightingaleHallLocation",
-     "place": "Tamriel 42,-27"
-    }
-   ],
-   "ownLocation": "NightingaleHallLocation",
-   "why": "its doors open onto Tamriel 42,-27, which no hold's location covers, and its own location, NightingaleHallLocation, is in no hold"
   },
   "3b065:Dragonborn.esm": {
    "name": "Apocrypha",
@@ -13209,20 +13329,6 @@
    "opensOnto": [],
    "why": "its doors open onto nowhere the game places a door, which no hold's location covers, and it has no location of its own"
   },
-  "4346:Dawnguard.esm": {
-   "name": "Darkfall Cave",
-   "opensOnto": [
-    {
-     "location": "DLC1DarkfallPassageLocation",
-     "place": "DLC1DarkfallPassageWorld -38,15"
-    },
-    {
-     "place": "Tamriel -38,17"
-    }
-   ],
-   "ownLocation": "DLC1DarkfallCaveLocation",
-   "why": "its doors open onto DLC1DarkfallPassageWorld -38,15, Tamriel -38,17, which no hold's location covers, and its own location, DLC1DarkfallCaveLocation, is in no hold"
-  },
   "6429:Dawnguard.esm": {
    "name": "Reaper's Lair",
    "opensOnto": [
@@ -13233,52 +13339,6 @@
    ],
    "ownLocation": "DLC1SoulCairnLocation",
    "why": "its doors open onto DLC01SoulCairn 5,-3, which no hold's location covers, and its own location, DLC1SoulCairnLocation, is in no hold"
-  },
-  "660d:Solitude Arena.esp": {
-   "name": "Lost Hut",
-   "opensOnto": [
-    {
-     "place": "Tamriel -38,4"
-    },
-    {
-     "place": "Tamriel -38,5"
-    }
-   ],
-   "why": "its doors open onto Tamriel -38,4, Tamriel -38,5, which no hold's location covers, and it has no location of its own"
-  },
-  "7203:Dawnguard.esm": {
-   "name": "Volkihar North Tower",
-   "opensOnto": [
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard 0,0"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -43,37"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleDungeonLocation",
-   "why": "its doors open onto DLC1VampireCastleCourtyard 0,0, Tamriel -43,37, which no hold's location covers, and its own location, DLC1VampireCastleDungeonLocation, is in no hold"
-  },
-  "803:Dawnguard.esm": {
-   "name": "Volkihar Keep",
-   "opensOnto": [
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "DLC1VampireCastleCourtyard -1,0"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -43,36"
-    },
-    {
-     "location": "DLC1VampireCastleLocation",
-     "place": "Tamriel -43,37"
-    }
-   ],
-   "ownLocation": "DLC1VampireCastleGuildhallLocation",
-   "why": "its doors open onto DLC1VampireCastleCourtyard -1,0, Tamriel -43,36, Tamriel -43,37, which no hold's location covers, and its own location, DLC1VampireCastleGuildhallLocation, is in no hold"
   },
   "8482:Dawnguard.esm": {
    "name": "Darkfall Grotto",
@@ -13310,20 +13370,6 @@
    "ownLocation": "DLC1zFalmerValley02Location",
    "why": "its doors open onto DLC01FalmerValley -7,4, DLC01FalmerValley -7,5, which no hold's location covers, and its own location, DLC1zFalmerValley02Location, is in no hold"
   },
-  "8e52:Dawnguard.esm": {
-   "name": "Mossy Glen Cave",
-   "opensOnto": [
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld -1,0"
-    },
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 2,1"
-    }
-   ],
-   "why": "its doors open onto DLC1HunterHQWorld -1,0, DLC1HunterHQWorld 2,1, which no hold's location covers, and it has no location of its own"
-  },
   "95c44:Skyrim.esm": {
    "name": "Hall of Valor",
    "opensOnto": [
@@ -13334,21 +13380,6 @@
    ],
    "ownLocation": "SovngardeHallofHeroesLocation",
    "why": "its doors open onto Sovngarde 15,22, which no hold's location covers, and its own location, SovngardeHallofHeroesLocation, is in no hold"
-  },
-  "9bde:Dawnguard.esm": {
-   "name": "Dead Drop Falls",
-   "opensOnto": [
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 0,-1"
-    },
-    {
-     "location": "DLC1HunterHQLocation",
-     "place": "DLC1HunterHQWorld 1,0"
-    }
-   ],
-   "ownLocation": "DLC1DeadDropFallsLocation",
-   "why": "its doors open onto DLC1HunterHQWorld 0,-1, DLC1HunterHQWorld 1,0, which no hold's location covers, and its own location, DLC1DeadDropFallsLocation, is in no hold"
   }
  },
  "rule": "A place is in a hold when its location (an exterior cell's XLCN, or its worldspace's when the cell has none, or a room's XLCN) reaches that hold's location record through its parents. A building takes the hold of the places its doors open onto (where the doors that lead into it stand); a room with no location is walked through to the places its own doors open onto, and the nearest ring with a hold decides. Two holds there: the building's own location picks, when it is one of them. None: the building's own location. Otherwise the building is refused and left out."

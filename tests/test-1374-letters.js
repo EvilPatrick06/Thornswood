@@ -499,10 +499,12 @@ if (missing.length === 0 && fees && seeding && PASSAGES) {
   const cell = doors.cells && doors.cells[NETCH];
   yes('the inn is vanilla Raven Rock\'s one inn, The Retching Netch, in doors.json',
       !!cell && cell.name === 'The Retching Netch' && cell.edid === 'DLC2RRTheRetchingNetch' && cell.interior === true);
-  const traders = read('game/data/merchant-traders.json');
-  const geldis = /"18291:Dragonborn\.esm": \{[^}]*"name": "Geldis Sadri"[^}]*"cell": "17ec0:Dragonborn\.esm"[^}]*"pos": \[\s*(-?[0-9.]+),\s*(-?[0-9.]+),\s*(-?[0-9.]+)/.exec(traders);
-  yes('the spot is where its innkeeper Geldis Sadri stands',
-      !!geldis && Math.round(Number(geldis[1])) === -39 && Math.round(Number(geldis[2])) === -178);
+  const traders = JSON.parse(read('game/data/merchant-traders.json'));
+  const geldis = traders.byRef['18291:Dragonborn.esm'];
+  const source = JSON.parse(read('game/data/npc-population.json')).npcs.find(row => row.ref === '18291:Dragonborn.esm');
+  yes('the spot is the retained Cook, originally Geldis Sadri, at the same inn coordinates',
+      !!geldis && !!source && source.name === 'Geldis Sadri' && geldis.name === 'Cook' &&
+      geldis.cell === NETCH && Math.round(Number(geldis.pos[0])) === -39 && Math.round(Number(geldis.pos[1])) === -178);
   const sites = JSON.parse(read('game/data/guild-sites.json')).sites;
   const rr = sites.filter(function (x) { return x.bookHold === 'ravenrock'; })[0];
   yes('and it is the spot Raven Rock\'s guild site already names', !!rr && rr.cell === NETCH &&

@@ -10,9 +10,9 @@
   its first start, left somebody with no launcher at all. The entry: "An
   unsigned exe that Defender flags is exactly when a fallback is needed".
 
-  WHAT IT DOES. Compiles launcher\app\SelfSwap.cs on its own with the .NET
-  Framework 4 csc, the compiler the launcher is built with, which also proves
-  it is still C# 5. Compiles stub launchers around it:
+  WHAT IT DOES. Compiles launcher\app\SelfSwap.cs on its own with the
+  compiler the launcher is built with (tests\Launcher-Csc.ps1). Compiles stub
+  launchers around it:
 
       old         the launcher asking for the update, and the one put back
       new-good    starts, calls the real SelfSwap.Settle, stays up
@@ -109,17 +109,9 @@ Yes '#497: the updater asks SelfSwap for no other destination' ($upd -cnotmatch 
 Yes '#497: Icons repoints no shortcut aimed at another exe' ($icons -cnotmatch 'AimsAtOld|SelfSwap\.(OldName|NewName)')
 
 if (-not $haveSwap) { Finish }
-$swapSrc = Get-Content -LiteralPath $swapCs -Raw
-# The compile below is the real proof, since this csc stops at C# 5. This is
-# the same search the entry gives, so a failure names what it found.
-Yes 'SelfSwap.cs has no C# 6: no $", no ?., no nameof' (-not ($swapSrc -match '\$"|\?\.|nameof\('))
 
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework 4 csc is on this machine' ([bool]$csc)
-if (-not $csc) { Finish }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
 
 # `find` in the script has to be Windows' own. A PATH with Git's usr\bin ahead
 # of System32 would hand it GNU find, and the wait would end at once.
@@ -230,9 +222,9 @@ class Driver
 [IO.File]::WriteAllText((Join-Path $bin 'Stub.cs'), $stubSrc)
 [IO.File]::WriteAllText((Join-Path $bin 'Driver.cs'), $driverSrc)
 
-# /noconfig and the one reference by name, the way Build-Launcher.ps1 compiles:
-# csc.rsp on a machine with the reference assemblies installed (the GitHub
-# runner) is what stopped the launcher build with CS1703.
+# /noconfig and the one reference by name, as the build compiles: csc.rsp
+# on a machine with the reference assemblies installed (the GitHub runner) is
+# what stopped the old launcher build with CS1703.
 function Build([string]$out, [string]$target, [string]$define, [string[]]$src) {
     $a = @('/noconfig', '/nologo', "/target:$target", "/out:$out", '/reference:System.dll')
     if ($define) { $a += "/define:$define" }
@@ -249,7 +241,7 @@ function Build([string]$out, [string]$target, [string]$define, [string[]]$src) {
 $stubCs = Join-Path $bin 'Stub.cs'
 $driver = Join-Path $bin 'driver.exe'
 $built = Build $driver 'exe' '' @((Join-Path $bin 'Driver.cs'), $swapCs)
-Yes 'SelfSwap.cs compiles with the Framework csc, alone, into a driver' $built
+Yes 'SelfSwap.cs compiles with the build''s compiler, alone, into a driver' $built
 $kinds = [ordered]@{ 'old' = ''; 'new-good' = 'NEW;GOOD'; 'new-broken' = 'NEW;BROKEN'; 'new-late' = 'NEW;LATE'; 'new-hang' = 'NEW;HANG' }
 foreach ($k in $kinds.Keys) {
     $ok = Build (Join-Path $bin "$k.exe") 'winexe' $kinds[$k] @($stubCs, $swapCs)

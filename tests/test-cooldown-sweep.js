@@ -16,7 +16,8 @@
 // characters.json was written in place, and writeFileSync empties a file
 // before it fills it, so a server stopped halfway left a book the next start
 // could not read, and every row for somebody offline was lost. It is written
-// beside and renamed over now; this tears a write halfway and restarts.
+// whole now, by the engine's mp.writeFileWhole (#2740); this tears a write
+// halfway and restarts, and has the write refused.
 //
 // Reads the gamemode. Writes only into a scratch folder under the system
 // temp folder, which it removes. GM=<path> reads another copy of the file.
@@ -283,13 +284,15 @@ const roster = (rosterA >= 0 && rosterB > rosterA) ? src.slice(rosterA, rosterB)
 yes('the roster block is in the gamemode', roster !== null);
 
 /*
-  The real block, over a real folder, with fs watched. tear makes the next
-  write stop halfway through and throw, the way a server stopped mid-write
-  leaves a file. refuse makes the next rename throw EPERM, the way Windows
-  answers while something else holds the file open.
+  The real block, over a real folder, with fs watched. Since #2740 the book
+  is written by the engine's mp.writeFileWhole: a new file beside it,
+  renamed over it. The stand-in below keeps that contract: tear stops the
+  next write halfway, which leaves the new file torn and the book as it was;
+  refuse throws the way the engine does when a reader that does not share
+  delete holds the book, and the book is as it was.
 */
 function book(dir, online) {
-  const spy = { writes: [], renames: [], tear: false, refuse: false };
+  const spy = { writes: [], renames: [], whole: [], said: [], tear: false, refuse: false };
   const wrapped = Object.assign({}, fs, {
     readFileSync: function (p, enc) {
       if (p === 'server-settings.json') return JSON.stringify({ privDir: dir, dataDir: dir });
@@ -297,20 +300,10 @@ function book(dir, online) {
     },
     writeFileSync: function (p, data) {
       spy.writes.push(String(p));
-      if (spy.tear) {
-        spy.tear = false;
-        fs.writeFileSync(p, String(data).slice(0, Math.floor(String(data).length / 2)));
-        throw new Error('the server stopped');
-      }
       return fs.writeFileSync(p, data);
     },
     renameSync: function (a, b) {
       spy.renames.push([String(a), String(b)]);
-      if (spy.refuse) {
-        spy.refuse = false;
-        const e = new Error('EPERM: operation not permitted, rename'); e.code = 'EPERM';
-        throw e;
-      }
       return fs.renameSync(a, b);
     }
   });
@@ -330,7 +323,20 @@ function book(dir, online) {
       return null;
     },
     lookupEspmRecordById: function () { return null; },
-    getIdFromDesc: function () { return 0; }
+    getIdFromDesc: function () { return 0; },
+    writeFileWhole: function (p, text) {
+      spy.whole.push(String(p));
+      if (spy.tear) {
+        spy.tear = false;
+        throw new Error('the server stopped');
+      }
+      if (spy.refuse) {
+        spy.refuse = false;
+        throw new Error('Could not write ' + p + ' whole: renaming the new file over it, refused because ' +
+                        'another program has it open without sharing delete. characters.json is as it was.');
+      }
+      fs.writeFileSync(p, text);
+    }
   };
   let tick = null;
   const fn = new Function('require', 'mp', 'chargenOf', 'setInterval', 'setTimeout',
@@ -346,7 +352,7 @@ function book(dir, online) {
      function () { return 0; },
      function () { },
      {},
-     { log: function () { } });
+     { log: function (l) { spy.said.push(String(l)); } });
   spy.tick = function () { if (tick) tick(); };
   return spy;
 }
@@ -367,9 +373,9 @@ if (roster !== null) {
     yes('R1 the book is written and has Ada in it', !!(whole && whole['42'] && whole['42'].name === 'Ada'));
     yes('R1 characters.json itself is never opened to be written into',
         s.writes.indexOf(FILE) === -1);
-    yes('R1 it is written beside and renamed over',
-        s.renames.some(function (r) { return r[0] === FILE + '.tmp' && r[1] === FILE; }));
-    yes('R1 and nothing is left beside it', !fs.existsSync(FILE + '.tmp'));
+    yes('R1 it is written whole, by the engine\'s mp.writeFileWhole (#2740)',
+        s.whole.indexOf(FILE) >= 0 && s.renames.length === 0);
+    yes('R1 and nothing is left beside it', fs.readdirSync(dir).join(',') === 'characters.json');
 
     // R2: THE POINT. Bram comes on, and the server stops halfway through
     // writing him down.
@@ -389,16 +395,27 @@ if (roster !== null) {
     yes('R2 and Bram is written in beside her',
         !!(restarted && restarted['43'] && restarted['43'].name === 'Bram'));
 
-    // R3: Windows refuses the rename while something else holds the file.
+    // R3: the engine refuses the write, as it does while a reader that does
+    // not share delete holds the book. Until #2740 a refused rename wrote the
+    // book in place after all; now the book stays the last one written whole.
     fs.rmSync(FILE, { force: true });
-    fs.rmSync(FILE + '.tmp', { force: true });
-    const held = book(dir, [1]);
+    const heldOnline = [1];
+    const held = book(dir, heldOnline);
+    held.tick();
+    heldOnline.push(2);
     held.refuse = true;
     held.tick();
-    const inPlace = readBook(FILE);
-    yes('R3 a refused rename still gets the book written, in place as before',
-        !!(inPlace && inPlace['42'] && inPlace['42'].name === 'Ada'));
-    yes('R3 and the file beside it is taken away', !fs.existsSync(FILE + '.tmp'));
+    const kept = readBook(FILE);
+    yes('R3 a refused write leaves the last whole book (Ada, not yet Bram)',
+        !!(kept && kept['42'] && !kept['43']));
+    yes('R3 nothing writes characters.json in place, and nothing is left beside it',
+        held.writes.indexOf(FILE) === -1 && fs.readdirSync(dir).join(',') === 'characters.json');
+    yes('R3 the console says why',
+        held.said.some(function (l) { return /could not write .*characters\.json: .*without sharing delete/.test(l); }));
+    held.tick();
+    const later = readBook(FILE);
+    yes('R3 and the next pass writes the whole book, Bram in it, with nothing new to say',
+        !!(later && later['42'] && later['43'] && later['43'].name === 'Bram'));
   } finally {
     try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
   }

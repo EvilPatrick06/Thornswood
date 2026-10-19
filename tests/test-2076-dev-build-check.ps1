@@ -60,6 +60,64 @@ $built = $src.IndexOf('New-ThornswoodArtifact -Component gamemode')
 $read = $src.IndexOf('[IO.File]::ReadAllBytes($devRecordPath)')
 Yes '  and the commit check runs before the record is read' ($built -gt 0 -and $read -gt $built)
 
+# #2711: what each box answers when its server-build.json does not read. The
+# dev box's commit read and the live box's commit and light reads sat in a try
+# with an empty catch: dev then refused with no why, and live's -FromStore
+# took the load order as written for an engine with no light plugins. Each
+# box read runs here, in Windows PowerShell as on the box, against a folder
+# standing in for the server root.
+. (Join-Path $repo 'scripts\deploy\ServerContent.ps1')
+. (Join-Path $repo 'scripts\deploy\ServerSettings.ps1')
+$winPs = 'powershell'
+if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { $winPs = 'pwsh' }
+function On-Box([string]$text) {
+  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
+  return @(& $winPs -NoProfile -NonInteractive -EncodedCommand $e 2>&1 | ForEach-Object { "$_".Trim() })
+}
+$box = Join-Path ([IO.Path]::GetTempPath()) ('ts-2076-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Path $box | Out-Null
+try {
+  [IO.File]::WriteAllText((Join-Path $box 'server-build.json'), '{ "source": { "commit": ')
+  [IO.File]::WriteAllText((Join-Path $box 'server-settings.json'), '{ "port": 7777, "thornswoodRequirePass": true }')
+
+  # Dev: the text Deploy-DevGamemode sends, with $Root its stand-in.
+  $m = [regex]::Match($src, '(?s)-Script \(\$ThornswoodRecordSumText \+ "`r`n" \+ @"\n(.*?)\n"@\)')
+  Yes 'the dev box read is where it was' ($m.Success)
+  if ($m.Success) {
+    $Root = $box
+    $said = On-Box ($ThornswoodRecordSumText + "`r`n" + $ExecutionContext.InvokeCommand.ExpandString($m.Groups[1].Value))
+    Yes 'a dev record that does not read is answered RECORDUNREADABLE, with why' (@($said | Where-Object { $_ -match '^RECORDUNREADABLE \S' }).Count -eq 1 -and @($said | Where-Object { $_ -match '^RECORD [0-9a-f]{64}$' }).Count -eq 1)
+  }
+  Yes '  and the refusal says what reading it said' ($src.Contains("elseif (`$l -match '^RECORDUNREADABLE (.*)$') { `$devBoxUnread = `$Matches[1] }") -and $src.Contains("if (`$devBuildProblem -and `$devBoxUnread) { `$devBuildProblem += ' Its server-build.json does not read: ' + `$devBoxUnread }"))
+
+  # Live: Deploy-Server's -GamemodeOnly and -FromStore read, and the refusals
+  # it makes of the answer, both taken out of the script and run.
+  $ds = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\Deploy-Server.ps1')).Replace("`r`n", "`n")
+  $rm = [regex]::Match($ds, "(?s)\n  \`$boxRead = @'\n(.*?)\n'@\n")
+  $p0 = $ds.IndexOf('  $livePort = 0')
+  $p1 = $ds.IndexOf('  $how = if ($FromStore)', $p0)
+  Yes 'the live box read and its refusals are where they were' ($rm.Success -and $p0 -gt 0 -and $p1 -gt $p0)
+  if ($rm.Success -and $p0 -gt 0 -and $p1 -gt $p0) {
+    $boxSaid = @(On-Box ($ThornswoodRecordSumText + "`r`n`$root = '" + $box.Replace("'", "''") + "'`r`n" + $rm.Groups[1].Value + "`r`n" + $ThornswoodServerContentText))
+    Yes 'a live record that does not read is answered RECORDUNREADABLE, with no commit or light line' (
+      @($boxSaid | Where-Object { $_ -match '^RECORDUNREADABLE \S' }).Count -eq 1 -and @($boxSaid | Where-Object { $_ -match '^RECORD(COMMIT|LIGHT) ' }).Count -eq 0)
+    $Root = 'C:/Thornswood-Server'
+    $rec = [pscustomobject]@{ source = [pscustomobject]@{ commit = ('7feb5dc4' + ('0' * 32)) }; lightPlugins = $false }
+    $recordSum = $new
+    foreach ($FromStore in @($true, $false)) {
+      $refusals = $null
+      Invoke-Expression $ds.Substring($p0, $p1 - $p0)
+      Yes ('  and ' + $(if ($FromStore) { '-FromStore' } else { '-GamemodeOnly' }) + ' refuses it, saying what reading it said') (@($refusals | Where-Object { $_ -match "server-build\.json does not read \(" }).Count -eq 1)
+    }
+    [IO.File]::WriteAllText((Join-Path $box 'server-settings.json'), '{ "port": ')
+    $boxSaid = @(On-Box ($ThornswoodRecordSumText + "`r`n`$root = '" + $box.Replace("'", "''") + "'`r`n" + $rm.Groups[1].Value + "`r`n" + $ThornswoodServerContentText))
+    $FromStore = $false; $refusals = $null
+    Invoke-Expression $ds.Substring($p0, $p1 - $p0)
+    Yes 'live settings that do not read are refused with what reading them said' (@($refusals | Where-Object { $_ -match 'cannot be read \(.+\), so there is no telling which process' }).Count -eq 1)
+  }
+} finally {
+  Remove-Item -LiteralPath $box -Recurse -Force -ErrorAction SilentlyContinue
+}
 Write-Host ''
 Write-Host ("$pass passed, $fail failed")
 if ($fail) { exit 1 }

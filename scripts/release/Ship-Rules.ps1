@@ -208,16 +208,24 @@ function Test-ShipRuntime([string]$rel) {
 # ours to delete off a machine either.
 $ShipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 $ShipClientHashes = @{}
-try {
-    $clientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
-    if (Test-Path -LiteralPath $clientRecord) {
-        $rec = Get-Content -LiteralPath $clientRecord -Raw | ConvertFrom-Json
-        foreach ($p in $rec.files.PSObject.Properties.Name) {
-            [void]$ShipClientFiles.Add($p)
-            $ShipClientHashes[$p] = ([string]$rec.files.$p.sha256).ToLowerInvariant()
-        }
+# A copy of this file with no record beside it (as test fixtures make) has no
+# client paths. A record that is there and does not read stops whatever
+# loaded this (#2711): read in a try with an empty catch, it left the six
+# paths unlisted, so the client runtime fell under Data\Platform as ours and
+# would ship whatever bytes the game folder held, unchecked against the record.
+$clientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+if (Test-Path -LiteralPath $clientRecord) {
+    try {
+        $rec = Get-Content -LiteralPath $clientRecord -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if (-not $rec -or -not $rec.PSObject.Properties['files'] -or -not $rec.files) { throw 'it names no files' }
+    } catch {
+        throw ("Ship-Rules.ps1: records\client-build.json does not read (" + $_.Exception.Message + "), so the client runtime's six paths cannot be told from ours. Nothing was packed or sent.")
     }
-} catch { }
+    foreach ($p in $rec.files.PSObject.Properties.Name) {
+        [void]$ShipClientFiles.Add($p)
+        $ShipClientHashes[$p] = ([string]$rec.files.$p.sha256).ToLowerInvariant()
+    }
+}
 
 # Whether the file at one of the six recorded paths is the recorded build, byte
 # for byte. $full is the file when the caller has it. Without it the file is
@@ -1434,8 +1442,20 @@ $ShipCollectionRevision = 0
 # which the callers dot-source; 0 without it.
 function Get-ShipCollectionRevision([string]$Root) {
     if (-not (Get-Command Get-CollectionRevision -ErrorAction SilentlyContinue)) { return 0 }
+    # No config.json, or one naming no collection, is the launcher's own
+    # collection. One that is there and does not read stops whatever asked,
+    # before anything is packed (Patrick, 19 Oct, #2711 decision 2 B): the
+    # revision decides which held files ship, and the launcher's own
+    # collection's may not be the one it meant to name. Until then it fell
+    # back to it, with an empty catch.
     $url = ''
-    try { $url = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
+    $cfg = Join-Path $Root 'config.json'
+    if (Test-Path -LiteralPath $cfg) {
+        $cfgDoc = $null
+        try { $cfgDoc = Get-Content -LiteralPath $cfg -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+        catch { throw ("$cfg does not read (" + ($_.Exception.Message -replace '\s+', ' ') + "), so the collection revision it names is not known, and nothing held for a later revision may ship. Fix config.json and run it again.") }
+        if ($cfgDoc -and $cfgDoc.PSObject.Properties['CollectionUrl']) { $url = [string]$cfgDoc.CollectionUrl }
+    }
     if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }
     return [int](Get-CollectionRevision (Get-CollectionSlug $url))
 }
@@ -1443,13 +1463,14 @@ function Get-ShipCollectionRevision([string]$Root) {
 # Plugins game\required-data puts in Data\ before a scan (Ensure-ShipRequiredData).
 # Worked out in a child scope: this file is dot-sourced into its callers, and
 # a name set here would overwrite one of theirs.
+# No folder (a copy of this file alone) lists none; a folder that cannot be
+# listed stops whatever loaded this, rather than shipping without the list
+# (#2711; it was a try with an empty catch).
 $ShipRequiredDataFiles = @(& {
-    try {
-        $dir = Join-Path $PSScriptRoot '..\..\game\required-data'
-        if (Test-Path -LiteralPath $dir) {
-            Get-ChildItem -LiteralPath $dir -File | Where-Object { $_.Name -ne 'README.md' } | ForEach-Object { 'Data\' + $_.Name }
-        }
-    } catch { }
+    $dir = Join-Path $PSScriptRoot '..\..\game\required-data'
+    if (Test-Path -LiteralPath $dir) {
+        Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object { $_.Name -ne 'README.md' } | ForEach-Object { 'Data\' + $_.Name }
+    }
 })
 
 # OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
@@ -1462,16 +1483,16 @@ $ShipRequiredDataFiles = @(& {
 # Scrub-Feed leaves them on the site, since they are ours while listed.
 # In a child scope, for the reason given over $ShipRequiredDataFiles.
 $ShipBuiltUntil1259 = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+# No list (a copy of this file alone) holds none; one that is there and cannot
+# be read stops whatever loaded this (#2711; it was a try with an empty catch).
 foreach ($ShipBuiltLine in @(& {
-    try {
-        $list = Join-Path $PSScriptRoot 'built-until-1259.txt'
-        if (Test-Path -LiteralPath $list) {
-            foreach ($line in [IO.File]::ReadAllLines($list)) {
-                $one = $line.Trim()
-                if ($one -and -not $one.StartsWith('#')) { $one }
-            }
+    $list = Join-Path $PSScriptRoot 'built-until-1259.txt'
+    if (Test-Path -LiteralPath $list) {
+        foreach ($line in [IO.File]::ReadAllLines($list)) {
+            $one = $line.Trim()
+            if ($one -and -not $one.StartsWith('#')) { $one }
         }
-    } catch { }
+    }
 })) { [void]$ShipBuiltUntil1259.Add($ShipBuiltLine) }
 
 # NEVER HANDED ON (#2454). A file used only as the collection installs it

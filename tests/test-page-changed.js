@@ -12,8 +12,8 @@ const crypto = require('crypto');
 const ROOT = path.join(__dirname, '..');
 const PAGES = ['terms', 'privacy', 'rules'];
 const EXPECT = {
-  terms: '2026-09-29',
-  privacy: '2026-10-17',
+  terms: '2026-10-19',
+  privacy: '2026-10-19',
   rules: '2026-09-29'
 };
 const MONTHS = [null, 'January', 'February', 'March', 'April', 'May', 'June',

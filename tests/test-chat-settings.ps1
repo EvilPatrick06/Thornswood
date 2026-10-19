@@ -12,9 +12,9 @@
   menu on the screen so it doesnt show and they can do /needs to find it all".
 
   HOW. The real ChatFade and NeedsBars classes are lifted out of
-  launcher\app\Display.cs by brace match and compiled with the .NET Framework csc
-  the launcher builds with, beside a Paths that points at a temp folder and a
-  Swallow that records. tests\test-chat-fade.js checks the other half, that
+  launcher\app\Display.cs by brace match and compiled with the compiler the
+  launcher builds with (tests\Launcher-Csc.ps1), beside a Paths that points at
+  a temp folder and a Swallow that records. tests\test-chat-fade.js checks the other half, that
   the plugin reads these lines. Read only apart from its own temp folder.
 #>
 [CmdletBinding()]
@@ -116,12 +116,8 @@ __LIFTED__
 '@
 $probe = $probe.Replace('__LIFTED__', $chat + "`n" + $needs)
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-chat-settings-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -131,7 +127,7 @@ try {
     $dll = Join-Path $work 'Probe.dll'
     $out = & $LauncherCsc /nologo /target:library "/out:$dll" $cs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes 'ChatFade and NeedsBars compile with the C# 5 compiler' $built
+    Yes 'ChatFade and NeedsBars compile with the compiler the build runs' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

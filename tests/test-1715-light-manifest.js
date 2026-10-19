@@ -76,6 +76,8 @@ function run(manifest) {
   const box = {
     require: function (name) { return name === "fs" ? fake : name === "path" ? path.posix : null; },
     console: { log: function () { log.push([].join.call(arguments, " ")); } },
+    // The engine's whole-file write (#2740), onto the fake disk.
+    mp: { writeFileWhole: function (p, text) { fake.writeFileSync(p, text); } },
     setInterval: function () { return 0; },
     clearInterval: function () {}
   };

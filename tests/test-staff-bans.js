@@ -442,7 +442,7 @@ const modlog = () => { try { return fs.readFileSync(path.join(gameDir, 'for-bot'
     }
 
     // ------------------------------------------------ 4. the door keeps them --
-    const doorWrite = src.slice(src.indexOf('fs.writeFileSync(FILE, JSON.stringify({'), src.indexOf("note: 'Written by the gamemode from the site."));
+    const doorWrite = src.slice(src.indexOf('mp.writeFileWhole(FILE, JSON.stringify({'), src.indexOf("note: 'Written by the gamemode from the site."));
     yes('the door writes the site\'s bans into allowed.json', /bans: Array\.isArray\(doc\.bans\) \? doc\.bans : \[\]/.test(doorWrite));
     const W = (() => { const m = src.match(/const WORDS = (\[[\s\S]*?\]);/); return m ? new Function('return ' + m[1])() : []; })();
     const PW = (() => { const m = src.match(/const PLAYER_WORDS = (\[[\s\S]*?\]);/); return m ? new Function('return ' + m[1])() : []; })();
