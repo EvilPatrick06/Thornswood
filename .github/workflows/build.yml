@@ -554,6 +554,7 @@ jobs:
                  'test-2261-tome-refused.js',
                  'test-papyrus-event-list.js',
                  'test-1383-treatments.js',
+                 'test-1383-limbs-brews.js',
                  'test-1384-condition.js',
                  'test-1384-shut-benches.js',
                  'test-1385-perks.js',
