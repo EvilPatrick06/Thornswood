@@ -11,6 +11,19 @@ namespace Thornswood
             // each of the game's meshes the two are made from, as this game had it
             Sources = new BoardSource[]
             {
+                new BoardSource("meshes\\clutter\\signage\\windhelm\\signwhpost01.nif", 8793, "d815587bd88e2df62771f5fa44570e49f40110c50ca31b6f28ccf06535643978"),
+                new BoardSource("meshes\\clutter\\stockade\\stockadefreewall01.nif", 8963, "3771d010d3f4d66749e1227424b87d8054851de0b40cb3897e5c05ffe357eb27"),
+                new BoardSource("meshes\\clutter\\stockade\\stockadewoodbeamshort01.nif", 6685, "299cad5fd2b6775b7485008a3b6c249e6d73dd7648a1a8802c0ba64d381b453d"),
+                new BoardSource("meshes\\architecture\\shackkit\\shackroofside01.nif", 2182, "57c6cb595d214525a437d9751079e7cadab349204673a3b64f3b313259c728fd"),
+                new BoardSource("meshes\\clutter\\common\\candlelanternwithcandle01.nif", 40217, "af936b61381d3771495a547e6f079848b41a84e26cd493dcbf7829cf0ce89f65"),
+                new BoardSource("meshes\\clutter\\books\\note01.nif", 8159, "72baed7c6797855e68c29e1ba2f70c2cfbdb4762c09dda9ac67cca8c2c2ea9c4"),
+                new BoardSource("meshes\\clutter\\books\\notetornpaper.nif", 6437, "47a637619c138d8a4e5ec360a3492b9d863ace637f5403b29af4ffc2c7eaa732"),
+                new BoardSource("meshes\\clutter\\books\\note02.nif", 8528, "8faa14335d6fb2c609c40374bc2220204b2c9752dd85e2d61e79a39d2fd14d87"),
+                new BoardSource("meshes\\clutter\\books\\note04.nif", 8159, "f73661e0c438b6e9941fde0461a163caa3718008621c7a1104bee1d00f39085c"),
+                new BoardSource("meshes\\clutter\\books\\note03.nif", 8528, "ea028559d1f5b086f5723da3e7c1a0636d684525c991368307ef687a30d9e0bb"),
+                new BoardSource("meshes\\clutter\\shipwreck\\shipwreckboards01.nif", 3282, "6e62c78cf2822b360b67b1cce0318f086ad1712dcfe7e8826ab03fbc2df9a0db"),
+                new BoardSource("meshes\\architecture\\solitude\\clutter\\smarketstalltop.nif", 64299, "6407b5e7e4199b56a85ac83438b52587ee2e18756aa8b2fb0c1ae3abe135c2b2"),
+                new BoardSource("meshes\\clutter\\common\\strongbox01.nif", 28235, "19dab7ec96df687f9dbb17e7c198c1eb0b52347f84278142921042363dcf3038"),
             },
             Parts = new[]
             {
@@ -69,7 +82,7 @@ namespace Thornswood
                     new double[] { 6.123233995736766e-17, -1.0, 0.0, 1.0, 6.123233995736766e-17, 0.0, 0.0, 0.0, 1.0 },
                     new double[] { 3.4, 0.36, 1.6 }, new double[] { 132.5203, -4.0, 76.8 }),
                 new BoardPart("Strut", "meshes\\clutter\\stockade\\stockadewoodbeamshort01.nif", // turned -45, 0, 90 degrees about x, y and z
-                    new double[] { 6.123233995736766e-17, -0.7071067811865476, -0.7071067811865475, 1.0, 4.329780281177467e-17, 4.329780281177466e-17, 0.0, -0.7071067811865475, 0.7071067811865476 },
+                    new double[] { 6.123233995736766e-17, -0.7071067811865476, -0.7071067811865476, 1.0, 4.329780281177467e-17, 4.329780281177467e-17, 0.0, -0.7071067811865476, 0.7071067811865476 },
                     new double[] { 0.45, 0.36, 0.45 }, new double[] { 117.3618, -4.0, 54.2656 }),
             },
             Box = new BoardPart("DropBox", "meshes\\clutter\\common\\strongbox01.nif", // turned 0, 0, 0 degrees about x, y and z
