@@ -28,7 +28,7 @@ for (const channel of ['main', 'dev', undefined]) {
     startSharedNpcServerRuntime: (api,timers,now,report,population,options) => {
       runtime++;assert.equal(options.suspended,true);return { stop() {},start:()=>true };
     },
-    MERCHANT_TRADING: { installMerchantTrading: env => {
+    MERCHANT_TRADING: { prepareRoles: population => ({population,catalog:{byRef:{}},roleTables:{}}), installMerchantTrading: env => {
       quotes++;assert.equal(env.suspended,true);
       return {nativeReady:()=>true,start(){starts++;},shutdown() { shutdowns++; }};
     } }
