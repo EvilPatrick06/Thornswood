@@ -132,11 +132,11 @@ function Get-Prop($o, [string]$k) {
 # "20260928-1630-dev" as "28 Sep at 16:30", for the note.
 function Get-ReleaseWhen([string]$rid) {
     $m = [regex]::Match($rid, '^(\d{8})-(\d{4})')
-    if ($m.Success) {
-        try {
-            $t = [datetime]::ParseExact($m.Groups[1].Value + $m.Groups[2].Value, 'yyyyMMddHHmm', [Globalization.CultureInfo]::InvariantCulture)
-            return $t.ToString('d MMM', [Globalization.CultureInfo]::InvariantCulture) + ' at ' + $t.ToString('HH:mm', [Globalization.CultureInfo]::InvariantCulture)
-        } catch { }
+    # Twelve digits that are not a date (a month 13) leave the id as it is,
+    # asked with TryParseExact rather than thrown and caught.
+    $t = [datetime]::MinValue
+    if ($m.Success -and [datetime]::TryParseExact($m.Groups[1].Value + $m.Groups[2].Value, 'yyyyMMddHHmm', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$t)) {
+        return $t.ToString('d MMM', [Globalization.CultureInfo]::InvariantCulture) + ' at ' + $t.ToString('HH:mm', [Globalization.CultureInfo]::InvariantCulture)
     }
     return $rid
 }
@@ -511,24 +511,33 @@ foreach ($n in $profileFound) { $staged[([string]$newMap[":golden:$n"]).Split(':
 $fileDir = Join-Path $stage 'files'
 $sendFiles = @()
 $cannot = @()
+# Why each file could not be fetched, the first said with the count (#2711):
+# the fetch was in a try with an empty catch, so a file the site does not have
+# and a fetch that failed on the way (or came back as other bytes) read the
+# same, and neither was named.
+$cannotWhy = @()
 foreach ($h in @($wantFiles.Keys)) {
     if ($present.Contains($h)) { continue }
     if ($staged.ContainsKey($h)) { $sendFiles += $staged[$h]; continue }
     $got = $false
+    $why = ''
     foreach ($ptr in @($tgt, $cur)) {
         $u = Get-RecordFileUrl ([string]$ptr.url) $h
         if (-not $u) { continue }
-        try { [void](Get-FeedAssetFile $u $h (Join-Path $fileDir $h) $sd $SiteUrl); $got = $true; break } catch { }
+        try { [void](Get-FeedAssetFile $u $h (Join-Path $fileDir $h) $sd $SiteUrl); $got = $true; break }
+        catch { $why = $_.Exception.Message }
     }
-    if ($got) { $sendFiles += (Join-Path $fileDir $h) } else { $cannot += $h }
+    if ($got) { $sendFiles += (Join-Path $fileDir $h) }
+    else { $cannot += $h; $cannotWhy += $(if ($why) { $why } else { "no feed names a folder $h could be in" }) }
 }
+$cannotSaid = $(if ($cannotWhy.Count) { ' The first: ' + $cannotWhy[0] + $(if ($cannotWhy.Count -gt 1) { (' (and {0} more)' -f ($cannotWhy.Count - 1)) } else { '' }) } else { '' })
 if ($cannot.Count -and $packsGone) {
     # No pack goes out, so a record without its files would leave every
     # launcher nothing to take: it would be no rollback at all.
     Remove-Item -LiteralPath $stage -Recurse -Force -ErrorAction SilentlyContinue
-    Die ("{0} file(s) of {1} are not on the site one by one, and the feed carries no packs, so no launcher could take this rollback. Nothing was sent. Point -FilesFrom at a folder holding them, and run it again." -f $cannot.Count, $tgtId)
+    Die ("{0} file(s) of {1} could not be fetched from the site one by one, and the feed carries no packs, so no launcher could take this rollback. Nothing was sent. Point -FilesFrom at a folder holding them, and run it again.{2}" -f $cannot.Count, $tgtId, $cannotSaid)
 } elseif ($cannot.Count) {
-    Say ("  {0} file(s) of {1} are not on the site one by one, so launchers take this as a pack, not file by file" -f $cannot.Count, $tgtId) 'Yellow'
+    Say ("  {0} file(s) of {1} could not be fetched from the site one by one, so launchers take this as a pack, not file by file.{2}" -f $cannot.Count, $tgtId, $cannotSaid) 'Yellow'
 } else {
     $newMap[$RecordFilesKey] = '1'
     Say ("  every file of what {0} installed will be on the site by its sha256 ({1} to send)" -f $tgtId, $sendFiles.Count) 'DarkGray'

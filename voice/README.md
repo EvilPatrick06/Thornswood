@@ -7,19 +7,20 @@ carries its own WebSocket code. The game server posts where everybody is to it
 five times a second over loopback (`POST /positions`). Every client holds a
 WebSocket to it for those positions, for the WebRTC signalling that sets up
 voice between two people, and for text chat, which it relays to the room and
-writes to `chat\`, one file a day. The audio goes straight between people and
+writes to `chat\`, one file a day. Slash lines are written there too, a
+key's or a panel's marked as a key press, but not the front plugin's own
+reports to the game server (`PLUGIN_REPORTS`, `tests\test-2723-plugin-reports.js`).
+The audio goes straight between people and
 never passes through it. The `test-*.js` files beside it are its harnesses.
 It serves no page of its own: its two clients are the launcher's voice page
 and the game's overlay, both loaded off disk. The plain browser page it used
 to serve at `/` went in #1822, because it had no way to get a join token and
-so could never get in. `gamemode-voice.js` is the gamemode's half of the
-position feed as `Add-VoiceFeed.ps1` first added it.
-The copy between the voice feed markers in `game\gamemode.js` has moved on
-since: it reads its port from `server-settings.json`, so the dev server feeds
-the dev service, where this file still has 7778 written in.
-`Add-VoiceFeed.ps1` would write this file over that block and redeploy the
-live gamemode, undoing that, so it stops when the two differ; `-Force` is the
-only way past.
+so could never get in. The game server's half of the position feed is the
+block between the voice feed markers in `game\gamemode.js`. It reads its port
+from `server-settings.json`, so the dev server feeds the dev service. The
+older copy of that block that sat here went in #2736, with the deploy script
+that wrote it into the gamemode: nothing ran the copy, and the script could
+only put the older block back.
 
 A socket opened by a browser has to come from a page loaded off disk, which
 says `null` or `file://`: the game's pages and the launcher's voice page. A
@@ -80,9 +81,34 @@ socket here. `test-most.js` covers it. `load-voice.js` is not a harness: it
 plays an evening at a copy of the service with no people (two sockets each, a
 join storm, the WebRTC signalling for every pair, walking and talk) and prints
 what the service cost at each size, which is where that number came from.
+It sends every message from its own one thread, so past a hundred or so
+people its signalling time is its own; `load-signalling.js` measures what the
+service itself takes to relay a full room's signalling (#2390).
 The joins and leaves one turn of the event loop handles share one roster, so
 a restart that brings every page back at once costs each socket a few
 rosters rather than one per arrival (#2332, `test-roster-once.js`).
+What one turn sends a socket goes to the kernel in writes of about 16 KB
+rather than one write a message (#2390): at 200 people, every pair trading an
+offer, an answer and six candidates each way took the service 5.5 to 6.0 s
+before and 2.4 to 2.6 s after, measured with `load-signalling.js`.
+`THORNSWOOD_CAPTIONS` (off when unset) is voice shown as words above the
+speaker's head (#2475). The words are made on the speaker's own machine and
+only the text comes here, as `{ t: 'caption', text }`; with it `on`, a
+caption goes to the speaker and to the people in the same cell within the
+reach of the speaker's voice mode (7, 30 or 85 metres), and only after the
+speaker said `{ t: 'captions', share: true }` and while their talk key is
+down or was up less than two seconds ago. `{ see: false }` stops a person
+getting anybody's, a text mute stops that speaker's, staff silence stops all
+of the speaker's, and none is written to the chat log or the service log.
+`/health` gives `captions`: whether it is on, how many went out and how
+many did not, and the settings below.
+`THORNSWOOD_CAPTION_TAIL_MS` (2000), `THORNSWOOD_CAPTION_BURST` (3),
+`THORNSWOOD_CAPTION_REFILL_MS` (1000), `THORNSWOOD_CAPTION_REACH` (unset: the
+voice reach; a number of units caps it, never past the voice reach) and
+`THORNSWOOD_CAPTION_TEXT_MUTE` (`off` leaves captions to the voice switch
+alone) tune it without a release. Nothing sends one yet, so every service is left without it
+until the questions on #2475 are decided.
+`tests\test-2475-voice-captions.js` covers it.
 `THORNSWOOD_VOICE_AUTH`, which once let unproven joins in, is not read any
 more. `/health`
 reports

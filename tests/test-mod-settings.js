@@ -70,7 +70,9 @@ function boot(room) {
       if (what === 'profileId') { return room[id]; }
       return undefined;
     },
-    set: function (id, name, value) { sets.push({ id: id, name: name, value: JSON.parse(JSON.stringify(value)) }); }
+    set: function (id, name, value) { sets.push({ id: id, name: name, value: JSON.parse(JSON.stringify(value)) }); },
+    // The engine's whole-file write (#2740), as far as the gamemode can tell.
+    writeFileWhole: function (p, text) { fs.writeFileSync(p, text); }
   };
   let tick = null;
   const logged = [];

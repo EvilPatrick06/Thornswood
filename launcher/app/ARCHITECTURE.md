@@ -293,6 +293,22 @@ Voice downloads (issue #1330): the same Windows check, then the chain must end
 at Microsoft Root Certificate Authority 2011 and the certificate must be
 Microsoft Corporation's, for signing programs.
 
+**ReleaseManifest** (ReleaseManifest.cs, FeedManifest.cs). Whether the
+release's signed manifest vouches for every asset the feed names (#2163,
+phase C of docs\SIGNED-RELEASES.md). The feed's "signedManifest" is read
+apart (`ManifestRef.FromFeed` in Config.cs). On an update check that brings
+a different manifest or different assets, `Updater.ManifestLine` fetches
+release.json and its catalog like any asset (a listed host, stored under
+their sha256, bytes that hash to it). `ReleaseManifest.Refusal` then checks
+the catalog with Signature.Refusal, finds release.json's sha256 among the
+catalog's digests (wintrust's CryptCATEnumerateMember), and checks that
+release.json lists every asset. The launcher, the client runtime, each pack
+and the release record are those assets. Phase C only writes the answer to
+launcher.log, from CheckUpdatesBackground in ShellUpdate.cs; nothing is
+refused on it yet. `tests\test-2163-manifest-check.ps1` compiles the two
+files on their own and checks them against a catalog ThornswoodRelease
+signed.
+
 **FeedNotice** (FeedNotice.cs). What the feed says to everybody. Three
 optional fields in version.json, set by hand in the releases repository:
 `message` (a bar above Play, never a hold on its own), `maintenance` (holds
@@ -365,13 +381,33 @@ an update waiting on the feed, the feed holding Play, Thornswood's own folder
 behind Vortex or refused, files the folder lost (`OwnGameLost.cs`), this
 build's own files changed or missing (Keep's kept files, `Thornswood.ini`,
 the shipped settings files), Windows' Skyrim folders left pointed at
-Profile, the shortcut icon, the client runtime, Steam not running, and the
-Skyrim build. `Look()` reads and writes nothing in the game folder.
+Profile, the shortcut icon, the client runtime, Steam not running, the
+Skyrim build, and the three files made from the game (below). `Look()` reads and writes nothing in the game folder.
 `FixOnDisk()` is Fix's steps that write files, with the folder to itself
 (`OwnGame.Alone`); the shell's Fix brings the folder up to date from Vortex
 first, then runs those steps, scans again and says only what is still wrong
 and what will put it right, and then makes the own folder, takes the update
 or starts the Downgrade, each of which asks first or restarts the launcher.
+
+**MadeFromGame and FromGame** (MadeFromGame.cs, FromGame.cs,
+FromGameArchive.cs, FromGameDeflate.cs, FromGameMath.cs, and the recipes
+FromGameMenu.cs and FromGameBoard.cs, #2827). The main menu with no Bethesda
+logo (`Data\Interface\startmenu.swf`) and the notice board and drop box
+meshes (`Data\meshes\thornswood\noticeboard01.nif`, `dropbox01.nif`) are
+Bethesda's files edited or put together, so Thornswood ships none of them:
+FromGame reads the game's own `.bsa` archives under `Paths.Skyrim` and makes
+each one, byte for byte the file that used to ship, from a recipe that
+`scripts\mods\Build-StartMenu.py` and `Build-NoticeBoard.py` write on a
+machine with the game. Each recipe names the sha256 of every game file it
+reads, so a game on another build makes nothing and the reason names the
+file that differs. MadeFromGame writes only the ones missing or changed in
+`Game\Data`, before every Play and from Fix, taking the old name off first
+(`OwnGame.DropName`) so a link into the Steam copy or Vortex's staging is
+never written through. The own folder's refresh counts them as Thornswood's
+(`OwnGameKinds.cs MadeInGame`), and `Ship-Rules.ps1 $ShipMadeFromGame` keeps
+them out of every pack. `scripts\release\Go.ps1` compiles the same files to
+make them for a hand-run install, and `scripts\mods\Check-FromGame.ps1`
+says whether a game makes all three.
 
 **Vortex profile state** (VortexProfileState.cs). Checks and the PowerShell
 load-order scripts share this reader for the named Skyrim profile and the
@@ -587,7 +623,7 @@ pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
-Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
+Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
 each mod name), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
 Gallery page uploads via `/api/gallery/submit`, reports via
@@ -661,20 +697,21 @@ configured at all, which is a developer's own build and never a tester's.
 | 16 | `ShellPlay.cs:289 AutoJoin.Apply` | `AutoJoin.cs:124 Apply()`: the server address and port, and where the client fetches the server's load order, through Hold.Around. SkyMP has no join screen; this file is the whole of joining. | `skymp5-client-settings.txt` when it changes |
 | 17 | `ShellPlay.cs:298 ThornIni.Ensure` | The template, if the file is missing. | `Game\Data\SKSE\Plugins\Thornswood.ini` |
 | 18 | `ShellPlay.cs:301 Mics.Apply` | This machine's microphone name, the voice port and the voice address. | `Thornswood.ini` |
-| 19 | `ShellPlay.cs:306 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
-| 20 | `ShellPlay.cs:313 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
-| 21 | `ShellPlay.cs:315 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
-| 22 | `ShellPlay.cs:321 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
-| 23 | `ShellPlay.cs:325 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
-| 24 | `ShellPlay.cs:344 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `ShellPlay.cs:367 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
-| 25 | `ShellPlay.cs:394 Discord.NewSession` | An id for this session, then `ShellPlay.cs:398 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
-| 26 | `ShellPlay.cs:405 Presence.Start` | The Discord card, on its own thread. | |
-| 27 | `ShellPlay.cs:407 PlayedFile` | Then `ShellPlay.cs:409 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
+| 18b | `ShellPlay.cs:311 MadeFromGame.Ensure` | The main menu and the notice board's two meshes made from this machine's game archives, only those missing or changed. A game that cannot make them still plays, and the log line says which game file differs. | `Game\Data\Interface\startmenu.swf`, `Game\Data\meshes\thornswood\noticeboard01.nif` and `dropbox01.nif` |
+| 19 | `ShellPlay.cs:318 EnsureServer` | `ShellPlay.cs:114 EnsureServer()`: `SkyMp.Up` connects to the resources port. A server elsewhere that does not answer is asked about; one on this machine is started. | `Profile\server.pid` and `server.log`, local server only |
+| 20 | `ShellPlay.cs:325 Keep.Restore` | Last thing before the game that can still say no, so nothing is left parked by a refusal. Our Data\Platform files back from `Profile\Keep`; other servers' plugins parked. | changed files in `Game\Data\Platform`; `Profile\Parked\*` and `parked.txt` |
+| 21 | `ShellPlay.cs:327 Keep.LeaveNote` | The note that says this session is ours. The plugins idle without it. | `Game\Data\Platform\thornswood-session.txt` |
+| 22 | `ShellPlay.cs:333 Hold.Take` | Read only handles on every kept file and the client settings, and an empty held stand-in where each parked plugin was. | locks, and the stand-ins |
+| 23 | `ShellPlay.cs:337 Swap.Apply` | Windows' two Skyrim folders pointed at Profile. Throws, with the folder named, when Windows will not let one go. On the next line `playing` goes true, the theme music and the video behind the title stop, the button reads RUNNING and Quit game appears. | two junctions, two `.st-backup` folders, `Profile\swap.json` |
+| 24 | `ShellPlay.cs:356 ProcessStartInfo` | For `Game\skse64_loader.exe`, with Game as the working directory and no arguments, started at `ShellPlay.cs:379 Process.Start`. The loader starts `SkyrimSE.exe` beside it. Then one log line names the launcher version, the newest pack applied and the display mode. | |
+| 25 | `ShellPlay.cs:406 Discord.NewSession` | An id for this session, then `ShellPlay.cs:410 Discord.SessionStart` on a pool thread posts it to `/api/play/start`. | `Profile\logs-pending.txt` |
+| 26 | `ShellPlay.cs:417 Presence.Start` | The Discord card, on its own thread. | |
+| 27 | `ShellPlay.cs:419 PlayedFile` | Then `ShellPlay.cs:421 Stats.StartedPlaying`, a pause of 1.2 seconds, and the window minimises unless Keep launcher open is ticked. | `Profile\played.flag`, `Profile\stats.txt` |
 
 If anything in Play throws, the catch at the end of it undoes the work in
-this order: `ShellPlay.cs:423 Swap.Restore`, `ShellPlay.cs:424 Hold.Release`,
-`ShellPlay.cs:425 Keep.Unpark`, `ShellPlay.cs:426 Presence.Stop`,
-`ShellPlay.cs:427 Keep.TakeNote`. A reason longer than one line is shown in a
+this order: `ShellPlay.cs:435 Swap.Restore`, `ShellPlay.cs:436 Hold.Release`,
+`ShellPlay.cs:437 Keep.Unpark`, `ShellPlay.cs:438 Presence.Stop`,
+`ShellPlay.cs:439 Keep.TakeNote`. A reason longer than one line is shown in a
 box.
 
 ### Inside Chars.Prepare (step 7)

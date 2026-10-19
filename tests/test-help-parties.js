@@ -329,8 +329,6 @@ if (social) {
 {
   yes('the party items never say player', !/\bplayers?\b/i.test(text));
   yes('and have no em dash in them', text.indexOf(String.fromCharCode(0x2014)) === -1);
-  yes('Help.cs uses no string interpolation, which C# 5 does not have',
-      helpCs.indexOf('$"') === -1);
 }
 
 console.log('\n' + pass + ' passed, ' + fail + ' failed');

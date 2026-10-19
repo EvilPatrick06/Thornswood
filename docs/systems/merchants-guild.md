@@ -79,13 +79,10 @@ can move any of these. Traders are not relocated by this list.
 
 ## Where this is
 
-The hold's box is in the server, and the note beside it says guild
-ledgers belong in that box. The box takes gold. A price list is not
-an item in the chest. Someone with Prices stands at the box and
-submits a copy, and the average of those copies is kept for that
-hold. A marked chest also requires the same known cell and a current
-distance of at most 400. Remembering a chest does not permit a remote
-submission. A failed save keeps both the previous saved file and the
+The hold's box is the drop box on its notice board, and guild ledgers
+are that hold's business. A price list is not an item put in the box.
+Someone with Prices stands at the board and submits a copy, and the average of those copies is kept for that
+hold. A failed save keeps both the previous saved file and the
 previous live prices. Failed book edits, disbands and membership saves
 also restore the previous live state. Empty buy and sell columns keep
 their positions; zero is a free offer. Prices must fit the server's

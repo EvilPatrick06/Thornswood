@@ -12,6 +12,10 @@
 // - It wrote both blocks with CRLF whatever the gamemode held, so on a
 //   checkout that keeps LF a run left two CRLF blocks in an LF file.
 //
+// #1384 took the armour table out of the open furniture: tempering is cut, so
+// it and the sharpening wheel are shut for everybody (SHUT_BENCHES, held by
+// tests/test-1384-shut-benches.js). The page names five open benches now.
+//
 // This holds the gamemode's markers, the knob against the page, the table in
 // the gamemode against the page, and runs the builder against a small plugin
 // made here and a copy of the real gamemode. Nothing outside a temporary
@@ -67,11 +71,11 @@ tbl.split("\n").forEach(function (l) {
   if (m && m[1] !== "---") { rows[m[1]] = m[2]; }
 });
 const openRows = Object.keys(rows).filter(function (b) { return /^Open furniture\./.test(rows[b]); });
-yes("the professions page names six benches open furniture", openRows.length === 6);
+yes("the professions page names five benches open furniture", openRows.length === 5);
 const knobSrc = between(py, "OPEN_FURNITURE = {", "\n}\n") || "";
 const knob = {};
 knobSrc.replace(/^\s+'([^']+)': '((?:[^'\\]|\\.)*)',$/gm, function (_, k, v) { knob[k] = v.replace(/\\'/g, "'"); return ""; });
-yes("OPEN_FURNITURE names six benches", Object.keys(knob).length === 6);
+yes("OPEN_FURNITURE names five benches", Object.keys(knob).length === 5);
 openRows.forEach(function (b) {
   const want = b + ". " + rows[b];
   yes("OPEN_FURNITURE carries the page's line for the " + b.toLowerCase(),
@@ -96,7 +100,8 @@ Object.keys(knob).forEach(function (n) {
 const CLOSED = {
   "Oven": "BYOHCraftingOven", "Grain mill": "isGrainMill", "Charcoal kiln": "ThornswoodCraftingCharcoalKiln",
   "Alchemy lab": "the alchemy lab", "Arcane enchanter": "the arcane enchanter", "Staff enchanter": "DLC2StaffEnchanter",
-  "Sharpening wheel": "CraftingSmithingSharpeningWheel", "Skyforge": "CraftingSmithingSkyforge",
+  "Sharpening wheel": "CraftingSmithingSharpeningWheel", "Armour table": "CraftingSmithingArmorTable",
+  "Skyforge": "CraftingSmithingSkyforge",
   "Dawnguard bench": "DLC1CraftingDawnguard"
 };
 Object.keys(CLOSED).forEach(function (p) {
@@ -185,8 +190,8 @@ try {
       !!A && !!A["801:Skyrim.esm"] && A["801:Skyrim.esm"].anyone === false &&
       JSON.stringify(A["801:Skyrim.esm"].halves) === '{"confectioner":"novice"}');
     yes("the alchemy lab is placed by its workbench type", !!A && !!A.alchemy && A.alchemy.anyone === false);
-    yes("the five open benches this plugin does not have are named, not invented",
-      /5 bench\(es\) the professions page calls open furniture are not in this load order/.test(r.out) &&
+    yes("the four open benches this plugin does not have are named, not invented",
+      /4 bench\(es\) the professions page calls open furniture are not in this load order/.test(r.out) &&
       !!A && Object.keys(A).length === 3);
     const r2 = build(lf);
     yes("a second run changes nothing", r2.code === 0 && fs.readFileSync(lf, "utf8") === after);

@@ -150,6 +150,9 @@ function subrecords(rec) {
 }
 
 const waters = {};     // water descriptor -> { e, c }
+// #2302: placed water. An ACTI with a WNAM is a water plane somebody put in a
+// cell (the Temple of Kynareth's pool is one); getWaterLevel cannot see it.
+const placed = {};     // activator descriptor -> { e, w, b: [x1, y1, x2, y2] }
 const where = {};      // cell or worldspace descriptor -> water descriptor
 let cells = 0, worlds = 0;
 
@@ -172,7 +175,7 @@ function walk(b, start, end, mast, self) {
       // records with nothing in them this wants.
       const isRefs = groupType === 8 || groupType === 9 || groupType === 10;
       if (!isRefs && (groupType !== 0 || label === 'CELL' || label === 'WRLD' ||
-                      label === 'WATR')) {
+                      label === 'WATR' || label === 'ACTI')) {
         walk(b, j + 24, Math.min(j + dataSize, end), mast, self);
       }
       j += dataSize;
@@ -180,7 +183,7 @@ function walk(b, start, end, mast, self) {
     }
     const flags = b.readUInt32LE(j + 8);
     const formId = b.readUInt32LE(j + 12);
-    if (type === 'WATR' || type === 'CELL' || type === 'WRLD') {
+    if (type === 'WATR' || type === 'CELL' || type === 'WRLD' || type === 'ACTI') {
       try {
         const rec = (flags & 0x00040000)
           ? zlib.inflateSync(b.slice(j + 28, j + 24 + dataSize))
@@ -190,6 +193,17 @@ function walk(b, start, end, mast, self) {
         const edid = s.EDID ? s.EDID.toString('latin1', 0, s.EDID.length - 1) : '';
         if (type === 'WATR') {
           waters[desc] = { e: edid, c: classOf(edid) };
+        } else if (type === 'ACTI') {
+          if (s.WNAM && s.WNAM.length >= 4 && s.OBND && s.OBND.length >= 12) {
+            placed[desc] = {
+              e: edid,
+              w: descOf(s.WNAM.readUInt32LE(0), mast, self),
+              b: [s.OBND.readInt16LE(0), s.OBND.readInt16LE(2),
+                  s.OBND.readInt16LE(6), s.OBND.readInt16LE(8)]
+            };
+          } else {
+            delete placed[desc];
+          }
         } else if (type === 'CELL') {
           cells++;
           if (s.XCWT && s.XCWT.length >= 4) {
@@ -279,10 +293,44 @@ function install() {
               ' places into game\\gamemode.js (deep is the default and is left out)');
 }
 
+/*
+  #2302: the placed waters go into the client, which is where wading is
+  decided. One row per activator, [plugin, local id, x1, y1, x2, y2], sorted
+  so the line only changes when the load order does.
+*/
+function placedRows() {
+  // An activator with no footprint (OBND all 0) has nowhere to stand in.
+  return Object.keys(placed).sort().filter(function (d) {
+    const b = placed[d].b;
+    return b[0] < b[2] && b[1] < b[3];
+  }).map(function (d) {
+    const c = d.indexOf(':');
+    const b = placed[d].b;
+    return [d.slice(c + 1), parseInt(d.slice(0, c), 16), b[0], b[1], b[2], b[3]];
+  });
+}
+
+function installPlaced() {
+  const fp = path.join(__dirname, '..', '..', 'game', 'plugins', 'thornswood-front.js');
+  let src;
+  try { src = fs.readFileSync(fp, 'utf8'); } catch (e) { fail('no thornswood-front.js to install into'); return; }
+  const rows = placedRows();
+  const line = '  const PLACED_WATERS = ' + JSON.stringify(rows) + ';';
+  const re = /^  const PLACED_WATERS = .*;$/m;
+  if (!re.test(src)) { fail('could not find PLACED_WATERS in thornswood-front.js'); return; }
+  const next = src.replace(re, function () { return line; });
+  if (next === src) { console.log('installed placed waters already match this load order'); return; }
+  fs.writeFileSync(fp, next);
+  console.log('installed ' + rows.length + ' placed waters into game\\plugins\\thornswood-front.js');
+}
+
+if (!Object.keys(placed).length) { fail('no placed water activators found, so ACTI WNAM is not being read'); }
+
 if (process.exitCode === 1) {
   console.error('nothing written');
 } else {
   install();
+  installPlaced();
   fs.writeFileSync(OUT, JSON.stringify({
     builtBy: 'scripts\\dev\\Build-WaterTable.js',
     builtAt: new Date().toISOString(),
@@ -294,6 +342,7 @@ if (process.exitCode === 1) {
     classes: CLASSES.map(function (c) { return c[0] + ': ' + String(c[1]); }),
     byClass: byClass,
     waters: waters,
+    placed: placed,
     where: where
   }, null, 2) + '\n');
   console.log('wrote ' + OUT);

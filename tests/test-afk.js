@@ -232,7 +232,7 @@ yes('the page is given the character they were, with no scroll and no theme',
 yes('arriving in the world ends it', /menuChosenId = 0;\s*menuAgain = null;/.test(front));
 yes('another character takes the place with "/line hand" before the connection becomes theirs',
     /if \(lineId\) \{ lineHand\(id\); return; \}/.test(front) &&
-    /say\(' \+ JSON\.stringify\('\/line hand ' \+ id\) \+ ',true\)/.test(front) &&
+    /say\(' \+ JSON\.stringify\('\/line hand ' \+ id\) \+ ',\{quiet:true\}\)/.test(front) &&
     /thornswoodNet\.rejoinAs\(' \+ lineId \+ ','/.test(front));
 yes('the window is one of the overlays, and one the two minute rescue can close by name',
     (function () { const m = /const OVERLAYS = (\[[\s\S]*?\]);/.exec(front); const list = m ? new Function('return ' + m[1])() : []; return list.indexOf('thornswood-afk.js') >= 0; })() && /afk: 'thornswoodAfk'/.test(front));

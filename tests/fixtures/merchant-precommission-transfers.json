@@ -1,0 +1,193 @@
+{
+  "full": {
+    "reference": "1:Skyrim.esm",
+    "base": "a:Skyrim.esm",
+    "revision": 1,
+    "purse": 250,
+    "stock": [],
+    "supply": {},
+    "pending": {
+      "version": 3,
+      "id": "dev:test-ledger:1:Skyrim.esm:0",
+      "world": "dev:test-ledger",
+      "reference": "1:Skyrim.esm",
+      "base": "a:Skyrim.esm",
+      "human": {
+        "desc": "10",
+        "profileId": 7
+      },
+      "kind": "sell",
+      "phase": "debit",
+      "previous": {
+        "purse": 250,
+        "stock": [],
+        "supply": {}
+      },
+      "next": {
+        "purse": 247,
+        "stock": [
+          {
+            "baseId": 100,
+            "count": 1,
+            "name": "Iron Ingot",
+            "entry": {
+              "baseId": 100,
+              "count": 1,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          }
+        ],
+        "supply": {}
+      },
+      "expected": {
+        "entries": [
+          {
+            "baseId": 15,
+            "count": 40
+          },
+          {
+            "baseId": 100,
+            "count": 8,
+            "name": "Tempered iron",
+            "health": 0.7
+          }
+        ]
+      },
+      "expectedReceipt": "null",
+      "debit": {
+        "entries": [
+          {
+            "baseId": 15,
+            "count": 40
+          },
+          {
+            "baseId": 100,
+            "count": 7,
+            "name": "Tempered iron",
+            "health": 0.7
+          }
+        ]
+      },
+      "credit": [
+        {
+          "baseId": 15,
+          "count": 3
+        }
+      ],
+      "sequence": 1,
+      "debitReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":1}",
+      "finalReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":2}",
+      "terms": {
+        "version": 1,
+        "kind": "sell",
+        "gold": 3,
+        "goods": "347d24b9ed7f6917ecb5e3bc8464585e5e4618ce25c1c5ddf63fb494efa7c12a",
+        "credit": "8afe34a104e0df4a1d7b9ca3531507199002b2772a0fdeef27c010e6443ca77d",
+        "next": "4eacb882eb4d12958f93ead7e83d5f16265c91e611a8a5b499b1524b48a2e804",
+        "previousSupply": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      }
+    }
+  },
+  "compact": {
+    "reference": "1:Skyrim.esm",
+    "base": "a:Skyrim.esm",
+    "revision": 3,
+    "purse": 247,
+    "stock": [
+      {
+        "baseId": 100,
+        "count": 1,
+        "name": "Iron Ingot",
+        "entry": {
+          "baseId": 100,
+          "count": 1,
+          "name": "Tempered iron",
+          "health": 0.7
+        }
+      }
+    ],
+    "supply": {},
+    "pending": {
+      "version": 3,
+      "id": "dev:test-ledger:1:Skyrim.esm:0",
+      "world": "dev:test-ledger",
+      "reference": "1:Skyrim.esm",
+      "base": "a:Skyrim.esm",
+      "human": {
+        "desc": "10",
+        "profileId": 7
+      },
+      "kind": "sell",
+      "phase": "credit",
+      "previous": {
+        "supply": {}
+      },
+      "next": {
+        "purse": 247,
+        "stock": [
+          {
+            "baseId": 100,
+            "count": 1,
+            "name": "Iron Ingot",
+            "entry": {
+              "baseId": 100,
+              "count": 1,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          }
+        ],
+        "supply": {}
+      },
+      "credit": [
+        {
+          "baseId": 15,
+          "count": 3
+        }
+      ],
+      "sequence": 1,
+      "debitReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":1}",
+      "finalReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":2}",
+      "terms": {
+        "version": 1,
+        "kind": "sell",
+        "gold": 3,
+        "goods": "347d24b9ed7f6917ecb5e3bc8464585e5e4618ce25c1c5ddf63fb494efa7c12a",
+        "credit": "8afe34a104e0df4a1d7b9ca3531507199002b2772a0fdeef27c010e6443ca77d",
+        "next": "4eacb882eb4d12958f93ead7e83d5f16265c91e611a8a5b499b1524b48a2e804",
+        "previousSupply": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a"
+      },
+      "creditAttempt": {
+        "expected": {
+          "entries": [
+            {
+              "baseId": 15,
+              "count": 40
+            },
+            {
+              "baseId": 100,
+              "count": 7,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          ]
+        },
+        "replacement": {
+          "entries": [
+            {
+              "baseId": 15,
+              "count": 43
+            },
+            {
+              "baseId": 100,
+              "count": 7,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          ]
+        }
+      }
+    }
+  }
+}
