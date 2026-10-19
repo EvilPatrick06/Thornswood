@@ -1,0 +1,94 @@
+# Where Thornswood stands its kilns, salt quarries, hives and labs (#2553)
+
+Patrick, 16 Oct 2026, A on #2553: Thornswood measures its own spots for the charcoal kiln, the salt quarry, the beehive and the alchemy lab, the way the woodworking benches were placed ([woodworker-bench-placement.md](woodworker-bench-placement.md)), and `Thornswood-Content.esp` places them. Until then the only placed kilns, salt quarries, placed hives and Thornswood labs were 57 placements salvaged from another server's plugin, at the spots it chose. Those are gone.
+
+## How it is done
+
+- `scripts/dev/Build-StationSites.py` reads the collection's plugins in the load order of `game/data/last-plugin.json` and measures each spot. It writes `game/data/station-sites.json`: every site's anchor, its point and angle, the ground under it, the nearest solid thing, the cell it stands in and why the plugin's copy of that cell changes nothing, and every site left out with why.
+- `scripts/mods/Add-ContentRecords.py` writes one placement for each row of that table, its base, point and turn and nothing else, under the form id the row gives (from `0x05015500`, which no version of the plugin ever used).
+- `tests/test-2553-station-sites.js` holds the table to its rules, and on a machine with the game reads the plugins again. `tests/test-2553-salvaged-gone.js` holds the plugin to the table and proves nothing salvaged is left.
+
+## The rule for each kind
+
+The rulebook says what each station is for and who works it, and names no town. So each kind has one rule, chosen from what the station is for.
+
+- **Charcoal kiln** ([charburner.md](professions/woodworker/charburner.md)): the kiln turns the firewood a woodworker splits at a chopping block into the charcoal every forge burns. One for each of the nine towns with a woodworking bench, outside the town: beside the chopping block in the open world nearest that town's forge, among those 1,000 units or more from every bench (#2337) and within 12,000 units of the forge, or 20,000 for Solitude and Markarth, whose nearest blocks are at Katla's Farm and Salvius Farm. A kiln may stand among small plants, the way Skyrim's smelters do: thickets, shrubs, ferns and flowers no larger than 250 units a side, never a crop plot (Patrick, 17 Oct, B on #2553).
+- **Salt quarry** ([miner.md](classes/miner.md)): salt comes from the sea. One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, Winterhold), beside the boat drawn up nearest the town, within 12,000 units. The quarry is an ore vein, so it is set into rock the way Skyrim's veins are (Patrick, 17 Oct, B on #2553): only the place the miner stands needs clear, dry, flat navmesh, no more than 240 units above the sea. The vein may run into rocks, cliffs and plants, but nothing else, and every part of it lies on ground no more than 16 units under it and above the water, or inside a rock or cliff, so it never hangs over a drop or the sea.
+- **Beehive** ([farmer.md](classes/farmer.md)): a placed hive is a farmer verb. One at each of Skyrim's own named farms (a location Skyrim marks as a farm) with at least 5 crop plots of the farmer's table within 2,400 units, the farm claim's circle, of the farm's point: its map marker, or the farmhouse's outside door where that marker is inside the house. It stands beside the crop plot nearest that point.
+- **Alchemy lab** ([physicker.md](professions/alchemist/physicker.md), [injury.md](injury.md)): the poultice and the remedy are made only at Thornswood's lab. One in the apothecary of each of the nine hold capitals, beside Skyrim's own lab there; Winterhold has no apothecary in town, so the College's Hall of Countenance; Windhelm's Palace of the Kings is tried after the White Phial.
+
+Each rule gives its anchors nearest first. The builder searches round each in turn, every step out to the kind's reach in eight turns, and takes the nearest clear spot; the first anchor with one wins.
+
+## What holds a spot clear
+
+The same measure as the benches, but where the rule above lets a kiln stand among plants or sets a vein into rock. The station's outline and the place somebody stands to use it lie on the winning navmesh, on ground flat to the kind's tolerance (a bench and a lab 8 or 16 units, a hive 40, a kiln 48, a quarry 32: the far side sinks into a slope, never floats), within 60 units of the anchor's height, out of doors above the water. Nothing overlaps it: no furniture, container, door, plant, item or small static, nor where somebody stands at other furniture, the way through a door, a woodworking bench, a notice board and its drop box, or another station, with 30 units to the nearest solid thing. The cell it stands in is copied from Bethesda's own record, and only where that copy changes nothing: a later plugin carries the cell too, or the record that wins without the content plugin is Bethesda's own, field for field. A spot in a cell a mod changes before the content plugin is refused.
+
+## Where they stand, 17 Oct 2026
+
+29 placements: 5 kilns, 4 salt quarries, 12 hives and 8 labs. `game/data/station-sites.json` has every number.
+
+### Charcoal kilns (5)
+
+| Where | Beside | Cell | From its anchor |
+| --- | --- | --- | --- |
+| Dawnstar | a chopping block in the town | Dawnstar03Exterior | 592 units |
+| Morthal | the chopping block at the lumber mill | MorthalExterior05 | 387 units |
+| Riverwood | a chopping block in the village | Riverwood | 382 units |
+| Whiterun | the chopping block outside the walls | WhiterunExterior14 | 945 units |
+| Windhelm | the chopping block by the bridge | WindhelmBridge01 | 998 units |
+
+### Salt quarries (4)
+
+| Where | Beside | Cell | From its anchor |
+| --- | --- | --- | --- |
+| Dawnstar | a rowboat on the shore by the town | Dawnstar03Exterior | 1,255 units |
+| Solitude | a longboat at the docks | `929a:Skyrim.esm` | 1,553 units |
+| Windhelm | a rowboat at the docks | WindhelmDocksExterior01 | 781 units |
+| Winterhold | a rowboat on the shore below the town | `8e66:Skyrim.esm` | 1,270 units |
+
+### Beehives (12)
+
+| Where | Cell | From its anchor plot |
+| --- | --- | --- |
+| Brandy-Mug Farm | BrandyMugFarmExterior | 272 units |
+| Chillfurrow Farm | `9617:Skyrim.esm` | 439 units |
+| Corpselight Farm, Falkreath | FalkreathExterior01 | 1,152 units |
+| Cowflop Farm, Rorikstead | RoriksteadExterior03 | 1,133 units |
+| Hlaalu Farm | `b4d9:Skyrim.esm` | 432 units |
+| Hollyfrost Farm | HollyfrostFarmExterior | 439 units |
+| Katla's Farm | KatlasFarmExterior | 272 units |
+| Lemkil's Farm, Rorikstead | RoriksteadExterior03 | 280 units |
+| Loreius Farm | LoreiusFarmExterior | 437 units |
+| Pelagia Farm | WhiterunExterior16 | 496 units |
+| Salvius Farm | LeftHandMineExterior02 | 780 units |
+| Snow-Shod Farm | SnowShodFarmExterior | 766 units |
+
+### Alchemy labs (8)
+
+| Where | From Skyrim's own lab |
+| --- | --- |
+| Angeline's Aromatics, Solitude | 587 units |
+| Arcadia's Cauldron, Whiterun | 131 units |
+| Elgrim's Elixirs, Riften | 131 units |
+| Grave Concoctions, Falkreath | 256 units |
+| Thaumaturgist's Hut, Morthal | 124 units |
+| The College's Hall of Countenance, Winterhold | 276 units |
+| The Hag's Cure, Markarth | 196 units |
+| The Mortar and Pestle, Dawnstar | 166 units |
+
+### Where the rule led to the other server's spot
+
+Elgrim's Elixirs' lab stands 114 units from where the other server's stood, Arcadia's Cauldron's 610 and Angeline's Aromatics' 569: the rule puts a lab beside Skyrim's own, and so did that server. Riverwood's kiln is 829 units from that server's Riverwood kiln and Chillfurrow's hive 950 from one of its two there; Rorikstead's two hives stand in the cell where it had one, 1,355 and 2,215 units from it. The four salt quarries are nowhere near its salt quarries. Every other spot is somewhere it never placed anything.
+
+## Left out, and why
+
+Nothing is placed where the measure refuses every spot. Measured over the same load order after Patrick's B; `game/data/station-sites.json` lists every anchor tried and the counts of what refused it.
+
+- Charcoal kiln, Markarth: no usable chopping block stands in the open world within 20,000 units of the forge. Salvius Farm's (15,707 units) has an enable parent, so it is not always there.
+- Charcoal kiln, Solitude: Katla's Farm's chopping block, the only one within 20,000 units, has no clear, flat navmesh of the kiln's 441 by 535 units beside it, even among plants: refused mostly for off the navmesh, the wheat field, and the farm's own furniture.
+- Charcoal kiln, Falkreath and Riften: none of the chopping blocks nearest the town has that ground beside it; refused mostly for off the navmesh, slopes, rocks and fences, and at Falkreath the bench's 1,000 units.
+- Beehive, Battle-Born Farm, Dragon Bridge Farm, Merryfair Farm and Sarethi Farm: none of the crop plots nearest the farm has clear, flat ground beside it; refused for thickets, fences, slopes and, at Battle-Born and Sarethi, cells that JK's Whiterun's Outskirts and Water for ENB change before the content plugin.
+- Alchemy lab, The White Phial, Windhelm: neither the White Phial nor the Palace of the Kings has a lab's floor clear beside Skyrim's own.
+- Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
+
+To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, and rebuild what hashes the plugin (Build-LastPlugin.py, Build-NpcPopulation.py, Build-MerchantRoleTables.py, Build-WoodworkingBenches.py).

@@ -289,17 +289,22 @@ $clientSecret = $null; $botToken = $null
 Write-Host ''
 Write-Host 'Writing it to the VPS...'
 if (-not (Test-Path -LiteralPath $writer)) { Write-Host "  missing: $writer" -ForegroundColor Red; exit 1 }
-Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
+$wrote = @(Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $payload -Script ((Get-Content -LiteralPath $writer -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Stop'
 `$patch = `$null
-try { `$patch = `$ThornswoodSecret | ConvertFrom-Json } catch { }
+if (-not `$ThornswoodSecret) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
+# The parse error is not said: its text would quote what arrived, the secrets.
+try { `$patch = `$ThornswoodSecret | ConvertFrom-Json }
+catch { `$ThornswoodSecret = `$null; 'NOT WRITTEN: what arrived on standard input is not the JSON Set-DiscordLogin.ps1 sends. Nothing written.'; return }
 `$ThornswoodSecret = `$null
 if (-not `$patch) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
 `$f = '$rootWin\config.json'
+# A config.json that is there and does not read is not empty: written over,
+# it would lose the bot token, botKey, the cookie secret and the rest (#2317).
 `$cfg = @{}
 if (Test-Path `$f) {
-  try { (Get-Content `$f -Raw | ConvertFrom-Json).PSObject.Properties |
-        ForEach-Object { `$cfg[`$_.Name] = `$_.Value } } catch { }
+  try { `$cfg = Read-ThornswoodJsonFile `$f }
+  catch { 'NOT WRITTEN: ' + `$_.Exception.Message + ', and it is left as it is. Nothing written.'; return }
 }
 
 `$d = @{}
@@ -375,8 +380,14 @@ function TokenLooks(`$v, `$cid) {
 
 Restart-ThornswoodSite -Root '$rootWin' -Task '$Task'
 if (`$tokenChanged) { Restart-ThornswoodBot -Root '$botWin' -Service '$BotService' }
-"@) | ForEach-Object { "  $_" }
+"@))
 $payload = $null
+$wrote | ForEach-Object { Write-Host "  $_" }
+if (@($wrote | Where-Object { "$_" -like 'NOT WRITTEN:*' -or "$_" -like 'NOTHING ARRIVED*' }).Count) {
+  Write-Host ''
+  Write-Host '  Nothing was written on the VPS, and nothing was restarted. The line above says why.' -ForegroundColor Red
+  exit 1
+}
 
 Write-Host ''
 Write-Host '  The redirect in the Discord application must be exactly this:' -ForegroundColor DarkGray

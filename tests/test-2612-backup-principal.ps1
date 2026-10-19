@@ -11,7 +11,8 @@
       (never LOCAL SERVICE as a whole) and goes back on SYSTEM when it cannot;
     - vps-nightly-backup.ps1 gives its stage in the shared TEMP to the task's
       SID when it runs as LOCAL SERVICE, and says NO ACCESS by name and ends
-      non-zero for a folder it cannot read, run for real on a scratch folder
+      non-zero for a folder it cannot read, or a file in a folder it cannot
+      list (the deletion record, #2833), run for real on scratch folders
       only SYSTEM may read;
     - every other SYSTEM, Highest principal under scripts\ is on the list
       below with the reason it needs SYSTEM, so a new one copied in fails
@@ -63,38 +64,48 @@ Yes 'a place it cannot read is said by name and the run ends non-zero' (
 $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 $root = Join-Path ([IO.Path]::GetTempPath()) ('tw-2612-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 $locked = Join-Path $root 'game\private'
+# The deletion record's folder as Delete-Person.ps1 locked it on the box on
+# 19 Oct, before #2833: the record is a file inside a folder the task may not
+# list, where Test-Path throws instead of saying no.
+$lockedRecord = Join-Path $root 'deletions'
 try {
     [void][IO.Directory]::CreateDirectory((Join-Path $root 'game\world'))
     [void][IO.Directory]::CreateDirectory($locked)
+    [void][IO.Directory]::CreateDirectory($lockedRecord)
     [IO.File]::WriteAllText((Join-Path $root 'game\world\0.json'), '{"profileId":1}')
     [IO.File]::WriteAllText((Join-Path $locked 'characters.json'), '{}')
+    [IO.File]::WriteAllText((Join-Path $lockedRecord 'requests.jsonl'), '{"discordId":"100000000000000001","profiles":[]}')
     [IO.File]::WriteAllText((Join-Path $root 'key.txt'), 'disposable-2612-key')
-    # Only SYSTEM may read it: not Administrators, not whoever runs this.
-    $acl = New-Object Security.AccessControl.DirectorySecurity
-    $acl.SetAccessRuleProtection($true, $false)
-    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
-        (New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-    Set-ThornswoodServiceAcl $locked $acl
+    # Only SYSTEM may read them: not Administrators, not whoever runs this.
+    foreach ($dir in $locked, $lockedRecord) {
+        $acl = New-Object Security.AccessControl.DirectorySecurity
+        $acl.SetAccessRuleProtection($true, $false)
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+            (New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+        Set-ThornswoodServiceAcl $dir $acl
+    }
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     try {
         $said = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $nightlyPath `
             -GameRoot (Join-Path $root 'game') -DevGameRoot (Join-Path $root 'no-dev') -SiteRoot (Join-Path $root 'no-site') `
             -BotRoot (Join-Path $root 'no-bot') -CaddyRoot (Join-Path $root 'no-web') -VoiceRoot (Join-Path $root 'no-voice') `
-            -DeletionRoot (Join-Path $root 'no-del') -Out (Join-Path $root 'out') -KeyFile (Join-Path $root 'key.txt') 2>&1 | ForEach-Object { "$_" })
+            -DeletionRoot $lockedRecord -Out (Join-Path $root 'out') -KeyFile (Join-Path $root 'key.txt') 2>&1 | ForEach-Object { "$_" })
         $code = $LASTEXITCODE
     } finally { $ErrorActionPreference = $old }
     $all = $said -join "`n"
     Yes 'a folder the task cannot read is named NO ACCESS' ($all -match 'NO ACCESS .*private')
+    Yes '  and so is a file in a folder it cannot list, the deletion record (#2833)' ($all -match 'NO ACCESS .*deletions\\requests\.jsonl')
     Yes '  and the run ends non-zero' ($code -ne 0)
     Yes '  and the rest was still backed up' (@(Get-ChildItem -LiteralPath (Join-Path $root 'out') -Filter 'thornswood-*.zip.enc' -EA SilentlyContinue).Count -eq 1)
     if ($code -eq 0 -or $all -notmatch 'NO ACCESS') { $said | Select-Object -Last 15 | Write-Host }
 } finally {
     # The owner may always rewrite the rules; give them back, then remove it.
-    if (Test-Path -LiteralPath $locked) {
+    foreach ($dir in $locked, $lockedRecord) {
+        if (-not (Test-Path -LiteralPath $dir)) { continue }
         $acl = New-Object Security.AccessControl.DirectorySecurity
         $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
             [Security.Principal.WindowsIdentity]::GetCurrent().User, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-        try { Set-ThornswoodServiceAcl $locked $acl } catch { }
+        try { Set-ThornswoodServiceAcl $dir $acl } catch { }
     }
     Remove-Item -LiteralPath $root -Recurse -Force -ErrorAction SilentlyContinue
 }
@@ -106,7 +117,6 @@ $allowed = @(
     @('scripts/deploy/ServiceAccount.ps1', "-UserId 'SYSTEM'", '-AsSystem, the way back (#2578)'),
     @('scripts/deploy/Install-ThornswoodServer.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
     @('scripts/vps/vps-dev-instance.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
-    @('scripts/deploy/Deploy-Docs.ps1', "SYSTEM", '-RunAs SYSTEM, open as #2613'),
     @('scripts/vps/vps-harden.ps1', "-UserId 'SYSTEM'", 'one-shot sshd restart and config rollback: rewrites ProgramData\ssh\sshd_config and restarts sshd, which need administrator, and must outlive the ssh session they cut (#2612)'),
     @('scripts/vps/vps-ssh-scope.ps1', "-UserId 'SYSTEM'", 'one-shot firewall rollback: sets rules'' remote addresses, which needs administrator, and must outlive a session the change may lock out (#2612)')
 )
@@ -117,6 +127,12 @@ foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse
     foreach ($m in @(Select-String -LiteralPath $f.FullName -Pattern $sysRe)) { $found += ($rel + ':' + $m.LineNumber) }
 }
 $stray = @($found | Where-Object { $names -notcontains ($_ -replace ':\d+$', '') })
+# #2613: the site's -RunAs SYSTEM is ServiceAccount.ps1's -AsSystem, so
+# Deploy-Docs is off the list and names no SYSTEM principal of its own.
+Yes 'Deploy-Docs is not on the list, and takes -RunAs SYSTEM from New-ThornswoodServicePrincipal -AsSystem (#2613)' (
+    $names -notcontains 'scripts/deploy/Deploy-Docs.ps1' -and
+    (Text 'scripts\deploy\Deploy-Docs.ps1') -notmatch $sysRe -and
+    (Text 'scripts\deploy\Deploy-Docs.ps1').Contains('New-ThornswoodServicePrincipal -AsSystem'))
 Yes 'every SYSTEM or Highest principal under scripts\ is on the list with its reason' ($stray.Count -eq 0)
 foreach ($s in $stray) { Write-Host "      not on the list: $s" }
 

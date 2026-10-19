@@ -17,8 +17,8 @@
   the only forced redraw (#816) keyed on Thornswood.exe.old, which a rebuild or
   a Ship never leaves.
 
-  Part 1 compiles the real Icons.cs with the .NET Framework 4 csc the launcher
-  uses (so it is a C# 5 check too) against stand-ins for Paths, Art and Swallow,
+  Part 1 compiles the real Icons.cs with the compiler the launcher is built
+  with (tests\Launcher-Csc.ps1) against stand-ins for Paths, Art and Swallow,
   and drives its Due / Remember / IconFile through reflection in a scratch
   folder. Ensure itself is never called: it walks the real Desktop and Start
   menu and talks to Explorer.
@@ -53,11 +53,8 @@ function Hash8([byte[]]$b) {
     ([BitConverter]::ToString($sha.ComputeHash($b), 0, 4)).Replace('-', '').ToLower()
 }
 
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) { Write-Host 'SKIP  no .NET Framework 4 csc on this machine'; Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $appIco = Join-Path $Repo 'launcher\app.ico'
 $devIco = Join-Path $Repo 'launcher\app-dev.ico'
@@ -83,7 +80,7 @@ namespace Thornswood
     Set-Content -LiteralPath $stubCs -Value $stub -Encoding ASCII
     $dll = Join-Path $work 'IconsUnderTest.dll'
     $out = & $LauncherCsc /nologo /target:library "/langversion:$LauncherLangVersion" "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
-    Yes 'Icons.cs compiles with the launcher''s csc as C# 5' ($LASTEXITCODE -eq 0)
+    Yes 'Icons.cs compiles with the launcher''s compiler' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "  $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
@@ -117,6 +114,27 @@ namespace Thornswood
     Remove-Item -LiteralPath $r.Path -Force   # what Install-Launcher's sweep used to do
     $r = IconNow
     Yes 'a start after an install deleted it writes it back before any shortcut is touched' ((Test-Path -LiteralPath $r.Path) -and $r.Wrote)
+
+    # #2627: what Ensure would change, said and not done, for Scan. Before any
+    # launcher exe is in the scratch install, so no shortcut anywhere names it
+    # and none is missing for it; only the icon file and the stamp count.
+    $outOfDate = $icons.GetMethod('OutOfDate', [Reflection.BindingFlags]'Public, Static')
+    Yes 'Icons has OutOfDate, what Ensure would change, for Scan (#2627)' ([bool]$outOfDate)
+    if ($outOfDate) {
+        $iconNow = [string]$r.Path
+        Remove-Item -LiteralPath $iconNow -Force
+        $seen = { @(Get-ChildItem -LiteralPath $root -Recurse -File | ForEach-Object { $_.FullName + '|' + $_.Length + '|' + $_.LastWriteTimeUtc.Ticks }) -join "`n" }
+        $before = & $seen
+        $l = @($outOfDate.Invoke($null, @()))
+        Yes 'with the icon file gone, OutOfDate says so' (@($l | Where-Object { "$_" -like '*icon file*' }).Count -eq 1)
+        Yes 'and writes nothing: the icon file is still gone, and no stamp or shortcut appeared' (((& $seen) -eq $before) -and -not (Test-Path -LiteralPath $iconNow))
+        $r = IconNow
+        [string]$noExe = Join-Path $launcherDir 'Thornswood.exe'
+        $remember.Invoke($null, @($noExe, ([string]$r.Path + ',0'))) | Out-Null
+        $l = @($outOfDate.Invoke($null, @()))
+        Yes ('with the icon written and the shortcuts redrawn for this launcher, nothing is out of date' + $(if ($l.Count) { ' (' + ($l -join '; ') + ')' } else { '' })) ($l.Count -eq 0)
+        Remove-Item -LiteralPath (Join-Path $profileDir 'icons.stamp') -Force
+    }
     $want = [string]$r.Path + ',0'
 
     # The stamp: a rebuild-style change with no .old.

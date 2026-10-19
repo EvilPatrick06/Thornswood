@@ -127,7 +127,7 @@ if ($Remove) {
 $artifact = $null
 if (-not $PutBack -and -not $Remove -and -not $Restart -and -not $TaskOnly) {
     $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js' `
-        -AlsoSends 'scripts/vps/Roll-Log.ps1'
+        -AlsoSends 'scripts/vps/Server-Log.js'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 }
 
@@ -165,7 +165,7 @@ if (-not $bindExplicit -or -not $chatExplicit -or -not $turnExplicit) {
     # answer /ice still has its bind and chat range kept. The relay
     # comes last in the answer because its address is read to the end.
     $probe = @"
-try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
+try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t = ''; `$ie = ''; try { `$t = @((Invoke-RestMethod 'http://127.0.0.1:$Port/ice' -TimeoutSec 5).iceServers | ForEach-Object { `$_.urls } | Where-Object { "`$_" -match '^turns?:' }) -join ',' } catch { `$ie = (`$_.Exception.Message -replace '[;\r\n]', ' ') }; 'bind=' + `$h.bind + ';auth=' + `$h.auth + ';chat=' + `$h.chatRange + ';ice=' + `$ie + ';relay=' + `$h.turn + ';turn=' + `$t } catch { 'none' }
 "@
     $current = & (Join-Path $Here '..\vps\Remote.ps1') $probe -VpsHost $VpsHost -VpsUser $VpsUser 2>$null | Select-Object -Last 1
     if ("$current" -match 'bind=([\d.]+);') {
@@ -178,6 +178,11 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
         $ChatRange = $Matches[1]
         if ($ChatRange -eq '0') { $ChatRange = 'off' }
         Say "  keeping the current chat range, $ChatRange, since -ChatRange was not passed" 'DarkGray'
+    }
+    # /ice that did not answer gives no relay to keep: said, so the relay is not
+    # dropped with nothing on the screen (#2711).
+    if (-not $turnExplicit -and "$current" -match ';ice=([^;]+);') {
+        Say "  the running service did not answer /ice ($($Matches[1].Trim())), so the relay it serves is not known and none is kept. Pass -TurnUrl to keep one." 'Yellow'
     }
     if (-not $turnExplicit -and "$current" -match ';turn=(\S+)') {
         $was = $Matches[1]
@@ -225,9 +230,23 @@ if (-not $PutBack -and -not $Remove -and -not $Restart) {
 # #1335). A file that is not that commit stops the install here, and nothing
 # is sent. The copies below are from its folder. -PutBack builds and sends
 # nothing.
+#
+# The build string out of the file being sent, read before it is sent. It is
+# checked on the far end after the start, because "the port answers" turned
+# out to prove nothing at all: an old process still holding the port answers
+# too (see StopIt below). Without it that check passes whatever answers, the
+# old process included, so a file that does not read or names no build stops
+# this here, before anything is sent (#2711).
+$expectBuild = ''
 $src = Join-Path $Here '..\..\voice'
 if (-not $PutBack -and -not $TaskOnly) {
 Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
+$vsPath = Join-Path $artifact.Folder 'voice\voice-server.js'
+$vsText = ''
+try { $vsText = [IO.File]::ReadAllText($vsPath) } catch { Die ("$vsPath could not be read, so there is no build to check the new service by. Nothing was sent: " + $_.Exception.Message) }
+$m = [regex]::Match($vsText, "const\s+BUILD\s*=\s*'([^']+)'")
+if (-not $m.Success) { Die "$vsPath names no const BUILD, so there is no build to check the new service by. Nothing was sent." }
+$expectBuild = $m.Groups[1].Value
 Send-ThornswoodArtifact -Artifact $artifact -Target $target -SshArgs $ssh
 $src = Join-Path $artifact.Folder 'voice'
 }
@@ -265,21 +284,6 @@ $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp
 $hashes    = [ordered]@{}
 
-<#
-  The build string out of the file being sent.
-
-  Checked on the far end after the start, because "the port answers" turned
-  out to prove nothing at all: an old process still holding the port answers
-  too. See StopIt below.
-#>
-$expectBuild = ''
-if (-not $PutBack -and -not $TaskOnly) {
-    try {
-        $m = [regex]::Match((Get-Content -LiteralPath (Join-Path $src 'voice-server.js') -Raw),
-                            "const\s+BUILD\s*=\s*'([^']+)'")
-        if ($m.Success) { $expectBuild = $m.Groups[1].Value }
-    } catch { }
-}
 
 # THE CHARACTER REGISTER IS GONE, 23 September, and so is the secret it used.
 # The three routes it guarded refused every real caller, and they are out of
@@ -292,9 +296,9 @@ if (-not $PutBack -and -not $TaskOnly) {
     $send = [ordered]@{}
     $send['voice-server.js'] = Join-Path $src 'voice-server.js'
     $send['headlines.js'] = Join-Path $src 'headlines.js'
-    # The roller the task runs in front of the service. See Roll-Log.ps1 for
-    # why a log cmd holds open can only be rolled at start.
-    $send['roll-log.ps1'] = Join-Path $Here '..\vps\Roll-Log.ps1'
+    # The log writer the task runs the service under (#2166), the game
+    # server's since #2349. See Server-Log.js.
+    $send['server-log.js'] = Join-Path $Here '..\vps\Server-Log.js'
     # A stage a run that died part way left behind was never swapped in.
     $made = @(Remote @"
 New-Item -ItemType Directory -Force -Path '$Root' | Out-Null
@@ -339,7 +343,7 @@ if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit
 $(Get-ThornswoodServiceAccountScript)
 `$AsSystem = [bool]$([int][bool]$AsSystem)
 if (-not `$AsSystem) {
-    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$Root'))
+    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$Root' -Box (Split-Path -Parent '$Root')))
     if (`$cannot.Count) {
         'LOCAL SERVICE could read what no service may, so voice is not moved onto it:'
         `$cannot
@@ -374,27 +378,36 @@ if ('$Bind' -eq '127.0.0.1') {
 # and the health probe, and nothing else, so -Port 7789 opened 7789, checked
 # 7789 was free, and then started a service that bound 7778 on top of live.
 #
-# roll-log.ps1 runs in front of node, because cmd holds voice.log open for as
-# long as node runs and nothing can move it until then. & rather than &&, so
-# a roll that fails still starts voice. The relay line, when there is one,
-# sits with the other settings ahead of the roll, so it is set in this cmd
-# before node starts whatever the roll does.
+# VOICE RUNS UNDER server-log.js (#2166), which writes voice.log. Until 17
+# Oct 2026 it was cmd's >> voice.log 2>&1 with roll-log.ps1 in front, and cmd
+# holds that file open for as long as node runs, so voice.log was rolled only
+# at a start, by size, five kept, and nothing aged it: a voice service that
+# was not restarted kept one file growing, holding profile numbers and
+# character names, for as long as it ran. Decided by Patrick on 17 Oct
+# (#2166, G5): voice.log goes after 90 days. server-log.js holds the file
+# itself, so it rolls it at midnight and at 4 MB and cuts every rolled copy
+# to 90 days (--days 90), at a start, at each roll and once an hour, and the
+# copies roll-log.ps1 left (.1 to .5) the same way. Voice's own lines carry
+# no time, so --stamp puts one in front of each; that is what lets a line be
+# aged. The relay line, when there is one, sits with the other settings, so
+# it is set in this cmd before node starts.
 #
 # node goes through cmd's start /high, so it runs High (#2491, the task's
-# settings below say why): /b keeps it in this cmd's console, so the
-# environment and the redirection to voice.log hold, and /wait keeps the task
-# running until node ends. start leaves cmd's exit code 0 whatever node's
-# was, so call exit %^errorlevel% hands node's back as the task's last
-# result, as before (measured 12 Oct).
+# settings below say why), and server-log.js gives voice its own priority as
+# it starts it: /b keeps it in this cmd's console, so the environment holds,
+# and /wait keeps the task running until voice ends. server-log.js ends with
+# voice's exit code and start leaves cmd's exit code 0 whatever that was, so
+# call exit %^errorlevel% hands it back as the task's last result, as before
+# (measured 12 Oct). The log path is still on the line, which is how this
+# installer finds its own process.
 #
 # THORNSWOOD_VOICE_AUTH=on is not read by this voice-server.js, which refuses
 # every join that cannot prove itself (#1303). It stays on the line because
 # -PutBack puts the files the last install replaced back under this same
 # task, and a copy from before #1303 reads it and lets unproven joins in
 # without it.
-`$roll = Join-Path '$Root' 'roll-log.ps1'
-`$psExe = Join-Path `$env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet"{2}" -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "{3}" -Path "{1}" & start "" /b /wait /high "{0}" voice-server.js >> "{1}" 2>&1 & call exit %^errorlevel%"' -f `$node.Source, `$log, `$psExe, `$roll)
+`$writer = Join-Path '$Root' 'server-log.js'
+`$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet start "" /b /wait /high "{0}" "{2}" --log "{1}" --days 90 --stamp voice-server.js & call exit %^errorlevel%"' -f `$node.Source, `$log, `$writer)
 
 # The task as it is now, for the way back: a new install that does not answer
 # gets its old files AND its old settings back.
@@ -470,18 +483,22 @@ function StopIt {
     `$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
                 Where-Object { `$_.CommandLine -like '*voice-server.js*' })
     if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
+    # A try that throws has not looked, so it is not taken for a free port.
     `$free = `$false
+    `$why = ''
     for (`$i = 0; `$i -lt 30; `$i++) {
         `$busy = `$false
+        `$c = New-Object Net.Sockets.TcpClient
         try {
-            `$c = New-Object Net.Sockets.TcpClient
             `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
-            `$busy = `$c.Connected; `$c.Close()
-        } catch { }
-        if (-not `$busy) { `$free = `$true; break }
+            `$busy = `$c.Connected; `$why = ''
+        } catch { `$why = `$_.Exception.Message }
+        finally { `$c.Close() }
+        if (-not `$busy -and -not `$why) { `$free = `$true; break }
         Start-Sleep -Milliseconds 500
     }
-    if (-not `$free) { 'something is still holding port $Port up here and would not let go' }
+    if (-not `$free -and `$why) { 'could not tell whether port $Port up here is free: ' + `$why }
+    elseif (-not `$free) { 'something is still holding port $Port up here and would not let go' }
 }
 
 # Any other task that starts voice-server.js from this root (#2008). The
@@ -556,8 +573,9 @@ function StartIt {
         }
     }
     # Rolled whatever its size rather than deleted, so the run before this
-    # install is voice.log.1 and the tails below read only this one.
-    try { & `$roll -Path `$log -Force } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
+    # install is a voice.log.<digits> of its own and the tails below read only
+    # this one, and every rolled copy cut to 90 days (#2166).
+    try { & `$node.Source `$writer --log `$log --days 90 --roll } catch { 'could not roll voice.log: ' + `$_.Exception.Message }
     Start-ScheduledTask -TaskName '$TaskName'
 }
 
@@ -566,15 +584,17 @@ function Build {
 }
 
 # The port answering is not the test. Which build answers is the test.
+`$healthWhy = ''
 function Healthy {
     `$until = (Get-Date).AddSeconds(`$Wait)
     while (`$true) {
         `$up = `$false
+        `$c = New-Object Net.Sockets.TcpClient
         try {
-            `$c = New-Object Net.Sockets.TcpClient
             `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(500)
-            `$up = `$c.Connected; `$c.Close()
-        } catch { }
+            `$up = `$c.Connected
+        } catch { `$script:healthWhy = `$_.Exception.Message }
+        finally { `$c.Close() }
         if (`$up) {
             if (`$Rolling -or -not `$wantBuild) { return `$true }
             if ((Build) -eq `$wantBuild) { return `$true }
@@ -591,6 +611,7 @@ function Why {
     if (`$wantBuild -and `$seen -and `$seen -ne `$wantBuild) {
         "WRONG BUILD on $Port. sent `$wantBuild, running '" + `$seen + "'. That means an old process is still answering."
     }
+    if (`$healthWhy) { 'the last try to connect on $Port said: ' + `$healthWhy }
     'voice.log says:'
     if (Test-Path -LiteralPath `$log) { Get-Content -LiteralPath `$log -Tail 20 } else { 'nothing was written' }
 }
@@ -616,7 +637,9 @@ if (Healthy) {
     $up = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -EA SilentlyContinue
     if (-not $up -or $up.CommandLine -notlike ('*' + $log + '*')) { continue }
     $class = 'unreadable'
-    try { $class = [string](Get-Process -Id $p.ProcessId -EA Stop).PriorityClass } catch { }
+    $proc = Get-Process -Id $p.ProcessId -EA SilentlyContinue
+    if (-not $proc) { 'node, pid ' + $p.ProcessId + ', has already gone'; continue }
+    try { $class = [string]$proc.PriorityClass } catch { $class = 'unreadable (' + $_.Exception.Message + ')' }
     'node, pid ' + $p.ProcessId + ', runs at ' + $class + ' priority'
   }
   'TASK OK'
@@ -664,13 +687,17 @@ Head 'Checking from here'
   So: on 0.0.0.0 the port must answer. On 127.0.0.1 it must NOT, and the
   service is reached through whatever is proxying instead.
 #>
+# A try that throws (a name that does not resolve) has not looked, so it is
+# said, and not taken for a port that is shut.
 $reachable = $false
+$reachWhy = ''
 for ($i = 0; $i -lt 15; $i++) {
+    $c = New-Object Net.Sockets.TcpClient
     try {
-        $c = New-Object Net.Sockets.TcpClient
         $null = $c.BeginConnect($VpsHost, $Port, $null, $null).AsyncWaitHandle.WaitOne(1000)
-        $reachable = $c.Connected; $c.Close()
-    } catch { }
+        $reachable = $c.Connected; $reachWhy = ''
+    } catch { $reachWhy = $_.Exception.Message }
+    finally { $c.Close() }
     if ($reachable) { break }
     # On loopback we are waiting to be sure it stays shut, not for it to open,
     # so there is nothing to keep retrying for.
@@ -684,6 +711,8 @@ if ($Bind -eq '127.0.0.1') {
         Say "$VpsHost`:$Port IS STILL ANSWERING from outside, and it should not be." 'Red'
         Say '  The bind did not take, or the firewall rule is still open.' 'Red'
         Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
+    } elseif ($reachWhy) {
+        Say "Loopback only, and ${VpsHost}:$Port could not be tried from out here ($reachWhy), so whether it is shut is not known." 'Yellow'
     } else {
         Say "Loopback only, and ${VpsHost}:$Port is correctly shut from out here." 'Green'
         # The service is only useful if something is carrying it, so say whether
@@ -703,9 +732,10 @@ if ($Bind -eq '127.0.0.1') {
 } elseif ($reachable) {
     Say "Voice is up at http://${VpsHost}:$Port" 'Green'
     Write-Host ''
-    Say 'Next:  .\Add-VoiceFeed.ps1   then  .\Publish-Server.ps1' 'Yellow'
+    Say 'The position feed is part of game\gamemode.js, so nothing else needs running for it.' 'Gray'
 } else {
     Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
+    if ($reachWhy) { Say "  The last try to connect said: $reachWhy" 'Red' }
     Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
 }
 # The service's files are in place: the box records that it runs this

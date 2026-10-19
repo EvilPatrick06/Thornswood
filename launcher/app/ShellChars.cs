@@ -41,7 +41,7 @@ namespace Thornswood
             // an install this supports any more. OwnGameRequired says why and
             // offers the folder when it can be made. See ShellOwnGame.cs.
             if (!OwnGameRequired()) return;
-            // Same path as Diagnostics, Bring it up to date from Vortex. Play
+            // The same bring-up-to-date Fix runs on Diagnostics. Play
             // used to walk past a folder that NeededRefresh and launch it.
             if (OwnGameRefreshIfDue()) return;
 

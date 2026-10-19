@@ -26,7 +26,9 @@
        through the one rename: SteamUpdates through its own (it is compiled
        alone, in test-steam-updates.ps1), Sync and FeedNews through
        OwnGame.WriteRecord, the feed store through Move-FeedStoreInto, whose
-       C# is Generated.ps1's word for word.
+       type is its own (Thornswood.FeedSwap, a rename with POSIX semantics
+       since #2727, tests\test-2727-feed-swap-readers.ps1), so it never
+       shares a name with Generated.ps1's Thornswood.RecordSwap.
     2. SteamUpdates.cs compiled with the launcher's compiler: its write
        replaces a manifest, and killed 40 times while it swaps a manifest in
        a loop, the manifest is whole every time.
@@ -34,7 +36,8 @@
        the same bytes, and whole after 40 kills.
     4. The feed store under Windows PowerShell 5.1, which is what the VPS
        runs it with: the real swap op, built by New-FeedStoreScript, replaces
-       a feed file and keeps the old one in history; and a 5.1 process
+       a store file (published.json; version.json is never replaced, it goes
+       up as a new generation, #2727) and keeps the old one in history; and a 5.1 process
        swapping a feed file through Move-FeedStoreInto, killed 15 times,
        leaves it whole every time.
 
@@ -91,12 +94,14 @@ $swap = [regex]::Match($store, "(?s)\`$script:FeedStoreSwap = @'\n(.*?)\n'@")
 Yes 'Feed-Store: the box''s script and the one rename are there' ($body.Success -and $swap.Success)
 Yes '...the box''s script has no File.Replace and no Move-Item over a feed file' ($body.Groups[1].Value -notmatch '::Replace\(' -and $body.Groups[1].Value -notmatch '(?<![A-Za-z])Move-Item')
 Yes '...it swaps each file in with Move-FeedStoreInto' ($body.Groups[1].Value -match 'Move-FeedStoreInto \$part \$p')
-Yes '...and the rename goes up with every script the box runs' ($store -match '\$script:FeedStoreSwap \+ "`r`n" \+ \$script:FeedStoreBody')
+Yes '...and the rename goes up with every script the box runs' ($store -match '\$script:FeedStoreSwap \+ "`r`n" \+ \$script:FeedStoreGenerations \+ "`r`n" \+ \$script:FeedStoreBody')
 Yes '...the received copy and read.json on this machine go through it too' (
     $store -match 'Move-FeedStoreInto \$down \$local' -and $store -match "Move-FeedStoreInto \(\`$f \+ '\.new'\) \`$f")
 $csStore = [regex]::Match($swap.Groups[1].Value, '(?s)namespace Thornswood\n\{.*?\n\}')
 $csGen = [regex]::Match($gen, '(?s)namespace Thornswood\n\{.*?\n\}')
-Yes '...its C# is Generated.ps1''s, word for word, so either may load the type first' ($csStore.Success -and $csGen.Success -and $csStore.Value -ceq $csGen.Value)
+Yes '...its type is its own, not Generated.ps1''s, so neither loads the other''s rename first (#2727)' (
+    $csStore.Success -and $csGen.Success -and $csStore.Value -match 'public static class FeedSwap' -and $csStore.Value -notmatch 'class RecordSwap' -and
+    $csGen.Value -match 'public static class RecordSwap' -and $csGen.Value -notmatch 'class FeedSwap')
 
 $work = Join-Path $Scratch ('thornswood-2591-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -147,9 +152,8 @@ __WRITERECORD__
     $src = Join-Path $work 'WholeRecordTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-record-test.exe'
-    $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', "/langversion:$LauncherLangVersion", "/out:$exe",
-                 "/reference:$(Join-Path $fw 'System.dll')", "/reference:$(Join-Path $fw 'System.Core.dll')",
+                 "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/reference:$(Join-Path $LauncherRefDir 'System.Core.dll')",
                  $src, (Join-Path $App 'SteamUpdates.cs'))
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $compiled = & $LauncherCsc @cscArgs 2>&1
@@ -205,24 +209,24 @@ __WRITERECORD__
     $root = Join-Path $work 'site'
     $feed = Join-Path $root 'feed'
     $null = New-Item -ItemType Directory -Force -Path $feed
-    [IO.File]::WriteAllText((Join-Path $feed 'version.json'), '{"version":"old"}')
-    [IO.File]::WriteAllText((Join-Path $feed 'version.json.part'), '{"version":"new one"}')
+    [IO.File]::WriteAllText((Join-Path $feed 'published.json'), '{"version":"old"}')
+    [IO.File]::WriteAllText((Join-Path $feed 'published.json.part'), '{"version":"new one"}')
     $one = Join-Path $work 'swap-once.ps1'
     [IO.File]::WriteAllText($one, @'
 param($store, $root)
 $ErrorActionPreference = 'Stop'
 . $store
 $feed = Join-Path $root 'feed'
-$was = Get-FeedStoreSha (Join-Path $feed 'version.json')
-$size = (Get-Item -LiteralPath (Join-Path $feed 'version.json.part')).Length
-$text = New-FeedStoreScript $root 'feed' 'swap' @('version.json') @{ 'version.json' = $was } @{ 'version.json' = $size }
+$was = Get-FeedStoreSha (Join-Path $feed 'published.json')
+$size = (Get-Item -LiteralPath (Join-Path $feed 'published.json.part')).Length
+$text = New-FeedStoreScript $root 'feed' 'swap' @('published.json') @{ 'published.json' = $was } @{ 'published.json' = $size }
 & ([scriptblock]::Create($text))
 '@)
     $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $one $storePs1 $root 2>&1 | ForEach-Object { [string]$_ })
     $hist = @(Get-ChildItem -LiteralPath (Join-Path $feed 'history') -File -ErrorAction SilentlyContinue)
-    Yes ('the box''s swap op, run by Windows PowerShell 5.1, sends the new feed file (' + (($out | Select-Object -Last 2) -join ' ') + ')') (
-        ($out -match '^SENT\|version\.json\|').Count -eq 1 -and ($out -contains 'DONE') -and
-        [IO.File]::ReadAllText((Join-Path $feed 'version.json')) -eq '{"version":"new one"}' -and -not (Test-Path -LiteralPath (Join-Path $feed 'version.json.part')))
+    Yes ('the box''s swap op, run by Windows PowerShell 5.1, sends the new baseline (' + (($out | Select-Object -Last 2) -join ' ') + ')') (
+        ($out -match '^SENT\|published\.json\|').Count -eq 1 -and ($out -contains 'DONE') -and
+        [IO.File]::ReadAllText((Join-Path $feed 'published.json')) -eq '{"version":"new one"}' -and -not (Test-Path -LiteralPath (Join-Path $feed 'published.json.part')))
     Yes '...keeps the old one in history, and leaves no ~RF file beside it' ($hist.Count -eq 1 -and [IO.File]::ReadAllText($hist[0].FullName) -eq '{"version":"old"}' -and
         @(Get-ChildItem -LiteralPath $feed -Force -Filter '*~RF*').Count -eq 0)
 

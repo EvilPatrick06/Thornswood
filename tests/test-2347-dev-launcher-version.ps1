@@ -18,8 +18,9 @@
   works out whether this is main's own launcher to the line that writes the
   number, out of the shipped Ship.ps1, and drives it against feeds on disk the
   way the real Feed-Store.ps1 reads them (THORNSWOOD_TEST_SITE_DIR):
-    <site>\feed\version.json         what main offers now
-    <site>\feed-dev\version.json     what dev offers now
+    <site>\feed\version\00000001.json     what main offers now (the feed's
+                                          newest generation, #2727)
+    <site>\feed-dev\version\00000001.json what dev offers now
     <site>\feed-dev\launchers.txt    every dev number ever published
   It carries the launcher's own IsNewer, so "offered" means what a launcher
   would do. Each run answers the number Ship chose and whether it builds a
@@ -118,9 +119,9 @@ $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $oldLocal = $env:LOCALAPPDATA
 $script:runN = 0
 function Put-Feed([string]$dir, [string]$version, [string]$inputs) {
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $dir 'version') | Out-Null
     $doc = [ordered]@{ launcherVersion = $version; launcherUrl = ('https://thornswood.net/x/assets/' + $sha); launcherSha256 = $sha; launcherInputs = $inputs }
-    [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($doc | ConvertTo-Json))
+    [IO.File]::WriteAllText((Join-Path $dir 'version\00000001.json'), ($doc | ConvertTo-Json))
 }
 # Feeds are 'version|fingerprint', or '' for none. Returns the choice, or the
 # STOP sentence as a string.
@@ -217,7 +218,8 @@ try {
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = ''; DevFeed = "1.2.3|$D"; Ever = @('1.2.3') }
     Yes ("6 clean main cannot tell whether it is main's launcher, so it stops before building: " + (Said $r)) ($r -is [string] -and $r -like "STOP.*main's feed could not be read*Nothing was built*")
     $r = Run @{ Aligned = $false; Current = '1.2.3'; Inputs = $E; Main = ''; DevFeed = "1.2.3.1|$D"; Ever = @('1.2.3.1') }
-    Yes ("6 a branch goes on as it always did: " + (Said $r)) (Chose $r '1.2.3.2' $true)
+    # Until 19 Oct a branch went on from its own number here (#2711 decision 1 B).
+    Yes ("6 a branch stops too, since its number could land below main's: " + (Said $r)) ($r -is [string] -and $r -like "STOP.*Could not read what main has published*Nothing was built*")
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $D; Main = ''; DevFeed = "1.2.3|$D"; ModsOnly = $true }
     Yes ("6 -ModsOnly builds no launcher, so it needs no answer: " + (Said $r)) (Chose $r '1.2.3' $false)
 

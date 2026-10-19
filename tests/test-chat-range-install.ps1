@@ -76,6 +76,11 @@ if ($pattern) {
 $remote = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')
 Yes 'the install here-string is there' $remote.Success
 
+# The here-string calls Get-ThornswoodServiceAccountScript (#2578) to paste
+# ServiceAccount.ps1's functions in. Only the task line is read here, so it
+# stands in as nothing. Without it the expansion threw before any check after
+# it ran (found while checking the voice line for #2166).
+function Get-ThornswoodServiceAccountScript { return '' }
 <# What the outer script has set by the time the here-string is built, as
    Check-VoiceInstall.ps1 sets them, with the range under test. #>
 function Expand([string]$range) {

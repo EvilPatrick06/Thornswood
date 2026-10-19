@@ -8,6 +8,7 @@
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-Server-Dev -Which dev
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Expect 1234567
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Work C:\ThornswoodTemps&Worktrees\temp\restore
+      .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <throwaway folder> -Rehearse [-Port 7800 -VoicePort 7802]
 
   Restore-Backup.ps1 checks the signature and unpacks; this is the step after
   it that docs\RESTORING.md used to leave to hand copying. It takes the
@@ -62,6 +63,37 @@
 
   Prints RESTORE OK and exits 0 only when every check above passed.
 
+  A REHEARSAL, -Rehearse (issue #1046). A restore makes the folder BE the
+  server it came from: its port, its name and private\door.json, which names
+  the live site and holds the key the site trusts and the join pass key. That
+  is right for a real restore and wrong for a throwaway folder somebody means
+  to start and connect to, and docs\RESTORING.md left making it safe to four
+  hand steps nobody had done. -Rehearse does them after every check above has
+  passed, and refuses before anything is put back when -Root is one of the
+  server folders on this machine (C:\Thornswood-Server,
+  C:\Thornswood-Server-Dev):
+    ports    port and thornswoodVoicePort become free ones: the first game
+             port from 7800 up whose UDP and TCP are free and whose resources
+             port (port+1, what the server opens itself) is free on TCP, and
+             the first free TCP port above that for voice. Never the live or
+             dev ports, read from both server folders' settings and the
+             backup's, nor 7777, 7778, 3000, 7787 or 7788. -Port and
+             -VoicePort name them instead, checked the same way.
+    door     private\door.json is deleted from the folder; the backup still
+             holds it. Not moved: a moved copy of the site key is one more
+             place a secret sits.
+    pass     thornswoodRequirePass is set to false, said by name only: the
+             join pass key is in door.json, so with the hold on nobody could
+             stay connected. Start it only where its ports are not open to
+             the internet.
+    name     " (restore rehearsal)" goes on the end of name.
+    record   rehearsal.json in the folder says when, from which backup, the
+             ports, and what was taken out. Each -Rehearse is a whole new
+             restore and writes it again.
+  It prints REHEARSAL READY with the start line and the launcher settings.
+  It never writes docs\RESTORING.md's Last rehearsed line: that waits for a
+  person who started it and loaded a character.
+
   -Work is the folder the decrypted zip and the unpacked backup sit in while
   this runs. Left out, that is %TEMP%. Restore-Backup.ps1 is given the same
   folder, so the zip is not written to %TEMP% either. Both are deleted before
@@ -77,6 +109,11 @@ param(
   [string]$Expect,
   # Where the decrypted zip and the unpacked backup sit. Left out, %TEMP%.
   [string]$Work,
+  # Make the restored folder safe to start and connect to (#1046, see above).
+  [switch]$Rehearse,
+  # With -Rehearse: the game port and the voice port. Left out, free ones.
+  [int]$Port = 0,
+  [int]$VoicePort = 0,
   [switch]$NoPause
 )
 
@@ -118,18 +155,112 @@ function People([string]$worldDir) {
   return $out
 }
 
+# ------------------------------------------------- the rehearsal (#1046) ---
+# The server folders on a box, which -Rehearse never touches and whose ports
+# a rehearsal never takes.
+$ServerRoots = @('C:\Thornswood-Server', 'C:\Thornswood-Server-Dev')
+# '' or why -Root may not be rehearsed in.
+function Get-RehearsalRootRefusal([string]$root, [string[]]$serverRoots) {
+  $r = ([string]$root).TrimEnd('\', '/')
+  foreach ($sr in $serverRoots) {
+    if ([string]::Equals($r, ([string]$sr).TrimEnd('\', '/'), [StringComparison]::OrdinalIgnoreCase)) {
+      return ("$root is a server folder people play on. A rehearsal is started and connected to, and changes its ports, name, join pass hold and door, " +
+              "so it only goes into a throwaway folder: Install-ThornswoodServer.ps1 -Zip <payload> -Root <throwaway> -NoTask, then -Rehearse into that.")
+    }
+  }
+  return ''
+}
+# The resources port the server opens beside its game port, as
+# Install-ThornswoodServer.ps1 and Swap.ps1 work it out.
+function Get-ResourcesPort([int]$gamePort) { if ($gamePort -eq 7777) { return 3000 } return ($gamePort + 1) }
+# Every port a rehearsal must not take: the fixed live and dev ones, and each
+# settings object's game, resources and voice ports.
+function Get-ReservedPorts([object[]]$settingsList) {
+  $out = New-Object 'System.Collections.Generic.List[int]'
+  foreach ($n in 7777, 7778, 3000, 7787, 7788) { if (-not $out.Contains($n)) { $out.Add($n) } }
+  foreach ($st in @($settingsList)) {
+    if ($null -eq $st) { continue }
+    $gp = 0; $vp = 0
+    if ($st.PSObject.Properties.Name -contains 'port') { try { $gp = [int]$st.port } catch { $gp = 0 } }
+    if ($st.PSObject.Properties.Name -contains 'thornswoodVoicePort') { try { $vp = [int]$st.thornswoodVoicePort } catch { $vp = 0 } }
+    foreach ($n in @($(if ($gp -gt 0) { $gp; (Get-ResourcesPort $gp) }) + @($(if ($vp -gt 0) { $vp })))) {
+      if (-not $out.Contains([int]$n)) { $out.Add([int]$n) }
+    }
+  }
+  return $out.ToArray()
+}
+# What is listening on this machine now: Udp and Tcp, each a list of ports.
+function Get-PortsInUse {
+  $ip = [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties()
+  return [pscustomobject]@{
+    Udp = @($ip.GetActiveUdpListeners() | ForEach-Object { [int]$_.Port })
+    Tcp = @($ip.GetActiveTcpListeners() | ForEach-Object { [int]$_.Port })
+  }
+}
+# Why a game port will not do for a rehearsal, or ''.
+function Get-GamePortRefusal([int]$p, [int[]]$reserved, $inUse) {
+  if ($p -lt 1024 -or $p -gt 65534) { return "$p is not a port a rehearsal can use (1024 to 65534)" }
+  $rp = Get-ResourcesPort $p
+  if (@($reserved) -contains $p) { return "$p is a live or dev server's port" }
+  if (@($reserved) -contains $rp) { return "$p's resources port $rp is a live or dev server's port" }
+  if (@($inUse.Udp) -contains $p -or @($inUse.Tcp) -contains $p) { return "$p is already in use on this machine" }
+  if (@($inUse.Tcp) -contains $rp) { return "$p's resources port $rp is already in use on this machine" }
+  return ''
+}
+# Why a voice port will not do beside game port $p, or ''.
+function Get-VoicePortRefusal([int]$v, [int]$p, [int[]]$reserved, $inUse) {
+  if ($v -lt 1024 -or $v -gt 65535) { return "$v is not a port a rehearsal can use (1024 to 65535)" }
+  if ($v -eq $p -or $v -eq (Get-ResourcesPort $p)) { return "voice port $v is the game port or its resources port" }
+  if (@($reserved) -contains $v) { return "voice port $v is a live or dev server's port" }
+  if (@($inUse.Tcp) -contains $v) { return "voice port $v is already in use on this machine" }
+  return ''
+}
+# The game and voice ports for a rehearsal: Port, Resources, VoicePort and Why
+# ('' when both are good). $want and $wantVoice are -Port and -VoicePort, 0
+# for the first free ones from 7800 up.
+function Get-RehearsalPorts([int]$want, [int]$wantVoice, [int[]]$reserved, $inUse) {
+  $p = 0
+  if ($want) {
+    $why = Get-GamePortRefusal $want $reserved $inUse
+    if ($why) { return [pscustomobject]@{ Port = $want; Resources = 0; VoicePort = $wantVoice; Why = "-Port: $why." } }
+    $p = $want
+  } else {
+    for ($c = 7800; $c -le 7998; $c++) { if (-not (Get-GamePortRefusal $c $reserved $inUse)) { $p = $c; break } }
+    if (-not $p) { return [pscustomobject]@{ Port = 0; Resources = 0; VoicePort = 0; Why = 'No free game port from 7800 to 7998. Name one with -Port.' } }
+  }
+  $v = 0
+  if ($wantVoice) {
+    $why = Get-VoicePortRefusal $wantVoice $p $reserved $inUse
+    if ($why) { return [pscustomobject]@{ Port = $p; Resources = (Get-ResourcesPort $p); VoicePort = $wantVoice; Why = "-VoicePort: $why." } }
+    $v = $wantVoice
+  } else {
+    for ($c = $p + 2; $c -le $p + 200; $c++) { if (-not (Get-VoicePortRefusal $c $p $reserved $inUse)) { $v = $c; break } }
+    if (-not $v) { return [pscustomobject]@{ Port = $p; Resources = (Get-ResourcesPort $p); VoicePort = 0; Why = "No free voice port above $p. Name one with -VoicePort." } }
+  }
+  return [pscustomobject]@{ Port = $p; Resources = (Get-ResourcesPort $p); VoicePort = $v; Why = '' }
+}
+
+if (-not $Rehearse -and ($Port -or $VoicePort)) {
+  Die '-Port and -VoicePort go with -Rehearse. A real restore keeps the ports the backup says.'
+}
 if (-not (Test-Path -LiteralPath $Root)) {
+
   Die ("There is no server folder at $Root. Put the server program there first " +
        "(Install-ThornswoodServer.ps1 -Zip <payload> -Root $Root -NoTask), then restore into it.")
 }
 $Root = (Resolve-Path -LiteralPath $Root).Path.TrimEnd('\')
 $rootFwd = $Root -replace '\\', '/'
 $tag = if ($Which -eq 'dev') { 'game-dev' } else { 'game' }
+if ($Rehearse) {
+  $rootWhy = Get-RehearsalRootRefusal $Root $ServerRoots
+  if ($rootWhy) { Die ($rootWhy + ' Nothing was put back.') }
+}
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  put a backup back into a server folder' -ForegroundColor White
 Say "  backup  $Backup" 'DarkGray'
 Say "  into    $Root  ($Which, from $tag in the backup)" 'DarkGray'
+if ($Rehearse) { Say '  as a rehearsal: free ports, no door, no join pass hold (#1046)' 'DarkGray' }
 
 # ------------------------------------------------------------ not running ---
 Head 'Is its server running'
@@ -152,20 +283,20 @@ if ($running.Count) {
 # command line. Whoever holds the game port does, or its parent does. A port
 # held by some OTHER server (a throwaway folder whose settings still say 7777
 # while live runs) is not this one running, and is only said.
-$port = 0
+$heldPort = 0
 if (Test-Path -LiteralPath $settingsPath) {
-  try { $port = [int]((Get-Content -LiteralPath $settingsPath -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).port } catch { $port = 0 }
+  try { $heldPort = [int]((Get-Content -LiteralPath $settingsPath -Raw) -replace '^\uFEFF', '' | ConvertFrom-Json).port } catch { $heldPort = 0 }
 }
-if ($port -and (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-  foreach ($ep in @(Get-NetUDPEndpoint -LocalPort $port -EA SilentlyContinue)) {
+if ($heldPort -and (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+  foreach ($ep in @(Get-NetUDPEndpoint -LocalPort $heldPort -EA SilentlyContinue)) {
     $p = Get-CimInstance Win32_Process -Filter ("ProcessId = " + [int]$ep.OwningProcess) -EA SilentlyContinue
     $up = $null
     if ($p) { $up = Get-CimInstance Win32_Process -Filter ("ProcessId = " + [int]$p.ParentProcessId) -EA SilentlyContinue }
     $lines = @($p, $up) | Where-Object { $_ -and $_.CommandLine } | ForEach-Object { $_.CommandLine }
     if (@($lines | Where-Object { $_.IndexOf($Root, [StringComparison]::OrdinalIgnoreCase) -ge 0 }).Count) {
-      Die "UDP $port is held by this folder's server (pid $($ep.OwningProcess)). Stop it first: it writes world while it runs."
+      Die "UDP $heldPort is held by this folder's server (pid $($ep.OwningProcess)). Stop it first: it writes world while it runs."
     }
-    Say "  UDP $port is held by another server (pid $($ep.OwningProcess)); give this folder its own port before starting it" 'Yellow'
+    Say "  UDP $heldPort is held by another server (pid $($ep.OwningProcess)); give this folder its own port before starting it" 'Yellow'
   }
 }
 Say '  nothing is running from it' 'Green'
@@ -263,11 +394,13 @@ if (-not $s.loadOrder) { Die 'server-settings.json has no loadOrder.' }
 # payload was unpacked here (see the note at the top). So do the join pass
 # switch and the written role lists (#1845), which are said by name only.
 $named = 0
+$backupSettings = $null
 $byNameOnly = @('thornswoodRequirePass', 'thornswoodDevs', 'thornswoodPlaytesters')
 $srcSettings = Join-Path $src 'server-settings.json'
 if (Test-Path -LiteralPath $srcSettings) {
   $b = $null
   try { $b = [IO.File]::ReadAllText($srcSettings) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $b = $null }
+  $backupSettings = $b
   if ($b) {
     foreach ($k in @('port', 'name', 'thornswoodVoicePort', 'thornswoodServer', 'thornswoodLoadOrderRefuse') + $byNameOnly) {
       $has = $s.PSObject.Properties.Name -contains $k
@@ -346,11 +479,77 @@ if (-not (Test-Path -LiteralPath (Join-Path $Root 'dist_back\skymp5-server.js'))
   Say '  there is no dist_back\skymp5-server.js here, so this folder has the world but not the server program yet' 'Yellow'
 }
 
+# ------------------------------------------------- a rehearsal (#1046) ---
+$rh = $null
+if ($Rehearse) {
+  Head 'Making it a rehearsal'
+  $others = @()
+  foreach ($sr in $ServerRoots) {
+    # A server folder this account may not look into (the runner's account
+    # on the VPS cannot read the live one) still has its usual ports kept
+    # off by Get-ReservedPorts, and a running server's ports are refused as
+    # in use; what it cannot see is a port someone changed, so it says so.
+    $sp = Join-Path $sr 'server-settings.json'
+    $there = $false
+    try { $there = Test-Path -LiteralPath $sp -EA Stop } catch {
+      Say ("  {0} could not be read ({1}); only the usual live and dev ports are kept off for it" -f $sp, $_.Exception.Message) 'Yellow'
+      continue
+    }
+    if ($there) {
+      try { $others += ([IO.File]::ReadAllText($sp) -replace '^\uFEFF', '' | ConvertFrom-Json) } catch {
+        Say ("  {0} could not be read ({1}); only the usual live and dev ports are kept off for it" -f $sp, $_.Exception.Message) 'Yellow'
+      }
+    }
+  }
+  $reserved = Get-ReservedPorts (@($backupSettings) + $others)
+  $rh = Get-RehearsalPorts $Port $VoicePort $reserved (Get-PortsInUse)
+  if ($rh.Why) { Die ($rh.Why + ' The world is back; the folder is not a rehearsal yet and must not be started.') }
+  $rs = [IO.File]::ReadAllText($settingsPath) -replace '^\uFEFF', '' | ConvertFrom-Json
+  $was = [string]$rs.port
+  $rs.port = $rh.Port
+  if ($rs.PSObject.Properties.Name -contains 'thornswoodVoicePort') { $wasVoice = [string]$rs.thornswoodVoicePort; $rs.thornswoodVoicePort = $rh.VoicePort }
+  else { $wasVoice = 'none'; $rs | Add-Member -NotePropertyName thornswoodVoicePort -NotePropertyValue $rh.VoicePort }
+  Say ("  port       {0}, was {1}; resources {2} (the server opens port+1 itself)" -f $rh.Port, $was, $rh.Resources) 'Green'
+  Say ("  voice      {0}, was {1}" -f $rh.VoicePort, $wasVoice) 'Green'
+  $suffix = ' (restore rehearsal)'
+  $nm = [string]$rs.name
+  if (-not $nm.EndsWith($suffix)) { $rs.name = $nm + $suffix }
+  Say ("  name       {0}" -f $rs.name) 'Green'
+  if ($rs.PSObject.Properties.Name -contains 'thornswoodRequirePass') { $rs.thornswoodRequirePass = $false }
+  else { $rs | Add-Member -NotePropertyName thornswoodRequirePass -NotePropertyValue $false }
+  Say '  thornswoodRequirePass off: the join pass key left with door.json. Start it only where these ports are not open to the internet.' 'Yellow'
+  [IO.File]::WriteAllText($settingsPath, ($rs | ConvertTo-Json -Depth 20), $utf8)
+  $door = Join-Path $Root 'private\door.json'
+  $removed = @()
+  if (Test-Path -LiteralPath $door) {
+    Remove-Item -LiteralPath $door -Force
+    $removed += 'private\door.json'
+    Say '  door       private\door.json deleted from this folder; the backup still holds it' 'Green'
+  } else {
+    Say '  door       there was no private\door.json' 'DarkGray'
+  }
+  $record = [ordered]@{
+    at = (Get-Date).ToString('o'); backup = (Split-Path -Leaf $Backup); which = $Which
+    port = $rh.Port; resources = $rh.Resources; voicePort = $rh.VoicePort
+    removed = $removed; requirePass = $false; issue = 1046
+  }
+  [IO.File]::WriteAllText((Join-Path $Root 'rehearsal.json'), ($record | ConvertTo-Json -Depth 5), $utf8)
+  Say '  record     rehearsal.json' 'DarkGray'
+}
+
 Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
 Write-Host ''
 Say ("RESTORE OK: {0} character(s), all {1} plugins on disk, in {2}" -f $now.Count, $order.Count, $Root) 'Green'
-Say '  Start it with its scheduled task, Start-ScheduledTask -TaskName <its task>, which runs node High (#2491); node started by hand runs Normal and outside the task' 'DarkGray'
-Say '  and watch thornswood.log until a character connects. docs\RESTORING.md has the rest.' 'DarkGray'
+if ($rh) {
+  Say ("REHEARSAL READY: game port {0}, voice {1}, no door, no join pass hold, in {2}" -f $rh.Port, $rh.VoicePort, $Root) 'Green'
+  Say ("  Start it by hand:   cd '{0}'; node dist_back/skymp5-server.js" -f $Root) 'DarkGray'
+  Say ('  Point a launcher at it: in that launcher''s config.json, ServerAddress this machine (127.0.0.1 on it), ServerPort "{0}"' -f $rh.Port) 'DarkGray'
+  Say '  and load a character from the backup while thornswood.log says it connected.' 'DarkGray'
+  Say ("  End it: stop node, then Remove-Item -LiteralPath '{0}' -Recurse -Force. docs\RESTORING.md has the rest." -f $Root) 'DarkGray'
+} else {
+  Say '  Start it with its scheduled task, Start-ScheduledTask -TaskName <its task>, which runs node High (#2491); node started by hand runs Normal and outside the task' 'DarkGray'
+  Say '  and watch thornswood.log until a character connects. docs\RESTORING.md has the rest.' 'DarkGray'
+}
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit 0
 

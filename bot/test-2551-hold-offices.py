@@ -43,7 +43,7 @@ Holds:
 The builder and bot.py are imported for real, the builder under another name
 so its __main__ block never runs. Read only. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import importlib.util
 import inspect

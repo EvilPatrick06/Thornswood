@@ -58,8 +58,12 @@ if (-not $Vortex -and -not $PSBoundParameters.ContainsKey('Game')) {
 }
 if ($Vortex) {
   $roots = @()
+  # Either key may be missing (Steam writes one or the other), so each is
+  # tested for, and a key without SteamPath names nothing.
   foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
-    try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+    if (-not (Test-Path -LiteralPath $k)) { continue }
+    $kp = Get-ItemProperty -LiteralPath $k
+    if ($kp.PSObject.Properties['SteamPath'] -and $kp.SteamPath) { $roots += ([string]$kp.SteamPath -replace '/', '\') }
   }
   foreach ($r in @($roots)) {
     $vdf = Join-Path $r 'config\libraryfolders.vdf'
@@ -485,10 +489,18 @@ if (-not $SkipServer) {
   }
   $voiceUrl = 'https://thornswood.net/voice/health'
   $vh = VoiceUp $voiceUrl
+  # voice-server.js answers /health with JSON that counts its peers. Anything
+  # else answering 200 there is not the voice service (Caddy handing the path
+  # to the site, say), so it is said as such rather than counted as up.
+  $vhDoc = $null; $vhWhy = ''
   if ($vh) {
-    $peers = ''
-    try { $peers = '  ' + ([string](($vh | ConvertFrom-Json).peers)) + ' peer(s)' } catch { }
-    Note ('voice service: answering at /voice/' + $peers)
+    try { $vhDoc = $vh | ConvertFrom-Json } catch { $vhWhy = $_.Exception.Message }
+    if (-not $vhWhy -and -not ($vhDoc -and $vhDoc.PSObject.Properties['peers'])) { $vhWhy = 'it names no peers' }
+  }
+  if ($vh -and $vhWhy) {
+    Bad "voice service: something answered at $voiceUrl, but not voice's health ($vhWhy)"
+  } elseif ($vh) {
+    Note ('voice service: answering at /voice/  ' + [string]$vhDoc.peers + ' peer(s)')
   } else {
     Bad "voice service: NOTHING at $voiceUrl"
     Bad '  that is Caddy or the service itself; the raw port is shut on purpose and proves nothing'
@@ -524,12 +536,13 @@ Get-CimInstance Win32_Process |
   Where-Object { $_.Name -eq 'node.exe' -and $_.CommandLine -like '*voice-server*' } |
   ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
 for ($i = 0; $i -lt 20; $i++) {
-  $busy = $false
-  try {
-    $c = New-Object Net.Sockets.TcpClient
-    $null = $c.BeginConnect('127.0.0.1', 7778, $null, $null).AsyncWaitHandle.WaitOne(300)
-    $busy = $c.Connected; $c.Close()
-  } catch { }
+  # Asked of the port list rather than by connecting: a connect that throws
+  # read as free here, with nothing said. Every listener is listed and
+  # filtered, because -LocalPort with nothing on it is an error, not an
+  # empty answer. A list that cannot be read stops this run, said, before
+  # the task is started into a port that may still be taken.
+  try { $busy = @(Get-NetTCPConnection -State Listen -ErrorAction Stop | Where-Object { $_.LocalPort -eq 7778 }).Count -gt 0 }
+  catch { 'could not list the ports in use, so the voice task was not started again: ' + $_.Exception.Message; exit 1 }
   if (-not $busy) { break }
   Start-Sleep -Milliseconds 500
 }

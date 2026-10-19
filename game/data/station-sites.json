@@ -1,0 +1,2293 @@
+{
+ "builtAgainst": [
+  {
+   "name": "Skyrim.esm",
+   "sha256": "2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107",
+   "size": 249753412
+  },
+  {
+   "name": "Update.esm",
+   "sha256": "c1795e0a1218da45dbfd523f064f1857b42805c49714c46091e75277e525aed9",
+   "size": 18874041
+  },
+  {
+   "name": "Dawnguard.esm",
+   "sha256": "1bda804009a21228acf6b30aa6aa7a692b247ff8a0313fe9aa69b3617ed4a6c4",
+   "size": 25885111
+  },
+  {
+   "name": "HearthFires.esm",
+   "sha256": "ad4ca9f32c81e7ddd3e39ec95e03b07841f20712989e598778442ea69b6e6a97",
+   "size": 3977420
+  },
+  {
+   "name": "Dragonborn.esm",
+   "sha256": "5f44f343552688c04f73bf83de58b90f70c7376b133fbbcb56b6fe33acf8778b",
+   "size": 64663863
+  },
+  {
+   "name": "_ResourcePack.esl",
+   "sha256": "d231915a4bbfe6e89536dfb0a46c5adc8e4d2d23ce95d248dc24943776eb76fb",
+   "size": 78418
+  },
+  {
+   "name": "Water for ENB.esm",
+   "sha256": "e043a0ab6136b861fa0117aef69a78a1ffbaf183c4862e196575977439601830",
+   "size": 437882
+  },
+  {
+   "name": "Embers XD.esm",
+   "sha256": "83f635cb33fe3c9f1192d3bb5cfc97b219220cfcef859885d3a7b06d95b6cfea",
+   "size": 64802
+  },
+  {
+   "name": "Expressive Facegen Morphs.esl",
+   "sha256": "59240f0ead8e723dc2ed8d1e93e23ba4d8ecd962e11c615cb2b47bc8e53e1470",
+   "size": 132
+  },
+  {
+   "name": "AHZmoreHUDInventory.esl",
+   "sha256": "ea9ce96cf1a8d174f8f2cfe22d938703dfdfcb3c3c572ee87e61427f51ec9aeb",
+   "size": 217
+  },
+  {
+   "name": "TrueHUD.esl",
+   "sha256": "f799336b2b849f816a522631898ff54dc8c39bbccaccfe8a7023390be4e1d813",
+   "size": 582
+  },
+  {
+   "name": "RaceCompatibility.esm",
+   "sha256": "69d212355c9df2b0a723bb6cd96c1a39e717aefe91df57f742838bf75b12f1c2",
+   "size": 61105
+  },
+  {
+   "name": "SkyUI_SE.esp",
+   "sha256": "61eb77164ed3632344ac2ccac4c8a4e69c62397999e7d8d558c162fd205616cf",
+   "size": 2433
+  },
+  {
+   "name": "LSFX-SSE-Audiosettings.esp",
+   "sha256": "615af3b58366553dbaaf352a2fc77324ce32f3cd3a4071028f08ba0d50649ab7",
+   "size": 761
+  },
+  {
+   "name": "I4IconAddon.esp",
+   "sha256": "3672a25b61bd192eac550caabc2860619c66ae39d93b44183272d88bfed65866",
+   "size": 234
+  },
+  {
+   "name": "Immersive Sounds - Compendium.esp",
+   "sha256": "5a1b36a7961d767c0937957767055dcf1bcb53b79b574003a40a66d382d3350e",
+   "size": 1048415
+  },
+  {
+   "name": "FNIS.esp",
+   "sha256": "3b2787c18fd55dab83d5ac23cef56493d583b805b519e1df563daecbbfddef03",
+   "size": 180
+  },
+  {
+   "name": "IcePenguinWorldMap.esp",
+   "sha256": "71e1679274ad76d596a6cbe3ae4899b23e3ed035f53acb45887157d6d8f2ef16",
+   "size": 2748
+  },
+  {
+   "name": "JKs Skyrim.esp",
+   "sha256": "6f0e2551017806ad9ab7acb074003a81457fa9606ab5e7b2833a862ce393f646",
+   "size": 3157818
+  },
+  {
+   "name": "JK's Castle Volkihar.esp",
+   "sha256": "45188a89845711d3047e0fa39ba3e5672078a1bc6822a0f323eb2641dada8514",
+   "size": 950572
+  },
+  {
+   "name": "WindhelmSSE.esp",
+   "sha256": "77ff48032f6479209e911e123ab5ecaf4c4dbf056e67eba0ef2f65a090c3d3e6",
+   "size": 2965984
+  },
+  {
+   "name": "CWE - JK - United.esp",
+   "sha256": "eeab8d8109be3c6f0de02841d9d3c5afbca566a6127d15873fe8fb1a7d999632",
+   "size": 355277
+  },
+  {
+   "name": "JK's Markarth Outskirts.esp",
+   "sha256": "cf159c93b89b379ea7d91b29534f20e7b3194edf9ac5e1fb774ce33fd7df2b58",
+   "size": 578111
+  },
+  {
+   "name": "JK's Whiterun's Outskirts.esp",
+   "sha256": "c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04",
+   "size": 1075057
+  },
+  {
+   "name": "The Great City of Solitude.esp",
+   "sha256": "8b52ce2fa6d21d95d16db3b4d630e05bae87eaaea1439a0b0bbdba0ef867af4e",
+   "size": 1167491
+  },
+  {
+   "name": "Embers XD.esp",
+   "sha256": "70e089e6841a63444aa96bc8bccc26351862c0512e139c575c91a14598f58ff3",
+   "size": 259127
+  },
+  {
+   "name": "Riften Expansion.esp",
+   "sha256": "dad73d07cc6c05a2e4c91dcb1a6704a64e0521a4b4f96de0830b533c021bba99",
+   "size": 875191
+  },
+  {
+   "name": "Odin - Skyrim Magic Overhaul.esp",
+   "sha256": "44a66b9696064eedec53a404251304ecf600b64df360dd068b7c947610114d70",
+   "size": 780438
+  },
+  {
+   "name": "JK's Riften Outskirts.esp",
+   "sha256": "3129ec5357c6d6e0093957eea251706308f202a6c752aec98d77a0639b6a75f5",
+   "size": 461558
+  },
+  {
+   "name": "Riften Expansion - JK's Skyrim Patch.esp",
+   "sha256": "2fb6d4ca7fe5e96343a040cb224182ce7e435cccfa2baa008df61c352fcda0fd",
+   "size": 115032
+  },
+  {
+   "name": "Hothtrooper44_ArmorCompilation.esp",
+   "sha256": "a5188649af4c74bb4366bd3bacafd78acf1a1545c0cf69d37a909fbb82ab0f01",
+   "size": 1121002
+  },
+  {
+   "name": "Guard Dialogue Overhaul.esp",
+   "sha256": "0c8c0fc2203e27813b2e7fc01a5f511685afac637fe7c37966d5e2de534cef4b",
+   "size": 465412
+  },
+  {
+   "name": "Gourmet.esp",
+   "sha256": "813bbc2e270cba3db018abc586cb3659a9d54f26ce98bdcee95a220ee0969b61",
+   "size": 226102
+  },
+  {
+   "name": "MoreCraftableEquipment.esp",
+   "sha256": "552fec4651e3b2a13c22c51e04268e5df1686fda5a539bbb949206479f087b19",
+   "size": 199987
+  },
+  {
+   "name": "HIMBO.esp",
+   "sha256": "9a6db51267dadf54d86788bcd6a113a63172f374037d3fa8888834bca574ed2a",
+   "size": 3432
+  },
+  {
+   "name": "AnotherOakwood.esp",
+   "sha256": "e29668024dc76c1dfb8e3724448522ae1b8853815cc221c5f0024e433d2b2264",
+   "size": 844208
+  },
+  {
+   "name": "aaaGraniteHill.esp",
+   "sha256": "84e95cd443bd6611b61ce2a0b0d3da1390737658d70b332c3ba82ec37463ee6f",
+   "size": 823125
+  },
+  {
+   "name": "Skyrim Unbound Addon - Orc Strongholds.esp",
+   "sha256": "4a385ad880e5255dcf78a4b1ff12afd80b16cd42b8828d189dd6b35562379463",
+   "size": 71023
+  },
+  {
+   "name": "ElysiumEstate.esp",
+   "sha256": "cd8c90917aa1e38597bb79882c1ec4196ba41695672492ad1dc683bec5e8c20e",
+   "size": 956423
+  },
+  {
+   "name": "Triumvirate - Mage Archetypes.esp",
+   "sha256": "34bffbb81ed640806b348d5fd1ac1d03f8b3cb2dc5a4fa78e54a77fc7c3451b2",
+   "size": 804064
+  },
+  {
+   "name": "Apocalypse - Magic of Skyrim.esp",
+   "sha256": "b0a9632372f2117f7d96583e1522b42758f414129d3572f848b8f7ac65681384",
+   "size": 1446114
+  },
+  {
+   "name": "RaceMenu.esp",
+   "sha256": "e949d05f1a0bbef5fe090ff85e276afab021276980cb49fc75926e17822aed37",
+   "size": 578
+  },
+  {
+   "name": "RaceMenuPlugin.esp",
+   "sha256": "d36cd31e2472c1278d4ae9b7f2de89a305a4704b0838a0c89328431e739457de",
+   "size": 328
+  },
+  {
+   "name": "CommonClothes.esp",
+   "sha256": "f3f30b811401f4839a05b0e3a3164775cb57e074e179b68caf2806648de8a413",
+   "size": 105651
+  },
+  {
+   "name": "Cloaks&Capes.esp",
+   "sha256": "dbc1aa28ba652c01d7be983473c2c95cd0e0a1203b11212824a39cc2c6b1cbfe",
+   "size": 36316
+  },
+  {
+   "name": "XPMSE.esp",
+   "sha256": "a6379982646aaf634912b2d1eadb2bcb592dc312c22d06d9e39df1485b72efe1",
+   "size": 1704
+  },
+  {
+   "name": "UIExtensions.esp",
+   "sha256": "f0d0ee6faf02518f67417cff8b338008d66c85f0bfd053d08c3594e5856d3fcc",
+   "size": 1143
+  },
+  {
+   "name": "chfshVariousActions.esp",
+   "sha256": "68fca73ea1f2ff3938931227d3e743610a4e92f32d450fe5a7e6443491da7359",
+   "size": 19904
+  },
+  {
+   "name": "DeadlySpellImpacts.esp",
+   "sha256": "90cd582950a6bb9f06c8e868b3e9ac293b69ead98ee62fdb060aa9a07f7bda26",
+   "size": 22763
+  },
+  {
+   "name": "Cathedral Weathers.esp",
+   "sha256": "c7f27ceb0f20923bfe7396ab6cee0d9021b2f84554cef88a26b96f771a146070",
+   "size": 427522
+  },
+  {
+   "name": "FishingInSkyrim.esp",
+   "sha256": "61f7a959e95c5eee6a86d86b2670522f6442ae0b601ed4ebe4baebb0b37b27df",
+   "size": 85303
+  },
+  {
+   "name": "Populated Cities Towns Villages Legendary.esp",
+   "sha256": "bca3715242f4188566cd65764f494f707bb158ff4b883d4d02656f60b0ad6fb8",
+   "size": 2065137
+  },
+  {
+   "name": "SkyrimSewers.esp",
+   "sha256": "2d2d3e1b78e32affc5b1979c0a165ba15cdcd6c21228ac9600ad030a8c76a47d",
+   "size": 1607107
+  },
+  {
+   "name": "Solitude Arena.esp",
+   "sha256": "8a4587ee0bf339493522459120b91a05f60f16b38211baed01a848a1f44fcae3",
+   "size": 997386
+  },
+  {
+   "name": "ZIA_Complete Pack.esp",
+   "sha256": "b5c7f6cc2c4d4c9f2ef71648c6673f935f773f060ed8420d2a20aebbf7afaf3d",
+   "size": 339009
+  },
+  {
+   "name": "CFTO.esp",
+   "sha256": "17581b6a701a90f0f8de71ab893b7d24f0baa39e8b35b9522df5fdc254b6710d",
+   "size": 308797
+  },
+  {
+   "name": "Arena - Markarth Side.esp",
+   "sha256": "07a234e56d7c3e05b8ab976e5bc8e5f92642b9b8566be6f5e946fcec5d0ac395",
+   "size": 886405
+  },
+  {
+   "name": "Immersive Weapons.esp",
+   "sha256": "bc084ae9f523c167eea11d1d7363314250b8fe7e7912607f58292e91e788e3c7",
+   "size": 408425
+  },
+  {
+   "name": "DIS_Heavy_Legion.esp",
+   "sha256": "728a6a6ea1dd369469068f19db97f14fee07d2e72864d7acdc3343f29a6a0d37",
+   "size": 113640
+  },
+  {
+   "name": "OarsRest.esp",
+   "sha256": "9b46a0882e34f4ee2bff4e87afa747d9a5aca141e032b46bd90776d043d77aaf",
+   "size": 415931
+  },
+  {
+   "name": "North Keep.esp",
+   "sha256": "f3cf4a95e722fb04d86546fadffb7d094cc9106c56e410d4773be88747a3621d",
+   "size": 618213
+  },
+  {
+   "name": "Immersive Patrols II.esp",
+   "sha256": "3b4758ed23fd0c195b9426f6e226ea66866da51c7f8edecab6af8b6007ff5e16",
+   "size": 151863
+  },
+  {
+   "name": "AHZmoreHUD.esp",
+   "sha256": "0e277c6b81bb41dfaeb5a460fe71dd9b1e75a2d4d4bad93c7c67b8b553684efd",
+   "size": 6116
+  },
+  {
+   "name": "HappyLittleTrees.esp",
+   "sha256": "32a365a02e137c080957bb323fc25d91e8fd4fa0a7166a259bd320d3ea2b3d4f",
+   "size": 15513
+  },
+  {
+   "name": "BetterContainerControls.esp",
+   "sha256": "a2f3794fc32de2469572e069923efc0d1b208e6b234faa22334c81d5465254d3",
+   "size": 322
+  },
+  {
+   "name": "GourmetTables.esp",
+   "sha256": "c834a5eb7511ddfc0437565b136ea58bd5201ef9abf5ca3b496cca3a9720f48f",
+   "size": 17849
+  },
+  {
+   "name": "Embers XD - Fire Magick Add-On.esp",
+   "sha256": "f3216628bb4967dafc83c63fcf1642e72d2d90728699a5fc466f1149c9963092",
+   "size": 8632
+  },
+  {
+   "name": "Embers XD - Patch - Capital Windhelm Expansion.esp",
+   "sha256": "ba16ac4849ff7fbb32c5b297a643423612ad2081d5901147e8fcf2002f819de6",
+   "size": 6999
+  },
+  {
+   "name": "Embers XD - Patch - Gourmet Tables.esp",
+   "sha256": "075b6c44a17822139c7b29918d4290014f9bb33dce2b1b97f23e08eb8afe510a",
+   "size": 6000
+  },
+  {
+   "name": "MoreCraftableEquipment_CloaksandCapes.esp",
+   "sha256": "d75366385d6be8a69877cdc19473f06091ac27178bb28dcdd288a5e56d561363",
+   "size": 9103
+  },
+  {
+   "name": "MCMHelper.esp",
+   "sha256": "5f9dad2ca8896ad2ad0c8ade678dc684f005c62d54dd6e9bcd7efe1b0fc7f7fc",
+   "size": 100
+  },
+  {
+   "name": "SkyHUD.esp",
+   "sha256": "bde0b0ee8d647669c7758d3c3ebb7f1e0220fd544a2c49638c1ffc2c92b6dcca",
+   "size": 333
+  },
+  {
+   "name": "PlayFluteLuteDrum.esp",
+   "sha256": "276ddf6f9baeda807e7a82b1341e6ba0d6a8515d749ce1b42ff8c1572d4ade00",
+   "size": 17808
+  },
+  {
+   "name": "Skyrim Unbound Addon - Blackreach Laboratory.esp",
+   "sha256": "6b9840b59b81a49ba06b37664d5451896bdd48373e0fc5ec581fc22ec5e529f0",
+   "size": 1325
+  },
+  {
+   "name": "CFTO-JK-Patch.esp",
+   "sha256": "b3e710c0e575bd0e406157ed3d9ff8e6afe08ba29221e16623efd08cb22c7031",
+   "size": 53631
+  },
+  {
+   "name": "YokuWeapons.esp",
+   "sha256": "ea8babc415473f21e91f6de3868e06deb4677b44b6261cda9f2fecef87ce42bb",
+   "size": 211479
+  },
+  {
+   "name": "CFTO-Lanterns.esp",
+   "sha256": "31f02c5de531a2a2607d38dda5c95c594374cb6349c765708d660d335667ee84",
+   "size": 55992
+  },
+  {
+   "name": "CFTO-CoveredCarriages.esp",
+   "sha256": "79f4d5667ccd3cdae309b72f549ad9fdeb6a10adcf748b4d24f9fdaf64376bd8",
+   "size": 52462
+  },
+  {
+   "name": "Skyrim Unbound Addon - Meeko's Shack.esp",
+   "sha256": "f053120b60cc8716c85408b58eb43af5cde8421c0c8fb964100653b68e00975c",
+   "size": 48202
+  },
+  {
+   "name": "AwBaldandShavedHair.esp",
+   "sha256": "8a9ca8843e8fe3f3dbe58c2ac5e6a04b222b21f94b50867aacce9016ecf0645a",
+   "size": 2701
+  },
+  {
+   "name": "BetterThirdPersonSelection.esp",
+   "sha256": "ee71a4609f67a007e2fb038e90b448197a2f5949bf817d9409c8377b40658d8e",
+   "size": 413
+  },
+  {
+   "name": "HammerHair.esp",
+   "sha256": "cb9ee383388dcbf147a87c9f6d132f29ac94dfe723a3ff5f4eeeac076c0e21bf",
+   "size": 62849
+  },
+  {
+   "name": "McmRecorder.esp",
+   "sha256": "c6f0249c6dfb9e550901529786dcdde4f03b856bedea03ec8b17df0cb3089cf9",
+   "size": 1903
+  },
+  {
+   "name": "RaceMenuMorphsHIMBO.esp",
+   "sha256": "8fb650a1617b743ef9f5058f558e2ecce093ac5290a2f63de9e69121bff9243b",
+   "size": 375
+  },
+  {
+   "name": "QuickLootIE.esp",
+   "sha256": "2675d895dbe0a76b0da9c4c2748fb83972410eec50c73a75c1dc1faeaa8a89e4",
+   "size": 527
+  },
+  {
+   "name": "KhisartinBeards.esp",
+   "sha256": "cbc58accb84f733c7b193889d52186406049ba50d468fafb2484d6c8889618a9",
+   "size": 29846
+  },
+  {
+   "name": "IA CBBE Patch.esp",
+   "sha256": "e3e5ccce4144270a17da1209d13f232d0f88dcc9d009b9f2facb9a510b9c9919",
+   "size": 66938
+  },
+  {
+   "name": "Hothtrooper44_Armor_Ecksstra.esp",
+   "sha256": "db0d748fad5258686aa65d2f598a9545c26ea80aac3a11cab68d891bd3c30637",
+   "size": 171
+  },
+  {
+   "name": "TrueDirectionalMovement.esp",
+   "sha256": "deb6707f859ef41f37ab2c4e124143ffe9cb0416a175d604be683f99386acccf",
+   "size": 1248
+  },
+  {
+   "name": "AZ_IADistribution.esp",
+   "sha256": "240082085b0d2db8369c28c8e2f94601946f6a493d45530b31774d450af0296c",
+   "size": 43802
+  },
+  {
+   "name": "Precision.esp",
+   "sha256": "48bea576dadadb93f3af3701baf634e870fc4e0ce6c6ee94fa5f2072d2520790",
+   "size": 783
+  },
+  {
+   "name": "BeardMaskFix.esp",
+   "sha256": "a3566fdf94acc82695809e80cfc06289bf0a3bfe9c87b64e594d9fb998e902db",
+   "size": 3853
+  },
+  {
+   "name": "3BBB.esp",
+   "sha256": "ce4f554616458a10b4809f705828f9d3e3e2d1457abe73ee32fe5f8f044a8549",
+   "size": 20257
+  },
+  {
+   "name": "Skyrim Unbound.esp",
+   "sha256": "aed19403857a5efddefde0b05b1f9cbf90fd0ef3f7a00ebd758258ccbc7e6a77",
+   "size": 546655
+  },
+  {
+   "name": "Skyrim Unbound - Capital Windhelm Expansion Patch.esp",
+   "sha256": "1b28552c12ef3e73a18cc51acd1c641ae634e4e43a990bf05937b71cda665fdd",
+   "size": 3045
+  },
+  {
+   "name": "Skyrim Unbound - GDO Patch.esp",
+   "sha256": "0f6c8d4153eaef864f8104ec9cc7926d2f9a4008d72f255699421fdcb6562cb6",
+   "size": 47370
+  },
+  {
+   "name": "Skyrim Unbound Addon - Thalmor.esp",
+   "sha256": "5a1d24a702316d887e48f2a0f6ed33ceda3c581ea94d56a906abc291a1367d04",
+   "size": 5452
+  },
+  {
+   "name": "atlas map markers.esp",
+   "sha256": "e93c675baa5ed7d0825afc697209616d769d480d324d24e6e2d362ee8c6d4361",
+   "size": 305094
+  },
+  {
+   "name": "Water for ENB (Shades of Skyrim).esp",
+   "sha256": "63e0893556515f8ebbf36b4199ebee1a441c9b8ed092a06551e315e6cc284204",
+   "size": 372774
+  },
+  {
+   "name": "Water for ENB - Patch - Generic Landscape Patch.esp",
+   "sha256": "d535e088e0b2996ccc76832323476a87281e178e4aa10c567250402fc4b7562e",
+   "size": 133302
+  },
+  {
+   "name": "Playable Rieklings.esp",
+   "sha256": "f550ebbc44bb4b39f27cea379da2254bc31b06ddcaea1133877e2b0b86135ee1",
+   "size": 468573
+  }
+ ],
+ "builtBy": "scripts/dev/Build-StationSites.py",
+ "decided": "Patrick, 16 October 2026, A on #2553: Thornswood measures its own spots for the kilns, salt quarries, beehives and alchemy labs, the way the woodworking benches were placed, and the content plugin places them.",
+ "issue": 2553,
+ "kinds": {
+  "hive": {
+   "amongPlants": false,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "bounds": [
+    -115,
+    -115,
+    -19,
+    115,
+    115,
+    275
+   ],
+   "count": 12,
+   "edid": "ThornswoodFloraBeehive",
+   "flat": 40.0,
+   "name": "beehive",
+   "reach": 1200,
+   "rule": "One at each of Skyrim's own named farms that has at least 5 crop plots of the farmer's table within 2,400 units, the farm claim's circle, of the farm's point: its map marker, or the farmhouse's outside door where that marker is inside the house. It stands beside the crop plot nearest that point. A placed hive is a farmer verb (farmer.md).",
+   "setIntoRock": false,
+   "user": [
+    -35.0,
+    -180.0,
+    35.0,
+    -115.0
+   ]
+  },
+  "kiln": {
+   "amongPlants": true,
+   "base": "1547e:Thornswood-Content.esp",
+   "bounds": [
+    -229,
+    -149,
+    -34,
+    212,
+    305,
+    254
+   ],
+   "count": 5,
+   "edid": "ThornswoodCraftingCharcoalKilnMarker",
+   "flat": 48.0,
+   "name": "charcoal kiln",
+   "reach": 1600,
+   "rule": "One for each of the nine towns with a woodworking bench, outside the town: beside the chopping block in the open world nearest that town's forge, among those 1,000 units or more from every bench (#2337), within 12,000 units of the forge, or 20,000 for Solitude and Markarth, whose nearest blocks are at Katla's Farm and Salvius Farm. It may stand among small plants, the way Skyrim's smelters do (Patrick, B on #2553). The kiln turns the firewood split at a chopping block into the charcoal every forge burns (charburner.md, smith.md).",
+   "setIntoRock": false,
+   "user": [
+    -35.0,
+    -230.0,
+    35.0,
+    8.0
+   ]
+  },
+  "lab": {
+   "amongPlants": false,
+   "base": "42e69:Thornswood-Content.esp",
+   "bounds": [
+    -60,
+    -10,
+    -34,
+    60,
+    123,
+    112
+   ],
+   "count": 8,
+   "edid": "ThornswoodCraftingAlchemyWorkbench",
+   "flat": 8.0,
+   "name": "alchemy lab",
+   "reach": 900,
+   "rule": "One in the apothecary of each of the nine hold capitals, the shop Skyrim marks as a store that holds Skyrim's own alchemy lab, beside that lab; Winterhold has no apothecary in town, so the College's Hall of Countenance. The poultice and the remedy are made only at Thornswood's lab (physicker.md, injury.md).",
+   "setIntoRock": false,
+   "user": [
+    -35.0,
+    -55.0,
+    35.0,
+    8.0
+   ]
+  },
+  "salt": {
+   "amongPlants": false,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "bounds": [
+    -178,
+    -236,
+    -16,
+    151,
+    265,
+    8
+   ],
+   "count": 4,
+   "edid": "ThornswoodFurnitureSaltMine",
+   "flat": 32.0,
+   "name": "salt quarry",
+   "reach": 1600,
+   "rule": "One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, Winterhold), beside the boat drawn up nearest the town: its forge, or Winterhold's smithing anvil. The quarry is an ore vein, so it is set into rock the way Skyrim's veins are: only the place the miner stands needs clear, dry, flat ground, and the vein lies on ground no lower than its underside or inside a rock or cliff (Patrick, B on #2553). Salt comes from the sea (miner.md, the salt quarry).",
+   "setIntoRock": true,
+   "user": [
+    -35.0,
+    -300.0,
+    35.0,
+    -236.0
+   ]
+  }
+ },
+ "leftOut": {
+  "FalkreathLodsHouseLocation": "Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots within 2,400 units of its door: a smith's yard, not a field."
+ },
+ "measure": "Each station stands at the nearest clear spot to its anchor, tried every step units out to its reach in eight turns of the anchor's angle, a turn costing 60 units. Its outline and its user's place lie on the navmesh, on ground flat to the kind's flat and within 60 units of the anchor's height, out of doors above the water, and touch no furniture, container, door, item, plant or static under 250 by 250, nor where anybody stands at other furniture, the way through a door, a woodworking bench, a notice board, or another station, from 6 to 140 units above the floor, with 30 units to the nearest solid thing. A kiln stands 1000 units or more from every woodworking bench. A kiln may stand among small plants, and a salt vein is set into rock: only its miner's place needs the ground (Patrick, B on #2553). The cell and worldspace records the plugin carries are Bethesda's and change nothing in the game.",
+ "readFrom": "game/data/last-plugin.json loadOrder, the collection's bytes; from Thornswood-Content.esp only its four station records; Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp place nothing",
+ "sites": {
+  "hive-brandymug": {
+   "anchor": "28c4b:Skyrim.esm",
+   "anchorAngle": 338.51,
+   "anchorAt": [
+    140690.7,
+    25498.6,
+    -12851.4
+   ],
+   "anchorEdid": "TreeFloraWheat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 338.51,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "b4fb:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "BrandyMugFarmExterior",
+   "farm": "18c8f:Skyrim.esm",
+   "fromAnchor": 272,
+   "groundUnder": [
+    -12879.1,
+    -12847.3
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "TreeFloraWheat01",
+    "ref": "28c44:Skyrim.esm",
+    "units": 90
+   },
+   "offset": [
+    -16,
+    272
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 8,
+   "point": "16339:Skyrim.esm",
+   "pos": [
+    140576.2,
+    25745.9,
+    -12879.1
+   ],
+   "ref": "15521:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Brandy-Mug Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-chillfurrow": {
+   "anchor": "14108a:JK's Whiterun's Outskirts.esp",
+   "anchorAngle": 19.77,
+   "anchorAt": [
+    33035.5,
+    -10506.4,
+    -4250.7
+   ],
+   "anchorEdid": "XJKWOTreeAppleRed",
+   "anchorRecordFrom": "JK's Whiterun's Outskirts.esp",
+   "anchorTouchedBy": [
+    "JK's Whiterun's Outskirts.esp"
+   ],
+   "angle": 19.77,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9617:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "",
+   "farm": "18c90:Skyrim.esm",
+   "fromAnchor": 439,
+   "groundUnder": [
+    -4289.9,
+    -4251.5
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "XJKWOTreeAppleRed",
+    "ref": "14108a:JK's Whiterun's Outskirts.esp",
+    "units": 286
+   },
+   "offset": [
+    -80,
+    -432
+   ],
+   "passedOver": [
+    {
+     "anchor": "141078:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (5335 its ground is more than # from the anchor's height; 4423 touches TreeYellowShrub02; 2671 off the navmesh; 2667 touches TreeThicket01)"
+    },
+    {
+     "anchor": "141083:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (11525 its ground is more than # from the anchor's height; 3280 touches TreeFloraCabbage01; 2396 touches TreeThicket01; 2275 touches TreeYellowShrub02)"
+    },
+    {
+     "anchor": "c8e48:Skyrim.esm",
+     "why": "no clear spot within 1200 units (5321 touches TreeFloraWheat01; 5228 touches TreeThicket01; 3928 its ground is more than # from the anchor's height; 3467 touches WRFenceStrGate01Door01, its way through)"
+    },
+    {
+     "anchor": "141080:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (12085 its ground is more than # from the anchor's height; 2529 touches TreeThicket01; 2245 touches XJKWOTreeAppleRed; 2060 the ground runs # to #)"
+    },
+    {
+     "anchor": "a89c1:Skyrim.esm",
+     "why": "no clear spot within 1200 units (8158 its ground is more than # from the anchor's height; 3088 touches TreeYellowShrub02; 2722 touches TreeThicket01; 2626 off the navmesh)"
+    },
+    {
+     "anchor": "141089:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (17710 its ground is more than # from the anchor's height; 3574 off the navmesh; 2408 touches TreeThicket01; 1628 touches TreeFloraCabbage01)"
+    },
+    {
+     "anchor": "c8e46:Skyrim.esm",
+     "why": "no clear spot within 1200 units (7695 its cell 9618:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 5001 touches TreeFloraWheat01; 3745 touches TreeThicket01; 3448 its ground is more than # from the anchor's height)"
+    }
+   ],
+   "plotsWithin2400": 49,
+   "point": "1633c:Skyrim.esm",
+   "pos": [
+    32814.1,
+    -10885.9,
+    -4289.9
+   ],
+   "ref": "15522:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Chillfurrow Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-corpselight": {
+   "anchor": "23f00:JKs Skyrim.esp",
+   "anchorAngle": 238.89,
+   "anchorAt": [
+    -31849.0,
+    -85615.7,
+    -3141.2
+   ],
+   "anchorEdid": "TreeFloraCabbage01",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "JKs Skyrim.esp"
+   ],
+   "angle": 238.89,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9c80:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "FalkreathExterior01",
+   "farm": "200bd:Skyrim.esm",
+   "fromAnchor": 1152,
+   "groundUnder": [
+    -3175.2,
+    -3154.3
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "TreeThicket01",
+    "ref": "9cacb:Skyrim.esm",
+    "units": 37
+   },
+   "offset": [
+    -496,
+    1040
+   ],
+   "passedOver": [
+    {
+     "anchor": "eea01:Skyrim.esm",
+     "why": "no clear spot within 1200 units (10998 touches TreeThicket01; 3861 off the navmesh; 3491 touches TreeFloraPotatoPlant01; 3246 its ground is more than # from the anchor's height)"
+    }
+   ],
+   "plotsWithin2400": 44,
+   "point": "1776a:Skyrim.esm",
+   "pos": [
+    -32483.1,
+    -86577.7,
+    -3175.2
+   ],
+   "ref": "15524:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Corpselight Farm, Falkreath",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-cowflop": {
+   "anchor": "24942:JKs Skyrim.esp",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    -82137.7,
+    6368.7,
+    -4549.6
+   ],
+   "anchorEdid": "XJKappleGreentree",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "JKs Skyrim.esp"
+   ],
+   "angle": 135.0,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9597:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RoriksteadExterior03",
+   "farm": "1f882:Skyrim.esm",
+   "fromAnchor": 1133,
+   "groundUnder": [
+    -4607.8,
+    -4576.5
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "TreeThicket01",
+    "ref": "f6048:Skyrim.esm",
+    "units": 30
+   },
+   "offset": [
+    -848,
+    -752
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 134,
+   "point": "177cf:Skyrim.esm",
+   "pos": [
+    -82985.7,
+    5616.7,
+    -4607.8
+   ],
+   "ref": "1552b:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 135,
+   "where": "Cowflop Farm, Rorikstead",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-hlaalu": {
+   "anchor": "2ac54:Skyrim.esm",
+   "anchorAngle": 199.57,
+   "anchorAt": [
+    147378.8,
+    33117.0,
+    -13602.4
+   ],
+   "anchorEdid": "TreeFloraWheat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 199.57,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "b4d9:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "",
+   "farm": "18e35:Skyrim.esm",
+   "fromAnchor": 432,
+   "groundUnder": [
+    -13608.0,
+    -13600.4
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "TreeFloraWheat01",
+    "ref": "2ac52:Skyrim.esm",
+    "units": 44
+   },
+   "offset": [
+    16,
+    432
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 6,
+   "point": "16355:Skyrim.esm",
+   "pos": [
+    147219.0,
+    32715.3,
+    -13608.0
+   ],
+   "ref": "15525:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Hlaalu Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-hollyfrost": {
+   "anchor": "2ae40:Skyrim.esm",
+   "anchorAngle": 199.1,
+   "anchorAt": [
+    149772.1,
+    34383.3,
+    -13324.3
+   ],
+   "anchorEdid": "TreeFloraWheat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 199.1,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "b4b7:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "HollyfrostFarmExterior",
+   "farm": "18e36:Skyrim.esm",
+   "fromAnchor": 439,
+   "groundUnder": [
+    -13320.0,
+    -13319.2
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "FenceWoven01Snow",
+    "ref": "4f0e1:Skyrim.esm",
+    "units": 37
+   },
+   "offset": [
+    432,
+    -80
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 11,
+   "point": "16358:Skyrim.esm",
+   "pos": [
+    149390.1,
+    34600.3,
+    -13320.0
+   ],
+   "ref": "15526:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Hollyfrost Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-katla": {
+   "anchor": "b770c:Skyrim.esm",
+   "anchorAngle": 115.87,
+   "anchorAt": [
+    -75102.9,
+    96273.6,
+    -11461.6
+   ],
+   "anchorEdid": "TreeFloraCabbage01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 115.87,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "92bf:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by YokuWeapons.esp, so the copy never wins",
+   "cellEdid": "KatlasFarmExterior",
+   "farm": "18e38:Skyrim.esm",
+   "fromAnchor": 272,
+   "groundUnder": [
+    -11481.3,
+    -11461.1
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "FenceWoven02",
+    "ref": "b76fe:Skyrim.esm",
+    "units": 36
+   },
+   "offset": [
+    -208,
+    176
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 42,
+   "point": "1635e:Skyrim.esm",
+   "pos": [
+    -74853.8,
+    96383.9,
+    -11481.3
+   ],
+   "ref": "15527:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Katla's Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-lemkil": {
+   "anchor": "2493c:JKs Skyrim.esp",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    -84294.6,
+    5573.0,
+    -4245.8
+   ],
+   "anchorEdid": "XJKcarrotplantflora",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "JKs Skyrim.esp"
+   ],
+   "angle": 0.0,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9597:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RoriksteadExterior03",
+   "farm": "1f884:Skyrim.esm",
+   "fromAnchor": 280,
+   "groundUnder": [
+    -4272.1,
+    -4236.2
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "XJKcarrotplantflora",
+    "ref": "2493b:JKs Skyrim.esp",
+    "units": 31
+   },
+   "offset": [
+    240,
+    144
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 54,
+   "point": "177cd:Skyrim.esm",
+   "pos": [
+    -84054.6,
+    5717.0,
+    -4272.1
+   ],
+   "ref": "1552c:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Lemkil's Farm, Rorikstead",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-loreius": {
+   "anchor": "c0790:Skyrim.esm",
+   "anchorAngle": 61.07,
+   "anchorAt": [
+    32230.4,
+    26499.3,
+    -6699.7
+   ],
+   "anchorEdid": "TreeFloraWheat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 61.07,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "9102:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "LoreiusFarmExterior",
+   "farm": "18e3b:Skyrim.esm",
+   "fromAnchor": 437,
+   "groundUnder": [
+    -6715.2,
+    -6675.9
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "FenceWoven01",
+    "ref": "c075a:Skyrim.esm",
+    "units": 53
+   },
+   "offset": [
+    400,
+    -176
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 45,
+   "point": "284c7:Skyrim.esm",
+   "pos": [
+    32269.8,
+    26064.1,
+    -6715.2
+   ],
+   "ref": "15528:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Loreius Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-pelagia": {
+   "anchor": "14b2e7:JK's Whiterun's Outskirts.esp",
+   "anchorAngle": 242.15,
+   "anchorAt": [
+    19726.2,
+    -16711.7,
+    -4523.5
+   ],
+   "anchorEdid": "XJKWOTreeFloraTomatoPlant01",
+   "anchorRecordFrom": "JK's Whiterun's Outskirts.esp",
+   "anchorTouchedBy": [
+    "JK's Whiterun's Outskirts.esp"
+   ],
+   "angle": 287.15,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "963a:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins",
+   "cellEdid": "WhiterunExterior16",
+   "farm": "18e3f:Skyrim.esm",
+   "fromAnchor": 496,
+   "groundUnder": [
+    -4575.0,
+    -4541.1
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "WRFenceBaseSupport01",
+    "ref": "14b2c0:JK's Whiterun's Outskirts.esp",
+    "units": 50
+   },
+   "offset": [
+    464,
+    176
+   ],
+   "passedOver": [],
+   "plotsWithin2400": 123,
+   "point": "16373:Skyrim.esm",
+   "pos": [
+    19353.8,
+    -16383.6,
+    -4575.0
+   ],
+   "ref": "1552a:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 45,
+   "where": "Pelagia Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-salvius": {
+   "anchor": "37e:JK's Markarth Outskirts.esp",
+   "anchorAngle": 301.45,
+   "anchorAt": [
+    -164143.7,
+    4759.2,
+    -4522.3
+   ],
+   "anchorEdid": "TreeFloraPotatoPlant01",
+   "anchorRecordFrom": "JK's Markarth Outskirts.esp",
+   "anchorTouchedBy": [
+    "JK's Markarth Outskirts.esp"
+   ],
+   "angle": 301.45,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "75ab:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "LeftHandMineExterior02",
+   "farm": "18e40:Skyrim.esm",
+   "fromAnchor": 780,
+   "groundUnder": [
+    -4553.9,
+    -4540.0
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "DweCivWarWallEndpost01",
+    "ref": "969d0:Skyrim.esm",
+    "units": 42
+   },
+   "offset": [
+    -752,
+    -208
+   ],
+   "passedOver": [
+    {
+     "anchor": "38b:JK's Markarth Outskirts.esp",
+     "why": "no clear spot within 1200 units (7260 touches TreeFloraPotatoPlant01; 3773 touches FenceWoven01; 2537 off the navmesh; 2500 touches ImpStableGate01, its way through)"
+    },
+    {
+     "anchor": "3c1:JK's Markarth Outskirts.esp",
+     "why": "no clear spot within 1200 units (6202 touches DweCivWarWall01; 4312 touches FenceWoven01; 3564 off the navmesh; 2986 touches TreeReachFern03)"
+    },
+    {
+     "anchor": "38f:JK's Markarth Outskirts.esp",
+     "why": "no clear spot within 1200 units (8197 off the navmesh; 7300 touches TreeFloraPotatoPlant01; 2851 touches FenceWoven01; 2065 touches RockPileS01Rocks01)"
+    },
+    {
+     "anchor": "3bd:JK's Markarth Outskirts.esp",
+     "why": "no clear spot within 1200 units (6440 off the navmesh; 5359 touches DweCivWarWall01; 4391 touches FenceWoven01; 2604 its ground is more than # from the anchor's height)"
+    }
+   ],
+   "plotsWithin2400": 98,
+   "point": "20521:Skyrim.esm",
+   "pos": [
+    -164358.7,
+    4009.2,
+    -4553.9
+   ],
+   "ref": "1552d:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Salvius Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "hive-snowshod": {
+   "anchor": "c5230:Skyrim.esm",
+   "anchorAngle": 121.35,
+   "anchorAt": [
+    166999.1,
+    -106908.2,
+    11163.7
+   ],
+   "anchorEdid": "TreeGourdCluster01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 211.35,
+   "base": "dbf8b3:Thornswood-Content.esp",
+   "cell": "bd14:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "SnowShodFarmExterior",
+   "farm": "18e43:Skyrim.esm",
+   "fromAnchor": 766,
+   "groundUnder": [
+    11104.0,
+    11135.1
+   ],
+   "interior": false,
+   "kind": "hive",
+   "nearest": {
+    "edid": "TreeYellowShrub02",
+    "ref": "b1509:Skyrim.esm",
+    "units": 248
+   },
+   "offset": [
+    -688,
+    336
+   ],
+   "passedOver": [
+    {
+     "anchor": "a99:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1200 units (10242 touches FenceWoven01; 1977 touches XJKRiftOouthouse02; 1681 touches TreeFloraWheat01; 1654 touches TreeSwordFernCluster02)"
+    },
+    {
+     "anchor": "eea7b:Skyrim.esm",
+     "why": "no clear spot within 1200 units (10533 touches FenceWoven01; 3942 its ground is more than # from the anchor's height; 2624 the ground runs # to #; 2012 off the navmesh)"
+    },
+    {
+     "anchor": "eea74:Skyrim.esm",
+     "why": "no clear spot within 1200 units (10484 touches FenceWoven01; 6190 its ground is more than # from the anchor's height; 2564 the ground runs # to #; 2298 off the navmesh)"
+    },
+    {
+     "anchor": "af2:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1200 units (8321 touches FenceWoven01; 5971 its ground is more than # from the anchor's height; 4378 the ground runs # to #; 3587 off the navmesh)"
+    },
+    {
+     "anchor": "eea80:Skyrim.esm",
+     "why": "no clear spot within 1200 units (10050 touches FenceWoven01; 8996 its ground is more than # from the anchor's height; 3760 the ground runs # to #; 3613 off the navmesh)"
+    },
+    {
+     "anchor": "eea71:Skyrim.esm",
+     "why": "no clear spot within 1200 units (9067 touches FenceWoven01; 8399 its ground is more than # from the anchor's height; 6228 the ground runs # to #; 3274 off the navmesh)"
+    }
+   ],
+   "plotsWithin2400": 52,
+   "point": "1634a:Skyrim.esm",
+   "pos": [
+    167644.0,
+    -106495.5,
+    11104.0
+   ],
+   "ref": "1552f:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 90,
+   "where": "Snow-Shod Farm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "kiln-dawnstar": {
+   "anchor": "1528:JKs Skyrim.esp",
+   "anchorAngle": 359.53,
+   "anchorAt": [
+    28365.7,
+    102114.6,
+    -13287.9
+   ],
+   "anchorEdid": "WoodChoppingBlockSnow",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "JKs Skyrim.esp"
+   ],
+   "angle": 269.53,
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "8eb5:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO-JK-Patch.esp, so the copy never wins",
+   "cellEdid": "Dawnstar03Exterior",
+   "fromAnchor": 592,
+   "groundUnder": [
+    -13328.3,
+    -13290.2
+   ],
+   "interior": false,
+   "kind": "kiln",
+   "nearest": {
+    "edid": "WalkwayStairs4Snow",
+    "ref": "d681c:Skyrim.esm",
+    "units": 44
+   },
+   "offset": [
+    368,
+    464
+   ],
+   "passedOver": [],
+   "point": "cadf6:Skyrim.esm",
+   "pos": [
+    28729.9,
+    102581.6,
+    -13328.3
+   ],
+   "ref": "15506:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 270,
+   "where": "Dawnstar",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "kiln-morthal": {
+   "anchor": "b9c21:Skyrim.esm",
+   "anchorAngle": 148.97,
+   "anchorAt": [
+    -38680.3,
+    70696.3,
+    -13879.8
+   ],
+   "anchorEdid": "WoodChoppingBlock",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 283.97,
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "937c:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "MorthalExterior05",
+   "fromAnchor": 387,
+   "groundUnder": [
+    -13902.7,
+    -13855.6
+   ],
+   "interior": false,
+   "kind": "kiln",
+   "nearest": {
+    "edid": "WoodPile",
+    "ref": "e7f41:Skyrim.esm",
+    "units": 34
+   },
+   "offset": [
+    -160,
+    -352
+   ],
+   "passedOver": [],
+   "point": "24588:JKs Skyrim.esp",
+   "pos": [
+    -38724.7,
+    71080.4,
+    -13902.7
+   ],
+   "ref": "15507:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 135,
+   "where": "Morthal",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "kiln-riverwood": {
+   "anchor": "6c3c9:Skyrim.esm",
+   "anchorAngle": 314.17,
+   "anchorAt": [
+    18338.8,
+    -45179.9,
+    -108.8
+   ],
+   "anchorEdid": "WoodChoppingBlock",
+   "anchorRecordFrom": "Populated Cities Towns Villages Legendary.esp",
+   "anchorTouchedBy": [
+    "Skyrim.esm",
+    "Populated Cities Towns Villages Legendary.esp"
+   ],
+   "angle": 44.17,
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "9732:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "Riverwood",
+   "fromAnchor": 382,
+   "groundUnder": [
+    -122.5,
+    -97.8
+   ],
+   "interior": false,
+   "kind": "kiln",
+   "nearest": {
+    "edid": "TreePineForestCutLog01",
+    "ref": "1f206:Skyrim.esm",
+    "units": 39
+   },
+   "offset": [
+    320,
+    -208
+   ],
+   "passedOver": [],
+   "point": "d6987:Skyrim.esm",
+   "pos": [
+    18711.0,
+    -45095.3,
+    -122.5
+   ],
+   "ref": "15508:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 90,
+   "where": "Riverwood",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "kiln-whiterun": {
+   "anchor": "56f04:JK's Whiterun's Outskirts.esp",
+   "anchorAngle": 266.61,
+   "anchorAt": [
+    13433.5,
+    -10870.4,
+    -4718.1
+   ],
+   "anchorEdid": "WoodChoppingBlock",
+   "anchorRecordFrom": "JK's Whiterun's Outskirts.esp",
+   "anchorTouchedBy": [
+    "JK's Whiterun's Outskirts.esp"
+   ],
+   "angle": 266.61,
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "961c:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins",
+   "cellEdid": "WhiterunExterior14",
+   "fromAnchor": 945,
+   "groundUnder": [
+    -4737.7,
+    -4696.5
+   ],
+   "interior": false,
+   "kind": "kiln",
+   "nearest": {
+    "edid": "WRWallCap01",
+    "ref": "fbf0:JK's Whiterun's Outskirts.esp",
+    "units": 71
+   },
+   "offset": [
+    944,
+    32
+   ],
+   "passedOver": [],
+   "point": "c430a:Skyrim.esm",
+   "pos": [
+    13345.7,
+    -9930.0,
+    -4737.7
+   ],
+   "ref": "15500:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Whiterun",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "kiln-windhelm": {
+   "anchor": "c7fd5:Skyrim.esm",
+   "anchorAngle": 17.19,
+   "anchorAt": [
+    136011.0,
+    25814.2,
+    -12751.8
+   ],
+   "anchorEdid": "WoodChoppingBlock",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 17.19,
+   "base": "1547e:Thornswood-Content.esp",
+   "cell": "b4fc:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO-CoveredCarriages.esp, so the copy never wins",
+   "cellEdid": "WindhelmBridge01",
+   "fromAnchor": 998,
+   "groundUnder": [
+    -12811.0,
+    -12775.2
+   ],
+   "interior": false,
+   "kind": "kiln",
+   "nearest": {
+    "edid": "HayBale01",
+    "ref": "e2bfd:Skyrim.esm",
+    "units": 52
+   },
+   "offset": [
+    992,
+    -112
+   ],
+   "passedOver": [
+    {
+     "anchor": "1014f4:WindhelmSSE.esp",
+     "why": "no clear spot within 1600 units (18839 off the navmesh; 4810 in the water; 1905 touches FXfireWithEmbersHeavy; 809 the ground runs # to #)"
+    }
+   ],
+   "point": "f7798:Skyrim.esm",
+   "pos": [
+    136925.5,
+    25414.1,
+    -12811.0
+   ],
+   "ref": "15502:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Windhelm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "lab-dawnstar": {
+   "anchor": "c76e1:Skyrim.esm",
+   "anchorAngle": 270.0,
+   "anchorAt": [
+    708.4,
+    1.5,
+    0.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 90.0,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "13a86:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "DawnstarMortarandPestle",
+   "fromAnchor": 166,
+   "groundUnder": [
+    0.0,
+    1.5
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "Bucket01",
+    "ref": "e0320:Skyrim.esm",
+    "units": 36
+   },
+   "offset": [
+    -100,
+    -132
+   ],
+   "passedOver": [],
+   "pos": [
+    840.4,
+    -98.5,
+    0.0
+   ],
+   "ref": "15546:Thornswood-Content.esp",
+   "space": "13a86:Skyrim.esm",
+   "spaceEdid": "DawnstarMortarandPestle",
+   "turn": 180,
+   "where": "The Mortar and Pestle, Dawnstar"
+  },
+  "lab-falkreath": {
+   "anchor": "c6cea:Skyrim.esm",
+   "anchorAngle": 233.95,
+   "anchorAt": [
+    -1169.0,
+    -86.7,
+    0.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 98.95,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "3a183:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "FalkreathGraveConcoctions",
+   "fromAnchor": 256,
+   "groundUnder": [
+    -0.0,
+    0.1
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "CounterStraight01",
+    "ref": "99bdd:Skyrim.esm",
+    "units": 48
+   },
+   "offset": [
+    -116,
+    -228
+   ],
+   "passedOver": [],
+   "pos": [
+    -916.4,
+    -46.3,
+    -0.0
+   ],
+   "ref": "15545:Thornswood-Content.esp",
+   "space": "3a183:Skyrim.esm",
+   "spaceEdid": "FalkreathGraveConcoctions",
+   "turn": 225,
+   "where": "Grave Concoctions, Falkreath"
+  },
+  "lab-markarth": {
+   "anchor": "c76e5:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    247.0,
+    1275.3,
+    -111.1
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 45.0,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16df6:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "MarkarthHagsCure",
+   "fromAnchor": 196,
+   "groundUnder": [
+    -112.0,
+    -111.8
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "FXcobwebCorner01",
+    "ref": "ca8ea:Skyrim.esm",
+    "units": 34
+   },
+   "offset": [
+    -4,
+    -196
+   ],
+   "passedOver": [],
+   "pos": [
+    243.0,
+    1079.3,
+    -112.0
+   ],
+   "ref": "15544:Thornswood-Content.esp",
+   "space": "16df6:Skyrim.esm",
+   "spaceEdid": "MarkarthHagsCure",
+   "turn": 45,
+   "where": "The Hag's Cure, Markarth"
+  },
+  "lab-morthal": {
+   "anchor": "c6c3b:Skyrim.esm",
+   "anchorAngle": 331.11,
+   "anchorAt": [
+    -1544.6,
+    12.3,
+    0.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 151.11,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "138cb:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "MorthalThaumaturgistsHut",
+   "fromAnchor": 124,
+   "groundUnder": [
+    -0.0,
+    0.2
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "FirewoodPileSmall01",
+    "ref": "dff01:Skyrim.esm",
+    "units": 32
+   },
+   "offset": [
+    44,
+    -116
+   ],
+   "passedOver": [],
+   "pos": [
+    -1450.1,
+    -68.0,
+    -0.0
+   ],
+   "ref": "15547:Thornswood-Content.esp",
+   "space": "138cb:Skyrim.esm",
+   "spaceEdid": "MorthalThaumaturgistsHut",
+   "turn": 180,
+   "where": "Thaumaturgist's Hut, Morthal"
+  },
+  "lab-riften": {
+   "anchor": "16dc1:Skyrim.esm",
+   "anchorAngle": 315.0,
+   "anchorAt": [
+    -397.4,
+    779.5,
+    112.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 90.0,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16bce:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RiftenElgrimsElixirs",
+   "fromAnchor": 131,
+   "groundUnder": [
+    112.0,
+    117.4
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "CounterRight01",
+    "ref": "16d53:Skyrim.esm",
+    "units": 39
+   },
+   "offset": [
+    -84,
+    -100
+   ],
+   "passedOver": [],
+   "pos": [
+    -386.1,
+    649.4,
+    112.0
+   ],
+   "ref": "15543:Thornswood-Content.esp",
+   "space": "16bce:Skyrim.esm",
+   "spaceEdid": "RiftenElgrimsElixirs",
+   "turn": 135,
+   "where": "Elgrim's Elixirs, Riften"
+  },
+  "lab-solitude": {
+   "anchor": "c6ce9:Skyrim.esm",
+   "anchorAngle": 176.65,
+   "anchorAt": [
+    -8.7,
+    -1288.0,
+    0.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 86.65,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "16a11:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "SolitudeAngelinesAromatics",
+   "fromAnchor": 587,
+   "groundUnder": [
+    -0.0,
+    2.4
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "NobleChair02L",
+    "ref": "64f70:Skyrim.esm",
+    "units": 42
+   },
+   "offset": [
+    -500,
+    -308
+   ],
+   "passedOver": [],
+   "pos": [
+    472.5,
+    -951.4,
+    -0.0
+   ],
+   "ref": "15541:Thornswood-Content.esp",
+   "space": "16a11:Skyrim.esm",
+   "spaceEdid": "SolitudeAngelinesAromatics",
+   "turn": 270,
+   "where": "Angeline's Aromatics, Solitude"
+  },
+  "lab-whiterun": {
+   "anchor": "c6e45:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    -18.6,
+    -10.5,
+    64.0
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 270.0,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "165b6:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "WhiterunArcadiasCauldron",
+   "fromAnchor": 131,
+   "groundUnder": [
+    68.3,
+    68.4
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "CraftingAlchemyWorkbench",
+    "ref": "c6e45:Skyrim.esm",
+    "units": 33
+   },
+   "offset": [
+    -100,
+    -84
+   ],
+   "passedOver": [],
+   "pos": [
+    -118.6,
+    -94.5,
+    68.3
+   ],
+   "ref": "15540:Thornswood-Content.esp",
+   "space": "165b6:Skyrim.esm",
+   "spaceEdid": "WhiterunArcadiasCauldron",
+   "turn": 270,
+   "where": "Arcadia's Cauldron, Whiterun"
+  },
+  "lab-winterhold": {
+   "anchor": "86775:Skyrim.esm",
+   "anchorAngle": 224.24,
+   "anchorAt": [
+    -474.0,
+    -477.7,
+    -1.6
+   ],
+   "anchorEdid": "CraftingAlchemyWorkbench",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 359.24,
+   "base": "42e69:Thornswood-Content.esp",
+   "cell": "1380f:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "WinterholdCollegeHallofCountenance",
+   "fromAnchor": 276,
+   "groundUnder": [
+    -0.9,
+    0.0
+   ],
+   "interior": true,
+   "kind": "lab",
+   "nearest": {
+    "edid": "CandleHornFloor01",
+    "ref": "871a4:Skyrim.esm",
+    "units": 37
+   },
+   "offset": [
+    -4,
+    -276
+   ],
+   "passedOver": [],
+   "pos": [
+    -278.6,
+    -282.8,
+    -0.9
+   ],
+   "ref": "15548:Thornswood-Content.esp",
+   "space": "1380f:Skyrim.esm",
+   "spaceEdid": "WinterholdCollegeHallofCountenance",
+   "turn": 135,
+   "where": "The College's Hall of Countenance, Winterhold"
+  },
+  "salt-dawnstar": {
+   "anchor": "1b3f:JKs Skyrim.esp",
+   "anchorAngle": 84.27,
+   "anchorAt": [
+    30375.6,
+    105765.5,
+    -14016.0
+   ],
+   "anchorEdid": "XJKShipRowBoatAnim01snowDawnstar",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "JKs Skyrim.esp"
+   ],
+   "angle": 84.27,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "8eb5:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO-JK-Patch.esp, so the copy never wins",
+   "cellEdid": "Dawnstar03Exterior",
+   "fromAnchor": 1255,
+   "groundUnder": [
+    -13854.2,
+    -13852.0
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "WalkwayStairs4Snow",
+    "ref": "d67f7:Skyrim.esm",
+    "units": 45
+   },
+   "offset": [
+    1184,
+    416
+   ],
+   "passedOver": [],
+   "point": "cadf6:Skyrim.esm",
+   "pos": [
+    30907.8,
+    104628.9,
+    -13854.2
+   ],
+   "ref": "15512:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Dawnstar",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-solitude": {
+   "anchor": "1363:The Great City of Solitude.esp",
+   "anchorAngle": 254.46,
+   "anchorAt": [
+    -58505.5,
+    100213.3,
+    -14092.3
+   ],
+   "anchorEdid": "ShipLongBoat01",
+   "anchorRecordFrom": "The Great City of Solitude.esp",
+   "anchorTouchedBy": [
+    "The Great City of Solitude.esp"
+   ],
+   "angle": 254.46,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "929a:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "",
+   "fromAnchor": 1553,
+   "groundUnder": [
+    -13888.0,
+    -13888.0
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "DockColStr02",
+    "ref": "514d:The Great City of Solitude.esp",
+    "units": 116
+   },
+   "offset": [
+    320,
+    1520
+   ],
+   "passedOver": [],
+   "point": "4e3e9:Skyrim.esm",
+   "pos": [
+    -60055.6,
+    100114.4,
+    -13888.0
+   ],
+   "ref": "15510:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "Solitude",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-windhelm": {
+   "anchor": "9a38d:Skyrim.esm",
+   "anchorAngle": 135.0,
+   "anchorAt": [
+    139503.1,
+    33232.9,
+    -14016.0
+   ],
+   "anchorEdid": "ShipRowBoat01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 225.0,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "b4b9:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO.esp, so the copy never wins",
+   "cellEdid": "WindhelmDocksExterior01",
+   "fromAnchor": 781,
+   "groundUnder": [
+    -13943.6,
+    -13941.8
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "FishRack01",
+    "ref": "f46f1:Skyrim.esm",
+    "units": 31
+   },
+   "offset": [
+    -448,
+    -640
+   ],
+   "passedOver": [
+    {
+     "anchor": "8b0a6:WindhelmSSE.esp",
+     "why": "no clear spot within 1600 units (8687 in the water; 6755 off the navmesh; 4992 the vein hangs over a drop; 3918 the vein hangs over nothing)"
+    }
+   ],
+   "point": "f7798:Skyrim.esm",
+   "pos": [
+    139367.3,
+    34002.3,
+    -13943.6
+   ],
+   "ref": "15511:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 90,
+   "where": "Windhelm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "salt-winterhold": {
+   "anchor": "153efd:CFTO.esp",
+   "anchorAngle": 303.7,
+   "anchorAt": [
+    101917.3,
+    113331.6,
+    -14018.0
+   ],
+   "anchorEdid": "ShipRowBoat01",
+   "anchorRecordFrom": "CFTO.esp",
+   "anchorTouchedBy": [
+    "CFTO.esp"
+   ],
+   "angle": 258.7,
+   "base": "dde4ef:Thornswood-Content.esp",
+   "cell": "8e66:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by CFTO.esp, so the copy never wins",
+   "cellEdid": "",
+   "fromAnchor": 1270,
+   "groundUnder": [
+    -13973.8,
+    -13964.5
+   ],
+   "interior": false,
+   "kind": "salt",
+   "nearest": {
+    "edid": "FishRack01",
+    "ref": "153f03:CFTO.esp",
+    "units": 340
+   },
+   "offset": [
+    -1264,
+    128
+   ],
+   "passedOver": [
+    {
+     "anchor": "765e:JKs Skyrim.esp",
+     "why": "no clear spot within 1600 units (13582 off the navmesh; 8539 in the water; 1536 the vein hangs over a drop; 1124 the ground runs # to #)"
+    }
+   ],
+   "point": "89c2:JKs Skyrim.esp",
+   "pos": [
+    101109.4,
+    112351.1,
+    -13973.8
+   ],
+   "ref": "15513:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 315,
+   "where": "Winterhold",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  }
+ },
+ "skipped": {
+  "hive-battleborn": {
+   "kind": "hive",
+   "triedAnchors": [
+    {
+     "anchor": "c394f:Skyrim.esm",
+     "why": "no clear spot within 1200 units (5034 touches TreeThicket01; 3704 off the navmesh; 3165 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3147 touches TreeFloraLeek01)"
+    },
+    {
+     "anchor": "a8ab3:Skyrim.esm",
+     "why": "no clear spot within 1200 units (6757 its ground is more than # from the anchor's height; 3650 touches TreeThicket01; 3175 touches TreeFloraLeek01; 3080 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin)"
+    },
+    {
+     "anchor": "c8e5b:Skyrim.esm",
+     "why": "no clear spot within 1200 units (10041 off the navmesh; 5283 touches TreeThicket01; 4424 its ground is more than # from the anchor's height; 3838 touches TreeFloraWheat01)"
+    },
+    {
+     "anchor": "ee9fa:Skyrim.esm",
+     "why": "no clear spot within 1200 units (4071 its cell 95f8:Skyrim.esm: JK's Whiterun's Outskirts.esp changes it before the content plugin; 3550 touches TreeThicket01; 3143 touches TreeFloraLeek01; 2660 off the navmesh)"
+    },
+    {
+     "anchor": "15f798:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (6510 its ground is more than # from the anchor's height; 4503 touches TreeThicket01; 3518 touches TreeGourdCluster01; 3119 off the navmesh)"
+    },
+    {
+     "anchor": "178e54:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (6077 its ground is more than # from the anchor's height; 4453 touches TreeThicket01; 4021 off the navmesh; 3914 touches TreeFloraWheat01)"
+    },
+    {
+     "anchor": "15f795:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (6190 its ground is more than # from the anchor's height; 4801 touches TreeThicket01; 3561 touches TreeGourdCluster01; 2004 off the navmesh)"
+    },
+    {
+     "anchor": "15f791:JK's Whiterun's Outskirts.esp",
+     "why": "no clear spot within 1200 units (6452 its ground is more than # from the anchor's height; 3899 off the navmesh; 3442 touches TreeGourdCluster01; 1967 the ground runs # to #)"
+    }
+   ],
+   "where": "Battle-Born Farm"
+  },
+  "hive-dragonbridge": {
+   "kind": "hive",
+   "triedAnchors": [
+    {
+     "anchor": "eea9a:Skyrim.esm",
+     "why": "no clear spot within 1200 units (7063 off the navmesh; 5102 its ground is more than # from the anchor's height; 3821 touches FenceWoven01; 3745 touches TreeThicket01)"
+    },
+    {
+     "anchor": "eea91:Skyrim.esm",
+     "why": "no clear spot within 1200 units (11207 off the navmesh; 5035 its ground is more than # from the anchor's height; 3749 touches FenceWoven01; 3336 touches TreeThicket01)"
+    },
+    {
+     "anchor": "5e49:JKs Skyrim.esp",
+     "why": "no clear spot within 1200 units (15204 off the navmesh; 3734 touches FenceWoven01; 3350 touches TreeThicket01; 2815 touches BYOHMineStone01)"
+    },
+    {
+     "anchor": "f197c:Skyrim.esm",
+     "why": "no clear spot within 1200 units (23095 off the navmesh; 6097 its ground is more than # from the anchor's height; 3038 touches TreeThicket01; 1108 touches TreeGourdCluster01)"
+    },
+    {
+     "anchor": "eea9e:Skyrim.esm",
+     "why": "no clear spot within 1200 units (28186 off the navmesh; 3876 its ground is more than # from the anchor's height; 1498 touches TreeFloraPotatoPlant01; 1415 touches TreeThicket01)"
+    }
+   ],
+   "where": "Dragon Bridge Farm"
+  },
+  "hive-merryfair": {
+   "kind": "hive",
+   "triedAnchors": [
+    {
+     "anchor": "9ef:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1200 units (6688 its ground is more than # from the anchor's height; 4991 off the navmesh; 3875 touches FenceWoven01; 2303 touches TreeFloraMountainFlower02Red)"
+    },
+    {
+     "anchor": "c87ce:Skyrim.esm",
+     "why": "no clear spot within 1200 units (8674 its ground is more than # from the anchor's height; 8547 off the navmesh; 5773 the ground runs # to #; 2876 touches TreeFallForestShrub02)"
+    },
+    {
+     "anchor": "9dc:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1200 units (7123 its ground is more than # from the anchor's height; 4214 touches FenceWoven01; 3348 off the navmesh; 2859 touches TreeFloraMountainFlower02Red)"
+    },
+    {
+     "anchor": "eea40:Skyrim.esm",
+     "why": "no clear spot within 1200 units (5646 its ground is more than # from the anchor's height; 4923 touches FenceWoven01; 2953 off the navmesh; 2608 touches HayMound02)"
+    },
+    {
+     "anchor": "eea35:Skyrim.esm",
+     "why": "no clear spot within 1200 units (8018 its ground is more than # from the anchor's height; 4579 touches FenceWoven01; 3226 off the navmesh; 2806 the ground runs # to #)"
+    },
+    {
+     "anchor": "9e2:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1200 units (8362 its ground is more than # from the anchor's height; 4876 touches FenceWoven01; 3882 touches TreeFallForestShrub02; 3667 off the navmesh)"
+    }
+   ],
+   "where": "Merryfair Farm"
+  },
+  "hive-sarethi": {
+   "kind": "hive",
+   "triedAnchors": [
+    {
+     "anchor": "5ce64:Skyrim.esm",
+     "why": "no clear spot within 1200 units (8419 off the navmesh; 5285 touches FenceWoven01; 4365 its ground is more than # from the anchor's height; 2726 its cell 97d5:Skyrim.esm: Water for ENB.esm changes it before the content plugin)"
+    },
+    {
+     "anchor": "5ced4:Skyrim.esm",
+     "why": "no clear spot within 1200 units (6724 its ground is more than # from the anchor's height; 6036 touches FenceWoven01; 4580 off the navmesh; 2641 its cell 97d5:Skyrim.esm: Water for ENB.esm changes it before the content plugin)"
+    },
+    {
+     "anchor": "5cecf:Skyrim.esm",
+     "why": "no clear spot within 1200 units (8733 off the navmesh; 7174 its ground is more than # from the anchor's height; 5175 touches FenceWoven01; 1907 touches TreeSwordFernCluster02)"
+    },
+    {
+     "anchor": "8f869:Skyrim.esm",
+     "why": "no clear spot within 1200 units (26163 off the navmesh; 4305 its ground is more than # from the anchor's height; 2116 touches TreeYellowShrub02; 2049 the ground runs # to #)"
+    }
+   ],
+   "where": "Sarethi Farm"
+  },
+  "kiln-falkreath": {
+   "kind": "kiln",
+   "triedAnchors": [
+    {
+     "anchor": "f1d9b:Skyrim.esm",
+     "why": "no clear spot within 1600 units (4784 within 1,000 units of a woodworking bench; 4687 off the navmesh; 2768 touches TreeThicket01; 2227 touches Ivy02)"
+    },
+    {
+     "anchor": "d6c2b:Skyrim.esm",
+     "why": "no clear spot within 1600 units (4526 off the navmesh; 1811 touches RockM01; 1660 touches StonewallEndL01Ivy; 1374 touches TreeClover01)"
+    },
+    {
+     "anchor": "99b49:Skyrim.esm",
+     "why": "no clear spot within 1600 units (7200 off the navmesh; 6127 touches TreePineForestCutLog01; 4964 touches FenceWoven02; 3116 its ground is more than # from the anchor's height)"
+    }
+   ],
+   "where": "Falkreath"
+  },
+  "kiln-markarth": {
+   "kind": "kiln",
+   "triedAnchors": [],
+   "where": "Markarth",
+   "why": "no chopping block stands in the open world within 20000 units of the forge"
+  },
+  "kiln-riften": {
+   "kind": "kiln",
+   "triedAnchors": [
+    {
+     "anchor": "876:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1600 units (8134 off the navmesh; 4813 its ground is more than # from the anchor's height; 1715 touches FarmTableBench01; 1366 touches FenceWoven01)"
+    },
+    {
+     "anchor": "ae7:JK's Riften Outskirts.esp",
+     "why": "no clear spot within 1600 units (7064 off the navmesh; 5825 its ground is more than # from the anchor's height; 2793 touches FenceWoven01; 1991 the ground runs # to #)"
+    }
+   ],
+   "where": "Riften"
+  },
+  "kiln-solitude": {
+   "kind": "kiln",
+   "triedAnchors": [
+    {
+     "anchor": "a9ee1:Skyrim.esm",
+     "why": "no clear spot within 1600 units (13436 off the navmesh; 1833 touches TreeFloraWheat01; 1666 touches WallLeanMarker; 1165 touches HandCartCanopy)"
+    }
+   ],
+   "where": "Solitude"
+  },
+  "lab-windhelm": {
+   "kind": "lab",
+   "triedAnchors": [
+    {
+     "anchor": "c6dff:Skyrim.esm",
+     "why": "no clear spot within 900 units (52073 off the navmesh; 5470 touches WHIntWoodWallStoneWindow03; 5152 touches WHIntWoodWallStone01; 2973 touches WHIntWoodLadder01)"
+    },
+    {
+     "anchor": "10e3b6:Skyrim.esm",
+     "why": "no clear spot within 900 units (53127 off the navmesh; 5460 touches WHIntCastleRoomWall01; 3564 touches WHIntmetalarchdoor, its way through; 2470 touches CraftingAlchemyWorkbench)"
+    }
+   ],
+   "where": "The White Phial, Windhelm"
+  }
+ }
+}

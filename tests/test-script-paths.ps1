@@ -83,6 +83,7 @@ $testsDir = Join-Path $repo 'tests'
 # paths resolve from its own folder.
 $scan = @()
 $scriptsDir = Join-Path $repo 'scripts'
+$repoFull = (Get-Item -LiteralPath $repo).FullName.TrimEnd('\', '/')
 # scripts\oneoff is parked history: its scripts name the layout they ran in.
 if (Test-Path -LiteralPath $scriptsDir) { $scan += @(Get-ChildItem -LiteralPath $scriptsDir -Filter *.ps1 -File -Recurse | Where-Object { $_.FullName -notmatch '[\\/]oneoff[\\/]' }) }
 if (Test-Path -LiteralPath $testsDir) { $scan += @(Get-ChildItem -LiteralPath $testsDir -Filter *.ps1 -File) }
@@ -107,7 +108,11 @@ foreach ($f in $scan) {
     foreach ($m in $rx.Matches($text)) {
         if ($inTests -and $m.Groups[1].Value -eq 'PSScriptRoot') { continue }
         $rel = $m.Groups[2].Value.Replace('\', '/').Trim('/')
-        $baseRel = if ($inTests) { '' } else { [IO.Path]::GetRelativePath($repo, (Split-Path -Parent $f.FullName)).Replace('\', '/') }
+        # The script's folder from the repository root. Every file read here
+        # was listed under $repo, so that is its folder with $repo taken off
+        # the front ([IO.Path]::GetRelativePath is .NET Core's, and Windows
+        # PowerShell 5.1 has no such method, #2739).
+        $baseRel = if ($inTests) { '' } else { (Split-Path -Parent $f.FullName).Substring($repoFull.Length).Trim('\', '/').Replace('\', '/') }
         $full = if ($m.Groups[1].Value -in 'RepoDir', 'Repo') { $rel } else { $baseRel + '/' + $rel }
         # scripts/release/../../bot/x is bot/x: a script reaches the rest of
         # the repository that way from its own folder.

@@ -123,7 +123,9 @@ function rig(opts) {
       getUserByActor: function (id) {
         return (r.online.indexOf(id) >= 0 && r.user[id] !== undefined) ? r.user[id] : -1;
       },
-      kick: function (u) { r.kicked.push(u); r.order.push('kick ' + u); }
+      kick: function (u) { r.kicked.push(u); r.order.push('kick ' + u); },
+      // The engine's whole-file write (#2740), onto the fake disk.
+      writeFileWhole: function (p, s) { fakeFs.writeFileSync(p, s); }
     },
     __thornswoodToProfile: function (p, text) { r.told.push({ p: p, text: String(text) }); r.order.push('told ' + p); },
     __thornswoodSayLine: function (p, what) {

@@ -14,9 +14,10 @@
     site\config.json   -> C:\Thornswood-Docs\config.json
     site\uploads       -> C:\Thornswood-Docs\uploads     whole
     site\feed\...      -> C:\Thornswood-Docs\feed\...    the feed's store:
-    site\feed-dev\...  -> C:\Thornswood-Docs\feed-dev\... version.json,
-                          published.json, launchers.txt, releases.txt, and
-                          history merged in. Never the assets folder, which
+    site\feed-dev\...  -> C:\Thornswood-Docs\feed-dev\... published.json,
+                          launchers.txt, releases.txt, and the feed's
+                          generations (version\, #2727) and history merged
+                          in. Never the assets folder, which
                           Remirror-Site-Feed.ps1 fills.
     bot\bot.env.json   -> C:\Thornswood-Bot\bot.env.json, readable by SYSTEM
                           and Administrators only, as Install-Bot.ps1 leaves it
@@ -130,19 +131,21 @@ Place 'site\uploads'     (Join-Path $SiteRoot 'uploads')
 
 # The feed's store, file by file, because the feed folder also holds the
 # assets, which are not in any backup and may already be arriving from
-# Remirror-Site-Feed.ps1. History is merged: nothing already there is replaced.
+# Remirror-Site-Feed.ps1. The feed's generations (version\, #2727) and history
+# are merged: nothing already there is replaced, as nothing there ever is.
 foreach ($feed in 'feed', 'feed-dev') {
   if (-not (Test-Path -LiteralPath (Join-Path $From "site\$feed"))) {
     'missing   site\' + $feed + ' is not in this backup (backups before issue #454 do not carry the feed; see docs\MOVING-THE-SERVER.md)'
     $missing += "site\$feed"
     continue
   }
-  foreach ($n in 'version.json', 'published.json', 'launchers.txt', 'releases.txt') {
+  foreach ($n in 'published.json', 'launchers.txt', 'releases.txt') {
     if (Test-Path -LiteralPath (Join-Path $From "site\$feed\$n")) { Place "site\$feed\$n" (Join-Path $SiteRoot "$feed\$n") }
   }
-  $hist = Join-Path $From "site\$feed\history"
-  if (Test-Path -LiteralPath $hist) {
-    $to = Join-Path $SiteRoot "$feed\history"
+  foreach ($kept in 'version', 'history') {
+    $hist = Join-Path $From "site\$feed\$kept"
+    if (-not (Test-Path -LiteralPath $hist)) { continue }
+    $to = Join-Path $SiteRoot "$feed\$kept"
     [void](New-Item -ItemType Directory -Path $to -Force)
     $k = 0
     foreach ($f in @(Get-ChildItem -LiteralPath $hist -File -Force)) {
@@ -150,7 +153,7 @@ foreach ($feed in 'feed', 'feed-dev') {
       Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $to $f.Name)
       $k++
     }
-    'placed    site\' + $feed + '\history -> ' + $to + ' (' + $k + ' files it did not have)'
+    'placed    site\' + $feed + '\' + $kept + ' -> ' + $to + ' (' + $k + ' files it did not have)'
   }
 }
 

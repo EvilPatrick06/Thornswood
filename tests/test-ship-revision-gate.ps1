@@ -44,7 +44,9 @@ try {
     Cfg '{"CollectionUrl":""}'
     Yes 'an empty CollectionUrl falls back to the shipped collection' ((Get-ShipCollectionRevision $T) -eq 2 -and $script:slugAsked[-1] -eq '7essxf')
     Cfg '{ not json'
-    Yes 'a config.json that is not JSON falls back too, rather than stopping Ship' ((Get-ShipCollectionRevision $T) -eq 2)
+    $stop = ''
+    try { $null = Get-ShipCollectionRevision $T } catch { $stop = $_.Exception.Message }
+    Yes 'a config.json that is not JSON stops Ship before anything is packed (#2711 decision 2 B)' ($stop -match 'does not read' -and $stop -match 'collection revision it names is not known')
     Cfg '{"CollectionUrl":"https://www.nexusmods.com/games/skyrimspecialedition/collections/zzz999"}'
     Yes 'a collection Vortex does not have is revision 0' ((Get-ShipCollectionRevision $T) -eq 0)
 }
@@ -89,7 +91,9 @@ Yes '  and is somebody else''s from that revision on' (Test-ShipNotOurs $inFolde
 Yes 'a stranger''s loose file is not ours at any revision' ((Test-ShipNotOurs 'Data\meshes\nobody\thing.nif' 0) -and (Test-ShipNotOurs 'Data\meshes\nobody\thing.nif' 99))
 Yes 'anything under Data\Platform is left to the other rules (never "not ours" here)' (-not (Test-ShipNotOurs 'Data\Platform\UI\x.js' 99))
 if ($ShipOursFiles.Count) { Yes ("a listed file of ours is ours at every revision ({0})" -f $ShipOursFiles[0]) (-not (Test-ShipNotOurs ([string]$ShipOursFiles[0]) 99)) }
-if ($ShipBuiltUntil1259.Count) { $b = @($ShipBuiltUntil1259)[0]; Yes "a #1259 outfit is ours until that list goes ($b)" (-not (Test-ShipNotOurs $b 99)) }
+# The first one not held for its permission (#2454): a held file is never ours.
+$unheld = @($ShipBuiltUntil1259 | Where-Object { -not (Test-ShipPermissionHeld $_) })
+if ($unheld.Count) { $b = $unheld[0]; Yes "a #1259 outfit is ours until that list goes ($b)" (-not (Test-ShipNotOurs $b 99)) }
 if ($ShipRequiredDataFiles.Count) { Yes ("required data is ours ({0})" -f $ShipRequiredDataFiles[0]) (-not (Test-ShipNotOurs ([string]$ShipRequiredDataFiles[0]) 99)) }
 
 Write-Host ''
