@@ -411,13 +411,9 @@ namespace Thornswood
 
 Yes 'the Build Tools csc the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
-$fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
-$refDir = Join-Path ${env:ProgramFiles(x86)} 'Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8.1'
-$refs = @()
-foreach ($n in $LauncherNeeded) {
-    $hit = @((Join-Path $refDir $n), (Join-Path $fw $n), (Join-Path $fw ('WPF\' + $n))) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if ($hit) { $refs += $hit }
-}
+$refs = @(); $missing = @()
+foreach ($n in $LauncherNeeded) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
 $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs') |
     ForEach-Object { Join-Path $App $_ }
 $real += @((Join-Path $Tool 'ShipRoot.cs'), (Join-Path $Tool 'OwnGameShipRoot.cs'))

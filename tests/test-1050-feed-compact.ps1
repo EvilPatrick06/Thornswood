@@ -22,8 +22,8 @@
       with a line break, quotes, a backslash and letters outside ASCII
     - the release record New-ReleaseRecord makes carries no uiAssets
     - the launcher compiled from launcher\app (or -Src, any launcher source,
-      such as the one at a channel's minLauncher) with the .NET Framework csc,
-      the way Build-Launcher.ps1 does, reads that file with VersionDoc.Parse:
+      such as the one at a channel's minLauncher) with the compiler the build
+      runs (tests\Launcher-Csc.ps1), reads that file with VersionDoc.Parse:
       every field it binds, the record pointer and its note, and the news file
 
   The launcher half runs under Windows PowerShell 5.1, because the launcher
@@ -67,39 +67,13 @@ $NewsSha = ('0326733ddbbd921d59a0506d00cdf313cfb422de3263b9958133a37e09984b63')
 # The Windows PowerShell half: compile the launcher and parse the feed.
 # ============================================================================
 if ($ParseFeed) {
-    $csc = @(
-        "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-        "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-    ) | Where-Object { Test-Path $_ } | Select-Object -First 1
-    $refDirs = @(
-        "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-        "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-        "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-        "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-        "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-        "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-        "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-    ) | Where-Object { Test-Path $_ }
-    function Find-Ref([string]$name) {
-        foreach ($d in $refDirs) { $p = Join-Path $d $name; if (Test-Path $p) { return $p } }
-        $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-        foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-            $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-            if (Test-Path $gac) {
-                $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
-                       Sort-Object FullName -Descending | Select-Object -First 1
-                if ($hit) { return $hit.FullName }
-            }
-        }
-        $null
-    }
     $needed = @($LauncherNeeded)
     $wv2 = @($LauncherWv2Managed)
 
-    Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
-    if (-not $csc -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; Done }
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not (Test-Path -LiteralPath $LauncherCsc) -or $needed.Count -eq 0) { Yes 'Thornswood.csproj names the references' $false; Done }
     $refs = @(); $missing = @()
-    foreach ($n in $needed) { $p = Find-Ref $n; if ($p) { $refs += $p } else { $missing += $n } }
+    foreach ($n in $needed) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
     foreach ($n in $wv2) {
         $p = Join-Path $Repo ('launcher\lib\webview2\' + $n)
         if (Test-Path -LiteralPath $p) { $refs += $p } else { $missing += $n }
@@ -122,7 +96,7 @@ if ($ParseFeed) {
         $rc = $LASTEXITCODE
         $ErrorActionPreference = $old
         $built = ($rc -eq 0) -and (Test-Path -LiteralPath $dll)
-        Yes ('the launcher''s {0} source files in {1} compile as C# 5' -f $cs.Count, $Src) $built
+        Yes ('the launcher''s {0} source files in {1} compile with the build''s compiler' -f $cs.Count, $Src) $built
         if (-not $built) {
             foreach ($l in @($said | Where-Object { "$_" -match 'error' } | Select-Object -First 20)) { Write-Host "      $l" }
             Done

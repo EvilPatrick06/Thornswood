@@ -53,7 +53,6 @@ $count=0
   if($got -ne $ids[$case]){throw ('Mod ids '+$case+': expected ['+$ids[$case]+'], got ['+$got+']')}
   $count++;Write-Host ('PASS mod ids '+$case)
  }
- $csc=Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
  $dll=Join-Path $Scratch 'VortexCollectionState.dll'
  & $LauncherCsc /noconfig /nologo /target:library "/langversion:$LauncherLangVersion" ("/out:"+$dll) /reference:System.dll /reference:System.Core.dll /reference:System.Xml.dll /reference:System.Runtime.Serialization.dll (Join-Path $repo 'launcher\app\VortexProfileState.cs')
  if($LASTEXITCODE){throw 'Framework compilation failed'}
@@ -68,7 +67,7 @@ $count=0
   if($gotIds -ne $ids[$case]){throw ('Shared C# reader mod ids '+$case+' differs')}
   $count++;Write-Host ('PASS reader '+$case)
  }
- Write-Host ($count.ToString()+' collection cases and C# 5 compilation passed')
+ Write-Host ($count.ToString()+' collection cases and the compile passed')
 }finally{
  $env:APPDATA=$oldAppData
  if($ownScratch -and (Test-Path -LiteralPath $Scratch)){Remove-Item -LiteralPath $Scratch -Recurse -Force}

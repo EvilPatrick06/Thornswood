@@ -58,8 +58,8 @@
   the start line says when a file has the mark and how to take it off by
   hand, and nothing in the launcher puts it back.
 
-  It compiles the shipped launcher\app\SteamUpdates.cs with the same .NET
-  Framework csc that Build-Launcher.ps1 uses, which is C# 5, and drives the
+  It compiles the shipped launcher\app\SteamUpdates.cs with the compiler the
+  build runs (tests\Launcher-Csc.ps1), and drives the
   real class. Where this machine has Steam and Skyrim, it also parses the
   real manifest, without writing to it.
 
@@ -94,19 +94,15 @@ $src = Join-Path $AppPath 'SteamUpdates.cs'
 Yes 'launcher\app\SteamUpdates.cs is there' (Test-Path -LiteralPath $src)
 if (-not (Test-Path -LiteralPath $src)) { Done }
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-steam-updates-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
 $dll = Join-Path $work 'SteamUpdates.dll'
 $said = & $LauncherCsc /nologo /target:library "/out:$dll" $src 2>&1
 $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-Yes 'it compiles on its own with the C# 5 compiler' $built
+Yes 'it compiles on its own with the compiler the build runs' $built
 if (-not $built) { $said | ForEach-Object { Write-Host "      $_" }; Done }
 
 $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

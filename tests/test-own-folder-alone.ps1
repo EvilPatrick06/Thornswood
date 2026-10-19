@@ -47,8 +47,8 @@
        untouched; one held open is tried again at the next start.
 
   HOW. It compiles the shipped launcher\app\OwnGame.cs, OwnGameShare.cs,
-  Downgrade.cs, Steam.cs, Paths.cs and Config.cs with the .NET Framework csc
-  Build-Launcher.ps1 uses (C# 5), with stand-ins for the few calls that touch
+  Downgrade.cs, Steam.cs, Paths.cs and Config.cs with the compiler the build
+  runs (tests\Launcher-Csc.ps1), with stand-ins for the few calls that touch
   the machine (Checks, Keep, Junction). A driver builds a pretend Steam, Steam
   copy and Vortex in a scratch folder, points Steam.cs at it through
   Steam.RootForTest, and runs the real code. Steam's console is never driven:
@@ -80,28 +80,14 @@ function Done {
     exit 0
 }
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
-$fw = Split-Path -Parent $csc
-$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll') |
-    ForEach-Object { Join-Path $fw $_ }
-# Downgrade.cs puts a line on the clipboard through WPF. Found the way
-# Build-Launcher.ps1 finds it: the reference assemblies first, then the
-# framework's own WPF folder, then the GAC.
-$refDirs = @(Get-ChildItem -Path "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework" -Directory -Filter 'v4.*' -ErrorAction SilentlyContinue |
-    Sort-Object Name -Descending | ForEach-Object { $_.FullName }) + @((Join-Path $fw 'WPF'), $fw)
-foreach ($n in 'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') {
-    $hit = $refDirs | ForEach-Object { Join-Path $_ $n } | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-    if (-not $hit) {
-        $hit = Get-ChildItem (Join-Path $env:WINDIR 'Microsoft.NET\assembly') -Filter $n -Recurse -File -ErrorAction SilentlyContinue |
-            Sort-Object FullName -Descending | Select-Object -First 1 | ForEach-Object { $_.FullName }
-    }
-    $refs += $(if ($hit) { $hit } else { Join-Path $fw $n })
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+# What the launcher compiles against, from the reference assemblies the
+# build uses (Launcher-Csc.ps1). Downgrade.cs puts a line on the clipboard
+# through WPF, so the WPF ones are here too.
+$refs = @('System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Xml.dll', 'System.Security.dll',
+          'PresentationCore.dll', 'WindowsBase.dll', 'PresentationFramework.dll', 'System.Xaml.dll') |
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
 foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
 
 $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs') |
@@ -1028,7 +1014,7 @@ try {
     $compiled = & $LauncherCsc @cscArgs 2>&1
     $ErrorActionPreference = $old
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'the real OwnGame.cs, OwnGameShare.cs and Downgrade.cs compile with the driver under the C# 5 compiler' $built
+    Yes 'the real OwnGame.cs, OwnGameShare.cs and Downgrade.cs compile with the driver under the build''s compiler' $built
     if (-not $built) { foreach ($l in @($compiled)) { Write-Host "      $l" }; Done }
 
     $scene = Join-Path $work 'machine'
