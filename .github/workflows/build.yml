@@ -527,6 +527,7 @@ jobs:
                  'test-site-gone-public.ps1',
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-merchant-quest-catalogue.js', 'test-quest-transactions.js', 'test-scene-reward-budget.js', 'test-kill-contracts.js',
+                 'test-511-trade-cargo.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',

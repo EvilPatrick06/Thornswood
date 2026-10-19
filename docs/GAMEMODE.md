@@ -90,7 +90,9 @@ Settings come from `server-settings.json` in the server's own folder, the
 working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 (`gamemode.js:dataDir`), `privDir` (`gamemode.js:privDir`), `thornswoodVoicePort`
 (`gamemode.js:voicePort`), `thornswoodChargen` (`gamemode.js:s.thornswoodChargen === false`),
-`thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`) and `loadOrder`
+`thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
+(`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
+issue #511, whose register is still read and counted while off) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
@@ -260,7 +262,7 @@ In the server's folder, `C:\Thornswood-Server` live and
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:The resources server hands out anything under data over plain HTTP`) |
-| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load), and the books, `books.json` and `last-left.json` (moved from `data` on 16 October, issue #2582, for the same reason; the old copies are removed, not carried); and the other registers naming characters, `law.json`, `beds.json`, `embassy.json`, `take-limit.json` and `dungeon-rewards-ledger.json`; and `deleted-characters.json`, a list of deleted characters that `Delete-Person.ps1` writes and the gamemode lets go of at its next start and then deletes (issue #2351) | No |
+| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load), and the books, `books.json` and `last-left.json` (moved from `data` on 16 October, issue #2582, for the same reason; the old copies are removed, not carried); and the other registers naming characters, `law.json`, `beds.json`, `embassy.json`, `take-limit.json` and `dungeon-rewards-ledger.json`; and `deleted-characters.json`, a list of deleted characters that `Delete-Person.ps1` writes and the gamemode lets go of at its next start and then deletes (issue #2351); and `trade-cargo.json`, the trade ships' register of ports, routes and what each hold carries, naming characters by form id and profile and never by name (issue #511) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:the changeform database. Every reference the server has ever written to`; `scripts\release\Where.ps1 ChangeForms` names its folder in the server build) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:LOG_MAX_BYTES`) | No |
 
