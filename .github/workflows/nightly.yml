@@ -261,13 +261,8 @@ jobs:
           .\scripts\dev\Check-Secrets.ps1 -Binary $built
           exit $LASTEXITCODE
 
-      - name: Keep the exe from this build
-        if: ${{ !cancelled() }}
-        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        with:
-          name: Thornswood.exe
-          path: ${{ runner.temp }}/Thornswood/Launcher/Thornswood.exe
-          retention-days: 7
+      # No artifact from this build: nothing read it, and the copies took most
+      # of the account's Actions storage (#2163, 19 Oct; build.yml says more).
 
       - name: Is the monthly restore rehearsal due
         if: ${{ !cancelled() }}
