@@ -35,6 +35,15 @@ http.createServer((req,res)=>{
       {id:'bear',name:'A bear',kind:'kill',count:1,kills:0,gold:50,hours:8,state:'open',locations:'Pinepeak Cavern',canReturn:false,canAbandon:true,recovery:true}
     ];
   }
+  if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='expanded') {
+    data.quests=[
+      {id:'q-whiterun-tailor-cloth-road',name:'Novice: A clear road for cloth',who:'Novice Warrior',kind:'kill',
+       count:1,kills:1,gold:15,hours:6,state:'open',locations:"Redoran's Retreat",canReturn:true,canAbandon:true,
+       token:7,exactMerchant:true,check:'Defeat the marked bandit and return to this Tailor. New guild jobs share a 150-gold daily payment limit.'},
+      {id:'q-winterhold-enchanter-coast',name:'Novice: Coastal preparations',who:'Novice Mage',kind:'kill',
+       count:1,kills:0,gold:10,hours:6,state:'locked',locations:'Winterhold coast',canTake:false,exactMerchant:true},base.quests[1]
+    ];
+  }
   res.setHeader('Content-Type','text/html');
   res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+
     '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+
