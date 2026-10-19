@@ -674,8 +674,10 @@ Yes 'one folder is still a list of one' ($one.Count -eq 1 -and $one[0].Folder -e
 Yes 'the three files Go.ps1 writes are the three called ours' ((@($ShipOwnArt) | Where-Object { (Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Go.ps1') -Raw).Contains("'" + $_ + "'") }).Count -eq 3)
 
 # ---- our menu files ---------------------------------------------------------------
-# The four paths in $ShipOursFiles that are not the plugin or the client
+# The three paths in $ShipOursFiles that are not the plugins or the client
 # script live in game\ours, and Go.ps1 writes those paths ($oursMenuFiles).
+# The main menu and the board's meshes are not among them since #2827: they
+# are made from each game ($ShipMadeFromGame, tests\test-2827-from-game.ps1).
 # The files on disk, the paths Go.ps1 quotes, and the same paths in
 # $ShipOursFiles are one list. One side gaining or losing a path fails.
 $goText = Get-Content -LiteralPath (Join-Path $Here 'scripts\release\Go.ps1') -Raw

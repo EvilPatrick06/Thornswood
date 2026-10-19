@@ -9,6 +9,7 @@
     "agreed-not-written": "Patrick has said it may go out, but the terms with its maker are not written down anywhere. Ships today.",
     "no-licence-found": "Somebody else's, and nothing found gives Thornswood the right to hand it on. Ships today. Its issue carries the decision.",
     "withheld": "Never ships: packs and the installer leave it out and delete it from installs.",
+    "made-from-game": "Bethesda's own file, edited, or put together from Bethesda's: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own game archives (#2827), so nobody is handed the game's files. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
     "not-published": "In this private repository only; nobody outside the team receives it."
   },
   "assets": [
@@ -419,20 +420,6 @@
       "from": "game/menu/logo.nif"
     },
     {
-      "path": "game/ours/Data/Interface/startmenu.swf",
-      "sha256": "a1dd4595c1e931ecb8910334a3529238f2f50146997f3cd10191b87fa0190ecf",
-      "what": "The main menu's interface file with no Bethesda logo and no button list (Ship-Rules.ps1 $ShipOursFiles). 83,386 bytes.",
-      "published": "Every pack and the installer (Data\\Interface)",
-      "source": "Skyrim's own interface\\startmenu.swf (Skyrim - Interface.bsa, 83,404 bytes), edited: its logo shapes taken out. Measured 15 Oct: the same 871 SWF tags in the same order, only DefineShape tags differ, by a byte or two each, and no strings were added or removed",
-      "creator": "Bethesda Game Studios; edited for Thornswood, by whom is not recorded",
-      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
-      "attribution": "Named as the game's own file, edited, on the site's terms and credits pages, which carry the notice line the terms ask for (#2792)",
-      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited; Patrick, 19 Oct 2026 (#2792, option 1): the terms page names it as the one game file Thornswood hands on",
-      "evidence": "The comparison on #2177, 15 Oct 2026; THIRD-PARTY.md, Bethesda's own file, edited; site\\data\\site\\terms.md and credits.md; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; scripts\\release\\Go.ps1.",
-      "status": "no-licence-found",
-      "issue": 2827
-    },
-    {
       "path": "game/ours/Data/Interface/loadwaitspinner.swf",
       "sha256": "ab7856f7aa3ddc63acea4633c24609c52dd2565c0f741f22d2335d1037e3470f",
       "what": "An empty loading spinner, 25 bytes, so no spinner draws.",
@@ -511,34 +498,6 @@
       "evidence": "Commit f32f3364 (#2482) and pull request #2522; docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js; tests\\test-2486-last-ships.ps1.",
       "status": "unconfirmed",
       "ask": "Patrick (#2177): whether the authors of the collection plugins named under licence allow an override plugin that carries copies of their cell, worldspace and quest records, the way their Nexus permissions read, and where that is kept."
-    },
-    {
-      "path": "game/ours/Data/meshes/thornswood/noticeboard01.nif",
-      "sha256": "47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216",
-      "what": "Thornswood's notice board mesh, 155,907 bytes: Windhelm sign posts, stockade planks, a shack roof, the candle lantern, vanilla notes and a plank shelf, with its own collision.",
-      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
-      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
-      "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
-      "attribution": "Named on the site's terms and credits pages as built from pieces of Skyrim's own meshes (#2792)",
-      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js; THIRD-PARTY.md, Bethesda's own file, edited.",
-      "status": "no-licence-found",
-      "issue": 2827
-    },
-    {
-      "path": "game/ours/Data/meshes/thornswood/dropbox01.nif",
-      "sha256": "09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e",
-      "what": "The hold's drop box mesh, 29,665 bytes: the vanilla strongbox scaled up, with a coin slot and an iron lip.",
-      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
-      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
-      "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
-      "attribution": "Named on the site's terms and credits pages as built from pieces of Skyrim's own meshes (#2792)",
-      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js; THIRD-PARTY.md, Bethesda's own file, edited.",
-      "status": "no-licence-found",
-      "issue": 2827
     },
     {
       "path": "bot/thornswood-bot-1024.png",
@@ -874,6 +833,41 @@
       "evidence": "THIRD-PARTY.md, Thornswood Content.",
       "status": "unconfirmed",
       "ask": "Whoever next works #2177: read the three mods' Nexus permissions for these files and record them here."
+    },
+    {
+      "path": "Data\\Interface\\startmenu.swf",
+      "what": "The main menu's interface file with no Bethesda logo and no button list, 83,386 bytes, sha256 a1dd4595c1e931ecb8910334a3529238f2f50146997f3cd10191b87fa0190ecf. Shipped in every pack and the installer until #2827, from game/ours.",
+      "published": "Never: the launcher makes it before every Play from the person's own Skyrim - Interface.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "Skyrim's own interface\\startmenu.swf (Skyrim - Interface.bsa, 83,404 bytes), edited: its logo shapes taken out. Measured 15 Oct: the same 871 SWF tags in the same order, only DefineShape tags differ, by a byte or two each, and no strings were added or removed. What the repository holds is the edit, as the bytes that change (launcher\\app\\FromGameMenu.cs, written by scripts\\mods\\Build-StartMenu.py), not the file",
+      "creator": "Bethesda Game Studios; edited for Thornswood, by whom is not recorded",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "The site's terms and credits pages say Thornswood ships no game files and makes these from the person's own game, and carry the notice line the terms ask for (#2792, #2827)",
+      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited; Patrick, 19 Oct 2026 (#2827, option 2): the launcher makes it from each person's own game and it stops shipping",
+      "evidence": "The comparison on #2177, 15 Oct 2026; launcher\\app\\FromGame.cs, FromGameMenu.cs and MadeFromGame.cs; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromGame; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, Bethesda's own files, made on each machine.",
+      "status": "made-from-game",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromGame",
+      "paths": [
+        "Data\\Interface\\startmenu.swf"
+      ],
+      "issue": 2827
+    },
+    {
+      "path": "Data\\meshes\\thornswood\\ (noticeboard01.nif and dropbox01.nif)",
+      "what": "Thornswood's notice board mesh, 155,907 bytes (sha256 47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216): Windhelm sign posts, stockade planks, a shack roof, the candle lantern, vanilla notes and a plank shelf, with its own collision; and the hold's drop box, 29,665 bytes (sha256 09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e): the vanilla strongbox scaled up, with a coin slot and an iron lip. In game/ours until #2827.",
+      "published": "Never: the launcher puts them together before every Play from the person's own Skyrim - Meshes0.bsa and Meshes1.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "Put together by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502). What the repository holds is the recipe (launcher\\app\\FromGameBoard.cs: which meshes, where each piece goes, and Thornswood's own collision hulls), not the meshes",
+      "creator": "Put together here from Bethesda's Skyrim meshes",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "The site's terms and credits pages say Thornswood ships no game files and makes these from the person's own game, and carry the notice line the terms ask for (#2792, #2827)",
+      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502); Patrick, 19 Oct 2026 (#2827, option 2): the launcher makes them from each person's own game and they stop shipping",
+      "evidence": "Commit b9923901 (#2502); launcher\\app\\FromGame.cs, FromGameBoard.cs and MadeFromGame.cs; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromGame; tests\\test-2298-board-meshes.js and tests\\test-2827-from-game.ps1.",
+      "status": "made-from-game",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromGame",
+      "paths": [
+        "Data\\meshes\\thornswood\\noticeboard01.nif",
+        "Data\\meshes\\thornswood\\dropbox01.nif"
+      ],
+      "issue": 2827
     }
   ],
   "dispositions": [

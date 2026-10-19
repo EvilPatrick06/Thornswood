@@ -1,11 +1,21 @@
 """
 Build-NoticeBoard.py
 
-Builds the notice board and its drop box, Thornswood's own two meshes, from
-Skyrim's own vanilla meshes and textures (#2298):
+The recipe for the notice board and its drop box, Thornswood's own two meshes,
+made from Skyrim's own vanilla meshes and textures (#2298):
 
-    game\\ours\\Data\\meshes\\thornswood\\noticeboard01.nif
-    game\\ours\\Data\\meshes\\thornswood\\dropbox01.nif
+    Data\\meshes\\thornswood\\noticeboard01.nif
+    Data\\meshes\\thornswood\\dropbox01.nif
+
+Since #2827 neither mesh ships. Bethesda's terms grant no right to hand on
+meshes put together from the game's own, so each machine makes them from its
+own game: the launcher (launcher\\app\\FromGame.cs) before every Play, and
+scripts\\release\\Go.ps1 for a ship root. What ships is the recipe this
+script writes, launcher\\app\\FromGameBoard.cs: the PARTS below, the blocks
+Thornswood draws itself (the nail heads, the coin slot and its lip, and the
+collision boxes), and the sha256 of each mesh, which the launcher's build must
+match byte for byte before it writes anything. This script stays the one place
+the board is designed; change PARTS here and run it on a machine with the game.
 
 WHY
 
@@ -58,11 +68,16 @@ Collision cannot be tried without the game: the in game check is in the
 issue's test task.
 
 Usage, on a machine with the game (the archives are read, never written):
-    python scripts/mods/Build-NoticeBoard.py           build and write both
+    python scripts/mods/Build-NoticeBoard.py           build, and write the recipe
+                                                      launcher\\app\\FromGameBoard.cs
     python scripts/mods/Build-NoticeBoard.py --check   build in memory and say
-                                                      whether the files in the
-                                                      repo are those bytes
+                                                      whether FromGameBoard.cs is
+                                                      what this writes
     --data <the game's Data folder>, default C:\\Thornswood\\Game\\Data
+    --out <folder>   also write the two meshes there, to look at; never a folder
+                     of the repository, since the meshes are not to be committed
+    --recipe <file> and --name <C# name>: where the recipe goes and what it is
+                     called (tests\\fixtures\\2827 uses these for its made-up game)
 Exit 1 when a check fails or a vanilla part cannot be read.
 """
 
@@ -76,7 +91,10 @@ import numpy as np
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 REPO = os.path.normpath(os.path.join(HERE, '..', '..'))
-OUT = os.path.join(REPO, 'game', 'ours', 'Data', 'meshes', 'thornswood')
+RECIPE = os.path.join(REPO, 'launcher', 'app', 'FromGameBoard.cs')
+MESH_ARCHIVES = ['Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa']   # what the launcher opens
+BOARD_PATH = 'Data\\meshes\\thornswood\\noticeboard01.nif'
+BOX_PATH = 'Data\\meshes\\thornswood\\dropbox01.nif'
 DATA = 'C:\\Thornswood\\Game\\Data'
 ARCHIVES = (['Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa'] +
             ['Skyrim - Textures%d.bsa' % i for i in range(9)])
@@ -171,6 +189,7 @@ class Archive(object):
 class Vanilla(object):
     def __init__(self, data):
         self.archives = []
+        self.read_files = {}  # each vanilla file read, by path, in the order first read
         for name in ARCHIVES:
             path = os.path.join(data, name)
             if not os.path.isfile(path):
@@ -188,7 +207,9 @@ class Vanilla(object):
         name, a = self.find(p)
         if a is None:
             raise SystemExit('STOP. %s is not in the vanilla archives.' % p)
-        return a.read(p.lower().replace('/', '\\'))
+        b = a.read(p.lower().replace('/', '\\'))
+        self.read_files.setdefault(p.lower().replace('/', '\\'), b)
+        return b
 
 
 # ---------------------------------------------------------------- nif reader --
@@ -393,6 +414,7 @@ class Mesh(object):
         self.root = self.add('BSFadeNode', b'')
         self.bsx = self.add('BSXFlags', struct.pack('<iI', self.string('BSX'), 130))
         self.root_name, self.kids, self.hulls, self.points, self.triangles = root_name, [], [], [], 0
+        self.named, self.hull_blocks, self.list_block = {}, [], None
 
     def string(self, s):
         if s not in self.strings:
@@ -418,18 +440,21 @@ class Mesh(object):
                 struct.pack('<iiiQHHI', -1, sh, al, desc, len(tris), len(pos), len(vb) + len(tb)) +
                 vb + tb + struct.pack('<I', 0))
         self.kids.append(self.add('BSTriShape', body))
+        self.named[name] = body
         self.points.append(pos)
         self.triangles += len(tris)
 
     def finish(self, body_template, material):
-        subs = [self.add('bhkConvexVerticesShape', convex(h, material)) for h in self.hulls]
+        self.hull_blocks = [convex(h, material) for h in self.hulls]
+        subs = [self.add('bhkConvexVerticesShape', b) for b in self.hull_blocks]
         if len(subs) == 1:
             shape = subs[0]
         else:
-            shape = self.add('bhkListShape', struct.pack('<I', len(subs)) +
-                             b''.join(struct.pack('<i', s) for s in subs) + struct.pack('<I', material) +
-                             struct.pack('<6I', 0, 0, 0x80000000, 0, 0, 0x80000000) +
-                             struct.pack('<I', len(subs)) + b'\0' * (4 * len(subs)))
+            self.list_block = (struct.pack('<I', len(subs)) +
+                               b''.join(struct.pack('<i', s) for s in subs) + struct.pack('<I', material) +
+                               struct.pack('<6I', 0, 0, 0x80000000, 0, 0, 0x80000000) +
+                               struct.pack('<I', len(subs)) + b'\0' * (4 * len(subs)))
+            shape = self.add('bhkListShape', self.list_block)
         rb = bytearray(body_template)
         struct.pack_into('<i', rb, 0, shape)
         body = self.add('bhkRigidBody', bytes(rb))
@@ -604,6 +629,91 @@ def build(vanilla):
     return board_bytes, box_bytes, board, box, origin
 
 
+def cs_str(v):
+    return '"' + v.replace('\\', '\\\\').replace('"', '\\"') + '"'
+
+
+def cs_num(v):
+    return repr(float(v))
+
+
+def cs_blob(b, indent):
+    """Base64, in lines of 96 characters joined with +."""
+    import base64
+    t = base64.b64encode(b).decode('ascii')
+    parts = [t[i:i + 96] for i in range(0, len(t), 96)] or ['']
+    return (' +\n' + indent).join('"%s"' % p for p in parts)
+
+
+def cs_part(part, indent):
+    """A BoardPart, its rotation as the matrix numpy makes (so the launcher needs no
+    sine of its own, which another maths library could round differently)."""
+    name, mesh, rot, scale, pos = part
+    return ('new BoardPart(%s, %s, // turned %s degrees about x, y and z\n%s    new double[] { %s },\n'
+            '%s    new double[] { %s }, new double[] { %s })') % (
+        cs_str(name), cs_str(mesh), ', '.join('%g' % x for x in rot),
+        indent, ', '.join(cs_num(x) for x in rotation(*rot).ravel()),
+        indent, ', '.join(cs_num(x) for x in scale), ', '.join(cs_num(x) for x in pos))
+
+
+def recipe(name, board_bytes, box_bytes, board, box, sources):
+    """launcher\\app\\FromGameBoard.cs: everything of Thornswood's the two meshes
+    are made of, and what the launcher's build must come to."""
+    import hashlib
+    i3, i4 = ' ' * 12, ' ' * 16
+    L = ['// Written by scripts\\mods\\Build-NoticeBoard.py, from its PARTS and the blocks it',
+         '// draws itself, on a machine with the game. Change the script and run it again;',
+         '// an edit here is lost and fails the launcher\'s byte for byte check (#2827).',
+         'namespace Thornswood',
+         '{',
+         '    public sealed partial class BoardRecipe',
+         '    {',
+         '        public static readonly BoardRecipe %s = new BoardRecipe' % name,
+         '        {',
+         i3 + 'Archives = new[] { %s },' % ', '.join(cs_str(a) for a in MESH_ARCHIVES),
+         i3 + '// each of the game\'s meshes the two are made from, as this game had it',
+         i3 + 'Sources = new BoardSource[]',
+         i3 + '{']
+    L += [i4 + 'new BoardSource(%s, %d, "%s"),' % (cs_str(p), len(b), hashlib.sha256(b).hexdigest())
+          for p, b in sources.items()]
+    L += [i3 + '},',
+         i3 + 'Parts = new[]',
+         i3 + '{']
+    L += [i4 + cs_part(p, i4) + ',' for p in PARTS]
+    L += [i3 + '},',
+          i3 + 'Box = %s,' % cs_part(BOX, i3),
+          i3 + 'NailSource = %s,' % cs_str(NAIL_SOURCE),
+          i3 + 'NailTexture = "snail01",',
+          i3 + 'BodyBoard = %s,' % cs_str(BODY_BOARD),
+          i3 + 'BodyBox = %s,' % cs_str(BODY_BOX),
+          i3 + 'BoardRoot = %s,' % cs_str(board.root_name),
+          i3 + 'BoxRoot = %s,' % cs_str(box.root_name),
+          i3 + 'NailHeads = ' + cs_blob(board.named['NailHeads'], i4) + ',',
+          i3 + 'CoinSlotLip = ' + cs_blob(box.named['CoinSlotLip'], i4) + ',',
+          i3 + 'CoinSlot = ' + cs_blob(box.named['CoinSlot'], i4) + ',',
+          i3 + 'BoardHulls = new[]',
+          i3 + '{']
+    L += [i4 + cs_blob(h, i4 + '    ') + ',' for h in board.hull_blocks]
+    L += [i3 + '},',
+          i3 + 'BoardList = ' + (cs_blob(board.list_block, i4) if board.list_block else 'null') + ',',
+          i3 + 'BoxHulls = new[]',
+          i3 + '{']
+    L += [i4 + cs_blob(h, i4 + '    ') + ',' for h in box.hull_blocks]
+    L += [i3 + '},',
+          i3 + 'BoxList = ' + (cs_blob(box.list_block, i4) if box.list_block else 'null') + ',',
+          i3 + 'BoardPath = %s,' % cs_str(BOARD_PATH),
+          i3 + 'BoardSize = %d,' % len(board_bytes),
+          i3 + 'BoardSha256 = "%s",' % hashlib.sha256(board_bytes).hexdigest(),
+          i3 + 'BoxPath = %s,' % cs_str(BOX_PATH),
+          i3 + 'BoxSize = %d,' % len(box_bytes),
+          i3 + 'BoxSha256 = "%s",' % hashlib.sha256(box_bytes).hexdigest(),
+          '        };',
+          '    }',
+          '}',
+          '']
+    return '\r\n'.join(L)
+
+
 def check_mesh(name, data, vanilla):
     """Every block reads to its size, every reference is to the right kind, and every
     texture is in the vanilla archives. Returns the problems found."""
@@ -643,6 +753,9 @@ def main():
     ap = argparse.ArgumentParser()
     ap.add_argument('--data', default=DATA)
     ap.add_argument('--check', action='store_true')
+    ap.add_argument('--out')
+    ap.add_argument('--recipe', default=RECIPE)
+    ap.add_argument('--name', default='Shipped')
     args = ap.parse_args()
     vanilla = Vanilla(args.data)
     board_bytes, box_bytes, board, box, origin = build(vanilla)
@@ -659,18 +772,23 @@ def main():
         print('  BAD  ' + b)
     if bad:
         return 1
-    pairs = (('noticeboard01.nif', board_bytes), ('dropbox01.nif', box_bytes))
+    if args.out:
+        if os.path.normcase(os.path.abspath(args.out)).startswith(os.path.normcase(REPO + os.sep)):
+            print('STOP. --out is inside the repository; the meshes are not to be committed (#2827).')
+            return 1
+        os.makedirs(args.out, exist_ok=True)
+        for n, b in (('noticeboard01.nif', board_bytes), ('dropbox01.nif', box_bytes)):
+            open(os.path.join(args.out, n), 'wb').write(b)
+            print('wrote ' + os.path.join(args.out, n))
+    text = recipe(args.name, board_bytes, box_bytes, board, box, vanilla.read_files)
     if args.check:
-        differ = [n for n, b in pairs
-                  if not os.path.isfile(os.path.join(OUT, n)) or open(os.path.join(OUT, n), 'rb').read() != b]
-        for n in differ:
-            print('  DIFFERS  %s is not what this builds' % n)
-        print('  ok    both files are what this builds' if not differ else '')
-        return 1 if differ else 0
-    os.makedirs(OUT, exist_ok=True)
-    for n, b in pairs:
-        open(os.path.join(OUT, n), 'wb').write(b)
-        print('wrote ' + os.path.join(OUT, n))
+        have = open(args.recipe, 'rb').read().decode('utf-8') if os.path.isfile(args.recipe) else None
+        same = have is not None and have.replace('\r\n', '\n') == text.replace('\r\n', '\n')
+        print('  ok    %s is what this writes' % args.recipe if same else
+              '  DIFFERS  %s is not what this writes' % args.recipe)
+        return 0 if same else 1
+    open(args.recipe, 'wb').write(text.encode('utf-8'))
+    print('wrote ' + args.recipe)
     return 0
 
 
