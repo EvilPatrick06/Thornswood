@@ -150,7 +150,7 @@ try {
     # the swap says what it could not add.
     $relTxt = Join-Path $site 'feed-dev\releases.txt'
     New-Item -ItemType Directory -Force -Path $relTxt | Out-Null
-    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x"},{"id":"y"}],"release":{"id":"20261018-120000-dev","channel":"dev"}}'
+    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x","url":"https://thornswood.net/feed-dev/assets/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","sha256":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"},{"id":"y","url":"https://thornswood.net/feed-dev/assets/bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb","sha256":"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}],"release":{"id":"20261018-120000-dev","channel":"dev"}}'
     $said = @(Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site 6>&1)
     $r = @($said | Where-Object { $_ -is [hashtable] })[0]
     $note = (@($said | Where-Object { $_ -isnot [hashtable] } | ForEach-Object { [string]$_ }) -join ' ')
