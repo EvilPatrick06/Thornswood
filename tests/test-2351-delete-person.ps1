@@ -136,7 +136,13 @@ $Dev  = Join-Path $Box 'Thornswood-Server-Dev'
 $Vl   = Join-Path $Box 'Thornswood-Voice'
 $Vd   = Join-Path $Box 'Thornswood-Voice-Dev'
 $Bot  = Join-Path $Box 'Thornswood-Bot'
-$roots = @('-SiteRoot', $Site, '-GameRoot', $Live, '-DevGameRoot', $Dev, '-VoiceRoot', $Vl, '-DevVoiceRoot', $Vd, '-BotRoot', $Bot, '-RecordRoot', $Rec, '-AllowGamingPc')
+# The nightly backup's task, where this runs on the box that has it (#2833):
+# the record's folder gives its SID read. Elsewhere no task, no rule.
+$BackupTask = 'Thornswood Backup'
+$BackupSid = ''
+try { $BackupSid = (New-Object Security.Principal.NTAccount('NT TASK', $BackupTask)).Translate([Security.Principal.SecurityIdentifier]).Value }
+catch [Security.Principal.IdentityNotMappedException] { $BackupSid = '' }
+$roots = @('-SiteRoot', $Site, '-GameRoot', $Live, '-DevGameRoot', $Dev, '-VoiceRoot', $Vl, '-DevVoiceRoot', $Vd, '-BotRoot', $Bot, '-RecordRoot', $Rec, '-BackupTask', $BackupTask, '-AllowGamingPc')
 
 $ME = '111111111111111111'      # asked to be deleted
 $YOU = '222222222222222222'     # did not
@@ -494,8 +500,15 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
     $acl = Get-Acl -LiteralPath $Rec
     $who = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value })
     $mySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    Yes 'the record''s folder inherits nothing and lets in only SYSTEM, Administrators and whoever made it' (
-        $acl.AreAccessRulesProtected -and @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $mySid) -notcontains $_ }).Count -eq 0)
+    Yes 'the record''s folder inherits nothing and lets in only SYSTEM, Administrators, whoever made it and the nightly backup' (
+        $acl.AreAccessRulesProtected -and @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $mySid, $BackupSid) -notcontains $_ }).Count -eq 0)
+    if ($BackupSid) {
+        $read = @($acl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $BackupSid })
+        Yes '  and the nightly backup''s task may read it, and do nothing more (#2833)' (
+            $read.Count -eq 1 -and $read[0].AccessControlType -eq 'Allow' -and
+            ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [Security.AccessControl.FileSystemRights]::ReadAndExecute -and
+            ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::Write) -eq 0)
+    } else { Write-Host ('SKIP  the nightly backup''s read on the folder: no Thornswood Backup task here (the VPS runners have one)') }
 
     # ---- a restore, and the reapply -------------------------------------------------
     Build
