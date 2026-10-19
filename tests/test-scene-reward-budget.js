@@ -153,10 +153,14 @@ test('small operation sequences obey conservation through recreation', () => {
   visit(undefined, T, [], 5);
   assert.ok(paths > 100);
 });
-test('source-only module is absent from the runtime bundler and gamemode', () => {
-  for (const name of ['scripts/dev/Build-MerchantGamemode.js', 'game/gamemode.js']) {
-    const source = fs.readFileSync(path.join(__dirname, '..', name), 'utf8');
-    assert.ok(!source.includes('scene-reward-budget'));
-  }
+test('the runtime bundle exposes the reviewed accounting implementation', () => {
+  const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8'),vm=require('node:vm'),context={require,Buffer};
+  vm.createContext(context);
+  vm.runInContext(source.slice(source.indexOf('// MERCHANT TRADING BUNDLE BEGIN'),source.indexOf('// MERCHANT TRADING BUNDLE END'))+
+    '\nglobalThis.accounting=MERCHANT_TRADING.sceneBudget;',context);
+  const actual=context.accounting.reserve(undefined,'q-budget-parity',40,T);
+  assert.deepEqual(clone(actual),budget.reserve(undefined,'q-budget-parity',40,T));
+  const done=context.accounting.complete(actual.next,'q-budget-parity',actual.token,T+1);
+  assert.equal(done.ok,true);assert.equal(done.gold,40);assert.deepEqual(clone(done.next.paid),[[T+1,40]]);
 });
-console.log('PASS ' + cases + ' scene reward accounting groups, malformed-state matrix and exhaustive operation sequences; source-only');
+console.log('PASS ' + cases + ' scene accounting groups, malformed-state matrix, exhaustive sequences and runtime parity');
