@@ -2,6 +2,7 @@
 const STATE=typeof MERCHANT_COMMISSION_STATE!=='undefined'?MERCHANT_COMMISSION_STATE:require('./merchant-commission-state');
 const INVENTORY=typeof MERCHANT_SETTLEMENT!=='undefined'?MERCHANT_SETTLEMENT:require('./merchant-settlement');
 const copy=value=>JSON.parse(JSON.stringify(value));
+const hash=value=>require('node:crypto').createHash('sha256').update(JSON.stringify(value)).digest('hex');
 // Published jobs remain routable while their accepted promises exist.
 const publication=Object.freeze({
  'q-whiterun-smith-straps':'8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734',
@@ -18,7 +19,10 @@ const publication=Object.freeze({
 function prepareCommissions(author,catalog,native) {
  if(!Array.isArray(author)||author.length!==Object.keys(publication).length)throw Error('Invalid published commission catalogue.');
  author=copy(author);catalog=copy(catalog);
- if(new Set(author.map(row=>row&&row.id)).size!==author.length||author.some(row=>!row||publication[row.id]!==row.sourceHash))
+ if(new Set(author.map(row=>row&&row.id)).size!==author.length||author.some(row=>{
+   if(!row||publication[row.id]!==row.sourceHash)return true;
+   const {sourceHash,itemType,...definition}=row;return hash(definition)!==sourceHash;
+  }))
   throw Error('Published commission definitions must remain available.');
  const ids=new Set();
  return author.map(source=>{
@@ -123,7 +127,7 @@ function createCommissions(deps) {
     if(!again||again.unit!==quote.unit||again.name!==quote.name||!eligible(actor,row))return false;
    }
    const count=STATE.openCount(namespace(),human);
-   return (!fresh||count<3)&&guards.alive();
+   return (!fresh||count<3)&&guards.current()&&guards.alive();
   }
   if(verb==='take') {
    if(!eligible(actor,row))return {ok:false,why:'eligibility'};

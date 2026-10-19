@@ -15,10 +15,11 @@ vm.runInContext(fs.readFileSync(ffile,'utf8').split('const roleMarket=')[0]+';th
 const fixture=fixtureContext.fixture,catalog=require('../game/data/merchant-traders.json'),tables=require('../game/data/merchant-role-tables.json');
 const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests;
 assert.equal(raw.length,10);
-for(const defect of ['missing','empty','hash','substitution']) {
+for(const defect of ['missing','empty','hash','substitution','definition']) {
  const damaged=copy(raw);if(defect==='missing')damaged.pop();if(defect==='empty')damaged.length=0;
  if(defect==='hash')damaged[0].sourceHash='0'.repeat(64);
  if(defect==='substitution')damaged[0].id='q-substitute-commission';
+ if(defect==='definition')damaged[damaged.length-1].goods[0].count++;
  let reads=0;
  assert.throws(()=>prepareCommissions(damaged,catalog,{resolveMerchant(){reads++;return 1;},resolveItem(){reads++;return 100;}}),
    /publish|commission/i,'published '+defect+' admission must refuse');
@@ -134,5 +135,12 @@ for(const row of rows) {
  assert.equal(w.open(row).quests.find(q=>q.id===row.id).canTake,false);
  assert.match(w.command('quest','take',row.id,'@2').text,/requirements/);
  assert.equal(w.purses.read(row.merchantId).commissions,undefined);
+}
+{
+ const row=rows[0],w=world();w.quote(row);let reads=0;
+ w.deps.onRankRead=()=>{if(++reads===2)w.box.actors[10].runtimeIdentity='101';};
+ w.command('quest','take',row.id,'@2');assert.ok(reads>=2);
+ assert.equal(w.purses.read(row.merchantId).commissions,undefined,
+  'native replacement during the final eligibility callback cannot reserve a promise');
 }
 console.log('PASS all ten compiled commissions: exact specialists, actual gates, pre-goods acceptance, original reserved payment, native settlement and stale-panel refusal');
