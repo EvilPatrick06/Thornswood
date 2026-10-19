@@ -53,10 +53,10 @@ What is NOT covered today, which is what this issue is about:
 | --- | --- | --- | --- | --- |
 | Launcher `Thornswood.exe` | PE | Authenticode, embedded (today) | RSA certificate from Artifact Signing, SHA256 file digest, RFC 3161 SHA256 timestamp | Ship gate; installed launcher before swap (`Signature.cs`) |
 | Installer / setup-stub | PE | Authenticode, embedded (today) | same | Ship gate; Windows SmartScreen for the people installing |
-| Client runtime, packs, baseline, optional packs | zip | Covered by the signed release manifest (below), by sha256 | SHA256 entries in a signed manifest | Launcher (phase C), Ship gate |
-| Feed `version.json` | JSON | Covered by the signed release manifest: the manifest names the feed's own sha256 for that release | same | Launcher (phase C), `Check-ShipReady` |
-| Build records `client-build.json`, `server-build.json` | JSON | Covered by the signed release manifest | same | Ship gate, box deploy |
-| Release manifest `release-<id>.cat` (new) | Windows catalog (PKCS#7) | Authenticode via the SAME Artifact Signing profile (`signtool sign` signs `.cat` files) | as above | `Signature.cs` on the catalog, then each listed sha256 |
+| Client runtime, packs, optional packs, the baseline record (which names every file of the release by its sha256) | zip, JSON | Listed by sha256 in the signed release manifest (below), since phase B | SHA256 entries in a signed manifest | Launcher (phase C), Publish-Update's gate |
+| Feed `version.json` | JSON | Not signed itself. It names the manifest (`signedManifest`), and every asset in it is checked against the manifest. Its own bytes are not listed: Set-Server, Set-Collection, Dev-News, Publish-Discord, Rollback-Feed and Repair-Manifest rewrite it after a Ship, so a signature over it would go stale at the next edit. What it says outside the asset hashes (server address, collection, news, minLauncher) is not covered; see "Not covered" below | none | |
+| Build records `client-build.json`, `server-build.json` | JSON | Not yet. The manifest carries the commit and the fork commit; listing the records' hashes is for phase C | | |
+| Release manifest `release.json` and its catalog (new, phase B) | JSON, and a Windows catalog (PKCS#7) whose one member is `release.json` | Authenticode on the catalog via the SAME Artifact Signing profile. Measured 18 Oct on One: ThornswoodRelease signed a `New-FileCatalog` catalog with a timestamp, Authenticode reads it Valid, and `Signature.cs` accepts it | as above | `Signature.cs` on the catalog, `Test-FileCatalog` for `release.json`, then each listed sha256 |
 
 Why a catalog. It reuses the one signing identity the launcher already pins,
 the one tool chain (`Sign-Artifact.ps1`) and the one custody arrangement. No
@@ -67,10 +67,20 @@ is the fallback if catalogs prove awkward to build on the runner. A separate
 key (minisign, Sigstore keyless) was the alternative; Patrick kept the
 catalog (section 8, decision 1).
 
-The manifest also carries the provenance: source commit, engine/skymp pin,
-tag, release id, runner name, the hashes of `client-build.json` and
-`server-build.json`, and the sha256 of every asset. The pilot's
+The manifest also carries the provenance: release id, channel, source
+commit and branch, launcher version, the engine/skymp fork commit, when it
+was made, and the sha256 of every asset. Not the machine's name: the
+manifest is public on the site, and the signature already says who signed. The
+records' own hashes are not in it yet (phase C). The pilot's
 `records\signing\pilot-2163.json` is that shape for one test file.
+
+Not covered, by design: what `version.json` says outside asset hashes. A
+writer of the feed can still change the server address, the collection
+address, the news and minLauncher. The manifest stops that writer from
+handing out a pack, runtime, launcher or file the signer did not release;
+it does not stop a feed that sends launchers to another server. Signing
+those fields would mean every feed edit after a Ship signs again (the six
+scripts above), which is phase C's question to settle.
 
 ## 3. Owners, custody, rotation, recovery, revocation
 
@@ -141,9 +151,27 @@ the sha256 and keeps the sha256 check.
 
 - Phase A, pilot (this change): a TEST exe signed and verified on One with
   the real profile, an offline harness, this document. No live change.
-- Phase B, produce: Ship writes and signs the manifest and uploads it to the
-  feed store beside `version.json`; Ship's own gate verifies it. Launchers
-  ignore it. Rollback: stop writing it.
+- Phase B, produce: Ship writes and signs the manifest and puts it on the
+  site; its own gate verifies it. Launchers ignore it. Rollback: stop
+  writing it (a revert of the block below).
+  As built (#2163, 19 Oct): Publish-Update.ps1, on every run that uploads,
+  after the release record and the news and before `version.json` is
+  written. `Release-Manifest.ps1` lists every asset the feed names that
+  carries code or names files (the launcher, the client runtime, each pack
+  and optional pack, the baseline record) in `release.json`, and makes a
+  catalog over it. `Sign-ReleaseCatalog.ps1` signs the catalog with
+  `Sign-Artifact.ps1 -Required` and checks it with the publish gate and
+  `Signature.cs`. `Get-ReleaseManifestRefusal` checks the catalog still holds
+  `release.json` and that it lists every asset. Both files go to the site
+  as assets by their sha256, and the feed names them as `signedManifest`
+  (`url`, `sha256`, `catalogUrl`, `catalogSha256`). Any failure stops the
+  publish before `version.json` moves. So every Ship now signs once more,
+  dev included, and needs the signing setup and Azure to answer even when
+  it ships no launcher. A run that uploads nothing drops `signedManifest`
+  from the feed rather than name an older release's.
+  Left for phase C: `Rollback-Feed.ps1` should name the manifest the release
+  it goes back to had; `Scrub-Feed.ps1` rebuilds packs, so it must sign a
+  manifest for them; and the records' hashes go into the manifest.
 - Phase C, warn: a launcher that understands the manifest verifies it and
   reports a failure to the log and the site, but still installs on a good
   sha256. Measure for at least one main and several dev releases.

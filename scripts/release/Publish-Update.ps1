@@ -161,6 +161,9 @@ if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
 # Where the notes are kept, in the feed or as a file of their own (#1050).
 . (Join-Path $Here 'Feed-News.ps1')
+# The signed release manifest (#2163, phase B): what it lists, and signing it.
+. (Join-Path $Here 'Release-Manifest.ps1')
+. (Join-Path $Here 'Sign-ReleaseCatalog.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -2300,6 +2303,51 @@ try {
     if ($newsWhere -eq 'file') { Say ("  the {0} notes are one file on the site, named in the feed (every launcher let in reads it)" -f @($news).Count) 'Green' }
 } catch { Die ($_.Exception.Message + ' Run Ship again.') }
 # ==== end thornswood news out ====
+
+# ==== thornswood signed manifest ====
+# THE RELEASE IS SIGNED BEFORE THE FEED NAMES IT (#2163, phase B of
+# docs\SIGNED-RELEASES.md). Every asset the feed now names that carries code or
+# names files (the launcher, the client runtime, the packs, the baseline
+# record) is listed by sha256 in release.json, a catalog over it is signed by
+# ThornswoodRelease and checked the way a launcher checks a launcher, and both
+# go to the site as assets before version.json names them as "signedManifest".
+# Launchers do not read it yet (phase C). A run that uploads nothing (-NoUpload,
+# what Ship -DryRun passes) signs nothing: nothing it names is on the site.
+# A catalog that is not signed and accepted stops here, before version.json is
+# written or sent, the same as an asset that did not reach the site.
+if (-not $NoUpload) {
+    Head 'Signing the release manifest'
+    $smWhy = ''
+    $sm = $null
+    try { $sm = New-ReleaseManifestFiles $doc $Id $Channel (Join-Path $DistDir ('signed-' + $Id)) }
+    catch { $smWhy = $_.Exception.Message }
+    if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir }
+    if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc }
+    if ($smWhy) {
+        Die ("The release manifest was not signed and checked, so version.json has not been touched and nobody has been sent this release: $smWhy")
+    }
+    $smArgs = @{ Dev = $Dev; Send = @($sm.Json, $sm.Catalog) }
+    if ($SiteDir) { $smArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @smArgs }
+    catch { $smWhy = $_.Exception.Message }
+    if (-not $smWhy -and $LASTEXITCODE -ne 0) { $smWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    if ($smWhy) { Die ("The signed manifest did not reach the site, so version.json has not been touched: $smWhy") }
+    $smJsonSha = (Get-FileHash -LiteralPath $sm.Json -Algorithm SHA256).Hash.ToLowerInvariant()
+    $smCatSha = (Get-FileHash -LiteralPath $sm.Catalog -Algorithm SHA256).Hash.ToLowerInvariant()
+    Set-Prop $doc 'signedManifest' ([pscustomobject][ordered]@{
+        url           = (Get-HostFeedAssetUrl $smJsonSha -Dev:$Dev)
+        sha256        = $smJsonSha
+        catalogUrl    = (Get-HostFeedAssetUrl $smCatSha -Dev:$Dev)
+        catalogSha256 = $smCatSha
+    })
+    Say ("  release.json lists {0} asset(s); its catalog is signed by ThornswoodRelease and on the site" -f @((ConvertFrom-Json ([IO.File]::ReadAllText($sm.Json))).assets).Count) 'Green'
+} elseif ($doc.PSObject.Properties['signedManifest']) {
+    # The feed names only a manifest made for the release it describes: the
+    # last release's would not list what this one changed.
+    $doc.PSObject.Properties.Remove('signedManifest')
+}
+# ==== end thornswood signed manifest ====
 
 # Compact and without a byte order mark, the one way every feed writer writes
 # it (Feed-Json.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
