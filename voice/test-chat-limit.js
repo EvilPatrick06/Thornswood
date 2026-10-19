@@ -337,11 +337,12 @@ const notices = (p) => p.chat.filter((m) => m.from === 0);
   const longCmds = (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json()).commands;
   yes('a post of ' + longPost.length + ' characters reaches the game server whole',
       longPost.length > 800 && longCmds.length === 1 && longCmds[0].text === longPost);
-  const tooLong = '/notice ' + 'x'.repeat(3000);
+  const tooLong = '/notice ' + 'x'.repeat(9000);
   say(loud, tooLong);
   await settle(loud);
   const cut = (await (await fetch('http://127.0.0.1:' + PORT + '/commands')).json()).commands;
-  yes('a command longer than 2,000 is cut at 2,000, not kept whole', cut.length === 1 && cut[0].text.length === 2000);
+  // 8,200 since #2563: the longest journal page line (tests/test-2563-journal-length.js).
+  yes('a command longer than 8,200 is cut at 8,200, not kept whole', cut.length === 1 && cut[0].text.length === 8200);
   const heardBefore = from(quiet, quiet).length;
   say(quiet, '/me ' + 'w'.repeat(1000));
   await settle(quiet);
