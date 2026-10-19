@@ -146,7 +146,10 @@ into service.
 
 Ask in the Discord, or open a ticket there with **I need help**. Say which
 account and what you want removed. It is done by a person, and you will be told
-when it is.
+when it is. Each part of Thornswood (the site, the game servers, voice chat and
+the Discord bot) removes it from its own records the next time that part
+restarts, which happens with its updates: usually within a day, and for voice
+and the bot sometimes up to a week. You are told once every part has done it.
 
 You can also ask what is kept about your account, request a copy, or ask to
 correct it. Use a private ticket for account details rather than a public

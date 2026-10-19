@@ -21,7 +21,7 @@ start the restored server and connect to it; see the end of that section.
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
 | `scripts\vps\Restore-Box.ps1` | run on Patrick's machine: carries one to a new box and puts all of it back there, both worlds with Restore-Server.ps1 and the rest with `vps-restore-services.ps1`, then deletes its copy (issue #454) |
-| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore (issue #2351, `docs\WEBSITE-OPERATIONS.md` "Deletion requests") |
+| `scripts\vps\Delete-Person.ps1` | carries out a deletion request and writes it in `C:\Thornswood-Deletions\requests.jsonl`; `-Reapply` removes everybody in that record again after a restore, from the copies nothing runs from at once and from each service's own files at its next start (#2758) (issue #2351, `docs\WEBSITE-OPERATIONS.md` "Deletion requests") |
 | `scripts\vps\vps-freeze.ps1` | run on the old box through Remote.ps1 on the day of a move: stops everything and takes the last backup |
 | `tests\test-backup-restore.ps1` | backs up a scratch server, restores it into another, and checks it, every night in the build checks |
 | `tests\test-backup-streaming.ps1` | verifies large uploads, old archive compatibility, tampering, stream failures and publication collisions with disposable data |
@@ -73,20 +73,23 @@ Before anything restored goes back into service, the people who asked to be
 deleted are removed again (issue #2351): a backup still holds everybody who
 asked after it was taken. `Restore-Box.ps1` does it as its last step. After
 any other restore (Restore-Server.ps1 on its own, a folder copied back by
-hand), with the services it wrote under still stopped, on the box:
+hand), before the services start again, on the box:
 ```powershell
 .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply'
 .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-Reapply -Delete'
 ```
-The first is a dry run that counts what goes; the second removes it, and
-refuses while a service it would write under is running. When the backup
+The first is a dry run that counts what goes; the second removes it from
+every copy nothing runs from and asks each service again, stopping nothing:
+each takes the request out of its restored files as it starts, so run it
+before they start (#2758). When the backup
 being put back carries a record the box's own does not, add
-`-Merge <its deletions\requests.jsonl>` to both. The second also writes
-`private\deleted-characters.json` again in each game server whose restored
-registers name one of those characters (a house, an office, a place on a
-roll or in a book), and each game server lets go of those entries as it
-starts (#2351): its `thornswood.log` says `release:` with counts, and the
-list is gone once every part is done. Putting back a folder an install or a
+`-Merge <its deletions\requests.jsonl>` to both. The second writes
+`private\deleted-characters.json` again in each game server that holds
+something of theirs: as it starts, `server-log.js` deletes their saves before
+the engine loads them (`server.log` says `deletions:`), and the gamemode lets
+go of what its restored registers say about them (#2351): its
+`thornswood.log` says `release:` with counts, and the list is gone once every
+part is done. Putting back a folder an install or a
 wipe set aside (`C:\Thornswood-Server.prev-<date>`, `world-before-<date>`
 and the `*-before-<date>.json` registers in `private`) is a restore too: run
 the two lines above with that server still stopped, before it starts. "Deletion requests" in

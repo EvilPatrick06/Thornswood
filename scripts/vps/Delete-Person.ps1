@@ -58,10 +58,10 @@
     voice           every chat line their characters wrote, out of each day's
                     file, live and dev, except the lines said inside a
                     session staff marked kept (#2166), which stay with it.
-                    The voice service never edits a day
-                    (voice\voice-server.js); these are the only edits, and the
-                    record keeps each file's line count before and after, so
-                    an edited day says so
+                    The voice service itself never edits a day
+                    (voice\voice-server.js); server-log.js does, before
+                    voice starts, and the record keeps each day's line count
+                    when the request was made
     the bot         their join number (joins.json; the last number given out
                     stays, so nobody is handed theirs again) and their open
                     ticket (open-tickets.json)
@@ -1050,7 +1050,7 @@ try {
             by        = $By.Trim()
             removes   = $r.removed
             chat      = @($r.chat)
-            asked     = @($asked)
+            asked     = @($names.Keys | Where-Object { $asked -contains $_ })
         }
         Ensure-RecordFolder
         [IO.File]::AppendAllText($record, (ConvertTo-Json -InputObject $row -Depth 6 -Compress) + "`n", $utf8)
