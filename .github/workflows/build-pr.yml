@@ -455,6 +455,7 @@ jobs:
                  'test-2516-server-boards.js',
                  'test-516-woodworking-benches.js',
                  'test-2554-board-posts.js',
+                 'test-2563-journal-length.js',
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
