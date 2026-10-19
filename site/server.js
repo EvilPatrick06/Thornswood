@@ -1191,10 +1191,14 @@ const jsonFile = (p, fallback) => {
     return fallback;
   }
 };
-const putJson = (p, o) => {
+const putJson = (p, o) => putFile(p, () => JSON.stringify(o, null, 2));
+const putFile = (p, text) => {
   // Same-folder temp + rename so a crash mid-write cannot leave truncated
   // JSON that jsonFile would then quietly replace with the empty fallback
-  // (bans, linked accounts, inbox, and the rest of putJson callers).
+  // (bans, linked accounts, inbox, and the rest of putJson callers), or a
+  // moderation.log cut short by its keeping time (#2353). text is the body,
+  // or a function that makes it, so a body that will not stringify is a
+  // failed write like any other.
   // A temp file that will not go is said, by its name and the error code
   // (#2736): it holds a whole copy of the file, and a folder full of them is
   // otherwise found by somebody wondering where the disk went. One that was
@@ -1206,7 +1210,7 @@ const putJson = (p, o) => {
     catch (e2) { console.error('[thornswood-docs] could not remove ' + tmp + ' (' + (e2.code || e2.message) + ')'); }
   };
   try {
-    const body = JSON.stringify(o, null, 2);
+    const body = typeof text === 'function' ? text() : String(text);
     fs.writeFileSync(tmp, body, 'utf8');
     try { fs.renameSync(tmp, p); }
     catch (e) {
@@ -1400,9 +1404,22 @@ function publicApiWait(req, now) {
 // TICKETS AND REPORTS ARE TRIMMED APART. Each kind keeps the newest 2000 the
 // shared list used to keep, so nothing posted to the public page can push a
 // ticket out, and a pile of tickets cannot push a report out either.
+//
+// AND KEPT FOR INBOX_DAYS, THEN DROPPED (#2353). The count was the only rule,
+// so on a quiet server a report, a call for help or an application lived for
+// as long as fewer than 2000 came after it, which could be years, and the
+// privacy page gave no time at all. Decided by Patrick on 12 October: a
+// keeping time for each store, enforced in code. 365 days, the same as
+// session records and chat, so a report has the session and the chat it is
+// about behind it for exactly as long as they exist. A row's time is its at;
+// a row with no usable time is kept, as the sign-in log keeps one, because
+// a guess that deletes a report is the wrong way to be wrong. The ageing runs
+// on every write, on the hub's read (so nothing past the window is shown),
+// and in the hourly retention sweep (sweepInbox), with nothing sent needed.
 const REPORT_HOUR = 5;
 const REPORT_DAY = 20;
 const INBOX_KEEP = 2000;
+const INBOX_DAYS = 365;
 const reportSalt = crypto.randomBytes(32);
 const reportSeen = new Map();
 
@@ -1489,10 +1506,14 @@ function reportPrune(now) {
   }
 }
 
-function trimInbox(rows) {
+function trimInbox(rows, now) {
+  const cut = (Number(now) || Date.now()) - INBOX_DAYS * 86400000;
   let tickets = 0, reports = 0;
-  return (Array.isArray(rows) ? rows : []).filter((r) =>
-    (r && r.kind === 'ticket') ? ++tickets <= INBOX_KEEP : ++reports <= INBOX_KEEP);
+  return (Array.isArray(rows) ? rows : []).filter((r) => {
+    const at = Number(r && r.at);
+    if (isFinite(at) && at > 0 && at < cut) return false;
+    return (r && r.kind === 'ticket') ? ++tickets <= INBOX_KEEP : ++reports <= INBOX_KEEP;
+  });
 }
 // ==== end thornswood report limits ====
 setInterval(() => reportPrune(Date.now()), 10 * 60 * 1000).unref?.();
@@ -2837,7 +2858,9 @@ function activeBans(now) {
 function putBan(key, row) {
   const readB = bansNow();
   if (readB.broken) return false;
-  const table = readB.table;
+  // Through the keeping time on the way in (#2353), so a write never puts
+  // back a ban that ran out more than STAFF_DAYS ago.
+  const table = freshBans(readB.table, Date.now());
   const had = table[key] || {};
   const profiles = new Set([].concat(had.profiles || [], row.profiles || []).map(Number).filter((n) => n > 0));
   table[key] = Object.assign({}, row, { profiles: Array.from(profiles) });
@@ -2848,7 +2871,7 @@ function putBan(key, row) {
 function dropBan(keys) {
   const readB = bansNow();
   if (readB.broken) return { was: false, ok: false };
-  const table = readB.table;
+  const table = freshBans(readB.table, Date.now());
   let was = false;
   for (const k of keys) {
     if (k && Object.prototype.hasOwnProperty.call(table, k)) { delete table[k]; was = true; standCache.delete(k); }
@@ -2856,7 +2879,7 @@ function dropBan(keys) {
   return { was, ok: !was || putJson(BANS, table) };
 }
 function putNote(key, row) {
-  const notes = jsonFile(NOTES, {});
+  const notes = freshNotes(jsonFile(NOTES, {}), Date.now());
   const list = Array.isArray(notes[key]) ? notes[key] : [];
   list.unshift(row);
   notes[key] = list.slice(0, NOTES_KEEP);
@@ -2868,7 +2891,7 @@ function modLog(row) {
 }
 /* A PK, kept for good. A row an admin undid goes into the new row's history. */
 function putPk(pid, row) {
-  const table = jsonFile(PK, {});
+  const table = freshPk(jsonFile(PK, {}), Date.now());
   const had = table[String(Number(pid))];
   if (had && typeof had === 'object') {
     const old = Object.assign({}, had);
@@ -2919,7 +2942,7 @@ async function undoPk(pid, by, byId, why, from) {
     }
   }
   // Read again after the wait above, so a write in between is not lost.
-  const now = jsonFile(PK, {});
+  const now = freshPk(jsonFile(PK, {}), Date.now());
   const cur = now[String(pid)];
   if (!pkActive(cur)) return { status: 200, body: { ok: true, was: false } };
   cur.undone = { at: Date.now(), by, byId, why, from };
@@ -2989,7 +3012,8 @@ function findDead(o) {
   profile, so the Linked accounts page can say which character is which.
 */
 function staffRecords(now) {
-  const table = jsonFile(BANS, {});
+  // Nothing past its keeping time is shown (#2353), sweep or no sweep.
+  const table = freshBans(jsonFile(BANS, {}), now);
   const out = {};
   for (const k of Object.keys(table || {})) {
     out[k] = Object.assign({}, table[k] || {}, { active: banActive(table[k] || {}, now) });
@@ -3003,7 +3027,7 @@ function staffRecords(now) {
       if (r && r.name) names[String(Number(n))] = String(r.name);
     }
   }
-  return { bans: out, notes: jsonFile(NOTES, {}), pk: jsonFile(PK, {}), names };
+  return { bans: out, notes: freshNotes(jsonFile(NOTES, {}), now), pk: freshPk(jsonFile(PK, {}), now), names };
 }
 /* Minutes as a ban length: 0 is for good, anything else is capped. */
 function banMinutes(v) {
@@ -3427,6 +3451,206 @@ function pruneSessionLogs() {
   return out;
 }
 
+// ==== thornswood keeping times ====
+//
+// A KEEPING TIME FOR EVERY STORE THE PRIVACY PAGE NAMES (#2353). The page
+// said what the site keeps and gave a time only for the stores that had a
+// rule: reports, staff records, the moderation log and the gallery queue had
+// none, and nothing in the code ever aged them. Decided by Patrick on 12
+// October: "write a keeping time for each store and enforce it in code;
+// Claude picks sensible times". The times, each on the page in the same
+// words:
+//
+//   STAFF_DAYS, 365. A ban is kept for as long as it holds; one that ran out
+//   is kept STAFF_DAYS past its end, then dropped, and lifting one already
+//   deletes it. A PK that holds is kept, because the character stays dead
+//   for good; one an admin undid is kept STAFF_DAYS past the undoing, and
+//   each earlier PK in a row's history by the same rule. A staff note is
+//   kept STAFF_DAYS from when it was written. A ban has to outlive any
+//   window while it holds; once it does not, a year is the history staff
+//   read a person by, the same year as their sessions and chat.
+//   MODLOG_DAYS, 365. One line of moderation.log (every staff action on the
+//   hub, for the bot's staff channel), the same as the game servers' own.
+//   GREPORTS_DAYS, 365. A report against a gallery picture, like every
+//   other report (INBOX_DAYS in the report limits).
+//   PENDING_DAYS, 90. A gallery submission staff have neither accepted nor
+//   deleted in 90 days is taken off the queue and its file deleted, the
+//   same way a removed one is (pruneRemovedUploads), so the queue cannot
+//   become a store of pictures nobody looked at.
+//
+// A time that cannot be read is kept rather than guessed at, as the sign-in
+// log keeps one: a row or a line with no usable time is a corrupt one, and
+// deleting a ban because its date would not parse is the wrong way to be
+// wrong. These are pure functions over what was read, so the harness drives
+// them on their own (tests\test-2353-keeping-times.js); the sweeps after the
+// block do the reading and writing, at start and every hour, and the writes
+// and the hub's reads go through the same functions.
+const STAFF_DAYS = 365;
+const MODLOG_DAYS = 365;
+const GREPORTS_DAYS = 365;
+const PENDING_DAYS = 90;
+function keptCut(days, now) { return (Number(now) || Date.now()) - days * 86400000; }
+// A usable time that is before the cut. Numbers are milliseconds; the logs
+// write an ISO string.
+function pastCut(at, cut) {
+  const t = typeof at === 'string' ? Date.parse(at) : Number(at);
+  return isFinite(t) && t > 0 && t < cut;
+}
+function isRecord(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+
+function freshBans(table, now) {
+  const cut = keptCut(STAFF_DAYS, now);
+  const out = {};
+  for (const k of Object.keys(isRecord(table) ? table : {})) {
+    const b = table[k];
+    if (isRecord(b) && Number(b.until) > 0 && pastCut(b.until, cut)) continue;
+    out[k] = b;
+  }
+  return out;
+}
+// An earlier PK in a row's history ages from its undoing, or, replaced by a
+// new PK without one, from when it was made.
+function freshPk(table, now) {
+  const cut = keptCut(STAFF_DAYS, now);
+  const out = {};
+  for (const k of Object.keys(isRecord(table) ? table : {})) {
+    const row = table[k];
+    if (!isRecord(row)) { out[k] = row; continue; }
+    if (isRecord(row.undone) && pastCut(row.undone.at, cut)) continue;
+    if (!Array.isArray(row.history)) { out[k] = row; continue; }
+    const history = row.history.filter((h) => !(isRecord(h) &&
+      pastCut(isRecord(h.undone) ? h.undone.at : h.at, cut)));
+    out[k] = history.length === row.history.length ? row : Object.assign({}, row, { history });
+  }
+  return out;
+}
+function freshNotes(notes, now) {
+  const cut = keptCut(STAFF_DAYS, now);
+  const out = {};
+  for (const k of Object.keys(isRecord(notes) ? notes : {})) {
+    const list = notes[k];
+    if (!Array.isArray(list)) { out[k] = list; continue; }
+    const kept = list.filter((n) => !(isRecord(n) && pastCut(n.at, cut)));
+    if (kept.length) out[k] = kept;
+  }
+  return out;
+}
+// moderation.log as text: every line inside MODLOG_DAYS, and every line whose
+// time cannot be read, in the order they were written.
+function freshModLog(text, now) {
+  const cut = keptCut(MODLOG_DAYS, now);
+  const lines = String(text || '').split('\n');
+  const last = lines.pop();
+  let dropped = 0;
+  const kept = lines.filter((l) => {
+    let row = null;
+    try { row = JSON.parse(l); } catch (e) { return true; }
+    if (isRecord(row) && pastCut(row.at, cut)) { dropped++; return false; }
+    return true;
+  });
+  return { text: kept.map((l) => l + '\n').join('') + last, dropped };
+}
+function freshGalleryReports(list, now) {
+  const cut = keptCut(GREPORTS_DAYS, now);
+  return (Array.isArray(list) ? list : []).filter((r) => !(isRecord(r) && pastCut(r.at, cut)));
+}
+// The gallery queue split into what stays and what has waited too long.
+function stalePending(list, now) {
+  const cut = keptCut(PENDING_DAYS, now);
+  const left = [], expired = [];
+  for (const e of (Array.isArray(list) ? list : [])) {
+    (isRecord(e) && pastCut(e.at, cut) ? expired : left).push(e);
+  }
+  return { left, expired };
+}
+// ==== end thornswood keeping times ====
+
+/* The timer's half for each store above, and for the inbox. Each writes only
+   when something aged out, never writes over a file that is there and will
+   not read (jsonFile answers its empty fallback for one, and an empty table
+   changes nothing), and says a write that fails: the store and the counts,
+   never what the rows hold (#2354). */
+function sweepInbox(now) {
+  const raw = jsonFile(INBOX, []);
+  const rows = Array.isArray(raw) ? raw : [];
+  const kept = trimInbox(rows, now);
+  const out = { rows: rows.length, kept: kept.length, written: false };
+  if (kept.length === rows.length) return out;
+  out.written = putJson(INBOX, kept);
+  if (!out.written) retentionSay('inbox', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  return out;
+}
+function sweepStaffRecords(now) {
+  const out = { bans: 0, pk: 0, notes: 0 };
+  // A ban list that is there and will not read is never written over (#2186).
+  const readB = bansNow();
+  if (!readB.broken) {
+    const kept = freshBans(readB.table, now);
+    const n = Object.keys(readB.table).length - Object.keys(kept).length;
+    if (n && putJson(BANS, kept)) out.bans = n;
+    else if (n) retentionSay('bans', { event: 'write-failed', dropped: n });
+  }
+  for (const [what, file, fresh] of [['pk', PK, freshPk], ['notes', NOTES, freshNotes]]) {
+    const raw = jsonFile(file, {});
+    if (!isRecord(raw)) continue;
+    const kept = fresh(raw, now);
+    if (JSON.stringify(kept) === JSON.stringify(raw)) continue;
+    if (putJson(file, kept)) out[what] = 1;
+    else retentionSay(what, { event: 'write-failed' });
+  }
+  return out;
+}
+function sweepModLog(now) {
+  let text;
+  try { text = fs.readFileSync(MODLOG, 'utf8'); }
+  catch (e) {
+    if (e && e.code === 'ENOENT') return { dropped: 0 };
+    retentionSay('moderation-log', { event: 'read-failed', code: (e && e.code) || 'unknown' });
+    return { dropped: 0, error: (e && e.code) || 'unknown' };
+  }
+  const kept = freshModLog(text, now);
+  if (!kept.dropped) return { dropped: 0 };
+  if (putFile(MODLOG, kept.text)) return { dropped: kept.dropped };
+  retentionSay('moderation-log', { event: 'write-failed', dropped: kept.dropped });
+  return { dropped: 0, error: 'write-failed' };
+}
+function sweepGalleryReports(now) {
+  const raw = jsonFile(GREPORTS, []);
+  const rows = Array.isArray(raw) ? raw : [];
+  const kept = freshGalleryReports(rows, now);
+  if (kept.length === rows.length) return { dropped: 0 };
+  if (putJson(GREPORTS, kept)) return { dropped: rows.length - kept.length };
+  retentionSay('gallery-reports', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  return { dropped: 0, error: 'write-failed' };
+}
+/* A submission past PENDING_DAYS is marked removed on uploads.json first, so
+   pruneRemovedUploads, run after this in the same sweep, deletes its file
+   and its note, and a delete that fails is said and asked again each hour
+   the way a removed one is. Off the queue only once the mark is written:
+   the other way round, a failed mark would leave a file nobody lists. */
+function expirePending(now) {
+  const raw = jsonFile(GPENDING, []);
+  if (!Array.isArray(raw)) return { expired: 0 };
+  const split = stalePending(raw, now);
+  if (!split.expired.length) return { expired: 0 };
+  const meta = jsonFile(UPMETA, {});
+  const at = Number(now) || Date.now();
+  for (const e of split.expired) {
+    const name = String(e.name || '');
+    if (!/^[A-Za-z0-9._ -]+$/.test(name) || name === 'uploads.json') continue;
+    meta[name] = Object.assign({}, isRecord(meta[name]) ? meta[name] : {}, { removed: at });
+  }
+  if (!putJson(UPMETA, meta)) {
+    retentionSay('gallery-pending', { event: 'note-write-failed', expired: split.expired.length });
+    return { expired: 0, error: 'note-write-failed' };
+  }
+  if (!putJson(GPENDING, split.left)) {
+    retentionSay('gallery-pending', { event: 'write-failed', expired: split.expired.length });
+    return { expired: 0, error: 'write-failed' };
+  }
+  return { expired: split.expired.length };
+}
+
 /*
   THE RETENTION TIMER (#2350). Both prunes used to run only when a session
   ended, so a quiet stretch with nobody playing left rows and log sets past
@@ -3437,7 +3661,9 @@ function pruneSessionLogs() {
   the file as it now stands. The failed-session alerts in trouble.json age
   in the same pass by the same 365 days (#2166, sweepTrouble), and removed
   gallery files whose hold has ended go too (#2352, pruneRemovedUploads),
-  and sign-in rows past their 30 days (sweepSignIns).
+  and sign-in rows past their 30 days (sweepSignIns). Since #2353 so do the
+  inbox, the staff records, the site's moderation.log, the gallery reports
+  and the gallery queue, each by its keeping time (the keeping times block).
 */
 const RETENTION_EVERY_MS = 60 * 60 * 1000;
 /*
@@ -3556,9 +3782,15 @@ function retentionSweep() {
   /* Copies before the prune, so a kept session's chat is in its set before
      anything goes. */
   const keptChat = copyKeptChats(now);
+  /* In this order, an object literal's own: the queue's expired submissions
+     are marked removed before the prune, so their files go in this same pass
+     (#2353). */
   return { sessions, keptChat, sessionLogs: pruneSessionLogs(),
-           trouble: sweepTrouble(now), removedUploads: pruneRemovedUploads(now),
-           signIns: sweepSignIns(now) };
+           trouble: sweepTrouble(now), pending: expirePending(now),
+           removedUploads: pruneRemovedUploads(now),
+           signIns: sweepSignIns(now), inbox: sweepInbox(now),
+           staff: sweepStaffRecords(now), moderationLog: sweepModLog(now),
+           galleryReports: sweepGalleryReports(now) };
 }
 setInterval(retentionSweep, RETENTION_EVERY_MS).unref?.();
 
@@ -6178,7 +6410,9 @@ async function handle(req, res) {
   if (p === '/api/gallery/pending' && req.method === 'GET') {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
-    return sendJson(res, 200, { pending: jsonFile(GPENDING, []) });
+    // A submission past PENDING_DAYS is not offered while it waits for the
+    // sweep to delete it (#2353).
+    return sendJson(res, 200, { pending: stalePending(jsonFile(GPENDING, []), Date.now()).left });
   }
 
   // Approve: take it off the queue and put it on the public list. Idempotent,
@@ -6376,15 +6610,16 @@ async function handle(req, res) {
     const entry = { id: id, name: name, why: why, at: Date.now(), from: from };
     if (discordId) entry.discordId = discordId;
     reports.push(entry);
-    // Keep the newest 500 so a flood cannot grow the file forever.
-    putJson(GREPORTS, reports.slice(-500));
+    // Keep the newest 500 so a flood cannot grow the file forever, and none
+    // past GREPORTS_DAYS (#2353).
+    putJson(GREPORTS, freshGalleryReports(reports, Date.now()).slice(-500));
     return sendJson(res, 200, { ok: true, id: id });
   }
 
   if (p === '/api/gallery/reports' && req.method === 'GET') {
     const gs = await galleryStaff(url, w);
     if (!gs.ok) return sendJson(res, gs.code, gs.body);
-    return sendJson(res, 200, { reports: jsonFile(GREPORTS, []) });
+    return sendJson(res, 200, { reports: freshGalleryReports(jsonFile(GREPORTS, []), Date.now()) });
   }
 
   if (p === '/api/gallery/report/dismiss' && req.method === 'POST') {
@@ -7318,7 +7553,7 @@ async function handle(req, res) {
         linked: w.dev ? Object.values(jsonFile(LINKED, {})) : [],
         records: w.dev ? staffRecords(Date.now()) : { bans: {}, notes: {}, pk: {}, names: {} },
         sessions: w.admin ? sessionRows() : [],
-        inbox: w.admin ? jsonFile(INBOX, []) : []
+        inbox: w.admin ? trimInbox(jsonFile(INBOX, []), Date.now()) : []
       });
     }
 
@@ -7603,7 +7838,11 @@ async function handle(req, res) {
       let obj;
       try { obj = JSON.parse(await body(req)); }
       catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
-      if (!putJson(INBOX, obj)) return sendJson(res, 500, { error: 'could not save' });
+      // The whole list, back from the hub, through the same keeping time as
+      // every other write (#2353), so a list the hub read before a row aged
+      // out cannot write that row back.
+      if (!Array.isArray(obj)) return sendJson(res, 400, { error: 'the inbox is a list' });
+      if (!putJson(INBOX, trimInbox(obj, Date.now()))) return sendJson(res, 500, { error: 'could not save' });
       return sendJson(res, 200, { ok: true });
     }
 
