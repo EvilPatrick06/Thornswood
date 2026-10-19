@@ -1288,6 +1288,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
     the whole point of those".
   - Work goes into a pull request the day it is done, never left on a
     pushed branch without one. That is how the two above were lost track of.
+  - A pull request held back on purpose (a freeze, a decision it waits on)
+    carries the `held` label, with the reason in its body, and the label
+    comes off the day it is let go (Patrick, 18 Oct, #1273). The nightly lists
+    a held pull request and does not count it; any other pull request open
+    more than two days turns the night red. A word in the title is not the
+    mark: the nightly reads the label only.
   - At the start of a session, and before anything is shipped, look at what
     is open: `gh pr list --state open` and `git ls-remote --heads origin`.
     Everything there other than main, the current `hotfix/` branch and work
