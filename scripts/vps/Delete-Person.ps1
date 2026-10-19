@@ -699,7 +699,11 @@ for (const person of people) {
           }
         }
       }
-      if (P.size && (theirs || A.size)) {
+      // The registers live in private; a folder with none (an old copy set
+      // aside before the gamemode kept them there) has nothing to let go, so
+      // no list is written into a folder that is not there (18 Oct: a real
+      // run stopped on ENOENT writing one into Thornswood-Server.prev-20261003).
+      if (P.size && (theirs || A.size) && isDir(priv)) {
         const lf = json(path.join(priv, LIST), g.writer);
         if (!lf.missing && !(isObj(lf.value) && Array.isArray(lf.value.profiles))) {
           stop(lf.p + ' is not a list of deleted characters, so nothing was changed');
@@ -778,7 +782,9 @@ function swap(p, body) {
   try { fs.writeFileSync(tmp, body, 'utf8'); fs.renameSync(tmp, p); }
   catch (e) {
     failed.push(p + ' (' + (e.code || e.message) + ')');
-    try { fs.unlinkSync(tmp); } catch (e2) { }
+    if (fs.existsSync(tmp)) {
+      try { fs.unlinkSync(tmp); } catch (e2) { failed.push(tmp + ', left behind (' + (e2.code || e2.message) + ')'); }
+    }
   }
 }
 for (const f of files.values()) {
