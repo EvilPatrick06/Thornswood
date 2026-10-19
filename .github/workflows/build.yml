@@ -544,6 +544,7 @@ jobs:
                  'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
                  'test-unpin.js', 'test-coffers.js',
+                 'test-512-trading-company.js',
                  'test-1383-injury.js',
                  'test-chat-log.js', 'test-1131-line-log.js', 'test-2723-plugin-reports.js', 'test-2732-press-mark.js',
                  'test-2260-burn-relog.js',
