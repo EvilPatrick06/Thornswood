@@ -243,6 +243,14 @@
       {
         "sha256": "238cfbb10494582208d387bdf785a3116ae5c79ca31ca2c67d9b9a2f7dec60d2",
         "changed": "2026-10-18"
+      },
+      {
+        "sha256": "e9eb979fc984e6c9dc283f6fa97b4cf6ddcf23a917e7fa4b3e66d248b48bce91",
+        "changed": "2026-10-19"
+      },
+      {
+        "sha256": "995c5882e8d59f70f4eec900202576070176084a767a173b85a389649298f5cd",
+        "changed": "2026-10-19"
       }
     ],
     "rules": [

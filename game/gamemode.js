@@ -34397,11 +34397,21 @@ log('gamemode loaded:',
 
   Patrick, 16 October, option A on #2351: "Delete-Person.ps1 writes a list,
   and the gamemode releases those entries at its next start." When somebody
-  asks to be deleted, scripts\vps\Delete-Person.ps1 removes their character's
-  change form, card and the rest, and writes their profile ids, and the form
-  ids of the characters it found, into private\deleted-characters.json:
+  asks to be deleted, scripts\vps\Delete-Person.ps1 writes their profile ids,
+  and the form ids of the characters it found, into
+  private\deleted-characters.json, and stops nothing (#2758, Patrick, 18 Oct:
+  "it should just fully apply the rest upon a server restart"):
 
       { "profiles": [ 5001 ], "actors": [ 4278192641 ] }
+
+  The part "saves" goes first, before the engine has started:
+  server-log.js, which the task starts the server under, deletes their change
+  forms (the engine loads them at its start, so it cannot be done from here)
+  and takes them out of the card, mod menu, take count and last-left files
+  (scripts\vps\Server-Log.js, startDeletions), and marks it done here. It
+  is in PARTS so the list is not deleted while it waits; nothing in this file
+  runs it. Its RELEASE_PARTS is this PARTS, held to it by
+  tests\test-2758-start-deletions.js.
 
   Every block that keeps a register naming a character lets go of what the
   list names through its own release(), so a register's rule stays in the
@@ -34442,7 +34452,7 @@ log('gamemode loaded:',
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['farms', 'property', 'embassy', 'dungeon', 'books'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'books'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {
