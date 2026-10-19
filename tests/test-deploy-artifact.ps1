@@ -259,6 +259,8 @@ try {
     $g = New-ThornswoodArtifact -Component gamemode -RepoDir $src -Paths 'game/gamemode.js' -OutDir (Join-Path $tmp 'out10')
     $stamp = New-ThornswoodBuildStamp -Gamemode (Join-Path $g.Folder 'game\gamemode.js') -Channel dev -RepoDir $src -Artifact $g
     Yes "the build stamp names the artifact's commit, and that the commit holds it" ($stamp.commit -eq $g.Short -and $stamp.gamemodeMatchesCommit -eq $true)
+    # 19 Oct: after #2747 every artifact's Short was '' and the stamp said "no commit".
+    Yes "  and that commit is the artifact's own twelve, not empty" ($g.Short -match '^[0-9a-f]{12}$' -and $g.Commit.StartsWith($g.Short) -and (Format-ThornswoodArtifact $g) -match (', commit ' + $g.Short + ','))
 
     # ---- 3b. site and voice source integrity, before anything is sent ------
     # Issue #1335. The check has to pass on the tree that would be sent, and
