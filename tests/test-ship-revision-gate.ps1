@@ -44,7 +44,9 @@ try {
     Cfg '{"CollectionUrl":""}'
     Yes 'an empty CollectionUrl falls back to the shipped collection' ((Get-ShipCollectionRevision $T) -eq 2 -and $script:slugAsked[-1] -eq '7essxf')
     Cfg '{ not json'
-    Yes 'a config.json that is not JSON falls back too, rather than stopping Ship' ((Get-ShipCollectionRevision $T) -eq 2)
+    $stop = ''
+    try { $null = Get-ShipCollectionRevision $T } catch { $stop = $_.Exception.Message }
+    Yes 'a config.json that is not JSON stops Ship before anything is packed (#2711 decision 2 B)' ($stop -match 'does not read' -and $stop -match 'collection revision it names is not known')
     Cfg '{"CollectionUrl":"https://www.nexusmods.com/games/skyrimspecialedition/collections/zzz999"}'
     Yes 'a collection Vortex does not have is revision 0' ((Get-ShipCollectionRevision $T) -eq 0)
 }
