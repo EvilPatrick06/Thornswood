@@ -551,7 +551,7 @@ try {
     $plain = Join-Path $work 'backups'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\vps-nightly-backup.ps1') @(
         '-GameRoot', $game, '-DevGameRoot', $gameDev, '-SiteRoot', $site, '-BotRoot', $bot,
-        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-Out', $plain, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain')
+        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-DeletionRoot', (Join-Path $work 'no-del'), '-Out', $plain, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain')
     $zip = @(Get-ChildItem -LiteralPath $plain -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     Yes "the nightly backup runs against a scratch site (exit $code)" ($code -eq 0 -and $zip.Count -eq 1)
     if (-not $zip.Count) { Show; throw 'no backup' }
@@ -569,7 +569,7 @@ try {
     $tight = Join-Path $work 'backups-tight'
     $code = Run $ps51 (Join-Path $scriptsDir 'vps\vps-nightly-backup.ps1') @(
         '-GameRoot', $game, '-DevGameRoot', $gameDev, '-SiteRoot', $site, '-BotRoot', $bot,
-        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-Out', $tight, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain', '-MaxUploadsMB', '5')
+        '-CaddyRoot', $caddy, '-VoiceRoot', $voice, '-DeletionRoot', (Join-Path $work 'no-del'), '-Out', $tight, '-KeyFile', (Join-Path $work 'no-key.txt'), '-Plain', '-MaxUploadsMB', '5')
     $tz = @(Get-ChildItem -LiteralPath $tight -Filter 'thornswood-*.zip' -File -EA SilentlyContinue)
     $tnames = @()
     if ($tz.Count) { $z = [IO.Compression.ZipFile]::OpenRead($tz[0].FullName); $tnames = @($z.Entries | ForEach-Object { $_.FullName -replace '\\', '/' }); $z.Dispose() }

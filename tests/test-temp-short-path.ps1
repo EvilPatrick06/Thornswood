@@ -67,6 +67,7 @@ try {
         '-BotRoot', (Join-Path $short 'no-bot'),
         '-CaddyRoot', (Join-Path $short 'no-caddy'),
         '-VoiceRoot', (Join-Path $short 'no-voice'),
+        '-DeletionRoot', (Join-Path $short 'no-del'),
         '-Out', $out,
         '-KeyFile', (Join-Path $short 'key.txt'),
         '-Plain'
