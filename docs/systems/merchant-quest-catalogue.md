@@ -1,15 +1,19 @@
 # Draft merchant quest catalogue
 
-There are **2 authored draft definitions** in
+There are **7 authored draft definitions** in
 `game/data/merchant-quests.json`, toward the required 240 or more distinct
-offers for the 60 retained merchants. Both are inactive. The file is marked
+offers for the 60 retained merchants. All are inactive. The file is marked
 `active:false` and `complete:false` and is not imported into the gamemode.
 The current runtime still has the 23 legacy definitions and ten bound routes.
 These candidates are not available in the game.
 
-This first authoring slice gives a beginning Warrior and Mage different work.
-The profession gate is separate from the merchant's trade and does not expand
-the goods that trader can buy, sell or request as supply.
+The two scenes give a beginning Warrior and Mage different work. Five further
+drafts request goods for specific trades and holds. These are deliveries,
+which can include goods obtained from other craftspeople; they do not assert
+that the person returning them crafted them. Neither kind grants ordinary
+buy, sell or supply permissions.
+
+## Draft scenes
 
 | Work | Offering trade and hold | Required standing | Exact objective | Gold | Personal cooldown |
 | --- | --- | --- | --- | ---: | --- |
@@ -39,15 +43,65 @@ identity, species, authored leash, kill attribution and original conversation
 and transaction fences. A similarly named bandit or skeever elsewhere does
 not count. Existing camp difficulty and animal habitat remain unchanged.
 
+## Draft finite-purse commissions
+
+All five require the named Novice profession half and propose a six-hour
+completion cooldown. Each row copies its complete offering roster identity
+and the selected public recipe's owner, half, rank, output, amount, bench,
+inputs and conditions. Their goods already belong to that trade's ordinary
+buy table. That does not grant legacy supply or commission permission.
+
+| Work | Offering reference and trade | Required half | Delivery | Recipe reference |
+| --- | --- | --- | --- | --- |
+| Straps for the forge | Whiterun Smith `1a67c:Skyrim.esm` | Platewright | 6 Leather `db5d2:Skyrim.esm` | `1033de:Skyrim.esm` |
+| Arrows for the hunt | Rift Woodworker `19dd0:Skyrim.esm` | Woodwright | 24 Iron Arrows `1397d:Skyrim.esm` | `b64f:Dawnguard.esm` |
+| Thread for mourning cloth | Falkreath Tailor `1939ba:aaaGraniteHill.esp` | Haberdasher | 4 Thread `6ce001:Update.esm` | `84a:MoreCraftableEquipment.esp` |
+| A supper for the docks | Haafingar Cook `198a0:Skyrim.esm` | Hearthcook | 2 Salmon Steak `64b3b:Skyrim.esm` | `f4310:Skyrim.esm` |
+| Poultices for the marsh road | Hjaalmarch Alchemist `1aa61:Skyrim.esm` | Physicker | 2 Poultice `154c2:Thornswood-Content.esp` | `154c6:Thornswood-Content.esp` |
+
+Leather's selected recipe produces two from one Novice Deer Hide. Iron
+Arrows produce 24 from one Firewood and one Iron Ingot. Thread produces one
+from two Tundra Cotton. Salmon Steak produces one from one Salt Pile and one
+Salmon Meat. Poultice produces one from one Tundra Cotton and one Garlic.
+Every listed input has Novice supply provenance in the public recipe table.
+These producer facts do not add placed resources or alter shared stock and
+returns. Current ingredient availability and accepted price are not measured.
+
+The copied recipe conditions matter. Leather requires at least one
+`DeerHide02`. Salmon Steak requires at least one `MAG_FoodSalmon` and no
+`MAG_FoodUpgradePerk03`. Their `canBeMadeOnDayOne:false` flag does not mean
+their ingredients have no Novice producer. It also does not prove every
+qualified customer can personally run that recipe. No condition or rank is
+changed for these drafts.
+
+Commission payment is the future accepted submitted hold price multiplied
+by the original quantity, from the merchant's finite purse. No default price,
+fixed bonus or new gold is granted here. Missing price, insufficient purse
+or unavailable goods must explain why the commission cannot be accepted;
+ordinary stock for sale remains visible. The future transaction must reserve
+the promised purse amount and preserve the accepted quote through its exact
+conserved pending-transfer protocol. This source slice implements none of
+that runtime protocol.
+
+Authored commissions need an explicit source-derived authority keyed by
+their exact reviewed quest and merchant, plus their own conserved transfer
+kind, cooldown persistence and recovery. Several finished goods are absent
+from ordinary supply. Never widen that table, treat all buy goods as approved
+commissions or pass these rows as legacy supply. Its existing five-good and
+six-hour dynamic rules remain intact. The proposed scene reward allowance does not
+apply to these transfers of existing purse gold.
+
 ## Reward and activation limits
 
-One finish of each candidate totals **25 gold**. Their cooldowns alone permit
+One finish of each scene candidate creates **25 gold**. Their cooldowns alone permit
 at most **100 gold** in a half-open 24-hour window if both could be completed
 by one character. This is an arithmetic upper bound before eligibility,
 travel, target availability and competition, not an approved aggregate
 economy budget or measured income. These proposed scene rewards would be
 created at completion, like legacy scene rewards; they are not supply
-purchases from a finite purse.
+purchases from a finite purse. The five commissions transfer existing purse
+money at their future accepted submitted prices, which are not invented or
+included as newly created gold in that bound.
 
 Before activation, finish the full distinct catalogue and its numerical
 aggregate budget and cadence, bounded saved-state representation, generic
@@ -58,6 +112,7 @@ rejects activation or a runtime import in this incomplete slice.
 
 `node tests/test-merchant-quest-catalogue.js` checks actual rulebook gates,
 exact merchant and retained-target bindings, distinct objectives, source
-positions and returns, and the inactive state. It does not construct a server,
+positions and returns, exact commission recipe/gate/role evidence, distinct
+goods bundles and the inactive state. It does not construct a server,
 touch a private world or establish connected acceptance. Claude owns all
 operational steps after their source prerequisites are complete.
