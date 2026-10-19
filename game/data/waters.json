@@ -1,7 +1,7 @@
 {
   "builtBy": "scripts\\dev\\Build-WaterTable.js",
-  "builtAt": "2026-10-02T01:50:06.191Z",
-  "source": "the WATR, CELL and WRLD records of 48 plugins in load order",
+  "builtAt": "2026-10-16T19:52:06.154Z",
+  "source": "the WATR, CELL and WRLD records of 103 plugins in load order",
   "readFrom": "XCWT on a cell, NAM2 on a worldspace, and the editor id of the WATR they point at",
   "note": "what a class is WORTH is balance and lives in NEEDS.water in gamemode.js. There is no ice water record in Skyrim: a frozen swim is cold weather, a dark hour and a high place, which the exposure half already measures.",
   "classes": [
@@ -405,6 +405,1128 @@
     "129e3e:Water for ENB (Shades of Skyrim).esp": {
       "e": "PondWater",
       "c": "deep"
+    }
+  },
+  "placed": {
+    "10e97d:Skyrim.esm": {
+      "e": "WRStairsWater01River01ACT",
+      "w": "129e3b:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -730,
+        -1068,
+        737,
+        399
+      ]
+    },
+    "10e97b:Skyrim.esm": {
+      "e": "WRGreatHousePlatform01River01ACT",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -2499,
+        -2833,
+        845,
+        511
+      ]
+    },
+    "10e97a:Skyrim.esm": {
+      "e": "WRMainRoadPlainsRiver01ACT",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -2524,
+        -2009,
+        781,
+        1292
+      ]
+    },
+    "10de15:Skyrim.esm": {
+      "e": "WaterPuddleLongFlow",
+      "w": "fe092:Skyrim.esm",
+      "b": [
+        -256,
+        -764,
+        238,
+        582
+      ]
+    },
+    "10de14:Skyrim.esm": {
+      "e": "WaterPuddleLongDefailtIntAnkleStill",
+      "w": "cc7b7:Skyrim.esm",
+      "b": [
+        -256,
+        -764,
+        238,
+        582
+      ]
+    },
+    "10cacd:Skyrim.esm": {
+      "e": "Water1024DefaultNW",
+      "w": "10639f:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10cacb:Skyrim.esm": {
+      "e": "Water1024SleepingTreeCamp",
+      "w": "261ea:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10cac9:Skyrim.esm": {
+      "e": "Water1024Deepwood",
+      "w": "e3812:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10cac7:Skyrim.esm": {
+      "e": "Water1024Marsh",
+      "w": "105cc3:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10cac4:Skyrim.esm": {
+      "e": "Water1024MarshTransition",
+      "w": "105cc4:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10cac1:Skyrim.esm": {
+      "e": "Water1024RiverFlowSE",
+      "w": "108ac7:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "10ad2f:Skyrim.esm": {
+      "e": "Water1024CreekFlow",
+      "w": "1824:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "108b01:Skyrim.esm": {
+      "e": "Water2048x1024RiverFlowSE",
+      "w": "108ac7:Skyrim.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "108afd:Skyrim.esm": {
+      "e": "Water2048RiverFlowNE",
+      "w": "e717c:Skyrim.esm",
+      "b": [
+        -1024,
+        -1024,
+        1024,
+        1024
+      ]
+    },
+    "107fc5:Skyrim.esm": {
+      "e": "Water1024RiverFlowNW",
+      "w": "1063aa:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "106e56:Skyrim.esm": {
+      "e": "Water2048KatariahWorld",
+      "w": "10cc8e:Skyrim.esm",
+      "b": [
+        -1024,
+        -1024,
+        1024,
+        1024
+      ]
+    },
+    "106a25:Skyrim.esm": {
+      "e": "Water1024CreekFlowSW",
+      "w": "2f7dc:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "106a21:Skyrim.esm": {
+      "e": "Water1024CreekFlowSE",
+      "w": "106a20:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "1063a9:Skyrim.esm": {
+      "e": "Water1024River",
+      "w": "105ce1:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "fe091:Skyrim.esm": {
+      "e": "WaterPuddleFlow",
+      "w": "fe092:Skyrim.esm",
+      "b": [
+        -154,
+        -152,
+        148,
+        199
+      ]
+    },
+    "fd0dc:Skyrim.esm": {
+      "e": "WaterPuddleLiteFog",
+      "w": "d61:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -154,
+        -152,
+        148,
+        199
+      ]
+    },
+    "fd0d7:Skyrim.esm": {
+      "e": "WaterPuddleDefaultIntAnkleStill",
+      "w": "cb11f:Skyrim.esm",
+      "b": [
+        -176,
+        -166,
+        171,
+        215
+      ]
+    },
+    "fd0cd:Skyrim.esm": {
+      "e": "Water512DefaultIntWaistStill",
+      "w": "cc7b4:Skyrim.esm",
+      "b": [
+        -256,
+        -256,
+        255,
+        256
+      ]
+    },
+    "fd0cc:Skyrim.esm": {
+      "e": "Water512DefaultIntAnkleStill",
+      "w": "cc7b7:Skyrim.esm",
+      "b": [
+        -256,
+        -256,
+        255,
+        256
+      ]
+    },
+    "fd0cb:Skyrim.esm": {
+      "e": "Water512",
+      "w": "18:Skyrim.esm",
+      "b": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "f4572:Skyrim.esm": {
+      "e": "Water1024ShadowmeresPool",
+      "w": "f4573:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "cc7ba:Skyrim.esm": {
+      "e": "Water2048x1024DefaultIntAnkleStill",
+      "w": "cc7b7:Skyrim.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "cc7b9:Skyrim.esm": {
+      "e": "Water2048DefaultIntAnkleStill",
+      "w": "cc7b7:Skyrim.esm",
+      "b": [
+        -1024,
+        -1024,
+        1024,
+        1024
+      ]
+    },
+    "cc7b8:Skyrim.esm": {
+      "e": "Water1024DefaultIntAnkleStill",
+      "w": "cc7b7:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "cc7b6:Skyrim.esm": {
+      "e": "Water2048x1024DefaultIntWaistStill",
+      "w": "cc7b4:Skyrim.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "cc7b5:Skyrim.esm": {
+      "e": "Water2048DefaultIntWaistStill",
+      "w": "cc7b4:Skyrim.esm",
+      "b": [
+        -1024,
+        -1024,
+        1024,
+        1024
+      ]
+    },
+    "cc7b3:Skyrim.esm": {
+      "e": "Water1024DefaultIntWaistStill",
+      "w": "cc7b4:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "38431:Skyrim.esm": {
+      "e": "MrkWaterSystemMillPond01act",
+      "w": "7a5f6:Skyrim.esm",
+      "b": [
+        -1116,
+        -176,
+        575,
+        1471
+      ]
+    },
+    "90d32:Skyrim.esm": {
+      "e": "WRStairsStreamExit01",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -450,
+        -274,
+        450,
+        274
+      ]
+    },
+    "86006:Skyrim.esm": {
+      "e": "WRStairsStreamLACT",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -154,
+        -721,
+        87,
+        560
+      ]
+    },
+    "86002:Skyrim.esm": {
+      "e": "WRStairsStreamRACT",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -76,
+        -721,
+        154,
+        552
+      ]
+    },
+    "85fcc:Skyrim.esm": {
+      "e": "Water1024WR",
+      "w": "74eea:Skyrim.esm",
+      "b": [
+        -724,
+        -724,
+        724,
+        724
+      ]
+    },
+    "85fc9:Skyrim.esm": {
+      "e": "WRWaterPool01",
+      "w": "74eea:Skyrim.esm",
+      "b": [
+        -1125,
+        -1173,
+        1173,
+        1125
+      ]
+    },
+    "e717d:Skyrim.esm": {
+      "e": "Water1024RiverFlowNE",
+      "w": "e717c:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "e41d6:Skyrim.esm": {
+      "e": "Water1024NoReflectionsDeepWood",
+      "w": "e3812:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "d19f4:Skyrim.esm": {
+      "e": "Water1024_Blackreach",
+      "w": "48c2b:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "c1d44:Skyrim.esm": {
+      "e": "Water1024Helgen",
+      "w": "c1d45:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "62a60:Skyrim.esm": {
+      "e": "Water1024Murky",
+      "w": "62a72:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "92127:Skyrim.esm": {
+      "e": "LargeRainBarrelWater01",
+      "w": "18:Skyrim.esm",
+      "b": [
+        -120,
+        -120,
+        119,
+        120
+      ]
+    },
+    "84ced:Skyrim.esm": {
+      "e": "MarkarthWaterSystemStream",
+      "w": "26b7f:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -2521,
+        -2042,
+        3041,
+        808
+      ]
+    },
+    "7a5f5:Skyrim.esm": {
+      "e": "MrkWaterSystemMillPond01",
+      "w": "7a5f6:Skyrim.esm",
+      "b": [
+        -1116,
+        -176,
+        575,
+        1471
+      ]
+    },
+    "7a5d8:Skyrim.esm": {
+      "e": "MarkarthLowerWater",
+      "w": "18:Skyrim.esm",
+      "b": [
+        -1787,
+        -1149,
+        1466,
+        605
+      ]
+    },
+    "7a5b7:Skyrim.esm": {
+      "e": "MrkWaterSystemWarrens01",
+      "w": "7a5f6:Skyrim.esm",
+      "b": [
+        -3253,
+        -1149,
+        0,
+        605
+      ]
+    },
+    "bcf26:Skyrim.esm": {
+      "e": "TG08Water1024",
+      "w": "e3812:Skyrim.esm",
+      "b": [
+        -2048,
+        -2048,
+        2048,
+        2048
+      ]
+    },
+    "9727e:Skyrim.esm": {
+      "e": "WaterPuddle",
+      "w": "d61:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -154,
+        -152,
+        148,
+        199
+      ]
+    },
+    "7e627:Skyrim.esm": {
+      "e": "Water1024NoReflections",
+      "w": "33da7:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "74ee9:Skyrim.esm": {
+      "e": "Water1024ClearAnkleStill",
+      "w": "cb11f:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "713c5:Skyrim.esm": {
+      "e": "Water1024Volcanic",
+      "w": "713c4:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "52740:Skyrim.esm": {
+      "e": "WRTreeCircleWater01ACT",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -896,
+        -928,
+        928,
+        896
+      ]
+    },
+    "5157a:Skyrim.esm": {
+      "e": "HorseTrough01",
+      "w": "f762d:Skyrim.esm",
+      "b": [
+        -63,
+        -24,
+        63,
+        23
+      ]
+    },
+    "41b4d:Skyrim.esm": {
+      "e": "WaterCreekDeepInterior01",
+      "w": "33da7:Skyrim.esm",
+      "b": [
+        -631,
+        -1675,
+        564,
+        364
+      ]
+    },
+    "176ae:Skyrim.esm": {
+      "e": "TundraStreamBend01WaterB",
+      "w": "23cb5:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "176ab:Skyrim.esm": {
+      "e": "TundraStreamBend01WaterA",
+      "w": "15429:Skyrim.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "176a9:Skyrim.esm": {
+      "e": "TundraStreamStraight01WaterB",
+      "w": "15429:Skyrim.esm",
+      "b": [
+        -461,
+        -1246,
+        401,
+        1163
+      ]
+    },
+    "1608e:Skyrim.esm": {
+      "e": "TundraStreamStraight01WaterA",
+      "w": "15429:Skyrim.esm",
+      "b": [
+        -461,
+        -1246,
+        401,
+        1163
+      ]
+    },
+    "15428:Skyrim.esm": {
+      "e": "Water1024Creek",
+      "w": "1825:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "3ac83:Skyrim.esm": {
+      "e": "Water1024",
+      "w": "cc7b4:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "cd71:Dawnguard.esm": {
+      "e": "DLC1Water2048x1024WaterFastFlow",
+      "w": "6afd:Dawnguard.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "5192:Dawnguard.esm": {
+      "e": "DLC1Water1024FrostreachNE",
+      "w": "ce72:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "1a0a2:Dawnguard.esm": {
+      "e": "DLC1Water1024FrostreachSE",
+      "w": "ce71:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "19c97:Dawnguard.esm": {
+      "e": "DLC1Water1024Frostreach",
+      "w": "19c98:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "14b85:Dawnguard.esm": {
+      "e": "Lava1024",
+      "w": "14b86:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "11cb2:Dawnguard.esm": {
+      "e": "Water1024DLC01DarkFallCave",
+      "w": "c7c2:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "6b94:Dawnguard.esm": {
+      "e": "DLC1DarkFallWater",
+      "w": "6afd:Dawnguard.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "610f:Dawnguard.esm": {
+      "e": "DLC1TestBloodWater1024",
+      "w": "42b7:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "42be:Dawnguard.esm": {
+      "e": "LargeRainBarrel_BloodWater01",
+      "w": "42b7:Dawnguard.esm",
+      "b": [
+        -120,
+        -120,
+        119,
+        120
+      ]
+    },
+    "42b6:Dawnguard.esm": {
+      "e": "Blood_RainWaterBarrel",
+      "w": "42b7:Dawnguard.esm",
+      "b": [
+        -121,
+        -117,
+        117,
+        118
+      ]
+    },
+    "2931:Dawnguard.esm": {
+      "e": "Water1024ColdDUPLICATE000",
+      "w": "2932:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "1c17:Dawnguard.esm": {
+      "e": "Water1024Cold",
+      "w": "1c18:Dawnguard.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "1e2b6:Dragonborn.esm": {
+      "e": "DLC2WaterApocrypha1024Small_Movable",
+      "w": "3731a:Dragonborn.esm",
+      "b": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "3d2f7:Dragonborn.esm": {
+      "e": "ApoFakeWater",
+      "w": "1dff1:Dragonborn.esm",
+      "b": [
+        -197,
+        -218,
+        197,
+        176
+      ]
+    },
+    "39b6c:Dragonborn.esm": {
+      "e": "DLC2WaterPuddle01",
+      "w": "4cc4b:Skyrim.esm",
+      "b": [
+        -154,
+        -152,
+        148,
+        199
+      ]
+    },
+    "37319:Dragonborn.esm": {
+      "e": "DLC2WaterApocrypha1024Small",
+      "w": "3731a:Dragonborn.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "33818:Dragonborn.esm": {
+      "e": "Water2048x1024CreekFlowSE",
+      "w": "106a20:Skyrim.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "2bed4:Dragonborn.esm": {
+      "e": "DLC2HrothmundAnimWater01",
+      "w": "18:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "2bed3:Dragonborn.esm": {
+      "e": "xDLC2HrothmundsBarrowWater1024",
+      "w": "62a72:Skyrim.esm",
+      "b": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2adea:Dragonborn.esm": {
+      "e": "DLC2ApoControlRing01WaterApocrypha",
+      "w": "2adec:Dragonborn.esm",
+      "b": [
+        -394,
+        -394,
+        394,
+        394
+      ]
+    },
+    "2ade8:Dragonborn.esm": {
+      "e": "DLC2ApoControlRing01WaterClean",
+      "w": "3805d:Dragonborn.esm",
+      "b": [
+        -455,
+        -455,
+        455,
+        455
+      ]
+    },
+    "260e5:Dragonborn.esm": {
+      "e": "DLC2KagrumezWater",
+      "w": "62a72:Skyrim.esm",
+      "b": [
+        -2048,
+        -2048,
+        2048,
+        2048
+      ]
+    },
+    "1eecb:Dragonborn.esm": {
+      "e": "DLC2WaterApocrypha1024",
+      "w": "1dff1:Dragonborn.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "1dbc1:Dragonborn.esm": {
+      "e": "DLC2dunKolbjornWater",
+      "w": "1db5f:Dragonborn.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "19a1a:Dragonborn.esm": {
+      "e": "DLC2dunNchardakAnimWater01",
+      "w": "18:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "811:Water for ENB.esm": {
+      "e": "Water1024Pond",
+      "w": "820:Water for ENB.esm",
+      "b": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "800:Water for ENB.esm": {
+      "e": "TundraStreamBend01WaterA_Blue",
+      "w": "81f:Water for ENB.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "801:Water for ENB.esm": {
+      "e": "TundraStreamBend01WaterA_Green",
+      "w": "81c:Water for ENB.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "802:Water for ENB.esm": {
+      "e": "TundraStreamBend01WaterB_Blue",
+      "w": "81f:Water for ENB.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "803:Water for ENB.esm": {
+      "e": "TundraStreamBend01WaterB_Brown",
+      "w": "814:Water for ENB.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "804:Water for ENB.esm": {
+      "e": "TundraStreamBend01WaterB_Green",
+      "w": "81c:Water for ENB.esm",
+      "b": [
+        -1057,
+        -360,
+        771,
+        1348
+      ]
+    },
+    "805:Water for ENB.esm": {
+      "e": "Water1024FalkreathFlowSW",
+      "w": "81d:Water for ENB.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "806:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLarge_Blue",
+      "w": "817:Water for ENB.esm",
+      "b": [
+        -886,
+        -1845,
+        810,
+        2163
+      ]
+    },
+    "807:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLong01FallForest01",
+      "w": "818:Water for ENB.esm",
+      "b": [
+        -344,
+        -1177,
+        335,
+        116
+      ]
+    },
+    "808:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLong01Rocks01_Blue",
+      "w": "818:Water for ENB.esm",
+      "b": [
+        -344,
+        -1177,
+        335,
+        116
+      ]
+    },
+    "809:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLong01_Blue",
+      "w": "818:Water for ENB.esm",
+      "b": [
+        -107,
+        -1054,
+        134,
+        1
+      ]
+    },
+    "80a:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLong01_Brown",
+      "w": "819:Water for ENB.esm",
+      "b": [
+        -344,
+        -1177,
+        335,
+        135
+      ]
+    },
+    "80b:Water for ENB.esm": {
+      "e": "WaterFXCreekFlatLong01_Green",
+      "w": "81a:Water for ENB.esm",
+      "b": [
+        -344,
+        -1177,
+        335,
+        116
+      ]
+    },
+    "80d:Water for ENB.esm": {
+      "e": "WaterTundraStreamTransition01_Blue",
+      "w": "816:Water for ENB.esm",
+      "b": [
+        -170,
+        -225,
+        188,
+        230
+      ]
+    },
+    "80e:Water for ENB.esm": {
+      "e": "WaterTundraStreamTransition01_Brown",
+      "w": "819:Water for ENB.esm",
+      "b": [
+        -119,
+        -179,
+        134,
+        168
+      ]
+    },
+    "80f:Water for ENB.esm": {
+      "e": "WaterTundraStreamTransition01_Green",
+      "w": "81a:Water for ENB.esm",
+      "b": [
+        -141,
+        -189,
+        141,
+        199
+      ]
+    },
+    "810:Water for ENB.esm": {
+      "e": "Water1024PuddleSW_Green",
+      "w": "81b:Water for ENB.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "832:Water for ENB.esm": {
+      "e": "Water1024_RF",
+      "w": "834:Water for ENB.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "812:Water for ENB.esm": {
+      "e": "Water1024Geir",
+      "w": "81e:Water for ENB.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "830:Water for ENB.esm": {
+      "e": "WRWaterStream",
+      "w": "85fc8:Skyrim.esm",
+      "b": [
+        -767,
+        -26,
+        1481,
+        1247
+      ]
+    },
+    "a022f:Apocalypse - Magic of Skyrim.esp": {
+      "e": "WB_IllusionNightmare_DeliverUntoVaermina_Water",
+      "w": "4218e:Apocalypse - Magic of Skyrim.esp",
+      "b": [
+        0,
+        0,
+        0,
+        0
+      ]
+    },
+    "2775f:SkyrimSewers.esp": {
+      "e": "SSewersWater2048x1024Default",
+      "w": "18:Skyrim.esm",
+      "b": [
+        -512,
+        -1024,
+        512,
+        1024
+      ]
+    },
+    "124d35:Water for ENB (Shades of Skyrim).esp": {
+      "e": "Water1024CaveFlow",
+      "w": "124d34:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "129e3c:Water for ENB (Shades of Skyrim).esp": {
+      "e": "Water1024MarkarthWaterFlow",
+      "w": "10b1d7:Skyrim.esm",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
+    },
+    "129e3f:Water for ENB (Shades of Skyrim).esp": {
+      "e": "Water1024Riften",
+      "w": "1df22:Water for ENB (Shades of Skyrim).esp",
+      "b": [
+        -512,
+        -512,
+        512,
+        512
+      ]
     }
   },
   "where": {

@@ -4187,14 +4187,29 @@
   // is about 128 units tall, so this is roughly waist deep.
   const WADE_DEEP = 70;
   /*
-    #608 temple / shallow: getPositionZ is the actor root, not a true feet
-    probe. A real cell water plane can sit a few units under that root while
-    the person is clearly standing in the pool, so deep reads slightly
-    negative and wading never fires (heartbeat then says indoors). Slack
-    covers that near-miss only. A no-water cell still answers a huge
-    negative level, far below -FEET_SLACK, so it stays dry.
+    PLACED WATER, READ OUT OF THE RECORDS (#2302).
+
+    There used to be a feet slack of 24 here (#608): wading counted with the
+    cell's water plane up to 24 units BELOW the actor's position, on the
+    guess that getPositionZ is "the actor root, not a true feet probe". It
+    was never measured, and the records say it could not have worked. A
+    reference's position is its base, so an actor's is its feet. The Temple
+    of Kynareth (CELL 165a7 in Skyrim.esm) has XCLW 0, so getWaterLevel
+    answers 0 there, while its pool is a placed activator,
+    Water1024ClearAnkleStill (an ACTI with a WNAM), at z 48, and nothing in
+    that room stands lower than z 32. 0 minus 32 or more is never above -24.
+    The cell plane and the pool are different objects, and getWaterLevel only
+    knows the plane.
+
+    So the place tick reads both: the cell plane, which counts only when it
+    is above the feet, and every placed water in the cell, which the cell walk
+    keeps with the fires (activator 24 is one of its four types). Each row is
+    [plugin, local id, x1, y1, x2, y2]: an ACTI with a WNAM and its OBND
+    footprint. scripts\dev\Build-WaterTable.js writes the line below from the
+    load order; do not edit it by hand. The footprint is taken unrotated and
+    unscaled, which is exact for the square WaterNNN planes Bethesda places.
   */
-  const FEET_SLACK = 24;
+  const PLACED_WATERS = [["Skyrim.esm",1074089,-512,-512,512,512],["Skyrim.esm",1075745,-512,-512,512,512],["Skyrim.esm",1075749,-512,-512,512,512],["Skyrim.esm",1076822,-1024,-1024,1024,1024],["Skyrim.esm",1081285,-512,-512,512,512],["Skyrim.esm",1084157,-1024,-1024,1024,1024],["Skyrim.esm",1084161,-512,-1024,512,1024],["Skyrim.esm",1092911,-512,-512,512,512],["Skyrim.esm",1100481,-512,-512,512,512],["Skyrim.esm",1100484,-512,-512,512,512],["Skyrim.esm",1100487,-512,-512,512,512],["Skyrim.esm",1100489,-512,-512,512,512],["Skyrim.esm",1100491,-512,-512,512,512],["Skyrim.esm",1100493,-512,-512,512,512],["Skyrim.esm",1105428,-256,-764,238,582],["Skyrim.esm",1105429,-256,-764,238,582],["Skyrim.esm",1108346,-2524,-2009,781,1292],["Skyrim.esm",1108347,-2499,-2833,845,511],["Skyrim.esm",1108349,-730,-1068,737,399],["Dawnguard.esm",72882,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1199413,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220156,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220159,-512,-512,512,512],["Dawnguard.esm",84869,-512,-512,512,512],["Skyrim.esm",87080,-512,-512,512,512],["Skyrim.esm",90254,-461,-1246,401,1163],["Skyrim.esm",95913,-461,-1246,401,1163],["Skyrim.esm",95915,-1057,-360,771,1348],["Skyrim.esm",95918,-1057,-360,771,1348],["Dragonborn.esm",104986,-512,-512,512,512],["Dawnguard.esm",105623,-512,-512,512,512],["Dawnguard.esm",106658,-512,-512,512,512],["Dawnguard.esm",7191,-512,-512,512,512],["Dragonborn.esm",121793,-512,-512,512,512],["Dragonborn.esm",126667,-512,-512,512,512],["Dragonborn.esm",155877,-2048,-2048,2048,2048],["SkyrimSewers.esp",161631,-512,-1024,512,1024],["Dawnguard.esm",10545,-512,-512,512,512],["Dragonborn.esm",175592,-455,-455,455,455],["Dragonborn.esm",175594,-394,-394,394,394],["Dragonborn.esm",179924,-512,-512,512,512],["Dragonborn.esm",210968,-512,-1024,512,1024],["Dragonborn.esm",226073,-512,-512,512,512],["Skyrim.esm",230449,-1116,-176,575,1471],["Dragonborn.esm",236396,-154,-152,148,199],["Skyrim.esm",240771,-512,-512,512,512],["Dragonborn.esm",250615,-197,-218,197,176],["Skyrim.esm",269133,-631,-1675,564,364],["Dawnguard.esm",17078,-121,-117,117,118],["Dawnguard.esm",17086,-120,-120,119,120],["Skyrim.esm",333178,-63,-24,63,23],["Dawnguard.esm",20882,-512,-512,512,512],["Skyrim.esm",337728,-896,-928,928,896],["Dawnguard.esm",24847,-512,-512,512,512],["Skyrim.esm",404064,-512,-512,512,512],["Dawnguard.esm",27540,-512,-1024,512,1024],["Skyrim.esm",463813,-512,-512,512,512],["Skyrim.esm",478953,-512,-512,512,512],["Skyrim.esm",501175,-3253,-1149,0,605],["Skyrim.esm",501208,-1787,-1149,1466,605],["Skyrim.esm",501237,-1116,-176,575,1471],["Skyrim.esm",517671,-512,-512,512,512],["Water for ENB.esm",2048,-1057,-360,771,1348],["Water for ENB.esm",2049,-1057,-360,771,1348],["Water for ENB.esm",2050,-1057,-360,771,1348],["Water for ENB.esm",2051,-1057,-360,771,1348],["Water for ENB.esm",2052,-1057,-360,771,1348],["Water for ENB.esm",2053,-512,-512,512,512],["Water for ENB.esm",2054,-886,-1845,810,2163],["Water for ENB.esm",2055,-344,-1177,335,116],["Water for ENB.esm",2056,-344,-1177,335,116],["Water for ENB.esm",2057,-107,-1054,134,1],["Water for ENB.esm",2058,-344,-1177,335,135],["Water for ENB.esm",2059,-344,-1177,335,116],["Water for ENB.esm",2061,-170,-225,188,230],["Water for ENB.esm",2062,-119,-179,134,168],["Water for ENB.esm",2063,-141,-189,141,199],["Water for ENB.esm",2064,-512,-512,512,512],["Water for ENB.esm",2066,-512,-512,512,512],["Water for ENB.esm",2096,-767,-26,1481,1247],["Water for ENB.esm",2098,-512,-512,512,512],["Skyrim.esm",543981,-2521,-2042,3041,808],["Skyrim.esm",548809,-1125,-1173,1173,1125],["Skyrim.esm",548812,-724,-724,724,724],["Skyrim.esm",548866,-76,-721,154,552],["Skyrim.esm",548870,-154,-721,87,560],["Skyrim.esm",593202,-450,-274,450,274],["Skyrim.esm",598311,-120,-120,119,120],["Skyrim.esm",619134,-154,-152,148,199],["Skyrim.esm",773926,-2048,-2048,2048,2048],["Skyrim.esm",793924,-512,-512,512,512],["Skyrim.esm",837555,-512,-512,512,512],["Skyrim.esm",837557,-1024,-1024,1024,1024],["Skyrim.esm",837558,-512,-1024,512,1024],["Skyrim.esm",837560,-512,-512,512,512],["Skyrim.esm",837561,-1024,-1024,1024,1024],["Skyrim.esm",837562,-512,-1024,512,1024],["Dawnguard.esm",52593,-512,-1024,512,1024],["Skyrim.esm",858612,-512,-512,512,512],["Skyrim.esm",934358,-512,-512,512,512],["Skyrim.esm",946557,-512,-512,512,512],["Skyrim.esm",1000818,-512,-512,512,512],["Skyrim.esm",1036492,-256,-256,255,256],["Skyrim.esm",1036493,-256,-256,255,256],["Skyrim.esm",1036503,-176,-166,171,215],["Skyrim.esm",1036508,-154,-152,148,199],["Skyrim.esm",1040529,-154,-152,148,199]];
   // FireFXShader, 0001b212 in Skyrim.esm, read out of the EFSH records. This
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
@@ -4251,6 +4266,14 @@
     out here, so the numbers go in the line.
   */
   let waterSaid = '';
+  /*
+    The placed waters of PLACED_WATERS, by runtime id: id -> [x1, y1, x2, y2].
+    Resolved once, the way the fire bases are, by the walk's own slice.
+    waterHere is the walk's list of them in this cell, [x, y, z, id] each.
+  */
+  let waterBox = null;
+  let waterHere = null;
+  let walkWant = null;      // fires and placed waters together, for the walk
   let fireCell = -1;      // the cell the list below was made for
   let fireHere = null;    // where the fires in it are
   let placeBeat = 0;      // when the heartbeat last wrote
@@ -4307,6 +4330,48 @@
   */
   let fireIdAt = 0;
   let fireIdOut = [];
+
+  /**
+   * Resolves PLACED_WATERS into waterBox, all at once: the table is a handful
+   * of rows, and a row that does not resolve is a plugin not in this load
+   * order, which is no water to find.
+   */
+  function resolveWaterIds() {
+    waterBox = {};
+    for (let i = 0; i < PLACED_WATERS.length; i++) {
+      const row = PLACED_WATERS[i];
+      try {
+        const raw = (row[0] === 'Skyrim.esm')
+          ? sp.Game.getFormEx(row[1])
+          : sp.Game.getFormFromFile(row[1], row[0]);
+        const base = sp.Form.from(raw);
+        const id = base ? base.getFormID() : 0;
+        if (id) { waterBox[id] = [row[2], row[3], row[4], row[5]]; }
+      } catch (e) { }
+    }
+    return waterBox;
+  }
+
+  /**
+   * The placed water somebody at (px, py, pz) is wading in, as
+   * { id, top, deep }, or null. Wading is inside the water's footprint with
+   * its surface above the feet and under WADE_DEEP over them.
+   */
+  function placedWaterAt(px, py, pz, waters, deepest) {
+    let best = null;
+    for (let i = 0; i < waters.length; i++) {
+      const w = waters[i];
+      const box = waterBox && waterBox[w[3]];
+      if (!box) { continue; }
+      if (px < w[0] + box[0] || px > w[0] + box[2] ||
+          py < w[1] + box[1] || py > w[1] + box[3]) { continue; }
+      const deep = w[2] - pz;
+      if (deep > 0 && deep < deepest && (!best || deep < best.deep)) {
+        best = { id: w[3], top: w[2], deep: deep };
+      }
+    }
+    return best;
+  }
 
   /** The runtime ids of FIRE_BASES, or [] until the walk has resolved them. */
   function fireIdList() {
@@ -4422,7 +4487,7 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireWalk = null; }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; waterHere = null; fireWalk = null; }
     if (!cell) { return []; }
 
     // Start the cell's walk, or carry the one under way on by a slice, and
@@ -4444,10 +4509,18 @@
       resolveFireIds(began);
       if (!fireIds) { return; }
     }
+    if (!waterBox) { resolveWaterIds(); }
     fireBases = fireIds.length;
     // No base resolved: there is nothing to look for in any cell.
-    if (!fireIds.length) { fireWalk = null; fireHere = []; fireHits = 0; return; }
-    const done = walkCellSlice(cell, w, fireWant, function (e) {
+    if (!fireIds.length && !Object.keys(waterBox).length) {
+      fireWalk = null; fireHere = []; waterHere = []; fireHits = 0; return;
+    }
+    if (!walkWant) {
+      walkWant = {};
+      for (const k in fireWant) { walkWant[k] = true; }
+      for (const k in waterBox) { walkWant[k] = true; }
+    }
+    const done = walkCellSlice(cell, w, walkWant, function (e) {
       fireThrew++;
       if (!fireWhy) { fireWhy = String((e && e.message) || e); }
     }, began);
@@ -4455,13 +4528,15 @@
     if (!done) { return; }
 
     fireWalk = null;
-    fireHere = w.out;
-    fireHits = w.out.length;
+    fireHere = w.out.filter(function (p) { return !!fireWant[p[3]]; });
+    waterHere = w.out.filter(function (p) { return !!waterBox[p[3]]; });
+    fireHits = fireHere.length;
     // fireWalked, not walked: naming the walk's own counter here threw on
     // every cell change from #184 on, 80 times in the dev log of 23
     // September, and the place report for that tick never went.
-    log('fires: ' + w.out.length + ' of ours in this cell, out of ' + fireWalked +
-        ' thing(s) looked at');
+    log('fires: ' + fireHere.length + ' of ours in this cell, out of ' + fireWalked +
+        ' thing(s) looked at' +
+        (waterHere.length ? ', and ' + waterHere.length + ' placed water(s)' : ''));
   }
 
   /**
@@ -4630,28 +4705,32 @@
           isSwimming only answers once somebody's feet have left the bottom.
           Standing knee deep in a river in the Pale reads as dry land to it,
           which is the wrong answer in the one situation people are actually
-          in most of the time. The cell's water level against where they are
-          standing is the rest of it: near or above their feet (see
-          FEET_SLACK) and below swimming is wading.
+          in most of the time. Water above their feet and below swimming is
+          wading, and there are two kinds of water (#2302): the cell's own
+          plane, and the placed waters the cell walk keeps (PLACED_WATERS).
+          pz is the actor's position, which is its feet.
 
           A cell with no water answers a level far below anywhere anybody
-          stands, so the subtraction comes out far more negative than
-          FEET_SLACK and this stays false without needing to ask whether
-          there is water at all.
+          stands, so the subtraction comes out negative and the plane stays
+          dry without needing to ask whether there is water at all.
         */
+        fireSpotsHere(pc);
+        const placed = placedWaterAt(px, py, pz, waterHere || [], WADE_DEEP);
         const level = cell.getWaterLevel();
+        let planeSaid = 'the cell has no readable water level';
         if (isFinite(level)) {
-          // pz is Actor.getPositionZ (root), not a true feet height (#608).
           const deep = level - pz;
-          wading = deep > -FEET_SLACK && deep < WADE_DEEP;
-          const slackBit = (wading && deep <= 0)
-            ? ', wading via feet slack'
-            : (wading ? ', wading' : ', dry');
-          waterSaid = 'water level ' + Math.round(level) + ', feet at ' +
-                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep' +
-                      slackBit;
+          wading = deep > 0 && deep < WADE_DEEP;
+          planeSaid = 'water level ' + Math.round(level) + ', feet at ' +
+                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep';
+        }
+        if (placed) {
+          wading = true;
+          waterSaid = planeSaid + ', wading in placed water ' +
+                      placed.id.toString(16) + ', surface at ' +
+                      Math.round(placed.top) + ', ' + Math.round(placed.deep) + ' deep';
         } else {
-          waterSaid = 'the cell has no readable water level';
+          waterSaid = planeSaid + (wading ? ', wading' : (isFinite(level) ? ', dry' : ''));
         }
       }
     } catch (e) { }
