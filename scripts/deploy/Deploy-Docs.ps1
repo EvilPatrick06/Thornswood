@@ -618,7 +618,8 @@ if (-not `$runAs) {
   `$runAs = 'LOCAL SERVICE'
   `$was = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
   if (`$was) {
-    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
+    try { `$sid = (New-Object Security.Principal.NTAccount([string]`$was.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { 'the task runs as ' + `$was.UserId + ', which does not translate to an account here (' + `$_.Exception.Message + ')' }
     if (`$sid -eq 'S-1-5-19') { `$already = `$true; 'no -RunAs, so the task keeps the account it has: LOCAL SERVICE' }
     elseif (`$sid -eq 'S-1-5-18') { 'no -RunAs, and the task ran as SYSTEM: it moves to LOCAL SERVICE (#2613). -RunAs SYSTEM is the way back.' }
     else { `$runAs = [string]`$was.UserId; `$principal = `$was }
@@ -631,8 +632,8 @@ if (`$principal) {
   `$principal = New-ThornswoodServicePrincipal -AsSystem
 } else {
   `$sid = ''
-  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-  if (-not `$sid) { 'NO SUCH ACCOUNT HERE: ' + `$runAs + '. Nothing was stopped or changed.'; return }
+  try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value }
+  catch { 'NO SUCH ACCOUNT HERE: ' + `$runAs + ' (' + `$_.Exception.Message + '). Nothing was stopped or changed.'; return }
   if (-not `$already) {
     `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin'))
     if (`$cannot.Count) {
@@ -789,8 +790,11 @@ if (`$chk) {
 `$who = (Get-ScheduledTask -TaskName '$Task' -EA SilentlyContinue).Principal
 if (`$who) {
   `$got = ''
-  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-  if (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
+  `$gotWhy = ''
+  try { `$got = (New-Object Security.Principal.NTAccount(`$who.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+  catch { `$gotWhy = `$_.Exception.Message }
+  if (`$gotWhy) { 'THE TASK RUNS AS ' + `$who.UserId + ', WHICH DOES NOT TRANSLATE TO AN ACCOUNT HERE (' + `$gotWhy + '), NOT ' + `$runAs }
+  elseif (`$got -eq `$sid) { 'task runs as ' + `$who.UserId + ', run level ' + `$who.RunLevel }
   else { 'THE TASK RUNS AS ' + `$who.UserId + ', NOT ' + `$runAs }
   # The privilege cut too, because the account alone is not what makes it low
   # privilege, and a box that dropped the list would otherwise pass as done.
@@ -855,7 +859,7 @@ function Healthy {
       $r = Invoke-WebRequest -Uri ('http://127.0.0.1:' + $Port + '/') -UseBasicParsing -TimeoutSec 5
       $code = [int]$r.StatusCode
     } catch {
-      if ($_.Exception.Response) { try { $code = [int]$_.Exception.Response.StatusCode } catch { } }
+      if ($_.Exception.Response) { $code = [int]$_.Exception.Response.StatusCode }
     }
     if ($code -gt 0 -and $code -lt 500) { return $true }
     if ((Get-Date) -gt $until) { return $false }

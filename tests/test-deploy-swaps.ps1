@@ -750,12 +750,24 @@ try {
     $live = Live $voiceRoot
     $pidBefore = Listener $voicePort
     $taskBefore = TaskArg ($TaskPrefix + ' Voice')
-    Put (Join-Path $repo 'voice\voice-server.js') 'function ( { not javascript'
+    # With its BUILD line, so this is the box's parse check and not the
+    # install's own read of the build (#2711, below).
+    Put (Join-Path $repo 'voice\voice-server.js') "const BUILD = 'voice-bad';`nfunction ( { not javascript"
     $r = Deploy 'Install-Voice.ps1' $voice.Clone()
     $failed = $script:fail
     Yes 'Install-Voice: a voice-server.js that does not parse stops the install, saying why' ((-not $r.Ok) -and $r.Said -match 'voice-server\.js does not parse')
     Yes '  and the running service is untouched, the same process, the same build' (
         ((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
+    if ($script:fail -gt $failed) { Show }
+
+    # #2711: the build the check after the start holds the service to was read
+    # in a try with an empty catch, and with none that check passed whatever
+    # answered. A voice-server.js naming no BUILD now stops before it is sent.
+    Put (Join-Path $repo 'voice\voice-server.js') "'use strict';`nconsole.log('no build here');`n"
+    $r = Deploy 'Install-Voice.ps1' $voice.Clone()
+    $failed = $script:fail
+    Yes 'Install-Voice: a voice-server.js that names no BUILD stops the install before anything is sent' ((-not $r.Ok) -and $r.Said -match 'names no const BUILD, so there is no build to check the new service by\. Nothing was sent\.')
+    Yes '  and the running service is untouched' (((Live $voiceRoot) -eq $live) -and ((Listener $voicePort) -eq $pidBefore) -and ((Build) -eq 'voice-v2'))
     if ($script:fail -gt $failed) { Show }
 
     Voice 'voice-v3'

@@ -342,5 +342,25 @@ Yes 'an answer carrying something that is not a relay address is not put on the 
 $r = Probe $plain @{} 'none'
 Yes 'nothing running leaves every default as it was, local chat on' (
     $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.ChatRange -eq 'on')
+# #2711: /ice that did not answer was a try with an empty catch, and the relay
+# it served was dropped with nothing on the screen.
+$r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;ice=The operation has timed out.;relay=ephemeral;turn='
+Yes 'a service whose /ice does not answer keeps no relay, and says so with why' (
+    $r.TurnUrl -eq '' -and $r.Bind -eq '127.0.0.1' -and $r.Said -match 'did not answer /ice \(The operation has timed out\.\)' -and $r.Said -match 'Pass -TurnUrl')
+$r = Probe $plain @{} 'bind=127.0.0.1;auth=on;chat=2500;ice=;relay=none;turn='
+Yes '  and one whose /ice answered says nothing about it' ($r.Said -notmatch '/ice')
+
+# And the build the check after the start holds the new service to: a
+# voice-server.js that does not read, or names no BUILD, stops the install
+# before anything on the box is stopped, where it used to leave the check
+# passing whatever answered (#2711).
+$installText = [IO.File]::ReadAllText($installPath)
+$iNoBuild = $installText.IndexOf('names no const BUILD, so there is no build to check the new service by')
+$iUnread = $installText.IndexOf('could not be read, so there is no build to check the new service by')
+$iStop = $installText.IndexOf('StopIt', [Math]::Max($iNoBuild, $iUnread))
+Yes 'a voice-server.js that names no BUILD, or does not read, stops the install with Die before the artifact is sent' (
+    $iNoBuild -gt 0 -and $iUnread -gt 0 -and $iStop -gt $iNoBuild -and $installText.IndexOf('Send-ThornswoodArtifact -Artifact $artifact') -gt $iNoBuild -and
+    $installText.Substring($iUnread - 260, 260) -match 'catch \{ Die' -and $installText -match 'if \(-not \$m\.Success\) \{ Die "\$vsPath names no const BUILD')
+Yes '  and the voice-server.js here names one, so an install today has its check' ([regex]::IsMatch([IO.File]::ReadAllText((Join-Path $RepoPath 'voice\voice-server.js')), "const\s+BUILD\s*=\s*'([^']+)'"))
 
 Done

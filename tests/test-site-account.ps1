@@ -721,6 +721,10 @@ try {
             (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'NT AUTHORITY\LOCAL SERVICE' $cut 'Unrestricted')[0] -like 'task runs as *')
         Yes 'read-back: a task still on SYSTEM after asking for LOCAL SERVICE is shouted' (
             (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'SYSTEM' $null 'Default')[0] -eq 'THE TASK RUNS AS SYSTEM, NOT LOCAL SERVICE')
+        # #2711: an account the task names that does not translate was looked up
+        # in a try with an empty catch, and came out as a plain mismatch.
+        Yes 'read-back: a task on an account that does not translate says so, with why' (
+            (ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'NOBODY AT ALL HERE' $null 'Default')[0] -match '^THE TASK RUNS AS NOBODY AT ALL HERE, WHICH DOES NOT TRANSLATE TO AN ACCOUNT HERE \(.+\), NOT LOCAL SERVICE$')
         $said = ReadBack 'LOCAL SERVICE' 'S-1-5-19' 'LOCAL SERVICE' $null 'Default'
         Yes 'read-back: a LOCAL SERVICE task that kept every privilege is shouted, not passed as done' (
             $said.Count -eq 2 -and $said[1] -like 'THE TASK KEEPS MORE THAN IT SHOULD: privileges every one LOCAL SERVICE has, token SID type Default*')
