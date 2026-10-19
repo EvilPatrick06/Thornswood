@@ -490,7 +490,7 @@ for (const person of people) {
       // Read and let go, not kept with the files this run may write: there
       // can be a year of them, up to a megabyte each.
       let set = null;
-      try { set = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^﻿/, '')); }
+      try { set = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); }
       catch (e) { left(T + ': launcher logs that would not parse, so were not read', 1); continue; }
       if (!isObj(set)) continue;
       if (String(set.who) !== id && !gone.has(String(set.session))) continue;
