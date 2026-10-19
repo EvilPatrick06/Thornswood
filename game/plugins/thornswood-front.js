@@ -2828,7 +2828,7 @@
   */
   let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
-     watchdog, and stuck rescue both refuse to fight that
+     watchdog and the stuck rescue both refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
      null while still seated, so furnitureEnter/Exit keep a seated flag too. */
   let seatedInFurniture = false;
