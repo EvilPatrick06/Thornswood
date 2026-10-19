@@ -48298,10 +48298,11 @@ log('gamemode loaded:',
                        effects() below and withPerks in the character block.
                        So the game never takes the magicka at all, and a spell
                        you could not have afforded can be cast.
-    Tireless           What a sprint and a power attack cost is the game's
-                       own sum on your own machine, so the front plugin holds
-                       those game settings at half there. Running and a plain
-                       swing cost nothing in this game.
+    Tireless           What a sprint, a power attack and a shield bash cost
+                       is the game's own sum on your own machine, so the front
+                       plugin holds those game settings at half there. A bash
+                       counts as a swing (Patrick, 12 Oct). Running and a
+                       plain swing cost nothing in this game.
     Second Wind        Stamina that reaches nothing fills, once every 5
                        minutes.
     Windwalker         +4 speed, through the tree's totals. The fall is the
