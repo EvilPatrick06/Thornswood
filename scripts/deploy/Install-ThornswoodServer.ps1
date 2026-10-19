@@ -291,13 +291,15 @@ function Get-ThornswoodTaskSid {
     } catch { return '' }
 }
 function Get-ThornswoodServiceNeverReach {
-    param([string]$Own = '')
+    param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @('C:\Thornswood-Backup', 'C:\Thornswood-Deploys', 'C:\Thornswood-Watch', 'C:\Thornswood-Maint')
-    foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
     }
-    foreach ($r in 'C:\Thornswood-Voice', 'C:\Thornswood-Voice-Dev') {
+    foreach ($r in 'Thornswood-Voice', 'Thornswood-Voice-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
     }
     return $list
@@ -309,7 +311,11 @@ function Test-ThornswoodServiceCannotReach {
     $read = [long]0x90000001
     $problems = @()
     foreach ($p in @($Paths)) {
-        if (-not $p -or -not (Test-Path -LiteralPath $p)) { continue }
+        if (-not $p) { continue }
+        # A denied look is an error, not a no: without Stop, Test-Path says
+        # False and the path would be passed over as if it were not there.
+        try { if (-not (Test-Path -LiteralPath $p -ErrorAction Stop)) { continue } }
+        catch { $problems += ($p + ': whether it is there could not be checked (' + $_.Exception.Message + ')'); continue }
         try { $acl = Get-Acl -LiteralPath $p }
         catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
         foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
@@ -372,7 +378,7 @@ function Grant-ThornswoodServiceFolder {
 # goes onto LOCAL SERVICE only where LOCAL SERVICE can read none of what no
 # service may.
 if (-not $AsSystem -and -not $NoTask) {
-    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root))
+    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)))
     if ($cannot.Count) {
         Say 'LOCAL SERVICE could read what no service may, so the server is not moved onto it:' 'Red'
         foreach ($c in $cannot) { Say ('  ' + $c) 'Red' }
