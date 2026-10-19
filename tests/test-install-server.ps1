@@ -683,7 +683,9 @@ try {
         Yes "$label is INSTALL REFUSED" (($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0)
         Yes '  and it says why' (($out -join "`n") -match $case.Why)
         Yes '  and the root is byte for byte as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
-        Yes '  and the same server process is still answering' (((Owner $P) -eq $running) -and (Answers $P))
+        $ownerNow = Owner $P; $ans = Answers $P
+        # Which half failed, said in the line, so a failure on a runner is measured (#1273).
+        Yes ('  and the same server process is still answering (process ' + $ownerNow + ', was ' + $running + '; answers ' + $ans + ')') (($ownerNow -eq $running) -and $ans)
         if ($script:fail -gt $failed) { Show }
     }
 
@@ -893,7 +895,9 @@ try {
     Yes '  and says which switch, and how to give one' (
         (($out -join "`n") -match 'thornswoodRequirePass is missing on this server') -and (($out -join "`n") -match 'Publish-Server\.ps1 -RequirePass on, or off'))
     Yes '  and the root is byte for byte as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
-    Yes '  and the same server process is still answering' (((Owner $P) -eq $running) -and (Answers $P))
+    $ownerNow = Owner $P; $ans = Answers $P
+    # Which half failed, said in the line, so a failure on a runner is measured (#1273).
+    Yes ('  and the same server process is still answering (process ' + $ownerNow + ', was ' + $running + '; answers ' + $ans + ')') (($ownerNow -eq $running) -and $ans)
     if ($script:fail -gt $failed) { Show }
     $out = Install (Payload -Gamemode '// v7 pass on') @('-RequirePass on')
     $failed = $script:fail
