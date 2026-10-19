@@ -144,6 +144,20 @@ try {
     Yes 'a version already in launchers.txt is not written twice' (@($lv | Where-Object { $_ -eq '1.1.101.35' }).Count -eq 1)
     Yes 'main was not touched by any of it' ((Sha (Join-Path $site 'feed\version.json')) -eq (Sha (Join-Path $site 'feed\version.json')) -and -not (Test-Path -LiteralPath (Join-Path $site 'feed\history')))
 
+    # releases.txt that cannot take its line (#2711). The swap added it in a
+    # try with an empty catch, so a line that was never written was never said.
+    # A folder in its place makes the read throw; the feed still goes out, and
+    # the swap says what it could not add.
+    $relTxt = Join-Path $site 'feed-dev\releases.txt'
+    New-Item -ItemType Directory -Force -Path $relTxt | Out-Null
+    Put (Join-Path $dir 'version.json') '{"launcherVersion":"1.1.101.35","packs":[{"id":"x"},{"id":"y"}],"release":{"id":"20261018-120000-dev","channel":"dev"}}'
+    $said = @(Send-FeedStore 'dev' $dir @('version.json') -SiteDir $site 6>&1)
+    $r = @($said | Where-Object { $_ -is [hashtable] })[0]
+    $note = (@($said | Where-Object { $_ -isnot [hashtable] } | ForEach-Object { [string]$_ }) -join ' ')
+    Yes 'a releases.txt that cannot take its line does not stop a feed that landed' ($null -ne $r -and @($r.Sent) -contains 'version.json' -and (Sha (Join-Path $site 'feed-dev\version.json')) -eq (Sha (Join-Path $dir 'version.json')))
+    Yes '  and the send says which line was not added, and why' ($note -match 'NOTE: the feed went out, but feed-dev\\releases\.txt was not given this release''s line: ' -and $note -match 'Get-FeedStoreReleases will not name this one')
+    Remove-Item -LiteralPath $relTxt -Recurse -Force
+
     # ---- 3. two publishers --------------------------------------------------
     Write-Host ''; Write-Host 'two publishers'
     $mdir = Get-FeedStoreDir 'main'

@@ -159,6 +159,16 @@
 # for what may rightly be missing, or says in words what it could not read or
 # clean. Two of the 58 were comments that quoted an empty catch
 # (SiteConfigSet.ps1, Rotate-ServerPassword.ps1), reworded. 125 are left.
+#
+# 18 Oct, the release scripts (#2711, the third part): all 43 in 17 files of
+# scripts\release. A failure that means a release cannot be trusted now stops
+# it before anything is sent, published or deleted (the client record and
+# lists Ship-Rules.ps1 loads, the collection config.json, the server record,
+# the site's files.json, a baseline Scrub-Feed cannot read); an absence that
+# may rightly happen is tested for (a registry key, no git, no node); what
+# fails after the work is done, or where a dev Ship fails open on purpose, is
+# said (releases.txt, the pending note, the icon cache, Explorer, what main
+# and dev have published). 82 are left.
 installer\Setup-Thornswood.ps1 7
 scripts\dev\Check-Outside.ps1 6
 scripts\dev\Close-Launcher.ps1 8
@@ -175,23 +185,6 @@ scripts\ops\Reset-Character.ps1 1
 scripts\ops\Set-Door.ps1 6
 scripts\ops\Set-Server.ps1 1
 scripts\ops\Wipe-Saves.ps1 1
-scripts\release\Build-Engine.ps1 1
-scripts\release\Build-Server.ps1 4
-scripts\release\BuildStamp.ps1 1
-scripts\release\Bump-Version.ps1 1
-scripts\release\Check-ShipReady.ps1 3
-scripts\release\Feed-Store.ps1 1
-scripts\release\Go.ps1 3
-scripts\release\Install-Launcher.ps1 5
-scripts\release\Package-Thornswood.ps1 1
-scripts\release\Publish-Installer.ps1 1
-scripts\release\Publish-Server.ps1 4
-scripts\release\Publish-Update.ps1 4
-scripts\release\Rollback-Feed.ps1 2
-scripts\release\Scrub-Feed.ps1 1
-scripts\release\Setup-ShipMachine.ps1 1
-scripts\release\Ship-Rules.ps1 4
-scripts\release\Ship.ps1 6
 scripts\vps\Bootstrap-VPS.ps1 1
 scripts\vps\Check-Load.ps1 1
 scripts\vps\Check-ServerPriority.ps1 1

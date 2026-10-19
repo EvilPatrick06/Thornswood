@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  56,
-    "callCount":  242,
+    "callCount":  243,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1432,7 +1432,16 @@
                       "script":  "scripts/release/Publish-Installer.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "Remote @\"",
+                      "anchor":  "$listCheck = @(Remote @\"",
+                      "does":  "reads whether the site's files.json parses, before the installer is sent",
+                      "class":  "read-status",
+                      "reason":  "reads the files store and changes nothing"
+                  },
+                  {
+                      "script":  "scripts/release/Publish-Installer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$listWrite = @(Remote @\"",
                       "does":  "writes the feed, news or files store",
                       "class":  "feed-send",
                       "reason":  "writes the feed, news or files store"

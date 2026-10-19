@@ -193,8 +193,14 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
     $rows += New-Row 'the server build record is in the repo' $false 'records\server-build.json' 'git pull brings it' 'either' 'warn'
     return $rows
   }
+  # A record that does not read is its own answer, not "no build matches": the
+  # fix is the record, not a build.
   $rec = $null
-  try { $rec = [IO.File]::ReadAllText($ServerRecord) | ConvertFrom-Json } catch { }
+  try { $rec = [IO.File]::ReadAllText($ServerRecord) | ConvertFrom-Json }
+  catch {
+    $rows += New-Row 'the server build record reads' $false ('records\server-build.json does not read: ' + $_.Exception.Message) 'git checkout -- records\server-build.json, or record the build again with .\scripts\release\New-ServerBuildRecord.ps1' 'either' 'warn'
+    return $rows
+  }
   $first = $ServerDists[0]
   $match = $null
   foreach ($d in $ServerDists) {
@@ -433,17 +439,27 @@ $hasGame = [bool]($GameDir -and (Test-Path $GameDir))
 # was current. Vortex knew all along and wrote it in its own state.
 try {
     . (Join-Path $Here '..\mods\LoadOrder.ps1')
+    # No config.json is the launcher's own collection (Get-CollectionSlug's
+    # default). One that is there and does not read could name another, so
+    # the revision is not asked of the default in its place.
     $colUrl = ''
-    try { $colUrl = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
-    $cs = Get-CollectionState $colUrl
-    if ($cs.Known) {
+    $colWhy = ''
+    $colCfg = $(if ($Root) { Join-Path $Root 'config.json' } else { '' })
+    if ($colCfg -and (Test-Path -LiteralPath $colCfg)) {
+        try { $colUrl = [string](Get-Content -LiteralPath $colCfg -Raw | ConvertFrom-Json).CollectionUrl }
+        catch { $colWhy = $_.Exception.Message }
+    }
+    $cs = $(if ($colWhy) { $null } else { Get-CollectionState $colUrl })
+    if ($colWhy) {
+        Say ('  note  ' + $colCfg + ' does not read (' + $colWhy + '), so which collection it names, and its revision, were not checked') 'Yellow'
+    } elseif ($cs.Known) {
         Ready 'the collection here is the newest Vortex knows of' (-not $cs.Behind) `
             ("revision {0}, newest {1}" -f $cs.Have, $cs.Newest) `
             'Update the collection in Vortex, let it deploy, then Deploy-Gamemode and ship. A release built from a stale collection turns away everybody who installed the current one.' 'patrick'
     } else {
         Say '  note  could not read the collection revision from Vortex, so it was not checked' 'DarkGray'
     }
-} catch { Say '  note  the collection revision check did not run' 'DarkGray' }
+} catch { Say ('  note  the collection revision check did not run: ' + $_.Exception.Message) 'DarkGray' }
 # Ship stops on this too (Assert-VortexProfile, #557): it reads the load order
 # from the Vortex profile named Thornswood and no other.
 $vpDir = $null
@@ -474,7 +490,8 @@ Ready 'MSBuild and the .NET Framework 4.8.1 reference assemblies are here' ([boo
   'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
 
 $node = $null
-try { $node = (Get-Command node -EA Stop).Source } catch { }
+$nodeCmd = Get-Command node -ErrorAction SilentlyContinue | Select-Object -First 1
+if ($nodeCmd) { $node = $nodeCmd.Source }
 Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2>$null) } else { '' }) `
   'Install Node from nodejs.org; the gamemode and the site are checked with it, and Ship refuses a game folder without it because SkyUI''s menus are read with it (#1913)'
 
