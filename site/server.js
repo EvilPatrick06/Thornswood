@@ -116,8 +116,11 @@ function makeLog(dir, name, maxBytes, keep, opts) {
   let rollFailures = 0;      // failed rolls since the last good one
   let nextRoll = 0;          // no retry before this (ms)
   let held = false;          // the ceiling line has been written
+  // No try (#2736): a string written to stdout does not throw here, and a
+  // pipe that has gone fails later as the stream's own error, which a catch
+  // around the write never saw.
   function say(line) {
-    try { process.stdout.write('[thornswood-docs] ' + line + '\n'); } catch (e) { }
+    process.stdout.write('[thornswood-docs] ' + line + '\n');
   }
 
   function two(n) { return n < 10 ? '0' + n : String(n); }
@@ -190,10 +193,7 @@ function makeLog(dir, name, maxBytes, keep, opts) {
       // Once, and out loud. A log that throws on every line is worse than no
       // log, and one that goes quiet with no trace is worse than both.
       broken = true;
-      try {
-        process.stdout.write('[thornswood-docs] could not write ' + file +
-                             ', carrying on with the console only: ' + e.message + '\n');
-      } catch (e2) { }
+      say('could not write ' + file + ', carrying on with the console only: ' + e.message);
       return false;
     }
   }
@@ -208,7 +208,12 @@ function makeLog(dir, name, maxBytes, keep, opts) {
       const m = /^(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2})/.exec(buf.toString('latin1', 0, n));
       return m ? new Date(+m[1], +m[2] - 1, +m[3], +m[4], +m[5], +m[6]).getTime() : null;
     } catch (e) { return null; }
-    finally { if (fd !== null) { try { fs.closeSync(fd); } catch (e) { } } }
+    finally {
+      if (fd !== null) {
+        try { fs.closeSync(fd); }
+        catch (e) { say('could not close ' + file + ' after reading its first line (' + (e.code || e.message) + ')'); }
+      }
+    }
   }
 
   function age() {
@@ -414,7 +419,13 @@ if (cfgBroken) {
   cfg.secret = crypto.randomBytes(32).toString('hex');
 } else if (!cfg.secret) {
   cfg.secret = crypto.randomBytes(32).toString('hex');
-  try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); } catch (e) { }
+  // Said when it cannot be kept (#2736): the secret then lives only in this
+  // run, so every restart signs everybody out until config.json can be written.
+  try { fs.writeFileSync(CFGFILE, JSON.stringify(cfg, null, 2), 'utf8'); }
+  catch (e) {
+    console.error('[thornswood] could not keep the new cookie secret in config.json (' + (e.code || e.message) +
+                  '), so a restart signs everybody out');
+  }
 }
 /* The join pass key (#937). Made here once and kept in config.json, never in
    the repository; Set-Door.ps1 -Connect copies it into each game server's
@@ -444,8 +455,12 @@ if (tellPassword) {
   }
 }
 
+// A folder that cannot be made is said (#2736), by its path and the error
+// code; every read and write under it fails after this, and the line here is
+// the one that says why.
 for (const dir of [DATA, FOR_BOT, PUBLIC, FILES, UP]) {
-  try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+  try { fs.mkdirSync(dir, { recursive: true }); }
+  catch (e) { console.error('[thornswood-docs] could not make ' + dir + ' (' + (e.code || e.message) + ')'); }
 }
 /* A site from before #1102 kept those three directly in data. Each is moved
    into for-bot once: copied, so the copy takes that folder's rules rather
@@ -1069,21 +1084,33 @@ const PAGES = {
   out and writes beside the count.
 */
 let gameStatus = { up: false, online: 0, max: 0, line: 0, full: false, at: 0 };
+/* online.json that is there and cannot be read is said (#2736), once, and
+   again only after a read has worked, since this runs every ten seconds. No
+   file is the normal case while the game server is down, and is tested for
+   rather than thrown. */
+let onlineUnread = '';
 function pollGame() {
   const sock = new net.Socket();
   let done = false;
   const finish = (up) => {
     if (done) return;
     done = true;
-    try { sock.destroy(); } catch (e) { }
+    sock.destroy();
     let online = 0, max = 0, line = 0, full = false;
-    try {
-      const o = JSON.parse(fs.readFileSync(cfg.onlineFile, 'utf8'));
-      if (o && typeof o.now === 'number') online = o.now;
-      if (o && typeof o.max === 'number' && o.max > 0) max = o.max;
-      if (o && typeof o.line === 'number' && o.line > 0) line = o.line;
-      if (o && o.full === true) full = true;
-    } catch (e) { }
+    let o = null, why = '';
+    if (fs.existsSync(cfg.onlineFile)) {
+      try { o = JSON.parse(fs.readFileSync(cfg.onlineFile, 'utf8')); }
+      catch (e) { why = e.code || 'not JSON'; }
+    }
+    if (why && why !== onlineUnread) {
+      console.error('[thornswood-docs] could not read the online count in ' + cfg.onlineFile + ' (' + why +
+                    '), so the site shows nobody on until it reads again');
+    }
+    onlineUnread = why;
+    if (o && typeof o.now === 'number') online = o.now;
+    if (o && typeof o.max === 'number' && o.max > 0) max = o.max;
+    if (o && typeof o.line === 'number' && o.line > 0) line = o.line;
+    if (o && o.full === true) full = true;
     gameStatus = { up, online: up ? online : 0, max: up ? max : 0, line: up ? line : 0,
                    full: up && full, at: Date.now() };
   };
@@ -1154,11 +1181,13 @@ const jsonFile = (p, fallback) => {
     // A missing file is the normal empty case. A file that exists but will
     // not parse usually means a crash mid-write left truncated JSON; shout
     // so bans / linked / inbox do not silently become the empty fallback.
-    try {
-      if (fs.existsSync(p)) {
-        console.error('[thornswood-docs] JSON will not parse, using fallback for ' + p + ': ' + (e && e.message || e));
-      }
-    } catch (e2) { }
+    // existsSync answers false rather than throwing, so no try (#2736). The
+    // error's name or code and never its message: a newer Node puts a piece
+    // of the text in a parse error's message, and these files hold Discord
+    // ids and addresses.
+    if (fs.existsSync(p)) {
+      console.error('[thornswood-docs] JSON will not parse, using fallback for ' + p + ': ' + ((e && (e.code || e.name)) || 'unknown'));
+    }
     return fallback;
   }
 };
@@ -1166,19 +1195,27 @@ const putJson = (p, o) => {
   // Same-folder temp + rename so a crash mid-write cannot leave truncated
   // JSON that jsonFile would then quietly replace with the empty fallback
   // (bans, linked accounts, inbox, and the rest of putJson callers).
+  // A temp file that will not go is said, by its name and the error code
+  // (#2736): it holds a whole copy of the file, and a folder full of them is
+  // otherwise found by somebody wondering where the disk went. One that was
+  // never made is not there to go, and is tested for.
+  const tmp = path.join(path.dirname(p), '.' + path.basename(p) + '.' + process.pid + '.tmp');
+  const dropTmp = () => {
+    if (!fs.existsSync(tmp)) return;
+    try { fs.unlinkSync(tmp); }
+    catch (e2) { console.error('[thornswood-docs] could not remove ' + tmp + ' (' + (e2.code || e2.message) + ')'); }
+  };
   try {
     const body = JSON.stringify(o, null, 2);
-    const dir = path.dirname(p);
-    const tmp = path.join(dir, '.' + path.basename(p) + '.' + process.pid + '.tmp');
     fs.writeFileSync(tmp, body, 'utf8');
     try { fs.renameSync(tmp, p); }
     catch (e) {
       // Windows: rename onto an existing file can fail; replace then drop tmp.
-      try { fs.copyFileSync(tmp, p); } finally { try { fs.unlinkSync(tmp); } catch (e2) { } }
+      try { fs.copyFileSync(tmp, p); } finally { dropTmp(); }
     }
     return true;
   } catch (e) {
-    try { fs.unlinkSync(path.join(path.dirname(p), '.' + path.basename(p) + '.' + process.pid + '.tmp')); } catch (e2) { }
+    dropTmp();
     return false;
   }
 };
@@ -1195,7 +1232,13 @@ function writeDoc(n, text) {
   const p = docPath(n);
   if (!p) return false;
   try {
-    try { if (fs.existsSync(p)) fs.copyFileSync(p, p + '.bak'); } catch (e) { }
+    // The page is still saved when its .bak cannot be made, and that is said
+    // (#2736), so the undo that is not there is not found out when it is
+    // needed.
+    if (fs.existsSync(p)) {
+      try { fs.copyFileSync(p, p + '.bak'); }
+      catch (e) { console.error('[thornswood-docs] could not keep ' + path.basename(p) + '.bak before saving it (' + (e.code || e.message) + ')'); }
+    }
     fs.writeFileSync(p, text, 'utf8');
     return true;
   } catch (e) { return false; }
@@ -1234,7 +1277,12 @@ function writeBoardOne(name, value, seenRev) {
   all[name] = value;
   all._rev = Object.assign({}, all._rev && typeof all._rev === 'object' ? all._rev : {});
   all._rev[name] = now + 1;
-  try { fs.copyFileSync(BOARDFILE, BOARDFILE + '.bak'); } catch (e) { }
+  // No boards file yet is the first save and has nothing to keep; one that is
+  // there and cannot be copied is said, and the save goes ahead (#2736).
+  if (fs.existsSync(BOARDFILE)) {
+    try { fs.copyFileSync(BOARDFILE, BOARDFILE + '.bak'); }
+    catch (e) { console.error('[thornswood-docs] could not keep ' + path.basename(BOARDFILE) + '.bak before saving a board (' + (e.code || e.message) + ')'); }
+  }
   if (!putJson(BOARDFILE, all)) return { ok: false, status: 500, error: 'could not save' };
   return { ok: true, status: 200, rev: now + 1 };
 }
@@ -1519,7 +1567,13 @@ function listFiles() {
   const meta = jsonFile(path.join(FILES, 'files.json'), {});
   const out = [];
   let names = [];
-  try { names = fs.readdirSync(FILES); } catch (e) { }
+  // No downloads folder is no downloads. One that is there and cannot be
+  // listed is said (#2736), since the page then offers nothing and the log
+  // is the only place that says it is the folder and not the build.
+  if (fs.existsSync(FILES)) {
+    try { names = fs.readdirSync(FILES); }
+    catch (e) { console.error('[thornswood-docs] could not list the downloads in ' + FILES + ' (' + (e.code || e.message) + ')'); }
+  }
   for (const name of names) {
     if (name === 'files.json') continue;
     let st;
@@ -1571,7 +1625,11 @@ const GPENDING = path.join(DATA, 'gallery-pending.json');
 let galleryPendingWrite = Promise.resolve();
 function withGalleryPending(fn) {
   const run = galleryPendingWrite.then(() => fn());
-  galleryPendingWrite = run.catch(() => {});
+  galleryPendingWrite = run.catch(() => {
+    /* Not dropped: the caller has run, and hears the failure there (the
+       upload answers it through failed). This only keeps the next write from
+       waiting on a broken one. */
+  });
   return run;
 }
 // Reports against approved shots. Same deploy rule as the queue: starts [],
@@ -1665,7 +1723,12 @@ function listUploads() {
   const meta = jsonFile(UPMETA, {});
   const out = [];
   let names = [];
-  try { names = fs.readdirSync(UP); } catch (e) { }
+  // As listFiles (#2736): no folder is no uploads, a folder that cannot be
+  // listed is said.
+  if (fs.existsSync(UP)) {
+    try { names = fs.readdirSync(UP); }
+    catch (e) { console.error('[thornswood-docs] could not list the uploads in ' + UP + ' (' + (e.code || e.message) + ')'); }
+  }
   for (const name of names) {
     if (name === 'uploads.json') continue;
     let st;
@@ -1756,7 +1819,8 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
   const deadline = setTimeout(() => {
     timedOut = true; req.unpipe(out); out.destroy(); req.resume();
   }, 300000);
-  out.on('error', () => { broke = true; });
+  // The write's own error code is kept, so the 500 below can say it (#2736).
+  out.on('error', (e) => { broke = (e && e.code) || 'unknown'; });
   req.on('data', (c) => {
     got += c.length;
     budget.bytes += c.length;
@@ -1773,14 +1837,19 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
     clearTimeout(deadline); budget.active--;
     const invalid = !over && !cut && !broke && !timedOut && allow && !mediaSignature(path.extname(safe).toLowerCase(), prefix);
     if (over || cut || broke || timedOut || invalid) {
-      try { fs.unlinkSync(dest); } catch (e) { }
+      // The half file goes. It was made above with wx, so it is there; one
+      // that will not go is said, by its name and the code (#2736).
+      try { fs.unlinkSync(dest); }
+      catch (e) { console.error('[thornswood-docs] could not remove the half upload ' + name + ' (' + (e.code || e.message) + ')'); }
       if (timedOut) return send(res, 408, JSON.stringify({error:'That upload took too long. Try again with a smaller file.'}), null, {Connection:'close'});
       if (quotaExceeded) return send(res, 429, JSON.stringify({error:'This connection has uploaded 500 MB in the last hour. Try again later.'}),
         null, {'Retry-After':String(Math.max(1, Math.ceil((budget.start + 3600000 - Date.now()) / 1000))), Connection:'close'});
       if (invalid) return sendJson(res, 415, {error:'The file contents do not match its image or recording type.'});
       if (over) return send(res, 413, JSON.stringify({ error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' }),
                             null, { Connection: 'close' });
-      if (cut) { try { res.destroy(); } catch (e) { } return; }
+      // destroy() does not throw, so no try (#2736).
+      if (cut) { res.destroy(); return; }
+      console.error('[thornswood-docs] could not write the upload ' + name + ' (' + broke + ')');
       return sendJson(res, 500, { error: 'the site could not save that file. Try again in a minute.' });
     }
     saved(name);
@@ -2391,7 +2460,8 @@ function boundDiscord(open) {
     const giveUp = () => finish(reject, discordSilent());
     timer = setTimeout(() => {
       giveUp();
-      try { if (req) req.destroy(); } catch (e) { }
+      // destroy() does not throw, so no try (#2736).
+      if (req) req.destroy();
     }, DISCORD_ASK_MS);
     req = open({
       giveUp: giveUp,
@@ -2444,7 +2514,13 @@ function discordWaitMs(headers, text) {
     if (at) s = (at - Date.now()) / 1000;
   }
   if (!(s >= 0)) s = parseFloat(h['x-ratelimit-reset-after']);
-  if (!(s >= 0)) { try { s = parseFloat(JSON.parse(text).retry_after); } catch (e) { } }
+  // Only a body that is a JSON object is read for it (#2736). Cloudflare in
+  // front of Discord answers some 429s with a page, which has no wait in it
+  // and falls through to -1; a body that looks like JSON and is not is said.
+  if (!(s >= 0) && /^\s*\{/.test(String(text || ''))) {
+    try { s = parseFloat(JSON.parse(text).retry_after); }
+    catch (e) { console.error('[thornswood] discord rate limit answer is not readable JSON (' + e.name + '), so it names no wait'); }
+  }
   if (!(s >= 0)) return -1;
   return Math.min(60000, Math.ceil(s * 1000));
 }
@@ -2508,7 +2584,7 @@ function discordGet(path) {
     });
     timer = setTimeout(() => {
       settle({ ok: false, status: 0, body: null, why: 'Discord did not answer inside ten seconds' });
-      try { req.destroy(); } catch (e) { }
+      req.destroy();
     }, DISCORD_ASK_MS);
     req.on('error', (e) => settle({ ok: false, status: 0, body: null, why: 'could not reach Discord: ' + e.message }));
   });
@@ -2564,7 +2640,7 @@ function discordWrite(method, path, reason) {
     });
     timer = setTimeout(() => {
       settle({ ok: false, status: 0, why: 'Discord did not answer inside ten seconds' });
-      try { req.destroy(); } catch (e) { }
+      req.destroy();
     }, DISCORD_ASK_MS);
     req.on('error', (e) => settle({ ok: false, status: 0, why: 'could not reach Discord: ' + e.message }));
     req.end();
@@ -3012,34 +3088,36 @@ function sweepSignIns(now) {
 // ==== end thornswood signin ageing ====
 
 function noteSignIn(req, me, st, back) {
-  try {
-    const list = jsonFile(ATTEMPTS, []);
-    const rows = Array.isArray(list) ? list : [];
+  /* No try around the whole (#2736). The one failure the record can have,
+     the write, is said below (#2354), and nothing else in here throws on
+     what the callback hands it; a bug that does is the handler's 500 and
+     its stack in site.log, not a sign in that is quietly not recorded. */
+  const list = jsonFile(ATTEMPTS, []);
+  const rows = Array.isArray(list) ? list : [];
 
-    let outcome = 'allowed';
-    if (st.lookupFailed) outcome = 'could not check';
-    else if (st.banned) outcome = 'banned';
-    else if (!st.inGuild) outcome = 'not in the Discord';
-    else if (!st.play) outcome = 'no role';
+  let outcome = 'allowed';
+  if (st.lookupFailed) outcome = 'could not check';
+  else if (st.banned) outcome = 'banned';
+  else if (!st.inGuild) outcome = 'not in the Discord';
+  else if (!st.play) outcome = 'no role';
 
-    rows.unshift({
-      at: Date.now(),
-      id: String(me.id || ''),
-      handle: String(me.username || ''),
-      name: String(st.name || me.global_name || me.username || ''),
-      wanted: String(back || '/'),
-      admin: !!st.admin,
-      outcome: outcome,
-      roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
-      ip: requestAddr(req)
-    });
-    // A write that fails leaves rows past thirty days in the file, so it is
-    // said rather than dropped (#2354): the count, never what they hold.
-    const kept = freshSignIns(rows, Date.now());
-    if (!putJson(ATTEMPTS, kept)) {
-      retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: kept.length });
-    }
-  } catch (e) { }
+  rows.unshift({
+    at: Date.now(),
+    id: String(me.id || ''),
+    handle: String(me.username || ''),
+    name: String(st.name || me.global_name || me.username || ''),
+    wanted: String(back || '/'),
+    admin: !!st.admin,
+    outcome: outcome,
+    roles: Array.isArray(st.roles) ? st.roles.slice(0, 12) : [],
+    ip: requestAddr(req)
+  });
+  // A write that fails leaves rows past thirty days in the file, so it is
+  // said rather than dropped (#2354): the count, never what they hold.
+  const kept = freshSignIns(rows, Date.now());
+  if (!putJson(ATTEMPTS, kept)) {
+    retentionSay('signin', { event: 'write-failed', rows: rows.length, kept: kept.length });
+  }
 }
 
 /* Who played, when they started, when they stopped, and on which build.
@@ -3208,7 +3286,8 @@ function slogTrim(s, cap) {
          t.slice(t.length - cap);
 }
 
-/* Written once. Returns 'saved', 'already' or 'nothing'. */
+/* Written once. Returns 'saved', 'already', 'nothing' (no log in it worth
+   keeping) or 'failed' (it could not be written, and that has been said). */
 function putSessionLogs(key, who, logs) {
   try {
     if (!fs.existsSync(SLOGS)) fs.mkdirSync(SLOGS, { recursive: true });
@@ -3222,19 +3301,30 @@ function putSessionLogs(key, who, logs) {
        (#2166): the session was kept before the launcher had sent anything,
        so the file is there but the logs are not. Those logs are the first
        set, not a second one, and they go in beside the chat. */
+    /* A first set that is there and will not read, or a replay that cannot
+       be marked on it, is said in the site's log (#2736), the session key
+       and the error and never what the set holds. Both used to be caught
+       and dropped, so a replay of a set that had gone bad left no trace. A
+       set that will not read is never written over: it is the evidence. */
     let keptChat = null;
-    if (fs.existsSync(file)) {
-      let first = null;
-      try { first = JSON.parse(fs.readFileSync(file, 'utf8')) || null; } catch (e) { first = null; }
+    let first = null;
+    const there = fs.existsSync(file);
+    if (there) {
+      try { first = JSON.parse(fs.readFileSync(file, 'utf8')) || null; }
+      catch (e) {
+        console.error('[thornswood-docs] session-logs ' + JSON.stringify({ event: 'set-unreadable', session: key, code: e.code || e.name }));
+      }
       if (first && first.chatOnly && isObjectLike(first.chat)) keptChat = first.chat;
     }
-    if (fs.existsSync(file) && !keptChat) {
-      try {
-        const had = JSON.parse(fs.readFileSync(file, 'utf8')) || {};
-        had.resent = (Number(had.resent) || 0) + 1;
-        had.resentAt = Date.now();
-        fs.writeFileSync(file, JSON.stringify(had));
-      } catch (e) { }
+    if (there && !keptChat) {
+      if (first && typeof first === 'object') {
+        first.resent = (Number(first.resent) || 0) + 1;
+        first.resentAt = Date.now();
+        try { fs.writeFileSync(file, JSON.stringify(first)); }
+        catch (e) {
+          console.error('[thornswood-docs] session-logs ' + JSON.stringify({ event: 'resend-unmarked', session: key, code: e.code || e.name }));
+        }
+      }
       return 'already';
     }
 
@@ -3263,7 +3353,15 @@ function putSessionLogs(key, who, logs) {
     if (keptChat) set.chat = keptChat;
     fs.writeFileSync(file, JSON.stringify(set));
     return 'saved';
-  } catch (e) { return 'nothing'; }
+  } catch (e) {
+    /* 'failed', not 'nothing' (#2736). A set the folder would not take was
+       answered 200 stored false, the same as a set with no logs in it, so
+       the launcher dropped the logs it had kept for the site and nothing
+       was said. Now it is said, and /api/play/logs answers 500, which the
+       launcher keeps the logs for and sends again at its next start. */
+    console.error('[thornswood-docs] session-logs ' + JSON.stringify({ event: 'write-failed', session: key, code: e.code || e.name }));
+    return 'failed';
+  }
 }
 
 /*
@@ -3285,8 +3383,11 @@ function putSessionLogs(key, who, logs) {
   the same shape the voice service's chat days use (#2191), and the answer
   says how many went and which would not, for the harness.
 */
+// No try (#2736): o is a plain object of codes and counts, which stringify
+// does not throw on, and console.error goes to the site log, which says its
+// own failure once and never throws.
 function retentionSay(what, o) {
-  try { console.error('[thornswood-docs] ' + what + '-retention ' + JSON.stringify(o)); } catch (e) { }
+  console.error('[thornswood-docs] ' + what + '-retention ' + JSON.stringify(o));
 }
 function pruneSessionLogs() {
   const out = { deleted: 0, failed: [] };
@@ -3718,34 +3819,39 @@ function rereadTrouble() {
 const TROUBLE_FILE = path.join(FOR_BOT, 'trouble.json');
 const TROUBLE_KEEP = 200;
 
+/* True when the bot's row is written, or was already there. A write that
+   fails is said and answers false (#2736): the whole of this sat in a try
+   with an empty catch, and the putJson below was never looked at, so a crash
+   whose note could not be written reached nobody in Discord and nothing said
+   so. jsonFile and freshTrouble do not throw. */
 function noteTrouble(row, found) {
-  try {
-    const list = jsonFile(TROUBLE_FILE, []);
-    const all = Array.isArray(list) ? list : [];
-    if (all.some(t => t && t.session === row.session)) return;
-    /* start and end are the session's own window, in the same unix ms the
-       row was stamped with. at is when the logs arrived. They are kept apart
-       because a backlog uploaded by a newer launcher lands long after the
-       session ended: a 401 held Patrick's 23 September logs until 14:09 the
-       next day, and the alert read as a fresh crash. With the session's start
-       named and the arrival called out when it is later than the end, a late
-       upload no longer looks like a new failure (issue #532). */
-    all.push({
-      session: row.session,
-      who: String(row.who),
-      name: String(row.name || ''),
-      channel: String(row.channel || ''),
-      profile: Number(row.profile) || 0,
-      version: String(row.version || ''),
-      start: Number(row.start) || 0,
-      end: Number(row.end) || 0,
-      at: Date.now(),
-      why: found.why,
-      file: found.file,
-      line: found.line
-    });
-    putJson(TROUBLE_FILE, freshTrouble(all, Date.now()).slice(-TROUBLE_KEEP));
-  } catch (e) { }
+  const list = jsonFile(TROUBLE_FILE, []);
+  const all = Array.isArray(list) ? list : [];
+  if (all.some(t => t && t.session === row.session)) return true;
+  /* start and end are the session's own window, in the same unix ms the
+     row was stamped with. at is when the logs arrived. They are kept apart
+     because a backlog uploaded by a newer launcher lands long after the
+     session ended: a 401 held Patrick's 23 September logs until 14:09 the
+     next day, and the alert read as a fresh crash. With the session's start
+     named and the arrival called out when it is later than the end, a late
+     upload no longer looks like a new failure (issue #532). */
+  all.push({
+    session: row.session,
+    who: String(row.who),
+    name: String(row.name || ''),
+    channel: String(row.channel || ''),
+    profile: Number(row.profile) || 0,
+    version: String(row.version || ''),
+    start: Number(row.start) || 0,
+    end: Number(row.end) || 0,
+    at: Date.now(),
+    why: found.why,
+    file: found.file,
+    line: found.line
+  });
+  if (putJson(TROUBLE_FILE, freshTrouble(all, Date.now()).slice(-TROUBLE_KEEP))) return true;
+  console.error('[thornswood-docs] trouble ' + JSON.stringify({ event: 'write-failed', session: row.session, file: path.basename(TROUBLE_FILE) }));
+  return false;
 }
 
 /*
@@ -3948,7 +4054,13 @@ function serverLogGenerations(file) {
   const rolled = [];
   for (const n of names) {
     if (n.toLowerCase().indexOf(base) !== 0 || !/^\d+$/.test(n.slice(base.length))) continue;
-    try { rolled.push({ f: path.join(dir, n), t: fs.statSync(path.join(dir, n)).mtimeMs }); } catch (e) { }
+    /* A copy deleted by the age rule between the listing and this look is
+       gone, and is left out. Any other failure is said, by its name and the
+       code (#2736), since the copy is then left out of what staff read. */
+    try { rolled.push({ f: path.join(dir, n), t: fs.statSync(path.join(dir, n)).mtimeMs }); }
+    catch (e) {
+      if (e.code !== 'ENOENT') console.error('[thornswood-docs] could not look at ' + n + ' beside ' + path.basename(file) + ' (' + (e.code || e.message) + ')');
+    }
   }
   rolled.sort((a, b) => b.t - a.t);
   return [file].concat(rolled.map((r) => r.f));
@@ -3983,7 +4095,7 @@ function serverLogSlice(channel, from, to) {
         left -= buf.length;
       } finally { fs.closeSync(fd); }
     }
-  } catch (e) { return { ok: false, why: String(e.message || e), lines: [] }; }
+  } catch (e) { return { ok: false, why: String(e.message || e), code: e.code || e.name, lines: [] }; }
   if (!found) return { ok: false, why: 'no server log on this box', lines: [] };
   const text = parts.join('');
 
@@ -4753,11 +4865,16 @@ function failed(req, res, e) {
   if (e instanceof BodyFailed) {
     console.error('[thornswood-docs] body ' + e.why + ' on ' +
                   JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)));
+    // failed() must not throw: it is the last catch on the request, and a
+    // throw from here is an unhandled rejection, which stops the site. An
+    // answer that cannot be written is said instead of dropped (#2736).
     try {
       if (!e.status || res.headersSent || res.destroyed) { if (!res.writableEnded) res.destroy(); return; }
       send(res, e.status, JSON.stringify({ ok: false, why: e.why, error: e.words, message: e.words }),
            null, { Connection: 'close' });
-    } catch (e2) { }
+    } catch (e2) {
+      console.error('[thornswood-docs] could not answer the body ' + e.why + ' (' + (e2.code || e2.name) + ')');
+    }
     return;
   }
   const bad = e instanceof URIError;
@@ -4847,8 +4964,10 @@ async function handle(req, res) {
      the plain to secure redirect already works, so this is the part that stops
      a browser trying the plain one again. On plain HTTP it means nothing and
      is left off. */
+  // No try (#2736): setHeader throws only once the headers are sent, and
+  // nothing has been sent at the top of the handler.
   if (secureHere(req)) {
-    try { res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains'); } catch (e) { }
+    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
   }
 
   /* Two slashes together are one (#929). The site already reads /rules/ and
@@ -5011,15 +5130,15 @@ async function handle(req, res) {
     const code = url.searchParams.get('code') || '';
     const state = (url.searchParams.get('state') || '').split('.');
     let back = '/', port = '', nonce = '', attempt = '', began = 0;
+    // No try (#2736): Buffer.from skips what is not base64url rather than
+    // throwing, and the state is ours, checked against its signature first.
     if (state.length === 2 && sameSecret(state[1], sign(state[0]))) {
-      try {
-        const bits = Buffer.from(state[0], 'base64url').toString().split('\u0000');
-        back = bits[0] || '/';
-        port = (bits[1] || '').replace(/[^0-9]/g, '').slice(0, 5);
-        nonce = (bits[2] || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
-        attempt = (bits[3] || '').replace(/[^0-9a-f]/g, '').slice(0, 32);
-        began = Number(bits[4]) || 0;
-      } catch (e) { }
+      const bits = Buffer.from(state[0], 'base64url').toString().split('\u0000');
+      back = bits[0] || '/';
+      port = (bits[1] || '').replace(/[^0-9]/g, '').slice(0, 5);
+      nonce = (bits[2] || '').replace(/[^A-Za-z0-9]/g, '').slice(0, 64);
+      attempt = (bits[3] || '').replace(/[^0-9a-f]/g, '').slice(0, 32);
+      began = Number(bits[4]) || 0;
     }
     // Refused here, before Discord is asked anything: a state with no attempt
     // in it, one this browser did not start, one already used, or one older
@@ -5249,15 +5368,26 @@ async function handle(req, res) {
     order.
   */
   if (route === '/api/payload' && req.method === 'GET') {
+    /* A downloads folder that is there and cannot be read answered as if no
+       zip was there, so the installer said the site was not offering a
+       download when the site could not look (#2736). Now it is said and
+       answered 500. No folder is still no zip, tested for; a zip deleted by a
+       publish between the listing and the look at it is left out. */
     let best = null;
     try {
-      for (const name of fs.readdirSync(FILES)) {
+      const names = fs.existsSync(FILES) ? fs.readdirSync(FILES) : [];
+      for (const name of names) {
         if (!/^Thornswood-Setup(?:-\d{8}-\d{4})?\.zip$/i.test(name)) continue;
-        const st = fs.statSync(path.join(FILES, name));
+        let st;
+        try { st = fs.statSync(path.join(FILES, name)); }
+        catch (e) { if (e.code === 'ENOENT') continue; throw e; }
         if (!st.isFile()) continue;
         if (!best || st.mtimeMs > best.at) best = { name, at: st.mtimeMs, size: st.size };
       }
-    } catch (e) { }
+    } catch (e) {
+      console.error('[thornswood-docs] could not read the downloads in ' + FILES + ' for /api/payload (' + (e.code || e.message) + ')');
+      return sendJson(res, 500, { error: 'the site could not look at its downloads' });
+    }
     // No zip means a one file build, where the payload rides inside the exe
     // and nothing should be fetched. Bootstrap turns an empty url into "The
     // site is not offering a download right now", which is the truth.
@@ -6021,16 +6151,23 @@ async function handle(req, res) {
       const meta = jsonFile(UPMETA, {});
       meta[name] = { orig: asked, by: by, note: note, at: Date.now() };
       if (discordId) meta[name].discordId = discordId;
-      putJson(UPMETA, meta);
+      // Neither write was looked at (#2736): a queue that could not be
+      // written answered ok, and the shot never reached staff. The note that
+      // will not write is said, since a deletion request needs it; the queue
+      // that will not write is said and answered, so the sender knows.
+      if (!putJson(UPMETA, meta)) console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'note-write-failed' }));
 
       withGalleryPending(() => {
         const pending = jsonFile(GPENDING, []);
         const entry = { name: name, by: by, note: note, at: Date.now(), from: from };
         if (discordId) entry.discordId = discordId;
         pending.push(entry);
-        putJson(GPENDING, pending);
+        if (!putJson(GPENDING, pending)) {
+          console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'pending-write-failed' }));
+          return sendJson(res, 500, { ok: false, error: 'the site could not put that in the queue for staff. Try again in a minute.' });
+        }
         sendJson(res, 200, { ok: true, name: name });
-      });
+      }).catch((e) => failed(req, res, e));
     });
   }
 
@@ -6615,6 +6752,9 @@ async function handle(req, res) {
     const what = putSessionLogs(key, t.d, logs);
     if (what === 'already') return sendJson(res, 409, { ok: false, why: 'already sent' });
     if (what === 'nothing') return sendJson(res, 200, { ok: true, stored: false });
+    // putSessionLogs has said why in the site's log. 500 is what the launcher
+    // keeps the logs for and sends again at its next start (#2736).
+    if (what === 'failed') return sendJson(res, 500, { ok: false, why: 'could not save' });
 
     /* Read them once, now, so the page can colour this one session and the
        bot can say so in Discord. Done here rather than when somebody opens
@@ -6624,44 +6764,61 @@ async function handle(req, res) {
        The launcher's own blockers and warnings come with the logs, already
        structured, and they carry more than the launcher's window shows: which
        plugin, whether it is absent or merely wrong, and the size, CRC and
-       manifest index the server wanted. Those are kept whole. */
-    try {
-      const issues = Array.isArray(o.issues) ? o.issues.slice(0, 100).map(i => ({
-        text: String((i && i.text) || '').slice(0, 400),
-        blocking: !!(i && i.blocking),
-        absent: !!(i && i.absent),
-        plugin: String((i && i.plugin) || '').slice(0, 160),
-        wantSize: Number(i && i.wantSize) || 0,
-        wantCrc: Number(i && i.wantCrc) || 0,
-        wantIndex: Number(i && i.wantIndex) || 0
-      })).filter(i => i.text) : [];
+       manifest index the server wanted. Those are kept whole.
 
-      const checks = Array.isArray(o.checks) ? o.checks.slice(0, 40).map(c => ({
-        name: String((c && c.name) || '').slice(0, 120),
-        detail: String((c && c.detail) || '').slice(0, 400)
-      })).filter(c => c.name) : [];
+       NOT IN A TRY (#2736). All of this sat in a try whose catch was empty, so
+       a failure stored the logs, answered ok, and the session's trouble
+       colour and the bot's crash note never happened with nothing said. What
+       can fail here is said where it fails, the session key and the error
+       code and never what the logs hold: the server log that will not read,
+       the row that will not write, the note for the bot that will not write
+       (noteTrouble says its own). The logs are stored by now, so the answer
+       stays 200 stored, and says read false or noted false for what did not
+       happen. Nothing else here throws on what JSON.parse hands it; a bug
+       that does is failed()'s 500 and its stack in site.log. */
+    const issues = Array.isArray(o.issues) ? o.issues.slice(0, 100).map(i => ({
+      text: String((i && i.text) || '').slice(0, 400),
+      blocking: !!(i && i.blocking),
+      absent: !!(i && i.absent),
+      plugin: String((i && i.plugin) || '').slice(0, 160),
+      wantSize: Number(i && i.wantSize) || 0,
+      wantCrc: Number(i && i.wantCrc) || 0,
+      wantIndex: Number(i && i.wantIndex) || 0
+    })).filter(i => i.text) : [];
 
-      if (issues.length) rows[at].issues = issues;
-      if (checks.length) rows[at].checks = checks;
+    const checks = Array.isArray(o.checks) ? o.checks.slice(0, 40).map(c => ({
+      name: String((c && c.name) || '').slice(0, 120),
+      detail: String((c && c.detail) || '').slice(0, 400)
+    })).filter(c => c.name) : [];
 
-      /* The server's half of this session, the same window the View more
-         button reads, for what the server said about this person's load
-         order (#945). */
-      const row = rows[at];
-      const from = (Number(row.start) || Number(row.end) || 0) - 60000;
-      const to = (Number(row.end) || Date.now()) + 60000;
-      const server = serverLogSlice(row.channel, from, to);
+    if (issues.length) rows[at].issues = issues;
+    if (checks.length) rows[at].checks = checks;
 
-      const found = readTrouble(logs, server.lines, row.profile);
-      applyTrouble(row, found);
-      row.troubleRules = TROUBLE_RULES;
+    /* The server's half of this session, the same window the View more
+       button reads, for what the server said about this person's load
+       order (#945). No server log on this box is the dev machine and says
+       nothing; one that is there and will not read is said. */
+    const row = rows[at];
+    const from = (Number(row.start) || Number(row.end) || 0) - 60000;
+    const to = (Number(row.end) || Date.now()) + 60000;
+    const server = serverLogSlice(row.channel, from, to);
+    if (!server.ok && server.code) {
+      console.error('[thornswood-docs] session-logs ' + JSON.stringify({ event: 'server-log-unread', session: key, code: server.code }));
+    }
 
-      putSessions(rows);
-      /* Only a crash is worth saying out loud. */
-      if (found && found.level === 'bad') noteTrouble(rows[at], found);
-    } catch (e) { }
+    const found = readTrouble(logs, server.lines, row.profile);
+    applyTrouble(row, found);
+    row.troubleRules = TROUBLE_RULES;
 
-    return sendJson(res, 200, { ok: true, stored: true });
+    const answer = { ok: true, stored: true };
+    if (!putSessions(rows)) {
+      console.error('[thornswood-docs] session-logs ' + JSON.stringify({ event: 'row-write-failed', session: key }));
+      answer.read = false;
+    }
+    /* Only a crash is worth saying out loud. */
+    if (found && found.level === 'bad' && !noteTrouble(rows[at], found)) answer.noted = false;
+
+    return sendJson(res, 200, answer);
   }
 
   /*
@@ -7512,6 +7669,10 @@ http.createServer((req, res) => {
       console.error('[thornswood-docs] THE BOT CANNOT READ THE SERVER: ' + r.why);
       console.error('[thornswood-docs] Until this is fixed everybody except the ids in ' +
                     '"admins" is turned away, and the page tells them so.');
-    }).catch(() => { });
+    }).catch((e) => {
+      // Said rather than dropped (#2736): a failure here is the roles read, and
+      // without this line nobody learns the check on the way up never finished.
+      console.error('[thornswood-docs] could not finish asking Discord on the way up: ' + ((e && (e.code || e.message)) || e));
+    });
   }
 });

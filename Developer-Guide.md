@@ -1323,7 +1323,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher and the scripts, the launcher compiles with the .NET
+  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher compiles with the .NET
   Framework csc, and on GitHub's runner the launcher built with MSBuild
   from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
