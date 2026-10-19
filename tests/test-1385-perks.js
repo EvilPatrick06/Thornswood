@@ -79,6 +79,12 @@ function spit(cost, castType) {
   return b;
 }
 function mgefData(av) { const b = new Array(0x48 + 4).fill(0); const x = bytes(av, 0x44, 0x48 + 4); return x; }
+// An MGEF's DATA with its flags (4 is hostile) and the value it works on.
+function mgefFlags(flags, av) { const x = mgefData(av); bytes(flags, 0, 4).forEach(function (v, i) { x[i] = v; }); return x; }
+// An EFIT: magnitude, area, duration.
+function efit(mag, dur) { const x = floatBytes(mag, 0, 12); bytes(dur, 8, 12).slice(8, 12).forEach(function (v, i) { x[8 + i] = v; }); return x; }
+// A SPIT with its spell type at 8 (0 a spell, 1 a disease, 2 a power).
+function spitTyped(cost, castType, type) { const b = spit(cost, castType); b[8] = type; return b; }
 const RECORDS = {};
 RECORDS[SPELL] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spit(50, 1) }] };
 RECORDS[HOLD_SPELL] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spit(14, 2) }] };
@@ -94,6 +100,29 @@ RECORDS[MGEF_OTHER] = { type: 'MGEF', fields: [{ type: 'DATA', data: mgefData(24
 RECORDS[0x37deb] = { type: 'GMST', fields: [{ type: 'DATA', data: floatBytes(80, 0) }] };
 RECORDS[0x21a72] = { type: 'GMST', fields: [{ type: 'DATA', data: floatBytes(0.12, 0) }] };
 RECORDS[RACE] = { type: 'RACE', fields: [{ type: 'DATA', data: floatBytes(3, 88, 128) }] };
+// Overcharge's other half: spells that hold, and spells that do not.
+const OAK = 0x5f0, LIGHT = 0x5f1, BURN = 0x5f2, HELD_WARD = 0x5f3, POWER = 0x5f4, BOLT = 0x5f5;
+const MGEF_BUFF = 0x7c2, MGEF_HURT = 0x7c3, MGEF_HEAL = 0x7c4;
+RECORDS[MGEF_BUFF] = { type: 'MGEF', fields: [{ type: 'DATA', data: mgefFlags(0, 39) }] };
+RECORDS[MGEF_HURT] = { type: 'MGEF', fields: [{ type: 'DATA', data: mgefFlags(4, 24) }] };
+RECORDS[MGEF_HEAL] = { type: 'MGEF', fields: [{ type: 'DATA', data: mgefFlags(0, 24) }] };
+RECORDS[OAK] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(40, 1, 0) },
+  { type: 'EFID', data: bytes(MGEF_BUFF, 0) }, { type: 'EFIT', data: efit(40, 60) }] };
+// A light whose second effect heals over a time: helping health is not taking it.
+RECORDS[LIGHT] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(20, 1, 0) },
+  { type: 'EFID', data: bytes(MGEF_BUFF, 0) }, { type: 'EFIT', data: efit(0, 0) },
+  { type: 'EFID', data: bytes(MGEF_HEAL, 0) }, { type: 'EFIT', data: efit(2, 30) }] };
+// A slow that also burns: it takes health, so it never holds longer.
+RECORDS[BURN] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(30, 1, 0) },
+  { type: 'EFID', data: bytes(MGEF_BUFF, 0) }, { type: 'EFIT', data: efit(1, 20) },
+  { type: 'EFID', data: bytes(MGEF_HURT, 0) }, { type: 'EFIT', data: efit(5, 4) }] };
+RECORDS[HELD_WARD] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(30, 2, 0) },
+  { type: 'EFID', data: bytes(MGEF_BUFF, 0) }, { type: 'EFIT', data: efit(40, 1) }] };
+RECORDS[POWER] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(0, 1, 2) },
+  { type: 'EFID', data: bytes(MGEF_BUFF, 0) }, { type: 'EFIT', data: efit(40, 60) }] };
+// A bolt that only takes health, at once.
+RECORDS[BOLT] = { type: 'SPEL', fields: [{ type: 'SPIT', data: spitTyped(30, 1, 0) },
+  { type: 'EFID', data: bytes(MGEF_HURT, 0) }, { type: 'EFIT', data: efit(25, 0) }] };
 
 const mpFake = {
   getActorRuntimeIdentity: function(id) {
@@ -459,6 +488,56 @@ strike(POT, WOLF, 0.1, SPELL); settle();
 yes('the count starts again', near(health(WOLF), 0.3));
 heal(WOLF);
 
+// The other half (#2848): every fifth cast that holds, twice as long. The
+// caster's machine counts and asks (the engine fork, setCastDurationEvery);
+// the server counts the same casts and answers for everybody else.
+yes('a spell holds when it is cast and let go, lasts a time, and takes no health',
+  K.holdsLonger(OAK) === true && K.holdsLonger(LIGHT) === true);
+yes('one that takes health, one held up, a power and one that lasts no time do not',
+  K.holdsLonger(BURN) === false && K.holdsLonger(HELD_WARD) === false && K.holdsLonger(POWER) === false &&
+  K.holdsLonger(BOLT) === false && K.holdsLonger(SPELL) === false && K.holdsLonger(SWORD) === false && K.holdsLonger(0x999) === false);
+{
+  const before = world.told.length;
+  const got = [];
+  for (let i = 0; i < 4; i++) { got.push(K.cast(POT, OAK, 1)); }
+  got.push(K.cast(POT, LIGHT, 2));
+  got.push(K.cast(POT, OAK, 1));
+  yes('four casts that hold hold their own time, and the fifth, asked for, holds twice as long', got.join(',') === '1,1,1,1,2,1');
+  yes('and the caster is told, and the log records it',
+    world.told.slice(before).some(function (x) { return x.id === POT && x.text === 'Overcharge: that spell holds twice as long.'; }) &&
+    logged('Overcharge') === 2);
+  K.state.holding[POT] = 0;
+  yes('a spell that takes health or is held up does not count, asked or not',
+    [K.cast(POT, BURN, 2), K.cast(POT, HELD_WARD, 2), K.cast(POT, BOLT, 1)].join(',') === '1,1,1' && !K.state.holding[POT]);
+  const early = [K.cast(POT, OAK, 1), K.cast(POT, OAK, 2)];
+  yes('a cast that asks before the count is there holds its own time for everybody else, and counts',
+    early.join(',') === '1,1' && K.state.holding[POT] === 2 &&
+    world.logs.some(function (l) { return /Overcharge: the cast of 5f0 by ff000006 asked for 2 times as long at 2 of 5/.test(l); }));
+  const late = [K.cast(POT, OAK, 1), K.cast(POT, OAK, 1), K.cast(POT, OAK, 1), K.cast(POT, OAK, 2)];
+  yes('a fifth its machine did not ask for keeps the count, so the next one it asks for is it',
+    late.join(',') === '1,1,1,2' && K.state.holding[POT] === 0);
+  yes('somebody who does not hold Overcharge holds every spell its own time, asked or not',
+    [1, 2, 3, 4, 5, 6].map(function () { return K.cast(NONE, OAK, 2); }).join(',') === '1,1,1,1,1,1');
+  yes('nor does an NPC', K.cast(WOLF, OAK, 2) === 1);
+
+  // mp.onSpellCast, the handler the engine asks before the cast goes out.
+  const onCast = slice(gm, "mp.onSpellCast = guard('onSpellCast', function (casterId, spell, asked) {", '\n});');
+  yes('mp.onSpellCast is in the gamemode, after the skill perks block', !!onCast && gm.indexOf(onCast) > gm.indexOf('// ==== end thornswood skill perks ===='));
+  if (onCast) {
+    vm.runInContext(onCast, box);
+    const answered = [];
+    const realSet = mpFake.set;
+    mpFake.set = function (id, prop, v) { if (prop === 'spellCastDurationMult') { answered.push(id.toString(16) + '=' + v); return; } return realSet(id, prop, v); };
+    K.state.holding[POT] = 4;
+    const r = box.mp.onSpellCast(POT, OAK, 2);
+    box.mp.onSpellCast(POT, OAK, 1);
+    box.mp.onSpellCast(NONE, OAK, 2);
+    mpFake.set = realSet;
+    yes('it answers through spellCastDurationMult, only when the answer is more than the game\'s own, and refuses nothing',
+      answered.join(',') === 'ff000006=2' && r === undefined);
+  }
+}
+
 // ---------------------------------------------------------- Spellbreaker --
 const WARD = actor(0xff000007);
 states.set(WARD, filled(['ward']));
@@ -625,6 +704,9 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   yes('so do Endurance and Agility: Tireless and the whole of Windwalker are in, on the person\'s own machine',
     K.spendLine(filled(['endurance']), 'endurance') === 'Endurance is full. Tireless: Running and swinging cost half stamina.' &&
     K.spendLine(filled(['agility']), 'agility') === 'Agility is full. Windwalker: +4 speed, and a fall deals no damage.');
+  yes('the point that fills Potency names Overcharge as the page says it, and no longer says any of it is not in the game',
+    K.spendLine(filled(['potency']), 'potency') === 'Potency is full. Overcharge: One spell in five deals double, or holds twice as long.' &&
+    !K.PERKS.overcharge.none && !K.PERKS.overcharge.not && K.PERKS.overcharge.longer === 2);
   yes('the point that fills Burden names Pack Mule as the page says it, and no longer says it is not in the game',
     K.spendLine(filled(['burden']), 'burden') === 'Burden is full. Pack Mule: Being overloaded does not slow you.' &&
     !K.PERKS.packmule.none && !K.PERKS.packmule.not && !K.PERKS.unshakeable.none && !K.PERKS.tireless.none);
@@ -784,10 +866,11 @@ for (const field of ['life','runtime']) {
                  fSprintStaminaDrainMult: 7, fStaminaAttackWeaponBase: 20, fStaminaAttackWeaponMult: 1,
                  fStaminaBashBase: 35, fStaminaPowerBashBase: 55 };
   function front(settings, storage) {
-    const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false, carry: [] };
+    const g = { settings: settings, storage: storage, hooks: [], updates: [], said: [], sets: [], blocking: false, carry: [], casts: [] };
     const sp = {
       storage: storage,
       setOverEncumberedIgnored: function (formId, ignored) { g.carry.push(formId + '=' + ignored); },
+      setCastDurationEvery: function (formId, every, mult) { g.casts.push(formId + ',' + every + ',' + mult); },
       hooks: { sendAnimationEvent: { add: function (h, from, to, pattern) { g.hooks.push({ h: h, from: from, to: to, pattern: pattern }); } } },
       on: function (ev, fn) { if (ev === 'update') { g.updates.push(fn); } },
       Game: {
@@ -878,6 +961,22 @@ for (const field of ['life','runtime']) {
     reloaded.view(['windwalker']); reloaded.frame();
     yes('a reloaded plugin tells the client at its first view, whatever an earlier copy left', reloaded.carry.join(',') === '20=false');
 
+    const oc = front(Object.assign({}, GAME), {});
+    oc.view(['windwalker']); oc.frame();
+    yes('without Overcharge, your own character\'s casts have no rule: every spell holds its own time',
+      oc.casts.join(';') === '20,0,1' &&
+      oc.said.some(function (l) { return l === 'perks: Overcharge not held, so every spell of yours holds its own time'; }));
+    oc.view(['windwalker', 'overcharge']); oc.frame();
+    yes('Overcharge: every fifth cast of yours that holds holds twice as long, the gamemode\'s numbers',
+      oc.casts.join(';') === '20,0,1;20,5,2' && K.PERKS.overcharge.inEvery === 5 && K.PERKS.overcharge.longer === 2 &&
+      oc.said.some(function (l) { return l === 'perks: Overcharge held, so every 5th spell of yours that holds holds 2 times as long'; }));
+    oc.view(['overcharge', 'windwalker']); oc.frame();
+    yes('the same perks again tell the client nothing, so its count is not started again', oc.casts.length === 2);
+    oc.view(['windwalker']); oc.frame();
+    yes('dropping Overcharge takes the rule off', oc.casts.join(';') === '20,0,1;20,5,2;20,0,1');
+    yes('and it changes no game setting and touches no carry weight', oc.carry.join(',') === '20=false' &&
+      oc.sets.join(',') === 'fJumpFallHeightMult=0');
+
     const keys = /const PERK_SETTINGS = \{([\s\S]*?)\n  \};/.exec(block);
     yes('the page\'s table of game settings is the block\'s, at the same share',
       !!keys && /\| Windwalker, the fall \| `fJumpFallHeightMult` \| 0\.1 \| 0, so a fall comes to nothing \|/.test(page) &&
@@ -888,11 +987,13 @@ for (const field of ['life','runtime']) {
       /tireless: \{\s*fSprintStaminaDrainMult: 0\.5, fStaminaAttackWeaponBase: 0\.5, fStaminaAttackWeaponMult: 0\.5,\s*fStaminaBashBase: 0\.5, fStaminaPowerBashBase: 0\.5\s*\}/.test(keys[1]) &&
       !/packmule/.test(keys[1]));
   }
-  yes('the K panel says the four are in',
+  yes('the K panel says the four are in, and the whole of Overcharge',
     panel.indexOf("perk: 'Unshakeable: nothing staggers you while you block.' }") !== -1 &&
     panel.indexOf("perk: 'Tireless: running and swinging cost half stamina.' }") !== -1 &&
     panel.indexOf("perk: 'Windwalker: +4 speed, and a fall deals no damage.' }") !== -1 &&
-    panel.indexOf("perk: 'Pack Mule: being overloaded does not slow you.' }") !== -1);
+    panel.indexOf("perk: 'Pack Mule: being overloaded does not slow you.' }") !== -1 &&
+    panel.indexOf("perk: 'Overcharge: one spell in five deals double, or holds twice as long.' }") !== -1 &&
+    !/not in the game/.test(panel.slice(panel.indexOf("key: 'potency'"), panel.indexOf("key: 'ward'"))));
   const where = {};
   page.split('\n').forEach(function (line) {
     const c = line.split('|').slice(1, -1).map(function (x) { return x.trim(); });
@@ -901,6 +1002,8 @@ for (const field of ['life','runtime']) {
   yes('the page\'s "Where this is" says Unshakeable, Tireless, Windwalker and Pack Mule fire',
     /^Yes/.test(where.Unshakeable[1]) && where.Unshakeable[2] === '' && /^Yes/.test(where.Tireless[1]) && where.Tireless[2] === '' &&
     /^Yes/.test(where.Windwalker[1]) && where.Windwalker[2] === '' && /^Yes, on your own machine/.test(where['Pack Mule'][1]) && where['Pack Mule'][2] === '');
+  yes('and that both halves of Overcharge fire, with nothing left out',
+    /^Yes, both halves/.test(where.Overcharge[1]) && /holds twice as long/.test(where.Overcharge[1]) && where.Overcharge[2] === '');
 }
 
 console.log('');

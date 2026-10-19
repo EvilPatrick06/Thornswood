@@ -9834,7 +9834,7 @@
     THE FILLED PERKS THAT HAPPEN ON THE PERSON'S OWN MACHINE (#1385).
 
     docs/systems/skill-tree.md is the table. The server fires every perk it
-    can reach (the skill perks block in game/gamemode.js). These three
+    can reach (the skill perks block in game/gamemode.js). These
     happen where it cannot: what a stagger, a sprint, a power attack and a
     fall do to you is worked out by the game on your own machine, and the
     health and stamina that leaves is what skymp5-client sends the server
@@ -9892,6 +9892,18 @@
     Mule is held, your own character is on that list. The inventory still
     shows your real carry weight.
 
+    OVERCHARGE, "one spell in five ... holds twice as long". A spell's
+    effects run on the machine that runs the actor they land on, and the
+    game gives each one its duration there. The engine fork counts the casts
+    this machine makes for a character with a rule on it
+    (setCastDurationEvery): every fifth spell of yours that holds (one you
+    cast and let go, with an effect that lasts a time and none that takes
+    health) holds twice as long here, and the cast says so to the server.
+    The server counts the same casts by the same rule (holdsLonger in the
+    skill perks block) and tells everybody else's machine to hold it twice
+    as long too. While Overcharge is held, your own character has that rule;
+    the numbers are the gamemode's PERKS.overcharge, inEvery and longer.
+
     SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
     setting read before this file first touched it is kept in sp.storage,
     which outlives a plugin reload in the same game, so a reload never takes
@@ -9921,6 +9933,10 @@
   let unshakeableSaid = 0;
   let unshakeableOpenSaid = 0;
   let packMuleKept = null;          // what the client's list was last told, null until a view has said
+  let overchargeKept = null;        // what the client's cast count was last told, null until a view has said
+
+  /* Overcharge's other half: every fifth cast that holds, twice as long. */
+  const OVERCHARGE = { every: 5, longer: 2 };
 
   /* The whole panel view, as treeFromView takes it. Only its perks are read. */
   function perksFromView(json) {
@@ -10002,6 +10018,25 @@
     }
   }
 
+  /* Your own character's casts counted while Overcharge is held, and not
+     while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the rule whatever an earlier copy left. */
+  function overchargeNow() {
+    const on = !!perksHeld.overcharge;
+    if (overchargeKept === on) { return; }
+    overchargeKept = on;
+    try {
+      sp.setCastDurationEvery(0x14, on ? OVERCHARGE.every : 0, on ? OVERCHARGE.longer : 1);
+      log('perks: Overcharge ' + (on ? 'held, so every ' + OVERCHARGE.every + 'th spell of yours that holds holds ' +
+                                       OVERCHARGE.longer + ' times as long'
+                                     : 'not held, so every spell of yours holds its own time'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Overcharge:', e);
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
@@ -10021,6 +10056,7 @@
       perksDirty = false;
       perkSettingsNow();
       packMuleNow();
+      overchargeNow();
     }
     if (perksHeld.unshakeable) {
       let pc = null;
