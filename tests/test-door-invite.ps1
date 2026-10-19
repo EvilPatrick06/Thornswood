@@ -12,8 +12,8 @@
   apply in the Discord had to find the Discord themselves.
 
   This compiles the real Door.cs, with the real Standing class lifted out of
-  Discord.cs by brace match, with the same .NET Framework 4 csc the launcher
-  is built with (so it is also a C# 5 check), and asks Door.InviteQuestion
+  Discord.cs by brace match, with the compiler the build runs
+  (tests\Launcher-Csc.ps1), and asks Door.InviteQuestion
   about every answer the site gives. Then it reads Explain and holds it to
   asking that question with Yes and No and opening the invite on Yes.
   site\server.js is read for the other half: 'role' is sent with the invite.
@@ -63,29 +63,12 @@ Yes 'site\server.js sends why role with the invite on /api/play/join' (
     $server -match "(?s)why:'role', message:\s*notAcceptedYet\(\),\s*invite: cfg\.discord\.invite")
 
 # ---- the compiler the launcher is built with --------------------------------
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) {
-    Write-Host 'SKIP  no .NET Framework 4 csc on this machine, so Door.cs cannot be compiled here'
-    Done
-}
-$fw = Split-Path -Parent $csc
-$refs = @(
-    (Join-Path $fw 'System.dll'),
-    (Join-Path $fw 'System.Core.dll'),
-    (Join-Path $fw 'System.Xaml.dll'),
-    (Join-Path $fw 'WPF\WindowsBase.dll'),
-    (Join-Path $fw 'WPF\PresentationCore.dll'),
-    (Join-Path $fw 'WPF\PresentationFramework.dll')
-)
-foreach ($r in $refs) {
-    if (-not (Test-Path -LiteralPath $r)) {
-        Write-Host "SKIP  $r is missing, so Door.cs cannot be compiled here"
-        Done
-    }
-}
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+$refs = @('System.dll', 'System.Core.dll', 'System.Xaml.dll', 'WindowsBase.dll', 'PresentationCore.dll', 'PresentationFramework.dll') |
+    ForEach-Object { Join-Path $LauncherRefDir $_ }
+foreach ($r in $refs) { Yes "$([IO.Path]::GetFileName($r)) is there to compile against" (Test-Path -LiteralPath $r) }
+if (@($refs | Where-Object { -not (Test-Path -LiteralPath $_) }).Count) { Done }
 
 # ---- the real Standing, out of Discord.cs -----------------------------------
 $discordSrc = [IO.File]::ReadAllText($DiscordPath)
@@ -145,16 +128,15 @@ try {
     $driverFile = Join-Path $tmp 'DoorInviteTest.cs'
     [IO.File]::WriteAllText($driverFile, $driver, (New-Object System.Text.UTF8Encoding($false)))
     $exe = Join-Path $tmp 'door-invite-test.exe'
-    # /noconfig for the same reason Build-Launcher.ps1 gives: csc.rsp adds its
-    # own copies of the framework and a machine with the reference assemblies
-    # installed stops on CS1703.
+    # /noconfig, as the build does: csc.rsp adds its own copies of the
+    # framework, and beside the reference assemblies that stops on CS1703.
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/out:$exe")
     foreach ($r in $refs) { $cscArgs += "/reference:$r" }
     $cscArgs += (Resolve-Path -LiteralPath $DoorPath).Path
     $cscArgs += $driverFile
     $compiled = & $LauncherCsc @cscArgs
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-    Yes 'Door.cs compiles with the .NET Framework 4 csc, which is C# 5' $built
+    Yes 'Door.cs compiles with the compiler the build runs' $built
     if (-not $built) {
         foreach ($l in @($compiled)) { Write-Host "      $l" }
         Done

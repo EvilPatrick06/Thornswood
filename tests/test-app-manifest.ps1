@@ -24,7 +24,7 @@
     2. the manifest really embedded in each built exe, read back through the
        Windows resource API (RT_MANIFEST, id 1), not by what the build says;
     3. the window fit (launcher\app\WindowFit.cs, shared with the setup
-       program), compiled with the Framework csc and run for both windows'
+       program), compiled with the build's compiler and run for both windows'
        own sizes on 1366x768, 1920x1080, 2560x1440 and 3840x2160 screens at
        100, 125, 150, 175 and 200 percent, and moving from a 200 percent
        screen back to a 100 percent one: never bigger than the screen, never
@@ -240,13 +240,9 @@ $sizes = @(
     @('setup', (Window-Size $bootHead 'the setup program'))
 )
 
-$csc = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe") |
-       Where-Object { Test-Path $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc is here' ([bool]$csc)
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not $Scratch) { $Scratch = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-test-app-manifest' }
 $null = New-Item -ItemType Directory -Force -Path $Scratch
-$wpf = @("$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF", "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF") |
-       Where-Object { Test-Path $_ } | Select-Object -First 1
 $driver = Join-Path $Scratch 'FitDriver.cs'
 [IO.File]::WriteAllText($driver, @'
 using System;
@@ -282,10 +278,11 @@ static class FitDriver
 }
 '@)
 $fitExe = Join-Path $Scratch 'FitDriver.exe'
-if ($csc -and $wpf) {
-    $out = & $LauncherCsc /nologo /target:exe "/out:$fitExe" `
-        "/reference:$wpf\PresentationFramework.dll" "/reference:$wpf\PresentationCore.dll" `
-        "/reference:$wpf\WindowsBase.dll" "/reference:$(Split-Path $wpf)\System.Xaml.dll" `
+if (Test-Path -LiteralPath $LauncherCsc) {
+    # /noconfig and the reference assemblies, as the build compiles it.
+    $out = & $LauncherCsc /noconfig /nologo /target:exe "/out:$fitExe" `
+        ('System.dll', 'System.Xaml.dll', 'WindowsBase.dll', 'PresentationCore.dll', 'PresentationFramework.dll' |
+            ForEach-Object { '/reference:' + (Join-Path $LauncherRefDir $_) }) `
         (Join-Path $repo 'launcher\app\WindowFit.cs') $driver 2>&1
     Yes 'WindowFit.cs compiles on its own, as the setup program needs' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "      $_" } }

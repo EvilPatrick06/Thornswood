@@ -16,8 +16,8 @@
   the wrong machine, or an id-token handed to a run that is not a release.
 
   BEFORE THE SWITCH-OVER. Until a hosted run has been proven (GitHub refuses
-  hosted jobs on billing, #2393) and a launcher built by MSBuild has been
-  started on dev (#498), the box still builds every release and the hosted
+  hosted jobs on billing, #2393; the launcher itself has been built by MSBuild
+  since 1.2.4.5, #498), the box still builds every release and the hosted
   job runs only on a manual run that asks for it. This checks that state.
   The switch-over changes the hosted job's "if" and the runner input's
   default (release.yml header, WHERE IT RUNS); this test's two "until the

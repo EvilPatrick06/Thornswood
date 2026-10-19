@@ -53,13 +53,12 @@ function Yes([string]$what, [bool]$cond) {
 # loaded another copy is not answered by it.
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
 Yes 'the build''s compiler is on this machine' (Test-Path -LiteralPath $LauncherCsc)
-$fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
-if (-not (Test-Path -LiteralPath $fw)) { $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319' }
 $ns = 'T2163_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $build = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163b-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $build | Out-Null
-$cscArgs = @('/noconfig', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu', ('/out:' + (Join-Path $build 'm.dll')))
-foreach ($r in 'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll', 'System.Xml.dll') { $cscArgs += ('/reference:' + (Join-Path $fw $r)) }
+# /nostdlib and mscorlib from the reference assemblies, as MSBuild passes them.
+$cscArgs = @('/noconfig', '/nostdlib', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu', ('/out:' + (Join-Path $build 'm.dll')))
+foreach ($r in 'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll', 'System.Xml.dll') { $cscArgs += ('/reference:' + (Join-Path $LauncherRefDir $r)) }
 foreach ($f in 'Signature.cs', 'ReleaseManifest.cs') {
     $to = Join-Path $build $f
     [IO.File]::WriteAllText($to, [IO.File]::ReadAllText((Join-Path $App $f)).Replace('namespace Thornswood', "namespace $ns"))

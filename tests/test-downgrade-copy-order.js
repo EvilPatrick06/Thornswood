@@ -125,13 +125,6 @@ yes('F4: and the log says it was the announced size that was reached',
 yes('F4: a folder this run never saw start is still refused as leftover',
     /if \(!sawStart\)\s*\n\s*return Stop\("Steam never started this download/.test(run));
 
-// ---- C# 5 --------------------------------------------------------------------
-for (const [name, src] of [['Run', run]]) {
-  yes(name + ' is C# 5: no interpolated strings', !/\$"/.test(src));
-  yes(name + ' is C# 5: no ?.', !/\?\./.test(src));
-  yes(name + ' is C# 5: no nameof, no out var', !/\bnameof\s*\(/.test(src) && !/\bout var\b/.test(src));
-}
-
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

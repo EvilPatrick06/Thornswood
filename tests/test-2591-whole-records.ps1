@@ -151,9 +151,8 @@ __WRITERECORD__
     $src = Join-Path $work 'WholeRecordTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-record-test.exe'
-    $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', "/langversion:$LauncherLangVersion", "/out:$exe",
-                 "/reference:$(Join-Path $fw 'System.dll')", "/reference:$(Join-Path $fw 'System.Core.dll')",
+                 "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/reference:$(Join-Path $LauncherRefDir 'System.Core.dll')",
                  $src, (Join-Path $App 'SteamUpdates.cs'))
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $compiled = & $LauncherCsc @cscArgs 2>&1
