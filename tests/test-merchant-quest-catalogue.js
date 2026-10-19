@@ -11,10 +11,10 @@ const roster = JSON.parse(read('game/data/merchant-roster.json'));
 const population = JSON.parse(read('game/data/npc-population.json'));
 const gm = read('game/gamemode.js');
 const activation=JSON.parse(read('game/data/merchant-quest-activation.json'));
-assert.deepEqual(Object.keys(activation).sort(),['killScenes','version']);
+assert.deepEqual(Object.keys(activation).sort(),['commissions','killScenes','version']);
 assert.equal(activation.version,1);assert.equal(activation.killScenes.length,4);
-const enabled=new Set(activation.killScenes.map(row=>row.id));
-assert.equal(enabled.size,activation.killScenes.length);
+const pins=activation.killScenes.concat(activation.commissions),enabled=new Set(pins.map(row=>row.id));
+assert.equal(enabled.size,pins.length);assert.equal(activation.commissions.length,10);
 const begin = gm.indexOf('// ==== thornswood progression ====');
 const end = gm.indexOf('// ==== end thornswood progression ====');
 assert.ok(begin >= 0 && end > begin);
@@ -151,9 +151,10 @@ function validate(catalogue, source = {recipes, tables, harvests}) {
   return {ids, firstFinishGold, dailyBound};
 }
 const {ids, firstFinishGold, dailyBound} = validate(catalogue);
-for(const pin of activation.killScenes) {
+for(const pin of pins) {
   assert.deepEqual(Object.keys(pin).sort(),['id','sha256']);
-  const row=catalogue.quests.find(row=>row.id===pin.id);assert.ok(row);assert.equal(row.kind,'kill');
+  const row=catalogue.quests.find(row=>row.id===pin.id);assert.ok(row);
+  assert.equal(row.kind,activation.killScenes.includes(pin)?'kill':'commission');
   assert.equal(require('node:crypto').createHash('sha256').update(JSON.stringify(row)).digest('hex'),pin.sha256);
 }
 const docs = read('docs/systems/merchant-quest-catalogue.md');
