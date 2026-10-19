@@ -70,33 +70,6 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) {
-        $p = Join-Path $d $name
-        if (Test-Path $p) { return $p }
-    }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
-                   Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    $null
-}
-
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts2636-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
 
@@ -219,7 +192,7 @@ function Run {
 
     $refs = @(); $missing = @()
     foreach ($n in $LauncherNeeded) {
-        $p = Find-Ref $n
+        $p = Find-LauncherRef $n
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $LauncherWv2Managed) {

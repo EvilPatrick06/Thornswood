@@ -17,8 +17,8 @@
   the only forced redraw (#816) keyed on Thornswood.exe.old, which a rebuild or
   a Ship never leaves.
 
-  Part 1 compiles the real Icons.cs with the .NET Framework 4 csc the launcher
-  uses (so it is a C# 5 check too) against stand-ins for Paths, Art and Swallow,
+  Part 1 compiles the real Icons.cs with the compiler the launcher is built
+  with (tests\Launcher-Csc.ps1) against stand-ins for Paths, Art and Swallow,
   and drives its Due / Remember / IconFile through reflection in a scratch
   folder. Ensure itself is never called: it walks the real Desktop and Start
   menu and talks to Explorer.
@@ -53,11 +53,8 @@ function Hash8([byte[]]$b) {
     ([BitConverter]::ToString($sha.ComputeHash($b), 0, 4)).Replace('-', '').ToLower()
 }
 
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-if (-not $csc) { Write-Host 'SKIP  no .NET Framework 4 csc on this machine'; Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $appIco = Join-Path $Repo 'launcher\app.ico'
 $devIco = Join-Path $Repo 'launcher\app-dev.ico'
@@ -83,7 +80,7 @@ namespace Thornswood
     Set-Content -LiteralPath $stubCs -Value $stub -Encoding ASCII
     $dll = Join-Path $work 'IconsUnderTest.dll'
     $out = & $LauncherCsc /nologo /target:library "/langversion:$LauncherLangVersion" "/out:$dll" "/resource:$appIco,app.ico" "/resource:$devIco,app-dev.ico" $iconsCs $stubCs 2>&1
-    Yes 'Icons.cs compiles with the launcher''s csc as C# 5' ($LASTEXITCODE -eq 0)
+    Yes 'Icons.cs compiles with the launcher''s compiler' ($LASTEXITCODE -eq 0)
     if ($LASTEXITCODE -ne 0) { $out | ForEach-Object { Write-Host "  $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))

@@ -29,10 +29,10 @@
 # ask otherwise skip the hosted job, and "launcher-vps" builds it. The hosted
 # job runs only on a manual run with runner: hosted, which is how the pilot
 # proves it. It cannot be proven while GitHub refuses hosted jobs on billing
-# (#2393), and no launcher built by MSBuild has been started on dev yet
-# (#498, its step 2). Once both are done and a hosted run has drafted a
-# signed launcher that the "verify" job passed, the switch-over is one change
-# here: the hosted job's "if" becomes vars.BUILD_RUNNER != 'vps' &&
+# (#2393). Every launcher since 1.2.4.5 on dev and 1.2.5 on main is built by
+# MSBuild (#498). Once GitHub takes hosted jobs again and a hosted run has
+# drafted a signed launcher that the "verify" job passed, the switch-over is
+# one change here: the hosted job's "if" becomes vars.BUILD_RUNNER != 'vps' &&
 # inputs.runner != 'vps', and the runner input's default becomes hosted, so
 # the box picks a release up the way build.yml does (BUILD_RUNNER is vps, a
 # manual run asks for the box, or the hosted job failed, as a quota or

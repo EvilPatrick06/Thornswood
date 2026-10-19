@@ -23,8 +23,8 @@
        files would have been copied over the game with the 1.6.1170 ones.
 
   HOW. ClearLeftover, MarkerIs and FolderSize are lifted out of
-  launcher\app\Downgrade.cs by brace match and compiled with the same .NET
-  Framework csc that Build-Launcher.ps1 uses (C# 5), and run against folders
+  launcher\app\Downgrade.cs by brace match and compiled with the compiler the
+  build runs (tests\Launcher-Csc.ps1), and run against folders
   made under a temp folder. Run itself drives Steam's window and cannot be run
   here, so where it calls ClearLeftover is read from its text. Nothing here
   opens Steam or touches Steam's folders.
@@ -149,12 +149,8 @@ if ($stop) {
 }
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
-$csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
-) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
-Yes 'the .NET Framework csc the launcher builds with is on this machine' ([bool]$csc)
-if (-not $csc) { Done }
+Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-downgrade-leftover-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -165,7 +161,7 @@ try {
     $dll = Join-Path $work 'Probe.dll'
     $out = & $LauncherCsc /nologo /target:library "/out:$dll" $probeCs 2>&1
     $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $dll)
-    Yes 'the lifted methods compile with the C# 5 compiler' $built
+    Yes 'the lifted methods compile with the compiler the build runs' $built
     if (-not $built) { $out | ForEach-Object { Write-Host "      $_" }; Done }
 
     $asm = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
