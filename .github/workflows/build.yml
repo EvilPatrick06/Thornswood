@@ -479,7 +479,9 @@ jobs:
           # Issue #2771: tests\test-2771-text-contrast.js holds every launcher
           # theme and the DIY starter to 4.5 to 1 for every text colour on
           # every surface, Muted above Faint, ui.xaml's placeholders to Forge,
-          # and the DIY editor to saying what falls short. Under a second.
+          # and the DIY editor to saying what falls short; and (#2851) the
+          # setup program to drawing its window in Forge from Themes.cs, with
+          # no colour of its own. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',

@@ -603,7 +603,7 @@ pages), Secrets.cs (DPAPI and locking a file to this account), Junction.cs
 (making and reading junctions without cmd), Steam.cs (finding Steam and its
 Skyrim), Online.cs (the headcount the server publishes), Slots.cs (the one
 rule for moving a character's slot), Art.cs (the art inside the exe),
-Themes.cs, Help.cs (the Help page's text), Links.cs (the Nexus page behind
+Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
 each mod name), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
 Gallery page uploads via `/api/gallery/submit`, reports via
