@@ -493,9 +493,11 @@ function New-ThornswoodArtifact {
       }
     }
   }
-  $short = Get-ThornswoodArtifactFolderShort $folder $contents
-  if ($short) {
-    throw ("The $Component artifact folder $folder is not what $name holds ($short). Nothing in it was changed: remove that folder and run again.")
+  # Its own name: $short is the commit's twelve, which the result hands on
+  # (#2747 reused the name here, and every artifact after it named no commit).
+  $folderGap = Get-ThornswoodArtifactFolderShort $folder $contents
+  if ($folderGap) {
+    throw ("The $Component artifact folder $folder is not what $name holds ($folderGap). Nothing in it was changed: remove that folder and run again.")
   }
 
   return [pscustomobject]@{
