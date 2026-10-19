@@ -345,7 +345,11 @@ at `<drive>:\Thornswood-DevBuild`, beside the main install. Then open it once an
 `<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
 has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
 dev build but without that folder it builds the dev release out of the Steam
-copy instead. `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
+copy instead. That refusal is for `<drive>:\Thornswood-DevBuild` only, the folder
+Ship finds for itself: a folder you name with `-Root`, or record once with
+`.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>`, is a release
+folder `Update-ShipRoot.ps1` makes with no `Launcher` folder, and the Ship's own
+launcher step makes one there (#2662). `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
 in place, without shipping anything.
 
 Then in `Thornswood-Repo`:
@@ -1127,7 +1131,11 @@ from the board, none of these three puts an issue aside:
   harnesses compile launcher files with the same compiler at the same
   version (`tests\Launcher-Csc.ps1`). C# inside PowerShell scripts
   (`Add-Type`, which Windows PowerShell 5.1 compiles with the Framework
-  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5.
+  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5. So do the two
+  launcher files a script compiles that way: `launcher\app\Signature.cs`
+  (`Assert-PublishSigned.ps1`) and `launcher\app\VortexProfileState.cs`
+  (`scripts\mods\LoadOrder.ps1`); `tests\test-signer-check.ps1` and
+  `tests\test-vortex-profile-state.ps1` compile them at C# 5.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1284,6 +1292,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
     the whole point of those".
   - Work goes into a pull request the day it is done, never left on a
     pushed branch without one. That is how the two above were lost track of.
+  - A pull request held back on purpose (a freeze, a decision it waits on)
+    carries the `held` label, with the reason in its body, and the label
+    comes off the day it is let go (Patrick, 18 Oct, #1273). The nightly lists
+    a held pull request and does not count it; any other pull request open
+    more than two days turns the night red. A word in the title is not the
+    mark: the nightly reads the label only.
   - At the start of a session, and before anything is shipped, look at what
     is open: `gh pr list --state open` and `git ls-remote --heads origin`.
     Everything there other than main, the current `hotfix/` branch and work
@@ -1319,9 +1333,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher, the launcher compiles with the .NET
-  Framework csc, and on GitHub's runner the launcher built with MSBuild
-  from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
+  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher builds
+  with MSBuild from its project files, and that build is held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
@@ -2305,7 +2319,7 @@ In the main launcher, on the Play page, open the Server dropdown and choose Dev.
 .\scripts\release\Check-ShipReady.ps1 -Channel dev
 ```
 
-That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
+That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build, unless the folder was named with `-Root` or recorded with Setup-ShipMachine.ps1 (#2662). The publish steps are [section 3](#3-how-to-release-to-dev).
 
 #### The Play page
 

@@ -513,7 +513,7 @@ yes('the front joins the relay only with this character own voice token, and ask
     /function tokenProfile\(tok\) \{ return Number\(String\(tok \|\| ''\)\.split\('\.'\)\[1\]\) \|\| 0; \}/.test(front) &&
     /askToken\(lineId\)/.test(front));
 yes('the front says /line every ten seconds, sends the pass, and tells the client to stay',
-    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",true\)/.test(front) &&
+    /const LINE_EVERY_MS = 10000;/.test(front) && /thornswoodNet\.say\("\/line",\{quiet:true\}\)/.test(front) &&
     /'\/joinpass ' \+ pass/.test(front) && /sendMessage\("thornswood","stay"\)/.test(front));
 yes('closing the game from the page gives the place up', /log\('menu: closing the game, asked from the character choice page'\);[\s\S]{0,80}try \{ lineLeave\(\); \} catch \(e\) \{ \}/.test(front));
 yes('the words on the page have no em dash and never the forbidden word',
@@ -561,19 +561,26 @@ yes('/api/play/join says how many are in the world, not the seats, when it says 
     /message: wait \? worldFull\(gameStatus\.online\) : '',/.test(site));
 
 // The fallback number: records\most-online.json, then the main feed's maxOnline.
+// The main feed is the newest of feed\version\<8 digits>.json (#2727), found by
+// the generations block lifted with it.
 (function () {
   const tmp = fs.mkdtempSync(path.join(require('os').tmpdir(), 'seats-'));
   try {
     const siteDir = path.join(tmp, 'site');
-    fs.mkdirSync(path.join(siteDir, 'feed'), { recursive: true });
+    fs.mkdirSync(path.join(siteDir, 'feed', 'version'), { recursive: true });
+    const genAt = site.indexOf('const feedNewest = {};');
+    const genFn = site.indexOf('\nfunction feedFile(', genAt);
+    const generations = genAt < 0 || genFn < 0 ? '' : site.slice(genAt, genFn + 1) + grabFn('feedFile');
+    yes('server.js has the feed generations block (feedFile)', !!generations && /function feedFile\(/.test(generations));
     const make = function () {
       return new Function('fs', 'path', 'ROOT',
+        generations + '\n' +
         'const MOST_ONLINE_RECORD = path.join(ROOT, "..", "records", "most-online.json");\n' +
         'let mostOnlineSeen = { file: "", mtime: -1, size: -1, v: 0 };\n' +
         grabFn('mostOnlineFallback') + '\nreturn mostOnlineFallback;')(fs, path, siteDir);
     };
     yes('no record and no feed: no number', make()() === 0);
-    fs.writeFileSync(path.join(siteDir, 'feed', 'version.json'), JSON.stringify({ launcherVersion: '1', maxOnline: 25 }));
+    fs.writeFileSync(path.join(siteDir, 'feed', 'version', '00000001.json'), JSON.stringify({ launcherVersion: '1', maxOnline: 25 }));
     yes('on the VPS (no records folder) it is the feed maxOnline: 25, which is what live serves today', make()() === 25);
     fs.mkdirSync(path.join(tmp, 'records'));
     fs.writeFileSync(path.join(tmp, 'records', 'most-online.json'), '﻿' + JSON.stringify({ people: 30, staffSeats: 5 }));
@@ -622,7 +629,7 @@ async function join(standing, status, channel) {
     within: new Function(grabFn('within') + '\nreturn within;')(),
     standingLate: function () { throw new Error('Discord answered here'); },
     jsonFile: function (f, fallback) { return f === 'linked.json' ? {} : fallback; },
-    putJson: function () { },
+    putJson: function () { return true; },
     LINKED: 'linked.json',
     slotsFor: function () { return 2; },
     sendJson: function (r, c, obj) { sent = { code: c, obj: obj }; return sent; },

@@ -73,6 +73,11 @@ function Sha([string]$path) {
     if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { return '' }
     return (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash.ToLowerInvariant()
 }
+# The feed the stand-in site serves: the newest of its generations (#2727).
+function SiteFeed([string]$site) {
+    $g = @(Get-ChildItem -LiteralPath (Join-Path $site 'feed\version') -File | Where-Object { $_.Name -match '^\d{8}\.json$' } | Sort-Object Name | Select-Object -Last 1)
+    return $g[0].FullName
+}
 function ShaOf([string]$text) {
     $h = [Security.Cryptography.SHA256]::Create()
     try { return -join ($h.ComputeHash([Text.Encoding]::UTF8.GetBytes($text)) | ForEach-Object { $_.ToString('x2') }) } finally { $h.Dispose() }
@@ -168,6 +173,8 @@ try {
     Put (Join-Path $fake 'game\content\Thornswood-Content.esp') $contentV2
     # The real Stop-Game closes any Skyrim on the machine; nothing here may.
     Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+    # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+    Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
     [void](RunGit $fake init -q)
     [void](RunGit $fake @gitId add -A)
     [void](RunGit $fake @gitId commit -q -m 'the build')
@@ -218,7 +225,7 @@ try {
     $contentV1 = 'the content plugin, version one'
     $v1Entry = ('{0}:{1}' -f [Text.Encoding]::UTF8.GetByteCount($contentV1), (ShaOf $contentV1))
     $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    Put (Join-Path $site 'feed\version.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","notice":1}}')
+    Put (Join-Path $site 'feed\version\00000001.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
     Put (Join-Path $site 'feed\published.json') ('{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000","Data\\Thornswood-Content.esp":"' + $v1Entry + '"}')
     $Shell = (Get-Process -Id $PID).Path
     function Publish([string[]]$extra) {
@@ -249,14 +256,14 @@ try {
 
     # a. The server still has version one: refused, nothing published.
     Put $liveEsp $contentV1
-    $feedBefore = Sha (Join-Path $site 'feed\version.json')
+    $feedBefore = Sha (SiteFeed $site)
     $baseBefore = Sha (Join-Path $site 'feed\published.json')
     $assetsBefore = Assets
     $r = Publish @('-Notes', "'Test release`n- one line'")
     YesR ("a release with a new content plugin, onto a server that holds the old one, is refused (exit {0})" -f $r.Code) ($r.Code -eq 1) $r
     Yes '  it says the server holds another plugin, and names Deploy-Server.ps1 -GamemodeOnly' ($r.Out -match 'holds another' -and $r.Out.Contains('Deploy-Server.ps1 -GamemodeOnly'))
     Yes '  and that nothing was published, posted or told to a server' ($r.Out -match 'Nothing was published, posted or told to a server')
-    Yes '  the store''s version.json is the bytes it was' ((Sha (Join-Path $site 'feed\version.json')) -eq $feedBefore)
+    Yes '  the store''s version.json is the bytes it was' ((Sha (SiteFeed $site)) -eq $feedBefore)
     Yes '  the store''s baseline is the bytes it was' ((Sha (Join-Path $site 'feed\published.json')) -eq $baseBefore)
     Yes ("  no asset reached the site ({0} before, {1} after)" -f $assetsBefore, (Assets)) ((Assets) -eq $assetsBefore)
     Yes '  and the publisher named no release, so Ship tells nobody' ($r.Published -eq '')
@@ -268,7 +275,7 @@ try {
     $r = Publish @('-Notes', "'Test release`n- one line'")
     YesR ("the same release, once the server holds the same plugin, goes out (exit {0}, release {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
     Yes '  and says the server already holds it' ($r.Out -match 'already holds this release''s Thornswood-Content.esp')
-    $feed = Read-Json (Join-Path $site 'feed\version.json')
+    $feed = Read-Json (SiteFeed $site)
     Yes '  the feed the site serves has the release''s pack' (@($feed.packs).Count -ge 1)
     Yes ("  and its assets reached the site, so the count in a. could see one ({0})" -f (Assets)) ((Assets) -gt $assetsBefore)
     $base = Read-Json (Join-Path $site 'feed\published.json')

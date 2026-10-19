@@ -55,7 +55,7 @@ $text = [IO.File]::ReadAllText($install)
 Yes 'it has -SetPing' ($text -match '\[switch\]\$SetPing')
 Yes '-SetPing sends the address with Invoke-ThornswoodSecretRemote -Secret' ($text -match 'Invoke-ThornswoodSecretRemote[^\r\n]*-Secret \$pingUrl')
 Yes '-SetPing asks for it hidden' ($text -match "if \(\`$SetPing\) \{[\s\S]{0,600}Read-Host '  Paste it' -AsSecureString")
-Yes 'a full run keeps settings it does not write, the ping address among them' ($text -match '\$env2\[`\$_\.Name\] = `\$_\.Value')
+Yes 'a full run keeps settings it does not write, the ping address among them, and stops on a file it cannot read (#2711)' ($text -match '`\$env2 = Read-ThornswoodJsonFile `\$f' -and $text -match 'SETTINGS NOT WRITTEN: '' \+ `\$_\.Exception\.Message')
 
 if (-not (Get-Command powershell.exe -ErrorAction SilentlyContinue) -or -not (Get-Command cmd.exe -ErrorAction SilentlyContinue)) {
     Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and cmd.exe, as on the VPS'

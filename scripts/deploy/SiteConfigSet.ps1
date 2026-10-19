@@ -20,7 +20,7 @@
   and secret, the bot token, botKey, the admins and the cookie secret. Both
   scripts once wrote {"<key>": ...} over the whole file: Deploy-Docs -Password
   always did until it was fixed, and Rotate-ServerPassword did whenever the
-  file was there but did not parse, because its read sat in try { } catch { }
+  file was there but did not parse, because its read sat in a try with an empty catch
   and an empty table was written back. With no Discord client id the site's
   discordReady() is false and the member password opens the door again. The
   fix in Deploy-Docs was not carried to Rotate-ServerPassword, so the two

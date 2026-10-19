@@ -77,43 +77,7 @@ function Yes([string]$what, [bool]$cond) {
 }
 function Known([string]$what) { Write-Host "KNOWN $what" }
 
-# ---- the compiler and the references, the way Build-Launcher.ps1 finds them --
-$csc = @(
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\csc.exe"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\csc.exe"
-) | Where-Object { Test-Path $_ } | Select-Object -First 1
-
-$refDirs = @(
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.7.2"
-    "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework64\v4.0.30319"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319\WPF"
-    "$env:WINDIR\Microsoft.NET\Framework\v4.0.30319"
-) | Where-Object { Test-Path $_ }
-
-function Find-Ref([string]$name) {
-    foreach ($d in $refDirs) {
-        $p = Join-Path $d $name
-        if (Test-Path $p) { return $p }
-    }
-    $stem = [IO.Path]::GetFileNameWithoutExtension($name)
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32', 'GAC') {
-        $gac = Join-Path "$env:WINDIR\Microsoft.NET\assembly\$gacRoot" $stem
-        if (Test-Path $gac) {
-            $hit = Get-ChildItem $gac -Filter $name -Recurse -File -EA SilentlyContinue |
-                   Sort-Object FullName -Descending | Select-Object -First 1
-            if ($hit) { return $hit.FullName }
-        }
-    }
-    foreach ($gacRoot in 'GAC_MSIL', 'GAC_64', 'GAC_32') {
-        $hit = Get-ChildItem (Join-Path "$env:WINDIR\Microsoft.NET\assembly" $gacRoot) -Filter $name -Recurse -File -EA SilentlyContinue |
-               Sort-Object FullName -Descending | Select-Object -First 1
-        if ($hit) { return $hit.FullName }
-    }
-    $null
-}
+# ---- the compiler and the references the build uses (Launcher-Csc.ps1) ------
 
 $needed = @($LauncherNeeded)
 $wv2 = @($LauncherWv2Managed)
@@ -122,14 +86,14 @@ $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tsupdater-' + [Guid]::NewGuid().To
 $null = New-Item -ItemType Directory -Force -Path $tmp
 
 function Run {
-    Yes 'the .NET Framework 4 compiler is here' ($null -ne $csc)
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
     Yes ('Thornswood.csproj names the references the launcher compiles against, {0} of them' -f ($needed.Count + $wv2.Count)) (
         $needed.Count -gt 5 -and $wv2.Count -gt 0)
-    if (-not $csc -or $needed.Count -eq 0) { return }
+    if (-not (Test-Path -LiteralPath $LauncherCsc) -or $needed.Count -eq 0) { return }
 
     $refs = @(); $missing = @()
     foreach ($n in $needed) {
-        $p = Find-Ref $n
+        $p = Find-LauncherRef $n
         if ($p) { $refs += $p } else { $missing += $n }
     }
     foreach ($n in $wv2) {
@@ -144,9 +108,9 @@ function Run {
 
     # ---- compile ---------------------------------------------------------------
     #
-    # A library, so no Main is picked and nothing starts. /noconfig for the
-    # reason Build-Launcher.ps1 gives: csc.rsp adds the framework by name, and
-    # on a machine with the reference assemblies installed that is CS1703.
+    # A library, so no Main is picked and nothing starts. /noconfig, as the
+    # build has it: csc.rsp adds the framework by name, and beside the
+    # reference assemblies that is CS1703.
     $cs = @(Get-ChildItem (Join-Path $Src '*.cs') -File)
     $dll = Join-Path $tmp 'Thornswood.dll'
     $cscArgs = @('/noconfig', '/nologo', '/target:library', '/platform:anycpu', "/out:$dll")

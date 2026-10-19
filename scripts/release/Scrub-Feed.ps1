@@ -662,7 +662,13 @@ else {
             foreach ($m in [regex]::Matches([IO.File]::ReadAllText($pth), '[0-9a-f]{64}')) { [void]$named.Add($m.Value) }
         }
         $d2 = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText((Join-Path $look 'version.json'))) (Join-Path $look 'version.json')
-        $rp = @(); try { $b2 = Get-FeedBaselinePointer $d2; if ($null -ne $b2) { $rp += $b2 } } catch { }
+        # A baseline the feed names but cannot be read from leaves every file
+        # its record names unnamed here, and then deleted (#2711: this was a
+        # try with an empty catch). It stops before anything is deleted.
+        $rp = @()
+        try { $b2 = Get-FeedBaselinePointer $d2 }
+        catch { Die ("The $ch feed names a baseline that does not read, so the files its record names cannot be kept. Nothing was deleted: " + $_.Exception.Message) }
+        if ($null -ne $b2) { $rp += $b2 }
         $rp += @(Get-StoreReleases $look $d2)
         foreach ($r in $rp) {
             $rsha = ([string]$r.sha256).ToLowerInvariant()

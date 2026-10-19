@@ -94,7 +94,7 @@ foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\ServerOrd
 . (Join-Path $repo 'scripts\deploy\ServerOrder.ps1')
 . (Join-Path $repo 'scripts\deploy\MaxOnline.ps1')
 $gmTry = @((Tree 'scripts\deploy\Deploy-Gamemode.ps1').FindAll({ param($n) $n -is [Management.Automation.Language.TryStatementAst] -and $n.Body.Extent.Text.Contains('$colUrl') -and $n.Body.Extent.Text.Contains('ConvertFrom-ThornswoodJson') }, $true))
-Yes 'Deploy-Gamemode reads config.json through ConvertFrom-ThornswoodJson, still inside its fallback' ($gmTry.Count -eq 1)
+Yes 'Deploy-Gamemode reads config.json through ConvertFrom-ThornswoodJson, inside a try whose catch keeps why' ($gmTry.Count -eq 1 -and $gmTry[0].CatchClauses.Count -eq 1 -and $gmTry[0].CatchClauses[0].Body.Extent.Text -match '\$cfgWhy = \$_\.Exception\.Message')
 $tmp2 = Join-Path ([IO.Path]::GetTempPath()) ('tw-json2 [x] & ' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Path $tmp2
 try {
@@ -110,9 +110,9 @@ try {
         $m = Get-MostOnline $mp
         Yes "MaxOnline: a most-online.json that is $k gives no number, saying why with the file" ($m.Value -eq 0 -and $m.Why -match '^it does not read as JSON \(' -and $m.Why.Contains($mp))
         [IO.File]::WriteAllText($cfgPath, $bad2[$k])
-        $colUrl = 'unset'
+        $colUrl = 'unset'; $cfgWhy = ''
         . ([scriptblock]::Create('$colUrl = ''''' + "`n" + $gmTry[0].Extent.Text))
-        Yes "Deploy-Gamemode: a config.json that is $k still falls back to no collection address" ($colUrl -eq '')
+        Yes "Deploy-Gamemode: a config.json that is $k gives no collection address, and says why with the file (#2711)" ($colUrl -eq '' -and $cfgWhy.Contains($cfgPath) -and ($cfgWhy -match 'is empty|is not valid JSON'))
     }
     $bom = [string][char]0xFEFF
     [IO.File]::WriteAllText($rp, $bom + '{ "lightPlugins": true }')
@@ -121,8 +121,9 @@ try {
     $m = Get-MostOnline $mp
     Yes 'MaxOnline: a good most-online.json still gives its number' ($m.Value -eq 40 -and $m.Staff -eq 2 -and -not $m.Why)
     [IO.File]::WriteAllText($cfgPath, $bom + '{ "CollectionUrl": "https://example/collections/abc" }')
+    $cfgWhy = ''
     . ([scriptblock]::Create($gmTry[0].Extent.Text))
-    Yes 'Deploy-Gamemode: a good config.json still gives the collection address' ($colUrl -eq 'https://example/collections/abc')
+    Yes 'Deploy-Gamemode: a good config.json still gives the collection address' ($colUrl -eq 'https://example/collections/abc' -and -not $cfgWhy)
 } finally {
     Remove-Item -LiteralPath $tmp2 -Recurse -Force -ErrorAction SilentlyContinue
 }

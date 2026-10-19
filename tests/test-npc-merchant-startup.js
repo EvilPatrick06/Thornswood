@@ -12,7 +12,7 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
     NPC_POPULATION_DATA:{plugins:['Skyrim.esm'],keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']],
       merchantRoster:{version:1,worldMode:'existing'}},
     createPrivateMerchantLedger:()=>({}),createNpcMerchantPurses:()=>merchant,
-    MERCHANT_TRADING:{installMerchantTrading(env){
+    MERCHANT_TRADING:{prepareRoles:population=>({population,catalog:{byRef:{}},roleTables:{}}),installMerchantTrading(env){
       if(failure==='trading')throw new Error('trading failure');
       assert.equal(env.suspended,true,'startup must prevent automatic recovery');
       return {shutdown(){},nativeReady:()=>failure!=='native',retirementReady:()=>failure!=='retirement',start(){started++;}};
@@ -51,7 +51,7 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
       merchantHistory:[['1:Skyrim.esm','a:Skyrim.esm'],['2:Skyrim.esm','a:Skyrim.esm']]},
     createPrivateMerchantLedger(fs,path,settings,refs){references=refs;return {};},
     createNpcMerchantPurses:()=>({shutdown(){}}),createNpcPopulation:()=>({commit(){},stop(){}}),
-    MERCHANT_TRADING:{installMerchantTrading:()=>({shutdown(){},nativeReady:()=>true,start(){}})},
+    MERCHANT_TRADING:{prepareRoles:population=>({population,catalog:{byRef:{}},roleTables:{}}),installMerchantTrading:()=>({shutdown(){},nativeReady:()=>true,start(){}})},
     startSharedNpcServerRuntime:()=>({stop(){},start:()=>true}),
     require,setTimeout,clearTimeout,serverRunId:()=>"test-run",removeSpawned(){},mintedEntry:()=>false,log(){}};
   vm.createContext(ctx);vm.runInContext(manifest,ctx);vm.runInContext(startup,ctx);
@@ -72,7 +72,7 @@ for(const failure of ['trading','native','retirement','population','runtime',nul
     NPC_POPULATION_DATA:{plugins:['Skyrim.esm'],keep:[['1:Skyrim.esm','a:Skyrim.esm',null,null,null,null,'trader']],
       merchantRoster:{version:1,worldMode:'existing'}},createPrivateMerchantLedger:()=>({}),
     createNpcMerchantPurses(){const service={alive:true,shutdown(){this.alive=false;}};merchants.push(service);return service;},
-    MERCHANT_TRADING:{installMerchantTrading(){
+    MERCHANT_TRADING:{prepareRoles:population=>({population,catalog:{byRef:{}},roleTables:{}}),installMerchantTrading(){
       const service={alive:true,started:false,shutdown(){this.alive=false;},nativeReady:()=>true,
         retirementReady(){
           if(++checks===2 && !replaced){replaced=true;vm.runInContext(startup,ctx);}

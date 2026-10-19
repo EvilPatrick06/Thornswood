@@ -61,7 +61,9 @@ function Set-DevNewsProp($obj, [string]$name, $value) {
 # writes the note) to the minute Ship tagged it (after the feed with the note
 # was sent), both on the clock of the machine that shipped it, the one the
 # note's date is written on. A tag with no tagger, made by hand without -a,
-# has no end to that span and no message, so it is left out.
+# has no end to that span and no message, so it is left out. Tagged is that
+# last moment to the second with its zone, which puts releases in the order
+# they went out across machines whose clocks are in different zones.
 function Get-DevReleaseTags([string]$sourceRepo) {
     $tags = @()
     # The caller's last exit code is put back, as Is-Published does below.
@@ -92,7 +94,10 @@ function Get-DevReleaseTags([string]$sourceRepo) {
             # "2026-10-01 20:04:26 -0600": the tagger's own clock.
             $at = $f[3].Trim()
             if ($at.Length -lt 16 -or -not [datetime]::TryParseExact($at.Substring(0, 16), 'yyyy-MM-dd HH:mm', $inv, 'None', [ref]$to)) { continue }
-            $cur = [pscustomobject]@{ Id = $id; Commit = $f[2]; From = $from; To = $to; Clean = $true }
+            $tagged = [DateTimeOffset]::MinValue
+            if ($at -notmatch '^(\d{4}-\d\d-\d\d \d\d:\d\d:\d\d) ([+-]\d\d)(\d\d)$' -or
+                -not [DateTimeOffset]::TryParseExact(('{0} {1}:{2}' -f $Matches[1], $Matches[2], $Matches[3]), 'yyyy-MM-dd HH:mm:ss zzz', $inv, 'None', [ref]$tagged)) { continue }
+            $cur = [pscustomobject]@{ Id = $id; Commit = $f[2]; From = $from; To = $to; Tagged = $tagged; Clean = $true }
         } elseif ($cur -and $s -match '^built with \d+ uncommitted change') {
             # Get-ReleaseTagMessage writes this line for a release whose
             # record says uncommitted above 0.
@@ -120,15 +125,19 @@ function Find-DevNoteRelease($tags, [string]$date) {
         Ids    = @($hits | ForEach-Object { $_.Id })
         Commit = $hits[0].Commit
         Clean  = (@($hits | Where-Object { -not $_.Clean }).Count -eq 0)
+        # The last of them to go out, for Is-Settled below.
+        Tagged = (@($hits | ForEach-Object { $_.Tagged }) | Sort-Object | Select-Object -Last 1)
     }
 }
 
 # Which of these notes the dev build has and main does not.
 #
 # Main's fresh release record proves which source commits have shipped. A
-# note proves its own: its sourceCommit, or before that field existed, the
-# commit of the dev release it came with (Find-DevNoteRelease). Headline
-# changes therefore cannot leave completed work marked Dev-only.
+# note proves its own: its sourceCommit, or when it has none (written before
+# that field existed, or by a release built with uncommitted files), the dev
+# release it came with (Find-DevNoteRelease), and for a release built with
+# uncommitted files, a later clean one (Is-Settled). Headline changes
+# therefore cannot leave completed work marked Dev-only.
 function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     if ($null -eq $mainDoc) { return }
     $mainRelease = $mainDoc.PSObject.Properties['release']
@@ -153,17 +162,21 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
     # lines (a newer engine pin, the next gamemode change) makes the merge
     # conflict there although the work went in. Against main at c63e9fab this
     # reads 3 of the 39 as still Dev, the three whose Dev release was built
-    # with uncommitted files: no commit records what those carried, so
-    # nothing can prove them.
+    # with uncommitted files: no commit records what those carried, so no
+    # commit proves them (Is-Settled below is what does).
     #
     # The release tags Ship pushes (release/dev/<id>) keep those commits
     # fetchable after the branch is gone. A git too old for
     # merge-tree --write-tree (before 2.38), or a commit this clone does not
     # have, proves nothing, and the note stays marked.
-    $script:publishedSeen = @{}
-    function Is-Published([string]$commit) {
-        if (-not $mainClean -or $commit -notmatch '^[0-9a-f]{40}$' -or $mainCommit -notmatch '^[0-9a-f]{40}$') { return $false }
-        if ($script:publishedSeen.ContainsKey($commit)) { return $script:publishedSeen[$commit] }
+    #
+    # Holds asks it of any commit; Is-Published asks it of main's, which only
+    # a release built with nothing uncommitted can speak for.
+    $script:holdsSeen = @{}
+    function Holds([string]$commit, [string]$target) {
+        if ($commit -notmatch '^[0-9a-f]{40}$' -or $target -notmatch '^[0-9a-f]{40}$') { return $false }
+        $key = $commit + ' ' + $target
+        if ($script:holdsSeen.ContainsKey($key)) { return $script:holdsSeen[$key] }
         # Put back as it was, so a caller's own last exit code is not git's.
         # It may not be set at all: Refresh-DevNews.ps1 runs nothing native
         # before this, and under strict mode reading it unset throws.
@@ -171,9 +184,9 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
         $was = if ($hadCode) { $global:LASTEXITCODE } else { 0 }
         $yes = $false
         try {
-            if ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $mainCommit)).Code -eq 0) { $yes = $true }
+            if ((Invoke-ReleaseGit $sourceRepo @('merge-base', '--is-ancestor', $commit, $target)).Code -eq 0) { $yes = $true }
             else {
-                $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $mainCommit)
+                $base = Invoke-ReleaseGit $sourceRepo @('merge-base', $commit, $target)
                 if ($base.Code -eq 0 -and $base.First -match '^[0-9a-f]{40}$') {
                     $files = @((Invoke-ReleaseGit $sourceRepo @('diff', '--name-only', $base.First, $commit)).Lines |
                         Where-Object { $_ } | ForEach-Object { ([string]$_).Trim() })
@@ -181,7 +194,7 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
                     # files, oldest first, each with its tree. Past 200 files
                     # the list would not fit on a Windows command line, so
                     # every Main commit since they parted is tried instead.
-                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($base.First + '..' + $mainCommit))
+                    $walk = @('rev-list', '--first-parent', '--reverse', '--format=%T', ($base.First + '..' + $target))
                     if ($files.Count -gt 0 -and $files.Count -le 200) { $walk += @('--') + $files }
                     $lines = @((Invoke-ReleaseGit $sourceRepo $walk).Lines | ForEach-Object { ([string]$_).Trim() })
                     for ($i = 0; $i + 1 -lt $lines.Count -and -not $yes; $i += 2) {
@@ -199,31 +212,63 @@ function Update-DevNewsChannels($doc, $news, $mainDoc, [string]$sourceRepo) {
             if ($hadCode) { $global:LASTEXITCODE = $was }
             else { Remove-Variable -Name LASTEXITCODE -Scope Global -ErrorAction SilentlyContinue }
         }
-        $script:publishedSeen[$commit] = $yes
+        $script:holdsSeen[$key] = $yes
         return $yes
     }
-    # Before sourceCommit existed (3 Oct, 1:57 PM) a note recorded no source,
-    # so its proof is the dev release it came with, found by that release's
-    # tag (Find-DevNoteRelease), and never by its headline.
+    function Is-Published([string]$commit) {
+        if (-not $mainClean) { return $false }
+        return (Holds $commit $mainCommit)
+    }
+    # A release built with uncommitted files is settled by a later clean dev
+    # release that holds its commit and is on main (Patrick, 12 Oct, #2401,
+    # option B). No commit records what the uncommitted files carried, but
+    # once a clean release went out after it the dev build was rebuilt from
+    # committed files only: whatever they carried is either in that clean
+    # release's commit, which main has, or no longer in the dev build at all,
+    # and either way "dev has it and main does not" is false. Measured on the
+    # 12 Oct dev feed: "Merchant purses and dungeon rewards" came with
+    # 20261002-015344-dev (286519a8, 1 uncommitted), and the next clean
+    # release, 20261002-143545-dev (85e44094), holds 286519a8 and is on main
+    # 7cece557, so it clears. It speaks for the dev client build only: a dev
+    # Ship does not redeploy the dev server's gamemode, so a gamemode change
+    # deployed by hand from uncommitted files is not covered by it.
     #
-    # Until 12 Oct every such note took the commit of the dev feed's current
-    # release instead. Between main releases the newest dev release is always
-    # ahead of main, so every one of them was marked DEV: measured on 12 Oct,
-    # the 16 notes of 1 to 3 Oct, all shipped on main 1.1.105 on 3 Oct, were
-    # marked DEV beside the 4 that really were (#2401).
+    # Oldest first, so the usual proof, the next clean release, is the first
+    # one tried.
+    function Is-Settled($rel) {
+        foreach ($l in @($devTags | Where-Object { $_.Clean -and $_.Tagged -gt $rel.Tagged } | Sort-Object Tagged)) {
+            if ((Is-Published $l.Commit) -and (Holds $rel.Commit $l.Commit)) { return $true }
+        }
+        return $false
+    }
+    # A note with no sourceCommit to prove it by is proved by the dev release
+    # it came with, found by that release's tag (Find-DevNoteRelease), and
+    # never by its headline. That is a note from before sourceCommit existed
+    # (3 Oct, 1:57 PM), which has no such field, and one written by a release
+    # built with uncommitted files, whose sourceCommit Publish-Update leaves
+    # empty.
+    #
+    # Until 12 Oct every note without the field took the commit of the dev
+    # feed's current release instead. Between main releases the newest dev
+    # release is always ahead of main, so every one of them was marked DEV:
+    # measured on 12 Oct, the 16 notes of 1 to 3 Oct, all shipped on main
+    # 1.1.105 on 3 Oct, were marked DEV beside the 4 that really were
+    # (#2401). And until 18 Oct an empty sourceCommit was judged as a commit
+    # main did not have, so such a note was marked DEV for good.
     #
     # No proof is not proof of the opposite. A note whose release this clone
-    # has no tag for, or whose release was built with uncommitted files (no
-    # commit records what those carried), keeps the mark it was last given.
+    # has no tag for, or whose release was built with uncommitted files and
+    # is not settled yet, keeps the mark it was last given.
     $devTags = $null
     $marked = 0
     foreach ($n in @($news)) {
         $commit = Get-DevNewsVal $n 'sourceCommit'
-        if ($n.PSObject.Properties['sourceCommit']) { $published = Is-Published $commit }
+        if ($commit) { $published = Is-Published $commit }
         else {
             if ($null -eq $devTags) { $devTags = @(Get-DevReleaseTags $sourceRepo) }
             $rel = Find-DevNoteRelease $devTags (Get-DevNewsVal $n 'date')
             if ($rel -and $rel.Clean) { $published = Is-Published $rel.Commit }
+            elseif ($rel -and (Is-Settled $rel)) { $published = $true }
             else { $published = ((Get-DevNewsVal $n 'channel') -ne 'dev') }
         }
         $want = if ($published) { '' } else { 'dev' }
