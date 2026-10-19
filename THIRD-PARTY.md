@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `d1944169` (in full, `d1944169ae66ad74898a614aa7e4256e8ec92885`). That
+commit `14d9fcd2` (in full, `14d9fcd287737a43a20f8b83a6b94c5a23262364`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -609,7 +609,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `d1944169ae66ad74898a614aa7e4256e8ec92885` on the public fork. The
+  name `14d9fcd287737a43a20f8b83a6b94c5a23262364` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -636,11 +636,16 @@ with.
   world's shutdown, with the outcome handed back to the gamemode (#1373). Since
   `d360fc1f` it also gives the gamemode a write that replaces a whole file at
   once, which readers never see half written, and its resource port serves
-  each file from the one handle it opened (#2740). The server module's SHA256
-  is `a4c34f85b6acb7e518f9aa505f91c61be52a7751e73ab5916c8d81a01119e11e`, built
-  2026-10-19T08:57:01Z. This is the recorded next release, not a deployment
-  claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724`, and dev
-  runs it too, until this goes out.
+  each file from the one handle it opened (#2740). Since `d1944169` it also
+  decides a block before it hands the gamemode the hit, so the hit's blocked
+  flag is the server's own and a block against a character the server runs is
+  seen (#1386), and lets a plugin keep a character from being slowed by what it
+  carries, here and on everybody else's screen (#1385). The server module's
+  SHA256
+  is `6bd0b70a9b901b6448c62087e8f0c229fc0b09a40f8d37b1a05f24a7b29beeca`, built
+  2026-10-19T21:01:38Z. This is the recorded next release, not a deployment
+  claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
+  out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
   feed's client files (a dev Ship) first.
   Section 13 of the AGPL asks that everybody who connects to a modified server
@@ -673,9 +678,9 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/d1944169ae66ad74898a614aa7e4256e8ec92885
+https://github.com/EvilPatrick06/skymp/tree/14d9fcd287737a43a20f8b83a6b94c5a23262364
 
-For the engine Main and dev run until then:
+For the engine Main runs until then:
 
 https://github.com/EvilPatrick06/skymp/tree/2008327879e6cad6369ec3afe1d6d1b8ecf37724
 
