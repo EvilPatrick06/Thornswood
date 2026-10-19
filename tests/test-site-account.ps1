@@ -93,7 +93,7 @@ if (-not $RepoPath) { $RepoPath = $Here }
 # The places no service may read, swapped for scratch ones the test sets, so
 # the fail-safe never reads this machine's own C:\Thornswood-* folders.
 $script:neverReach = @()
-function Get-ThornswoodServiceNeverReach { param([string]$Own = '') return $script:neverReach }
+function Get-ThornswoodServiceNeverReach { param([string]$Own = '', [string]$Box = 'C:\') return $script:neverReach }
 
 $script:pass = 0
 $script:fail = 0
@@ -112,6 +112,9 @@ $deploy = Join-Path $RepoPath 'scripts\deploy\Deploy-Docs.ps1'
 $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($deploy, [ref]$null, [ref]$errs)
 Yes 'Deploy-Docs.ps1 parses' ($errs.Count -eq 0)
+# Build below fills $boxWin the way this line does (#1273).
+Yes 'Deploy-Docs.ps1 takes the box from the folder its root is in' (
+    $ast.Extent.Text.Contains("`$boxWin    = (Split-Path -Parent `$rootWin.TrimEnd('\')).TrimEnd('\')"))
 
 # ---- the parameter ------------------------------------------------------------
 $params = @{}
@@ -149,12 +152,12 @@ $remote = $remotes[0]
 # ServiceAccount.ps1 functions sent up in front of it (#2613). Anything else would be
 # built from a variable this does not set, and the test would be testing a
 # different script from the one that goes up.
-$known = @('Task', 'Port', 'rootWin', 'RunAs', 'siteAccountHelpers')
+$known = @('Task', 'Port', 'rootWin', 'boxWin', 'RunAs', 'siteAccountHelpers')
 $used = @($remote.NestedExpressions | ForEach-Object {
     if ($_ -is [System.Management.Automation.Language.VariableExpressionAst]) { $_.VariablePath.UserPath } else { $_.Extent.Text }
 } | Sort-Object -Unique)
 $strangers = @($used | Where-Object { $known -notcontains $_ })
-Yes ('the script is filled in from $Task, $Port, $rootWin, $RunAs and $siteAccountHelpers and nothing else' +
+Yes ('the script is filled in from $Task, $Port, $rootWin, $boxWin, $RunAs and $siteAccountHelpers and nothing else' +
      $(if ($strangers.Count) { ' (also ' + ($strangers -join ', ') + ')' } else { '' })) ($strangers.Count -eq 0)
 
 # The here-string, evaluated exactly as Deploy-Docs evaluates it. An empty
@@ -164,6 +167,8 @@ function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornsw
     if (-not $account) { $account = $script:runAsDefault }
     $RunAs = $account
     $rootWin = $docsRoot
+    # The same line Deploy-Docs fills it from: the folder the site's root is in.
+    $boxWin = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
     $Task = $taskName
     $Port = 3001
     # The helpers are checked on their own below; here the setup script is what is under test.
@@ -358,12 +363,6 @@ function Put([string]$path, [string]$text) {
     if (-not (Test-Path -LiteralPath $d)) { New-Item -ItemType Directory -Force -Path $d | Out-Null }
     [IO.File]::WriteAllText($path, $text)
 }
-# The block's own folders, swapped for scratch ones. Every one of them has to
-# be found and swapped, or this would be granting on the real C:\ folders.
-function Scratch([string]$block, [hashtable]$map) {
-    foreach ($k in $map.Keys) { $block = $block.Replace("'" + $k + "'", "'" + $map[$k] + "'") }
-    return $block
-}
 # Runs a block in a scope of its own and hands back what it said and what it
 # left behind.
 function Run([string]$code) {
@@ -422,20 +421,16 @@ try {
         [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
         [Security.AccessControl.PropagationFlags]::None, 'Allow')))
     Set-Acl -LiteralPath $tmp -AclObject $top
-    # $dev is left out on purpose: a box with no dev server has no folder.
-    $map = @{
-        'C:\Thornswood-Server\data'    = (Join-Path $server 'data')
-        'C:\Thornswood-Server'         = $server
-        'C:\Thornswood-Server-Dev'     = $dev
-        'C:\Thornswood-Voice\chat'     = $voice
-        'C:\Thornswood-Voice-Dev\chat' = $voiceDev
-        'C:\Thornswood-Deploys\current' = $deploys
-    }
+    # The folders outside the site's own that the block grants. The site's
+    # folder is in the scratch box, so the block names these in it and not on
+    # C: (#1273). $dev is left out on purpose: a box with no dev server has no
+    # folder.
+    $outsideFolders = @((Join-Path $server 'data'), $server, $dev, $voice, $voiceDev, $deploys)
 
     # -- SYSTEM: the principal it always had, and not one grant -----------------
     $script:icaclsCalls = 0
     $code = 'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
-            (Scratch (BlockOf (Build 'SYSTEM' $docs)) $map)
+            (BlockOf (Build 'SYSTEM' $docs))
     $r = Run $code
     Yes 'SYSTEM: the task runs as SYSTEM' ($r.principal -and $r.principal.UserId -eq 'SYSTEM')
     Yes 'SYSTEM: at Highest, as it was registered from the start' ($r.principal -and "$($r.principal.RunLevel)" -eq 'Highest')
@@ -447,7 +442,7 @@ try {
     Yes 'SYSTEM: the SID it compares the read-back with is SYSTEM''s' ($r.sid -eq 'S-1-5-18')
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
-    $block = Scratch (BlockOf (Build 'LOCAL SERVICE' $docs)) $map
+    $block = BlockOf (Build 'LOCAL SERVICE' $docs)
     Yes 'LOCAL SERVICE: every folder in the block was swapped for a scratch one' ($block -notmatch "'C:\\Thornswood-")
     $r = Run $block
     $said = $r.said -join "`n"
@@ -574,7 +569,7 @@ try {
     # -- an account this box does not have: nothing is stopped ------------------
     $script:icaclsCalls = 0
     $code = 'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
-            (Scratch (BlockOf (Build 'NOBODY AT ALL' $docs)) $map)
+            (BlockOf (Build 'NOBODY AT ALL' $docs))
     $r = Run $code
     Yes 'an account that does not resolve is said' (($r.said -join "`n") -match 'NO SUCH ACCOUNT HERE: NOBODY AT ALL')
     Yes 'and nothing is granted and no principal is made' ($script:icaclsCalls -eq 0 -and $null -eq $r.principal)
@@ -601,10 +596,10 @@ try {
         $script:taskAsked = 0
         $script:taskWas = $null
         if ($taskRunsAs) { $script:taskWas = [pscustomobject]@{ UserId = $taskRunsAs; RunLevel = 'Limited' } }
-        return Run ($standins + (Scratch (BlockOf (Build $given $docs)) $map))
+        return Run ($standins + (BlockOf (Build $given $docs)))
     }
     # Folders the scratch box has, so the grants the block should give.
-    $there = @($map.Values | Where-Object { Test-Path -LiteralPath $_ }).Count + 1
+    $there = @($outsideFolders | Where-Object { Test-Path -LiteralPath $_ }).Count + 1
 
     function IsCutP($p) {
         return [bool]($p -and $p.UserId -match 'LOCAL SERVICE$' -and "$($p.RunLevel)" -eq 'Limited' -and
@@ -794,7 +789,7 @@ try {
         function OnTask([string]$given, [int]$n) {
             $code = '$ErrorActionPreference = ''Continue''' + "`n" +
                     'function icacls { $script:icaclsCalls++; $global:LASTEXITCODE = 0 }' + "`n" +
-                    (Scratch (BlockOf (Build $given $docs $scratchTask)) $map) + "`n" +
+                    (BlockOf (Build $given $docs $scratchTask)) + "`n" +
                     ('$a = New-ScheduledTaskAction -Execute ''cmd.exe'' -Argument ''/c exit {0}''' -f $n) + "`n" +
                     $makeOrUpdate
             $script:icaclsCalls = 0

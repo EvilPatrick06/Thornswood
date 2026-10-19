@@ -245,6 +245,11 @@ function Push($local, $remote) {
 }
 
 $rootWin   = $Root.Replace('/','\')
+# The folder the Thornswood folders sit side by side in, C: on the box, with
+# no backslash at the end. The fail-safe and the site's grants name the other
+# folders from it, so a deploy into a scratch box never reaches the real ones
+# (#1273).
+$boxWin    = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
 $stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp
@@ -635,7 +640,7 @@ if (`$principal) {
   try { `$sid = (New-Object Security.Principal.NTAccount('NT AUTHORITY', `$runAs)).Translate([Security.Principal.SecurityIdentifier]).Value }
   catch { 'NO SUCH ACCOUNT HERE: ' + `$runAs + ' (' + `$_.Exception.Message + '). Nothing was stopped or changed.'; return }
   if (-not `$already) {
-    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin'))
+    `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own '$rootWin' -Box '$boxWin'))
     if (`$cannot.Count) {
       'LOCAL SERVICE COULD READ WHAT NO SERVICE MAY, so the site is not moved onto it:'
       foreach (`$c in `$cannot) { '  ' + `$c }
@@ -646,12 +651,12 @@ if (`$principal) {
   `$principal = New-ThornswoodServicePrincipal
   foreach (`$g in @(
       @('$rootWin', '(OI)(CI)M'),
-      @('C:\Thornswood-Server\data', '(OI)(NP)R'),
-      @('C:\Thornswood-Server', '(OI)(NP)R'),
-      @('C:\Thornswood-Server-Dev', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice\chat', '(OI)(NP)R'),
-      @('C:\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
-      @('C:\Thornswood-Deploys\current', '(OI)(NP)R'))) {
+      @('$boxWin\Thornswood-Server\data', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Server-Dev', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Voice-Dev\chat', '(OI)(NP)R'),
+      @('$boxWin\Thornswood-Deploys\current', '(OI)(NP)R'))) {
     if (-not (Test-Path -LiteralPath `$g[0])) { 'not here, nothing granted: ' + `$g[0]; continue }
     `$said = & icacls `$g[0] /grant ('*' + `$sid + ':' + `$g[1]) 2>&1
     if (`$LASTEXITCODE -eq 0) { 'granted ' + `$runAs + ' ' + `$g[1] + ' on ' + `$g[0] }

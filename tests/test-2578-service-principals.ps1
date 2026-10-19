@@ -120,6 +120,24 @@ Yes 'never reach: the backups, the deploys, the watch and maint folders' (
 Yes "never reach: another server's private folder, and voice keys, but not its own" (
     $nr -contains 'C:\Thornswood-Server-Dev\private' -and $nr -notcontains 'C:\Thornswood-Server\private' -and
     $nr -contains 'C:\Thornswood-Voice\token-key.txt')
+# A deploy into a scratch box is checked against that box (#1273): with the
+# list fixed on C:, a harness on a VPS runner looked at the real servers'
+# private folders, which the runner may not, and the install ended there.
+$sb = @(Get-ThornswoodServiceNeverReach -Own 'D:\scratch\box\Thornswood-Server' -Box 'D:\scratch\box')
+Yes 'never reach follows -Box: the scratch box is checked, and nothing on C:' (
+    $sb -contains 'D:\scratch\box\Thornswood-Backup' -and $sb -contains 'D:\scratch\box\Thornswood-Server-Dev\private' -and
+    $sb -notcontains 'D:\scratch\box\Thornswood-Server\private' -and -not @($sb | Where-Object { $_ -like 'C:\*' }).Count)
+Yes '  and with no -Box it is the box, C:' (@(Get-ThornswoodServiceNeverReach) -contains 'C:\Thornswood-Server\private')
+Yes '  and C: written without its backslash is the same' (
+    (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs' -Box 'C:') -join '|') -eq (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs') -join '|'))
+Yes 'each caller passes the folder its own root is in as -Box' (
+    $server.Contains('Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)') -and
+    $voice.Contains("Get-ThornswoodServiceNeverReach -Own '`$Root' -Box (Split-Path -Parent '`$Root')") -and
+    $devInst.Contains('Get-ThornswoodServiceNeverReach -Own $dev -Box (Split-Path -Parent $dev)'))
+$docs = Text (Join-Path $Deploy 'Deploy-Docs.ps1')
+Yes "and Deploy-Docs does, and names the site's grants from it, not from C:" (
+    $docs.Contains("Get-ThornswoodServiceNeverReach -Own '`$rootWin' -Box '`$boxWin'") -and
+    $docs.Contains("@('`$boxWin\Thornswood-Server', '(OI)(NP)R')") -and -not $docs.Contains("@('C:\Thornswood-"))
 
 # ---- scratch folders -------------------------------------------------------------
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts2578-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -156,6 +174,21 @@ try {
         @(Test-ThornswoodServiceCannotReach @($shut, (Join-Path $scratch 'nothing'))).Count -eq 0)
     Yes "the fail-safe finds a folder the task's own SID may read" (
         @(Test-ThornswoodServiceCannotReach @($open) @($sid)).Count -gt 0)
+
+    # A folder this account may not even look into, the way a VPS runner sees
+    # the servers' private folders (#1273): Test-Path on what is inside is an
+    # error, and without -ErrorAction Stop it said False and the path was
+    # passed over as not there. Only SYSTEM is let in; the owner, this
+    # account, may still put its rules back for the clean-up.
+    $hidden = Join-Path $scratch 'hidden'
+    $null = New-Item -ItemType Directory -Path (Join-Path $hidden 'private') -Force
+    $null = & icacls $hidden /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'
+    $null = & icacls $hidden /remove:g ('*' + $me)
+    try {
+        $why = @(Test-ThornswoodServiceCannotReach @((Join-Path $hidden 'private')))
+        Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + ')') (
+            $why.Count -eq 1 -and $why[0] -match 'could not be checked')
+    } finally { $null = & icacls $hidden /grant ('*' + $me + ':(OI)(CI)F') }
 
     $root = Join-Path $scratch 'root'; Locked $root
     foreach ($d in 'world', 'data', 'private') { Locked (Join-Path $root $d) }

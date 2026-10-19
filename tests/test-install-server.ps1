@@ -743,7 +743,10 @@ try {
     Yes '  and the old root is kept beside it as .prev, with what it shipped' (
         $prev.Count -eq 1 -and (Get (Join-Path $prev[0] 'gamemode.js')) -eq '// v1' -and
         (Get (Join-Path $prev[0] 'data\shipped.txt')) -eq 'shipped v1')
-    Yes '  and without the world, which moved rather than being copied' (-not (Test-Path -LiteralPath (Join-Path $prev[0] 'world')))
+    # Only with the one .prev there: a run that failed left none, and indexing
+    # it would end every case after this one (#1273).
+    Yes '  and without the world, which moved rather than being copied' (
+        $prev.Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $prev[0] 'world')))
     if ($script:fail -gt $failed) { Show }
 
     # ---- -PutBack --------------------------------------------------------------
@@ -946,7 +949,7 @@ try {
     $failed = $script:fail
     Yes '-FreshWorld is INSTALL OK and starts with no world' (($out -contains 'INSTALL OK') -and -not (Test-Path -LiteralPath (Join-Path $root 'world')))
     $prev = @(Beside '.prev-*')
-    Yes '  and the old world is kept in the .prev it left' ((Get (Join-Path $prev[-1] 'world\w.txt')) -eq 'every character')
+    Yes '  and the old world is kept in the .prev it left' ($prev.Count -and (Get (Join-Path $prev[-1] 'world\w.txt')) -eq 'every character')
     Yes '  and the roster still came across' ((Get (Join-Path $root 'private\door.json')) -match 'site')
     Yes '  and only the newest two .prev folders are kept, not three (#1121)' (
         $prev.Count -eq 2 -and -not (Test-Path -LiteralPath (Join-Path $box 'Thornswood-Server.prev-20000101-000003')))
