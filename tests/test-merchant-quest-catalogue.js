@@ -20,14 +20,16 @@ const P = context.__thornswoodProgression;
 const rules = require('../game/quest-eligibility').createQuestEligibility({table: P.TABLE, spellIds: P.SPELL_IDS});
 const recipes = JSON.parse(read('game/data/recipes.json')).recipes;
 const tables = JSON.parse(read('game/data/merchant-role-tables.json')).tables;
+const harvests = JSON.parse(read('game/data/harvests.json')).harvests;
 const proofFields = ['owner', 'half', 'rank', 'out', 'makes', 'bench', 'inputItems', 'needs'];
 // Settled class-Novice slots. Recipe/output authority stays in the catalogue.
 const beginnerClasses = new Map([
   ['1a67c:Skyrim.esm', 'miner'], ['19dd0:Skyrim.esm', 'fisher'],
-  ['1939ba:aaaGraniteHill.esp', 'hunter'], ['198a0:Skyrim.esm', 'farmer']
+  ['1939ba:aaaGraniteHill.esp', 'hunter'], ['198a0:Skyrim.esm', 'farmer'],
+  ['1aa61:Skyrim.esm', 'gatherer']
 ]);
 
-function validate(catalogue, source = {recipes, tables}) {
+function validate(catalogue, source = {recipes, tables, harvests}) {
   assert.deepEqual(Object.keys(catalogue).sort(), ['active', 'complete', 'quests', 'version']);
   assert.equal(catalogue.version, 1);
   assert.equal(catalogue.active, false, 'Draft data cannot activate work');
@@ -81,9 +83,24 @@ function validate(catalogue, source = {recipes, tables}) {
       assert.ok(Array.isArray(row.goods) && row.goods.length > 0 && row.goods.length <= 5);
       const items = new Set();
       for (const good of row.goods) {
-        assert.deepEqual(Object.keys(good).sort(), ['count', 'item', 'recipe']);
+        const plant = Object.hasOwn(good, 'harvest');
+        assert.deepEqual(Object.keys(good).sort(), plant ? ['count', 'harvest', 'item'] : ['count', 'item', 'recipe']);
         assert.ok(typeof good.item === 'string' && !items.has(good.item)); items.add(good.item);
         assert.ok(Number.isSafeInteger(good.count) && good.count > 0 && good.count <= 255, 'Commission quantity');
+        assert.ok(source.tables[row.merchant.role].buy.includes(good.item), 'Commission output needs ordinary buy permission too');
+        if (plant) {
+          assert.equal(gate.classKey, 'gatherer', 'Gatherer harvest gate');
+          assert.ok(good.harvest && typeof good.harvest === 'object' && !Array.isArray(good.harvest) &&
+            typeof good.harvest.reference === 'string' && source.harvests &&
+            Object.hasOwn(source.harvests, good.harvest.reference), 'Public Gatherer harvest');
+          const harvest = source.harvests[good.harvest.reference];
+          assert.ok(harvest && typeof harvest === 'object' && !Array.isArray(harvest), 'Public Gatherer harvest');
+          assert.deepEqual(Object.keys(harvest).sort(), ['name', 'produce', 'rank']);
+          assert.deepEqual(good.harvest, {reference: good.harvest.reference, ...harvest}, 'Harvest evidence');
+          assert.equal(harvest.rank, row.tier);
+          assert.equal(good.item, harvest.produce);
+          continue;
+        }
         assert.deepEqual(Object.keys(good.recipe).sort(), ['reference', ...proofFields].sort());
         const recipe = source.recipes[good.recipe.reference];
         assert.ok(recipe && recipe.fires === true && recipe.book !== 'cut' &&
@@ -92,7 +109,6 @@ function validate(catalogue, source = {recipes, tables}) {
         assert.equal(recipe.rank, row.tier);
         if (gate.classKey === undefined) assert.equal(gate.half, recipe.half.toLowerCase());
         assert.equal(good.item, recipe.out);
-        assert.ok(source.tables[row.merchant.role].buy.includes(good.item), 'Commission output needs ordinary buy permission too');
         for (const field of proofFields) assert.deepEqual(good.recipe[field], recipe[field], 'Recipe evidence/' + field);
         assert.ok(recipe.inputItems.length > 0 && recipe.inputItems.every(input =>
           input.suppliedAt === 'novice' && (Object.keys(P.TABLE.classes).includes(input.suppliedBy) ||
@@ -196,12 +212,46 @@ rejectsClass(row => {
   row.goods[0] = {item: recipes['1549c:Thornswood-Content.esp'].out, count: 1,
     recipe: proof('1549c:Thornswood-Content.esp')};
 });
-for (const classKey of ['miner', 'fisher', 'hunter', 'farmer']) {
+const plantSources = harvests;
+const cotton = {id: 'q-hjaalmarch-alchemist-cotton-dressings', name: 'Cotton for marsh-road dressings',
+  text: "Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.",
+  tier: 'novice', gate: {classKey: 'gatherer', rank: 'novice'},
+  merchant: roster.merchants.find(m => m.bookHold === 'morthal' && m.role === 'Alchemist'),
+  kind: 'commission', goods: [{item: '3f7f8:Skyrim.esm', count: 3,
+    harvest: {reference: 'bb947:Skyrim.esm', ...plantSources['bb947:Skyrim.esm']}}],
+  reward: {source: 'merchant-purse', pricing: 'submitted-hold-price'}, cooldownHours: 6};
+assert.doesNotThrow(() => validate(one(cotton)), 'Gatherer delivery uses actual harvest provenance, not an invented recipe');
+let harvestRefusals = 0;
+function rejectsHarvest(edit, expected) {
+  const row = clone(cotton); edit(row);
+  assert.throws(() => validate(one(row)), expected); harvestRefusals++;
+}
+rejectsHarvest(row => {row.goods[0].harvest.reference = 'unknown:Skyrim.esm';}, /Public Gatherer harvest/);
+rejectsHarvest(row => {row.goods[0].harvest.reference = 'toString';}, /Public Gatherer harvest/);
+rejectsHarvest(row => {row.goods[0].harvest.name = 'Garlic';}, /Harvest evidence/);
+rejectsHarvest(row => {row.goods[0].harvest.rank = 'advanced';}, /Harvest evidence/);
+rejectsHarvest(row => {row.goods[0].harvest.produce = '34d22:Skyrim.esm';}, /Harvest evidence/);
+rejectsHarvest(row => {row.goods[0].item = '34d22:Skyrim.esm';});
+rejectsHarvest(row => {row.gate.classKey = 'miner';}, /Reserved class allocation/);
+rejectsHarvest(row => {row.gate = {profession: 'alchemist', half: 'physicker', rank: 'novice'};}, /Gatherer harvest gate/);
+rejectsHarvest(row => {row.goods[0].recipe = proof('154c6:Thornswood-Content.esp');});
+rejectsHarvest(row => {delete row.goods[0].harvest;});
+rejectsHarvest(row => {row.goods[0].harvest.yield = 99;}, /Harvest evidence/);
+const advancedPlant = clone(plantSources); advancedPlant['bb947:Skyrim.esm'].rank = 'advanced';
+const advancedCotton = clone(cotton); advancedCotton.goods[0].harvest.rank = 'advanced';
+assert.throws(() => validate(one(advancedCotton), {recipes, tables, harvests: advancedPlant})); harvestRefusals++;
+const inheritedPlant = Object.create({'bb947:Skyrim.esm': plantSources['bb947:Skyrim.esm']});
+assert.throws(() => validate(one(cotton), {recipes, tables, harvests: inheritedPlant}), /Public Gatherer harvest/); harvestRefusals++;
+const noCotton = clone(tables); noCotton.Alchemist.buy = noCotton.Alchemist.buy.filter(item => item !== '3f7f8:Skyrim.esm');
+assert.throws(() => validate(one(cotton), {recipes, tables: noCotton, harvests: plantSources}), /buy permission/); harvestRefusals++;
+const duplicateCotton = clone(cotton); duplicateCotton.id = 'q-more-cotton'; duplicateCotton.goods[0].count++;
+assert.throws(() => validate({...one(cotton), quests: [cotton, duplicateCotton]}), /quantity change alone/); harvestRefusals++;
+for (const classKey of ['miner', 'fisher', 'hunter', 'farmer', 'gatherer']) {
   const gate = {classKey, rank: 'novice'};
-  const state = {v: 1, cls: classKey, prof: 'alchemist', ranks: {[classKey]: 'novice'}};
+  const state = {v: 1, cls: classKey, prof: 'warrior', ranks: {[classKey]: 'novice'}};
   for (const [snapshot, allowed] of [[state, true],
     [{...state, ranks: {[classKey]: 'master'}}, true],
-    [{...state, cls: 'gatherer'}, false], [{...state, ranks: {}}, false],
+    [{...state, cls: classKey === 'gatherer' ? 'miner' : 'gatherer'}, false], [{...state, ranks: {}}, false],
     [{...state, ranks: {[classKey]: 'invalid'}}, false]]) {
     assert.equal(rules.allows(gate, snapshot), allowed); classEligibility++;
   }
@@ -209,3 +259,4 @@ for (const classKey of ['miner', 'fisher', 'hunter', 'farmer']) {
 console.log('PASS ' + ids.size + ' inactive quest candidates, exact source bindings and real gates; ' + dailyBound + ' gold cooldown-only 24h bound, 0 enabled');
 console.log('PASS explicit commission source authority and ' + refusals + ' malformed-source/permission/quantity/bundle refusals');
 console.log('PASS ' + classRefusals + ' class-allocation/source refusals and ' + classEligibility + ' cross-profession class eligibility cases');
+console.log('PASS ' + harvestRefusals + ' harvest provenance/allocation/permission/bundle refusals');

@@ -816,6 +816,41 @@
         "pricing": "submitted-hold-price"
       },
       "cooldownHours": 6
+    },
+    {
+      "id": "q-hjaalmarch-alchemist-cotton-dressings",
+      "name": "Cotton for marsh-road dressings",
+      "text": "Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.",
+      "tier": "novice",
+      "gate": {
+        "classKey": "gatherer",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "1aa61:Skyrim.esm",
+        "base": "135ef:Skyrim.esm",
+        "role": "Alchemist",
+        "hold": "Hjaalmarch",
+        "bookHold": "morthal"
+      },
+      "kind": "commission",
+      "goods": [
+        {
+          "item": "3f7f8:Skyrim.esm",
+          "count": 3,
+          "harvest": {
+            "reference": "bb947:Skyrim.esm",
+            "produce": "3f7f8:Skyrim.esm",
+            "name": "Tundra Cotton",
+            "rank": "novice"
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6
     }
   ]
 }
