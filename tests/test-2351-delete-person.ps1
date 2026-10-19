@@ -272,6 +272,9 @@ try {
             $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $svcRoots)
             Yes '  a real run stops that server first, then refuses the batch it left' ($c -ne 0 -and (Said 'stopped   the dev game server') -and (Said '\.pending-batch is an unfinished save'))
             Yes '  and stopped it before looking' ($srv.HasExited)
+            # On a VPS runner the real tasks of the same names run from the
+            # real roots; a stand-in root never reaches them.
+            Yes '  and a task of the same name that runs from another root is not started for it' (Said 'not started again: the dev game server ran from')
         } finally {
             if (-not $srv.HasExited) { Stop-Process -Id $srv.Id -Force }
             $srv.WaitForExit()
