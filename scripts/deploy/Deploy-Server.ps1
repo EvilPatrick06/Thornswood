@@ -288,7 +288,15 @@ function Read-LiveOnline($lines) {
 }
 
 function Get-LiveOnline {
+  # online.json and the names are read sharing write and delete (#2740). The
+  # gamemode replaces them whole with a POSIX rename, which a reader that does
+  # not share delete refuses (Get-Content does not share it), and a refused
+  # write leaves the count it was replacing.
   Read-LiveOnline (Remote @"
+function ReadShared(`$f) {
+  `$h = New-Object IO.FileStream(`$f, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+  try { return (New-Object IO.StreamReader(`$h, (New-Object Text.UTF8Encoding(`$false)), `$true)).ReadToEnd() } finally { `$h.Dispose() }
+}
 `$root = '$Root'.Replace('/','\')
 `$port = 0
 `$d = 'data'
@@ -313,14 +321,14 @@ if (`$port -gt 0) {
 if (-not `$up) { 'ONLINE 0' }
 else {
   try {
-    `$j = Get-Content (Join-Path `$dataPath 'online.json') -Raw -EA Stop | ConvertFrom-Json
+    `$j = ReadShared (Join-Path `$dataPath 'online.json') | ConvertFrom-Json
     if (`$null -eq `$j -or `$null -eq `$j.now) { throw 'no count' }
     'ONLINE ' + [int]`$j.now
   } catch { 'ONLINE 0' }
   `$nf = [IO.Path]::Combine(`$root, `$p, 'online-names.json')
   if (Test-Path -LiteralPath `$nf) {
     try {
-      `$n = Get-Content `$nf -Raw -EA Stop | ConvertFrom-Json
+      `$n = ReadShared `$nf | ConvertFrom-Json
       foreach (`$x in @(`$n.names)) { if (`$x) { 'NAME ' + `$x } }
     } catch { 'NOTE ' + `$nf + ' does not read (' + `$_.Exception.Message + '), so nobody is named' }
   }
