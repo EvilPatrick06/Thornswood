@@ -247,6 +247,8 @@ if (Test-Path -LiteralPath $reqFrom) {
 }
 # The real Stop-Game closes any Skyrim on the machine; nothing here may.
 Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+# No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
 
 $pub = Join-Path $T 'publisher'
 $rel = Join-Path $T 'rel'
@@ -355,6 +357,18 @@ Yes '  its record says every file is on the site beside it' ($null -ne $m1 -and 
 $shas = Get-RecordFileShas $m1
 $absent = @($shas.Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) })
 Yes ("  and every one is: {0} file(s), each at /feed/assets/<its sha256>" -f $shas.Count) ($shas.Count -ge 6 -and $absent.Count -eq 0)
+# The signed manifest (#2163, phase B): on the site by its sha256, named by the
+# feed, and listing the baseline record that names every file above.
+$smOk = $false
+if ($d1.PSObject.Properties['signedManifest']) {
+    $smFile = Join-Path $feedDir ("assets\" + [string]$d1.signedManifest.sha256)
+    $smCat = Join-Path $feedDir ("assets\" + [string]$d1.signedManifest.catalogSha256)
+    if ((Test-Path -LiteralPath $smFile) -and (Test-Path -LiteralPath $smCat)) {
+        $smDoc = [IO.File]::ReadAllText($smFile) | ConvertFrom-Json
+        $smOk = ($smDoc.release -eq $R1 -and (@($smDoc.assets | ForEach-Object { $_.sha256 }) -contains [string]$d1.baseline.sha256))
+    }
+}
+Yes '  the feed names its signed manifest, on the site with its catalog, listing the baseline record' $smOk
 $okBytes = $true
 foreach ($k in @($m1.Keys | Where-Object { -not $_.StartsWith(':') })) {
     $sha = ([string]$m1[$k]).Split(':')[1]

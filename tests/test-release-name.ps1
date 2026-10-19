@@ -197,6 +197,8 @@ try {
     }
     # The real Stop-Game closes any Skyrim on the machine; nothing here may.
     Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+    # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+    Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
     [void](RunGit $fake init -q)
     [void](RunGit $fake @gitId add -A)
     [void](RunGit $fake @gitId commit -q -m 'the build')
