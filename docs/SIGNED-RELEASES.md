@@ -53,10 +53,10 @@ What is NOT covered today, which is what this issue is about:
 | --- | --- | --- | --- | --- |
 | Launcher `Thornswood.exe` | PE | Authenticode, embedded (today) | RSA certificate from Artifact Signing, SHA256 file digest, RFC 3161 SHA256 timestamp | Ship gate; installed launcher before swap (`Signature.cs`) |
 | Installer / setup-stub | PE | Authenticode, embedded (today) | same | Ship gate; Windows SmartScreen for the people installing |
-| Client runtime, packs, baseline, optional packs | zip | Covered by the signed release manifest (below), by sha256 | SHA256 entries in a signed manifest | Launcher (phase C), Ship gate |
-| Feed `version.json` | JSON | Covered by the signed release manifest: the manifest names the feed's own sha256 for that release | same | Launcher (phase C), `Check-ShipReady` |
-| Build records `client-build.json`, `server-build.json` | JSON | Covered by the signed release manifest | same | Ship gate, box deploy |
-| Release manifest `release-<id>.cat` (new) | Windows catalog (PKCS#7) | Authenticode via the SAME Artifact Signing profile (`signtool sign` signs `.cat` files) | as above | `Signature.cs` on the catalog, then each listed sha256 |
+| Client runtime, packs, optional packs, the baseline record (which names every file of the release by its sha256) | zip, JSON | Listed by sha256 in the signed release manifest (below), since phase B | SHA256 entries in a signed manifest | Launcher (phase C), Publish-Update's gate |
+| Feed `version.json` | JSON | Not signed itself. It names the manifest (`signedManifest`), and every asset in it is checked against the manifest. Its own bytes are not listed: Set-Server, Set-Collection, Dev-News, Publish-Discord, Rollback-Feed and Repair-Manifest rewrite it after a Ship, so a signature over it would go stale at the next edit. What it says outside the asset hashes (server address, collection, news, minLauncher) is not covered; see "Not covered" below | none | |
+| Build records `client-build.json`, `server-build.json` | JSON | Not yet. The manifest carries the commit and the fork commit; listing the records' hashes is for phase C | | |
+| Release manifest `release.json` and its catalog (new, phase B) | JSON, and a Windows catalog (PKCS#7) whose one member is `release.json` | Authenticode on the catalog via the SAME Artifact Signing profile. Measured 18 Oct on One: ThornswoodRelease signed a `New-FileCatalog` catalog with a timestamp, Authenticode reads it Valid, and `Signature.cs` accepts it | as above | `Signature.cs` on the catalog, `Test-FileCatalog` for `release.json`, then each listed sha256 |
 
 Why a catalog. It reuses the one signing identity the launcher already pins,
 the one tool chain (`Sign-Artifact.ps1`) and the one custody arrangement. No
@@ -67,10 +67,20 @@ is the fallback if catalogs prove awkward to build on the runner. A separate
 key (minisign, Sigstore keyless) was the alternative; Patrick kept the
 catalog (section 8, decision 1).
 
-The manifest also carries the provenance: source commit, engine/skymp pin,
-tag, release id, runner name, the hashes of `client-build.json` and
-`server-build.json`, and the sha256 of every asset. The pilot's
+The manifest also carries the provenance: release id, channel, source
+commit and branch, launcher version, the engine/skymp fork commit, when it
+was made, and the sha256 of every asset. Not the machine's name: the
+manifest is public on the site, and the signature already says who signed. The
+records' own hashes are not in it yet (phase C). The pilot's
 `records\signing\pilot-2163.json` is that shape for one test file.
+
+Not covered, by design: what `version.json` says outside asset hashes. A
+writer of the feed can still change the server address, the collection
+address, the news and minLauncher. The manifest stops that writer from
+handing out a pack, runtime, launcher or file the signer did not release;
+it does not stop a feed that sends launchers to another server. Signing
+those fields would mean every feed edit after a Ship signs again (the six
+scripts above), which is phase C's question to settle.
 
 ## 3. Owners, custody, rotation, recovery, revocation
 
@@ -141,12 +151,41 @@ the sha256 and keeps the sha256 check.
 
 - Phase A, pilot (this change): a TEST exe signed and verified on One with
   the real profile, an offline harness, this document. No live change.
-- Phase B, produce: Ship writes and signs the manifest and uploads it to the
-  feed store beside `version.json`; Ship's own gate verifies it. Launchers
-  ignore it. Rollback: stop writing it.
+- Phase B, produce: Ship writes and signs the manifest and puts it on the
+  site; its own gate verifies it. Launchers ignore it. Rollback: stop
+  writing it (a revert of the block below).
+  As built (#2163, 19 Oct): Publish-Update.ps1, on every run that uploads,
+  after the release record and the news and before `version.json` is
+  written. `Release-Manifest.ps1` lists every asset the feed names that
+  carries code or names files (the launcher, the client runtime, each pack
+  and optional pack, the baseline record) in `release.json`, and makes a
+  catalog over it. `Sign-ReleaseCatalog.ps1` signs the catalog with
+  `Sign-Artifact.ps1 -Required` and checks it with the publish gate and
+  `Signature.cs`. `Get-ReleaseManifestRefusal` checks the catalog still holds
+  `release.json` and that it lists every asset. Both files go to the site
+  as assets by their sha256, and the feed names them as `signedManifest`
+  (`url`, `sha256`, `catalogUrl`, `catalogSha256`). Any failure stops the
+  publish before `version.json` moves. So every Ship now signs once more,
+  dev included, and needs the signing setup and Azure to answer even when
+  it ships no launcher. A run that uploads nothing drops `signedManifest`
+  from the feed rather than name an older release's.
+  Left for phase C: `Rollback-Feed.ps1` should name the manifest the release
+  it goes back to had; `Scrub-Feed.ps1` rebuilds packs, so it must sign a
+  manifest for them; and the records' hashes go into the manifest.
 - Phase C, warn: a launcher that understands the manifest verifies it and
   reports a failure to the log and the site, but still installs on a good
   sha256. Measure for at least one main and several dev releases.
+  As built (#2163, 19 Oct): `launcher\app\ReleaseManifest.cs` and
+  `FeedManifest.cs`. On an update check that brings a different manifest or
+  different assets, the launcher fetches release.json and the catalog like
+  any asset, checks the catalog with `Signature.cs`, checks the catalog lists
+  release.json's sha256 (wintrust's catalog reader), and checks release.json
+  lists every asset the feed names. One line goes to launcher.log, which
+  reaches the site with a session's logs: the release and "lists all N of
+  the feed's assets, signed", or a line starting "WARNING: the release
+  manifest", or "names no signed release manifest". Nothing is refused on it.
+  What to read before phase D: those lines in the session logs the site
+  keeps, for one main and several dev releases.
 - Phase D, enforce: a new `minManifestLauncher` (or the next `minLauncher`)
   makes the launcher refuse a release with no manifest, a bad signature, or
   an asset not listed. From here an unsigned artifact is never silently
@@ -244,13 +283,20 @@ The switch-over, the last step. It waits on three things, in this order:
 1. GitHub's hosted runner has usage that month. Patrick is not raising the
    Actions budget (#2393, 15 Oct): hosted first, the VPS when hosted has none.
    `BUILD_RUNNER` still read `vps` on 16 Oct, so no workflow tries hosted
-   unless a manual run asks for it.
+   unless a manual run asks for it. Measured again 18 Oct, 9:02 PM MT (run
+   39192804622, pilot tag `v0.0.2163-pilot2` on main): GitHub still refused
+   the hosted job on billing before any step ran.
 2. A pilot: a tag that can never ship (`v0.0.2163-pilot<n>`) on a commit
    with this release.yml, then
    `gh workflow run release.yml --ref <tag> -f tag=<tag> -f runner=hosted`,
-   with `-f expected_sha=<commit>` added when the tag is not on main (a
-   pilot tag usually is not). Without it `Resolve-ReleaseTag.ps1` refuses a
-   tag whose commit is not on main, and the run stops before it builds.
+   with `-f expected_sha=<commit>` added when the tag is not on main.
+   Without it `Resolve-ReleaseTag.ps1` refuses a tag whose commit is not on
+   main, and the run stops before it builds. A tag on main's own commit
+   needs no `expected_sha`. Pushing the tag starts the usual VPS build: let
+   it finish, never cancel it. Cancelling a VPS job during its checkout
+   leaves git lock files in that runner's workspace and every later job
+   there fails (#2751, 18 Oct). The hosted run then uploads into that one
+   draft and writes its notes again for its own files.
    The hosted job's log says "building with MSBuild on a github-hosted
    runner", then the Azure sign in, then "signed by" the ThornswoodRelease
    certificate; `verify` passes; the draft's notes say signed. Then the

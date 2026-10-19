@@ -14,9 +14,10 @@ function memoryPurses(seed) {
   for (const [id, state] of seed) states.set(id, JSON.parse(JSON.stringify(state)));
   return {
     namespace:'dev:test-ledger',
+    callerGuard:true,
     read(id) { return this.prepare(id); },
     pendingRecords() { return Array.from(states,([merchantId,state])=>({merchantId,reference:state.reference,state:JSON.parse(JSON.stringify(state))})).filter(x=>x.state.pending); },
-    compareAndCommit(id,rev,next) { if ((states.get(id).revision || 0)!==rev) return null; return this.commit(id,next); },
+    compareAndCommit(id,rev,next,caller) { if ((states.get(id).revision || 0)!==rev || caller && !caller()) return null; return this.commit(id,next); },
     prepare(id) {
       const state = states.get(id);
       return state ? JSON.parse(JSON.stringify(state)) : null;
@@ -207,14 +208,16 @@ assert.equal(legacyRole.purses.read(1).pending,null,'new role restrictions do no
 assert.equal(legacyRole.world.inv[10][15],43);assert.equal(legacyRole.purses.read(1).stock[0].baseId,100);
 legacyRecovery.shutdown();
 
-const roleQuestContext={log(){},mp:{makeProperty(){}}};
+const roleQuestContext={Buffer,log(){},mp:{makeProperty(){}}};
 vm.runInNewContext(mode.slice(mode.indexOf('// ==== thornswood custom quests ===='),
   mode.indexOf('// ==== end thornswood custom quests ====')),roleQuestContext);
+const roleEligibility=require('./quest-eligibility-fixture')(roleQuestContext,mode);
 for(const replacement of ['close','replace']) for(const entry of ['act','offer','return']) {
   const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
   let record=entry==='return'?{v:1,open:{ebony:{drawn:4,kills:0,itemDesc:'ore'}},cool:{}}:null,questWrites=0,armed=false;
   const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
-    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,eligibility:roleEligibility,
+    readCharacter:()=>({v:1,cls:'miner',ranks:{miner:'master'}}),
     commit(actor,expected,next,goods,guard) {
       if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
     },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole() {
@@ -241,7 +244,8 @@ for(const capture of ['missing','replace']) for(const entry of ['act','offer','r
   const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
   let record=entry==='return'?{v:1,open:{ebony:{drawn:4,kills:0,itemDesc:'ore'}},cool:{}}:null,questWrites=0;
   const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
-    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,eligibility:roleEligibility,
+    readCharacter:()=>({v:1,cls:'miner',ranks:{miner:'master'}}),
     commit(actor,expected,next,goods,guard) {
       if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
     },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
@@ -264,7 +268,8 @@ for(const capture of ['missing','replace']) for(const entry of ['act','offer','r
   const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
   let record=null,questWrites=0,inCommit=false;
   const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
-    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,rankOf:()=> 'master',
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,eligibility:roleEligibility,
+    readCharacter:()=>({v:1,cls:'miner',ranks:{miner:'master'}}),
     commit(actor,expected,next,goods,guard) {
       inCommit=true;
       if(guard && !guard())return {ok:false};questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
@@ -278,6 +283,49 @@ for(const capture of ['missing','replace']) for(const entry of ['act','offer','r
   assert.equal(originalAdmission(),false,'the supplied origin callback replaces the original conversation');
   assert.equal(result.ok,false,'the actual session is checked after a supplied origin callback');
   assert.equal(questWrites,0);assert.equal(record,null);assert.equal(JSON.stringify(routed.world.inv),beforeInventory);
+  routed.api.shutdown();quest.shutdown();
+}
+for(const replacement of ['close','replace']) {
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=null,questWrites=0,inCommit=false,reentered=false;
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,eligibility:roleEligibility,
+    readCharacter() {
+      if(inCommit && !reentered) {
+        reentered=true;
+        if(replacement==='close')routed.api.command({actorId:10,profileId:7,parts:['/merchant','close']});
+        else open(routed.api);
+      }
+      return {v:1,cls:'miner',ranks:{miner:'master'}};
+    },
+    commit(actor,expected,next,goods,guard) {
+      inCommit=true;
+      if(guard && !guard())return {ok:false};
+      questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;open(routed.api);
+  const original=routed.api.questAdmission(10,1),inventory=JSON.stringify(routed.world.inv);
+  const outcome=quest.offer(10,'ebony',{traderRef:1});
+  assert.ok(reentered && !original(),replacement+' happened during the final eligibility read');
+  assert.equal(outcome.ok,false,replacement+' during the final read revokes acceptance');
+  assert.equal(questWrites,0);assert.equal(record,null);assert.equal(JSON.stringify(routed.world.inv),inventory);
+  routed.api.shutdown();quest.shutdown();
+}
+{
+  const routed=service({on:true},250,undefined,prices,roleConfig('Smith'));
+  let record=null,questWrites=0,inCommit=false,standing='master';
+  const quest=roleQuestContext.__thornswoodCustomQuestsCreate({now:()=>1,load:()=>record,
+    identity:()=> 'quest-owner',ready:()=>true,available:()=>true,eligibility:roleEligibility,
+    readCharacter:()=>({v:1,cls:'miner',ranks:{miner:standing}}),
+    commit(actor,expected,next,goods,guard) {
+      inCommit=true;if(guard && !guard())return {ok:false};
+      questWrites++;record=JSON.parse(JSON.stringify(next));return {ok:true};
+    },traderAdmission:(actor,ref)=>routed.api.questAdmission(actor,ref),traderRole:()=> 'Smith'});
+  quest.bindPlace('ebony',{cell:'test'});routed.deps.quests=()=>quest;open(routed.api);
+  const outcome=quest.act(10,'take','ebony',null,1,undefined,()=>{if(inCommit)standing='advanced';return true;});
+  assert.equal(standing,'advanced','the origin callback changed standing inside the commit');
+  assert.equal(outcome.ok,false,'origin callbacks happen before the final eligibility snapshot');
+  assert.equal(questWrites,0);assert.equal(record,null);
   routed.api.shutdown();quest.shutdown();
 }
 let native = { on: true };
@@ -842,9 +890,10 @@ finalCase('later validation cannot retain an earlier replaced view',()=>{
 });
 finalCase('production publication checks after serialization',()=>{
   const b=service({on:true},250);let armed=false;
-  const quests=[];quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
+  const quests=[];
   b.deps.quests=()=>({describe:()=>quests});
   const view=open(b.api).view;
+  view.quests.toJSON=()=>{if(armed){armed=false;open(b.api);}return [];};
   const source=fs.readFileSync(path.join(__dirname,'../game/merchant-trading.js'),'utf8');
   const push=source.slice(source.indexOf('  trading.push = function'),source.indexOf('  var timers=env.timers'));
   const writes=[];vm.runInNewContext(push,{trading:b.api,mp:{set:(...args)=>writes.push(args)},property:'view',log:()=>{}});

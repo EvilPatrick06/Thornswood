@@ -49,9 +49,10 @@ function Run([string]$current, [string]$live, [string[]]$extra) {
     # The site's root, standing in for thornswood.net (Feed-Store.ps1's test
     # variable), so the live feed is read from a file and nothing is fetched.
     $site = Join-Path $root 'site'
-    New-Item -ItemType Directory -Path (Join-Path $site 'feed') -Force | Out-Null
+    New-Item -ItemType Directory -Path (Join-Path $site 'feed\version') -Force | Out-Null
     if ($live) {
-        [IO.File]::WriteAllText((Join-Path $site 'feed\version.json'), '{"launcherVersion":"' + $live + '","packs":[]}')
+        # The feed's newest generation (Feed-Store.ps1, #2727).
+        [IO.File]::WriteAllText((Join-Path $site 'feed\version\00000001.json'), '{"launcherVersion":"' + $live + '","packs":[]}')
     }
     $args2 = @('-NoProfile', '-File', (Join-Path $repo 'scripts\release\Bump-Version.ps1'), '-WhatIf', '-NoPause') + $extra
     $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
@@ -91,6 +92,44 @@ try {
     $r = Run '1.1.92' '' @()
     Yes 'with no live feed to read it bumps as before' ($r.Code -eq 0 -and $r.Out -match '1\.1\.92\s+->\s+1\.1\.93')
     Yes 'and says the number was not checked' ($r.Out -match 'not checked')
+
+    # 5. The next steps on main (#2711). Asking GitHub whether main is
+    # protected against everybody had an empty catch, and a gh that could not
+    # answer read as "off": the steps then printed a direct push as allowed.
+    # A real run here, not -WhatIf, in a scratch repository on main with a
+    # stand-in gh first on the path; the commit it makes is the scratch one's.
+    function RunMain([string]$ghSays, [int]$ghExit) {
+        $root = Join-Path $work ([Guid]::NewGuid().ToString('N'))
+        $repo = Join-Path $root 'Thornswood-Repo'
+        New-Item -ItemType Directory -Path (Join-Path $repo 'launcher\app'), (Join-Path $repo 'scripts\release') -Force | Out-Null
+        Copy-Item -LiteralPath $BumpPath -Destination (Join-Path $repo 'scripts\release\Bump-Version.ps1')
+        [IO.File]::WriteAllText((Join-Path $repo 'launcher\app\Updater.cs'), "namespace Thornswood { static class Updater {`n    public const string Version = `"1.1.94`";`n} }`n")
+        & { $ErrorActionPreference = 'Continue'
+            & git -C $repo init -q -b main 2>&1 | Out-Null
+            & git -C $repo config user.email t@t 2>&1 | Out-Null
+            & git -C $repo config user.name t 2>&1 | Out-Null
+            & git -C $repo add -A 2>&1 | Out-Null
+            & git -C $repo commit -q -m one 2>&1 | Out-Null }
+        $bin = Join-Path $root 'bin'
+        New-Item -ItemType Directory -Path $bin -Force | Out-Null
+        [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'), "@echo off`r`necho $ghSays`r`nexit /b $ghExit`r`n")
+        $site = Join-Path $root 'site'
+        New-Item -ItemType Directory -Path (Join-Path $site 'feed') -Force | Out-Null
+        $oldSite = $env:THORNSWOOD_TEST_SITE_DIR; $oldPath = $env:PATH
+        $env:THORNSWOOD_TEST_SITE_DIR = $site; $env:PATH = $bin + ';' + $env:PATH
+        try { $out = (& $shell -NoProfile -File (Join-Path $repo 'scripts\release\Bump-Version.ps1') -NoPause 2>&1 | Out-String); $code = $LASTEXITCODE }
+        finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:PATH = $oldPath }
+        return @{ Out = $out; Code = $code }
+    }
+    $r = RunMain 'HTTP 401: Bad credentials' 1
+    Yes 'a gh that cannot answer is said, with what it said' ($r.Code -eq 0 -and $r.Out -match 'Could not ask GitHub whether main is protected' -and $r.Out -match 'exit 1' -and $r.Out -match 'Bad credentials')
+    Yes '  and the steps take the branch, never a direct push' ($r.Out -match 'git push -u origin patrick/launcher-1\.1\.95' -and $r.Out -notmatch 'direct push to main is still allowed')
+    $r = RunMain 'true' 0
+    Yes 'protection on: the branch, as before' ($r.Out -match 'protected against everybody, including you' -and $r.Out -match 'git push -u origin patrick/launcher-1\.1\.95')
+    $r = RunMain 'false' 0
+    Yes 'protection off: the direct push, as before' ($r.Out -match 'direct push to main is still allowed' -and $r.Out -notmatch 'patrick/launcher-')
+    $r = RunMain 'null' 0
+    Yes 'an answer that is neither true nor false is said, and takes the branch' ($r.Out -match 'not true or false' -and $r.Out -match 'git push -u origin patrick/launcher-1\.1\.95')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

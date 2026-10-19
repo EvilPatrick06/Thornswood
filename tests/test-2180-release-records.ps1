@@ -88,6 +88,10 @@ try {
     [IO.File]::WriteAllText($pinPath, [IO.File]::ReadAllText($pinPath).Replace('"build": "1.6.1170"', '"build": "1.6.1179"'))
     $out = & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Check-Records.ps1') -Repo $fake 2>&1
     Yes 'Check-Records refuses a pin and a file list on different builds (exit 1), naming both' ($LASTEXITCODE -eq 1 -and @($out | Where-Object { "$_" -match 'REFUSED\s+skyrim pin and files.*1\.6\.1179.*1\.6\.1170' }).Count -eq 1)
+    # A comparison that cannot be made says so (#2711): its catch was empty.
+    Remove-Item -LiteralPath (Join-Path $fake 'records\skyrim-files.json')
+    $out = & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Check-Records.ps1') -Repo $fake 2>&1
+    Yes 'Check-Records says when it cannot compare the pin with the file list (exit 1)' ($LASTEXITCODE -eq 1 -and @($out | Where-Object { "$_" -match 'REFUSED\s+skyrim pin and files\s+could not compare' }).Count -eq 1)
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }

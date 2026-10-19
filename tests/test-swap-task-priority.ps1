@@ -96,10 +96,21 @@ try {
     # The installer's shape: priority 1 and node through start /high.
     Unregister-ScheduledTask -TaskName $Task -Confirm:$false
     $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument '/c "start "" /b /wait /high "node.exe" dist_back/skymp5-server.js >> "server.log" 2>&1 & call exit %^errorlevel%"' -WorkingDirectory $env:TEMP
-    Register-ScheduledTask -TaskName $Task -Action $a -Principal $p -Settings (New-ScheduledTaskSettingsSet -Priority 1) | Out-Null
-    $again = @(& $run | ForEach-Object { "$_" })
-    Yes ('on the installer''s task, priority 1 and start /high, it says nothing (' + ($again -join ' | ') + ')') ($again.Count -eq 0)
-    Yes '  and the task is still at 1' ((Get-ScheduledTask -TaskName $Task).Settings.Priority -eq 1)
+    # Priority 1 is above what an account that is not elevated may give a
+    # task: a VPS runner is refused here (#1273), the way
+    # test-server-task-priority.ps1 is refused its scratch task, and says so.
+    $denied = $null
+    try { Register-ScheduledTask -TaskName $Task -Action $a -Principal $p -Settings (New-ScheduledTaskSettingsSet -Priority 1) -ErrorAction Stop | Out-Null }
+    catch {
+        if ($_.Exception.HResult -eq -2147024891 -or $_.Exception.Message -match 'Access is denied') { $denied = $_.Exception.Message } else { throw }
+    }
+    if ($denied) {
+        Write-Host ('SKIP  the installer''s task, priority 1, could not be registered for ' + $me + ': ' + $denied)
+    } else {
+        $again = @(& $run | ForEach-Object { "$_" })
+        Yes ('on the installer''s task, priority 1 and start /high, it says nothing (' + ($again -join ' | ') + ')') ($again.Count -eq 0)
+        Yes '  and the task is still at 1' ((Get-ScheduledTask -TaskName $Task).Settings.Priority -eq 1)
+    }
 }
 catch {
     Yes ('the harness ran to the end without an error: ' + $_.Exception.Message) $false

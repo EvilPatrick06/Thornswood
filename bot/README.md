@@ -325,6 +325,17 @@ channel, where the panel opens them. In any other thread, a `#test-tasks`
 post or a `#tales` post, they answer that they only work inside a ticket
 and archive and write down nothing (#1776, `test-1776-close-tickets-only.py`).
 
+A closed ticket is kept for 365 days and then the bot deletes the thread
+(#2353, `TICKET_KEEP_DAYS`, `tests/test-2353-ticket-keeping.py`). When it
+closed is Discord's own archive time, so opening a ticket again and closing it
+starts the year over, and a ticket nobody closed ages from when Discord
+archived it after a week with nothing said. Every hour the bot asks Discord
+for the closed private threads in each `TICKET_CHANNEL` channel and deletes
+those it opened that closed more than a year ago, one `closed tickets:` line
+in bot.log each. Threads a Gamemaster opened there by hand are never touched.
+The `#tickets` line for a deleted ticket keeps its name, and its link stops
+working.
+
 Staff roles are job titles on purpose. Thane, Steward, Warden and Housecarl are
 all things somebody should be able to play, and a moderator wearing one makes
 every in-world use of the word ambiguous.
