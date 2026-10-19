@@ -301,9 +301,10 @@ jobs:
           # longer compiled against the code they lift. All six read only the
           # checkout and a temp folder of their own, and together take under a
           # minute, so they earn a place here the way test-ownership.js did.
-          # pwsh on purpose: test-script-paths.ps1 needs .NET's
-          # Path.GetRelativePath, and test-script-index.ps1 starts Windows
-          # PowerShell 5.1 itself to compare what the two write.
+          # pwsh on purpose: test-script-index.ps1 starts Windows PowerShell
+          # 5.1 itself to compare what the two write. (test-script-paths.ps1
+          # needed .NET's Path.GetRelativePath until #2739 and runs under
+          # either now.)
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error file=tests/test-architecture.js::no node on this runner, so the architecture page was not checked'
             exit 1
