@@ -43,6 +43,11 @@ namespace Thornswood
     // (#2771); Muted stays a step above it so the two still read as two.
     // LowContrast below is the measure, and the DIY editor shows what it
     // finds.
+    //
+    // Shared: installer\setup\Setup.csproj compiles this file into the setup
+    // program too, which draws its window in Forge from here (#2851), so the
+    // first window a new tester sees has the same colours as the launcher
+    // and cannot fall behind them. It uses nothing else from launcher\app.
     static class Themes
     {
         // The sixteen colour names, in the order the editor lays them out.
@@ -193,17 +198,18 @@ namespace Thornswood
             return t;
         }
 
-        // The theme this config actually wants: the custom one when it is
-        // chosen and there is a custom one to show, and otherwise the built-in
-        // it names. Everything that applies a theme goes through here so the
-        // custom one is never a special case at the call sites.
-        public static Theme Resolve(Config cfg)
+        // The theme config.json actually wants, from its Theme, CustomColors
+        // and CustomLight: the custom one when it is chosen and there is a
+        // custom one to show, and otherwise the built-in it names. Everything
+        // that applies a theme goes through here so the custom one is never a
+        // special case at the call sites. It takes the three fields rather
+        // than the Config, so this file needs nothing else from launcher\app.
+        public static Theme Resolve(string name, string[] customColors, bool customLight)
         {
-            if (cfg != null
-                && string.Equals(cfg.Theme, CustomName, StringComparison.OrdinalIgnoreCase)
-                && HasCustom(cfg.CustomColors))
-                return Custom(cfg.CustomColors, cfg.CustomLight);
-            return Find(cfg == null ? "Forge" : cfg.Theme);
+            if (string.Equals(name, CustomName, StringComparison.OrdinalIgnoreCase)
+                && HasCustom(customColors))
+                return Custom(customColors, customLight);
+            return Find(name);
         }
 
         // The contrast every text colour has to reach (#2771).

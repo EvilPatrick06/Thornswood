@@ -321,7 +321,7 @@ namespace Thornswood
             win = (Window)XamlReader.Parse(xaml);
 
             Bind();
-            Themes.Apply(win, Themes.Resolve(cfg));
+            Themes.Apply(win, Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight));
             Wire();
             BuildThemeRow();
             BuildThemeEditor();
@@ -3496,7 +3496,7 @@ namespace Thornswood
                 txtThemeNote.Text = "DIY. Make your own colours below.";
             else
             {
-                Theme cur = Themes.Resolve(cfg);
+                Theme cur = Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight);
                 txtThemeNote.Text = cur.Name + ". " + cur.Note;
             }
         }
@@ -3539,7 +3539,7 @@ namespace Thornswood
                 diyPanelOpen = false;
                 cfg.Theme = captured.Name;
                 cfg.Save(Paths.CfgFile);
-                Themes.Apply(win, Themes.Resolve(cfg));
+                Themes.Apply(win, Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight));
                 Redraw();
                 Log("Theme set to " + captured.Name + ".");
             };
@@ -3590,7 +3590,7 @@ namespace Thornswood
                 {
                     cfg.Theme = Themes.CustomName;
                     cfg.Save(Paths.CfgFile);
-                    Themes.Apply(win, Themes.Resolve(cfg));
+                    Themes.Apply(win, Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight));
                     Redraw();
                     Log("Theme set to DIY.");
                 }
@@ -3624,7 +3624,7 @@ namespace Thornswood
             }
             themeEditor.Visibility = Visibility.Visible;
 
-            Theme cur = Themes.Resolve(cfg);
+            Theme cur = Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight);
 
             var head = new TextBlock();
             head.Text = "Make your own";
@@ -3732,10 +3732,10 @@ namespace Thornswood
             cfg.Theme = Themes.CustomName;
             diyPanelOpen = true;
             cfg.Save(Paths.CfgFile);
-            Themes.Apply(win, Themes.Resolve(cfg));
+            Themes.Apply(win, Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight));
             Redraw();
             Log("Your own theme is on. Change the colours any time, or pick a preset to leave DIY.");
-            List<string> low = Themes.LowContrast(Themes.Resolve(cfg));
+            List<string> low = Themes.LowContrast(Themes.Resolve(cfg.Theme, cfg.CustomColors, cfg.CustomLight));
             if (low.Count > 0)
                 Log("Some text is hard to read with these colours (" + string.Join(", ", low.ToArray())
                     + "). The colour editor says what to change.");
