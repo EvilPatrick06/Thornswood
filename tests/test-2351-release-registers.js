@@ -192,7 +192,8 @@ function registers(dir) {
   });
   w('last-left.json', { [P1]: NOW, [PY]: NOW });
   w('benches.json', { whiterun: 4278190081 });
-  w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2] });
+  // Its saves already taken by server-log.js before the engine started (#2758).
+  w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2], done: { saves: NOW } });
   return P;
 }
 
@@ -405,7 +406,7 @@ try {
       w1.logged.some(function (l) { return l === 'release: embassy could not write what it let go, so its part waits for the next start'; }) &&
       w1.logged.some(function (l) { return l === 'release: embassy did not let go at this start, so the list waits for the next one'; }));
   yes('W2 the list stays with the other four parts marked done',
-      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'dungeon', 'farms', 'property']) &&
+      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'dungeon', 'farms', 'property', 'saves']) &&
       JSON.stringify(list1.profiles) === JSON.stringify([P1, P2]));
   // A claim made by a listed profile after the first start is not a released one.
   const p2 = j(dir2, 'property.json');
@@ -434,6 +435,19 @@ try {
   }
   yes('W5 a list that is not one lets go of nothing and is left as it is, said in the log',
       same && n1.logged.some(function (l) { return /is not a list of deleted characters, so nothing was let go and it is left as it is/.test(l); }));
+
+  // ============================================================ S: saves not taken yet
+  // A list whose saves server-log.js has not taken (#2758): the registers go,
+  // and the list stays for the start that takes the saves, said in the log.
+  const dir4 = path.join(scratch, 'saves-wait');
+  registers(dir4);
+  fs.writeFileSync(path.join(dir4, 'private', 'deleted-characters.json'), JSON.stringify({ profiles: [P1, P2], actors: [A1, A2] }));
+  const s1 = start(dir4);
+  const list4 = j(dir4, 'deleted-characters.json');
+  yes('S1 with the saves not taken, every register part is done and the list stays',
+      JSON.stringify(Object.keys(list4.done).sort()) === JSON.stringify(['books', 'dungeon', 'embassy', 'farms', 'property']));
+  yes('S2 and the log says the saves wait for the next start',
+      s1.logged.some(function (l) { return l === 'release: saves did not let go at this start, so the list waits for the next one'; }));
 } catch (e) {
   yes('the harness ran to the end: ' + (e && e.stack || e), false);
 }
