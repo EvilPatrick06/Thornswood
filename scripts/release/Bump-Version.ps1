@@ -90,8 +90,12 @@ function Get-LiveLauncher([string]$repoDir) {
   $from = 'https://thornswood.net/feed/version.json'
   try {
     if ($env:THORNSWOOD_TEST_SITE_DIR) {
-      $from = Join-Path $env:THORNSWOOD_TEST_SITE_DIR 'feed\version.json'
-      if (-not (Test-Path -LiteralPath $from)) { return $null }
+      # The newest of the feed's generations (Feed-Store.ps1, #2727).
+      $gens = Join-Path $env:THORNSWOOD_TEST_SITE_DIR 'feed\version'
+      if (-not (Test-Path -LiteralPath $gens)) { return $null }
+      $gen = @(Get-ChildItem -LiteralPath $gens -File | Where-Object { $_.Name -match '^\d{8}\.json$' } | Sort-Object Name | Select-Object -Last 1)
+      if (-not $gen.Count) { return $null }
+      $from = $gen[0].FullName
       $json = [IO.File]::ReadAllText($from)
     } else {
       [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12

@@ -18,8 +18,9 @@
   works out whether this is main's own launcher to the line that writes the
   number, out of the shipped Ship.ps1, and drives it against feeds on disk the
   way the real Feed-Store.ps1 reads them (THORNSWOOD_TEST_SITE_DIR):
-    <site>\feed\version.json         what main offers now
-    <site>\feed-dev\version.json     what dev offers now
+    <site>\feed\version\00000001.json     what main offers now (the feed's
+                                          newest generation, #2727)
+    <site>\feed-dev\version\00000001.json what dev offers now
     <site>\feed-dev\launchers.txt    every dev number ever published
   It carries the launcher's own IsNewer, so "offered" means what a launcher
   would do. Each run answers the number Ship chose and whether it builds a
@@ -118,9 +119,9 @@ $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $oldLocal = $env:LOCALAPPDATA
 $script:runN = 0
 function Put-Feed([string]$dir, [string]$version, [string]$inputs) {
-    New-Item -ItemType Directory -Force -Path $dir | Out-Null
+    New-Item -ItemType Directory -Force -Path (Join-Path $dir 'version') | Out-Null
     $doc = [ordered]@{ launcherVersion = $version; launcherUrl = ('https://thornswood.net/x/assets/' + $sha); launcherSha256 = $sha; launcherInputs = $inputs }
-    [IO.File]::WriteAllText((Join-Path $dir 'version.json'), ($doc | ConvertTo-Json))
+    [IO.File]::WriteAllText((Join-Path $dir 'version\00000001.json'), ($doc | ConvertTo-Json))
 }
 # Feeds are 'version|fingerprint', or '' for none. Returns the choice, or the
 # STOP sentence as a string.

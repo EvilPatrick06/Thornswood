@@ -830,13 +830,43 @@ function fillCreditsCommits(md, deployed, feeds) {
 }
 // ==== end thornswood credits fill ====
 const DEPLOYED_BUILD = path.join(DATA, 'deployed-build.json');
+/* THE FEED'S GENERATIONS (#2727). The store never replaces version.json: each
+   feed a Ship or feed edit sends is a new file, <channel>\version\<8 digits>.json,
+   one past the newest, and none is ever replaced or deleted
+   (scripts\release\Feed-Store.ps1). Windows has no way to put one file in place
+   of another by name without a moment where the name is missing: measured on
+   the VPS, every way of doing it left opens finding nothing, so a launcher's
+   check, a /watch tick or a join pass that landed in a Ship's swap found no
+   feed. A generation's name only ever appears, and the one before it stays, so
+   the newest one is always there to read. The folder is listed once; after
+   that each call only asks whether the newest is still there (a folder put back
+   by hand lists again) and whether the next number has appeared. Null while a
+   channel has no feed. */
+const feedNewest = {};
+function feedGeneration(n) { return String(n).padStart(8, '0') + '.json'; }
+function feedFile(channel) {
+  const dir = path.join(ROOT, channel, 'version');
+  let n = feedNewest[channel] || 0;
+  if (n && !fs.existsSync(path.join(dir, feedGeneration(n)))) n = 0;
+  if (!n) {
+    if (!fs.existsSync(dir)) return null;
+    for (const name of fs.readdirSync(dir)) {
+      if (/^\d{8}\.json$/.test(name)) n = Math.max(n, Number(name.slice(0, 8)));
+    }
+    if (!n) return null;
+  }
+  while (fs.existsSync(path.join(dir, feedGeneration(n + 1)))) n++;
+  feedNewest[channel] = n;
+  return path.join(dir, feedGeneration(n));
+}
 function readJsonQuiet(file) {
   try { return JSON.parse(fs.readFileSync(file, 'utf8').replace(/^\uFEFF/, '')); } catch (e) { return null; }
 }
 function creditsFacts() {
   const feeds = {};
   for (const pair of [['public', 'feed'], ['dev', 'feed-dev']]) {
-    const v = readJsonQuiet(path.join(ROOT, pair[1], 'version.json'));
+    const f = feedFile(pair[1]);
+    const v = f ? readJsonQuiet(f) : null;
     const c = v && v.clientRuntime && v.clientRuntime.forkCommit;
     if (typeof c === 'string') feeds[pair[0]] = c;
   }
@@ -1154,7 +1184,8 @@ function worldFull(online) {
 const MOST_ONLINE_RECORD = path.join(ROOT, '..', 'records', 'most-online.json');
 let mostOnlineSeen = { file: '', mtime: -1, size: -1, v: 0 };
 function mostOnlineFallback() {
-  for (const file of [MOST_ONLINE_RECORD, path.join(ROOT, 'feed', 'version.json')]) {
+  for (const file of [MOST_ONLINE_RECORD, feedFile('feed')]) {
+    if (!file) continue;
     let st;
     try { st = fs.statSync(file); } catch (e) { continue; }
     if (mostOnlineSeen.file === file && mostOnlineSeen.mtime === st.mtimeMs && mostOnlineSeen.size === st.size) {
@@ -5020,7 +5051,8 @@ function versionCompare(a, b) {
 const feedLaunchersSeen = {};
 function feedLaunchers(server) {
   const dir = server === 'dev' ? 'feed-dev' : 'feed';
-  const file = path.join(ROOT, dir, 'version.json');
+  const file = feedFile(dir);
+  if (!file) return null;
   let st;
   try { st = fs.statSync(file); } catch (e) { return null; }
   const hit = feedLaunchersSeen[dir];
@@ -6160,11 +6192,10 @@ async function handle(req, res) {
   // sha256 only so a path cannot walk outside the folder. #649.
   const feedVer = p.match(/^\/(feed(?:-dev)?)\/version\.json$/);
   if (feedVer && req.method === 'GET') {
-    const dir = path.join(ROOT, feedVer[1]);
-    const file = path.join(dir, 'version.json');
-    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
-      return send(res, 404, 'no such file', 'text/plain');
-    }
+    // The newest of the feed's generations (feedFile), never a name a Ship
+    // replaces (#2727).
+    const file = feedFile(feedVer[1]);
+    if (!file) return send(res, 404, 'no such file', 'text/plain');
     /*
       AN ETAG, AND 304 FOR A LAUNCHER THAT ALREADY HAS THIS ONE. #445.
 
@@ -6180,7 +6211,7 @@ async function handle(req, res) {
       answer is a few bytes when nothing has moved.
 
       The tag is size and modified time, the same shape the static and asset
-      branches use, so whatever writes a new version.json changes it.
+      branches use, so every new generation of the feed changes it.
     */
     const vst = fs.statSync(file);
     const vtag = '"' + vst.size.toString(16) + '-' + Math.floor(vst.mtimeMs).toString(16) + '"';
@@ -6205,16 +6236,17 @@ async function handle(req, res) {
   // hammers the document: the tip is quiet until a Ship writes the feed.
   const feedWatch = p.match(/^\/(feed(?:-dev)?)\/watch$/);
   if (feedWatch && req.method === 'GET') {
-    const dir = path.join(ROOT, feedWatch[1]);
-    const file = path.join(dir, 'version.json');
-    if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
-      return send(res, 404, 'no such file', 'text/plain');
-    }
+    const channel = feedWatch[1];
+    if (!feedFile(channel)) return send(res, 404, 'no such file', 'text/plain');
     const have = String(req.headers['if-none-match'] || '');
     const WAIT_MS = 50000;
     const started = Date.now();
     const tick = () => {
       if (res.writableEnded || res.destroyed) return;
+      // Each tick the newest generation: a Ship's send is a new one (#2727).
+      // Generations are never deleted, so only a feed folder taken away by
+      // hand ends the wait, with the 404 a channel with no feed answers.
+      const file = feedFile(channel);
       let st;
       try { st = fs.statSync(file); }
       catch (e) {
