@@ -319,7 +319,8 @@ function Run {
     # ---- 6. where it is called, and the fence ---------------------------------------
     $su = Get-Content -LiteralPath (Join-Path $Src 'ShellUpdate.cs') -Raw
     Yes 'the update check fills the news on its own thread, before the window reads the document' (
-        $su -match '(?s)static void CheckUpdatesBackground\(bool loud\).*?VersionDoc v = Updater\.Check\(cfg\);.*?Updater\.FillNews\(cfg, v\);\s*win\.Dispatcher\.BeginInvoke\(new Action\(delegate \{ OnVersionDoc\(v, loud\); \}\)\);')
+        # The signed manifest's line (#2163) is worked out between the two, on the same thread.
+        $su -match '(?s)static void CheckUpdatesBackground\(bool loud\).*?VersionDoc v = Updater\.Check\(cfg\);.*?Updater\.FillNews\(cfg, v\);(\s*//[^\n]*)*\s*(string manifest = Updater\.ManifestLine\(cfg, v\);\s*)?win\.Dispatcher\.BeginInvoke\(new Action\(delegate\s*\{[^}]*?OnVersionDoc\(v, loud\);\s*\}\)\);')
     $fn = Get-Content -LiteralPath (Join-Path $Src 'FeedNews.cs') -Raw
     Yes 'FillNews runs CheckUrl on the file''s address before NewsFile fetches it' ($fn -match '(?s)public static void FillNews\(Config cfg, VersionDoc v\).*?CheckUrl\(v\.newsRef\.url\);.*?NewsFile\(cfg, v\.newsRef\)')
 }
