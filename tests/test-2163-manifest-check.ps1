@@ -142,7 +142,11 @@ Yes 'VersionDoc.Parse reads "signedManifest" apart, like the record and the news
 Yes 'the manifest must list the launcher, the client runtime, the packs, the optional packs and the record' ($fm.Contains('v.launcherSha256') -and $fm.Contains('v.clientRuntime.sha256') -and $fm.Contains('new[] { v.packs, v.optional }') -and $fm.Contains('v.record.sha256'))
 Yes 'each file is fetched by a url on the list, stored under its sha256, and must hash to it' ($fm.Contains('CheckUrl(url);') -and $fm.Contains('EndsWith("/" + sha') -and $fm.Contains('if (got != sha) throw'))
 Yes 'it checks with the launcher''s own signer' ($fm.Contains('ReleaseManifest.Refusal(cat, json, assets, ExpectedSigner, out said)'))
-Yes 'the update check logs the line, on its own thread, before the feed is acted on' ($su.Contains('string manifest = Updater.ManifestLine(cfg, v);') -and $su.Contains('if (manifest != null) LogOnly(manifest);'))
+$iDoc = $su.IndexOf('win.Dispatcher.BeginInvoke(new Action(delegate { OnVersionDoc(v, loud); }));')
+$iPool = $su.IndexOf('ThreadPool.QueueUserWorkItem(delegate', [Math]::Max($iDoc, 0))
+$iLine = $su.IndexOf('string manifest = Updater.ManifestLine(cfg, v);')
+Yes 'the update check hands the feed over first, then checks the manifest on a thread of its own' ($iDoc -gt 0 -and $iPool -gt $iDoc -and $iLine -gt $iPool)
+Yes '  and logs the line on the window''s thread' ($su.Contains('if (manifest != null) win.Dispatcher.BeginInvoke(new Action(delegate { LogOnly(manifest); }));'))
 Yes 'phase C refuses nothing on it: the line is only logged' (-not ($su -match 'manifest[^\r\n]*(CheckFailed|return;)') -and $fm.Contains('Nothing was refused for it yet'))
 
 Write-Host ''
