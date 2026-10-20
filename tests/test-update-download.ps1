@@ -224,6 +224,8 @@ namespace Thornswood
             MarkApplied(p.id);
         }
         public static void SyncRecord(Config cfg, RecordRef r, VersionDoc v, Action<string> log) { Syncs++; }
+        // The feed read whole (FeedSettings.cs, #1050); this harness's feeds name no settings file.
+        static VersionDoc ReadFeed(byte[] body, string feedUrl, Config fetchWith) { return VersionDoc.Parse(body); }
 
 /*BODIES*/
     }

@@ -223,6 +223,13 @@ names its notes as a file of their own (`newsFile`, an asset under its sha256),
 `FillNews()` fetches it once, checks it, keeps it in `Profile\news.json`, and
 puts its notes after the ones the feed carries, on the update check's own
 thread in `ShellUpdate.cs CheckUpdatesBackground`.
+FeedSettings.cs reads the feed when the site answers it in two (#1050,
+docs\FEED.md "version.json in two"): `Updater.ReadFeed`, called by
+`Conditional` and `ReadCache`, reads version.json with every asset at the
+feed's own `assets/` folder plus its sha256 (`AssetsOf`,
+`VersionDoc.ParseFeed`), and when it names `settings`, the rest of the feed,
+fetches that once by its sha256, checks it, keeps it in
+`Profile\feed-settings.json`, and joins the two (`VersionDoc.Join`).
 On a dev build the News tab's header says what main is on from main's own
 feed (#2434): each time the tab is shown, `ShellNews.cs ReadMainVersion`
 asks `MainVersion.cs MainLauncherVersion()` for main's `launcherVersion` on a

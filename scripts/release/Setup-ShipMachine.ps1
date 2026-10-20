@@ -609,9 +609,12 @@ if ($inGame -eq $total -or $inDist -eq $total) {
   Row 'the recorded client is here' $true $(if ($inGame -eq $total) { 'in the game folder' } else { 'in ' + $dist + ', and Ship copies it in' }) ''
 } else {
   $feeds = @()
+  . (Join-Path $PSScriptRoot 'Feed-Json.ps1')   # Join-FeedSettings: the site's feed whole (#1050)
   foreach ($pair in @(@('dev', '/feed-dev/version.json'), @('main', '/feed/version.json'))) {
     $doc = $null
-    try { $doc = Invoke-RestMethod -Uri ($Site.TrimEnd('/') + $pair[1]) -UseBasicParsing -TimeoutSec 30 } catch { $doc = $null }
+    # Whole again: the client runtime is in the settings the feed names (#1050).
+    $u = $Site.TrimEnd('/') + $pair[1]
+    try { $doc = Join-FeedSettings (Invoke-RestMethod -Uri $u -UseBasicParsing -TimeoutSec 30) $u } catch { $doc = $null }
     $feeds += [pscustomobject]@{ Name = $pair[0]; Doc = $doc }
   }
   $cr = Find-ClientRuntime $feeds $commit

@@ -72,7 +72,9 @@ fs.mkdirSync(path.join(ROOT, 'feed-dev', 'version'), { recursive: true });
 
 const genSrc = generations();
 yes('server.js has the feed generations block (feedFile)', !!genSrc);
-const feedFile = eval('(function () {\n' + genSrc + '\nreturn feedFile;\n})()');
+// feedView and feedSettings are in the same block: what the feed routes answer (#1050).
+const gen = eval('(function () {\n' + genSrc + '\nreturn { feedFile: feedFile, feedView: feedView, feedSettings: feedSettings };\n})()');
+const feedFile = gen.feedFile, feedView = gen.feedView, feedSettings = gen.feedSettings;
 
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);

@@ -725,8 +725,10 @@ function Remove-FeedStoreAssets([string]$Channel, [string[]]$Shas, [hashtable]$E
 }
 
 # The feed as a launcher reads it: https://thornswood.net/feed[-dev]/version.json,
-# public, no ssh. With -SiteDir (or the test variable) the file in that folder.
-# $null when there is none. Throws when the site does not answer.
+# public, no ssh, with the settings it names joined back in (Join-FeedSettings,
+# #1050), so it is the whole feed the store holds. With -SiteDir (or the test
+# variable) the file in that folder. $null when there is none. Throws when the
+# site does not answer.
 function Read-SiteFeed([string]$Channel, [string]$SiteDir, [string]$SiteUrl = 'https://thornswood.net') {
     $prefix = Get-FeedStorePrefix $Channel
     $sd = Get-FeedStoreSiteDir $SiteDir
@@ -739,7 +741,8 @@ function Read-SiteFeed([string]$Channel, [string]$SiteDir, [string]$SiteUrl = 'h
     $wc = New-Object Net.WebClient
     $wc.Headers['User-Agent'] = 'Thornswood-Publish'
     $wc.Headers['Cache-Control'] = 'no-cache'
-    try { $bytes = $wc.DownloadData($SiteUrl.TrimEnd('/') + '/' + $prefix + '/version.json') }
+    $feedUrl = $SiteUrl.TrimEnd('/') + '/' + $prefix + '/version.json'
+    try { $bytes = $wc.DownloadData($feedUrl) }
     finally { $wc.Dispose() }
-    return (([Text.Encoding]::UTF8.GetString($bytes) -replace '^\uFEFF', '') | ConvertFrom-Json)
+    return (Join-FeedSettings (([Text.Encoding]::UTF8.GetString($bytes) -replace '^\uFEFF', '') | ConvertFrom-Json) $feedUrl)
 }
