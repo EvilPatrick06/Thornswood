@@ -301,6 +301,16 @@ jobs:
           # event list, records/papyrus-events.json, to the rest of this
           # repository and proves its reader on a small fork it makes. The
           # fork itself is read against the record in the nightly. A second.
+          # Issue #2863: a board: label sets the issue's Status on the board
+          # and comes off (.github\workflows\board-status.yml), so a cloud
+          # thread, refused GraphQL, can move a card. tests\test-2863-board-status.ps1
+          # runs its script against a stand-in for GitHub. A few seconds.
+          # Issue #2753: ssh from a cloud thread goes inside a WebSocket to the
+          # box bridge. tests\test-2753-box-bridge.js runs bridge.js,
+          # connect.js and listen.js against an echo server and a stand-in
+          # proxy; tests\test-2753-cloud-ssh.ps1 builds and parses every
+          # script Install-Bridge.ps1 and New-CloudAccess.ps1 send and holds
+          # Setup-CloudSsh.ps1 to the host key pin. A few seconds each.
           # $six is a historical name: the gate list grew well past six (#1368).
           # Issue #1589: a line here with no comma after it ends the list, and
           # every name below it only prints itself. test-gate-list.ps1 parses
@@ -438,6 +448,11 @@ jobs:
           # and the DIY editor to saying what falls short; and (#2851) the
           # setup program to drawing its window in Forge from Themes.cs, with
           # no colour of its own. Under a second.
+          # Issue #2700: tests\test-2700-trade-ship-dock.js holds the dock, the
+          # staff panel and the clock (game\trade-ship-dock.js and the trade ships
+          # block): a crate opens the dock, coin and a full hold refused before the
+          # pack, the one charter call, a staff draft confirmed against the list it
+          # was proposed on, and arrivals on their own. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -454,7 +469,7 @@ jobs:
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
                  'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-2459-artifact-unpack-race.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-2863-board-status.ps1', 'test-2753-cloud-ssh.ps1', 'test-2753-box-bridge.js', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -475,6 +490,7 @@ jobs:
                  'test-1320-pass-one-session.js',
                  'test-1373-scarce-scene.js', 'test-quest-eligibility.js', 'test-merchant-quest-catalogue.js', 'test-quest-transactions.js', 'test-scene-reward-budget.js', 'test-kill-contracts.js',
                  'test-511-trade-cargo.js',
+                 'test-2700-trade-ship-dock.js',
                  'test-nobody-makes.js', 'test-614-riekling-shift.js',
                  'test-1378-shared-gather.js',
                  'test-special-edition-only.js',
