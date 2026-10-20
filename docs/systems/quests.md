@@ -161,7 +161,7 @@ save does not discard a later kill. Rewards still wait for the inventory
 save acknowledgement and are paid once with the completed quest.
 These bindings await the matching native engine and gamemode release;
 implementation does not establish availability on either server.
-The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. Five remaining scarce offers and seven retrieval offers still need their interactions. Source implementation is not a deployment record.
+The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. Four remaining scarce offers and seven retrieval offers still need their interactions. Source implementation is not a deployment record.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
@@ -180,3 +180,5 @@ counts, cooldowns and the distinction between existing sources and markers
 still to be placed. The remaining scarce and retrieval interactions are not
 bound yet, so their offers stay shut. A dragon is not a bounty. Papyrus
 quests do not run.
+
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
