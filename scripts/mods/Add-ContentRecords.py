@@ -707,6 +707,12 @@ TEA_HERBS = 2
 WELL_BUCKET = 0x5018030
 WELL_BUCKET_MODEL = 'Clutter\\Bucket02a.nif'
 WELL_BUCKET_BOUNDS = (-18, -18, 0, 18, 18, 46)
+# THE WATER BUCKET (#1382): the same bucket on a river's or a lake's bank, its
+# own record so the server knows the water drawn there is a river's
+# (NEEDS.riverActivators; Patrick, 20 October 2026: lake water is worth what
+# river water is), placed where game\data\station-sites.json, kind river,
+# measures.
+RIVER_BUCKET = 0x5018031
 
 # THE DRUNK SCREEN. docs/systems/drink.md: from the third ale "the client draws
 # a sway and a soft edge". Skyrim has no drunk image space modifier (measured
@@ -948,6 +954,9 @@ def needs_records():
     out.append(own_record(b'ACTI', WELL_BUCKET, [
         (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
         (b'FULL', zstr('Well Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
+    out.append(own_record(b'ACTI', RIVER_BUCKET, [
+        (b'EDID', zstr('ThornswoodActivatorWaterBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
+        (b'FULL', zstr('Water Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
     return out
 
 
@@ -1247,7 +1256,7 @@ def bethesdas_world_records(masters_dir, plugin_masters, wanted):
 STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                               'game', 'data', 'station-sites.json'))
 STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
-                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets'}
+                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets', RIVER_BUCKET: 'water buckets'}
 STATION_BASES = set(STATION_NAMES)
 
 

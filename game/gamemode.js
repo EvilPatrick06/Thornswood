@@ -61977,7 +61977,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       and salt. The chance of fouled water is the disease block's own
       (EXPOSED.fouled), so it is named here and rolled there. Patrick, 12 Oct
       2026: Frostreach ice water and well water are safe without boiling;
-      rivers, lakes and streams must be boiled. Boiled water is safe.
+      rivers, lakes and streams must be boiled. Boiled water is safe. And
+      20 October 2026 (#1382): lake water is worth what river water is, 20
+      thirst and the river's chance of fouled water unboiled, so the water
+      bucket by a lake fills river water.
     */
     waterSource: {
       safe: { thirst: 20, fouled: '' },
@@ -62018,6 +62021,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       72 real minutes. This is the one number to change.
     */
     wellActivators: ['18030:Thornswood-Content.esp'],
+    /*
+      THE WATER BUCKET (#1382, Patrick, 12 Oct 2026: drawing spots at rivers
+      and lakes). The content plugin stands it on the bank of the river or
+      lake nearest each town with a forge (game\data\station-sites.json,
+      kind river). Activating it fills an empty bottle with river water,
+      which must be boiled; lake water is worth the same (Patrick, 20 Oct
+      2026), so one bucket serves both. No cooldown: drink.md gives a river
+      none.
+    */
+    riverActivators: ['18031:Thornswood-Content.esp'],
     wellCooldownMinutes: 72,
     // Boiling is activating a cooking spot (Patrick, 12 Oct 2026): the
     // workbench keyword the cooking recipes are made at, CraftingCookpot,
@@ -63724,6 +63737,19 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       return 'You have drawn from this well today. Try another well, or wait ' +
              left + (left === 1 ? ' minute.' : ' minutes.');
     }
+    var refused = fillBottle(actorId);
+    if (refused !== null) { return refused; }
+    n.water.well = (n.water.well || 0) + 1;
+    n.wellAt[wellKey] = Date.now();
+    write(actorId, n);
+    return 'You fill a bottle at the well. The water is clean.';
+  }
+
+  /*
+    An empty bottle swapped for a full one. Answers null when it filled, else
+    what to tell them, '' when the bottles are not known at all.
+  */
+  function fillBottle(actorId) {
     var empty = waterId('empty'), full = waterId('full');
     if (!empty || !full) { return ''; }
     if (typeof takeItemById !== 'function' || !takeItemById(actorId, empty, 1)) {
@@ -63733,10 +63759,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       if (typeof addItem === 'function') { addItem(actorId, NEEDS.waterItems.empty, 1); }
       return 'The bottle would not fill.';
     }
-    n.water.well = (n.water.well || 0) + 1;
-    n.wellAt[wellKey] = Date.now();
+    return null;
+  }
+
+  // At the water bucket by a river or a lake (#1382): river water, to boil.
+  function fillAtRiver(actorId) {
+    var n = settle(actorId);
+    var refused = fillBottle(actorId);
+    if (refused !== null) { return refused; }
+    n.water.river = (n.water.river || 0) + 1;
     write(actorId, n);
-    return 'You fill a bottle at the well. The water is clean.';
+    return 'You fill a bottle from the water. Boil it before you drink it.';
   }
 
   /*
@@ -63748,6 +63781,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function activatedWater(actorId, refrDesc, baseDesc, benchKeyword) {
     if (baseDesc && NEEDS.wellActivators.indexOf(baseDesc) !== -1) {
       return fillAtWell(actorId, String(refrDesc || baseDesc));
+    }
+    if (baseDesc && NEEDS.riverActivators.indexOf(baseDesc) !== -1) {
+      return fillAtRiver(actorId);
     }
     if (benchKeyword && benchKeyword === NEEDS.cookKeyword) {
       var n = settle(actorId);

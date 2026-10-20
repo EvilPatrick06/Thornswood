@@ -197,6 +197,11 @@ KINDS = {
     # presses: they stand in front of it, inside the game's reach of it.
     'well': {'base': 0x18030, 'edid': 'ThornswoodActivatorWellBucket', 'name': 'well bucket',
              'user': (-30.0, -80.0, 30.0, -18.0), 'flat': 8.0, 'reach': 400, 'step': 16},
+    # The water bucket (#1382) stands on a river's or a lake's bank: its ground
+    # no lower than the water and no more than two storeys above it.
+    'river': {'base': 0x18031, 'edid': 'ThornswoodActivatorWaterBucket', 'name': 'water bucket',
+              'user': (-30.0, -80.0, 30.0, -18.0), 'flat': 8.0, 'reach': 3000, 'step': 48, 'shore': 60.0,
+              'river': True},
 }
 
 RULES = {
@@ -219,6 +224,13 @@ RULES = {
              'raise no activation, so the bucket is what somebody activates to draw water there (Patrick, 12 '
              'October 2026, approved on #1382). A well in a cell no master of the content plugin carries is left '
              'out, because the plugin can only place into its masters\' cells.'),
+    'river': ('One on the river nearest each of the nine towns with a forge (#1382), the nearest clear spot to '
+              'the forge within 3,000 units whose cell\'s water is river water by game/data/waters.json, and one '
+              'on Lake Honrich at Riften, whose water the records call deep. At the edge: ground no lower than '
+              'that water and no more than 120 units above it, and navmesh under the water within 160 units, so '
+              'the water is there to reach. Patrick, 12 October 2026, approved '
+              'drawing spots at rivers and lakes on #1382, and 20 October 2026: lake water is worth what river '
+              'water is, so one bucket serves both, and both must be boiled.'),
     'lab': ('One in the apothecary of each of the nine hold capitals, the shop Skyrim marks as a store that holds '
             'Skyrim\'s own alchemy lab, beside that lab; Winterhold has no apothecary in town, so the College\'s '
             'Hall of Countenance. The poultice and the remedy are made only at Thornswood\'s lab (physicker.md, '
@@ -300,6 +312,18 @@ SITES = {
                     'ref': 0x15547},
     'lab-winterhold': {'kind': 'lab', 'where': 'The College\'s Hall of Countenance, Winterhold',
                        'anchors': ['86775:Skyrim.esm'], 'ref': 0x15548},
+    # Water buckets (#1382): on the river shore nearest each town's forge, and on
+    # Lake Honrich at Riften. lake: a town Skyrim's own map sets on a lake, whose
+    # deep water is that lake. Every other deep water is the sea or a marsh's.
+    'river-dawnstar': {'kind': 'river', 'where': 'the river at Dawnstar', 'point': 'cadf6:Skyrim.esm', 'ref': 0x18140},
+    'river-falkreath': {'kind': 'river', 'where': 'the river at Falkreath', 'point': '99b8a:Skyrim.esm', 'ref': 0x18141},
+    'river-markarth': {'kind': 'river', 'where': 'the river at Markarth', 'point': '514d8:Skyrim.esm', 'ref': 0x18142},
+    'river-morthal': {'kind': 'river', 'where': 'the river at Morthal', 'point': '24588:JKs Skyrim.esp', 'ref': 0x18143},
+    'river-riften': {'kind': 'river', 'where': 'Lake Honrich at Riften', 'lake': True, 'point': '53481:Skyrim.esm', 'ref': 0x18144},
+    'river-riverwood': {'kind': 'river', 'where': 'the river at Riverwood', 'point': 'd6987:Skyrim.esm', 'ref': 0x18145},
+    'river-solitude': {'kind': 'river', 'where': 'the river at Solitude', 'point': '4e3e9:Skyrim.esm', 'ref': 0x18146},
+    'river-whiterun': {'kind': 'river', 'where': 'the river at Whiterun', 'point': 'c430a:Skyrim.esm', 'ref': 0x18147},
+    'river-windhelm': {'kind': 'river', 'where': 'the river at Windhelm', 'point': 'f7798:Skyrim.esm', 'ref': 0x18148},
     # Well buckets (#1382): beside each placed well of game/data/wells.json, by its cell.
     'well-01': {'kind': 'well', 'where': 'DLC2SkaalVilFarmWell01 in 142ec:Dragonborn.esm', 'anchors': ['2b245:Dragonborn.esm'], 'ref': 0x18100},
     'well-02': {'kind': 'well', 'where': 'FarmWell01 in 965b:Skyrim.esm', 'anchors': ['1f99b:ElysiumEstate.esp'], 'ref': 0x18101},
@@ -1066,6 +1090,30 @@ PLOT_APART = 400.0
 # off stands by another town or farm (Markarth's nearest is Salvius Farm's,
 # 15,707 units out, and Solitude's Katla's Farm's, 18,204).
 TOWN_REACH = {'kiln': 12000.0, 'salt': 12000.0}
+# What water a cell holds, by game/data/waters.json: the cell's own, else its worldspace's.
+WATERS = json.load(io.open(os.path.join(ROOT, 'game', 'data', 'waters.json'), encoding='utf-8'))
+
+
+# A water bucket stands at the edge: within this far of it the navmesh runs
+# under the water, so the water is there to reach.
+EDGE = 160.0
+
+
+def at_the_edge(ground, x, y, water):
+    for r in (64.0, 112.0, EDGE):
+        for i in range(16):
+            t = i * math.pi / 8
+            g = ground.at(x + r * math.cos(t), y + r * math.sin(t), water)
+            if g is not None and g < water - DRY:
+                return True
+    return False
+
+
+def water_class(cell_desc, world_desc):
+    w = WATERS['where'].get(cell_desc) or WATERS['where'].get(world_desc)
+    return (WATERS['waters'].get(w) or {}).get('c') if w else None
+
+
 # A well this close to one that already has its bucket shares that bucket.
 WELL_SHARED = 300.0
 # The well bases, by editor id: game/data/wells.json's.
@@ -1108,6 +1156,9 @@ def anchors_for(site, s, world, first, benches):
     pt = first.refs.get(key_of(s['point']))
     if not pt or pt['space'][0] != 'world':
         return 'its point %s is not placed out of doors' % s['point']
+    if kind == 'river':
+        # The search goes out from the forge itself, to the river bank nearest it.
+        return [(key_of(s['point']), pt)]
     px, py = pt['pos'][0], pt['pos'][1]
     rows = []
     if kind == 'kiln':
@@ -1216,11 +1267,24 @@ def search(s, kind, r, world, scan, gate, benches, boards, taken, ob, skip):
             # The cell's own water over the world's.
             cw = scan.cellinfo.get((b'CELL', ck), {}).get('water')
             spot.water = cw if cw is not None and abs(cw) < 1e8 else water
+            if kind.get('river'):
+                # A water bucket's water is its cell's: a river's, or inland a lake's.
+                wc = water_class(world.desc(ck), world.desc(space[1]))
+                if wc != 'river' and not (wc == 'deep' and s.get('lake')):
+                    say_no('not by river or lake water')
+                    continue
+                if spot.water is None:
+                    say_no('no water in its cell')
+                    continue
+                spot.zref = spot.water + kind['shore']
         got, w = spot.check(x, y, a, ob)
         if not got:
             say_no(re.sub(r' \(.*\)$|[-0-9]+', '#', w) if not w.startswith('touches') else w.split(' (')[0])
             continue
         z, glo, ghi = got
+        if kind.get('river') and not at_the_edge(ground, x, y, spot.water):
+            say_no('not at the water\'s edge')
+            continue
         dist, near = spot.nearest(x, y, a, z, ob)
         if near and dist < MARGIN:
             say_no('under %d units from %s' % (MARGIN, near['edid']))
