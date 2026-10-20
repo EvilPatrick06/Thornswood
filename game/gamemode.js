@@ -8755,6 +8755,15 @@ function kindIsContainer(baseDesc) {
 }
 
 mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
+  if(globalThis.__thornswoodQuestRetrievalRefs && globalThis.__thornswoodQuestRetrievalRefs[refrId]) {
+    if(!casterRefrId)return false;
+    try {
+      const quests=globalThis.__thornswoodQuests;
+      const text=quests && typeof quests.onActivate==='function' ? quests.onActivate(casterRefrId,refrId) : null;
+      notify(casterRefrId,text || 'This retrieval source is unavailable for now.');
+    }catch(error){try {log('Retrieval refused:',String(error));}catch(logError){}}
+    return false;
+  }
   const questFishBase=globalThis.__thornswoodQuestFishingRefs && globalThis.__thornswoodQuestFishingRefs[refrId];
   if(questFishBase) {
     if(!casterRefrId)return false;
@@ -49044,7 +49053,7 @@ return module.exports;
       ((inv && inv.entries) || []).forEach(function (e) {
         if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
         var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
-        if (TRADE_DOCK.isCoin(e.baseId)) { return; }
+        if (TRADE_DOCK.isCoin(e.baseId) || questItemBlocked(e.baseId)) { return; }
         out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
       });
       return out.slice(0, 200);
@@ -49052,6 +49061,7 @@ return module.exports;
 
     /* The debit: n of that stack out of the pack, every other field kept. Coin is refused before the pack is read. */
     function packTake(actorId, base, nthOf, n) {
+      if(questItemBlocked(base))throw new Error('Quest items stay with their assigned work.');
       if (TRADE_DOCK.isCoin(base)) { throw new Error('Coin is not cargo.'); }
       var inv = mp.get(actorId, 'inventory');
       var entries = copy((inv && inv.entries) || []);
@@ -49070,6 +49080,7 @@ return module.exports;
 
     /* The credit: a piece the manifest handed out, onto the stack it matches or as its own. */
     function packGive(actorId, entry) {
+      if(questItemBlocked(entry.baseId))throw new Error('Quest items cannot be cargo.');
       var inv = mp.get(actorId, 'inventory');
       var entries = copy((inv && inv.entries) || []);
       var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
@@ -59135,7 +59146,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
 
 
 /*
-  WHAT GOES IN A CONTAINER: whatever Skyrim lets in, for every container.
+  WHAT GOES IN A CONTAINER: ordinary goods, with bound quest items refused.
 
   mp.onPutItem(containerRefrId, actorId, baseId, count) fires before anything
   moves, and PutItemEvent::OnFireSuccess is what removes the items, so
@@ -59148,9 +59159,11 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   drop box on the notice board is the only box, and it is an activator whose
   contents are the server's record, never a container. The handler stays for
   guard(): a session that has not shown its join pass is refused a put like
-  every other act (ACTS_AS, #410). Everybody else falls off the end.
+  every other act (ACTS_AS, #410). Bound quest items also stay with their work;
+  all other valid item identities fall off the end.
 */
-mp.onPutItem = guard('onPutItem', function () {
+mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, count) {
+  if(questItemBlocked(baseId))return false;
   return;
 });
 
@@ -59199,16 +59212,17 @@ mp.onPutItem = guard('onPutItem', function () {
                   race, profession and rank question; and a temper at the
                   sharpening wheel or the armour table (#1384). A refusal
                   keeps their materials.
-    onPutItem     Putting into a container. mp.onPutItem refuses only what
-                  guard() refuses for the join pass, and says nothing about
-                  any container.
+    onPutItem     Putting into a container. Bound quest items and unverified
+                  item identities are refused before diagnostics, alongside
+                  the join-pass guard. No container-specific ledger remains.
     onTakeItem    Taking out of a container or a body. Watched below, and
-                  refused on one path only: THE TAKE LIMIT, another person's
+                  refused for bound quest items or unverifiable identities,
+                  and by THE TAKE LIMIT, another person's
                   body or a container in a building another person holds.
                   TakeItemEvent::OnFireSuccess is what removes the items, so
                   a false here refuses the take.
-    onDropItem    Dropping from the pack onto the ground. Watched below, never
-                  refused. MpActor::DropItem stops before RemoveItems on a
+    onDropItem    Dropping from the pack onto the ground. Bound quest items
+                  and unverified item identities are refused. MpActor::DropItem stops before RemoveItems on a
                   false. Gold cannot be dropped at all: DropItem returns before
                   the event is raised for Gold001.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
@@ -59446,6 +59460,7 @@ function auditCell(actorId) {
 }
 
 mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, count) {
+  if(questItemBlocked(baseId))return false;
   var limit = globalThis.__thornswoodTakeLimit;
   var no = null;
   try { no = (limit && limit.take) ? limit.take(sourceRefrId, actorId, baseId, count) : null; }
@@ -59460,6 +59475,7 @@ mp.onTakeItem = guard('onTakeItem', function (sourceRefrId, actorId, baseId, cou
 });
 
 mp.onDropItem = guard('onDropItem', function (actorId, baseId, count) {
+  if(questItemBlocked(baseId))return false;
   log('drop:', auditPerson(actorId), 'dropped', Number(count) || 0, auditItem(baseId),
       'in', auditCell(actorId));
   // The engine puts the piece's extra, its condition in the name included,
@@ -68729,7 +68745,7 @@ module.exports = {
       var byPiece = {};
       for (var i = 0; i < entries.length; i++) {
         var e = entries[i];
-        if (!e || !e.baseId || Number(e.baseId) === GOLD) { continue; }
+        if (!e || !e.baseId || Number(e.baseId) === GOLD || questItemBlocked(Number(e.baseId))) { continue; }
         var piece = pieceOf(e);
         if (Object.prototype.hasOwnProperty.call(byPiece, piece)) {
           byPiece[piece].c += (e.count || 1);
@@ -68923,6 +68939,9 @@ module.exports = {
     half done trade is somebody's sword gone with nothing back for it.
   */
   function swap(t) {
+    if(t.offerA.concat(t.offerB).some(function(row){return questItemBlocked(row.id);})) {
+      unconfirm(t);push(t);return 'Quest items stay with their assigned work.';
+    }
     if (!within(t.a, t.b)) {
       unconfirm(t); push(t);
       return 'You have moved too far apart.';
@@ -69077,6 +69096,7 @@ module.exports = {
     10% that leaves the server.
   */
   function saleById(sellerActor, workerActor, things, share, cost) {
+    if(things.some(function(row){return questItemBlocked(row.id);}))return false;
     var GOLD = (g.__thornswoodSpoils && g.__thornswoodSpoils.GOLD) || 0x0000000F;
     var sellerInv, workerInv;
     try {
@@ -69172,6 +69192,7 @@ module.exports = {
     (#1718). Gold is a pair without one.
   */
   function moveById(fromActor, toActor, pairs) {
+    if(pairs.some(function(pair){return questItemBlocked(pair[0]);}))return false;
     var fromInv, toInv;
     try {
       fromInv = mp.get(fromActor, 'inventory') || { entries: [] };
@@ -76373,7 +76394,7 @@ module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeS
 module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;
 module.exports.createQuestRetrievalSources = QUEST_FISHING_SOURCES.createQuestRetrievalSources;
 module.exports.createQuestItemPolicy = QUEST_ITEMS.createQuestItemPolicy;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"bb160f188bf4159e24ae4acaf66e7686a50dce4e515e25f3015e275738035caf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"bb160f188bf4159e24ae4acaf66e7686a50dce4e515e25f3015e275738035caf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
@@ -76386,6 +76407,11 @@ module.exports.createQuestEligibility = QUEST_ELIGIBILITY.createQuestEligibility
 return module.exports;
 })();
 // MERCHANT TRADING BUNDLE END
+
+var QUEST_ITEM_POLICY=MERCHANT_TRADING.createQuestItemPolicy(mp);
+function questItemBlocked(baseId) {
+  return !QUEST_ITEM_POLICY || QUEST_ITEM_POLICY.blocked(baseId);
+}
 
 // NPC SERVER STARTUP BEGIN
 (function () {
@@ -76518,8 +76544,9 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
 
   The rare mine is bound: RARE_PLACES below is the one building each rare
   seam is, and every vein of that seam anywhere else stays shut. The other
-  scarce sources and scene places are specified in quest-locations.md but
-  their interactions remain unbound. The miner offer requires an explicit
+  scarce sources and scene places are specified in quest-locations.md.
+  Seven retrievals use measured original sources and their appointed specialists;
+  the mammoth ground and existing Farmer orchard remain separate source work. The miner offer requires an explicit
   choice among the four gems on the miner page.
 */
 (function () {
@@ -76613,6 +76640,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     var active = true;
     var GOLD_DESC = deps.goldDesc;
     var places = {};
+    var retrievalRows=deps.retrievalData ? JSON.parse(JSON.stringify(deps.retrievalData.sources)) : [];
+    var retrievalByQuest=Object.create(null);
+    var retrievalPlaces={satchel:'The roadside sack outside Whiterun',ledger:'The upstairs books at Riverwood Trader',
+      signet: "The chest in Redoran's Retreat",locket:'The urn in Bleak Falls Temple',
+      case:'The strongbox at Whiterun Stables',dispatch:'The chest in Halted Stream Camp',
+      seal:'The chest inside the Silent Moons Camp ruins'};
+    retrievalRows.forEach(function(source){retrievalByQuest[source.quest]=source;});
     var eligibility = deps.eligibility, gates = Object.create(null);
     if (!eligibility || typeof eligibility.validate !== 'function' || typeof eligibility.allows !== 'function' ||
         typeof deps.readCharacter !== 'function') throw new Error('The custom quests have no eligibility rules.');
@@ -76621,6 +76655,12 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     var budget=typeof MERCHANT_TRADING!=='undefined' ? MERCHANT_TRADING.sceneBudget : null;
     if(expandedRows.length && !budget)throw new Error('Expanded scene reward authority is unavailable.');
     function traderFor(row,ref,recovery) {
+      var retrieval=retrievalByQuest[row.id];
+      if(retrieval) {
+        if(!active || typeof deps.traderRole!=='function' || deps.traderRole(ref)!==retrieval.role)return false;
+        var desc=descOf(ref);
+        return desc===retrieval.merchant || recovery===true && desc===retrieval.destination;
+      }
       if (typeof deps.traderRole!=='function') return !row.expanded;
       var role=deps.traderRole(ref);
       if(row.expanded)return active && typeof row.role==='string' && row.role.length>0 &&
@@ -77045,6 +77085,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       var b=held || questsOf(actor);
       if(!b)return {ok:false,why:'unread'};
       b.admission=admission;
+      b.finalAdmission=admission;
       return turnInWork(actor,id,traderRef,b,token);
     }
     function turnInWork(actor, id, traderRef, held, token) {
@@ -77062,8 +77103,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         changes.push({item: open.itemDesc, count: -row.ask});
       } else if (row.kind === 'retrieval') {
         if (open.drawn < 1) return { ok: false, why: 'short' };
+        var retrieval=retrievalByQuest[id];
+        if(retrieval && (descOf(traderRef)!==retrieval.destination || open.drawn!==1 || open.itemDesc!==retrieval.item))
+          return {ok:false,why:'destination'};
         var place = places[id] || {};
-        if (row.handoff) {
+        if (row.handoff && !retrieval) {
           var hold = deps.traderHold ? deps.traderHold(traderRef) : '';
           if (!place.handoffHold || hold !== place.handoffHold) return { ok: false, why: 'hold' };
         }
@@ -77083,7 +77127,8 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       }
       delete b.open[id];
       b.cool[id] = deps.now() + (row.expanded ? open.terms.hours : row.hours) * HOUR;
-      if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
+      var eligible=retrieval ? function(){return traderFor(row,traderRef,true) && descOf(traderRef)===retrieval.destination && qualify(actor,row,b,true).ok;} : undefined;
+      if (!keep(actor, b, changes,eligible)) return { ok: false, why: 'unwritten' };
       return { ok: true, gold: row.scarce ? 0 : row.gold };
     }
     function noteKill(killer, victim) {
@@ -77095,6 +77140,20 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       return keep(killer,b,[]) ? {ok:true} : {ok:false,why:'unwritten'};
     }
     function noteContainer(actor, ref, cell, held) {
+      var selected=retrievalRows.find(function(source){return source.reference===descOf(ref);});
+      if(selected) {
+        if(!active || !deps.retrievalSources)return 'This retrieval source is unavailable for now.';
+        held=held || questsOf(actor);
+        if(!held)return UNREAD;
+        var row=byId[selected.quest],open=held.open[selected.quest];
+        if(!open)return 'Take this retrieval work from its appointed specialist first.';
+        if(open.drawn)return 'You already have this quest item.';
+        var eligible=function(atCommit){return deps.retrievalSources.verify(actor,ref) && qualify(actor,row,held,atCommit).ok;};
+        if(!eligible(false))return 'This retrieval needs a closer approach to its original source.';
+        open.drawn=1;open.itemDesc=selected.item;
+        return keep(actor,held,[{item:selected.item,count:1}],function(){return eligible(true);}) ? 'You take it.' : UNWRITTEN;
+      }
+      if(deps.retrievalData)return null;
       held = held || questsOf(actor);
       if (!held) return null;
       var said = null;
@@ -77125,6 +77184,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       gem: {Ruby: 'White Ridge Sanctum', Sapphire: 'Highpoint Tower', Emerald: 'Kolbjorn Barrow', Amethyst: 'Highpoint Tower'}
     };
     function bound(row) {
+      if(row.kind==='retrieval' && typeof deps.traderRole==='function')return !!retrievalByQuest[row.id] && !!deps.retrievalSources;
       if(row.id==='longfin')return !!deps.longfinSources && !!deps.longfinData;
       if(row.id==='pearl')return !!deps.fishingSources && !!deps.fishingData;
       if(row.id==='geode')return !!deps.geodeSources && !!deps.geodeData;
@@ -77150,6 +77210,18 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
           canAbandon:ready && !!open};
       });
       var hold=deps.traderHold && deps.traderHold(traderRef);
+      retrievalRows.forEach(function(source){
+        var row=byId[source.quest],open=held.open[row.id],until=held.cool[row.id] || 0;
+        if(!bound(row)||!traderFor(row,traderRef,!!open))return;
+        var gate=qualify(actor,row,held),atOffer=descOf(traderRef)===source.merchant,atReturn=descOf(traderRef)===source.destination;
+        offers.push({id:row.id,name:row.name,kind:'retrieval',who:'Open to anyone',check:row.check,gold:row.gold,hours:row.hours,
+          locations:retrievalPlaces[row.id]+'. Return to the '+(row.handoff?'Eastmarch ':source.hold+' ')+source.role+'.',
+          state:open?'open':until>deps.now()?'cooldown':gate.ok?'available':'locked',drawn:open?open.drawn:0,
+          waitMinutes:Math.max(0,Math.ceil((until-deps.now())/60000)),
+          canTake:ready && gate.ok && atOffer && !open && until<=deps.now(),
+          canReturn:ready && gate.ok && atReturn && !!open && open.drawn===1 && open.itemDesc===source.item,
+          canAbandon:ready && !!open});
+      });
       if(kills)kills.rows.forEach(function(source){
         if(source.hold!==hold || !traderFor(byId[source.id],traderRef,own(held.open,source.id)))return;
         var row=byId[source.id],hasOpen=own(held.open,row.id),open=held.open[row.id],until=held.cool[row.id] || 0;
@@ -77200,6 +77272,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       return describe(actor,refrId);
     }
     function onActivate(actor, refrId) {
+      if(deps.retrievalData)return noteContainer(actor,refrId);
       var held = questsOf(actor);
       if (!held) return null;
       var retrieval = false;
@@ -77242,6 +77315,20 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         }
       });
       globalThis.__thornswoodQuestTransactions = questTransactions;
+      var retrievalData=typeof MERCHANT_TRADING.retrievalSources==='function'?MERCHANT_TRADING.retrievalSources():null;
+      var retrievalSources=null,retrievalRefs=Object.create(null);
+      globalThis.__thornswoodQuestRetrievalRefs=retrievalRefs;
+      if(retrievalData) {
+        retrievalData.sources.forEach(function(source){
+          var ref=mp.getIdFromDesc(source.reference);
+          if(!Number.isInteger(ref)||ref<=0||ref>=0xff000000||mp.getDescFromId(ref)!==source.reference||retrievalRefs[ref])
+            throw new Error('The retrieval reference register cannot be resolved.');
+          retrievalRefs[ref]=source.reference;
+        });
+        Object.freeze(retrievalRefs);
+        try {retrievalSources=MERCHANT_TRADING.createQuestRetrievalSources(mp,retrievalData.sources);}
+        catch(error){log('The retrieval work stays unavailable: '+String(error));}
+      }
       var questRulesSource=globalThis.__thornswoodProgression;
       var questCharacterSource=globalThis.__thornswoodCharacter;
       var fishingData=typeof MERCHANT_TRADING.scarceFishing==='function'?MERCHANT_TRADING.scarceFishing():null;
@@ -77279,6 +77366,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         catch(error){log('The geode work stays unavailable: '+String(error));}
       }
       globalThis.__thornswoodQuests = createCustomQuests({
+        retrievalData:retrievalData,retrievalSources:retrievalSources,
         geodeData:geodeData,geodeSources:geodeSources,geodeRules:function(actor){return toolGate(actor,'enchanter');},
         geodeStock:function(){return globalThis.__thornswoodResourceStock;},
         harvestData:harvestData,harvestSources:harvestSources,

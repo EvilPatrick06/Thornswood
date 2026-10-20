@@ -3,7 +3,7 @@
 `quest-content.json` gives the authoring inputs for seven inventory tokens,
 eight longfin markers and a ledger source. `Add-ContentRecords.py` writes them
 into the repository's Content plugin. This section supplies objects and refuses premature longfin draws;
-the remaining retrieval and longfin interactions require their runtime code.
+the matching retrieval and longfin runtime must be delivered with these objects.
 No new actor, container contents, recipe, skill book or farming mechanic is added.
 
 | Quest token | Local reference | Model source |
@@ -19,7 +19,7 @@ No new actor, container contents, recipe, skill book or farming mechanic is adde
 These are MISC tokens with zero value and weight, no vendor keywords, no
 equipment data, scripts, spells, recipes, book effects or container interface.
 Only the verified model path and bounds come from the named source. They do
-not copy vanilla quest items. The later retrieval controller must enforce
+not copy vanilla quest items. The retrieval controller enforces
 non-sale and transfer/drop restrictions before enabling these offers.
 
 The ledger source is ACTI `17100:Thornswood-Content.esp`, with the book's

@@ -3,7 +3,7 @@ const crypto=require('node:crypto');
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 function validateRetrievalSources(doc,population,content,roster) {
  const fail=()=>{throw new Error('Invalid retrieval source evidence');};
- if(!doc||hash(doc)!=='a279773226130d0bbd12f244728d6c123ced700d664b93aa09f0d6b4d40bd9e9'||
+ if(!doc||hash(doc)!=='8deb02fa26363a47bcdb7a8d37c1a53040799325f3bd46c9263bea50ecf383a7'||
    !population||hash(population.loadOrder)!==doc.loadOrderSha256||
    !Buffer.isBuffer(content)||crypto.createHash('sha256').update(content).digest('hex')!==doc.contentSha256||
    !roster||!Array.isArray(roster.merchants))fail();

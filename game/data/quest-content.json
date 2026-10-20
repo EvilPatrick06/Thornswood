@@ -102,17 +102,17 @@
       "ref": "17005:Thornswood-Content.esp",
       "edid": "ThornswoodQuestDispatch",
       "name": "Sealed Guild Dispatch",
-      "model": "Clutter\\Quest\\TGParchment01.nif",
+      "model": "Clutter\\Common\\StrongBox01.nif",
       "bounds": [
-        -27,
-        -2,
-        -2,
-        27,
-        2,
-        2
+        -14,
+        -9,
+        0,
+        14,
+        9,
+        20
       ],
       "weight": 0.0,
-      "modelSource": "33761:Skyrim.esm",
+      "modelSource": "ea722:Skyrim.esm",
       "modelField": "MODL"
     },
     {

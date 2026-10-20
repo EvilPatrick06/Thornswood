@@ -37,8 +37,27 @@ record bytes and verify replacement, malformed provenance, distance, identity
 and zero-value/weight refusal paths. CI also exercises truncated record/group
 envelopes, ordered fields and compressed lengths/trailing bytes.
 
-This source-evidence section exports the validated manifest, source factory and
-closed seven-item transfer policy. It does not activate source pickup, merchant
-offers or transfer hooks. Their atomic pickup/return/abandon and final live
-conversation checks belong to the following runtime section. There are no new
-NPCs, purse refills, migration prerequisites or invented farming mechanics.
+Pickup, return and abandon use the existing atomic inventory and quest-record
+commit. A source gives one item per open retrieval; repeated presses give no
+more. Returning consumes it and grants the fixed gold in the same commit,
+then starts the listed rest. Abandon consumes the outstanding item and starts
+no rest. These seven original rewards total 315 gold once each; their existing
+personal rests limit them to at most 945 gold in a rolling 24 hours even with
+instant travel and completion. They do not draw from or refill merchant purses.
+
+Accepting and returning require the live conversation with the exact specialist
+through the final native commit. Dispatch returns only to the Eastmarch Cook.
+The panel names the actual destination and source place. Source approach and
+eligibility are checked again at the pickup commit; travelling to the source
+does not require keeping the merchant conversation open.
+
+The seven items cannot be dropped, put into or taken from containers, traded
+to another person or company, or loaded into ship cargo. The same refusal is
+checked at final transfer, before diagnostics or inventory writes. A failed
+native item identity query or missing policy refuses the transfer. Ordinary
+goods keep their existing behavior. The dispatch uses the sealed case model
+and distinct MISC identity, with no container-opening behavior.
+
+Claude delivers the matching Content file to the server before clients and
+the runtime. Source tests are not a deployment record. There are no new NPCs,
+purse refills, migration prerequisites or invented farming mechanics.

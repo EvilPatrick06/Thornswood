@@ -27,6 +27,9 @@ function walk(start,end,groups=[]) {
 walk(24+buf.readUInt32LE(4),buf.length);
 const fid=desc=>0x05000000+parseInt(desc.split(':')[0],16),text=b=>b.toString('utf8').replace(/\0$/,'');
 assert.equal(doc.version,1);assert.equal(doc.items.length,7);assert.equal(Object.keys(doc.sites).length,9);
+const sealedCase=doc.items.find(r=>r.key==='case'),dispatch=doc.items.find(r=>r.key==='dispatch');
+assert.equal(dispatch.model,sealedCase.model,'dispatch is the same kind of sealed case');
+assert.deepEqual(dispatch.bounds,sealedCase.bounds);
 for(const [i,row] of doc.items.entries()) {
  assert.equal(fid(row.ref),0x05017000+i);const r=records.get(fid(row.ref));assert(r,'missing '+row.ref);assert.equal(r.tag,'MISC');assert.equal(r.flags,0);
  const f=fields(r.body);assert.deepEqual([...f.keys()],['EDID','OBND','FULL','MODL','KSIZ','KWDA','DATA']);

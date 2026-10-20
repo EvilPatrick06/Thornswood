@@ -199,7 +199,7 @@ function sandbox(w, roles) {
   vm.createContext(ctx);
   ctx.__thornswoodCompany = require('./fixtures/company-block').companyApi(gm);
   vm.runInContext(SOCIAL, ctx, { filename: 'gamemode.js social' });
-  vm.runInContext(TRADE, ctx, { filename: 'gamemode.js trade' });
+  vm.runInContext(require('./fixtures/ordinary-quest-items') + TRADE, ctx, { filename: 'gamemode.js trade' });
   ctx.__thornswoodIsCompany = function (pid) { return (roles.company || []).indexOf(pid) !== -1; };
   ctx.__thornswoodIsAdmin = function (pid) { return (roles.admin || []).indexOf(pid) !== -1; };
   ctx.said = said;

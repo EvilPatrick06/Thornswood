@@ -87,7 +87,7 @@ function world() {
       'globalThis', 'mp', 'Date', 'console', 'setInterval', 'clearInterval',
       'guard', 'say', 'notify', 'Math', 'Number', 'String', 'Object', 'Array',
       'JSON', 'isFinite', 'parseInt',
-      block)(
+      require('./fixtures/ordinary-quest-items') + block)(
       g, mp, { now: function () { return clock.now; } },
       { log: function () { } },
       function (f) { timers.push(f); return timers.length; },

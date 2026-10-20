@@ -8,7 +8,7 @@ cast in `npc-population.json`. Counts and rewards come from [Custom quests](ques
 This is the binding specification. The four rare-mine offers have an
 implementation in PR2065. The six kill contracts have bindings in PR2130;
 their matching native and gamemode changes still need to be released by
-Claude. The [pearl bed](merchant-pearl-bed.md) , [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. Two other scarce offers and seven retrieval offers still need their resource or scene interaction connected before they can be taken. A
+Claude. The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The mammoth ground and existing Farmer orchard still need their resource interactions. A
 reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
