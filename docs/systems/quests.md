@@ -161,8 +161,7 @@ save does not discard a later kill. Rewards still wait for the inventory
 save acknowledgement and are paid once with the completed quest.
 These bindings await the matching native engine and gamemode release;
 implementation does not establish availability on either server.
-The six remaining scarce offers and seven retrieval offers are not connected
-to the panel yet.
+The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. Five remaining scarce offers and seven retrieval offers still need their interactions. Source implementation is not a deployment record.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
