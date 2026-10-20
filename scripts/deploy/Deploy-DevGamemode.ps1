@@ -503,7 +503,10 @@ if ($LoadOrder) {
   }
 
   foreach ($n in $pluginNames) {
-    $local = Join-Path $Data $n
+    # Combine, not Join-Path: a machine with no game folder (a cloud one, #2903)
+    # has no C: drive, and Join-Path refuses a path on a drive that is not
+    # there. The path then just is not there, which is the case handled below.
+    $local = [IO.Path]::Combine($Data, $n)
     # Ours (RepoPlugins.ps1) comes from the repo, never -Data (#2486).
     $isOurs = $false
     if (Test-ThornswoodRepoPlugin $n) {
@@ -965,7 +968,15 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # The light table and the counting function the block below takes up (#2011).
   . (Join-Path $Here 'ServerOrder.ps1')
   $lightRows = @()
-  foreach ($f in @(Get-ChildItem -LiteralPath $Data -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.esp', '.esm', '.esl' })) {
+  # No game folder on this machine (a cloud one, #2903): no table, and the
+  # start point is left alone as for any plugin this machine cannot read.
+  # Get-ChildItem on a drive that is not there fails on -File before
+  # -ErrorAction is read, so the folder is asked about first.
+  $dataPlugins = @()
+  if (Test-Path -LiteralPath $Data -PathType Container) {
+    $dataPlugins = @(Get-ChildItem -LiteralPath $Data -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.esp', '.esm', '.esl' })
+  }
+  foreach ($f in $dataPlugins) {
     try { $isLightPlugin = Test-ThornswoodPluginLight $f.FullName } catch { continue }
     $lightRows += ("'{0}' = {1}" -f $f.Name.ToLowerInvariant().Replace("'", "''"), $(if ($isLightPlugin) { '$true' } else { '$false' }))
   }
