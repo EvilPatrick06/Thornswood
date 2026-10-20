@@ -394,7 +394,7 @@ $rootWin = $Root.Replace('/', '\')
 # BuildStamp.ps1. -RepoDir is this script's own repo, which is the branch being
 # tried, and the dev feed is where the four part number lives.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
-$stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
+$stampFile = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-dev-build.json'
 $buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampFile -Artifact $artifact
 Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
@@ -569,7 +569,7 @@ if ($LoadOrder) {
   # cannot read or remove each other's list (#1070).
   if ($Dist -or $orderMoved) {
     $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
-    $orderFile = Join-Path $env:TEMP $orderName
+    $orderFile = Join-Path ([IO.Path]::GetTempPath()) $orderName
     [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
     $farOrder = 'C:/Windows/Temp/' + $orderName
   }
