@@ -63,6 +63,22 @@ function Remote($script) {
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
+# What both halves need to reach the box: the shared Remote, and the box's
+# address and account. Above the one time setup, not inside it: until 5 Oct
+# they were loaded there, so -TaskOnly (#1968) stopped at its first Remote on
+# "Invoke-ThornswoodRemote is not recognized" with nothing sent. And above the
+# DNS check, which compares the name with the box's address: until 19 Oct it
+# ran first, so a full run without -Vps stopped on "resolves to
+# 192.135.112.23 and not ." with the address still empty.
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here '..\vps\Lock-Folder.ps1')
+. (Join-Path $Here 'ServiceAccount.ps1')
+if (-not $User) { $User = Get-ThornswoodVpsUser }
+if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
+
 # ------------------------------------------------------------------- dns --
 if (-not $SkipDnsCheck -and -not $TaskOnly) {
   Write-Host "Checking where $Domain points..."
@@ -90,19 +106,6 @@ if (-not $SkipDnsCheck -and -not $TaskOnly) {
 # ----------------------------------------------------------------- caddy --
 $caddyWin = $CaddyDir.Replace('/','\')
 $rootWin  = $Root.Replace('/','\')
-
-# What both halves need to reach the box: the shared Remote, and the box's
-# address and account. Above the one time setup, not inside it: until 5 Oct
-# they were loaded there, so -TaskOnly (#1968) stopped at its first Remote on
-# "Invoke-ThornswoodRemote is not recognized" with nothing sent.
-$Here = $PSScriptRoot
-if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here '..\vps\Vps.ps1')
-. (Join-Path $Here '..\vps\Send-Script.ps1')
-. (Join-Path $Here '..\vps\Lock-Folder.ps1')
-. (Join-Path $Here 'ServiceAccount.ps1')
-if (-not $User) { $User = Get-ThornswoodVpsUser }
-if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
 # Everything from here to the task block is the one time setup: fetching caddy,
 # writing the Caddyfile, opening 80 and 443, and moving the docs site onto

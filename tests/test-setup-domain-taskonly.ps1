@@ -94,4 +94,12 @@ finally {
     Remove-Variable -Name TsDomainCalls -Scope Global -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# A full run compares where the name points with the box's address, so the
+# address is read from vps.json before that check. On 19 Oct it was read after,
+# and a full run without -Vps stopped on "resolves to 192.135.112.23 and not .".
+$text = [IO.File]::ReadAllText($SetupDomain)
+$loads = $text.IndexOf('if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }')
+$dns = $text.IndexOf('Write-Host "Checking where $Domain points..."')
+Yes 'the box''s address is read from vps.json before the DNS check that compares with it' ($loads -ge 0 -and $dns -ge 0 -and $loads -lt $dns)
 Done
