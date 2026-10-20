@@ -38,11 +38,12 @@ normal rank and tool rules. Ordinary harvesting must not bypass a scarce gate.
 | Orchard | Chillfurrow Farm's orchard outside Whiterun | Red apple trees `141084`, `141083`, `141082`, `141080`, `1699d7`, `1831a6`, `1831a3`, `1699d6`, `1831a0`, `1831ad`, all `:JK's Whiterun's Outskirts.esp` | 4 / 10 apples | 12 hours |
 | Geode | Blackreach's soul-gem deposits | `10fc57`, `10eb24`, `10e994`, `10e955`, `10e8bb`, `10fc4c`; all use base `10e93b` | 2 / 6 empty petty soul gems | 12 hours |
 
-The longfin base `154a5:Thornswood-Content.esp` exists, but the installed order
-contains **zero placements** of it. The eight anchors above are existing clam
-positions in sea water. They are not longfin spots yet. Add eight distinct
-longfin markers, with their own final descriptors recorded here, before
-enabling this offer. Keep the original clam sources and their shared stock.
+Eight dedicated [longfin markers](merchant-quest-content.md) now have authored
+references `17200` through `17207:Thornswood-Content.esp`, using the existing
+base `154a5:Thornswood-Content.esp`. Each is48 units east of its listed clam
+anchor, at the same height and in the same CELL. Exact positions and authoring
+checks are in `quest-content.json`. The original clams remain independent.
+The runtime quest still needs its interaction and matching content delivery.
 The Fisher page requires master rank for longfin; the quest's broad Fisher
 label does not remove that rank gate.
 

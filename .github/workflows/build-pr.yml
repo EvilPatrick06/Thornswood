@@ -517,7 +517,7 @@ jobs:
                  'test-2554-board-posts.js',
                  'test-2563-journal-length.js',
                  'test-1380-rare-mines.js',
-                 'test-1621-quest-state.js', 'test-merchant-legacy-offers.js', 'test-quest-fishing-sources.js', 'test-merchant-pearl-bed.js', 'test-quest-harvest-sources.js', 'test-merchant-crimson.js', 'test-quest-geode-sources.js', 'test-merchant-geode.js', 'test-merchant-expanded-scenes.js',
+                 'test-1621-quest-state.js', 'test-merchant-legacy-offers.js', 'test-quest-fishing-sources.js', 'test-merchant-pearl-bed.js', 'test-quest-harvest-sources.js', 'test-merchant-crimson.js', 'test-quest-geode-sources.js', 'test-merchant-geode.js', 'test-merchant-content.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
                  'test-merchant-commission-bundles.js', 'test-merchant-ranked-sources.js',
                  'test-merchant-hold-coverage.js',

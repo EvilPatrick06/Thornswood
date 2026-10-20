@@ -1,0 +1,310 @@
+{
+  "version": 1,
+  "sourcePlugins": [
+    {
+      "name": "Skyrim.esm",
+      "sha256": "2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107"
+    }
+  ],
+  "items": [
+    {
+      "key": "satchel",
+      "ref": "17000:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestSatchel",
+      "name": "Guild Satchel",
+      "model": "Clutter\\Containers\\MiscSackLarge.nif",
+      "bounds": [
+        -19,
+        -26,
+        -28,
+        18,
+        29,
+        41
+      ],
+      "weight": 0.0,
+      "modelSource": "97f54:Skyrim.esm",
+      "modelField": "MODL"
+    },
+    {
+      "key": "ledger",
+      "ref": "17001:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestLedger",
+      "name": "Guild Ledger",
+      "model": "Clutter\\Books\\Book02LowPoly02.nif",
+      "bounds": [
+        -11,
+        -15,
+        -3,
+        11,
+        15,
+        3
+      ],
+      "weight": 0.0,
+      "modelSource": "ed045:Skyrim.esm",
+      "modelField": "MODL"
+    },
+    {
+      "key": "signet",
+      "ref": "17002:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestSignet",
+      "name": "Guild Signet",
+      "model": "Armor\\AmuletsandRings\\SilverRingGO.nif",
+      "bounds": [
+        -1,
+        -1,
+        0,
+        1,
+        1,
+        0
+      ],
+      "weight": 0.0,
+      "modelSource": "3b97c:Skyrim.esm",
+      "modelField": "MOD2"
+    },
+    {
+      "key": "locket",
+      "ref": "17003:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestLocket",
+      "name": "Guild Locket",
+      "model": "Armor\\AmuletsandRings\\GoldAmuletDiamondGO.nif",
+      "bounds": [
+        -3,
+        -9,
+        0,
+        3,
+        9,
+        1
+      ],
+      "weight": 0.0,
+      "modelSource": "877f1:Skyrim.esm",
+      "modelField": "MOD2"
+    },
+    {
+      "key": "case",
+      "ref": "17004:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestCase",
+      "name": "Sealed Guild Case",
+      "model": "Clutter\\Common\\StrongBox01.nif",
+      "bounds": [
+        -14,
+        -9,
+        0,
+        14,
+        9,
+        20
+      ],
+      "weight": 0.0,
+      "modelSource": "ea722:Skyrim.esm",
+      "modelField": "MODL"
+    },
+    {
+      "key": "dispatch",
+      "ref": "17005:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestDispatch",
+      "name": "Sealed Guild Dispatch",
+      "model": "Clutter\\Quest\\TGParchment01.nif",
+      "bounds": [
+        -27,
+        -2,
+        -2,
+        27,
+        2,
+        2
+      ],
+      "weight": 0.0,
+      "modelSource": "33761:Skyrim.esm",
+      "modelField": "MODL"
+    },
+    {
+      "key": "seal",
+      "ref": "17006:Thornswood-Content.esp",
+      "edid": "ThornswoodQuestSeal",
+      "name": "Guild Seal",
+      "model": "Clutter\\Quest\\TGParchment01.nif",
+      "bounds": [
+        -27,
+        -2,
+        -2,
+        27,
+        2,
+        2
+      ],
+      "weight": 0.0,
+      "modelSource": "33761:Skyrim.esm",
+      "modelField": "MODL"
+    }
+  ],
+  "sites": {
+    "longfin1": {
+      "ref": "17200:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1915:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -143811.796875,
+        143993.71875,
+        -14137.501953125
+      ],
+      "angle": 0,
+      "anchor": "100420:Skyrim.esm",
+      "anchorPosition": [
+        -143859.796875,
+        143993.71875,
+        -14137.501953125
+      ]
+    },
+    "longfin2": {
+      "ref": "17201:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1915:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -143934.40625,
+        143937.03125,
+        -14110.263671875
+      ],
+      "angle": 0,
+      "anchor": "100422:Skyrim.esm",
+      "anchorPosition": [
+        -143982.40625,
+        143937.03125,
+        -14110.263671875
+      ]
+    },
+    "longfin3": {
+      "ref": "17202:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1915:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -143814.453125,
+        143875.390625,
+        -14122.21484375
+      ],
+      "angle": 0,
+      "anchor": "100421:Skyrim.esm",
+      "anchorPosition": [
+        -143862.453125,
+        143875.390625,
+        -14122.21484375
+      ]
+    },
+    "longfin4": {
+      "ref": "17203:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1934:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -144130.0,
+        143301.265625,
+        -14029.966796875
+      ],
+      "angle": 0,
+      "anchor": "100423:Skyrim.esm",
+      "anchorPosition": [
+        -144178.0,
+        143301.265625,
+        -14029.966796875
+      ]
+    },
+    "longfin5": {
+      "ref": "17204:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1935:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -150180.328125,
+        141408.5625,
+        -13990.80078125
+      ],
+      "angle": 0,
+      "anchor": "fbc5c:Skyrim.esm",
+      "anchorPosition": [
+        -150228.328125,
+        141408.5625,
+        -13990.80078125
+      ]
+    },
+    "longfin6": {
+      "ref": "17205:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "1935:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -150292.5,
+        141505.890625,
+        -13981.5224609375
+      ],
+      "angle": 0,
+      "anchor": "fb01f:Skyrim.esm",
+      "anchorPosition": [
+        -150340.5,
+        141505.890625,
+        -13981.5224609375
+      ]
+    },
+    "longfin7": {
+      "ref": "17206:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "3d8c:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -128727.5390625,
+        141360.34375,
+        -15496.2294921875
+      ],
+      "angle": 0,
+      "anchor": "faf95:Skyrim.esm",
+      "anchorPosition": [
+        -128775.5390625,
+        141360.34375,
+        -15496.2294921875
+      ]
+    },
+    "longfin8": {
+      "ref": "17207:Thornswood-Content.esp",
+      "base": "154a5:Thornswood-Content.esp",
+      "cell": "3d6a:Skyrim.esm",
+      "space": "3c:Skyrim.esm",
+      "interior": false,
+      "pos": [
+        -124530.8671875,
+        145979.84375,
+        -13975.3671875
+      ],
+      "angle": 0,
+      "anchor": "faf60:Skyrim.esm",
+      "anchorPosition": [
+        -124578.8671875,
+        145979.84375,
+        -13975.3671875
+      ]
+    },
+    "ledger": {
+      "ref": "17208:Thornswood-Content.esp",
+      "base": "17100:Thornswood-Content.esp",
+      "cell": "133c9:Skyrim.esm",
+      "space": "133c9:Skyrim.esm",
+      "interior": true,
+      "pos": [
+        173.47137451171875,
+        -99.40931701660156,
+        329.3854064941406
+      ],
+      "angle": 0,
+      "anchor": "1060aa:Skyrim.esm",
+      "anchorPosition": [
+        173.47137451171875,
+        -99.40931701660156,
+        317.3854064941406
+      ]
+    }
+  }
+}
