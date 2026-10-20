@@ -18,7 +18,11 @@ const questSource = fs.readFileSync(path.join(root, 'game/quest-transactions.js'
 const eligibilitySource = fs.readFileSync(path.join(root, 'game/quest-eligibility.js'), 'utf8').replace(/\r\n/g, '\n');
 const killSource = fs.readFileSync(path.join(root, 'game/kill-contracts.js'), 'utf8').replace(/\r\n/g, '\n');
 const roleSource = fs.readFileSync(path.join(root, 'game/merchant-role-stage.js'), 'utf8').replace(/\r\n/g, '\n');
-const fishingSource = fs.readFileSync(path.join(root, 'game/quest-fishing-sources.js'), 'utf8').replace(/\r\n/g, '\n');
+const fishingSource = fs.readFileSync(path.join(root, 'game/quest-resource-sources.js'), 'utf8').replace(/\r\n/g, '\n');
+const scarceGeodes=require(path.join(root,'scripts/dev/MerchantScarceGeodeSources.js')).validateScarceGeodes(
+ require(path.join(root,'game/data/merchant-scarce-geodes.json')),require(path.join(root,'game/data/npc-population.json')));
+const scarceHarvest=require(path.join(root,'scripts/dev/MerchantScarceHarvestSources.js')).validateScarceHarvest(
+ require(path.join(root,'game/data/merchant-scarce-harvest.json')),require(path.join(root,'game/data/npc-population.json')));
 const scarceFishing=require(path.join(root,'scripts/dev/MerchantScarceFishingSources.js')).validateScarceFishing(
  require(path.join(root,'game/data/merchant-scarce-fishing.json')),require(path.join(root,'game/data/resource-locations.json')));
 const nativeSource = fs.readFileSync(path.join(root, 'game/merchant-ledger-native.js'), 'utf8').replace(/\r\n/g, '\n');
@@ -82,6 +86,10 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   '  prepared.commissions=MERCHANT_COMMISSIONS.prepareCommissions(' + JSON.stringify(commissionRows) + ',prepared.catalog,native);\n' +
   '  return prepared;\n};\n' +
   'module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFishingSources;\n' +
+  'module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;\n' +
+  'module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeSources;\n' +
+  'module.exports.scarceGeodes = function () { return '+JSON.stringify(scarceGeodes)+'; };\n' +
+  'module.exports.scarceHarvest = function () { return '+JSON.stringify(scarceHarvest)+'; };\n' +
   'module.exports.scarceFishing = function () { return '+JSON.stringify(scarceFishing)+'; };\n' +
   'module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;\n' +
   'module.exports.sceneBudget = SCENE_BUDGET;\n' +

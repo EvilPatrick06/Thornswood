@@ -289,7 +289,7 @@ jobs:
           # source, a moment, and goes red on the fail-open it replaced.
           # Issue #1345: site auth (door key header, Discord cookie, OAuth state,
           # gamemode refresh()) on every PR. ~2s; test-token-refresh.js does not
-          # exist on main — site-auth already drives the refresh() path.
+          # exist on main â€” site-auth already drives the refresh() path.
           # Issue #1163: the Discord sign-in callback gives up inside ten
           # seconds when the token exchange or the profile lookup stalls,
           # never answers, or drops halfway, and the page says to try again.
@@ -465,6 +465,12 @@ jobs:
           # fork harness the shares never had. On the gate now. The kept NPC
           # harness says SKIP without the fork; the nightly runs it with it.
           # Under ten seconds together.
+          # Issue #2914: tests\test-2914-nexus-scripts.ps1 drives the Nexus Mods
+          # scripts (a new file version, a description line, a collection
+          # revision and its publish) against a stand-in Nexus on loopback,
+          # under pwsh and Windows PowerShell 5.1, and holds the key to the
+          # stand-in's made-up one, never printed and never sent to storage.
+          # About a minute.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -517,7 +523,7 @@ jobs:
                  'test-2554-board-posts.js',
                  'test-2563-journal-length.js',
                  'test-1380-rare-mines.js',
-                 'test-1621-quest-state.js', 'test-merchant-legacy-offers.js', 'test-quest-fishing-sources.js', 'test-merchant-pearl-bed.js', 'test-merchant-expanded-scenes.js',
+                 'test-1621-quest-state.js', 'test-merchant-legacy-offers.js', 'test-quest-fishing-sources.js', 'test-merchant-pearl-bed.js', 'test-quest-harvest-sources.js', 'test-merchant-crimson.js', 'test-quest-geode-sources.js', 'test-merchant-geode.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
                  'test-merchant-commission-bundles.js', 'test-merchant-ranked-sources.js',
                  'test-merchant-hold-coverage.js',
@@ -751,7 +757,8 @@ jobs:
                  'test-gate-list.ps1',
                  'test-storage-forecast.ps1',
                  'test-jump-sprint-no-timers.js',
-                 'test-2183-availability.ps1'
+                 'test-2183-availability.ps1',
+                 'test-2914-nexus-scripts.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
