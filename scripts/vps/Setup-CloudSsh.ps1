@@ -97,10 +97,11 @@ if (-not $keyB64) {
          'It goes in the cloud environment''s variables; New-CloudAccess.ps1 on One makes it. A new session picks it up.')
 }
 $keyText = ''
-try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($keyB64 -replace '\s', ''))) } catch { }
+try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($keyB64 -replace '\s', ''))) }
+catch { Die 'THORNSWOOD_BOX_KEY_B64 is not base64. Make it again with New-CloudAccess.ps1 on One.' }
 # Whether it is a key at all is ssh-keygen's to say, below, once it is written.
 if (-not $keyText.Trim()) {
-    Die 'THORNSWOOD_BOX_KEY_B64 is not base64, or decodes to nothing. Make it again with New-CloudAccess.ps1 on One.'
+    Die 'THORNSWOOD_BOX_KEY_B64 decodes to nothing. Make it again with New-CloudAccess.ps1 on One.'
 }
 Say '  THORNSWOOD_BOX_KEY_B64 is set' 'Green'
 if ($env:THORNSWOOD_BOX_TOKEN) { Say '  THORNSWOOD_BOX_TOKEN is set' 'Green' }
@@ -216,8 +217,10 @@ if ($hk.Status -eq 'trusted') {
         Say "  added $n pinned key line(s) to known_hosts" 'Green'
     }
     finally {
-        try { $listener.StandardInput.Close() } catch { }
-        if (-not $listener.WaitForExit(3000)) { try { $listener.Kill() } catch { } }
+        # Closing its input is how listen.js is told to stop. Either step can
+        # find it already gone, which is the end wanted, so neither says more.
+        try { $listener.StandardInput.Close() } catch { <# already ended, its input closed with it #> }
+        if (-not $listener.WaitForExit(3000)) { try { $listener.Kill() } catch { <# ended between the wait and the kill #> } }
     }
 }
 
