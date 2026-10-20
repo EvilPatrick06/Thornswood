@@ -187,6 +187,7 @@ function boot(into, source, expanded) {
   if (!into) { vm.createContext(ctx); }
   require('./quest-eligibility-fixture')(ctx, gm);
   ctx.MERCHANT_TRADING.expandedScenes=vm.runInContext('(function(){return '+JSON.stringify(expanded || [])+';})',ctx);
+  if(typeof ctx.__beforeQuestStartup==='function')ctx.__beforeQuestStartup(ctx);
   vm.runInContext(source || block, ctx);
   return { svc: ctx.__thornswoodQuests, ctx: ctx, logged: logged };
 }
