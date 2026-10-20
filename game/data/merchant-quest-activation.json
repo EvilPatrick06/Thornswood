@@ -418,6 +418,570 @@
     {
       "id": "q-markarth-alchemist-master-parcel",
       "sha256": "f46347e9e2a02ba39a843d35a3bd8bcda9a063d0f98cd85830c439486c2cf419"
+    },
+    {
+      "id": "q-windhelm-smith-novice-parcel",
+      "sha256": "c0e4218201818d55a7957bfdcf02672343e7d585b74af1b4f76448cf0883b86e"
+    },
+    {
+      "id": "q-windhelm-smith-advanced-parcel",
+      "sha256": "fa8cafb3541d990d0868527a403051fb9deac6ae4b2c5febf06bb7fc15b102b0"
+    },
+    {
+      "id": "q-windhelm-smith-expert-parcel",
+      "sha256": "c29193fea0e4eca0b1b77134c1f145a5bc168d9a9de9bb65884708c831026861"
+    },
+    {
+      "id": "q-windhelm-smith-master-parcel",
+      "sha256": "0e32a9558d1c6f039dc4a57cfeb09383bfccc6eaff0abec37451288f62c3d606"
+    },
+    {
+      "id": "q-windhelm-woodworker-novice-parcel",
+      "sha256": "04e22dbf3675ba9281a944e7aa4f8e7a42fe253ad91571954bd9e04188de82dd"
+    },
+    {
+      "id": "q-windhelm-woodworker-advanced-parcel",
+      "sha256": "44380d7414e269163ceb131070d2fa45d9394f3e8e1c575bb82d6e653f80f954"
+    },
+    {
+      "id": "q-windhelm-woodworker-expert-parcel",
+      "sha256": "4c49c060c88282c277a28b75fe20ecf6438e8360a9f8fbc948e8267d30a11411"
+    },
+    {
+      "id": "q-windhelm-woodworker-master-parcel",
+      "sha256": "5d6b5bb46c39a96c1a07d0bef4d209f9285eb7dfb26c9a2367f155dce1a2c045"
+    },
+    {
+      "id": "q-windhelm-tailor-novice-parcel",
+      "sha256": "c312b72a66b80d09c7bb78b9225434eb56d25035810af5054ccd21214bed456b"
+    },
+    {
+      "id": "q-windhelm-tailor-advanced-parcel",
+      "sha256": "e78c9b94d05aa1048459e5a41c95d3232355b4f72f4e5738cc17f18555b6b419"
+    },
+    {
+      "id": "q-windhelm-tailor-expert-parcel",
+      "sha256": "692711d814bae0d42cc8be0badc140d2aa18778429af2ff48c2a5824ea7be537"
+    },
+    {
+      "id": "q-windhelm-tailor-master-parcel",
+      "sha256": "c7a3f61df76c862b67e4e02c0c64e437e7ae8e659bb1eeb9db99641d9d6aa6dc"
+    },
+    {
+      "id": "q-windhelm-enchanter-novice-parcel",
+      "sha256": "903a626b593e5ef06e17d30529e534e3a6e02a7ba7dec393e987a2b9f36ad7db"
+    },
+    {
+      "id": "q-windhelm-enchanter-advanced-parcel",
+      "sha256": "ec803e6460f66f8960b16ecd82952a674ab7efc12ef44e7472f54535e24fc611"
+    },
+    {
+      "id": "q-windhelm-enchanter-expert-parcel",
+      "sha256": "991d265f4c541513b73150d6fc7378041f3801839e7a1b2e4f0235745ab2e78e"
+    },
+    {
+      "id": "q-windhelm-enchanter-master-parcel",
+      "sha256": "4355d3eb01e0c995716d7bba1d04ebe43d03d3df54df1f20f07a202c44505e3e"
+    },
+    {
+      "id": "q-windhelm-cook-novice-parcel",
+      "sha256": "9e065bbcc57b9a3f87ed07ed2dfabdc7a7bbb137c5fe08e7c01cb5e51bf1e99b"
+    },
+    {
+      "id": "q-windhelm-cook-advanced-parcel",
+      "sha256": "9d82f18a0387f7d5c00f201224daa8a47c7f2a83573ab3593c4a441122ef8f5a"
+    },
+    {
+      "id": "q-windhelm-cook-expert-parcel",
+      "sha256": "4d4ac7df1b7666af20d1ac1f0eb2ac29ad95db1f69c258646a1212d48bd3aa47"
+    },
+    {
+      "id": "q-windhelm-cook-master-parcel",
+      "sha256": "bf138c7f1125f7f849c416e0ecf8e2edce337eadfae93b88f0af988dbed749a8"
+    },
+    {
+      "id": "q-windhelm-alchemist-novice-parcel",
+      "sha256": "ee40865e133bd7f2b0d605ef4a9c4712a1ea2810044ede29feb45922ca738361"
+    },
+    {
+      "id": "q-windhelm-alchemist-advanced-parcel",
+      "sha256": "d24414df81db0d7019f9316b910bb1b6b77619741545c2443295b8a1cf7e102a"
+    },
+    {
+      "id": "q-windhelm-alchemist-expert-parcel",
+      "sha256": "09281de4aadb3aa2779b01e07851d7ffe5a9262cf400133fc0c814de483133ba"
+    },
+    {
+      "id": "q-windhelm-alchemist-master-parcel",
+      "sha256": "d18f709cb9a2cba54a85c9d262f2f7e1b34e20d67a18f3b287a03d88d6ef76f7"
+    },
+    {
+      "id": "q-morthal-smith-novice-parcel",
+      "sha256": "71b4f6416009581f405e7de6f059a2911765f1f807b6287bc637f404ddf6905f"
+    },
+    {
+      "id": "q-morthal-smith-advanced-parcel",
+      "sha256": "f86f37ec293876d4fbfb1889859cf28e1908b71835df70cc9231afc68cd5b61f"
+    },
+    {
+      "id": "q-morthal-smith-expert-parcel",
+      "sha256": "419ddedc579950eee90774f768d1b51574f440c2453a2b703f03da5d114355e9"
+    },
+    {
+      "id": "q-morthal-smith-master-parcel",
+      "sha256": "00d8e6292fbb97467975120876fed4b80579849c1d8ac6c4b2748340c48ae6fd"
+    },
+    {
+      "id": "q-morthal-woodworker-novice-parcel",
+      "sha256": "1826e4d2d9f8f54abfc7d117dee2a025d9ed97bea817310f72df3509a6e79c41"
+    },
+    {
+      "id": "q-morthal-woodworker-advanced-parcel",
+      "sha256": "51ce93d15b6ba610a43424b4a32dc4ea099354575112aa27f0893d87327bdc69"
+    },
+    {
+      "id": "q-morthal-woodworker-expert-parcel",
+      "sha256": "0dc1b3f60331ccec3ef609a166dbaf47ff8196d31ebc49b3d780759272cd0f40"
+    },
+    {
+      "id": "q-morthal-woodworker-master-parcel",
+      "sha256": "189e472f274ba7a5fc2b9c537c23d1fb1a699c6963d4afdd9c0f28b4465ffa2d"
+    },
+    {
+      "id": "q-morthal-tailor-novice-parcel",
+      "sha256": "020ac422c90a12d91d074c53ab7f1a0e325ff4a85eb8c77bf9031d8a274c40a5"
+    },
+    {
+      "id": "q-morthal-tailor-advanced-parcel",
+      "sha256": "c6e0af976053ef88adbec1920db6e3b8cb15ac84e156746dad9932a0ebf42789"
+    },
+    {
+      "id": "q-morthal-tailor-expert-parcel",
+      "sha256": "8aaa861dbd792e367d851d906f151b2f99f821a26aefade3b77e636097949738"
+    },
+    {
+      "id": "q-morthal-tailor-master-parcel",
+      "sha256": "cf9c4f718bda5da779e21266d19e2dba3a0c34e66fc3dc43a65054875c0f2852"
+    },
+    {
+      "id": "q-morthal-enchanter-novice-parcel",
+      "sha256": "24886d3509a1c320fce55b8b45b4e7d30fb68052ae56b5512fa281182b8258c2"
+    },
+    {
+      "id": "q-morthal-enchanter-advanced-parcel",
+      "sha256": "760e419f89c3578715ff7546a2467a71afef335697504d2b356a9da3bbaed197"
+    },
+    {
+      "id": "q-morthal-enchanter-expert-parcel",
+      "sha256": "134e901f7a77c9082752569f4bd9624055143774ab9b073ecf828534a0200639"
+    },
+    {
+      "id": "q-morthal-enchanter-master-parcel",
+      "sha256": "eac915ae01dd6e7774ff92c483c16ad724dac640bbb79ff11ddfda18ee1f5a6e"
+    },
+    {
+      "id": "q-morthal-cook-novice-parcel",
+      "sha256": "889c1098ce23f5128bf40356d94650060e27ea909d599c4a9b4849aedd1a7764"
+    },
+    {
+      "id": "q-morthal-cook-advanced-parcel",
+      "sha256": "8a1bfa63a9be5ff7c65ec8ec12e5412e9a3349206b98b007e738a8b129142998"
+    },
+    {
+      "id": "q-morthal-cook-expert-parcel",
+      "sha256": "e27c070f1cb1eceb650ce1d22cda0225fda286d98c868b9b503d0adfe521744c"
+    },
+    {
+      "id": "q-morthal-cook-master-parcel",
+      "sha256": "41acabd559d2e2386a52cb90bcfb08767101d6d38ca520e4abfab1bbf81efdcb"
+    },
+    {
+      "id": "q-morthal-alchemist-advanced-parcel",
+      "sha256": "e4cec0fa1fb02c710391ee52fb5b6a707595c37c2381aebf2a3d591228470840"
+    },
+    {
+      "id": "q-morthal-alchemist-expert-parcel",
+      "sha256": "f0c57e7eb19b3a3bd872b158585f2f9c3e374351498eb589cc130b451a92bc7a"
+    },
+    {
+      "id": "q-morthal-alchemist-master-parcel",
+      "sha256": "a2a951da83f6811ca7b50a5a513a79b5dcf131941c14fe7eabb2602ba5b1101c"
+    },
+    {
+      "id": "q-dawnstar-smith-novice-parcel",
+      "sha256": "7345ba98148e5c941a2fa89f9f4e541c7582824be3757d1f13537662ee75a5f6"
+    },
+    {
+      "id": "q-dawnstar-smith-advanced-parcel",
+      "sha256": "5a65525543e7182b7e77d90ff3f5977341f11040b908d2bef0c53ac00a553b92"
+    },
+    {
+      "id": "q-dawnstar-smith-expert-parcel",
+      "sha256": "b0cbd3eb9b479d7aa7ba6048e1cc49f8453c7d5dbccd7bfb21c98a8392088d12"
+    },
+    {
+      "id": "q-dawnstar-smith-master-parcel",
+      "sha256": "ab644834d136c962ec9783e4cc1d7dcfed25f2033ca102918da25cff860ecaca"
+    },
+    {
+      "id": "q-dawnstar-woodworker-novice-parcel",
+      "sha256": "85071996fec908c1300c2c471351755da029f369dc35d45c069cc27a3c1d25d8"
+    },
+    {
+      "id": "q-dawnstar-woodworker-advanced-parcel",
+      "sha256": "85a606247d15cc745a0330e25acc969ca5b7e7fc486171b5e0ba10f58d6dbbbd"
+    },
+    {
+      "id": "q-dawnstar-woodworker-expert-parcel",
+      "sha256": "dcdc647dd5b1b7cd1f6a2a7911d135320a2e444788665c79f56e7db2493e9900"
+    },
+    {
+      "id": "q-dawnstar-woodworker-master-parcel",
+      "sha256": "7373b5119b57de4718c9cb4b62cf913ed8b693272127dfb913ce5318650cac8b"
+    },
+    {
+      "id": "q-dawnstar-tailor-novice-parcel",
+      "sha256": "9b384b54b4f24c87854b4b8c9ae5e24578233a1ef9fc15b432e3ab5d5022a029"
+    },
+    {
+      "id": "q-dawnstar-tailor-advanced-parcel",
+      "sha256": "e15bfeb0b24485b5884ca8792eb9a5432cc0692b38cb114b02df321c58bd881d"
+    },
+    {
+      "id": "q-dawnstar-tailor-expert-parcel",
+      "sha256": "bc40f28f23a39c8465ced1c877030df4daa5b0555dc7abb3752bddb10ce6ed89"
+    },
+    {
+      "id": "q-dawnstar-tailor-master-parcel",
+      "sha256": "4b4ea40b5a6d5ace6112b8e8e46af44d65c20714059f75fd085969d301049e09"
+    },
+    {
+      "id": "q-dawnstar-enchanter-novice-parcel",
+      "sha256": "af0d27b2e59d18aeb02ce06d4a44fc9eaad702efe4eb5da2689ea5d142e3b1aa"
+    },
+    {
+      "id": "q-dawnstar-enchanter-advanced-parcel",
+      "sha256": "5d525b5a4c8c2fab1f9144434bddc52325e84104a74c35518083786923410898"
+    },
+    {
+      "id": "q-dawnstar-enchanter-expert-parcel",
+      "sha256": "c6075730151fb6eadb28e476fcc40be2fa6be568ef659e4dacc01ec79c763a99"
+    },
+    {
+      "id": "q-dawnstar-enchanter-master-parcel",
+      "sha256": "0f16b90e17e2d31004e4a93a406f29a4bcd7f4331e2c8284386eca19f3f5a03d"
+    },
+    {
+      "id": "q-dawnstar-cook-novice-parcel",
+      "sha256": "1d0643248109c1e9e66fae653ae8949915f8ca2d1a1ebc3419df88c4b038fef9"
+    },
+    {
+      "id": "q-dawnstar-cook-advanced-parcel",
+      "sha256": "c0630a94b40b18b6f3bff64c1ffa026a596e06d8592c7db0034f2dae4320b414"
+    },
+    {
+      "id": "q-dawnstar-cook-expert-parcel",
+      "sha256": "6f77682975f615646a11e3e53e44fb5c0d70ee9044d2a3f0be7f5f2f6f78b7c9"
+    },
+    {
+      "id": "q-dawnstar-cook-master-parcel",
+      "sha256": "44b5a50455ed1a108049348f11ac507eb1c49c20f4eab6e979413ef3a6edeab7"
+    },
+    {
+      "id": "q-dawnstar-alchemist-novice-parcel",
+      "sha256": "9c2a4f3bb2d59b3727e7e58c688ef92b643d06ca8f8aec80486977943e1d5db3"
+    },
+    {
+      "id": "q-dawnstar-alchemist-advanced-parcel",
+      "sha256": "8fea1c65c671810b28782a45186238a69fcc8cb13f97d7afdb98bec5a9da20ff"
+    },
+    {
+      "id": "q-dawnstar-alchemist-expert-parcel",
+      "sha256": "c16ca4f418c642936bd2edf74fe928a841b9635c870852818beee73d0641df1e"
+    },
+    {
+      "id": "q-dawnstar-alchemist-master-parcel",
+      "sha256": "2b98c60e1663b678b15054390200f0bae5bb9e3e68bd8ac112bc1d1731905bcf"
+    },
+    {
+      "id": "q-winterhold-smith-novice-parcel",
+      "sha256": "68c46dc312e61a9359c230ffec9d24bd9543eae91f6f436f893f8148c0b6aa68"
+    },
+    {
+      "id": "q-winterhold-smith-advanced-parcel",
+      "sha256": "4599fb76f4644416b87817cf0bf6518699b0b46f55149a76769f2b6757d66864"
+    },
+    {
+      "id": "q-winterhold-smith-expert-parcel",
+      "sha256": "75c5bceb51d5f24af727c4ee968774097754b7cc0f64f10cb415d58330cd7e60"
+    },
+    {
+      "id": "q-winterhold-smith-master-parcel",
+      "sha256": "59f73bf6d038034fa2c9ac65b1b85a6582c9502c77e512349ef309125969f02d"
+    },
+    {
+      "id": "q-winterhold-woodworker-novice-parcel",
+      "sha256": "c77c432bc1a72f7da71368a839140359f67880dcc6d2dd928ceee18091aa6339"
+    },
+    {
+      "id": "q-winterhold-woodworker-advanced-parcel",
+      "sha256": "7362c2e1c85870d505ba5fad8413d5673fb99cb993b33f4bc09d6a82239f4840"
+    },
+    {
+      "id": "q-winterhold-woodworker-expert-parcel",
+      "sha256": "2b15efd43ad1a57ffa9519a592e41ee56062e220441bf7cdfd340bd1c359335b"
+    },
+    {
+      "id": "q-winterhold-woodworker-master-parcel",
+      "sha256": "22941c4af6bd41eb6aa96c9f29085ea2605fdd89157f091d562305d1e9e5c184"
+    },
+    {
+      "id": "q-winterhold-tailor-novice-parcel",
+      "sha256": "4ddea61b68bc9451d942295376ebd20082dc472aa12f5e046cc9960548bf58c8"
+    },
+    {
+      "id": "q-winterhold-tailor-advanced-parcel",
+      "sha256": "1e25774626e32469e0dae4cf4e949f279d1d6e9f1839ac48a4753a7d7f5fb5e7"
+    },
+    {
+      "id": "q-winterhold-tailor-expert-parcel",
+      "sha256": "8322953574b8161b13669df1e8f973f9009418f806681e9ecf4ea8b3b8aa0518"
+    },
+    {
+      "id": "q-winterhold-tailor-master-parcel",
+      "sha256": "c9c8d241fa93e31f3309e390234b02b1669aa5d8a909b21d1957da8fe9f0561b"
+    },
+    {
+      "id": "q-winterhold-enchanter-advanced-parcel",
+      "sha256": "27f62e866cbfba6be168028131e12b1e7617a36c0836f432544f7a33669ca67f"
+    },
+    {
+      "id": "q-winterhold-enchanter-expert-parcel",
+      "sha256": "e4a9ed1da463bccc801cac3fa6e15c72b494cb73246aade83a1d280388a3fad2"
+    },
+    {
+      "id": "q-winterhold-enchanter-master-parcel",
+      "sha256": "0cfba95b4a3024c53110c8c83c3c17a75e7f7d792a6d3a3b39078bc61852e147"
+    },
+    {
+      "id": "q-winterhold-cook-novice-parcel",
+      "sha256": "277548087151d77d846a585ced8bda3eb84805709af9f2698bd95eaed391a97d"
+    },
+    {
+      "id": "q-winterhold-cook-advanced-parcel",
+      "sha256": "3aa9880e1f254978a6a2272c66d559a2a69af9247e40fec979d7a6c75b1fb32c"
+    },
+    {
+      "id": "q-winterhold-cook-expert-parcel",
+      "sha256": "87747364053cb2011be77572dd9c73e613207616a0dec5e61194662aea51ac50"
+    },
+    {
+      "id": "q-winterhold-cook-master-parcel",
+      "sha256": "779e68af65ae32402a3b4ca0ee8f7e1da7b950d6c1fcc7a516699bd9f718d160"
+    },
+    {
+      "id": "q-winterhold-alchemist-novice-parcel",
+      "sha256": "8681041354c2bde2e6488629a0b6f771e62da15c91a14cf5a8bf6479832a5456"
+    },
+    {
+      "id": "q-winterhold-alchemist-advanced-parcel",
+      "sha256": "f51cb1451347adb50bfb81750a95456911a7b3d9973ccacfe1a096f893c868f6"
+    },
+    {
+      "id": "q-winterhold-alchemist-expert-parcel",
+      "sha256": "0488787bf8ba5adf803a5bbeeac07b71c9413f53e9bebea1334a6b995f1dc80c"
+    },
+    {
+      "id": "q-winterhold-alchemist-master-parcel",
+      "sha256": "e3fcaff2016fd92fa134179552961c37d237cea450605e44d23dd0db9aeec8c1"
+    },
+    {
+      "id": "q-falkreath-smith-novice-parcel",
+      "sha256": "ca3c2279d29109699533cdb8fefd39f5f40bfbed975dc3db521a672f0a29ef1b"
+    },
+    {
+      "id": "q-falkreath-smith-advanced-parcel",
+      "sha256": "c5599272d5fdb9dae5f99345c1c3b2d585f2a5de491e3575263b8ef6bcf5e2fe"
+    },
+    {
+      "id": "q-falkreath-smith-expert-parcel",
+      "sha256": "bef06ccb520179bd8d2acbaa59cb1ec4e7a4a67f11b33ea5f1079809a32e44e0"
+    },
+    {
+      "id": "q-falkreath-smith-master-parcel",
+      "sha256": "ab6b81c32740d170ad918b21ed37e61ba9dc4cb8cfda3050c57b5cc3edaeb43a"
+    },
+    {
+      "id": "q-falkreath-woodworker-novice-parcel",
+      "sha256": "5cd6da18590fac2fad633549b90985c52c2573065446c73c4f19bf90f52cb2ba"
+    },
+    {
+      "id": "q-falkreath-woodworker-advanced-parcel",
+      "sha256": "e0ce2e8cbf0e43d3a20fd1760c553a808a49bf1e75503427716359789d486d06"
+    },
+    {
+      "id": "q-falkreath-woodworker-expert-parcel",
+      "sha256": "3efc744007fd932a54dc6a4e09eac53cff8bb2d7ac7409d996be396805a663c8"
+    },
+    {
+      "id": "q-falkreath-woodworker-master-parcel",
+      "sha256": "c06d0c4cd4240fc4ff615eadec7080561b73e54761e5c71815fcf4c4782fce54"
+    },
+    {
+      "id": "q-falkreath-tailor-advanced-parcel",
+      "sha256": "4edd3818a0dc0aa5489de0df8aa8389fde26a98439319ceae129c760a2801116"
+    },
+    {
+      "id": "q-falkreath-tailor-expert-parcel",
+      "sha256": "a0615ea295953a744db2fa781af3b49e0c13226130cbdc815d5a55d52f036f47"
+    },
+    {
+      "id": "q-falkreath-tailor-master-parcel",
+      "sha256": "0e7a83f0b4cf3592bd68c6bc6cbc27b440b0a1f67ffd1a644b5ea7566bf40393"
+    },
+    {
+      "id": "q-falkreath-enchanter-novice-parcel",
+      "sha256": "6b4ab04f1b88aae537a34663138fdce78b0f78b77cb993103ba35d4b3a0a8570"
+    },
+    {
+      "id": "q-falkreath-enchanter-advanced-parcel",
+      "sha256": "9085844625e5af0a5a28f75d725e1d3248eb1c60154e371916c1916843501638"
+    },
+    {
+      "id": "q-falkreath-enchanter-expert-parcel",
+      "sha256": "5c67b8147d7781b830f790d9337779601e041b51d1912a5c76363a8a5c9fa3d2"
+    },
+    {
+      "id": "q-falkreath-enchanter-master-parcel",
+      "sha256": "2ddcc4b856c3ff5a37bd34b271789436547be0ba9454edcfab030dab5c37cc90"
+    },
+    {
+      "id": "q-falkreath-cook-novice-parcel",
+      "sha256": "d2d1aea6a672e08a00f83297378c9e640c58031743ef37857e6fc9da16da6a1b"
+    },
+    {
+      "id": "q-falkreath-cook-advanced-parcel",
+      "sha256": "84f7e09da0dbcc9e8f028c42bc994e7e1ff595cc3f1393f891cd80cb05a50ac0"
+    },
+    {
+      "id": "q-falkreath-cook-expert-parcel",
+      "sha256": "1233ab8d8e973049bb6579420ea00b3ec8c45817a060c2d122229ac7a4603e73"
+    },
+    {
+      "id": "q-falkreath-cook-master-parcel",
+      "sha256": "d0b2bf90773d1ded857b4b62df38463643dd7625131cf4cd109ec2f985160da8"
+    },
+    {
+      "id": "q-falkreath-alchemist-novice-parcel",
+      "sha256": "3362a1a626e9d923a1df34052aebee69b4631a9ba0f1c8315e1f7f8ffc7c6ea9"
+    },
+    {
+      "id": "q-falkreath-alchemist-advanced-parcel",
+      "sha256": "03a169491e5bb331843cc9838e8cf49c8f75b9bf81e3a9e9f33ba2d7f77e95e1"
+    },
+    {
+      "id": "q-falkreath-alchemist-expert-parcel",
+      "sha256": "8e97eca85396e324c2e9ce677cfd43060bc2ed00dc54114116aef13390c0ca08"
+    },
+    {
+      "id": "q-falkreath-alchemist-master-parcel",
+      "sha256": "dd6462bcececf28c771975e0067523f074bb38f9a5a4cd88532558fb7c5bb3e2"
+    },
+    {
+      "id": "q-ravenrock-smith-novice-parcel",
+      "sha256": "3cbca79c5f5e6650ad2d9b36ca4dd297bc459015aa5e9c534e955e104021a0ea"
+    },
+    {
+      "id": "q-ravenrock-smith-advanced-parcel",
+      "sha256": "5af2fa92555f278a4effd6072ed45fadefd1aeb8637525371ff07bb84cd0c66f"
+    },
+    {
+      "id": "q-ravenrock-smith-expert-parcel",
+      "sha256": "cc61db7e68c6da387bb44cc9bd3500f704315c55eda489f965c90e52a82e704c"
+    },
+    {
+      "id": "q-ravenrock-smith-master-parcel",
+      "sha256": "adae6050ba1670bb4aaa69ab79a771a505a774a76af77080d05ab98e5b16e0fb"
+    },
+    {
+      "id": "q-ravenrock-woodworker-novice-parcel",
+      "sha256": "cf1869fb57473e2139b9cc240c0f96083013c0c9d64fa08b0e3af24416141bf8"
+    },
+    {
+      "id": "q-ravenrock-woodworker-advanced-parcel",
+      "sha256": "90b0b77a702946246027fd48ee0cced62d2f0a8fa171258d1357bdf528760ab1"
+    },
+    {
+      "id": "q-ravenrock-woodworker-expert-parcel",
+      "sha256": "65d7ba9ae2bb492cfc4a989f3276a4e6f4990ff13b6130ec70b8bf9b12840a15"
+    },
+    {
+      "id": "q-ravenrock-woodworker-master-parcel",
+      "sha256": "fd63ff331800aae2c4257a1bc0b88b443fcd617b9c9783b6139ea8789c0a19a1"
+    },
+    {
+      "id": "q-ravenrock-tailor-novice-parcel",
+      "sha256": "5e80ddcd6736ee38ee9eaaabd392645ca7564d0bae66df87658ea87ae1c896d4"
+    },
+    {
+      "id": "q-ravenrock-tailor-advanced-parcel",
+      "sha256": "40fddf34d93a2c21fd8f9afe00caafba8b6a7b0a4b95a1dad551d9c659495e7b"
+    },
+    {
+      "id": "q-ravenrock-tailor-expert-parcel",
+      "sha256": "6137111ca25e9c03e324b5d13e33047fee1756c9b68e46f9f29fadde1840008e"
+    },
+    {
+      "id": "q-ravenrock-tailor-master-parcel",
+      "sha256": "bb5af439f5dc13640c4ecfa4d1c4b29d8e65fb782b01179a0e4891dd541195d1"
+    },
+    {
+      "id": "q-ravenrock-enchanter-novice-parcel",
+      "sha256": "dd9e05072befea7c2fa9401f522fef644712cfed83f8682aed7e971642463b31"
+    },
+    {
+      "id": "q-ravenrock-enchanter-advanced-parcel",
+      "sha256": "da1376c750a3b34723cb333f6879a553fb13e709d1921ee12d312508c79e8815"
+    },
+    {
+      "id": "q-ravenrock-enchanter-expert-parcel",
+      "sha256": "82bbb3f667b0fddfedb0bb3ce4d88338ee2cdc43a4f7bc0760b83cfc4208042f"
+    },
+    {
+      "id": "q-ravenrock-enchanter-master-parcel",
+      "sha256": "0879f08ed07175f14f519cdfce0b65240c1d5fd8b8c5c1a6ca119f82a54ba3a2"
+    },
+    {
+      "id": "q-ravenrock-cook-novice-parcel",
+      "sha256": "48bc5bb6b6ca2351b485565bdb1ebbb99a2a85399d98fbe591d5bf4d15d44032"
+    },
+    {
+      "id": "q-ravenrock-cook-advanced-parcel",
+      "sha256": "567d2e351485ac5f9e3e1e9fe85e845c8e012b2ffaec0684f65bc191480bb5d4"
+    },
+    {
+      "id": "q-ravenrock-cook-expert-parcel",
+      "sha256": "a43435d6530340ba7d9fff848514f23d1423047fc20faff6ddd2152c16add63b"
+    },
+    {
+      "id": "q-ravenrock-cook-master-parcel",
+      "sha256": "3562e7b189f3dee63ac2bf957a356b680b725ba67b93d9642c96306b6fb931cf"
+    },
+    {
+      "id": "q-ravenrock-alchemist-novice-parcel",
+      "sha256": "cbfe3d78eea5c536deea9fc63c1afbfd2ca1fcd34b3f87ab437386e08daa46b0"
+    },
+    {
+      "id": "q-ravenrock-alchemist-advanced-parcel",
+      "sha256": "28f1ff6e39d2f59f45a21c1025b6d8d847829b57c14f684e78ef0bcc8f319cb2"
+    },
+    {
+      "id": "q-ravenrock-alchemist-expert-parcel",
+      "sha256": "bcea0c2a92a1ac8b1c53a859b5ef9d511fca9c799c8d934a129a84df30f0ed58"
+    },
+    {
+      "id": "q-ravenrock-alchemist-master-parcel",
+      "sha256": "66951c0e24ab8e00f349e96fc336766d2a33797bacc40831961188017d611490"
     }
   ]
 }

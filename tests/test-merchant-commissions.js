@@ -14,12 +14,13 @@ vm.createContext(fixtureContext);
 vm.runInContext(fs.readFileSync(ffile,'utf8').split('const roleMarket=')[0]+';this.fixture={memoryPurses,worldOf};',fixtureContext);
 const fixture=fixtureContext.fixture,catalog=require('../game/data/merchant-traders.json'),tables=require('../game/data/merchant-role-tables.json');
 const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests.concat(require('../game/data/merchant-ranked-quests.json').quests);
-assert.equal(raw.length,100);
-for(const defect of ['missing','empty','hash','substitution','definition']) {
+assert.equal(raw.length,241);
+for(const defect of ['missing','empty','hash','substitution','definition','grandfather']) {
  const damaged=copy(raw);if(defect==='missing')damaged.pop();if(defect==='empty')damaged.length=0;
  if(defect==='hash')damaged[0].sourceHash='0'.repeat(64);
  if(defect==='substitution')damaged[0].id='q-substitute-commission';
  if(defect==='definition')damaged[damaged.length-1].goods[0].count++;
+ if(defect==='grandfather')damaged.find(row=>row.id==='q-whiterun-tailor-winter-vestments').goods[1].count=6;
  let reads=0;
  assert.throws(()=>prepareCommissions(damaged,catalog,{resolveMerchant(){reads++;return 1;},resolveItem(){reads++;return 100;}}),
    /publish|commission/i,'published '+defect+' admission must refuse');
@@ -182,7 +183,7 @@ for(const row of [rows[0],ranked[0]]) {
  assert.ok(reads>=2);assert.equal(w.purses.read(row.merchantId).commissions,undefined,
   'native replacement during the final eligibility callback cannot reserve a promise');
 }
-console.log('PASS90 ranked compiled parcel jobs: actual gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');
+console.log('PASS231 ranked compiled parcel jobs: actual gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');
 {
  const row=ranked[ranked.length-1],w=world(1),quote=w.quote(row);
  assert.ok(quote.gold>1);assert.equal(quote.canTake,false);w.take(row);

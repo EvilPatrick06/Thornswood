@@ -1,19 +1,19 @@
 # Merchant quest catalogue
 
-There are **104 authored definitions** in
-`game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, toward the required 240 or more distinct
-offers for the60 retained merchants. Four kill scenes are explicitly admitted
-by the pinned activation manifest, along with one hundred delivery commissions.
+There are **245 authored definitions** in
+`game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, covering all240 merchant/rank slots
+for the60 retained merchants. Four kill scenes are explicitly admitted
+by the pinned activation manifest, along with 241 delivery commissions.
 The aggregate authoring file stays `active:false` and
 `complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these104 offers. Source
+legacy definitions and ten bound routes plus these245 offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
 Novice commissions request goods for specific trades and holds. Eight more
 commissions add six Master offers, one Expert offer and one Novice Enchanter
 offer in Whiterun. Thirteen further parcels complete all24 Whiterun slots.
-A further69 parcels complete the Rift, Reach and Haafingar. These four holds have all96 slots, and the full source covers99 of240 unique merchant/rank slots;
+A further69 parcels complete the Rift, Reach and Haafingar. A final141 parcels complete Hjaalmarch, Falkreath, Eastmarch, the Pale, Winterhold and Solstheim. All ten holds now have all240 unique merchant/rank slots;
 the five class Novice extras share already covered slots. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -72,7 +72,7 @@ not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Finite-purse commissions
 
-The [regional delivery catalogue](merchant-regional-deliveries.md) lists the69 additions in the Rift, Reach and Haafingar, with their exact references, source records, counts, gates and personal rest periods. Whiterun's first complete set is below.
+The [regional delivery catalogue](merchant-regional-deliveries.md) lists the69 additions in the Rift, Reach and Haafingar, with their exact references, source records, counts, gates and personal rest periods. The [remaining-hold catalogue](merchant-all-hold-deliveries.md) lists the final141 additions and complete Master-half/school allocation. Whiterun's first complete set is below.
 
 ### Complete Whiterun rank coverage
 
@@ -99,8 +99,7 @@ are pinned in `merchant-ranked-quests.json`. No existing published terms change.
 
 These additions also bring each class and each profession to at least two
 distinct authored jobs across the catalogue. Source checks enforce both that
-coverage and all24 Whiterun merchant/rank slots. Remaining holds and Master
-halves/schools are still unfinished. Displayed payments use the offering
+coverage and all24 Whiterun merchant/rank slots. The full catalogue now covers all240 slots, every14 non-Mage mastered half, all five Master schools and each Master class. Displayed payments use the offering
 hold's submitted buy prices and existing finite purse; no default quote,
 additional money, stock refill, source placement or yield is added.
 
@@ -193,8 +192,7 @@ For profession deliveries the named half must still match the recipe.
 The class allocation is separate from the exact authored goods in the JSON;
 the compiler derives commission authority from that reviewed
 catalogue, never from every item that could pass a source check. All five
-planned class-Novice slots now have playable definitions. The second distinct quest for
-each class, Master work and full catalogue coverage remain unfinished.
+planned class-Novice slots now have playable definitions. The completed catalogue also supplies the second distinct quest for each class, Master work and every merchant/rank slot.
 
 The pickaxe recipe makes one from one Iron Ingot and one Tool Handle. The
 pole makes one from two Firewood, one Leather Strips and two Tundra Cotton.
@@ -273,8 +271,7 @@ money at their accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
 Further definitions need their own source evidence, reward/cadence review,
-bounded state, exact bindings and explicit pinned admission. The full distinct
-catalogue is still unfinished; its aggregate flags remain false. Existing
+bounded state, exact bindings and explicit pinned admission. The original scarce-resource and retrieval interactions remain unfinished; aggregate authoring flags remain false. Existing
 accepted quests keep their original terms. Editing a draft or changing the
 aggregate flags does not enable another quest. Published definitions use
 stable hashes and IDs; changing an objective or reward needs a new ID.

@@ -9,8 +9,8 @@ const {validateRankedQuests}=require('../scripts/dev/MerchantQuestSources');
 const load=name=>require('../game/data/'+name+'.json'),copy=value=>JSON.parse(JSON.stringify(value));
 const doc=load('merchant-ranked-quests'),source={legacy:load('merchant-quests').quests,roster:load('merchant-roster').merchants,
  roles:load('merchant-role-tables'),gates,recipes:load('recipes').recipes,harvests:load('harvests').harvests,ores:load('ores').ores};
-assert.equal(validateRankedQuests(doc,source).length,90);
-for(const defect of ['source','quantity','price','merchant','tier','duplicate','half-source','missing-part','difficulty','held','gate','school','class-half','public-proof','other-logistics','lower-producer','lower-recipe','copied-logistics']) {
+assert.equal(validateRankedQuests(doc,source).length,231);
+for(const defect of ['source','quantity','price','merchant','tier','duplicate','half-source','missing-part','difficulty','held','gate','school','class-half','public-proof','other-logistics','lower-producer','lower-recipe','copied-logistics','non-tailor-batches']) {
  const broken=copy(doc),sources={...copy(source),gates};
  if(defect==='source')broken.quests[0].goods[0].mining.rank='novice';
  if(defect==='quantity')broken.quests[0].goods[0].count=0;
@@ -36,6 +36,13 @@ for(const defect of ['source','quantity','price','merchant','tier','duplicate','
  }
  if(defect==='copied-logistics') {
   broken.quests=[broken.quests[2]];broken.quests[0].id='q-new-tailor-logistical-parcel';sources.legacy=[];
+ }
+ if(defect==='non-tailor-batches') {
+  const target=broken.quests[2];target.id='q-new-tailor-gold-cloak-parcel';
+  const reference='a30d4:Skyrim.esm',recipe=sources.recipes[reference];
+  target.goods[0]={item:recipe.out,count:3,recipe:{reference,...Object.fromEntries(
+   ['owner','half','rank','out','makes','bench','inputItems','needs'].map(key=>[key,recipe[key]]))}};
+  broken.quests=[target];sources.legacy=[];
  }
  if(defect==='other-logistics') {
   const target=broken.quests[2];target.merchant=copy(source.roster.find(row=>row.bookHold==='whiterun'&&row.role==='Smith'));
@@ -73,4 +80,4 @@ for(const merchant of source.roster.filter(row=>row.bookHold==='whiterun'))for(c
  assert.ok(all.some(row=>row.merchant.reference===merchant.reference&&row.tier===tier),merchant.role+'/'+tier);
 for(const kind of ['classes','professions'])for(const key of Object.keys(progression.__thornswoodProgression.TABLE[kind]))
  assert.ok(all.filter(row=>row.gate[kind==='classes'?'classKey':'profession']===key).length>=2,'Two offers for '+kind+'/'+key);
-console.log('PASS90 ranked parcels, exact public evidence/role permissions, all24 Whiterun slots and at least two jobs for every class and profession');
+console.log('PASS231 ranked parcels, exact public evidence/role permissions and at least two jobs for every class and profession');
