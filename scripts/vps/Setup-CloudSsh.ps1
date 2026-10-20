@@ -98,10 +98,11 @@ if (-not $keyB64) {
 }
 $keyText = ''
 try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($keyB64 -replace '\s', ''))) } catch { }
-if ($keyText -notmatch '-----BEGIN OPENSSH PRIVATE KEY-----') {
-    Die 'THORNSWOOD_BOX_KEY_B64 does not decode to an OpenSSH private key. Make it again with New-CloudAccess.ps1 on One.'
+# Whether it is a key at all is ssh-keygen's to say, below, once it is written.
+if (-not $keyText.Trim()) {
+    Die 'THORNSWOOD_BOX_KEY_B64 is not base64, or decodes to nothing. Make it again with New-CloudAccess.ps1 on One.'
 }
-Say '  THORNSWOOD_BOX_KEY_B64 is set and is an OpenSSH key' 'Green'
+Say '  THORNSWOOD_BOX_KEY_B64 is set' 'Green'
 if ($env:THORNSWOOD_BOX_TOKEN) { Say '  THORNSWOOD_BOX_TOKEN is set' 'Green' }
 else { Say '  THORNSWOOD_BOX_TOKEN is not set, so the bridge token has to come from a network secret for thornswood.net' 'Yellow' }
 
