@@ -84,15 +84,12 @@ Yes 'no File.Move is left in OwnGameShare.cs' ($share -notmatch 'File\.Move\(')
 # ---- 2 and 3: the real code, compiled -----------------------------------------------
 $region = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
 $block = [regex]::Match($og, '(?s)\n(        // ---- #2599: one name of the game folder replaced whole.*?        // ---- end #2599[^\n]*\n)')
-$linksDecl = [regex]::Match($og, '(?s)\n(        \[StructLayout\(LayoutKind\.Sequential\)\]\n        struct FileInfoByHandle\n.*?        const uint BackupSemantics = 0x02000000;\n)')
-$linksFn = [regex]::Match($og, '(?s)\n(        static int Links\(string path\)\n        \{\n.*?\n        \}\n)')
 Yes 'ReplaceName and the record writers, with the MoveFileEx they call, are in OwnGame.cs' ($region.Success -and $region.Groups[1].Value -match 'internal static void ReplaceName\(string next, string path, bool clearReadOnly\)')
 Yes 'DeleteName, SwapCopyIn and SwapNameIn are in OwnGame.cs' ($block.Success -and $block.Groups[1].Value -match 'internal static void DeleteName\(' -and $block.Groups[1].Value -match 'internal static void SwapCopyIn\(' -and $block.Groups[1].Value -match 'internal static void SwapNameIn\(')
 Yes 'the records keep their own SwapIn, a different name from ReplaceName' ($og -match 'static void SwapIn\(string next, string path\)' -and $og -notmatch 'static void SwapIn\(string next, string path, bool')
-Yes 'ReplaceName flushes next before the rename and renames with write through' ($region.Success -and $region.Groups[1].Value -match 'FlushToDisk\(next\);\s*int err = MoveOver\(next, path\);' -and $region.Groups[1].Value -match 'fs\.Flush\(true\)' -and $region.Groups[1].Value -match 'MoveReplaceExisting \| MoveWriteThrough')
-Yes 'FlushToDisk leaves a file with another name alone: a link to the Steam copy is never opened for writing' ($region.Success -and $region.Groups[1].Value -match '(?s)static void FlushToDisk\(string file\)\s*\{[^}]*if \(Links\(file\) > 1\) return;')
-Yes 'Links and what it asks the file system with are in OwnGame.cs' ($linksDecl.Success -and $linksFn.Success)
-if (-not ($region.Success -and $block.Success -and $linksDecl.Success -and $linksFn.Success)) { Done }
+Yes 'ReplaceName renames with write through and never opens next for writing: a link to the Steam copy is not flushed' ($region.Success -and $region.Groups[1].Value -match 'internal static void ReplaceName\(string next, string path, bool clearReadOnly\)\s*\{\s*int err = MoveOver\(next, path\);' -and $region.Groups[1].Value -match 'fs\.Flush\(true\)' -and $region.Groups[1].Value -match 'MoveReplaceExisting \| MoveWriteThrough')
+Yes 'SwapCopyIn flushes the fresh copy it made before it takes the file''s place' ($block.Success -and $block.Groups[1].Value -match '(?s)internal static void SwapCopyIn\(string path, string aside\).*?File\.Copy\(path, aside, false\);.*?FlushToDisk\(aside\);\s*SwapNameIn\(aside, path, false\);')
+if (-not ($region.Success -and $block.Success)) { Done }
 
 $work = Join-Path $Scratch ('thornswood-2599-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -104,7 +101,6 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text;
 using System.Threading;
-using Microsoft.Win32.SafeHandles;
 
 namespace Thornswood
 {
@@ -114,8 +110,6 @@ namespace Thornswood
     {
 __REGION__
 __BLOCK__
-__LINKSDECL__
-__LINKSFN__
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool CreateHardLink(string name, string existing, IntPtr security);
 
@@ -181,8 +175,7 @@ __LINKSFN__
     }
 }
 '@
-    $driver = $driver.Replace('__REGION__', $region.Groups[1].Value.TrimEnd()).Replace('__BLOCK__', $block.Groups[1].Value.TrimEnd()).
-        Replace('__LINKSDECL__', $linksDecl.Groups[1].Value.TrimEnd()).Replace('__LINKSFN__', $linksFn.Groups[1].Value.TrimEnd())
+    $driver = $driver.Replace('__REGION__', $region.Groups[1].Value.TrimEnd()).Replace('__BLOCK__', $block.Groups[1].Value.TrimEnd())
     $src = Join-Path $work 'WholeSwapTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-swap-test.exe'

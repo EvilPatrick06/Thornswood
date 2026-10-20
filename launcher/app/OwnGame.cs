@@ -197,11 +197,15 @@ namespace Thornswood
         /// new one, and a launcher stopped anywhere never leaves path missing.
         /// A delete and then a move left a moment with no file: killed 150
         /// times, that left it missing 30 times (#2591). Not SwapIn, which is
-        /// the records' plain rename; this one also flushes, waits out a lock
-        /// and may clear a read only mark.
+        /// the records' plain rename; this one also waits out a lock and may
+        /// clear a read only mark.
         ///
-        /// next is flushed to the disk first, so the name never points at a
-        /// file whose bytes are still only in the cache.
+        /// next is never opened for writing here. A fresh copy is flushed by
+        /// the one that made it (SwapCopyIn), so the name never points at bytes
+        /// still only in the cache. Any other next is a link to a file already
+        /// on the disk under another name (the share step links the Steam
+        /// copy's own file), with nothing to flush, and a write handle on it
+        /// would be one on Steam's file, which Steam reading it refuses.
         ///
         /// A lock (an antivirus scan, the indexer, Steam reading the file) is
         /// waited out: the rename is tried again for about 600 ms while it is
@@ -218,7 +222,6 @@ namespace Thornswood
         /// </summary>
         internal static void ReplaceName(string next, string path, bool clearReadOnly)
         {
-            FlushToDisk(next);
             int err = MoveOver(next, path);
             if (err == 0) return;
             if (clearReadOnly && err == 5 && File.Exists(path))
@@ -255,16 +258,10 @@ namespace Thornswood
 
         /// <summary>
         /// Flushes a file's bytes to the disk (FlushFileBuffers, through
-        /// FileStream.Flush(true)). A file with another name is a link to bytes
-        /// already on the disk under that name (the share step links the Steam
-        /// copy's own file, read only or not), so there is nothing to flush, and
-        /// a write handle on it would be a write handle on Steam's file, which
-        /// Steam reading it refuses. Only a fresh copy, one name, is flushed.
+        /// FileStream.Flush(true)), for a fresh copy this file just made.
         /// </summary>
         static void FlushToDisk(string file)
         {
-            if ((File.GetAttributes(file) & FileAttributes.ReadOnly) != 0) return;
-            if (Links(file) > 1) return;
             using (var fs = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
                 fs.Flush(true);
         }
@@ -317,6 +314,7 @@ namespace Thornswood
             DeleteName(aside);
             File.Copy(path, aside, false);
             File.SetAttributes(aside, File.GetAttributes(aside) & ~FileAttributes.ReadOnly);
+            FlushToDisk(aside);
             SwapNameIn(aside, path, false);
         }
 
