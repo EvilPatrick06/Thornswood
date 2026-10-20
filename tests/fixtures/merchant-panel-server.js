@@ -63,6 +63,17 @@ http.createServer((req,res)=>{
       Object.assign(data.quests[1],{waiting:true,canReturn:false,canAbandon:false,check:data.sellReason});
     }
   }
+  if(commissionScenario==='bundles') {
+    data.trader='Woodworker';data.reservedPurse=72;
+    data.quests=[
+      {id:'q-whiterun-woodworker-outfitter-reserve',name:"Master: An outfitter's last reserve",who:'woodworker, woodwright, master',kind:'commission',
+       goods:[{count:1,name:'Master Fishing Pole'},{count:24,name:'Ebony Arrow'}],gold:72,quoteToken:'b'.repeat(64),hours:48,
+       state:'available',locations:'Whiterun; return to this Woodworker.',canTake:true},
+      {id:'q-whiterun-alchemist-travelling-case',name:"Expert: A field medic's travelling case",who:'alchemist, physicker, expert',kind:'commission',
+       goods:[{count:2,name:"Physicker's Remedy"},{count:4,name:'Nirnroot'}],gold:36,hours:24,state:'open',
+       locations:'Whiterun; return to this Alchemist.',canReturn:true,canAbandon:true,token:21}
+    ];
+  }
   res.setHeader('Content-Type','text/html');
   res.end('<!doctype html><html lang="en"><meta charset="utf-8"><title>Merchant panel fixture</title>'+
     '<body style="margin:0;background:#302820"><div style="position:fixed;top:0;left:0;color:white;z-index:2147483500"><output id="commands"></output>'+

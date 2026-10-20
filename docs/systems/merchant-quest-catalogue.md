@@ -1,16 +1,19 @@
 # Merchant quest catalogue
 
-There are **14 authored definitions** in
-`game/data/merchant-quests.json`, toward the required 240 or more distinct
+There are **22 authored definitions** in
+`game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, toward the required 240 or more distinct
 offers for the60 retained merchants. Four kill scenes are explicitly admitted
-by the pinned activation manifest, along with ten delivery commissions.
+by the pinned activation manifest, along with eighteen delivery commissions.
 The aggregate authoring file stays `active:false` and
 `complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these fourteen offers. Source
+legacy definitions and ten bound routes plus these twenty-two offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
-commissions request goods for specific trades and holds. These are deliveries,
+Novice commissions request goods for specific trades and holds. Eight more
+commissions add six Master offers, one Expert offer and one Novice Enchanter
+offer in Whiterun. These fill17 of the240 unique merchant/rank slots;
+the five class Novice extras share already covered slots. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
 buy, sell or supply permissions.
@@ -67,6 +70,54 @@ and transaction fences. A similarly named bandit or skeever elsewhere does
 not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Finite-purse commissions
+
+### Ranked parcels in Whiterun
+
+These eight additional jobs keep their complete item lists and original quoted
+payments. The six Master offers each belong to a different trade. The source
+file records exact merchant bases, item records, recipe conditions and
+producer ranks. No location or return rate changes.
+
+| Work | Exact offering reference | Requirement | Complete parcel | Personal rest |
+| --- | --- | --- | --- | --- |
+| An ebony seam's account | Smith `1a67c:Skyrim.esm` | Master Miner class | 4 Ebony Ore, 4 Silver Ore, 1 Pickaxe | 48 hours |
+| An outfitter's last reserve | Woodworker `1a681:Skyrim.esm` | Master Woodwright half | 1 Master Fishing Pole, 24 Ebony Arrows | 48 hours |
+| Winter vestments for a caravan | Tailor `1a684:Skyrim.esm` | Master Liverywright half | 3 Ragged Robes, 3 Snowy Sabre Fur Cloaks | 48 hours |
+| A ward tutor's demonstration stock | Enchanter `1a672:Skyrim.esm` | Master Alteration standing and at least one learned, mapped Master Alteration spell | 2 Ebony Shields, 2 Ragged Robes | 48 hours |
+| A mammoth supper for the hall | Cook `1a66e:Skyrim.esm` | Master Hearthcook half | 2 Mammoth Steaks, 2 Mammoth Stews | 48 hours |
+| Remedies for the ash-road expedition | Alchemist `1a66d:Skyrim.esm` | Master Physicker half | 2 Physicker's Remedies, 4 Ash Creep Clusters | 48 hours |
+| A field medic's travelling case | Alchemist `1a66d:Skyrim.esm` | Expert Physicker half | 2 Physicker's Remedies, 4 Nirnroots | 24 hours |
+| Clothes for the commission rack | Enchanter `1a672:Skyrim.esm` | Novice Wardweaver half | 1 Clothes, 1 Shoes | 6 hours |
+
+Payment is the sum of each required count times that item's submitted buy
+price in Whiterun. No number is invented when a price is missing or ambiguous;
+that offer explains why it cannot be accepted. Zero submitted prices remain
+valid. Other shelf stock remains for sale. Acceptance sets aside the whole
+sum from the finite purse, and a partial parcel transfers nothing. Original
+payments and per-job rest periods survive price/rank changes and restart.
+The rest begins when the final ledger settlement succeeds.
+
+Ebony and ash supplies are Master producer sources; Nirnroot is Expert.
+The pole and arrows are two Master batches. The Tailor order is six
+production batches including three Expert cloaks, rather than an invented
+Master clothing recipe. The shield order includes two Master batches.
+Recipe conditions such as smithing perks, cooking knowledge and loom settings
+remain exactly as authored. These are delivery orders, so goods from other
+craftspeople qualify; the quest does not bypass those conditions, promise
+unenchanted blanks, or create resources. Gatherer and Miner source references
+identify existing producer evidence, not a requirement to use one particular
+plant or seam.
+
+Only a new bundle reservation changes the private commission map to version2.
+Existing single-good promises and numeric six-hour cooldowns remain readable
+without changing their bytes. Bundle promises retain every quoted item and
+their6/12/24/48-hour cadence; their cooldown stores its own cadence. Pending
+transfer version4 remains compatible with earlier full and compact records.
+Rolling back to old code while any version2 map exists requires Claude's
+stopped-instance disposition of disposable alpha work. No automatic reset,
+refill or migration runs.
+
+### First ten Novice deliveries
 
 The five profession deliveries require the named Novice half. Five additional
 deliveries require a Novice class, independently of crafting profession.
@@ -214,15 +265,15 @@ recovery bind the original terms. Previous version2/3 pending formats retain
 their exact snapshot and digest representation, tested against serialized
 pre-change full and compact fixtures.
 
-The six-hour cooldown starts at successful final NPC-ledger settlement,
+Each job's cooldown starts at successful final NPC-ledger settlement,
 after the exact final native inventory receipt has reached storage. If a
 crash delays reconciliation, the job remains pending until settlement and
-then begins its six hours. This is not the native receipt's timestamp, which
+then begins its full original rest period. This is not the native receipt's timestamp, which
 the current protocol does not preserve. Reconnecting does not move an already
 committed cooldown. Pending saves, missing goods and native inventory/stock
 capacity refusals preserve the accepted job and its original payment.
 
-The ten commissions add no actor, spawn, harvest, purse refill, new currency
+The eighteen commissions add no actor, spawn, harvest, purse refill, new currency
 or character inventory grant. Native inventory, pending-record and private
 ledger byte limits remain in force. No alpha reset is required for this slice.
 
@@ -239,7 +290,7 @@ The four published scene IDs and their full authored hashes are pinned in
 `merchant-quest-activation.json`. Published definitions are immutable; new
 deeds or rewards need new IDs while the old definitions remain available
 for accepted work. These are the four scene IDs admitted to the hot-reload bundle;
-the ten commissions have their separate permanent publication contract above.
+the eighteen commissions have their separate permanent publication contract above.
 
 At acceptance, the server reserves the original reward in the same character
 property transaction as its objective and copied terms. At completion,

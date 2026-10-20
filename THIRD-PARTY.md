@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `9d3139ca` (in full, `9d3139cadbd857a6159eb96507ee6b5f6a4d1a87`). That
+commit `90591081` (in full, `90591081ba6646838a19428274ee22cc6b4cee7c`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -474,10 +474,15 @@ no licence this file can name.
   fix) shipped until collection revision 2 carried them
   (docs\COLLECTION-REVISION-2.md). The message board Thornswood-Content.esp
   places ships for as long as that plugin names it, since no revision carries
-  it (#2298), and 140
-  outfit meshes built in BodySlide on another machine ship as ours for now,
-  until Thornswood builds them itself from the collection's BodySlide projects
-  (#1259, `scripts\release\built-until-1259.txt`). Packs
+  it (#2298), and 122
+  outfit meshes built in BodySlide on another machine (the travel clothes and
+  More Craftable Equipment's executioner) ship as ours for now, until
+  Thornswood builds them itself from the collection's BodySlide projects
+  (#1259, #2454, `scripts\release\built-until-1259.txt`). The 18 Bosmer
+  armour morphs leave in the next release, and nothing built from Immersive
+  Armors is handed on: it is used as-is through the collection (Patrick,
+  17 Oct, #2454). What each mod's page permits for that built output is in
+  `records\asset-provenance.json`. Packs
   and records already on the site, and the installer there, still carry the
   rest until they are scrubbed.
 - Bethesda's `MarketplaceTextures.bsa` went out in every pack and in the
@@ -618,7 +623,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `9d3139cadbd857a6159eb96507ee6b5f6a4d1a87` on the public fork. The
+  name `90591081ba6646838a19428274ee22cc6b4cee7c` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -649,10 +654,14 @@ with.
   decides a block before it hands the gamemode the hit, so the hit's blocked
   flag is the server's own and a block against a character the server runs is
   seen (#1386), and lets a plugin keep a character from being slowed by what it
-  carries, here and on everybody else's screen (#1385). The server module's
-  SHA256
-  is `6bd0b70a9b901b6448c62087e8f0c229fc0b09a40f8d37b1a05f24a7b29beeca`, built
-  2026-10-19T21:01:38Z. This is the recorded next release, not a deployment
+  carries, here and on everybody else's screen (#1385). Since `9d3139ca` it also
+  has a kept NPC take the reference its plugin placed instead of spawning a
+  second one (#2483), lets a cast hold its effects longer, counted on the
+  caster's machine and agreed by the server (#2848), and keeps the cursor
+  menu's queued show and hide until the game handles it (#2384). The server
+  module's SHA256
+  is `544098874a6f54b57a9139bfa218e0876230dbddd4b341a0a9bc63b047b5e824`, built
+  2026-10-20T01:31:42Z. This is the recorded next release, not a deployment
   claim. Main remains on `3bdf3d3c9926a4dd241b1d1c09dadde808a788d5` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -687,7 +696,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/9d3139cadbd857a6159eb96507ee6b5f6a4d1a87
+https://github.com/EvilPatrick06/skymp/tree/90591081ba6646838a19428274ee22cc6b4cee7c
 
 For the engine Main runs until then:
 
