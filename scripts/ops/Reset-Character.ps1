@@ -16,8 +16,9 @@
       .\Reset-Character.ps1            the VPS
       .\Reset-Character.ps1 -Local     a server running on this machine
 
-  The launcher has a switch for this in Settings, but only for a local server,
-  because it will not hold your VPS password and neither will this.
+  The launcher has no switch for this (its unused copy went in #2673); for a
+  server on this machine use -UseLocal here, or New-Character.ps1, which
+  writes the same release list. Neither holds your VPS password.
 
   WHAT THE SERVER STILL HOLDS OF THE CHARACTER IS LET GO AT ITS NEXT START
   (#2668). A guild trader keys its supply waits and a trade still waiting by

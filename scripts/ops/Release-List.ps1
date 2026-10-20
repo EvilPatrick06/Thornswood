@@ -2,26 +2,28 @@
   Release-List.ps1
 
   The release list a game server lets go of at its next start (#2351), as
-  Reset-Character.ps1 and Wipe-Saves.ps1 write it (#2668). Dot-sourced by
-  both; it does nothing on its own. $ThornswoodReleaseList is the text of
-  the functions below, sent with the step each script already runs on the
-  server (Windows PowerShell 5.1 there), so there is one copy of it and the
-  two scripts cannot drift apart.
+  Reset-Character.ps1, Wipe-Saves.ps1 (#2668) and New-Character.ps1 (#2673)
+  write it. Dot-sourced by all three; it does nothing on its own.
+  $ThornswoodReleaseList is the text of the functions below, sent with the
+  step each script already runs on the server (Windows PowerShell 5.1 there)
+  or, for New-Character on a local test server, run in place, so there is
+  one copy of it and the scripts cannot drift apart.
 
   The list is private\deleted-characters.json (the server's privDir), the
   same shape Delete-Person.ps1 writes and game\gamemode.js reads:
 
       { "profiles": [ ... ], "actors": [ form ids ], "done": { part: time } }
 
-  WHO IT NAMES. A reset or a wipe throws characters away and keeps every
-  profile: the profile keeps its id, its mod menu choices and, after a
-  reset, its house, offices, books and farm. So both name the thrown-away
-  characters by form id only and never a profile. Each register's release
-  in gamemode.js lets go by profile what a profile holds and by form id
-  only what the character held (a dungeon chest's reservation, an embassy
-  row with no profile, a trader's supply waits, commission promises and a
-  trade waiting on that character), so a list with no profiles in it never
-  takes anything a profile holds (#2668 has the table, part by part).
+  WHO IT NAMES. A reset, a new character or a wipe throws characters away
+  and keeps every profile: the profile keeps its id, its mod menu choices
+  and, after a reset or a new character, its house, offices, books and
+  farm. So each names the thrown-away characters by form id only and never
+  a profile. Each register's release in gamemode.js lets go by profile what
+  a profile holds and by form id only what the character held (a dungeon
+  chest's reservation, an embassy row with no profile, a trader's supply
+  waits, commission promises and a trade waiting on that character), so a
+  list with no profiles in it never takes anything a profile holds (#2668
+  has the table, part by part).
 
   A character's form id is read off its change form the way Delete-Person
   reads it: profileId above 0 and a formDesc made in the world, a hex
@@ -47,8 +49,9 @@
   (scripts\vps\Server-Log.js, #2758): it takes the change forms, card, mod
   menu choices, take counts and last-left time of the profiles a list names,
   and nothing else. A list that names no profile leaves it nothing to do,
-  and a server on this machine (Reset-Character -UseLocal) is started as
-  node dist_back/skymp5-server.js by the launcher or by hand, never under
+  and a server on this machine (Reset-Character -UseLocal, New-Character)
+  is started as node dist_back/skymp5-server.js by the launcher or by hand,
+  never under
   server-log.js, so nothing there would ever mark it done and the list
   would wait for good. So the merged list marks 'saves' done itself when it
   names no profile. A list carrying a profile still waiting (a deletion not
