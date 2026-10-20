@@ -9789,6 +9789,50 @@
     log(what);
   }));
 
+  // ------------------------------------------------------ the drunk screen --
+  /*
+    docs/systems/drink.md: "Drunk, from the third ale until you sleep or the
+    45 minutes pass: the client draws a sway and a soft edge." The server
+    decides drunk (NEEDS.ale.drunkFrom in gamemode.js) and the needs HUD
+    script hands it here through globalThis.thornswoodDrunk, the one thing
+    the two scopes share, as thornswoodCatchFire is.
+
+    The look is the content plugin's ThornswoodDrunkImod (IMAD 0x18020,
+    scripts/mods/Add-ContentRecords.py, Patrick's decision 3 of 12 Oct 2026
+    on #1382): a little double vision and blur, a soft radial blur at the
+    edges, and motion blur that smears into a sway as the head turns. It is
+    not animatable, so it holds for as long as it is applied: applied as the
+    cross fade modifier while drunk and taken off when that ends. Skyrim
+    keeps one cross fade modifier at a time, so it is only ever taken off
+    after this applied it.
+  */
+  const DRUNK_FILE = 'Thornswood-Content.esp';
+  const DRUNK_IMOD = 0x18020;
+  const DRUNK_FADE = 3.0;   // seconds, in and out
+  let drunkWanted = false;
+  let drunkShown = false;
+  // A content plugin older than the record: said once, and nothing drawn.
+  let drunkNoRecord = false;
+
+  globalThis.thornswoodDrunk = function (on) { drunkWanted = !!on; };
+
+  sp.on('update', guard('drunk', () => {
+    if (drunkWanted === drunkShown || drunkNoRecord) { return; }
+    if (!drunkWanted) {
+      sp.ImageSpaceModifier.removeCrossFade(DRUNK_FADE);
+      drunkShown = false;
+      return;
+    }
+    const mod = sp.ImageSpaceModifier.from(sp.Game.getFormFromFile(DRUNK_IMOD, DRUNK_FILE));
+    if (!mod) {
+      log('drunk: no ThornswoodDrunkImod in', DRUNK_FILE, 'so nothing is drawn');
+      drunkNoRecord = true;
+      return;
+    }
+    mod.applyCrossFade(DRUNK_FADE);
+    drunkShown = true;
+  }));
+
   // ----------------------------------------------- what the skill tree adds --
   /*
     The tree has to change the character, and the server cannot do it.

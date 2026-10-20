@@ -744,6 +744,8 @@ jobs:
                  'test-1382-meal-time-cold.js',
                  'test-1382-wet-fade.js',
                  'test-1382-ale-help-hangover.js',
+                 'test-1382-tea.js',
+                 'test-1382-drunk.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',

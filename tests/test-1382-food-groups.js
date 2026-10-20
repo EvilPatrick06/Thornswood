@@ -41,7 +41,9 @@ if (GROUPS) { for (const d in GROUPS.items) { count[GROUPS.items[d]] = (count[GR
 yes('the approved counts: raw 19, cooked 43, soup 30, ingredient 14, prepared 13, drugs 6',
   count.raw === 19 && count.cooked === 43 && count.soup === 30 && count.ingredient === 14 && count.prepared === 13 && count.drugs === 6);
 yes('six drinks are ale, two are drink, one is a potion', count.ale === 6 && count.drink === 2 && count.potion === 1);
-yes('no feast, tea or burnt group', !count.feast && !count.tea && !count.burnt);
+yes('no feast or burnt group', !count.feast && !count.burnt);
+// Patrick, 12 Oct 2026, decision 4: the content plugin's three teas.
+yes('three teas, the content plugin\'s own', count.tea === 3);
 yes('Glacier Water is left to the water mechanic', !!GROUPS && !GROUPS.items['13f598:WindhelmSSE.esp']);
 yes('every grouped record is one the food table knows', !!GROUPS && !!FOODS &&
   Object.keys(GROUPS.items).every(function (d) { return !!FOODS.items[d]; }));
