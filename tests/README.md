@@ -46,6 +46,17 @@ and exits 1 when anything failed. A harness that reads something only one
 machine has, such as the game folder, says SKIP for that part and checks the
 rest.
 
+## A harness that reads a child's error
+
+pwsh's default error view wraps a script error's message at the console's
+width, at a space, and starts the next line with `     | `. A check that looks
+for a phrase in that text then passes or fails by how long the temp folder's
+path is and how wide the console is: on 20 October two checks failed only on
+the runners whose profile folder names are 16 characters longer (#2933). A
+child whose error a check reads runs with `$global:ErrorView = 'NormalView'`,
+which prints the message as written: as the first line of the script it
+writes, or through a launcher like `Child` in `test-bad-json-records.ps1`.
+
 ## A harness that starts a service
 
 Several builds run at once on the VPS and share its 127.0.0.1, so a harness
