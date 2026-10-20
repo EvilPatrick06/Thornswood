@@ -101,6 +101,8 @@ const charBlock = slice(gm, '// ==== thornswood character ====', '// ==== end th
 const farmBlock = slice(gm, '// ==== thornswood farming ====', '// ==== end thornswood farming ====');
 const addItemSrc = liftFrom(gm, 'function addItem(actorId, itemDesc, count) {', '');
 const takeItemSrc = liftFrom(gm, 'function takeItem(actorId, itemDesc, count) {', '');
+// What addItem and takeItem ask so a hair dye is never the plain item (#2675).
+const mintedSrc = liftFrom(gm, 'function mintedEntry(entry) {', '');
 // The craft gate a key cut at a forge asks (#1733); nobody here is hurt or tired.
 const unfitSrc = liftFrom(gm, 'function unfitToMake(actorId, workbenchId) {', '');
 yes('the property, character and farming blocks and the pack helpers are in the gamemode',
@@ -212,7 +214,7 @@ const box = {
 };
 box.globalThis = box;
 inDir(function () {
-  vm.runInNewContext(addItemSrc + '\n' + takeItemSrc + '\n' + unfitSrc + '\n' + propBlock, box,
+  vm.runInNewContext(mintedSrc + '\n' + addItemSrc + '\n' + takeItemSrc + '\n' + unfitSrc + '\n' + propBlock, box,
                      { filename: 'gamemode.js property' });
 });
 const W = box.__thornswoodProperty;

@@ -48,7 +48,7 @@ yes('no waitWord call anywhere is handed what stock.left answered unconverted',
 const code = [source.slice(begin, end),
   ...['FISH_BY_BASE', 'FISH_TUNING', 'GAME_BY_BASE', 'GAME_TUNING'].map(table),
   "const RANK_LADDER=['novice','advanced','expert','master'];",
-  ...['isFish', 'isGame', 'idOf', 'addItem', 'addItemsAtomic', 'waitWord', 'classGate', 'rankStep', 'rankWord',
+  ...['isFish', 'isGame', 'idOf', 'mintedEntry', 'addItem', 'addItemsAtomic', 'waitWord', 'classGate', 'rankStep', 'rankWord',
     'creditWork', 'withinResourceReach', 'fish', 'game'].map(fn)].join('\n');
 const copy = v => v == null ? null : JSON.parse(JSON.stringify(v));
 let time = 1000000000;

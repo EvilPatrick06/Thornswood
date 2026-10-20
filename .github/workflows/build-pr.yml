@@ -665,6 +665,8 @@ jobs:
                  'test-spawn-reply.js',
                  'test-2623-temporary-spawns.js',
                  'test-2622-start-spots.js',
+                 'test-2675-hair-dye.js',
+                 'test-2675-hair-dye-wiring.js',
                  'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
