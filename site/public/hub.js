@@ -968,6 +968,26 @@ function drawLogs(box, sid, d) {
     '</div></div>';
   }
 
+  /* A crash staff have looked at (#2319). The crash snapshot, when the
+     person turned snapshots on, stays on their PC until this is marked (two
+     at most), and their launcher deletes it at a Play after that. */
+  if (row && row.troubleFile === 'crash.log') {
+    out += '<div class="prov">' +
+      (row.looked
+        ? '<b>looked at by</b> ' + esc(row.lookedBy || 'unknown') +
+          '  <b>at</b> ' + esc(row.lookedAt ? new Date(row.lookedAt).toLocaleString() : 'unknown')
+        : '<b>nobody has marked this crash looked at</b>') +
+      '<br><span class="said">If they have crash snapshots turned on, their launcher keeps this ' +
+      'crash\'s snapshot until it is marked looked at here, two at most, and deletes it at a Play ' +
+      'after that. Mark it once nobody needs the snapshot.</span>' +
+      '<div class="mt-9">' +
+        '<button class="btn small lookedBtn' + (row.looked ? ' on' : '') + '" ' +
+          'data-s="' + esc(row.session) + '" data-w="' + esc(row.who || '') + '">' +
+          (row.looked ? 'Looked at, take the mark off' : 'Mark this crash looked at') + '</button>' +
+      '</div>' +
+    '</div>';
+  }
+
   if (row) out += issuesHtml(row);
 
   /* Where this came from, because the point of keeping it is to be able to
@@ -1123,6 +1143,32 @@ function drawLogs(box, sid, d) {
       }).catch(function () { b.disabled = false; saidNow('did not save'); });
     };
   });
+
+  /* A crash looked at, or the mark taken off (#2319). */
+  each(box, 'button.lookedBtn', function (b) {
+    b.onclick = function () {
+      var on = !b.classList.contains('on');
+      b.disabled = true;
+      saidNow('saving');
+      api('/api/session-looked', {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ session: b.dataset.s, who: b.dataset.w, looked: on })
+      }).then(function (r) {
+        return r.json().then(function (j) { return { ok: r.ok, j: j || {} }; });
+      }).then(function (a) {
+        b.disabled = false;
+        saidNow(a.ok ? 'saved' : (a.j.message || 'did not save'));
+        if (!a.ok) return;
+        S.sessions.forEach(function (s) {
+          if (s.session !== b.dataset.s) return;
+          s.looked = !!a.j.looked;
+          s.lookedBy = a.j.lookedBy || '';
+          s.lookedAt = a.j.lookedAt || 0;
+        });
+        drawLogs(box, sid, d);
+      }).catch(function () { b.disabled = false; saidNow('did not save'); });
+    };
+  });
 }
 
 /* The sessions of one person, as the table this page used to be. */
@@ -1145,6 +1191,7 @@ function sessionTable(rows) {
           ? (s.troubleAt === 'warn'
               ? '<span class="pill warn">would not play</span>'
               : '<span class="pill fail">went wrong</span>') +
+            (s.troubleFile === 'crash.log' && s.looked ? ' <span class="pill pass">looked at</span>' : '') +
             '<div class="said">' + esc(s.trouble) + '</div>'
           : '') +
         (s.profile ? '<code>' + esc(s.profile) + '</code>' : 'none picked') + '</div></td>' +
@@ -1281,6 +1328,7 @@ function sessionMatches(s, q, show, chan) {
   if (show === 'clean' && s.trouble)              return false;
   if (show === 'open'  && !sessionOpen(s))        return false;
   if (show === 'kept'  && !s.keep)                return false;
+  if (show === 'unlooked' && !(s.troubleFile === 'crash.log' && !s.looked)) return false;
 
   if (chan === 'main' && !(s.profile && s.channel === 'main')) return false;
   if (chan === 'dev'  && !(s.profile && s.channel === 'dev'))  return false;
@@ -1318,7 +1366,7 @@ function drawSessions() {
         'placeholder="A name, an id, a character, a build, anything in a fault">' +
       '<select id="sshow" aria-label="Show">' +
         [['all','Everything'],['any','Anything that went wrong'],['bad','Crashed only'],
-         ['warn','Would not play only'],['clean','Nothing wrong'],['open','Never reported an end'],
+         ['unlooked','Crashes nobody has looked at'],['warn','Would not play only'],['clean','Nothing wrong'],['open','Never reported an end'],
          ['kept','Kept as evidence']].map(function (o) {
           return '<option value="' + o[0] + '"' + (SFIND.show === o[0] ? ' selected' : '') + '>' + o[1] + '</option>';
         }).join('') +

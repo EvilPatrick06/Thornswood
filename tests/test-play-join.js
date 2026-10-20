@@ -303,6 +303,9 @@ async function checkIn(table, discordId, profileId, standingOver, world) {
     seatsFull: function () { return false; },
     worldFull: function () { return ''; },
     mostOnlineFallback: function () { return 0; },
+    // No crash snapshots asked about here (#2319); test-2319-crash-looked-at.js runs that answer.
+    sessionRows: function () { return []; },
+    lookedAtFor: function () { return []; },
     console: {
       log: function (s) { state.logged.push(String(s)); },
       error: function (s) { state.logged.push(String(s)); }
