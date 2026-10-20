@@ -62,7 +62,7 @@ still applies.
 | A gem | Miner, master | 2 of the gem they name | 6 | 24 hours |
 | The stalhrim | Miner, master | 3 stalhrim | 8 | 24 hours |
 | The heart stone | Miner, master | 3 heart stone | 8 | 24 hours |
-| The longfin | Fisher | 2 Abecean longfin | 8 spots | 12 hours |
+| The longfin | Fisher, master | 2 Abecean longfin | 8 spots | 12 hours |
 | The pearl bed | Fisher, expert | 1 pearl | 3 spots | 8 hours |
 | The crimson | Gatherer | 3 crimson nirnroot | 8 | 12 hours |
 | The mammoth ground | Hunter, master | Dress 1 mammoth | 3 mammoths | 24 hours |
