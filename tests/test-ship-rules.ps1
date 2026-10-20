@@ -474,7 +474,7 @@ $fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Gu
 try {
     foreach ($rel in $clientFiles) {
         $recorded = $ShipClientHashes[$rel]
-        $full = [IO.Path]::Combine($fakeGame, $rel)
+        $full = [IO.Path]::Combine($fakeGame, $rel.Replace('\', [IO.Path]::DirectorySeparatorChar))
         $null = New-Item -ItemType Directory -Force -Path (Split-Path $full -Parent)
         [IO.File]::WriteAllText($full, 'the recorded build of ' + $rel)
         $sha = [Security.Cryptography.SHA256]::Create()

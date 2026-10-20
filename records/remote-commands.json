@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  60,
-    "callCount":  264,
+    "scriptCount":  61,
+    "callCount":  265,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1634,6 +1634,15 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedCatalogRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
                   {
                       "script":  "scripts/vps/Backup-Server.ps1",

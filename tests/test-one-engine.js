@@ -259,6 +259,16 @@ if (problems.length) {
   console.log('  and Build-Server.ps1 (every server file, recorded) in the same pull request.');
 }
 
+// The front (#2754): skymp5-front built from the same commit, recorded by
+// scripts/release/Build-Front.ps1 -Record when the pin moves.
+const front = readJson('records/front-build.json');
+const fc = front ? String(front.forkCommit || '').toLowerCase() : '';
+if (front && fc !== String(pin || '').toLowerCase()) {
+  console.log('      the front was built from ' + (fc ? fc.slice(0, 8) : 'nothing') + ', and engine/skymp is pinned to ' + String(pin || '').slice(0, 8));
+  console.log('      Build it from the pin and record it: scripts/release/Build-Front.ps1 -Record, in the same pull request as the pin.');
+}
+yes('records/front-build.json names the pinned commit in full', !!front && HEX40.test(fc) && fc === String(pin || '').toLowerCase());
+
 let readme = null;
 try { readme = fs.readFileSync(path.join(REPO, 'engine', 'README.md'), 'utf8'); } catch (e) { readme = null; }
 const inFull = namedInFull(readme);
