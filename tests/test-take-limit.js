@@ -41,7 +41,9 @@ function lift(from, to) {
   return b < 0 ? null : src.slice(a, b + to.length);
 }
 
-const guardSrc = lift('function guard(name, fn) {', '\n}\n');
+// guard() counts its time through countSpent() since #385, so both are lifted.
+const guardSrc = lift('function guard(name, fn) {', '\n}\n') &&
+  lift('function guard(name, fn) {', '\n}\n') + '\n' + (lift('function countSpent(name, began) {', '\n}\n') || '');
 // The audit helpers and the take watcher, through the line that closes it.
 const watchSrc = lift('function auditProfile(refrId) {', "'from', auditSource(sourceRefrId), 'in', auditCell(actorId));\n});");
 const limitSrc = lift('/*\n  THE TAKE LIMIT: A FEW THINGS', '})();\n// end of the take limit');

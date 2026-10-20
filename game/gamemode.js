@@ -308,17 +308,41 @@ function guard(name, fn) {
       console.error('[thornswood] ' + name + ' threw: ' + (e && e.stack ? e.stack : e));
       return undefined;
     } finally {
-      // Counted for the minute line below. Never allowed to throw: a finally
-      // that throws would replace what the handler returned.
-      try {
-        if (began) {
-          const d = process.hrtime(began);
-          const ms = d[0] * 1000 + d[1] / 1e6;
-          const row = gmSpent[name] || (gmSpent[name] = { ms: 0, runs: 0, worst: 0 });
-          row.ms += ms; row.runs++;
-          if (ms > row.worst) { row.worst = ms; }
-        }
-      } catch (e) { }
+      countSpent(name, began);
+    }
+  };
+}
+
+/*
+  Counted for the minute line below. Never allowed to throw: it runs in a
+  finally, and a finally that throws would replace what the handler returned.
+*/
+function countSpent(name, began) {
+  try {
+    if (began) {
+      const d = process.hrtime(began);
+      const ms = d[0] * 1000 + d[1] / 1e6;
+      const row = gmSpent[name] || (gmSpent[name] = { ms: 0, runs: 0, worst: 0 });
+      row.ms += ms; row.runs++;
+      if (ms > row.worst) { row.worst = ms; }
+    }
+  } catch (e) { }
+}
+
+/*
+  fn, with its time counted on the minute line under name, for work that does
+  not go through guard(). The shared NPC runtime steps every actor it keeps on
+  timers of its own (#385). Unlike guard() it hands on whatever fn throws, so
+  the caller sees what it saw before.
+*/
+function counted(name, fn) {
+  return function () {
+    let began = null;
+    try { began = process.hrtime(); } catch (e) { began = null; }
+    try {
+      return fn.apply(this, arguments);
+    } finally {
+      countSpent(name, began);
     }
   };
 }
@@ -335,7 +359,10 @@ function guard(name, fn) {
     process   the whole server's CPU as a share of one core: the engine's tick,
               its NPCs and networking, and this file, all together
     gamemode  the part of that spent inside guard(), which wraps every event
-              handler and most of the timers here
+              handler and most of the timers here, and inside the shared NPC
+              runtime's own timers, which show as "npc <task>" (#385, 20 Oct:
+              until then the runtime stepping some 4,800 NPCs was the largest
+              script on the server and was counted as the engine's)
     loop      how late the event loop ran, p50, p99 and worst. The engine's
               tick runs on this loop, so a slow tick shows up here as delay
     and the five costliest handlers, with their worst single call.
@@ -76218,8 +76245,10 @@ try {
       // #1390: the staff's patrol roads, as the patrol keeper below read them.
       patrols:()=>globalThis.__thornswoodThalmorPatrols});
     current();
+    // Each step it schedules is counted on the minute line (#385).
     runtime = startSharedNpcServerRuntime(
-      mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
+      mp, {setTimeout:(fn,delay)=>setTimeout(counted('npc '+(fn.npcRuntimeTask||'task'),fn),delay), clearTimeout},
+      Date.now, text=>log(text),population,{suspended:true});
     ready();
     // Every fallible constructor and initial timer is staged before this commit attempt.
     population.commit();
