@@ -152,20 +152,24 @@ if (Test-Path -LiteralPath `$save) { Remove-Item -LiteralPath `$save -Recurse -F
 New-Item -ItemType Directory -Path (Join-Path `$save 'tokens') -Force | Out-Null
 if (Test-Path -LiteralPath `$keys) { Copy-Item -LiteralPath `$keys -Destination (Join-Path `$save 'keys') }
 if (Test-Path -LiteralPath `$tokens) { Get-ChildItem -LiteralPath `$tokens -File | Copy-Item -Destination (Join-Path `$save 'tokens') }
+# The put back runs once as SYSTEM and removes itself, its whole command
+# inline (no script file a later change could swap), with every path under
+# ProgramData\ssh or the bridge's folder, which only SYSTEM and
+# Administrators may change (#2612). One statement to a line, no double
+# quote, so the lines join into one -Command.
 `$back = @'
 `$keys = 'C:\ProgramData\ssh\administrators_authorized_keys'
 `$tokens = '$BridgeRoot\tokens'
 `$save = 'C:\ProgramData\ssh\box-access-before'
-if (Test-Path -LiteralPath (Join-Path `$save 'keys')) { Copy-Item -LiteralPath (Join-Path `$save 'keys') -Destination `$keys -Force }
-else { Remove-Item -LiteralPath `$keys -Force -EA SilentlyContinue }
+if (Test-Path -LiteralPath (Join-Path `$save 'keys')) { Copy-Item -LiteralPath (Join-Path `$save 'keys') -Destination `$keys -Force } else { Remove-Item -LiteralPath `$keys -Force -EA SilentlyContinue }
 if (Test-Path -LiteralPath `$keys) { icacls `$keys /inheritance:r /grant 'Administrators:F' /grant 'SYSTEM:F' | Out-Null }
 if (-not (Test-Path -LiteralPath `$tokens)) { New-Item -ItemType Directory -Path `$tokens -Force | Out-Null }
 Get-ChildItem -LiteralPath `$tokens -File | Remove-Item -Force
 Get-ChildItem -LiteralPath (Join-Path `$save 'tokens') -File | Copy-Item -Destination `$tokens
 Unregister-ScheduledTask -TaskName '$PutBack' -Confirm:`$false
 '@
-[IO.File]::WriteAllText((Join-Path `$save 'put-back.ps1'), `$back, (New-Object Text.UTF8Encoding(`$true)))
-`$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -ExecutionPolicy Bypass -File "' + (Join-Path `$save 'put-back.ps1') + '"')
+`$cmd = (@(`$back -split '\r?\n' | Where-Object { `$_.Trim() }) -join '; ')
+`$a = New-ScheduledTaskAction -Execute 'powershell.exe' -Argument ('-NoProfile -Command "' + `$cmd + '"')
 `$t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
 `$p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
 Register-ScheduledTask -TaskName `$task -Action `$a -Trigger `$t -Principal `$p -Force | Out-Null

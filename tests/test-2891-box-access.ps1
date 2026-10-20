@@ -94,7 +94,10 @@ $bad = @()
 foreach ($b in $built) { $errs = @(ParseErrors $b); if ($errs.Count) { $bad += $errs[0].Message } }
 Yes ('every script Grant-BoxAccess.ps1 sends parses once built' + $(if ($bad.Count) { ': ' + ($bad -join '; ') })) ($bad.Count -eq 0)
 $back = [regex]::Match($built[0], "(?s)\`$back = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
-Yes '  and so does the put back it leaves on the box' ($back -and (@(ParseErrors $back).Count -eq 0))
+$joined = (@($back -split '\r?\n' | Where-Object { $_.Trim() }) -join '; ')
+Yes '  and so does the put back, joined into the one -Command the task runs' ($back -and (@(ParseErrors $joined).Count -eq 0))
+Yes 'the put back runs once, inline, and removes itself (#2612)' ($back -notmatch '"' -and $back.Contains("Unregister-ScheduledTask -TaskName '" + $PutBack + "'") -and
+    $built[0].Contains("-Argument ('-NoProfile -Command") -and $built[0] -notmatch '-Argument [^\r\n]*-File' -and $built[0] -notmatch '-Daily|-Weekly|-AtStartup|-AtLogOn|RepetitionInterval')
 
 # ---- 2. the box change, against a scratch box ----------------------------------
 $keys = Join-Path $tmp 'administrators_authorized_keys'
@@ -144,14 +147,14 @@ try {
     $out = RunBox (Get-BoxChangeScript 'djinn' $digest ('from="127.0.0.1" ' + $pubB + ' thornswood-djinn') (($pubB -split ' ')[1]))
     $after = Lines
     Yes 'a grant: ARMED, then CHANGED, then DONE' (($out -join '|') -match '^ARMED .*\|CHANGED djinn: 1 key line\(s\) taken off.*\|CHANGED now 4 key line\(s\), and tokens for: cloud, djinn\|DONE$')
-    Yes '  the put back is armed before anything changed' ($global:Armed -and (Test-Path -LiteralPath (Join-Path $save 'keys')) -and (Test-Path -LiteralPath (Join-Path $save 'put-back.ps1')))
+    Yes '  the put back is armed before anything changed' ($global:Armed -and (Test-Path -LiteralPath (Join-Path $save 'keys')))
     Yes '  the old djinn line goes and the new one, only through the bridge, comes' ($after -contains ('from="127.0.0.1" ' + $pubB + ' thornswood-djinn') -and -not ($after -match 'AAAAolddjinn'))
     Yes '  every other key line stays as it was' ($after[0] -eq ($pubA + ' thornswood') -and $after[1] -match 'thornswood-cloud$' -and $after[2] -eq 'ssh-rsa AAAAsomebody someone-else' -and $after.Count -eq 4)
     Yes '  the digest is written under the name, and the cloud token stays' ((Text (Join-Path $tokens 'djinn')) -eq $digest -and (Text (Join-Path $tokens 'cloud')) -eq ('c' * 64))
-    Yes '  the put back task runs its own script with powershell -File' ($global:PutBackArg -match '-NoProfile -ExecutionPolicy Bypass -File ".*put-back\.ps1"')
+    Yes '  the put back task carries its command inline' ($global:PutBackArg -match '^-NoProfile -Command ".*Unregister-ScheduledTask.*"$')
 
-    # The put back, as the task would run it.
-    $pb = (Text (Join-Path $save 'put-back.ps1')).Replace('C:\ProgramData\ssh\administrators_authorized_keys', $keys).Replace('C:\ProgramData\ssh\box-access-before', $save)
+    # The put back, as the task would run it: the command out of its argument.
+    $pb = [regex]::Match($global:PutBackArg, '^-NoProfile -Command "(.*)"$').Groups[1].Value
     $null = & ([scriptblock]::Create($stubs + "`n" + $pb))
     $back = Lines
     Yes 'the put back puts the key file back as it was' ($back.Count -eq 4 -and ($back -match 'AAAAolddjinn').Count -eq 1 -and -not ($back -match 'NewDjinn'))

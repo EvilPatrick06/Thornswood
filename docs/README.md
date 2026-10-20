@@ -24,6 +24,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [MOVING-THE-SERVER.md](MOVING-THE-SERVER.md) | Growing the VPS, or moving everything to a new box. |
 | [DEPLOY-IDENTITIES.md](DEPLOY-IDENTITIES.md) | The VPS access audit (#2182): who can get in and as what today, and a restricted deploy identity design with migration, rollback and the decisions it needs. |
 | [OWNERSHIP.md](OWNERSHIP.md) | Who holds each credential, account and build, and who the second holder is. |
+| [BOX-ACCESS.md](BOX-ACCESS.md) | Reaching the box over ssh from your own PC, through the bridge with your own key and token (#2891), and how Patrick gives and takes that access one person at a time. |
 | [RUNNER-ISOLATION.md](RUNNER-ISOLATION.md) | The GitHub Actions runners on the VPS (#2161): what they can reach, who can run code on them, the findings, the read-only check, and the risk decision it needs. |
 | [SIGNED-RELEASES.md](SIGNED-RELEASES.md) | The signed release design (#2163): what gets signed and how, custody, rotation, revocation, the rollout that keeps every checksum, and the test-only pilot. |
 | [CLEAN-INSTALL-RUN.md](CLEAN-INSTALL-RUN.md) | The checklist for a stranger's first install, and what each step should show. |
