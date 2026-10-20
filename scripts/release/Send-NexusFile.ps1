@@ -50,8 +50,9 @@
   still being processed when the wait runs out can be carried on with
   -UploadId and the same arguments; nothing was made from it yet.
 
-  Only tested against the stand-in in tests\test-2914-nexus-scripts.ps1 until
-  its first real run.
+  First real run 20 October (Client Runtime 1.0.1, #421): it stopped at the
+  multipart complete, which the storage refuses with the checksum header the
+  spec asks for; see Send-NexusUpload in Nexus.ps1.
 
 .PARAMETER Mod
   The mod's number on the website, as in nexusmods.com/skyrimspecialedition/mods/192762.

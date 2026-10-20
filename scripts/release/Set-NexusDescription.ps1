@@ -19,10 +19,13 @@
   saving the same text from the website". v3 cannot read one: getMod answers
   only id, game_scoped_id, game_id and name, and no other v3 operation returns
   a description. So the description as it is now is read from the v2 GraphQL
-  API, legacyModsByDomain { description }, which answers in the stored form.
+  API, mod(modId, gameId) { description }, which answers in the stored form.
+  Not legacyModsByDomain: measured on 20 October, for minutes after an edit
+  it answers the old description on some asks and the new one on others,
+  while mod(modId, gameId) answered the new one every time from the first ask.
 
-  THE STORED FORM, measured on both our pages on 20 October through that
-  GraphQL query: the BBCode as typed, with every line break stored as a line
+  THE STORED FORM, measured on both our pages on 20 October through
+  GraphQL, where both queries give the same form: the BBCode as typed, with every line break stored as a line
   break followed by <br />, and every backslash as &#92;. The apostrophe was
   stored as it is. Nothing else was there to measure: neither page has < > &
   or a double quote. So this turns the stored form back into what the editor
@@ -42,8 +45,7 @@
 
   -WhatIf reads both and prints where the line goes, then stops.
 
-  Only tested against the stand-in in tests\test-2914-nexus-scripts.ps1 until
-  its first real run.
+  First real run 20 October: the ZeniMax line on both our pages (#2829).
 
 .PARAMETER Mod
   The mods' numbers on the website, as 192001,192762.
@@ -147,10 +149,10 @@ Write-Host '  THORNSWOOD  -  a mod page description on Nexus Mods' -ForegroundCo
 if ($WhatIf) { Say '  -WhatIf: reads only, and says what it would write.' 'Yellow' }
 Say ('  key from ' + $script:NexusKeyFrom) 'DarkGray'
 
-function Read-Stored([string]$m) {
-  $q = '{ legacyModsByDomain(ids: [{gameDomain: "' + $Game + '", modId: ' + $m + '}]) { nodes { modId name description } } }'
+function Read-Stored([string]$m, [string]$gameId) {
+  $q = '{ mod(modId: ' + $m + ', gameId: ' + $gameId + ') { modId name description } }'
   $d = Invoke-NexusGraph $q $null ('Reading the description of mod ' + $m)
-  $n = @(Get-NexusField (Get-NexusField $d 'legacyModsByDomain') 'nodes') | Where-Object { $_ } | Select-Object -First 1
+  $n = Get-NexusField $d 'mod'
   if (-not $n) { throw ('Nexus has no mod ' + $m + ' on ' + $Game + ' to read a description from.') }
   return [string](Get-NexusField $n 'description')
 }
@@ -162,8 +164,10 @@ foreach ($m in $Mod) {
   $info = Step { Get-NexusField (Invoke-NexusApi 'GET' ('/v3/games/' + $Game + '/mods/' + $m) '' ('Reading mod ' + $m)) 'data' }
   $uid = [string](Get-NexusField $info 'id')
   if (-not $uid) { Die ('Nexus answered for mod ' + $m + ' without its id.') }
+  $gameId = [string](Get-NexusField $info 'game_id')
+  if ($gameId -notmatch '^\d+$') { Die ('Nexus answered for mod ' + $m + ' without its game''s number.') }
   Say ('  ' + (Get-NexusField $info 'name') + ' (id ' + $uid + ')')
-  $stored = Step { Read-Stored $m }
+  $stored = Step { Read-Stored $m $gameId }
   $editor = ConvertFrom-Stored $stored
   if ($null -eq $editor -or (ConvertTo-Stored $editor) -cne $stored) {
     $why = if ($script:Unreadable) { $script:Unreadable } else { 'something that does not come back the same' }
@@ -205,7 +209,7 @@ foreach ($m in $Mod) {
 
   [void](Step { Invoke-NexusApi 'PATCH' ('/v3/mods/' + $uid) $body ('Editing the description of mod ' + $m) })
   $script:Done.Add('mod ' + $m + ' description edited (as it was: ' + $kept + ')')
-  $after = Step { Read-Stored $m }
+  $after = Step { Read-Stored $m $gameId }
   $want = ConvertTo-Stored $text
   if ($after -cne $want) {
     if ($after -ceq $stored) { Die ('Nexus answered the edit of mod ' + $m + ' but its description still reads as it was. Look at the page before running this again.') }
