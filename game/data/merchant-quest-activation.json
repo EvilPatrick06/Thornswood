@@ -58,6 +58,38 @@
     {
       "id": "q-hjaalmarch-alchemist-cotton-dressings",
       "sha256": "7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9"
+    },
+    {
+      "id": "q-whiterun-smith-ebony-seam-account",
+      "sha256": "d09451fa3306f0743d0e68bd78ae43bde11dcd0fdc2761abe37c350d37a70faa"
+    },
+    {
+      "id": "q-whiterun-woodworker-outfitter-reserve",
+      "sha256": "a94934368484eaf0bcfa65564909260c8b1da3e198a11495b31a8d1c070836e0"
+    },
+    {
+      "id": "q-whiterun-tailor-winter-vestments",
+      "sha256": "68f0406f1fe3db80d3b820d13413c0419a960da038eef3a54ac103091d9af2e0"
+    },
+    {
+      "id": "q-whiterun-enchanter-ward-demonstration",
+      "sha256": "8f19b0da990fc2102dd312016717dc92a48f23d6bcfdec622aaf3adc621d169e"
+    },
+    {
+      "id": "q-whiterun-cook-mammoth-supper",
+      "sha256": "d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4"
+    },
+    {
+      "id": "q-whiterun-alchemist-ash-expedition",
+      "sha256": "75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df"
+    },
+    {
+      "id": "q-whiterun-alchemist-travelling-case",
+      "sha256": "7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da"
+    },
+    {
+      "id": "q-whiterun-enchanter-commission-rack",
+      "sha256": "531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787"
     }
   ]
 }

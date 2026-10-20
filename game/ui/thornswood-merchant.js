@@ -102,9 +102,9 @@
         'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
         quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
         quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
-      var terms=quest.kind==='commission'?'Deliver '+quest.count+' '+quest.item+'. '+
+      var terms=quest.kind==='commission'?'Deliver '+(Array.isArray(quest.goods)?quest.goods.map(function(good){return good.count+' '+good.name;}).join('; '):quest.count+' '+quest.item)+'. '+
         (quest.gold===null?'No submitted payment is available.':'Payment '+quest.gold+' gold.')+
-        ' Return to this specialist. This work rests for six hours after the trade settles.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
+        ' Return to this specialist. This work rests for '+quest.hours+' hours after the trade settles.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
         (quest.exactMerchant?'Return to this specialist.':'Return to a guild trader in this hold.')+' Returns after '+quest.hours+' hours.' :
         'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
@@ -121,7 +121,8 @@
           for (var g = 0; g < gems.length; g++) body += '<option value="' + esc(gems[g]) + '"' + (chosen === gems[g] ? ' selected' : '') + '>' + esc(gems[g]) + '</option>';
           body += '</select>';
         }
-        var quote=quest.kind==='commission'&&Number.isSafeInteger(quest.quotedUnit)&&quest.quotedUnit>=0?' data-token="'+esc(quest.quotedUnit)+'"':'';
+        var quote=quest.kind==='commission'&&typeof quest.quoteToken==='string'&&/^[0-9a-f]{64}$/.test(quest.quoteToken)?' data-token="'+esc(quest.quoteToken)+'"':
+          quest.kind==='commission'&&Number.isSafeInteger(quest.quotedUnit)&&quest.quotedUnit>=0?' data-token="'+esc(quest.quotedUnit)+'"':'';
         body += '<button data-quest="' + esc(quest.id) + '" data-action="take"'+quote+' data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
           (quest.canTake && (!gems.length || chosen) ? '' : ' disabled') + '>Take work</button>';
       }

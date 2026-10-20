@@ -247,14 +247,20 @@ function createSettlement(deps) {
     }
     var removed=Object.keys(previous.commissions.held).filter(function(key){return !Object.prototype.hasOwnProperty.call(next.commissions.held,key);});
     if(removed.length!==1)throw new Error('Commission completion must release exactly one promise.');
-    var key=removed[0],row=previous.commissions.held[key],at=next.commissions.cool[key];
+    var key=removed[0],row=previous.commissions.held[key],at=COMMISSION_STATE.cooldownAt(next.commissions.cool[key]);
     if(COMMISSION_STATE.key(pending.human,row.job)!==key||!Number.isSafeInteger(at)||at<row.at||gold!==row.gold)
       throw new Error('Commission owner or payment cannot be verified.');
     var finished=COMMISSION_STATE.finish(previous.commissions,pending.human,row.job,row.token,at);
     if(!finished.ok||!equal(canonical(finished.next),canonical(next.commissions)))throw new Error('Commission promise transition cannot be verified.');
-    if(moved&&(moved.some(function(item){return item.entry.baseId!==row.item.baseId||item.label!==row.item.name;})||
-      moved.reduce(function(total,item){return total+item.entry.count;},0)!==row.count))
-      throw new Error('Commission goods cannot be verified.');
+    if(moved) {
+      var promised=row.goods||[{item:row.item,count:row.count,unit:row.unit}],totals=new Map();
+      moved.forEach(function(item){
+        var good=promised.find(function(good){return item.entry.baseId===good.item.baseId&&item.label===good.item.name;});
+        if(!good)throw new Error('Commission goods cannot be verified.');
+        totals.set(item.entry.baseId,(totals.get(item.entry.baseId)||0)+item.entry.count);
+      });
+      if(promised.some(function(good){return totals.get(good.item.baseId)!==good.count;}))throw new Error('Commission goods cannot be verified.');
+    }
   }
   function records() {
     try {
@@ -371,9 +377,10 @@ function createSettlement(deps) {
     if(pending.kind==='commission') {
       var keys=Object.keys(pending.previous.commissions.held).filter(function(key){return !Object.prototype.hasOwnProperty.call(pending.next.commissions.held,key);});
       var completedAt=now();
-      if(keys.length!==1||!Number.isSafeInteger(completedAt)||completedAt<pending.next.commissions.cool[keys[0]])
+      if(keys.length!==1||!Number.isSafeInteger(completedAt)||completedAt<COMMISSION_STATE.cooldownAt(pending.next.commissions.cool[keys[0]]))
         throw new Error('Commission settlement time cannot be verified.');
-      next.commissions.cool[keys[0]]=completedAt;
+      if(Array.isArray(next.commissions.cool[keys[0]]))next.commissions.cool[keys[0]][0]=completedAt;
+      else next.commissions.cool[keys[0]]=completedAt;
     }
     return !!save(id, state, next, pending.id);
   }
