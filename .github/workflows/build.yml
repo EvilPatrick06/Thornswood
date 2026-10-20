@@ -531,6 +531,13 @@ jobs:
           # block): a crate opens the dock, coin and a full hold refused before the
           # pack, the one charter call, a staff draft confirmed against the list it
           # was proposed on, and arrivals on their own. Under a second.
+          # Issue #1273: five harnesses that ran only in the nightly went stale
+          # there unseen, or were broken by a change no pull request ran them
+          # against: a pasted byte order mark, a launcher file that gained a
+          # caller, the feed's new generations, a reworded close frame, and the
+          # fork harness the shares never had. On the gate now. The kept NPC
+          # harness says SKIP without the fork; the nightly runs it with it.
+          # Under ten seconds together.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -598,6 +605,8 @@ jobs:
                  'test-2181-gamemode-source.js',
                  'test-2261-tome-refused.js',
                  'test-papyrus-event-list.js',
+                 'test-scripts-no-literal-feff.ps1', 'test-963-perf-settings.ps1', 'test-bad-json-records.ps1',
+                 'test-sweep.js', 'test-2483-kept-npcs.js',
                  'test-1383-treatments.js',
                  'test-1383-limbs-brews.js',
                  'test-1384-condition.js',

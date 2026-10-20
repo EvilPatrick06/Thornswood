@@ -101,6 +101,27 @@ jobs:
           if ($code -eq 0 -and -not $fetched) { $code = 1 }
           exit $code
 
+      - name: Run the fork's kept NPC harness at the pin
+        if: ${{ !cancelled() }}
+        shell: pwsh
+        run: |
+          # Issue #2483: tests\test-2483-kept-npcs.js runs the fork's own
+          # skymp5-client\test-kept-npc-adopt.js. The harness shares below
+          # never have the fork, so it failed there every night (#1273); it
+          # is run here instead, with the fork fetched shallow at its pin and
+          # taken out again, the way the two steps above do it, and
+          # THORNSWOOD_FORK_REQUIRED makes a fork that did not arrive a
+          # failure. Everywhere without the fork it says SKIP.
+          git -c core.longpaths=true submodule update --init --depth 1 engine/skymp
+          $fetched = ($LASTEXITCODE -eq 0)
+          if (-not $fetched) { Write-Host '::error file=.gitmodules::engine/skymp could not be fetched at its pin, so the kept NPC harness did not run' }
+          $env:THORNSWOOD_FORK_REQUIRED = '1'
+          node tests\test-2483-kept-npcs.js
+          $code = $LASTEXITCODE
+          git -c core.longpaths=true submodule deinit -q -f engine/skymp
+          if ($code -eq 0 -and -not $fetched) { $code = 1 }
+          exit $code
+
       - name: Parse every PowerShell script
         if: ${{ !cancelled() }}
         shell: pwsh
