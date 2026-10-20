@@ -74,6 +74,7 @@ try {
 
     # 1. A fresh clone: nothing fetched, nothing built.
     Yes 'Repo is the folder above scripts\release' (Same (Ask 'Repo') $repo)
+    Yes 'MachineData is this machine''s own data folder (#2903)' (Same (Ask 'MachineData') (Join-Path $env:LOCALAPPDATA 'Thornswood'))
     Yes 'Releases is this machine''s working copy of the main feed (#907)' (Same (Ask 'Releases') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'))
     Yes 'ReleasesDev is the dev one' (Same (Ask 'ReleasesDev') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev'))
     Yes 'ShipRoots is beside them, in this machine''s own data (#1692; tests\test-1692-release-root.ps1 holds the rest)' (
@@ -94,7 +95,7 @@ try {
     $strictSaid = @{}
     & {
         Set-StrictMode -Version Latest
-        foreach ($p in 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'EngineBuild', 'EngineBuilds', 'Out', 'bot') {
+        foreach ($p in 'MachineData', 'ClientDist', 'ServerDist', 'ServerSettings', 'ChangeForms', 'Dist', 'Payload', 'ServerZip', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'Engine', 'EngineBuild', 'EngineBuilds', 'Out', 'bot') {
             try { $strictSaid[$p] = [string](& $w $p) } catch { $strictSaid[$p] = 'THREW ' + $_.Exception.Message }
         }
     }
@@ -161,6 +162,7 @@ try {
             $platform = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Thornswood'
             Yes 'with no LOCALAPPDATA, ReleasesDev is in the platform''s folder for this machine''s data (#2872)' (Same (Ask 'ReleasesDev') (Join-Path $platform 'feed\dev'))
             Yes 'and EngineBuilds beside it' (Same (Ask 'EngineBuilds') (Join-Path $platform 'engine-build.json'))
+            Yes 'and MachineData is that folder (#2903)' (Same (Ask 'MachineData') $platform)
             foreach ($p in 'Releases', 'ReleasesDev', 'EngineBuilds') {
                 Yes ('and where.js ' + $p + ' says the same') (Same (AskJs $p) (Ask $p))
             }
@@ -172,7 +174,7 @@ try {
     # ---- the scripts --------------------------------------------------------
     # A string naming C:\Thornswood-Dev: scripts\oneoff is parked history.
     $named = @()
-    $keys = @('Repo', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev', 'EngineBuild', 'EngineBuilds')
+    $keys = @('Repo', 'MachineData', 'Engine', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms', 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev', 'EngineBuild', 'EngineBuilds')
     $badKeys = @()
     $callers = 0
     $scriptsDir = Join-Path $realRepo 'scripts'

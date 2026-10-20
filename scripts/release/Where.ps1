@@ -202,6 +202,8 @@ function Get-EngineBuild {
 function Get-Place([string]$name) {
     switch ($name) {
         'Repo'   { return $repo }
+        # This machine's own data, the folder below (#2903).
+        'MachineData' { return Get-MachineData }
         # This machine's working copies of the feeds (Feed-Store.ps1, #907),
         # not clones of Thornswood-Releases beside the repository any more.
         'Releases'    { return Join-Path (Get-MachineData) 'feed\main' }
@@ -227,7 +229,7 @@ function Get-Place([string]$name) {
     return $null
 }
 
-$placeNames = @('Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+$placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
                 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
 $folderNames = @($layout.folders.PSObject.Properties.Name)

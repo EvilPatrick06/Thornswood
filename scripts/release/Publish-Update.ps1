@@ -239,7 +239,7 @@ if (Test-Path -LiteralPath $OldDist) {
 $StateFile = Join-Path $ReleaseDir 'published.json'
 
 # Pending resume notes stay per-machine under LOCALAPPDATA.
-$legacyDir = Join-Path $env:LOCALAPPDATA 'Thornswood'
+$legacyDir = & (Join-Path $PSScriptRoot 'Where.ps1') MachineData
 $PendingDir = $legacyDir
 if (-not (Test-Path -LiteralPath $PendingDir)) { New-Item -ItemType Directory -Path $PendingDir -Force | Out-Null }
 $script:PendingFile = Join-Path $PendingDir $(if ($Dev) { 'published-dev-pending.json' } else { 'published-pending.json' })
