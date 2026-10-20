@@ -128,7 +128,7 @@ $builtList = Join-Path $Repo 'scripts\release\built-until-1259.txt'
 Yes 'the BodySlide builds shipped for now are listed beside Ship-Rules' (Test-Path -LiteralPath $builtList)
 $builtText = $(if (Test-Path -LiteralPath $builtList) { Get-Content -LiteralPath $builtList -Raw } else { '' })
 Yes '  and the list says it is for now, until #1259 replaces it' ($builtText -match '#1259' -and $builtText -match 'FOR NOW')
-Yes ('  140 of them, the count measured on 29 September ({0})' -f $ShipBuiltUntil1259.Count) ($ShipBuiltUntil1259.Count -eq 140)
+Yes ('  122 of them: the 140 measured on 29 September less the 18 Bosmer morphs #2454 dropped ({0})' -f $ShipBuiltUntil1259.Count) ($ShipBuiltUntil1259.Count -eq 122)
 # Except what is never handed on (#2454,
 # permission-held.txt, tests\test-ship-permission-held.ps1): listed, not shipped.
 $builtHeld = @($ShipBuiltUntil1259 | Where-Object { Test-ShipPermissionHeld $_ })
@@ -136,8 +136,8 @@ $builtOut = @($ShipBuiltUntil1259 | Where-Object { -not (Test-ShipPermissionHeld
 Yes ('  every one ships as ours, but the {0} never handed on' -f $builtHeld.Count) ($builtOut.Count -eq 0)
 Yes '  and a held one does not ship' (@($builtHeld | Where-Object { -not (Test-ShipNotOurs $_) }).Count -eq 0)
 $builtWhere = @($ShipBuiltUntil1259 | ForEach-Object { ($_ -split '\\')[0..3] -join '\' } | Sort-Object -Unique)
-Yes ('  all in the three folders BodySlide built ({0})' -f ($builtWhere -join ', ')) (
-    @($builtWhere | Where-Object { $_ -notin @('Data\meshes\armor\travel clothes', 'Data\meshes\armor\bosmerarmormaty743', 'Data\meshes\MCE\clothes') }).Count -eq 0)
+Yes ('  all in the two folders still waiting on our build ({0})' -f ($builtWhere -join ', ')) (
+    @($builtWhere | Where-Object { $_ -notin @('Data\meshes\armor\travel clothes', 'Data\meshes\MCE\clothes') }).Count -eq 0)
 Yes '  by exact path: a file beside them that is not listed does not ship' (
     (Test-ShipNotOurs 'Data\meshes\armor\travel clothes\clothes\3clothesf_0.nif') -and (Test-ShipNotOurs 'Data\meshes\armor\bosmerarmormaty743\new.tri'))
 Yes '  and none is held for the collection, which could not carry built output' (@($ShipBuiltUntil1259 | Where-Object { Test-ShipHeld $_ 1 }).Count -eq 0)
