@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -2108,7 +2108,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', box: 'thornswoodBox'
+    help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip'
   };
 
   T.claimFocus = function (who, on) {
@@ -9426,6 +9426,10 @@
     if (what === 'box:opened') { T.claimFocus('box', true); return; }
     if (what === 'box:closed') { T.claimFocus('box', false); return; }
     if (what === 'box:ready') { log('the drop box panel is in'); return; }
+    // The trade ships' panel (#2700): a dock crate's E, or Ports and routes on K.
+    if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
+    if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
+    if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
