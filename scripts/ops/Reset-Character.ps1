@@ -16,8 +16,20 @@
       .\Reset-Character.ps1            the VPS
       .\Reset-Character.ps1 -Local     a server running on this machine
 
-  The launcher has a switch for this in Settings, but only for a local server,
-  because it will not hold your VPS password and neither will this.
+  The launcher has no switch for this (its unused copy went in #2673); for a
+  server on this machine use -UseLocal here, or New-Character.ps1, which
+  writes the same release list. Neither holds your VPS password.
+
+  WHAT THE SERVER STILL HOLDS OF THE CHARACTER IS LET GO AT ITS NEXT START
+  (#2668). A guild trader keys its supply waits and a trade still waiting by
+  the character's form id (#2652), and that form id can be handed to the
+  next character made. So the characters thrown away are written into the
+  release list, private\deleted-characters.json (Release-List.ps1, the same
+  list Delete-Person.ps1 writes, #2351), by form id only: the profile keeps
+  its id and everything it holds (a house, an office, a book, a farm, the mod
+  menu choices), so no profile is ever named. The start right after this
+  lets go of the rest and the list is gone. A list already there that is not
+  one stops this before anything is moved.
 #>
 [CmdletBinding()]
 param(
@@ -34,6 +46,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here 'Release-List.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
@@ -42,22 +55,46 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 # The body of the job, written once and run in both places. Everything it needs
-# arrives as two arguments, so there is no second copy of this logic to drift.
-$body = @'
-param([string]$Root)
+# arrives as one argument, so there is no second copy of this logic to drift;
+# the release list's functions (Release-List.ps1) go in with it.
+$body = "param([string]`$Root)`n" + $ThornswoodReleaseList + "`n" + @'
 $forms = Join-Path $Root 'world\changeForms'
 if (-not (Test-Path -LiteralPath $forms)) { Write-Host 'no characters saved yet, nothing to do'; exit 0 }
+# A list there that is not one would be neither read by the server nor safe
+# to write over, so nothing is thrown away until somebody has looked at it.
+$list = Get-ThornswoodReleaseListPath $Root
+if (-not $list) {
+    Write-Host ("STOP. " + (Join-Path $Root 'server-settings.json') + " will not parse, so the server's private folder, where the release list goes, is not known. Nothing was thrown away.")
+    exit 1
+}
+if (-not (Read-ThornswoodReleaseList $list).ok) {
+    Write-Host ("STOP. $list is not a list of deleted characters, so nothing was thrown away. Look at it, then run this again.")
+    exit 1
+}
 $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $bin = Join-Path $forms ('_discarded-' + $stamp)
-$moved = 0
+$moved = @()
 foreach ($f in (Get-ChildItem -LiteralPath $forms -Filter *.json -File)) {
     if ($f.BaseName -notmatch '^[0-9]+$') { continue }
     if (-not (Test-Path -LiteralPath $bin)) { New-Item -ItemType Directory -Path $bin -Force | Out-Null }
-    Move-Item -LiteralPath $f.FullName -Destination (Join-Path $bin $f.Name) -Force
-    $moved++
+    $to = Join-Path $bin $f.Name
+    try { Move-Item -LiteralPath $f.FullName -Destination $to -Force -ErrorAction Stop; $moved += $to }
+    catch { Write-Host ("could not move {0}: {1}" -f $f.Name, $_.Exception.Message) }
 }
-if ($moved -eq 0) { Write-Host 'there was no character on the server to throw away' }
-else { Write-Host ("thrown away: {0} change form(s), kept at {1}" -f $moved, $bin) }
+if ($moved.Count -eq 0) { Write-Host 'there was no character on the server to throw away'; exit 0 }
+Write-Host ("thrown away: {0} change form(s), kept at {1}" -f $moved.Count, $bin)
+# Only the characters, never the profile (#2668): Release-List.ps1 says why.
+$bad = $false
+$found = Get-ThornswoodCharacterIds $moved
+foreach ($l in @($found.notes) + @(Write-ThornswoodReleaseList -Root $Root -Actors $found.ids)) {
+    $b = "$l" -split '\|'
+    switch ($b[0]) {
+        'RELEASE'     { if ($b[1] -ne 'none') { Write-Host ("release list: {0}, {1} character(s); the server lets go of what it holds of them at its next start" -f $b[1], $b[3]) } }
+        'RELEASENOTE' { Write-Host $b[1] }
+        default       { $bad = $true; Write-Host ('STOP. ' + $b[1]) }
+    }
+}
+if ($bad) { exit 1 }
 '@
 
 if ($UseLocal) {
