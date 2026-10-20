@@ -271,7 +271,7 @@ money at their accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
 Further definitions need their own source evidence, reward/cadence review,
-bounded state, exact bindings and explicit pinned admission. Four remaining scarce-resource interactions and seven retrieval interactions are unfinished; aggregate authoring flags remain false. Existing
+bounded state, exact bindings and explicit pinned admission. Three remaining scarce-resource interactions and seven retrieval interactions are unfinished; aggregate authoring flags remain false. Existing
 accepted quests keep their original terms. Editing a draft or changing the
 aggregate flags does not enable another quest. Published definitions use
 stable hashes and IDs; changing an objective or reward needs a new ID.
@@ -355,3 +355,5 @@ acceptance without deleting unknown or legacy fields. This is a source and
 synthetic transaction measurement, not a connected playtest.
 
 The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
+
+The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask2/cap6 and12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.

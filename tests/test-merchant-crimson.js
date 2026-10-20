@@ -8,7 +8,7 @@ vm.runInNewContext(fixture.slice(0,fixture.indexOf('let w = boot();'))+
 const h=realm.h,doc=require('../game/data/merchant-scarce-harvest.json'),item=doc.sources[0].item;
 const refs=doc.sources.map(row=>parseInt(row.reference,16));
 const gm=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8');
-const interception=Array.from(gm.matchAll(/\[(0x[0-9a-f, x]+)\]\.includes\(refrId\)/g));
+const interception=Array.from(gm.matchAll(/\[(0x[0-9a-f, x]+)\]\.includes\(refrId\)/g)).filter(hit=>hit[1].split(',').length===8);
 assert.equal(interception.length,2,'activation and direct harvesting both intercept the eight static sources');
 for(const hit of interception)assert.deepEqual(hit[1].split(',').map(x=>Number(x)),refs);
 
