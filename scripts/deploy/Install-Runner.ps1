@@ -314,7 +314,7 @@ function Invoke-Here([string]$script, $secret = $null) {
     return @('DRY RUN, nothing ran', 'service Running')
   }
   $pre = $(if ($null -ne $secret) { '$ThornswoodSecret = [Console]::In.ReadToEnd().Trim()' + "`r`n" } else { '' })
-  $file = Join-Path $env:TEMP ('ts-runner-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+  $file = Join-Path ([IO.Path]::GetTempPath()) ('ts-runner-' + [Guid]::NewGuid().ToString('N') + '.ps1')
   [IO.File]::WriteAllText($file, $pre + $script, (New-Object Text.UTF8Encoding $true))
   $ErrorActionPreference = 'Continue'
   try {
