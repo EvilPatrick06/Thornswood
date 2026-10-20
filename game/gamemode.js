@@ -26909,8 +26909,10 @@ function raceGate(actorId, row) {
      anyone  the professions page calls it open furniture, or it holds a recipe
              nobody owns, so it opens for everybody
      halves  each half that owns something here, at the LOWEST rank it owns
-             something at, because that is the rank the door asks for. */
-const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"novice","woodwright":"novice"},"name":"CraftingSmithingSharpeningWheel"},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","platewright":"novice"},"name":"CraftingSmithingArmorTable"},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
+             something at, because that is the rank the door asks for
+     shut    nothing can be made here by anybody (SHUT_BENCHES), and this is
+             what the gate says instead of opening it */
+const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingSharpeningWheel","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingArmorTable","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
 // ==== end BENCH_ACCESS ====
 
 /**
@@ -26931,6 +26933,11 @@ function benchGate(actorId, baseDesc) {
     return null;
   }
   const bench = BENCH_ACCESS[key];
+  // A bench nothing can be made at, by anybody, says why and does not open,
+  // so its menu never lists a thing (SHUT_BENCHES in Build-BenchTable.py: the
+  // sharpening wheel and the armour table, where tempering is cut, #1384).
+  // Asked before the character, because it is the same answer for everybody.
+  if (bench.shut) { return String(bench.shut); }
   if (bench.anyone) { return null; }
 
   const C = globalThis.__thornswoodCharacter;
@@ -27500,7 +27507,14 @@ var MIXTURES = {
   '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
   '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
   '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
-  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  /*
+    The magic effect AlchCureDisease, 0xAE722 (#1383). It was keyed 'ae723'
+    until 17 October, which is CureDisease, the ALCH record of the potion
+    itself, so every Cure Disease brew the engine named (fork #60 hands over
+    MGEF ids) was refused as off the list. Measured in Skyrim.esm on One:
+    0xAE722 is MGEF AlchCureDisease and 0xAE723 is ALCH CureDisease.
+  */
+  'ae722:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
   '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
   '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
   '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
@@ -28040,6 +28054,23 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
     try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
     if (brewed) {
       masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
+  }
+
+  /*
+    A BREWED BOTTLE OF CURE DISEASE CURES (#1383, disease.md "A potion of
+    cure disease clears one ordinary disease"). The bottle is a runtime form
+    with no record, so when it is drunk the injury block cannot read what it
+    does; the effects are known only here, from the ingredients the engine
+    found in the pack (fork #60). So the injury block is told which runtime id
+    this brew made and whether it cures. Every brew is told, not only a cure,
+    so an id the client hands out again after a relog cannot keep a stale cure.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME && Array.isArray(effects)) {
+    var hurtBrew = globalThis.__thornswoodHurt;
+    if (hurtBrew && hurtBrew.brewed) {
+      try { hurtBrew.brewed(actorId, Number(craftedItemBaseId), effects); }
+      catch (e) { log('the injury block threw on a brew:', e); }
     }
   }
   return;
@@ -36352,6 +36383,625 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood farming ====
 
+// ==== thornswood company terms ====
+/*
+  THE FREE SKYRIM TRADING COMPANY'S TERMS, READ IN ONE PLACE (#512, #2695).
+
+  Patrick, 18 Oct 2026 (#2695): staff change the company's terms on an
+  in-game staff panel where staff confirm a proposal; the Trading Company
+  role charters a ship hold by default; there is no freight fee by default,
+  with a ledger fee as a setting; and the haul fee stays apart from the
+  notice board's job fee.
+
+  THE TERMS are game/data/trading-company.json, and the arithmetic that reads
+  them is game/trading-company.js (its own header says what each term is).
+  The server is sent this file and not game/, so both are copied in between
+  the TRADING_COMPANY markers below by
+  scripts/dev/Build-TradingCompanyGamemode.js, and
+  tests/test-512-trading-company.js fails when they differ.
+
+  THE TERMS IN FORCE are kept in private/company-terms.json beside war.json
+  and season.json, so a restart or a deploy keeps them: the terms, every
+  confirmed change (when, from and to), and the one proposal waiting. The
+  file names nobody: who proposed, confirmed or dropped a change is in the
+  staff log, which keeps it for the staff log's own time (#2353). Who made
+  the proposal waiting now is held in memory for the card and the log lines,
+  and after a restart the card says only when it was made.
+  With no file they are the shipped terms. A file that does not read, or
+  terms in it that do not check, are logged and left on disk, and the
+  shipped terms stand until the next confirm writes a good file (it puts the
+  bad one aside first). Terms are never half used and never guessed.
+
+  globalThis.__thornswoodCompany IS THE ONE PLACE ANYTHING ASKS:
+    terms()          a copy of the terms in force
+    haulFee()        gold a haul costs to post, on top of its pay
+    stampHaul(n)     a copy of haul n with the cut it was posted under on it
+    haulCut(n)       the company's cut of haul n's pay, by its stamp
+    saleCuts(price)  a sale out of the world: worker, gone and seller
+    mayCharter(who)  game/trading-company.js mayCharter(who, terms) over the
+                     terms in force (#511, #2700 builds on it)
+    freightFor()     { gold, to } for one load into a ship hold
+  The property block posts and pays hauls by these, and the trade block
+  splits a sale by them. Nothing loads a ship yet; that is #2700's.
+
+  THE STAFF CARD ON THE OFFICE PAGE OF K, the same way as #2685's world
+  card: the server proposes, staff confirm, and nothing is typed. Staff see
+  the terms in force and the proposal waiting, with each change, who
+  proposed it, when, and how many open hauls keep the terms they were posted
+  under. They set the terms on the card and press Propose; Confirm (pressed
+  twice) and Drop name the proposal by when it was made, so a press on a card
+  drawn before somebody else's proposal cannot act on the newer one. The
+  card's buttons send /companyterms, which nobody is told to type, and every line
+  is checked here again: staff by the chat block's isStaff, and the staff
+  block's proof (unproven). Every press goes in the staff log
+  (companypropose, companyconfirm, companydrop), and no press is taken when
+  that log is not loaded. A confirm made against terms that changed since
+  the proposal is refused, so two staff never overwrite each other unseen.
+
+  WHAT IT NEVER DECIDES. Who hauls, for whom, between which holds, when or
+  for how long, and who charters which ship: those are the players' RP.
+  Nothing here proposes by itself, and no timer changes anything.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  // ==== TRADING_COMPANY ====
+  /* Built by scripts\dev\Build-TradingCompanyGamemode.js out of game\data\trading-company.json
+     and game\trading-company.js. Do not hand edit: change those two and run it again. */
+  var COMPANY_TERMS = {"v":1,"haulFee":30,"haulCutPercent":10,"haulCutFrom":10,"saleWorkerPercent":10,"saleGonePercent":10,"saleCutFrom":10,"charter":"company","freightPerLoad":0,"freightTo":"ledger"};
+  var LIB = (function () {
+  var module = { exports: {} };
+'use strict';
+/*
+  THE FREE SKYRIM TRADING COMPANY: ITS TERMS (#512).
+
+  The company is Skyrim's hauler and a business (docs/systems/trading-company.md,
+  #1393, #1646). Its hauls, its tenth and its sales out of the world are in the
+  property block of gamemode.js. This file is the company's terms as data staff
+  can change, and the arithmetic that reads them. It never touches the world, a
+  pack, a ledger, a purse or a price, and it is not wired in yet: the design and
+  Patrick's questions are on #512 (issuecomment-6245906394).
+
+  THE TERMS are one object, kept in game/data/trading-company.json:
+
+    haulFee            gold a haul costs to post, on top of its pay
+    haulCutPercent     the company's cut of a delivered haul's pay, in whole percent
+    haulCutFrom        a pay under this keeps no cut, and the hauler gets it all
+    saleWorkerPercent  on a sale out of the world, the worker's percent
+    saleGonePercent    on a sale out of the world, the percent that leaves the server
+    saleCutFrom        a price under this takes neither cut
+    charter            who may charter a trade ship hold (#511): 'company', 'anyone' or 'staff'
+    freightPerLoad     gold one load into a ship hold costs; 0 is no freight
+    freightTo          where freight goes: 'ledger' (the loading hold's) or 'gone'
+
+  The file's numbers are today's numbers in gamemode.js, and
+  tests/test-512-trading-company.js fails the day the two differ.
+
+  WHAT IT REFUSES. Terms that do not check are refused, never replaced with a
+  default: a negative fee, a percent outside 0 to 100, two sale cuts over 100,
+  an unknown or missing key. A server that silently fell back would charge
+  people a number nobody chose.
+
+  THE SERVER PROPOSES, STAFF CONFIRM (Patrick, 17 Oct 2026, 10:13 PM MT).
+  proposeTerms() says what would change and how many open hauls keep the terms
+  they were posted under. It changes nothing. adoptTerms() is the confirm, and
+  it refuses a proposal made against terms that have changed since.
+
+  A HAUL KEEPS ITS TERMS. stampHaul() writes the cut a haul was posted under
+  onto the haul, and haulCut() reads that stamp before the current terms, so a
+  haul already on the road is paid the way it was posted.
+
+  WHAT IT NEVER DECIDES. Who hauls, for whom, between which holds, when or for
+  how long: those are the players' RP. Nothing here names a person, a hold, a
+  port, a time or a length.
+*/
+
+var KEYS = ['v', 'haulFee', 'haulCutPercent', 'haulCutFrom', 'saleWorkerPercent', 'saleGonePercent',
+            'saleCutFrom', 'charter', 'freightPerLoad', 'freightTo'];
+var CHARTER = ['company', 'anyone', 'staff'];
+var FREIGHT_TO = ['ledger', 'gone'];
+var MAX_GOLD = 100000;
+
+function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function object(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
+function copy(o) { return JSON.parse(JSON.stringify(o)); }
+function gold(n) { return Number.isInteger(n) && n >= 0 && n <= MAX_GOLD; }
+function percent(n) { return Number.isInteger(n) && n >= 0 && n <= 100; }
+function whole(n) { var p = Math.floor(Number(n)); return Number.isFinite(p) && p > 0 ? p : 0; }
+function canonical(t) {
+  var out = {};
+  KEYS.forEach(function (k) { out[k] = t[k]; });
+  return JSON.stringify(out);
+}
+
+/** The reasons a terms object is refused; empty when it checks. */
+function checkTerms(t) {
+  var why = [];
+  if (!object(t)) { return ['The terms are not an object.']; }
+  Object.keys(t).forEach(function (k) { if (KEYS.indexOf(k) < 0) { why.push('Unknown term: ' + k + '.'); } });
+  KEYS.forEach(function (k) { if (!own(t, k)) { why.push('Missing term: ' + k + '.'); } });
+  if (why.length) { return why; }
+  if (t.v !== 1) { why.push('Terms version must be 1.'); }
+  ['haulFee', 'haulCutFrom', 'saleCutFrom', 'freightPerLoad'].forEach(function (k) {
+    if (!gold(t[k])) { why.push(k + ' must be a whole number of gold from 0 to ' + MAX_GOLD + '.'); }
+  });
+  ['haulCutPercent', 'saleWorkerPercent', 'saleGonePercent'].forEach(function (k) {
+    if (!percent(t[k])) { why.push(k + ' must be a whole percent from 0 to 100.'); }
+  });
+  if (percent(t.saleWorkerPercent) && percent(t.saleGonePercent) && t.saleWorkerPercent + t.saleGonePercent > 100) {
+    why.push('The two sale cuts come to more than the price.');
+  }
+  if (CHARTER.indexOf(t.charter) < 0) { why.push('charter must be one of ' + CHARTER.join(', ') + '.'); }
+  if (FREIGHT_TO.indexOf(t.freightTo) < 0) { why.push('freightTo must be one of ' + FREIGHT_TO.join(', ') + '.'); }
+  return why;
+}
+
+/** Terms from the file's text. Throws on anything that does not check. */
+function loadTerms(text) {
+  var t;
+  try { t = JSON.parse(String(text)); } catch (e) { throw new Error('The company terms are not readable JSON.'); }
+  var why = checkTerms(t);
+  if (why.length) { throw new Error('The company terms are refused: ' + why.join(' ')); }
+  return copy(t);
+}
+
+function must(t) {
+  var why = checkTerms(t);
+  if (why.length) { throw new Error('The company terms are refused: ' + why.join(' ')); }
+}
+
+/** A copy of a haul with the cut it was posted under written on it. */
+function stampHaul(haul, terms) {
+  must(terms);
+  var h = copy(haul || {});
+  h.cut = { percent: terms.haulCutPercent, from: terms.haulCutFrom };
+  return h;
+}
+
+/** The cut a haul is paid under: its own stamp, or the current terms for one posted before stamps. */
+function cutOf(haul, terms) {
+  var c = haul && haul.cut;
+  if (object(c) && percent(c.percent) && gold(c.from)) { return { percent: c.percent, from: c.from }; }
+  must(terms);
+  return { percent: terms.haulCutPercent, from: terms.haulCutFrom };
+}
+
+/** The company's cut of a delivered haul, rounded down. */
+function haulCut(haul, terms) {
+  var c = cutOf(haul, terms), p = whole(haul && haul.pay);
+  return p < c.from ? 0 : Math.floor(p * c.percent / 100);
+}
+
+/** A sale out of the world: the worker's cut, the cut that leaves, and the seller's rest. */
+function saleCuts(price, terms) {
+  must(terms);
+  var p = whole(price);
+  if (p < terms.saleCutFrom) { return { price: p, worker: 0, gone: 0, seller: p }; }
+  var w = Math.floor(p * terms.saleWorkerPercent / 100), g = Math.floor(p * terms.saleGonePercent / 100);
+  return { price: p, worker: w, gone: g, seller: p - w - g };
+}
+
+/*
+  The #511 hook: may this person charter (load or sail) a ship hold. who is
+  what the server already knows about the pressing character: { company }
+  for the Trading Company role (__thornswoodIsCompany), { staff } for an admin.
+  An admin testing the chain counts as the company, the same as inCompany.
+*/
+function mayCharter(who, terms) {
+  must(terms);
+  var w = object(who) ? who : {};
+  if (terms.charter === 'anyone') { return true; }
+  if (terms.charter === 'staff') { return w.staff === true; }
+  return w.company === true || w.staff === true;
+}
+
+/** What one load into a ship hold costs, and where the gold goes. */
+function freightFor(terms) {
+  must(terms);
+  return { gold: terms.freightPerLoad, to: terms.freightTo };
+}
+
+/*
+  The server's proposal. Changes nothing. openHauls is the hauls on the boards
+  now; each keeps the cut it was posted under.
+*/
+function proposeTerms(current, next, openHauls) {
+  must(current);
+  var why = checkTerms(next);
+  if (why.length) { return { ok: false, why: why }; }
+  var changes = [];
+  KEYS.forEach(function (k) { if (current[k] !== next[k]) { changes.push({ term: k, from: current[k], to: next[k] }); } });
+  var keep = (Array.isArray(openHauls) ? openHauls : []).length;
+  return { ok: true, base: canonical(current), next: copy(next), changes: changes, openHaulsKeepTerms: keep };
+}
+
+/*
+  Staff confirm a proposal. state is { terms, history }; at is the time. The
+  history keeps when and what changed, never who: who proposed and who
+  confirmed are in the staff log, which keeps them for its own time, and the
+  terms file is not a place that names people (#2353). Refused when the
+  proposal was not ok, changes nothing, or was made against other terms.
+*/
+function adoptTerms(state, proposal, at) {
+  if (!object(state)) { throw new Error('There are no company terms to change.'); }
+  must(state.terms);
+  if (!object(proposal) || proposal.ok !== true) { throw new Error('That proposal was refused.'); }
+  if (!proposal.changes.length) { throw new Error('That proposal changes nothing.'); }
+  if (proposal.base !== canonical(state.terms)) { throw new Error('The terms changed since that proposal. Propose again.'); }
+  if (!Number.isInteger(at) || at < 0) { throw new Error('A confirm says when.'); }
+  must(proposal.next);
+  var history = Array.isArray(state.history) ? state.history.slice() : [];
+  history.push({ at: at, changes: copy(proposal.changes) });
+  return { terms: copy(proposal.next), history: history };
+}
+
+module.exports = {
+  KEYS: KEYS, CHARTER: CHARTER, FREIGHT_TO: FREIGHT_TO,
+  checkTerms: checkTerms, loadTerms: loadTerms, stampHaul: stampHaul, cutOf: cutOf, haulCut: haulCut,
+  saleCuts: saleCuts, mayCharter: mayCharter, freightFor: freightFor,
+  proposeTerms: proposeTerms, adoptTerms: adoptTerms
+};
+  return module.exports;
+  })();
+  // ==== end TRADING_COMPANY ====
+
+  var BY_CHARS = 80;
+  var FILE_NAME = 'company-terms.json';
+
+  /* What the card calls each term, and what kind of value it takes. v is not staff's to change. */
+  var FIELDS = [
+    { key: 'haulFee', label: 'Haul fee', kind: 'gold' },
+    { key: 'haulCutPercent', label: 'The company\'s cut of a haul\'s pay', kind: 'percent' },
+    { key: 'haulCutFrom', label: 'No haul cut on a pay under', kind: 'gold' },
+    { key: 'saleWorkerPercent', label: 'The worker\'s cut of a sale', kind: 'percent' },
+    { key: 'saleGonePercent', label: 'The part of a sale that leaves Skyrim', kind: 'percent' },
+    { key: 'saleCutFrom', label: 'No sale cuts on a price under', kind: 'gold' },
+    { key: 'charter', label: 'Who charters a ship hold', kind: 'choice', choices: LIB.CHARTER },
+    { key: 'freightPerLoad', label: 'Freight for one load into a ship hold (0 is none)', kind: 'gold' },
+    { key: 'freightTo', label: 'Where freight goes', kind: 'choice', choices: LIB.FREIGHT_TO }
+  ];
+
+  function clog() {
+    var a = ['[thornswood company]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+  function fsOf() { try { return require('fs'); } catch (e) { return null; } }
+
+  function termsPath() {
+    var fs = fsOf();
+    if (!fs) { return null; }
+    var path = require('path');
+    var priv = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { priv = String(cfg.privDir); }
+    } catch (e) { }
+    try { if (!fs.existsSync(priv)) { fs.mkdirSync(priv, { recursive: true }); } } catch (e2) { }
+    return path.join(priv, FILE_NAME);
+  }
+
+  // The shipped terms. They check, or this throws at load: tests/test-512-trading-company.js holds that.
+  var SHIPPED = LIB.loadTerms(JSON.stringify(COMPANY_TERMS));
+
+  function cleanWho(by) { return typeof by === 'string' ? by.replace(/\s+/g, ' ').trim().slice(0, BY_CHARS) : ''; }
+
+  function historyOf(rows) {
+    var out = [];
+    (Array.isArray(rows) ? rows : []).forEach(function (r) {
+      if (r && typeof r === 'object' && Number.isInteger(r.at) && Array.isArray(r.changes)) {
+        out.push({ at: r.at, changes: copy(r.changes) });
+      }
+    });
+    return out;
+  }
+
+  function pendingOf(p) {
+    if (!p || typeof p !== 'object' || !Number.isInteger(p.at) ||
+        typeof p.base !== 'string' || !Array.isArray(p.changes) || !p.changes.length) { return null; }
+    if (LIB.checkTerms(p.next).length) { return null; }
+    return { at: p.at, base: p.base, next: copy(p.next), changes: copy(p.changes),
+             openHaulsKeepTerms: Number(p.openHaulsKeepTerms) || 0 };
+  }
+
+  function readState() {
+    var fresh = { terms: copy(SHIPPED), history: [], pending: null, unreadable: false };
+    var fs = fsOf();
+    var file = termsPath();
+    if (!fs || !file) { return fresh; }
+    var text = null;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return fresh; }
+      clog('could not read', file + ':', (e && e.message) || e, '; the shipped terms stand');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var raw = null;
+    try { raw = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e2) { raw = null; }
+    var why = raw && typeof raw === 'object' ? LIB.checkTerms(raw.terms) : ['it is not readable JSON'];
+    if (why.length) {
+      clog(file, 'is refused (' + why.join(' ') + '); the shipped terms stand and the file is left as it is');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var pending = pendingOf(raw.pending);
+    if (raw.pending && !pending) { clog('the proposal in', file, 'does not check; it is not kept'); }
+    return { terms: copy(raw.terms), history: historyOf(raw.history), pending: pending, unreadable: false };
+  }
+
+  var state = readState();
+  // Who made the proposal waiting now, as the staff log names them. Memory
+  // only: the file names nobody, so after a restart this is ''.
+  var proposedBy = '';
+
+  /* Writes the next state whole, or nothing. Answers true when it is on disk. */
+  function write(next) {
+    var fs = fsOf();
+    var file = termsPath();
+    if (!fs || !file) { return false; }
+    try {
+      if (state.unreadable && fs.existsSync(file)) {
+        fs.renameSync(file, file + '.unreadable-' + Date.now());
+      }
+      fs.writeFileSync(file + '.tmp', JSON.stringify({ terms: next.terms, history: next.history, pending: next.pending }));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      clog('could not write', file + ':', (e && e.message) || e, '; nothing changed');
+      return false;
+    }
+    state = { terms: copy(next.terms), history: next.history, pending: next.pending, unreadable: false };
+    return true;
+  }
+
+  function terms() { return copy(state.terms); }
+  function pending() { return state.pending ? copy(state.pending) : null; }
+  function history() { return copy(state.history); }
+
+  /* The hauls on the boards now, not yet delivered or down, that carry the cut they were posted under. */
+  function openHauls() {
+    var out = [];
+    var P = g.__thornswoodProperty;
+    var all = null;
+    try { all = (P && typeof P.notices === 'function') ? P.notices() : null; } catch (e) { all = null; }
+    for (var hold in (all || {})) {
+      if (!Object.prototype.hasOwnProperty.call(all, hold) || !Array.isArray(all[hold])) { continue; }
+      all[hold].forEach(function (n) { if (n && n.haul && n.cut && !n.down && !n.paid) { out.push(n); } });
+    }
+    return out;
+  }
+
+  /** Keeps one proposal, checked whole, and changes nothing else. A later one replaces it. */
+  function propose(next, by) {
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is proposing it.' }; }
+    var p = LIB.proposeTerms(state.terms, next, openHauls());
+    if (!p.ok) { return { ok: false, why: p.why.join(' ') }; }
+    if (!p.changes.length) { return { ok: false, why: 'Those are the terms in force already.' }; }
+    var was = state.pending;
+    var wasBy = proposedBy;
+    var row = { at: Date.now(), base: p.base, next: p.next, changes: p.changes,
+                openHaulsKeepTerms: p.openHaulsKeepTerms };
+    if (was && row.at <= was.at) { row.at = was.at + 1; }
+    if (!write({ terms: state.terms, history: state.history, pending: row })) {
+      return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
+    }
+    proposedBy = who;
+    clog(who, 'proposed', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
+    return { ok: true, pending: pending(), replaced: was ? copy(was) : null, replacedBy: was ? wasBy : '' };
+  }
+
+  /** Adopts the proposal made at at, as a change by whoever confirms it. */
+  function confirm(at, by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    if (String(at) !== String(p.at)) { return { ok: false, why: 'That is not the proposal waiting now.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is confirming it.' }; }
+    var adopted;
+    try {
+      adopted = LIB.adoptTerms({ terms: state.terms, history: state.history },
+                               { ok: true, base: p.base, next: p.next, changes: p.changes }, Date.now());
+    } catch (e) {
+      return { ok: false, why: String((e && e.message) || e) };
+    }
+    if (!write({ terms: adopted.terms, history: adopted.history, pending: null })) {
+      return { ok: false, why: 'The new terms could not be written, so nothing changed.' };
+    }
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'confirmed', (byWas || 'an earlier') + '\'s proposal:', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
+    return { ok: true, terms: terms(), changes: copy(p.changes), proposedBy: byWas };
+  }
+
+  /** Clears the proposal made at at, and changes nothing else. */
+  function drop(at, by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    if (String(at) !== String(p.at)) { return { ok: false, why: 'That is not the proposal waiting now.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is dropping it.' }; }
+    if (!write({ terms: state.terms, history: state.history, pending: null })) {
+      return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
+    }
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'dropped', (byWas || 'an earlier') + '\'s proposal');
+    return { ok: true, dropped: copy(p), proposedBy: byWas };
+  }
+
+  /* ------------------------------------------------------- the staff card */
+  var STAFF_LOG_GONE = 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.';
+
+  function isStaffNow(pid) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+  }
+
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function labelOf(key) {
+    for (var i = 0; i < FIELDS.length; i++) { if (FIELDS[i].key === key) { return FIELDS[i].label; } }
+    return key;
+  }
+  function said(changes) {
+    return changes.map(function (c) { return labelOf(c.term) + ' from ' + c.from + ' to ' + c.to; }).join('; ');
+  }
+
+  /** What the staff card on the Office page draws, or null for anybody who is not staff. */
+  function staffView(profileId) {
+    if (!isStaffNow(profileId)) { return null; }
+    var t = state.terms;
+    var p = state.pending;
+    return {
+      fields: FIELDS.map(function (f) {
+        var row = { key: f.key, label: f.label, kind: f.kind, value: t[f.key] };
+        if (f.choices) { row.choices = f.choices.slice(); }
+        return row;
+      }),
+      pending: p ? { at: p.at, by: proposedBy, openHaulsKeepTerms: p.openHaulsKeepTerms,
+                     changes: p.changes.map(function (c) { return { term: c.term, label: labelOf(c.term), from: c.from, to: c.to }; }) } : null,
+      openHauls: openHauls().length,
+      changed: state.history.length ? { at: state.history[state.history.length - 1].at } : null
+    };
+  }
+
+  /* Every staff member's K panel again, so each card says what is true now. */
+  function redrawStaff() {
+    var c = g.__thornswoodCharacter;
+    if (!c || !c.stateOf || !c.writeState) { return; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e2) { pid = 0; }
+      if (!pid || !isStaffNow(pid)) { continue; }
+      try {
+        var s = c.stateOf(online[i]);
+        if (s) { c.writeState(online[i], s); }
+      } catch (e3) { }
+    }
+  }
+
+  /* The terms a propose line names: term=value pairs over the terms in force. null and why when one is wrong. */
+  function nextFrom(pairs) {
+    var next = copy(state.terms);
+    var seen = {};
+    for (var i = 0; i < pairs.length; i++) {
+      var m = /^([A-Za-z]+)=([a-z0-9]+)$/.exec(String(pairs[i] || ''));
+      var f = null;
+      for (var j = 0; m && j < FIELDS.length; j++) { if (FIELDS[j].key === m[1]) { f = FIELDS[j]; } }
+      if (!f) { return { why: 'The card sent a term the server does not know.' }; }
+      if (seen[f.key]) { return { why: 'The card sent ' + f.label + ' twice.' }; }
+      seen[f.key] = true;
+      if (f.kind === 'choice') { next[f.key] = m[2]; } else if (/^\d+$/.test(m[2])) { next[f.key] = Number(m[2]); } else {
+        return { why: f.label + ' is a whole number.' };
+      }
+    }
+    if (!pairs.length) { return { why: 'Change a term on the card first.' }; }
+    return { next: next };
+  }
+
+  /*
+    The staff card's lines: propose <term>=<value>..., confirm <when> and
+    drop <when>. Answers true, because the word is always this block's.
+  */
+  function command(parts, actorId, profileId, toProfile, cmd) {
+    var pid = Number(profileId) || 0;
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    if (!isStaffNow(pid)) {
+      clog('a line for the company\'s terms from profile', pid, 'who is not staff; nothing changed');
+      toProfile(profileId, 'The company\'s terms are staff\'s. Nothing changed.');
+      return true;
+    }
+    var log = g['__thornswoodStaff'];
+    if (!log || typeof log.unproven !== 'function' || typeof log.record !== 'function') {
+      toProfile(profileId, STAFF_LOG_GONE);
+      return true;
+    }
+    var unproven = log.unproven(cmd, pid);
+    if (unproven) { toProfile(profileId, unproven); return true; }
+    var name = nameOfActor(actorId);
+    var by = name.slice(0, 60) + ' (profile ' + pid + ')';
+    var r;
+
+    if (verb === 'propose') {
+      var n = nextFrom((parts || []).slice(2));
+      if (!n.next) { toProfile(profileId, n.why + ' Nothing changed.'); return true; }
+      r = propose(n.next, by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      log.record('companypropose', pid, name, 0, 'the company\'s terms',
+                 said(r.pending.changes) + (r.replaced ? ', in place of ' + (r.replacedBy || 'an earlier') + '\'s proposal' : ''),
+                 0, { changes: r.pending.changes });
+      toProfile(profileId, 'You propose new terms for the company: ' + said(r.pending.changes) + '. They change only ' +
+                'when staff confirm them on this page. ' + r.pending.openHaulsKeepTerms +
+                (r.pending.openHaulsKeepTerms === 1 ? ' open haul keeps' : ' open hauls keep') +
+                ' the terms it was posted under. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    if (verb === 'confirm' || verb === 'drop') {
+      var at = parts && parts[2];
+      var p = state.pending;
+      r = verb === 'confirm' ? confirm(at, by) : drop(at, by);
+      var from = r.proposedBy ? 'proposed by ' + r.proposedBy : 'proposed before the last restart';
+      if (!r.ok) {
+        toProfile(profileId, r.why + (/waiting now/.test(r.why) ? ' Open the page again to see the one that is.' : '') +
+                  ' Nothing changed.');
+        return true;
+      }
+      if (verb === 'drop') {
+        log.record('companydrop', pid, name, 0, 'the company\'s terms', from + ': ' + said(p.changes),
+                   0, { changes: p.changes, proposedBy: r.proposedBy });
+        toProfile(profileId, 'You drop the proposal. The company\'s terms stay as they are. It is in the staff log.');
+        redrawStaff();
+        return true;
+      }
+      log.record('companyconfirm', pid, name, 0, 'the company\'s terms', from + ': ' + said(r.changes),
+                 0, { changes: r.changes, proposedBy: r.proposedBy });
+      toProfile(profileId, 'The company\'s terms change: ' + said(r.changes) + '. Hauls already posted keep the ' +
+                'terms they were posted under. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    toProfile(profileId, 'The company\'s card on the Office page of K proposes, confirms and drops. Nothing changed.');
+    return true;
+  }
+
+  g.__thornswoodCompany = {
+    terms: terms,
+    haulFee: function () { return state.terms.haulFee; },
+    stampHaul: function (n) { return LIB.stampHaul(n, state.terms); },
+    haulCut: function (n) { return LIB.haulCut(n, state.terms); },
+    saleCuts: function (price) { return LIB.saleCuts(price, state.terms); },
+    mayCharter: function (who) { return LIB.mayCharter(who, state.terms); },
+    freightFor: function () { return LIB.freightFor(state.terms); },
+    pending: pending,
+    history: history,
+    propose: propose,
+    confirm: confirm,
+    drop: drop,
+    // The staff card on the Office page of K: what it draws, and its lines.
+    staffView: staffView,
+    command: command,
+    FIELDS: copy(FIELDS)
+  };
+  clog('the company\'s terms are read: haul fee', state.terms.haulFee, ', haul cut', state.terms.haulCutPercent + '%',
+       ', charter', state.terms.charter, ', freight', state.terms.freightPerLoad);
+})();
+// ==== end thornswood company terms ====
+
 // ==== thornswood property ====
 /*
   PROPERTY: CLAIMING A BUILDING, AND THE DEED THAT SAYS SO.
@@ -36366,17 +37016,18 @@ log('gamemode loaded:',
   Claiming hands you the deed there and then, which is why it has to happen at
   the door.
 
-  WHAT THIS BLOCK IS AND IS NOT, because the system is bigger than what is built.
-  This is the claim, the deed and the lapse. Locks, keys, key molds, the offices
-  that grant stewardship, rent and the drop box are not here yet and are their
-  own entries on the list.
+  WHAT THIS BLOCK IS. It began as the claim, the deed and the lapse. Locks,
+  keys and key molds (#615, #1637), the master key (#2254), the hold offices
+  (#2551), rent, the drop box (#2298), beds (#1603) and the notice boards
+  (#1627) have joined it since, each with its own note further down.
 
   WHERE THE DOOR COMES FROM. mp.onActivate is handed the door, so the door a
-  person last opened is written on them and /claim reads it back. That is why
+  person last opened is written on them and the lock key's Claim, which sends
+  /claim (#1637), reads it back. That is why
   there is no proximity search here: the engine has already told us which door
   they touched, and searching for the nearest one would be a worse answer to a
   question already answered. A door touched longer ago than DOOR_MEMORY_MS does
-  not count, so /claim typed in a field claims nothing.
+  not count, so a /claim that reaches the server from a field claims no house.
 
   A DEED IS ONE RECORD. ThornswoodBookDeed, and the property it is for is the
   per-instance name on the inventory entry: Inventory::Entry in the fork carries
@@ -36384,7 +37035,8 @@ log('gamemode loaded:',
   to Breezehome' in one pack and 'Deed to Honeyside' in another. 852 buildings,
   one record.
 
-  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in data/property.json,
+  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in private/property.json
+  (registerPath, #541),
   and that record is what decides who holds a building. The deed in somebody's
   pack is the thing that can be stolen; it is not the register. A book somebody
   renamed by hand is not a deed, because the server never issued it.
@@ -40920,7 +41572,7 @@ log('gamemode loaded:',
           var hp = Math.floor(Number(hl.pay)) || 0;
           arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
                           n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
-                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp, hl) || 0 });
         }
       }
     }
@@ -41761,7 +42413,7 @@ log('gamemode loaded:',
       return true;
     }
     if (n.haul) {
-      var tenth = haulTenth(n.pay);
+      var tenth = haulTenth(n.pay, n) || 0;
       plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
       toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
                 n.name + ' or a steward confirms it on the board, and ' +
@@ -42328,8 +42980,10 @@ log('gamemode loaded:',
     open or taken. Nothing was delivered, so the company keeps no tenth.
 
     On a confirm, by the poster or a steward, standing at the board the haul
-    named, the company keeps a tenth of the pay, rounded down, and nothing
-    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    named, the company keeps its cut of the pay: the cut the haul was posted
+    under, from the company's terms (#512, #2695; a tenth, rounded down, and
+    nothing under 10 gold as they ship). The haul fee is the company's too,
+    and apart from the board's job fee. The hauler is handed the rest out of the ledger, so the
     ledger drops by what the hauler received and keeps the fee and the tenth.
     It is the poster's gold moving, never new gold.
 
@@ -42345,13 +42999,19 @@ log('gamemode loaded:',
     they are in the world, the way a bed's takings wait for a holder who is
     away (#1392). Nothing else can spend it in the meantime.
   */
-  var HAUL_TENTH_FROM = 10;
   var HAUL_EVERY_MS = 5000;
 
-  /** The company's tenth of a pay: rounded down, and nothing under 10. */
-  function haulTenth(pay) {
-    var p = Math.floor(Number(pay)) || 0;
-    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  /*
+    The company's cut of a haul's pay (#512, #2695): the cut haul n was
+    posted under, read by the company terms block (a tenth, rounded down, and
+    nothing under 10 gold, as the terms ship). null when the terms are not
+    loaded, and then nothing is paid. The name is the one it had when the cut
+    was a fixed tenth.
+  */
+  function haulTenth(pay, n) {
+    var c = g.__thornswoodCompany;
+    if (!c || typeof c.haulCut !== 'function') { return null; }
+    return c.haulCut({ pay: Math.floor(Number(pay)) || 0, cut: n && n.cut });
   }
 
   /** A haul's line on the wall and in Your jobs: where it goes and the pay. */
@@ -42399,9 +43059,16 @@ log('gamemode loaded:',
       toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
       return true;
     }
-    var cost = JOB_FEE + pay;
+    // The haul fee and the cut are the company's terms (#512, #2695), apart from the board's job fee.
+    var co = g.__thornswoodCompany;
+    if (!co || typeof co.haulFee !== 'function' || typeof co.stampHaul !== 'function') {
+      toProfile(profileId, 'The company\'s terms are not loaded on this server, so no haul is posted. Say so in the dev channel.');
+      return true;
+    }
+    var fee = co.haulFee();
+    var cost = fee + pay;
     if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
-      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + fee + ' for the board and the ' + pay +
                 ' pay, and you do not have it. Nothing was taken.');
       return true;
     }
@@ -42411,18 +43078,19 @@ log('gamemode loaded:',
       if (ap && ap.name) { who = String(ap.name); }
     } catch (e) { }
     if (!notices[hold]) { notices[hold] = []; }
-    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
-                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // The haul carries the cut it was posted under, so a change of terms never re-prices it.
+    notices[hold].push(co.stampHaul({ by: profileId, name: who, text: text, at: Date.now(),
+                                      job: true, haul: true, dest: dest, pay: pay, taken: 0 }));
     // deposit saves the notice with the coin, so the two cannot part.
-    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + fee + ' fee, and ' + pay + ' pay held')) {
       notices[hold].pop();
       payOut(actorId, cost);
       toProfile(profileId, 'That did not work. Nothing was taken.');
       return true;
     }
-    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', fee, 'fee');
     toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
-              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + fee + ' for the board, and the ' +
               pay + ' pay, held until it is confirmed at ' + dest + '.');
     refreshPanel(actorId);
     return true;
@@ -42475,7 +43143,11 @@ log('gamemode loaded:',
       return true;
     }
     var pay = Math.floor(Number(n.pay)) || 0;
-    var tenth = haulTenth(pay);
+    var tenth = haulTenth(pay, n);
+    if (tenth === null) {
+      toProfile(profileId, 'The company\'s terms are not loaded on this server, so nothing was paid. Say so in the dev channel.');
+      return true;
+    }
     var got = pay - tenth;
     var r = handHaul(from, n, Number(n.taken), got,
                      'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
@@ -42684,8 +43356,9 @@ log('gamemode loaded:',
     puts up and the two of them agree to on the panel, the way any trade is
     agreed. Any change to either side takes both agreements back.
 
-    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
-    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    THE CUTS are the company's terms (#512, #2695), and as they ship: the
+    worker takes 10% of the price, rounded down, and another 10% leaves the
+    server. The seller receives the rest. Under 10 gold neither cut
     is taken and the seller receives the whole price. The price comes out of
     the worker's pack, the company's coin in their hands, and the worker's own
     10% is never taken from it, so the worker pays the price less their cut.
@@ -42696,14 +43369,15 @@ log('gamemode loaded:',
     role an application in Discord leads to (__thornswoodIsCompany), or an
     admin testing the chain, the same as a Jarl.
   */
-  var SALE_CUT_FROM = 10;
-
-  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  /*
+    A price split by the company's terms (#512, #2695): the worker's cut, the
+    cut that leaves, and the seller's rest. null when the terms are not
+    loaded, and then the trade block refuses the sale.
+  */
   function saleCuts(price) {
-    var p = Math.floor(Number(price)) || 0;
-    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
-    var tenth = Math.floor(p / 10);
-    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+    var c = g.__thornswoodCompany;
+    if (!c || typeof c.saleCuts !== 'function') { return null; }
+    return c.saleCuts(price);
   }
 
   function inCompany(profileId) {
@@ -42758,6 +43432,15 @@ log('gamemode loaded:',
     if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
+    // The company's terms card on the Office page, for staff (#512, #2695): the company terms block answers it.
+    if (word === '/companyterms') {
+      var companyTerms = g['__thornswoodCompany'];
+      if (companyTerms && typeof companyTerms.command === 'function') {
+        return companyTerms.command(parts, actorId, profileId, toProfile, cmd);
+      }
+      toProfile(profileId, 'The company\'s terms are not running on this server. Say so in the dev channel.');
+      return true;
+    }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') {
@@ -43185,6 +43868,10 @@ log('gamemode loaded:',
       view.jarls.push(row);
     }
     if (!view.steward && !staff) { return view; }
+    // The company's terms, for staff only (#512, #2695): the company terms block's card.
+    var companyApi = g['__thornswoodCompany'];
+    try { view.company = (staff && companyApi && companyApi.staffView) ? companyApi.staffView(pid) : null; }
+    catch (eCompany) { view.company = null; }
 
     var building = here(actorId);
     if (building) {
@@ -43494,13 +44181,9 @@ log('gamemode loaded:',
   robes are not race locked: races.md says Thalmor robes are a faction,
   not a people.
 
-  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
-  between holds. At most 3 patrols in the province at once, and only one on
-  a given road." Every actor the server stands up goes through the NPC
-  population policy and the shared NPC runtime: placeActors admits and
-  enrolls what it places, and the policy switches off any runtime actor it
-  has no rule for. Those are the NPC lane's, so the patrols wait on it.
-  What a patrol needs from it is written on issue #1390.
+  THE PATROLS ARE NOT IN THIS BLOCK. They are the Thalmor patrols block,
+  after the NPC startup, and a patrol rule in the NPC population policy
+  (#1390). Nothing here waits on them, and they do not read either roll.
 */
 (function () {
   'use strict';
@@ -44772,6 +45455,8 @@ log('gamemode loaded:',
     if (baseId === GOLD) { return true; }
     if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
+    // #2479: the cut rows (#1511) are held back the way a sword is.
+    if (isCutOut(baseId)) { return true; }
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
 
@@ -46060,6 +46745,724 @@ log('gamemode loaded:',
   };
 })();
 // ==== end thornswood dungeon loot ====
+
+// ==== thornswood trade ships ====
+/*
+  TRADE SHIPS ON THE SERVER (#511), SWITCHED OFF BY DEFAULT.
+
+  The manifest is game\trade-cargo.js, bundled just below so the one file the
+  server loads carries it (scripts\dev\Build-TradeCargoGamemode.js writes the
+  bundle; tests\test-511-trade-cargo.js fails when it is stale). This block is
+  the server's side of it: the register on disk, the release of deleted
+  characters, and the line the load says. Nothing is placed in the world and
+  nobody is told anything from here yet: how a dock looks and what pressing a
+  hold does wait on #511's questions for Patrick (issuecomment-6245473792).
+
+  THE REGISTER is private\trade-cargo.json, beside the other registers that
+  name characters, because the data folder is served to anybody (#541). It
+  keeps the staff list of ports, routes and crews in force with the manifest,
+  in one file, so the two are always written together (trade-cargo.js, THE
+  REGISTER). No file is a world with no ships. A file that is there and does
+  not verify is refused whole: the ships hold nothing at this start, nothing
+  is written over it, and the log says so, because writing would throw away
+  every piece aboard.
+
+  Every change is written before it is made, as the embassy's rolls are: the
+  next register goes to disk and only then becomes the register, so what the
+  server holds is what a restart reads, and a write that fails changes
+  nothing.
+
+  THE SWITCH. "thornswoodTradeShips": true in server-settings.json switches
+  the ships on: this block then puts the register's handle on globalThis as
+  __thornswoodTradeShips, for the dock code to come. Off, which is every
+  server today, the register is still read, still let go of deleted
+  characters and still counted in the log, so a list of deleted characters
+  never waits on a switch and staff can see what is aboard before turning
+  anything on; but there is no handle, so nothing can load, sail or hand out.
+
+  THE RELEASE (#2351, #2668). As this block loads it asks for the part
+  'cargo' through __thornswoodRelease, before anything else acts on the
+  register. A deleted, reset, wiped or replaced character comes off every
+  line and hand out by form id, or by profile when Delete-Person names the
+  profile; every piece stays where it was (trade-cargo.js, release). The log
+  says counts only, never a name, a profile id or a form id.
+*/
+// TRADE CARGO BUNDLE BEGIN
+// Built by scripts\dev\Build-TradeCargoGamemode.js out of game\trade-cargo.js. Do not hand edit.
+const TRADE_CARGO = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  TRADE SHIPS: THE MANIFEST (#511).
+
+  A trade ship is a hold, a container the server places at a dock, that is
+  loaded at one port, is away for a voyage, and is emptied at another. This
+  file is only the manifest: what is in each hold, whose pack every piece came
+  out of, who it is for, and where it went. It never touches the world, a
+  pack, a purse or a price. The design, its boundaries and the questions for
+  Patrick are on #511 (issuecomment-6245473792).
+
+  WHAT IT REFUSES TO DO, because a cargo worth robbing is a cargo worth making
+  out of nothing (the trap #511 names):
+
+  - A piece is written aboard only with the receipt of the debit that already
+    took it out of somebody's pack. One receipt loads once.
+  - A piece leaves only in two steps. begin() takes it off the hold and holds
+    it as pending; finish() records the receipt of the credit that put it into
+    exactly one pack or drop box. A pending piece is still counted, so a crash
+    between the two steps neither loses it nor pays it twice.
+  - Every change runs the audit: for every line, what was loaded equals what
+    is aboard plus what is pending plus what went out. A hold never grows.
+  - Coin is not cargo. Gold (base 0xF) is refused; freight is #512's rule.
+  - Saved state that does not verify is refused. It never starts empty.
+
+  WHO IS NAMED. A person on the manifest is a character, { actor, profile }:
+  the character's form id and the profile it is on, the two numbers the
+  release list of deleted characters (#2351, #2668) names people by. Never a
+  name: what a panel shows is read off the character when it is shown. When
+  a character is deleted, reset, wiped or replaced by New-Character,
+  release() takes them off: every place they are named becomes null, and
+  every piece stays exactly where it was. A line whose recipient is gone
+  cannot be delivered or left for them, and one whose loader is gone cannot
+  be returned to them; it stays aboard for the world to settle (a piece can
+  still be taken, and staff can narrate what became of it).
+
+  WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
+  17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
+  what happens with it in the world. So nothing here says who sails, where,
+  when or for how long. The ports, the routes, their leg times and the crews
+  are staff data: checkRoutes() below reads and checks them, and
+  proposeRoutes() lists what a change would do so staff can confirm it before
+  it is kept. Who may load, and whether opening a hold is a crime, are the
+  world's business, not this file's.
+
+  Ownership of who may run a ship, contracts and freight belong to #512 (the
+  Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
+  Nothing here calls either.
+*/
+
+var GOLD_BASE = 15;
+var MAX_COUNT = 2147483647;
+var MAX_LINES_DEFAULT = 24;
+var MAX_STATE_BYTES = 512 * 1024;
+var ID_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+var HOWS = { delivered: 1, left: 1, returned: 1, taken: 1 };
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function count(n) { return Number.isInteger(n) && n > 0 && n <= MAX_COUNT; }
+function text(s, max) { return typeof s === 'string' && s.length > 0 && s.length <= (max || 128) && s.trim() === s; }
+function time(t) { return Number.isInteger(t) && t >= 0; }
+
+/* A character: its form id and its profile (0 when it has none). */
+function party(p) {
+  return isObj(p) && Object.keys(p).length === 2 &&
+    Number.isInteger(p.actor) && p.actor > 0 && p.actor <= 0xffffffff &&
+    Number.isSafeInteger(p.profile) && p.profile >= 0;
+}
+function partyOf(p, what) {
+  if (!party(p)) { throw new Error(what + ' has to be a character.'); }
+  return { actor: p.actor, profile: p.profile };
+}
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+
+/* A piece as the inventory holds it: base, count and every other field kept. */
+function entryOf(e) {
+  if (!isObj(e) || !Number.isInteger(e.baseId) || e.baseId <= 0 || e.baseId > 0xffffffff || !count(e.count)) {
+    throw new Error('A piece of cargo cannot be verified.');
+  }
+  if (e.baseId === GOLD_BASE) { throw new Error('Coin is not cargo.'); }
+  return copy(e);
+}
+
+function canonical(v) {
+  if (Array.isArray(v)) { return v.map(canonical); }
+  if (!isObj(v)) { return v; }
+  var out = {};
+  Object.keys(v).sort().forEach(function (k) { out[k] = canonical(v[k]); });
+  return out;
+}
+
+/*
+  opts.ports is the port keys a hold may stand at, and may be empty (a world
+  with no ships). opts.routes, when given, is the one-way legs a hold may sail.
+*/
+function createTradeCargo(opts) {
+  opts = opts || {};
+  if (!Array.isArray(opts.ports)) { throw new Error('The ports cannot be verified.'); }
+  var ports = {};
+  opts.ports.forEach(function (p) {
+    if (typeof p !== 'string' || !ID_RE.test(p) || ports[p]) { throw new Error('A port cannot be verified: ' + p); }
+    ports[p] = true;
+  });
+  var routes = null;
+  if (opts.routes !== undefined) {
+    routes = {};
+    if (!Array.isArray(opts.routes)) { throw new Error('The routes cannot be verified.'); }
+    opts.routes.forEach(function (r) {
+      if (!isObj(r) || !ports[r.from] || !ports[r.to] || r.from === r.to) { throw new Error('A route cannot be verified.'); }
+      routes[r.from + '>' + r.to] = true;
+    });
+  }
+  var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
+  if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
+
+  function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
+
+  function holdOf(state, id) {
+    var h = has(state.holds, id) ? state.holds[id] : null;
+    if (!h) { throw new Error('No hold ' + id + '.'); }
+    return h;
+  }
+
+  function useReceipt(state, receipt) {
+    if (!text(receipt, 200)) { throw new Error('A receipt cannot be verified.'); }
+    if (has(state.receipts, receipt)) { throw new Error('That receipt was already used.'); }
+    state.receipts[receipt] = true;
+  }
+
+  /*
+    The audit. Throws on the first thing that does not add up, so a caller that
+    catches it can refuse the change and keep the state it had. Answers the
+    counts a load banner says.
+  */
+  function audit(state) {
+    if (!isObj(state) || state.v !== 1 || !Number.isInteger(state.seq) || state.seq < 0 ||
+        !isObj(state.holds) || !isObj(state.receipts)) {
+      throw new Error('The manifest cannot be verified.');
+    }
+    var seen = {}, used = {}, holds = 0, sailing = 0, aboard = 0, pending = 0, out = 0;
+    function receipt(r) {
+      if (!text(r, 200) || used[r] || state.receipts[r] !== true) { throw new Error('A receipt does not match the manifest.'); }
+      used[r] = true;
+    }
+    function named(p) { return p === null || party(p); }
+    Object.keys(state.holds).forEach(function (id) {
+      var h = state.holds[id];
+      if (!ID_RE.test(id) || !isObj(h) || !ports[h.port] || !isObj(h.lines) || !Array.isArray(h.outs)) {
+        throw new Error('Hold ' + id + ' cannot be verified.');
+      }
+      holds++;
+      if (h.sailing !== null) {
+        var s = h.sailing;
+        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
+          throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
+        }
+        sailing++;
+      }
+      var left = {};
+      var lines = Object.keys(h.lines);
+      if (lines.length > maxLines) { throw new Error('Hold ' + id + ' carries more lines than it may.'); }
+      lines.forEach(function (k) {
+        var l = h.lines[k];
+        if (!isObj(l) || String(l.seq) !== k || !Number.isInteger(l.seq) || l.seq < 1 || l.seq > state.seq || seen[l.seq] ||
+            !named(l.by) || !named(l.for) || !ports[l.from] || !Number.isInteger(l.aboard) || l.aboard < 0) {
+          throw new Error('A line in hold ' + id + ' cannot be verified.');
+        }
+        seen[l.seq] = true;
+        entryOf(l.entry);
+        if (l.aboard > l.entry.count) { throw new Error('A line in hold ' + id + ' grew.'); }
+        receipt(l.receipt);
+        left[k] = l.entry.count - l.aboard;
+        aboard += l.aboard;
+      });
+      h.outs.forEach(function (o) {
+        if (!isObj(o) || !Number.isInteger(o.seq) || o.seq < 1 || o.seq > state.seq || seen[o.seq] || !HOWS[o.how] ||
+            !named(o.who) || !count(o.count) || !time(o.at) || !has(h.lines, String(o.line))) {
+          throw new Error('Something that left hold ' + id + ' cannot be verified.');
+        }
+        seen[o.seq] = true;
+        left[o.line] -= o.count;
+        if (left[o.line] < 0) { throw new Error('More left hold ' + id + ' than was loaded.'); }
+        if (o.receipt === null) { pending += o.count; } else { receipt(o.receipt); out += o.count; }
+      });
+      Object.keys(left).forEach(function (k) {
+        if (left[k] !== 0) { throw new Error('Hold ' + id + ' does not add up.'); }
+      });
+    });
+    Object.keys(state.receipts).forEach(function (r) {
+      if (!used[r]) { throw new Error('A receipt is not on the manifest.'); }
+    });
+    return { holds: holds, sailing: sailing, aboard: aboard, pending: pending, out: out };
+  }
+
+  /* Every change works on a copy and replaces the state only once it audits. */
+  function change(state, fn) {
+    var next = copy(state);
+    var result = fn(next);
+    audit(next);
+    Object.keys(state).forEach(function (k) { delete state[k]; });
+    Object.keys(next).forEach(function (k) { state[k] = next[k]; });
+    return result;
+  }
+
+  function open(state, id, port) {
+    return change(state, function (s) {
+      if (typeof id !== 'string' || !ID_RE.test(id)) { throw new Error('A hold needs a plain name.'); }
+      if (has(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
+      if (!ports[port]) { throw new Error('No port ' + port + '.'); }
+      s.holds[id] = { port: port, sailing: null, lines: {}, outs: [] };
+      return id;
+    });
+  }
+
+  /*
+    Loads one piece. The caller has already taken it out of a pack, and
+    receipt names that debit. by is the character who loaded it, for the
+    character it is for.
+  */
+  function load(state, id, piece) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (h.sailing) { throw new Error('The hold is at sea.'); }
+      if (!isObj(piece)) { throw new Error('A load needs who loaded it and who it is for.'); }
+      var by = partyOf(piece.by, 'Who loaded it');
+      var to = partyOf(piece.for, 'Who it is for');
+      var e = entryOf(piece.entry);
+      if (Object.keys(h.lines).length >= maxLines) { throw new Error('The hold is full.'); }
+      useReceipt(s, piece.receipt);
+      var seq = ++s.seq;
+      h.lines[seq] = { seq: seq, by: by, for: to, from: h.port, receipt: piece.receipt, entry: e, aboard: e.count };
+      return seq;
+    });
+  }
+
+  function depart(state, id, to, at, arriveAt) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (h.sailing) { throw new Error('The hold is already at sea.'); }
+      if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
+        throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
+      }
+      if (!time(at) || !time(arriveAt) || arriveAt <= at) { throw new Error('A voyage needs a time to leave and a later time to arrive.'); }
+      var carrying = Object.keys(h.lines).some(function (k) { return h.lines[k].aboard > 0; });
+      if (!carrying) { throw new Error('The hold is empty.'); }
+      if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
+      h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
+      return h.sailing;
+    });
+  }
+
+  /*
+    A staff tool, for narration: change a voyage that is under way, to another
+    port on the list or to another time to arrive, or both. It never touches
+    what is aboard. Staff routes do not bind it, because staff are the ones
+    who wrote them; the port still has to be one a hold can stand at.
+  */
+  function amend(state, id, change_) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The hold is not at sea.'); }
+      if (!isObj(change_)) { throw new Error('Say what changes.'); }
+      var to = change_.to === undefined ? h.sailing.to : change_.to;
+      var arriveAt = change_.arriveAt === undefined ? h.sailing.arriveAt : change_.arriveAt;
+      if (!ports[to] || to === h.sailing.from) { throw new Error('No voyage from ' + h.sailing.from + ' to ' + to + '.'); }
+      if (!time(arriveAt) || arriveAt <= h.sailing.at) { throw new Error('A voyage arrives after it left.'); }
+      h.sailing.to = to;
+      h.sailing.arriveAt = arriveAt;
+      return h.sailing;
+    });
+  }
+
+  /* Every hold whose voyage is over by now is docked at its destination. */
+  function arrive(state, now) {
+    if (!time(now)) { throw new Error('The time cannot be verified.'); }
+    return change(state, function (s) {
+      var landed = [];
+      Object.keys(s.holds).sort().forEach(function (id) {
+        var h = s.holds[id];
+        if (h.sailing && h.sailing.arriveAt <= now) {
+          h.port = h.sailing.to;
+          h.sailing = null;
+          landed.push(id);
+        }
+      });
+      return landed;
+    });
+  }
+
+  /*
+    Takes count of a line off the hold and holds it as pending, then hands
+    back what the caller must put into one pack or drop box. how is
+    delivered (to the recipient), left (in the drop box under the
+    recipient's name), returned (to the loader, at the port it was loaded
+    in) or taken (by whoever opened it; when that is allowed is the
+    caller's rule, not this file's). who is the character receiving it.
+  */
+  function begin(state, id, line, n, how, who, at) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var l = has(h.lines, String(line)) ? h.lines[String(line)] : null;
+      if (!l) { throw new Error('No such line in the hold.'); }
+      if (!HOWS[how]) { throw new Error('Not a way for cargo to leave.'); }
+      var to = partyOf(who, 'Who receives it');
+      if (!count(n) || n > l.aboard) { throw new Error('There is not that much aboard.'); }
+      if (!time(at)) { throw new Error('The time cannot be verified.'); }
+      if (how !== 'taken' && h.sailing) { throw new Error('The hold is at sea.'); }
+      if ((how === 'delivered' || how === 'left') && (!same(to, l.for) || h.port === l.from)) {
+        throw new Error('Only the person it is for receives it, at the far end.');
+      }
+      if (how === 'returned' && (!same(to, l.by) || h.port !== l.from)) {
+        throw new Error('Only the person who loaded it takes it back, where it was loaded.');
+      }
+      l.aboard -= n;
+      var seq = ++s.seq;
+      h.outs.push({ seq: seq, line: l.seq, count: n, how: how, who: to, at: at, receipt: null });
+      var e = copy(l.entry);
+      e.count = n;
+      return { out: seq, entry: e };
+    });
+  }
+
+  /* The credit happened; receipt names it. */
+  function finish(state, id, out, receipt) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var o = h.outs.filter(function (x) { return x.seq === out; })[0];
+      if (!o || o.receipt !== null) { throw new Error('Nothing is waiting to be handed out under that number.'); }
+      useReceipt(s, receipt);
+      o.receipt = receipt;
+      return o.seq;
+    });
+  }
+
+  /* The credit was refused for certain; the piece goes back aboard. */
+  function undo(state, id, out) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var i = -1;
+      h.outs.forEach(function (x, j) { if (x.seq === out && x.receipt === null) { i = j; } });
+      if (i < 0) { throw new Error('Nothing is waiting to be handed out under that number.'); }
+      var o = h.outs.splice(i, 1)[0];
+      h.lines[String(o.line)].aboard += o.count;
+      return o.seq;
+    });
+  }
+
+  /*
+    THE RELEASE OF DELETED CHARACTERS (#2351, #2668). who is what the
+    release list answers: who.actor(formId) and who.profile(profileId), each
+    true for one the list names. A character the list names by form id, or
+    whose profile it names (Delete-Person.ps1, which deletes the profile and
+    every character on it), comes off every line and every hand out: the
+    place becomes null. A list of characters only (Reset-Character.ps1,
+    Wipe-Saves.ps1, New-Character.ps1) never names a profile, so a profile's
+    other characters stay. Nothing aboard, pending or gone out changes by one
+    piece, which the audit holds it to. Answers the counts, for the log.
+  */
+  function release(state, who) {
+    if (!isObj(who) || typeof who.actor !== 'function' || typeof who.profile !== 'function') {
+      throw new Error('The release list cannot be verified.');
+    }
+    function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
+    return change(state, function (s) {
+      var c = { loaders: 0, recipients: 0, receivers: 0 };
+      Object.keys(s.holds).forEach(function (id) {
+        var h = s.holds[id];
+        Object.keys(h.lines).forEach(function (k) {
+          var l = h.lines[k];
+          if (gone(l.by)) { l.by = null; c.loaders++; }
+          if (gone(l.for)) { l.for = null; c.recipients++; }
+        });
+        h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+      });
+      return c;
+    });
+  }
+
+  /* What is aboard a hold now, line by line, for a panel. */
+  function aboard(state, id) {
+    var h = holdOf(state, id);
+    return Object.keys(h.lines).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (k) { return h.lines[k]; })
+      .filter(function (l) { return l.aboard > 0; })
+      .map(function (l) {
+        var e = copy(l.entry); e.count = l.aboard;
+        return { line: l.seq, for: l.for && copy(l.for), by: l.by && copy(l.by), entry: e };
+      });
+  }
+
+  function save(state) {
+    audit(state);
+    var out = JSON.stringify(canonical(state));
+    if (Buffer.byteLength(out, 'utf8') > MAX_STATE_BYTES) { throw new Error('The manifest is too large to keep.'); }
+    return out;
+  }
+
+  function load_(textIn) {
+    if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES) {
+      throw new Error('The saved manifest cannot be verified.');
+    }
+    var s;
+    try { s = JSON.parse(textIn); } catch (e) { throw new Error('The saved manifest cannot be verified.'); }
+    audit(s);
+    return s;
+  }
+
+  return {
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
+    begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
+    PORTS: Object.keys(ports), MAX_LINES: maxLines
+  };
+}
+
+/*
+  STAFF DATA: THE PORTS, ROUTES AND CREWS.
+
+  Nothing about where ships go is written in code. Staff keep one list:
+
+    { v: 1,
+      ports:  [{ key, name, hold, world, pos: [x, y, z] }],
+      routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
+
+  A port is a place a hold can stand: its key, the name people read, the hold
+  whose drop box takes what nobody collects, and where it stands. A route is
+  one way between two ports with the real minutes a leg takes; the way back is
+  its own row, so staff can make it longer, shorter or absent. crew is the
+  references of any NPCs or special characters staff have stood up for it;
+  empty is a route nobody crews. An empty list is a world with no ships.
+
+  checkRoutes() refuses the whole list on the first thing wrong, so a bad edit
+  never half applies. proposeRoutes() compares the list in force with an edit
+  and says, line by line, what would change, including the holds a removed
+  port or route would strand, so staff confirm it knowing that.
+*/
+var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1, falkreath: 1,
+  morthal: 1, dawnstar: 1, winterhold: 1, ravenrock: 1 };
+var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
+var MAX_ROUTE_MINUTES = 7 * 24 * 60;
+var NO_ROUTES = { v: 1, ports: [], routes: [] };
+
+function checkRoutes(cfg) {
+  if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
+      Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
+    throw new Error('The ship routes cannot be verified.');
+  }
+  var keys = {}, pairs = {};
+  var ports = cfg.ports.map(function (p, i) {
+    if (!isObj(p) || typeof p.key !== 'string' || !ID_RE.test(p.key) || keys[p.key] || !text(p.name, 64) ||
+        !HOLD_KEYS[p.hold] || typeof p.world !== 'string' || !REF_RE.test(p.world) ||
+        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); })) {
+      throw new Error('Port ' + (i + 1) + ' cannot be verified.');
+    }
+    keys[p.key] = true;
+    return { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+  });
+  var routes = cfg.routes.map(function (r, i) {
+    var crew = r && r.crew === undefined ? [] : r && r.crew;
+    if (!isObj(r) || !keys[r.from] || !keys[r.to] || r.from === r.to || pairs[r.from + '>' + r.to] ||
+        !Number.isInteger(r.minutes) || r.minutes < 1 || r.minutes > MAX_ROUTE_MINUTES ||
+        !Array.isArray(crew) || crew.length > 64 ||
+        !crew.every(function (c, j) { return typeof c === 'string' && REF_RE.test(c) && crew.indexOf(c) === j; })) {
+      throw new Error('Route ' + (i + 1) + ' cannot be verified.');
+    }
+    pairs[r.from + '>' + r.to] = true;
+    return { from: r.from, to: r.to, minutes: r.minutes, crew: crew.slice() };
+  });
+  return { v: 1, ports: ports, routes: routes };
+}
+
+/*
+  What an edit would do, for staff to confirm. state is the manifest in force
+  (or null), so a port or route that holds are at or sailing on is named.
+*/
+function proposeRoutes(current, next, state) {
+  var a = checkRoutes(current), b = checkRoutes(next);
+  var lines = [], strands = [];
+  function byKey(list) { var o = {}; list.forEach(function (p) { o[p.key] = p; }); return o; }
+  function byPair(list) { var o = {}; list.forEach(function (r) { o[r.from + '>' + r.to] = r; }); return o; }
+  var pa = byKey(a.ports), pb = byKey(b.ports), ra = byPair(a.routes), rb = byPair(b.routes);
+  Object.keys(pb).forEach(function (k) {
+    if (!pa[k]) { lines.push('Add the port ' + pb[k].name + ' (' + k + ').'); }
+    else if (JSON.stringify(pa[k]) !== JSON.stringify(pb[k])) { lines.push('Change the port ' + pb[k].name + ' (' + k + ').'); }
+  });
+  Object.keys(pa).forEach(function (k) { if (!pb[k]) { lines.push('Remove the port ' + pa[k].name + ' (' + k + ').'); } });
+  Object.keys(rb).forEach(function (k) {
+    var r = rb[k];
+    if (!ra[k]) { lines.push('Add the route ' + r.from + ' to ' + r.to + ', ' + r.minutes + ' minutes.'); }
+    else {
+      if (ra[k].minutes !== r.minutes) { lines.push('The route ' + r.from + ' to ' + r.to + ' takes ' + r.minutes + ' minutes, not ' + ra[k].minutes + '.'); }
+      if (JSON.stringify(ra[k].crew) !== JSON.stringify(r.crew)) { lines.push('The route ' + r.from + ' to ' + r.to + ' has a new crew of ' + r.crew.length + '.'); }
+    }
+  });
+  Object.keys(ra).forEach(function (k) { if (!rb[k]) { lines.push('Remove the route ' + ra[k].from + ' to ' + ra[k].to + '.'); } });
+  if (state && isObj(state.holds)) {
+    Object.keys(state.holds).sort().forEach(function (id) {
+      var h = state.holds[id];
+      if (!pb[h.port]) { strands.push(id + ' is at ' + h.port + ', which this removes.'); }
+      if (h.sailing && (!pb[h.sailing.to] || !rb[h.sailing.from + '>' + h.sailing.to])) {
+        strands.push(id + ' is sailing ' + h.sailing.from + ' to ' + h.sailing.to + ', which this removes.');
+      }
+    });
+  }
+  return { changes: lines, strands: strands, next: b };
+}
+
+/*
+  THE REGISTER: what the server keeps on disk, one file in the private
+  folder (it names characters, and the data folder is served to anybody,
+  #541):
+
+    { v: 1, routes: <the staff list in force>, cargo: <the manifest> }
+
+  The list in force is kept beside the manifest, in the same file, because
+  the manifest names ports and routes off that list: written apart, a crash
+  between the two writes could leave a manifest naming a port the list does
+  not have, and that manifest would no longer verify. Where staff write an
+  edit before it is confirmed (#511 question 1) is a separate thing; a
+  confirmed edit becomes the list in force here, through adoptRoutes().
+
+  openRegister(null) is the register of a server that never had one: no
+  ports, no routes, no holds. A text that is there and does not verify is
+  refused whole, never read as empty.
+*/
+function registerOf(routes, state) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+  ships.audit(state);
+  return { routes: routes, ships: ships, state: state };
+}
+
+function openRegister(textIn) {
+  if (textIn === null || textIn === undefined) {
+    var none = checkRoutes(NO_ROUTES);
+    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+  }
+  if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  var raw;
+  try { raw = JSON.parse(textIn.replace(/^\uFEFF/, '')); } catch (e) { throw new Error('The ship register cannot be verified.'); }
+  if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  return registerOf(checkRoutes(raw.routes), raw.cargo);
+}
+
+function saveRegister(reg) {
+  if (!isObj(reg) || !reg.ships || !isObj(reg.routes)) { throw new Error('The ship register cannot be verified.'); }
+  var routes = checkRoutes(reg.routes);
+  var cargo = JSON.parse(reg.ships.save(reg.state));
+  return JSON.stringify(canonical({ v: 1, routes: routes, cargo: cargo }));
+}
+
+/* The register with a staff-confirmed list in force. It strands no hold. */
+function adoptRoutes(reg, next) {
+  var p = proposeRoutes(reg.routes, next, reg.state);
+  if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
+  return registerOf(p.next, copy(reg.state));
+}
+
+/* The counts a load banner says. */
+function countsOf(reg) {
+  var c = reg.ships.audit(reg.state);
+  c.ports = reg.routes.ports.length;
+  c.routes = reg.routes.routes.length;
+  return c;
+}
+
+module.exports = {
+  createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes,
+  openRegister: openRegister, saveRegister: saveRegister, adoptRoutes: adoptRoutes, countsOf: countsOf,
+  GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT
+};
+return module.exports;
+})();
+// TRADE CARGO BUNDLE END
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  var fs = require('fs'), path = require('path');
+  function slog() {
+    var a = Array.prototype.slice.call(arguments);
+    if (typeof log === 'function') { log.apply(null, ['[ships]'].concat(a)); } else { console.log('[thornswood] [ships] ' + a.join(' ')); }
+  }
+  function copy(v) { return JSON.parse(JSON.stringify(v)); }
+
+  var on = false;
+  try { var settings = mp.getServerSettings(); on = !!settings && settings.thornswoodTradeShips === true; } catch (e) { on = false; }
+
+  var privDir = 'private';
+  try {
+    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { }
+  // Resolved once, at load, against the server's own folder.
+  var FILE = path.resolve(privDir, 'trade-cargo.json');
+
+  var unreadable = '';
+  var reg = null;
+  (function read() {
+    var t = null;
+    try { t = fs.readFileSync(FILE, 'utf8'); }
+    catch (e) { if (!e || e.code !== 'ENOENT') { unreadable = String((e && e.code) || e); } }
+    if (unreadable) { return; }
+    try { reg = TRADE_CARGO.openRegister(t); }
+    catch (e2) { unreadable = String((e2 && e2.message) || e2); reg = null; }
+  })();
+  if (unreadable) {
+    slog(FILE, 'could not be read (' + unreadable + '), so the ships hold nothing at this start and nothing is written over it until it is put right');
+  }
+
+  function commit(next) {
+    if (unreadable || !reg) { return false; }
+    try {
+      var text = TRADE_CARGO.saveRegister(next);
+      fs.mkdirSync(path.dirname(FILE), { recursive: true });
+      fs.writeFileSync(FILE + '.tmp', text);
+      fs.renameSync(FILE + '.tmp', FILE);
+    } catch (e) {
+      slog('could not write', FILE + ':', (e && e.message) || e);
+      return false;
+    }
+    reg = next;
+    return true;
+  }
+
+  function release(who) {
+    var none = { loaders: 0, recipients: 0, receivers: 0 };
+    if (unreadable || !reg) { return { counts: none, saved: false }; }
+    var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+    var c = reg.ships.release(next.state, who);
+    if (!c.loaders && !c.recipients && !c.receivers) { return { counts: c, saved: true }; }
+    return { counts: c, saved: commit(next) };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('cargo', release); }
+
+  if (reg) {
+    var n = TRADE_CARGO.countsOf(reg);
+    slog('ready,', on ? 'on:' : 'off ("thornswoodTradeShips": true in server-settings.json switches it on):',
+         n.ports, 'port(s),', n.routes, 'route(s),', n.holds, 'hold(s),', n.sailing, 'at sea,',
+         n.aboard, 'piece(s) aboard,', n.pending, 'being handed out');
+    if (n.pending) {
+      slog(n.pending, 'piece(s) were being handed out when the server stopped; they stay counted on the manifest until each is finished or undone, and their hold cannot sail before');
+    }
+  }
+
+  if (on && reg) {
+    var act = function (name) {
+      return function () {
+        var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+        var r = reg.ships[name].apply(null, [next.state].concat(Array.prototype.slice.call(arguments)));
+        if (!commit(next)) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        return r;
+      };
+    };
+    g.__thornswoodTradeShips = {
+      counts: function () { return TRADE_CARGO.countsOf(reg); },
+      routes: function () { return copy(reg.routes); },
+      aboard: function (id) { return reg.ships.aboard(reg.state, id); },
+      propose: function (next) { return TRADE_CARGO.proposeRoutes(reg.routes, next, reg.state); },
+      adopt: function (next) {
+        if (!commit(TRADE_CARGO.adoptRoutes(reg, next))) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        return TRADE_CARGO.countsOf(reg);
+      },
+      open: act('open'), load: act('load'), depart: act('depart'), amend: act('amend'), arrive: act('arrive'),
+      begin: act('begin'), finish: act('finish'), undo: act('undo')
+    };
+  }
+})();
+// ==== end thornswood trade ships ====
 
 
 
@@ -47827,6 +49230,7 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
+        word === '/companyterms' ||
         word === '/office' || word === '/evict' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
@@ -47847,8 +49251,10 @@ log('gamemode loaded:',
         to guess: the property block answers false unless the engine has just
         told us they opened a door of a building it knows.
 
-        A home and its farm are one claim in the design and they are two claims
-        in the code today. That is the next piece of this and it is on the list.
+        A home and its farm are one claim, in the code as in the design: the
+        house's claim carries the ground outside its front door, and
+        claimCovering asks the property block (coversGround) before this
+        block's own claims.
       */
       var prop = g.__thornswoodProperty;
       if (prop && prop.command) {
@@ -48353,9 +49759,13 @@ log('gamemode loaded:',
     Windwalker         +4 speed, through the tree's totals. The fall is the
                        game's own sum on your own machine, so the front plugin
                        holds its multiplier at nothing there.
-    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
-                       walk you, on your own machine, and no game setting
-                       changes that. What it should be is Patrick's (#1385).
+    Pack Mule          Being overloaded makes the game walk you, on your own
+                       machine, and no game setting changes that. So the
+                       engine fork's client keeps a list of characters the
+                       game does not hold to their carry weight (Patrick, 12
+                       Oct: the engine change), and the front plugin puts your
+                       own character on it while Pack Mule is held. Nothing
+                       here reads carry weight.
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -48439,9 +49849,8 @@ log('gamemode loaded:',
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
                          say: '+4 speed, and a fall deals no damage.' },
-    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
-                         say: 'Being overloaded does not slow you.',
-                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden',
+                         say: 'Being overloaded does not slow you.' },
     lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
                          say: 'An arrow ignores half the armour it hits.' }
   };
@@ -49812,18 +51221,21 @@ log('gamemode loaded:',
     threw away took nothing and costs nothing. The stamina comes off the
     person's real most, the way spend() takes a maneuver's, and stops at
     nothing: a block with no stamina left still blocks, as in the game. Set
-    halves the charge for a hit that lands while it runs.
+    halves the charge for a hit that lands while it runs. A broken arm
+    doubles it while the break lasts, splinted or set (docs/systems/injury.md,
+    #1383): the injury block's record says which limb is broken (limbsOf), so
+    the charge is decided here with the rest of it, never measured off the
+    client's stamina afterwards.
 
     A person's block only, which is what was decided ("when a hit lands
     blocked on a person"). A spell is not one: the engine's spell damage
     (OnSpellHit) has no block in it. blocked is the flag the OnHit event
-    carries. The engine pinned now sends the event before it decides a block,
-    so the flag is the client's alone, and a block only the server saw, which
-    is every block against a server NPC, costs nothing; fork PR 84
-    decides the block first, and the pin move that takes it in changes this
-    line and the list of the fork's events at the end of this file.
+    carries. The engine decides the block before it sends the event (fork PR
+    84, in the pin since #1386), so the flag is the server's own decision,
+    and a block only the server saw, which is every block against a server
+    NPC, costs stamina like any other.
   */
-  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5 };
+  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5, brokenArm: 2 };
 
   /** The stamina a blocked hit costs, in points: took is the health share it
       took, mult 1, or Set's half. NaN when the most health cannot be read. */
@@ -49873,6 +51285,8 @@ log('gamemode loaded:',
     if (guarded) {
       var mine = has(ST.on, target) ? ST.on[target] : null;
       e.block = (mine && mine.set && mine.set > t) ? BLOCK.set : 1;
+      var hurt = globalThis.__thornswoodHurt;
+      if (hurt && hurt.limbsOf(hurt.read(target)).arm) { e.block *= BLOCK.brokenArm; }
     }
     var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
@@ -52804,6 +54218,10 @@ const WORDS = ['/ooc', '/o',
                // /letter, and the look prompt's Hand over the letter sends
                // /deliver. Never typed, and not in PLAYER_WORDS either.
                '/letter', '/deliver',
+               // The company's terms card on the Office page of K, for staff
+               // (#512, #2695): propose, confirm and drop. Sent by the page,
+               // never typed, and so NOT in PLAYER_WORDS.
+               '/companyterms',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
                // PLAYER_WORDS. See the property block.
@@ -55886,8 +57304,8 @@ mp.onPutItem = guard('onPutItem', function () {
                   that the weapon or spell is one it has equipped, or a bare
                   fist. It fires before the attack speed and splash checks and
                   before the damage, so a hit those checks then throw away was
-                  still raised. The blocked flag is the one the client sent,
-                  because the engine works out a block after the event.
+                  still raised. The blocked flag is the engine's own decision,
+                  made before the event (fork PR 84).
     OnSpellCast   A cast of a spell the caster has equipped, by the sender or
                   an actor it hosts: (caster, spell). Raised after the cast has
                   already gone out to everybody nearby, and not for the second
@@ -61212,8 +62630,11 @@ module.exports = {
       The broken limb and the crooked one, as the engine actor values the
       skills panel already carries. attackDamageMult is a multiplier, which is
       why its numbers are small (see TUNING.perPoint). "A block costs twice the
-      stamina" and "sprint is refused" are not actor values and are not here:
-      the issue says what they need.
+      stamina" and "sprint is refused" are not actor values: the record carries
+      limbs (write, below). The maneuvers block reads it when it charges a
+      block's stamina and doubles the charge for a broken arm (BLOCK.brokenArm),
+      and the screen script hands it to the front plugin as
+      thornswoodBrokenLimbs, which shuts the sprint gate on a broken leg (#1383).
     */
     broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
     crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
@@ -61298,10 +62719,32 @@ module.exports = {
   /*
     THE POTION OF CURE DISEASE. The one ALCH record in this load order whose
     effect is Cure Disease, CureDisease in Skyrim.esm (game\data\food.json).
-    A potion somebody brews has no record (it is made above 0xff000000) and
-    the server cannot read what it does yet; the issue says what that needs.
+    A potion somebody brews has no record (it is made above 0xff000000), so
+    it cures by the brew instead: the alchemy gate tells brewed() which
+    runtime id a brew carrying CURE_DISEASE_EFFECT (the magic effect
+    AlchCureDisease) made, and swallowed() cures for that id too. The engine
+    raises onEatItem for a brewed bottle from fork #78 on (#1383).
   */
   var CURE_DISEASE = ['ae723:Skyrim.esm'];
+  var CURE_DISEASE_EFFECT = 'ae722:Skyrim.esm';
+  var RUNTIME = 0xff000000;
+  // The most brewed bottles one record remembers, newest kept.
+  var BREWS_MOST = 16;
+
+  /*
+    A COOKED MEAL'S HELP AGAINST DISEASE, the guard. food.md: "the chance of
+    catching a disease cut in half while it lasts", for 20 real minutes, and
+    a feast is "double the help and half the time, so the disease chance is a
+    quarter". chanceFor reads it. Patrick, 18 October (#2682): a cooked meal
+    gives only its temperature help unless the cook adds one extra ingredient
+    at the pot, so the guard comes ONLY from a dish seasoned at the cooking
+    pot with garlic. Which extra that is stays data (the one
+    FOOD_GROUPS.season.extras maps to 'guard'). This is the only guard; there
+    is no second one. The needs block's meal help (#2682) calls
+    guarded(actorId, false) for it, and unguarded() when a later meal's
+    warmth or stamina replaces it.
+  */
+  var MEAL_GUARD = { cooked: { mult: 0.5, min: 20 }, feast: { mult: 0.25, min: 10 } };
 
   /*
     BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
@@ -61329,7 +62772,7 @@ module.exports = {
   // ------------------------------------------------------------ the record --
 
   function fresh() {
-    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [] };
+    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [], brews: [], guard: null };
   }
 
   /*
@@ -61375,6 +62818,32 @@ module.exports = {
     out.cold = num(v.cold, 0);
     out.ground = num(v.ground, 0);
     out.show = Array.isArray(v.show) ? v.show.map(String) : [];
+    var bs = Array.isArray(v.brews) ? v.brews : [];
+    for (var b = 0; b < bs.length; b++) {
+      var bid = num(bs[b], 0);
+      if (bid >= RUNTIME && out.brews.indexOf(bid) === -1) { out.brews.push(bid); }
+    }
+    while (out.brews.length > BREWS_MOST) { out.brews.shift(); }
+    var gd = (v.guard && typeof v.guard === 'object') ? v.guard : null;
+    if (gd && num(gd.until, 0) > 0 && num(gd.mult, 1) > 0 && num(gd.mult, 1) < 1) {
+      out.guard = { until: num(gd.until, 0), mult: num(gd.mult, 1) };
+    }
+    return out;
+  }
+
+  /*
+    WHICH LIMB IS BROKEN (#1383). injury.md: a broken arm makes a block cost
+    twice the stamina and a broken leg refuses sprint. Neither is an actor
+    value, so the record carries the answer: the maneuvers block reads the arm
+    when it charges a block, and the screen script hands the leg to the front
+    plugin for the sprint gate. As long as the break lasts,
+    splinted or set, the same as the -8 speed and the -0.15 melee in forNeeds.
+  */
+  function limbsOf(rec) {
+    var out = { arm: 0, leg: 0 };
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].k === 'break') { out[rec.wounds[i].limb === 'leg' ? 'leg' : 'arm'] = 1; }
+    }
     return out;
   }
 
@@ -61383,6 +62852,7 @@ module.exports = {
     // Whether anybody could tend something here: the inventory's line and
     // the look prompt's row are offered only then (#1383).
     rec.care = (needsCare(rec) || hungOver(actorId)) ? 1 : 0;
+    rec.limbs = limbsOf(rec);
     try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
     catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
   }
@@ -61427,9 +62897,12 @@ module.exports = {
     (TUNING.perPoint.toughness.diseaseResist), the one the client puts on the
     actor, so the two cannot disagree.
   */
-  function chanceFor(actorId, chance) {
+  function chanceFor(actorId, chance, rec) {
     var K = g.__thornswoodPerks;
     try { if (K && K.holds && K.holds(actorId, 'purifiedblood')) { return 0; } } catch (e) { }
+    // A cooked meal's help (MEAL_GUARD), while it lasts.
+    var r = rec || read(actorId);
+    if (r.guard && Date.now() < r.guard.until) { chance = chance * r.guard.mult; }
     var P = g.__thornswoodProgression;
     var s = stateOf(actorId);
     if (!P || !s) { return chance; }
@@ -61443,7 +62916,7 @@ module.exports = {
   /* One roll at a disease. True when it took. A kind already held is not caught twice. */
   function catchIll(actorId, rec, k, chance, now) {
     if (!has(DISEASE, k) || hasIll(rec, k)) { return false; }
-    var c = chanceFor(actorId, chance);
+    var c = chanceFor(actorId, chance, rec);
     if (!(c > 0) || Math.random() >= c) { return false; }
     rec.ills.push({ k: k, at: now, cold: false, told: '' });
     hlog(actorId.toString(16), 'caught', DISEASE[k].name);
@@ -62132,14 +63605,73 @@ module.exports = {
       try { id = idOf(CURE_DISEASE[i]); } catch (e) { id = 0; }
       if (id && id === baseId) { cure = true; }
     }
-    if (!cure) { return ''; }
     var rec = read(actorId);
+    // A bottle of cure disease somebody brewed (brewed, below).
+    var brew = !cure && baseId >= RUNTIME && rec.brews.indexOf(baseId) !== -1;
+    if (!cure && !brew) { return ''; }
     var gone = cureOne(rec, Date.now());
     if (!gone) { return ''; }
     write(actorId, rec);
     redraw(actorId);
-    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, 'by a potion');
+    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, brew ? 'by a brewed potion' : 'by a potion');
     return gone.shown ? ('The ' + DISEASE[gone.ill.k].name + ' is gone.') : '';
+  }
+
+  /*
+    A BREW AT A LAB, from the alchemy gate (recipelessCraft), with the magic
+    effects the engine worked out from the ingredients. Remembers baseId as
+    a bottle of cure disease when the brew carries CURE_DISEASE_EFFECT, and
+    forgets it when it does not, because a runtime id is the brewing client's
+    and the same number can be handed out again for another brew after a
+    relog. Answers whether this brew cures.
+  */
+  function brewed(actorId, baseId, effects) {
+    baseId = Number(baseId) || 0;
+    if (baseId < RUNTIME || !Array.isArray(effects)) { return false; }
+    var cureEffect = 0;
+    try { cureEffect = idOf(CURE_DISEASE_EFFECT); } catch (e) { cureEffect = 0; }
+    var cures = false;
+    for (var i = 0; i < effects.length; i++) {
+      if (cureEffect && (Number(effects[i]) || 0) === cureEffect) { cures = true; }
+    }
+    var rec = read(actorId);
+    var at = rec.brews.indexOf(baseId);
+    if (at === -1 && !cures) { return false; }
+    if (at !== -1) { rec.brews.splice(at, 1); }
+    if (cures) {
+      rec.brews.push(baseId);
+      while (rec.brews.length > BREWS_MOST) { rec.brews.shift(); }
+    }
+    write(actorId, rec);
+    return cures;
+  }
+
+  /*
+    A COOKED MEAL THAT GUARDS AGAINST DISEASE (MEAL_GUARD). feast is true for
+    a feast. The latest meal's help is the one that counts: a cooked meal's
+    help is "one of these, not all of them". Answers true.
+  */
+  function guarded(actorId, feast) {
+    var row = feast ? MEAL_GUARD.feast : MEAL_GUARD.cooked;
+    var rec = read(actorId);
+    rec.guard = { until: Date.now() + row.min * MIN, mult: row.mult };
+    write(actorId, rec);
+    return true;
+  }
+
+  /*
+    THE GUARD TAKEN OFF (#2682). The latest meal's help is the one that
+    counts, so a later meal's warmth or stamina replaces the guard. The 20
+    minutes is rec.guard.until, which chanceFor compares against; there is no
+    timer to stop. True when a guard was on the record and is now gone; false
+    when there was none, and then nothing is written.
+  */
+  function unguarded(actorId) {
+    var rec = read(actorId);
+    if (!rec.guard) { return false; }
+    rec.guard = null;
+    write(actorId, rec);
+    return true;
   }
 
   /*
@@ -62690,13 +64222,18 @@ module.exports = {
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       '    var show = (v && v.show && v.show.length) ? v.show : [];',
-      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "");',
+      '    var limbs = (v && v.limbs) ? v.limbs : {};',
+      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "") +',
+      '      (limbs.arm ? "|arm" : "") + (limbs.leg ? "|leg" : "");',
       '    if (st.thornswoodHurtHud === sig) { return; }',
       '    st.thornswoodHurtHud = sig;',
       // The front plugin offers Tend your wounds in the inventory while there
       // is something to tend (#1383). The globalThis a plugin sees; see the
       // note over thornswoodCatchFire.
       '    try { globalThis.thornswoodHurtCare = (v && v.care) ? 1 : 0; } catch (e) { }',
+      // And whether a leg is broken (#1383): the plugin shuts the sprint gate.
+      // A broken arm's dearer block is charged by the server (BLOCK.brokenArm).
+      '    try { globalThis.thornswoodBrokenLimbs = { leg: limbs.leg ? 1 : 0 }; } catch (e) { }',
       '    var html = "";',
       '    for (var i = 0; i < show.length; i++) {',
       '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
@@ -62815,6 +64352,8 @@ module.exports = {
   g.__thornswoodHurt = {
     HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
     CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
+    CURE_DISEASE_EFFECT: CURE_DISEASE_EFFECT, MEAL_GUARD: MEAL_GUARD, BREWS_MOST: BREWS_MOST,
+    brewed: brewed, guarded: guarded, unguarded: unguarded, limbsOf: limbsOf,
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,
@@ -63709,7 +65248,17 @@ module.exports = {
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
     if (!j) { return 'No such journal.'; }
-    var body = String(text || '').slice(0, SOCIAL.pageChars);
+    /*
+      TOO LONG IS REFUSED, NOT CUT (#2563). A cut page was saved short and the
+      writer was never told. The panel holds the text box to pageChars and the
+      chat socket carries a page this long whole, so a longer one only comes
+      from a hand typed line, and it is told how long it is.
+    */
+    var body = String(text || '');
+    if (body.length > SOCIAL.pageChars) {
+      return 'That page is too long: ' + body.length + ' characters, and a page holds ' +
+             SOCIAL.pageChars + '. Nothing was saved.';
+    }
     var page = null;
     for (var i = 0; i < j.pages.length; i++) {
       if (j.pages[i].id === pageId) { page = j.pages[i]; break; }
@@ -64562,7 +66111,7 @@ module.exports = {
   function saleView(t, actorId) {
     var pr = g.__thornswoodProperty;
     var price = t.sale === t.a ? t.goldA : t.goldB;
-    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    var cuts = (pr && pr.saleCuts && pr.saleCuts(price)) || { price: price, worker: 0, gone: 0, seller: price };
     return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
              cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
   }
@@ -64683,6 +66232,7 @@ module.exports = {
       }
     }
     var cuts = pr.saleCuts(price);
+    if (!cuts) { return refuse('The company\'s terms are not loaded on this server. Say so in the dev channel.'); }
     var cost = cuts.price - cuts.worker;
     if (!saleById(seller, worker, things, cuts.seller, cost)) {
       return refuse('Something went wrong moving it. Nothing was taken.');
@@ -67670,6 +69220,85 @@ function createNpcMerchantPurses(api,data,storage) {
 // NPC MERCHANT PURSES END
 
 // NPC POPULATION POLICY BEGIN
+/*
+  THALMOR PATROLS (#1390). docs/systems/thalmor.md: "A patrol is 2 to 4. They
+  are on the roads between holds. They do not spawn inside a walled city. At
+  most 3 patrols in the province at once, and only one on a given road."
+
+  Which roads, how many on each, how long a dead one takes to come back, how
+  far one strays and whether any patrol is out at all are staff settings in
+  game/data/thalmor-patrols.json, never code. thalmorPatrolTable checks that
+  file and answers the roads that may stand: on, in Tamriel, clear of every
+  walled town and village, 2 to 4 points each, and no more roads than
+  thalmorPatrolCap. A road that fails is refused with its reason and the rest
+  still stand. A file that is not version 1, or has a setting out of range, is
+  thrown out whole, and then nothing is stood up or taken down.
+
+  WALLED TOWNS. A city worldspace is not Tamriel, so the world check keeps a
+  patrol out of every walled city with its own worldspace. A town or village
+  on Tamriel's own ground is known by the catalogue's kept city placements
+  (traders and the few town animals, habitat city): no point of a road may be
+  closer to one than THALMOR_PATROL_CITY_CLEARANCE plus the road's leash, so
+  a member never strays into the street either.
+*/
+const THALMOR_PATROL_WORLD='3c:Skyrim.esm';
+const THALMOR_PATROL_CITY_CLEARANCE=8192;
+// The one place the province cap is read (#2697). Staff may give a cap for
+// each world stage in the same file (stageMost, by stage id); the patrol
+// keeper reads the current stage from the world stage register (#2685) and
+// hands it in as table.stage. With no stage, no register, or no entry for the
+// stage, the cap is the plain most. Code names no stage and no number.
+function thalmorPatrolCap(table) {
+  if(typeof table.stage==='string' && table.stageMost &&
+      Object.prototype.hasOwnProperty.call(table.stageMost,table.stage)) return table.stageMost[table.stage];
+  return table.most;
+}
+function thalmorPatrolTable(doc,keep,stage) {
+  const desc=/^[0-9a-f]{1,8}:[^:\\/]+\.es[mpl]$/i;
+  const whole=(v,lo,hi)=>Number.isInteger(v) && v>=lo && v<=hi;
+  if(!doc || typeof doc!=='object' || Array.isArray(doc) || doc.version!==1 ||
+      typeof doc.on!=='boolean' || !Array.isArray(doc.roads))
+    throw new Error('thalmor-patrols.json needs version 1, on and roads');
+  const most=doc.most===undefined ? 3 : doc.most;
+  const returnMinutes=doc.returnMinutes===undefined ? 45 : doc.returnMinutes;
+  const leash=doc.leash===undefined ? 1536 : doc.leash;
+  const tier=doc.tier===undefined ? null : doc.tier;
+  if(!whole(most,0,10) || !whole(returnMinutes,1,1440) || !whole(leash,256,8192) ||
+      !(tier===null || whole(tier,0,5)))
+    throw new Error('thalmor-patrols.json has most, returnMinutes, leash or tier out of range');
+  const stageMost=doc.stageMost===undefined ? {} : doc.stageMost;
+  if(!stageMost || typeof stageMost!=='object' || Array.isArray(stageMost) ||
+      !Object.keys(stageMost).every(k=>/^[a-z0-9-]{1,32}$/.test(k) && whole(stageMost[k],0,10)))
+    throw new Error('thalmor-patrols.json has a stageMost that is not stage ids with a cap of 0 to 10');
+  const towns=(Array.isArray(keep) ? keep : []).filter(r=>Array.isArray(r) && r[7]==='city' &&
+    r[2]===THALMOR_PATROL_WORLD && Array.isArray(r[3]) && r[3].length===3);
+  const table={on:doc.on,most,stageMost:Object.assign({},stageMost),
+    stage:typeof stage==='string' && stage ? stage : null,roads:[],refused:[]},seen=new Set();
+  for(const r of doc.roads) {
+    const id=r && typeof r.id==='string' ? r.id : '';
+    const refuse=why=>table.refused.push({id:id || '?',why});
+    if(!/^[a-z0-9-]{1,32}$/.test(id) || seen.has(id)) {refuse('needs an id of its own: lower case letters, digits and dashes');continue;}
+    seen.add(id);
+    if(typeof r.on!=='boolean') {refuse('needs on, true or false');continue;}
+    if(r.world!==THALMOR_PATROL_WORLD) {refuse('is not on Tamriel\'s roads ('+THALMOR_PATROL_WORLD+')');continue;}
+    if(!Array.isArray(r.points) || r.points.length<2 || r.points.length>4 ||
+        !r.points.every(p=>Array.isArray(p) && p.length===3 && p.every(Number.isFinite)))
+      {refuse('needs 2 to 4 points, one for each of the patrol');continue;}
+    if(!Array.isArray(r.bases) || r.bases.length!==r.points.length ||
+        !r.bases.every(b=>typeof b==='string' && desc.test(b)))
+      {refuse('needs one base, an NPC record as a descriptor, for each point');continue;}
+    const back=r.returnMinutes===undefined ? returnMinutes : r.returnMinutes;
+    const reach=r.leash===undefined ? leash : r.leash;
+    if(!whole(back,1,1440) || !whole(reach,256,8192)) {refuse('has returnMinutes or leash out of range');continue;}
+    const town=towns.find(t=>r.points.some(p=>Math.hypot(p[0]-t[3][0],p[1]-t[3][1])<THALMOR_PATROL_CITY_CLEARANCE+reach));
+    if(town) {refuse('has a point in or beside a walled town or village (near '+town[0]+')');continue;}
+    if(!r.on || !doc.on) continue;
+    if(table.roads.length>=thalmorPatrolCap(table)) {refuse('is over the province cap of '+thalmorPatrolCap(table));continue;}
+    table.roads.push({id,name:typeof r.name==='string' ? r.name.slice(0,80) : id,bases:r.bases.slice(),
+      points:r.points.map(p=>p.slice()),returnMinutes:back,leash:reach,tier});
+  }
+  return table;
+}
 function createNpcPopulation(api,data,plugins,merchants,options) {
   const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
@@ -67706,6 +69335,38 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  // A Thalmor patrol member (#1390) carries {road, slot}, set by the patrol
+  // keeper before admission. Never the commanded marker: a patrol is not a
+  // staff spawn, and it never joins a natural habitat bucket either.
+  api.makeProperty('thornswoodNpcPatrol',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  const patrolSlots=new Map();
+  // The rule for a patrol member, from the staff's road: its home is its own
+  // point, its leash and return are the road's, its bucket is the road, capped
+  // at the road's points, so there is only one group on a road. 'discard'
+  // takes it out of the world: its road is off, gone or over the province cap,
+  // its slot is past the road's points or already filled, or staff changed the
+  // record for that point. With no readable table nothing is decided: it stays
+  // switched off and nothing is deleted. A held table (the keeper could not
+  // read the world stage, so this stage's cap is not known) keeps what stands:
+  // a member that is its road's, slot's and record's own is admitted with no
+  // cap, and anything else stays switched off, never deleted.
+  function patrolRule(id,mark,base,call) {
+    const table=options && typeof options.patrols==='function' ? options.patrols() : null;
+    if(!table || !Array.isArray(table.roads)) return null;
+    const out=table.hold===true ? null : 'discard';
+    const road=table.roads.find(r=>r.id===mark.road);
+    if(!road || !Number.isInteger(mark.slot) || mark.slot<0 || mark.slot>=road.points.length) return out;
+    let wanted=0;
+    try {wanted=resolve(road.bases[mark.slot],call);} catch(e) {return null;}
+    if(wanted!==base) return out;
+    const key=road.id+'#'+mark.slot,holder=patrolSlots.get(key);
+    if(holder!==undefined && holder!==id) return out;
+    const up=new Set([...patrolSlots.keys()].map(k=>k.split('#')[0]));
+    if(table.hold!==true && !up.has(road.id) && up.size>=thalmorPatrolCap(table)) return 'discard';
+    return {cell:resolve(THALMOR_PATROL_WORLD,call),patrol:key,bucket:'patrol:'+road.id,
+      row:[null,road.bases[mark.slot],THALMOR_PATROL_WORLD,road.points[mark.slot].slice(),road.leash,
+        road.returnMinutes,'enemy','road',road.tier,road.points.length,'patrol:'+road.id,0,'highelf']};
+  }
   let committed=false,closed=false,attempted=false;
   function commit() {
     if(closed) throw new Error('NPC population activation is revoked');
@@ -67748,10 +69409,22 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
+      // A Thalmor patrol member (#1390): its road and slot decide, never a
+      // habitat row or the spawn command's marker.
+      const patrolMark=call('get',id,'thornswoodNpcPatrol');
+      const patrolled=!!patrolMark && typeof patrolMark==='object' && typeof patrolMark.road==='string';
+      if(patrolled) {
+        const verdict=patrolRule(id,patrolMark,base,call);
+        if(verdict==='discard') {
+          if(options && typeof options.discard==='function') options.discard(id);
+          return null;
+        }
+        rule=verdict;
+      }
       // The spawn command's marker (#2623): {keep:true} for one staff kept,
       // {run} for a temporary one, and plain true from before that split,
       // which nobody chose to keep.
-      const marker=call('get',id,'thornswoodNpcCommanded');
+      const marker=patrolled ? null : call('get',id,'thornswoodNpcCommanded');
       const commanded=marker===true || (!!marker && typeof marker==='object' &&
         (marker.keep===true || typeof marker.run==='string'));
       const kept=commanded && marker!==true && marker.keep===true;
@@ -67767,16 +69440,19 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
         rule={cell,commanded:true,keep:kept,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
-      } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
+      } else if(!commanded && !patrolled) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
         .sort((a,b)=>Math.hypot(...a.row[3].map((v,j)=>v-anchor[j]))-
           Math.hypot(...b.row[3].map((v,j)=>v-anchor[j])))[0];
-      if(rule && !rule.commanded && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
+      if(rule && !rule.commanded && !rule.patrol && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
       if(closed) return null;
       if(rule) {
-        home=validHome ? saved.home.slice() : state.pos.slice();
-        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        // A patrol member's home is always its road's point, so staff moving
+        // a point moves the member's home at the next start.
+        home=rule.patrol ? rule.row[3].slice() : validHome ? saved.home.slice() : state.pos.slice();
+        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,
+          source:rule.commanded ? 'command' : rule.patrol ? rule.bucket : rule.row[0]});
         if(closed) return null;
         call('set',id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
         if(closed) return null;
@@ -67805,6 +69481,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     if(policy.swims) policy.top=rule.row[3][2];
     if(id>=0xff000000 && !rule.commanded) counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
     configured.set(id,{policy,rule});
+    if(rule.patrol) patrolSlots.set(rule.patrol,id);
     return policy;
   }
   function afterOwnership(id,owner) {
@@ -67820,6 +69497,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     const entry=configured.get(id);
     if(id>=0xff000000 && entry) {
       if(!entry.rule.commanded) counts.set(entry.rule.bucket,Math.max(0,(counts.get(entry.rule.bucket)||0)-1));
+      if(entry.rule.patrol && patrolSlots.get(entry.rule.patrol)===id) patrolSlots.delete(entry.rule.patrol);
       configured.delete(id);
     }
   }
@@ -71468,7 +73146,9 @@ try {
       // #2623: a temporary spawn left from an earlier run is taken out of
       // the world on the next turn of the event loop, never inside the
       // runtime's own preparation pass that asked about it.
-      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0)});
+      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0),
+      // #1390: the staff's patrol roads, as the patrol keeper below read them.
+      patrols:()=>globalThis.__thornswoodThalmorPatrols});
     current();
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
@@ -72244,3 +73924,270 @@ try {
   globalThis.__thornswoodCustomQuestsCreate = createCustomQuests;
 })();
 // ==== end thornswood custom quests ====
+
+// ==== thornswood thalmor patrols ====
+/*
+  THE THALMOR PATROLS ARE STOOD UP HERE (#1390). docs/systems/thalmor.md,
+  Patrols: 2 to 4 on a road between holds, never inside a walled city, at
+  most 3 patrols in the province and one on a road; not people; no coin.
+
+  WHAT STAFF DECIDE. game/data/thalmor-patrols.json: whether any patrol is
+  out (on, false as shipped), the province cap (most), and for each road its
+  points (one member each, 2 to 4), the record each member is made from, how
+  long a dead one takes to come back and how far one strays. The three roads
+  it ships with are the cut Immersive Patrols II Justiciar placements in the
+  Pale, Haafingar and Hjaalmarch, at their own positions: candidates, all on,
+  under the file's own on. thalmorPatrolTable (the NPC population policy)
+  checks the file; nothing in code names a road, a number of members or a
+  time.
+
+  WHAT THIS DOES, ONCE AT START AND ON A GAMEMODE RELOAD, WITH NO TIMER. For
+  each road that may stand, each point is a slot. The register, in the
+  private folder and naming nobody, says which form fills each slot. A slot
+  whose form is still there and still carries that road's marker and record
+  is left alone, standing or dead: the engine brings a dead member back at
+  its point after the road's return time (spawnDelay, set by the policy), so a
+  return replaces it and never stacks a second group. A slot whose form is
+  gone gets a new member: made from its record at its point, marked with
+  {road, slot}, admitted by the population (which gives it the road's rule)
+  and enrolled in the shared NPC runtime. Members of a road that is off, gone,
+  over the cap or changed are taken out of the world (removeSpawned). Running
+  it again changes nothing.
+
+  WHAT IT NEVER DOES. With the file unreadable or the register unreadable it
+  stands nobody up and takes nobody down, and writes nothing. It sets no
+  timer, adds no command, and tells nobody to do anything: a patrol is a fight
+  on the road for whoever meets it, and the people decide what comes of it.
+
+  NOT PEOPLE, NO COIN. A member has no profile, so it does not wake in a
+  temple, and killing one is a warrior's work as for a bandit. Nobody can open
+  a body (the spoils block), and the dungeon body roll answers no key for a
+  runtime reference, so a body gives no coin and nothing else.
+
+  WALKING THE ROAD. The shared runtime keeps an NPC inside a leash around its
+  home. A member's home is its own point on the road and the leash is the
+  road's, so the group keeps to its stretch of road. A route between holds is
+  not built.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = require('fs');
+  var path = require('path');
+  var REGISTER = 'thalmor-patrol-slots.json';
+  var HEX = /^[0-9a-f]{1,8}$/;
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[patrols]');
+    console.log(a.join(' '));
+  }
+
+  function privateDir() {
+    var dir = 'private';
+    try {
+      var cfg = mp.getServerSettings();
+      if (cfg && cfg.privDir) { dir = String(cfg.privDir); }
+    } catch (e) { }
+    return dir;
+  }
+
+  /*
+    THE WORLD STAGE, FOR THE PER-STAGE CAP (#2697). The one read of the world
+    stage register (#2685): its worldStage().id and its stages(), nothing else.
+    No register (not merged, or it failed to load), no worldStage or no id is
+    no stage, and then the cap is the plain most. A register that is there
+    and throws is not "no stage": the cap for the stage the world is at is not
+    known, so, as for an unreadable slot register, no patrol is stood up or
+    taken down (broken, below). Read once per start or reload, so a stage staff
+    confirm takes effect the next time the gamemode loads.
+  */
+  function stageRegister() {
+    var reg = g.__thornswoodWorldStage;
+    return reg && typeof reg.worldStage === 'function' ? reg : null;
+  }
+
+  // { id: the stage id or null, broken: the error when the register threw }
+  function currentStage(reg) {
+    if (!reg) { return { id: null, broken: null }; }
+    try {
+      var st = reg.worldStage();
+      return { id: st && typeof st.id === 'string' && st.id ? st.id : null, broken: null };
+    } catch (e) {
+      return { id: null, broken: String((e && e.message) || e) };
+    }
+  }
+
+  // Each stageMost key the register does not list (a typo, or a stage taken
+  // out of war-stages.json): logged, never refused. No register, or no list
+  // from it, logs nothing.
+  function unknownStageKeys(table, reg) {
+    var keys = Object.keys(table.stageMost || {});
+    if (!reg || typeof reg.stages !== 'function' || !keys.length) { return []; }
+    var list;
+    try { list = reg.stages(); } catch (e) { return []; }
+    if (!Array.isArray(list)) { return []; }
+    var known = {};
+    list.forEach(function (s) { if (s && typeof s.id === 'string') { known[s.id] = true; } });
+    return keys.filter(function (k) { return !Object.prototype.hasOwnProperty.call(known, k); });
+  }
+
+  // The staff's file, checked. null when it cannot be used at all.
+  function readTable(stage) {
+    var doc = null;
+    try {
+      doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      tlog('game/data/thalmor-patrols.json would not read, so no patrol is stood up or taken down:', e && e.message);
+      return null;
+    }
+    try {
+      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep, stage.id);
+    } catch (e2) {
+      tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
+      return null;
+    }
+  }
+
+  // { roads: { <road>: { <slot>: <form id in hex> } } }. No file yet is an
+  // empty register. A file that is there and will not read is null, and then
+  // nothing is changed or written over.
+  function readRegister() {
+    var text = null;
+    try {
+      text = fs.readFileSync(path.join(privateDir(), REGISTER), 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return { version: 1, roads: {} }; }
+      return null;
+    }
+    try {
+      var doc = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+      if (!doc || doc.version !== 1 || !doc.roads || typeof doc.roads !== 'object' || Array.isArray(doc.roads)) { return null; }
+      var clean = { version: 1, roads: {} };
+      Object.keys(doc.roads).forEach(function (road) {
+        var slots = doc.roads[road];
+        if (!/^[a-z0-9-]{1,32}$/.test(road) || !slots || typeof slots !== 'object') { return; }
+        var keep = {};
+        Object.keys(slots).forEach(function (s) {
+          if (/^[0-3]$/.test(s) && typeof slots[s] === 'string' && HEX.test(slots[s])) { keep[s] = slots[s]; }
+        });
+        clean.roads[road] = keep;
+      });
+      return clean;
+    } catch (e2) {
+      return null;
+    }
+  }
+
+  function writeRegister(reg) {
+    var dir = privateDir();
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+    var file = path.join(dir, REGISTER);
+    fs.writeFileSync(file + '.tmp', JSON.stringify(reg, null, 2) + '\n', 'utf8');
+    fs.renameSync(file + '.tmp', file);
+  }
+
+  // The form is still there, still this road's slot, still made from the
+  // record staff gave that point. A form id the engine reused for something
+  // else carries no such marker.
+  function holds(id, road, slot, base) {
+    try {
+      var mark = mp.get(id, 'thornswoodNpcPatrol');
+      if (!mark || mark.road !== road || mark.slot !== slot) { return false; }
+      if (base === undefined) { return true; }
+      return mp.getIdFromDesc(String(mp.get(id, 'baseDesc'))) === mp.getIdFromDesc(base);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function place(road, slot, population, runtime) {
+    var ref = 0;
+    try {
+      ref = mp.place(mp.getIdFromDesc(road.bases[slot]));
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: THALMOR_PATROL_WORLD,
+        pos: road.points[slot].slice(),
+        rot: [0, 0, 0]
+      });
+      // Before admission, so the population and every later start read it.
+      mp.set(ref, 'thornswoodNpcPatrol', { road: road.id, slot: slot });
+      if (!population.admit(ref, mp.getNpcAIState(ref))) { throw new Error('the NPC population did not admit it'); }
+      if (runtime && typeof runtime.enroll === 'function') { runtime.enroll(ref); }
+      return ref;
+    } catch (e) {
+      tlog(road.id, 'slot', slot, 'could not be stood up:', e && e.message);
+      if (ref) {
+        try { mp.destroyActor(ref); } catch (e2) { }
+        try { population.release(ref); } catch (e3) { }
+      }
+      return 0;
+    }
+  }
+
+  function keepPatrols() {
+    var worldReg = stageRegister();
+    var stage = currentStage(worldReg);
+    var table = readTable(stage);
+    if (table && stage.broken !== null) {
+      // The cap for this stage is not known. The population keeps what stands
+      // (hold) and the keeper stands nobody up and takes nobody down.
+      table.hold = true;
+      g.__thornswoodThalmorPatrols = table;
+      tlog('the world stage register failed (' + stage.broken + '), so no patrol is stood up or taken down');
+      return;
+    }
+    g.__thornswoodThalmorPatrols = table;
+    if (!table) { return; }
+    table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
+    unknownStageKeys(table, worldReg).forEach(function (k) {
+      tlog('stageMost names', k, 'but the world stage list has no such stage, so that cap is never used');
+    });
+    var population = g.__thornswoodNpcPopulation;
+    var runtime = g.__thornswoodNpcRuntime;
+    if (!population || typeof population.admit !== 'function') {
+      tlog('no NPC population on this server, so no patrol is stood up or taken down');
+      return;
+    }
+    var reg = readRegister();
+    if (!reg) {
+      tlog(REGISTER, 'would not read, so no patrol is stood up or taken down');
+      return;
+    }
+    var standing = {};
+    table.roads.forEach(function (r) { standing[r.id] = r; });
+    var changed = false, made = 0, kept = 0, gone = 0;
+
+    Object.keys(reg.roads).forEach(function (rid) {
+      var slots = reg.roads[rid], road = standing[rid];
+      Object.keys(slots).forEach(function (s) {
+        var slot = Number(s), id = parseInt(slots[s], 16) >>> 0;
+        if (road && slot < road.points.length && (!holds(id, rid, slot) || holds(id, rid, slot, road.bases[slot]))) { return; }
+        if (holds(id, rid, slot)) { removeSpawned(id); gone++; }
+        delete slots[s];
+        changed = true;
+      });
+      if (!Object.keys(slots).length) { delete reg.roads[rid]; changed = true; }
+    });
+
+    table.roads.forEach(function (road) {
+      var slots = reg.roads[road.id] || {};
+      for (var slot = 0; slot < road.points.length; slot++) {
+        var had = slots[slot] ? parseInt(slots[slot], 16) >>> 0 : 0;
+        if (had && holds(had, road.id, slot, road.bases[slot])) { kept++; continue; }
+        var ref = place(road, slot, population, runtime);
+        if (ref) { slots[slot] = (ref >>> 0).toString(16); made++; changed = true; }
+        else if (had) { delete slots[slot]; changed = true; }
+      }
+      if (Object.keys(slots).length) { reg.roads[road.id] = slots; }
+    });
+
+    if (changed) {
+      try { writeRegister(reg); } catch (e) { tlog('the register could not be written:', e && e.message); }
+    }
+    tlog(table.on ? 'on' : 'off', '- stage', table.stage || '(none)', 'cap', thalmorPatrolCap(table), '-', table.roads.length, 'road(s) may stand;', made, 'stood up,', kept, 'already there,', gone, 'taken down');
+  }
+
+  try { keepPatrols(); } catch (e) { tlog('the patrol keeper failed:', e && e.message); }
+})();
+// ==== end thornswood thalmor patrols ====

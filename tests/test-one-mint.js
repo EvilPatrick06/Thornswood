@@ -492,7 +492,8 @@ for (const at of Object.keys(WRITERS)) {
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
   /*
-    A HAUL (#1393). Posting a haul takes JOB_FEE and the pay, a whole number
+    A HAUL (#1393). Posting a haul takes the company's haul fee (its terms,
+    #512, #2695, apart from JOB_FEE) and the pay, a whole number
     above nothing, onto the ledger. It takes; it puts none in. A company
     sale is the trade block's saleById, section 4. A night in a bed was a
     caller too (#1392) until #1603: a night is paid in a trade now, and the
@@ -501,13 +502,13 @@ for (const at of Object.keys(WRITERS)) {
   // And gold put in the drop box (#2298): n, a whole number above nothing, or refused first.
   // A post's cost (#2554) is its fee, NOTICE_FEE or JOB_FEE, and a job's reward, a whole number above nothing.
   yes('its five callers pass a post\'s cost, NOTICE_FEE, or JOB_FEE and the reward, a letter\'s cost, LETTER_FEE and ' +
-      'LETTER_PAY, a haul\'s cost, JOB_FEE and the pay, a ride\'s fare, and gold put in the drop box',
+      'LETTER_PAY, a haul\'s cost, the company\'s haul fee and the pay, a ride\'s fare, and gold put in the drop box',
       callers.slice().sort().join(',') === 'cost,cost,cost,n,price' &&
       /var n = Math\.floor\(Number\(amount\)\);\s*\n\s*if \(!\(n > 0\)/.test(code) &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;\s*\n\s*var cost = fee \+ reward;/.test(code) &&
       /reward = \/\^\\d\+\$\/\.test\(first\) \? Number\(first\) : 0;\s*\n\s*if \(!\(reward > 0\)/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
-      /\bvar cost = JOB_FEE \+ pay;/.test(code));
+      /\bvar fee = co\.haulFee\(\);\s*\n\s*var cost = fee \+ pay;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE_IN_HOLD', 'FARE_CARRIAGE', 'FARE_CROSSING'].map(function (n) {
     const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
     return m ? Number(m[1]) : 0;
