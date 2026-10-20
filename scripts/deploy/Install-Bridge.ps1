@@ -61,6 +61,36 @@ param(
 $ErrorActionPreference = 'Stop'
 # The bridge's answer to a plain request, the same line as PLAIN in bridge.js.
 $Plain = 'box bridge: not here'
+
+# What a plain GET of a URL answers: @{ Code; Body; Why }, Code 0 when nothing
+# answered and Why says what happened instead. Every check here reads the
+# bridge's 404 through this, on One and on the box (sent ahead of the scripts
+# that use it). Invoke-WebRequest can't do it: on the box's Windows PowerShell
+# 5.1 a 404 leaves ErrorDetails empty, so its body was never seen and the
+# install rolled back (#2875). WebRequest hands back the response the same way
+# in 5.1 and 7.
+function Get-PlainAnswer {
+    param([string]$Url, [int]$Seconds)
+    $q = [Net.WebRequest]::Create($Url)
+    $q.Timeout = $Seconds * 1000
+    $q.ReadWriteTimeout = $Seconds * 1000
+    $r = $null
+    $why = ''
+    try { $r = $q.GetResponse() }
+    catch {
+        $why = $_.Exception.Message
+        $e = $_.Exception
+        while ($e -and -not ($e -is [Net.WebException])) { $e = $e.InnerException }
+        if ($e -and $e.Response) { $r = $e.Response }
+    }
+    if (-not $r) { return @{ Code = 0; Body = ''; Why = $why } }
+    try {
+        $body = (New-Object IO.StreamReader($r.GetResponseStream())).ReadToEnd()
+        return @{ Code = [int]$r.StatusCode; Body = $body.Trim(); Why = '' }
+    }
+    finally { $r.Close() }
+}
+$SendPlainAnswer = "function Get-PlainAnswer {" + ${function:Get-PlainAnswer} + "}"
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
@@ -99,12 +129,11 @@ if ($Status) {
 if (`$t) { `$i = Get-ScheduledTaskInfo -TaskName '$TaskName'; 'task      ' + `$t.State + ' as ' + `$t.Principal.UserId + ', last ran ' + `$i.LastRunTime + ' result ' + `$i.LastTaskResult } else { 'task      NOT REGISTERED' }
 # Whether a token is there, never what it is.
 if (Test-Path -LiteralPath '$Root\token.txt') { 'token     there, so New-CloudAccess.ps1 has run' } else { 'token     NOT THERE, so every WebSocket is refused' }
-try { Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:$Port/' -TimeoutSec 5 | Out-Null; 'port      $Port answered 200, which the bridge never says' }
-catch {
-    if ("`$(`$_.ErrorDetails.Message)".Trim() -eq '$Plain') { 'port      $Port answers as the bridge' }
-    elseif (`$_.Exception.Response) { 'port      $Port answered ' + [int]`$_.Exception.Response.StatusCode + ' but not as the bridge: ' + "`$(`$_.ErrorDetails.Message)".Trim() }
-    else { 'port      $Port did not answer: ' + `$_.Exception.Message }
-}
+$SendPlainAnswer
+`$a = Get-PlainAnswer 'http://127.0.0.1:$Port/' 5
+if (`$a.Code -eq 404 -and `$a.Body -eq '$Plain') { 'port      $Port answers as the bridge' }
+elseif (`$a.Code) { 'port      $Port answered ' + `$a.Code + ' but not as the bridge: ' + `$a.Body }
+else { 'port      $Port did not answer: ' + `$a.Why }
 if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Content -LiteralPath '$log' -Tail 15 }
 "@ | ForEach-Object { Say "  $_" }
     Write-Host ''
@@ -262,13 +291,12 @@ function Register([bool]`$system) {
 # Whether the port answers a plain request with one of these lines, the
 # bridge's 404. A status code alone would take any other server on the port
 # for the bridge (#2875).
+$SendPlainAnswer
 function Answers([string[]]`$Lines) {
     `$until = (Get-Date).AddSeconds($Wait)
     while ((Get-Date) -lt `$until) {
-        try { Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:$Port/' -TimeoutSec 2 | Out-Null }
-        catch {
-            if (`$Lines -contains "`$(`$_.ErrorDetails.Message)".Trim()) { return `$true }
-        }
+        `$a = Get-PlainAnswer 'http://127.0.0.1:$Port/' 2
+        if (`$a.Code -eq 404 -and `$Lines -contains `$a.Body) { return `$true }
         Start-Sleep -Milliseconds 700
     }
     return `$false
@@ -330,19 +358,12 @@ Head 'Checking from here'
 # a 404, and the site's own 404 says only "not here", so this whole line tells
 # whether Caddy carries /box/ (#2875).
 $via = $Site.TrimEnd('/') + '/box/'
-$said = ''
-try { $said = (Invoke-WebRequest -UseBasicParsing $via -TimeoutSec 15).Content }
-catch {
-    $r = $_.Exception.Response
-    if ($r) {
-        try { $said = (New-Object IO.StreamReader($r.GetResponseStream())).ReadToEnd() } catch { $said = '' }
-        if (-not $said -and $_.ErrorDetails) { $said = [string]$_.ErrorDetails.Message }
-    } else { $said = 'no answer: ' + $_.Exception.Message }
-}
-if ("$said".Trim() -eq $Plain) {
+$a = Get-PlainAnswer $via 15
+if ($a.Code -eq 404 -and $a.Body -eq $Plain) {
     Say "  $via reaches the bridge." 'Green'
 } else {
-    Say "  $via did not reach the bridge, so Caddy does not carry /box/ yet. Setup-Domain.ps1 -TaskOnly does not send the Caddyfile; Setup-Domain.ps1 does." 'Yellow'
+    $said = if ($a.Code) { "$($a.Code) $($a.Body)" } else { 'no answer: ' + $a.Why }
+    Say "  $via did not reach the bridge (it said: $said), so Caddy does not carry /box/ yet. Setup-Domain.ps1 -TaskOnly does not send the Caddyfile; Setup-Domain.ps1 does." 'Yellow'
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
