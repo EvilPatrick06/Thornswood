@@ -976,6 +976,13 @@ How to use it:
 - Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
   or what it waits on, and `anyone can start` marks what needs nobody in
   particular. Assign yourself when you start one.
+- Status: In Progress the moment work starts, Completed when it is merged and
+  only needs testing (Patrick, 19 Oct). Move the card on the board, or add the
+  label `board: <Status>` to the issue (`board: In Progress`, `board: Completed`):
+  `.github\workflows\board-status.yml` sets the card's Status and takes the
+  label off again (#2863). A cloud Claude thread is refused GraphQL, which the
+  board needs, so the label is how it moves a card:
+  `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
