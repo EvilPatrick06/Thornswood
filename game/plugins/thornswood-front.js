@@ -2747,6 +2747,9 @@
 
     Containers and doors only. An unlocked display case is still Skyrim's.
   */
+  // When each property door last told the server it opened (#2680), so one
+  // pick is one line.
+  const pickSaid = {};
   sp.on('lockChanged', guard('lockchanged', (e) => {
     const ref = e ? e.lockedObject : null;
     if (!ref) { return; }
@@ -2770,6 +2773,24 @@
       say('lock opened on ' + id.toString(16) + ', handed it back to the server');
     } catch (err) {
       say('could not hand ' + id.toString(16) + ' back to the server: ' + err);
+    }
+
+    /*
+      A PROPERTY DOOR THAT OPENED HERE IS A PICK (#2680), and the server is
+      told, so its holder can be sent word. The lock script publishes the
+      doors the server shut to this person and takes a door off that list
+      before it opens one itself, so a door still on it that is open now was
+      opened by Skyrim's lockpicking. The server checks it all again.
+    */
+    if (type === 29 && id) {
+      let shutHere = null;
+      try { shutHere = globalThis.__thornswoodPropertyShut; } catch (err) { shutHere = null; }
+      const now = Date.now();
+      if (shutHere && shutHere[id] && !(pickSaid[id] && now - pickSaid[id] < 10000)) {
+        pickSaid[id] = now;
+        say('property door ' + id.toString(16) + ' opened on its lock, telling the server');
+        tellServer('/tspicked ' + id.toString(16));
+      }
     }
   }));
 
