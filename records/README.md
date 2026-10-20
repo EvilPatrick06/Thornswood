@@ -7,6 +7,11 @@ read it (issue #440, phase 8):
   hash, and the fork commit they came from. `scripts\release\New-ClientBuildRecord.ps1`
   writes it; Build-Launcher puts it inside the launcher, and Sync-Client and
   Ship refuse a client that is not this build.
+- `front-build.json`: the front, skymp5-front built by webpack from the same
+  fork commit, every file by hash (#2754). `scripts\release\Build-Front.ps1
+  -Record` writes it when the pin moves; Build-Front puts the build in
+  `local\thornswood-front.zip` only when it is this one, and Go.ps1 refuses a
+  zip that is not.
 - `server-build.json`: every server file the fork builds the same way (the
   binary, the JavaScript half the server runs, its map and the rest
   `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.

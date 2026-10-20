@@ -294,9 +294,11 @@ A change to the engine goes like this:
    a path with an `&` in it is reached through the drive letter it was
    configured through (`K:\<fork>`).
 3. `New-ClientBuildRecord.ps1 -Dist <fork>\build\dist\client -Clone <fork>`; the
-   server record came out of step 2.
+   server record came out of step 2. Then `Build-Front.ps1 -Fork <fork> -Commit
+   <commit> -Record`, which builds the front from the same commit and writes
+   `records\front-build.json` (#2754).
 4. One pull request here with the new pin (`git -C engine/skymp checkout
-   <commit>`, then `git add engine/skymp`), both records, and the commit named
+   <commit>`, then `git add engine/skymp`), the three records, and the commit named
    in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
    SHA256, and the link in "Where the source is") and in
    `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of

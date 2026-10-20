@@ -56,6 +56,8 @@ $want = 'Get-LauncherInputHash', 'Get-PublishedLauncher', 'Test-LauncherUnchange
 foreach ($n in $want) { Yes "Ship.ps1 has $n" ($fns.ContainsKey($n)) }
 foreach ($n in $want) { if (-not $fns.ContainsKey($n)) { Done } }
 foreach ($n in $want) { Invoke-Expression $fns[$n] }
+# The fingerprint reads each file as it ships (#2903).
+. (Join-Path $repo 'scripts\release\ShippedBytes.ps1')
 
 function Run-Git {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
