@@ -97,7 +97,7 @@ finally {
 
 # A full run compares where the name points with the box's address, so the
 # address is read from vps.json before that check. On 19 Oct it was read after,
-# and a full run without -Vps stopped on "resolves to 192.135.112.23 and not .".
+# and a full run without -Vps stopped on "resolves to <the box> and not .".
 $text = [IO.File]::ReadAllText($SetupDomain)
 $loads = $text.IndexOf('if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }')
 $dns = $text.IndexOf('Write-Host "Checking where $Domain points..."')

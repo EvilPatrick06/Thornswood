@@ -69,7 +69,7 @@ function Remote($script) {
 # "Invoke-ThornswoodRemote is not recognized" with nothing sent. And above the
 # DNS check, which compares the name with the box's address: until 19 Oct it
 # ran first, so a full run without -Vps stopped on "resolves to
-# 192.135.112.23 and not ." with the address still empty.
+# the box and not ." with the address still empty.
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
