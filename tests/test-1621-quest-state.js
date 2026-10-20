@@ -765,8 +765,8 @@ for(const [index,source] of contractRows.entries()) {
   w.ctx.__thornswoodMerchantTrade.questHold=id=>id===9102?(source.hold==='Falkreath'?'Whiterun':'Falkreath'):source.hold;
   const before=JSON.stringify(forms[actor]);
   const newActor=240+index;
-  yes(source.id+': direct offer keeps the original hold restriction',
-    w.svc.offer(newActor,source.id,{traderRef:9102}).why==='hold' && !(forms[newActor] && forms[newActor].props[PROP]));
+  yes(source.id+': direct new offer also requires its appointed specialist',
+    w.svc.offer(newActor,source.id,{traderRef:9102}).why==='role' && !(forms[newActor] && forms[newActor].props[PROP]));
   yes(source.id+': wrong role, wrong hold and absent trader make no write',
     w.svc.act(actor,'return',source.id,null,9101).why==='role' &&
     w.svc.act(actor,'return',source.id,null,9102).why==='hold' &&
@@ -783,8 +783,11 @@ yes('a roleless live trader cannot open an unbound retrieval quest',
   w.svc.offer(260,'satchel',{traderRef:9000}).why==='unbound' && !(forms[260] && forms[260].props[PROP]));
 w.ctx.__thornswoodMerchantTrade.questRole=id=>id===9100?'Smith':id===9101?'Enchanter':id===9102?'Tailor':null;
 w.ctx.__thornswoodMerchantTrade.questHold=()=> 'Whiterun';
-yes('a Smith displays three bound mines and its own Whiterun contracts',
-  w.svc.describe(230,9100).map(row=>row.id).sort().join(',')==='camp,ebony,giant,heartstone,stalhrim');
+const oldTraderDesc=w.ctx.mp.getDescFromId;
+w.ctx.mp.getDescFromId=id=>id===9100?'1a67c:Skyrim.esm':id===9101?'177da:Dragonborn.esm':
+  id===9102?'1a684:Skyrim.esm':oldTraderDesc(id);
+yes('the appointed Whiterun Smith displays its own contracts, without distant mine work',
+  w.svc.describe(230,9100).map(row=>row.id).sort().join(',')==='camp,giant');
 yes('an Enchanter displays the bound gem work only',w.svc.describe(230,9101).map(row=>row.id).join(',')==='gem');
 yes('a Tailor displays the local wolf work only',w.svc.describe(230,9102).map(row=>row.id).join(',')==='wolf');
 yes('a direct wrong-role offer cannot bypass the route',w.svc.offer(230,'ebony',{traderRef:9101}).why==='role');

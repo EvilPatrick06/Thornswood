@@ -30,7 +30,12 @@
        with nothing written, and ssh-keyscan is not asked.
     6. The Caddyfile carries /box/ to the port the bridge and its installer
        use, and Setup-Domain.ps1 refuses a Caddyfile without it.
-  Nothing connects to anything and nothing leaves this machine.
+    7. Get-PlainAnswer, the one way Install-Bridge.ps1 reads an answer, run
+       in pwsh and in Windows PowerShell 5.1 where it is installed (the box
+       runs 5.1) against bridge.js itself, a stand-in for the site's 404 and
+       a port nobody holds: the bridge's line, the site's, and nothing (#2875).
+  Section 7 starts bridge.js and a stand-in on loopback ports of its own and
+  stops them; nothing else connects and nothing leaves this machine.
 #>
 [CmdletBinding()]
 param()
@@ -88,6 +93,16 @@ function Build($h) {
 $Root = 'C:\Thornswood-Bridge'; $Port = 7790; $TaskName = 'Thornswood Bridge'; $Wait = 20; $AsSystem = $false
 $log = 'C:\Thornswood-Bridge\bridge.log'; $stage = '.stage-20261020-000000'; $prev = '.prev-20261020-000000'
 $want = "'bridge.js' = 'AA'; 'ws.js' = 'BB'; 'server-log.js' = 'CC'"
+# Get-PlainAnswer and what is sent ahead of the scripts that use it, defined
+# from Install-Bridge.ps1's own text, as the script defines them.
+$e = $null
+$iast = [System.Management.Automation.Language.Parser]::ParseFile($installPath, [ref]$null, [ref]$e)
+$pa = @($iast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-PlainAnswer' }, $true))
+$sendAst = @($iast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$SendPlainAnswer' }, $true))
+Yes 'Install-Bridge.ps1 reads every answer through one Get-PlainAnswer, which it sends to the box' ($pa.Count -eq 1 -and $sendAst.Count -eq 1)
+Invoke-Expression $pa[0].Extent.Text
+Invoke-Expression $sendAst[0].Extent.Text
+$Plain = 'box bridge: not here'
 $hs = HereStrings $installPath
 $stopAst = @($hs | Where-Object { $_.Extent.Text -match '^@"\r?\nfunction StopIt' })
 Yes 'Install-Bridge.ps1 has one StopIt it sends' ($stopAst.Count -eq 1)
@@ -143,9 +158,15 @@ Yes 'StopIt stops only what names bridge.log, and the child it started' ($stopIt
 $bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')
 Yes 'Install-Bridge.ps1 looks for the line bridge.js answers a plain request with (#2875)' (
     $bridgeJs -match "const PLAIN = 'box bridge: not here';" -and $install -match "(?m)^\`$Plain = 'box bridge: not here'\r?$")
-Yes '  through Caddy, at the outside check' ($install -match 'if \("\$said"\.Trim\(\) -eq \$Plain\)' -and $install -notmatch "-eq 'not here'")
+Yes '  through Caddy, at the outside check' ($install.Contains('if ($a.Code -eq 404 -and $a.Body -eq $Plain) {') -and $install -notmatch "-eq 'not here'")
 Yes '  and on the port, at install and in the status, never by status code alone' (
-    $install -match "if \(Answers @\('\`$Plain'\)\)" -and $install -match "-eq '\`$Plain'\) \{ 'port" -and $installCode -notmatch 'StatusCode -eq 404')
+    $install.Contains("if (Answers @('`$Plain'))") -and $installCode.Contains('if ($a.Code -eq 404 -and $Lines -contains $a.Body) { return $true }') -and
+    $install.Contains('if (`$a.Code -eq 404 -and `$a.Body -eq ''$Plain'') { ''port'))
+Yes '  each through Get-PlainAnswer, which goes with the scripts that call it' (
+    $installCode.Contains('function Get-PlainAnswer {') -and $installCode.IndexOf('function Get-PlainAnswer {') -lt $installCode.IndexOf('function Answers'))
+# On the box's Windows PowerShell 5.1 a 404 leaves Invoke-WebRequest's
+# ErrorDetails empty, so a body read that way is never seen (#2875).
+Yes '  and none through Invoke-WebRequest or ErrorDetails' ($install -notmatch 'Invoke-WebRequest -' -and $install -notmatch '\.ErrorDetails')
 Yes 'the status says whether a token is there, never what it is' ($install -match "token     there" -and $install -notmatch 'Get-Content[^\r\n]*token\.txt')
 
 # ---- 3. New-CloudAccess.ps1 ----------------------------------------------
@@ -224,6 +245,66 @@ Yes 'the Caddyfile hands /box/ to 127.0.0.1:7790' ($caddy -match '(?s)handle_pat
 Yes '  the port bridge.js takes when none is given' ($bridgeJs -match 'THORNSWOOD_BRIDGE_PORT\) \|\| 7790')
 Yes '  and Install-Bridge.ps1 installs it on' ($install -match '\[int\]\$Port\s+= 7790')
 Yes 'Setup-Domain.ps1 refuses a Caddyfile without the /box/ block' ((Text (P 'scripts', 'deploy', 'Setup-Domain.ps1')) -match "'handle_path /box/\*'")
+
+# ---- 7. Get-PlainAnswer in each PowerShell -------------------------------
+function FreePort {
+    $l = New-Object Net.Sockets.TcpListener ([Net.IPAddress]::Loopback), 0
+    $l.Start(); $n = $l.LocalEndpoint.Port; $l.Stop()
+    return $n
+}
+function StartNode([string]$script, [hashtable]$envs) {
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = (Get-Command node).Source
+    $psi.Arguments = '"' + $script + '"'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    foreach ($k in $envs.Keys) { $psi.EnvironmentVariables[$k] = [string]$envs[$k] }
+    return [Diagnostics.Process]::Start($psi)
+}
+function Until([string]$url) {
+    $stop = (Get-Date).AddSeconds(10)
+    while ((Get-Date) -lt $stop) {
+        if ((Get-PlainAnswer $url 1).Code) { return $true }
+        Start-Sleep -Milliseconds 200
+    }
+    return $false
+}
+if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
+    Yes 'node is here to run bridge.js for Get-PlainAnswer' $false
+} else {
+    $ptmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2875-' + [Guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $ptmp -Force | Out-Null
+    $procs = @()
+    try {
+        [IO.File]::WriteAllText((Join-Path $ptmp 'token.txt'), 'stand-in-token')
+        $sitePath = Join-Path $ptmp 'site.js'
+        # The site's own 404, as site/server.js sends it.
+        [IO.File]::WriteAllText($sitePath, "require('http').createServer((q, s) => { s.writeHead(404, { 'Content-Type': 'text/plain' }); s.end('not here'); }).listen(Number(process.env.PORT), '127.0.0.1');")
+        $bridgePort = FreePort; $sitePort = FreePort; $nobody = FreePort
+        $procs += StartNode (P 'scripts', 'vps', 'bridge', 'bridge.js') @{ THORNSWOOD_BRIDGE_PORT = $bridgePort; THORNSWOOD_BRIDGE_TOKEN_FILE = (Join-Path $ptmp 'token.txt'); THORNSWOOD_BRIDGE_TARGET = ('127.0.0.1:' + $nobody) }
+        $procs += StartNode $sitePath @{ PORT = $sitePort }
+        Yes 'bridge.js and the stand-in site start' ((Until "http://127.0.0.1:$bridgePort/") -and (Until "http://127.0.0.1:$sitePort/"))
+        $shells = @()
+        foreach ($sh in 'pwsh', 'powershell.exe') { if (Get-Command $sh -ErrorAction SilentlyContinue) { $shells += $sh } }
+        foreach ($sh in $shells) {
+            $asks = @($bridgePort, $sitePort, $nobody) | ForEach-Object { "`$a = Get-PlainAnswer 'http://127.0.0.1:$_/' 3; 'ANSWER ' + `$a.Code + ' ' + `$a.Body" }
+            $code = $SendPlainAnswer + "`n" + ($asks -join "`n")
+            $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($code))
+            $out = @(& $sh -NoProfile -NonInteractive -EncodedCommand $enc 2>&1 | ForEach-Object { "$_" } | Where-Object { $_ -like 'ANSWER *' })
+            $ver = (& $sh -NoProfile -NonInteractive -Command '$PSVersionTable.PSVersion.ToString()' | Select-Object -First 1)
+            $saw = ' (read: ' + ($out -join ' / ') + ')'
+            Yes ("${sh} ${ver}: the bridge's 404 reads as its line" + $(if ($out[0] -ne 'ANSWER 404 box bridge: not here') { $saw })) ($out.Count -eq 3 -and $out[0] -eq 'ANSWER 404 box bridge: not here')
+            Yes ("${sh} ${ver}: the site's 404 reads as the site's, not the bridge's") ($out.Count -eq 3 -and $out[1] -eq 'ANSWER 404 not here')
+            Yes ("${sh} ${ver}: a port nobody holds reads as no answer") ($out.Count -eq 3 -and $out[2] -eq 'ANSWER 0 ')
+        }
+        Yes 'Get-PlainAnswer ran in at least one PowerShell' ($shells.Count -ge 1)
+    }
+    finally {
+        foreach ($p in $procs) { if ($p -and -not $p.HasExited) { $p.Kill() } }
+        Remove-Item -LiteralPath $ptmp -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
