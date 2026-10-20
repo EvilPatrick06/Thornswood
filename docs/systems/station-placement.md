@@ -17,6 +17,7 @@ The rulebook says what each station is for and who works it, and names no town. 
 - **Beehive** ([farmer.md](classes/farmer.md)): a placed hive is a farmer verb. One at each of Skyrim's own named farms (a location Skyrim marks as a farm) with at least 5 crop plots of the farmer's table within 2,400 units, the farm claim's circle, of the farm's point: its map marker, or the farmhouse's outside door where that marker is inside the house. It stands beside the crop plot nearest that point.
 - **Alchemy lab** ([physicker.md](professions/alchemist/physicker.md), [injury.md](injury.md)): the poultice and the remedy are made only at Thornswood's lab. One in the apothecary of each of the nine hold capitals, beside Skyrim's own lab there; Winterhold has no apothecary in town, so the College's Hall of Countenance; Windhelm's Palace of the Kings is tried after the White Phial.
 - **Well bucket** ([drink.md](drink.md)): water is drawn at a well by activating it (Patrick, 12 Oct, #1382), and every placed well in the load order is a static, which the game never lets anybody activate. So one bucket beside each of the 30 placed wells in `game/data/wells.json`, the nearest clear spot within 400 units of the well. Activating it fills an empty bottle with well water. A well in a cell that no master of the content plugin carries (the two in the sewers) is left out, since the plugin can only place into its masters' cells.
+- **Water bucket** ([drink.md](drink.md)): drawing spots at rivers and lakes (Patrick, 12 Oct, #1382). One for each of the nine towns with a forge, on the river nearest it, or for Riften on Lake Honrich: the nearest clear spot to the forge within 3,000 units whose cell's water `game/data/waters.json` classes as a river (for Riften, the deep water of the lake), at its edge: ground no lower than the water and no more than 120 units above it, with navmesh under the water within 160 units, so the water is there to reach. Lake water is worth what river water is (Patrick, 20 Oct), so one bucket serves both, and the water drawn there must be boiled.
 
 Each rule gives its anchors nearest first. The builder searches round each in turn, every step out to the kind's reach in eight turns, and takes the nearest clear spot; the first anchor with one wins.
 
@@ -102,6 +103,13 @@ Each row is the well the bucket stands beside, by its base and cell, as the tabl
 | RTPlazaWell01 in RiftenOrigin | 284 units |
 | ImpWell01 in TrevasWatchExterior01 | 222 units |
 
+### Water buckets (2), 20 Oct 2026
+
+| Where | Cell | From the forge |
+| --- | --- | --- |
+| Lake Honrich at Riften | RiftenOrigin | 754 units |
+| the river at Riverwood | Riverwood02 | 2,338 units |
+
 ### Where the rule led to the other server's spot
 
 Elgrim's Elixirs' lab stands 114 units from where the other server's stood, Arcadia's Cauldron's 610 and Angeline's Aromatics' 569: the rule puts a lab beside Skyrim's own, and so did that server. Riverwood's kiln is 829 units from that server's Riverwood kiln and Chillfurrow's hive 950 from one of its two there; Rorikstead's two hives stand in the cell where it had one, 1,355 and 2,215 units from it. The four salt quarries are nowhere near its salt quarries. Every other spot is somewhere it never placed anything.
@@ -128,6 +136,14 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - FarmBWell01 in SSewersWRBurrow: the well 3907d:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
   - FarmBWell01 in WindhelmMarketplaceExterior: no clear spot within 400 units beside it (7841 off the navmesh; 3061 touches ImpExtBlocks01SnowLight; 1861 touches TreeFloraHangingMoss01; 1151 touches FishRack01Light_SNWH).
   - RTPlazaWell01 in bcd0:Skyrim.esm: no clear spot within 400 units beside it (15688 off the navmesh).
+- Water buckets, 7 of the 9 left out: no river water, or for Riften lake water, within 3,000 units of the forge that has a clear spot at its edge. Whiterun's and Markarth's streams are placed water the records do not class as a river cell, and Windhelm's and Solitude's nearest water is the sea's:
+  - the river at Dawnstar: 98048 not by river or lake water.
+  - the river at Falkreath: 97936 not by river or lake water; 64 touches TreeThicket01; 47 off the navmesh; 1 not at the water's edge.
+  - the river at Markarth: 98048 not by river or lake water.
+  - the river at Morthal: 98048 not by river or lake water.
+  - the river at Solitude: 98048 not by river or lake water.
+  - the river at Whiterun: 98048 not by river or lake water.
+  - the river at Windhelm: 98048 not by river or lake water.
 - Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
 
 To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, and rebuild what hashes the plugin (Build-LastPlugin.py, Build-NpcPopulation.py, Build-MerchantRoleTables.py, Build-WoodworkingBenches.py).
