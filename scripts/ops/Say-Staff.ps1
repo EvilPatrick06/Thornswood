@@ -52,8 +52,6 @@ param(
     [string]$From = '',
     [Parameter(ParameterSetName = 'Check', Mandatory = $true)]
     [string]$Check,
-    # For the harness: what is run in ssh's place.
-    [string]$SshCommand = 'ssh',
     [string]$VpsHost = '',
     [string]$VpsUser = ''
 )
@@ -121,7 +119,7 @@ try {
     }
 
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $out = @(Invoke-ThornswoodNative { @($line) | & $SshCommand @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
+    $out = @(Invoke-ThornswoodNative { @($line) | & ssh @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
              Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
     $code = $LASTEXITCODE
     $ErrorActionPreference = $old

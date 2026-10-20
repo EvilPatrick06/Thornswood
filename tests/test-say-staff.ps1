@@ -184,23 +184,33 @@ except Exception as e:
     print('SKIP ' + type(e).__name__)
     sys.exit(0)
 lines = [l.strip() for l in open(sys.argv[2], encoding='utf-8-sig') if l.strip()]
-print('DUE ' + json.dumps(bot.watch_alerts_due(lines, set(), int(time.time()))))
+due = bot.watch_alerts_due(lines, set(), int(time.time()))
+print('DUE %d' % len(due))
+for aid, text in due:
+    print('ID ' + aid)
+    print('TEXT ' + json.dumps(text))
 "@
         $pyFile = Join-Path $tmp 'probe.py'
         [IO.File]::WriteAllText($pyFile, $code, $enc)
-        $probe = (@(& $py.Source -I $pyFile (P 'bot') $alerts 2>&1 | ForEach-Object { "$_" }) | Where-Object { $_ -match '^(SKIP|DUE) ' } | Select-Object -Last 1)
+        $said = @(& $py.Source -I $pyFile (P 'bot') $alerts 2>&1 | ForEach-Object { "$_" })
+        $probe = @($said | Where-Object { $_ -match '^(SKIP|DUE) ' }) | Select-Object -Last 1
+        $dueId = @($said | Where-Object { $_ -like 'ID *' } | ForEach-Object { $_.Substring(3) })
+        $dueText = @($said | Where-Object { $_ -like 'TEXT *' } | ForEach-Object { ConvertFrom-Json $_.Substring(5) })
         Remove-Item Env:DISCORD_TOKEN -ErrorAction SilentlyContinue
     }
     if ($probe -like 'DUE *') {
-        $due = ConvertFrom-Json $probe.Substring(4)
-        Yes 'bot.py watch_alerts_due takes the line the box half wrote, with its text' (@($due).Count -eq 1 -and ('QUEUED ' + $due[0][0]) -eq $r.Last -and $due[0][1] -eq '[cloud] for the bot')
+        Yes 'bot.py watch_alerts_due takes the line the box half wrote, with its text' (
+            $probe -eq 'DUE 1' -and $dueId.Count -eq 1 -and ('QUEUED ' + $dueId[0]) -eq $r.Last -and $dueText.Count -eq 1 -and $dueText[0] -eq '[cloud] for the bot')
     } else {
         Write-Host ('SKIP  bot.py could not be imported here (' + $(if ($probe) { $probe } else { 'no python' }) + '); bot\test-watch-services.py covers its reader')
     }
 
     # ---- 4. Say-Staff.ps1 end to end -----------------------------------------
-    # A stand-in for ssh: writes down what it was given, then runs the box
-    # half with what came on its input, the way sshd would.
+    # A stand-in for ssh, first on the path of the process Say-Staff.ps1 runs
+    # in: writes down what it was given, then runs the box half with what
+    # came on its input, the way sshd would.
+    $bin = Join-Path $tmp 'bin'
+    New-Item -ItemType Directory -Path $bin -Force | Out-Null
     $standIn = Join-Path $tmp 'ssh-stand-in.ps1'
     $argsFile = Join-Path $tmp 'ssh-args.txt'
     [IO.File]::WriteAllText($standIn, @"
@@ -208,13 +218,24 @@ print('DUE ' + json.dumps(bot.watch_alerts_due(lines, set(), int(time.time()))))
 [IO.File]::WriteAllLines('$argsFile', [string[]]`$all)
 `$cmd = `$all[-1]
 `$from = if (`$cmd -match '-From ([a-z0-9-]+)`$') { `$Matches[1] } else { '' }
-`$in = @(`$input)
+`$in = @([Console]::In.ReadToEnd() -split '\r?\n' | Where-Object { `$_ })
 [IO.File]::WriteAllLines('$argsFile.in', [string[]]`$in)
 `$in | & '$shell' -NoProfile -NonInteractive -File '$box' -From `$from -Root '$root'
+exit `$LASTEXITCODE
 "@, $enc)
+    if ($env:OS -eq 'Windows_NT') {
+        [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $standIn + '" %*' + "`r`n"), $enc)
+    } else {
+        $sh = Join-Path $bin 'ssh'
+        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $standIn + "' `"`$@`"`n"), $enc)
+        & chmod 755 $sh
+    }
     Remove-Item Env:THORNSWOOD_NOTICE_KEY_B64, Env:THORNSWOOD_NOTICE_TOKEN -ErrorAction SilentlyContinue
     function SayStaff([string[]]$a) {
-        $out = @(& $shell -NoProfile -NonInteractive -File $say @a -SshCommand $standIn -VpsHost 'box.invalid' -VpsUser 'Administrator' 2>&1 | ForEach-Object { "$_" })
+        $path = $env:PATH
+        $env:PATH = $bin + [IO.Path]::PathSeparator + $path
+        try { $out = @(& $shell -NoProfile -NonInteractive -File $say @a -VpsHost 'box.invalid' -VpsUser 'Administrator' 2>&1 | ForEach-Object { "$_" }) }
+        finally { $env:PATH = $path }
         return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE }
     }
     Fresh
