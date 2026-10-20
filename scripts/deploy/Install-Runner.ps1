@@ -27,10 +27,10 @@
   thornswood-pr-<computer> and the label thornswood-pr (-Number n puts the
   number on the end of each, the same as on the box). What changes from the box:
     - The account is shut out of every C:\Thornswood* folder, not only
-      C:\Thornswood-*: on a developer machine the worktrees, the play build and
-      the vault are C:\ThornswoodTemps&Worktrees, C:\Thornswood and
-      C:\Thornswood Vault, and none has the hyphen. -AlsoDeny adds any other
-      folder (another drive, say) to that list.
+      C:\Thornswood-*: on a developer machine the play build and the vault
+      are C:\Thornswood and C:\Thornswood Vault, and neither has the hyphen
+      (nor had C:\ThornswoodTemps&Worktrees, the worktrees until #2900).
+      -AlsoDeny adds any other folder (another drive, say) to that list.
     - Defender keeps scanning the runner's folder unless -DefenderSkip is given.
       On the VPS the speed was worth it; on a machine people work on, a pull
       request's code is exactly what the scanner is for.

@@ -10,7 +10,7 @@ what it changes. If you are not sure, the answer is further down.
 Ask from outside the box, because the box can always reach itself.
 
 ```powershell
-cd C:\Users\evilp\Downloads\Thornswood-Repo
+cd C:\Thornswood-Repo
 .\scripts\vps\Check-Site.ps1
 ```
 

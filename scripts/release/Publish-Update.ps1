@@ -77,7 +77,13 @@ param(
     # to the VPS. Tests only.
     ,[string]$SiteDir,
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
-    [switch]$AllowStaleCheckout
+    [switch]$AllowStaleCheckout,
+    # A release with no game folder of the collection's (#2754, Ship -FromFeed):
+    # -Root is a folder New-FeedRoot.ps1 staged, whose Game holds the files the
+    # last release carried and this checkout's own. The collection's files are
+    # not in it, so the plugin list, its order key and the collection revision
+    # are the last release's, held to the server's order read off the box.
+    [switch]$FromFeed
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 . (Join-Path $PSScriptRoot 'RecordShape.ps1')     # #2180: the Skyrim pin is held to its shape before it goes into the feed
@@ -164,6 +170,7 @@ if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (
 # The signed release manifest (#2163, phase B): what it lists, and signing it.
 . (Join-Path $Here 'Release-Manifest.ps1')
 . (Join-Path $Here 'Sign-ReleaseCatalog.ps1')
+. (Join-Path $Here 'Sign-OnGitHub.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -284,6 +291,8 @@ function Get-SkyrimPath {
 # Package-Thornswood.ps1, so the installer follows exactly the same rules as
 # the packs (it did not, and shipped a token file).
 . (Join-Path $Here 'Ship-Rules.ps1')
+# What a file of the repo ships as, from any machine (#2903).
+. (Join-Path $Here 'ShippedBytes.ps1')
 
 # Where the source of the SkyMP files is, and the GPL and AGPL texts, go inside
 # every pack that carries one and inside the client runtime zip (#421).
@@ -384,6 +393,13 @@ $IsCollection = -not (Test-Path -LiteralPath $GameDir)
 # A Game folder the launcher made out of Vortex's deployment (OwnGame.cs) is
 # not the old installer's copy: most of it is the collection, linked in.
 $ownCollection = if ($IsCollection) { $null } else { Get-ShipOwnGameCollection $ProfileDir }
+# A staged folder holds none of the collection's files (#2754): New-FeedRoot
+# put only the last release's and this checkout's in it, so nothing in it is
+# Vortex's and there is no files.txt to say so.
+if ($FromFeed) {
+    if ($IsCollection) { Die "-FromFeed publishes a folder New-FeedRoot.ps1 staged, and $GameDir is not there. Nothing was built." }
+    $ownCollection = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+}
 
 # No record, no release.
 #
@@ -446,6 +462,12 @@ if ($IsCollection) {
         Die 'Refusing to publish the whole collection as an update. Deploy once in Vortex and run this again.'
     }
 }
+elseif ($FromFeed) {
+    $vortexFiles = $ownCollection
+    Write-Host ''
+    Write-Host "  a folder staged from the $Channel feed, with none of the collection's files in it:" -ForegroundColor DarkGray
+    Write-Host "  $GameDir" -ForegroundColor DarkGray
+}
 elseif ($null -ne $ownCollection) {
     $vortexFiles = $ownCollection
     Write-Host ''
@@ -461,7 +483,10 @@ elseif ($null -ne $ownCollection) {
 # fishing and crafting records. Updater unshares each destination before
 # extraction, preserving Vortex staging and the independently updated channel.
 $shipGeneratedFiles = Get-ShipGeneratedFiles $ProfileDir
-Assert-ShipGeneratedBodies $GameDir $ProfileDir
+# From the feed the bodies are the bytes the last release carried, each held
+# to its sha256 there by New-FeedRoot; only a collection Ship builds them.
+if ($FromFeed) { Say '  the generated bodies are the last release''s, by their sha256' 'DarkGray' }
+else { Assert-ShipGeneratedBodies $GameDir $ProfileDir }
 function Test-FromCollection([string]$rel) {
     if ($null -eq $vortexFiles) { return $false }
     if (Test-ThornswoodRepoPlugin $rel) { return $false }
@@ -523,7 +548,16 @@ function Test-OtherServer([string]$rel) { return (Test-ShipOtherServer $rel) }
 # Other people's loose files as well (#1178): never packed, never recorded,
 # never listed as removed. What waits for the collection is asked at the
 # revision this release is built against.
-$ShipCollectionRevision = Get-ShipCollectionRevision $Root
+if ($FromFeed) {
+    # Nothing here has Vortex to ask: the revision is the one the feed says
+    # its last release was built against, which only a collection Ship moves.
+    $ShipCollectionRevision = 0
+    try { $revDoc = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($VersionFile)) $VersionFile } catch { Die $_.Exception.Message }
+    if ($revDoc.PSObject.Properties['collectionRevision']) { [void][int]::TryParse([string]$revDoc.collectionRevision, [ref]$ShipCollectionRevision) }
+    if ($ShipCollectionRevision -le 0) { Die "The $Channel feed names no collection revision, so which held files ship is not known. A collection Ship on One names it. Nothing was built." }
+} else {
+    $ShipCollectionRevision = Get-ShipCollectionRevision $Root
+}
 Say ("  collection revision {0}: loose files held for the collection until then still ship" -f $ShipCollectionRevision) 'DarkGray'
 function Test-Machine([string]$rel) { return ((Test-ShipMachine $rel) -or (Test-ShipNotOurs $rel)) }
 
@@ -541,9 +575,9 @@ $menuSrc  = Join-Path $RepoDir 'game\ui\index.html'
 $menuLive = Join-Path $GameDir $menuRel
 if ((Test-Path -LiteralPath $menuLive) -and (Test-Path -LiteralPath $menuSrc)) {
     if (-not ([IO.File]::ReadAllText($menuLive) -like '*thornswood-bridge.js*')) {
-        Copy-Item -LiteralPath $menuSrc -Destination $menuLive -Force
+        Copy-ThornswoodShippedFile $menuSrc $menuLive
         $menuKept = Join-Path $ProfileDir "Keep\$menuRel"
-        if (Test-Path -LiteralPath (Split-Path -Parent $menuKept)) { Copy-Item -LiteralPath $menuSrc -Destination $menuKept -Force }
+        if (Test-Path -LiteralPath (Split-Path -Parent $menuKept)) { Copy-ThornswoodShippedFile $menuSrc $menuKept }
         Say "  $menuRel was another server's menu. Thornswood's put back from the repo." 'Yellow'
     }
 }
@@ -553,7 +587,10 @@ Say '  Scanning the build...'
 # is the short 8.3 form when the build sits under a short TEMP
 # (issue #1156).
 $listedGame = (Get-Item -LiteralPath $GameDir).FullName
-$prefix = $listedGame.TrimEnd('\') + '\'
+# Its own separator, so the keys come out the same off Windows (#2903): the
+# record writes every path with backslashes.
+$sep = [string][IO.Path]::DirectorySeparatorChar
+$prefix = $listedGame.TrimEnd($sep) + $sep
 $now = @{}
 # Each file of ours is recorded by its bytes, '<size>:<sha256>', not by its
 # file time (#441): the same bytes are the same entry on any machine, after a
@@ -562,7 +599,7 @@ $now = @{}
 $nowFile = @{}
 $hashWatch = [Diagnostics.Stopwatch]::StartNew()
 foreach ($f in (Get-ChildItem -LiteralPath $listedGame -Recurse -File -Force)) {
-    $rel = $f.FullName.Substring($prefix.Length)
+    $rel = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
     if (Test-FromCollection $rel) { continue }
     if (Test-Vanilla $rel) { continue }
     if (Test-Runtime $rel) { continue }
@@ -575,16 +612,21 @@ foreach ($f in (Get-ChildItem -LiteralPath $listedGame -Recurse -File -Force)) {
 }
 Say ("  {0:n0} mod files, hashed in {1:n1} s" -f $now.Count, $hashWatch.Elapsed.TotalSeconds) 'Green'
 $others = @(Get-ChildItem -LiteralPath (Join-Path $listedGame 'Data\Platform') -Recurse -File -Force -ErrorAction SilentlyContinue |
-            ForEach-Object { $_.FullName.Substring($prefix.Length) } | Where-Object { Test-OtherServer $_ })
+            ForEach-Object { $_.FullName.Substring($prefix.Length).Replace($sep, '\') } | Where-Object { Test-OtherServer $_ })
 if ($others.Count) { Say ("  {0} of another server's file(s) in Data\Platform left alone: {1}" -f $others.Count, (($others | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')) 'DarkGray' }
 
 # The reference plugin list is part of what ships, so a load order change on its
 # own has to be enough to make a pack. Hashed rather than timestamped, because
 # rewriting the same list is not a change worth sending anyone.
-$shipReferenceDir = Get-ShipLoadOrderDir $Root $ProfileDir
-foreach ($f in 'plugins.txt', 'loadorder.txt') {
-    $src = Join-Path $shipReferenceDir $f
-    if (Test-Path $src) { $now[":profile:$f"] = (Get-FileHash $src -Algorithm SHA256).Hash }
+# From the feed there is no list here: the last release's goes forward,
+# below, once that release has been read (#2754).
+$shipReferenceDir = ''
+if (-not $FromFeed) {
+    $shipReferenceDir = Get-ShipLoadOrderDir $Root $ProfileDir
+    foreach ($f in 'plugins.txt', 'loadorder.txt') {
+        $src = Join-Path $shipReferenceDir $f
+        if (Test-Path $src) { $now[":profile:$f"] = (Get-FileHash $src -Algorithm SHA256).Hash }
+    }
 }
 
 # WHAT A SAVE ACTUALLY CARES ABOUT, kept apart from the hash above. The hash
@@ -618,8 +660,8 @@ function Get-ActiveOrderKey([string]$path, [string]$data = '') {
 # list as it will be packed. A new key name for the 27 September reason: the
 # first release after this has no key of the new kind to compare with, so it
 # says nothing rather than comparing against a machine's own order.
-$orderSrc = Join-Path $shipReferenceDir 'plugins.txt'
-if (Test-Path $orderSrc) {
+$orderSrc = if ($shipReferenceDir) { Join-Path $shipReferenceDir 'plugins.txt' } else { '' }
+if ($orderSrc -and (Test-Path $orderSrc)) {
     $orderTmp = Join-Path $DistDir 'reference-plugins-ordered.txt'
     try {
         $shippedList = Get-ReferenceInServerOrder $orderSrc $orderTmp -Quiet
@@ -664,8 +706,9 @@ if (Test-Path $srcDir) {
     $srcListed = (Get-Item -LiteralPath $srcDir).FullName
     foreach ($f in @(Get-ChildItem -LiteralPath $srcListed -Recurse -File -ErrorAction SilentlyContinue |
                      Where-Object { $_.Extension -in '.cs', '.xaml' })) {
-        $rel = $f.FullName.Substring($srcListed.Length).TrimStart('\')
-        $now[":src:$rel"] = (Get-FileHash $f.FullName -Algorithm SHA256).Hash
+        $rel = $f.FullName.Substring($srcListed.Length).Replace([string][IO.Path]::DirectorySeparatorChar, '\').TrimStart('\')
+        # As a Windows checkout holds it, so any machine records the same (#2903).
+        $now[":src:$rel"] = (Get-ThornswoodShippedSha256 $f.FullName).ToUpperInvariant()
     }
 }
 
@@ -811,6 +854,44 @@ if (-not $prev.Count) {
     Die ("No baseline for the $Channel channel: what was last published came back empty, so every file would look new. Nothing was built.")
 }
 # ==== end thornswood what was published ====
+
+# ==== thornswood the feed's plugin list ====
+# FROM THE FEED THE PLUGIN LIST IS THE LAST RELEASE'S (#2754). Nothing here has
+# the collection, so the list, its hash and its order key go forward as the
+# last release recorded them, the way the golden list goes forward below when
+# no pack moved it. What a Ship from One asks of the list is asked of the
+# server instead: Get-ShipFeedOrderProblem holds it to the order the channel's
+# server loads, read off the box, and Thornswood-Last.esp to that order.
+if ($FromFeed) {
+    Head "The last release's plugin list"
+    foreach ($k in @($prev.Keys | Where-Object { $_ -like ':profile:*' -or $_ -like ':order:*' })) { $now[$k] = [string]$prev[$k] }
+    $fromPtr = $null
+    if (Get-Variable -Name resolved -Scope Script -ErrorAction SilentlyContinue) { $fromPtr = $resolved.Pointer }
+    if (-not $prev.ContainsKey(':golden:plugins.txt') -or $null -eq $fromPtr) {
+        Die "The $Channel feed's last release names no plugin list on the site, so a release from the feed has none to carry. A collection Ship from One makes one. Nothing was built."
+    }
+    $feedGoldenSha = ([string]$prev[':golden:plugins.txt']).Split(':')[1]
+    $feedGolden = Join-Path $DistDir 'feed-plugins.txt'
+    try { [void](Get-FeedAssetFile (Get-RecordFileUrl ([string]$fromPtr.url) $feedGoldenSha) $feedGoldenSha $feedGolden (Get-FeedStoreSiteDir $SiteDir) $SiteUrl) }
+    catch { Die ("The last release's plugin list could not be read back from the site, so nothing was built: " + $_.Exception.Message) }
+    $feedEnabled = @([IO.File]::ReadAllLines($feedGolden) | ForEach-Object { $_.Trim() } |
+                     Where-Object { $_.StartsWith('*') } | ForEach-Object { $_.Substring(1).Trim() })
+    $feedBox = $null
+    try { $feedBox = Read-ThornswoodServerContent -Channel $Channel }
+    catch { Die ("The $Channel server's load order could not be read off the box, so nothing was built: " + $_.Exception.Message) }
+    if (-not $feedBox.OrderRead) {
+        Die ("The $Channel server's load order could not be read off the box, so nothing was built. It said: " + (@($feedBox.Said | Select-Object -First 5) -join ' | '))
+    }
+    $feedOrder = Get-ShipFeedOrderProblem $feedBox.Order $feedEnabled
+    if ($feedOrder.Problem) { Die ('Nothing was published, posted or told to a server: ' + $feedOrder.Problem) }
+    Say ("  {0} plugins enabled, the {1} server's order: the masters, {2}, then the list" -f $feedEnabled.Count, $Channel, $(if ($feedOrder.Ccc.Count) { $feedOrder.Ccc -join ', ' } else { 'no Creation Club plugin' })) 'Green'
+    if (Test-ShipLastPluginHeld $RepoDir) {
+        $lastProblem = Get-ShipLastPluginProblem $RepoDir $feedEnabled $feedOrder.Ccc
+        if ($lastProblem) { Die ('Nothing was published, posted or told to a server: ' + $lastProblem) }
+        Say ("  {0} was built against this release's load order and the collection's bytes" -f $ShipLastPlugin) 'DarkGray'
+    }
+}
+# ==== end thornswood the feed's plugin list ====
 
 # ------------------------------------------------------------ diff
 Head 'Changes'
@@ -1173,7 +1254,9 @@ if ($changed.Count -or $removed.Count -or $profileChanged.Count) {
             # the folder was last brought up to date, which is the collection's
             # order. Get-ShipLoadOrderDir (Ship-Rules.ps1) picks between the
             # three, the same for the installer.
-            if ($part -eq $groups.Count) {
+            # From the feed the list goes forward in the record alone (the
+            # feed's plugin list block): it did not move, so no pack carries it.
+            if ($part -eq $groups.Count -and -not $FromFeed) {
                 $ownGame = Join-Path $Root 'Game'
                 $isCollection = -not (Test-Path -LiteralPath $ownGame)
                 $refDir = Get-ShipLoadOrderDir $Root $ProfileDir
@@ -2018,9 +2101,13 @@ if (Test-Path $cfgPath) {
         #
         # Silence when it cannot be read, never a guess: a wrong number here
         # tells everybody to reinstall a collection that is already right.
+        # From the feed there is no Vortex here, and the revision is the one
+        # the last release named, which only a collection Ship moves (#2754).
         $slug = Get-CollectionSlug ([string]$cfg.CollectionUrl)
-        $rev = Get-CollectionRevision $slug
-        if ($rev -gt 0) {
+        $rev = if ($FromFeed) { 0 } else { Get-CollectionRevision $slug }
+        if ($FromFeed) {
+            Say "  collection revision $ShipCollectionRevision, as the last release named it" 'DarkGray'
+        } elseif ($rev -gt 0) {
             Set-Prop $doc 'collectionRevision' $rev
             Say "  collection revision $rev (what this release was built against)" 'Green'
         } else {
@@ -2334,10 +2421,19 @@ if (-not $NoUpload) {
     Head 'Signing the release manifest'
     $smWhy = ''
     $sm = $null
-    try { $sm = New-ReleaseManifestFiles $doc $Id $Channel (Join-Path $DistDir ('signed-' + $Id)) }
+    # A release from the feed signs on GitHub, in the engine fork (#2903,
+    # Patrick's A of 20 Oct), so it needs no signing machine: the catalog
+    # comes back signed and is held to release.json and the launcher's own
+    # check there (Sign-OnGitHub.ps1). Any other release signs here.
+    try { $sm = New-ReleaseManifestFiles $doc $Id $Channel (Join-Path $DistDir ('signed-' + $Id)) -NoCatalog:$FromFeed }
     catch { $smWhy = $_.Exception.Message }
-    if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir }
-    if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc }
+    if ($FromFeed) {
+        if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSignOnGitHub -Json $sm.Json -Catalog $sm.Catalog -RepoDir $RepoDir -Request ($Id + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) }
+        if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc -CatalogChecked }
+    } else {
+        if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir }
+        if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc }
+    }
     if ($smWhy) {
         Die ("The release manifest was not signed and checked, so version.json has not been touched and nobody has been sent this release: $smWhy")
     }

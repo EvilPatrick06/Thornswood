@@ -764,7 +764,7 @@ jobs:
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
                  'test-2384-cursor-focus.js',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1', 'test-2727-feed-swap-readers.ps1', 'test-2180-feed-sends.ps1', 'test-feed-store.ps1', 'test-2740-whole-writes.js', 'test-2740-shared-reads.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1', 'test-2727-feed-swap-readers.ps1', 'test-2180-feed-sends.ps1', 'test-feed-store.ps1', 'test-2754-front.ps1', 'test-2754-from-feed.ps1', 'test-2740-whole-writes.js', 'test-2740-shared-reads.ps1',
                  'test-2599-whole-swaps.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',

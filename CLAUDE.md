@@ -185,10 +185,10 @@ this section exists for.
 Added by Patrick on 27 Sep, after a session found 624 local branches and 15
 worktrees in the shared clone and read a session-start snapshot as the truth.
 
-- `C:\Users\evilp\Downloads\Thornswood-Repo` is shared with Patrick's Grok Bot
-  lanes and sits detached at `origin/main`, because they build from it. Do
-  branch work in a worktree beside it (`git worktree add
-  ..\Thornswood-claude-<what> -b claude/<what> origin/main`), and afterwards
+- `C:\Thornswood-Repo` is shared with Patrick's Grok Bot lanes and sits
+  detached at `origin/main`, because they build from it. Do branch work in a
+  worktree in its ignored `worktrees` folder (`git worktree add
+  worktrees\claude-<what> -b claude/<what> origin/main`), and afterwards
   remove the worktree and delete the branch. Never leave that folder on a
   branch. Before deleting a worktree or branch you did not make, check no
   running process names its folder and its pull request merged over an hour
@@ -206,11 +206,12 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   what of yours is still there has its reason written on its issue, or it
   goes. Developer-Guide.md "No stray branches, worktrees or pull requests"
   is the rule for everybody.
-- Three folders, no copies (Patrick, 5 Oct). Work only in this repository,
-  the vault and `C:\ThornswoodTemps&Worktrees` (`worktrees\<name>`,
-  `temp\<task>`); never make another top-level folder or leave scratch in
-  Downloads, and never save a copy of a log, report, build or backup that
-  GitHub or the VPS already holds. Cite where it lives instead.
+- Two folders, no copies (Patrick, 5 Oct; on 20 Oct temp and worktrees moved
+  into the repository, #2900). Work only in this repository (its ignored
+  `worktrees\<name>` and `temp\<task>`) and the vault; never make another
+  top-level folder or leave scratch in Downloads, and never save a copy of a
+  log, report, build or backup that GitHub or the VPS already holds. Cite
+  where it lives instead.
 - The git status at the start of a session is a snapshot and can be hours
   old. Run `git status` and `git log -1 origin/main` before saying what state
   the clone is in.
