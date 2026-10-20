@@ -76339,6 +76339,12 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
   var LEGACY_TRADE = {ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
     wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith'};
+  // New legacy work has one appointed specialist. Already accepted work
+  // keeps its former compatible trade and destination rules after the cut.
+  var LEGACY_OFFER_REF = {ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
+    stalhrim:'1828f:Dragonborn.esm',heartstone:'1828f:Dragonborn.esm',
+    wolf:'1a684:Skyrim.esm',sabre:'1b124:Skyrim.esm',camp:'1a67c:Skyrim.esm',
+    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm'};
 
   function createCustomQuests(deps) {
     deps = deps || {};
@@ -76352,12 +76358,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     var kills = deps.killContracts;
     var budget=typeof MERCHANT_TRADING!=='undefined' ? MERCHANT_TRADING.sceneBudget : null;
     if(expandedRows.length && !budget)throw new Error('Expanded scene reward authority is unavailable.');
-    function traderFor(row,ref) {
+    function traderFor(row,ref,recovery) {
       if (typeof deps.traderRole!=='function') return !row.expanded;
       var role=deps.traderRole(ref);
       if(row.expanded)return active && typeof row.role==='string' && row.role.length>0 &&
         role===row.role && descOf(ref)===row.merchantRef;
-      return active && (role==='' || typeof role==='string' && role===(row.role || LEGACY_TRADE[row.id]));
+      return active && (role==='' || typeof role==='string' && role===(row.role || LEGACY_TRADE[row.id]) &&
+        (recovery===true || descOf(ref)===LEGACY_OFFER_REF[row.id]));
     }
     function captureAdmission(actor,ref) {
       if(typeof deps.traderRole!=='function')return undefined;
@@ -76573,7 +76580,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       if ((b.cool[id] || 0) > deps.now()) return { ok: false, why: 'cooldown' };
       var gate = qualify(actor, row, b);
       if (!gate.ok) return { ok: false, why: gate.why };
-      var eligible=function(){return qualify(actor,row,b,true).ok;};
+      var eligible=function(){return traderFor(row,opts && opts.traderRef) && qualify(actor,row,b,true).ok;};
       if (row.kind==='kill') {
         if(!kills)return {ok:false,why:'unbound'};
         if(typeof deps.traderRole==='function') {
@@ -76735,7 +76742,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       if (row && !b) return { ok: false, why: 'unread' };
       var open = row && b.open[id];
       if (!row || !open) return { ok: false, why: 'none' };
-      if (!traderFor(row,traderRef)) return {ok:false,why:'role'};
+      if (!traderFor(row,traderRef,true)) return {ok:false,why:'role'};
       if(row.expanded && !sceneActionCurrent(row,b,token))return {ok:false,why:'session'};
       if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
       var changes = [];
@@ -76816,7 +76823,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       var held = questsOf(actor);
       if (!held) return [];
       var ready = active && (!deps.ready || deps.ready(actor));
-      var offers=SCARCE.filter(bound).filter(function(row){return traderFor(row,traderRef);}).map(function(row){
+      var offers=SCARCE.filter(bound).filter(function(row){return traderFor(row,traderRef,own(held.open,row.id));}).map(function(row){
         var open = held.open[row.id], gate = qualify(actor,row,held), until = held.cool[row.id] || 0;
         var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
         var location = mineNames[row.id] || '';
@@ -76829,7 +76836,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       });
       var hold=deps.traderHold && deps.traderHold(traderRef);
       if(kills)kills.rows.forEach(function(source){
-        if(source.hold!==hold || !traderFor(byId[source.id],traderRef))return;
+        if(source.hold!==hold || !traderFor(byId[source.id],traderRef,own(held.open,source.id)))return;
         var row=byId[source.id],hasOpen=own(held.open,row.id),open=held.open[row.id],until=held.cool[row.id] || 0;
         var liability=row.expanded && held.sceneBudget && held.sceneBudget.held && own(held.sceneBudget.held,row.id);
         var recovered=row.expanded && (hasOpen || liability) && !sceneTerms(row,held);
@@ -76862,7 +76869,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       held.finalAdmission=current;
       if (!active || deps.ready && !deps.ready(actor)) return {ok:false,why:'unavailable'};
       if(deps.identity(actor)!==held.owner)return {ok:false,why:'identity'};
-      if(!traderFor(row,traderRef))return {ok:false,why:'role'};
+      if(!traderFor(row,traderRef,verb!=='take' && own(held.open,id)))return {ok:false,why:'role'};
       if(row.kind==='kill') {
         var source=kills.rows.find(function(r){return r.id===id;});
         if(!source || !deps.traderHold || deps.traderHold(traderRef)!==source.hold)return {ok:false,why:'hold'};

@@ -208,7 +208,10 @@ assert.equal(legacyRole.purses.read(1).pending,null,'new role restrictions do no
 assert.equal(legacyRole.world.inv[10][15],43);assert.equal(legacyRole.purses.read(1).stock[0].baseId,100);
 legacyRecovery.shutdown();
 
-const roleQuestContext={Buffer,log(){},mp:{makeProperty(){}}};
+// The synthetic trader represents the appointed Solstheim Smith for ebony work.
+const roleQuestContext={Buffer,log(){},mp:{makeProperty(){},getDescFromId(id) {
+  return id===1?'1828f:Dragonborn.esm':id.toString(16)+':Skyrim.esm';
+}}};
 vm.runInNewContext(mode.slice(mode.indexOf('// ==== thornswood custom quests ===='),
   mode.indexOf('// ==== end thornswood custom quests ====')),roleQuestContext);
 const roleEligibility=require('./quest-eligibility-fixture')(roleQuestContext,mode);
