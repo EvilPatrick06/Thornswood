@@ -151,8 +151,15 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { [IO.
 
     $al = Join-Path $T 'al'; W (Join-Path $al 'plugins.txt') ''; [void][IO.Directory]::CreateDirectory((Join-Path $al 'Data'))
     W (Join-Path $al 'server-settings.json') ''
-    $r = Child @((Join-Path $Repo 'scripts\mods\Align-LoadOrder.ps1'), '-Data', (Join-Path $al 'Data'), '-Plugins', (Join-Path $al 'plugins.txt'), '-Settings', (Join-Path $al 'server-settings.json'))
-    Yes 'Align-LoadOrder: an empty server-settings.json is named' (Named $r (Join-Path $al 'server-settings.json') 'empty')
+    # Align-LoadOrder throws, so the sentence is read from the exception, as
+    # Where.ps1's is above (#1273). Printed in the error view it was wrapped at
+    # the console's width, and on build runner 5, whose profile folder is
+    # thornswood-runner5.WIN-MP817AMCSJ9, the break fell inside the path.
+    $alCall = Join-Path $al 'call.ps1'
+    $q = { param($p) "'" + $p.Replace("'", "''") + "'" }
+    W $alCall ("`$ErrorActionPreference = 'Stop'`ntry { & " + (& $q (Join-Path $Repo 'scripts\mods\Align-LoadOrder.ps1')) + ' -Data ' + (& $q (Join-Path $al 'Data')) + ' -Plugins ' + (& $q (Join-Path $al 'plugins.txt')) + ' -Settings ' + (& $q (Join-Path $al 'server-settings.json')) + "; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
+    $r = Child @($alCall)
+    Yes 'Align-LoadOrder: an empty server-settings.json is named' ($r.Code -ne 0 -and $r.Out.Contains('THREW ' + ((Join-Path $al 'server-settings.json') -replace '\s+', ' ') + ' ' + $expect['empty']))
 
     $sm = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1'), [ref]$null, [ref]$null)
     $gcm = $sm.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ClientMatch' }, $true)
