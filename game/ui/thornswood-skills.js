@@ -2289,10 +2289,22 @@
     // Where the world is, for staff (#513): propose, confirm and drop a move.
     if (o.world) wrap.appendChild(officeWorld(o.world));
     if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
+    // The trade ships' ports and routes (#2700), staff only, while the ships are on.
+    if (o.ships) wrap.appendChild(officeShips());
     if (o.steward) wrap.appendChild(officeBoards(o.boards));
     // The company's terms, for staff (#512, #2695): propose, confirm and drop.
     if (o.company) wrap.appendChild(officeCompany(o.company));
     elBody.appendChild(wrap);
+  }
+
+  /* The trade ships' staff panel (#2700): ports, routes and ships, a draft staff confirm. */
+  function officeShips() {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'Trade ships'));
+    card.appendChild(el('div', 'desc', 'The ports, routes and ships. Open a crate at a dock within a minute before, to make it a port. ' +
+      'Every edit is a draft, and nothing changes until you confirm what the server proposes.'));
+    officeRow(card, '', '', [officeButton('Ports and routes', '/ship staff')]);
+    return card;
   }
 
   /* The door the steward opened in the last minute: evict, and the rent. */

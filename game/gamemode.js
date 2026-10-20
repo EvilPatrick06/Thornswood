@@ -8683,6 +8683,20 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 
   /*
+    A TRADE SHIP'S DOCK CRATE (#2700): the dock panel, never the container.
+    Any other container a staff member opens is remembered for a minute,
+    for the staff panel, and the press goes on.
+  */
+  try {
+    const shipsDock = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeShips;
+    if (shipsDock && shipsDock.activated && shipsDock.activated(refrId, casterRefrId, baseDesc)) {
+      return false;
+    }
+  } catch (eShip) {
+    log('the dock crate at', Number(refrId).toString(16), 'threw:', eShip);
+  }
+
+  /*
     WATER (#1382). A well activator with an empty bottle fills it; a cooking
     spot starts boiling any unboiled water carried. It answers nothing to the
     engine, so the press goes on down the chain and the cooking menu opens as
@@ -44885,7 +44899,9 @@ module.exports = {
                    return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
                             by: t.by ? t.by.name : null };
                  }),
-                 steward: keeps.length > 0, staff: staff, door: null, boards: [] };
+                 steward: keeps.length > 0, staff: staff, door: null, boards: [],
+                 // The trade ships' ports and routes (#2700), for staff while the ships are on.
+                 ships: staff && !!(g.__thornswoodTradeShips && g.__thornswoodTradeShips.command) };
     // Where the world is, for staff only (#513): the world stage block's staff card.
     var worldStageApi = g['__thornswoodWorldStage'];
     try { view.world = (staff && worldStageApi && worldStageApi.staffView) ? worldStageApi.staffView(pid) : null; }
@@ -45179,7 +45195,9 @@ module.exports = {
     standBench: standBench, standBenches: standBenches,
     benchRefs: function () { return Object.assign({}, benchRefs); },
     WOODWORKING_BENCHES: WOODWORKING_BENCHES,
-    boardsView: boardsView, lettersCarried: lettersCarried
+    boardsView: boardsView, lettersCarried: lettersCarried,
+    // An item's name the way the box names it, for the trade ships' dock (#2700).
+    itemName: itemName
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
        Object.keys(BUILDING_NAME).length, 'buildings,',
@@ -47810,9 +47828,9 @@ module.exports = {
   server loads carries it (scripts\dev\Build-TradeCargoGamemode.js writes the
   bundle; tests\test-511-trade-cargo.js fails when it is stale). This block is
   the server's side of it: the register on disk, the release of deleted
-  characters, and the line the load says. Nothing is placed in the world and
-  nobody is told anything from here yet: how a dock looks and what pressing a
-  hold does wait on #511's questions for Patrick (issuecomment-6245473792).
+  characters, the line the load says and, with the switch on, the dock, the
+  staff panel and the clock (#2700, game\trade-ship-dock.js, bundled below
+  it). Nothing is placed in the world: a port's dock is a crate already in it.
 
   THE REGISTER is private\trade-cargo.json, beside the other registers that
   name characters, because the data folder is served to anybody (#541). It
@@ -47830,7 +47848,8 @@ module.exports = {
 
   THE SWITCH. "thornswoodTradeShips": true in server-settings.json switches
   the ships on: this block then puts the register's handle on globalThis as
-  __thornswoodTradeShips, for the dock code to come. Off, which is every
+  __thornswoodTradeShips, which mp.onActivate asks about a pressed crate and
+  the word /ship from the panel reaches. Off, which is every
   server today, the register is still read, still let go of deleted
   characters and still counted in the log, so a list of deleted characters
   never waits on a switch and staff can see what is aboard before turning
@@ -48269,11 +48288,15 @@ function createTradeCargo(opts) {
   Nothing about where ships go is written in code. Staff keep one list:
 
     { v: 1,
-      ports:  [{ key, name, hold, world, pos: [x, y, z] }],
+      ports:  [{ key, name, hold, world, pos: [x, y, z], crate: '<ref>' }],
       routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
 
   A port is a place a hold can stand: its key, the name people read, the hold
-  whose drop box takes what nobody collects, and where it stands. A route is
+  whose drop box takes what nobody collects, and where it stands. crate is
+  the reference of the container already in the world that is its dock
+  (Patrick, 18 Oct 2026: a ship at the dock is a crate, with no new plugin;
+  #2700): E on it opens the dock, never the container. One crate is one
+  port's. A port with no crate yet is on the list with nothing to press. A route is
   one way between two ports with the real minutes a leg takes; the way back is
   its own row, so staff can make it longer, shorter or absent. crew is the
   references of any NPCs or special characters staff have stood up for it;
@@ -48289,21 +48312,26 @@ var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1,
 var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
 var MAX_ROUTE_MINUTES = 7 * 24 * 60;
 var NO_ROUTES = { v: 1, ports: [], routes: [] };
+var PORT_KEYS = ['key', 'name', 'hold', 'world', 'pos', 'crate'];
 
 function checkRoutes(cfg) {
   if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
       Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
     throw new Error('The ship routes cannot be verified.');
   }
-  var keys = {}, pairs = {};
+  var keys = {}, pairs = {}, crates = {};
   var ports = cfg.ports.map(function (p, i) {
     if (!isObj(p) || typeof p.key !== 'string' || !ID_RE.test(p.key) || keys[p.key] || !text(p.name, 64) ||
         !HOLD_KEYS[p.hold] || typeof p.world !== 'string' || !REF_RE.test(p.world) ||
-        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); })) {
+        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); }) ||
+        Object.keys(p).some(function (k) { return PORT_KEYS.indexOf(k) < 0; }) ||
+        (p.crate !== undefined && (typeof p.crate !== 'string' || !REF_RE.test(p.crate) || crates[p.crate.toLowerCase()]))) {
       throw new Error('Port ' + (i + 1) + ' cannot be verified.');
     }
     keys[p.key] = true;
-    return { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+    var out = { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+    if (p.crate !== undefined) { crates[p.crate.toLowerCase()] = true; out.crate = p.crate; }
+    return out;
   });
   var routes = cfg.routes.map(function (r, i) {
     var crew = r && r.crew === undefined ? [] : r && r.crew;
@@ -48425,6 +48453,356 @@ module.exports = {
 return module.exports;
 })();
 // TRADE CARGO BUNDLE END
+// TRADE DOCK BUNDLE BEGIN
+// Built by scripts\dev\Build-TradeCargoGamemode.js out of game\trade-ship-dock.js. Do not hand edit.
+const TRADE_DOCK = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  TRADE SHIPS: THE DOCK, THE STAFF PANEL AND THE CLOCK (#2700, split from #511).
+
+  game\trade-cargo.js is the manifest and the staff list of ports and routes.
+  This file is what a person meets in the world, as views and as the words the
+  panel sends back, and it never touches the world itself: the trade ships
+  block of gamemode.js hands it what the server knows and does what it says.
+
+  PATRICK'S ANSWERS (18 Oct 2026, 11:30 AM MT, via Smeagle; #2700):
+    1. Staff edit ports, routes and crews in an in-game staff panel.
+    2. A ship at the dock is a crate, with no new plugin.
+    3. Arrivals happen on their own.
+    4. Coin cannot be cargo.
+    5. One hold carries 24 lines.
+
+  THE CRATE. A port's crate is a container already in the world that staff
+  picked (its reference, port.crate in the staff list). E on it opens the dock
+  panel and never the container, so what the engine keeps in it is never
+  cargo and no record is added to any plugin. portOfCrate() answers which
+  port a pressed reference is.
+
+  THE STAFF PANEL. Staff edit a draft of the list in force (editDraft); an edit
+  changes nothing in force. The server proposes (staffView, through
+  trade-cargo's proposeRoutes: every change and every hold the draft would
+  strand) and staff confirm. A confirm names the list it was proposed against
+  (baseOf), and one made against a list that has changed since is refused.
+
+  THE CLOCK. A voyage takes the minutes staff gave its route (voyage), so
+  nothing here says how long anything takes. nextArrival() is the earliest
+  arrival among the holds at sea, for the one timer the block keeps; the
+  manifest's arrive() docks every hold that is due. Nobody confirms an
+  arrival and nobody is told: people find out at the dock.
+
+  COIN. isCoin() is the one test; the dock never offers gold out of a pack and
+  a load of it is refused before the pack is touched. trade-cargo refuses it
+  again.
+
+  THE CHARTER (#512). Loading and sailing are a charter; charterOf() is the one
+  place it is asked, through the Trading Company's mayCharter(who, terms)
+  (game\trading-company.js, #2687). who is { company, staff }: the Trading
+  Company role and an admin. Collecting what was shipped to you, or taking
+  back your own where you loaded it, is not a charter. With no company rule
+  running, nobody charters, and the panel says why.
+
+  WHAT IT NEVER DECIDES. Who sails, where, when or for how long: those are the
+  players' RP (Patrick, 17 Oct 2026, 10:13 PM MT). Ports, routes, minutes and
+  crews are staff data. Taking cargo that is not yours, and leaving goods in a
+  drop box for somebody who never comes, wait on their own answer (#2700).
+*/
+
+var GOLD_BASE = 15;
+var MINUTE = 60 * 1000;
+var KEY_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+var HOLD_KEYS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath',
+  'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+var NO_CHARTER = 'The Trading Company\'s charter rule is not running on this server yet, so nobody can load or sail a ship.';
+var BAD_TERMS = 'The Trading Company\'s terms could not be read, so nobody can load or sail a ship until staff put them right.';
+var NOT_CHARTERED = 'Only those the Trading Company charters may load or sail a ship.';
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function whole(n) { return Number.isInteger(n) && n > 0; }
+function hex(n) { return (Number(n) >>> 0).toString(16); }
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+
+function isCoin(baseId) { return (Number(baseId) >>> 0) === GOLD_BASE; }
+
+/* A short, stable name for the list in force, so a confirm says what it was proposed against. */
+function baseOf(routes) {
+  var s = JSON.stringify(routes), h = 5381;
+  for (var i = 0; i < s.length; i++) { h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; }
+  return h.toString(36) + '.' + s.length.toString(36);
+}
+
+function routeOf(routes, from, to) {
+  var list = (routes && routes.routes) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].from === from && list[i].to === to) { return list[i]; }
+  }
+  return null;
+}
+function portOf(routes, key) {
+  var list = (routes && routes.ports) || [];
+  for (var i = 0; i < list.length; i++) { if (list[i].key === key) { return list[i]; } }
+  return null;
+}
+
+/* The port whose crate this reference is, or ''. */
+function portOfCrate(routes, desc) {
+  if (typeof desc !== 'string' || !desc) { return ''; }
+  var d = desc.toLowerCase();
+  var list = (routes && routes.ports) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (typeof list[i].crate === 'string' && list[i].crate.toLowerCase() === d) { return list[i].key; }
+  }
+  return '';
+}
+
+/* When a voyage leaves and arrives: now, and now plus its route's minutes. */
+function voyage(routes, from, to, now) {
+  var r = routeOf(routes, from, to);
+  if (!r) { throw new Error('No ship sails from here to there.'); }
+  if (!Number.isInteger(now) || now < 0) { throw new Error('The time cannot be verified.'); }
+  return { at: now, arriveAt: now + r.minutes * MINUTE };
+}
+
+/* The earliest arrival among the holds at sea, or null when none is. */
+function nextArrival(state) {
+  var next = null;
+  var holds = (state && state.holds) || {};
+  Object.keys(holds).forEach(function (id) {
+    var s = holds[id] && holds[id].sailing;
+    if (s && Number.isInteger(s.arriveAt) && (next === null || s.arriveAt < next)) { next = s.arriveAt; }
+  });
+  return next;
+}
+
+/*
+  THE CHARTER, ASKED IN ONE PLACE. tc is what the Trading Company publishes:
+  { mayCharter(who, terms), terms() } (#2687). Answers { may, why }.
+*/
+function charterOf(tc, who) {
+  if (!tc || typeof tc.mayCharter !== 'function') { return { may: false, why: NO_CHARTER }; }
+  var w = { company: !!(who && who.company === true), staff: !!(who && who.staff === true) };
+  var may = false;
+  try {
+    var terms = typeof tc.terms === 'function' ? tc.terms() : tc.terms;
+    may = tc.mayCharter(w, terms) === true;
+  } catch (e) {
+    return { may: false, why: BAD_TERMS };
+  }
+  return may ? { may: true, why: '' } : { may: false, why: NOT_CHARTERED };
+}
+
+/*
+  THE PANEL'S WORDS. Sent by game\ui\thornswood-ship.js, never typed (Patrick,
+  4 Oct: no chat commands for what people do). Answers { verb, ... } or
+  { why } for anything it does not know.
+
+    /ship close
+    /ship load <hold> <base hex> <nth> <count> <for actor hex>
+    /ship sail <hold> <port>
+    /ship collect <hold> <line> <count>
+    /ship return <hold> <line> <count>
+    /ship staff
+    /ship draft <edit ...>           see editDraft
+    /ship confirm <base>
+    /ship add <port>                 a new hold (ship) at a port, staff only
+*/
+function parse(parts) {
+  var p = Array.isArray(parts) ? parts.map(function (x) { return String(x); }) : [];
+  var verb = String(p[1] || '').toLowerCase();
+  var n = function (s) { return /^[0-9]{1,9}$/.test(String(s)) ? Number(s) : NaN; };
+  var h = function (s) { return /^[0-9a-f]{1,8}$/i.test(String(s)) ? parseInt(s, 16) >>> 0 : NaN; };
+  var key = function (s) { return typeof s === 'string' && KEY_RE.test(s) ? s : ''; };
+  if (verb === 'close' || verb === 'staff') { return { verb: verb }; }
+  if (verb === 'load') {
+    var l = { verb: 'load', hold: key(p[2]), base: h(p[3]), nth: n(p[4]), count: n(p[5]), forActor: h(p[6]) };
+    if (!l.hold || !whole(l.base) || !Number.isInteger(l.nth) || !whole(l.count) || !whole(l.forActor)) { return { why: 'That load cannot be read.' }; }
+    return l;
+  }
+  if (verb === 'sail') {
+    var s = { verb: 'sail', hold: key(p[2]), to: key(p[3]) };
+    return s.hold && s.to ? s : { why: 'That voyage cannot be read.' };
+  }
+  if (verb === 'collect' || verb === 'return') {
+    var c = { verb: verb, hold: key(p[2]), line: n(p[3]), count: n(p[4]) };
+    return c.hold && whole(c.line) && whole(c.count) ? c : { why: 'That cannot be read.' };
+  }
+  if (verb === 'draft') { return { verb: 'draft', edit: p.slice(2) }; }
+  if (verb === 'confirm') { return p[2] ? { verb: 'confirm', base: String(p[2]) } : { why: 'That confirm cannot be read.' }; }
+  if (verb === 'add') {
+    var a = { verb: 'add', port: key(p[2]) };
+    return a.port ? a : { why: 'Say which port.' };
+  }
+  return { why: 'The ship does not know that.' };
+}
+
+/*
+  A STAFF EDIT TO THE DRAFT. Answers the next draft, checked whole by
+  trade-cargo's checkRoutes, or throws what is wrong. crate is the container
+  this staff member opened in the last minute, { desc, world, pos }, or null.
+
+    port <key> <hold> <name ...>     a port at that crate
+    crate <key>                      that port's crate is now the one opened
+    unport <key>                     the port off the list
+    route <from> <to> <minutes>      a one way route, or its new minutes
+    unroute <from> <to>              the route off the list
+    crew <from> <to> <ref ...>       the route's crew references; none is no crew
+    reset                            the draft back to the list in force
+*/
+function editDraft(cargo, inForce, draft, edit, crate) {
+  var d = copy(draft || inForce);
+  var e = Array.isArray(edit) ? edit.map(String) : [];
+  var op = (e[0] || '').toLowerCase();
+  function needCrate() {
+    if (!isObj(crate) || typeof crate.desc !== 'string' || typeof crate.world !== 'string' || !Array.isArray(crate.pos)) {
+      throw new Error('Open the crate first, then press this within a minute.');
+    }
+    if (!/^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i.test(crate.desc)) {
+      throw new Error('That container is not one of the world\'s own, so it cannot be a dock.');
+    }
+    var taken = portOfCrate(d, crate.desc);
+    if (taken) { throw new Error('That crate is already the dock of ' + taken + '.'); }
+    return crate;
+  }
+  if (op === 'reset') { return cargo.checkRoutes(inForce); }
+  if (op === 'port') {
+    var c = needCrate();
+    if (!e[1] || portOf(d, e[1])) { throw new Error('A port needs a new plain name.'); }
+    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A port is in one of the holds.'); }
+    var name = e.slice(3).join(' ').trim();
+    d.ports.push({ key: e[1], name: name, hold: e[2], world: c.world, pos: c.pos.slice(0, 3), crate: c.desc });
+  } else if (op === 'crate') {
+    var c2 = needCrate();
+    var pc = portOf(d, e[1]);
+    if (!pc) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    pc.crate = c2.desc; pc.world = c2.world; pc.pos = c2.pos.slice(0, 3);
+  } else if (op === 'unport') {
+    if (!portOf(d, e[1])) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    d.ports = d.ports.filter(function (p) { return p.key !== e[1]; });
+    d.routes = d.routes.filter(function (r) { return r.from !== e[1] && r.to !== e[1]; });
+  } else if (op === 'route') {
+    var m = /^[0-9]{1,6}$/.test(e[3] || '') ? Number(e[3]) : NaN;
+    var r = routeOf(d, e[1], e[2]);
+    if (r) { r.minutes = m; } else { d.routes.push({ from: e[1], to: e[2], minutes: m, crew: [] }); }
+  } else if (op === 'unroute') {
+    if (!routeOf(d, e[1], e[2])) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    d.routes = d.routes.filter(function (x) { return !(x.from === e[1] && x.to === e[2]); });
+  } else if (op === 'crew') {
+    var rc = routeOf(d, e[1], e[2]);
+    if (!rc) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    rc.crew = e.slice(3);
+  } else {
+    throw new Error('The staff panel does not know that edit.');
+  }
+  return cargo.checkRoutes(d);
+}
+
+/*
+  WHAT STAFF SEE: the list in force, the draft, and the server's proposal of
+  what confirming the draft would do. Never a person's name or id.
+*/
+function staffView(cargo, reg, draft, crate) {
+  var d = draft || reg.routes;
+  var p = cargo.proposeRoutes(reg.routes, d, reg.state);
+  var c = cargo.countsOf(reg);
+  var holdsAt = {};
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var h = reg.state.holds[id];
+    (holdsAt[h.port] = holdsAt[h.port] || []).push({ id: id, sailing: !!h.sailing });
+  });
+  return {
+    open: true, mode: 'staff',
+    base: baseOf(reg.routes),
+    counts: c,
+    holdKeys: HOLD_KEYS.slice(),
+    inForce: { ports: reg.routes.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate, ships: holdsAt[x.key] || [] }; }),
+               routes: reg.routes.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+    draft: { ports: d.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate }; }),
+             routes: d.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+    changes: p.changes.slice(), strands: p.strands.slice(),
+    canConfirm: p.changes.length > 0 && p.strands.length === 0,
+    crate: crate ? { here: true, dockOf: portOfCrate(d, crate.desc) || null } : null
+  };
+}
+
+/*
+  WHAT A PERSON SEES AT A DOCK. input:
+    reg       the register (routes, ships, state)
+    port      the port key of the crate pressed
+    viewer    { actor, profile }, the character at the crate
+    charter   charterOf()'s answer for them
+    pack      [{ baseId, nth, count, name }], what they carry, coin left out by the caller
+    people    [{ actor, profile, name }], who a load can be for, the viewer first
+    nameOf    function (party) -> the name to show, or '' when it cannot be read
+    itemName  function (entry) -> the name of a piece
+    now       the time
+  Lines are shown only to whoever they concern: the one they are for, the one
+  who loaded them, and staff (input.staff).
+*/
+function dockView(input) {
+  var reg = input.reg, port = portOf(reg.routes, input.port);
+  if (!port) { return { open: false }; }
+  var me = input.viewer, max = reg.ships.MAX_LINES, now = input.now;
+  var nameOf = input.nameOf || function () { return ''; };
+  var itemName = input.itemName || function () { return 'Goods'; };
+  var holds = [], incoming = [];
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var h = reg.state.holds[id];
+    if (h.sailing) {
+      if (h.sailing.to === port.key) {
+        var from = portOf(reg.routes, h.sailing.from);
+        incoming.push({ id: id, from: from ? from.name : h.sailing.from,
+                        dueIn: Math.max(0, Math.ceil((h.sailing.arriveAt - now) / MINUTE)) });
+      }
+      return;
+    }
+    if (h.port !== port.key) { return; }
+    var lines = reg.ships.aboard(reg.state, id).map(function (l) {
+      var line = reg.state.holds[id].lines[String(l.line)];
+      var mine = same(l.for, me), loaded = same(l.by, me);
+      return {
+        line: l.line, item: itemName(l.entry), count: l.entry.count,
+        shown: mine || loaded || input.staff === true,
+        forName: l.for ? (same(l.for, me) ? 'you' : (nameOf(l.for) || 'someone')) : 'nobody now',
+        canCollect: mine && line.from !== h.port,
+        canReturn: loaded && line.from === h.port
+      };
+    });
+    var used = Object.keys(h.lines).length;
+    var others = lines.filter(function (l) { return !l.shown; }).length;
+    holds.push({
+      id: id, used: used, max: max,
+      lines: lines.filter(function (l) { return l.shown; }).map(function (l) { delete l.shown; return l; }),
+      others: others,
+      canLoad: input.charter.may && used < max,
+      sail: input.charter.may ? reg.routes.routes.filter(function (r) { return r.from === port.key; }).map(function (r) {
+        var to = portOf(reg.routes, r.to);
+        return { to: r.to, name: to ? to.name : r.to, minutes: r.minutes };
+      }) : []
+    });
+  });
+  return {
+    open: true, mode: 'dock',
+    port: { key: port.key, name: port.name },
+    holds: holds, incoming: incoming,
+    charter: { may: input.charter.may, why: input.charter.why },
+    pack: input.charter.may ? (input.pack || []).filter(function (p) { return !isCoin(p.baseId); }).map(function (p) {
+      return { base: hex(p.baseId), nth: p.nth, count: p.count, name: p.name };
+    }) : [],
+    people: input.charter.may ? (input.people || []).map(function (p) {
+      return { actor: hex(p.actor), name: same(p, me) ? 'Yourself' : p.name };
+    }) : []
+  };
+}
+
+module.exports = {
+  GOLD_BASE: GOLD_BASE, HOLD_KEYS: HOLD_KEYS,
+  isCoin: isCoin, baseOf: baseOf, portOfCrate: portOfCrate, voyage: voyage, nextArrival: nextArrival,
+  charterOf: charterOf, parse: parse, editDraft: editDraft, staffView: staffView, dockView: dockView
+};
+return module.exports;
+})();
+// TRADE DOCK BUNDLE END
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
@@ -48501,9 +48879,320 @@ return module.exports;
         var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
         var r = reg.ships[name].apply(null, [next.state].concat(Array.prototype.slice.call(arguments)));
         if (!commit(next)) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        // Every write that went through sets the clock again: a departure or an
+        // amended voyage moves the next arrival, and a hold whose docking could
+        // not be written (arriveNow) docks now that the register writes again.
+        schedule();
         return r;
       };
     };
+
+    /*
+      THE DOCK, THE STAFF PANEL AND THE CLOCK (#2700). game\trade-ship-dock.js
+      is the views and the panel's words; this is the world's side of them.
+      Patrick, 18 Oct 2026, 11:30 AM MT (via Smeagle): an in-game staff panel,
+      a crate at the dock with no new plugin, arrivals on their own, no coin
+      as cargo, 24 lines a hold.
+    */
+    var SHIP_VIEW_PROPERTY = 'thornswoodShipView';
+    try {
+      mp.makeProperty(SHIP_VIEW_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: [
+          '(function(){',
+          '  try {',
+          '    var v = ctx.value;',
+          '    if (!v || typeof v !== "object") { return; }',
+          '    var st = ctx.state;',
+          '    if (!st || st.thornswoodShipAt === v.at) { return; }',
+          '    st.thornswoodShipAt = v.at;',
+          '    var body = JSON.stringify(v);',
+          '    ctx.sp.browser.executeJavaScript("(function(){try{var d=" + body + ";if(window.thornswoodShip&&window.thornswoodShip.setData){window.thornswoodShip.setData(d);}}catch(e){}})();");',
+          '  } catch (e) { }',
+          '})();'
+        ].join('\n'),
+        updateNeighbor: ''
+      });
+    } catch (eProp) { /* made by an earlier load, or no world here. harmless. */ }
+
+    var SESSION_MS = 10 * 60 * 1000;   // a dock panel left open this long asks for the crate again
+    var CRATE_MS = 60 * 1000;          // staff press a container, then the staff panel, within a minute
+    var NEAR = 400;                    // the reach of a dock crate, the same as a hold's box
+    var sessions = {}, drafts = {}, crateSeen = {}, viewAt = 0, receiptN = 0, timer = null;
+    var RUN = (function () {
+      try { if (typeof serverRunId === 'function') { return String(serverRunId()); } } catch (eRun) { }
+      return Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+    })();
+    function receipt(kind) { return kind + ':' + RUN + ':' + (++receiptN); }
+
+    function hook(name, pid) {
+      var f = g[name];
+      try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+    }
+    function profileOf(actorId) {
+      try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    }
+    function partyOf(actorId) { return { actor: Number(actorId) >>> 0, profile: profileOf(actorId) }; }
+    function nameOf(p) {
+      try { var ap = mp.get(p.actor, 'appearance'); return ap && ap.name ? String(ap.name) : ''; } catch (e) { return ''; }
+    }
+    function itemName(entry) {
+      var prop = g.__thornswoodProperty;
+      try { if (prop && typeof prop.itemName === 'function') { return String(prop.itemName(entry)); } } catch (e) { }
+      return entry && typeof entry.name === 'string' && entry.name ? entry.name : 'Goods';
+    }
+
+    /*
+      THE ONE CHARTER SPOT (#512, #2687). The Trading Company publishes
+      globalThis.__thornswoodCompany, whose mayCharter(who) and terms() read the terms in force;
+      who is the Trading Company role and an admin, the same two inCompany reads.
+    */
+    function charter(profileId) {
+      return TRADE_DOCK.charterOf(g.__thornswoodCompany, {
+        company: hook('__thornswoodIsCompany', profileId),
+        staff: hook('__thornswoodIsAdmin', profileId)
+      });
+    }
+
+    function near(actorId, refrId) {
+      try {
+        var cell = mp.get(actorId, 'worldOrCellDesc');
+        if (typeof cell !== 'string' || !cell || cell !== mp.get(refrId, 'worldOrCellDesc')) { return false; }
+        var a = mp.get(actorId, 'pos'), b = mp.get(refrId, 'pos');
+        var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+        return dx * dx + dy * dy + dz * dz <= NEAR * NEAR;
+      } catch (e) { return false; }
+    }
+
+    /* What they carry, coin left out: [{ baseId, nth, count, name }]. nth is which stack of that base. */
+    function packList(actorId) {
+      var inv = null;
+      try { inv = mp.get(actorId, 'inventory'); } catch (e) { return []; }
+      var nth = {}, out = [];
+      ((inv && inv.entries) || []).forEach(function (e) {
+        if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
+        var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
+        if (TRADE_DOCK.isCoin(e.baseId)) { return; }
+        out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
+      });
+      return out.slice(0, 200);
+    }
+
+    /* The debit: n of that stack out of the pack, every other field kept. Coin is refused before the pack is read. */
+    function packTake(actorId, base, nthOf, n) {
+      if (TRADE_DOCK.isCoin(base)) { throw new Error('Coin is not cargo.'); }
+      var inv = mp.get(actorId, 'inventory');
+      var entries = copy((inv && inv.entries) || []);
+      var seen = -1, at = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === base && ++seen === nthOf) { at = i; break; }
+      }
+      if (at < 0 || !(entries[at].count >= n)) { throw new Error('You do not carry that many.'); }
+      var piece = copy(entries[at]);
+      piece.count = n;
+      entries[at].count -= n;
+      if (entries[at].count <= 0) { entries.splice(at, 1); }
+      mp.set(actorId, 'inventory', { entries: entries });
+      return piece;
+    }
+
+    /* The credit: a piece the manifest handed out, onto the stack it matches or as its own. */
+    function packGive(actorId, entry) {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = copy((inv && inv.entries) || []);
+      var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
+      var want = shape(entry), done = false;
+      for (var i = 0; i < entries.length && !done; i++) {
+        if (entries[i] && shape(entries[i]) === want) { entries[i].count += entry.count; done = true; }
+      }
+      if (!done) { entries.push(copy(entry)); }
+      mp.set(actorId, 'inventory', { entries: entries });
+    }
+
+    function people(actorId) {
+      var me = partyOf(actorId), out = [me], online = [];
+      try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+      online.forEach(function (id) {
+        if ((Number(id) >>> 0) === me.actor || out.length >= 60) { return; }
+        var p = partyOf(id), nm = nameOf(p);
+        if (nm) { p.name = nm; out.push(p); }
+      });
+      return out;
+    }
+
+    function push(actorId, view) {
+      viewAt = Math.max(Date.now(), viewAt + 1);
+      view.at = viewAt;
+      try { mp.set(actorId, SHIP_VIEW_PROPERTY, view); } catch (e) { }
+      return view;
+    }
+    function crateOf(actorId) {
+      var c = crateSeen[actorId];
+      return c && Date.now() - c.at <= CRATE_MS ? c : null;
+    }
+    function pushDock(actorId, profileId, said) {
+      var s = sessions[actorId];
+      var me = partyOf(actorId);
+      var v = TRADE_DOCK.dockView({
+        reg: reg, port: s.port, viewer: me, charter: charter(profileId), staff: hook('__thornswoodIsStaff', profileId),
+        pack: packList(actorId), people: people(actorId), nameOf: nameOf, itemName: itemName, now: Date.now()
+      });
+      v.note = said || '';
+      return push(actorId, v);
+    }
+    function pushStaff(actorId, profileId, said) {
+      var v = TRADE_DOCK.staffView(TRADE_CARGO, reg, drafts[profileId] || null, crateOf(actorId));
+      v.note = said || '';
+      return push(actorId, v);
+    }
+
+    /* The next hold to dock, on one timer; anything overdue docks now. */
+    function schedule(wait) {
+      if (typeof setTimeout !== 'function') { return; }
+      if (timer) { clearTimeout(timer); timer = null; }
+      var next = TRADE_DOCK.nextArrival(reg.state);
+      if (next === null && wait === undefined) { return; }
+      var ms = wait !== undefined ? wait : Math.min(Math.max(0, next - Date.now()), 60 * 60 * 1000);
+      timer = setTimeout(function () { timer = null; arriveNow(); }, ms);
+    }
+    function arriveNow() {
+      var due = TRADE_DOCK.nextArrival(reg.state);
+      if (due === null || due > Date.now()) { schedule(); return; }
+      var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+      var landed = reg.ships.arrive(next.state, Date.now());
+      // No timed retry: a register that will not write is said once, and the
+      // overdue holds dock at the next write that goes through, or at the next
+      // start, which docks every overdue ship.
+      if (!commit(next)) { slog('could not write the register, so', landed.length, 'ship(s) stay at sea past their time; they dock at the next change to the register or the next start'); return; }
+      slog(landed.length, 'ship(s) docked');
+      schedule();
+    }
+
+    function hand(actorId, w, how) {
+      var h = reg.state.holds[w.hold];
+      if (!h || h.sailing || h.port !== sessions[actorId].port) { throw new Error('That ship is not at this dock.'); }
+      var out = act('begin')(w.hold, w.line, w.count, how, partyOf(actorId), Date.now());
+      try { packGive(actorId, out.entry); } catch (eGive) {
+        act('undo')(w.hold, out.out);
+        throw new Error('It could not be put in your pack, so it stays aboard.');
+      }
+      try { act('finish')(w.hold, out.out, receipt('credit')); } catch (eFinish) {
+        // The piece is in the pack and the line is still being handed out on
+        // the manifest. Said, with what staff need to settle it by hand.
+        slog('handed', JSON.stringify(out.entry), 'from', w.hold, 'to', String(actorId.toString(16)),
+             'but could not mark it finished:', (eFinish && eFinish.message) || eFinish);
+        throw new Error('It is in your pack, but the ship\'s book could not be written. Say so in the dev channel.');
+      }
+      return how === 'delivered' ? 'Collected.' : 'Taken back.';
+    }
+
+    function dockWord(w, actorId, profileId) {
+      var port = sessions[actorId].port;
+      var h = reg.state.holds[w.hold];
+      if (w.verb === 'collect') { return hand(actorId, w, 'delivered'); }
+      if (w.verb === 'return') { return hand(actorId, w, 'returned'); }
+      if (!h || h.sailing || h.port !== port) { throw new Error('That ship is not at this dock.'); }
+      var c = charter(profileId);
+      if (!c.may) { throw new Error(c.why); }
+      if (w.verb === 'sail') {
+        var t = TRADE_DOCK.voyage(reg.routes, port, w.to, Date.now());
+        act('depart')(w.hold, w.to, t.at, t.arriveAt);
+        return 'The ship has sailed.';
+      }
+      // load: coin, a full hold and the recipient are refused before the pack is touched.
+      if (TRADE_DOCK.isCoin(w.base)) { throw new Error('Coin is not cargo.'); }
+      if (Object.keys(h.lines).length >= reg.ships.MAX_LINES) { throw new Error('The hold is full.'); }
+      var to = null;
+      people(actorId).forEach(function (p) { if (p.actor === w.forActor) { to = { actor: p.actor, profile: p.profile }; } });
+      if (!to) { throw new Error('Who it is for has to be here, in the world.'); }
+      var piece = packTake(actorId, w.base, w.nth, w.count);
+      try {
+        act('load')(w.hold, { by: partyOf(actorId), for: to, receipt: receipt('debit'), entry: piece });
+      } catch (eLoad) {
+        try { packGive(actorId, piece); } catch (eBack) {
+          slog('could not load', JSON.stringify(piece), 'for', String(actorId.toString(16)),
+               'and could not put it back in their pack:', (eBack && eBack.message) || eBack);
+          throw new Error('It could not be loaded, and it could not be put back in your pack. Say so in the dev channel.');
+        }
+        throw eLoad;
+      }
+      return 'Loaded.';
+    }
+
+    function staffWord(w, actorId, profileId) {
+      if (w.verb === 'draft') {
+        drafts[profileId] = TRADE_DOCK.editDraft(TRADE_CARGO, reg.routes, drafts[profileId] || null, w.edit, crateOf(actorId));
+        return 'The draft changed. Nothing is in force until you confirm.';
+      }
+      if (w.verb === 'confirm') {
+        if (w.base !== TRADE_DOCK.baseOf(reg.routes)) { throw new Error('The list in force changed since. Look again before you confirm.'); }
+        if (!drafts[profileId]) { throw new Error('There is no draft to confirm.'); }
+        if (!commit(TRADE_CARGO.adoptRoutes(reg, drafts[profileId]))) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        drafts[profileId] = null;
+        var n = TRADE_CARGO.countsOf(reg);
+        slog('staff confirmed the ship list:', n.ports, 'port(s),', n.routes, 'route(s)');
+        return 'Confirmed. The new list is in force.';
+      }
+      if (w.verb === 'add') {
+        if (!reg.routes.ports.some(function (p) { return p.key === w.port; })) { throw new Error('No port ' + w.port + ' in force.'); }
+        var k = 1;
+        while (reg.state.holds['ship-' + k]) { k++; }
+        act('open')('ship-' + k, w.port);
+        slog('staff put a ship at a port:', Object.keys(reg.state.holds).length, 'ship(s) in all');
+        return 'A ship is at the dock.';
+      }
+      return '';
+    }
+
+    /* The panel's words (game\ui\thornswood-ship.js). Answers a line for the chat, or ''. */
+    function command(parts, actorId, profileId) {
+      var w = TRADE_DOCK.parse(parts);
+      if (w.why) { return w.why; }
+      var said = '';
+      if (w.verb === 'close') { sessions[actorId] = null; push(actorId, { open: false }); return ''; }
+      if (w.verb === 'staff' || w.verb === 'draft' || w.verb === 'confirm' || w.verb === 'add') {
+        if (!hook('__thornswoodIsStaff', profileId)) { return 'Only staff keep the ports and routes.'; }
+        try { said = staffWord(w, actorId, profileId); } catch (eStaff) { said = String((eStaff && eStaff.message) || eStaff); }
+        sessions[actorId] = { mode: 'staff', at: Date.now() };
+        pushStaff(actorId, profileId, said);
+        return '';
+      }
+      var s = sessions[actorId];
+      if (!s || s.mode !== 'dock' || Date.now() - s.at > SESSION_MS || !near(actorId, s.ref)) {
+        sessions[actorId] = null;
+        push(actorId, { open: false });
+        return 'Stand at the dock and press its crate.';
+      }
+      s.at = Date.now();
+      try { said = dockWord(w, actorId, profileId); } catch (eDock) { said = String((eDock && eDock.message) || eDock); }
+      pushDock(actorId, profileId, said);
+      return '';
+    }
+
+    /*
+      E on anything (mp.onActivate). A dock crate opens the dock and answers
+      true, so the container never opens. Any other container a staff member
+      opens is remembered for a minute, for the staff panel's port and crate
+      edits, and the press goes on.
+    */
+    function activated(refrId, actorId, baseDesc) {
+      var desc = '';
+      try { desc = mp.getDescFromId(refrId); } catch (e) { desc = ''; }
+      var port = TRADE_DOCK.portOfCrate(reg.routes, desc);
+      var pid = profileOf(actorId);
+      if (!port) {
+        if (desc && hook('__thornswoodIsStaff', pid) && typeof kindIsContainer === 'function' && kindIsContainer(baseDesc)) {
+          try {
+            crateSeen[actorId] = { desc: desc, world: mp.get(refrId, 'worldOrCellDesc'), pos: mp.get(refrId, 'pos').slice(0, 3), at: Date.now() };
+          } catch (eSeen) { }
+        }
+        return false;
+      }
+      sessions[actorId] = { mode: 'dock', port: port, ref: refrId, at: Date.now() };
+      pushDock(actorId, pid, '');
+      return true;
+    }
+
     g.__thornswoodTradeShips = {
       counts: function () { return TRADE_CARGO.countsOf(reg); },
       routes: function () { return copy(reg.routes); },
@@ -48514,8 +49203,11 @@ return module.exports;
         return TRADE_CARGO.countsOf(reg);
       },
       open: act('open'), load: act('load'), depart: act('depart'), amend: act('amend'), arrive: act('arrive'),
-      begin: act('begin'), finish: act('finish'), undo: act('undo')
+      begin: act('begin'), finish: act('finish'), undo: act('undo'),
+      activated: activated, command: command
     };
+    // Anything that came due while the server was down docks now; then the clock runs.
+    arriveNow();
   }
 })();
 // ==== end thornswood trade ships ====
@@ -55367,6 +56059,9 @@ const WORDS = ['/ooc', '/o',
                // which the P panel's Name buttons send and which was missing
                // here, so it ran before the character was in the world (#1628).
                '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+               // The trade ships' panel, at a dock crate or on the Office page
+               // for staff (#2700). Never typed, so not in PLAYER_WORDS.
+               '/ship',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -56595,6 +57290,15 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
         try { merchants.push(actorId, merchantAnswer.view); } catch (eMerchant) { }
       }
       if (merchantAnswer && merchantAnswer.text) { toProfile(profileId, merchantAnswer.text); }
+      return true;
+    }
+
+    if (word === '/ship') {
+      var shipsApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeShips;
+      if (!shipsApi || !shipsApi.command) { toProfile(profileId, 'Trade ships are not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var shipSaid = shipsApi.command(parts, actorId, profileId);
+      if (shipSaid) { toProfile(profileId, shipSaid); }
       return true;
     }
 
