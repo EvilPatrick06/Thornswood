@@ -63,13 +63,13 @@ emote is not a chop.
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 33 recipes. 33 reach the server. None of them are tempering. The same rows, with ids, are in [woodworker-woodwright](../../lists/woodworker-woodwright.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 44 recipes. 44 reach the server. None of them are tempering. The same rows, with ids, are in [woodworker-woodwright](../../lists/woodworker-woodwright.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (9 names). Crude Fishing Pole. Drum. Dwarven Arrow. Dwarven Bolt. Fish Trap. Flute. Iron Arrow. Lute. Splint.
+**Novice** (20 names). Bar Stool. Bed. Bedroll. Chest. Crude Fishing Pole. Double Bed. Drum. Dwarven Arrow. Dwarven Bolt. Fine Bench. Fine Chair. Fine Double Bed. Fish Trap. Flute. Iron Arrow. Large Chest. Lute. Splint. Wooden Bench. Wooden Chair.
 
 **Advanced** (9 names). Crossbow. Dwarven Bow. Nordic Arrow. Nordic Bow. Orcish Arrow. Orcish Bow. Riekling Spear. Steel Arrow. Steel Bolt.
 
@@ -82,9 +82,20 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Dwarven Arrow | 24 | novice | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Dwarven Metal Ingot |  | yes | `b652:Dawnguard.esm` |
 | Dwarven Bolt | 10 | novice | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Dwarven Metal Ingot |  | yes | `f814:Dawnguard.esm` |
 | Iron Arrow | 24 | novice | Arrows and bolts | ThornswoodCraftingWoodworking | 1 Firewood, 1 Iron Ingot |  | yes | `b64f:Dawnguard.esm` |
+| Bar Stool | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 2 Firewood |  | yes | `16080:Thornswood-Content.esp` |
+| Bed | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 6 Firewood, 2 Leather Strips, 4 Tundra Cotton |  | yes | `16086:Thornswood-Content.esp` |
+| Bedroll | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 2 Leather Strips, 3 Tundra Cotton |  | yes | `16085:Thornswood-Content.esp` |
+| Chest | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 4 Firewood, 2 Iron Ingot |  | yes | `16089:Thornswood-Content.esp` |
 | Crude Fishing Pole | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 2 Firewood, 1 Leather Strips, 2 Tundra Cotton |  | yes | `1549c:Thornswood-Content.esp` |
+| Double Bed | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 8 Firewood, 3 Leather Strips, 6 Tundra Cotton |  | yes | `16087:Thornswood-Content.esp` |
+| Fine Bench | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 5 Firewood, 2 Leather Strips, 1 Iron Ingot |  | yes | `16084:Thornswood-Content.esp` |
+| Fine Chair | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 4 Firewood, 2 Leather Strips, 1 Iron Ingot |  | yes | `16083:Thornswood-Content.esp` |
+| Fine Double Bed | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 10 Firewood, 4 Leather Strips, 8 Tundra Cotton, 2 Iron Ingot |  | yes | `16088:Thornswood-Content.esp` |
 | Fish Trap | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 3 Firewood, 2 Leather Strips, 1 Iron Ingot |  | yes | `1549f:Thornswood-Content.esp` |
+| Large Chest | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 6 Firewood, 3 Iron Ingot |  | yes | `1608a:Thornswood-Content.esp` |
 | Splint | 1 | novice | Other goods | ThornswoodCraftingCharcoalKiln | 1 Firewood, 1 Leather Strips |  | yes | `154c5:Thornswood-Content.esp` |
+| Wooden Bench | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 4 Firewood, 1 Leather Strips |  | yes | `16082:Thornswood-Content.esp` |
+| Wooden Chair | 1 | novice | Other goods | ThornswoodCraftingWoodworking | 3 Firewood, 1 Leather Strips |  | yes | `16081:Thornswood-Content.esp` |
 | Drum | 1 | novice | Other weapons | SmithingForge | 1 Drum |  | yes | `2de5:PlayFluteLuteDrum.esp` |
 | Flute | 1 | novice | Other weapons | SmithingForge | 1 Flute |  | yes | `1838:PlayFluteLuteDrum.esp` |
 | Lute | 1 | novice | Other weapons | SmithingForge | 1 Lute |  | yes | `2de4:PlayFluteLuteDrum.esp` |

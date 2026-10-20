@@ -350,7 +350,7 @@ try {
   yes('R4 the Office page offers staff Ports and routes while the ships are on', /if \(o\.ships\) wrap\.appendChild\(officeShips\(\)\)/.test(skills) &&
       /officeButton\('Ports and routes', '\/ship staff'\)/.test(skills) && /ships: staff && !!\(g\.__thornswoodTradeShips && g\.__thornswoodTradeShips\.command\)/.test(gm));
   const front = fs.readFileSync(path.join(REPO, 'game', 'plugins', 'thornswood-front.js'), 'utf8');
-  yes('R5 the front plugin loads the panel and lets its focus go', /'thornswood-ship\.js'\]/.test(front) && /ship: 'thornswoodShip'/.test(front) &&
+  yes('R5 the front plugin loads the panel and lets its focus go', /'thornswood-ship\.js'[,\]]/.test(front) && /ship: 'thornswoodShip'/.test(front) &&
       /'ship:closed'\) \{ T\.claimFocus\('ship', false\)/.test(front));
 
   // ================================================================== U
