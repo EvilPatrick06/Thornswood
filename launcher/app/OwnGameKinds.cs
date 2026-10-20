@@ -423,12 +423,28 @@ namespace Thornswood
             "Data\\Platform\\voice-muted.txt",
         };
 
-        /// <summary>Thornswood's by its name alone: NamedOurs, WrittenInGame, or the client runtime.</summary>
+        /// <summary>
+        /// The files the launcher makes from the person's own game before every
+        /// Play (MadeFromGame, #2827), which no pack carries any more. FromGame.Files
+        /// by value, so the harnesses that compile this file need none of
+        /// FromGame's; tests\test-2827-from-game.ps1 holds the two the same. A
+        /// refresh leaves them as they are, Vortex's name or not (Owned), and
+        /// keeps them on the folder's record as Thornswood's.
+        /// </summary>
+        static readonly string[] MadeInGame = {
+            "Data\\Interface\\startmenu.swf",
+            "Data\\meshes\\thornswood\\noticeboard01.nif",
+            "Data\\meshes\\thornswood\\dropbox01.nif",
+        };
+
+        /// <summary>Thornswood's by its name alone: NamedOurs, WrittenInGame, MadeInGame, or the client runtime.</summary>
         static bool OursByName(string rel)
         {
             if (NamedOurs(rel) || ClientFile(rel)) return true;
             foreach (string w in WrittenInGame)
                 if (rel.Equals(w, StringComparison.OrdinalIgnoreCase)) return true;
+            foreach (string m in MadeInGame)
+                if (rel.Equals(m, StringComparison.OrdinalIgnoreCase)) return true;
             return false;
         }
 

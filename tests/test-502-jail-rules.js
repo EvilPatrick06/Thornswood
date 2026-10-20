@@ -444,8 +444,10 @@ yes('P2 the Jarl\'s claim on their own jail, and a house, are kept',
 yes('P3 the log names the holder, the profile and the jail, and counts what ended',
     run1.logged.some(function (l) { return /law: the jail rule ends Erik's claim \(profile 909\) on Dragonsreach Dungeon, made before only the Jarl of whiterun could hold it/.test(l); }) &&
     run1.logged.some(function (l) { return /applied to the claims made before it once: 1 claim\(s\) ended/.test(l); }));
-yes('P4 the register records that it ran, and keeps every other part it holds',
-    Number(reg1.steps && reg1.steps.jailRule) > 0 && reg1.boxes && reg1.boxes.whiterun === 1234 &&
+// boxes is the steward-marked chest, retired by #2298: a register written
+// before then still has it, and it is simply not written again.
+yes('P4 the register records that it ran, and keeps every other part it holds, but not the retired boxes',
+    Number(reg1.steps && reg1.steps.jailRule) > 0 && reg1.boxes === undefined &&
     reg1.funds && reg1.funds.whiterun === 77);
 // A claim on a jail somehow in the register after that (written by hand, say) is not touched again.
 reg1.claims[JAIL] = { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: false };

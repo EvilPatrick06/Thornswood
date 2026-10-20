@@ -170,7 +170,7 @@
                   stewardOf: [ { hold, where } ], guardOf: [ { hold, where, jail } ],
                   steward: <bool>, staff: <bool>,
                   door: { name, by, hold, where, ours, staff, rent: { amount, every, owed } | null } | null,
-                  box: { hold } | null, boards: [ { hold, where } ] }
+                  boards: [ { hold, where } ] }
       The offices (#1638), sent to anybody who holds one or is staff, and to
       nobody else.
       Every office is a Discord role on the account (#2551): jarls are the
@@ -180,15 +180,15 @@
       profile id the button sends. clash are the holds whose Jarl role
       another account holds too, so it does not act as their Jarl. courtOf,
       stewardOf and guardOf are the offices it was given. steward: it keeps a
-      hold (Steward of it, or its Jarl), so it evicts, sets rent, marks a box
-      and moves its own hold's board; boards are those boards only. door and
-      box are what the steward opened in the last minute; door.where is the
+      hold (Steward of it, or its Jarl), so it evicts, sets rent and moves
+      its own hold's board; boards are those boards only. door is the door
+      the steward opened in the last minute; door.where is the
       town whose hold the building is in (null for none), and door.ours is
       true when this character keeps it. staff (#2551, Patrick, 17 Oct): staff
       hold no office, but end claims and set rent at any building, so they
       get the door card at every door, with door.staff true where they act
       as staff rather than as its steward; the server logs each press for
-      staff. The box and the boards stay a steward's. An office is one
+      staff. The boards stay a steward's. An office is one
       character's (Patrick, 16 Oct): a holder row is the character that
       holds it, or chosen false for an account none of whose characters
       does yet, and toHold are the offices this account's roles give that
@@ -196,8 +196,8 @@
       Hold it here sends /office hold <office> <hold>.
       Its buttons send the server's own lines through the chat line, the way
       the property page's Stop does: /office <court|steward|guard> <hold>
-      <pid> (Name) and -<pid> (Remove), /evict, /rent <gold>, /rent -,
-      /box <hold> and /board move <hold>. The answers come back in the chat,
+      <pid> (Name) and -<pid> (Remove), /evict, /rent <gold>, /rent - and
+      /board move <hold>. The answers come back in the chat,
       and the page is written again.
 */
 
@@ -284,7 +284,7 @@
             { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina.' },
             { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
             { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed, and a fall deals no damage.' },
-            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
+            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you.' },
             { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]
     },
@@ -390,8 +390,8 @@
       rows: []
     },
     /*
-      The offices (#1638). Who holds what, and what is at the door and the
-      container are the server's, under mine.officePage; this is the title
+      The offices (#1638). Who holds what, and what is at the door, are the
+      server's, under mine.officePage; this is the title
       and the one sentence over the page.
     */
     /*
@@ -405,7 +405,7 @@
     },
     office: {
       title: 'Office',
-      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, makes a container a hold\'s box, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, and each press is logged for staff.',
+      lead: 'The offices your Discord roles give you. The Jarl of a hold names its Court, its Steward and its Guards. A steward ends a claim and sets the rent at a door, and moves their hold\'s notice board. A guard keeps the cells of their hold\'s jail. The Court, the Guards, the Steward and the Jarl take anything out of their hold\'s drop box. Staff hold no office, but end a claim and set the rent at any door, and each press is logged for staff.',
       rows: []
     },
     home: {
@@ -2011,8 +2011,9 @@
     steward are people. So the offices are buttons here, for anybody who
     holds one: the Jarl names and removes their hold's Court, Steward and
     Guards by picking somebody in the world, and a steward has Evict and the
-    rent at the door they just opened, the container they just opened made a
-    hold's box, and their hold's board moved to where they stand.
+    rent at the door they just opened, and their hold's board moved to where
+    they stand. A steward no longer marks a container as a hold's box: the
+    drop box on the board is the only one (#2298, Patrick, 15 Oct).
 
     THE OFFICES ARE DISCORD ROLES (#2551). Patrick, 15 Oct: a Jarl's hold is
     their "Jarl of <Hold>" role, and the Court, Steward and Guards are roles
@@ -2022,7 +2023,7 @@
     page is written again once the game has read it back.
 
     EVERYTHING ON IT IS THE SERVER'S. Who holds what, who is in the world,
-    the door and the container are mine.officePage, and each button sends
+    the door are mine.officePage, and each button sends
     the server's own line through the chat line every panel uses, the way
     the property page's Stop does. The server checks it all again and
     answers in the chat, and writes the page again.
@@ -2039,6 +2040,81 @@
     if (window.thornswoodNet && window.thornswoodNet.say) window.thornswoodNet.say(line);
     status = 'Sent. The server answers in the chat.'; statusKind = '';
     drawFoot();
+  }
+
+  /*
+    THE COMPANY'S TERMS, FOR STAFF (#512, #2695, Patrick, 18 Oct): the server
+    proposes, staff confirm. The terms in force, the proposal waiting with
+    each change, who proposed it and when, and every term to set and
+    propose. Confirm asks twice. Everything here is the server's, under
+    officePage.company, and the server checks staff again on every line.
+  */
+  function officeCompany(c) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The company\'s terms'));
+    var fields = Array.isArray(c && c.fields) ? c.fields : [];
+    card.appendChild(el('div', 'desc', (c && c.changed)
+      ? 'Last changed ' + whenOpens(Number(c.changed.at) || 0) + '. Who changed it is in the staff log.'
+      : 'These are the terms the company shipped with.'));
+    var p = c && c.pending;
+    if (p) {
+      var list = (Array.isArray(p.changes) ? p.changes : []).map(function (ch) {
+        return String(ch.label || ch.term) + ' from ' + String(ch.from) + ' to ' + String(ch.to);
+      }).join('; ');
+      officeRow(card, 'Proposed: ' + list, (p.by ? 'by ' + String(p.by) + ', ' : '') + whenOpens(Number(p.at) || 0), [
+        officeButton('Confirm', '/companyterms confirm ' + String(Number(p.at) || 0), 'Press again to change the company\'s terms'),
+        officeButton('Drop', '/companyterms drop ' + String(Number(p.at) || 0))
+      ]);
+      var keep = Number(p.openHaulsKeepTerms) || 0;
+      card.appendChild(el('div', 'desc', keep + (keep === 1 ? ' open haul keeps' : ' open hauls keep') +
+        ' the terms it was posted under.'));
+    } else {
+      card.appendChild(el('div', 'desc', 'Nothing is proposed.'));
+    }
+    var inputs = [];
+    fields.forEach(function (f) {
+      if (!f || typeof f.key !== 'string') return;
+      var box;
+      if (f.kind === 'choice') {
+        box = document.createElement('select');
+        (Array.isArray(f.choices) ? f.choices : []).forEach(function (ch) {
+          var opt = document.createElement('option');
+          opt.value = String(ch);
+          opt.textContent = String(ch);
+          if (String(ch) === String(f.value)) opt.selected = true;
+          box.appendChild(opt);
+        });
+      } else {
+        box = document.createElement('input');
+        box.value = String(f.value);
+        box.placeholder = f.kind === 'percent' ? 'percent' : 'gold';
+      }
+      inputs.push({ f: f, box: box });
+      officeRow(card, String(f.label || f.key), f.kind === 'percent' ? String(f.value) + '%' : String(f.value), [box]);
+    });
+    var send = officeButton('Propose', function () {
+      var pairs = [];
+      for (var i = 0; i < inputs.length; i++) {
+        var f = inputs[i].f;
+        var v = String(inputs[i].box.value || '').trim();
+        if (f.kind !== 'choice' && !/^\d+$/.test(v)) {
+          status = String(f.label || f.key) + ' is a whole number.'; statusKind = 'no';
+          drawFoot();
+          return '';
+        }
+        if (v !== String(f.value)) pairs.push(f.key + '=' + v);
+      }
+      if (!pairs.length) {
+        status = 'Change a term first. Those are the terms in force.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/companyterms propose ' + pairs.join(' ');
+    });
+    officeRow(card, '', '', [send]);
+    card.appendChild(el('div', 'desc', 'The terms change only when staff confirm a proposal here, and every press ' +
+      'goes in the staff log with your name. Hauls already posted keep the terms they were posted under.'));
+    return card;
   }
 
   /* A button on the Office page. With twice, the first press only says what the second does. */
@@ -2170,10 +2246,9 @@
         'staff log with your name.');
     }
     if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
-    if (o.steward) {
-      wrap.appendChild(officeBox(o.box, o.boards));
-      wrap.appendChild(officeBoards(o.boards));
-    }
+    if (o.steward) wrap.appendChild(officeBoards(o.boards));
+    // The company's terms, for staff (#512, #2695): propose, confirm and drop.
+    if (o.company) wrap.appendChild(officeCompany(o.company));
     elBody.appendChild(wrap);
   }
 
@@ -2216,27 +2291,6 @@
     var buttons = [input, set];
     if (r) buttons.push(officeButton('No rent', '/rent -'));
     officeRow(card, 'Rent every 7 days', '', buttons);
-    return card;
-  }
-
-  /* The container the steward opened in the last minute, made a hold's box. */
-  function officeBox(b, boards) {
-    var card = el('div', 'card');
-    card.appendChild(el('div', 'name', 'A hold\'s box'));
-    if (!b) {
-      card.appendChild(el('div', 'desc', 'Open a container, then open this page within a minute, to make it a hold\'s box. Only gold goes in a box. Each hold\'s notice board is its box already.'));
-      return card;
-    }
-    var list = Array.isArray(boards) ? boards : [];
-    var whose = b.hold ? String(b.hold) : '';
-    list.forEach(function (h) { if (h.hold === b.hold && h.where) whose = String(h.where); });
-    card.appendChild(el('div', 'desc', whose
-      ? 'The container you just opened is ' + whose + '\'s box. Press a hold to make it that hold\'s instead.'
-      : 'The container you just opened is nobody\'s box. Press a hold to make it that hold\'s.'));
-    var row = officeRow(card, '', '', []);
-    list.forEach(function (h) {
-      row.appendChild(officeButton(String(h.where || h.hold), '/box ' + String(h.hold)));
-    });
     return card;
   }
 

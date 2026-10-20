@@ -70,7 +70,7 @@ check calls it one.
 | Disk forecast | Days until free space on C: crosses 10% and 20%, a straight line through one sample a day over the last 30 days | 14 samples over at least 7 days before any forecast | Warning: 10% within 30 days, or 20% within 7. Critical: 10% within 7 days, or already under | `Forecast-Storage.ps1:$WarnDays = 30`, `Forecast-Storage.ps1:$CriticalDays = 7`; the `Thornswood Disk History` task, daily at 04:00 box time | Staff channel, once when the forecast turns and once when it is back | Daily | Warning: Installer lane. Critical: whoever is on staff |
 | Build runners | Every runner's service runs, and GitHub lists every runner online | 1 run on the box; 3 runs, 15 minutes from outside | Any runner not running or not online | `Watch-Services.ps1:$tellOnly`; `Watch-Outside.ps1:are not all online on GitHub` | Staff channel | 5 min | GitHub lane, with Patrick |
 | RPO (data that can be lost) | Hours between the newest backup and a failure | Per failure | 26 hours on the box and 26 hours off it (the two lines above) | See "RPO" below | As above | Daily | Patrick |
-| RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Nothing measures this today | See "RTO" below | **Proposed, needs Patrick's agreement**: a restore rehearsal that starts the server and connects, at a cadence he sets (see "RTO") | Per rehearsal | Patrick |
+| RTO (time to come back) | Minutes from deciding to restore to a server answering | Per restore | Last rehearsed more than 35 days ago: the monthly hands-on rehearsal is overdue | `Check-RehearsalDue.ps1:$Days = 35`, reading RESTORING.md's Last rehearsed line; see "RTO" below | The board: the nightly checks fail and "Nightly checks failed" says so | Nightly | Patrick |
 
 ## Service by service
 
@@ -182,11 +182,16 @@ back is not measured; only the restore step is.
 answering again, within one hour; a new box within one day. Both stay
 proposals until a rehearsal that starts the server and connects measures them.
 
-**Alert: Proposed, needs Patrick's agreement.** Only a rehearsal measures this,
-and nothing records when the last one ran or says when one is due. The
-proposed alert is a restore rehearsal that starts the server and connects to
-it, at a cadence Patrick sets. Until he agrees, there is no alert and no
-cadence, and nothing tells anyone a rehearsal is due.
+**Alert: a monthly rehearsal, overdue after 35 days.** Only a rehearsal
+measures this. Patrick ruled on 18 October 2026 (#1046) that the hands-on
+restore rehearsal, which starts the restored server and connects to it, runs
+monthly ([RESTORING.md](RESTORING.md), "Rehearsing it"). Its record is
+RESTORING.md's Last rehearsed line. `scripts/vps/Check-RehearsalDue.ps1` reads
+it every night in the nightly checks (`Check-RehearsalDue.ps1:$Days = 35`, a
+month with a few days' slack), and once the line is older than that the night
+fails, so the board's "Nightly checks failed" issue says the rehearsal is
+overdue until one is done and the date written. The proposal above stays a
+proposal until the first such rehearsal measures it.
 
 ## Availability
 
@@ -232,8 +237,8 @@ The checks and restarts above already run, so doing nothing keeps every alert
 and every restart. What it leaves:
 
 - **Restore:** one rehearsal, on 28 September, that stopped before starting
-  the server. With nothing scheduled, the time to come back stays unknown
-  until it is needed, and the 28 September rehearsal found three faults that
+  the server. The monthly rehearsal is scheduled now (the RTO alert above),
+  but until one has been done the time to come back stays unknown, and the 28 September rehearsal found three faults that
   would have been found during a real restore instead.
 - **Capacity:** the disk warns only once it is under 20%.
   `scripts/vps/Forecast-Storage.ps1` forecasts the day each line is crossed

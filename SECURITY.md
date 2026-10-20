@@ -6,14 +6,14 @@ played. That is enough to be worth reporting a hole in rather than posting one.
 
 ## Where to send it
 
-**Use GitHub's private vulnerability reporting** on this repository: the
-Security tab, then *Report a vulnerability*. It opens a thread only the
-maintainers can read, and it is the preferred way because nothing about it is
-public until we say so.
+**Send it to the owner as a Discord direct message.** The Discord is linked
+from every page of [thornswood.net](https://thornswood.net). Only the owner
+reads it, and nothing about it is public until we say so.
 
-If that is not available to you, send it to the owner as a Discord direct
-message rather than posting it in a channel. The Discord is linked from
-[thornswood.net](https://thornswood.net).
+The repository is private, so GitHub's private vulnerability reporting (the
+Security tab) is there only for people who already have access to it. The
+site's privacy and terms pages give the Discord message route for everybody
+else, and this file says the same.
 
 Please do not open a public issue for a security problem, and please do not
 post it in a Discord channel. Both are read by everybody, including whoever

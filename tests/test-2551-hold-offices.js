@@ -418,7 +418,9 @@ function siteWith(opts) {
       require: function (m) { if (m === 'fs') { return fakeFs; } if (m === 'path') { return path; } if (m === 'https') { return fakeHttps; } return {}; },
       Buffer: Buffer, Date: Date, Math: Math, Number: Number, String: String, Array: Array, Object: Object, JSON: JSON, URL: URL,
       setTimeout: function () { return 1; }, setInterval: function () { return 1; }, clearInterval: function () { }, clearTimeout: function () { },
-      mp: { getServerSettings: function () { return {}; }, get: function () { return []; }, kick: function () { } }
+      mp: { getServerSettings: function () { return {}; }, get: function () { return []; }, kick: function () { },
+            // The engine's whole-file write (#2740), onto the fake disk.
+            writeFileWhole: function (p, s) { fakeFs.writeFileSync(p, s); } }
     };
     box.globalThis = box;
     box.__thornswoodPassTrusts = function (pid) { return !!trusted[pid]; };

@@ -290,7 +290,7 @@ if ($open -ge 0 -and $close -gt $marker) {
         $remotePlugins = 'C:/Thornswood-Server-Dev/plugins'
         $fullIndexDef = $script:fullIndexDef
         $lightTable = ''
-        $boxRecord = Join-Path $rootWin 'server-build.json'
+        $devRecordLight = $false
         $VoicePort = 7789
         return & ([scriptblock]::Create('@"' + "`n" + $body + "`n" + '"@'))
     }

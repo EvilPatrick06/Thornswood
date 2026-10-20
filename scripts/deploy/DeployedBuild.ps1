@@ -37,12 +37,16 @@ function Write-ThornswoodDeployedBuild([string]$RecordPath, [string]$OutPath, [s
   # no folder made for it.
   $app = Split-Path -Parent (Split-Path -Parent $OutPath)
   if (-not (Test-Path -LiteralPath (Join-Path $app 'server.js'))) { 'DEPLOYED BUILD NOT WRITTEN: there is no site at ' + $app; return }
+  # The other server's entry is kept. A file that does not read holds nothing
+  # this can keep: it is written over with this server's entry alone, and the
+  # line says the other server's is gone until its next deploy writes it.
   $doc = [ordered]@{}
   if (Test-Path -LiteralPath $OutPath) {
-    try {
-      $old = [IO.File]::ReadAllText($OutPath) -replace '^\uFEFF', '' | ConvertFrom-Json
-      foreach ($k in 'live', 'dev') { if ($old.PSObject.Properties[$k] -and $old.$k) { $doc[$k] = $old.$k } }
-    } catch { }
+    $old = $null; $why = ''
+    try { $old = [IO.File]::ReadAllText($OutPath) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $why = $_.Exception.Message }
+    if (-not $why -and $null -eq $old) { $why = 'it is empty' }
+    if ($why) { 'DEPLOYED BUILD NOTE: ' + $OutPath + ' did not read (' + $why + '), so it is written with the ' + $Channel + ' server alone' }
+    else { foreach ($k in 'live', 'dev') { if ($old.PSObject.Properties[$k] -and $old.$k) { $doc[$k] = $old.$k } } }
   }
   $doc[$Channel] = [ordered]@{ commit = $commit; binary = [string]$rec.binary; sha256 = [string]$rec.sha256; at = $At }
   $dir = Split-Path -Parent $OutPath
@@ -74,6 +78,7 @@ function Save-ThornswoodDeployedBuild([string]$Target, [string[]]$SshArgs, [stri
   $said = @()
   try { $said = @(Invoke-ThornswoodArtifactRemote $Target $SshArgs (Get-ThornswoodDeployedBuildScript $Root $DocsRoot)) }
   catch { $said = @('DEPLOYED BUILD NOT WRITTEN: ' + $_.Exception.Message) }
+  foreach ($n in @($said | Where-Object { "$_" -like 'DEPLOYED BUILD NOTE: *' })) { Write-Host ('  ' + ([string]$n).Substring(21)) -ForegroundColor Yellow }
   $ok = @($said | Where-Object { "$_" -like 'DEPLOYED BUILD WRITTEN *' })
   if ($ok.Count) { Write-Host ('  the site now reads that the ' + (Get-ThornswoodDeployedChannel $Root) + ' server runs ' + ($ok[0] -split ' ')[-1].Substring(0, 8)) -ForegroundColor DarkGray }
   else {

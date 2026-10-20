@@ -1191,7 +1191,7 @@
   */
   function lineHand(id) {
     const from = lineId;
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',{quiet:true});}catch(e){}');
     log('menu: profile', from, 'hands its place in line to profile', id);
     lineStart(id, null);
   }
@@ -1256,15 +1256,15 @@
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
-      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',{quiet:true});}catch(e){}');
     }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",{quiet:true});}catch(e){}');
   }
 
   /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",{quiet:true});}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
@@ -2818,11 +2818,11 @@
   const toServer = [];
 
   /*
-    The true after the line marks it as the plugin's own, so the chat page
-    queues it without saying "Not connected yet" over it. Patrick, 24
-    September, over a tester in the creation hall who had typed nothing: "it
-    says mulitple trimes he wasnt connected yet". A page from before the
-    marker ignores it and says what it always said.
+    say marks every line as pressed rather than typed (#2251, #2732), and
+    quiet asks the chat page to queue it without saying "Not connected yet"
+    over it. Patrick, 24 September, over a tester in the creation hall who
+    had typed nothing: "it says mulitple trimes he wasnt connected yet". The
+    two are separate answers in thornswood-chat.js (TWO ANSWERS, over send).
   */
   function tellServer(line) {
     if (line) { toServer.push(line); }
@@ -2830,7 +2830,7 @@
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',{quiet:true});}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -4208,14 +4208,29 @@
   // is about 128 units tall, so this is roughly waist deep.
   const WADE_DEEP = 70;
   /*
-    #608 temple / shallow: getPositionZ is the actor root, not a true feet
-    probe. A real cell water plane can sit a few units under that root while
-    the person is clearly standing in the pool, so deep reads slightly
-    negative and wading never fires (heartbeat then says indoors). Slack
-    covers that near-miss only. A no-water cell still answers a huge
-    negative level, far below -FEET_SLACK, so it stays dry.
+    PLACED WATER, READ OUT OF THE RECORDS (#2302).
+
+    There used to be a feet slack of 24 here (#608): wading counted with the
+    cell's water plane up to 24 units BELOW the actor's position, on the
+    guess that getPositionZ is "the actor root, not a true feet probe". It
+    was never measured, and the records say it could not have worked. A
+    reference's position is its base, so an actor's is its feet. The Temple
+    of Kynareth (CELL 165a7 in Skyrim.esm) has XCLW 0, so getWaterLevel
+    answers 0 there, while its pool is a placed activator,
+    Water1024ClearAnkleStill (an ACTI with a WNAM), at z 48, and nothing in
+    that room stands lower than z 32. 0 minus 32 or more is never above -24.
+    The cell plane and the pool are different objects, and getWaterLevel only
+    knows the plane.
+
+    So the place tick reads both: the cell plane, which counts only when it
+    is above the feet, and every placed water in the cell, which the cell walk
+    keeps with the fires (activator 24 is one of its four types). Each row is
+    [plugin, local id, x1, y1, x2, y2]: an ACTI with a WNAM and its OBND
+    footprint. scripts\dev\Build-WaterTable.js writes the line below from the
+    load order; do not edit it by hand. The footprint is taken unrotated and
+    unscaled, which is exact for the square WaterNNN planes Bethesda places.
   */
-  const FEET_SLACK = 24;
+  const PLACED_WATERS = [["Skyrim.esm",1074089,-512,-512,512,512],["Skyrim.esm",1075745,-512,-512,512,512],["Skyrim.esm",1075749,-512,-512,512,512],["Skyrim.esm",1076822,-1024,-1024,1024,1024],["Skyrim.esm",1081285,-512,-512,512,512],["Skyrim.esm",1084157,-1024,-1024,1024,1024],["Skyrim.esm",1084161,-512,-1024,512,1024],["Skyrim.esm",1092911,-512,-512,512,512],["Skyrim.esm",1100481,-512,-512,512,512],["Skyrim.esm",1100484,-512,-512,512,512],["Skyrim.esm",1100487,-512,-512,512,512],["Skyrim.esm",1100489,-512,-512,512,512],["Skyrim.esm",1100491,-512,-512,512,512],["Skyrim.esm",1100493,-512,-512,512,512],["Skyrim.esm",1105428,-256,-764,238,582],["Skyrim.esm",1105429,-256,-764,238,582],["Skyrim.esm",1108346,-2524,-2009,781,1292],["Skyrim.esm",1108347,-2499,-2833,845,511],["Skyrim.esm",1108349,-730,-1068,737,399],["Dawnguard.esm",72882,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1199413,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220156,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220159,-512,-512,512,512],["Dawnguard.esm",84869,-512,-512,512,512],["Skyrim.esm",87080,-512,-512,512,512],["Skyrim.esm",90254,-461,-1246,401,1163],["Skyrim.esm",95913,-461,-1246,401,1163],["Skyrim.esm",95915,-1057,-360,771,1348],["Skyrim.esm",95918,-1057,-360,771,1348],["Dragonborn.esm",104986,-512,-512,512,512],["Dawnguard.esm",105623,-512,-512,512,512],["Dawnguard.esm",106658,-512,-512,512,512],["Dawnguard.esm",7191,-512,-512,512,512],["Dragonborn.esm",121793,-512,-512,512,512],["Dragonborn.esm",126667,-512,-512,512,512],["Dragonborn.esm",155877,-2048,-2048,2048,2048],["SkyrimSewers.esp",161631,-512,-1024,512,1024],["Dawnguard.esm",10545,-512,-512,512,512],["Dragonborn.esm",175592,-455,-455,455,455],["Dragonborn.esm",175594,-394,-394,394,394],["Dragonborn.esm",179924,-512,-512,512,512],["Dragonborn.esm",210968,-512,-1024,512,1024],["Dragonborn.esm",226073,-512,-512,512,512],["Skyrim.esm",230449,-1116,-176,575,1471],["Dragonborn.esm",236396,-154,-152,148,199],["Skyrim.esm",240771,-512,-512,512,512],["Dragonborn.esm",250615,-197,-218,197,176],["Skyrim.esm",269133,-631,-1675,564,364],["Dawnguard.esm",17078,-121,-117,117,118],["Dawnguard.esm",17086,-120,-120,119,120],["Skyrim.esm",333178,-63,-24,63,23],["Dawnguard.esm",20882,-512,-512,512,512],["Skyrim.esm",337728,-896,-928,928,896],["Dawnguard.esm",24847,-512,-512,512,512],["Skyrim.esm",404064,-512,-512,512,512],["Dawnguard.esm",27540,-512,-1024,512,1024],["Skyrim.esm",463813,-512,-512,512,512],["Skyrim.esm",478953,-512,-512,512,512],["Skyrim.esm",501175,-3253,-1149,0,605],["Skyrim.esm",501208,-1787,-1149,1466,605],["Skyrim.esm",501237,-1116,-176,575,1471],["Skyrim.esm",517671,-512,-512,512,512],["Water for ENB.esm",2048,-1057,-360,771,1348],["Water for ENB.esm",2049,-1057,-360,771,1348],["Water for ENB.esm",2050,-1057,-360,771,1348],["Water for ENB.esm",2051,-1057,-360,771,1348],["Water for ENB.esm",2052,-1057,-360,771,1348],["Water for ENB.esm",2053,-512,-512,512,512],["Water for ENB.esm",2054,-886,-1845,810,2163],["Water for ENB.esm",2055,-344,-1177,335,116],["Water for ENB.esm",2056,-344,-1177,335,116],["Water for ENB.esm",2057,-107,-1054,134,1],["Water for ENB.esm",2058,-344,-1177,335,135],["Water for ENB.esm",2059,-344,-1177,335,116],["Water for ENB.esm",2061,-170,-225,188,230],["Water for ENB.esm",2062,-119,-179,134,168],["Water for ENB.esm",2063,-141,-189,141,199],["Water for ENB.esm",2064,-512,-512,512,512],["Water for ENB.esm",2066,-512,-512,512,512],["Water for ENB.esm",2096,-767,-26,1481,1247],["Water for ENB.esm",2098,-512,-512,512,512],["Skyrim.esm",543981,-2521,-2042,3041,808],["Skyrim.esm",548809,-1125,-1173,1173,1125],["Skyrim.esm",548812,-724,-724,724,724],["Skyrim.esm",548866,-76,-721,154,552],["Skyrim.esm",548870,-154,-721,87,560],["Skyrim.esm",593202,-450,-274,450,274],["Skyrim.esm",598311,-120,-120,119,120],["Skyrim.esm",619134,-154,-152,148,199],["Skyrim.esm",773926,-2048,-2048,2048,2048],["Skyrim.esm",793924,-512,-512,512,512],["Skyrim.esm",837555,-512,-512,512,512],["Skyrim.esm",837557,-1024,-1024,1024,1024],["Skyrim.esm",837558,-512,-1024,512,1024],["Skyrim.esm",837560,-512,-512,512,512],["Skyrim.esm",837561,-1024,-1024,1024,1024],["Skyrim.esm",837562,-512,-1024,512,1024],["Dawnguard.esm",52593,-512,-1024,512,1024],["Skyrim.esm",858612,-512,-512,512,512],["Skyrim.esm",934358,-512,-512,512,512],["Skyrim.esm",946557,-512,-512,512,512],["Skyrim.esm",1000818,-512,-512,512,512],["Skyrim.esm",1036492,-256,-256,255,256],["Skyrim.esm",1036493,-256,-256,255,256],["Skyrim.esm",1036503,-176,-166,171,215],["Skyrim.esm",1036508,-154,-152,148,199],["Skyrim.esm",1040529,-154,-152,148,199]];
   // FireFXShader, 0001b212 in Skyrim.esm, read out of the EFSH records. This
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
@@ -4272,6 +4287,14 @@
     out here, so the numbers go in the line.
   */
   let waterSaid = '';
+  /*
+    The placed waters of PLACED_WATERS, by runtime id: id -> [x1, y1, x2, y2].
+    Resolved once, the way the fire bases are, by the walk's own slice.
+    waterHere is the walk's list of them in this cell, [x, y, z, id] each.
+  */
+  let waterBox = null;
+  let waterHere = null;
+  let walkWant = null;      // fires and placed waters together, for the walk
   let fireCell = -1;      // the cell the list below was made for
   let fireHere = null;    // where the fires in it are
   let placeBeat = 0;      // when the heartbeat last wrote
@@ -4328,6 +4351,48 @@
   */
   let fireIdAt = 0;
   let fireIdOut = [];
+
+  /**
+   * Resolves PLACED_WATERS into waterBox, all at once: the table is a handful
+   * of rows, and a row that does not resolve is a plugin not in this load
+   * order, which is no water to find.
+   */
+  function resolveWaterIds() {
+    waterBox = {};
+    for (let i = 0; i < PLACED_WATERS.length; i++) {
+      const row = PLACED_WATERS[i];
+      try {
+        const raw = (row[0] === 'Skyrim.esm')
+          ? sp.Game.getFormEx(row[1])
+          : sp.Game.getFormFromFile(row[1], row[0]);
+        const base = sp.Form.from(raw);
+        const id = base ? base.getFormID() : 0;
+        if (id) { waterBox[id] = [row[2], row[3], row[4], row[5]]; }
+      } catch (e) { }
+    }
+    return waterBox;
+  }
+
+  /**
+   * The placed water somebody at (px, py, pz) is wading in, as
+   * { id, top, deep }, or null. Wading is inside the water's footprint with
+   * its surface above the feet and under WADE_DEEP over them.
+   */
+  function placedWaterAt(px, py, pz, waters, deepest) {
+    let best = null;
+    for (let i = 0; i < waters.length; i++) {
+      const w = waters[i];
+      const box = waterBox && waterBox[w[3]];
+      if (!box) { continue; }
+      if (px < w[0] + box[0] || px > w[0] + box[2] ||
+          py < w[1] + box[1] || py > w[1] + box[3]) { continue; }
+      const deep = w[2] - pz;
+      if (deep > 0 && deep < deepest && (!best || deep < best.deep)) {
+        best = { id: w[3], top: w[2], deep: deep };
+      }
+    }
+    return best;
+  }
 
   /** The runtime ids of FIRE_BASES, or [] until the walk has resolved them. */
   function fireIdList() {
@@ -4443,7 +4508,7 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireWalk = null; }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; waterHere = null; fireWalk = null; }
     if (!cell) { return []; }
 
     // Start the cell's walk, or carry the one under way on by a slice, and
@@ -4465,10 +4530,18 @@
       resolveFireIds(began);
       if (!fireIds) { return; }
     }
+    if (!waterBox) { resolveWaterIds(); }
     fireBases = fireIds.length;
     // No base resolved: there is nothing to look for in any cell.
-    if (!fireIds.length) { fireWalk = null; fireHere = []; fireHits = 0; return; }
-    const done = walkCellSlice(cell, w, fireWant, function (e) {
+    if (!fireIds.length && !Object.keys(waterBox).length) {
+      fireWalk = null; fireHere = []; waterHere = []; fireHits = 0; return;
+    }
+    if (!walkWant) {
+      walkWant = {};
+      for (const k in fireWant) { walkWant[k] = true; }
+      for (const k in waterBox) { walkWant[k] = true; }
+    }
+    const done = walkCellSlice(cell, w, walkWant, function (e) {
       fireThrew++;
       if (!fireWhy) { fireWhy = String((e && e.message) || e); }
     }, began);
@@ -4476,13 +4549,15 @@
     if (!done) { return; }
 
     fireWalk = null;
-    fireHere = w.out;
-    fireHits = w.out.length;
+    fireHere = w.out.filter(function (p) { return !!fireWant[p[3]]; });
+    waterHere = w.out.filter(function (p) { return !!waterBox[p[3]]; });
+    fireHits = fireHere.length;
     // fireWalked, not walked: naming the walk's own counter here threw on
     // every cell change from #184 on, 80 times in the dev log of 23
     // September, and the place report for that tick never went.
-    log('fires: ' + w.out.length + ' of ours in this cell, out of ' + fireWalked +
-        ' thing(s) looked at');
+    log('fires: ' + fireHere.length + ' of ours in this cell, out of ' + fireWalked +
+        ' thing(s) looked at' +
+        (waterHere.length ? ', and ' + waterHere.length + ' placed water(s)' : ''));
   }
 
   /**
@@ -4651,28 +4726,32 @@
           isSwimming only answers once somebody's feet have left the bottom.
           Standing knee deep in a river in the Pale reads as dry land to it,
           which is the wrong answer in the one situation people are actually
-          in most of the time. The cell's water level against where they are
-          standing is the rest of it: near or above their feet (see
-          FEET_SLACK) and below swimming is wading.
+          in most of the time. Water above their feet and below swimming is
+          wading, and there are two kinds of water (#2302): the cell's own
+          plane, and the placed waters the cell walk keeps (PLACED_WATERS).
+          pz is the actor's position, which is its feet.
 
           A cell with no water answers a level far below anywhere anybody
-          stands, so the subtraction comes out far more negative than
-          FEET_SLACK and this stays false without needing to ask whether
-          there is water at all.
+          stands, so the subtraction comes out negative and the plane stays
+          dry without needing to ask whether there is water at all.
         */
+        fireSpotsHere(pc);
+        const placed = placedWaterAt(px, py, pz, waterHere || [], WADE_DEEP);
         const level = cell.getWaterLevel();
+        let planeSaid = 'the cell has no readable water level';
         if (isFinite(level)) {
-          // pz is Actor.getPositionZ (root), not a true feet height (#608).
           const deep = level - pz;
-          wading = deep > -FEET_SLACK && deep < WADE_DEEP;
-          const slackBit = (wading && deep <= 0)
-            ? ', wading via feet slack'
-            : (wading ? ', wading' : ', dry');
-          waterSaid = 'water level ' + Math.round(level) + ', feet at ' +
-                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep' +
-                      slackBit;
+          wading = deep > 0 && deep < WADE_DEEP;
+          planeSaid = 'water level ' + Math.round(level) + ', feet at ' +
+                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep';
+        }
+        if (placed) {
+          wading = true;
+          waterSaid = planeSaid + ', wading in placed water ' +
+                      placed.id.toString(16) + ', surface at ' +
+                      Math.round(placed.top) + ', ' + Math.round(placed.deep) + ' deep';
         } else {
-          waterSaid = 'the cell has no readable water level';
+          waterSaid = planeSaid + (wading ? ', wading' : (isFinite(level) ? ', dry' : ''));
         }
       }
     } catch (e) { }
@@ -5195,7 +5274,8 @@
     if (!lookingAt) { return false; }
     const line = '/' + cmd + ' ' + lookingAt;
     if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
-    // These are deliberate actions; chat reports an offline queued request.
+    // These are deliberate actions: say marks the line as a key press, and
+    // with no quiet the chat says when it is queued offline (#2732).
     const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
       'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
       'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');
@@ -6919,6 +6999,54 @@
     }
   }
 
+  // ==== broken limbs (#1383) ====
+  /*
+    A BROKEN LEG REFUSES SPRINT, the half of a break that is not an actor
+    value. docs/systems/injury.md: "A leg: ... sprint is refused." The server
+    keeps the break on the character and its screen script hands this file
+    globalThis.thornswoodBrokenLimbs, { leg }, the same way it hands
+    thornswoodHurtCare. The -8 speed and the -0.15 melee already ride on the
+    skills panel, and a broken arm's dearer block is charged by the server
+    when it charges the block (gamemode.js, BLOCK.brokenArm), so nothing of
+    the arm is done here.
+
+    bSprintOK is the only condition on the sprint transition (see
+    holdSprintGate below, measured on 20 September), so with a broken leg the
+    gate is held SHUT while the sprint key is down instead of open, and a
+    sprint already running is stopped. The game's own refusals work the same
+    way: over encumbered, out of stamina.
+
+    Both callers run under guard(), so a call the game refuses reaches the
+    guard's log rather than being swallowed here. Self contained, with sp
+    handed in, so tests/test-1383-limbs-brews.js can run it over a fake sp.
+  */
+  const brokenLimbs = (function (sp) {
+    const TELL_EVERY_MS = 30000;
+    let toldLegAt = 0;
+
+    function leg() {
+      const l = globalThis.thornswoodBrokenLimbs;
+      return !!(l && l.leg);
+    }
+
+    /* Shut the sprint gate on a broken leg. True when it did, so the caller
+       does not hold the gate open again on the same frame. */
+    function refuseSprint(pc) {
+      if (!pc || !leg()) { return false; }
+      if (pc.getAnimationVariableBool('bSprintOK')) { pc.setAnimationVariableBool('bSprintOK', false); }
+      if (pc.isSprinting()) { sp.Debug.sendAnimationEvent(pc, 'SprintStop'); }
+      const now = Date.now();
+      if (now - toldLegAt > TELL_EVERY_MS) {
+        toldLegAt = now;
+        sp.Debug.notification('Your broken leg will not take a sprint.');
+      }
+      return true;
+    }
+
+    return { refuseSprint: refuseSprint, leg: leg };
+  })(sp);
+  // ==== end broken limbs ====
+
   /**
    * Hold the sprint gate open while the key is down.
    *
@@ -6935,6 +7063,8 @@
     // keyboard mid press. Eight seconds is longer than anybody sprints in one
     // hold and short enough that it cannot stay stuck.
     if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
+    // A broken leg refuses sprint (#1383): the gate is held shut instead.
+    if (brokenLimbs.refuseSprint(pc)) { return; }
     if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
     try {
       if (pc.isOverEncumbered()) { return; }
@@ -7069,6 +7199,12 @@
     if (kind === 'sprint') {
       if (e.isUp) { sprintHeldSince = 0; }
       else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
+      // A broken leg (#1383): shut on the press itself, the frame the graph
+      // reads the gate, not only on the next update.
+      if (e.isDown && !e.isUp && brokenLimbs.leg()) {
+        const legPc = sp.Game.getPlayer();
+        if (legPc) { brokenLimbs.refuseSprint(legPc); }
+      }
     }
 
     if (!e.isDown || e.isUp) return;
@@ -9812,17 +9948,26 @@
     nothing however far the fall, for this character and nobody else.
 
     TIRELESS. Running costs nothing in this game and neither does a plain
-    swing. A sprint and a power attack do, and both are the game's own sums
-    from game settings (Skyrim.esm, overridden by nothing in the load order;
-    skymp5-server's attack costs are SweetPie's only, and this server does
-    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
-    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
-    weapon's weight for a power attack. Each is held at half while Tireless
-    is held. These have no second set for everybody else, so an NPC this
-    machine runs pays half as well; #1385 says so for Patrick.
+    swing. A sprint, a power attack and a shield bash do, and each is the
+    game's own sum from game settings (Skyrim.esm, overridden by nothing in
+    the load order; skymp5-server's attack costs are SweetPie's only, and
+    this server does not load SweetPie): fSprintStaminaDrainMult for a
+    sprint, fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack, and fStaminaBashBase and
+    fStaminaPowerBashBase for a bash and a power bash. A bash counts as a
+    swing (Patrick, 12 Oct: one rule for every attack). Each is held at half
+    while Tireless is held. These have no second set for everybody else, so
+    an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
-    PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
-    game setting changes that; #1385 has it for Patrick.
+    PACK MULE, "being overloaded does not slow you". Being overloaded has
+    one effect here: the game makes you walk, on your own machine, and no
+    game setting changes that. The engine fork's client keeps a list of
+    characters the game does not hold to their carry weight (Patrick chose
+    the engine change on 12 Oct, #1385): for one on it, the game's own
+    Actor::IsOverEncumbered answers no, so it never makes you walk, and the
+    fork's movement sends your run to everybody else as it plays. While Pack
+    Mule is held, your own character is on that list. The inventory still
+    shows your real carry weight.
 
     SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
     setting read before this file first touched it is kept in sp.storage,
@@ -9838,7 +9983,10 @@
   /* perk -> { game setting: the share of the game's own value it is held at }. */
   const PERK_SETTINGS = {
     windwalker: { fJumpFallHeightMult: 0 },
-    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+    tireless: {
+      fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5,
+      fStaminaBashBase: 0.5, fStaminaPowerBashBase: 0.5
+    }
   };
 
   let perksHeld = {};               // perk -> true, the view's list
@@ -9849,6 +9997,7 @@
   let unshakeableOpen = 0;          // staggers that played with the block down, for the log
   let unshakeableSaid = 0;
   let unshakeableOpenSaid = 0;
+  let packMuleKept = null;          // what the client's list was last told, null until a view has said
 
   /* The whole panel view, as treeFromView takes it. Only its perks are read. */
   function perksFromView(json) {
@@ -9912,6 +10061,24 @@
     if (said.length) { log('perks: ' + said.join('; ')); }
   }
 
+  /* Your own character on the client's list while Pack Mule is held, and off
+     it while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the list whatever an earlier copy left in it. */
+  function packMuleNow() {
+    const on = !!perksHeld.packmule;
+    if (packMuleKept === on) { return; }
+    packMuleKept = on;
+    try {
+      sp.setOverEncumberedIgnored(0x14, on);
+      log('perks: Pack Mule ' + (on ? 'held, so carrying past your carry weight does not make you walk'
+                                    : 'not held, so carrying past your carry weight makes you walk, as the game does'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Pack Mule:', e);
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
@@ -9930,6 +10097,7 @@
     if (perksDirty) {
       perksDirty = false;
       perkSettingsNow();
+      packMuleNow();
     }
     if (perksHeld.unshakeable) {
       let pc = null;

@@ -37,8 +37,9 @@
 //   Writes each exit and each give-up to the Application event log, under the
 //   source ThornswoodBot, when that source is registered (Install-Bot does).
 //
-// .NET Framework 4 and C# 5, the same compiler as the launcher, so it builds
-// on any Windows Server with nothing installed.
+// .NET Framework 4 and C# 5: Bot-Service.ps1 builds it with the .NET Framework
+// csc that ships inside Windows, so it builds on any Windows Server with
+// nothing installed. (The launcher left that compiler for MSBuild, #498.)
 //
 //   ThornswoodBotService.exe             as the service
 //   ThornswoodBotService.exe --console   in the foreground, until a line or
