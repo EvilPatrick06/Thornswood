@@ -54,8 +54,8 @@ the same public branch:
 
 | Channel | Feed | The six client files are built from |
 |---|---|---|
-| Public | `feed/version.json` | [`92848550`](https://github.com/EvilPatrick06/skymp/tree/92848550) |
-| Dev | `feed-dev/version.json` | [`92848550`](https://github.com/EvilPatrick06/skymp/tree/92848550) |
+| Public | `feed/version.json` | the commit that feed names |
+| Dev | `feed-dev/version.json` | the commit that feed names |
 
 | File | Built from | Licence |
 |---|---|---|
@@ -103,7 +103,12 @@ Platform runs on, and Thornswood wrote none of it but the README: the Chromium
 Embedded Framework and Chromium 108, ANGLE and ICU's data (BSD and Unicode
 licences), Node.js 23.2.0 (MIT), Microsoft's Direct3D shader compiler, and the
 one SkyMP script above. The licence texts come with it, in
-`Data\Docs\Thornswood Client Runtime`.
+`Data\Docs\Thornswood Client Runtime`. The shader compiler,
+`d3dcompiler_47.dll`, is Microsoft's, unmodified and signed by Microsoft. It is
+on the Windows SDK's list of files that may be handed on with a Windows
+program ([Windows SDK redist lists](https://learn.microsoft.com/en-us/legal/windows-sdk/redist)),
+under the Windows SDK's licence terms for that code, and it remains
+Microsoft's property.
 
 **The main menu's interface file**, `Data\Interface\startmenu.swf`, is
 Skyrim's own, edited so the menu shows no logo and no button list. The notice

@@ -744,7 +744,7 @@ jobs:
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
-                 'test-site-credits-fill.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
+                 'test-site-credits-fill.js', 'test-421-source-offer-ui.js', 'test-deployed-build.ps1', 'test-459-publish-record.ps1',
                  'test-site-headers.js', 'test-generated-source-chain.ps1',
                  'test-site-render.js', 'test-site-discovery.js', 'test-998-patreon-copy.js',
                  'test-home-status.js', 'test-seats.js', 'test-age-gate.js', 'test-download-hash.js', 'test-2233-inuse-image.ps1',
