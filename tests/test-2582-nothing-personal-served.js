@@ -53,6 +53,7 @@ const PUBLIC = {
 };
 // Shipped with the gamemode from game\data in the repository, read only.
 const SHIPPED = {
+  'thalmor-patrols.json': 'the Thalmor patrol roads and limits (#1390), from the repository, naming nobody',
   'guild-sites.json': 'the ten guild sites, from the repository',
   'merchant-traders.json': 'the merchant table, from the repository',
 };

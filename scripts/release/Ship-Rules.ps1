@@ -1313,7 +1313,16 @@ $ShipGeneratedBodyFiles = @(
     'Data\meshes\actors\character\character assets\malebody_0.nif',
     'Data\meshes\actors\character\character assets\malebody_1.nif'
 )
-$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
+# THE OUTFITS FITTED TO THOSE BODIES ARE OURS (#2454), built by the same
+# scripted build from the collection's BodySlide projects named in
+# records\generated.json (bodyslide.outfits), at their own slider defaults and
+# with no RaceMenu morphs (#1004). Exact paths, the OutputPath and OutputFile
+# (_0 and _1) of each set. None yet: the travel clothes and the executioner
+# come with the collection revision that deploys their projects (#2454). Never
+# anything from Immersive Armors: Patrick, 17 Oct, it is used as-is through the
+# collection and nothing built from it is redistributed (permission-held.txt).
+$ShipGeneratedOutfitFiles = @()
+$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + $ShipGeneratedOutfitFiles + @(
     'Data\meshes\animationdatasinglefile.txt',
     'Data\meshes\animationsetdatasinglefile.txt',
     'Data\meshes\actors\*\behaviors\*.hkx',
@@ -1501,9 +1510,9 @@ $ShipRequiredDataFiles = @(& {
     }
 })
 
-# OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
-# machine (Common Clothes' travel clothes, Immersive Armours' Bosmer armour,
-# More Craftable Equipment's executioner). Patrick, 29 September: Thornswood
+# OURS FOR NOW, UNTIL #1259: 122 outfit meshes built in BodySlide on some other
+# machine (Common Clothes' travel clothes, More Craftable Equipment's
+# executioner; the Bosmer armour's morphs left in #2454, and nothing is built from it). Patrick, 29 September: Thornswood
 # builds the outfits itself from the collection's BodySlide projects, and until
 # that build replaces these they keep shipping so nothing looks broken. Exact
 # paths, in built-until-1259.txt beside this file; the build that closes #1259
@@ -1593,7 +1602,7 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
             [pscustomobject]@{ Sha=$matches[1]; Rel=$matches[2].Replace('/', '\'); Destination=[IO.Path]::GetFullPath((Join-Path $GameDir $matches[2])) }
         }
     })
-    foreach ($rel in $ShipGeneratedBodyFiles) {
+    foreach ($rel in @($ShipGeneratedBodyFiles) + @($ShipGeneratedOutfitFiles)) {
         $file = Join-Path $GameDir $rel
         $destination = [IO.Path]::GetFullPath($file)
         $matching = @($rows | Where-Object { $_.Destination -ieq $destination })
