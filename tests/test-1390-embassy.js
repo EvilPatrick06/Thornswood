@@ -7,7 +7,7 @@
 // admin writes. /embassy and /remnant are staff commands only, and the person
 // a change is about is told in their own chat. Only those two rolls make the
 // embassy and remnant rows; a public forge makes none of them. A character in
-// Thalmor gear reads Thalmor. The patrols wait on the NPC lane, so this block
+// Thalmor gear reads Thalmor. The patrols are their own block (tests/test-1390-thalmor-patrols.js), so this block
 // stands up no actor.
 //
 // Read only.
@@ -463,7 +463,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
 
   // ------------------------------------------- what the block does not do --
   {
-    yes('P1 the block stands up no actor: the patrols wait on the NPC lane',
+    yes('P1 the block stands up no actor: the patrols are their own block',
         !/placeActors\(|mp\.place\(|createActor|__thornswoodNpcRuntime|__thornswoodNpcPopulation/.test(block));
     yes('P1 and runs no timer of its own', !/setInterval|setTimeout/.test(block));
     yes('P1 placeActors is the /spawn commands\' own, as it was', /\n  return \{ made: made, why: why \};\n\}/.test(gm));
