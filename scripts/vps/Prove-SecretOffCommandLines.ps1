@@ -27,10 +27,21 @@
   HOW. The watcher goes up the way every secret does (Send-Secret.ps1): the
   value on ssh's standard input, only the watcher's own script on the command
   line. On the VPS it reads Win32_Process about ten times a second until this
-  machine closes its standard input, and looks in every command line for the
-  value, its UTF-8 base64 and its UTF-16 base64, with any -EncodedCommand
-  decoded first. It writes nothing to disk and prints only counts: never a
-  command line and never the value, whichever way it comes out.
+  machine sends it a stop line when the run is over, and looks in every
+  command line for the value, its UTF-8 base64 and its UTF-16 base64, with any
+  -EncodedCommand decoded first. It writes nothing to disk and prints only
+  counts: never a command line and never the value, whichever way it comes
+  out.
+
+  WHY A STOP LINE (#451, 20 Oct). The stop signal used to be this machine
+  closing ssh's standard input. Against the real VPS that never reached the
+  watcher: the Deploy-Docs run ended at 8:31 AM and no verdict had come back
+  by 9:15 AM, well past the 900 second limit. And the limit did not end it
+  either, because the reader waiting for the close is still blocked on
+  Console.In when the watch ends, and that keeps powershell.exe alive after
+  the script (measured in Windows PowerShell 5.1 on One: answered, never
+  exited). Lines do reach it (the value is one), so the stop is a line, and
+  the far side ends its own process once it has answered.
 
   The harness is tests\test-prove-secret.ps1: it runs this against a fake ssh,
   once the way Send-Secret sends (NOT FOUND) and once the old way, the value
@@ -84,8 +95,9 @@ function Look {
     foreach ($f in $forms) { if ($c.Contains($f)) { $hit[[string]$p.ProcessId] = 1 } }
   }
 }
-# The stop signal: this machine closing standard input. Read on a runspace of
-# its own, because Console.In's ReadLineAsync does not return until it is read.
+# The stop signal: the next line from this machine, sent when the run is over.
+# Read on a runspace of its own, because Console.In's ReadLineAsync does not
+# return until it is read.
 $stop = [powershell]::Create().AddScript('[void][Console]::In.ReadLine()').BeginInvoke()
 $end = (Get-Date).AddSeconds(SECONDS)
 'WATCHER READY'
@@ -93,6 +105,9 @@ do { Look; Start-Sleep -Milliseconds 100 } while (-not $stop.IsCompleted -and (G
 Look
 if ($hit.Count) { 'WATCHER FOUND ' + $hit.Count } else { 'WATCHER NOT FOUND' }
 'WATCHER READ ' + $read.Count
+# At the time limit the reader is still blocked on Console.In, and that keeps
+# powershell.exe running after the script, so ssh never ends. Answered: end.
+[Environment]::Exit(0)
 '@
     return (Get-ThornswoodSecretPrelude) + "`r`n" + $body.Replace('SECONDS', [string]$Seconds)
 }
@@ -148,8 +163,12 @@ try {
         Remove-Variable -Name Secret, value, wire -ErrorAction SilentlyContinue
         try { & $Run }
         finally {
-            # Closing standard input is the watcher's signal to take one more
-            # look and answer.
+            # A line is the watcher's signal to take one more look and answer.
+            # Closing standard input alone never reached it on the VPS.
+            if (-not $proc.HasExited) {
+                $proc.StandardInput.WriteLine('STOP')
+                $proc.StandardInput.Flush()
+            }
             $proc.StandardInput.Close()
         }
         while ($true) {
