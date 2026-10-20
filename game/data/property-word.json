@@ -1,0 +1,21 @@
+{
+ "_about": "Word to a property holder when their door's lock is picked or their deed is presented (#2680). Staff data: change the numbers here, never in gamemode.js. Minutes and days are real time. A key that is missing or the wrong type keeps the default in the property block's WORD_DEFAULTS, and the server log says which.",
+ "pick": {
+  "on": true,
+  "delayMinutes": 20,
+  "describe": true,
+  "samePickerMinutes": 360
+ },
+ "deed": {
+  "on": true,
+  "delayMinutes": 10,
+  "describe": true
+ },
+ "bundle": true,
+ "perHolderPerDay": 6,
+ "maxPending": 20,
+ "keepDays": 14,
+ "reach": 400,
+ "needLockpick": true,
+ "everySeconds": 30
+}

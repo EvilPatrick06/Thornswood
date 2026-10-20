@@ -32,7 +32,8 @@
 //   - TESModPlatform.closeMenu queues a kHide (PapyrusTESModPlatform.cpp);
 //   - browser.setFocused(true) raises the Cursor Menu only when it is not up
 //     already, and setFocused(false) lowers it only when focus raised it
-//     (BrowserApiTilted.cpp);
+//     (BrowserApiTilted.cpp), and since #2384 shows it again when it closes
+//     under a focus still up (the Cursor Menu's close event, CursorFocus.h);
 //   - while browser focus is up the game and the plugins get no keys; the
 //     page does (DInputHook.cpp zeroes the game's keyboard read, and
 //     buttonEvent is built from the game's own input).
@@ -308,7 +309,13 @@ function rig(opts) {
         const last = game.books[game.books.length - 1];
         if (last && last.closedAt < 0) { last.closedAt = game.frame; }
         // And takes it down with it, whoever else wanted it: the worst case.
-        delete game.open[CURSOR];
+        // The fork (#2384) sees the Cursor Menu close under a focus still up
+        // and queues its show again.
+        if (game.open[CURSOR]) {
+          delete game.open[CURSOR];
+          game.cursorByFocus = false;
+          if (game.focus) { game.ui.push({ menu: CURSOR, type: 'show' }); game.cursorByFocus = true; }
+        }
         game.tasks.push(['menuClose', { name: m.menu }]);
       }
     }
@@ -428,8 +435,8 @@ if (arbiter !== null && keys !== null) {
     yes('S1 our journal holds the keyboard', bad.focus.length === 0); show(bad.focus);
     yes('S1 and has a cursor, whichever of the page and the close landed first',
         bad.cursor.length === 0); show(bad.cursor);
-    yes('S1 the race the cursor fix is for does happen in this model (' + repaired + ' of ' +
-        variants.length + ' orders)', repaired > 0);
+    yes('S1 #2384: the plugin never lowers and raises focus for the cursor (' + repaired + ' of ' +
+        variants.length + ' orders)', repaired === 0);
     yes('S1 the log says how long after J the book opened and how long it took to go',
         bad.measured.length === 0); show(bad.measured);
     yes('S1 closing ours leaves no book, no cursor and the keyboard with the game',

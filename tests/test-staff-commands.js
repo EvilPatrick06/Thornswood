@@ -54,10 +54,12 @@ const COMMANDS = slice('const WORDS = [', '// ==== end thornswood chat commands 
 const STAFF = slice('// ==== thornswood staff ====', '// ==== end thornswood staff ====');
 yes('the chat command block is in gamemode.js', !!COMMANDS);
 yes('the staff block is in gamemode.js', !!STAFF);
-const PLACE_ACTORS = slice('\nfunction placeActors(', '\n  return { made: made, why: why };\n}');
+// From serverRunId, which placeActors asks for the run a temporary spawn
+// belongs to (#2623), through removeSpawned, to the end of placeActors.
+const PLACE_ACTORS = slice('\nfunction serverRunId(', '\n  return { made: made, why: why };\n}');
 yes('and placeActors, which /spawn and /spawnat share', !!PLACE_ACTORS);
 yes('handle() hands staff words to the staff block with isStaff and /give\'s, /spawn\'s and /tp\'s lookups',
-    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace \}\)/.test(COMMANDS));
+    !!COMMANDS && /staffCmd\.command\(cmd, word, parts, profileId, actorId, isStaff,\s*\{ findThing: findThing, findBeast: findBeast,\s*byFormId: byFormId, findPlace: findPlace,\s*beastName: beastName \}\)/.test(COMMANDS));
 yes('and before the /give, /spawn and /tp branches, so a line aimed at a person reaches it first',
     !!COMMANDS && COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/give' || word === '/spawn') {") &&
     COMMANDS.indexOf('staffCmd.command(') < COMMANDS.indexOf("if (word === '/tp' || word === '/goto') {"));
@@ -111,7 +113,9 @@ function load(w) {
     // A reference made from a base record, the way the server makes one.
     place: function (baseId) { const id = 0xff100000 + w.placed.length; w.placed.push({ id: id, base: baseId }); return id; },
     makeProperty: function () { },
-    callPapyrusFunction: function () { }
+    callPapyrusFunction: function (kind, cls, fn, self) { (w.papyrus = w.papyrus || []).push(fn); },
+    getDescFromId: function (id) { return id.toString(16) + ':Skyrim.esm'; },
+    destroyActor: function (id) { (w.destroyed = w.destroyed || []).push(id); }
   };
   const http = {
     request: function (opts, cb) {
@@ -173,7 +177,8 @@ function load(w) {
     ADMIN_ITEMS: { 'iron ore': ['Iron Ore', '71cf3:Skyrim.esm'], 'gold': ['Gold', 'f:Skyrim.esm'] },
     ADMIN_ACTORS: { 'troll': ['Troll', '23aba:Skyrim.esm'], 'giant': ['Giant', 'deadbe:Missing.esp'] },
     HALL: { desc: 'Hall:0', pos: [0, 0, 0], rot: [0, 0, 0] },
-    PASSAGES: { a: { key: 'whiterun', town: 'Whiterun', arrival: { desc: 'Tamriel:w', pos: [10, 20, 30], rot: [0, 0, 45] } } },
+    PASSAGES: { a: { key: 'whiterun', town: 'Whiterun', start: { desc: 'Tamriel:w', pos: [10, 20, 30], rot: [0, 0, 45] },
+                     arrival: { desc: 'inn:w', pos: [1, 2, 3], rot: [0, 0, 0] } } },
     BUILDING_BY_DOOR: {}, BUILDING_NAME: {}, DATA: { cellToHold: {}, capitals: {} }
   };
   vm.createContext(box);
@@ -337,11 +342,23 @@ if (COMMANDS && STAFF) {
     const dx = m.pos[0] - spotB.pos[0], dy = m.pos[1] - spotB.pos[1];
     return Math.abs(Math.sqrt(dx * dx + dy * dy) - 150) < 1;
   }));
-  yes('and answers both', to(got, STAFFER)[0] === 'Spawned 2 Troll beside Bjorn Iron-Hand.' &&
+  yes('and answers both, saying the spawn is temporary (#2623)', to(got, STAFFER)[0] ===
+      'Spawned 2 Troll beside Bjorn Iron-Hand. Temporary: when it dies its body lies the usual time, then it is gone, and a restart takes it too. Add keep to make one stay.' &&
       to(got, BJORN)[0] === 'Staff put 2 Troll beside you.');
   got = run(w, STAFFER, '/spawnat Sera troll');
   yes('/spawnat <person> <creature> does the same', w.placed.length === 3 &&
       w.where[w.placed[2].id].desc === w.where[A_SERA].desc && to(got, SERA)[0] === 'Staff put 1 Troll beside you.');
+  // keep, at either end, makes a spawn stay (#2623).
+  got = run(w, STAFFER, '/spawnat Sera troll keep');
+  yes('/spawnat <person> <creature> keep places one and says it is kept', w.placed.length === 4 &&
+      to(got, STAFFER)[0] === 'Spawned 1 Troll beside Sera. Kept: it stays, and comes back after it dies.');
+  got = run(w, STAFFER, '/spawn troll 2 keep on Bjorn');
+  yes('/spawn <creature> <count> keep on <person> reads the count and keep', w.placed.length === 6 &&
+      /^Spawned 2 Troll beside Bjorn Iron-Hand\. Kept:/.test(to(got, STAFFER)[0] || ''));
+  got = run(w, STAFFER, '/spawn troll on Bjorn keep');
+  yes('/spawn <creature> on <person> keep, keep at the very end', w.placed.length === 7 &&
+      /\. Kept:/.test(to(got, STAFFER)[0] || ''));
+  w.placed.length = 3;  // the giant check below counts from the first three
   got = run(w, STAFFER, '/spawnat Sera giant');
   yes('a creature whose plugin is not loaded says so and places nothing',
       w.placed.length === 3 && /plugin is not in this load order/.test(to(got, STAFFER)[0] || ''));
@@ -364,7 +381,40 @@ if (COMMANDS && STAFF) {
 
   const dids = w.records.map(function (r) { return JSON.parse(r.text).did; }).join(',');
   yes('every action wrote one line for the staff channel: ' + dids,
-      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,tp,tp');
+      // Three more spawns are the keep checks (#2623).
+      dids === 'warn,freeze,unfreeze,bring,goto,silence,unsilence,kick,give,spawn,spawn,spawn,spawn,spawn,tp,tp');
+
+  /*
+    /despawn (#2623): the spawned creature nearest the staff member goes for
+    good, kept or not, and nothing the world put there is ever touched.
+  */
+  {
+    const d = load(world());
+    pass10(d, STAFFER);
+    const KEPT = 0xff200001, FAR = 0xff200002, OTHER_CELL = 0xff200003;
+    d.where[KEPT] = { desc: 'Whiterun:1', pos: [400, 200, 300], rot: [0, 0, 0] };        // 3 m away
+    d.where[FAR] = { desc: 'Whiterun:1', pos: [100, 4000, 300], rot: [0, 0, 0] };        // 54 m away
+    d.where[OTHER_CELL] = { desc: 'Riften:2', pos: [100, 200, 300], rot: [0, 0, 0] };   // same spot, other cell
+    const released = [];
+    d.box.__thornswoodNpcPopulation = {
+      spawned: function () { return [{ id: FAR, keep: false }, { id: KEPT, keep: true }, { id: OTHER_CELL, keep: true }]
+        .filter(function (s) { return (d.destroyed || []).indexOf(s.id) < 0; }); },
+      release: function (id) { released.push(id); }
+    };
+    let g2 = run(d, STAFFER, '/despawn');
+    yes('/despawn removes the spawned creature nearest you, kept or not: ' + JSON.stringify(to(g2, STAFFER)),
+        JSON.stringify(d.destroyed || []) === JSON.stringify([KEPT]) &&
+        /^Removed the kept creature nearest you, for good\./.test(to(g2, STAFFER)[0] || ''));
+    yes('through removeSpawned: its record marked deleted and its habitat slot let go',
+        (d.papyrus || []).indexOf('Delete') >= 0 && released.indexOf(KEPT) >= 0);
+    yes('and it is written for the staff channel',
+        d.records.some(function (r) { const j = JSON.parse(r.text); return j.did === 'despawn' && /kept creature ff200001/.test(j.why); }));
+    g2 = run(d, STAFFER, '/despawn');
+    yes('nothing within about 20 m, and one in another cell, are left alone',
+        JSON.stringify(d.destroyed) === JSON.stringify([KEPT]) && /No spawned creature within about 20 metres/.test(to(g2, STAFFER)[0] || ''));
+    g2 = run(d, NOBODY, '/despawn');
+    yes('/despawn from somebody not staff: "' + REFUSED + '"', to(g2, NOBODY)[0] === REFUSED);
+  }
 
   console.log('\nstaff whose identity is not proven:');
   const recs = w.records.length;

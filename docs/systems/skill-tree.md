@@ -91,13 +91,14 @@ A perk is ticked here when it fires. Each time the server fires one, it
 writes `perks: <name> fired` to its log, so a tester can see it happen. Troll's Blood and Leyline Attunement write one line a fight
 and one a cast, not one a second.
 
-Three happen on your own machine, because the game works them out there
-and the server cannot reach them: Unshakeable, Tireless and Windwalker's
-fall. The front plugin does them, from the list of perks the K panel's view
-carries, and writes them in `thornswood-front.log`:
+Four happen on your own machine, because the game works them out there
+and the server cannot reach them: Unshakeable, Tireless, Windwalker's fall
+and Pack Mule. The front plugin does them, from the list of perks the K
+panel's view carries, and writes them in `thornswood-front.log`:
 `unshakeable: refused a stagger while blocking` for each stagger refused,
 `unshakeable: a stagger played with the block down` for each one let
-through, and a `perks:` line naming each game setting it changes. Tireless
+through, a `perks:` line naming each game setting it changes, and
+`perks: Pack Mule held` or `not held` when Pack Mule comes or goes. Tireless
 and the fall are the game's own sums, from game settings read out of
 Skyrim.esm that nothing in the load order changes:
 
@@ -106,13 +107,15 @@ Skyrim.esm that nothing in the load order changes:
 | Windwalker, the fall | `fJumpFallHeightMult` | 0.1 | 0, so a fall comes to nothing |
 | Tireless, a sprint | `fSprintStaminaDrainMult` | 7 | half |
 | Tireless, a power attack | `fStaminaAttackWeaponBase` and `fStaminaAttackWeaponMult` | 20 and 1 | half of each |
+| Tireless, a shield bash | `fStaminaBashBase` and `fStaminaPowerBashBase` | 35 and 55 | half of each |
 
 The fall's settings are your own character's: everybody else's are the same
 names ending in NPC, so nobody else's fall changes. Tireless's have no
-second set, so an NPC your machine runs pays half for a sprint and a power
-attack too (issue #1385 asks whether that stays). Running costs nothing in
-this game and neither does a plain swing; a sprint and a power attack are
-what cost stamina.
+second set, so an NPC your machine runs pays half for a sprint, a power
+attack and a bash too, which Patrick kept (12 Oct). Running costs nothing
+in this game and neither does a plain swing; a sprint, a power attack and
+a shield bash are what cost stamina. A bash counts as a swing for Tireless
+(Patrick, 12 Oct: one rule for every attack).
 
 Nothing here is a command. Font of Magic, the one perk a person starts,
 is the Use button beside it on the K panel. The K panel also says, beside
@@ -137,11 +140,11 @@ not left on you (issue #1642).
 | Purified Blood | Yes. The tree's disease resistance comes to 100 and its poison resistance to 75. What your race resists comes on top, as far as the game allows | |
 | Archmage's Vessel | Yes | |
 | Leyline Attunement | Yes. The server sees a cast as magicka falling. The usual rate is your race's own, raised by your Clarity | |
-| Overcharge | Yes, the damage. Every fifth spell of yours that takes health takes double | Holding twice as long |
+| Overcharge | Yes, both halves, each counted on its own. Every fifth spell of yours that takes health takes double, counted on the server. Every fifth spell of yours that holds (one you cast and let go, with an effect that lasts a time and none that takes health, like Oakflesh, Candlelight or Fear) holds twice as long. Its effects run on the machine of whoever they land on, so the engine fork counts the cast on your own machine and the server, counting the same casts, tells everybody else's machine to hold it twice as long too | |
 | Spellbreaker | Yes. A spell you hold up, like Flames, counts once a second | |
 | Font of Magic | Yes, from the Use button on the K panel. For 15 seconds each school's cost is taken off in full, the way the game's own Fortify enchantments take it off, so the game takes no magicka at all | |
-| Tireless | Yes, on your own machine: a sprint and a power attack cost half | |
+| Tireless | Yes, on your own machine: a sprint, a power attack and a shield bash cost half | |
 | Second Wind | Yes | |
 | Windwalker | Yes. The speed from the server, the fall on your own machine | |
-| Pack Mule | No | All of it. Being overloaded makes the game walk you, on your own machine, and no game setting changes that. What it should be waits on Patrick (issue #1385) |
+| Pack Mule | Yes, on your own machine. Being overloaded makes the game walk you there, and no game setting changes that, so the engine fork's client keeps a list of characters the game does not hold to their carry weight, and the front plugin puts yours on it while Pack Mule is held. You run and sprint whatever you carry, and everybody else sees you run. The inventory still shows your real carry weight | |
 | Lethal Aim | Yes. An arrow or a bolt is worked out again against half the armour, by the same sum the server uses for every blow | |

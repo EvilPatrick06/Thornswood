@@ -16,7 +16,7 @@ The real bot module is imported and the real coroutine is run over real
 files in a temp folder. Only the Discord send, the client and the sleep are
 replaced. Read only. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import inspect
 import json
@@ -253,6 +253,51 @@ try:
         '@everyone' not in idle_ping and '<@&111111111111111111>' not in idle_ping)
     yes('M12 no em dash and never the forbidden word',
         chr(0x2014) not in idle and ('pla' + 'yer') not in idle.lower())
+
+    # M14: staff at a building's door (#2551, Patrick, 17 Oct): the property
+    # block's staff presses come through the staff block's record with the
+    # building and its hold in the why, and each reads as who did what where.
+    yes('M14 the property block records each staff press at a door, and each has a sentence here',
+        all(("staffRecord('%s'" % d) in gm and d in bot._MOD_DID for d in ('evict', 'rent', 'norent')))
+    ev = bot.moderation_text('dev', json.loads(row('evict', who='Alice', why='Breezehome, in Whiterun')))
+    yes('M14 an eviction by staff says who, whose claim and where',
+        ev == '**Staff on the dev server:** Aela (profile 1001) ended the claim of Alice (profile 2002): '
+              'Breezehome, in Whiterun')
+    rn = bot.moderation_text('live', json.loads(row('rent', who='Alice',
+                                                    why='50 gold every 7 days on Jakob\'s House, which answers to no hold')))
+    yes('M14 rent set by staff says the amount and the building, a building of no hold too',
+        rn == '**Staff on the live server:** Aela (profile 1001) set the rent on the claim of Alice (profile 2002): '
+              '50 gold every 7 days on Jakob\'s House, which answers to no hold')
+    nr = bot.moderation_text('dev', json.loads(row('norent', who='@everyone', why='<@&111111111111111111> Breezehome')))
+    yes('M14 no rent by staff says so, and nothing in it pings anybody',
+        nr.startswith('**Staff on the dev server:** Aela (profile 1001) took the rent off the claim of ')
+        and '@everyone' not in nr and '<@&111111111111111111>' not in nr)
+    yes('M14 no em dash and never the forbidden word',
+        all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (ev, rn, nr)))
+
+    # M15: staff on the world's card, the Office page of K (#513, Patrick,
+    # 17 Oct): each press comes through the staff block's record with the
+    # stage as the who, and reads as who did what to the world.
+    yes('M15 the world stage block records each staff press on the card, and each has a sentence here',
+        all(("log.record('%s'" % d) in gm and d in bot._MOD_DID
+            for d in ('worldpropose', 'worldconfirm', 'worlddrop')))
+    wp = bot.moderation_text('dev', {'did': 'worldpropose', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                     'whoName': 'A landing', 'why': 'from peace to landing, force: remnant'})
+    yes('M15 a proposal says who proposed which stage, and from where',
+        wp == '**Staff on the dev server:** Aela (profile 1001) proposed moving the world to A landing: '
+              'from peace to landing, force: remnant')
+    wc = bot.moderation_text('live', {'did': 'worldconfirm', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                      'whoName': 'A landing', 'why': 'from peace to landing, proposed by Bjorn (profile 2002)'})
+    yes('M15 a confirm says who confirmed it and who proposed it',
+        wc == '**Staff on the live server:** Aela (profile 1001) confirmed moving the world to A landing: '
+              'from peace to landing, proposed by Bjorn (profile 2002)')
+    wd = bot.moderation_text('dev', {'did': 'worlddrop', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                     'whoName': '@everyone', 'why': '<@&111111111111111111>'})
+    yes('M15 a drop says so, and nothing in it pings anybody',
+        wd.startswith('**Staff on the dev server:** Aela (profile 1001) dropped the proposal to move the world to ')
+        and '@everyone' not in wd and '<@&111111111111111111>' not in wd)
+    yes('M15 no em dash and never the forbidden word',
+        all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (wp, wc, wd)))
 
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)

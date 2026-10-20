@@ -14,20 +14,27 @@
   Windows PowerShell 5.1, which is what runs it on the VPS:
 
     - the dry run changes no byte and says, by count, what a real run removes,
-      what it keeps and which services it would stop
+      what it keeps and which services take the rest at their next start
     - it refuses a Discord id that is not one, -Delete without -By, -Merge
-      without -Reapply, a store that will not parse, and an unfinished save,
-      each with nothing changed
-    - the real run removes every record of theirs in every store, live and
-      in every copy set aside beside it, keeps staff's records and reports and
-      a session staff marked kept, leaves the shared character and everybody
-      else's records as they were, takes their lines out of each chat day and
-      leaves the other lines byte for byte
+      without -Reapply, a store that will not parse, and an unfinished save
+      in a copy nothing runs from, each with nothing changed; a live
+      server's unfinished save is its own to look at as it starts (#2758)
+    - the real run stops nothing and changes no live file (#2758): it removes
+      their records from every copy set aside at once, and writes a request
+      into each service that holds some of theirs, which the dry run then
+      shows as waiting
+    - then each service is started the way it starts on the box: server-log.js
+      for the game servers and voice, the site's start block, and the bot's
+      (when Python 3.11 and discord.py are here). After that every record of
+      theirs is gone from every store, staff's records and reports and a
+      session staff marked kept stay, the shared character and everybody
+      else's records are as they were, and the other chat lines are byte for
+      byte
     - it writes one line to the record, with no name, no address and nothing
       a record said, in a folder only SYSTEM and Administrators can open
     - after the stand-ins are put back as a backup would put them, -Reapply
-      removes it all again and adds no line; -Merge adds a request from
-      another copy of the record and removes that one too, once
+      asks for it all again, the same way, and adds no line; -Merge adds a
+      request from another copy of the record and asks for that one too, once
     - the nightly backup takes the record, Restore-Box.ps1 reapplies it from
       the backup before anything starts, and docs\RESTORING.md says so
 
@@ -129,13 +136,20 @@ $Dev  = Join-Path $Box 'Thornswood-Server-Dev'
 $Vl   = Join-Path $Box 'Thornswood-Voice'
 $Vd   = Join-Path $Box 'Thornswood-Voice-Dev'
 $Bot  = Join-Path $Box 'Thornswood-Bot'
-$roots = @('-SiteRoot', $Site, '-GameRoot', $Live, '-DevGameRoot', $Dev, '-VoiceRoot', $Vl, '-DevVoiceRoot', $Vd, '-BotRoot', $Bot, '-RecordRoot', $Rec, '-NoServices', '-AllowGamingPc')
+# The nightly backup's task, where this runs on the box that has it (#2833):
+# the record's folder gives its SID read. Elsewhere no task, no rule.
+$BackupTask = 'Thornswood Backup'
+$BackupSid = ''
+try { $BackupSid = (New-Object Security.Principal.NTAccount('NT TASK', $BackupTask)).Translate([Security.Principal.SecurityIdentifier]).Value }
+catch [Security.Principal.IdentityNotMappedException] { $BackupSid = '' }
+$roots = @('-SiteRoot', $Site, '-GameRoot', $Live, '-DevGameRoot', $Dev, '-VoiceRoot', $Vl, '-DevVoiceRoot', $Vd, '-BotRoot', $Bot, '-RecordRoot', $Rec, '-BackupTask', $BackupTask, '-AllowGamingPc')
 
 $ME = '111111111111111111'      # asked to be deleted
 $YOU = '222222222222222222'     # did not
 $THEM = '333333333333333333'    # asked, in another copy of the record
 $P1 = 5001; $P2 = 5002          # P2 is held by both accounts
 $PY = 6001; $PT = 7001
+$A1 = 4278192641; $AY = 4278192642  # the form ids of their character (ff000a01) and of yours
 
 function Build {
     if (Test-Path -LiteralPath $Box) { Remove-Item -LiteralPath $Box -Recurse -Force }
@@ -143,7 +157,7 @@ function Build {
     Put (Join-Path $D 'linked.json') ('{"' + $ME + '":{"name":"Me","profiles":[' + $P1 + ',' + $P2 + ']},"' + $YOU + '":{"name":"You","profiles":[' + $PY + ',' + $P2 + ']},"' + $THEM + '":{"name":"Them","profiles":[' + $PT + ']}}')
     Put (Join-Path $D 'rules-accepted.json') ('{"' + $ME + '":{"yes":true},"' + $YOU + '":{"yes":true}}')
     Put (Join-Path $D 'signins.json') ('[{"id":"' + $ME + '","ip":"203.0.113.1"},{"id":"' + $YOU + '","ip":"203.0.113.2"},{"id":"' + $ME + '","ip":"203.0.113.3"}]')
-    Put (Join-Path $D 'sessions.json') ('[{"session":"s1","who":"' + $ME + '","profile":' + $P1 + '},{"session":"s2","who":"' + $ME + '","profile":' + $P1 + ',"keep":true},{"session":"s3","who":"' + $YOU + '","profile":' + $PY + '},{"session":"s4","who":"' + $THEM + '","profile":' + $PT + '}]')
+    Put (Join-Path $D 'sessions.json') ('[{"session":"s1","who":"' + $ME + '","profile":' + $P1 + '},{"session":"s2","who":"' + $ME + '","profile":' + $P1 + ',"start":100000,"end":200000,"keep":true},{"session":"s3","who":"' + $YOU + '","profile":' + $PY + '},{"session":"s4","who":"' + $THEM + '","profile":' + $PT + '}]')
     Put (Join-Path $D 'session-logs\s1.json') ('{"session":"s1","who":"' + $ME + '","logs":{"launcher.log":"x"}}')
     Put (Join-Path $D 'session-logs\s2.json') ('{"session":"s2","who":"' + $ME + '","logs":{"launcher.log":"kept"}}')
     Put (Join-Path $D 'session-logs\s3.json') ('{"session":"s3","who":"' + $YOU + '","logs":{"launcher.log":"y"}}')
@@ -169,6 +183,8 @@ function Build {
 
     foreach ($g in @(@{ R = $Live; Tag = 'live' }, @{ R = $Dev; Tag = 'dev' })) {
         $R = $g.R
+        # What tells server-log.js it starts a game server, and where its private folder is.
+        Put (Join-Path $R 'server-settings.json') '{"privDir":"private"}'
         $CF = Join-Path $R 'world\changeForms'
         Put (Join-Path $CF 'ff000a01.json') ('{"formDesc":"ff000a01","profileId":' + $P1 + ',"isDeleted":false}')
         Put (Join-Path $CF 'ff000a02.json') ('{"formDesc":"ff000a02","profileId":' + $PY + '}')
@@ -182,20 +198,49 @@ function Build {
         Put (Join-Path $PV 'characters-before-20260930-000000.json') ('{"who":{"' + $P1 + '":{"name":"Mine"}}}')
         Put (Join-Path $PV 'mod-settings.json') ('{"who":{"' + $P1 + '":{"a":1},"' + $PY + '":{"a":2}}}')
         Put (Join-Path $PV 'take-limit.json') ('{"counts":{"' + $P1 + '|1a2b3":{"n":1},"' + $PY + '|1a2b3":{"n":2}}}')
-        Put (Join-Path $PV 'property.json') ('{"houses":[{"id":"h1","owner":' + $P1 + '},{"id":"h2","owner":' + $PY + '}]}')
+        # The game's registers, in the shapes the gamemode writes, each naming
+        # their character and somebody else's (#2351, released at the game
+        # server's next start, never edited here).
+        Put (Join-Path $PV 'property.json') ('{"claims":{"b1:Skyrim.esm":{"by":' + $P1 + ',"name":"Mine","at":1,"touched":1},"b2:Skyrim.esm":{"by":' + $PY + ',"name":"Yours","at":1,"touched":1,"master":{"for":' + $P1 + ',"no":3}}},' +
+            '"notices":{"whiterun":[{"by":' + $P1 + ',"name":"Mine","title":"t","text":"x","at":1,"job":false,"taken":0},{"by":' + $PY + ',"name":"Yours","title":"u","text":"y","at":1,"job":true,"pay":5,"taken":' + $P1 + ',"takenName":"Mine"}]},' +
+            '"dropbox":{"whiterun":{"items":[{"n":1,"by":' + $P1 + ',"name":"Mine","kind":"gold","baseId":15,"count":5,"what":"Gold","at":1}],"log":[],"next":2}}}')
+        Put (Join-Path $PV 'law.json') ('{"cells":{},"held":{"jarl:whiterun":{"' + $ME + '":{"pid":' + $P1 + ',"name":"Mine","at":1}},"guard:riften":{"' + $YOU + '":{"pid":' + $PY + ',"name":"Yours","at":1}}}}')
+        Put (Join-Path $PV 'beds.json') ('{"guests":{"b2:Skyrim.esm":{"' + $P1 + '":{"by":' + $PY + ',"at":1,"name":"Mine"}}},"takings":{"' + $P1 + '":10,"' + $PY + '":4}}')
+        Put (Join-Path $PV 'farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{"' + $P1 + '":1,"' + $PY + '":1}}')
+        Put (Join-Path $PV 'embassy.json') ('{"embassy":[{"actor":' + $A1 + ',"profile":0,"name":"Mine","at":1,"armed":false},{"actor":' + $AY + ',"profile":' + $PY + ',"name":"Yours","at":1,"armed":false}],"remnant":[]}')
+        Put (Join-Path $PV 'books.json') ('{"books":[{"id":"b1","kind":"faction","name":"F","account":"' + $ME + '","owner":' + $P1 + ',"members":[{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[],"prices":[]},' +
+            '{"id":"b2","kind":"business","name":"G","account":"' + $YOU + '","owner":' + $PY + ',"members":[{"pid":' + $PY + ',"name":"Yours","role":"Member"},{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[{"pid":' + $P1 + ',"name":"Mine","text":"hello","at":1}],"prices":[]}],"ledgers":{}}')
+        Put (Join-Path $PV 'dungeon-rewards-ledger.json') ('{"version":1,"entries":{"1a2b3:Skyrim.esm":{"at":1,"actor":' + $A1 + ',"tier":1,"gold":5,"items":[]}},"sha256":"x"}')
+        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":1,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[\"ff000a01\",' + $P1 + ',\"ore\"]":1}},' +
+            '"8:Skyrim.esm":{"version":1,"purse":250,"stock":[],"commissions":{"v":1,"serial":1,"held":{"[\"[2561,\\\"\\\",' + $P1 + ']\",\"q-iron-1\"]":{"token":1}},"cool":{}}}},"sha256":"x"}')
+        # The trade ships' manifest names a character { actor, profile } on a line it loaded (#511).
+        Put (Join-Path $PV 'trade-cargo.json') ('{"v":1,"routes":{"ports":[],"routes":[]},"cargo":{"holds":{"ship-1":{"lines":{"1":{"by":{"actor":' + $A1 + ',"profile":' + $P1 + '},"baseId":4096,"count":2}}}}}}')
+        Put (Join-Path $PV 'benches.json') '{"whiterun":4278190081}'
         Put (Join-Path $PV 'moderation.log') ('{"what":"stuck","pid":' + $P1 + '}' + "`n")
         Put (Join-Path $PV 'door.log') ("2026-10-01 WOULD TURN AWAY profile $P1`n")
-        Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1790000000000,"' + $PY + '":1790000000001}')
+        Put (Join-Path $PV 'last-left.json') ('{"' + $P1 + '":1790000000000,"' + $PY + '":1790000000001}')
+        # Where the gamemode kept it before #2582, as a folder set aside then still has it.
+        Put (Join-Path $R 'data\last-left.json') ('{"' + $P1 + '":1780000000000,"' + $PY + '":1780000000001}')
         Put (Join-Path $R 'data\online.json') '{"now":0}'
     }
-    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json') ('{"formDesc":"ff000a07","profileId":' + $P1 + '}')
+    Put (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\farm-claims.json') ('{"at":1,"claims":{"' + $P1 + '":{"by":' + $P1 + ',"name":"Mine","at":1,"cell":"3c:Skyrim.esm","x":0,"y":0}},"seeded":{}}')
+    # An old copy set aside with no private folder at all, only a discarded
+    # change form of theirs (the 18 Oct real run stopped on ENOENT here).
+    Put (Join-Path $Box 'Thornswood-Server.prev-20260930-000000\world-before-1\changeForms\_discarded-1\ff000a08.json') ('{"formDesc":"ff000a08","profileId":' + $P1 + '}')
+    # A list the dev server has not let go of yet, part of it done.
+    Put (Join-Path $Dev 'private\deleted-characters.json') '{"profiles":[9999],"actors":[4278199999],"done":{"property":1}}'
 
     $mine = '{"at":1,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"hello"}'
     $yours = '{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}'
     $shared = '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}'
-    Put (Join-Path $Vl 'chat\2026-10-01.jsonl') ($mine + "`n" + $yours + "`n" + $mine + "`n" + $shared + "`n")
+    # Said inside the session staff kept (s2, live, 100000 to 200000), so it
+    # stays with it (#2166). The same moment on the dev service is not that
+    # session and goes.
+    $inKept = '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}'
+    Put (Join-Path $Vl 'chat\2026-10-01.jsonl') ($mine + "`n" + $yours + "`n" + $inKept + "`n" + $mine + "`n" + $shared + "`n")
     Put (Join-Path $Vl 'chat\2026-10-02.jsonl') ($yours + "`n")
-    Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n")
+    Put (Join-Path $Vd 'chat\2026-10-01.jsonl') ($mine + "`n" + $inKept + "`n")
     Put (Join-Path $Bot 'data\joins.json') ('{"900":{"last":40,"members":{"' + $ME + '":39,"' + $YOU + '":40}}}')
     Put (Join-Path $Bot 'data\open-tickets.json') ('{"900:' + $ME + '":123,"900:' + $YOU + '":456}')
 }
@@ -221,10 +266,22 @@ try {
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     Yes 'a store that will not parse refuses the run' ($c -eq 1 -and (Said 'roster\.json will not parse, so nothing was changed'))
     Put $roster $keepRoster
-    $pend = Join-Path $Dev 'world\changeForms\.pending-batch'
+    $lst = Join-Path $Live 'private\deleted-characters.json'
+    Put $lst '["not a list"]'
+    $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
+    Yes 'a list of deleted characters that is not one refuses the run' ($c -eq 1 -and (Said 'deleted-characters\.json is not a list of deleted characters, so nothing was changed'))
+    Remove-Item -LiteralPath $lst -Force
+    $pend = Join-Path $Dev 'world-before-20260930-000000\changeForms\.pending-batch'
     Put $pend '{}'
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
-    Yes 'an unfinished save in a game server refuses the run' ($c -eq 1 -and (Said '\.pending-batch is an unfinished save'))
+    Yes 'an unfinished save in a copy nothing runs from refuses the run' ($c -eq 1 -and (Said '\.pending-batch is an unfinished save in a copy nothing runs from'))
+    Remove-Item -LiteralPath $pend -Force
+    # A live server's own save in flight, or one left by a crash, is
+    # server-log.js's to look at as the server starts (#2758): it never refuses.
+    $pend = Join-Path $Dev 'world\changeForms\.pending-batch'
+    Put $pend '{}'
+    $c = Run (@('-DiscordId', $ME) + $roots)
+    Yes 'a live server''s unfinished save does not refuse the dry run' ($c -eq 0 -and (Said 'DRY RUN: nothing was changed') -and -not (Said '\.pending-batch is an unfinished save'))
     Remove-Item -LiteralPath $pend -Force
     Yes '  and none of the refusals changed a byte or wrote a record' ((Same $before (Hashes $Box)) -and -not (Test-Path -LiteralPath $Rec))
 
@@ -242,18 +299,119 @@ try {
     Yes '  and what stays: bans, notes, PK, reports, the kept session' (
         (Said 'kept\s+1\s+site: bans') -and (Said 'kept\s+2\s+site: staff notes') -and (Said 'kept\s+1\s+site: PK records') -and
         (Said 'kept\s+1\s+site: reports they made') -and (Said 'kept\s+1\s+site: reports about them') -and
-        (Said 'kept\s+1\s+site: session rows staff marked kept'))
+        (Said 'kept\s+1\s+site: session rows staff marked kept') -and
+        (Said 'kept\s+1\s+live voice: chat lines in sessions staff marked kept\s*$') -and
+        -not (Said 'dev voice: chat lines in sessions staff marked kept'))
     Yes '  and counts their approved gallery picture, and leaves the one a report is about' (
         (Said 'remove\s+1\s+site: approved gallery pictures') -and (Said 'kept\s+1\s+site: gallery pictures held while a report about them is looked into'))
-    Yes '  and counts the game registers naming their character without changing them' (Said 'left\s+1\s+live game server: places in private\\property\.json naming their character')
-    if (-not (Said 'A real run stops these')) { Show }
-    Yes '  and names the services a real run would stop' (Said 'A real run stops these while it changes their files, then starts them again: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
+    Yes '  and counts each game register the game server lets go at its next start' (
+        (Said 'release\s+5\s+live game server: places in private\\property\.json naming their character') -and
+        (Said 'release\s+2\s+live game server: places in private\\law\.json') -and (Said 'release\s+2\s+live game server: places in private\\beds\.json') -and
+        (Said 'release\s+3\s+live game server: places in private\\farm-claims\.json') -and (Said 'release\s+1\s+live game server: places in private\\embassy\.json') -and
+        (Said 'release\s+1\s+live game server: places in private\\dungeon-rewards-ledger\.json') -and (Said 'release\s+4\s+live game server: places in private\\books\.json'))
+    Yes '  and the books they own, which close unless staff hand them on first' (Said 'release\s+1\s+live game server: faction and business books they own, disbanded unless staff hand them on first')
+    Yes '  and the request it writes for each server that holds something of theirs, and the list for the copy an install set aside' (
+        (Said 'release\s+1\s+live game server: private\\deleted-characters\.json, the request it takes at its next start') -and (Said 'release\s+1\s+dev game server: private\\deleted-characters\.json') -and
+        (Said 'release\s+1\s+live game server, set aside as Thornswood-Server\.prev-20261001-000000: private\\deleted-characters\.json'))
+    Yes '  and counts the merchant ledger as released, a supply wait and a commission promise, which the purse service lets go at the next start (#2652)' (Said 'release\s+2\s+live game server: places in private\\merchant-ledger\.json naming their character')
+    Yes '  and counts the trade ships'' manifest as released, which the trade ships block lets go at the next start (#511)' (Said 'release\s+1\s+live game server: places in private\\trade-cargo\.json naming their character')
+    Yes '  and says nothing of a register that names nobody of theirs' (-not (Said 'benches\.json') -and -not (Said 'deleted-characters\.json naming'))
+    if (-not (Said 'A real run stops nothing')) { Show }
+    Yes '  and says a real run stops nothing, and which services take the rest as they next start' (Said 'A real run stops nothing\. These take the rest out of their own files as each next starts: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
     Yes '  and never prints an address or what a record says' (-not (Said '203\.0\.113') -and -not (Said 'hello'))
 
     # ---- the real run -------------------------------------------------------------
     $c = Run (@('-DiscordId', $ME, '-Delete', '-By', 'Tester') + $roots)
     if ($c -ne 0) { Show }
-    Yes 'the real run ends 0 and says it is written down' ($c -eq 0 -and (Said 'DELETED, and written down in'))
+    Yes 'the real run ends 0 and says it is written down' ($c -eq 0 -and (Said 'RECORDED, and written down in'))
+    Yes '  and that it stopped nothing, and which services take the rest as they next start' (
+        (Said 'Nothing was stopped\. Each of these takes the rest out of its own files as it next starts: the site, the live game server, the dev game server, live voice, dev voice, the bot\.') -and
+        -not (Said '^stopped ') -and -not (Said '^started '))
+    Yes '  and the run says each chat day it asks to edit, with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 5 lines before, 3 after')
+
+    # ---- right after the run: no live file changed, the copies set aside did
+    $now = Hashes $Box
+    $liveFile = '^\\Thornswood-Docs\\(data|uploads)\\|^\\Thornswood-Server(-Dev)?\\world\\changeForms\\[^\\]+$|^\\Thornswood-Server(-Dev)?\\private\\(characters|mod-settings|take-limit|last-left)\.json$|^\\Thornswood-Voice(-Dev)?\\chat\\|^\\Thornswood-Bot\\data\\'
+    $changed = @($before.Keys | Where-Object { $_ -match $liveFile -and $now[$_] -ne $before[$_] })
+    foreach ($k in $changed) { Write-Host "        changed: $k" }
+    Yes 'no file a service writes while it runs was changed' ($changed.Count -eq 0)
+    $A = Join-Path $Site 'data-before-restore-20261001-010101'
+    Yes 'the copy of the site''s data a restore set aside loses them at once' ($null -eq (J (Join-Path $A 'linked.json')).$ME -and @(J (Join-Path $A 'signins.json')).Count -eq 0)
+    foreach ($R in $Live, $Dev) {
+        $CF = Join-Path $R 'world\changeForms'
+        Yes ((Split-Path -Leaf $R) + ': the copies a reset and a wipe set aside lose them at once, and the wipe''s card and the old last-left too') (
+            -not (Test-Path (Join-Path $CF '_discarded-20261002-000000\ff000a05.json')) -and -not (Test-Path (Join-Path $R 'world-before-20260930-000000\changeForms\ff000a06.json')) -and
+            $null -eq (J (Join-Path $R 'private\characters-before-20260930-000000.json')).who."$P1" -and $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1")
+    }
+    Yes 'the live server''s folder an install set aside loses their change form at once' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
+    $prevList = J (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\private\deleted-characters.json')
+    Yes '  and gets the list, so it lets go of them too if it is ever put back' ((@($prevList.actors) -join ',') -eq '4278192647' -and (@($prevList.profiles) -join ',') -eq "$P1")
+    $sr = J (Join-Path $Site 'data\deletion-requests.json')
+    Yes 'the site is asked: its request names them and their character' (@($sr.people).Count -eq 1 -and $sr.people[0].discordId -eq $ME -and (@($sr.people[0].profiles) -join ',') -eq "$P1")
+    foreach ($g in @(@{ R = $Live; Tag = 'live'; P = "$P1"; A = "$A1" }, @{ R = $Dev; Tag = 'dev'; P = "$P1,9999"; A = "$A1,4278199999" })) {
+        $list = J (Join-Path $g.R 'private\deleted-characters.json')
+        Yes ($g.Tag + ' game server is asked: its list names their profile and their character''s form id, never the shared one or a name, with nothing done') (
+            (@($list.profiles) -join ',') -eq $g.P -and (@($list.actors) -join ',') -eq $g.A -and $null -eq $list.done -and
+            (Get (Join-Path $g.R 'private\deleted-characters.json')) -notmatch 'Mine|5002')
+    }
+    $vr = J (Join-Path $Vl 'deletion-requests.json')
+    Yes 'live voice is asked, with the window of the session staff kept on it' (
+        $vr.people[0].discordId -eq $ME -and @($vr.kept).Count -eq 1 -and $vr.kept[0].profile -eq $P1 -and $vr.kept[0].from -eq 40000 -and $vr.kept[0].to -eq 260000)
+    Yes '  and dev voice is asked, with no window: that session was not on it' (@((J (Join-Path $Vd 'deletion-requests.json')).kept).Count -eq 0)
+    Yes 'the bot is asked' ((J (Join-Path $Bot 'data\deletion-requests.json')).people[0].discordId -eq $ME)
+    $afterDelete = Hashes $Box
+    $c = Run (@('-DiscordId', $ME) + $roots)
+    Yes 'a dry run now shows each service that still has the request waiting' (
+        $c -eq 0 -and (Said 'waiting\s+the site has a request for them it takes at its next start') -and (Said 'waiting\s+the live game server has a request') -and
+        (Said 'waiting\s+the dev game server has a request') -and (Said 'waiting\s+live voice has a request') -and (Said 'waiting\s+dev voice has a request') -and (Said 'waiting\s+the bot has a request'))
+
+    # ---- each service starts, the way it starts on the box
+    $node = (Get-Command node).Source
+    $writer = Join-Path $Repo 'scripts\vps\Server-Log.js'
+    foreach ($R in $Live, $Dev, $Vl, $Vd) {
+        Put (Join-Path $R 'exit.js') 'process.exit(0);'
+        Push-Location -LiteralPath $R
+        try { & $node $writer --log (Join-Path $R 'server.log') exit.js | Out-Null } finally { Pop-Location }
+        Remove-Item -LiteralPath (Join-Path $R 'exit.js') -Force
+    }
+    $logs = (Get (Join-Path $Live 'server.log')) + (Get (Join-Path $Vl 'server.log'))
+    Yes 'server-log.js took the game server''s and voice''s requests as each started, and said so with counts' (
+        $logs -match 'deletions: saves: characters 1, cards 1' -and $logs -match 'deletions: chat: chat lines 2' -and $logs -notmatch "$P1|$ME")
+    $driver = Join-Path $T 'site-start.js'
+    Put $driver @'
+const fs = require('fs'), path = require('path');
+const [repo, site] = process.argv.slice(2);
+const src = fs.readFileSync(path.join(repo, 'site', 'server.js'), 'utf8');
+const block = /\/\/ ==== thornswood deletion requests ====([\s\S]*?)\/\/ ==== end thornswood deletion requests ====/.exec(src)[1];
+const D = path.join(site, 'data'), FB = path.join(D, 'for-bot'), UP = path.join(site, 'uploads');
+const putJson = (p, o) => { try { fs.writeFileSync(p, JSON.stringify(o, null, 2)); return true; } catch (e) { return false; } };
+new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEMPTS', 'SESSIONS', 'SLOGS', 'TROUBLE_FILE', 'ROSTER', 'INBOX',
+  'GPENDING', 'GALLERY', 'GREPORTS', 'UPMETA', block + '\napplyDeletionRequests();')(fs, path, putJson, D, UP,
+  path.join(D, 'linked.json'), path.join(D, 'rules-accepted.json'), path.join(D, 'signins.json'), path.join(D, 'sessions.json'),
+  path.join(D, 'session-logs'), path.join(FB, 'trouble.json'), path.join(D, 'roster.json'), path.join(FB, 'inbox.json'),
+  path.join(D, 'gallery-pending.json'), path.join(D, 'gallery.json'), path.join(D, 'gallery-reports.json'), path.join(UP, 'uploads.json'));
+'@
+    $siteSaid = @(& $node $driver $Repo $Site 2>&1 | ForEach-Object { "$_" }) -join "`n"
+    Yes 'the site took its request as it started, and said so with counts' ($siteSaid -match 'deletion requests: 1 person\(s\): .*done, and the request is gone' -and -not (Test-Path (Join-Path $Site 'data\deletion-requests.json')))
+    # The bot needs Python 3.11 or newer and discord.py to be imported at all.
+    $pyExe = $null
+    foreach ($cand in @(@('py', '-3.12'), @('py', '-3.11'), @('python'))) {
+        if (-not (Get-Command $cand[0] -ErrorAction SilentlyContinue)) { continue }
+        $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { & $cand[0] @($cand | Select-Object -Skip 1) -c 'import sys, discord; sys.exit(0 if sys.version_info >= (3, 11) else 1)' 2>$null | Out-Null } finally { $ErrorActionPreference = $eap }
+        if ($LASTEXITCODE -eq 0) { $pyExe = $cand; break }
+    }
+    $botRan = $false
+    if ($pyExe) {
+        $env:THORNSWOOD_BOT_DATA = Join-Path $Bot 'data'
+        $env:DISCORD_TOKEN = 'not-a-real-token'
+        $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $botSaid = @(& $pyExe[0] @($pyExe | Select-Object -Skip 1) -c ('import sys; sys.path.insert(0, r"' + (Join-Path $Repo 'bot') + '"); import bot; bot.apply_deletion_requests()') 2>&1 | ForEach-Object { "$_" }) -join "`n" }
+        finally { $ErrorActionPreference = $eap; Remove-Item Env:\THORNSWOOD_BOT_DATA, Env:\DISCORD_TOKEN -ErrorAction SilentlyContinue }
+        $botRan = $true
+        Yes 'the bot took its request as it started, and said so with counts' ($botSaid -match 'join numbers 1, open tickets 1; done' -and -not (Test-Path (Join-Path $Bot 'data\deletion-requests.json')))
+    } else { Write-Host 'SKIP  the bot''s start: no Python 3.11 with discord.py here (bot\test-2758-deletion-requests.py runs it nightly)' }
+
     $D = Join-Path $Site 'data'
     $lk = J (Join-Path $D 'linked.json')
     Yes 'their Discord link is gone, the others stay' ($null -eq $lk.$ME -and $null -ne $lk.$YOU -and $null -ne $lk.$THEM)
@@ -292,8 +450,6 @@ try {
         $before['\Thornswood-Docs\data\pk.json'] -eq (Get-FileHash (Join-Path $D 'pk.json')).Hash -and
         $before['\Thornswood-Docs\data\gallery-reports.json'] -eq (Get-FileHash (Join-Path $D 'gallery-reports.json')).Hash -and
         $before['\Thornswood-Docs\data\for-bot\moderation.log'] -eq (Get-FileHash (Join-Path $D 'for-bot\moderation.log')).Hash)
-    $A = Join-Path $Site 'data-before-restore-20261001-010101'
-    Yes 'the copy of the site''s data a restore set aside loses them too' ($null -eq (J (Join-Path $A 'linked.json')).$ME -and @(J (Join-Path $A 'signins.json')).Count -eq 0)
 
     foreach ($g in @(@{ R = $Live; Tag = 'live' }, @{ R = $Dev; Tag = 'dev' })) {
         $R = $g.R; $tag = $g.Tag
@@ -307,25 +463,32 @@ try {
         Yes "$tag`: their mod menu choices, take counts and last-left time are gone" (
             $null -eq (J (Join-Path $PV 'mod-settings.json')).who."$P1" -and $null -ne (J (Join-Path $PV 'mod-settings.json')).who."$PY" -and
             $null -eq (J (Join-Path $PV 'take-limit.json')).counts."$P1|1a2b3" -and $null -ne (J (Join-Path $PV 'take-limit.json')).counts."$PY|1a2b3" -and
+            $null -eq (J (Join-Path $PV 'last-left.json'))."$P1" -and $null -ne (J (Join-Path $PV 'last-left.json'))."$PY" -and
             $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1" -and $null -ne (J (Join-Path $R 'data\last-left.json'))."$PY")
         $rel = $R.Substring($Box.Length)
-        Yes "$tag`: the property register, the staff log and the door log are as they were" (
-            $before["$rel\private\property.json"] -eq (Get-FileHash (Join-Path $PV 'property.json')).Hash -and
-            $before["$rel\private\moderation.log"] -eq (Get-FileHash (Join-Path $PV 'moderation.log')).Hash -and
-            $before["$rel\private\door.log"] -eq (Get-FileHash (Join-Path $PV 'door.log')).Hash)
+        $same = $true
+        foreach ($f in 'property.json', 'law.json', 'beds.json', 'farm-claims.json', 'embassy.json', 'books.json', 'dungeon-rewards-ledger.json', 'merchant-ledger.json', 'trade-cargo.json', 'benches.json', 'moderation.log', 'door.log') {
+            if ($before["$rel\private\$f"] -ne (Get-FileHash (Join-Path $PV $f)).Hash) { $same = $false; Write-Host "        changed: $tag private\$f" }
+        }
+        Yes "$tag`: every game register, the staff log and the door log are as they were (the game server lets go, not this)" $same
+        $list = J (Join-Path $PV 'deleted-characters.json')
+        Yes "$tag`: the list stays for the gamemode's registers, with the saves marked done" ($list.done.saves -gt 0 -and @($list.done.PSObject.Properties).Count -eq 1)
     }
-    Yes 'the live server''s folder an install set aside loses their change form too' (-not (Test-Path (Join-Path $Box 'Thornswood-Server.prev-20261001-000000\world\changeForms\ff000a07.json')))
+    $old = Join-Path $Box 'Thornswood-Server.prev-20260930-000000'
+    Yes 'an old copy with no private folder loses their discarded change form' (-not (Test-Path (Join-Path $old 'world-before-1\changeForms\_discarded-1\ff000a08.json')))
+    Yes '  and is given no list, and no private folder is made for one' (-not (Test-Path (Join-Path $old 'private')))
 
     $day = Get (Join-Path $Vl 'chat\2026-10-01.jsonl')
-    Yes 'their chat lines are gone from the day, the other lines stay byte for byte' (
-        $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
+    Yes 'their chat lines are gone from the day, the other lines and the one in the kept session stay byte for byte' (
+        $day -eq ('{"at":2,"kind":"say","profileId":' + $PY + ',"name":"Yours","text":"hi"}' + "`n" + '{"at":150000,"kind":"say","profileId":' + $P1 + ',"name":"Mine","text":"kept"}' + "`n" + '{"at":3,"kind":"say","profileId":' + $P2 + ',"name":"Shared","text":"hey"}' + "`n"))
     Yes '  a day with none of theirs is not touched' ($before['\Thornswood-Voice\chat\2026-10-02.jsonl'] -eq (Get-FileHash (Join-Path $Vl 'chat\2026-10-02.jsonl')).Hash)
     Yes '  and a dev day of only theirs is left empty, not deleted' ((Get (Join-Path $Vd 'chat\2026-10-01.jsonl')) -eq '')
-    Yes '  and the run says each edited day with its line count before and after' (Said 'chat\s+live 2026-10-01\.jsonl: 4 lines before, 2 after')
-    $jn = J (Join-Path $Bot 'data\joins.json')
-    Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)
-    $ot = J (Join-Path $Bot 'data\open-tickets.json')
-    Yes 'their open ticket is forgotten' ($null -eq $ot."900:$ME" -and $null -ne $ot."900:$YOU")
+    if ($botRan) {
+        $jn = J (Join-Path $Bot 'data\joins.json')
+        Yes 'their join number is gone and the last number given out stays' ($null -eq $jn.'900'.members.$ME -and $jn.'900'.members.$YOU -eq 40 -and $jn.'900'.last -eq 40)
+        $ot = J (Join-Path $Bot 'data\open-tickets.json')
+        Yes 'their open ticket is forgotten' ($null -eq $ot."900:$ME" -and $null -ne $ot."900:$YOU")
+    }
 
     # ---- the record ---------------------------------------------------------------
     $recFile = Join-Path $Rec 'requests.jsonl'
@@ -334,17 +497,24 @@ try {
     if ($lines.Count -eq 1) {
         $row = $lines[0] | ConvertFrom-Json
         Yes '  with the Discord id, the character, who ran it and when' ($row.discordId -eq $ME -and (@($row.profiles) -join ',') -eq "$P1" -and $row.by -eq 'Tester' -and $lines[0] -match '"at":"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z"')
-        Yes '  and the counts, with each edited chat day' ($row.removed.'site: Discord link' -eq 1 -and @($row.chat).Count -ge 2)
+        Yes '  and the counts, with each chat day, and the services it asked' (
+            $row.removes.'site: Discord link' -eq 1 -and @($row.chat).Count -ge 2 -and (@($row.asked) -join ',') -eq 'site,server:live,server:dev,voice:live,voice:dev,bot')
         Yes '  and no name, no address and nothing a record said' ($lines[0] -notmatch '203\.0\.113' -and $lines[0] -notmatch 'hello' -and $lines[0] -notmatch '"Me"' -and $lines[0] -notmatch 'Mine')
     }
     $acl = Get-Acl -LiteralPath $Rec
     $who = @($acl.Access | ForEach-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value })
     $mySid = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    Yes 'the record''s folder inherits nothing and lets in only SYSTEM, Administrators and whoever made it' (
-        $acl.AreAccessRulesProtected -and @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $mySid) -notcontains $_ }).Count -eq 0)
+    Yes 'the record''s folder inherits nothing and lets in only SYSTEM, Administrators, whoever made it and the nightly backup' (
+        $acl.AreAccessRulesProtected -and @($who | Where-Object { @('S-1-5-18', 'S-1-5-32-544', $mySid, $BackupSid) -notcontains $_ }).Count -eq 0)
+    if ($BackupSid) {
+        $read = @($acl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq $BackupSid })
+        Yes '  and the nightly backup''s task may read it, and do nothing more (#2833)' (
+            $read.Count -eq 1 -and $read[0].AccessControlType -eq 'Allow' -and
+            ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [Security.AccessControl.FileSystemRights]::ReadAndExecute -and
+            ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::Write) -eq 0)
+    } else { Write-Host ('SKIP  the nightly backup''s read on the folder: no Thornswood Backup task here (the VPS runners have one)') }
 
     # ---- a restore, and the reapply -------------------------------------------------
-    $after = Hashes $Box
     Build
     $c = Run (@('-Reapply') + $roots)
     if ($c -ne 0 -or -not (Said 'DRY RUN')) { Show }
@@ -352,7 +522,7 @@ try {
     Yes '  and changed nothing' (Same $before (Hashes $Box))
     $c = Run (@('-Reapply', '-Delete') + $roots)
     if ($c -ne 0) { Show }
-    Yes '-Reapply -Delete removes it all again' ($c -eq 0 -and (Said 'REAPPLIED') -and (Same $after (Hashes $Box)))
+    Yes '-Reapply -Delete removes it all again from the copies and asks every service again, exactly as the request did' ($c -eq 0 -and (Said 'REAPPLIED') -and (Same $afterDelete (Hashes $Box)))
     Yes '  and adds no line to the record' (@([IO.File]::ReadAllLines($recFile) | Where-Object { $_.Trim() }).Count -eq 1)
     $c = Run (@('-Reapply', '-DiscordId', $ME) + $roots)
     Yes '-Reapply with a Discord id is refused' ($c -eq 1 -and (Said 'REFUSED: -Reapply takes every request in the record'))
@@ -362,9 +532,9 @@ try {
     Put $other ('{"at":"2026-10-02T00:00:00Z","discordId":"' + $THEM + '","profiles":[' + $PT + '],"by":"Tester"}' + "`n")
     $c = Run (@('-Reapply', '-Delete', '-Merge', $other) + $roots)
     if ($c -ne 0) { Show }
-    Yes '-Merge adds the request the box''s record did not have, and removes that person too' (
-        $c -eq 0 -and (Said 'merged\s+1 request') -and $null -eq (J (Join-Path $Site 'data\linked.json')).$THEM -and
-        -not (Test-Path (Join-Path $Live 'world\changeForms\ff000a04.json')) -and @([IO.File]::ReadAllLines($recFile) | Where-Object { $_.Trim() }).Count -eq 2)
+    Yes '-Merge adds the request the box''s record did not have, and asks for that person too' (
+        $c -eq 0 -and (Said 'merged\s+1 request') -and @((J (Join-Path $Site 'data\deletion-requests.json')).people | Where-Object { $_.discordId -eq $THEM }).Count -eq 1 -and
+        @((J (Join-Path $Live 'private\deleted-characters.json')).profiles) -contains $PT -and @([IO.File]::ReadAllLines($recFile) | Where-Object { $_.Trim() }).Count -eq 2)
     $c = Run (@('-Reapply', '-Delete', '-Merge', $other) + $roots)
     Yes '  and merging the same copy again adds nothing' ($c -eq 0 -and -not (Said 'merged') -and @([IO.File]::ReadAllLines($recFile) | Where-Object { $_.Trim() }).Count -eq 2)
     Put $other "not json`n"

@@ -329,10 +329,14 @@ $stageDir = Join-Path $Root $Stage
 $sp = Join-Path $stageDir 'server-settings.json'
 $run = $null
 $rel = $null
-try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-try { $rel = [IO.File]::ReadAllText($sp) | ConvertFrom-Json } catch { }
-if ($null -eq $run -or $null -eq $rel) {
+$unread = @()
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the settings the server runs on: ' + $_.Exception.Message) }
+try { $rel = [IO.File]::ReadAllText($sp) | ConvertFrom-Json } catch { $unread += ('the settings sent: ' + $_.Exception.Message) }
+if (-not $unread.Count -and $null -eq $run) { $unread += 'the settings the server runs on: the file is empty' }
+if (-not $unread.Count -and $null -eq $rel) { $unread += 'the settings sent: the file is empty' }
+if ($unread.Count) {
   'the settings the server runs on, or the ones sent, cannot be read, so nothing can be carried across'
+  foreach ($u in $unread) { '  ' + $u }
   Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
   'the stage is cleared and the server was not touched'
   'CARRY REFUSED'
@@ -386,8 +390,10 @@ if ($has -ne $WantRecord) {
            ', the commit ' + $WantRecord.Substring(0, 12) + '), so the server build running here is not the one this gamemode was committed with')
 }
 $run = $null
-try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-if ($null -eq $run) { $why += 'the settings the server runs on cannot be read' }
+$runWhy = ''
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $runWhy = $_.Exception.Message }
+if (-not $runWhy -and $null -eq $run) { $runWhy = 'the file is empty' }
+if ($runWhy) { $why += ('the settings the server runs on cannot be read: ' + $runWhy) }
 else {
   $passWhy = Get-ThornswoodPassSwitchProblem $run
   if ($passWhy) { $why += $passWhy }
@@ -433,8 +439,10 @@ if ($has -ne $WasRecord) {
            $WasRecord.Substring(0, [Math]::Min(12, $WasRecord.Length)) + '), so another deploy ran in between; run this again to deploy over what is there now')
 }
 $run = $null
-try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-if ($null -eq $run) { $why += 'the settings the server runs on cannot be read' }
+$runWhy = ''
+try { $run = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $runWhy = $_.Exception.Message }
+if (-not $runWhy -and $null -eq $run) { $runWhy = 'the file is empty' }
+if ($runWhy) { $why += ('the settings the server runs on cannot be read: ' + $runWhy) }
 else {
   $passWhy = Get-ThornswoodPassSwitchProblem $run
   if ($passWhy) { $why += $passWhy }

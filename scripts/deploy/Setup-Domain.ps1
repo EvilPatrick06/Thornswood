@@ -48,7 +48,10 @@ param(
   # exist, so changing the settings above in this file does nothing at all to
   # a box that is already set up, and running the whole script to fix a task
   # redoes the certificate and the firewall for no reason.
-  [switch]$TaskOnly
+  [switch]$TaskOnly,
+  # Register Thornswood Web as SYSTEM, Highest, the way it was before #2578,
+  # and grant nothing. The way back if Caddy will not run as LOCAL SERVICE.
+  [switch]$AsSystem
 )
 
 $ErrorActionPreference = 'Stop'
@@ -63,17 +66,21 @@ function Remote($script) {
 # ------------------------------------------------------------------- dns --
 if (-not $SkipDnsCheck -and -not $TaskOnly) {
   Write-Host "Checking where $Domain points..."
+  # A name with no record yet is an error from Resolve-DnsName, as is a DNS
+  # server that cannot be reached; what it said goes into the stop.
   $ips = @()
+  $dnsSaid = @()
   foreach ($name in @($Domain, "www.$Domain")) {
     try {
       $ips += (Resolve-DnsName $name -Type A -ErrorAction Stop |
                Where-Object { $_.IPAddress }).IPAddress
-    } catch { }
+    } catch { $dnsSaid += ($name + ': ' + $_.Exception.Message) }
   }
   $ips = $ips | Sort-Object -Unique
   if (-not $ips) {
-    throw "$Domain does not resolve yet. Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour."
+    throw ("$Domain does not resolve yet" + $(if ($dnsSaid.Count) { " (" + ($dnsSaid -join ' | ') + ")" } else { "" }) + ". Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour.")
   }
+  foreach ($d in $dnsSaid) { Write-Host ("  " + $d) -ForegroundColor Yellow }
   if ($ips -notcontains $Vps) {
     throw "$Domain resolves to $($ips -join ', ') and not $Vps. Fix the A record first."
   }
@@ -93,6 +100,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
+. (Join-Path $Here 'ServiceAccount.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -117,7 +125,7 @@ if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The si
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
 if ($Domain -ne 'thornswood.net') { $caddyfile = $caddyfile.Replace('thornswood.net', $Domain) }
 if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email }) }
-foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'reverse_proxy 127.0.0.1:3001')) {
+foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'handle_path /box/*', 'reverse_proxy 127.0.0.1:3001')) {
   if ($caddyfile.IndexOf($need) -lt 0) { throw "scripts\deploy\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
 }
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
@@ -151,7 +159,7 @@ if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
   # The pin is for a fresh box. One that already has caddy keeps it, and says
   # which it is, so a box on some other version is plain to see.
   `$have = 'a version it would not say'
-  try { `$have = ((& (Join-Path `$dir 'caddy.exe') version) -join ' ').Trim() } catch { }
+  try { `$have = ((& (Join-Path `$dir 'caddy.exe') version) -join ' ').Trim() } catch { `$have = 'a version it would not say (' + (`$_.Exception.Message -replace '\s+', ' ') + ')' }
   'caddy already here, ' + `$have + '. A fresh box gets $CaddyVersion.'
 }
 
@@ -213,6 +221,33 @@ Remote @"
 `$dir = '$caddyWin'
 `$exe = Join-Path `$dir 'caddy.exe'
 
+# The account Caddy runs as (#2578, ServiceAccount.ps1). The fail-safe comes
+# before Caddy is stopped: it goes onto LOCAL SERVICE only where LOCAL SERVICE
+# can read none of what no service may.
+$(Get-ThornswoodServiceAccountScript)
+`$asSystem = [bool]$([int][bool]$AsSystem)
+if (-not `$asSystem) {
+  `$cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach))
+  if (`$cannot.Count) {
+    'LOCAL SERVICE could read what no service may, so Caddy is not moved onto it:'
+    `$cannot
+    'Lock those (scripts\vps\Lock-VpsFolders.ps1), or pass -AsSystem. Caddy was not stopped or changed.'
+    exit 1
+  }
+}
+
+# Caddy keeps its certificates and ACME account in data beside it (the
+# Caddyfile's storage line, #2578), not in the profile of whichever account
+# runs it, so they are the same under SYSTEM and LOCAL SERVICE. What it kept
+# as SYSTEM is copied in once, so the move does not ask Let's Encrypt again.
+`$data = Join-Path `$dir 'data'
+if (-not (Test-Path -LiteralPath `$data)) { `$null = New-Item -ItemType Directory -Path `$data -Force }
+`$kept = Join-Path `$env:SystemRoot 'System32\config\systemprofile\AppData\Roaming\Caddy'
+if ((Test-Path -LiteralPath `$kept) -and -not (Test-Path -LiteralPath (Join-Path `$data 'certificates'))) {
+  Copy-Item -Path (Join-Path `$kept '*') -Destination `$data -Recurse -Force
+  'copied what Caddy kept as SYSTEM into ' + `$data
+}
+
 Stop-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue
 Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinue
 
@@ -260,9 +295,12 @@ Get-Process caddy -EA SilentlyContinue | Stop-Process -Force -EA SilentlyContinu
       -ExecutionTimeLimit ([TimeSpan]::Zero) -StartWhenAvailable ``
       -MultipleInstances IgnoreNew -Priority 4
 
+# LOCAL SERVICE, Limited, with a SID of its own (#2578); -AsSystem is SYSTEM,
+# Highest, as it was. Given on an existing task too, for the reason below.
+`$who = New-ThornswoodServicePrincipal -AsSystem:`$asSystem
 if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
   Register-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
-    -Settings `$s -RunLevel Highest -User 'SYSTEM' | Out-Null
+    -Settings `$s -Principal `$who | Out-Null
   'scheduled task created'
 } else {
   # -Trigger and -Settings as well as -Action. An existing task keeps whatever
@@ -270,8 +308,24 @@ if (-not (Get-ScheduledTask -TaskName 'Thornswood Web' -EA SilentlyContinue)) {
   # a three day limit through every run of this script that was meant to change
   # them. Deploy-Docs.ps1 learned the same thing on its own task.
   Set-ScheduledTask -TaskName 'Thornswood Web' -Action `$a -Trigger @(`$boot, `$again) ``
-    -Settings `$s | Out-Null
+    -Settings `$s -Principal `$who | Out-Null
   'scheduled task updated'
+}
+# Read and run in the Caddy folder, change only data (ServiceAccount.ps1).
+# Back on SYSTEM when the SID cannot be looked up or the grants cannot be
+# written, rather than a Caddy that cannot keep its certificates.
+if (-not `$asSystem) {
+  `$why = ''
+  `$sid = Get-ThornswoodTaskSid 'Thornswood Web'
+  if (-not `$sid) { `$why = 'the task SID NT TASK\Thornswood Web could not be looked up' }
+  else {
+    try { Grant-ThornswoodServiceFolder -Root `$dir -Sid `$sid -Writable 'data' }
+    catch { `$why = 'its folder could not be granted to it: ' + `$_.Exception.Message }
+  }
+  if (`$why) {
+    `$why + ', so the task goes back on SYSTEM'
+    Set-ScheduledTask -TaskName 'Thornswood Web' -Principal (New-ThornswoodServicePrincipal -AsSystem) | Out-Null
+  } else { 'the task runs as LOCAL SERVICE, Limited, as NT TASK\Thornswood Web' }
 }
 
 # Read back rather than assumed. Set-ScheduledTask is quiet about settings it

@@ -67,8 +67,14 @@ foreach ($rev in 0, 1, 2, 3, 99) {
     Yes "a mesh shaped like the old board is not held at revision $rev" (-not (Test-ShipHeld $board $rev))
     Yes "  and does not ship at revision $rev" (Test-ShipNotOurs $board $rev)
 }
-Yes 'the new board and its drop box are ours at every revision' (
-    -not (Test-ShipNotOurs 'Data\meshes\thornswood\noticeboard01.nif' 2) -and -not (Test-ShipNotOurs 'Data\meshes\thornswood\dropbox01.nif' 99))
+# Since #2827 the board and its drop box are made on each machine from its own
+# game and never ship: they are never held for the collection either.
+foreach ($rev in 2, 99) {
+    Yes "the new board and its drop box are made from the game, never shipped nor held, at revision $rev" (
+        (Test-ShipMadeFromGame 'Data\meshes\thornswood\noticeboard01.nif') -and (Test-ShipMadeFromGame 'Data\meshes\thornswood\dropbox01.nif') -and
+        -not (Test-ShipHeld 'Data\meshes\thornswood\noticeboard01.nif' $rev) -and -not (Test-ShipHeld 'Data\meshes\thornswood\dropbox01.nif' $rev) -and
+        -not (Test-ShipOurs 'Data\meshes\thornswood\noticeboard01.nif') -and -not (Test-ShipOurs 'Data\meshes\thornswood\dropbox01.nif'))
+}
 
 # ---- plugins built here --------------------------------------------------------
 function Sub([string]$tag, [byte[]]$body) {

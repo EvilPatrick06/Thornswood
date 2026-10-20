@@ -20,7 +20,7 @@
 // take through.
 //
 // It drives the REAL guard() and the REAL watchers out of gamemode.js over a
-// fake mp, the way test-coffers.js drives putIn. Where the fork is on this
+// fake mp. Where the fork is on this
 // machine it also checks the list against the fork itself; on a machine
 // without it those checks say SKIP.
 //
@@ -69,10 +69,11 @@ function liftThrough(from, anchor, to) {
   return c < 0 ? null : src.slice(a, c + to.length);
 }
 
-// The eleven events with a fixed name, read out of
-// skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September.
+// The twelve events with a fixed name: eleven read out of
+// skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September, and
+// onSpellCast, which skymp #86 added for Overcharge (#2848).
 const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onEatItem',
-                'onPutItem', 'onReadBook', 'onRespawn', 'onTakeItem',
+                'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
 // The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
 // of these. They are the server half of the fork's event list,
@@ -172,7 +173,7 @@ if (handlersSrc !== null) {
 // ---------------------------------------------------------------- the list --
 
 if (listSrc !== null) {
-  yes('the list names all eleven events with a fixed name',
+  yes('the list names all twelve events with a fixed name',
       EVENTS.every(function (e) { return listSrc.indexOf(e) !== -1; }));
   yes('the list names the Papyrus family by the name the engine looks up',
       listSrc.indexOf("mp['" + PAPYRUS_PREFIX + "<Name>']") !== -1);
@@ -304,7 +305,7 @@ if (getNames === null) {
     if (lit) { literal.push(lit[1]); } else { runtime.push(g); }
   });
   literal.sort();
-  yes('the eleven fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
+  yes('the twelve fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
       JSON.stringify(literal) === JSON.stringify(EVENTS.slice().sort()));
 
   // The two families whose name is built when they fire, each checked by what
@@ -537,17 +538,22 @@ if (guardSrc !== null && auditSrc !== null) {
     yes('T3 it names the body by reference and base', l.indexOf('from 0x1a2b3 (1e7d5:Skyrim.esm)') !== -1);
   }
 
-  // T4: a hold's box, which is money a steward will ask about.
+  // T4: a chest a steward once marked as a hold's box. The marking is
+  //     retired (#2298, Patrick, 15 Oct): it is an ordinary chest, and the
+  //     line names it by reference and base like any other, never as a hold's.
   {
     const w = world({ prop: whiterunBox });
     const out = w.take(BOX, ALICE, GOLD, 100);
-    yes('T4 a take from a hold\'s box goes through', out === undefined);
-    yes('T4 and names the hold', (w.lines[0] || '').indexOf('from whiterun\'s box 0xaaaa') !== -1);
+    yes('T4 a take from a chest that was a hold\'s box goes through', out === undefined);
+    yes('T4 and names it as a chest, never as a hold\'s box',
+        (w.lines[0] || '').indexOf('from 0xaaaa (d9f2:Skyrim.esm)') !== -1 &&
+        (w.lines[0] || '').indexOf('box') === -1);
   }
 
-  // T5: the property block missing, or throwing, changes nothing but the line.
+  // T5: the property block missing, or throwing, changes nothing: the audit
+  //     line asks it nothing since #2298.
   {
-    const w = world({ prop: { holdOfBox: function () { throw new Error('boxes not loaded'); } } });
+    const w = world({ prop: { holdOfBox: function () { throw new Error('the audit asked about a marked box'); } } });
     const out = w.take(BOX, ALICE, GOLD, 100);
     yes('T5 a property block that throws still lets the take through', out === undefined);
     yes('T5 and the take is still logged', w.lines.length === 1 && w.errors.length === 0);

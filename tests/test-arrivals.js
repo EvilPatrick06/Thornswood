@@ -1,7 +1,11 @@
 // test-arrivals.js
 //
-// Where a new character arrives in each of the nine inns, and whether that
-// point is in the room.
+// Each of the nine inn spots, and whether that point is in the room.
+//
+// Since #2622 a new character arrives at the town's start spot
+// (test-2622-start-spots.js checks those), and the inn spot is where staff's
+// /tp <town> inn lands; Djinn re-marked three of them on 17 Oct because the
+// old ones were too close to the door. Everything below still holds for them.
 //
 // WHY THIS EXISTS. Entry 161: "Four of the nine starting towns use
 // hand-written arrival points, and the shipped config says one of them puts

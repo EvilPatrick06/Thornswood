@@ -60,7 +60,7 @@ const HERE = __dirname;
 // that string is the only way to tell from outside which copy is running. It
 // stayed at owners-5 across the chat log going in on 22 September, so the
 // health check answered identically before and after and proved nothing.
-const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1';
+const BUILD = 'cull-1-command-ack-1-chat-limit-1-chat-local-1-turn-key-1-backpressure-1-keepalive-2-moved-1-deploy-1-line-close-1-head-1-hush-1-auth-on-1-owns-limit-1-masked-1-relay-shapes-1-origin-1-doors-1-ice-relay-1-proxied-1-token-once-1-tls-only-1-ice-socket-1-no-page-1-most-1-roster-once-1-long-command-1-captions-2-line-log-1-own-reports-1';
 
 // ==== thornswood deploy record ====
 // Which commit this copy came from (#459): Install-Voice.ps1 leaves the deploy
@@ -149,7 +149,7 @@ function owns(ticket, profileId, then) {
         if (size > OWNS_REPLY_MAX) {
           console.log('[voice] the site\'s answer to the ownership check passed ' + OWNS_REPLY_MAX +
                       ' bytes, so the rest was not read');
-          try { req2.destroy(); } catch (e) { }
+          req2.destroy();
           finish('unchecked');
           return;
         }
@@ -164,7 +164,7 @@ function owns(ticket, profileId, then) {
     });
   } catch (e) { finish('unchecked'); return; }
 
-  late = setTimeout(() => { try { req2.destroy(); } catch (e) { } finish('unchecked'); }, OWNS_WAIT_MS);
+  late = setTimeout(() => { req2.destroy(); finish('unchecked'); }, OWNS_WAIT_MS);
   req2.on('error', () => finish('unchecked'));
   req2.write(payload);
   req2.end();
@@ -228,11 +228,18 @@ const COMMAND_REFUSED_EVERY_MS = 10000;
   and a backslash sent as two characters each and a colon in the title as
   two, so a job at its longest is about 1,350. A command cut at 400 lost
   the end of the body without a word, and the gamemode, which checks the
-  lengths, could never see what was missing. 2,000 covers it; the queue
-  still holds at most COMMAND_CAP of them.
+  lengths, could never see what was missing.
+
+  The longest command is a journal page (#2563): "/journal page " (14), two
+  ids of about 12 each, a title of up to 60, " :: " (4) and a page of up to
+  SOCIAL.pageChars (4,000) with every newline sent as two characters, so
+  8,000 at worst. 2,000 cut any page past about 1,900 without a word. 8,200
+  carries the longest page whole (tests/test-2563-journal-length.js holds the
+  sum to this number); the queue still holds at most COMMAND_CAP of them, so
+  about 1.6 MB at the very most.
 */
 const SAID_CHARS = 400;
-const COMMAND_CHARS = 2000;
+const COMMAND_CHARS = 8200;
 
 // What the gamemode is handed. The offer count is this service's business.
 // proven says this connection's join token checked out, which the gamemode's
@@ -311,13 +318,14 @@ function silencedLeft(profileId, now) {
 
 /* Staff silence is a moderation tool, so every connection is told, including
    people who are not in earshot: a connection opened earlier still carries
-   sound until the microphone is closed and the listener's level is nothing. */
+   sound until the microphone is closed and the listener's level is nothing.
+   Sock.send does not throw: a write that fails closes that connection, and
+   whoever reconnects is told their own hush at join (onJoin), so nobody is
+   left unhushed by a failed send. */
 function tellHush(profileId, on) {
   const msg = { t: 'hush', profileId: Number(profileId) || 0, on: !!on };
   if (!msg.profileId) return;
-  for (const [, p] of peers) {
-    try { p.ws.send(msg); } catch (e) { }
-  }
+  for (const [, p] of peers) p.ws.send(msg);
 }
 
 function sweepSilenced(now) {
@@ -353,6 +361,10 @@ function sweepSilenced(now) {
  * SLASH COMMANDS ARE KEPT TOO. They are queued for the game server rather
  * than broadcast, so nobody else sees them, but somebody typed them and
  * "what did they run" is the same kind of question as "what did they say".
+ * So is a line a key or a panel sent for somebody, kept as a key press
+ * (#2251). The front plugin's own reports are not kept: nobody typed or
+ * pressed them, and they were most of every day's file (#2723, see
+ * pluginReport below).
  */
 const CHAT_DIR = process.env.THORNSWOOD_CHAT_DIR || path.join(HERE, 'chat');
 const CHAT_DAYS = Number(process.env.THORNSWOOD_CHAT_DAYS || 365);
@@ -392,14 +404,102 @@ function chatWrite(kind, peerId, me, text, via) {
   }
 }
 
+/* THE FRONT PLUGIN'S OWN REPORTS ARE NOT WRITTEN (#2723).
+
+   Measured 18 Oct on the box: the dev chat log for 17 Oct had 444 lines and
+   every one was a command line, most of them the front plugin telling the
+   game server what only the client can see (docs\systems\commands.md, "Lines
+   the game sends itself"): /place 130, /joinpass 102, /loadorderlight and
+   /loadorder 42 each, /afk 33, /pick 33, /party 24. Nobody typed or pressed
+   any of them. They go on a change or a timer (the pass every minute, the
+   load order every two minutes, /place whenever the weather or the roof
+   changes, /afk active while somebody is at the keys, /racemenu every minute
+   while the race menu is up) or as a panel opens and asks for its view
+   (/pick refresh, /party refresh, /trade refresh). The game server reads
+   them as reports and answers most with nothing. The chat log is for what
+   somebody said, typed or pressed, so staff reading it for a report read
+   that and not the client.
+
+   WHAT DECIDES IT. The line's whole text has to be one of the shapes below,
+   each exactly what thornswood-front.js builds, and the line has to come
+   with press, which the chat page sets only on the plugin's own lines and a
+   key's (thornswood-chat.js, say with auto). Neither alone is enough. press
+   is the client's word and anybody with a console can put it on any line, so
+   on its own it would let somebody keep a typed /tp out of the log; here it
+   only ever leaves out a line that is a report by its shape, which the game
+   server takes the same way whoever sent it. A report shape typed into the
+   chat box comes with no press, so it is written: somebody typed it.
+   tests\test-2723-plugin-reports.js holds this list to the plugin's own
+   send sites, so a report added there without a shape here fails the build.
+
+   A report is still queued for the game server like every other line: this
+   decides the chat log and nothing else. What stays written of the plugin's
+   lines: the keys' and E's (/lock, /key, /moldhere, /plot, /ride e,
+   /merchant e, /repair, /treat), the K panel's picks (/pick <what>), the
+   "I am still here" button (/afk here), and the wait in line (#1131):
+   the /line that starts it, /afk out, /line leave and /line hand. */
+const PLUGIN_REPORTS = [
+  /^\/joinpass jp1\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/,
+  /^\/place (?:outdoors|water|shallow|indoors|snow|rain) (?:[0-9a-f]+|-) [01] [01] -?\d+ (?:\d+|-)$/,
+  /^\/loadorder(?:light)? \d+ \d+ (?:[0-9a-f]{5})*$/,
+  /^\/afk active$/,
+  /^\/(?:pick|party|trade) refresh$/,
+  /^\/racemenu$/,
+  /^\/racedown$/,
+  /^\/face done$/,
+  /^\/burn [01]$/,
+  /^\/chopped$/,
+  /^\/ate [0-9a-f]+$/,
+  /^\/rest (?:bed|sit|up)$/,
+  /^\/tspicks \d+$/,
+  /^\/tspicked [0-9a-f]+$/,
+  /^\/modset(?: [A-Za-z0-9_]+=-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)+$/
+];
+function pluginReport(text) {
+  for (const shape of PLUGIN_REPORTS) { if (shape.test(text)) return true; }
+  return false;
+}
+
+/* WHAT A SLASH LINE WRITES TO THE CHAT LOG, or '' for nothing (#1131, #2723).
+
+   press is true for a line the chat page sent with press. A report the
+   front plugin makes by itself writes nothing; see PLUGIN_REPORTS above.
+
+   A join pass is good for ten minutes to whoever holds it, so the log keeps
+   that one was sent and never the pass itself (#937).
+
+   A bare "/line" from a connection that is already waiting writes nothing.
+   That "/line" is not something a person typed: the menu's front plugin says
+   it every ten seconds while somebody waits for a seat (every two for the
+   first twenty), so the gamemode keeps the place and a menu can ask again
+   after this service restarts. It was written every time, about six lines a
+   minute for each person waiting and seven thousand an hour for twenty, and
+   staff reading the log for a report scrolled past them. The connection's
+   own waiting mark (me.inLine, set by lineMark after this is asked) already
+   says whether it is waiting, so the "/line" that starts the wait is written,
+   and so is the first one after "/line leave", on a new connection, or after
+   this service restarts. "/line leave" ends the wait and "/line hand" gives
+   the place away; each is said once and written once, like every other
+   command. Every "/line" still goes to the game server: this decides the log
+   and nothing else. */
+function commandLogText(me, text, press) {
+  if (press === true && pluginReport(text)) return '';
+  if (/^\/joinpass\b/i.test(text)) return '/joinpass [pass]';
+  if (/^\/line\s*$/i.test(text) && me && me.inLine) return '';
+  return text;
+}
+
 /* Whole days go, never lines out of a day, so a file is either all there or
    not there at all and nobody has to wonder whether it was edited. */
 /* A DAY THAT WILL NOT GO IS SAID (#2191). A failed delete used to be dropped
    silently, so a locked or protected day could outlive CHAT_DAYS with nobody
    told. Now each failure is a structured line (the file's name and the error
    code, never what it holds), a day that has failed CHAT_PRUNE_ALERT passes
-   in a row says ALERT, /health counts the days past their time, and while
-   any is overdue the prune is tried again every hour, not every six. */
+   in a row says ALERT, and /health counts the days past their time.
+   EVERY HOUR (#2166). The privacy page says the site checks every hour and
+   that chat ages the same way; this ran every six hours and hourly only while
+   a day was overdue, so a day could sit up to six hours past its window. It
+   now runs at start and then every hour, overdue or not. */
 const CHAT_PRUNE_ALERT = 3;
 const chatPruneFailures = {};   // file name -> passes in a row it would not go
 let chatOverdue = 0;
@@ -439,7 +539,7 @@ function chatPrune() {
   }
   chatOverdue = overdue;
   clearTimeout(chatPruneTimer);
-  chatPruneTimer = setTimeout(chatPrune, (overdue || chatPruneError) ? 3600000 : 6 * 3600000);
+  chatPruneTimer = setTimeout(chatPrune, 3600000);
 }
 chatPrune();
 
@@ -561,6 +661,158 @@ function hearers(myId, me, reach) {
   return { to: to, placed: !!mine };
 }
 
+/* ------------------------------------------------------------- captions ---
+ *
+ * WHAT SOMEBODY SAYS ON VOICE, AS WORDS ABOVE THEIR HEAD (#2475). Patrick,
+ * 12 Oct: "so it's not only just chat but also what players say".
+ *
+ * The audio never comes here (it goes between people's machines), so the
+ * words are made on the speaker's own machine and only the text comes
+ * here, as { t: 'caption', text }. This decides who sees it and nothing
+ * else: it does not make words out of anything, and it does not keep them.
+ *
+ * OFF UNLESS THORNSWOOD_CAPTIONS IS on. Nothing sends a caption yet, and the
+ * decisions on #2475 (where the words are made, whether they are kept,
+ * whether they also go in the chat box) are still open there, so a service started
+ * without the setting drops every caption, and /health says which it is.
+ *
+ * NOBODY'S VOICE IS SHOWN UNLESS THEY SAID SO. A person's captions go out
+ * only after one of their connections has sent { t: 'captions', share: true }.
+ * { see: false } stops them being sent anybody else's. Both are kept for
+ * the profile, not the connection, because the launcher's voice page and the
+ * game's chat each hold one, and both are forgotten when the last of them
+ * closes, so every session starts from what the client says, never from
+ * what this process remembers.
+ *
+ * WHO SEES IT is who could hear it: the same cell, and the reach of the
+ * voice mode the speaker is in (headlines.captionReach: 7, 30 or 85 metres,
+ * as the speaking mark). No fresh position for the speaker is nobody but
+ * themselves, never everybody, unlike a typed line when the feed is down:
+ * a caption is somebody's voice, and voice is never worldwide. The speaker's
+ * own connections always get it, so they can see what was made of them.
+ * A listener who turned the speaker's text off gets none of theirs.
+ *
+ * ONLY WHILE THEY ARE TALKING: the talk key down, or up for less than
+ * CAPTION_TAIL_MS, which is how long the words for the last thing said can
+ * take to come. Staff silence drops them, as it closes the microphone. A
+ * caption at any other time did not come from a voice, so it goes nowhere.
+ *
+ * NOT IN THE CHAT LOG, and not in the service log. Whether voice words are
+ * kept is one of the open decisions; until it is made, they are not.
+ *
+ * Three at once, then one a second, per connection: a sentence is one
+ * caption, and the bucket only stops a machine that sends them as fast as
+ * it can.
+ *
+ * EVERY NUMBER IS A SETTING, with these as the defaults, so the server's
+ * staff tune it without a release:
+ *   THORNSWOOD_CAPTION_TAIL_MS    how long after the key comes up words still go (2000)
+ *   THORNSWOOD_CAPTION_BURST      how many at once (3)
+ *   THORNSWOOD_CAPTION_REFILL_MS  how often one more is earned (1000)
+ *   THORNSWOOD_CAPTION_REACH      the furthest a caption goes, in units, never
+ *                                 past the speaker's own voice reach; unset is
+ *                                 the voice reach itself
+ *   THORNSWOOD_CAPTION_TEXT_MUTE  off lets a personal text mute leave captions
+ *                                 alone, so only the voice switch hides them
+ *                                 on the client (on when unset)
+ * /health says what each is.
+ */
+function captionNumber(v, fallback) {
+  const n = Number(String(v == null ? '' : v).trim());
+  return String(v == null ? '' : v).trim() !== '' && isFinite(n) && n >= 0 ? n : fallback;
+}
+const CAPTIONS = String(process.env.THORNSWOOD_CAPTIONS || '').trim().toLowerCase() === 'on';
+const CAPTION_BURST = Math.max(1, captionNumber(process.env.THORNSWOOD_CAPTION_BURST, 3));
+const CAPTION_REFILL_MS = Math.max(1, captionNumber(process.env.THORNSWOOD_CAPTION_REFILL_MS, 1000));
+const CAPTION_TAIL_MS = captionNumber(process.env.THORNSWOOD_CAPTION_TAIL_MS, 2000);
+const CAPTION_REACH = captionNumber(process.env.THORNSWOOD_CAPTION_REACH, 0);   // 0: the voice reach
+const CAPTION_TEXT_MUTE = String(process.env.THORNSWOOD_CAPTION_TEXT_MUTE || '').trim().toLowerCase() !== 'off';
+const captionPrefs = new Map();   // profileId -> { share, see }
+const talkEnded = new Map();      // profileId -> when the talk key last came up
+const captionCounts = { sent: 0, dropped: 0 };
+
+function captionPrefsOf(profileId) {
+  return captionPrefs.get(Number(profileId) || 0) || { share: false, see: true };
+}
+
+function setCaptionPrefs(profileId, msg) {
+  const pid = Number(profileId) || 0;
+  if (!pid || !msg) return;
+  const was = captionPrefsOf(pid);
+  captionPrefs.set(pid, {
+    share: typeof msg.share === 'boolean' ? msg.share : was.share,
+    see: typeof msg.see === 'boolean' ? msg.see : was.see
+  });
+}
+
+function forgetCaptions(profileId) {
+  const pid = Number(profileId) || 0;
+  captionPrefs.delete(pid);
+  talkEnded.delete(pid);
+}
+
+function speakingNow(profileId, now) {
+  const pid = Number(profileId) || 0;
+  for (const [, p] of peers) {
+    if (Number(p.profileId) === pid && p.talking) return true;
+  }
+  const ended = talkEnded.get(pid);
+  return !!ended && now - ended >= 0 && now - ended <= CAPTION_TAIL_MS;
+}
+
+function captionAllow(me, now) {
+  if (typeof me.captionTokens !== 'number') { me.captionTokens = CAPTION_BURST; me.captionAt = now; }
+  const since = Math.max(0, now - me.captionAt);
+  me.captionTokens = Math.min(CAPTION_BURST, me.captionTokens + since / CAPTION_REFILL_MS);
+  me.captionAt = now;
+  if (me.captionTokens < 1) return false;
+  me.captionTokens -= 1;
+  return true;
+}
+
+/* The connections a caption from me goes to. */
+function captionTargets(me, reach, now) {
+  const pid = Number(me.profileId) || 0;
+  const fresh = (p) => {
+    const v = positions.get(Number(p) || 0);
+    return (v && now - v.at <= STALE_MS && Array.isArray(v.pos)) ? v : null;
+  };
+  const mine = fresh(pid);
+  const to = [];
+  for (const [, p] of peers) {
+    const them = Number(p.profileId) || 0;
+    if (them === pid) { to.push(p); continue; }
+    if (!mine) continue;
+    if (captionPrefsOf(them).see === false) continue;
+    if (CAPTION_TEXT_MUTE && textBlocked(them, pid)) continue;
+    const v = fresh(them);
+    if (!v || !headlines.sameCellWithin(mine, v, reach)) continue;
+    to.push(p);
+  }
+  return to;
+}
+
+/* Why a caption went nowhere, or '' when it went out. */
+function relayCaption(me, raw, now) {
+  if (!CAPTIONS) return 'off';
+  if (!me) return 'nobody';
+  const pid = Number(me.profileId) || 0;
+  if (!captionPrefsOf(pid).share) return 'not shared';
+  if (silencedLeft(pid, now)) return 'silenced';
+  if (!speakingNow(pid, now)) return 'not talking';
+  const text = headlines.captionHead(raw);
+  if (!text) return 'empty';
+  if (!captionAllow(me, now)) return 'too fast';
+  const voice = voiceOf(pid);
+  const out = { t: 'caption', profileId: pid, actor: actorOf(pid), mode: voice.mode, text: text, at: now };
+  const voiceReach = headlines.captionReach(voice.mode);
+  const reach = CAPTION_REACH > 0 ? Math.min(CAPTION_REACH, voiceReach) : voiceReach;
+  for (const p of captionTargets(me, reach, now)) {
+    if (p && p.ws) p.ws.send(out);
+  }
+  return '';
+}
+
 /* ----------------------------------------------------------- chat limit ---
  *
  * HOW FAST ONE CONNECTION CAN TALK TO THE ROOM. The To Do List, entry 149:
@@ -638,24 +890,27 @@ function accept(key) {
   return crypto.createHash('sha1').update(key + GUID).digest('base64');
 }
 
+/*
+  One buffer, the head and the text written straight into it (#2390). It
+  used to encode the text into one buffer, the head into another and copy
+  both into a third, three allocations and two copies for every message.
+*/
 function frame(payload) {
-  const data = Buffer.from(payload, 'utf8');
-  const len = data.length;
-  let head;
-  if (len < 126) {
-    head = Buffer.alloc(2);
-    head[1] = len;
-  } else if (len < 65536) {
-    head = Buffer.alloc(4);
-    head[1] = 126;
-    head.writeUInt16BE(len, 2);
+  const len = Buffer.byteLength(payload, 'utf8');
+  const head = len < 126 ? 2 : len < 65536 ? 4 : 10;
+  const out = Buffer.allocUnsafe(head + len);
+  out[0] = 0x81;             // FIN + text
+  if (head === 2) {
+    out[1] = len;
+  } else if (head === 4) {
+    out[1] = 126;
+    out.writeUInt16BE(len, 2);
   } else {
-    head = Buffer.alloc(10);
-    head[1] = 127;
-    head.writeBigUInt64BE(BigInt(len), 2);
+    out[1] = 127;
+    out.writeBigUInt64BE(BigInt(len), 2);
   }
-  head[0] = 0x81;            // FIN + text
-  return Buffer.concat([head, data]);
+  out.write(payload, head, 'utf8');
+  return out;
 }
 
 /*
@@ -714,7 +969,7 @@ setInterval(() => {
       s.close();
       continue;
     }
-    try { s.ping(); } catch (e) { }
+    s.ping();   // does not throw: a ping that cannot be written closes s
   }
 }, PING_EVERY);
 
@@ -769,6 +1024,47 @@ let droppedPositions = 0;   // ticks not sent to a backed socket, for /health
 let skippedRosters = 0;     // rosters replaced by a newer one unsent, for /health
 let closedBacklogged = 0;   // sockets closed at the ceiling, for /health
 
+/*
+  WHAT ONE TURN SENDS A SOCKET GOES TO THE KERNEL IN BATCHES (#2390).
+
+  Every message used to be its own socket.write, and each one went to the
+  kernel on its own. When a room fills, every pair of voice pages trades an
+  offer, an answer and their candidates through here, about fourteen
+  messages a pair: N squared writes. Profiled on 19 Oct with
+  voice/load-voice.js at 200 people (19,900 pairs, 278,600 relayed
+  messages): handling what pages sent took 4.1 s of the one thread, and
+  3.0 s of that was inside socket.write, the kernel write per message.
+  Everything else (reading the frames, signal(), JSON and framing) came to
+  about 1.1 s, and the copies in that are cut too (frame, and feed).
+
+  So a socket is corked by its first write in a turn of the event loop and
+  uncorked after every I/O callback of that turn has run (setImmediate, as
+  the roster does, with no timer in between), or sooner, the moment a write
+  returns false: what is corked has reached the socket's high water mark
+  (16 KB), and it goes to the kernel then as one writev rather than waiting
+  for the end of the turn. So the kernel is handed a turn's messages in
+  batches of about 16 KB, in the order they were written, and nothing is
+  held past the turn. A write returned false at 16 KB before this as well,
+  whether or not the kernel took it, so backed means what it meant, and the
+  drain that follows clears it before the next position tick for a socket
+  that reads. The ceiling is checked after that uncork, so it still
+  measures what the kernel would not take, at the same write it did. A
+  socket closed here is uncorked first, so whatever was written ahead of
+  the close still goes.
+
+  Measured with voice/load-signalling.js on 19 Oct, which times the service
+  rather than the one thread sending to it, three runs each: every pair at
+  200 people took 5.5 to 6.0 s before and 2.4 to 2.6 s after, and at 400
+  people 21.5 to 22.4 s before and 9.9 to 10.2 s after, nothing lost and
+  no socket closed at the ceiling either way.
+*/
+const corked = new Set();
+let uncorkDue = false;
+function uncorkAll() {
+  uncorkDue = false;
+  for (const s of corked) s.uncork();
+}
+
 class Sock {
   constructor(socket) {
     this.socket = socket;
@@ -812,9 +1108,15 @@ class Sock {
     try { this.write(Buffer.from([0x89, 0])); } catch (e) { this.close(); }
   }
 
-  /* Where what socket.write says is heard. See the note over QUEUE_CEILING. */
+  /* Where what socket.write says is heard. See the note over QUEUE_CEILING.
+     Corked for the rest of this turn: see the note over corked. */
   write(buf) {
-    if (this.socket.write(buf) === false) this.backed = true;
+    if (!corked.has(this)) {
+      corked.add(this);
+      this.socket.cork();
+      if (!uncorkDue) { uncorkDue = true; setImmediate(uncorkAll); }
+    }
+    if (this.socket.write(buf) === false) { this.backed = true; this.uncork(); }
     const queued = this.socket.writableLength;
     if (queued > QUEUE_CEILING) {
       closedBacklogged++;
@@ -887,16 +1189,25 @@ class Sock {
     try { this.write(framed); } catch (e) { this.close(); }
   }
 
+  /* What this turn wrote goes to the kernel now. See the note over corked. */
+  uncork() {
+    if (!corked.delete(this)) return;
+    this.socket.uncork();
+  }
+
   close() {
     live.delete(this);
     if (this.closed) return;
     this.closed = true;
-    try { this.socket.destroy(); } catch (e) { }
+    // What was written before the close (a close frame among it) still goes,
+    // as it did when every write reached the kernel at once.
+    this.uncork();
+    this.socket.destroy();
     if (this.onclose) this.onclose();
   }
 
   feed(chunk) {
-    this.buf = Buffer.concat([this.buf, chunk]);
+    this.buf = this.buf.length ? Buffer.concat([this.buf, chunk]) : chunk;
     // A frame can arrive split across reads, and several can arrive in one, so
     // this loops until what is left is not a whole frame.
     for (;;) {
@@ -925,7 +1236,7 @@ class Sock {
         nothing that talks to this service sends one.
       */
       if (!masked) {
-        try { this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea])); } catch (e) { }   // FIN+close, len 2, 1002
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xea]));   // FIN+close, len 2, 1002
         this.close();
         return;
       }
@@ -949,9 +1260,11 @@ class Sock {
       }
       if (this.buf.length < off + len) return;
 
-      const body = Buffer.from(this.buf.slice(off, off + len));
+      // Unmasked where it lies: this.buf is this socket's own (a chunk the
+      // socket handed over, or a concat of them), so it needs no copy (#2390).
+      const body = this.buf.subarray(off, off + len);
       if (mask) for (let i = 0; i < body.length; i++) body[i] ^= mask[i & 3];
-      this.buf = this.buf.slice(off + len);
+      this.buf = this.buf.subarray(off + len);
 
       /*
         A close is ANSWERED with a close, which RFC 6455 section 5.5.1 asks
@@ -960,14 +1273,12 @@ class Sock {
         the reply until its own timeout.
 
         The body of a close frame is a two byte status code, big endian, and
-        1000 is a normal closure. Written before the teardown so a write that
-        throws cannot leave the socket open.
+        1000 is a normal closure. A socket's write does not throw: one the
+        other end has already dropped reports it on the socket's error event,
+        which closes this as well.
       */
       if (op === 0x8) {
-        try {
-          const bye = Buffer.from([0x88, 2, 0x03, 0xe8]);   // FIN+close, len 2, 1000
-          this.socket.write(bye);
-        } catch (e) { }
+        this.socket.write(Buffer.from([0x88, 2, 0x03, 0xe8]));   // FIN+close, len 2, 1000
         this.close();
         return;
       }
@@ -1181,7 +1492,7 @@ function onJoin(ws, msg, profileId) {
 
   ws.send({ t: 'welcome', peer: id, profileId: profileId });
   if (profileId && silencedLeft(profileId, Date.now())) {
-    try { ws.send({ t: 'hush', profileId: profileId, on: true }); } catch (e) { }
+    ws.send({ t: 'hush', profileId: profileId, on: true });
   }
   announce();
   return id;
@@ -1578,7 +1889,9 @@ function readBody(req, res, limit, then) {
     body += d;
     if (body.length > limit) {
       tooBig = true;
-      try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+      // The only answer this request gets: nothing is written before its end,
+      // which a destroyed request never reaches, so writeHead cannot throw.
+      res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');
       req.destroy();
     }
   });
@@ -1891,7 +2204,7 @@ const server = http.createServer((req, res) => {
       body += d;
       if (body.length > 200000) {
         tooBig = true;
-        try { res.writeHead(413, { 'content-type': 'text/plain' }).end('too big'); } catch (e) { }
+        res.writeHead(413, { 'content-type': 'text/plain' }).end('too big');   // see readBody
         req.destroy();
       }
     });
@@ -2049,9 +2362,7 @@ const server = http.createServer((req, res) => {
       for (const pid of silenced.keys()) {
         const clear = { t: 'headclear', profileId: pid };
         const hush = { t: 'hush', profileId: Number(pid), on: true };
-        for (const [, p] of peers) {
-          try { p.ws.send(clear); p.ws.send(hush); } catch (e) { }
-        }
+        for (const [, p] of peers) { p.ws.send(clear); p.ws.send(hush); }   // see tellHush
       }
       for (const pid of before) {
         if (!silenced.has(pid)) tellHush(pid, false);
@@ -2182,7 +2493,11 @@ const server = http.createServer((req, res) => {
                             skippedRosters: skippedRosters,
                             closedBacklogged: closedBacklogged,
                             closedSilent: closedSilent,
-                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError } }));
+                            chatRetention: { overdueDays: chatOverdue, pruneError: chatPruneError },
+                            // Last: /health's fields only ever go on the end (voice/test-turn-key.js).
+                            captions: { on: CAPTIONS, sent: captionCounts.sent, dropped: captionCounts.dropped,
+                                        tailMs: CAPTION_TAIL_MS, burst: CAPTION_BURST, refillMs: CAPTION_REFILL_MS,
+                                        reach: CAPTION_REACH || 'voice', textMute: CAPTION_TEXT_MUTE } }));
     return;
   }
 
@@ -2274,15 +2589,15 @@ function plainFromOutside(req) {
 */
 const PROTOCOL = 'thornswood';
 
+/* The error listener is there for a client that hung up before the refusal
+   is written: the write's failure is reported as an error event, and that
+   client was being turned away anyway, so there is nobody to tell and the
+   socket is already gone. end() itself does not throw. */
 function refuseUpgrade(socket, why) {
   const body = 'no: ' + why + '\n';
-  try {
-    socket.on('error', () => { });
-    socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
-               'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
-  } catch (e) {
-    try { socket.destroy(); } catch (x) { }
-  }
+  socket.on('error', () => { /* the client hung up first; see above */ });
+  socket.end('HTTP/1.1 403 Forbidden\r\nConnection: close\r\nContent-Type: text/plain\r\n' +
+             'Content-Length: ' + Buffer.byteLength(body) + '\r\n\r\n' + body);
 }
 
 server.on('upgrade', (req, socket, head) => {
@@ -2353,14 +2668,10 @@ server.on('upgrade', (req, socket, head) => {
                   '(THORNSWOOD_VOICE_MOST), so profile ' + proven + ' was told and closed (' +
                   refusedFull + ' turned away so far)');
     }
-    socket.on('error', () => { });
+    socket.on('error', () => { /* the client hung up first; see refuseUpgrade */ });
     const why = Buffer.from('full', 'utf8');
-    try {
-      socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
-      socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
-    } catch (e) {
-      try { socket.destroy(); } catch (x) { }
-    }
+    socket.write(frame(JSON.stringify({ t: 'chat', from: 0, profileId: 0, name: 'Thornswood', text: FULL_LINE, at: Date.now() })));
+    socket.end(Buffer.concat([Buffer.from([0x88, 2 + why.length, 0x03, 0xf5]), why]));   // FIN+close, 1013 try again later
     return;
   }
 
@@ -2447,6 +2758,24 @@ server.on('upgrade', (req, socket, head) => {
       for (const [, p] of peers) {
         if (Number(p.profileId) === Number(me.profileId)) p.talking = on;
       }
+      // When the key came up, for the words that are still coming (#2475).
+      if (!on) talkEnded.set(Number(me.profileId) || 0, Date.now());
+      return;
+    }
+
+    // Whether this person's voice may be shown as words, and whether they
+    // see other people's (#2475). See captions, above.
+    if (msg.t === 'captions') {
+      const me = peers.get(myId);
+      if (me) setCaptionPrefs(me.profileId, msg);
+      return;
+    }
+
+    // Words made of what somebody said on voice, on their own machine
+    // (#2475). Never written down; see captions, above.
+    if (msg.t === 'caption') {
+      const why = relayCaption(peers.get(myId), msg.text, Date.now());
+      if (why) captionCounts.dropped++; else captionCounts.sent++;
       return;
     }
 
@@ -2560,10 +2889,13 @@ server.on('upgrade', (req, socket, head) => {
       // placeatme, disable, mp) and coc is not one of them, so a coc moves you
       // in your own game and the server puts you straight back.
       if (text.charAt(0) === '/') {
-        // A join pass is good for ten minutes to whoever holds it, so the
-        // chat log keeps that one was sent and never the pass itself (#937).
-        chatWrite('command', myId, me, /^\/joinpass\b/i.test(text) ? '/joinpass [pass]' : text,
-                  msg.press === true ? 'press' : '');
+        // What the chat log keeps of it: the pass masked, and a waiting
+        // menu's repeated "/line" and the front plugin's own reports not at
+        // all (commandLogText). Asked before lineMark below, which is what
+        // moves the waiting mark it reads.
+        const press = msg.press === true;
+        const logged = commandLogText(me, text, press);
+        if (logged) chatWrite('command', myId, me, logged, press ? 'press' : '');
         // Full: the newest is refused and its sender told, and everything
         // already taken stays. See the note over COMMAND_CAP.
         if (commands.length >= COMMAND_CAP) {
@@ -2661,6 +2993,8 @@ server.on('upgrade', (req, socket, head) => {
 
   ws.onclose = () => {
     letGoFor(proven);
+    // The last connection for this person: their caption choices go with it.
+    if (!heldBy.has(proven)) forgetCaptions(proven);
     if (!myId) return;
     const me = peers.get(myId);
     peers.delete(myId);

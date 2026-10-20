@@ -23,8 +23,11 @@ two Windhelm sign posts, a face of stockade planks between two log
 rails, a gable of shingle boards, a candle lantern on a bracket, and
 notices nailed to it. On a shelf on its right post sits the hold's drop
 box. It is about 3.5 metres tall and 4.4 wide with the shelf.
-`scripts/mods/Build-NoticeBoard.py` builds both meshes from the game's
-own archives; only the meshes ship, never a texture.
+Neither mesh ships (#2827): they are put together from Bethesda's, so
+the launcher makes both on each machine from that machine's own game
+archives before every Play (`launcher/app/MadeFromGame.cs`), byte for
+byte. `scripts/mods/Build-NoticeBoard.py` writes the recipe it follows,
+`launcher/app/FromGameBoard.cs`, on a machine with the game.
 
 A steward moves it. Standing where it should be, facing the way its
 notices should face, they press its town under the notice boards on the
@@ -73,7 +76,8 @@ Who sees and takes what:
 - Anybody sees only what they put in themselves, gold included: only the
   gold they added, never the box's total. They may take back what they
   put in, rent included, and then that rent is owed again.
-- That hold's officers, its Jarl, its guards and a steward, see
+- That hold's officers, its Court, its Guards, its Jarl and its
+  Steward, each by the hold's Discord role (#2551), see
   everything in it and may take anything. Only they get Records: every
   deposit and every take, by character name, what, how much, and when,
   newest first. An officer taking gold somebody paid rent with leaves the
@@ -182,11 +186,11 @@ reward comes back to the poster. A job somebody has taken stays up until
 they hand it back.
 
 A guard of the hold takes down any post on its board, taken or not
-(#502). The fee stays with the hold. Gold the post was holding goes back
+(#502), and so does the hold's Jarl (#2551). The fee stays with the hold. Gold the post was holding goes back
 to whoever posted it: a job's reward, a letter's 15, a haul's pay. When they are away it
 is held for them and handed over when they are back. Whoever had taken
-it is told it is off their list. At another hold's board a guard is
-anybody. See [Offices](offices.md).
+it is told it is off their list. At another hold's board a guard or a
+Jarl is anybody. See [Offices](offices.md).
 
 ## Where this is
 
@@ -195,7 +199,8 @@ post, notices and jobs with Read, taking one, Pay the reward, taking
 your own down, handing a job back, Your jobs with
 Put it back on this board's, the line that counts the older ones, and
 leaving a price list are on that panel. Walking away closes it. A
-steward moves a board from the Office page of the K panel. See
+steward of the hold moves its board from the Office page of the K
+panel. See
 [Offices](offices.md).
 
 J has a Boards tab (#1627): the ten towns, the board of the one you

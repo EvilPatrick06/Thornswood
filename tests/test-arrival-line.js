@@ -90,8 +90,9 @@ function run(townKey, stage) {
   yes('said to the person who arrived and nobody else', line.id === 0xff000058);
   yes('through say, not notify, which may well do nothing from here',
       r.said.length === 1 && !line.notify);
-  yes('it names the town they chose', /Whiterun/.test(line.text));
-  yes('and the inn, which is where they are standing', /\binn\b/.test(line.text));
+  // Djinn, 17 October: "Welcome to (insert Hold name here), Safe Travels."
+  yes('it is Djinn\'s line with the hold they chose: "Welcome to Whiterun Hold, Safe Travels."',
+      line.text === 'Welcome to Whiterun Hold, Safe Travels.');
   yes('the log line is still written beside it',
       r.logs.some(function (l) { return /home = whiterun/.test(l); }));
   yes('and the character is still moved and marked done',
@@ -106,11 +107,12 @@ function run(townKey, stage) {
   for (const key in TOWN_BY_KEY) {
     const t = PASSAGES[TOWN_BY_KEY[key]];
     const r = run(key, 'choosing');
-    const ok = r.answer === true && r.said.length === 1 &&
-      r.said[0].text.indexOf(t.town) >= 0;
+    const ok = typeof t.hold === 'string' && t.hold.length > 0 &&
+      r.answer === true && r.said.length === 1 &&
+      r.said[0].text === 'Welcome to ' + t.hold + ', Safe Travels.';
     if (!ok) { every = false; wrong.push(key); }
   }
-  yes('every town in the table is named in its own line' +
+  yes('every town in the table has a hold name, and its line names that hold' +
       (wrong.length ? ' (not: ' + wrong.join(', ') + ')' : ''), every);
 }
 

@@ -68,6 +68,15 @@
 
   /* 'sent', 'queued' (the chat holds it until it joins), or '' (it went
      nowhere). say answers true only for a line on the socket. */
+  /*
+    HOW MUCH A PAGE HOLDS (#2563). The same numbers as SOCIAL.pageChars and
+    writePage's title cut in game/gamemode.js; the chat socket's COMMAND_CHARS
+    in voice/voice-server.js is sized to carry a page this long whole.
+    tests/test-2563-journal-length.js holds the three together.
+  */
+  var PAGE_CHARS = 4000;
+  var TITLE_CHARS = 60;
+
   function net(line) {
     try {
       var n = window.thornswoodNet;
@@ -786,13 +795,13 @@
     } else {
       html +=
         '<div class="bar">' +
-        '<input id="' + ID + '-ptitle" value="' + esc(page.title) + '" style="max-width:320px">' +
+        '<input id="' + ID + '-ptitle" maxlength="' + TITLE_CHARS + '" value="' + esc(page.title) + '" style="max-width:320px">' +
         '<span class="grow"></span>' +
         '<button data-do="sharepage">Share this page</button>' +
         '<button data-do="unsharepage">Stop sharing it</button>' +
         '<button class="go" data-do="save">Save</button>' +
         '</div>' +
-        '<textarea id="' + ID + '-text">' + esc(page.text || '') + '</textarea>';
+        '<textarea id="' + ID + '-text" maxlength="' + PAGE_CHARS + '">' + esc(page.text || '') + '</textarea>';
     }
 
     main.innerHTML = html;
@@ -837,7 +846,13 @@
         would arrive as several commands and the second would be nonsense.
         They go over as \\n and the server never sees a raw newline.
       */
-      var text = val('text').split('\n').join('\\n');
+      var raw = val('text');
+      if (raw.length > PAGE_CHARS) {
+        var foot = root.querySelector('#' + ID + '-foot');
+        if (foot) { foot.textContent = 'That page is ' + raw.length + ' characters long and a page holds ' + PAGE_CHARS + '. Shorten it to save.'; }
+        return;
+      }
+      var text = raw.split('\n').join('\\n');
       net('/journal page ' + book.id + ' ' + (openPage || '-') + ' ' + val('ptitle') + ' :: ' + text);
       return;
     }

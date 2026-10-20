@@ -65,10 +65,25 @@ WHAT IT PUTS IN THE PLUGIN
      neither stops nor keeps stops the build, so a new one is decided, not
      missed.
 
+  4. The places on Tamriel's ground that Skyrim and the collection's mods put
+     in no hold get one (Patrick, 17 October 2026, decision 2 = B on #2551),
+     from the policy's placeHolds. A location record is copied from its
+     winner with only its parent (PNAM) changed: to the hold's location, or
+     to the place on Patrick's list it lies in (Dead Drop Falls, in
+     Dayspring Canyon), so the game, the server, the main menu's last
+     location and scripts/dev/Build-BuildingHolds.py all read the place in
+     that hold. A room that has no location record at all (Oar's Rest's
+     utility room, the Lost Hut, Mossy Glen Cave) cannot have a parent
+     changed, so its cell is copied from its winner with only its location
+     (XLCN) set: the location of the place it belongs to when there is one,
+     the hold's own when none covers it. Everything else on each record is
+     the winner's own.
+
   A placed actor's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
-  them, form ids moved into this plugin's numbering. A quest is copied the same
-  way. The plugin's own masters are every plugin those copies name.
+  them, form ids moved into this plugin's numbering. A quest and a location
+  are copied the same way. The plugin's own masters are every plugin those
+  copies name.
 
 WHY NOT IN Thornswood-Content.esp
 
@@ -80,6 +95,15 @@ WHY NOT IN Thornswood-Content.esp
   its five base masters, and 429 by one of the 50 plugins that load after it.
   At the end of the load order every copy is the winner, exactly. So
   everything is here.
+
+  The place holds (4) are here for the same reasons, measured 17 October
+  over the catalogue's load order: Castle Volkihar's location is won by
+  JK's Castle Volkihar.esp, which loads before the content plugin and is not
+  among its five masters, so a copy there would undo that mod's edit of it;
+  Oar's Rest's utility room and the Lost Hut are OarsRest.esp's and Solitude
+  Arena.esp's, which load after the content plugin and so cannot be its
+  masters at all; and a new master renumbers every record the content plugin
+  adds. Here the copy is the winner, and any plugin can be a master.
 
 WHY IT IS LIGHT (ESL FLAGGED)
 
@@ -108,8 +132,10 @@ WHAT IT WRITES
   game/content/Thornswood-Last.esp, and game/data/last-plugin.json, the
   manifest: the plugin's sha256, the load order it was built against, every
   cut actor it switches off and every one it leaves and why, every quest it
-  stops and every quest it keeps. tests/test-2468-last-plugin.js holds the two
-  together on every build, without the game.
+  stops and every quest it keeps, and every place it gives a hold, with the
+  parent or location it had before. tests/test-2468-last-plugin.js holds the
+  two together on every build, without the game, and
+  tests/test-2551-place-holds.js the place holds.
 
 HOW IT REACHES PEOPLE
 
@@ -186,7 +212,18 @@ NEVER_TRUE = struct.pack('<B3sfHHIIIIi', 4 << 5, b'\x00\x00\x00', 0.0, 47, 0,
                          0x0000000F, 0, 0, 0, -1)
 
 # The order Skyrim writes its top groups in.
-GROUP_ORDER = [b'CELL', b'WRLD', b'QUST']
+GROUP_ORDER = [b'CELL', b'WRLD', b'QUST', b'LCTN']
+
+# The subrecords of a cell that come before its location (XLCN), in the
+# order Skyrim.esm writes a cell; a location set on a cell that had none goes
+# straight after the last of these it has.
+CELL_BEFORE_XLCN = (b'EDID', b'FULL', b'DATA', b'XCLC', b'XCLL', b'TVDT', b'MHDT', b'LTMP',
+                    b'LNAM', b'XCLW', b'XNAM', b'XCLR')
+# The subrecords of a location that come before its parent (PNAM), the same
+# way, for a location that had no parent at all (Nightingale Hall's).
+LCTN_BEFORE_PNAM = (b'EDID', b'ACPR', b'LCPR', b'RCPR', b'ACUN', b'LCUN', b'RCUN', b'ACSR',
+                    b'LCSR', b'RCSR', b'ACEC', b'LCEC', b'RCEC', b'ACID', b'LCID', b'ACEP',
+                    b'LCEP', b'FULL', b'KSIZ', b'KWDA')
 
 
 # --------------------------------------------------------------- reading
@@ -559,6 +596,23 @@ FIELDS = {
         'dlstrings': {b'CNAM'},
         'drop': set(),
     },
+    # A location's lists of the references, actors and cells in it. Each
+    # 'structs' entry is a run of fixed size structures with form ids at the
+    # given offsets (and grid numbers, which stay, in the rest); each 'head'
+    # entry starts with a worldspace's form id and is grid numbers after it.
+    # Added (AC), master (LC) and removed (RC) lists alike.
+    b'LCTN': {
+        'fid': {b'PNAM', b'NAM1', b'FNAM', b'MNAM', b'NAM0'},
+        'array': {b'KWDA', b'RCPR', b'RCUN', b'RCSR', b'ACID', b'LCID'},
+        'structs': {b'ACPR': (12, (0, 4)), b'LCPR': (12, (0, 4)),
+                    b'ACUN': (12, (0, 4, 8)), b'LCUN': (12, (0, 4, 8)),
+                    b'ACSR': (16, (0, 4, 8)), b'LCSR': (16, (0, 4, 8)),
+                    b'ACEP': (12, (0, 4)), b'LCEP': (12, (0, 4))},
+        'head': {b'ACEC', b'LCEC', b'RCEC'},
+        'plain': {b'EDID', b'KSIZ', b'RNAM', b'CNAM'},
+        'strings': {b'FULL'},
+        'drop': set(),
+    },
 }
 
 
@@ -628,8 +682,26 @@ def copy_record(src, entry, rn, strings, what):
                                  % (what, t.decode(), len(b)))
             b = struct.pack('<I', rn.one(src, struct.unpack('<I', b)[0], what))
         elif t in table['array']:
+            if len(b) % 4:
+                raise SystemExit('STOP. %s %s is %d bytes, not a list of form ids. Nothing was written.'
+                                 % (what, t.decode(), len(b)))
             b = b''.join(struct.pack('<I', rn.one(src, v, what))
                          for v in struct.unpack('<%dI' % (len(b) // 4), b))
+        elif t in table.get('structs', {}):
+            size, offsets = table['structs'][t]
+            if len(b) % size:
+                raise SystemExit('STOP. %s %s is %d bytes, not a list of %d byte entries. Nothing was written.'
+                                 % (what, t.decode(), len(b), size))
+            b = bytearray(b)
+            for at in range(0, len(b), size):
+                for o in offsets:
+                    struct.pack_into('<I', b, at + o, rn.one(src, struct.unpack_from('<I', b, at + o)[0], what))
+            b = bytes(b)
+        elif t in table.get('head', ()):
+            if len(b) < 4 or (len(b) - 4) % 4:
+                raise SystemExit('STOP. %s %s is %d bytes, not a worldspace and its cells. Nothing was written.'
+                                 % (what, t.decode(), len(b)))
+            b = struct.pack('<I', rn.one(src, struct.unpack_from('<I', b, 0)[0], what)) + b[4:]
         elif t == b'RNAM' and entry.tag == b'WRLD':
             b = bytearray(b)
             count = struct.unpack_from('<I', b, 4)[0]
@@ -783,11 +855,117 @@ def arrival_talk(plugins, canon):
     return out
 
 
+# The hold location records (#2551): the nine holds, and Solstheim for Raven
+# Rock, by editor id, the same ones scripts/dev/Build-BuildingHolds.py reads.
+HOLD_LOCATIONS = ('WhiterunHoldLocation', 'HaafingarHoldLocation', 'RiftHoldLocation',
+                  'ReachHoldLocation', 'EastmarchHoldLocation', 'FalkreathHoldLocation',
+                  'HjaalmarchHoldLocation', 'PaleHoldLocation', 'WinterholdHoldLocation',
+                  'DLC2SolstheimLocation')
+
+
+def edid_of(plugins, e):
+    return dict(subrecords(plugins[e.pi].data(e))).get(b'EDID', b'').rstrip(b'\x00').decode('latin1')
+
+
+def form_field(plugins, e, tag):
+    """The form id in e's one subrecord tag, as (owner, object id), or None."""
+    b = dict(subrecords(plugins[e.pi].data(e))).get(tag)
+    if not b or len(b) != 4 or not struct.unpack('<I', b)[0]:
+        return None
+    return plugins[e.pi].gid(struct.unpack('<I', b)[0])
+
+
+def hold_of(plugins, win, gid, planned=None):
+    """The hold location a location's parent chain reaches, by editor id, or
+    None. The location itself counts. planned is {location: its new parent},
+    the policy's, read in place of the records' own."""
+    seen = set()
+    while gid and gid not in seen:
+        seen.add(gid)
+        e = win.get((b'LCTN', gid))
+        if e is None:
+            return None
+        if edid_of(plugins, e) in HOLD_LOCATIONS:
+            return edid_of(plugins, e)
+        gid = (planned or {}).get(gid) or form_field(plugins, e, b'PNAM')
+    return None
+
+
+def set_field(pairs, tag, body, before):
+    """pairs with tag's bytes as body: in its place when it is there, else
+    straight after the last subrecord of before."""
+    if any(t == tag for t, _ in pairs):
+        return [(t, body if t == tag else b) for t, b in pairs]
+    at = max([i + 1 for i, (t, _) in enumerate(pairs) if t in before] or [0])
+    return pairs[:at] + [(tag, body)] + pairs[at:]
+
+
+def place_holds(policy, plugins, win, canon):
+    """The policy's placeHolds checked against the load order: [(location
+    entry, its new parent's entry, manifest row)] and {cell gid: (cell entry,
+    its new location's entry, manifest row)}. A new parent is a hold's own
+    location, or a place that the policy itself puts in one (Dead Drop Falls
+    in Dayspring Canyon). Stops on anything the policy and the records do not
+    agree on, so a collection that moved is decided again, never carried
+    over."""
+    rules = policy.get('placeHolds') or {}
+    planned = {ref_key(r['location']): ref_key(r['parent']) for r in rules.get('locations', [])}
+    locs, cells = [], {}
+    for row in rules.get('locations', []):
+        g = ref_key(row['location'])
+        e = win.get((b'LCTN', g))
+        pe = win.get((b'LCTN', ref_key(row['parent'])))
+        if e is None or edid_of(plugins, e) != row['edid']:
+            raise SystemExit('STOP. the policy gives %s (%s) a hold, and no plugin has that location. '
+                             'Nothing was written.' % (row['location'], row['edid']))
+        if pe is None or edid_of(plugins, pe) != row['parentEdid']:
+            raise SystemExit('STOP. the policy gives %s the parent %s (%s), which no plugin has. '
+                             'Nothing was written.' % (row['edid'], row['parent'], row['parentEdid']))
+        was = form_field(plugins, e, b'PNAM')
+        if hold_of(plugins, win, was):
+            raise SystemExit('STOP. %s is in %s already, through its parent %s. Take it out of the policy. '
+                             'Nothing was written.' % (row['edid'], hold_of(plugins, win, was), desc_of(was, canon)))
+        hold = hold_of(plugins, win, g, planned)
+        if hold != row['holdEdid'] or hold not in HOLD_LOCATIONS:
+            raise SystemExit('STOP. the policy puts %s in %s, and its new parent puts it in %s. '
+                             'Nothing was written.' % (row['edid'], row['holdEdid'], hold))
+        locs.append((e, pe, {'location': row['location'], 'edid': row['edid'], 'place': row['place'],
+                             'wonBy': plugins[e.pi].name,
+                             'parentWas': (desc_of(was, canon) + ' ' + edid_of(plugins, win[(b'LCTN', was)]))
+                             if was else None,
+                             'parent': row['parent'] + ' ' + row['parentEdid'], 'hold': hold}))
+    for row in rules.get('cells', []):
+        g = ref_key(row['cell'])
+        e = win.get((b'CELL', g))
+        le = win.get((b'LCTN', ref_key(row['location'])))
+        if e is None or edid_of(plugins, e) != row['edid']:
+            raise SystemExit('STOP. the policy gives cell %s (%s) a location, and no plugin has that cell. '
+                             'Nothing was written.' % (row['cell'], row['edid']))
+        if e.ctx[0] is not None:
+            raise SystemExit('STOP. cell %s is outside, and the policy only gives a room a location. '
+                             'Nothing was written.' % row['cell'])
+        was = form_field(plugins, e, b'XLCN')
+        if was:
+            raise SystemExit('STOP. cell %s (%s) has a location of its own now, %s. Decide it again in the '
+                             'policy. Nothing was written.' % (row['cell'], row['edid'], desc_of(was, canon)))
+        if le is None or edid_of(plugins, le) != row['locationEdid']:
+            raise SystemExit('STOP. the policy gives cell %s the location %s (%s), which no plugin has. '
+                             'Nothing was written.' % (row['cell'], row['location'], row['locationEdid']))
+        hold = hold_of(plugins, win, ref_key(row['location']), planned)
+        if hold != row['holdEdid']:
+            raise SystemExit('STOP. the policy puts cell %s in %s, and its location %s is in %s. '
+                             'Nothing was written.' % (row['cell'], row['holdEdid'], row['locationEdid'], hold))
+        cells[g] = (e, le, {'cell': row['cell'], 'edid': row['edid'], 'place': row['place'],
+                            'wonBy': plugins[e.pi].name, 'locationWas': None,
+                            'location': row['location'] + ' ' + row['locationEdid'], 'hold': hold})
+    return locs, cells
+
+
 def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
     order, canon, plugins = load(data_dir, catalogue)
-    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST', b'LCTN'})
     tables = {}
 
     def strings(src, kind):
@@ -892,11 +1070,18 @@ def build(data_dir):
                 raise SystemExit('STOP. %s 0x%08X stands in a world its cell is not in. '
                                  'Nothing was written.' % (src.name, e.fid))
 
+    # 4. The places given a hold (#2551). A room given a location is copied
+    # like any other cell, with nothing placed under it unless an actor here
+    # stands in it too.
+    hold_locs, hold_cells = place_holds(policy, plugins, win, canon)
+    for g, (e, le, row) in hold_cells.items():
+        cells[g] = e
+
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()
 
     def copies():
-        out = {'achr': [], 'refr': [], 'cell': {}, 'wrld': {}, 'qust': []}
+        out = {'achr': [], 'refr': [], 'cell': {}, 'wrld': {}, 'qust': [], 'lctn': []}
         for e in gates:
             src = plugins[e.pi]
             what = '%s REFR 0x%08X' % (src.name, e.fid)
@@ -933,8 +1118,19 @@ def build(data_dir):
         for g, e in cells.items():
             src = plugins[e.pi]
             what = '%s CELL 0x%08X' % (src.name, e.fid)
-            out['cell'][g] = (rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
-                              pack_subrecords(copy_record(src, e, rn, strings, what)), e)
+            pairs = copy_record(src, e, rn, strings, what)
+            if g in hold_cells:
+                le = hold_cells[g][1]
+                pairs = set_field(pairs, b'XLCN', struct.pack('<I', rn.one(plugins[le.pi], le.fid, what)),
+                                  CELL_BEFORE_XLCN)
+            out['cell'][g] = (rn.one(src, e.fid, what), e.flags & ~COMPRESSED, pack_subrecords(pairs), e)
+        for e, pe, row in hold_locs:
+            src = plugins[e.pi]
+            what = '%s LCTN 0x%08X' % (src.name, e.fid)
+            pairs = copy_record(src, e, rn, strings, what)
+            pairs = set_field(pairs, b'PNAM', struct.pack('<I', rn.one(plugins[pe.pi], pe.fid, what)),
+                              LCTN_BEFORE_PNAM)
+            out['lctn'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED, pack_subrecords(pairs), e))
         for g, e in worlds.items():
             src = plugins[e.pi]
             what = '%s WRLD 0x%08X' % (src.name, e.fid)
@@ -973,10 +1169,15 @@ def build(data_dir):
         'counts': {'actorsOff': len(refs['disabled']), 'cells': len(made['cell']),
                    'worlds': len(made['wrld']), 'questsStopped': len(quests_cut),
                    'modQuestsStopped': len(mod_stopped),
-                   'questsKept': len(quests_kept), 'gatesUnlocked': len(gates)},
+                   'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
+                   'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
+        # The places given a hold (#2551): each location's parent before and
+        # after, and each room's location.
+        'placeHolds': {'locations': [row for _, _, row in hold_locs],
+                       'rooms': [hold_cells[g][2] for g in sorted(hold_cells)]},
         'arrivalTalk': arrival_talk(plugins, canon),
     }
     return plugin, manifest
@@ -1039,6 +1240,10 @@ def write_plugin(made, masters, plugins, rn):
             if items:
                 body += g(struct.pack('<I', cfid), kind,
                           b''.join(r(t, f, i, d) for i, t, f, d in items))
+        # A room copied only to give it a location (#2551) has nothing
+        # placed under it here, so it gets no children group.
+        if not body:
+            return r(b'CELL', cflags, cfid, cdata)
         return r(b'CELL', cflags, cfid, cdata) + g(struct.pack('<I', cfid), 6, body)
 
     interior = collections.defaultdict(lambda: collections.defaultdict(list))
@@ -1081,6 +1286,9 @@ def write_plugin(made, masters, plugins, rn):
         out[b'WRLD'] = g(b'WRLD', 0, body)
     if made['qust']:
         out[b'QUST'] = g(b'QUST', 0, b''.join(r(b'QUST', f, i, d) for i, f, d, e in sorted(made['qust'])))
+    if made['lctn']:
+        out[b'LCTN'] = g(b'LCTN', 0, b''.join(r(b'LCTN', f, i, d)
+                                              for i, f, d, e in sorted(made['lctn'], key=lambda x: x[0])))
 
     head = [(b'HEDR', struct.pack('<fiI', 1.71, count, 0x800)),
             (b'CNAM', b'Thornswood\x00'),
@@ -1118,13 +1326,26 @@ def verify(data_dir, plugin_bytes, manifest):
     if not last.hflags & LIGHT:
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
-    win = winners(plugins, {b'ACHR', b'REFR', b'QUST'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL'})
     fails = []
     for desc in manifest.get('gatesUnlocked', []):
         e = win.get((b'REFR', ref_key(desc)))
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []
         if e is None or e.pi != last.index or b'XLOC' in tags or b'VMAD' in tags:
             fails.append('town gate %s is left locked' % desc)
+    # Every place the policy gives a hold is in that hold, by this plugin's
+    # own record, read the way scripts/dev/Build-BuildingHolds.py reads it.
+    rules = json.load(open(POLICY, encoding='utf-8')).get('placeHolds') or {}
+    for row in rules.get('locations', []):
+        e = win.get((b'LCTN', ref_key(row['location'])))
+        if e is None or e.pi != last.index or form_field(plugins, e, b'PNAM') != ref_key(row['parent']) or                 hold_of(plugins, win, ref_key(row['location'])) != row['holdEdid']:
+            fails.append('location %s %s is not in %s by this plugin' % (row['location'], row['edid'], row['holdEdid']))
+    for row in rules.get('cells', []):
+        e = win.get((b'CELL', ref_key(row['cell'])))
+        loc = form_field(plugins, e, b'XLCN') if e is not None else None
+        if e is None or e.pi != last.index or loc != ref_key(row['location']) or \
+                hold_of(plugins, win, loc) != row['holdEdid']:
+            fails.append('room %s %s is not in %s by this plugin' % (row['cell'], row['edid'], row['holdEdid']))
     for desc in manifest['refs']['disabled']:
         e = win.get((b'ACHR', ref_key(desc)))
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []
@@ -1190,6 +1411,8 @@ def main():
         print('  ok    %d cut actors are off and nothing can switch them on; %d vanilla quests '
               'cannot start; %d kept by the policy; %d mod quests cannot start'
               % (c['actorsOff'], c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
+        print('  ok    %d locations and %d rooms are in the hold the policy gives them'
+              % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
         return 0
 
     plugin, manifest = build(args.data)
@@ -1201,13 +1424,19 @@ def main():
              len(manifest['refs']['corpseKept'])))
     print('  %d vanilla quests stopped, %d kept, %d mod quests stopped'
           % (c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
+    for row in manifest['placeHolds']['locations']:
+        print('  %s (%s): parent %s -> %s, in %s' % (row['place'], row['edid'], row['parentWas'] or 'none',
+                                                    row['parent'], row['hold']))
+    for row in manifest['placeHolds']['rooms']:
+        print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
     fails = verify(args.data, plugin, manifest)
     if fails:
         for f in fails[:40]:
             print('  FAIL  ' + f)
         print('STOP. what this built does not verify. Nothing was written.')
         return 1
-    print('  ok    read back in the load order: every cut actor off, every cut quest unable to start')
+    print('  ok    read back in the load order: every cut actor off, every cut quest unable to start, '
+          'every place in the hold the policy gives it')
     if args.check:
         a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
         # The manifest is text, and a Windows checkout may hand it back with

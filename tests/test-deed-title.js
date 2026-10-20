@@ -55,13 +55,14 @@ function press(opts) {
   const said = [];
   const logs = [];
   const issued = [];
+  const words = [];
   const claims = {};
   if (opts.held) { claims[HOUSE] = opts.held; }
 
   const fn = new Function(
     'mine', 'actorId', 'building', 'held', 'claims', 'holdsDeed', 'holderOf',
     'nameOf', 'groundHere', 'save', 'pushAll', 'plog', 'notify', 'say', 'mp', 'mayHold',
-    'issueMaster', 'masterHandedLine',
+    'issueMaster', 'masterHandedLine', 'recordWord', 'WORD_SAID',
     block + '\nreturn { moved: false, claims: claims };');
 
   const out = fn(
@@ -84,9 +85,12 @@ function press(opts) {
       held.master = { for: held.by, no: opts.master };
       return opts.master;
     },
-    function () { return 'Its master key is in your pack.'; });
+    function () { return 'Its master key is in your pack.'; },
+    // Word to the holder whose deed was presented (#2680): recorded, not sent here.
+    function (kind, b, holder, actor, by) { words.push({ kind: kind, b: b, holder: holder, by: by }); return 'kept'; },
+    { kept: 'kept for them' });
 
-  return { claim: claims[HOUSE], said: said, logs: logs, issued: issued };
+  return { claim: claims[HOUSE], said: said, logs: logs, issued: issued, words: words };
 }
 
 if (block !== null) {
@@ -104,6 +108,9 @@ if (block !== null) {
         r.said.length > 0 && r.said[0].indexOf('It is yours now') !== -1);
     yes('S1 and told whose it was, because that is the story',
         r.said[0].indexOf('Alice') !== -1);
+    yes('S1 and word is kept for Alice that her deed was presented at her door (#2680)',
+        r.words.length === 1 && r.words[0].kind === 'deed' && r.words[0].b === HOUSE &&
+        r.words[0].holder === ALICE && r.words[0].by === BOB);
   }
 
   // S1j: A JAIL'S DEED IS PAPER (#502). Patrick, 12 Oct: a jail is claimed

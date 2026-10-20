@@ -1,10 +1,11 @@
 {
-  "about": "What scripts\\mods\\Build-Generated.ps1 builds in Thornswood's own game folder on the shipping machine before a Ship (issue #1247). pandora.patches are the behavior patch codes (the folder names under Data\\Nemesis_Engine\\mod or Data\\Pandora_Engine\\mod) Pandora Behaviour Engine+ generates the behavior files with; every other patch is off. bodyslide.sets are the BodySlide slider sets built into the bodies, each at its own slider defaults, never with RaceMenu morphs. bodyslide.sliders may move a slider of one set away from its default, as { \"<set>\": { \"<slider>\": { \"big\": 0, \"small\": 0 } } }, and Build-Generated refuses any that shapes the breasts, the seat, the genitals or the nipples (issue #1004) or takes the underwear off (issue #405).",
+  "about": "What scripts\\mods\\Build-Generated.ps1 builds in Thornswood's own game folder on the shipping machine before a Ship (issue #1247). pandora.patches are the behavior patch codes (the folder names under Data\\Nemesis_Engine\\mod or Data\\Pandora_Engine\\mod) Pandora Behaviour Engine+ generates the behavior files with; every other patch is off. bodyslide.sets are the BodySlide slider sets built into the bodies, each at its own slider defaults, never with RaceMenu morphs. bodyslide.outfits are the outfit slider sets built to fit those bodies (issue #2454), built the same way, at their own slider defaults and under the same rules, never with RaceMenu morphs, and never writing a body. bodyslide.sliders may move a slider of one set or outfit away from its default, as { \"<set>\": { \"<slider>\": { \"big\": 0, \"small\": 0 } } }, and Build-Generated refuses any that shapes the breasts, the seat, the genitals or the nipples (issue #1004) or takes the underwear off (issue #405).",
   "pandora": {
     "patches": ["colis", "tdmh", "tdmlen", "tdmv"]
   },
   "bodyslide": {
     "sets": ["CBBE 3BBB Amazing NeverNude", "HIMBO Body - Vanilla Nevernude", "CBBE Vanilla - Body - Astrid"],
+    "outfits": [],
     "sliders": {}
   }
 }

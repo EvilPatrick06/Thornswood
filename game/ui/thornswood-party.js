@@ -416,8 +416,9 @@
       var what = data.offer.kind === 'friend' ? 'wants to be friends'
         : (data.offer.kind === 'party' ? 'is asking you to join their party'
         : (data.offer.kind === 'apprentice' ? 'offers to take you on as an apprentice'
+        : (data.offer.kind === 'dye' ? 'offers to dye your hair with ' + esc(data.offer.about || 'a hair dye')
         : (data.offer.kind === 'book' ? 'invites you into ' + esc(data.offer.about || 'a group book')
-                                            : 'is offering to trade')));
+                                            : 'is offering to trade'))));
       html += '<div class="ask"><span class="who"><span class="kicker">Request</span><b>' + esc(data.offer.name) +
               '</b> ' + what + '</span>' +
               '<button class="go" data-do="yes">Accept</button>' +
@@ -501,6 +502,25 @@
       send. Muted and hidden is everybody switched off, friend or not, here
       or not, so each one can be switched back on.
     */
+    /*
+      Dye hair (#2675), only while the server says you carry a hair dye:
+      one button per dye beside each person, an offer they answer.
+    */
+    var dyes = [];
+    if (Array.isArray(data.dyes)) {
+      for (var di = 0; di < data.dyes.length; di++) {
+        var dy = data.dyes[di];
+        if (dy && typeof dy.id === 'string' && /^[a-z0-9-]+$/.test(dy.id)) { dyes.push(dy); }
+      }
+    }
+    function dyeButtons(id) {
+      var b = '';
+      for (var dj = 0; dj < dyes.length; dj++) {
+        b += '<button data-do="dye" data-who="' + esc(id) + '" data-dye="' + esc(dyes[dj].id) + '">' +
+             (dyes.length === 1 ? 'Dye hair' : 'Dye: ' + esc(dyes[dj].name || dyes[dj].id)) + '</button>';
+      }
+      return b;
+    }
     html += '<div><h3>Near you</h3>';
     if (!data.near || !data.near.length) {
       html += '<div class="none">Nobody close enough to look at.</div>';
@@ -513,6 +533,7 @@
                 '<span class="tools">' +
                 (nr.friend ? '' : '<button data-do="befriend" data-who="' + esc(nr.id) + '">Add friend</button>') +
                 '<button data-do="trade" data-who="' + esc(nr.id) + '">Trade</button>' +
+                dyeButtons(nr.id) +
                 switches(nr) +
                 '</span></div>';
       }
@@ -578,6 +599,7 @@
         else if (verb === 'drop') { net('/friend remove ' + who); }
         else if (verb === 'befriend') { net('/friend ' + who); }
         else if (verb === 'trade') { net('/trade ' + who); }
+        else if (verb === 'dye') { net('/hairdye offer ' + who + ' ' + (this.getAttribute('data-dye') || '')); }
       };
     }
   }
@@ -593,6 +615,8 @@
     if (kind === 'friend') { return 'wants to be friends.'; }
     if (kind === 'party') { return 'is asking you to join their party.'; }
     if (kind === 'apprentice') { return 'offers to take you on as an apprentice.'; }
+    // A hair dye (#2675): nothing is used and nothing written until Accept.
+    if (kind === 'dye') { return 'offers to dye your hair with ' + esc(about || 'a hair dye') + '.'; }
     // A group book invite, "the business The Bee" (#1591). Accept joins it.
     if (kind === 'book') { return 'invites you into ' + esc(about || 'a group book') + '.'; }
     return 'is offering to trade.';

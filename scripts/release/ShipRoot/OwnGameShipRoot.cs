@@ -47,13 +47,5 @@ namespace Thornswood
             try { return File.Exists(MadeFile) ? File.ReadAllLines(MadeFile) : new string[0]; }
             catch (Exception ex) { Swallow.Note("OwnGame.MadeLines", ex); return new string[0]; }
         }
-
-        /// <summary>A text value from made.txt, such as source, or "".</summary>
-        static string RecordedText(string key)
-        {
-            foreach (string line in MadeLines())
-                if (line.StartsWith(key + "=", StringComparison.Ordinal)) return line.Substring(key.Length + 1).Trim();
-            return "";
-        }
     }
 }

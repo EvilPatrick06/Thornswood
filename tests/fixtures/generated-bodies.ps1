@@ -4,7 +4,7 @@
 
   Since d2519bb a publish needs the covered bodies Build-Generated.ps1 makes:
   Assert-ShipGeneratedBodies (scripts\release\Ship-Rules.ps1) wants every file
-  $ShipGeneratedBodyFiles names in <Root>\Game, and <Root>\Profile\OwnGame\generated.txt
+  $ShipGeneratedBodyFiles and $ShipGeneratedOutfitFiles (#2454) name in <Root>\Game, and <Root>\Profile\OwnGame\generated.txt
   listing each with its sha256, naming <Root>\Game as the folder it was built
   in, and current by Get-GeneratedState (scripts\mods\Generated.ps1). A
   stand-in without them is refused before the part a harness is about.
@@ -24,7 +24,7 @@ function New-GeneratedBodies([string]$Root, [string]$Repo) {
     $game = Join-Path $Root 'Game'
     $bodies = & {
         . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
-        $ShipGeneratedBodyFiles
+        @($ShipGeneratedBodyFiles) + @($ShipGeneratedOutfitFiles)
     }
     & {
         . (Join-Path $Repo 'scripts\mods\Generated.ps1')

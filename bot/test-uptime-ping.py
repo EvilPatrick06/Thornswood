@@ -23,7 +23,7 @@ outside monitor alerts when the pings stop; this checks the bot half:
 The real bot module is imported and its real functions are run against a fake
 monitor on 127.0.0.1. Never connects to anything else.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import http.server
 import os

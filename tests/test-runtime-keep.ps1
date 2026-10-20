@@ -15,7 +15,6 @@ try {
     $recordPath = Join-Path $work 'client-build.json'
     [IO.File]::WriteAllText($recordPath, $record)
     $exe = Join-Path $work 'runtime-keep-test.exe'
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
     & $LauncherCsc /nologo /target:exe "/out:$exe" /r:System.IO.Compression.dll /r:System.IO.Compression.FileSystem.dll "/resource:$recordPath,client-build.json" (Join-Path $Repo 'launcher\app\Keep.cs') (Join-Path $Repo 'launcher\app\ClientRuntime.cs') (Join-Path $Repo 'tests\fixtures\RuntimeKeepTest.cs')
     if ($LASTEXITCODE) { throw 'Runtime/Keep fixture did not compile' }
     & $exe $work

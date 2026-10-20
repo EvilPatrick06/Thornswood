@@ -20,7 +20,7 @@ The background half runs the real card.render and the real make-join-card.py.
 
 Read only. Never connects to anything.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import io
 import json
@@ -359,7 +359,7 @@ yes('B2 the background is the size the card always was, 1000 by 360 (got %r)'
 
 def mean(im, box):
     # get_flattened_data, not getdata: Pillow 12.1 deprecated getdata and
-    # Pillow 14 removes it (#1401). The pin is 12.3.0, which has both.
+    # Pillow 14 removes it (#1401). The pin is 13.0.0, which has both.
     px = list(im.crop(box).get_flattened_data())
     return [sum(p[i] for p in px) / float(len(px)) for i in range(3)]
 

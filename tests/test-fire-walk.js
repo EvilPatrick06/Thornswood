@@ -35,6 +35,15 @@
 // that the slice does stop once its time is spent, and that the walk finishes
 // over the next slices with the same answer.
 //
+// NO CLOCK DECIDES A WALK (#2590). Two timers sat around this walk: an empty
+// cell was walked again every 8 s, and bases that resolved to nothing were
+// asked for again every 4 s, over a load race nobody had measured. A cell is
+// now walked again only when the engine says the cell underfoot has finished
+// loading (cellFullyLoaded, fireCellLoaded), and the bases are resolved once.
+// The lifted code gets the harness's clock for Date.now as well, and S7 to
+// S10 move it by hours between asks: a walk or an ask on a clock shows up.
+// Against the plugin with the two timers, S7, S8 and S10 fail.
+//
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -81,6 +90,9 @@ const NOT_A_FIRE = 0x999;
 function standingClock() {
   const c = { t: 1000 };
   c.performance = { now: function () { return c.t; } };
+  // Date.now too, the same clock, so a wait on the wall clock in the lifted
+  // code moves when the harness moves time and S7 to S10 would see it.
+  c.Date = { now: function () { return c.t; } };
   return c;
 }
 
@@ -100,10 +112,11 @@ function harness(clock) {
     }
   };
   const fn = new Function('sp', 'log', 'FIRE_BASES', 'FIRE_FILES',
-    'FIRE_REACH', 'FIRE_INSIDE', 'performance', walk + fires +
+    'FIRE_REACH', 'FIRE_INSIDE', 'performance', 'Date', 'PLACED_WATERS', 'WADE_DEEP', walk + fires +
     '\nreturn {' +
     '  spots: fireSpotsHere,' +
     '  distance: fireDistance,' +
+    '  loaded: typeof fireCellLoaded === "function" ? fireCellLoaded : function () { },' +
     '  walked: function () { return fireWalked; },' +
     '  hits: function () { return fireHits; },' +
     '  threw: function () { return fireThrew; },' +
@@ -113,7 +126,7 @@ function harness(clock) {
     '};');
   const api = fn(sp, log,
     [['Skyrim.esm', FXFIRE01], ['Skyrim.esm', EMBERS_HEAVY]], ['Skyrim.esm'],
-    Number(reach[1]), Number(inside[1]), time.performance);
+    Number(reach[1]), Number(inside[1]), time.performance, time.Date, [], 70);
   api.logs = logs;
   api.clock = time;
   api.sp = sp;
@@ -266,6 +279,103 @@ if (walk !== null && fires !== null && reach && inside) {
     yes('S6 the slice that resolves the last base leaves the walk nothing', h.bases() === 2 && calls.n === 0);
     const third = tryIt(function () { return h.distance(0, 0, 0, me); });
     yes('S6 the walk has the next slice to itself', third.err === null && third.value === 30 && calls.n === 4);
+  }
+
+  // S7 to S10, #2590: a cell is walked again when the engine says it has
+  // finished loading (cellFullyLoaded), and never on a clock. The clock here
+  // is moved by hours between asks: nothing may depend on it.
+
+  // S7: AN EMPTY WALK STANDS until the cell says it has loaded. The room
+  // gets its fire after the first walk, the way a cell still loading does.
+  {
+    const h = harness();
+    const calls = { n: 0 };
+    const refs = { 24: [ref(NOT_A_FIRE, 0, 0, 0)] };
+    const forge = cell(0x16bdf, refs, calls);
+    const me = standingIn(forge);
+    const first = tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S7 a room with no fire of ours yet is no fire', first.err === null && first.value === -1);
+    const asked = calls.n;
+    refs[24].push(ref(FXFIRE01, 20, 0, 0));
+    let later = null;
+    for (let k = 0; k < 5; k++) {
+      h.clock.t += 3600 * 1000;
+      later = tryIt(function () { return h.distance(0, 0, 0, me); });
+    }
+    yes('S7 the empty list stands however long it is asked, no walk on a clock',
+        later.err === null && later.value === -1 && calls.n === asked);
+    const ev = tryIt(function () { return h.loaded({ cell: forge }); });
+    yes('S7 the cell finishing loading does not throw', ev.err === null);
+    yes('S7 and says what the walk before it had seen',
+        h.logs.indexOf('fires: cell 16bdf finished loading after it was walked (0 of ours, out of 1 thing(s) looked at), so it is walked again') >= 0);
+    const after = tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S7 the walk after it finds the fire', after.err === null && after.value === 20 &&
+        h.logs.indexOf('fires: 1 of ours in this cell, out of 2 thing(s) looked at') >= 0);
+    const n2 = calls.n;
+    h.clock.t += 3600 * 1000;
+    tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S7 and that list is kept, no third walk', calls.n === n2);
+  }
+
+  // S8: A FULL LIST FROM A WALK RUN TOO SOON is redone as well, which the
+  // retry never did; and while the second walk runs, the first list answers.
+  {
+    const h = harness();
+    const calls = { n: 0 };
+    const refs = { 24: [ref(FXFIRE01, 500, 0, 0)] };
+    const yard = cell(0x1a275, refs, calls);
+    const me = standingIn(yard);
+    yes('S8 the first walk finds the far fire', h.distance(400, 0, 0, me) === 100);
+    refs[24].push(ref(EMBERS_HEAVY, 10, 0, 0));
+    yes('S8 the fire that came in late is not seen before the cell says it is in',
+        h.distance(0, 0, 0, me) === -1);
+    h.loaded({ cell: yard });
+    // Each read now costs the slice, so the second walk takes more than one ask.
+    const slow = cell(0x1a275, refs, calls, function () { h.clock.t += 1; });
+    const meSlow = standingIn(slow);
+    const mid = h.distance(450, 0, 0, meSlow);
+    yes('S8 mid way through the second walk, the first list still answers', mid === 50 && h.hits() === 1);
+    let d = mid;
+    for (let k = 0; k < 5 && h.hits() !== 2; k++) { d = h.distance(0, 0, 0, meSlow); }
+    yes('S8 the second walk keeps both', h.hits() === 2 && d === 10);
+  }
+
+  // S9: ONLY THE CELL UNDERFOOT. Cells load around somebody all the time.
+  {
+    const h = harness();
+    const calls = { n: 0 };
+    const here = cell(0x42247, { 24: [ref(FXFIRE01, 30, 0, 0)] }, calls);
+    const there = cell(0x42249, { 24: [] }, { n: 0 });
+    const me = standingIn(here);
+    h.distance(0, 0, 0, me);
+    const asked = calls.n;
+    const lines = h.logs.length;
+    h.loaded({ cell: there });
+    h.loaded({});
+    h.loaded(null);
+    h.distance(0, 0, 0, me);
+    yes('S9 another cell loading, or an event with no cell, walks nothing and says nothing',
+        calls.n === asked && h.logs.length === lines);
+  }
+
+  // S10: NO BASE RESOLVES. One pass, said once, never asked again.
+  {
+    const h = harness();
+    let asks = 0;
+    h.sp.Game.getFormEx = function () { asks++; return null; };
+    const calls = { n: 0 };
+    const yard = cell(0x9a7d, { 24: [ref(FXFIRE01, 0, 0, 0)] }, calls);
+    const me = standingIn(yard);
+    const r = tryIt(function () { return h.distance(0, 0, 0, me); });
+    yes('S10 nothing resolved is no fire, no throw', r.err === null && r.value === -1);
+    yes('S10 and says so once', h.logs.indexOf('fires: 0 of 2 bases resolved, across 1 plugin(s), so no fire warms or burns anybody this session') >= 0);
+    const once = asks;
+    for (let k = 0; k < 3; k++) {
+      h.clock.t += 3600 * 1000;
+      h.distance(0, 0, 0, standingIn(cell(0x9a7e + k, { 24: [] }, calls)));
+    }
+    yes('S10 the bases are not asked for again in later cells', asks === once && once === 2);
+    yes('S10 and no cell is walked for nothing', calls.n === 0);
   }
 }
 

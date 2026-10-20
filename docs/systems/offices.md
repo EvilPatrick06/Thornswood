@@ -22,17 +22,58 @@ See [Death](death.md).
 
 ## What the server already treats as an office
 
-A Jarl is Jarl of one hold, chosen when the office is taken, and names
-stewards and that hold's guards. A hold has one Jarl (Patrick,
-12 October, #502): its seat is kept by the server, a hold whose seat is
-taken is not offered to anybody else, and the seat comes free when its
-Jarl presses Give up the office. Giving it up hands the hold's jail back
-to nobody; the guards stay the hold's. The office is on the character,
-not a Discord role by itself. A steward is the only one who evicts, sets rent, names
-the hold's box, and moves the notice board, and a Jarl counts as a
-steward. All of it is buttons on the Office page of the K panel, and
-nothing is typed. See [Property](property.md) and
-[Notice boards](noticeboards.md).
+Every office the server knows is a Discord role on the account (Patrick,
+15 October, #2551), and the role is the one truth for who may hold it. The
+office itself is one character's (Patrick, 16 October: "it's character
+based not account based"): the server keeps which one character on the
+account holds each office, and only that character acts in it. Every other
+character on the account is ordinary.
+
+- The Jarl names a character on the Office page, and the role is set on
+  that character's account; that character holds the office.
+- A role given anywhere else (the bot's office panel, or staff for a
+  Jarl) names only an account. Each of its characters sees the office on
+  the Office page of K, and the one that presses Hold it here holds it.
+  Pressing it on another character moves the office there.
+- Without the role there is no office: a role taken away in Discord ends
+  the office at once, and the record of which character held it is
+  deleted the next time the game reads the roles, so a role given back
+  later is held again only when somebody chooses the character.
+
+- **The Jarl** of a hold holds its "Jarl of <Hold>" role, which staff
+  give. Nobody takes the office or picks a hold in the game. A hold has
+  one Jarl: if two accounts hold the same hold's Jarl role, neither acts
+  as Jarl until staff take it from all but one, and staff are told which
+  accounts, in the staff channel.
+- **The Court** of a hold is everybody holding its "<Hold> Court" role.
+  They are officers at that hold's drop box.
+- **The Steward** of a hold holds its "Steward of <Hold>" role. A steward
+  is the only one in the world who evicts and sets rent (staff evict and
+  set rent too, below), and moves
+  their own hold's notice board, and the Jarl of a hold keeps it as its
+  steward too. All of it in their own hold only: a building's hold is the
+  hold its doors open onto ([Property](property.md), Where this is).
+- **The Guards** of a hold hold its "Guard of <Hold>" role (below).
+
+The Jarl of a hold gives and takes its Court, Steward and Guard roles, for
+their own hold only, two ways: in Discord, from the office panel in
+#choose-your-hold, with Add and Remove beside each office, and in the
+game, with Name and Remove on the Office page of the K panel. In the game
+the server asks the site, and the bot's account sets the role in Discord.
+Every change is said in the staff channel with who changed what, and
+Discord's audit log keeps it with the reason. Staff hold no office by
+being staff. They do end claims and set rent at any building, in any
+hold or none, with the same buttons on the Office page of K, which says
+they act as staff there, and every press is in the staff log (Patrick,
+17 October, #2551; [Property](property.md)). All of it is buttons, and
+nothing is typed. See
+[Property](property.md) and [Notice boards](noticeboards.md).
+
+The roles are made for the nine holds of Skyrim and for Raven Rock
+(Patrick, 16 October): "Jarl of Raven Rock", "Raven Rock Court", "Steward
+of Raven Rock" and "Guard of Raven Rock". Raven Rock has no Citizen role
+or hold channel. Its board, its drop box and its jail answer to them like
+any hold's.
 
 The [Merchant's Guild](merchants-guild.md) is the merchant NPCs.
 It has no joinable roll or factor appointment for people.
@@ -63,8 +104,8 @@ The rest of the jail, as Patrick decided on 12 October (#502):
 - Only the Jarl of a hold claims its jail building. Nobody else is
   offered the claim at its door, and its deed presented by anybody else
   claims nothing. A claim made on a jail before this rule, by anybody
-  but that hold's seated Jarl, ended once at the first server start
-  with the rule, and the server log names each.
+  but that hold's Jarl, ended once at the first server start with the
+  rule, and the server log names each.
 - There is no timer. Whoever is locked in stays until a guard of that
   hold unlocks the cell, or until they pick the lock, which is allowed.
 - The game's own jail keys open nothing: the world does not hand one
@@ -78,13 +119,17 @@ The rest of the jail, as Patrick decided on 12 October (#502):
   hall of the dead ([Death](death.md)).
 
 A guard of a hold also takes down any post on that hold's notice board,
-and on no other hold's board. See [Notice boards](noticeboards.md).
+and on no other hold's board, and so does that hold's Jarl. A guard is an
+officer at that hold's drop box. See [Notice boards](noticeboards.md).
 
-The Jarl of a hold names its guards (Patrick, 12 October, #502), with
-Name guard beside a person in the world on the Office page of K, and
-takes the office back with Remove. A Jarl names and removes only their
-own hold's guards, themselves included. A guard keeps one hold, so
-somebody who guards another hold is that hold's Jarl's to remove first.
+A guard holds the hold's "Guard of <Hold>" role, which its Jarl gives
+and takes (Patrick, 15 October, #2551), from the office panel in Discord
+or with Name and Remove on the Office page of K. A Jarl names and removes
+only their own hold's guards, themselves included.
+
+The Guard role is also to give handcuff access. There are no handcuffs
+in the game yet; what they do is a question for Patrick on #2551, and the
+role is what will open them.
 
 ## Ambassador
 
@@ -130,29 +175,36 @@ payouts on the trading company page leave it. See
 
 ## Where this is
 
-Jarl and steward are in the server, including eviction, rent, the box,
-and the board. They are the Office page of the K panel, which only a
-character that holds an office or may take one sees, and a guard. On an
-account with the Discord Jarl role, or an admin's, it offers the ten
-holds: pressing one twice takes the Jarl office of that hold, which is
-chosen once. A hold with a seated Jarl is named with its Jarl and not
-offered. A Jarl seated before there was a hold is offered the same
-ten until they choose, and every Jarl has Give up the office, pressed
-twice. A Jarl
-names a steward by picking somebody in the world from a list of names,
-and removes one with Remove beside the name; a steward is kept by
-profile, and the list shows the profile beside the name, so two
-characters with one name are told apart. A steward sees the door they
+The Jarl, the Court, the Steward and the Guards are in the server,
+including eviction, rent, the box, the board and the jail. Each is a
+Discord role (`bot\Build-Discord.py` makes them, never hoisted, and never
+deletes them), which the site reads with the other roles and hands the
+game server for each profile (`/api/allowed`); the game reads every
+office through one function, `officeOf` in the property block. They are
+the Office page of the K panel, which only somebody who holds an office
+sees. The Jarl of a hold sees its Court, its Steward and its Guards:
+who holds each, by the character that holds it (named when in the world,
+and by profile with its name when not), or an account none of whose
+characters holds it yet, with Remove, which asks twice, and the people in
+the world who do not hold it, with Name. Naming another character of an
+account that already holds the role moves the office there, and Discord
+is not asked. Anybody whose account holds a role that this character does
+not hold sees it with Hold it here, which asks twice. A row shows the profile beside the name, so two
+characters with one name are told apart. Name and Remove send the change
+to the site (`/api/office`), which checks the Jarl's role again and sets
+the role in Discord with the bot's token; the game reads the roles back
+at once and writes the page again. In Discord the same Jarl has the office
+panel in #choose-your-hold (`bot\bot.py`). A steward sees the door they
 opened in the last minute, who holds it and the rent owed there, with
-Evict, Set rent and No rent; the container they opened in the last
-minute, with the ten holds to make it that hold's box; and the ten
-boards, each moved to where the steward stands. Evict and moving a
-board ask for a second press. The Jarl of a hold sees its guards with
-Remove, and the people in the world who guard no hold with Name guard;
-a guard sees which hold and which jail they keep. The server checks
-every press again and answers in the chat. Housecarl, thane, captain, and priest are the public
-rules and no command. A guard's cells are in the server (#502): the
-register of guards and the cells they turned is `private\law.json`, and
-the jails are `game\data\jails.json`, read out of the load order by
-`scripts\dev\Build-JailTable.py`. Ambassador and Archmage of the College are this
-plan and no command.
+Evict, Set rent and No rent; and their own hold's board, moved to where
+the steward stands. A steward no longer marks a container as a hold's
+box: the drop box on the board is the only one (Patrick, 15 Oct, #2298). Evict and moving a
+board ask for a second press. The Court, a Steward and a guard each see
+which hold they serve and what it lets them do, and a guard which jail
+they keep. A Jarl whose role another account holds too sees that they
+do not act, and why. The server checks every press again and answers in
+the chat. Housecarl, thane, captain, and priest are the public rules and
+no command. A guard's cells are in the server (#502): the cells guards
+turned are `private\law.json`, and the jails are `game\data\jails.json`,
+read out of the load order by `scripts\dev\Build-JailTable.py`.
+Ambassador and Archmage of the College are this plan and no command.

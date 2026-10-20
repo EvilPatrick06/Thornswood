@@ -90,8 +90,12 @@ function Get-LiveLauncher([string]$repoDir) {
   $from = 'https://thornswood.net/feed/version.json'
   try {
     if ($env:THORNSWOOD_TEST_SITE_DIR) {
-      $from = Join-Path $env:THORNSWOOD_TEST_SITE_DIR 'feed\version.json'
-      if (-not (Test-Path -LiteralPath $from)) { return $null }
+      # The newest of the feed's generations (Feed-Store.ps1, #2727).
+      $gens = Join-Path $env:THORNSWOOD_TEST_SITE_DIR 'feed\version'
+      if (-not (Test-Path -LiteralPath $gens)) { return $null }
+      $gen = @(Get-ChildItem -LiteralPath $gens -File | Where-Object { $_.Name -match '^\d{8}\.json$' } | Sort-Object Name | Select-Object -Last 1)
+      if (-not $gen.Count) { return $null }
+      $from = $gen[0].FullName
       $json = [IO.File]::ReadAllText($from)
     } else {
       [Net.ServicePointManager]::SecurityProtocol = [Net.ServicePointManager]::SecurityProtocol -bor [Net.SecurityProtocolType]::Tls12
@@ -178,11 +182,33 @@ if ($branch -eq 'main') {
   # request like any other. Asked rather than assumed, because the setting can
   # be changed at any time and a wrong instruction here sends somebody into a
   # refused push with a release half prepared.
+  # Three answers, not two: GitHub says on, GitHub says off, or GitHub could
+  # not be asked (no gh, no sign in, no network). The third used to read as
+  # off and printed a direct push as allowed. It now takes the branch, which
+  # works whichever way the setting is.
   $enforced = ''
-  try { $enforced = (& gh api repos/EvilPatrick06/Thornswood/branches/main/protection --jq '.enforce_admins.enabled' 2>$null | Out-String).Trim() } catch { }
-  if ($enforced -eq 'true') {
-    Say '  main is protected against everybody, including you, so this cannot be' 'Yellow'
-    Say '  pushed straight there. Put it on a branch:' 'Yellow'
+  $askWhy = ''
+  if (-not (Get-Command gh -ErrorAction SilentlyContinue)) {
+    $askWhy = 'gh is not on the path'
+  } else {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+      $said = @(& gh api repos/EvilPatrick06/Thornswood/branches/main/protection --jq '.enforce_admins.enabled' 2>&1)
+      $rc = $LASTEXITCODE
+    } finally { $ErrorActionPreference = $old }
+    $text = (($said | ForEach-Object { [string]$_ }) -join ' ').Trim()
+    if ($rc -ne 0) { $askWhy = 'gh api answered exit ' + $rc + $(if ($text) { ': ' + $text } else { '' }) }
+    elseif ($text -eq 'true' -or $text -eq 'false') { $enforced = $text }
+    else { $askWhy = 'GitHub answered "' + $text + '", not true or false' }
+  }
+  if ($askWhy -or $enforced -eq 'true') {
+    if ($askWhy) {
+      Say ('  Could not ask GitHub whether main is protected against everybody (' + $askWhy + ').') 'Yellow'
+      Say '  The branch below works whichever way that setting is:' 'Yellow'
+    } else {
+      Say '  main is protected against everybody, including you, so this cannot be' 'Yellow'
+      Say '  pushed straight there. Put it on a branch:' 'Yellow'
+    }
     Write-Host ''
     Say ("      git branch -f patrick/launcher-$target; git reset --hard HEAD~1; git checkout patrick/launcher-$target") 'White'
     Say '  Moves the commit you just made onto a branch and takes main back.' 'DarkGray'

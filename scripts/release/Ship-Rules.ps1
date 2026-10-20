@@ -208,16 +208,24 @@ function Test-ShipRuntime([string]$rel) {
 # ours to delete off a machine either.
 $ShipClientFiles = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 $ShipClientHashes = @{}
-try {
-    $clientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
-    if (Test-Path -LiteralPath $clientRecord) {
-        $rec = Get-Content -LiteralPath $clientRecord -Raw | ConvertFrom-Json
-        foreach ($p in $rec.files.PSObject.Properties.Name) {
-            [void]$ShipClientFiles.Add($p)
-            $ShipClientHashes[$p] = ([string]$rec.files.$p.sha256).ToLowerInvariant()
-        }
+# A copy of this file with no record beside it (as test fixtures make) has no
+# client paths. A record that is there and does not read stops whatever
+# loaded this (#2711): read in a try with an empty catch, it left the six
+# paths unlisted, so the client runtime fell under Data\Platform as ours and
+# would ship whatever bytes the game folder held, unchecked against the record.
+$clientRecord = Join-Path $PSScriptRoot '..\..\records\client-build.json'
+if (Test-Path -LiteralPath $clientRecord) {
+    try {
+        $rec = Get-Content -LiteralPath $clientRecord -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop
+        if (-not $rec -or -not $rec.PSObject.Properties['files'] -or -not $rec.files) { throw 'it names no files' }
+    } catch {
+        throw ("Ship-Rules.ps1: records\client-build.json does not read (" + $_.Exception.Message + "), so the client runtime's six paths cannot be told from ours. Nothing was packed or sent.")
     }
-} catch { }
+    foreach ($p in $rec.files.PSObject.Properties.Name) {
+        [void]$ShipClientFiles.Add($p)
+        $ShipClientHashes[$p] = ([string]$rec.files.$p.sha256).ToLowerInvariant()
+    }
+}
 
 # Whether the file at one of the six recorded paths is the recorded build, byte
 # for byte. $full is the file when the caller has it. Without it the file is
@@ -774,6 +782,37 @@ function Test-ShipBethesdaLeftAlone([string]$rel) {
     return $false
 }
 
+# MADE FROM THE GAME ON EACH MACHINE, NEVER SHIPPED (#2827).
+#
+# The main menu (Skyrim's own startmenu.swf with its logo shapes taken out,
+# #2177) and the notice board's two meshes (pieces of Skyrim's own meshes,
+# #2298) are Bethesda's files, edited or put together, and Bethesda's terms
+# grant no right to hand those on (#2792). Patrick chose on 19 Oct that each
+# machine makes them from its own game (#2827, option 2): the launcher before
+# every Play (launcher\app\MadeFromGame.cs) and Go.ps1 for a ship root. So
+# they are in every game folder Ship reads, and none of them may leave it: a
+# pack, the installer or a record that carried one would hand on Bethesda's
+# file again. Test-ShipBethesda says yes to them, so the record guard refuses
+# them and Scrub-Feed.ps1 takes them out of what is already on the site.
+#
+# NEVER LISTED AS REMOVED either (Test-ShipMachine): an install that took one
+# from an earlier pack has the very bytes the launcher makes, and a delete.txt
+# line would only take it away until the next Play made it again. The
+# launcher's list is FromGame.Files; tests\test-2827-from-game.ps1 holds the
+# two to each other.
+$ShipMadeFromGame = @(
+    'Data\Interface\startmenu.swf',
+    'Data\meshes\thornswood\noticeboard01.nif',
+    'Data\meshes\thornswood\dropbox01.nif'
+)
+
+function Test-ShipMadeFromGame([string]$rel) {
+    foreach ($f in $ShipMadeFromGame) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # A mod Thornswood has taken out. Never shipped, and never listed as removed:
 # the launcher takes these out of its own game folder itself (OwnGame.Retired,
 # rules 7), so a pack has nothing to delete and no Vortex file in the Steam
@@ -925,7 +964,8 @@ function Test-ShipBackup([string]$rel) {
 # drops. Measured the same day, no pack, record or loose file on the site names
 # it.
 function Test-ShipBethesda([string]$rel) {
-    return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel))
+    return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel) -or
+            (Test-ShipMadeFromGame $rel))
 }
 
 # ---------------------------------------------------------------------------
@@ -1062,6 +1102,8 @@ function Test-ShipMachine([string]$rel) {
     if (Test-ShipVanilla $rel) { return $true }
     if (Test-ShipForeignFramework $rel) { return $true }
     if (Test-ShipBethesdaLeftAlone $rel) { return $true }
+    # Made on each machine from its own game (#2827).
+    if (Test-ShipMadeFromGame $rel) { return $true }
     # One machine's own by kind (#1239), the named files and Vortex's records
     # among them. The runtime folders are the one kind left to Test-ShipRuntime,
     # which lists them as removed when a baseline once had them.
@@ -1237,11 +1279,11 @@ $ShipOursFiles = @(
     'Data\Thornswood-Last.esp',
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
-    # Our main menu: no Bethesda logo and no button list, an empty loading
-    # spinner (Checks.cs, since 16 September), and the menu music's silent
-    # stand in for the game's theme. Go.ps1 writes these four from
-    # game\ours ($oursMenuFiles there; change the two together).
-    'Data\Interface\startmenu.swf',
+    # An empty loading spinner (Checks.cs, since 16 September) and the menu
+    # music's silent stand in for the game's theme. Go.ps1 writes these
+    # three from game\ours ($oursMenuFiles there; change the two together).
+    # The main menu itself, with no Bethesda logo, is made on each machine
+    # from the game's own since #2827 ($ShipMadeFromGame).
     'Data\Interface\loadwaitspinner.swf',
     'Data\music\special\mus_maintheme.xwm',
     # SkyHUD's settings as Thornswood set them (16 September, after the first
@@ -1249,13 +1291,7 @@ $ShipOursFiles = @(
     # were Daedric Online's by their own first lines and are one machine's
     # (#1239); TrueHUD\RP_Bosses.ini is Daedric Online's boss list (#1253), so
     # neither is named here.
-    'Data\Interface\skyhud\skyhud.txt',
-    # The notice board and the hold's drop box, Thornswood's own meshes,
-    # built from vanilla Skyrim pieces by scripts\mods\Build-NoticeBoard.py
-    # (#2298). Every texture they name is the game's own, so only the two
-    # meshes ship. Go.ps1 writes them from game\ours with the four above.
-    'Data\meshes\thornswood\noticeboard01.nif',
-    'Data\meshes\thornswood\dropbox01.nif'
+    'Data\Interface\skyhud\skyhud.txt'
 )
 
 # NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.
@@ -1277,7 +1313,16 @@ $ShipGeneratedBodyFiles = @(
     'Data\meshes\actors\character\character assets\malebody_0.nif',
     'Data\meshes\actors\character\character assets\malebody_1.nif'
 )
-$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
+# THE OUTFITS FITTED TO THOSE BODIES ARE OURS (#2454), built by the same
+# scripted build from the collection's BodySlide projects named in
+# records\generated.json (bodyslide.outfits), at their own slider defaults and
+# with no RaceMenu morphs (#1004). Exact paths, the OutputPath and OutputFile
+# (_0 and _1) of each set. None yet: the travel clothes and the executioner
+# come with the collection revision that deploys their projects (#2454). Never
+# anything from Immersive Armors: Patrick, 17 Oct, it is used as-is through the
+# collection and nothing built from it is redistributed (permission-held.txt).
+$ShipGeneratedOutfitFiles = @()
+$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + $ShipGeneratedOutfitFiles + @(
     'Data\meshes\animationdatasinglefile.txt',
     'Data\meshes\animationsetdatasinglefile.txt',
     'Data\meshes\actors\*\behaviors\*.hkx',
@@ -1434,8 +1479,20 @@ $ShipCollectionRevision = 0
 # which the callers dot-source; 0 without it.
 function Get-ShipCollectionRevision([string]$Root) {
     if (-not (Get-Command Get-CollectionRevision -ErrorAction SilentlyContinue)) { return 0 }
+    # No config.json, or one naming no collection, is the launcher's own
+    # collection. One that is there and does not read stops whatever asked,
+    # before anything is packed (Patrick, 19 Oct, #2711 decision 2 B): the
+    # revision decides which held files ship, and the launcher's own
+    # collection's may not be the one it meant to name. Until then it fell
+    # back to it, with an empty catch.
     $url = ''
-    try { $url = [string](Get-Content -LiteralPath (Join-Path $Root 'config.json') -Raw | ConvertFrom-Json).CollectionUrl } catch { }
+    $cfg = Join-Path $Root 'config.json'
+    if (Test-Path -LiteralPath $cfg) {
+        $cfgDoc = $null
+        try { $cfgDoc = Get-Content -LiteralPath $cfg -Raw -ErrorAction Stop | ConvertFrom-Json -ErrorAction Stop }
+        catch { throw ("$cfg does not read (" + ($_.Exception.Message -replace '\s+', ' ') + "), so the collection revision it names is not known, and nothing held for a later revision may ship. Fix config.json and run it again.") }
+        if ($cfgDoc -and $cfgDoc.PSObject.Properties['CollectionUrl']) { $url = [string]$cfgDoc.CollectionUrl }
+    }
     if (-not $url) { $url = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/7essxf' }
     return [int](Get-CollectionRevision (Get-CollectionSlug $url))
 }
@@ -1443,18 +1500,19 @@ function Get-ShipCollectionRevision([string]$Root) {
 # Plugins game\required-data puts in Data\ before a scan (Ensure-ShipRequiredData).
 # Worked out in a child scope: this file is dot-sourced into its callers, and
 # a name set here would overwrite one of theirs.
+# No folder (a copy of this file alone) lists none; a folder that cannot be
+# listed stops whatever loaded this, rather than shipping without the list
+# (#2711; it was a try with an empty catch).
 $ShipRequiredDataFiles = @(& {
-    try {
-        $dir = Join-Path $PSScriptRoot '..\..\game\required-data'
-        if (Test-Path -LiteralPath $dir) {
-            Get-ChildItem -LiteralPath $dir -File | Where-Object { $_.Name -ne 'README.md' } | ForEach-Object { 'Data\' + $_.Name }
-        }
-    } catch { }
+    $dir = Join-Path $PSScriptRoot '..\..\game\required-data'
+    if (Test-Path -LiteralPath $dir) {
+        Get-ChildItem -LiteralPath $dir -File -ErrorAction Stop | Where-Object { $_.Name -ne 'README.md' } | ForEach-Object { 'Data\' + $_.Name }
+    }
 })
 
-# OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
-# machine (Common Clothes' travel clothes, Immersive Armours' Bosmer armour,
-# More Craftable Equipment's executioner). Patrick, 29 September: Thornswood
+# OURS FOR NOW, UNTIL #1259: 122 outfit meshes built in BodySlide on some other
+# machine (Common Clothes' travel clothes, More Craftable Equipment's
+# executioner; the Bosmer armour's morphs left in #2454, and nothing is built from it). Patrick, 29 September: Thornswood
 # builds the outfits itself from the collection's BodySlide projects, and until
 # that build replaces these they keep shipping so nothing looks broken. Exact
 # paths, in built-until-1259.txt beside this file; the build that closes #1259
@@ -1462,17 +1520,56 @@ $ShipRequiredDataFiles = @(& {
 # Scrub-Feed leaves them on the site, since they are ours while listed.
 # In a child scope, for the reason given over $ShipRequiredDataFiles.
 $ShipBuiltUntil1259 = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+# No list (a copy of this file alone) holds none; one that is there and cannot
+# be read stops whatever loaded this (#2711; it was a try with an empty catch).
 foreach ($ShipBuiltLine in @(& {
-    try {
-        $list = Join-Path $PSScriptRoot 'built-until-1259.txt'
-        if (Test-Path -LiteralPath $list) {
-            foreach ($line in [IO.File]::ReadAllLines($list)) {
-                $one = $line.Trim()
-                if ($one -and -not $one.StartsWith('#')) { $one }
-            }
+    $list = Join-Path $PSScriptRoot 'built-until-1259.txt'
+    if (Test-Path -LiteralPath $list) {
+        foreach ($line in [IO.File]::ReadAllLines($list)) {
+            $one = $line.Trim()
+            if ($one -and -not $one.StartsWith('#')) { $one }
         }
-    } catch { }
+    }
 })) { [void]$ShipBuiltUntil1259.Add($ShipBuiltLine) }
+
+# NEVER HANDED ON (#2454). A file used only as the collection installs it
+# never ships, whichever list above calls it ours: permission-held.txt beside
+# this file. Patrick, 17 Oct: Immersive Armors is used as-is through the
+# collection and nothing built from it is redistributed, so its Bosmer armour
+# folder is held. One hold a line: a path under the game folder (a folder ends
+# in \), two or more spaces or a tab, then a reason naming its issue. A line
+# with no reason, or no issue, stops the script. The repo's own list is kept by
+# tests\test-ship-permission-held.ps1 in the gate, which fails without it; a
+# copy of this file alone (as test fixtures make) has no list and no holds,
+# like the lists above. Read-ShipPermissionHeld refuses a missing list. A release
+# that drops a held file an earlier one shipped lists it as gone with its
+# sha256 (Publish-Update, #1261), so installs lose our copy and keep any other.
+function Read-ShipPermissionHeld([string]$List) {
+    if (-not (Test-Path -LiteralPath $List -PathType Leaf)) { throw "The permission hold list is missing: $List. A hold is released by taking its line out; keep the file." }
+    $out = @()
+    foreach ($line in [IO.File]::ReadAllLines($List)) {
+        $one = $line.Trim()
+        if (-not $one -or $one.StartsWith('#')) { continue }
+        $parts = ([regex]'\t+| {2,}').Split($one, 2)
+        if ($parts.Count -lt 2 -or -not $parts[1].Trim()) { throw "A permission hold gives no reason: $one" }
+        if ($parts[1] -notmatch '#\d+') { throw "A permission hold names no issue: $one" }
+        $out += [pscustomobject]@{ Path = $parts[0].Trim().Replace('/', '\'); Reason = $parts[1].Trim() }
+    }
+    return $out
+}
+$ShipPermissionHeldList = Join-Path $PSScriptRoot 'permission-held.txt'
+$ShipPermissionHeld = @(if (Test-Path -LiteralPath $ShipPermissionHeldList -PathType Leaf) { Read-ShipPermissionHeld $ShipPermissionHeldList })
+
+# Whether a path is held until its maker's permission is recorded. Either slash.
+function Test-ShipPermissionHeld([string]$rel) {
+    $rel = $rel.Replace('/', '\')
+    foreach ($h in $ShipPermissionHeld) {
+        $p = [string]$h.Path
+        if ($p.EndsWith('\')) { if ($rel.StartsWith($p, 'OrdinalIgnoreCase')) { return $true } }
+        elseif ($rel -ieq $p) { return $true }
+    }
+    return $false
+}
 
 function Test-ShipGenerated([string]$rel) {
     foreach ($p in $ShipGeneratedPatterns) { if ($rel -like $p) { return $true } }
@@ -1505,7 +1602,7 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
             [pscustomobject]@{ Sha=$matches[1]; Rel=$matches[2].Replace('/', '\'); Destination=[IO.Path]::GetFullPath((Join-Path $GameDir $matches[2])) }
         }
     })
-    foreach ($rel in $ShipGeneratedBodyFiles) {
+    foreach ($rel in @($ShipGeneratedBodyFiles) + @($ShipGeneratedOutfitFiles)) {
         $file = Join-Path $GameDir $rel
         $destination = [IO.Path]::GetFullPath($file)
         $matching = @($rows | Where-Object { $_.Destination -ieq $destination })
@@ -1544,6 +1641,8 @@ function Test-ShipHeld([string]$rel, [int]$Revision = $ShipCollectionRevision) {
 # the generator's output. Inside Data\Platform this answers yes; that folder is
 # Test-ShipOtherServer's to decide.
 function Test-ShipOurs([string]$rel) {
+    # Never handed on (permission-held.txt, #2454): not ours to ship.
+    if (Test-ShipPermissionHeld $rel) { return $false }
     if ($rel.StartsWith('Data\Platform\', 'OrdinalIgnoreCase')) { return $true }
     if ($ShipClientFiles.Contains($rel)) { return $true }
     foreach ($o in $ShipOursFiles) { if ($rel -ieq $o) { return $true } }
@@ -1556,6 +1655,8 @@ function Test-ShipOurs([string]$rel) {
 # Somebody else's loose file, which never ships: not ours, and not held for the
 # collection at this revision.
 function Test-ShipNotOurs([string]$rel, [int]$Revision = $ShipCollectionRevision) {
+    # Never handed on (permission-held.txt, #2454), at every revision.
+    if (Test-ShipPermissionHeld $rel) { return $true }
     if (Test-ShipOurs $rel) { return $false }
     return (-not (Test-ShipHeld $rel $Revision))
 }

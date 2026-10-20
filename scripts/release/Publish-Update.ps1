@@ -127,8 +127,14 @@ if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
 # The dev launcher lives beside the main one. Its config.json carries the dev
 # ports and its Launcher folder holds the exe that gets uploaded.
 if ($Dev -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $Root + '-DevBuild' }
-if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
-    Die "No dev build at $Root. Install it from the main launcher's Settings page first."
+# Only the folder worked out here is asked for a Launcher folder (#2662): no
+# Launcher folder in <install>-DevBuild means the dev build was never
+# installed. A folder named by -Root is not: Ship always passes one, the ship
+# root Update-ShipRoot.ps1 makes has no Launcher folder, and the exe is read
+# from it only with -Launcher, after Ship's launcher step has put it there
+# ("No launcher at" below says so when it has not).
+if ($Dev -and -not $PSBoundParameters.ContainsKey('Root') -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
+    Die "No dev build at $Root. Install it from the main launcher's Settings page first, or name the folder with -Root."
 }
 
 # ------------------------------------------------------------ the feed store
@@ -155,6 +161,9 @@ if ($Dev -and -not (Test-Path (Join-Path $Root 'Launcher'))) {
 . (Join-Path $Here '..\deploy\ServerContent.ps1')
 # Where the notes are kept, in the feed or as a file of their own (#1050).
 . (Join-Path $Here 'Feed-News.ps1')
+# The signed release manifest (#2163, phase B): what it lists, and signing it.
+. (Join-Path $Here 'Release-Manifest.ps1')
+. (Join-Path $Here 'Sign-ReleaseCatalog.ps1')
 if (-not $ReleaseDir) { $ReleaseDir = Get-FeedStoreDir $Channel }
 if (-not (Test-Path -LiteralPath $ReleaseDir)) { New-Item -ItemType Directory -Path $ReleaseDir -Force | Out-Null }
 $haveLocal = (Test-Path -LiteralPath (Join-Path $ReleaseDir 'version.json')) -and (Test-Path -LiteralPath (Join-Path $ReleaseDir 'published.json'))
@@ -198,10 +207,13 @@ if (-not (Test-Path -LiteralPath $DistDir)) {
 # do quietly.
 $OldDist = Join-Path $Root '_dist'
 if (Test-Path -LiteralPath $OldDist) {
-    $oldMb = 0
-    try { $oldMb = ((Get-ChildItem -LiteralPath $OldDist -Recurse -File -EA SilentlyContinue | Measure-Object Length -Sum).Sum / 1MB) } catch { }
+    # A count for the person, never a reason to stop: what could not be read
+    # is said as an "at least" rather than left out of the number unsaid.
+    $oldUnread = @()
+    $oldMb = ([double](@(Get-ChildItem -LiteralPath $OldDist -Recurse -File -ErrorAction SilentlyContinue -ErrorVariable oldUnread) | Measure-Object Length -Sum).Sum) / 1MB
     Write-Host ("  releases stage in $DistDir now, not in $OldDist") -ForegroundColor DarkGray
-    Write-Host ("  the old one still holds {0:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $oldMb) -ForegroundColor Yellow
+    Write-Host ("  the old one still holds {0}{1:N1} MB. Check it with .\scripts\dev\Measure-Reclaim.ps1 -Path `"$OldDist`", then remove it." -f $(if ($oldUnread.Count) { 'at least ' } else { '' }), $oldMb) -ForegroundColor Yellow
+    if ($oldUnread.Count) { Write-Host ("  {0} part(s) of it could not be read to count: {1}" -f $oldUnread.Count, $oldUnread[0].Exception.Message) -ForegroundColor DarkGray }
 }
 
 # Profile\developer.flag was written here until 25 September, so the machine
@@ -244,8 +256,12 @@ $VersionFile = Join-Path $ReleaseDir 'version.json'
 # Skyrim they are looking at.
 function Get-SkyrimPath {
     $roots = @()
+    # Either key may be missing (Steam writes one or the other), so each is
+    # tested for, and a key without SteamPath names nothing.
     foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
-        try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+        if (-not (Test-Path -LiteralPath $k)) { continue }
+        $kp = Get-ItemProperty -LiteralPath $k
+        if ($kp.PSObject.Properties['SteamPath'] -and $kp.SteamPath) { $roots += ([string]$kp.SteamPath -replace '/', '\') }
     }
     foreach ($r in @($roots)) {
         $vdf = Join-Path $r 'config\libraryfolders.vdf'
@@ -699,23 +715,31 @@ function Read-Pending([string]$stateFile) {
     } catch { return $null }
 }
 
+# Each hands back '' when it did what it says, or a sentence saying what it
+# could not do (#2711): until 18 Oct both ran in a try with an empty catch, so
+# a note that was never written still let Done say the next run finishes this
+# release, and one that was never removed was left to name a release already
+# out. The caller says the sentence; the send it follows stands either way.
 function Write-Pending([string]$stateFile, [string]$id, [string]$why) {
     $f = Get-PendingFile $stateFile
-    if (-not $f) { return }
+    if (-not $f) { return 'there is no place to keep the note' }
     try {
         [ordered]@{
             id  = $id
             why = $why
             at  = (Get-Date).ToUniversalTime().ToString('s') + 'Z'
-        } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $f -Encoding UTF8
-    } catch { }
+        } | ConvertTo-Json -Depth 3 | Set-Content -LiteralPath $f -Encoding UTF8 -ErrorAction Stop
+        return ''
+    } catch { return ("the note that would finish $id could not be written to ${f}: " + $_.Exception.Message) }
 }
 
 function Clear-Pending([string]$stateFile) {
     $f = Get-PendingFile $stateFile
     if ($f -and (Test-Path -LiteralPath $f)) {
-        try { Remove-Item -LiteralPath $f -Force } catch { }
+        try { Remove-Item -LiteralPath $f -Force -ErrorAction Stop }
+        catch { return ("$f, the note of an unfinished release, could not be removed: " + $_.Exception.Message) }
     }
+    return ''
 }
 # ==== end thornswood publish resume ====
 
@@ -2226,9 +2250,10 @@ if ($repeat) {
 # since 6 Oct, because a dev publish with nothing new and a main Ship mark the
 # dev feed by it too (Set-DevFeedMarks, Update-DevFeedMarks). Main's fresh
 # release record proves which source commits have shipped; a note from before
-# sourceCommit is proved by the dev release it came with, found by its tag
-# (#2401); headline changes therefore cannot leave completed work marked
-# Dev-only.
+# sourceCommit, or with the empty one written above for a release built with
+# uncommitted files, is proved by the dev release it came with, found by its
+# tag, and that release when dirty by a later clean one on main (#2401);
+# headline changes therefore cannot leave completed work marked Dev-only.
 if ($Dev) {
     # Main's feed as the site serves it, read fresh on every dev publish, so
     # mainVersion and the news marks are what main has published, not whatever
@@ -2293,6 +2318,51 @@ try {
     if ($newsWhere -eq 'file') { Say ("  the {0} notes are one file on the site, named in the feed (every launcher let in reads it)" -f @($news).Count) 'Green' }
 } catch { Die ($_.Exception.Message + ' Run Ship again.') }
 # ==== end thornswood news out ====
+
+# ==== thornswood signed manifest ====
+# THE RELEASE IS SIGNED BEFORE THE FEED NAMES IT (#2163, phase B of
+# docs\SIGNED-RELEASES.md). Every asset the feed now names that carries code or
+# names files (the launcher, the client runtime, the packs, the baseline
+# record) is listed by sha256 in release.json, a catalog over it is signed by
+# ThornswoodRelease and checked the way a launcher checks a launcher, and both
+# go to the site as assets before version.json names them as "signedManifest".
+# Launchers do not read it yet (phase C). A run that uploads nothing (-NoUpload,
+# what Ship -DryRun passes) signs nothing: nothing it names is on the site.
+# A catalog that is not signed and accepted stops here, before version.json is
+# written or sent, the same as an asset that did not reach the site.
+if (-not $NoUpload) {
+    Head 'Signing the release manifest'
+    $smWhy = ''
+    $sm = $null
+    try { $sm = New-ReleaseManifestFiles $doc $Id $Channel (Join-Path $DistDir ('signed-' + $Id)) }
+    catch { $smWhy = $_.Exception.Message }
+    if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir }
+    if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc }
+    if ($smWhy) {
+        Die ("The release manifest was not signed and checked, so version.json has not been touched and nobody has been sent this release: $smWhy")
+    }
+    $smArgs = @{ Dev = $Dev; Send = @($sm.Json, $sm.Catalog) }
+    if ($SiteDir) { $smArgs['SiteDir'] = $SiteDir }
+    $global:LASTEXITCODE = 0
+    try { & (Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1') @smArgs }
+    catch { $smWhy = $_.Exception.Message }
+    if (-not $smWhy -and $LASTEXITCODE -ne 0) { $smWhy = "Remirror-Site-Feed.ps1 -Send exited $LASTEXITCODE" }
+    if ($smWhy) { Die ("The signed manifest did not reach the site, so version.json has not been touched: $smWhy") }
+    $smJsonSha = (Get-FileHash -LiteralPath $sm.Json -Algorithm SHA256).Hash.ToLowerInvariant()
+    $smCatSha = (Get-FileHash -LiteralPath $sm.Catalog -Algorithm SHA256).Hash.ToLowerInvariant()
+    Set-Prop $doc 'signedManifest' ([pscustomobject][ordered]@{
+        url           = (Get-HostFeedAssetUrl $smJsonSha -Dev:$Dev)
+        sha256        = $smJsonSha
+        catalogUrl    = (Get-HostFeedAssetUrl $smCatSha -Dev:$Dev)
+        catalogSha256 = $smCatSha
+    })
+    Say ("  release.json lists {0} asset(s); its catalog is signed by ThornswoodRelease and on the site" -f @((ConvertFrom-Json ([IO.File]::ReadAllText($sm.Json))).assets).Count) 'Green'
+} elseif ($doc.PSObject.Properties['signedManifest']) {
+    # The feed names only a manifest made for the release it describes: the
+    # last release's would not list what this one changed.
+    $doc.PSObject.Properties.Remove('signedManifest')
+}
+# ==== end thornswood signed manifest ====
 
 # Compact and without a byte order mark, the one way every feed writer writes
 # it (Feed-Json.ps1, Write-FeedVersionFile, #1050). A BOM is not JSON: the
@@ -2492,11 +2562,12 @@ if (-not $NoPush) {
 }
 
 # THE BASELINE MOVES ONLY WHEN THE RELEASE IS REALLY OUT.
+$pendingWhy = ''
 if ($pushFailed) {
-    Write-Pending $StateFile $Id $pushFailed
+    $pendingWhy = Write-Pending $StateFile $Id $pushFailed
 } else {
     Save-State
-    Clear-Pending $StateFile
+    $pendingWhy = Clear-Pending $StateFile
     Send-Baseline $Id
     # What Ship tags, and only once the feed is on the VPS (#444). Global, the
     # way Publish-Discord hands back its result, because Ship runs this script
@@ -2510,14 +2581,24 @@ if ($pushFailed) {
     Say "NOT SHIPPED. $pushFailed" 'Red'
     Say 'The assets are on the site but version.json is not, so no launcher' 'Red'
     Say 'will see this update. Fix the line above and run Ship again.' 'Red'
-    Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
-    Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
+    if ($pendingWhy) {
+        Say "The baseline was NOT moved, but $pendingWhy." 'Red'
+        Say "So the next run starts a new release instead of finishing $Id; its assets" 'Red'
+        Say "stay on the site unnamed. To finish it, run this script again with -Id $Id." 'Red'
+    } else {
+        Say "The baseline was NOT moved, so the next run finishes $Id rather than" 'Yellow'
+        Say 'starting a new one. Nothing here is lost by running it again.' 'Yellow'
+    }
 }
 elseif ($NoPush) {
     Say "-NoPush: $Id was not sent, so no launcher will see it." 'Yellow'
 }
 else {
     Say "Everyone's launcher will offer update $Id on next start." 'Green'
+    if ($pendingWhy) {
+        Say "But $pendingWhy." 'Red'
+        Say "It names a release that is out now: delete it before the next Ship, or that Ship goes out under $Id again." 'Red'
+    }
 }
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

@@ -89,7 +89,7 @@ It is written to keep going when a piece of it fails. A card that will not
 draw still gets a greeting, a site that is down still gets a thread, and a
 thread that cannot be made still gets an answer to the person who asked.
 """
-# First, before anything else: Python 3.10 or newer, or a plain message
+# First, before anything else: Python 3.11 or newer, or a plain message
 # saying so (#2276). Shared with every bot test.
 import _pyguard  # noqa: F401
 import asyncio
@@ -97,7 +97,6 @@ import datetime
 import json
 import os
 import re
-import ssl
 import time
 import traceback
 import sys
@@ -108,16 +107,15 @@ import urllib.request
 # Windows Server ships with an empty root certificate store and the automatic
 # update for it switched off, so Python cannot verify discord.com and the
 # handshake dies with "unable to get local issuer certificate". Install-Bot
-# normally sets SSL_CERT_FILE for us; this is the belt to that braces, so a bot
-# copied somewhere by hand still connects.
+# sets SSL_CERT_FILE for the service; a bot started any other way points it at
+# certifi's bundle here. certifi is in requirements.txt beside discord.py, so
+# a bot without it is missing its libraries and stops on this import, saying
+# so, rather than connecting without its roots (#2736). Each SSL context made
+# from here on reads the variable.
 if not os.environ.get('SSL_CERT_FILE'):
-    try:
-        import certifi
-        os.environ['SSL_CERT_FILE'] = certifi.where()
-        os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
-        ssl.create_default_context()      # picked up on the next context made
-    except Exception:
-        pass
+    import certifi
+    os.environ['SSL_CERT_FILE'] = certifi.where()
+    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
 
 import discord
 
@@ -427,6 +425,7 @@ class Thornswood(discord.Client):
         self.add_view(TicketPanel())          # so it keeps working after a restart
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
+        self.add_view(OfficePanel())          # and a Jarl's office buttons (#2551)
 
 
 client = Thornswood(intents=intents)
@@ -699,6 +698,17 @@ def thread_block(guild, ch):
 JOINS = os.path.join(DATA_DIR, 'joins.json')
 JOIN_FLOOR = _int_env('JOIN_NUMBER_FLOOR', 28)
 
+# HOW LONG A NUMBER IS KEPT (#2353). It was kept for ever, after its person
+# left too, and the privacy page did not name it. Decided by Patrick on 12
+# October: a keeping time for each store, enforced in code. A number is kept
+# while its person is in the Discord, and for JOIN_KEEP_DAYS after they leave,
+# so coming back within a year still keeps it; then it goes. 'left' in each
+# server's part of the record says when each numbered person was first seen
+# gone, in milliseconds. 'last' is never aged: it is a count, not a person,
+# and it is what stops a number being handed out twice.
+JOIN_KEEP_DAYS = 365
+JOIN_KEEP_EVERY = 60 * 60
+
 
 def _joins_read():
     """
@@ -744,6 +754,85 @@ def _joins_number(ids, member_id):
     return had if type(had) is int and had > 0 else None
 
 
+def joins_age(rec, now_ms, here):
+    """
+    Ages the record in place and returns (marked, dropped).
+
+    here is {server id as text: set of member ids as text} for each server
+    whose member list is whole. Somebody numbered there and not in it is
+    marked left at now_ms, unless already marked; somebody marked and in it
+    again is unmarked. Then, on every server, a number whose person left more
+    than JOIN_KEEP_DAYS ago goes with its mark. A mark that is not a time is
+    a corrupt one and is left as it is, with its number, rather than guessed
+    at. A server not in here (its list not whole, or the bot not in it) is
+    never marked, only aged.
+    """
+    cut = now_ms - JOIN_KEEP_DAYS * 86400000
+    marked = dropped = 0
+    for gid, g in rec.items():
+        if not isinstance(g, dict):
+            continue
+        ids = g.get('members')
+        if not isinstance(ids, dict):
+            continue
+        left = g.get('left')
+        if not isinstance(left, dict):
+            left = {}
+        if gid in here:
+            for k in ids:
+                if k not in here[gid] and k not in left:
+                    left[k] = now_ms
+                    marked += 1
+            for k in [k for k in left if k in here[gid]]:
+                del left[k]
+                marked += 1
+        for k in [k for k, t in left.items()
+                  if type(t) in (int, float) and t < cut]:
+            del left[k]
+            ids.pop(k, None)
+            dropped += 1
+        if left:
+            g['left'] = left
+        else:
+            g.pop('left', None)
+    return marked, dropped
+
+
+async def watch_join_numbers():
+    """
+    Marks who has left and drops the numbers past JOIN_KEEP_DAYS, as the bot
+    comes up and every JOIN_KEEP_EVERY seconds. On the event loop and not in
+    an executor, like arrival_number, so a join cannot write the record
+    between this reading and writing it. A record that cannot be read or
+    written is said in bot.log and left as it is; the next pass tries again.
+    Nothing in here may end the loop.
+    """
+    await client.wait_until_ready()
+    partial = set()
+    while not client.is_closed():
+        try:
+            here = {}
+            for gd in client.guilds:
+                if gd.chunked:
+                    here[str(gd.id)] = set(str(m.id) for m in gd.members)
+                    partial.discard(gd.id)
+                elif gd.id not in partial:
+                    partial.add(gd.id)
+                    log('join numbers: the member list of "%s" is not whole yet, '
+                        'so nobody there is marked as gone until it is' % gd.name)
+            rec = _joins_read()
+            marked, dropped = joins_age(rec, int(time.time() * 1000), here)
+            if marked or dropped:
+                _joins_write(rec)
+            if dropped:
+                log('join numbers: %d dropped, their people gone more than %d days'
+                    % (dropped, JOIN_KEEP_DAYS))
+        except Exception:
+            log('join numbers: could not age %s, so it is as it was until the '
+                'next pass:\n%s' % (JOINS, traceback.format_exc()))
+        await asyncio.sleep(JOIN_KEEP_EVERY)
+
+
 def joins_given(guild):
     """
     {member id: number} for everybody the record has numbered on this server,
@@ -782,6 +871,11 @@ def arrival_number(guild, member):
         had = _joins_number(ids, member.id)
         if had is not None:
             n, said = had, 'came back and keeps number %d' % had
+            left = g.get('left')
+            if isinstance(left, dict) and str(member.id) in left:
+                del left[str(member.id)]
+                rec[str(guild.id)] = g
+                _joins_write(rec)
         else:
             last = g.get('last')
             if type(last) is not int:
@@ -1757,7 +1851,9 @@ async def close_here(interaction, why=None):
     Archived and locked rather than deleted. A ticket is the record of what
     somebody was told and when, and the one time anybody goes looking for it
     is the argument afterwards, so nothing here removes anything. Locked means
-    it takes a staff member to open it again, not a stray message.
+    it takes a staff member to open it again, not a stray message. It is
+    deleted TICKET_KEEP_DAYS after it closes, by watch_closed_tickets and not
+    here (#2353).
 
     Only in a ticket's own thread (is_ticket_thread), refused before anything
     is said, archived or written down.
@@ -1780,8 +1876,9 @@ async def close_here(interaction, why=None):
     line = 'Closed by %s.' % interaction.user.mention
     if why:
         line += ' ' + why.strip()
-    line += ('\nNothing is deleted. Everybody who was in here can still read it, '
-             'and staff can open it again.')
+    line += ('\nEverybody who was in here can still read it, and staff can open '
+             'it again. It is deleted %d days after it was last closed.'
+             % TICKET_KEEP_DAYS)
     await interaction.response.send_message(line[:1900])
 
     # Archiving drops a thread out of the sidebar and out of the channel's
@@ -1829,6 +1926,110 @@ class TicketTools(discord.ui.View):
 async def close_cmd(interaction: discord.Interaction,
                     why: typing.Optional[str] = None):
     await close_here(interaction, why)
+
+
+# HOW LONG A CLOSED TICKET IS KEPT (#2353). Closing archived and locked the
+# thread and nothing ever deleted it, so it was the one store with no keeping
+# time. Decided by Patrick on 19 Oct: the bot deletes a ticket thread
+# TICKET_KEEP_DAYS after it closes, the same 365 days the site keeps its copy
+# of the application (INBOX_DAYS in site/server.js). Discord cannot undo it.
+#
+# When it closed is Discord's own archive_timestamp, not a record of ours. It
+# is set for every archived thread, so the tickets closed before this was
+# written are aged too, and so is one staff archived by hand. Opening a ticket
+# again and closing it moves the time on, so the year starts over. A ticket
+# nobody closed is archived by Discord after a week with nothing said in it
+# (auto_archive_duration in TicketModal), and the bot already counts it as
+# closed: _open_thread lets its person open another. So it ages from then.
+#
+# Only threads the bot opened off a TICKET_CHANNEL channel: a private thread
+# a Gamemaster opened there by hand (see the note in TicketModal) is not a
+# ticket and is never touched.
+TICKET_KEEP_DAYS = 365
+TICKET_KEEP_EVERY = 60 * 60
+
+
+def ticket_past_keeping(thread, bot_id, cut):
+    """
+    True when this thread is a ticket the bot opened, archived, and archived
+    before cut, an aware datetime. A thread whose close time is not an aware
+    datetime, or whose opener cannot be read, is kept rather than guessed at.
+    """
+    if bot_id is None or getattr(thread, 'owner_id', None) != bot_id:
+        return False
+    if getattr(thread, 'archived', None) is not True:
+        return False
+    at = getattr(thread, 'archive_timestamp', None)
+    if not isinstance(at, datetime.datetime) or at.tzinfo is None:
+        return False
+    return at < cut
+
+
+async def age_closed_tickets(guild, bot_id, now):
+    """
+    Deletes this server's ticket threads closed more than TICKET_KEEP_DAYS
+    before now, and returns (deleted, failed). Each one deleted is a line in
+    bot.log with its id and when it closed; the staff record's Closed line
+    carries the same id in its link. A list that cannot be read, or a delete
+    Discord refuses, is a line with Discord's reason, and that thread stays
+    until the next pass.
+    """
+    cut = now - datetime.timedelta(days=TICKET_KEEP_DAYS)
+    deleted = failed = 0
+    for ch in getattr(guild, 'text_channels', []):
+        if (getattr(ch, 'name', '') or '').lower() not in TICKETS:
+            continue
+        due = []
+        try:
+            # Discord lists them newest closed first and, given before, only
+            # those closed before it. ticket_past_keeping still checks each.
+            async for t in ch.archived_threads(private=True, limit=None,
+                                               before=cut):
+                if ticket_past_keeping(t, bot_id, cut):
+                    due.append(t)
+        except Exception as e:
+            failed += 1
+            log('closed tickets: could not list the closed threads in #%s of '
+                '"%s", so none of them was deleted this pass: %s: %s'
+                % (ch.name, guild.name, type(e).__name__, e))
+            continue
+        for t in due:
+            try:
+                await t.delete()
+            except Exception as e:
+                failed += 1
+                log('closed tickets: could not delete thread %s in #%s, closed '
+                    '%s: %s: %s' % (t.id, ch.name,
+                                    t.archive_timestamp.date().isoformat(),
+                                    type(e).__name__, e))
+                continue
+            deleted += 1
+            log('closed tickets: deleted thread %s in #%s, closed %s, more '
+                'than %d days ago' % (t.id, ch.name,
+                                      t.archive_timestamp.date().isoformat(),
+                                      TICKET_KEEP_DAYS))
+    return deleted, failed
+
+
+async def watch_closed_tickets():
+    """
+    Runs age_closed_tickets on every server as the bot comes up and every
+    TICKET_KEEP_EVERY seconds, like watch_join_numbers. Nothing in here may
+    end the loop: a pass that fails is said in bot.log, and the threads it
+    did not reach are there for the next one.
+    """
+    await client.wait_until_ready()
+    while not client.is_closed():
+        now = datetime.datetime.now(datetime.timezone.utc)
+        bot_id = getattr(client.user, 'id', None)
+        for gd in list(client.guilds):
+            try:
+                await age_closed_tickets(gd, bot_id, now)
+            except Exception:
+                log('closed tickets: the pass on "%s" stopped part way, so '
+                    'what it did not reach waits for the next one:\n%s'
+                    % (gd.name, traceback.format_exc()))
+        await asyncio.sleep(TICKET_KEEP_EVERY)
 
 
 class TicketPanel(discord.ui.View):
@@ -1986,21 +2187,20 @@ async def ensure_panel(guild):
     # channel. The server owner bypasses every overwrite, so /close looked
     # fine to the one person who could never have been blocked by it while
     # staff saw nothing at all. Named here rather than left to be discovered.
-    try:
-        blocked = []
-        for r in guild.roles:
-            if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
-                    or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
-                continue
-            if not getattr(ch.permissions_for(r), 'use_application_commands', True):
-                blocked.append(r.name)
-        if blocked:
-            log('%s cannot use /close in #%s: Use Application Commands is off '
-                'for them there. Turn it on in that channel\'s permissions. The '
-                'Close button on the ticket works for them either way.'
-                % (', '.join(blocked), ch.name))
-    except Exception:
-        pass
+    # Read from the cache with no request, so nothing here waits on Discord or
+    # throws: it is no longer in a try that dropped any error unsaid (#2736).
+    blocked = []
+    for r in guild.roles:
+        if not (_role_hit(r, STAFF_IDS, STAFF_NAMES)
+                or _role_hit(r, CREATOR_IDS, CREATOR_NAMES)):
+            continue
+        if not getattr(ch.permissions_for(r), 'use_application_commands', True):
+            blocked.append(r.name)
+    if blocked:
+        log('%s cannot use /close in #%s: Use Application Commands is off '
+            'for them there. Turn it on in that channel\'s permissions. The '
+            'Close button on the ticket works for them either way.'
+            % (', '.join(blocked), ch.name))
 
     book = await log_channel(guild)
     if book is not None:
@@ -2272,7 +2472,10 @@ async def ensure_hold_panel(guild):
 
     try:
         async for m in ch.history(limit=30):
-            if m.author.id == client.user.id and m.components:
+            # Its own message, by its buttons: the office panel (#2551) is
+            # the bot's too, in the same channel, and must not be written over.
+            if (m.author.id == client.user.id and m.components and
+                    any(i.startswith('thornswood:hold:') for i in _hold_ids(m))):
                 if hold_panel_is_current(m):
                     log('hold panel is already current in #%s' % ch.name)
                     return
@@ -2283,6 +2486,402 @@ async def ensure_hold_panel(guild):
         log('hold panel posted in #%s' % ch.name)
     except Exception:
         log('hold panel failed:\n' + traceback.format_exc())
+
+
+# ---------------------------------------------------------- hold offices --
+#
+# #2551. Patrick, 15 Oct: each hold has a Court, a Steward and Guards, and
+# they are Discord roles ("<Hold> Court", "Steward of <Hold>", "Guard of
+# <Hold>", made by Build-Discord.py and never hoisted). That hold's Jarl gives
+# and takes them, two ways, for their own hold only: here, with Add and Remove
+# buttons, and in the game on the Office page of K, where the site sets the
+# same roles with this bot's token. The role is the one truth either way, so
+# nothing here or in the game keeps a list of who holds what.
+#
+# A Jarl is whoever holds that hold's "Jarl of <Hold>" role. If two accounts
+# hold the same one, neither acts as Jarl here until staff take it from all
+# but one (Patrick, 15 Oct); the site tells staff which accounts, through the
+# staff log, the moment it sees it.
+#
+# The panel is a second message in #choose-your-hold, under the hold panel,
+# found again by its own buttons. Every change is said in the staff channel
+# (report_say), with who changed what, and Discord's audit log keeps it with
+# the reason. Changes made in the game come to the staff channel the same way,
+# through the site's moderation.log (watch_moderation, office_text).
+OFFICES = [('court', 'Court'), ('steward', 'Steward'), ('guard', 'Guard')]
+# The towns a hold role can name: Build-Discord.py's nine, and Raven Rock,
+# which it makes no roles for, so roles made for it by hand work the same.
+OFFICE_TOWNS = HOLDS + ['Raven Rock']
+
+OFFICE_PANEL = ('**Hold offices**\n\n'
+                'The Jarl of a hold gives and takes its Court, its Steward and '
+                'its Guards here, for their own hold only. Press Add or Remove '
+                'beside the office, then pick the person. The roles are the '
+                'same ones the game reads, and a Jarl can change them there '
+                'too, on the Office page of K. In the game the office is held '
+                'by one character: the one the Jarl named there, or the one '
+                'its holder chooses on the Office page of K. Every change is '
+                'said to staff.')
+
+
+def office_role(office, town):
+    """The role's exact name, as Build-Discord.py makes it and the site reads it."""
+    if office == 'court':
+        return town + ' Court'
+    if office == 'steward':
+        return 'Steward of ' + town
+    if office == 'guard':
+        return 'Guard of ' + town
+    return ''
+
+
+def jarl_towns(member):
+    """The towns this member is Jarl of, by their own Jarl of <Hold> roles."""
+    out = []
+    for r in list(getattr(member, 'roles', None) or []):
+        name = getattr(r, 'name', '')
+        if name.startswith('Jarl of ') and name[len('Jarl of '):] in OFFICE_TOWNS:
+            out.append(name[len('Jarl of '):])
+    return out
+
+
+def jarl_held_twice(guild, town):
+    """True when more than one account holds this hold's Jarl role."""
+    jarl = _role(guild, 'Jarl of ' + town)
+    return jarl is not None and len(list(getattr(jarl, 'members', None) or [])) > 1
+
+
+def office_text(row):
+    """
+    One office line for the staff channel, from the site's moderation.log or
+    from the panel here: a Jarl's change (office), two accounts holding one
+    hold's Jarl role (jarlclash), and that ending (jarlclear). Names were
+    typed by people, so they are escaped. None for a row that is not one.
+    """
+    if not isinstance(row, dict):
+        return None
+    clean = as_typed
+    did = row.get('did')
+    if did == 'jarlclash':
+        people = [p for p in (row.get('people') or []) if isinstance(p, dict)]
+        named = ', '.join('%s (account %s)' % (clean(p.get('name'), 40) or 'somebody',
+                                               clean(p.get('id'), 24) or '?')
+                          for p in people[:10])
+        return ('**Two Jarls of one hold:** %d accounts hold the %s role: %s. '
+                'Neither acts as Jarl, in the game or on the office panel, '
+                'until staff take the role from all but one.'
+                % (len(people), clean(row.get('role'), 40) or 'Jarl', named))[:1900]
+    if did == 'jarlclear':
+        return ('**One Jarl again:** one account or none holds the %s role now, '
+                'so whoever holds it acts as Jarl again.'
+                % (clean(row.get('role'), 40) or 'Jarl'))[:1900]
+    if did != 'office':
+        return None
+
+    def person(name, pid):
+        try:
+            pid = int(pid)
+        except (TypeError, ValueError):
+            pid = 0
+        if pid <= 0:
+            return clean(name, 40) or 'somebody'
+        return '%s (profile %d)' % (clean(name, 40) or 'somebody', pid)
+
+    hold = clean(row.get('hold'), 20)
+    town = hold
+    for t in OFFICE_TOWNS:
+        if t.lower().replace(' ', '') == hold:
+            town = t
+    where = {'panel': 'on the office panel', 'dev': 'in the game, on the dev server',
+             'main': 'in the game'}.get(row.get('from'), 'in the game')
+    role = clean(row.get('role'), 40) or 'an office'
+    jarl = person(row.get('byName'), row.get('by'))
+    them = person(row.get('whoName'), row.get('who'))
+    if row.get('give'):
+        did_text = 'gave %s the %s role' % (them, role)
+    else:
+        did_text = 'took the %s role from %s' % (role, them)
+    return ('**Hold office:** %s, Jarl of %s, %s, %s.'
+            % (jarl, town, did_text, where))[:1900]
+
+
+async def office_press(interaction, office, add):
+    """Add or Remove beside one office: works out the presser's hold first."""
+    guild, who = interaction.guild, interaction.user
+    towns = jarl_towns(who) if guild is not None else []
+    if not towns:
+        await _say(interaction, 'Only the Jarl of a hold gives its offices. A Jarl '
+                                'is whoever holds that hold\'s Jarl role.')
+        return
+    if len(towns) > 1:
+        await interaction.response.send_message(
+            'You hold more than one Jarl role. Which hold?',
+            view=OfficeTownPick(office, add, towns), ephemeral=True)
+        return
+    await office_for(interaction, office, add, towns[0])
+
+
+async def office_for(interaction, office, add, town):
+    """The picker for one office of one hold: a member to give it, or a holder to take it from."""
+    guild = interaction.guild
+    if jarl_held_twice(guild, town):
+        await _say(interaction, 'Two accounts hold the Jarl of %s role, so neither '
+                                'acts as Jarl until staff fix it. Staff have been '
+                                'told.' % town)
+        return
+    name = office_role(office, town)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        log('cannot give %s: the role is missing, or the bot has no Manage '
+            'Roles, or its own role is not above it.' % name)
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if add:
+        await interaction.response.send_message(
+            'Who gets the %s role?' % name, view=OfficeGive(office, town), ephemeral=True)
+        return
+    holders = [m for m in list(getattr(role, 'members', None) or [])
+               if not getattr(m, 'bot', False)]
+    if not holders:
+        await _say(interaction, 'Nobody holds the %s role.' % name)
+        return
+    await interaction.response.send_message(
+        'Take the %s role from whom?' % name,
+        view=OfficeTake(office, town, holders[:25]), ephemeral=True)
+
+
+async def office_change(interaction, office, town, member, add):
+    """
+    Give or take the role, with every rule asked again at the moment of the
+    change: the presser still holds that hold's Jarl role, nobody else does,
+    and the role is one the bot may give. Said to the Jarl, in bot.log and in
+    the staff channel, and the reason goes in Discord's audit log.
+    """
+    guild, who = interaction.guild, interaction.user
+    if guild is None or town not in jarl_towns(who):
+        await _say(interaction, 'Only the Jarl of %s gives its offices.' % town)
+        return
+    if jarl_held_twice(guild, town):
+        await _say(interaction, 'Two accounts hold the Jarl of %s role, so neither '
+                                'acts as Jarl until staff fix it. Staff have been '
+                                'told.' % town)
+        return
+    name = office_role(office, town)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if member is None or not hasattr(member, 'roles'):
+        await _say(interaction, 'That person is not in this Discord.')
+        return
+    if getattr(member, 'bot', False):
+        await _say(interaction, 'A bot holds no office.')
+        return
+    shown = getattr(member, 'display_name', None) or str(member)
+    has = role in member.roles
+    if add and has:
+        await _say(interaction, '%s already holds the %s role.' % (shown, name))
+        return
+    if not add and not has:
+        await _say(interaction, '%s does not hold the %s role.' % (shown, name))
+        return
+    by = getattr(who, 'display_name', None) or str(who)
+    reason = '%s by %s, Jarl of %s, on the office panel' % ('Given' if add else 'Taken', by, town)
+    try:
+        if add:
+            await member.add_roles(role, reason=reason)
+        else:
+            await member.remove_roles(role, reason=reason)
+    except Exception:
+        log('office change failed:\n' + traceback.format_exc())
+        await _say(interaction, 'That did not go through. Try again, or ask staff.')
+        return
+    log('office: %s (%s), Jarl of %s, %s %s (%s) the %s role'
+        % (by, who.id, town, 'gave' if add else 'took from', shown, member.id, name))
+    await _say(interaction, ('%s holds the %s role now. In the game they choose which '
+                             'character holds it, on the Office page of K.' if add
+                             else '%s no longer holds the %s role.') % (shown, name))
+    await report_say(office_text({
+        'did': 'office', 'from': 'panel', 'give': bool(add), 'office': office,
+        'hold': town.lower().replace(' ', ''), 'role': name,
+        'byName': by, 'whoName': shown}))
+
+
+class OfficeButton(discord.ui.Button):
+    def __init__(self, office, label, add, row):
+        super().__init__(label=('Add ' if add else 'Remove ') + label,
+                         style=(discord.ButtonStyle.primary if add
+                                else discord.ButtonStyle.secondary),
+                         custom_id='thornswood:office:%s:%s' % ('add' if add else 'remove', office),
+                         row=row)
+        self.office = office
+        self.add = add
+
+    async def callback(self, interaction):
+        await office_press(interaction, self.office, self.add)
+
+
+class OfficePanel(discord.ui.View):
+    """Persistent, like the hold panel: Add and Remove for each of the three offices."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        for i, (office, label) in enumerate(OFFICES):
+            self.add_item(OfficeButton(office, label, True, i))
+            self.add_item(OfficeButton(office, label, False, i))
+
+
+class OfficeTownSelect(discord.ui.Select):
+    def __init__(self, office, add, towns):
+        super().__init__(placeholder='The hold',
+                         options=[discord.SelectOption(label=t, value=t) for t in towns[:25]])
+        self.office = office
+        self.add = add
+
+    async def callback(self, interaction):
+        await office_for(interaction, self.office, self.add, self.values[0])
+
+
+class OfficeTownPick(discord.ui.View):
+    def __init__(self, office, add, towns):
+        super().__init__(timeout=180)
+        self.add_item(OfficeTownSelect(office, add, towns))
+
+
+class OfficeGiveSelect(discord.ui.UserSelect):
+    def __init__(self, office, town):
+        super().__init__(placeholder='The person', min_values=1, max_values=1)
+        self.office = office
+        self.town = town
+
+    async def callback(self, interaction):
+        picked = self.values[0] if self.values else None
+        # A pick of somebody not in this Discord comes back as a User, which
+        # has no roles to give.
+        member = picked if hasattr(picked, 'roles') else (
+            interaction.guild.get_member(getattr(picked, 'id', 0)) if interaction.guild else None)
+        await office_change(interaction, self.office, self.town, member, True)
+
+
+class OfficeGive(discord.ui.View):
+    def __init__(self, office, town):
+        super().__init__(timeout=180)
+        self.add_item(OfficeGiveSelect(office, town))
+
+
+class OfficeTakeSelect(discord.ui.Select):
+    def __init__(self, office, town, holders):
+        super().__init__(placeholder='The person', options=[
+            discord.SelectOption(label=(getattr(m, 'display_name', None) or str(m))[:100],
+                                 value=str(m.id)) for m in holders])
+        self.office = office
+        self.town = town
+
+    async def callback(self, interaction):
+        try:
+            mid = int(self.values[0])
+        except (TypeError, ValueError, IndexError):
+            mid = 0
+        member = interaction.guild.get_member(mid) if interaction.guild else None
+        await office_change(interaction, self.office, self.town, member, False)
+
+
+class OfficeTake(discord.ui.View):
+    def __init__(self, office, town, holders):
+        super().__init__(timeout=180)
+        self.add_item(OfficeTakeSelect(office, town, holders))
+
+
+# The in-world roles the game reads, as Build-Discord.py makes them: name,
+# colour, shown as a group of its own. The office roles are never hoisted
+# (Patrick, 15 Oct); the Jarl roles are.
+JARL_COLOUR = 0xE0C56A
+OFFICE_COLOUR = 0xA8977A
+
+
+def office_roles_wanted():
+    out = [('Jarl of ' + t, JARL_COLOUR, True) for t in OFFICE_TOWNS]
+    for t in OFFICE_TOWNS:
+        for o, _ in OFFICES:
+            out.append((office_role(o, t), OFFICE_COLOUR, False))
+    return out
+
+
+async def ensure_office_roles(guild):
+    """
+    Make any Jarl or office role the game reads that is missing, the way the
+    hold panel makes its two ping roles, so the offices exist as soon as the
+    bot that gives them is running, without a run of Build-Discord.py (which
+    asks for the bot's token at a prompt). Raven Rock's included (#2551,
+    Patrick, 16 Oct). Nothing that is there is changed. A new Jarl role goes
+    under the lowest Jarl role there is, and a new office role under the
+    lowest Citizen role, where Build-Discord.py keeps them; a build later puts
+    every role in its exact place. Says in bot.log what it made.
+    """
+    if not guild.me.guild_permissions.manage_roles:
+        log('the office roles cannot be made: the bot has no Manage Roles.')
+        return []
+    made = []
+    for name, colour, hoist in office_roles_wanted():
+        if _role(guild, name) is not None:
+            continue
+        under = [r for r in guild.roles
+                 if r.name.startswith('Jarl of ' if hoist else 'Citizen of ')]
+        try:
+            role = await guild.create_role(name=name, colour=discord.Colour(colour), hoist=hoist,
+                                           mentionable=True, reason='Thornswood hold offices (#2551)')
+            made.append(name)
+            if under:
+                low = min(under, key=lambda r: r.position)
+                try:
+                    await role.edit(position=max(1, low.position))
+                except Exception:
+                    log('made %s, and could not move it under %s:\n' % (name, low.name)
+                        + traceback.format_exc())
+        except Exception:
+            log('could not make the %s role:\n' % name + traceback.format_exc())
+    if made:
+        log('made the office roles that were missing: %s' % ', '.join(made))
+    return made
+
+
+def _office_ids_wanted():
+    out = []
+    for office, _ in OFFICES:
+        out += ['thornswood:office:add:' + office, 'thornswood:office:remove:' + office]
+    return out
+
+
+def office_panel_is_current(msg):
+    return (getattr(msg, 'content', None) == OFFICE_PANEL and
+            _hold_ids(msg) == _office_ids_wanted())
+
+
+async def ensure_office_panel(guild):
+    """The office panel in #choose-your-hold, under the hold panel, found again by its own buttons."""
+    ch = by_name(guild, HOLD_CHANNEL)
+    if ch is None:
+        return
+    missing = [office_role(o, t) for t in HOLDS for o, _ in OFFICES
+               if _role(guild, office_role(o, t)) is None]
+    if missing:
+        log('these office roles are missing, so those offices cannot be given '
+            'until Build-Discord.py makes them: %s' % ', '.join(missing))
+    try:
+        async for m in ch.history(limit=30):
+            if (m.author.id == client.user.id and m.components and
+                    any(i.startswith('thornswood:office:') for i in _hold_ids(m))):
+                if office_panel_is_current(m):
+                    log('office panel is already current in #%s' % ch.name)
+                    return
+                await m.edit(content=OFFICE_PANEL, view=OfficePanel())
+                log('office panel updated in #%s' % ch.name)
+                return
+        await ch.send(OFFICE_PANEL, view=OfficePanel())
+        log('office panel posted in #%s' % ch.name)
+    except Exception:
+        log('office panel failed:\n' + traceback.format_exc())
 
 
 # ------------------------------------------------------- testing channels --
@@ -4338,6 +4937,16 @@ _MOD_DID = {
     # An admin undoing a PK made by mistake (#1010, 29 September).
     'unpk': 'undid the PK of %s, so the character can be played again',
     'note': 'wrote a note on %s',
+    # Staff at a building's door, from the Office page of K (#2551, Patrick,
+    # 17 Oct): the why names the building and its hold, and the rent set.
+    'evict': 'ended the claim of %s',
+    'rent': 'set the rent on the claim of %s',
+    'norent': 'took the rent off the claim of %s',
+    # Staff on the world's card, the Office page of K (#513): the stage is
+    # the who, and the why says from where, to where, and the force.
+    'worldpropose': 'proposed moving the world to %s',
+    'worldconfirm': 'confirmed moving the world to %s',
+    'worlddrop': 'dropped the proposal to move the world to %s',
     # Not staff: somebody's own /stuck (#414), said as its why reads.
     'stuck': 'used /stuck',
     # Not staff either: the server took somebody idle out of the world (#1142).
@@ -4351,6 +4960,8 @@ def moderation_text(where, row):
     line that is not one. Names and reasons were typed in the game, so they
     are escaped: nothing in them can ping anybody or dress itself up.
     """
+    if isinstance(row, dict) and row.get('did') in ('office', 'jarlclash', 'jarlclear'):
+        return office_text(row)
     if not isinstance(row, dict) or row.get('did') not in _MOD_DID:
         return None
 
@@ -4653,23 +5264,22 @@ def ping_once(url, timeout=None):
             why = 'it answered %d' % code
         else:
             why = '%s: %s' % (type(e).__name__, getattr(e, 'reason', None) or e)
-    try:
-        if ok:
-            if _ping['down']:
-                log('uptime ping: the outside monitor hears from this bot again')
-            elif not _ping['ok_once']:
-                log('uptime ping: reached the outside monitor, and pings it every '
-                    '%ds while on Discord' % PING_EVERY)
-            _ping['down'] = False
-            _ping['ok_once'] = True
-        else:
-            if not _ping['down']:
-                log('uptime ping FAILED (%s). The outside monitor alerts if it '
-                    'hears nothing past its grace. Said once until it works '
-                    'again.' % _ping_scrub(why, url))
-            _ping['down'] = True
-    except Exception:
-        pass
+    # Only the log lines and the record of what was said, none of which
+    # throws, so they sit outside the try (#2736).
+    if ok:
+        if _ping['down']:
+            log('uptime ping: the outside monitor hears from this bot again')
+        elif not _ping['ok_once']:
+            log('uptime ping: reached the outside monitor, and pings it every '
+                '%ds while on Discord' % PING_EVERY)
+        _ping['down'] = False
+        _ping['ok_once'] = True
+    else:
+        if not _ping['down']:
+            log('uptime ping FAILED (%s). The outside monitor alerts if it '
+                'hears nothing past its grace. Said once until it works '
+                'again.' % _ping_scrub(why, url))
+        _ping['down'] = True
     return ok
 
 
@@ -4846,6 +5456,8 @@ async def on_ready():
         asyncio.create_task(watch_reports())
         asyncio.create_task(watch_moderation())
         asyncio.create_task(watch_known_issues())
+        asyncio.create_task(watch_join_numbers())
+        asyncio.create_task(watch_closed_tickets())
 
     log('up as %s' % client.user)
 
@@ -4854,6 +5466,8 @@ async def on_ready():
     for g in client.guilds:
         await ensure_panel(g)
         await ensure_hold_panel(g)
+        await ensure_office_roles(g)
+        await ensure_office_panel(g)
     log('watching %d server(s)' % len(client.guilds))
     # Guilds are known here. Empty was already said in setup_hook. IDs
     # that match no role can only be seen once the guild's roles are in.
@@ -4968,6 +5582,89 @@ def run_cli(argv):
     return out['code']
 
 
+# A deletion request, taken out of the bot's own records as it starts (#2758).
+# Patrick, 18 Oct 2026, after the first real deletion on his own account: "it
+# should not restart everytime we want to delete a person it should just fully
+# apply the rest upon a server restart". scripts\vps\Delete-Person.ps1 stops
+# nothing: it writes the request into deletion-requests.json in the bot's data
+# folder,
+#
+#     {"people": [{"discordId": "111111111111111111", "profiles": [5001]}]}
+#
+# and this takes it out before the bot connects, so no click can write one of
+# these files back while it goes: their join number (the last number given out
+# stays in joins.json, so nobody is handed theirs again) and their open ticket.
+# A file that is there and will not parse, or a write that does not take,
+# leaves the request for the next start, and is said; running it again finds
+# what is already gone gone. The log says counts and never an id.
+DELETION_REQUESTS = os.path.join(DATA_DIR, 'deletion-requests.json')
+
+
+def apply_deletion_requests():
+    """Takes every request in deletion-requests.json out of joins.json and
+       open-tickets.json, then deletes it. Returns the line it logged, or
+       None when there was no request."""
+    def said(m):
+        line = 'deletion requests: ' + m
+        log(line)
+        return line
+    if not os.path.exists(DELETION_REQUESTS):
+        return None
+    try:
+        with open(DELETION_REQUESTS, encoding='utf-8-sig') as f:
+            req = json.load(f)
+        people = req.get('people') if isinstance(req, dict) else None
+        ids = [str(p.get('discordId')) for p in people] if isinstance(people, list) and all(isinstance(p, dict) for p in people) else None
+    except (OSError, ValueError) as e:
+        return said('the request could not be read (%s), so nothing was removed and it is left as it is' % type(e).__name__)
+    if not ids or not all(re.match(r'^\d{17,20}$', i) for i in ids):
+        return said('the request is not a list of deletion requests, so nothing was removed and it is left as it is')
+    try:
+        joins = _joins_read()
+        tickets = {}
+        if os.path.exists(OPEN_TICKETS):
+            with open(OPEN_TICKETS, encoding='utf-8-sig') as f:
+                tickets = json.load(f)
+            if not isinstance(tickets, dict):
+                raise ValueError(OPEN_TICKETS + ' is not a JSON object')
+    except (OSError, ValueError) as e:
+        return said('the records could not be read (%s), so nothing was removed and the request waits for the next start' % type(e).__name__)
+    numbers = marks = 0
+    for g in joins.values():
+        members = g.get('members') if isinstance(g, dict) else None
+        if isinstance(members, dict):
+            for i in ids:
+                if i in members:
+                    del members[i]
+                    numbers += 1
+        # And when they left (#2353), which is about them as much as the number.
+        left = g.get('left') if isinstance(g, dict) else None
+        if isinstance(left, dict):
+            for i in ids:
+                if i in left:
+                    del left[i]
+                    marks += 1
+    gone = [k for k in tickets if k.split(':')[-1] in ids]
+    for k in gone:
+        del tickets[k]
+    try:
+        if numbers or marks:
+            _joins_write(joins)
+        if gone:
+            tmp = OPEN_TICKETS + '.tmp'
+            with open(tmp, 'w', encoding='utf-8') as f:
+                json.dump(tickets, f)
+            os.replace(tmp, OPEN_TICKETS)
+    except OSError as e:
+        return said('a record could not be written (%s), so the request waits for the next start' % type(e).__name__)
+    what = '%d person(s): join numbers %d, open tickets %d' % (len(ids), numbers, len(gone))
+    try:
+        os.remove(DELETION_REQUESTS)
+    except OSError as e:
+        return said(what + '; the request could not be deleted (%s), so it runs again at the next start' % type(e).__name__)
+    return said(what + '; done, and the request is gone')
+
+
 # Under a main guard, so that importing this file reads it instead of running
 # it. Without one, `import bot` connects to Discord with whatever token is in
 # env, which is why nothing in here had ever been tested: there was no way to
@@ -4981,6 +5678,8 @@ if __name__ == '__main__':
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.
     beat_now()
+    # Before it connects, so nothing it does can write a record back (#2758).
+    apply_deletion_requests()
     try:
         client.run(TOKEN)
     except discord.PrivilegedIntentsRequired:

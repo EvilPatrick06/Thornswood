@@ -75,7 +75,13 @@ function New-ThornswoodBuildStamp {
 
   $commit = ''
   $atCommit = $null
-  try {
+  if ($Artifact) {
+    $commit = [string]$Artifact.Short
+    $atCommit = $true
+  } elseif (Get-Command git -ErrorAction SilentlyContinue) {
+    # No git on the path is the one thing that threw here, and it is asked
+    # for directly: then git cannot tell, so commit is '' and the flag null,
+    # which Format-ThornswoodBuildStamp prints as "no commit".
     $out = & git -C $RepoDir rev-parse --short HEAD 2>$null
     if ($LASTEXITCODE -eq 0 -and $out) { $commit = ([string]($out | Select-Object -First 1)).Trim() }
     if ($commit) {
@@ -88,10 +94,6 @@ function New-ThornswoodBuildStamp {
       if ($LASTEXITCODE -eq 0) { $atCommit = $true }
       elseif ($LASTEXITCODE -eq 1) { $atCommit = $false }
     }
-  } catch { }
-  if ($Artifact) {
-    $commit = [string]$Artifact.Short
-    $atCommit = $true
   }
 
   $launcher = ''

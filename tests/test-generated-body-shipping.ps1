@@ -7,7 +7,7 @@ $repo=Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
 $pass=0; $fail=0
 function Yes([string]$what,[bool]$ok){if($ok){$script:pass++;Write-Host "PASS $what"}else{$script:fail++;Write-Host "FAIL $what"}}
-$bodies=@('femalebody_0.nif','femalebody_1.nif','femalebodyastrid_0.nif','femalebodyastrid_1.nif','malebody_0.nif','malebody_1.nif') | ForEach-Object {'Data\meshes\actors\character\character assets\'+$_}
+$bodies=@(@('femalebody_0.nif','femalebody_1.nif','femalebodyastrid_0.nif','femalebodyastrid_1.nif','malebody_0.nif','malebody_1.nif') | ForEach-Object {'Data\meshes\actors\character\character assets\'+$_}) + @($ShipGeneratedOutfitFiles)
 $fixture=Join-Path ([IO.Path]::GetTempPath()) ('thornswood-body-shipping-'+[guid]::NewGuid().ToString('N'))
 $ProfileDir=Join-Path $fixture 'Profile'
 $game=Join-Path $fixture 'Game'
@@ -22,7 +22,7 @@ foreach($b in $bodies){
 }
 [IO.File]::WriteAllLines($receipt,$rows)
 Assert-ShipGeneratedBodyFiles $game $ProfileDir
-Yes 'all six body hashes match the actual receipt' $true
+Yes 'all six bodies and the fitted outfits match the actual receipt (#2454)' $true
 foreach($scriptName in 'Publish-Update.ps1','Package-Thornswood.ps1'){
   $tokens=$null; $errors=$null
   $ast=[Management.Automation.Language.Parser]::ParseFile((Join-Path $repo ('scripts\release\'+$scriptName)),[ref]$tokens,[ref]$errors)

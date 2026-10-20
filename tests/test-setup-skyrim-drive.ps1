@@ -92,7 +92,7 @@ if ($say.Success) {
     Yes 'and why: a hard link cannot cross a drive' (
         $body.Contains('hard links') -and $body.Contains('cannot cross a drive'))
     Yes 'and what that costs: the launcher will not let you play' ($body.Contains('will not let you play'))
-    Yes 'in the colour the window uses for something that will not work' ($body.Contains('B("#BC5039")'))
+    Yes 'in the colour the window uses for something that will not work' ($body.Contains('B("Bad")'))
     Yes 'and it says so too when no Steam copy of Skyrim was found at all' (
         $body.Contains('was not found on this PC'))
 }

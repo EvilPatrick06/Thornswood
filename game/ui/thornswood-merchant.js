@@ -86,7 +86,8 @@
     shown = true;
     root.querySelector('#' + ID + '-title').textContent =
       (data.trader || 'Trader') + (data.place ? ' at ' + data.place : '');
-    root.querySelector('#' + ID + '-purse').textContent = 'Purse ' + (data.purse == null ? '' : data.purse);
+    root.querySelector('#' + ID + '-purse').textContent = 'Purse ' + (data.purse == null ? '' : data.purse)+
+      (data.reservedPurse?' ('+data.reservedPurse+' promised for work)':'');
     var body = '';
     if (data.note) body += '<p class="note" role="status">' + esc(data.note) + '</p>';
     var quests = data.quests || [];
@@ -97,18 +98,22 @@
         return gem + ': ' + quest.locations[gem];
       }).join('; ');
       if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
-      var status = quest.state === 'open' ? (quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
+      var status = quest.state === 'open' ? (quest.waiting?'Waiting for the saved trade.':quest.kind==='commission'?'Accepted; payment reserved.':quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
         'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
         quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
         quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
-      var terms=quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. Return to a guild trader in this hold. Returns after '+quest.hours+' hours.' :
+      var terms=quest.kind==='commission'?'Deliver '+(Array.isArray(quest.goods)?quest.goods.map(function(good){return good.count+' '+good.name;}).join('; '):quest.count+' '+quest.item)+'. '+
+        (quest.gold===null?'No submitted payment is available.':'Payment '+quest.gold+' gold.')+
+        ' Return to this specialist. This work rests for '+quest.hours+' hours after the trade settles.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
+        (quest.exactMerchant?'Return to this specialist.':'Return to a guild trader in this hold.')+' Returns after '+quest.hours+' hours.' :
         'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +
-        '<p>' + esc(location) + '</p><p>'+esc(terms)+'</p><p>' + esc(status) + '</p>'+
+        '<p>' + esc(location) + '</p><p>'+esc(terms)+'</p>'+(quest.check?'<p>'+esc(quest.check)+'</p>':'')+'<p>' + esc(status) + '</p>'+
         (quest.recovery ? '<p>Leave this older work before taking it again. Its progress could not be verified.</p>' : '')+'</div>';
       if (quest.state === 'open') {
-        body += '<button data-quest="' + esc(quest.id) + '" data-action="return"' + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
-          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"' + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'?'Leave work':'Give back and leave')+'</button>';
+        var token=Number.isSafeInteger(quest.token) && quest.token>0 ? ' data-token="'+esc(quest.token)+'"' : '';
+        body += '<button data-quest="' + esc(quest.id) + '" data-action="return"'+token + (quest.canReturn ? '' : ' disabled') + '>Turn in work</button>' +
+          '<button data-quest="' + esc(quest.id) + '" data-action="abandon"'+token + (quest.canAbandon ? '' : ' disabled') + '>'+(quest.kind==='kill'||quest.kind==='commission'?'Leave work':'Give back and leave')+'</button>';
       } else {
         var gems = quest.gems || [], chosen = gemChoices[quest.id] || '';
         if (gems.length) {
@@ -116,7 +121,9 @@
           for (var g = 0; g < gems.length; g++) body += '<option value="' + esc(gems[g]) + '"' + (chosen === gems[g] ? ' selected' : '') + '>' + esc(gems[g]) + '</option>';
           body += '</select>';
         }
-        body += '<button data-quest="' + esc(quest.id) + '" data-action="take" data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
+        var quote=quest.kind==='commission'&&typeof quest.quoteToken==='string'&&/^[0-9a-f]{64}$/.test(quest.quoteToken)?' data-token="'+esc(quest.quoteToken)+'"':
+          quest.kind==='commission'&&Number.isSafeInteger(quest.quotedUnit)&&quest.quotedUnit>=0?' data-token="'+esc(quest.quotedUnit)+'"':'';
+        body += '<button data-quest="' + esc(quest.id) + '" data-action="take"'+quote+' data-ready="' + (quest.canTake ? 'yes' : 'no') + '"' +
           (quest.canTake && (!gems.length || chosen) ? '' : ' disabled') + '>Take work</button>';
       }
       body += '</div>';
@@ -157,8 +164,9 @@
         if (questId) {
           // Availability comes from the server view. Chat transport has no
           // per-command acknowledgement, so it cannot own a pending button.
+          var token=el.getAttribute('data-token');
           net('/merchant quest ' + el.getAttribute('data-action') + ' ' + questId +
-            (gemChoices[questId] ? ' ' + gemChoices[questId] : ''));
+            (token ? ' @'+token : gemChoices[questId] ? ' ' + gemChoices[questId] : ''));
           return;
         }
         var verb = el.getAttribute('data-verb');

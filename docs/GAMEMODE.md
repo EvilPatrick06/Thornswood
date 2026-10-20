@@ -1,8 +1,8 @@
 # How gamemode.js is put together
 
 This page is for somebody opening `game\gamemode.js` for the first time. It
-is the whole of Thornswood's server side: 64,664 lines and 6 MB in one file on
-12 October (about 24,000 when this page was written), loaded by skymp5-server. It says where each system lives, which generated
+is the whole of Thornswood's server side: 69,961 lines and 6 MB in one file on
+17 October (about 24,000 when this page was written), loaded by skymp5-server. It says where each system lives, which generated
 table each script writes into it, how it reaches the server, how it talks to
 the plugins, what it keeps on disk, and which tests read it.
 
@@ -90,7 +90,10 @@ Settings come from `server-settings.json` in the server's own folder, the
 working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 (`gamemode.js:dataDir`), `privDir` (`gamemode.js:privDir`), `thornswoodVoicePort`
 (`gamemode.js:voicePort`), `thornswoodChargen` (`gamemode.js:s.thornswoodChargen === false`),
-`thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`) and `loadOrder`
+`thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
+(`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
+issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
+keep the ports and routes from the Office page of K, issue #2700) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
@@ -106,7 +109,9 @@ stages kept in the actor property `thornswoodChargen` (`gamemode.js:CHARGEN_PROP
 2. `choosing`, set by `beginChoosing` (`gamemode.js:beginChoosing`): the choice is made
    on K in the character panel.
 3. `done`, set by `arriveAt` (`gamemode.js:arriveAt`), which moves the person to
-   the inn of the town they picked (`CHARGEN.towns` as `PASSAGES`).
+   the start spot of the town they picked (`CHARGEN.towns` as `PASSAGES`, the
+   `start` of each town; #2622), and welcomes them: "Welcome to (hold), Safe
+   Travels." The inn spot (`arrival`) is staff's `/tp <town> inn`.
 
 An old `arriving` state is folded into `done` (`gamemode.js:if (state.stage === 'arriving') {`).
 `"thornswoodChargen": false` in `server-settings.json` switches the hall off.
@@ -192,11 +197,13 @@ The rules are in progression and the three blocks after the character block.
 The register is `private\property.json` (`gamemode.js:registerPath`;
 `save`). A claim is made at the door (`touched`, `claim`)
 and carried by the deed (`giveDeed`). Locks and keys follow
-(`lockScript`, `mold`, `cutKey`). A Jarl, the one admin
-grant, names stewards (`loadStewards`, `stewardCmd`), and only a
-steward can `evict`. A hold's box takes gold only (`putIn`);
-rent (`rentDue`, `rentCmd`) and board fees (`takeGold`)
-land in it. Notice boards come after them. Coin enters the world in one
+(`lockScript`, `mold`, `cutKey`). The offices are Discord roles the
+door reads from the site (`__thornswoodOffices`, read through `officeOf`,
+#2551): a Jarl gives their hold's Court, Steward and Guard on the Office
+page (`officeCmd`, which asks the site to set the role), and only a
+steward can `evict`. A hold's box is the drop box on its board
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). The spoils block strips spawned gold from the
 world, and a coin purse found in it counts as gold.
@@ -245,9 +252,8 @@ There is no custom packet. Two paths:
 The voice feed (`gamemode.js:path: '/positions'`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
-Do not run `scripts\deploy\Add-VoiceFeed.ps1`: it writes the older
-`voice\gamemode-voice.js` over this block, with 7778 written in and no
-party field (`voice\README.md:the dev service, where this file still has 7778 written in`).
+This block is the only copy: the older one beside the voice service, and the
+deploy script that wrote it in, went in #2736.
 
 ## Where its data lives on the VPS
 
@@ -257,12 +263,33 @@ In the server's folder, `C:\Thornswood-Server` live and
 | Folder | What the gamemode keeps there | Served to anybody? |
 |---|---|---|
 | `data` | `online.json`, `manifest.json`, `server-bases.json`, `thornswood-log.json`, `restart.json` | Yes: the resources port (3000 live, 7788 dev) hands out anything under it over plain HTTP (`gamemode.js:The resources server hands out anything under data over plain HTTP`) |
-| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load) | No |
+| `private` | `characters.json`, `allowed.json`, `door.json`, `door.log`, `property.json`, `farm-claims.json`, `mod-settings.json` (the first six moved from `data` on 25 September, issue #541, because they carry profile ids; the gamemode carries an old copy across on first load), and the books, `books.json` and `last-left.json` (moved from `data` on 16 October, issue #2582, for the same reason; the old copies are removed, not carried); and the other registers naming characters, `law.json`, `beds.json`, `embassy.json`, `take-limit.json` and `dungeon-rewards-ledger.json`; and `deleted-characters.json`, a list of deleted characters that `Delete-Person.ps1` writes and the gamemode lets go of at its next start and then deletes (issue #2351); `Reset-Character.ps1`, `Wipe-Saves.ps1` and `New-Character.ps1` write it too, naming the characters they throw away by form id and never a profile (issues #2668 and #2673); and `trade-cargo.json`, the trade ships' register of ports, routes and what each hold carries, naming characters by form id and profile and never by name (issue #511) | No |
 | `world` | Not the gamemode's: SkyMP's changeform database, every reference the server has written to (`scripts\ops\Wipe-Saves.ps1:the changeform database. Every reference the server has ever written to`; `scripts\release\Where.ps1 ChangeForms` names its folder in the server build) | No |
 | the folder itself | `thornswood.log`, rolled at 4 MB with five kept (`gamemode.js:LOG_MAX_BYTES`) | No |
 
 `scripts\ops\Wipe-Saves.ps1` starts the world over by moving `world`,
-`private\characters.json`, `private\property.json` and `private\farm-claims.json` (and the old copies in `data`, for a server still on the older gamemode).
+`private\characters.json`, `private\property.json`, `private\farm-claims.json`
+and, since 17 October (issue #2351), every other register naming a character:
+`law.json`, `beds.json`, `embassy.json`, `books.json`, `last-left.json`,
+`take-limit.json`, the trade ships' `trade-cargo.json` (issue #511, with the
+staff list of ports and routes in force beside the goods aboard), the dungeon
+chests' ledger with its `.initialized` mark,
+and a waiting `deleted-characters.json` (and the old copies in `data`, for a
+server still on the older gamemode). It leaves `mod-settings.json`, each
+person's menu choices, and `merchant-ledger.json`, which the merchant code
+needs to start. Once everything has moved it writes a new
+`deleted-characters.json` (`scripts\ops\Release-List.ps1`, issue #2668)
+naming every character in the world it set aside, by form id only, with the
+ids of a list it set aside carried over and every part whose register it
+moved marked done, so the first start lets the merchant ledger go of a wiped
+character's supply waits, commission promises and waiting trade and deletes
+the list. `scripts\ops\Reset-Character.ps1` and, on a local test server,
+`scripts\ops\New-Character.ps1` (issue #2673) write the same list for the
+characters they throw away, with nothing marked done; a profile keeps its id
+and what it holds either way. The part `saves` (`server-log.js`, on the VPS)
+acts only on the profiles a list names, and a server on this machine does
+not start under `server-log.js` at all, so the writer marks `saves` done
+whenever the list it writes names no profile.
 
 ## Generated tables
 
@@ -372,7 +399,7 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-dressed-at-creation.js`, `test-new-character.js`, `test-stuck-in-the-hall.js`, `test-1269-kept-character.js` |
 | Gathering and mining | `test-deposit.js`, `test-chopping-gate.js`, `test-cooldown-sweep.js`, `test-mine-buildings.js`, `test-farming.js`, `test-eggs.js` |
 | Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js`, `test-enchanter-staff-spells.js`, `test-classes-page.js` |
-| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
+| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-2298-box-retired.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
 | Needs | `test-needs.js`, `test-temp.js`, `test-food-table.js`, `test-hud.js` |
 | Chat, commands, door | `test-command-ack.js`, `test-held-commands.js`, `test-help.js`, `test-tp.js`, `test-dice.js`, `test-door.js`, `test-allowed-failed.js`, `test-audit-handlers.js` |
 | Social | `test-social.js`, `test-party-markers.js`, `test-2474-heads.js` |

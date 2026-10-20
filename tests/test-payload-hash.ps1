@@ -150,6 +150,63 @@ try {
     }
     [IO.File]::WriteAllText((Join-Path $site 'files.json'), ($all | ConvertTo-Json -Depth 4), $noBom)
 
+    # ---- 1b. a files.json that does not read (#2711) ---------------------------
+    #
+    # The remote half read files.json in a try with an empty catch, so a list
+    # that did not read became an empty one and was written back naming the
+    # installer alone, after the installer had already replaced the old one.
+    # Now a check reads it before the send, and the write leaves one that does
+    # not read as it is. Both scripts are lifted out of Publish-Installer.ps1,
+    # filled in as Remote fills them, and run under Windows PowerShell 5.1, as
+    # the box runs them, against a stand-in Thornswood-Docs.
+    $docs = Join-Path $work 'docs'
+    New-Item -ItemType Directory -Path (Join-Path $docs 'files') -Force | Out-Null
+    $listFile = Join-Path $docs 'files\files.json'
+    function Lift-Remote([string]$opener) {
+        $i = $pub.IndexOf($opener)
+        if ($i -lt 0) { return '' }
+        $s = $pub.IndexOf("`n", $i) + 1
+        $e = $pub.IndexOf("`n`"@)", $s)
+        if ($e -lt 0) { return '' }
+        return $pub.Substring($s, $e - $s).TrimEnd("`r")
+    }
+    $checkBody = Lift-Remote '$listCheck = @(Remote @"'
+    $writeBody = Lift-Remote '$listWrite = @(Remote @"'
+    Yes 'Publish-Installer reads files.json on the box, and writes it, as two scripts' ($checkBody -and $writeBody)
+    $scpAt = $pub.IndexOf('& scp @ssh $pair[0]')
+    Yes '  the read comes before the installer is sent, and the write after' ($scpAt -gt 0 -and $pub.IndexOf('$listCheck = @(Remote @"') -lt $scpAt -and $pub.IndexOf('$listWrite = @(Remote @"') -gt $scpAt)
+    Yes '  and a refusal from either stops the script (the first before anything is sent)' (
+        $pub -match '(?s)\$listCode = \$LASTEXITCODE.{0,600}throw \("files\.json on the site.{0,200}Nothing was sent' -and
+        $pub -match '(?s)\$listWriteCode = \$LASTEXITCODE.{0,200}if \(\$listWriteCode -ne 0\) \{\s*throw')
+    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    function Run-Remote([string]$body) {
+        $rootWin = $docs
+        $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
+        $text = $ExecutionContext.InvokeCommand.ExpandString($body)
+        $f = Join-Path $work ('remote-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+        [IO.File]::WriteAllText($f, $text, (New-Object Text.UTF8Encoding($true)))
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $out = @(& $winps -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }); $code = $LASTEXITCODE }
+        finally { $ErrorActionPreference = $old }
+        return @{ Out = ($out -join ' '); Code = $code }
+    }
+    if ($checkBody -and $writeBody) {
+        $r = Run-Remote $checkBody
+        Yes 'no files.json yet: the check lets the send go on' ($r.Code -eq 0 -and $r.Out -match 'FILESJSON\|none')
+        [IO.File]::WriteAllText($listFile, '{"Other-Download.zip":{"label":"something else on the page","sha256":"ab"}}', $noBom)
+        $r = Run-Remote $checkBody
+        Yes 'a files.json that reads: the check lets the send go on' ($r.Code -eq 0 -and $r.Out -match 'FILESJSON\|reads')
+        $r = Run-Remote $writeBody
+        $after = Get-Content -LiteralPath $listFile -Raw | ConvertFrom-Json
+        Yes '  and the write keeps every other download, adding the installer' ($r.Code -eq 0 -and $after.PSObject.Properties['Other-Download.zip'] -and $after.PSObject.Properties[$exeOut])
+        $broken = '{"Other-Download.zip":{"label":"cut off'
+        [IO.File]::WriteAllText($listFile, $broken, $noBom)
+        $r = Run-Remote $checkBody
+        Yes 'a files.json that does not read: the check exits 1, saying why' ($r.Code -eq 1 -and $r.Out -match 'FILESJSON\|' -and $r.Out -notmatch 'FILESJSON\|(none|reads)')
+        $r = Run-Remote $writeBody
+        Yes '  and the write exits 1 and leaves it as it was, not a list of the installer alone' ($r.Code -eq 1 -and $r.Out -match 'does not read, so it was left as it is' -and [IO.File]::ReadAllText($listFile) -eq $broken)
+    }
+
     # ---- 2. the site hands it over --------------------------------------------
     #
     # server.js opens a port and reads a config when it is required, so the
