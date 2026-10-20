@@ -10,8 +10,9 @@
 //
 // Root cause (#1382, issuecomment-6127861218 and issuecomment-6129142274):
 // nothing collected or boiled water and nothing knew where it came from.
-// The wells are statics and raise no activation, so the well path waits on
-// activators the content plugin places (NEEDS.wellActivators, empty).
+// The wells are statics and raise no activation, so the content plugin stands
+// a well bucket beside each well it can (#1382), and NEEDS.wellActivators is
+// that bucket.
 //
 // Runs the REAL needs block over a stand-in mp, inventory and clock, and
 // reads the REAL onActivate handler and panel. Read only.
@@ -42,7 +43,7 @@ yes('the needs block is in the gamemode', !!needsBlock);
 yes('the well table is in the gamemode, read out of the load order', !!WELLS && Array.isArray(WELLS.items) && WELLS.items.length > 0);
 
 const EMPTY = 0xf2012, FULL = 0x13f598;
-const COOK = 'a5cb3:Skyrim.esm', WELL_ACT = 'wellact:Test.esm';
+const COOK = 'a5cb3:Skyrim.esm', WELL_ACT = '18030:Thornswood-Content.esp';
 function idOf(d) { return d === 'f2012:Skyrim.esm' ? EMPTY : d === '13f598:WindhelmSSE.esp' ? FULL : 0; }
 
 function rig() {
@@ -84,11 +85,9 @@ if (ready) {
   const A = 7;
   r.seed(A);
 
-  // Wells. The shipped list is empty: the wells are statics (issuecomment-6129142274).
-  yes('no well activator is listed until the content plugin places them', Array.isArray(N.NEEDS.wellActivators) &&
-    N.NEEDS.wellActivators.length === 0);
-  yes('so activating anything that is not listed fills nothing', N.activatedWater(A, 'ref:Test.esm', WELL_ACT, '') === '');
-  N.NEEDS.wellActivators.push(WELL_ACT);   // as if the content plugin had placed them
+  // Wells: the content plugin's well bucket is the one activator listed (#1382).
+  yes('the well bucket is the one well activator listed', JSON.stringify(N.NEEDS.wellActivators) === JSON.stringify([WELL_ACT]));
+  yes('activating anything that is not listed fills nothing', N.activatedWater(A, 'ref:Test.esm', 'other:Test.esm', '') === '');
   yes('a well with no empty bottle fills nothing', /empty bottle/.test(N.activatedWater(A, 'w1:Test.esm', WELL_ACT, '')));
   r.addItem(A, 'f2012:Skyrim.esm', 10);
   yes('a well with an empty bottle fills it clean', /clean/.test(N.activatedWater(A, 'w1:Test.esm', WELL_ACT, '')) &&
@@ -108,7 +107,6 @@ if (ready) {
   let before = r.thirst(A);
   N.consumed(A, FULL);
   yes('well water is 20 and safe without boiling', Math.round(r.thirst(A) - before) === 20 && r.fouled.length === 0);
-  N.NEEDS.wellActivators.length = 0;
 
   // Unsafe water, worst first.
   r.carry(A, 'well', 0); delete r.store[A].water.well;

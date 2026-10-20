@@ -45,6 +45,7 @@ const CONTENT = 'Thornswood-Content.esp';
 const BASES = {
   kiln: '1547e:Thornswood-Content.esp', salt: 'dde4ef:Thornswood-Content.esp',
   hive: 'dbf8b3:Thornswood-Content.esp', lab: '42e69:Thornswood-Content.esp',
+  well: '18030:Thornswood-Content.esp',
 };
 
 let pass = 0, fail = 0;
@@ -101,7 +102,9 @@ yes('K0 every site left out names its kind, its place, and each anchor tried wit
     left.every((n) => BASES[skipped[n].kind] && typeof skipped[n].where === 'string' && !sites[n] &&
       Array.isArray(skipped[n].triedAnchors) && skipped[n].triedAnchors.every((t) => desc.test(t.anchor) &&
         /^no clear spot within \d+ units \(/.test(t.why)) &&
-      (skipped[n].triedAnchors.length > 0 || /^no .* stands in the open world within \d+ units/.test(skipped[n].why || ''))));
+      (skipped[n].triedAnchors.length > 0 || /^no .* stands in the open world within \d+ units/.test(skipped[n].why || '') ||
+       // A well with no bucket of its own (#1382): not there, in a cell the plugin cannot carry, or beside one that has it.
+       (skipped[n].kind === 'well' && /^(the well |it shares the bucket of well-\d+, \d+ units away)/.test(skipped[n].why || '')))));
 const placesOf = (kind) => of(kind).map((n) => sites[n].where).concat(left.filter((n) => skipped[n].kind === kind)
   .map((n) => skipped[n].where)).sort();
 const benches = JSON.parse(fs.readFileSync(BENCHES, 'utf8')).benches;
