@@ -325,7 +325,7 @@ NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 # (#1407): widening a mode widens every channel that uses it, so the lead
 # gamemaster role gets the one channel it needs by name, on that channel's own
 # line, through extra_roles. Both still see every hold through HOLD_STAFF.
-# Moving either of them in here is a line in #staff-general first, because it
+# Moving either of them in here is a line in #staff-updates first, because it
 # opens #reports and every other staff channel.
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
@@ -1295,7 +1295,7 @@ async def on_ready():
                     print('             #' + ch.name)
                 print('             -Prune is what deletes them, and a channel')
                 print('             somebody is using belongs in the plan')
-                print('             instead. Ask in #staff-general first.')
+                print('             instead. Ask in #staff-updates first.')
 
         print('')
         if CHECK:
@@ -1343,7 +1343,7 @@ async def on_ready():
                 print('  at #rules. Nothing makes people accept them until you do.')
             if not PRUNE:
                 print('  Nothing was deleted. -Prune is what deletes, and it')
-                print('  goes through #staff-general before anybody runs it.')
+                print('  goes through #staff-updates before anybody runs it.')
         print('')
         # Only after a real build that did all it set out to. After -Check
         # nothing was built, and after a failure the run that fixes it still
