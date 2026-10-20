@@ -160,6 +160,46 @@ Start-Sleep -Seconds 2
     $r = Prove { $global:wasRun = $true } -sshCommand @($deadSsh)
     Yes 'no watcher: the run is not run' (-not $global:wasRun)
     Yes 'no watcher: says nothing is proved, exit code 2' ($r.Out -match 'did not start' -and $r.Code -eq 2)
+
+    # ---- 6. the watcher ends with standard input still open (#451, 20 Oct).
+    # The fake ssh above passes the end of standard input on; the VPS's did
+    # not, and the watcher never answered. Here it runs straight in Windows
+    # PowerShell 5.1 with its standard input left open: a stop line must end
+    # it, and so must its time limit with no line at all.
+    $ast = [Management.Automation.Language.Parser]::ParseFile($prove, [ref]$null, [ref]$null)
+    $fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ThornswoodSecretWatcher' }, $true)
+    . ([scriptblock]::Create($fn.Extent.Text))
+    function Watch-Open([int]$seconds, [bool]$stopLine) {
+        $psi = New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName = 'powershell.exe'
+        $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodSecretWatcher $seconds)))
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $true
+        $psi.RedirectStandardOutput = $true
+        $psi.CreateNoWindow = $true
+        $p = [Diagnostics.Process]::Start($psi)
+        $o = $p.StandardOutput.ReadToEndAsync()
+        $p.StandardInput.WriteLine($wire)
+        $p.StandardInput.Flush()
+        if ($stopLine) { Start-Sleep -Seconds 2; $p.StandardInput.WriteLine('STOP'); $p.StandardInput.Flush() }
+        $sw = [Diagnostics.Stopwatch]::StartNew()
+        $ended = $p.WaitForExit(($seconds + 20) * 1000)
+        if (-not $ended) { $p.Kill(); [void]$p.WaitForExit(5000) }
+        return [pscustomobject]@{ Ended = $ended; Seconds = $sw.Elapsed.TotalSeconds; Out = $o.Result }
+    }
+    $w = Watch-Open 120 $true
+    Yes 'standard input open: a stop line ends the watcher well before its limit' ($w.Ended -and $w.Seconds -lt 30)
+    Yes 'standard input open: after a stop line it answers NOT FOUND over some command lines' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
+    # And this side sends that line: a watcher that reads two lines, the value
+    # and the next, and keeps the second.
+    $lineFile = Join-Path $work 'second-line.txt'
+    $liner = Join-Path $work 'liner.cmd'
+    [IO.File]::WriteAllText($liner, ("@echo off`r`nset /p first=`r`necho WATCHER READY`r`nset /p second=`r`n>`"" + $lineFile + "`" echo [%second%]`r`necho WATCHER NOT FOUND`r`necho WATCHER READ 1`r`n"), (New-Object Text.ASCIIEncoding))
+    $r = Prove { 'ran' } -sshCommand @($liner)
+    Yes 'this side sends the watcher a stop line when the run is over' ((Test-Path -LiteralPath $lineFile) -and ([IO.File]::ReadAllText($lineFile).Trim() -eq '[STOP]') -and $r.Code -eq 0)
+    $w = Watch-Open 3 $false
+    Yes 'standard input open, no stop line: the time limit ends the watcher' $w.Ended
+    Yes 'standard input open, no stop line: it still answers' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
