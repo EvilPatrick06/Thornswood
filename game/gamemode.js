@@ -7611,6 +7611,10 @@ function collectFishTrap(actorId) {
 
 function fish(actorId, refrId, baseDesc) {
   if (!isFish(baseDesc)) return null;
+  if(baseDesc==='154a5:Thornswood-Content.esp') {
+    const quests=globalThis.__thornswoodQuests;
+    if(!quests || typeof quests.longfinScarce!=='function')return 'This longfin water is unavailable for now.';
+  }
   const caught = FISH_BY_BASE[baseDesc];
   if(!withinResourceReach(actorId,refrId)) return 'Come closer to this water.';
   const stock=globalThis.__thornswoodResourceStock;

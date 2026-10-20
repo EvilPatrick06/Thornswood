@@ -56,6 +56,22 @@ for(const [i,key] of expectedKeys.entries()) {
 const stations=JSON.parse(fs.readFileSync(path.join(root,'game/data/station-sites.json'),'utf8')).sites;
 const expected=new Set(Object.values(stations).concat(Object.values(doc.sites)).map(r=>fid(r.ref)));
 assert.deepEqual(new Set([...records].filter(([,r])=>r.tag==='REFR').map(([id])=>id)),expected);
+// Content can precede its runtime release. The newly placed FLOR markers
+// must not become ordinary unbounded fishing while that controller is absent.
+{
+ const vm=require('node:vm'),gm=fs.readFileSync(path.join(root,'game/gamemode.js'),'utf8');
+ const start=gm.indexOf('function fish(actorId'),end=gm.indexOf('\n}',start)+2;
+ let grants=0;const longfin='154a5:Thornswood-Content.esp',clam='85f80:Skyrim.esm';
+ const context={isFish:()=>true,FISH_BY_BASE:{[longfin]:{rank:'master',name:'Longfin',from:'Water',produce:'106e1b:Skyrim.esm'},
+  [clam]:{rank:'novice',name:'Clam Meat',from:'Clam',produce:'ec03:Skyrim.esm'}},withinResourceReach:()=>true,
+  __thornswoodResourceStock:{left:()=>0,take(ref,span,give){return {ok:give()};}},
+  classGate:()=>null,toolGate:()=>null,poleTooWeak:()=>null,rankStep:()=>3,rankWord:v=>v,
+  RANK_LADDER:['novice','advanced','expert','master'],FISH_TUNING:{cooldownMs:{novice:600000,master:14400000},yieldByStep:{3:[2,4]}},
+  randInt:()=>4,addItemsAtomic:()=>{grants++;return true;},creditWork:()=>'',wearTool:()=>'',waitWord:String};
+ vm.runInNewContext(gm.slice(start,end),context);
+ assert.match(context.fish(1,999999,longfin),/unavailable/);assert.equal(grants,0);
+ assert.match(context.fish(1,999999,clam),/4 Clam Meat/);assert.equal(grants,1,'ordinary clams still work');
+}
 const {spawnSync}=require('node:child_process');
 const code=String.raw`
 import copy,importlib.util,json

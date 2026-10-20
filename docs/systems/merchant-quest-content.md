@@ -2,7 +2,7 @@
 
 `quest-content.json` gives the authoring inputs for seven inventory tokens,
 eight longfin markers and a ledger source. `Add-ContentRecords.py` writes them
-into the repository's Content plugin. This section supplies objects only;
+into the repository's Content plugin. This section supplies objects and refuses premature longfin draws;
 the remaining retrieval and longfin interactions require their runtime code.
 No new actor, container contents, recipe, skill book or farming mechanic is added.
 
@@ -63,3 +63,5 @@ them to clients, using the normal content fingerprint checks. Runtime offers
 stay disabled until their source validation succeeds. The next runtime section
 must be released only with the matching content fingerprint. No install,
 release, server command, Vortex action or playtest is part of source authoring.
+
+The new longfin base refuses fishing while its quest runtime is missing. This guard is delivered in the same gamemode step as Content, before client release. Ordinary clams remain available. A regression reproduces the former ordinary four-fish grant and verifies zero longfin goods without the controller.
