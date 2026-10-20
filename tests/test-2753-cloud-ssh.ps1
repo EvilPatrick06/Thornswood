@@ -142,7 +142,7 @@ Yes 'StopIt stops only what names bridge.log, and the child it started' ($stopIt
 # bridge answers looks for its whole line, never a status code or "not here".
 $bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')
 Yes 'Install-Bridge.ps1 looks for the line bridge.js answers a plain request with (#2875)' (
-    $bridgeJs -match "const PLAIN = 'box bridge: not here';" -and $install -match "(?m)^\`$Plain = 'box bridge: not here'$")
+    $bridgeJs -match "const PLAIN = 'box bridge: not here';" -and $install -match "(?m)^\`$Plain = 'box bridge: not here'\r?$")
 Yes '  through Caddy, at the outside check' ($install -match 'if \("\$said"\.Trim\(\) -eq \$Plain\)' -and $install -notmatch "-eq 'not here'")
 Yes '  and on the port, at install and in the status, never by status code alone' (
     $install -match "if \(Answers @\('\`$Plain'\)\)" -and $install -match "-eq '\`$Plain'\) \{ 'port" -and $installCode -notmatch 'StatusCode -eq 404')
