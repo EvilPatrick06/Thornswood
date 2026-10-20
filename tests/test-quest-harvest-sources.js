@@ -9,7 +9,8 @@ function fixture() {
  const record=(desc,type,fields=[])=>{const n=id(desc);records.set(n,{record:{id:n,type,flags:0,fields},toGlobalRecordId:raw=>raw});return n;};
  for(const row of rows) {
   const base=record(row.base,'ACTI');record(row.item,'INGR');record(row.world,'WRLD');
-  const name=Buffer.alloc(4);name.writeUInt32LE(base);const ref=record(row.reference,'REFR',[{type:'NAME',data:name}]);
+  const name=Buffer.alloc(4);name.writeUInt32LE(base);const data=Buffer.alloc(24);row.position.forEach((v,i)=>data.writeFloatLE(v,i*4));
+  const ref=record(row.reference,'REFR',[{type:'NAME',data:name},{type:'DATA',data}]);
   objects.set(ref,{baseDesc:row.base,isDisabled:false,locationalData:{cellOrWorldDesc:row.world,pos:row.position.slice()}});
  }
  objects.set(10,{locationalData:{cellOrWorldDesc:rows[0].world,pos:rows[0].position.slice()}});
