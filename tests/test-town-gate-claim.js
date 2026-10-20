@@ -5,8 +5,8 @@
 // Build-DoorTable only maps doors into interiors, so town gates were never
 // buildings. /claim at the Whiterun gate fell through to farming ("Only a
 // farmer can bring a crop in"). Patrick decided gates SHOULD be claimable
-// via the mold flow. This checks the tables and that openTheGates skips a
-// property-shut gate.
+// via the mold flow. This checks the tables, that the lock script shuts a
+// claimed gate, and that the client's gate timer is gone (#2484).
 //
 //   node tests/test-town-gate-claim.js
 'use strict';
@@ -31,48 +31,12 @@ yes('Whiterun gate has a plain name', /'gate:whiterun-main':\s*'Whiterun Main Ga
 yes('Riften gate has a plain name', /'gate:riften-main':\s*'Riften Main Gate'/.test(gm));
 yes('Whiterun inside leaf is a way out', /'1b1f3:Skyrim\.esm':\s*1/.test(gm) && /addTownGateProperties/.test(gm));
 yes('lockScript publishes __thornswoodPropertyShut', /__thornswoodPropertyShut/.test(gm));
-yes('openTheGates skips property-shut gates', /__thornswoodPropertyShut/.test(front) && /shut\[id\]/.test(front));
-
-// Drive openTheGates with a pretend shut map.
-{
-  const a = front.indexOf('  const TOWN_GATES = [');
-  const b = a < 0 ? -1 : front.indexOf('\n  }\n', front.indexOf('function openTheGates', a));
-  const block = (a >= 0 && b >= 0) ? front.slice(a, b + 5) : null;
-  yes('openTheGates block still extracts', !!block);
-  if (block) {
-    const world = {};
-    function gate(locked) {
-      return { state: !!locked, isLocked: function () { return this.state; },
-               lock: function (on) { this.state = !!on; this.calls = (this.calls || 0) + 1; } };
-    }
-    const WHITERUN = 0x1b1f1;
-    const g = gate(true);
-    world[WHITERUN] = g;
-    const said = [];
-    const fn = new Function(
-      'sp', 'say', 'Date', 'globalThis',
-      block + '\nreturn { open: openTheGates, ids: TOWN_GATES };');
-    const api = fn(
-      { Game: { getFormEx: function (id) { return world[id] || null; } },
-        ObjectReference: { from: function (f) { return f; } } },
-      function (line) { said.push(line); },
-      { now: function () { return 1; } },
-      { __thornswoodPropertyShut: { [WHITERUN]: true } });
-    api.open();
-    yes('a property-shut Whiterun gate is left locked', g.state === true && !g.calls);
-    // Clear shut map: should open.
-    const g2 = gate(true);
-    world[WHITERUN] = g2;
-    const api2 = fn(
-      { Game: { getFormEx: function (id) { return world[id] || null; } },
-        ObjectReference: { from: function (f) { return f; } } },
-      function (line) { said.push(line); },
-      { now: function () { return 1; } },
-      { __thornswoodPropertyShut: {} });
-    api2.open();
-    yes('an unclaimed Whiterun gate still opens', g2.state === false && g2.calls === 1);
-  }
-}
+// Since #2484 the client no longer opens the gates on a timer: the outer
+// leaves load unlocked from Thornswood-Last.esp, and the lock script above is
+// what shuts a claimed one, so nothing on the client can force it back open.
+yes('nothing on the client opens the town gates on a timer any more (#2484)',
+    !/openTheGates|TOWN_GATES|GATE_EVERY_MS/.test(front));
+yes('the lock script locks every door property wants shut, on its own', /r\.lock\(true, false\)/.test(gm));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

@@ -748,7 +748,8 @@ def main():
     ap.add_argument('--check', action='store_true')
     args = ap.parse_args()
 
-    lo = json.load(io.open(os.path.join(ROOT, 'game', 'data', 'last-plugin.json'), encoding='utf-8'))['loadOrder']
+    lo_doc = json.load(io.open(os.path.join(ROOT, 'game', 'data', 'last-plugin.json'), encoding='utf-8'))
+    lo = lo_doc['loadOrder']
     order = [(os.path.join(ROOT, 'game', 'content', n) if n == CONTENT else os.path.join(args.data, n), n)
              for n in lo]
     missing = [n for p, n in order if not os.path.isfile(p)]
@@ -764,15 +765,27 @@ def main():
         print('STOP. %d plugin(s) in %s are not the collection\'s bytes (revision %s): %s'
               % (len(other), args.data, record.get('revision'), ', '.join(other[:6])))
         return 2
-    # Thornswood's two plugins after the content plugin place nothing, so
-    # they are not read: measured here, not assumed.
+    # Thornswood's two plugins after the content plugin place nothing new, so
+    # they are not read: measured here, not assumed. The one exception is
+    # Thornswood-Last.esp's overrides of the town gates Bethesda ships locked
+    # (#2484): each is a master's own reference, left where it stands without
+    # its lock or script, and last-plugin.json names every one. A gate is not
+    # a station and stands where it always stood, so no spot changes.
+    gates = set(lo_doc.get('gatesUnlocked') or [])
     for n in OURS_AFTER:
         pl = wb.Plugin(os.path.join(ROOT, 'game', 'content', n), n)
         placed = []
-        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(1) if tag == b'REFR' else None,
+        pl.walk(lambda tag, p, size, flags, fid, w, c: placed.append(fid) if tag == b'REFR' else None,
                 tops={b'WRLD', b'CELL'})
-        if placed:
-            print('STOP. %s places %d reference(s); this table would have to read it.' % (n, len(placed)))
+        named = []
+        for fid in placed:
+            i = fid >> 24
+            desc = '%x:%s' % (fid & 0xFFFFFF, pl.masters[i]) if i < len(pl.masters) else None
+            if not (n == 'Thornswood-Last.esp' and desc in gates):
+                named.append(desc or '%08X (its own)' % fid)
+        if named:
+            print('STOP. %s places %d reference(s) that are not the town gates it unlocks (%s); '
+                  'this table would have to read it.' % (n, len(named), ', '.join(named[:6])))
             return 1
     print('The load order: %d plugins, game\\data\\last-plugin.json\'s; %s read from game\\content for its '
           'station records only' % (len(plugins), CONTENT))

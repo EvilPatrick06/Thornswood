@@ -26773,10 +26773,11 @@ const WAY_OUT = {"1006d0:Skyrim.esm":1,"10209:Dawnguard.esm":1,"1028ed:Skyrim.es
   Whiterun gate and saying /claim then fell through to farming, which answered
   "Only a farmer can bring a crop in."
 
-  These four leaves are the ones openTheGates already knows. The inside
+  These four leaves are the town gates (Thornswood-Last.esp loads the outer ones
+  unlocked since #2484). The inside
   Whiterun leaf is a way out so a lock never shuts people inside the city.
   Riften's two listed leaves are both the locked outer ones from the same
-  measurement that put them in TOWN_GATES on the client.
+  measurement that put them in GATES in scripts/mods/Build-LastPlugin.py.
 */
 (function addTownGateProperties() {
   var doors = {
@@ -39180,9 +39181,8 @@ module.exports = {
       // and expensive. Failing that way round is the right one: a door that
       // is not locked is a house anybody can walk into.
       '    var sp = ctx.sp;',
-      // Remember which form ids property wants shut, so openTheGates on the
-      // client does not force-open a claimed locked town gate every thirty
-      // seconds (#615).
+      // Remember which form ids property wants shut (#615), published for
+      // anything on the client that asks whether a door is property's to hold.
       '    var shutMap = {};',
       '    for (var i = 0; i < v.shut.length; i++) {',
       '      try {',

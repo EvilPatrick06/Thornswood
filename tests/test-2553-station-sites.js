@@ -169,8 +169,13 @@ function placements(file) {
   })(24 + b.readUInt32LE(4), b.length);
   return n;
 }
-yes('B3 Thornswood-Last.esp and Thornswood-WoodworkerTrail.esp place nothing, so the table need not read them',
-    ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp'].every((n) => placements(path.join(ROOT, 'game', 'content', n)) === 0));
+// Thornswood-Last.esp places nothing new: its only placed references are the
+// three town gates it overrides where they stand, without their lock (#2484),
+// and a gate is not a station, so the table need not read them.
+const lastGates = (JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {}).gatesUnlocked;
+yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and Thornswood-WoodworkerTrail.esp nothing, so the table need not read them',
+    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) === lastGates &&
+    placements(path.join(ROOT, 'game', 'content', 'Thornswood-WoodworkerTrail.esp')) === 0);
 
 // ---------------------------------------------------------------- P
 const doc = fs.existsSync(DOC) ? fs.readFileSync(DOC, 'utf8') : '';
