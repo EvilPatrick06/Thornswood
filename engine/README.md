@@ -105,16 +105,16 @@ with the line to run again with fewer at once, instead of pointing at the
 first error.
 
 A fork in a folder whose path has an `&` in it (every worktree under
-`C:\ThornswoodTemps&Worktrees`, for one) builds too (issue #1025). vcpkg sets
-itself up through `bootstrap-vcpkg.bat`, and cmd.exe cuts a path at a bare
-`&`, so `Build-Engine.ps1 -Fork <that fork>` gives the fork's parent folder a
+`C:\ThornswoodTemps&Worktrees` on One until #2900, for one) builds too (issue
+#1025). vcpkg sets itself up through `bootstrap-vcpkg.bat`, and cmd.exe cuts a
+path at a bare `&`, so `Build-Engine.ps1 -Fork <that fork>` gives the fork's parent folder a
 free drive letter for the run (`subst`), configures and builds through it,
 and removes the letter when it ends, however it ends. It is the parent and not
 the fork itself because the fork's `CMakeLists.txt` compares the build folder
 with `<fork>/build`, and a drive root gives `J://build`. A build configured
 that way is built through the same letter next time; when that letter has
 become another drive, it stops and says to free it or delete the build
-folder. By hand, the same thing is `subst J: "C:\ThornswoodTemps&Worktrees\worktrees"`,
+folder. By hand, the same thing is `subst J: "<the folder that holds the fork>"`,
 then `-Fork J:\<name>`, then `subst J: /d`.
 
 ## Configuring
@@ -320,7 +320,7 @@ refused against the record. A record naming a folder with no `build\dist`
 stops the script that asks, with a sentence; it never falls back to another
 folder. After building a new engine commit in another worktree, record that
 one. On One the recorded build is
-`C:\ThornswoodTemps&Worktrees\worktrees\claude-skymp-7feb5dc4`.
+`C:\Thornswood-Repo\worktrees\engine-3d2cb747`.
 
 Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
 pull request, is red when the pin and the two records do not name one commit,

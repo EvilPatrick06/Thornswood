@@ -29,8 +29,8 @@
   The key's comment is thornswood-cloud, which is how a second run and
   -Remove find the old line. Nothing here touches any other key.
 
-  THE FILE. -Out, by default cloud-access.txt in
-  C:\ThornswoodTemps&Worktrees\temp\cloud-access, readable by the person
+  THE FILE. -Out, by default cloud-access.txt in the cloud-access folder
+  Get-ScratchDir.ps1 names (the repository's temp), readable by the person
   running this only. It holds two lines, THORNSWOOD_BOX_KEY_B64=... and
   THORNSWOOD_BOX_TOKEN=..., which go into the cloud environment's variables
   as they are (the token may go under the environment's network secrets for
@@ -44,7 +44,7 @@ param(
     [string]$VpsHost = '',
     [string]$VpsUser = '',
     [string]$BridgeRoot = 'C:\Thornswood-Bridge',
-    [string]$Out = 'C:\ThornswoodTemps&Worktrees\temp\cloud-access\cloud-access.txt',
+    [string]$Out = '',
     # Where the proof connects, the same address connect.js uses by default.
     [string]$BoxUrl = 'wss://thornswood.net/box/',
     [switch]$Remove,
@@ -57,6 +57,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here 'Send-Secret.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
+if (-not $Out) { $Out = Join-Path (& (Join-Path $Here '..\release\Get-ScratchDir.ps1') 'cloud-access') 'cloud-access.txt' }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

@@ -16,7 +16,7 @@ start the restored server and connect to it; see the end of that section.
 | --- | --- |
 | `Thornswood Backup` | a task on the VPS, 03:15 nightly, `scripts\vps\vps-nightly-backup.ps1` |
 | `C:\Thornswood-Backup` | where they land on the box, seven daily and four weekly |
-| `scripts\vps\Fetch-Backups.ps1` | brings them here, run on Patrick's machine, into `local\backups` in the repository folder (`C:\Users\evilp\Downloads\Thornswood-Repo\local\backups` on One, since 5 October); `-Schedule` makes that a daily task at 04:15 |
+| `scripts\vps\Fetch-Backups.ps1` | brings them here, run on Patrick's machine, into `local\backups` in the repository folder (`C:\Thornswood-Repo\local\backups` on One, since 5 October); `-Schedule` makes that a daily task at 04:15 |
 | `Thornswood Fetch Backups` | that task, on Patrick's machine (One), keeping 30 days and never fewer than seven, logging to `fetch.log` beside them |
 | `scripts\vps\Restore-Backup.ps1` | checks and unpacks one; `-CheckOnly` fails a backup with no characters in it |
 | `scripts\vps\Restore-Server.ps1` | puts one back into a server folder and checks the load order resolves and the characters are there |
@@ -274,7 +274,7 @@ the newest one `Fetch-Backups.ps1` had brought to Patrick's machine. Nobody
 was online (`https://thornswood.net/api/public` said `online: 0`).
 
 **On Patrick's machine**, from a worktree, into
-`C:\ThornswoodTemps&Worktrees\temp\401\restore`. `Install-ThornswoodServer.ps1`
+`C:\Thornswood-Repo\temp\401\restore`. `Install-ThornswoodServer.ps1`
 refuses to run on a machine with `SkyrimSE.exe` in `C:\Thornswood\Game`, so the
 server program went in by unzipping the payload instead. On that day `TEMP`
 was pointed at the task's temp folder by hand, because both scripts decrypted
@@ -285,13 +285,13 @@ were in `Downloads\Thornswood-Backups` that day; since 5 October they are in
 `local\backups` in the repository folder, and the line below says so.
 
 ```powershell
-$W   = 'C:\ThornswoodTemps&Worktrees\temp\401\work'
+$W   = 'C:\Thornswood-Repo\temp\401\work'
 $key = "$env:USERPROFILE\Documents\thornswood-backup-key.txt"
-$bk  = (Get-ChildItem 'C:\Users\evilp\Downloads\Thornswood-Repo\local\backups\thornswood-*.zip.enc' | Sort-Object Name -Descending | Select-Object -First 1).FullName
-$R   = 'C:\ThornswoodTemps&Worktrees\temp\401\restore'
+$bk  = (Get-ChildItem 'C:\Thornswood-Repo\local\backups\thornswood-*.zip.enc' | Sort-Object Name -Descending | Select-Object -First 1).FullName
+$R   = 'C:\Thornswood-Repo\temp\401\restore'
 .\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -CheckOnly -Work $W -NoPause
 .\scripts\vps\Restore-Backup.ps1 -Backup $bk -KeyFile $key -To "$R\unpacked" -Work $W -NoPause
-$payload = 'C:\Users\evilp\Downloads\Thornswood-Repo\out\thornswood-server.zip'
+$payload = 'C:\Thornswood-Repo\out\thornswood-server.zip'
 Expand-Archive -LiteralPath $payload -DestinationPath "$R\server-live"
 .\scripts\vps\Restore-Server.ps1 -Backup $bk -Root "$R\server-live" -KeyFile $key -Expect <a profile id> -Work $W -NoPause
 Expand-Archive -LiteralPath $payload -DestinationPath "$R\server-dev"

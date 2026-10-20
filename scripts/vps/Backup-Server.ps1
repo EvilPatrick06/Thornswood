@@ -82,7 +82,7 @@ function Remote($script) {
 
 # The repository's local\backups since 5 October, asked of Where.ps1, not
 # Downloads\Thornswood-Backups: Patrick's rule that Thornswood work on One
-# lives only in the repository, the vault and C:\ThornswoodTemps&Worktrees.
+# lives only in the repository and the vault.
 # A worktree's local folder goes when the worktree is removed, and this zip is
 # the only copy (the one on the VPS is deleted unless -KeepOnVps), so a
 # worktree is refused rather than written into.
