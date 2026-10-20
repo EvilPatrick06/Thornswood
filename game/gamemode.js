@@ -37759,7 +37759,7 @@ module.exports = {
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims,
                         funds: funds, notices: notices, boards: boards, steps: steps,
-                        masters: masterCut, dropbox: dropbox }, null, 1));
+                        masters: masterCut, dropbox: dropbox, word: wordBook }, null, 1));
       return true;
     } catch (e) {
       plog('could not write the register:', e);
@@ -37769,6 +37769,56 @@ module.exports = {
 
   var claims = load();
   var masterCut = loadMasterCut();
+  var wordBook = loadWord();
+
+  /*
+    The holders' word (#2680), from the register's word key, rebuilt row by
+    row the way the claims are: a row that is not a word is dropped and
+    counted. See word to the holder. Plain numbers here, because this runs
+    before that section's own values are set.
+  */
+  function loadWord() {
+    var out = { list: [] };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8')); } catch (e) { return out; }
+    var src = (raw && raw.word && typeof raw.word === 'object' &&
+               Object.prototype.toString.call(raw.word.list) === '[object Array]') ? raw.word.list : [];
+    var dropped = 0;
+    for (var i = 0; i < src.length; i++) {
+      var w = wordRow(src[i]);
+      if (w) { out.list.push(w); } else { dropped++; }
+    }
+    if (dropped) { plog('word: dropped', dropped, 'row(s) of the holders\' word that were not words'); }
+    if (out.list.length) { plog('word: read', out.list.length, 'word(s) for holders'); }
+    return out;
+  }
+  function wordRow(r) {
+    if (!r || typeof r !== 'object') { return null; }
+    var kind = (r.kind === 'pick' || r.kind === 'deed') ? r.kind : null;
+    var building = typeof r.building === 'string' ? r.building : '';
+    var holder = Number(r.holder) || 0;
+    var at = Number(r.at) || 0;
+    var last = Number(r.last) || at;
+    var due = Number(r.due) || 0;
+    if (!kind || !building || building === '__proto__' || !(holder > 0) || !(at > 0) ||
+        !(due > 0) || last < at) { return null; }
+    var by = [];
+    var rb = Object.prototype.toString.call(r.by) === '[object Array]' ? r.by : [];
+    for (var b = 0; b < rb.length && by.length < 10; b++) {
+      var p = Number(rb[b]) || 0;
+      if (p > 0 && by.indexOf(p) === -1) { by.push(p); }
+    }
+    var looks = [];
+    var rl = Object.prototype.toString.call(r.looks) === '[object Array]' ? r.looks : [];
+    for (var j = 0; j < rl.length && looks.length < 3; j++) {
+      var s = String(rl[j] || '').slice(0, 40);
+      if (s && looks.indexOf(s) === -1) { looks.push(s); }
+    }
+    var count = Math.floor(Number(r.count)) || 1;
+    return { kind: kind, building: building, holder: holder, by: by, at: at, last: last,
+             count: Math.max(1, Math.min(99, count)), due: due, looks: looks,
+             sent: Number(r.sent) > 0 ? Number(r.sent) : 0 };
+  }
 
   /*
     The last number a master key was cut with (#2254), from the register. Never
@@ -38633,10 +38683,13 @@ module.exports = {
       deed still has to get through the door, which is exactly the story
       Patrick described rather than a hole in it.
 
-      THE OLD HOLDER IS NOT TOLD BY THE SERVER. They find out the way they
-      would in the world, by trying their own door, and their deed is gone
-      from their pack because that is how it left. A notification here would
-      turn a theft into an alarm system.
+      THE OLD HOLDER IS TOLD, LATE AND IN THE WORLD (#2680). Until Patrick's
+      decision 6B on #507 they were not told at all: they found out by trying
+      their own door, with the deed gone from their pack because that is how
+      it left, since a notice at the moment would turn a theft into an alarm
+      system. It is still not one. A runner from the steward's office brings
+      word deed.delayMinutes later, or when they are next in the world, and
+      names nobody. See word to the holder.
     */
     /*
       A JAIL'S DEED IS PAPER IN ANY HAND BUT ITS JARL'S (#502): the jail is
@@ -38673,6 +38726,13 @@ module.exports = {
       plog(who2, 'presented the deed at', nameOf(building), 'and now holds it',
            was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)',
            master2 ? 'with master key no. ' + master2 : '');
+      // The old holder is sent word of it (#2680). A lapsed claim is no
+      // claim, so its holder had already lost the place and is not.
+      if (held && held.by && held.by !== mine) {
+        var wordSaid = recordWord('deed', building, held.by, actorId, mine, now2);
+        plog('word: the deed to', nameOf(building), 'presented by', who2, '(profile ' + mine + '), for',
+             was, '(profile ' + held.by + '):', WORD_SAID[wordSaid] || wordSaid);
+      }
       var told = 'You present the deed at ' + nameOf(building) +
                  '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.' +
                  (master2 ? ' ' + masterHandedLine(building) : '');
@@ -39099,6 +39159,10 @@ module.exports = {
       '    for (var j = 0; j < (v.open || []).length; j++) {',
       '      try {',
       '        var o = sp.ObjectReference.from(sp.Game.getFormEx(v.open[j]));',
+      // OFF THE PUBLISHED LIST BEFORE IT OPENS (#2680). The front plugin
+      // reads a door on __thornswoodPropertyShut that opens as a pick, so
+      // a door this script opens is taken off the list first.
+      '        try { var pub = globalThis.__thornswoodPropertyShut; if (pub) { delete pub[v.open[j]]; } } catch (e3) { }',
       '        if (o) { var shut = true; try { shut = o.isLocked(); } catch (e2) { }',
       '          if (shut !== false) { o.lock(false, false); } }',
       '        delete shutMap[v.open[j]];',
@@ -43837,6 +43901,376 @@ module.exports = {
   g.__thornswoodHaulTimer = setInterval(
     (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
 
+  /*
+    ------------------------------------------------ word to the holder (#2680)
+
+    Patrick, 17 October, decision 6B on #507: a holder is told, in the world,
+    when somebody picks their door's lock or presents their deed, so they can
+    answer it through RP. Nothing is typed, and it decides nothing: a dispute
+    about who should have the place is the court's.
+
+    WHY NOBODY WAS TOLD BEFORE. A locked reference is never announced to this
+    server (activationService.ts in the fork), so that Skyrim's own
+    lockpicking runs, and the only thing that ever saw a lock open was the
+    front plugin's lockChanged handler, which said nothing. A presented deed
+    was kept quiet on purpose (the deed in claim()), because a notice at the
+    moment turns a theft into an alarm.
+
+    SO THE WORD IS LATE, AND IT COMES FROM SOMEBODY IN THE WORLD. A runner
+    from the steward's office of the building's hold, or a neighbour where no
+    hold covers it, finds the holder delayMinutes after the act, or the next
+    time they are in the world after that. They learn what happened, where,
+    roughly when and, with describe on, what the person looked like: race and
+    sex, never a name, a profile or an account. A name is for RP to bring out.
+    The log keeps who, for staff and the court, the way every other property
+    act is logged.
+
+    THE PICK IS A CLIENT'S REPORT, /tspicked with the door's id, so it is
+    checked here before it counts (picked, below): a property door that is
+    not a way out or a cell, held and locked, the reporter with no way through
+    it, standing at it or already inside, and carrying a lockpick. So a
+    changed client can at most report a pick it could have made, and the
+    limits below hold even that down. They are staff data,
+    game/data/property-word.json; anything missing or wrong there is
+    WORD_DEFAULTS, and the log says so.
+
+    THE BOOK is the register's word key (wordBook, read beside the claims), so
+    a restart keeps a word that has not gone out and a wipe moves it aside
+    with the claims. A word that has gone out stays only as long as the limits
+    need to count it.
+  */
+  var WORD_DEFAULTS = {
+    pick: { on: true, delayMinutes: 20, describe: true, samePickerMinutes: 360 },
+    deed: { on: true, delayMinutes: 10, describe: true },
+    bundle: true, perHolderPerDay: 6, maxPending: 20, keepDays: 14,
+    reach: 400, needLockpick: true, everySeconds: 30
+  };
+  var LOCKPICK_DESC = 'a:Skyrim.esm';
+
+  /* What the log says a report came to. */
+  var WORD_SAID = {
+    'new': 'word goes to the holder',
+    bundled: 'added to the word that has not reached them yet',
+    same: 'already counted for that person at that door',
+    day: 'the holder has had as much word of picks today as the limit allows',
+    full: 'as much word as the limit allows is already waiting for the holder',
+    off: 'word of this is turned off',
+    nobody: 'there is nobody to tell'
+  };
+
+  /* The ten playable races, as a neighbour would put it. */
+  var WORD_RACE = {
+    nord: 'Nord', imperial: 'Imperial', breton: 'Breton', redguard: 'Redguard',
+    highelf: 'High Elf', woodelf: 'Wood Elf', darkelf: 'Dark Elf', orc: 'Orc',
+    argonian: 'Argonian', khajiit: 'Khajiit'
+  };
+
+  /*
+    The limits, read once at start out of game/data/property-word.json and
+    checked key by key: a number has to be a number at or above its floor and
+    a switch has to be true or false, or that key stays the default.
+  */
+  var wordRulesRead = null;
+  function wordRules() {
+    if (wordRulesRead) { return wordRulesRead; }
+    var out = JSON.parse(JSON.stringify(WORD_DEFAULTS));
+    var doc = null;
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var root = typeof __dirname === 'string' ? __dirname : path.dirname(__filename);
+      doc = JSON.parse(fs.readFileSync(path.join(root, 'data', 'property-word.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      plog('word: game/data/property-word.json would not read, so the limits are the defaults:',
+           e && e.message ? e.message : e);
+      doc = null;
+    }
+    var bad = [];
+    function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+    function num(src, key, dst, floor, where) {
+      if (!has(src, key)) { return; }
+      if (typeof src[key] !== 'number' || !isFinite(src[key]) || src[key] < floor) { bad.push(where + key); return; }
+      dst[key] = src[key];
+    }
+    function flag(src, key, dst, where) {
+      if (!has(src, key)) { return; }
+      if (typeof src[key] !== 'boolean') { bad.push(where + key); return; }
+      dst[key] = src[key];
+    }
+    if (doc && typeof doc === 'object') {
+      ['pick', 'deed'].forEach(function (k) {
+        if (!has(doc, k)) { return; }
+        var s = doc[k];
+        if (!s || typeof s !== 'object') { bad.push(k); return; }
+        flag(s, 'on', out[k], k + '.');
+        flag(s, 'describe', out[k], k + '.');
+        num(s, 'delayMinutes', out[k], 0, k + '.');
+        if (k === 'pick') { num(s, 'samePickerMinutes', out[k], 0, k + '.'); }
+      });
+      flag(doc, 'bundle', out, '');
+      flag(doc, 'needLockpick', out, '');
+      num(doc, 'perHolderPerDay', out, 0, '');
+      num(doc, 'maxPending', out, 1, '');
+      num(doc, 'keepDays', out, 1, '');
+      num(doc, 'reach', out, 1, '');
+      num(doc, 'everySeconds', out, 5, '');
+      if (bad.length) {
+        plog('word: property-word.json has', bad.join(', '), 'wrong, so those keep the defaults');
+      }
+    }
+    wordRulesRead = out;
+    return out;
+  }
+
+  /*
+    What a neighbour saw: "a Nord man", "an Orc woman". The race is the
+    character's own, read the way the recipes read it (raceOf), and anything
+    that is not one of the ten playable races is no description at all
+    rather than a guess.
+  */
+  function lookOf(actorId) {
+    var race = '';
+    try { race = (typeof raceOf === 'function') ? String(raceOf(actorId) || '') : ''; } catch (e) { race = ''; }
+    race = race.toLowerCase().replace(/vampire$/, '').replace(/race$/, '');
+    var word = Object.prototype.hasOwnProperty.call(WORD_RACE, race) ? WORD_RACE[race] : '';
+    if (!word) { return ''; }
+    var female = false;
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      female = !!(ap && ap.isFemale);
+    } catch (e2) { female = false; }
+    return (/^[AEIOU]/.test(word) ? 'an ' : 'a ') + word + (female ? ' woman' : ' man');
+  }
+
+  /*
+    One act, written down for the holder. Answers which of WORD_SAID it came
+    to. A pick by the same person at the same building inside
+    samePickerMinutes is one pick. With bundle on, a second act at a building
+    whose word has not gone out yet is added to that word rather than sent as
+    another. Picks are held to perHolderPerDay (0 is no limit) and maxPending;
+    a deed is never held back, because it is one word for one transfer.
+  */
+  function recordWord(kind, building, holder, actorId, by, now) {
+    var R = wordRules();
+    var K = R[kind];
+    if (!K || !K.on) { return 'off'; }
+    holder = Number(holder) || 0;
+    by = Number(by) || 0;
+    if (!(holder > 0)) { return 'nobody'; }
+    var list = wordBook.list;
+    var look = K.describe ? lookOf(actorId) : '';
+    var i, w;
+    if (kind === 'pick' && R.pick.samePickerMinutes > 0 && by > 0) {
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (w.kind === 'pick' && w.building === building && w.holder === holder &&
+            w.by.indexOf(by) !== -1 && now - w.last < R.pick.samePickerMinutes * 60000) {
+          return 'same';
+        }
+      }
+    }
+    if (R.bundle) {
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (!w.sent && w.kind === kind && w.building === building && w.holder === holder) {
+          w.count = Math.min(99, w.count + 1);
+          w.last = now;
+          if (by > 0 && w.by.indexOf(by) === -1 && w.by.length < 10) { w.by.push(by); }
+          if (look && w.looks.indexOf(look) === -1 && w.looks.length < 3) { w.looks.push(look); }
+          save();
+          return 'bundled';
+        }
+      }
+    }
+    if (kind === 'pick') {
+      var pending = 0, today = 0;
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (w.holder !== holder) { continue; }
+        if (!w.sent) { pending++; }
+        if (w.kind === 'pick' && now - w.at < 86400000) { today++; }
+      }
+      if (R.perHolderPerDay > 0 && today >= R.perHolderPerDay) { return 'day'; }
+      if (pending >= R.maxPending) { return 'full'; }
+    }
+    list.push({ kind: kind, building: building, holder: holder, by: by > 0 ? [by] : [],
+                at: now, last: now, count: 1, due: now + K.delayMinutes * 60000,
+                looks: look ? [look] : [], sent: 0 });
+    save();
+    return 'new';
+  }
+
+  /* A lockpick in the server's copy of the pack. A pick that opens a lock is not spent. */
+  function holdsLockpick(actorId) {
+    var baseId = idOf(LOCKPICK_DESC);
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === baseId && e.count > 0) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    At the door or already through it. The report rides the chat socket and
+    arrives a second or two late, and a picked load door has usually taken the
+    person inside by then, so the building's own cell counts as well as
+    standing within reach of the door in its cell.
+  */
+  function atPickedDoor(actorId, doorId, building, reach) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return false; }
+    if (!cell) { return false; }
+    if (cell === building) { return true; }
+    try {
+      var dc = String(mp.get(doorId, 'worldOrCellDesc') || '');
+      if (!dc || dc !== cell) { return false; }
+      var pa = mp.get(actorId, 'pos'), pb = mp.get(doorId, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
+  }
+
+  /*
+        /tspicked 1a2b3        the door's form id, in hex
+
+    NOBODY TYPES THIS. The front plugin sends it when a door the server shut
+    to this person opens on their machine, which is a pick (the lock script
+    takes a door off that list before it opens one itself). Every check is
+    made again here and a report that fails one is logged and counts for
+    nothing. Answers which of WORD_SAID it came to, or why it did not count.
+  */
+  function picked(actorId, profileId, idText) {
+    var now = Date.now();
+    var R = wordRules();
+    profileId = Number(profileId) || 0;
+    var who = personName(actorId);
+    function no(why) {
+      plog('word: a pick reported by', who, '(profile ' + profileId + ') did not count:', why);
+      return why;
+    }
+    if (!R.pick.on) { return 'off'; }
+    var id = parseInt(String(idText || ''), 16);
+    if (!(id > 0)) { return no('it named no door'); }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(id) || ''); } catch (e) { desc = ''; }
+    var building = desc ? buildingOf(desc) : null;
+    if (!building) { return no('that is not a door of a building'); }
+    if (wayOut(desc)) { return no('that door is a way out of ' + nameOf(building)); }
+    if (jailHoldOf(desc)) { return no('that is a cell door'); }
+    var held = holderOf(building);
+    if (!held) { return no(nameOf(building) + ' is held by nobody'); }
+    if (!held.locked) { return no(nameOf(building) + ' is not locked'); }
+    if (mayPass(actorId, profileId, building)) { return no('they may go through ' + nameOf(building) + '\'s doors anyway'); }
+    if (!atPickedDoor(actorId, id, building, R.reach)) { return no('they are not at that door or inside ' + nameOf(building)); }
+    if (R.needLockpick && !holdsLockpick(actorId)) { return no('they carry no lockpick'); }
+    var r = recordWord('pick', building, held.by, actorId, profileId, now);
+    plog('word:', who, '(profile ' + profileId + ') picked the lock of', nameOf(building), 'held by',
+         held.name, '(profile ' + held.by + '):', WORD_SAID[r] || r);
+    return r;
+  }
+
+  /* Roughly when, the way somebody passing it on would say it. */
+  function wordWhen(ms) {
+    var m = Math.max(0, Math.round(ms / 60000));
+    if (m < 15) { return 'only a few minutes ago'; }
+    if (m < 60) { return 'within the hour'; }
+    var h = Math.round(m / 60);
+    if (h < 2) { return 'about an hour ago'; }
+    if (h < 24) { return 'about ' + h + ' hours ago'; }
+    var d = Math.floor(m / 1440);
+    if (d < 2) { return 'yesterday'; }
+    return d + ' days ago';
+  }
+
+  /* The words the holder is handed. Nobody is named in them. */
+  function wordText(w, now) {
+    var hold = holdOfBuilding(w.building);
+    var town = hold ? (HOLD_TOWN[hold] || hold) : '';
+    var from = town ? 'A runner from the steward\'s office of ' + town + ' finds you with word: '
+                    : 'A neighbour finds you with word: ';
+    var when = (w.count > 1 ? ' more than once, the last time ' : ' ') + wordWhen(now - w.last);
+    var body = w.kind === 'pick'
+      ? 'somebody was seen working the lock on the door of ' + nameOf(w.building) + when + '.'
+      : 'the deed to ' + nameOf(w.building) + ' was presented at its door' + when +
+        ', and the register named somebody else as its holder.';
+    var looks = '';
+    if (w.looks.length === 1) { looks = ' Whoever it was looked like ' + w.looks[0] + '.'; }
+    else if (w.looks.length > 1) {
+      looks = ' Those seen looked like ' + w.looks.slice(0, -1).join(', ') + ' and ' +
+              w.looks[w.looks.length - 1] + '.';
+    }
+    var tail = town ? ' The office takes no side. A grievance is for the court.'
+                    : ' Nobody here takes a side. A grievance is for the court.';
+    return from + body + looks + tail;
+  }
+
+  /* Who is in the world, by profile. */
+  function onlineByProfile() {
+    var here = {};
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return here; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    return here;
+  }
+
+  /*
+    Every word that is due, to a holder who is in the world; the rest wait.
+    A word nobody could be handed in keepDays (the lapse) is dropped, and a
+    word that has gone out is kept only while the limits still count it: a
+    day, or samePickerMinutes when that is longer.
+  */
+  function wordTick() {
+    var now = Date.now();
+    var R = wordRules();
+    var keepSent = Math.max(86400000, R.pick.samePickerMinutes * 60000);
+    var kept = [];
+    var changed = false;
+    var here = null;
+    var list = wordBook.list;
+    for (var i = 0; i < list.length; i++) {
+      var w = list[i];
+      if (w.sent) {
+        if (now - w.sent >= keepSent && now - w.last >= keepSent) { changed = true; continue; }
+        kept.push(w);
+        continue;
+      }
+      if (now - w.last >= R.keepDays * 86400000) {
+        plog('word: the', w.kind, 'word about', nameOf(w.building), 'for profile', w.holder,
+             'did not reach them in', R.keepDays, 'days and is dropped');
+        changed = true;
+        continue;
+      }
+      kept.push(w);
+      if (w.due > now) { continue; }
+      if (!here) { here = onlineByProfile(); }
+      var to = here[w.holder];
+      if (!to) { continue; }
+      var line = wordText(w, now);
+      w.sent = now;
+      changed = true;
+      plog('word: the', w.kind, 'word about', nameOf(w.building), 'reached', personName(to),
+           '(profile ' + w.holder + ')');
+      notify(to, line);
+      say(to, line);
+    }
+    if (changed) {
+      wordBook.list = kept;
+      save();
+    }
+  }
+
+  if (g.__thornswoodWordTimer) { try { clearInterval(g.__thornswoodWordTimer); } catch (e) { } }
+  g.__thornswoodWordTimer = setInterval(
+    (typeof guard === 'function') ? guard('wordTick', wordTick) : wordTick, wordRules().everySeconds * 1000);
+
+
   // The boards and boxes stood where they should be (#2516), once, at start.
   // The ten second check that was here is gone: a timer repairing state.
   if (g.__thornswoodBoardTimer) { try { clearInterval(g.__thornswoodBoardTimer); } catch (e) { } }
@@ -44660,6 +45094,10 @@ module.exports = {
     masterKeysOf: masterKeysOf, MASTER_KEY: MASTER_KEY,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     wayOut: wayOut,
+    // Word to the holder (#2680): a picked lock and a presented deed.
+    picked: picked, recordWord: recordWord, wordTick: wordTick, wordText: wordText,
+    wordWhen: wordWhen, wordRules: wordRules, lookOf: lookOf, WORD_DEFAULTS: WORD_DEFAULTS,
+    wordBook: function () { return wordBook; },
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
     takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey, blankMoldsExist: blankMoldsExist,
     keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
@@ -54800,6 +55238,9 @@ const WORDS = ['/ooc', '/o',
                // the page, never typed, and so NOT in PLAYER_WORDS.
                '/world',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
+               // A property door's lock opening on the client, a pick (#2680):
+               // the front plugin's, never typed.
+               '/tspicked',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
                // invitation, and the gate answers everybody else anyway.
@@ -55105,7 +55546,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown', '/tspicked'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -56550,6 +56991,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
       if (takeItem(actorId, 'a:Skyrim.esm', picks)) {
         log('spent ' + picks + ' lockpick(s) for ' + actorId.toString(16));
+      }
+      return;
+    }
+
+    // A property door's lock opened on this person's machine: a pick
+    // (#2680). The property block checks it all again and sends the
+    // holder word if it counts.
+    if (word === '/tspicked') {
+      if (!needCharacter()) { return; }
+      var propPick = g.__thornswoodProperty;
+      if (propPick && propPick.picked) {
+        try { propPick.picked(actorId, profileId, parts[1]); } catch (ePick) { log('/tspicked failed:', ePick); }
       }
       return;
     }
