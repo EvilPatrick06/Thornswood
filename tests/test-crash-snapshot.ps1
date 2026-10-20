@@ -34,7 +34,7 @@
   HOW. Compiles the shipped CrashDump.cs and Enforce.cs with the build's own
   compiler (Launcher-Csc.ps1), with small stand-ins for Paths, Files,
   Swallow and Config, and drives it against pretend installs in a temp folder
-  under C:\ThornswoodTemps&Worktrees\temp (or %TEMP% on another machine).
+  Get-ScratchDir.ps1 names (the repository's temp, or %TEMP% outside a checkout).
   Reads Config.cs, Shell.cs, ui.xaml, Diag.cs and Discord.cs as text. Changes
   nothing outside its temp folder.
 #>
@@ -135,9 +135,7 @@ __OWNGAME__
 }
 '@
 
-$tempBase = 'C:\ThornswoodTemps&Worktrees\temp'
-if (-not (Test-Path -LiteralPath $tempBase)) { $tempBase = [IO.Path]::GetTempPath() }
-$tmp = Join-Path $tempBase ('test-crash-snapshot-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$tmp = & (Join-Path $root 'scripts\release\Get-ScratchDir.ps1') ('test-crash-snapshot-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 try {

@@ -419,8 +419,8 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # PATH before an .exe further along it and runs it with every argument
     # whole. A .cmd gets its arguments through cmd.exe, which ends a command at
     # a bare &, so under C:\ThornswoodTemps&Worktrees (where every temp file on
-    # the shipping machine goes) the gh download's --dir was cut in two and the
-    # real main Ship case went red.
+    # the shipping machine went until #2900) the gh download's --dir was cut
+    # in two and the real main Ship case went red.
     $standIn = @'
 [IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@('NAME') + @($args | ForEach-Object { [string]$_ })) -join ' ') + "`r`n")
 '@

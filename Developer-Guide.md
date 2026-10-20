@@ -584,11 +584,11 @@ launcher refuses a Thornswood game folder as Vortex's folder since #2210
 (docs/COLLECTION-REVISION-2.md step 8). A machine that keeps its release
 folder apart from its installs records it once. On One it is `local\release-devbuild` in the
 repository folder since 5 Oct, because Thornswood work on One lives only in
-the repository, the vault and `C:\ThornswoodTemps&Worktrees` (Patrick); give
+the repository and the vault (Patrick); give
 the whole path, since every clone and worktree reads what is recorded:
 
 ```
-.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild
+.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild
 ```
 
 It writes the file `.\scripts\release\Where.ps1 ShipRoots` names, in this
@@ -805,10 +805,10 @@ the board is still the one record of work. They mark what they are on with a
 issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
 label off it (#1863), so a lane's finish step need not. Their
 branches carry the lane's name (`launcher/`, `website/`, `github/` and so on).
-On the shipping machine `C:\Users\evilp\Downloads\Thornswood-Repo` is shared
+On the shipping machine `C:\Thornswood-Repo` is shared
 by all of them and sits detached at `origin/main`, because lanes build from
-it: branch work goes in a worktree beside it, removed with its branch once
-the pull request merges.
+it: branch work goes in a worktree in its ignored `worktrees` folder, removed
+with its branch once the pull request merges.
 
 One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
 commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
@@ -1290,12 +1290,13 @@ The short form of the rules. The same decisions, with the dates they were made, 
   - No scratch clones, copies of a build, or folders made for one task are
     left behind, and no process started for the work (a build, a load test)
     is left running after it.
-  - Three folders, no copies (Patrick, 5 Oct). On a machine, Thornswood work
-    lives in the repository folder (its ignored `local\` and `out\` for what
-    is one machine's own), and in one folder for worktrees and scratch
-    (`C:\ThornswoodTemps&Worktrees` on One, `worktrees\<name>` and
-    `temp\<task>`, each removed when its work is done), plus the shared notes
-    on One (`C:\Thornswood Vault`). The launcher's installs, the main one and
+  - Two folders, no copies (Patrick, 5 Oct; worktrees and scratch moved
+    into the repository on 20 Oct, #2900). On a machine, Thornswood work
+    lives in the repository folder: its ignored `local\` and `out\` for what
+    is one machine's own, and its ignored `worktrees\<name>` and
+    `temp\<task>` for worktrees and scratch, each removed when its work is
+    done. On One that folder is `C:\Thornswood-Repo`. The other is the
+    shared notes on One (`C:\Thornswood Vault`). The launcher's installs, the main one and
     `<Root>-DevBuild`, are the product and stay. No other top-level folders
     and no scratch files in Downloads. And no copies of what GitHub or the VPS
     already holds: logs, report bundles, builds and backups are read where
@@ -2001,7 +2002,7 @@ Steam copy is not on it since 16 Oct (another `bink2w64.dll` and
 folder that holds them, such as the other root's `Game` (#2603):
 
 ```
-.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -SkyrimFrom C:\Thornswood-Repo\local\release-devbuild\Game
 ```
 
 Every one of the game's own files the new folder takes is checked against
