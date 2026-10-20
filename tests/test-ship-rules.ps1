@@ -474,7 +474,7 @@ $fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Gu
 try {
     foreach ($rel in $clientFiles) {
         $recorded = $ShipClientHashes[$rel]
-        $full = [IO.Path]::Combine($fakeGame, $rel)
+        $full = [IO.Path]::Combine($fakeGame, $rel.Replace('\', [IO.Path]::DirectorySeparatorChar))
         $null = New-Item -ItemType Directory -Force -Path (Split-Path $full -Parent)
         [IO.File]::WriteAllText($full, 'the recorded build of ' + $rel)
         $sha = [Security.Cryptography.SHA256]::Create()
@@ -770,9 +770,9 @@ try {
     $me = (Get-Process -Id $PID).Path
     function Load-Rules([string]$then) {
         $driver = Join-Path $scratch 'load.ps1'
-        # A throw is caught and its sentence printed whole, not left to the
-        # error view, which wraps it at the console's width (see below).
-        [IO.File]::WriteAllText($driver, ("`$ErrorActionPreference = 'Stop'`r`ntry { . '" + (Join-Path $relDir 'Ship-Rules.ps1').Replace("'", "''") + "' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`r`n'LOADED'`r`n" + $then), (New-Object Text.UTF8Encoding($true)))
+        # NormalView: pwsh's default error view wraps a message at the console's
+        # width, and the scratch path in it is longer on some runners (#2933).
+        [IO.File]::WriteAllText($driver, ("`$global:ErrorView = 'NormalView'`r`n`$ErrorActionPreference = 'Stop'`r`n. '" + (Join-Path $relDir 'Ship-Rules.ps1').Replace("'", "''") + "'`r`n'LOADED'`r`n" + $then), (New-Object Text.UTF8Encoding($true)))
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $o = @(& $me -NoProfile -ExecutionPolicy Bypass -File $driver 2>&1 | ForEach-Object { "$_" }); $c = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }
@@ -782,20 +782,16 @@ try {
     Yes 'the rules load with no client record beside them, as before' ($r.Code -eq 0 -and $r.Out -match 'LOADED')
     [IO.File]::WriteAllText((Join-Path $scratch 'records\client-build.json'), '{ "files": { "Data\\Platform', (New-Object Text.UTF8Encoding($false)))
     $r = Load-Rules ''
-    Yes 'a client record that does not read stops them loading, saying so' ($r.Code -ne 0 -and $r.Out -notmatch 'LOADED' -and $r.Out -match 'THREW Ship-Rules\.ps1: records\\client-build\.json does not read' -and $r.Out -match 'Nothing was packed or sent')
+    Yes 'a client record that does not read stops them loading, saying so' ($r.Code -ne 0 -and $r.Out -notmatch 'LOADED' -and $r.Out -match 'client-build\.json does not read' -and $r.Out -match 'Nothing was packed or sent')
     Remove-Item -LiteralPath (Join-Path $scratch 'records\client-build.json')
     $cfgRoot = Join-Path $scratch 'root'
     New-Item -ItemType Directory -Force -Path $cfgRoot | Out-Null
-    # The throw is caught and its sentence printed whole. Left to the error
-    # view it was wrapped at the console's width, and on build runner 5, whose
-    # profile folder is thornswood-runner5.WIN-MP817AMCSJ9, the break fell at
-    # "config.|json" (#1273 is the same, in test-bad-json-records).
-    $ask = "function Get-CollectionRevision([string]`$s) { return 7 }`r`nfunction Get-CollectionSlug([string]`$u) { return `$u }`r`ntry { 'REV ' + (Get-ShipCollectionRevision '" + $cfgRoot.Replace("'", "''") + "') } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`r`n"
+    $ask = "function Get-CollectionRevision([string]`$s) { return 7 }`r`nfunction Get-CollectionSlug([string]`$u) { return `$u }`r`n'REV ' + (Get-ShipCollectionRevision '" + $cfgRoot.Replace("'", "''") + "')`r`n"
     $r = Load-Rules $ask
     Yes 'no config.json: the launcher''s own collection is asked' ($r.Code -eq 0 -and $r.Out -match 'REV 7')
     [IO.File]::WriteAllText((Join-Path $cfgRoot 'config.json'), '{ "CollectionUrl": ', (New-Object Text.UTF8Encoding($false)))
     $r = Load-Rules $ask
-    Yes 'a config.json that does not read stops the revision read, and says why (test-ship-revision-gate)' ($r.Code -ne 0 -and $r.Out -notmatch 'REV 7' -and $r.Out -match 'THREW .*config\.json does not read' -and $r.Out -match 'collection revision it names is not known')
+    Yes 'a config.json that does not read stops the revision read, and says why (test-ship-revision-gate)' ($r.Code -ne 0 -and $r.Out -notmatch 'REV 7' -and $r.Out -match 'config\.json does not read' -and $r.Out -match 'collection revision it names is not known')
 } finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -227,7 +227,7 @@
 
   THERE IS ONE DEV FEED AND THE LAST DEV SHIP WINS. Both machines publish to
   the same one, so a dev Ship replaces whatever the other machine put there.
-  Say in #staff-general before taking it. A main Ship resets dev to match main. A
+  Say in #staff-updates before taking it. A main Ship resets dev to match main. A
   hotfix does not, because the work on dev was not in it.
 
   Everything goes to dev first, decided by Patrick on 23 September: "even
@@ -246,11 +246,23 @@
 
 .PARAMETER AllowStaleCheckout
     Go ahead from a checkout that is not exactly origin/main and clean, with a loud warning (#2118). Without it the script refuses a stale or dirty checkout before it sends anything.
+
+.PARAMETER FromFeed
+  Builds the release with no game folder of the collection's (#2754, Patrick's
+  A, 20 Oct), so it runs anywhere, the cloud included. New-FeedRoot.ps1
+  stages every file the channel's last release carried from the site, by its
+  sha256, and this checkout builds over them: the front, Go.ps1's files, the
+  plugins and the client. The plugin list and the Vortex profile are the last
+  release's, held to the server's load order on the box; a load order or
+  collection change ships from One, as a collection Ship. Keeps the feed's
+  launcher, so it needs -ModsOnly, and takes neither -Package nor
+  -RebuildLauncher.
+
 .EXAMPLE
   .\scripts\release\Ship.ps1 -Channel dev "The map marker points at the right door now"
 
   Puts this branch on the dev build and the dev server for testing. Say in
-  #staff-general first: the last dev Ship wins.
+  #staff-updates first: the last dev Ship wins.
 
 .EXAMPLE
   .\scripts\release\Ship.ps1 -DryRun "The map marker points at the right door now"
@@ -319,6 +331,14 @@ param(
     ,[switch]$AllowUncoveredBodies
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     ,[switch]$AllowStaleCheckout
+    # Build the release with no game folder of the collection's (#2754,
+    # Patrick's A, 20 Oct): New-FeedRoot.ps1 stages the files the last release
+    # carried, by their sha256 on the site, and this checkout builds over them.
+    # The collection's checks (the Vortex profile, the generated files, the
+    # covered bodies) belong to a Ship from One, run when the collection
+    # changes; the plugin list is the last release's, held to the server's
+    # order on the box. Runs off Windows. Keeps the feed's launcher.
+    ,[switch]$FromFeed
 )
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
@@ -649,13 +669,15 @@ function Get-LauncherInputHash([string]$repoDir) {
         foreach ($f in @(Get-ChildItem -LiteralPath $launcherDir -Recurse -File -Force -EA SilentlyContinue |
                          Where-Object { $_.Extension -ne '.md' })) {
             $rel = 'launcher/' + $f.FullName.Substring($launcherDir.Length).TrimStart('\', '/').Replace('\', '/')
-            $lines.Add($rel + "`t" + (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant())
+            # As a Windows checkout holds it, so the fingerprint is the same from
+            # any machine (ShippedBytes.ps1, #2903).
+            $lines.Add($rel + "`t" + (Get-ThornswoodShippedSha256 $f.FullName))
         }
     }
     foreach ($rel in 'records/client-build.json', 'records/ui-gone.json', 'scripts/release/Build-Launcher.ps1') {
         $p = Join-Path $repoDir $rel
         $h = 'missing'
-        if (Test-Path -LiteralPath $p) { $h = (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash.ToLowerInvariant() }
+        if (Test-Path -LiteralPath $p) { $h = Get-ThornswoodShippedSha256 $p }
         $lines.Add($rel + "`t" + $h)
     }
     $arr = $lines.ToArray()
@@ -969,6 +991,10 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 # Launcher / setup-stub .pdb stay on this machine only (Ship-Rules, issue #462).
 . (Join-Path $Here 'Ship-Rules.ps1')
+# What a file of the repo ships as, and fingerprints as, from any machine (#2903).
+. (Join-Path $Here 'ShippedBytes.ps1')
+# A release from the feed signs its manifest on GitHub, in the engine fork (#2903).
+if ($FromFeed) { . (Join-Path $Here 'Sign-OnGitHub.ps1') }
 # The publish sign helpers, loaded here rather than at the publish gate because
 # a main Ship signs and checks the exe CI built before it is installed (#921).
 . (Join-Path $Here 'Assert-PublishSigned.ps1')
@@ -991,9 +1017,18 @@ $MainReleaseDir = Get-FeedStoreDir 'main'
 # launcher install, C:\Thornswood or Thornswood on another fixed drive, and for
 # dev that plus -DevBuild, where the main launcher's Settings page installs it
 # (DevBuild.cs). -Root still wins.
-if (-not $PSBoundParameters.ContainsKey('Root')) {
+# From the feed it is the folder New-FeedRoot.ps1 stages (#2754).
+if ($FromFeed -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = Get-FeedRootDir $Channel }
+if (-not $PSBoundParameters.ContainsKey('Root') -and -not $FromFeed) {
     try { $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'ShipRootDev' } else { 'ShipRoot' })) }
     catch { Die ($_.Exception.Message + ' Nothing was built.') }
+}
+# What a Ship from the feed cannot do, said before anything is built: a new
+# launcher is compiled with MSBuild and signed, and the installer holds the
+# whole game, both on One (#2754).
+if ($FromFeed) {
+    if ($Package) { Die '-Package builds the installer from the whole game folder, which a Ship from the feed does not have. Ship -Package from One. Nothing was built.' }
+    if ($RebuildLauncher -or $Version) { Die 'A Ship from the feed keeps the launcher the feed offers; a new one is built and signed on One. Nothing was built.' }
 }
 
 # ------------------------------------------------------------ dev channel
@@ -1020,7 +1055,7 @@ function Get-DevRootRefusal([string]$Root, [bool]$RootGiven, [string]$Recorded) 
     return "No dev build at $Root. Install it from the main launcher's Settings page (The dev build) first, or record the folder this machine builds dev from: .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>."
 }
 if ($Dev) {
-    $rootGiven = $PSBoundParameters.ContainsKey('Root')
+    $rootGiven = $PSBoundParameters.ContainsKey('Root') -or $FromFeed
     $rootRecorded = ''
     if (-not $rootGiven) {
         try { $rootRecorded = [string](& (Join-Path $Here 'Where.ps1') 'ShipRootNamedDev') }
@@ -1232,10 +1267,17 @@ if (-not $DryRun -and (Test-Path (Join-Path $RepoDir '.git'))) {
 # changes nothing outside the root. Before the version moves and before
 # anything is built, so a refusal here leaves nothing to put back.
 Head 'The ship root'
-$global:LASTEXITCODE = 0
-& (Join-Path $Here 'Update-ShipRoot.ps1') -Channel $Channel -Root $Root -NoPause
-if ($LASTEXITCODE -ne 0) {
-    Die ('The folder this release is built from, ' + $Root + ', is not current: Update-ShipRoot.ps1 says why above. Nothing was built or published.')
+if ($FromFeed) {
+    # The last release's files from the site instead (#2754): New-FeedRoot.ps1
+    # puts every one in by its sha256 and takes out anything else.
+    try { & (Join-Path $Here 'New-FeedRoot.ps1') -Channel $Channel -Root $Root }
+    catch { Die ('The last release could not be staged from the site, so nothing was built or published: ' + $_.Exception.Message) }
+} else {
+    $global:LASTEXITCODE = 0
+    & (Join-Path $Here 'Update-ShipRoot.ps1') -Channel $Channel -Root $Root -NoPause
+    if ($LASTEXITCODE -ne 0) {
+        Die ('The folder this release is built from, ' + $Root + ', is not current: Update-ShipRoot.ps1 says why above. Nothing was built or published.')
+    }
 }
 
 # ------------------------------------------------------------ version
@@ -1302,6 +1344,10 @@ if (-not $ModsOnly -and -not $RebuildLauncher -and -not $Version) {
              'no rebuild, no signing, only the packs. -RebuildLauncher to build one anyway.') 'Green'
         $ModsOnly = $true
     }
+}
+if ($FromFeed -and -not $ModsOnly) {
+    Die ('Something the launcher is built from changed since the one the ' + $Channel + ' feed offers, and a new launcher is compiled and signed on One. ' +
+         'Ship from One, or -ModsOnly to keep the feed''s launcher. Nothing was built.')
 }
 
 if ($ModsOnly) {
@@ -1568,9 +1614,13 @@ if ($Package -and -not $Dev -and -not $DryRun) {
 # dev Ship built and installed it, closing the running launcher, and only
 # then stopped here. And before the covered bodies, which read what it built.
 $GameDir = Join-Path $Root 'Game'
-if (-not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
+if (-not $FromFeed -and -not (Test-Path -LiteralPath (Join-Path $GameDir 'SkyrimSE.exe'))) { $GameDir = '' }
 Head 'Generated files'
-if ($GameDir) {
+if ($FromFeed) {
+    # The last release's, each held to its sha256 by New-FeedRoot; a Ship from
+    # One builds and checks them when the collection changes (#2754).
+    Say '  the last release''s, by their sha256; a Ship from One makes them when the collection changes' 'DarkGray'
+} elseif ($GameDir) {
     . (Join-Path $Here '..\mods\Generated.ps1')
     $genState = $null
     try { $genState = Get-GeneratedState $Root (Join-Path $RepoDir 'records\generated.json') }
@@ -1763,6 +1813,19 @@ if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
 # and has no business talking to the VPS. $GameDir is the game folder the
 # generated files were checked in, above, or '' when there is none.
 
+# ------------------------------------------------------------ the front
+# The front Go.ps1 unpacks is built here from the pinned fork commit and held
+# to records\front-build.json (#2754, Build-Front.ps1), never a zip left in
+# local\ by an earlier build: the one One kept still carried four fonts the
+# fork had taken out a month before (#1317). Before Go.ps1, which refuses a
+# zip that is not the recorded build.
+Head 'The front'
+try { & (Join-Path $Here 'Build-Front.ps1') }
+catch {
+    Unbump 'the front could not be built'
+    Die ('The front could not be built from the pinned fork commit: ' + $_.Exception.Message)
+}
+
 Head 'The in game plugins'
 $goArgs = @{ SkipServer = $true }
 if ($GameDir) { $goArgs['Game'] = $GameDir } else { $goArgs['Vortex'] = $true }
@@ -1790,8 +1853,9 @@ if ($GameDir) {
         $seen++
         $dst = Join-Path $plugDst $f.Name
         if (-not (Test-Path -LiteralPath $dst)) { $stale += ($f.Name + ' never arrived'); continue }
-        $a = (Get-FileHash -LiteralPath $f.FullName -Algorithm SHA256).Hash
-        $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash
+        # The source as it ships (ShippedBytes.ps1), which is how Go.ps1 puts it in.
+        $a = Get-ThornswoodShippedSha256 $f.FullName
+        $b = (Get-FileHash -LiteralPath $dst -Algorithm SHA256).Hash.ToLowerInvariant()
         if ($a -ne $b) { $stale += ($f.Name + ' in the game folder is not this source') }
     }
     if ($stale.Count) {
@@ -1813,36 +1877,42 @@ if ($GameDir) {
 # copy it must match. Differing copies stop Ship naming which lists diverge.
 Head 'The load order copies'
 . (Join-Path $Here '..\mods\LoadOrder.ps1')
-try {
-    $twProfile = Assert-VortexProfile 'Thornswood'
-} catch {
-    Unbump 'Vortex profile Thornswood was not found'
-    Die $_.Exception.Message
-}
 $profileDir = Join-Path $Root 'Profile'
-$copies = @{
-    'Vortex Thornswood\plugins.txt' = (Join-Path $twProfile 'plugins.txt')
-}
-$ownPlugins = Join-Path $profileDir 'OwnGame\plugins.txt'
-if (Test-Path -LiteralPath $ownPlugins) {
-    $copies['Profile\OwnGame\plugins.txt'] = $ownPlugins
-}
-$loCopies = @{}
-foreach ($k in @($copies.Keys)) {
-    $pluginsPath = $copies[$k]
-    $loPath = Join-Path (Split-Path -Parent $pluginsPath) 'loadorder.txt'
-    if (Test-Path -LiteralPath $loPath) {
-        $loCopies[($k -replace 'plugins\.txt$', 'loadorder.txt')] = $loPath
+if ($FromFeed) {
+    # No Vortex here: the plugin list is the last release's, which the publish
+    # holds to the server's order on the box (#2754).
+    Say '  the last release''s plugin list, held to the server''s order when it is published' 'DarkGray'
+} else {
+    try {
+        $twProfile = Assert-VortexProfile 'Thornswood'
+    } catch {
+        Unbump 'Vortex profile Thornswood was not found'
+        Die $_.Exception.Message
     }
+    $copies = @{
+        'Vortex Thornswood\plugins.txt' = (Join-Path $twProfile 'plugins.txt')
+    }
+    $ownPlugins = Join-Path $profileDir 'OwnGame\plugins.txt'
+    if (Test-Path -LiteralPath $ownPlugins) {
+        $copies['Profile\OwnGame\plugins.txt'] = $ownPlugins
+    }
+    $loCopies = @{}
+    foreach ($k in @($copies.Keys)) {
+        $pluginsPath = $copies[$k]
+        $loPath = Join-Path (Split-Path -Parent $pluginsPath) 'loadorder.txt'
+        if (Test-Path -LiteralPath $loPath) {
+            $loCopies[($k -replace 'plugins\.txt$', 'loadorder.txt')] = $loPath
+        }
+    }
+    $diffs = @(Get-LoadOrderCopyDiffs $copies)
+    $diffs += @(Get-LoadOrderCopyDiffs $loCopies)
+    if ($diffs.Count -gt 0) {
+        foreach ($line in $diffs) { Say "  $line" 'Red' }
+        Unbump 'load order copies diverge'
+        Die ("Load order copies that must match diverge:`n  " + ($diffs -join "`n  ") + "`nBake OwnGame from the Thornswood Vortex profile (launcher Settings, Maintenance, bring the folder up to date), or fix the lists, then Ship again.")
+    }
+    Say ("  Thornswood profile at $twProfile; load order copies agree") 'Green'
 }
-$diffs = @(Get-LoadOrderCopyDiffs $copies)
-$diffs += @(Get-LoadOrderCopyDiffs $loCopies)
-if ($diffs.Count -gt 0) {
-    foreach ($line in $diffs) { Say "  $line" 'Red' }
-    Unbump 'load order copies diverge'
-    Die ("Load order copies that must match diverge:`n  " + ($diffs -join "`n  ") + "`nBake OwnGame from the Thornswood Vortex profile (launcher Settings, Maintenance, bring the folder up to date), or fix the lists, then Ship again.")
-}
-Say ("  Thornswood profile at $twProfile; load order copies agree") 'Green'
 
 # ------------------------------------------------------------ client build
 # The client runtime is built from the fork and recorded in client-build.json.
@@ -1881,7 +1951,11 @@ if ($LASTEXITCODE -ne 0) {
 # while the covered bodies' revision is on its way. 1 refuses on both channels
 # (#1956, Patrick 5 Oct), as the SkyUI menus step below does since #1913.
 Head 'Covered bodies'
-if ($GameDir) {
+if ($FromFeed) {
+    # The bodies are the last release's bytes; a Ship from One reads them when
+    # the collection changes, as it builds them (#2754).
+    Say '  the last release''s bodies, by their sha256; a Ship from One reads them when the collection changes' 'DarkGray'
+} elseif ($GameDir) {
     $global:LASTEXITCODE = 0
     & (Join-Path $Here '..\mods\Check-CoveredBodies.ps1') -Game $GameDir -Quiet
     $bodiesExit = $LASTEXITCODE
@@ -1915,7 +1989,29 @@ if ($GameDir) {
 # node is on the machine by now: Ship stopped before the build without it
 # (#1913).
 Head 'SkyUI menus'
-if ($GameDir) {
+if ($FromFeed) {
+    # The collection's archives are not here, so the menus cannot be read
+    # against them. What can be said is whether this release changes anything
+    # the check reads (Ship-Rules.ps1, Get-ShipSkyUIFeedChange): when it does
+    # not, every install reads what it read with the last release, which
+    # passed. When it does, the check has to run where the collection is.
+    $feedRecordFile = Join-Path $Root 'record\record.json'
+    $feedRecord = @{}
+    if (Test-Path -LiteralPath $feedRecordFile) {
+        $feedRecordJson = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($feedRecordFile)) $feedRecordFile
+        foreach ($feedProp in $feedRecordJson.PSObject.Properties) { $feedRecord[$feedProp.Name] = [string]$feedProp.Value }
+    }
+    if (-not $feedRecord.Count) {
+        Unbump 'the last release''s record is not in the feed root'
+        Die "There is no record of the last release at $feedRecordFile, so what SkyUI's menu check reads cannot be compared with it. New-FeedRoot.ps1 writes it; run the Ship again."
+    }
+    $skyuiMoved = @(Get-ShipSkyUIFeedChange $GameDir $feedRecord @(Get-ShipDeleteAlways))
+    if ($skyuiMoved.Count) {
+        Unbump 'SkyUI''s files changed and the check cannot read them here'
+        Die ("This release changes what SkyUI's menu check reads (" + (($skyuiMoved | Select-Object -First 5) -join ', ') + "), and that check reads the collection's archives, which are on One, not here. Ship this from One. Nothing was published.")
+    }
+    Say '  no SkyUI script, menu or archive differs from the last release''s, so its check holds' 'Green'
+} elseif ($GameDir) {
     $skyuiPlugins = Join-Path (Get-ShipLoadOrderDir $Root $profileDir) 'plugins.txt'
     $global:LASTEXITCODE = 0
     & node (Join-Path $Here '..\mods\Check-SkyUIMenus.js') --data (Join-Path $GameDir 'Data') --plugins $skyuiPlugins --gone (@(Get-ShipDeleteAlways) -join ';') --quiet
@@ -2039,7 +2135,10 @@ if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
 # build machines, not for publish. Assert-PublishSigned.ps1 is dot-sourced at
 # the top, beside Ship-Rules.ps1.
 $signCfg = Join-Path $Here '..\..\records\signing\signing.json'
-$signWhy = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir
+# A release from the feed signs on GitHub, in the engine fork (#2903,
+# Patrick's A of 20 Oct), so this machine needs gh rather than a signing
+# setup; it keeps the feed's launcher, so there is no launcher to sign here.
+$signWhy = if ($FromFeed) { Get-SignOnGitHubRefusal $RepoDir } else { Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
 if ($signWhy) {
     Unbump 'this machine cannot sign'
     Die $signWhy
@@ -2058,6 +2157,8 @@ if (-not $ModsOnly) {
         Die $signWhy
     }
     Say ("  publish sign gate: $(Split-Path -Leaf $pubExe) Authenticode Valid, ExpectedSigner $expectWho") 'Green'
+} elseif ($FromFeed) {
+    Say ("  publish sign gate: the manifest signs on GitHub, in $SignOnGitHubRepo (mods-only; the feed's launcher stays)") 'DarkGray'
 } else {
     Say '  publish sign gate: signing.json ready (mods-only; launcher tip not published)' 'DarkGray'
 }
@@ -2074,6 +2175,7 @@ if ($Dev) { $pubArgs['Channel'] = 'dev'; $pubArgs['VersionOverride'] = $target }
 # -AllowStaleCheckout was Ship's alone, so Publish-Update refused what Ship had
 # already been told to let through (#2235).
 if ($AllowStaleCheckout) { $pubArgs['AllowStaleCheckout'] = $true }
+if ($FromFeed) { $pubArgs['FromFeed'] = $true }
 # A dry run has to leave nothing behind, and NoUpload plus NoPush is not that.
 #
 # Those two stop the release LEAVING the machine. They do not stop the

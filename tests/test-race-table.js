@@ -151,6 +151,7 @@ fs.writeFileSync(path.join(DATA, 'LowerCase.esp'), plugin(0, ['skyrim.esm'], [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*RaceMod.esp', '*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'Build-RaceTable.js'), path.join(TMP, 'scripts', 'dev', 'Build-RaceTable.js'));
+fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'OwnPlugins.js'), path.join(TMP, 'scripts', 'dev', 'OwnPlugins.js'));
 fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
   ['const FOODS = {"items":{}};', 'const RACES = {"items":{}};', ''].join(String.fromCharCode(10)));
 

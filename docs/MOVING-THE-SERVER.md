@@ -63,7 +63,7 @@ which service leads each of those, and when the busiest hour was.
 
 Leave it a week that includes a busy evening before reading anything into it.
 Whether the answer is the plan above or moving some services off this box is
-for the team in #staff-general, and whatever is done goes back on this page.
+for the team in #staff-updates, and whatever is done goes back on this page.
 
 ## Doing it
 
@@ -126,9 +126,9 @@ files in it. Steps 1 to 9 leave the old box serving, so they can take as many
 days as they need.
 
 ```powershell
-git -C C:\Users\evilp\Downloads\Thornswood-Repo fetch origin
-git -C C:\Users\evilp\Downloads\Thornswood-Repo worktree add "C:\ThornswoodTemps&Worktrees\worktrees\move" -b patrick/move-to-new-box origin/main
-Set-Location "C:\ThornswoodTemps&Worktrees\worktrees\move"
+git -C C:\Thornswood-Repo fetch origin
+git -C C:\Thornswood-Repo worktree add "C:\Thornswood-Repo\worktrees\move" -b patrick/move-to-new-box origin/main
+Set-Location "C:\Thornswood-Repo\worktrees\move"
 ```
 
 The secrets a move needs, and where each one comes from. None of them is ever
@@ -299,9 +299,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     lacks and whether this machine has the bytes; the same two without `-Check`
     send them. For any this machine does not have, bring the old box's copy
     down first with
-    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`
+    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\Thornswood-Repo\temp\move\feed-assets"`
     (and `feed-dev/assets` for the dev feed) and add
-    `-AssetDir "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`. Then
+    `-AssetDir "C:\Thornswood-Repo\temp\move\feed-assets"`. Then
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
 18. **The name:** in Patrick's Cloudflare login, point the A records for
@@ -412,9 +412,9 @@ The steps, in order:
    per-machine override (issue #1090, `scripts\vps\Vps.ps1`): a file holding
    only `{"address": "<its address>", "hostKeys": ["SHA256:..."]}`, with the
    fingerprints step 2 of "If it is a new machine" reads in its console.
-   Save it as `C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json` and, in
+   Save it as `C:\Thornswood-Repo\temp\rehearsal\vps.json` and, in
    the one PowerShell window the rehearsal runs in, set
-   `$env:THORNSWOOD_VPS_LOCAL = "C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json"`.
+   `$env:THORNSWOOD_VPS_LOCAL = "C:\Thornswood-Repo\temp\rehearsal\vps.json"`.
    Every script run from that window talks to the throwaway box, and every
    other window and every lane on the machine still talks to the real one.
    (`%LOCALAPPDATA%\Thornswood\vps.json` also works, but it points the whole

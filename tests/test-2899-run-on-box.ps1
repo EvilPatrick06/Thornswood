@@ -21,11 +21,15 @@
      the tool's exit code comes back, and the clean-up removes the run's
      folder. Skyrim's archives in the store are linked into the data folder,
      and a tool that opens one to write is refused, the store keeping its
-     bytes. Off Windows there is no powershell.exe and no py, and this part
-     says so and is skipped; the Windows runner runs it.
+     bytes; the loose string tables in the store's Strings are linked into
+     the data folder's Strings, where the tools look for them. Off Windows
+     there is no powershell.exe and no py, and this part says so and is
+     skipped; the Windows runner runs it.
   4. scripts\mods\Send-GameArchives.ps1 refuses archives that are missing or
      not the bytes records\skyrim-files.json names, before it asks the box
-     anything, and its far side text is ASCII and parses.
+     anything, and its far side text is ASCII and parses. Every file
+     records\game-strings.json names is a loose string table under Strings,
+     with its size and sha256.
 
   Nothing here reaches the box.
 #>
@@ -72,6 +76,12 @@ try {
 } finally { Remove-Item -LiteralPath $empty -Recurse -Force -ErrorAction SilentlyContinue }
 $sendText = Get-Content -LiteralPath $send -Raw
 Yes 'it sends only the archives OnBox.ps1 names, each held to records\skyrim-files.json' ($sendText -match 'foreach \(\$n in \$ThornswoodGameArchives\)' -and $sendText -match "records\\skyrim-files.json")
+Yes 'and the string tables records\game-strings.json names, each held to its sha256' ($sendText -match "records\\game-strings.json" -and $sendText -match "Algo = 'sha256'")
+$gs = Get-Content -LiteralPath (Join-Path $Repo 'records\game-strings.json') -Raw | ConvertFrom-Json
+$gsFiles = @($gs.files.PSObject.Properties)
+Yes 'records\game-strings.json names loose string tables under Strings, each with its size and sha256' (
+    $gsFiles.Count -gt 0 -and -not @($gsFiles | Where-Object {
+        $_.Name -notmatch '^Strings\\[^\\]+\.(STRINGS|DLSTRINGS|ILSTRINGS)$' -or [long]$_.Value.bytes -le 0 -or [string]$_.Value.sha256 -notmatch '^[0-9a-f]{64}$' }).Count)
 
 # ---- 2. the far side text ------------------------------------------------
 . $lib
@@ -112,6 +122,9 @@ if (-not $ps51 -or -not (Test-Path -LiteralPath $ps51) -or -not $py) {
         New-Item -ItemType Directory -Force -Path $store | Out-Null
         $archive = Join-Path $store 'Skyrim - Interface.bsa'
         [IO.File]::WriteAllText($archive, 'archive bytes')
+        New-Item -ItemType Directory -Force -Path (Join-Path $store 'Strings') | Out-Null
+        $table = Join-Path $store 'Strings\RaceCompatibility_English.STRINGS'
+        [IO.File]::WriteAllText($table, 'table bytes')
         $roFile = Join-Path $work 'ro.ps1'
         [IO.File]::WriteAllText($roFile, ((Get-ThornswoodArchiveReadOnlyScript) + "`r`nSet-ThornswoodArchiveReadOnly '" + $archive + "'`r`n'RO'"), (New-Object Text.UTF8Encoding($true)))
         $ro = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $roFile 2>&1 | ForEach-Object { "$_" })
@@ -131,6 +144,7 @@ print('ENV ' + os.environ.get('THORNSWOOD_DATA', ''))
 print('CONTENT ' + open(os.path.join(data, 'Thornswood-Content.esp')).read())
 open(os.path.join(data, 'Skyrim.esm'), 'w').write('written by the tool')
 print('ARCHIVE ' + open(os.path.join(data, 'Skyrim - Interface.bsa')).read())
+print('TABLE ' + open(os.path.join(data, 'Strings', 'racecompatibility_english.strings')).read())
 try:
     open(os.path.join(data, 'Skyrim - Interface.bsa'), 'w').write('changed')
     print('ARCHIVE WRITE went through')
@@ -163,6 +177,7 @@ sys.exit(3)
         Yes '{data} reaches the tool as the data folder, and THORNSWOOD_DATA names it' (
             ($lines -contains ('ARGS --data|' + $data + '|it''s here')) -and ($lines -contains ('ENV ' + $data)))
         Yes 'Skyrim''s archives in the store are linked into the data folder' (($lines -match '^archives\s+1 from ').Count -eq 1 -and ($lines -contains 'ARCHIVE archive bytes'))
+        Yes 'the loose string tables in the store are linked into the data folder''s Strings' (($lines -match '^strings\s+1 loose string table').Count -eq 1 -and ($lines -contains 'TABLE table bytes'))
         Yes 'a tool opening an archive to write is refused, and the store keeps its bytes' (($lines -contains 'ARCHIVE WRITE refused') -and [IO.File]::ReadAllText($archive) -eq 'archive bytes')
         Yes 'a tool writing into the data folder leaves the server''s own files as they were' (
             [IO.File]::ReadAllText((Join-Path $plugins 'Skyrim.esm')) -eq 'vanilla' -and

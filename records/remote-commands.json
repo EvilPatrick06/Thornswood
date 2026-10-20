@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  60,
-    "callCount":  265,
+    "scriptCount":  62,
+    "callCount":  267,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1303,6 +1303,15 @@
                       "reason":  "sends Stop-Process"
                   },
                   {
+                      "script":  "scripts/ops/Say-Staff.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh @sshArgs $target $remote",
+                      "does":  "runs C:\\Thornswood-Watch\\say-staff.ps1 with one staff notice, or a check of one, on its standard input; it appends one line to the watchdog\u0027s outbox, which the bot says in #staff-updates",
+                      "class":  "admin",
+                      "reason":  "work outside the gate verbs; a notices key (Grant-BoxAccess.ps1 -NoticesOnly) runs only this"
+                  },
+                  {
                       "script":  "scripts/ops/Set-Door.ps1",
                       "scope":  "Remote",
                       "via":  "Invoke-ThornswoodRemote",
@@ -1634,6 +1643,15 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedCatalogRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
                   {
                       "script":  "scripts/vps/Backup-Server.ps1",
@@ -2359,7 +2377,7 @@
                       "script":  "scripts/vps/Grant-BoxAccess.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob)",
+                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' }))",
                       "does":  "saves the key file and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
                       "class":  "admin",
                       "reason":  "sends authorized_keys; task registration"
@@ -2386,8 +2404,8 @@
                       "script":  "scripts/vps/Grant-BoxAccess.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
-                      "anchor":  "\u0026 ssh -F none -i $newKey -o IdentitiesOnly=yes",
-                      "does":  "logs in through the bridge with the new cloud key and echoes a word",
+                      "anchor":  "\u0026 ssh -n -F none -i $newKey -o IdentitiesOnly=yes",
+                      "does":  "logs in through the bridge with the new cloud key and echoes a word, or for a notices key has say-staff.ps1 answer READY",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },

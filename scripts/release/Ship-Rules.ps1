@@ -245,7 +245,8 @@ function Test-ShipClientRecorded([string]$rel, [string]$full = '') {
         if (-not $game) { return $false }
         # Not Join-Path, which throws on a drive that is not there rather than
         # answering that the file is not.
-        $full = [IO.Path]::Combine([string]$game, $rel)
+        # The record's backslashes as this system's separator (#2903).
+        $full = [IO.Path]::Combine([string]$game, $rel.Replace('\', [IO.Path]::DirectorySeparatorChar))
     }
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { return $false }
     $sha = [Security.Cryptography.SHA256]::Create()
@@ -435,7 +436,7 @@ function Test-ShipUiGoneByHash([string]$rel) {
     if (-not $game) { return $false }
     # [IO.Path]::Combine, not Join-Path: Join-Path throws on a drive this
     # machine has not got (the test's X:\Game\ fakes on the nightly runner).
-    $full = [IO.Path]::Combine([string]$game, $rel)
+    $full = [IO.Path]::Combine([string]$game, $rel.Replace('\', [IO.Path]::DirectorySeparatorChar))
     $have = Get-ShipFileSha256 $full
     if (-not $have) { return $false }
     return $ShipDaedricMenuHashes.Contains($have)
@@ -478,7 +479,8 @@ function Save-ShipUiHashedAssets([string]$GameFolder) {
         # Written only when the names moved, so a Ship that finds the same front
         # leaves the file and its time alone: an old size and time baseline then
         # still reads it as unchanged (#2088).
-        $text = ($lines -join [Environment]::NewLine) + [Environment]::NewLine
+        # CRLF from every machine, as every release has carried it (#2903).
+        $text = ($lines -join "`r`n") + "`r`n"
         if (-not (Test-Path -LiteralPath $out -PathType Leaf) -or [IO.File]::ReadAllText($out) -ne $text) {
             [IO.File]::WriteAllText($out, $text)
         }
@@ -2023,6 +2025,75 @@ function Add-ShipLastPluginLine([string]$Src, [string]$Out, [switch]$Plain) {
 # (ServerOrder.ps1, Get-ThornswoodGameSequence). Until 15 Oct this left them
 # out, and the first dev Ship carrying the plugin was refused on One for
 # loading Water for ENB.esm where the server loads _ResourcePack.esl.
+# A RELEASE FROM THE FEED SHIPS THE LAST RELEASE'S PLUGIN LIST (#2754), and
+# has no game folder to put it into the server's order with, so it is held to
+# the order the channel's server loads, read off the box (ServerContent.ps1):
+# the base masters, then the Creation Club plugins the game loads on its own
+# (on the box, in the server's order, and in no plugin list), then every
+# plugin the list enables, in its order, and nothing else. Measured on dev,
+# 20 Oct: 103 names, the five masters, _ResourcePack.esl and the 97 the list
+# enables, in that order. Anything else means the load order moved, which is a
+# collection Ship's to ship. Returns Problem, '' when it holds, and Ccc, the
+# names between the masters and the list, for Get-ShipLastPluginProblem.
+function Get-ShipFeedOrderProblem([string[]]$ServerOrder, [string[]]$Enabled) {
+    $server = @($ServerOrder | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    $names = @($Enabled | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    $ccc = @($server | Where-Object { $ShipBaseMasters -notcontains $_ -and $names -notcontains $_ })
+    $want = @($ShipBaseMasters) + $ccc + $names
+    for ($i = 0; $i -lt [Math]::Max($server.Count, $want.Count); $i++) {
+        $a = if ($i -lt $server.Count) { $server[$i] } else { '(nothing)' }
+        $b = if ($i -lt $want.Count) { $want[$i] } else { '(nothing)' }
+        if ($a -ine $b) {
+            $off = @($names | Where-Object { $server -notcontains $_ })
+            $why = if ($off.Count) { 'the plugin list enables ' + (($off | Select-Object -First 5) -join ', ') + ', which the server does not load' }
+                   else { "at position $($i + 1) the server loads $a and the plugin list has $b" }
+            return [pscustomobject]@{ Problem = "the server's load order is not the plugin list the last release shipped: $why. A load order change ships from One, as a collection Ship."; Ccc = $ccc }
+        }
+    }
+    return [pscustomobject]@{ Problem = ''; Ccc = $ccc }
+}
+
+# WHAT SKYUI'S MENU CHECK READS, FROM THE FEED (#2754). Check-SkyUIMenus.js
+# reads SkyUI's script and its menus where the game takes them: loose under
+# Data\Scripts and Data\Interface, or inside an archive (*.bsa) the plugin list
+# loads, with the paths every release deletes read as gone. A release from the
+# feed has the collection's revision and the last release's plugin list (held
+# to the server's order above), and the last release passed the check: every
+# Ship runs it, on both channels, with no way past it. So when every file of
+# those kinds in $GameDir, less the paths this release deletes, is byte for
+# byte the one the last release's record names, and the record names no other,
+# the check would read what every install read with the last release, and its
+# answer holds. Returns the paths that differ, sorted; none when it holds. Any
+# path means SkyUI's files moved, which the check has to read, against the
+# collection's archives, on One.
+function Test-ShipSkyUIInput([string]$Rel) {
+    return ($Rel -match '^(?i)Data\\(Scripts|Interface)\\' -or $Rel -match '(?i)\.bsa$')
+}
+
+function Get-ShipSkyUIFeedChange([string]$GameDir, [hashtable]$Record, [string[]]$Gone = @()) {
+    $goneSet = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($g in $Gone) { if ($g) { [void]$goneSet.Add($g) } }
+    $then = New-Object 'System.Collections.Generic.Dictionary[string,string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($k in $Record.Keys) {
+        if ($k.StartsWith(':') -or -not (Test-ShipSkyUIInput $k)) { continue }
+        $then[$k] = ([string]$Record[$k]).ToLowerInvariant()
+    }
+    $changed = New-Object 'System.Collections.Generic.List[string]'
+    $listed = (Get-Item -LiteralPath $GameDir).FullName
+    $sep = [string][IO.Path]::DirectorySeparatorChar
+    $prefix = $listed.TrimEnd($sep) + $sep
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
+    foreach ($f in @(Get-ChildItem -LiteralPath $listed -Recurse -File -Force)) {
+        $rel = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
+        if (-not (Test-ShipSkyUIInput $rel) -or $goneSet.Contains($rel)) { continue }
+        [void]$seen.Add($rel)
+        $now = ('{0}:{1}' -f $f.Length, (Get-ShipFileSha256 $f.FullName))
+        if (-not $then.ContainsKey($rel) -or $then[$rel] -ne $now) { $changed.Add($rel) }
+    }
+    foreach ($k in $then.Keys) { if (-not $seen.Contains($k)) { $changed.Add($k) } }
+    return @($changed | Sort-Object -Unique)
+}
+
 function Get-ShipLastPluginProblem([string]$RepoDir, [string[]]$Enabled, [string[]]$Ccc = @()) {
     $rebuild = 'Build it again for this load order: python scripts\mods\Build-LastPlugin.py --data <a Data folder holding the collection''s bytes>, then commit the plugin and game\data\last-plugin.json.'
     $plugin = Join-Path $RepoDir ('game\content\' + $ShipLastPlugin)

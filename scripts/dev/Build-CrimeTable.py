@@ -75,6 +75,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+import own_plugins  # noqa: E402
 
 
 def _load(name, file):
@@ -185,7 +186,7 @@ def read(data, order):
     factions, settings = {}, {}
     names = set(s[1] for s in SETTINGS)
     for name in order:
-        pl = dt.Plugin(os.path.join(data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(data, name), name)
         if not pl.ok:
             continue
         for tag, flags, fid, q, rs in top_groups(pl, (b'FACT', b'GMST')):
@@ -297,7 +298,7 @@ def main():
         print('STOP. no load order here: %s, %s' % (args.plugins, args.data))
         return 1
     order = active_order(args.plugins)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d active plugin(s) are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))

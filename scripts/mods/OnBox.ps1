@@ -15,7 +15,10 @@
 # for the notice board and Check-FromGame. Kept on the box in one folder of
 # their own, SYSTEM's and Administrators' only, each file read only to
 # everyone but SYSTEM, and every one of them the bytes records\skyrim-files.json
-# names. scripts\mods\Send-GameArchives.ps1 puts them there.
+# names. scripts\mods\Send-GameArchives.ps1 puts them there, and with them,
+# under Strings, the loose string tables records\game-strings.json names: a
+# localized master whose names are in no archive (RaceCompatibility.esm,
+# measured 20 Oct) stops Build-LastPlugin without them.
 $ThornswoodGameArchiveStore = 'C:\Thornswood-GameData'
 $ThornswoodGameArchives = @('Skyrim - Interface.bsa', 'Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa') +
     @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' })
@@ -83,6 +86,17 @@ if (Test-Path -LiteralPath `$store) {
   }
 }
 if (`$linked) { 'archives  ' + `$linked + ' from ' + `$store + ', linked, read only' } else { 'archives  none: ' + `$store + ' holds no Skyrim archive, so a tool that reads one stops' }
+`$storeStrings = Join-Path `$store 'Strings'
+`$linkedStrings = 0
+if (Test-Path -LiteralPath `$storeStrings) {
+  `$dataStrings = Join-Path `$data 'Strings'
+  New-Item -ItemType Directory -Force -Path `$dataStrings | Out-Null
+  foreach (`$f in @(Get-ChildItem -LiteralPath `$storeStrings -File)) {
+    `$null = New-Item -ItemType HardLink -Path (Join-Path `$dataStrings `$f.Name) -Value `$f.FullName
+    `$linkedStrings++
+  }
+}
+if (`$linkedStrings) { 'strings   ' + `$linkedStrings + ' loose string table(s) from ' + `$storeStrings + ', linked, read only' }
 
 `$sha = [Security.Cryptography.SHA256]::Create()
 function Hashes {

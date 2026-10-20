@@ -19,9 +19,10 @@
   server-settings.json in a temp folder. Nothing connects to anything.
 
   The last case is the measured one, and runs where this machine has the build
-  the dev server runs (THORNSWOOD_DEV_SETTINGS, or the fork build under
-  C:\ThornswoodTemps&Worktrees\worktrees\claude-1005-skymp) and the game folder
-  whose headers say which plugins are light (C:\Thornswood\Game\Data);
+  the dev server runs (THORNSWOOD_DEV_SETTINGS names its server-settings.json;
+  the fork build it named by default, claude-1005-skymp, no longer exists)
+  and the game folder whose headers say which plugins are light
+  (C:\Thornswood\Game\Data);
   elsewhere it says SKIP.
 #>
 [CmdletBinding()]
@@ -118,10 +119,9 @@ try {
     Yes '  and says which' ($r.said -match 'cannot tell whether mystery\.esp is light, so the start point is left alone')
 
     # The measured case: the order the dev server runs, its headers from the game folder.
-    $devSettings = $env:THORNSWOOD_DEV_SETTINGS
-    if (-not $devSettings) { $devSettings = 'C:\ThornswoodTemps&Worktrees\worktrees\claude-1005-skymp\build\dist\server\server-settings.json' }
+    $devSettings = [string]$env:THORNSWOOD_DEV_SETTINGS
     $data = 'C:\Thornswood\Game\Data'
-    if ((Test-Path -LiteralPath $devSettings) -and (Test-Path -LiteralPath $data)) {
+    if ($devSettings -and (Test-Path -LiteralPath $devSettings) -and (Test-Path -LiteralPath $data)) {
         $names = @((Get-Content -LiteralPath $devSettings -Raw | ConvertFrom-Json).loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
         $real = @{}
         foreach ($n in $names) { $f = Join-Path $data $n; if (Test-Path -LiteralPath $f) { $real[$n] = Test-ThornswoodPluginLight $f } }

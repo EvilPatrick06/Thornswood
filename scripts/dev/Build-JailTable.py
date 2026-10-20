@@ -60,6 +60,7 @@ if HERE not in sys.path:
     sys.path.insert(0, HERE)
 
 import bsa  # noqa: E402
+import own_plugins  # noqa: E402
 
 # Build-DoorTable.py already reads a plugin: the header, the master list, a
 # form id as <hex>:<plugin>, compressed records, localised names. Its name has
@@ -220,7 +221,7 @@ def main():
     args = ap.parse_args()
 
     order = active_order(args.plugins)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d active plugin(s) are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))
@@ -233,7 +234,7 @@ def main():
     # a later plugin adds, so every base is known before a placement is read.
     plugins = []
     for name in order:
-        pl = dt.Plugin(os.path.join(args.data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(args.data, name), name)
         if pl.ok:
             plugins.append(pl)
             read_factions(pl, factions)

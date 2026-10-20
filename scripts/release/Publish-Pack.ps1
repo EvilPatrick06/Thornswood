@@ -119,7 +119,7 @@ if ($Only) {
 $GameDir = Join-Path $Root 'Game'
 if (-not (Test-Path -LiteralPath $GameDir)) { Die "No build at $GameDir." }
 
-$work = Join-Path $env:TEMP 'thornswood-packs'
+$work = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-packs'
 if (Test-Path $work) { Remove-Item $work -Recurse -Force }
 $null = New-Item -ItemType Directory -Force -Path $work
 

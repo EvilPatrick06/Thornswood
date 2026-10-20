@@ -27,9 +27,15 @@ function Yes([string]$what, [bool]$cond) {
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-badjson-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 [void][IO.Directory]::CreateDirectory($T)
 function W([string]$p, [string]$t) { [void][IO.Directory]::CreateDirectory((Split-Path -Parent $p)); [IO.File]::WriteAllText($p, $t, (New-Object Text.UTF8Encoding($false))) }
+# Each script runs through this launcher so its error comes back as written:
+# pwsh's default error view wraps a message at the console's width, breaking
+# the path in it when the temp folder's path is long (#2933). The exit code is
+# the one -File would give.
+$childRun = Join-Path $T 'run-child.ps1'
+W $childRun "`$global:ErrorView = 'NormalView'`r`n`$script, `$rest = `$args`r`n& `$script @rest`r`nif (-not `$?) { exit `$LASTEXITCODE }`r`nexit 0`r`n"
 function Child([string[]]$a) {
     $ErrorActionPreference = 'Continue'
-    $o = & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File @a 2>&1 | Out-String
+    $o = & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $childRun @a 2>&1 | Out-String
     return @{ Code = $LASTEXITCODE; Out = ($o -replace '\s+', ' ') }
 }
 $bad = [ordered]@{ 'empty' = ''; 'cut off' = '{"files": {"a": {"sha256": "ab'; 'not JSON' = 'this is not json' }
@@ -151,15 +157,8 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { [IO.
 
     $al = Join-Path $T 'al'; W (Join-Path $al 'plugins.txt') ''; [void][IO.Directory]::CreateDirectory((Join-Path $al 'Data'))
     W (Join-Path $al 'server-settings.json') ''
-    # Align-LoadOrder throws, so the sentence is read from the exception, as
-    # Where.ps1's is above (#1273). Printed in the error view it was wrapped at
-    # the console's width, and on build runner 5, whose profile folder is
-    # thornswood-runner5.WIN-MP817AMCSJ9, the break fell inside the path.
-    $alCall = Join-Path $al 'call.ps1'
-    $q = { param($p) "'" + $p.Replace("'", "''") + "'" }
-    W $alCall ("`$ErrorActionPreference = 'Stop'`ntry { & " + (& $q (Join-Path $Repo 'scripts\mods\Align-LoadOrder.ps1')) + ' -Data ' + (& $q (Join-Path $al 'Data')) + ' -Plugins ' + (& $q (Join-Path $al 'plugins.txt')) + ' -Settings ' + (& $q (Join-Path $al 'server-settings.json')) + "; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
-    $r = Child @($alCall)
-    Yes 'Align-LoadOrder: an empty server-settings.json is named' ($r.Code -ne 0 -and $r.Out.Contains('THREW ' + ((Join-Path $al 'server-settings.json') -replace '\s+', ' ') + ' ' + $expect['empty']))
+    $r = Child @((Join-Path $Repo 'scripts\mods\Align-LoadOrder.ps1'), '-Data', (Join-Path $al 'Data'), '-Plugins', (Join-Path $al 'plugins.txt'), '-Settings', (Join-Path $al 'server-settings.json'))
+    Yes 'Align-LoadOrder: an empty server-settings.json is named' (Named $r (Join-Path $al 'server-settings.json') 'empty')
 
     $sm = [Management.Automation.Language.Parser]::ParseFile((Join-Path $Repo 'scripts\release\Setup-ShipMachine.ps1'), [ref]$null, [ref]$null)
     $gcm = $sm.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ClientMatch' }, $true)

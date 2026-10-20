@@ -25,7 +25,8 @@
   WHERE THEY LAND: local\backups in the repository (Where.ps1 Backups), or
   the folder -To names. Until 5 October it was Downloads\Thornswood-Backups;
   Patrick's rule that day is that Thornswood work on One lives only in the
-  repository, the vault and C:\ThornswoodTemps&Worktrees. A worktree's local
+  repository and the vault (and C:\ThornswoodTemps&Worktrees, inside the
+  repository since #2900). A worktree's local
   folder goes when the worktree is removed, so run from a worktree it stops
   and asks for -To rather than land there.
 

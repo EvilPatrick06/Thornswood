@@ -931,12 +931,18 @@ if ($Install) {
   Head 'Putting it on the server'
 
   $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($watcher))
+  # The box's half of scripts\ops\Say-Staff.ps1, beside watch.ps1 so it takes
+  # this folder's lock: how an agent puts a staff notice in this outbox (#2934).
+  # A notices key (Grant-BoxAccess.ps1 -NoticesOnly) can run this and nothing else.
+  $sayB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Here 'vps-say-staff.ps1')))
 
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 $(Get-ThornswoodLockedFolderScript $Root)
 [IO.File]::WriteAllBytes('$Root\watch.ps1', [Convert]::FromBase64String('$b64'))
 'wrote     $Root\watch.ps1  ' + (Get-Item '$Root\watch.ps1').Length + ' bytes'
+[IO.File]::WriteAllBytes('$Root\say-staff.ps1', [Convert]::FromBase64String('$sayB64'))
+'wrote     $Root\say-staff.ps1  ' + (Get-Item '$Root\say-staff.ps1').Length + ' bytes, for staff notices from agents'
 
 # Every five minutes, as SYSTEM, so it keeps going when nobody is logged in.
 # The path has no spaces in it, so the command needs no quotes inside the
@@ -1035,6 +1041,7 @@ if (`$d -and ([double]`$d.Used + `$d.Free) -gt 0) { 'disk      ' + [math]::Round
 else { 'disk      could not be read' }
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
+if (Test-Path '$Root\say-staff.ps1') { 'notices   say-staff.ps1 is there, so agents can post in #staff-updates (Say-Staff.ps1)' } else { 'notices   NO say-staff.ps1, so Say-Staff.ps1 cannot post. Run this with -Install' }
 # Where the webhook posts, asked of Discord on the box (WebhookChannel's
 # question, there): only the channel id comes back, never the address.
 if (Test-Path '$Root\alerts-webhook.txt') {
@@ -1065,7 +1072,7 @@ if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told     
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY') { $c = 'Red' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY|NO say-staff') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$|Running$') { $c = 'Green' }
   Say "  $l" $c
 }

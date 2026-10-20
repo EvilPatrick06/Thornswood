@@ -74,7 +74,7 @@
   Brings the dev root up to date and puts the recorded client in it.
 
 .EXAMPLE
-  .\scripts\release\Update-ShipRoot.ps1 -Channel main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+  .\scripts\release\Update-ShipRoot.ps1 -Channel main -SkyrimFrom C:\Thornswood-Repo\local\release-devbuild\Game
   Makes main's root with the game's own files copied from the dev root's
   Game, on a machine whose Steam copy is not on 1.6.1170.
 #>

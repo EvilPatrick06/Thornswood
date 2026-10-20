@@ -6,7 +6,7 @@
       .\scripts\release\Check-ShipReady.ps1              the main channel
       .\scripts\release\Check-ShipReady.ps1 -Channel dev the dev channel
       .\scripts\release\Check-ShipReady.ps1 -NoVps       skip the two checks that ask the VPS
-      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild
+      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild
                                                     a folder this machine has not recorded
 
   WHICH FOLDER (#1692). The one this machine builds the channel's release
@@ -652,7 +652,7 @@ if ($verdict.Ready) {
   Write-Host ''
   if ($Dev) {
     Say '      .\scripts\release\Ship.ps1 -Channel dev "what changed"' 'White'
-    Say '  Say in #staff-general when you take the dev feed: there is one, and the last dev Ship wins.' 'DarkGray'
+    Say '  Say in #staff-updates when you take the dev feed: there is one, and the last dev Ship wins.' 'DarkGray'
   } else {
     Say '      .\scripts\release\Ship.ps1 "what changed"' 'White'
     Say '  That publishes to everybody. Only run it from main, with the pull done.' 'DarkGray'

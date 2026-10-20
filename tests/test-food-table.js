@@ -148,6 +148,7 @@ fs.writeFileSync(path.join(DATA, 'Gourmet.esp'), plugin(0x200, FIVE, [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*LowerCase.esp', '*Gourmet.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'Build-FoodTable.js'), path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'));
+fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'OwnPlugins.js'), path.join(TMP, 'scripts', 'dev', 'OwnPlugins.js'));
 fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
   ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
 

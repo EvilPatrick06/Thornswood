@@ -26,7 +26,7 @@
   HOW. Compiles the shipped Enforce.cs, AutoJoin.cs, Hold.cs, Watched.cs and
   ChannelWait.cs together, with small stand-ins for Paths, Swallow, Config
   and Keep, and runs them against a pretend game folder in a temp folder
-  under C:\ThornswoodTemps&Worktrees\temp (or %TEMP% on another machine).
+  Get-ScratchDir.ps1 names (the repository's temp, or %TEMP% outside a checkout).
   Reads the rest as text. Changes nothing outside that folder.
 #>
 $ErrorActionPreference = 'Stop'
@@ -132,9 +132,7 @@ $sources[0] = [regex]::Replace($sources[0], '(?m)^using [\w.]+;\s*$', '')
 Add-Type -TypeDefinition ((@($usings) -join "`n") + "`n" + ($sources -join "`n")) -Language CSharp
 $Api = [Thornswood963.Api]
 
-$tempBase = 'C:\ThornswoodTemps&Worktrees\temp'
-if (-not (Test-Path -LiteralPath $tempBase)) { $tempBase = [IO.Path]::GetTempPath() }
-$tmp = Join-Path $tempBase ('test-963-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$tmp = & (Join-Path $root 'scripts\release\Get-ScratchDir.ps1') ('test-963-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 try {

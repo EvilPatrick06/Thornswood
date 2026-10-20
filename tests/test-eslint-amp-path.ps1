@@ -4,7 +4,7 @@
   The eslint part of build.yml's "Lint (warnings only)" step (issue #1343)
   has to work when the checkout, or the folder eslint is installed into,
   sits under a path holding '&', as every lane worktree under
-  C:\ThornswoodTemps&Worktrees does.
+  C:\ThornswoodTemps&Worktrees did until #2900.
 
   WHY THIS EXISTS. The step ran npm's eslint.cmd shim. cmd.exe reads that
   shim, and its "SET dp0=%~dp0" and "%*" are unquoted, so an '&' in the

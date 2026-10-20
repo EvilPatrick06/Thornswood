@@ -110,6 +110,7 @@ import zlib
 from collections import defaultdict
 
 import bsa
+import own_plugins
 
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 
@@ -537,7 +538,7 @@ def load_order(data_dir, plugins_txt):
             listed.append(name)
     first, rest, missing = [], [], []
     for name in listed:
-        path = os.path.join(data_dir, name)
+        path = own_plugins.plugin_path(data_dir, name)
         if not os.path.isfile(path):
             missing.append(name)
             continue
@@ -720,7 +721,7 @@ def audit(data_dir, plugins_txt, rule):
     chains, kinds, subkeys = {}, {}, defaultdict(set)
     bad_vmad = defaultdict(int)
     for idx, plugin in enumerate(order):
-        with open(os.path.join(data_dir, plugin), 'rb') as fh:
+        with open(own_plugins.plugin_path(data_dir, plugin), 'rb') as fh:
             buf = fh.read()
         try:
             _flags, masters, start = plugin_header(buf)

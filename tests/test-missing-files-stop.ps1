@@ -71,7 +71,9 @@ foreach ($what in 'game\\ui\\index.html is missing', 'is not in site\\public', '
     Yes "  $($what -replace '\\\\', '\') is a Gone" ($g -match ('Gone [^\r\n]*' + $what))
 }
 Yes '  and exits 1 when anything is Gone' ($g -match 'if \(\$script:gone\.Count\) \{[^}]*exit 1' -and $g -match '(?m)^exit 0\s*$')
-Yes '  the front zip, which git never had, stays a warning' ($g -match "Bad 'thornswood-front\.zip is not in local\\ in the repository folder'")
+# The front zip is built from the pinned fork and recorded since #2754, so a
+# missing or unrecorded one stops the run like a missing file of ours.
+Yes '  a front zip that is missing or not the recorded build is a Gone (#2754)' ($g -match "Gone 'the front is not the recorded build" -and $g -match 'Get-ThornswoodFrontProblems')
 
 # ---- Ship.ps1 --------------------------------------------------------------------
 $s = Read 'Ship.ps1'

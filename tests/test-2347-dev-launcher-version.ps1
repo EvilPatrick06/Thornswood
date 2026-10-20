@@ -161,6 +161,8 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $tree 'launcher\app') | Out-Null
     [IO.File]::WriteAllText((Join-Path $tree 'launcher\app\OwnGame.cs'), 'class OwnGame { }')
     Invoke-Expression $fns['Get-LauncherInputHash']
+    # The fingerprint reads each file as it ships (#2903).
+    . (Join-Path $repo 'scripts\release\ShippedBytes.ps1')
     $before = Get-LauncherInputHash $tree
     [IO.File]::WriteAllText((Join-Path $tree 'launcher\app\OwnGame.cs'), 'class OwnGame { void Faster() { } }')
     Yes 'a launcher change since main''s release moves the fingerprint Ship compares' ((Get-LauncherInputHash $tree) -ne $before)
