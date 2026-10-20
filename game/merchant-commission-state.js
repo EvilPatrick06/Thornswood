@@ -3,6 +3,7 @@
 // Promise existing NPC gold before asking for goods. This state belongs to
 // the same private ledger entry as the purse, never a character projection.
 const WAIT=6*60*60*1000,MAX_GOLD=2147483647,MAX_HELD=100,MAX_COOL=1024;
+const CADENCES=[6,12,24,48];
 const owns=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 const integer=(value,min,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(value)&&value>=min&&value<=max;
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -29,24 +30,47 @@ function keyParts(value) {
   JSON.stringify(row)===value?row:null;}catch(error){return null;}
 }
 function empty(){return {v:1,serial:0,held:{},cool:{}};}
+function item(value) {
+ return fields(value,['baseId','name'])&&integer(value.baseId,1,0xffffffff)&&value.baseId!==15&&
+  typeof value.name==='string'&&!!value.name.trim()&&value.name.length<=160&&!/[\x00-\x1f\x7f]/.test(value.name);
+}
+function goods(value) {
+ if(!Array.isArray(value)||value.length<1||value.length>5)return false;
+ const seen=new Set();
+ for(let i=0;i<value.length;i++) {
+  if(!owns(value,i))return false;
+  const row=value[i];
+  if(!fields(row,['item','count','unit'])||!item(row.item)||seen.has(row.item.baseId)||
+    !integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||!integer(row.count*row.unit,0,MAX_GOLD))return false;
+  seen.add(row.item.baseId);
+ }
+ return integer(value.reduce((sum,row)=>sum+row.count*row.unit,0),0,MAX_GOLD);
+}
+function cooldownAt(value){return Array.isArray(value)?value[0]:value;}
+function cooldownWait(value){return Array.isArray(value)?value[1]*3600000:WAIT;}
 function read(raw) {
  if(raw===undefined)return empty();
  function bad(){throw Error('Saved commission promises cannot be verified.');}
- if(!fields(raw,['v','serial','held','cool'])||raw.v!==1||!integer(raw.serial,0)||!object(raw.held)||!object(raw.cool)||
+ if(!fields(raw,['v','serial','held','cool'])||![1,2].includes(raw.v)||!integer(raw.serial,0)||!object(raw.held)||!object(raw.cool)||
    Object.keys(raw.held).length>MAX_HELD||Object.keys(raw.cool).length+Object.keys(raw.held).length>MAX_COOL)bad();
  const tokens=new Set();
  for(const name of Object.keys(raw.held)) {
   const parts=keyParts(name),row=raw.held[name];
-  if(!parts||!fields(row,['token','owner','job','hash','item','count','unit','gold','at'])||
+  const bundle=raw.v===2&&object(row)&&owns(row,'goods');
+  if(!parts||!fields(row,bundle?['token','owner','job','hash','goods','hours','gold','at']:['token','owner','job','hash','item','count','unit','gold','at'])||
     !integer(row.token,1,raw.serial)||tokens.has(row.token)||row.owner!==parts[0]||row.job!==parts[1]||
     typeof row.hash!=='string'||!/^[0-9a-f]{64}$/.test(row.hash)||
-    !fields(row.item,['baseId','name'])||!integer(row.item.baseId,1,0xffffffff)||row.item.baseId===15||
-    typeof row.item.name!=='string'||!row.item.name.trim()||row.item.name.length>160||/[\x00-\x1f\x7f]/.test(row.item.name)||
-    !integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||!integer(row.gold,0,MAX_GOLD)||
-    row.gold!==row.count*row.unit||!integer(row.at,1)||owns(raw.cool,name))bad();
+    !integer(row.gold,0,MAX_GOLD)||!integer(row.at,1)||owns(raw.cool,name))bad();
+  if(bundle) {
+   if(!goods(row.goods)||!CADENCES.includes(row.hours)||row.gold!==row.goods.reduce((sum,part)=>sum+part.count*part.unit,0))bad();
+  }else if(!item(row.item)||!integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||row.gold!==row.count*row.unit)bad();
   tokens.add(row.token);
  }
- for(const name of Object.keys(raw.cool))if(!keyParts(name)||!integer(raw.cool[name],1))bad();
+ for(const name of Object.keys(raw.cool)) {
+  const stamp=raw.cool[name],bundle=Array.isArray(stamp);
+  if(!keyParts(name)||bundle&&(raw.v!==2||stamp.length!==2||!owns(stamp,0)||!owns(stamp,1)||!CADENCES.includes(stamp[1]))||
+    !integer(cooldownAt(stamp),1))bad();
+ }
  return copy(raw);
 }
 function reserved(raw){return Object.values(read(raw).held).reduce((sum,row)=>sum+row.gold,0);}
@@ -62,33 +86,37 @@ function openCount(states,human) {
 function prepare(raw,at) {
  if(!integer(at,1))throw Error('Commission time cannot be verified.');
  const next=read(raw);
- for(const name of Object.keys(next.cool))if(at-next.cool[name]>=WAIT)delete next.cool[name];
+ for(const name of Object.keys(next.cool))if(at-cooldownAt(next.cool[name])>=cooldownWait(next.cool[name]))delete next.cool[name];
  return next;
 }
 function reserve(raw,human,id,terms,at,purse) {
  const next=prepare(raw,at),name=key(human,id);
  if(!name)return {ok:false,why:'session'};
- if(!terms||!integer(terms.unit,0,MAX_GOLD)||!integer(terms.count,1,100000)||
-   !integer(terms.unit*terms.count,0,MAX_GOLD))return {ok:false,why:'price'};
+ const bundle=terms&&owns(terms,'goods');
+ if(!terms||typeof terms.hash!=='string'||!/^[0-9a-f]{64}$/.test(terms.hash)||
+   (bundle?!goods(terms.goods)||!CADENCES.includes(terms.hours):!item(terms.item)||terms.hours!==undefined||
+    !integer(terms.unit,0,MAX_GOLD)||!integer(terms.count,1,100000)||!integer(terms.unit*terms.count,0,MAX_GOLD)))return {ok:false,why:'price'};
+ const gold=bundle?terms.goods.reduce((sum,row)=>sum+row.count*row.unit,0):terms.unit*terms.count;
  if(owns(next.held,name))return {ok:false,why:'open'};
  if(owns(next.cool,name))return {ok:false,why:'cooldown'};
  if(Object.keys(next.held).length>=MAX_HELD||Object.keys(next.cool).length+Object.keys(next.held).length>=MAX_COOL)return {ok:false,why:'capacity'};
  if(next.serial===Number.MAX_SAFE_INTEGER)return {ok:false,why:'counter'};
- if(spendable({purse,commissions:next})<terms.unit*terms.count)return {ok:false,why:'purse'};
+ if(spendable({purse,commissions:next})<gold)return {ok:false,why:'purse'};
  const token=++next.serial;
- next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,item:copy(terms.item),count:terms.count,
-   unit:terms.unit,gold:terms.unit*terms.count,at};
+ if(bundle){next.v=2;next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,goods:copy(terms.goods),hours:terms.hours,gold,at};}
+ else next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,item:copy(terms.item),count:terms.count,unit:terms.unit,gold,at};
  read(next);
  return {ok:true,next,token};
 }
 function close(raw,human,id,token,at,pay) {
  const next=prepare(raw,at),name=key(human,id),row=name&&next.held[name];
  if(!row||!integer(token,1)||row.token!==token)return {ok:false,why:'session'};
+ if(at<row.at)return {ok:false,why:'time'};
  if(pay&&Object.keys(next.cool).length>=MAX_COOL)return {ok:false,why:'capacity'};
  delete next.held[name];
- if(pay)next.cool[name]=at;
+ if(pay)next.cool[name]=owns(row,'goods')?[at,row.hours]:at;
  return {ok:true,next,gold:pay?row.gold:0,terms:row};
 }
-module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,
+module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
  cancel:(raw,human,id,token,at)=>close(raw,human,id,token,at,false),
  finish:(raw,human,id,token,at)=>close(raw,human,id,token,at,true)};
