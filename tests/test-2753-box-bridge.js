@@ -159,8 +159,14 @@ function runClient(env, input, waitMs) {
     yes('the bridge starts on loopback and says where it joins to', await waitFor(() => /listening on 127\.0\.0\.1:\d+, joining to 127\.0\.0\.1:\d+/.test(log), 5000));
 
     // ---- 2. the bridge -----------------------------------------------------
-    const plain = await new Promise((resolve) => http.get({ host: '127.0.0.1', port, path: '/' }, (res) => { res.resume(); resolve(res.statusCode); }).on('error', () => resolve(0)));
-    yes('a plain request is a 404', plain === 404);
+    const plain = await new Promise((resolve) => http.get({ host: '127.0.0.1', port, path: '/' }, (res) => { let b = ''; res.setEncoding('utf8'); res.on('data', (d) => { b += d; }); res.on('end', () => resolve({ code: res.statusCode, body: b.trim() })); }).on('error', () => resolve({ code: 0, body: '' })));
+    yes('a plain request is a 404', plain.code === 404);
+    // #2875: the site's own 404 says "not here", so the bridge's line has to
+    // be one the site never sends, or a check through Caddy takes the site
+    // for the bridge.
+    yes('  saying "box bridge: not here", the line Install-Bridge.ps1 looks for', plain.body === 'box bridge: not here');
+    const siteSays = fs.readFileSync(path.join(REPO, 'site', 'server.js'), 'utf8');
+    yes('  which the site never says', siteSays.indexOf('box bridge') < 0);
     yes('an upgrade with no token is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS)));
     yes('an upgrade with a wrong token is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN + 'x']))));
     yes('the token as a bare header, without "Bearer", is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: ' + TOKEN]))));
