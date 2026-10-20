@@ -342,8 +342,8 @@ try {
         Yes 'otherwise it is sent to the site under its sha256' ((Get-BaselineFileSha (Join-Path $site5 "feed\assets\$($r.Sha)")) -eq $r.Sha)
         Yes '  and the feed names it there, with its id and entry count' ($null -ne $r.Pointer -and $r.Pointer.url -eq (Url 'feed' $r.Sha) -and
                                                                       $r.Pointer.sha256 -eq $r.Sha -and $r.Pointer.id -eq '20260928-2200' -and $r.Pointer.entries -eq $last.Count)
-        Yes '  with the release note, which the update card shows once no pack carries it (#1050)' (
-            $null -ne $r.Pointer -and $r.Pointer.PSObject.Properties['notes'] -and $r.Pointer.notes -eq "Keys open their own doors`n- A house key opens the house it is named for.")
+        Yes '  with the release note''s title, which the update card shows once no pack carries it (#1050)' (
+            $null -ne $r.Pointer -and $r.Pointer.PSObject.Properties['notes'] -and $r.Pointer.notes -ceq 'Keys open their own doors')
         $r = Run-Manifest $false $true
         Yes 'a dev release sends it to /feed-dev/' ($null -ne $r.Pointer -and $r.Pointer.url -eq (Url 'feed-dev' $r.Sha) -and (Test-Path -LiteralPath (Join-Path $site5 "feed-dev\assets\$($r.Sha)")))
         $r = Run-Manifest $false $false ''

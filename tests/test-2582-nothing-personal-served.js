@@ -57,6 +57,7 @@ const SHIPPED = {
   'thalmor-patrols.json': 'the Thalmor patrol roads and limits (#1390), from the repository, naming nobody',
   'guild-sites.json': 'the ten guild sites, from the repository',
   'merchant-traders.json': 'the merchant table, from the repository',
+  'furniture.json': 'the furniture catalog and its staff numbers, from the repository (#2679)',
 };
 // Kept in private. The data copy an older gamemode wrote is only taken out.
 const TAKEN_OUT = ['farm-claims.json', 'property.json'];

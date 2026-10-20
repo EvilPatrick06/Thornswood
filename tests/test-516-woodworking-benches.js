@@ -207,8 +207,16 @@ const recipes = JSON.parse(fs.readFileSync(RECIPES, 'utf8').replace(/^\uFEFF/, '
 const atBench = Object.keys(recipes.recipes || {}).concat(Object.keys(recipes.unowned || {}), Object.keys(recipes.refused || {}))
   .map((k) => (recipes.recipes[k] || (recipes.unowned || {})[k] || (recipes.refused || {})[k]))
   .filter((r) => r && r.bench === KEYWORD);
-yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench (' + atBench.length + ')',
-    atBench.length === 26 && atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));
+// And the furniture (#2679): one recipe for each row of game/data/furniture.json
+// whose type is on, written by Add-ContentRecords.py at the same bench.
+const furnitureDoc = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'furniture.json'), 'utf8').replace(/^\uFEFF/, ''));
+const furnitureOuts = furnitureDoc.pieces.filter((p) => furnitureDoc.limits.types[p.type])
+  .map((p) => p.item + ':Thornswood-Content.esp');
+const movedAt = atBench.length - furnitureOuts.length;
+yes('R1 game/data/recipes.json has the 26 rows #2529 moved at the woodworking bench, and one for each piece of furniture (' +
+    atBench.length + ', ' + furnitureOuts.length + ' of them furniture)',
+    movedAt === 26 && furnitureOuts.every((o) => atBench.some((r) => r.out === o)) &&
+    atBench.every((r) => r.benchName === 'ThornswoodCraftingWoodworking'));
 const bbb = /const BENCH_BY_BASE = (\{.*\});/.exec(gm);
 const bac = /const BENCH_ACCESS = (\{.*\});/.exec(gm);
 const byBase = bbb ? JSON.parse(bbb[1]) : {};

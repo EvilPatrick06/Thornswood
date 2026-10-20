@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -6157,6 +6157,221 @@
   }
 
   /*
+    ------------------------------------- furniture in a building you hold (#2679)
+
+    Setting a chair, a bed or a chest down, moving it and picking it up again,
+    with keys and a panel and nothing typed (Patrick, 4 October). The server
+    decides who may (the holder, or whoever carries the deed or the master
+    key) and writes what these lines need on thornswoodFurnitureLine: may,
+    the building's name, every piece of it you may touch as the server's id
+    in hex, and the piece in your hands with how long it stays there. This
+    file only draws the lines and sends what a key means; the furniture
+    block in game/gamemode.js checks everything again.
+
+    THREE LINES, never two at once:
+      in the inventory     the lock key, Arrange furniture: shuts the
+                           inventory and asks for the furniture panel
+                           (game/ui/thornswood-furniture.js), whose Place
+                           buttons set a piece down in front of you
+      a piece under the    the mold key, Move it; the lock key, Pick it up
+      crosshair
+      a piece in hand      the mold key, Set it down here; the lock key, Turn it
+
+    THE LOCK KEY IN THE INVENTORY, not the mold key: the repair line has U
+    there while a kit is carried, and X means nothing else in the inventory
+    (the treatment line is H). In the world a piece is no door, forge, crop
+    or person, so neither key means anything else on one; a piece in hand
+    takes both keys first, because that is what you are doing.
+
+    The server is asked for the line when you walk into another cell and
+    each time the inventory opens, so a building you just claimed shows the
+    line on the next open.
+  */
+  const FURNITURE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:22%');
+  const PIECE_CSS = LOCK_CSS.replace('top:67%', 'top:72%');
+  const FURNITURE_ASK_MS = 1500;
+  let arrangeShown = false;
+  let pieceShown = '';
+  let furnitureCell = -1;
+  let furnitureAskedAt = 0;
+  let pieceAt = 0;
+  let pieceSentFor = '';
+  let pieceSentAt = 0;
+
+  function furnitureLine() {
+    let v = null;
+    try { v = globalThis.thornswoodFurnitureLine; } catch (e) { v = null; }
+    return (v && typeof v === 'object') ? v : null;
+  }
+
+  function askFurniture(force) {
+    const t = Date.now();
+    if (!force && t - furnitureAskedAt < FURNITURE_ASK_MS) { return; }
+    furnitureAskedAt = t;
+    tellServer('/furniture look');
+  }
+
+  /** The line up or down in the inventory. Only remembered once the page has taken it. */
+  function drawArrangeLine(on) {
+    if (on === arrangeShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-furniture-line");if(d){d.style.display="none";}}catch(e){}')) {
+        arrangeShown = false;
+      }
+      return;
+    }
+    const v = furnitureLine();
+    const html = lockRow(LOCK_NAME, 'Arrange furniture' + (v && v.n ? ' in ' + v.n : ''));
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-furniture-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-furniture-line";' +
+             'd.style.cssText=' + JSON.stringify(FURNITURE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      arrangeShown = true;
+    }
+  }
+
+  function inventoryOpen() {
+    try { return !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { return false; }
+  }
+
+  sp.on('menuOpen', guard('furniture line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    askFurniture(true);
+    const v = furnitureLine();
+    drawArrangeLine(!!T.ready && !!(v && v.may));
+  }));
+  sp.on('menuClose', guard('furniture line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawArrangeLine(false);
+  }));
+
+  /* The lock key in the inventory, inside a building you may arrange. */
+  function arrangePress() {
+    if (!T.ready || claims.chat) { return false; }
+    if (!inventoryOpen()) { return false; }
+    const v = furnitureLine();
+    if (!v || !v.may) { drawArrangeLine(false); return false; }
+    drawArrangeLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('furniture: closeMenu threw on the inventory: ' + err); }
+    tellServer('/furniture');
+    say('pressed ' + LOCK_NAME + ' in the inventory in ' + (v.n || 'a building') + ', asked for the furniture panel');
+    return true;
+  }
+
+  /** The piece in your hands, while it is still there, as its server id in hex. */
+  function pieceInHand() {
+    const v = furnitureLine();
+    if (!v || !v.may || !v.c) { return ''; }
+    return (Date.now() - (Number(v.seen) || 0) < (Number(v.left) || 0)) ? v.c : '';
+  }
+
+  /** The piece under the crosshair that you may touch, as its server id in hex, or ''. */
+  function pieceLookedAt() {
+    const v = furnitureLine();
+    if (!v || !v.may || !Array.isArray(v.p) || !v.p.length) { return ''; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return ''; }
+    let hex = '';
+    // Every piece is a reference the server placed, so its local id is not the server's (#1275).
+    try {
+      const convert = globalThis.thornswoodSocialServerId;
+      const serverId = typeof convert === 'function' ? convert(ref.getFormID() >>> 0) : 0;
+      if (serverId) { hex = (serverId >>> 0).toString(16); }
+    } catch (e) { hex = ''; }
+    return hex && v.p.indexOf(hex) !== -1 ? hex : '';
+  }
+
+  /** What the two keys do in the world right now: { hand, hex, rows }, or null. */
+  function pieceKeysNow() {
+    if (anyClaim() || busyMenuOpenNow()) { return null; }
+    const hand = pieceInHand();
+    if (hand) {
+      return { hand: hand, hex: hand, info: 'Carrying a piece',
+               rows: [lockRow(MOLD_NAME, 'Set it down here'), lockRow(LOCK_NAME, 'Turn it')] };
+    }
+    const hex = pieceLookedAt();
+    if (!hex) { return null; }
+    return { hand: '', hex: hex, info: '',
+             rows: [lockRow(MOLD_NAME, 'Move it'), lockRow(LOCK_NAME, 'Pick it up')] };
+  }
+
+  function drawPiece(now) {
+    const html = now ? (now.info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' +
+                                   plainWords(now.info) + '</div>' : '') + now.rows.join('') : '';
+    if (html === pieceShown) { return; }
+    if (!html) {
+      if (T.js('try{var d=document.getElementById("ts-furniture-piece");if(d){d.style.display="none";}}catch(e){}')) {
+        pieceShown = '';
+      }
+      return;
+    }
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-furniture-piece");' +
+             'if(!d){d=document.createElement("div");d.id="ts-furniture-piece";' +
+             'd.style.cssText=' + JSON.stringify(PIECE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      pieceShown = html;
+    }
+  }
+
+  /* The cell you stand in, so walking into another one asks for the line again. */
+  function cellNow() {
+    try {
+      const pc = sp.Game.getPlayer();
+      const cell = pc ? pc.getParentCell() : null;
+      return cell ? (cell.getFormID() >>> 0) : 0;
+    } catch (e) { return -1; }
+  }
+
+  sp.on('update', guard('furniture line', () => {
+    const now = Date.now();
+    if (now - pieceAt < LOCK_EVERY) { return; }
+    pieceAt = now;
+    if (!T.ready) { pieceShown = ''; arrangeShown = false; return; }
+    const cell = cellNow();
+    if (cell !== -1 && cell !== furnitureCell) { furnitureCell = cell; askFurniture(true); }
+    if (inventoryOpen()) {
+      const v = furnitureLine();
+      drawArrangeLine(!!(v && v.may));
+      drawPiece(null);
+      return;
+    }
+    drawPiece(pieceKeysNow());
+  }));
+
+  /*
+    The mold key or the lock key in the world, on a piece or with one in
+    hand. Asked again at the press. The same thing once in a third of a
+    second, so Turn can be pressed as fast as anybody likes and a double
+    press of Move is still one.
+  */
+  function furniturePress(code) {
+    if (!T.ready || claims.chat) { return false; }
+    const now = pieceKeysNow();
+    drawPiece(now);
+    if (!now) { return false; }
+    let line = '';
+    if (now.hand) { line = code === MOLD_KEY ? 'down' : 'turn'; }
+    else { line = (code === MOLD_KEY ? 'move ' : 'pick ') + now.hex; }
+    const t = Date.now();
+    if (line === pieceSentFor && t - pieceSentAt < 330) { return true; }
+    pieceSentFor = line;
+    pieceSentAt = t;
+    tellServer('/furniture ' + line);
+    say('pressed ' + (code === MOLD_KEY ? MOLD_NAME : LOCK_NAME) + ' for /furniture ' + line);
+    return true;
+  }
+
+  /*
     ------------------------------------- your party: the name, the map, the way
 
     Patrick, 22 September, asked the party menu to let people "see their name
@@ -8360,6 +8575,12 @@
     */
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
+    // A piece of furniture in hand or under the crosshair, in a building you
+    // may arrange (#2679): the mold key moves or sets it down, the lock key
+    // picks it up or turns it. In the inventory the lock key is Arrange
+    // furniture. See furniturePress and arrangePress.
+    if ((e.code === MOLD_KEY || e.code === LOCK_KEY) && furniturePress(e.code)) { return; }
+    if (e.code === LOCK_KEY && arrangePress()) { return; }
     if (e.code === MOLD_KEY && moldPress()) { return; }
     // The same key on a person inside a building you hold. See SLEEP_KEY.
     if (e.code === SLEEP_KEY && sleepPress()) { return; }
@@ -9336,6 +9557,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
+    if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
+    if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
     if (what === 'treat:opened') { T.claimFocus('treat', true); return; }
     if (what === 'treat:closed') { T.claimFocus('treat', false); return; }
     if (what === 'treat:ready') { log('the treatment panel is in'); return; }
