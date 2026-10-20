@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "stages": [
+    {
+      "id": "peace",
+      "name": "Peace",
+      "text": "The Kingdom is at peace. Nothing in the world changes."
+    }
+  ]
+}

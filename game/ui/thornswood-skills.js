@@ -2245,6 +2245,8 @@
         'hold or none. At a building whose hold you do not keep you act as staff, and every press goes in the ' +
         'staff log with your name.');
     }
+    // Where the world is, for staff (#513): propose, confirm and drop a move.
+    if (o.world) wrap.appendChild(officeWorld(o.world));
     if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
     if (o.steward) wrap.appendChild(officeBoards(o.boards));
     // The company's terms, for staff (#512, #2695): propose, confirm and drop.
@@ -2291,6 +2293,51 @@
     var buttons = [input, set];
     if (r) buttons.push(officeButton('No rent', '/rent -'));
     officeRow(card, 'Rent every 7 days', '', buttons);
+    return card;
+  }
+
+  /*
+    THE WORLD, FOR STAFF (#513, Patrick, 17 Oct): server proposes, staff
+    confirm. Where the world is, with its force when the stage names one, the
+    proposal waiting with who made it and when, and a button for every other
+    stage to propose it. Confirm asks twice, because it moves the world for
+    everybody. Everything here is the server's, under officePage.world, and
+    the server checks staff again on every line.
+  */
+  function officeWorld(w) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The world'));
+    var st = (w && w.stage) || {};
+    var name = String(st.name || st.id || 'the start');
+    card.appendChild(el('div', 'desc', 'The world is at ' + name + '.' +
+      (st.force ? ' Behind it: ' + String(st.force) + '.' : '') +
+      (Number(st.since) > 0
+        ? ' It got there ' + whenOpens(Number(st.since)) + (st.by ? ', moved by ' + String(st.by) : '') + '.'
+        : ' It has been there from the start.') +
+      (st.text ? ' ' + String(st.text) : '')));
+    var p = w && w.pending;
+    if (p) {
+      var pname = String(p.name || p.id);
+      officeRow(card, 'Proposed: ' + pname + (p.force ? ' (' + String(p.force) + ')' : ''),
+        'by ' + String(p.by || 'somebody') + ', ' + whenOpens(Number(p.at) || 0), [
+          officeButton('Confirm', '/world confirm ' + String(p.id) + ' ' + String(Number(p.at) || 0),
+            'Press again to move the world to ' + pname + (p.notice ? ' and put up its notice' : '')),
+          officeButton('Drop', '/world drop ' + String(Number(p.at) || 0))
+        ]);
+    } else {
+      card.appendChild(el('div', 'desc', 'Nothing is proposed.'));
+    }
+    var others = (w && Array.isArray(w.stages) ? w.stages : []).filter(function (s) { return s && s.id !== st.id; });
+    if (others.length) {
+      var row = officeRow(card, 'Propose', '', []);
+      others.forEach(function (s) {
+        row.appendChild(officeButton(String(s.name || s.id), '/world propose ' + String(s.id)));
+      });
+    } else {
+      card.appendChild(el('div', 'desc', 'There is no other stage in the list to propose.'));
+    }
+    card.appendChild(el('div', 'desc', 'The world moves only when staff confirm a proposal here, and every press ' +
+      'goes in the staff log with your name.'));
     return card;
   }
 
