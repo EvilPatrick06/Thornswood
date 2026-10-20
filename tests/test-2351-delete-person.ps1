@@ -211,7 +211,10 @@ function Build {
         Put (Join-Path $PV 'books.json') ('{"books":[{"id":"b1","kind":"faction","name":"F","account":"' + $ME + '","owner":' + $P1 + ',"members":[{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[],"prices":[]},' +
             '{"id":"b2","kind":"business","name":"G","account":"' + $YOU + '","owner":' + $PY + ',"members":[{"pid":' + $PY + ',"name":"Yours","role":"Member"},{"pid":' + $P1 + ',"name":"Mine","role":"Member"}],"roles":[{"name":"Member","perms":[]}],"chat":[{"pid":' + $P1 + ',"name":"Mine","text":"hello","at":1}],"prices":[]}],"ledgers":{}}')
         Put (Join-Path $PV 'dungeon-rewards-ledger.json') ('{"version":1,"entries":{"1a2b3:Skyrim.esm":{"at":1,"actor":' + $A1 + ',"tier":1,"gold":5,"items":[]}},"sha256":"x"}')
-        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":1,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[\"ff000a01\",' + $P1 + ',\"ore\"]":1}}},"sha256":"x"}')
+        Put (Join-Path $PV 'merchant-ledger.json') ('{"version":1,"entries":{"9:Skyrim.esm":{"version":1,"purse":250,"stock":[],"supply":{"[\"ff000a01\",' + $P1 + ',\"ore\"]":1}},' +
+            '"8:Skyrim.esm":{"version":1,"purse":250,"stock":[],"commissions":{"v":1,"serial":1,"held":{"[\"[2561,\\\"\\\",' + $P1 + ']\",\"q-iron-1\"]":{"token":1}},"cool":{}}}},"sha256":"x"}')
+        # The trade ships' manifest names a character { actor, profile } on a line it loaded (#511).
+        Put (Join-Path $PV 'trade-cargo.json') ('{"v":1,"routes":{"ports":[],"routes":[]},"cargo":{"holds":{"ship-1":{"lines":{"1":{"by":{"actor":' + $A1 + ',"profile":' + $P1 + '},"baseId":4096,"count":2}}}}}}')
         Put (Join-Path $PV 'benches.json') '{"whiterun":4278190081}'
         Put (Join-Path $PV 'moderation.log') ('{"what":"stuck","pid":' + $P1 + '}' + "`n")
         Put (Join-Path $PV 'door.log') ("2026-10-01 WOULD TURN AWAY profile $P1`n")
@@ -310,7 +313,8 @@ try {
     Yes '  and the request it writes for each server that holds something of theirs, and the list for the copy an install set aside' (
         (Said 'release\s+1\s+live game server: private\\deleted-characters\.json, the request it takes at its next start') -and (Said 'release\s+1\s+dev game server: private\\deleted-characters\.json') -and
         (Said 'release\s+1\s+live game server, set aside as Thornswood-Server\.prev-20261001-000000: private\\deleted-characters\.json'))
-    Yes '  and counts the merchant ledger as left, its release being the merchant code''s' (Said 'left\s+1\s+live game server: places in private\\merchant-ledger\.json naming their character')
+    Yes '  and counts the merchant ledger as released, a supply wait and a commission promise, which the purse service lets go at the next start (#2652)' (Said 'release\s+2\s+live game server: places in private\\merchant-ledger\.json naming their character')
+    Yes '  and counts the trade ships'' manifest as released, which the trade ships block lets go at the next start (#511)' (Said 'release\s+1\s+live game server: places in private\\trade-cargo\.json naming their character')
     Yes '  and says nothing of a register that names nobody of theirs' (-not (Said 'benches\.json') -and -not (Said 'deleted-characters\.json naming'))
     if (-not (Said 'A real run stops nothing')) { Show }
     Yes '  and says a real run stops nothing, and which services take the rest as they next start' (Said 'A real run stops nothing\. These take the rest out of their own files as each next starts: the site, the live game server, the dev game server, live voice, dev voice, the bot\.')
@@ -463,7 +467,7 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
             $null -eq (J (Join-Path $R 'data\last-left.json'))."$P1" -and $null -ne (J (Join-Path $R 'data\last-left.json'))."$PY")
         $rel = $R.Substring($Box.Length)
         $same = $true
-        foreach ($f in 'property.json', 'law.json', 'beds.json', 'farm-claims.json', 'embassy.json', 'books.json', 'dungeon-rewards-ledger.json', 'merchant-ledger.json', 'benches.json', 'moderation.log', 'door.log') {
+        foreach ($f in 'property.json', 'law.json', 'beds.json', 'farm-claims.json', 'embassy.json', 'books.json', 'dungeon-rewards-ledger.json', 'merchant-ledger.json', 'trade-cargo.json', 'benches.json', 'moderation.log', 'door.log') {
             if ($before["$rel\private\$f"] -ne (Get-FileHash (Join-Path $PV $f)).Hash) { $same = $false; Write-Host "        changed: $tag private\$f" }
         }
         Yes "$tag`: every game register, the staff log and the door log are as they were (the game server lets go, not this)" $same

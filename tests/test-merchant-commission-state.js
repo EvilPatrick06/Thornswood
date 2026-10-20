@@ -28,7 +28,7 @@ assert.equal(jobs.reserve(jobs.empty(),human,id,{...terms,unit:null},at,250).why
 assert.equal(jobs.reserve(jobs.empty(),human,id,{...terms,unit:2147483647},at,2147483647).why,'price');
 const exhausted=jobs.empty();exhausted.serial=Number.MAX_SAFE_INTEGER;
 assert.equal(jobs.reserve(exhausted,human,id,terms,at,250).why,'counter');
-for(const defect of [null,[],{v:1},{...state,v:2},{...state,unknown:1},
+for(const defect of [null,[],{v:1},{...state,v:99},{...state,unknown:1},
  {...state,serial:0},{...state,held:{[jobs.key(other,id)]:Object.values(state.held)[0]}},
  {...state,cool:{bad:at}},{...state,cool:{[jobs.key(human,id)]:at}},
  {...state,held:{[jobs.key(human,id)]:{...Object.values(state.held)[0],gold:1}}}])

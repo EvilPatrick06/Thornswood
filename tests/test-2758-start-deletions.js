@@ -109,7 +109,7 @@ try {
   const g2 = start(G);
   yes('the next start finds saves done and does nothing more', !/deletions:/.test(g2.log.slice(g1.log.length)));
 
-  game({ profiles: [P1], actors: [], done: { farms: 1, property: 1, embassy: 1, dungeon: 1, books: 1 } });
+  game({ profiles: [P1], actors: [], done: Object.fromEntries(SL.RELEASE_PARTS.filter((p) => p !== 'saves').map((p) => [p, 1])) });
   const g3 = start(G);
   yes('a list with every other part done is deleted once the saves go',
       !fs.existsSync(path.join(PV, 'deleted-characters.json')) && /every part is done, and the list is gone/.test(g3.log));

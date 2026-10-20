@@ -28,7 +28,7 @@ const WELLS = {"items":[["3c:Skyrim.esm",173440.0,-97024.0,11136.0],["3c:Skyrim.
 const WEATHER = {"most":200,"mid":43,"items":{"101910:Skyrim.esm":{"w":0,"k":0},"10199f:Skyrim.esm":{"w":38,"k":1},"104ab4:Skyrim.esm":{"w":100,"k":1},"105941:Skyrim.esm":{"w":13,"k":18},"105942:Skyrim.esm":{"w":13,"k":2},"105943:Skyrim.esm":{"w":13,"k":2},"105944:Skyrim.esm":{"w":13,"k":2},"105945:Skyrim.esm":{"w":13,"k":2},"105f40:Skyrim.esm":{"w":51,"k":1},"106635:Skyrim.esm":{"w":25,"k":1},"10a230:Skyrim.esm":{"w":50,"k":1},"10a231:Skyrim.esm":{"w":85,"k":4},"10a232:Skyrim.esm":{"w":44,"k":2},"10a233:Skyrim.esm":{"w":100,"k":1},"10a234:Skyrim.esm":{"w":50,"k":1},"10a235:Skyrim.esm":{"w":25,"k":1},"10a236:Skyrim.esm":{"w":100,"k":1},"10a237:Skyrim.esm":{"w":25,"k":1},"10a238:Skyrim.esm":{"w":85,"k":4},"10a239:Skyrim.esm":{"w":44,"k":2},"10a23a:Skyrim.esm":{"w":38,"k":1},"10a23b:Skyrim.esm":{"w":150,"k":1},"10a23c:Skyrim.esm":{"w":85,"k":4},"10a23d:Skyrim.esm":{"w":85,"k":4},"10a23e:Skyrim.esm":{"w":25,"k":1},"10a23f:Skyrim.esm":{"w":25,"k":1},"10a240:Skyrim.esm":{"w":25,"k":1},"10a241:Skyrim.esm":{"w":85,"k":4},"10a242:Skyrim.esm":{"w":85,"k":4},"10a243:Skyrim.esm":{"w":38,"k":1},"10a244:Skyrim.esm":{"w":50,"k":1},"10a245:Skyrim.esm":{"w":100,"k":1},"10a7a5:Skyrim.esm":{"w":25,"k":1},"10a7a6:Skyrim.esm":{"w":85,"k":4},"10a7a7:Skyrim.esm":{"w":44,"k":2},"10a7a8:Skyrim.esm":{"w":38,"k":1},"10c32f:Skyrim.esm":{"w":102,"k":20},"10d9ec:Skyrim.esm":{"w":0,"k":17},"10da13:Skyrim.esm":{"w":0,"k":0},"10e0b:Dawnguard.esm":{"w":100,"k":1},"10e0e:Dawnguard.esm":{"w":100,"k":1},"10e0f:Dawnguard.esm":{"w":25,"k":1},"10e10:Dawnguard.esm":{"w":25,"k":1},"10e1e3:Skyrim.esm":{"w":38,"k":1},"10e1e4:Skyrim.esm":{"w":25,"k":1},"10e1e5:Skyrim.esm":{"w":100,"k":8},"10e1e6:Skyrim.esm":{"w":50,"k":1},"10e1e7:Skyrim.esm":{"w":100,"k":8},"10e1e8:Skyrim.esm":{"w":50,"k":1},"10e1e9:Skyrim.esm":{"w":38,"k":2},"10e1ea:Skyrim.esm":{"w":25,"k":1},"10e1eb:Skyrim.esm":{"w":38,"k":2},"10e1ec:Skyrim.esm":{"w":150,"k":1},"10e1ed:Skyrim.esm":{"w":38,"k":2},"10e1ee:Skyrim.esm":{"w":150,"k":1},"10e1ef:Skyrim.esm":{"w":100,"k":8},"10e1f0:Skyrim.esm":{"w":50,"k":1},"10e1f1:Skyrim.esm":{"w":25,"k":1},"10e1f2:Skyrim.esm":{"w":25,"k":1},"10e3d4:Skyrim.esm":{"w":100,"k":8},"10fe7e:Skyrim.esm":{"w":44,"k":2},"10fef8:Skyrim.esm":{"w":0,"k":18},"12f89:Skyrim.esm":{"w":25,"k":1},"1407:Dawnguard.esm":{"w":25,"k":18},"14551:Dawnguard.esm":{"w":25,"k":20},"15e:Skyrim.esm":{"w":38,"k":1},"18471:Dragonborn.esm":{"w":43,"k":2},"18dbb:Dawnguard.esm":{"w":25,"k":18},"18dbc:Dawnguard.esm":{"w":25,"k":18},"18dbd:Dawnguard.esm":{"w":25,"k":18},"19599:Dawnguard.esm":{"w":100,"k":1},"195a0:Dawnguard.esm":{"w":100,"k":1},"1d760:Dragonborn.esm":{"w":43,"k":2},"1dff5:Dragonborn.esm":{"w":76,"k":18},"2e7ab:Skyrim.esm":{"w":110,"k":4},"31ac0:Dragonborn.esm":{"w":43,"k":2},"32336:Dragonborn.esm":{"w":200,"k":8},"34cfb:Dragonborn.esm":{"w":76,"k":18},"374b8:Dragonborn.esm":{"w":43,"k":2},"374b9:Dragonborn.esm":{"w":43,"k":2},"374ba:Dragonborn.esm":{"w":43,"k":2},"48c14:Skyrim.esm":{"w":0,"k":8},"4d7fb:Skyrim.esm":{"w":70,"k":8},"5ed7a:Skyrim.esm":{"w":0,"k":0},"6aec:Dawnguard.esm":{"w":0,"k":50},"6ed5a:Skyrim.esm":{"w":0,"k":0},"6ed5b:Skyrim.esm":{"w":0,"k":0},"7548f:Skyrim.esm":{"w":0,"k":0},"75491:Skyrim.esm":{"w":0,"k":0},"75de5:Skyrim.esm":{"w":0,"k":0},"777cf:Skyrim.esm":{"w":0,"k":0},"808:Cathedral Weathers.esp":{"w":200,"k":8},"817:Cathedral Weathers.esp":{"w":44,"k":2},"818:Cathedral Weathers.esp":{"w":85,"k":4},"819:Cathedral Weathers.esp":{"w":70,"k":8},"81a:Skyrim.esm":{"w":150,"k":1},"81b:Cathedral Weathers.esp":{"w":150,"k":8},"81c:Cathedral Weathers.esp":{"w":200,"k":8},"81d:Cathedral Weathers.esp":{"w":25,"k":1},"81e:Cathedral Weathers.esp":{"w":100,"k":8},"8277a:Skyrim.esm":{"w":0,"k":0},"8282a:Skyrim.esm":{"w":0,"k":0},"88a:Cathedral Weathers.esp":{"w":85,"k":4},"923fd:Skyrim.esm":{"w":25,"k":18},"959f:Dawnguard.esm":{"w":25,"k":17},"a6858:Skyrim.esm":{"w":0,"k":0},"aee84:Skyrim.esm":{"w":0,"k":0},"c821e:Skyrim.esm":{"w":44,"k":2},"c821f:Skyrim.esm":{"w":85,"k":4},"c8220:Skyrim.esm":{"w":85,"k":4},"c8221:Skyrim.esm":{"w":150,"k":8},"d299e:Skyrim.esm":{"w":102,"k":18},"d4886:Skyrim.esm":{"w":125,"k":20},"d9329:Skyrim.esm":{"w":38,"k":0},"ecc96:Skyrim.esm":{"w":0,"k":0},"f89c:Dawnguard.esm":{"w":25,"k":1},"f89d:Dawnguard.esm":{"w":100,"k":1}}};
 const WARMTH = {"items":{"10013c:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"1014f8:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"101737:Skyrim.esm":{"m":"cloth","c":"body"},"101738:Skyrim.esm":{"m":"cloth","c":"body"},"101739:Skyrim.esm":{"m":"cloth","c":"body"},"10173a:Skyrim.esm":{"m":"cloth","c":"body"},"10173b:Skyrim.esm":{"m":"cloth","c":"body"},"10173c:Skyrim.esm":{"m":"cloth","c":"body"},"10173d:Skyrim.esm":{"m":"cloth","c":"body"},"10173e:Skyrim.esm":{"m":"cloth","c":"body"},"10173f:Skyrim.esm":{"m":"cloth","c":"body"},"101740:Skyrim.esm":{"m":"cloth","c":"body"},"101741:Skyrim.esm":{"m":"cloth","c":"body"},"101742:Skyrim.esm":{"m":"cloth","c":"body"},"101743:Skyrim.esm":{"m":"cloth","c":"body"},"101744:Skyrim.esm":{"m":"cloth","c":"body"},"101745:Skyrim.esm":{"m":"cloth","c":"body"},"101746:Skyrim.esm":{"m":"cloth","c":"body"},"101747:Skyrim.esm":{"m":"cloth","c":"body"},"101748:Skyrim.esm":{"m":"cloth","c":"body"},"101749:Skyrim.esm":{"m":"cloth","c":"body"},"101750:Skyrim.esm":{"m":"cloth","c":"body"},"101751:Skyrim.esm":{"m":"cloth","c":"body"},"101752:Skyrim.esm":{"m":"cloth","c":"body"},"101753:Skyrim.esm":{"m":"cloth","c":"body"},"101754:Skyrim.esm":{"m":"cloth","c":"body"},"101755:Skyrim.esm":{"m":"cloth","c":"body"},"101756:Skyrim.esm":{"m":"cloth","c":"body"},"101757:Skyrim.esm":{"m":"cloth","c":"body"},"101758:Skyrim.esm":{"m":"cloth","c":"body"},"101759:Skyrim.esm":{"m":"cloth","c":"body"},"10175a:Skyrim.esm":{"m":"cloth","c":"body"},"10175b:Skyrim.esm":{"m":"cloth","c":"body"},"10175c:Skyrim.esm":{"m":"cloth","c":"body"},"10175d:Skyrim.esm":{"m":"cloth","c":"body"},"101777:Skyrim.esm":{"m":"cloth","c":"body"},"101778:Skyrim.esm":{"m":"cloth","c":"body"},"101779:Skyrim.esm":{"m":"cloth","c":"body"},"10177a:Skyrim.esm":{"m":"cloth","c":"body"},"10177b:Skyrim.esm":{"m":"cloth","c":"body"},"10177c:Skyrim.esm":{"m":"cloth","c":"body"},"10177d:Skyrim.esm":{"m":"cloth","c":"body"},"10177e:Skyrim.esm":{"m":"cloth","c":"body"},"10177f:Skyrim.esm":{"m":"cloth","c":"body"},"101780:Skyrim.esm":{"m":"cloth","c":"body"},"101781:Skyrim.esm":{"m":"cloth","c":"body"},"101782:Skyrim.esm":{"m":"cloth","c":"body"},"101783:Skyrim.esm":{"m":"cloth","c":"body"},"10179d:Skyrim.esm":{"m":"cloth","c":"body"},"10179e:Skyrim.esm":{"m":"cloth","c":"body"},"10179f:Skyrim.esm":{"m":"cloth","c":"body"},"1017a0:Skyrim.esm":{"m":"cloth","c":"body"},"1017a1:Skyrim.esm":{"m":"cloth","c":"body"},"1017a2:Skyrim.esm":{"m":"cloth","c":"body"},"1017a3:Skyrim.esm":{"m":"cloth","c":"body"},"1017a4:Skyrim.esm":{"m":"cloth","c":"body"},"1017a5:Skyrim.esm":{"m":"cloth","c":"body"},"1017ac:Skyrim.esm":{"m":"cloth","c":"body"},"1017ad:Skyrim.esm":{"m":"cloth","c":"body"},"1017ae:Skyrim.esm":{"m":"cloth","c":"body"},"1017af:Skyrim.esm":{"m":"cloth","c":"body"},"1017b0:Skyrim.esm":{"m":"cloth","c":"body"},"1017b1:Skyrim.esm":{"m":"cloth","c":"body"},"1017b2:Skyrim.esm":{"m":"cloth","c":"body"},"1017b3:Skyrim.esm":{"m":"cloth","c":"body"},"1017b4:Skyrim.esm":{"m":"cloth","c":"body"},"1017b5:Skyrim.esm":{"m":"cloth","c":"body"},"1017b6:Skyrim.esm":{"m":"cloth","c":"body"},"1019ca:Skyrim.esm":{"m":"heavy","c":"hair"},"1019cb:Skyrim.esm":{"m":"heavy","c":"hands"},"1019cc:Skyrim.esm":{"m":"heavy","c":"body"},"1019cd:Skyrim.esm":{"m":"heavy","c":"feet"},"1028f:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"feet"},"103941:Skyrim.esm":{"m":"cloth","c":"hands"},"104f44:Skyrim.esm":{"m":"cloth","c":"body"},"10524f:Skyrim.esm":{"m":"cloth","c":"body"},"10559d:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"10594b:Skyrim.esm":{"m":"cloth","c":"body"},"10594d:Skyrim.esm":{"m":"cloth","c":"body"},"10594f:Skyrim.esm":{"m":"cloth","c":"body"},"105966:Skyrim.esm":{"m":"cloth","c":"body"},"105967:Skyrim.esm":{"m":"cloth","c":"feet"},"105968:Skyrim.esm":{"m":"cloth","c":"hands"},"105969:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"105ef0:Skyrim.esm":{"m":"cloth","c":"body"},"105f11:Skyrim.esm":{"m":"light","c":"feet"},"105f12:Skyrim.esm":{"m":"light","c":"body"},"105f13:Skyrim.esm":{"m":"light","c":"hands"},"105f14:Skyrim.esm":{"m":"light","c":"hair,circlet"},"106390:Skyrim.esm":{"m":"cloth","c":"body"},"106392:Skyrim.esm":{"m":"cloth","c":"body"},"106661:Skyrim.esm":{"m":"cloth","c":"body"},"10682f:WindhelmSSE.esp":{"m":"cloth","c":"circlet"},"107106:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"107108:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"107109:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10710a:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10710b:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10710c:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10710d:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"107611:Skyrim.esm":{"m":"cloth","c":"body,hands,feet"},"107ff:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"feet"},"10800:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hands"},"10853f:Skyrim.esm":{"m":"cloth","c":"feet"},"108540:Skyrim.esm":{"m":"cloth","c":"body"},"108541:Skyrim.esm":{"m":"cloth","c":"hands"},"108542:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"108543:Skyrim.esm":{"m":"cloth","c":"feet"},"108544:Skyrim.esm":{"m":"cloth","c":"body"},"108545:Skyrim.esm":{"m":"cloth","c":"hands"},"108546:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"109008:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109009:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900a:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900b:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900c:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900d:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900e:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10900f:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109010:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109011:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109012:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109013:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109014:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109015:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109016:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109017:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109018:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109019:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109020:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109021:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109022:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109023:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109024:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109025:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109026:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109027:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109028:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109029:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10902a:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10902b:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109045:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109046:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109047:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109048:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109049:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904a:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904b:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904c:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904d:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904e:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10904f:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109050:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109051:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109052:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109053:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109054:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109055:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109056:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109057:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109058:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109059:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10905a:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109061:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109062:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109063:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109064:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109065:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109066:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109080:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109081:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109082:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109083:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109084:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109085:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109086:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109087:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109088:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"109089:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"1092b4:Skyrim.esm":{"m":"cloth","c":"feet"},"1092b5:Skyrim.esm":{"m":"cloth","c":"body"},"1092b6:Skyrim.esm":{"m":"cloth","c":"hands"},"109c11:Skyrim.esm":{"m":"cloth","c":"body"},"109c3d:Skyrim.esm":{"m":"cloth","c":"neck"},"109de6:Skyrim.esm":{"m":"cloth","c":"back"},"109de7:Skyrim.esm":{"m":"cloth","c":"chest"},"109de8:Skyrim.esm":{"m":"cloth","c":"neck"},"109dee:Skyrim.esm":{"m":"cloth","c":"back"},"109def:Skyrim.esm":{"m":"cloth","c":"neck"},"109df0:Skyrim.esm":{"m":"cloth","c":"chest"},"109df6:Skyrim.esm":{"m":"cloth","c":"back"},"109df7:Skyrim.esm":{"m":"cloth","c":"neck"},"109df8:Skyrim.esm":{"m":"cloth","c":"chest"},"109dfb:Skyrim.esm":{"m":"cloth","c":"back"},"10a06a:Skyrim.esm":{"m":"fur","c":"hands"},"10b2fd:Skyrim.esm":{"m":"heavy","c":"head,hair,body,circlet,ears"},"10b2ff:Skyrim.esm":{"m":"heavy","c":"feet"},"10b300:Skyrim.esm":{"m":"heavy","c":"hands"},"10c698:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10cee3:Skyrim.esm":{"m":"cloth","c":"body"},"10cee4:Skyrim.esm":{"m":"cloth","c":"body"},"10cee5:Skyrim.esm":{"m":"cloth","c":"body"},"10cee6:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10cee8:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10cf30:Skyrim.esm":{"m":"heavy","c":"body"},"10cf31:Skyrim.esm":{"m":"heavy","c":"body"},"10cf32:Skyrim.esm":{"m":"heavy","c":"body"},"10cf33:Skyrim.esm":{"m":"heavy","c":"body"},"10cf34:Skyrim.esm":{"m":"heavy","c":"body"},"10cf35:Skyrim.esm":{"m":"heavy","c":"body"},"10cf36:Skyrim.esm":{"m":"heavy","c":"body"},"10cf37:Skyrim.esm":{"m":"heavy","c":"body"},"10cf38:Skyrim.esm":{"m":"heavy","c":"body"},"10cf39:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3a:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3b:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3c:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3d:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3e:Skyrim.esm":{"m":"heavy","c":"body"},"10cf3f:Skyrim.esm":{"m":"heavy","c":"body"},"10cf40:Skyrim.esm":{"m":"heavy","c":"body"},"10cf41:Skyrim.esm":{"m":"heavy","c":"body"},"10cf42:Skyrim.esm":{"m":"heavy","c":"body"},"10cf43:Skyrim.esm":{"m":"heavy","c":"body"},"10cf44:Skyrim.esm":{"m":"heavy","c":"body"},"10cf45:Skyrim.esm":{"m":"heavy","c":"body"},"10cf46:Skyrim.esm":{"m":"heavy","c":"body"},"10cf47:Skyrim.esm":{"m":"heavy","c":"body"},"10cf48:Skyrim.esm":{"m":"heavy","c":"body"},"10cf49:Skyrim.esm":{"m":"heavy","c":"body"},"10cf4a:Skyrim.esm":{"m":"heavy","c":"body"},"10cf4b:Skyrim.esm":{"m":"heavy","c":"body"},"10cf4c:Skyrim.esm":{"m":"heavy","c":"body"},"10cf4d:Skyrim.esm":{"m":"heavy","c":"body"},"10cf4e:Skyrim.esm":{"m":"light","c":"body"},"10cf4f:Skyrim.esm":{"m":"light","c":"body"},"10cf50:Skyrim.esm":{"m":"light","c":"body"},"10cf51:Skyrim.esm":{"m":"light","c":"body"},"10cf52:Skyrim.esm":{"m":"light","c":"body"},"10cf53:Skyrim.esm":{"m":"light","c":"body"},"10cf54:Skyrim.esm":{"m":"light","c":"body"},"10cf55:Skyrim.esm":{"m":"light","c":"body"},"10cf56:Skyrim.esm":{"m":"light","c":"body"},"10cf57:Skyrim.esm":{"m":"light","c":"body"},"10cf58:Skyrim.esm":{"m":"light","c":"body"},"10cf59:Skyrim.esm":{"m":"light","c":"body"},"10cf5a:Skyrim.esm":{"m":"light","c":"body"},"10cf5b:Skyrim.esm":{"m":"light","c":"body"},"10cf5c:Skyrim.esm":{"m":"light","c":"body"},"10cf5d:Skyrim.esm":{"m":"heavy","c":"body"},"10cf5e:Skyrim.esm":{"m":"heavy","c":"body"},"10cf5f:Skyrim.esm":{"m":"heavy","c":"body"},"10cf60:Skyrim.esm":{"m":"heavy","c":"body"},"10cf61:Skyrim.esm":{"m":"heavy","c":"body"},"10cf62:Skyrim.esm":{"m":"heavy","c":"body"},"10cf63:Skyrim.esm":{"m":"heavy","c":"body"},"10cf64:Skyrim.esm":{"m":"heavy","c":"body"},"10cf65:Skyrim.esm":{"m":"heavy","c":"body"},"10cf66:Skyrim.esm":{"m":"heavy","c":"body"},"10cf67:Skyrim.esm":{"m":"heavy","c":"body"},"10cf68:Skyrim.esm":{"m":"heavy","c":"body"},"10cf69:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6a:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6b:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6c:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6d:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6e:Skyrim.esm":{"m":"heavy","c":"body"},"10cf6f:Skyrim.esm":{"m":"heavy","c":"body"},"10cf70:Skyrim.esm":{"m":"heavy","c":"body"},"10cf71:Skyrim.esm":{"m":"heavy","c":"body"},"10cf72:Skyrim.esm":{"m":"heavy","c":"body"},"10cf73:Skyrim.esm":{"m":"heavy","c":"body"},"10cf74:Skyrim.esm":{"m":"heavy","c":"body"},"10cf75:Skyrim.esm":{"m":"heavy","c":"body"},"10cf76:Skyrim.esm":{"m":"heavy","c":"body"},"10cf77:Skyrim.esm":{"m":"heavy","c":"body"},"10cf78:Skyrim.esm":{"m":"heavy","c":"body"},"10cf79:Skyrim.esm":{"m":"heavy","c":"body"},"10cf7a:Skyrim.esm":{"m":"light","c":"body"},"10cf7b:Skyrim.esm":{"m":"light","c":"body"},"10cf7c:Skyrim.esm":{"m":"light","c":"body"},"10cf7d:Skyrim.esm":{"m":"light","c":"body"},"10cf7e:Skyrim.esm":{"m":"light","c":"body"},"10cf7f:Skyrim.esm":{"m":"light","c":"body"},"10cf80:Skyrim.esm":{"m":"light","c":"body"},"10cf81:Skyrim.esm":{"m":"light","c":"body"},"10cf82:Skyrim.esm":{"m":"light","c":"body"},"10cf83:Skyrim.esm":{"m":"light","c":"body"},"10cf84:Skyrim.esm":{"m":"light","c":"body"},"10cf85:Skyrim.esm":{"m":"light","c":"body"},"10cf86:Skyrim.esm":{"m":"light","c":"body"},"10cf87:Skyrim.esm":{"m":"light","c":"body"},"10cf88:Skyrim.esm":{"m":"light","c":"body"},"10cf89:Skyrim.esm":{"m":"light","c":"body"},"10cf8a:Skyrim.esm":{"m":"light","c":"body"},"10cf8b:Skyrim.esm":{"m":"light","c":"body"},"10cf8c:Skyrim.esm":{"m":"light","c":"body"},"10cf8d:Skyrim.esm":{"m":"light","c":"body"},"10cf8e:Skyrim.esm":{"m":"light","c":"body"},"10cf8f:Skyrim.esm":{"m":"light","c":"body"},"10cf90:Skyrim.esm":{"m":"light","c":"body"},"10cf91:Skyrim.esm":{"m":"light","c":"body"},"10cf92:Skyrim.esm":{"m":"light","c":"body"},"10cf93:Skyrim.esm":{"m":"light","c":"body"},"10cf94:Skyrim.esm":{"m":"light","c":"body"},"10cf95:Skyrim.esm":{"m":"light","c":"body"},"10cf96:Skyrim.esm":{"m":"light","c":"body"},"10cf97:Skyrim.esm":{"m":"light","c":"body"},"10cf98:Skyrim.esm":{"m":"light","c":"body"},"10cf99:Skyrim.esm":{"m":"light","c":"body"},"10cf9a:Skyrim.esm":{"m":"light","c":"body"},"10cf9b:Skyrim.esm":{"m":"light","c":"body"},"10cf9c:Skyrim.esm":{"m":"light","c":"body"},"10cf9d:Skyrim.esm":{"m":"light","c":"body"},"10cf9e:Skyrim.esm":{"m":"light","c":"body"},"10cf9f:Skyrim.esm":{"m":"light","c":"body"},"10cfa0:Skyrim.esm":{"m":"light","c":"body"},"10cfa1:Skyrim.esm":{"m":"light","c":"body"},"10cfa2:Skyrim.esm":{"m":"light","c":"body"},"10cfa3:Skyrim.esm":{"m":"light","c":"body"},"10cfa4:Skyrim.esm":{"m":"light","c":"body"},"10cfa5:Skyrim.esm":{"m":"light","c":"body"},"10cfa6:Skyrim.esm":{"m":"light","c":"body"},"10cfa7:Skyrim.esm":{"m":"light","c":"body"},"10cfa8:Skyrim.esm":{"m":"fur","c":"body"},"10cfa9:Skyrim.esm":{"m":"fur","c":"body"},"10cfaa:Skyrim.esm":{"m":"fur","c":"body"},"10cfab:Skyrim.esm":{"m":"fur","c":"body"},"10cfac:Skyrim.esm":{"m":"fur","c":"body"},"10cfad:Skyrim.esm":{"m":"fur","c":"body"},"10cfae:Skyrim.esm":{"m":"fur","c":"body"},"10cfaf:Skyrim.esm":{"m":"fur","c":"body"},"10cfb0:Skyrim.esm":{"m":"fur","c":"body"},"10cfb1:Skyrim.esm":{"m":"fur","c":"body"},"10cfb2:Skyrim.esm":{"m":"fur","c":"body"},"10cfb3:Skyrim.esm":{"m":"fur","c":"body"},"10cfb4:Skyrim.esm":{"m":"fur","c":"body"},"10cfb5:Skyrim.esm":{"m":"fur","c":"body"},"10cfb6:Skyrim.esm":{"m":"fur","c":"body"},"10cfb8:Skyrim.esm":{"m":"heavy","c":"body"},"10cfb9:Skyrim.esm":{"m":"heavy","c":"body"},"10cfba:Skyrim.esm":{"m":"heavy","c":"body"},"10cfbb:Skyrim.esm":{"m":"heavy","c":"body"},"10cfbc:Skyrim.esm":{"m":"heavy","c":"body"},"10cfbd:Skyrim.esm":{"m":"heavy","c":"body"},"10cfbe:Skyrim.esm":{"m":"heavy","c":"body"},"10cfbf:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc0:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc1:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc2:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc3:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc4:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc5:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc6:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc7:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc8:Skyrim.esm":{"m":"heavy","c":"body"},"10cfc9:Skyrim.esm":{"m":"heavy","c":"body"},"10cfca:Skyrim.esm":{"m":"heavy","c":"body"},"10cfcb:Skyrim.esm":{"m":"heavy","c":"body"},"10cfcc:Skyrim.esm":{"m":"heavy","c":"body"},"10cfcd:Skyrim.esm":{"m":"heavy","c":"body"},"10cfce:Skyrim.esm":{"m":"heavy","c":"body"},"10cfcf:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd0:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd1:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd2:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd3:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd4:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd5:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd6:Skyrim.esm":{"m":"heavy","c":"body"},"10cfd:Dawnguard.esm":{"m":"cloth","c":"body"},"10cfe4:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10cfe:Dawnguard.esm":{"m":"cloth","c":"hands"},"10cfea:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10cfeb:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10cfec:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"10cfef:Skyrim.esm":{"m":"cloth","c":"body"},"10cff0:Skyrim.esm":{"m":"cloth","c":"body"},"10cff1:Skyrim.esm":{"m":"cloth","c":"body"},"10cff2:Skyrim.esm":{"m":"cloth","c":"body"},"10d2b4:Skyrim.esm":{"m":"cloth","c":"body"},"10d2b5:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10d662:Skyrim.esm":{"m":"cloth","c":"body"},"10d664:Skyrim.esm":{"m":"cloth","c":"body"},"10d667:Skyrim.esm":{"m":"cloth","c":"body"},"10d668:Skyrim.esm":{"m":"cloth","c":"body"},"10d669:Skyrim.esm":{"m":"cloth","c":"body"},"10d66a:Skyrim.esm":{"m":"cloth","c":"body"},"10d66b:Skyrim.esm":{"m":"cloth","c":"body"},"10d66c:Skyrim.esm":{"m":"cloth","c":"body"},"10d66d:Skyrim.esm":{"m":"cloth","c":"body"},"10d66e:Skyrim.esm":{"m":"cloth","c":"body"},"10d66f:Skyrim.esm":{"m":"cloth","c":"body"},"10d670:Skyrim.esm":{"m":"cloth","c":"body"},"10d671:Skyrim.esm":{"m":"cloth","c":"body"},"10d672:Skyrim.esm":{"m":"cloth","c":"body"},"10d673:Skyrim.esm":{"m":"cloth","c":"body"},"10d674:Skyrim.esm":{"m":"cloth","c":"body"},"10d675:Skyrim.esm":{"m":"cloth","c":"body"},"10d676:Skyrim.esm":{"m":"cloth","c":"body"},"10d677:Skyrim.esm":{"m":"cloth","c":"body"},"10d678:Skyrim.esm":{"m":"cloth","c":"body"},"10d679:Skyrim.esm":{"m":"cloth","c":"body"},"10d67a:Skyrim.esm":{"m":"cloth","c":"body"},"10d67b:Skyrim.esm":{"m":"cloth","c":"body"},"10d67c:Skyrim.esm":{"m":"cloth","c":"body"},"10d67d:Skyrim.esm":{"m":"cloth","c":"body"},"10d67e:Skyrim.esm":{"m":"cloth","c":"body"},"10d67f:Skyrim.esm":{"m":"cloth","c":"body"},"10d680:Skyrim.esm":{"m":"cloth","c":"body"},"10d681:Skyrim.esm":{"m":"cloth","c":"body"},"10d682:Skyrim.esm":{"m":"cloth","c":"body"},"10d683:Skyrim.esm":{"m":"cloth","c":"body"},"10d684:Skyrim.esm":{"m":"cloth","c":"body"},"10d691:Skyrim.esm":{"m":"cloth","c":"body"},"10d6a4:Skyrim.esm":{"m":"cloth","c":"body"},"10d6a5:Skyrim.esm":{"m":"cloth","c":"body"},"10d6a6:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10d6a7:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10d6c:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hands"},"10d6e:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"10d76:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"10d80:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"10dd3a:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10dd3b:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10dd3c:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10dec5:Skyrim.esm":{"m":"leather","c":"body"},"10dec6:Skyrim.esm":{"m":"leather","c":"body"},"10dec7:Skyrim.esm":{"m":"leather","c":"body"},"10dec8:Skyrim.esm":{"m":"leather","c":"body"},"10dec9:Skyrim.esm":{"m":"leather","c":"body"},"10deca:Skyrim.esm":{"m":"leather","c":"body"},"10decb:Skyrim.esm":{"m":"leather","c":"body"},"10decc:Skyrim.esm":{"m":"leather","c":"body"},"10decd:Skyrim.esm":{"m":"leather","c":"body"},"10dece:Skyrim.esm":{"m":"leather","c":"body"},"10decf:Skyrim.esm":{"m":"leather","c":"body"},"10ded0:Skyrim.esm":{"m":"leather","c":"body"},"10ded1:Skyrim.esm":{"m":"leather","c":"body"},"10ded2:Skyrim.esm":{"m":"leather","c":"body"},"10ded3:Skyrim.esm":{"m":"leather","c":"body"},"10ded4:Skyrim.esm":{"m":"heavy","c":"body"},"10ded5:Skyrim.esm":{"m":"heavy","c":"body"},"10ded6:Skyrim.esm":{"m":"heavy","c":"body"},"10ded7:Skyrim.esm":{"m":"heavy","c":"body"},"10ded8:Skyrim.esm":{"m":"heavy","c":"body"},"10ded9:Skyrim.esm":{"m":"heavy","c":"body"},"10deda:Skyrim.esm":{"m":"heavy","c":"body"},"10dedb:Skyrim.esm":{"m":"heavy","c":"body"},"10dedc:Skyrim.esm":{"m":"heavy","c":"body"},"10dedd:Skyrim.esm":{"m":"heavy","c":"body"},"10dede:Skyrim.esm":{"m":"heavy","c":"body"},"10dedf:Skyrim.esm":{"m":"heavy","c":"body"},"10dee0:Skyrim.esm":{"m":"heavy","c":"body"},"10dee1:Skyrim.esm":{"m":"heavy","c":"body"},"10dee2:Skyrim.esm":{"m":"heavy","c":"body"},"10dee3:Skyrim.esm":{"m":"light","c":"body"},"10dee4:Skyrim.esm":{"m":"light","c":"body"},"10dee5:Skyrim.esm":{"m":"light","c":"body"},"10dee6:Skyrim.esm":{"m":"light","c":"body"},"10dee7:Skyrim.esm":{"m":"light","c":"body"},"10dee8:Skyrim.esm":{"m":"light","c":"body"},"10dee9:Skyrim.esm":{"m":"light","c":"body"},"10deea:Skyrim.esm":{"m":"light","c":"body"},"10deeb:Skyrim.esm":{"m":"light","c":"body"},"10deec:Skyrim.esm":{"m":"light","c":"body"},"10deed:Skyrim.esm":{"m":"light","c":"body"},"10deee:Skyrim.esm":{"m":"light","c":"body"},"10deef:Skyrim.esm":{"m":"light","c":"body"},"10def0:Skyrim.esm":{"m":"light","c":"body"},"10def1:Skyrim.esm":{"m":"light","c":"body"},"10def2:Skyrim.esm":{"m":"heavy","c":"body"},"10def3:Skyrim.esm":{"m":"heavy","c":"body"},"10def4:Skyrim.esm":{"m":"heavy","c":"body"},"10def5:Skyrim.esm":{"m":"heavy","c":"body"},"10def6:Skyrim.esm":{"m":"heavy","c":"body"},"10def7:Skyrim.esm":{"m":"heavy","c":"body"},"10def8:Skyrim.esm":{"m":"heavy","c":"body"},"10def9:Skyrim.esm":{"m":"heavy","c":"body"},"10defa:Skyrim.esm":{"m":"heavy","c":"body"},"10defb:Skyrim.esm":{"m":"heavy","c":"body"},"10defc:Skyrim.esm":{"m":"heavy","c":"body"},"10defd:Skyrim.esm":{"m":"heavy","c":"body"},"10defe:Skyrim.esm":{"m":"heavy","c":"body"},"10deff:Skyrim.esm":{"m":"heavy","c":"body"},"10df00:Skyrim.esm":{"m":"heavy","c":"body"},"10df01:Skyrim.esm":{"m":"heavy","c":"body"},"10df02:Skyrim.esm":{"m":"heavy","c":"body"},"10df03:Skyrim.esm":{"m":"heavy","c":"body"},"10df04:Skyrim.esm":{"m":"heavy","c":"body"},"10df05:Skyrim.esm":{"m":"heavy","c":"body"},"10df06:Skyrim.esm":{"m":"heavy","c":"body"},"10df07:Skyrim.esm":{"m":"heavy","c":"body"},"10df08:Skyrim.esm":{"m":"heavy","c":"body"},"10df09:Skyrim.esm":{"m":"heavy","c":"body"},"10df0a:Skyrim.esm":{"m":"heavy","c":"body"},"10df0b:Skyrim.esm":{"m":"heavy","c":"body"},"10df0c:Skyrim.esm":{"m":"heavy","c":"body"},"10df0d:Skyrim.esm":{"m":"heavy","c":"body"},"10df0e:Skyrim.esm":{"m":"heavy","c":"body"},"10df0f:Skyrim.esm":{"m":"heavy","c":"body"},"10df6e:Skyrim.esm":{"m":"light","c":"hands"},"10df6f:Skyrim.esm":{"m":"light","c":"hands"},"10df70:Skyrim.esm":{"m":"light","c":"hands"},"10df71:Skyrim.esm":{"m":"light","c":"hands"},"10df72:Skyrim.esm":{"m":"light","c":"hands"},"10df73:Skyrim.esm":{"m":"light","c":"hands"},"10df74:Skyrim.esm":{"m":"light","c":"feet"},"10df75:Skyrim.esm":{"m":"light","c":"feet"},"10df76:Skyrim.esm":{"m":"light","c":"feet"},"10df77:Skyrim.esm":{"m":"heavy","c":"feet"},"10df78:Skyrim.esm":{"m":"heavy","c":"feet"},"10df79:Skyrim.esm":{"m":"heavy","c":"feet"},"10df7a:Skyrim.esm":{"m":"heavy","c":"feet"},"10df7b:Skyrim.esm":{"m":"heavy","c":"feet"},"10df7c:Skyrim.esm":{"m":"heavy","c":"feet"},"10df7d:Skyrim.esm":{"m":"light","c":"feet"},"10df7e:Skyrim.esm":{"m":"light","c":"feet"},"10df7f:Skyrim.esm":{"m":"light","c":"feet"},"10df80:Skyrim.esm":{"m":"heavy","c":"feet"},"10df81:Skyrim.esm":{"m":"heavy","c":"feet"},"10df82:Skyrim.esm":{"m":"heavy","c":"feet"},"10df83:Skyrim.esm":{"m":"heavy","c":"feet"},"10df84:Skyrim.esm":{"m":"heavy","c":"feet"},"10df85:Skyrim.esm":{"m":"heavy","c":"feet"},"10df86:Skyrim.esm":{"m":"light","c":"feet"},"10df87:Skyrim.esm":{"m":"light","c":"feet"},"10df88:Skyrim.esm":{"m":"light","c":"feet"},"10df89:Skyrim.esm":{"m":"light","c":"feet"},"10df8a:Skyrim.esm":{"m":"light","c":"feet"},"10df8b:Skyrim.esm":{"m":"light","c":"feet"},"10df8c:Skyrim.esm":{"m":"fur","c":"feet"},"10df8d:Skyrim.esm":{"m":"fur","c":"feet"},"10df8e:Skyrim.esm":{"m":"fur","c":"feet"},"10df8f:Skyrim.esm":{"m":"heavy","c":"feet"},"10df90:Skyrim.esm":{"m":"heavy","c":"feet"},"10df91:Skyrim.esm":{"m":"heavy","c":"feet"},"10df92:Skyrim.esm":{"m":"leather","c":"feet"},"10df93:Skyrim.esm":{"m":"leather","c":"feet"},"10df94:Skyrim.esm":{"m":"leather","c":"feet"},"10df95:Skyrim.esm":{"m":"heavy","c":"feet"},"10df96:Skyrim.esm":{"m":"heavy","c":"feet"},"10df97:Skyrim.esm":{"m":"heavy","c":"feet"},"10df98:Skyrim.esm":{"m":"light","c":"feet"},"10df99:Skyrim.esm":{"m":"light","c":"feet"},"10df9a:Skyrim.esm":{"m":"light","c":"feet"},"10df9b:Skyrim.esm":{"m":"heavy","c":"feet"},"10df9c:Skyrim.esm":{"m":"heavy","c":"feet"},"10df9d:Skyrim.esm":{"m":"heavy","c":"feet"},"10df9e:Skyrim.esm":{"m":"heavy","c":"feet"},"10df9f:Skyrim.esm":{"m":"heavy","c":"feet"},"10dfa0:Skyrim.esm":{"m":"heavy","c":"feet"},"10e039:Skyrim.esm":{"m":"cloth","c":"hands"},"10e15:Dawnguard.esm":{"m":"cloth","c":"hands"},"10e2ce:Skyrim.esm":{"m":"cloth","c":"feet"},"10e2d8:Skyrim.esm":{"m":"cloth","c":"hands"},"10e2dc:Skyrim.esm":{"m":"cloth","c":"feet"},"10e3c5:Skyrim.esm":{"m":"cloth","c":"body"},"10eb5b:Skyrim.esm":{"m":"cloth","c":"body"},"10eb5c:Skyrim.esm":{"m":"cloth","c":"feet"},"10eb5d:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"10eb5e:Skyrim.esm":{"m":"cloth","c":"hands"},"10f570:Skyrim.esm":{"m":"cloth","c":"hair,body"},"10f5a5:Skyrim.esm":{"m":"cloth","c":"body"},"10f63:CommonClothes.esp":{"m":"leather","c":"body"},"10f64:CommonClothes.esp":{"m":"leather","c":"body"},"10f6c:CommonClothes.esp":{"m":"cloth","c":"body"},"10f6d:CommonClothes.esp":{"m":"cloth","c":"body"},"10f6e:CommonClothes.esp":{"m":"cloth","c":"body"},"10f6f:CommonClothes.esp":{"m":"cloth","c":"body"},"10f70:CommonClothes.esp":{"m":"cloth","c":"body"},"10f71:CommonClothes.esp":{"m":"cloth","c":"body"},"10f72:CommonClothes.esp":{"m":"cloth","c":"body"},"10f75f:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"10f78:CommonClothes.esp":{"m":"cloth","c":"body"},"10f79:CommonClothes.esp":{"m":"cloth","c":"body"},"10f7a:CommonClothes.esp":{"m":"cloth","c":"body"},"10f7b:CommonClothes.esp":{"m":"cloth","c":"body"},"10f7c:CommonClothes.esp":{"m":"cloth","c":"body"},"112ec:Apocalypse - Magic of Skyrim.esp":{"m":"light","c":"feet"},"112ed:Apocalypse - Magic of Skyrim.esp":{"m":"light","c":"body,arms,calves"},"112ee:Apocalypse - Magic of Skyrim.esp":{"m":"light","c":"hands"},"112ff:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"body"},"1186a:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"body"},"1186e:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"11873:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"11876:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,ears"},"11a6e:Dawnguard.esm":{"m":"cloth","c":"body"},"11a75:Dawnguard.esm":{"m":"cloth","c":"back"},"11a76:Dawnguard.esm":{"m":"cloth","c":"neck"},"11a77:Dawnguard.esm":{"m":"cloth","c":"chest"},"11a78:Dawnguard.esm":{"m":"cloth","c":"body"},"11ddc:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"123e5f:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hair,circlet"},"12528c:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet"},"12c7:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"12c7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"12d1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"12d2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"12d3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"12d4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"12e46:Skyrim.esm":{"m":"heavy","c":"hands"},"12e49:Skyrim.esm":{"m":"heavy","c":"body"},"12e4b:Skyrim.esm":{"m":"heavy","c":"feet"},"12e4d:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"12e8a:Dawnguard.esm":{"m":"cloth","c":"head,hair,circlet"},"1302:DIS_Heavy_Legion.esp":{"m":"heavy","c":"feet"},"1303:DIS_Heavy_Legion.esp":{"m":"heavy","c":"body"},"1304:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hands"},"1305:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hair,circlet"},"13104:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"13105:Skyrim.esm":{"m":"cloth","c":"body"},"13106:Skyrim.esm":{"m":"cloth","c":"feet"},"132781:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"132788:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"136cf:Skyrim.esm":{"m":"light","c":"hair,circlet"},"136d4:Skyrim.esm":{"m":"light","c":"hands"},"136d5:Skyrim.esm":{"m":"light","c":"body"},"136d6:Skyrim.esm":{"m":"light","c":"feet"},"13910:Skyrim.esm":{"m":"fur","c":"feet"},"13911:Skyrim.esm":{"m":"fur","c":"body"},"13912:Skyrim.esm":{"m":"fur","c":"hands"},"13913:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"1391a:Skyrim.esm":{"m":"light","c":"feet"},"1391c:Skyrim.esm":{"m":"light","c":"hands"},"1391d:Skyrim.esm":{"m":"light","c":"hair,circlet"},"13920:Skyrim.esm":{"m":"leather","c":"feet"},"13921:Skyrim.esm":{"m":"leather","c":"hands"},"13922:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"1392a:Skyrim.esm":{"m":"light","c":"body"},"13938:Skyrim.esm":{"m":"light","c":"feet"},"13939:Skyrim.esm":{"m":"light","c":"body"},"1393a:Skyrim.esm":{"m":"light","c":"hands"},"1393b:Skyrim.esm":{"m":"light","c":"hair,circlet"},"1393d:Skyrim.esm":{"m":"light","c":"feet"},"1393e:Skyrim.esm":{"m":"light","c":"body"},"1393f:Skyrim.esm":{"m":"light","c":"hands"},"13940:Skyrim.esm":{"m":"light","c":"hair,circlet"},"13948:Skyrim.esm":{"m":"heavy","c":"body"},"1394c:Skyrim.esm":{"m":"heavy","c":"feet"},"1394d:Skyrim.esm":{"m":"heavy","c":"body"},"1394e:Skyrim.esm":{"m":"heavy","c":"hands"},"1394f:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"13951:Skyrim.esm":{"m":"heavy","c":"feet"},"13952:Skyrim.esm":{"m":"heavy","c":"body"},"13953:Skyrim.esm":{"m":"heavy","c":"hands"},"13954:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"13956:Skyrim.esm":{"m":"heavy","c":"feet"},"13957:Skyrim.esm":{"m":"heavy","c":"body"},"13958:Skyrim.esm":{"m":"heavy","c":"hands"},"13959:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"1395b:Skyrim.esm":{"m":"heavy","c":"feet"},"1395c:Skyrim.esm":{"m":"heavy","c":"body"},"1395d:Skyrim.esm":{"m":"heavy","c":"hands"},"1395e:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"13960:Skyrim.esm":{"m":"heavy","c":"feet"},"13961:Skyrim.esm":{"m":"heavy","c":"body"},"13962:Skyrim.esm":{"m":"heavy","c":"hands"},"13963:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"13965:Skyrim.esm":{"m":"heavy","c":"feet"},"13966:Skyrim.esm":{"m":"heavy","c":"body"},"13967:Skyrim.esm":{"m":"heavy","c":"hands"},"13969:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"1396a:Skyrim.esm":{"m":"heavy","c":"feet"},"1396b:Skyrim.esm":{"m":"heavy","c":"body"},"1396c:Skyrim.esm":{"m":"heavy","c":"hands"},"1396d:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"13b79:Dawnguard.esm":{"m":"cloth","c":"head"},"13ed7:Skyrim.esm":{"m":"leather","c":"feet"},"13ed8:Skyrim.esm":{"m":"leather","c":"body"},"13ed9:Skyrim.esm":{"m":"leather","c":"body"},"13eda:Skyrim.esm":{"m":"leather","c":"hands"},"13edb:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"13edc:Skyrim.esm":{"m":"light","c":"hair,circlet"},"14000c:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hands"},"140013:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hands"},"142c7:Dawnguard.esm":{"m":"leather","c":"body"},"14457:Dragonborn.esm":{"m":"cloth","c":"body"},"14482:Dragonborn.esm":{"m":"cloth","c":"body"},"14497:Dragonborn.esm":{"m":"cloth","c":"body"},"14520d:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"head"},"1452d3:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"14541c:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"145443:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"14547f:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"145483:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"14571a:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"145c7:Dragonborn.esm":{"m":"cloth","c":"body"},"14757:Dawnguard.esm":{"m":"cloth","c":"feet"},"14758:Dawnguard.esm":{"m":"cloth","c":"hands"},"14c03:Dawnguard.esm":{"m":"cloth","c":"body"},"14c05:Dawnguard.esm":{"m":"heavy","c":"body"},"14ccd:Dawnguard.esm":{"m":"cloth","c":"body"},"14d882:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet,ears"},"14d887:WindhelmSSE.esp":{"m":"heavy","c":"body,chest"},"14d888:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet,ears"},"14eab:Dawnguard.esm":{"m":"cloth","c":"body"},"14eb0:Dawnguard.esm":{"m":"cloth","c":"neck"},"14eb2:Dawnguard.esm":{"m":"cloth","c":"back"},"14eb3:Dawnguard.esm":{"m":"cloth","c":"chest"},"14eb6:Dawnguard.esm":{"m":"cloth","c":"body"},"14eb8:Dawnguard.esm":{"m":"cloth","c":"body"},"14ebe:Dawnguard.esm":{"m":"cloth","c":"back"},"14ebf:Dawnguard.esm":{"m":"cloth","c":"neck"},"14ec0:Dawnguard.esm":{"m":"cloth","c":"chest"},"14ec10:WindhelmSSE.esp":{"m":"cloth","c":"body,neck,chest"},"14ec11:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"14ec1d:WindhelmSSE.esp":{"m":"cloth","c":"hands"},"1505af:Arena - Markarth Side.esp":{"m":"cloth","c":"circlet"},"1529f7:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"15516:Skyrim.esm":{"m":"cloth","c":"body"},"1570b:Dawnguard.esm":{"m":"cloth","c":"feet"},"1570c:Dawnguard.esm":{"m":"cloth","c":"body"},"157b17:WindhelmSSE.esp":{"m":"cloth","c":"body"},"157b19:WindhelmSSE.esp":{"m":"cloth","c":"body"},"15970f:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"15c1c:Dawnguard.esm":{"m":"cloth","c":"head,body,hands,feet"},"15c3d:Dawnguard.esm":{"m":"cloth","c":"body"},"15cb9:Dawnguard.esm":{"m":"leather","c":"body"},"15cba:Dawnguard.esm":{"m":"leather","c":"body"},"15cbb:Dawnguard.esm":{"m":"leather","c":"body"},"15cbc:Dawnguard.esm":{"m":"leather","c":"body"},"15cbd:Dawnguard.esm":{"m":"leather","c":"body"},"15cbe:Dawnguard.esm":{"m":"leather","c":"body"},"15cbf:Dawnguard.esm":{"m":"leather","c":"body"},"15cc0:Dawnguard.esm":{"m":"leather","c":"body"},"15cc1:Dawnguard.esm":{"m":"leather","c":"body"},"15cc2:Dawnguard.esm":{"m":"leather","c":"body"},"15cc3:Dawnguard.esm":{"m":"leather","c":"body"},"15cc4:Dawnguard.esm":{"m":"leather","c":"body"},"15cc5:Dawnguard.esm":{"m":"leather","c":"body"},"15cc6:Dawnguard.esm":{"m":"leather","c":"body"},"15cc7:Dawnguard.esm":{"m":"leather","c":"body"},"15cc8:Dawnguard.esm":{"m":"leather","c":"body"},"15e2b3:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"15fce:Dawnguard.esm":{"m":"cloth","c":"body"},"16125:Dawnguard.esm":{"m":"cloth","c":"body"},"1612a:Dawnguard.esm":{"m":"cloth","c":"head"},"16688:Dawnguard.esm":{"m":"cloth","c":"body"},"16689:Dawnguard.esm":{"m":"cloth","c":"body"},"166d6:Skyrim.esm":{"m":"cloth","c":"circlet"},"166e0:Skyrim.esm":{"m":"cloth","c":"circlet"},"166fd:Skyrim.esm":{"m":"cloth","c":"circlet"},"166fe:Skyrim.esm":{"m":"cloth","c":"circlet"},"166ff:Skyrim.esm":{"m":"cloth","c":"circlet"},"16719:Skyrim.esm":{"m":"cloth","c":"circlet"},"1671a:Skyrim.esm":{"m":"cloth","c":"circlet"},"1672f:Skyrim.esm":{"m":"cloth","c":"circlet"},"16730:Skyrim.esm":{"m":"cloth","c":"circlet"},"16731:Skyrim.esm":{"m":"cloth","c":"circlet"},"169211:ZIA_Complete Pack.esp":{"m":"cloth","c":"body"},"16ee3:Skyrim.esm":{"m":"cloth","c":"body"},"16ee4:Skyrim.esm":{"m":"cloth","c":"body"},"16ee5:Skyrim.esm":{"m":"cloth","c":"body"},"16ee6:Skyrim.esm":{"m":"cloth","c":"body"},"16ee7:Skyrim.esm":{"m":"cloth","c":"body"},"16ffe:Skyrim.esm":{"m":"cloth","c":"body"},"16fff:Skyrim.esm":{"m":"cloth","c":"feet"},"1715f0:WindhelmSSE.esp":{"m":"cloth","c":"circlet"},"171688:WindhelmSSE.esp":{"m":"fur","c":"body"},"17514:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"17515:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,hands"},"17516:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,circlet"},"17695:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"17696:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"179d0:Dragonborn.esm":{"m":"cloth","c":"body"},"17ab4:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"head"},"17c4b1:WindhelmSSE.esp":{"m":"light","c":"body"},"17ce34:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"17e9b:Dawnguard.esm":{"m":"cloth","c":"hair"},"17f46:Dragonborn.esm":{"m":"cloth","c":"body"},"17f73:Dawnguard.esm":{"m":"heavy","c":"feet"},"17f75:Dawnguard.esm":{"m":"heavy","c":"hands"},"17f76:Dawnguard.esm":{"m":"heavy","c":"body"},"1829:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"182c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"182d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"18388:Skyrim.esm":{"m":"heavy","c":"body"},"185a:CommonClothes.esp":{"m":"cloth","c":"body"},"185b:CommonClothes.esp":{"m":"cloth","c":"body"},"185c:CommonClothes.esp":{"m":"cloth","c":"body"},"185d:CommonClothes.esp":{"m":"cloth","c":"body"},"185e:CommonClothes.esp":{"m":"cloth","c":"body"},"185f:CommonClothes.esp":{"m":"cloth","c":"body"},"1860:CommonClothes.esp":{"m":"cloth","c":"body"},"1861:CommonClothes.esp":{"m":"cloth","c":"body"},"1862:CommonClothes.esp":{"m":"cloth","c":"body"},"1863:CommonClothes.esp":{"m":"cloth","c":"body"},"1864:CommonClothes.esp":{"m":"cloth","c":"body"},"1865:CommonClothes.esp":{"m":"cloth","c":"body"},"1865c:CommonClothes.esp":{"m":"cloth","c":"body"},"1865d:CommonClothes.esp":{"m":"cloth","c":"body"},"1865e:CommonClothes.esp":{"m":"cloth","c":"body"},"1865f:CommonClothes.esp":{"m":"cloth","c":"body"},"18660:CommonClothes.esp":{"m":"cloth","c":"body"},"18661:CommonClothes.esp":{"m":"cloth","c":"body"},"18662:CommonClothes.esp":{"m":"cloth","c":"body"},"18663:CommonClothes.esp":{"m":"cloth","c":"body"},"18664:CommonClothes.esp":{"m":"cloth","c":"body"},"18665:CommonClothes.esp":{"m":"cloth","c":"body"},"18666:CommonClothes.esp":{"m":"cloth","c":"body"},"18667:CommonClothes.esp":{"m":"cloth","c":"body"},"18668:CommonClothes.esp":{"m":"cloth","c":"body"},"18669:CommonClothes.esp":{"m":"cloth","c":"body"},"1866:CommonClothes.esp":{"m":"cloth","c":"body"},"1866a:CommonClothes.esp":{"m":"cloth","c":"body"},"1866b:CommonClothes.esp":{"m":"cloth","c":"body"},"1866c:CommonClothes.esp":{"m":"cloth","c":"body"},"1866d:CommonClothes.esp":{"m":"cloth","c":"body"},"18678:CommonClothes.esp":{"m":"cloth","c":"body"},"18679:CommonClothes.esp":{"m":"cloth","c":"body"},"1867:CommonClothes.esp":{"m":"cloth","c":"body"},"1867a:CommonClothes.esp":{"m":"cloth","c":"body"},"1867b:CommonClothes.esp":{"m":"cloth","c":"body"},"1867c:CommonClothes.esp":{"m":"cloth","c":"body"},"1867d:CommonClothes.esp":{"m":"cloth","c":"body"},"1867e:CommonClothes.esp":{"m":"cloth","c":"body"},"1867f:CommonClothes.esp":{"m":"cloth","c":"body"},"18680:CommonClothes.esp":{"m":"cloth","c":"body"},"1868:CommonClothes.esp":{"m":"cloth","c":"body"},"1869:CommonClothes.esp":{"m":"cloth","c":"body"},"186a:CommonClothes.esp":{"m":"cloth","c":"body"},"186b:CommonClothes.esp":{"m":"cloth","c":"body"},"186c:CommonClothes.esp":{"m":"cloth","c":"body"},"186d:CommonClothes.esp":{"m":"cloth","c":"body"},"186e:CommonClothes.esp":{"m":"cloth","c":"body"},"186f:CommonClothes.esp":{"m":"cloth","c":"body"},"1870:CommonClothes.esp":{"m":"leather","c":"body"},"1871:CommonClothes.esp":{"m":"leather","c":"body"},"1872:CommonClothes.esp":{"m":"leather","c":"body"},"1873:CommonClothes.esp":{"m":"leather","c":"body"},"1873:DIS_Heavy_Legion.esp":{"m":"cloth","c":"feet"},"1874:CommonClothes.esp":{"m":"leather","c":"body"},"1874:DIS_Heavy_Legion.esp":{"m":"cloth","c":"body"},"1875:CommonClothes.esp":{"m":"leather","c":"body"},"1875:DIS_Heavy_Legion.esp":{"m":"cloth","c":"hands"},"1876:CommonClothes.esp":{"m":"leather","c":"body"},"1876:DIS_Heavy_Legion.esp":{"m":"cloth","c":"hair"},"1877:CommonClothes.esp":{"m":"leather","c":"body"},"1878:CommonClothes.esp":{"m":"leather","c":"body"},"1879:CommonClothes.esp":{"m":"leather","c":"body"},"187a:CommonClothes.esp":{"m":"leather","c":"body"},"187c:DIS_Heavy_Legion.esp":{"m":"cloth","c":"chest"},"187d:DIS_Heavy_Legion.esp":{"m":"cloth","c":"chest"},"187e:DIS_Heavy_Legion.esp":{"m":"cloth","c":"chest"},"187fd:Skyrim.esm":{"m":"cloth","c":"head"},"187fe:Skyrim.esm":{"m":"cloth","c":"head"},"18801:Skyrim.esm":{"m":"cloth","c":"feet"},"188290:WindhelmSSE.esp":{"m":"cloth","c":"body"},"188291:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet"},"18b31:Dawnguard.esm":{"m":"cloth","c":"body"},"18b37:Dawnguard.esm":{"m":"cloth","c":"body"},"18c26d:WindhelmSSE.esp":{"m":"cloth","c":"body"},"191f2:Dawnguard.esm":{"m":"leather","c":"body"},"191f3:Dawnguard.esm":{"m":"leather","c":"body"},"194c5:Dawnguard.esm":{"m":"leather","c":"body"},"1989e:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"19ade:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"19adf:Dawnguard.esm":{"m":"cloth","c":"body"},"19ae1:Dawnguard.esm":{"m":"cloth","c":"feet"},"19ae3:Dawnguard.esm":{"m":"cloth","c":"hands"},"19b0a:Dragonborn.esm":{"m":"cloth","c":"body"},"19b1b:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"19b1c:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"19b1d:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hands"},"19b1f:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"19b6e9:WindhelmSSE.esp":{"m":"cloth","c":"body"},"19d85:Dawnguard.esm":{"m":"cloth","c":"body"},"19f44:Playable Rieklings.esp":{"m":"cloth","c":"head,body,hands,feet"},"19f5f:Playable Rieklings.esp":{"m":"leather","c":"body"},"19f60:Playable Rieklings.esp":{"m":"leather","c":"feet,calves"},"19f61:Playable Rieklings.esp":{"m":"leather","c":"hands,arms"},"19f62:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f63:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f64:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f65:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f66:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f67:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f68:Playable Rieklings.esp":{"m":"leather","c":"feet"},"19f69:Playable Rieklings.esp":{"m":"leather","c":"hands"},"19f6a:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f6b:Playable Rieklings.esp":{"m":"leather","c":"hair"},"19f6c:Playable Rieklings.esp":{"m":"leather","c":"body"},"19f6d:Playable Rieklings.esp":{"m":"heavy","c":"body"},"19f6e:Playable Rieklings.esp":{"m":"leather","c":"body"},"19f6f:Playable Rieklings.esp":{"m":"heavy","c":"body"},"19f70:Playable Rieklings.esp":{"m":"leather","c":"body"},"19f71:Playable Rieklings.esp":{"m":"heavy","c":"body"},"1a151:Dawnguard.esm":{"m":"cloth","c":"head,body,hands"},"1a153:Dawnguard.esm":{"m":"cloth","c":"head,body,hands"},"1a155:Dawnguard.esm":{"m":"cloth","c":"body"},"1a157:Dawnguard.esm":{"m":"cloth","c":"body"},"1a51f:Dawnguard.esm":{"m":"leather","c":"hands"},"1a573:Dragonborn.esm":{"m":"light","c":"feet"},"1a574:Dragonborn.esm":{"m":"light","c":"body"},"1a575:Dragonborn.esm":{"m":"light","c":"hands"},"1a576:Dragonborn.esm":{"m":"leather","c":"hair,circlet"},"1a73f:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"1a752:Dawnguard.esm":{"m":"cloth","c":"body"},"1a755:Dawnguard.esm":{"m":"light","c":"hands"},"1abf33:WindhelmSSE.esp":{"m":"cloth","c":"circlet"},"1b106f:WindhelmSSE.esp":{"m":"heavy","c":"circlet"},"1b1077:WindhelmSSE.esp":{"m":"cloth","c":"neck"},"1b31f:Skyrim.esm":{"m":"heavy","c":"feet"},"1b335:Skyrim.esm":{"m":"heavy","c":"feet"},"1b33d:Skyrim.esm":{"m":"heavy","c":"feet"},"1b39f:Skyrim.esm":{"m":"light","c":"feet"},"1b3a0:Skyrim.esm":{"m":"light","c":"hands"},"1b3a1:Skyrim.esm":{"m":"light","c":"hair,circlet"},"1b3a2:Skyrim.esm":{"m":"fur","c":"body"},"1b3a3:Skyrim.esm":{"m":"fur","c":"body"},"1b3a4:Skyrim.esm":{"m":"light","c":"body"},"1b3cb:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3cc:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3cd:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3ce:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3cf:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d0:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d1:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d2:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d3:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d4:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3d8:Skyrim.esm":{"m":"heavy","c":"body"},"1b3d9:Skyrim.esm":{"m":"heavy","c":"body"},"1b3da:Skyrim.esm":{"m":"heavy","c":"body"},"1b3db:Skyrim.esm":{"m":"heavy","c":"body"},"1b3fb:Skyrim.esm":{"m":"heavy","c":"hands"},"1b3fc:Skyrim.esm":{"m":"heavy","c":"hands"},"1b3fd:Skyrim.esm":{"m":"heavy","c":"hands"},"1b3fe:Skyrim.esm":{"m":"heavy","c":"feet"},"1b3ff:Skyrim.esm":{"m":"heavy","c":"feet"},"1b400:Skyrim.esm":{"m":"heavy","c":"feet"},"1b401:Skyrim.esm":{"m":"heavy","c":"feet"},"1b402:Skyrim.esm":{"m":"heavy","c":"feet"},"1b403:Skyrim.esm":{"m":"heavy","c":"feet"},"1b404:Skyrim.esm":{"m":"heavy","c":"feet"},"1b405:Skyrim.esm":{"m":"heavy","c":"feet"},"1b406:Skyrim.esm":{"m":"heavy","c":"feet"},"1b407:Skyrim.esm":{"m":"heavy","c":"feet"},"1b408:Skyrim.esm":{"m":"heavy","c":"feet"},"1b40c:Skyrim.esm":{"m":"heavy","c":"body"},"1b40d:Skyrim.esm":{"m":"heavy","c":"body"},"1b40e:Skyrim.esm":{"m":"heavy","c":"body"},"1b40f:Skyrim.esm":{"m":"heavy","c":"body"},"1b440:Skyrim.esm":{"m":"heavy","c":"body"},"1b446:Skyrim.esm":{"m":"heavy","c":"body"},"1b54e:Skyrim.esm":{"m":"heavy","c":"body"},"1b555:Skyrim.esm":{"m":"heavy","c":"body"},"1b6263:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"1b755:Skyrim.esm":{"m":"heavy","c":"hands"},"1b756:Skyrim.esm":{"m":"heavy","c":"hands"},"1b757:Skyrim.esm":{"m":"heavy","c":"hands"},"1b761:Skyrim.esm":{"m":"heavy","c":"hands"},"1b762:Skyrim.esm":{"m":"heavy","c":"hands"},"1b766:Skyrim.esm":{"m":"heavy","c":"hands"},"1b767:Skyrim.esm":{"m":"heavy","c":"hands"},"1b768:Skyrim.esm":{"m":"heavy","c":"hands"},"1b76a:Skyrim.esm":{"m":"heavy","c":"hands"},"1b76b:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b76c:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b76d:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b76e:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b76f:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b770:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b771:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b772:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b78a:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9b0:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9b7:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9b8:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9bb:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9bc:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9be:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c0:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c1:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c3:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c4:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c5:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1b9c7:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"1ba09e:WindhelmSSE.esp":{"m":"cloth","c":"hands"},"1ba0a3:WindhelmSSE.esp":{"m":"leather","c":"body"},"1ba0a7:WindhelmSSE.esp":{"m":"heavy","c":"body,neck,chest"},"1bc82:Skyrim.esm":{"m":"cloth","c":"body"},"1bca7:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"1be1a:Skyrim.esm":{"m":"cloth","c":"body"},"1be1b:Skyrim.esm":{"m":"cloth","c":"feet"},"1bf04c:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"1c57c5:WindhelmSSE.esp":{"m":"cloth","c":"body"},"1c655:Dragonborn.esm":{"m":"heavy","c":"feet"},"1cad9:Dragonborn.esm":{"m":"cloth","c":"body"},"1cd7e:Dragonborn.esm":{"m":"heavy","c":"feet"},"1cd82:Dragonborn.esm":{"m":"light","c":"feet"},"1cd86:Dragonborn.esm":{"m":"light","c":"feet"},"1cd87:Dragonborn.esm":{"m":"light","c":"body"},"1cd88:Dragonborn.esm":{"m":"light","c":"hands"},"1cd89:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"1cd8a:Dragonborn.esm":{"m":"light","c":"body"},"1cd8b:Dragonborn.esm":{"m":"light","c":"hands"},"1cd8c:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"1cd92:Dragonborn.esm":{"m":"fur","c":"feet"},"1cd93:Dragonborn.esm":{"m":"fur","c":"body"},"1cd94:Dragonborn.esm":{"m":"fur","c":"hands"},"1cd95:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"1cd96:Dragonborn.esm":{"m":"heavy","c":"feet"},"1cd97:Dragonborn.esm":{"m":"heavy","c":"body"},"1cd98:Dragonborn.esm":{"m":"heavy","c":"hands"},"1cd99:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"1cd9e:Dragonborn.esm":{"m":"heavy","c":"feet"},"1cd9f:Dragonborn.esm":{"m":"heavy","c":"body"},"1cda0:Dragonborn.esm":{"m":"heavy","c":"hands"},"1cda1:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"1cda2:Dragonborn.esm":{"m":"heavy","c":"body"},"1cda3:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"1cda5:Dragonborn.esm":{"m":"heavy","c":"hands"},"1cda6:Dragonborn.esm":{"m":"cloth","c":"body"},"1cda7:Dragonborn.esm":{"m":"cloth","c":"hair,body"},"1cda8:Dragonborn.esm":{"m":"cloth","c":"body"},"1cda9:Dragonborn.esm":{"m":"cloth","c":"hair,body"},"1cdaa:Dragonborn.esm":{"m":"cloth","c":"hair,body"},"1cdab:Dragonborn.esm":{"m":"cloth","c":"body"},"1d8e:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"1d8e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"1d8f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"1d93:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"1d9db3:WindhelmSSE.esp":{"m":"cloth","c":"chest"},"1d9db7:WindhelmSSE.esp":{"m":"heavy","c":"feet"},"1db97:Dragonborn.esm":{"m":"heavy","c":"body"},"1db98:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"1db99:Dragonborn.esm":{"m":"heavy","c":"hands"},"1dcb7:Dragonborn.esm":{"m":"cloth","c":"body"},"1dcbf:FishingInSkyrim.esp":{"m":"cloth","c":"hair,circlet"},"1dde:CommonClothes.esp":{"m":"cloth","c":"body"},"1ddf:CommonClothes.esp":{"m":"cloth","c":"body"},"1de0:CommonClothes.esp":{"m":"cloth","c":"body"},"1de1:CommonClothes.esp":{"m":"cloth","c":"body"},"1de2:CommonClothes.esp":{"m":"cloth","c":"body"},"1de3:CommonClothes.esp":{"m":"cloth","c":"body"},"1de4:CommonClothes.esp":{"m":"cloth","c":"body"},"1ded:CommonClothes.esp":{"m":"cloth","c":"body"},"1dee:CommonClothes.esp":{"m":"cloth","c":"body"},"1def62:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"1def63:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"1def:CommonClothes.esp":{"m":"cloth","c":"body"},"1df0:CommonClothes.esp":{"m":"cloth","c":"body"},"1df1:CommonClothes.esp":{"m":"cloth","c":"body"},"1df2:CommonClothes.esp":{"m":"cloth","c":"body"},"1df3:CommonClothes.esp":{"m":"cloth","c":"body"},"1df4:CommonClothes.esp":{"m":"cloth","c":"body"},"1df5:CommonClothes.esp":{"m":"cloth","c":"body"},"1df6:CommonClothes.esp":{"m":"cloth","c":"body"},"1dfea:Dragonborn.esm":{"m":"cloth","c":"body"},"1dfeb:Dragonborn.esm":{"m":"cloth","c":"body"},"1dfee:Dragonborn.esm":{"m":"cloth","c":"body"},"1e17e:Dragonborn.esm":{"m":"cloth","c":"body"},"1f3539:WindhelmSSE.esp":{"m":"leather","c":"body,neck,chest"},"1f353a:WindhelmSSE.esp":{"m":"leather","c":"hair,circlet"},"1f353b:WindhelmSSE.esp":{"m":"leather","c":"circlet"},"1f3540:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"1f3541:WindhelmSSE.esp":{"m":"cloth","c":"body"},"1f3544:WindhelmSSE.esp":{"m":"cloth","c":"body"},"1f3546:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet"},"1f991:Dragonborn.esm":{"m":"cloth","c":"head"},"1f992:Dragonborn.esm":{"m":"cloth","c":"head"},"1fd77:Skyrim.esm":{"m":"cloth","c":"head"},"1fd7b:Skyrim.esm":{"m":"cloth","c":"head"},"1fd7c:Skyrim.esm":{"m":"cloth","c":"head"},"1fe7e:Skyrim.esm":{"m":"cloth","c":"body"},"1fe7f:Skyrim.esm":{"m":"cloth","c":"body"},"1fe80:Skyrim.esm":{"m":"cloth","c":"body"},"1fe81:Skyrim.esm":{"m":"cloth","c":"body"},"1fe82:Skyrim.esm":{"m":"cloth","c":"body"},"1fe83:Skyrim.esm":{"m":"cloth","c":"body"},"1fe84:Skyrim.esm":{"m":"cloth","c":"body"},"1febb:Dragonborn.esm":{"m":"cloth","c":"body"},"2003c:Skyrim.esm":{"m":"cloth","c":"feet"},"2003e:Skyrim.esm":{"m":"cloth","c":"body"},"2003f:Skyrim.esm":{"m":"cloth","c":"hands"},"20042:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"20157:Skyrim.esm":{"m":"cloth","c":"feet"},"20159:Skyrim.esm":{"m":"cloth","c":"body"},"2015a:Skyrim.esm":{"m":"cloth","c":"hands"},"2015c:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"209a5:Skyrim.esm":{"m":"cloth","c":"feet"},"209a6:Skyrim.esm":{"m":"cloth","c":"body"},"209aa:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"20d7a8:Riften Expansion.esp":{"m":"cloth","c":"body"},"20d7ac:Riften Expansion.esp":{"m":"cloth","c":"body"},"20d7ae:Riften Expansion.esp":{"m":"cloth","c":"body"},"20d7bb:Riften Expansion.esp":{"m":"cloth","c":"hair,circlet"},"20d7bc:Riften Expansion.esp":{"m":"cloth","c":"hair,circlet"},"20d7bd:Riften Expansion.esp":{"m":"cloth","c":"hair,circlet"},"20d7be:Riften Expansion.esp":{"m":"cloth","c":"hair,circlet"},"20d7c4:Riften Expansion.esp":{"m":"cloth","c":"body"},"2128c6:Riften Expansion.esp":{"m":"cloth","c":"chest"},"21507:Skyrim.esm":{"m":"fur","c":"body"},"21508:Skyrim.esm":{"m":"fur","c":"body"},"2150d:Skyrim.esm":{"m":"fur","c":"body"},"2151e:Skyrim.esm":{"m":"fur","c":"body"},"21520:Skyrim.esm":{"m":"fur","c":"body"},"21522:Skyrim.esm":{"m":"fur","c":"body"},"21525:Skyrim.esm":{"m":"fur","c":"body"},"21613:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"21615:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"21619:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"2161b:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"2161d:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"2161f:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"21622:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"21f7e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21f8c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"21f8d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"21f8e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"21f8f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21f91:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"21fe3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"21fe4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"21fe5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"21fe6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"21fe7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"21fe8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"21fe9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21fea:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21feb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21fec:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21fed:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21fee:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21fef:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21ff0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21ff1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21ff2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"21ff3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2214e0:WindhelmSSE.esp":{"m":"cloth","c":"circlet"},"2266b2:WindhelmSSE.esp":{"m":"cloth","c":"body,neck,chest"},"22f5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"22fc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"22fd:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23060:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"neck"},"23061:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"neck"},"23068:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"23069:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"23083:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23084:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23085:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23086:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"23087:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"23088:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"23089:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2308a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2308b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2308c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"2308d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"2308e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"230ad:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"230ae:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"230af:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"230b0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"230c4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"230c5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"230c6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"230c8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"230c9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"230ca:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"230cb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"230e7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"230e8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"230e9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"230ea:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"230f7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"230f8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"230f9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23146:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23147:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23148:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23149:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2314a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2314b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2314c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2314d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2314e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2314f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23150:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23151:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23152:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23153:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23154:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23155:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23156:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23157:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23158:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23159:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2315f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23160:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23161:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23162:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23163:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23164:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23165:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23166:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23167:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23168:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23169:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2316a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2316b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2316c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2316d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2316e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2316f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23170:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23171:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23172:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23173:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23174:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23175:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23176:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23177:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2317c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2317d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2317e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2317f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23180:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23181:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23182:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23183:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23184:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23185:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23186:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23187:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23188:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23189:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2318a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2318b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2318c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2318d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2318e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2318f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23258:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23259:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2325f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23260:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23261:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23262:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23263:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23264:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23265:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23266:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"23267:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"2327b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2327c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2327d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23289:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2328a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2328b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2328c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet,ears"},"23295:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23296:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23297:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23298:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23299:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2329a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2329b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2329c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232df:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"232e0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"232e1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"232e3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"232e4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"232e5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"232f0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"232f1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232f2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"232f3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"232f4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232f5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232f6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232f7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"232f8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"232f9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"232fb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"232fc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"232fd:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"232fe:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238e0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"238e1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238e2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"238e3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"238e4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238e5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"238e6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"238e7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238e8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"238e9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"238ea:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"238eb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"238ec:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"238ed:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238ee:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"238ef:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"238f0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238f1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238f2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"238f3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"238f4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"238f5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"238f6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"238f7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"238f8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"238f9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"238fa:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"238fc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"2393a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2393b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2393c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"23947:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"23948:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"23949:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2394a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"2394b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"2394c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"2394d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"2394e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"23964:JKs Skyrim.esp":{"m":"cloth","c":"feet"},"23965:JKs Skyrim.esp":{"m":"cloth","c":"hands"},"23966:JKs Skyrim.esp":{"m":"cloth","c":"body"},"23e0:Dawnguard.esm":{"m":"cloth","c":"body"},"23e9:Dawnguard.esm":{"m":"cloth","c":"body"},"23eb:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"23ed:Dawnguard.esm":{"m":"cloth","c":"hands"},"23ef:Dawnguard.esm":{"m":"cloth","c":"feet"},"23f5:Dawnguard.esm":{"m":"cloth","c":"body"},"2401a:Dragonborn.esm":{"m":"heavy","c":"feet"},"2401b:Dragonborn.esm":{"m":"heavy","c":"body"},"2401c:Dragonborn.esm":{"m":"heavy","c":"hands"},"2401d:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"24037:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"24039:Dragonborn.esm":{"m":"cloth","c":"body"},"240fe:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"240ff:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"247843:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"24ca67:ZIA_Complete Pack.esp":{"m":"heavy","c":"body"},"24ca68:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"24ca71:ZIA_Complete Pack.esp":{"m":"light","c":"hair,circlet,ears"},"24ca72:ZIA_Complete Pack.esp":{"m":"light","c":"hair,circlet"},"24ca73:ZIA_Complete Pack.esp":{"m":"light","c":"body"},"24ca74:ZIA_Complete Pack.esp":{"m":"light","c":"hands"},"24ca75:ZIA_Complete Pack.esp":{"m":"light","c":"feet"},"24fe1:Dragonborn.esm":{"m":"cloth","c":"body"},"24fe3:Dragonborn.esm":{"m":"cloth","c":"body"},"24fe4:Dragonborn.esm":{"m":"cloth","c":"body"},"25ae6:Dragonborn.esm":{"m":"cloth","c":"body"},"261bd:Skyrim.esm":{"m":"cloth","c":"feet"},"261c0:Skyrim.esm":{"m":"cloth","c":"body"},"261c1:Skyrim.esm":{"m":"cloth","c":"hands"},"26c3b:Skyrim.esm":{"m":"cloth","c":"hands"},"2701b8:ZIA_Complete Pack.esp":{"m":"light","c":"body"},"27118:Dragonborn.esm":{"m":"cloth","c":"head"},"27e16:Dragonborn.esm":{"m":"cloth","c":"head"},"2848:Dawnguard.esm":{"m":"cloth","c":"body"},"284b:Dawnguard.esm":{"m":"cloth","c":"body"},"284c6:Dragonborn.esm":{"m":"fur","c":"feet"},"284c7:Dragonborn.esm":{"m":"fur","c":"feet"},"284c8:Dragonborn.esm":{"m":"fur","c":"feet"},"284c9:Dragonborn.esm":{"m":"fur","c":"feet"},"284ca:Dragonborn.esm":{"m":"fur","c":"feet"},"284cb:Dragonborn.esm":{"m":"fur","c":"feet"},"284cc:Dragonborn.esm":{"m":"fur","c":"feet"},"284cd:Dragonborn.esm":{"m":"fur","c":"feet"},"284ce:Dragonborn.esm":{"m":"fur","c":"feet"},"284cf:Dragonborn.esm":{"m":"fur","c":"feet"},"284d0:Dragonborn.esm":{"m":"fur","c":"feet"},"284d1:Dragonborn.esm":{"m":"fur","c":"feet"},"284d2:Dragonborn.esm":{"m":"fur","c":"feet"},"284d3:Dragonborn.esm":{"m":"fur","c":"feet"},"284d4:Dragonborn.esm":{"m":"fur","c":"feet"},"284d5:Dragonborn.esm":{"m":"fur","c":"body"},"284d6:Dragonborn.esm":{"m":"fur","c":"body"},"284d7:Dragonborn.esm":{"m":"fur","c":"body"},"284d8:Dragonborn.esm":{"m":"fur","c":"body"},"284d9:Dragonborn.esm":{"m":"fur","c":"body"},"284da:Dragonborn.esm":{"m":"fur","c":"body"},"284db:Dragonborn.esm":{"m":"fur","c":"hands"},"284dc:Dragonborn.esm":{"m":"fur","c":"hands"},"284dd:Dragonborn.esm":{"m":"fur","c":"hands"},"284de:Dragonborn.esm":{"m":"fur","c":"hands"},"284df:Dragonborn.esm":{"m":"fur","c":"hands"},"284e0:Dragonborn.esm":{"m":"fur","c":"hands"},"284e1:Dragonborn.esm":{"m":"fur","c":"hands"},"284e2:Dragonborn.esm":{"m":"fur","c":"hands"},"284e3:Dragonborn.esm":{"m":"fur","c":"hands"},"284e4:Dragonborn.esm":{"m":"fur","c":"hands"},"284e5:Dragonborn.esm":{"m":"fur","c":"hands"},"284e6:Dragonborn.esm":{"m":"fur","c":"hands"},"284e7:Dragonborn.esm":{"m":"fur","c":"hands"},"284e8:Dragonborn.esm":{"m":"fur","c":"hands"},"284e9:Dragonborn.esm":{"m":"fur","c":"hands"},"284ea:Dragonborn.esm":{"m":"fur","c":"hands"},"284eb:Dragonborn.esm":{"m":"fur","c":"hands"},"284ec:Dragonborn.esm":{"m":"fur","c":"hands"},"284ed:Dragonborn.esm":{"m":"fur","c":"hands"},"284ee:Dragonborn.esm":{"m":"fur","c":"hands"},"284ef:Dragonborn.esm":{"m":"fur","c":"hands"},"284f0:Dragonborn.esm":{"m":"fur","c":"hands"},"284f1:Dragonborn.esm":{"m":"fur","c":"hands"},"284f2:Dragonborn.esm":{"m":"fur","c":"hands"},"284f3:Dragonborn.esm":{"m":"fur","c":"hands"},"284f4:Dragonborn.esm":{"m":"fur","c":"hands"},"284f5:Dragonborn.esm":{"m":"fur","c":"hands"},"284f6:Dragonborn.esm":{"m":"fur","c":"hands"},"284f7:Dragonborn.esm":{"m":"fur","c":"hands"},"284f8:Dragonborn.esm":{"m":"fur","c":"hands"},"284f9:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284fa:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284fb:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284fc:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284fd:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284fe:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"284ff:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28500:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28501:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28502:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28503:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28504:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28505:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28506:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28507:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28508:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28509:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"2850a:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"28581:Dragonborn.esm":{"m":"cloth","c":"body"},"2859:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"ears"},"2883:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2884:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2885:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2886:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2887:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2888:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2889:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"28fdf:Dragonborn.esm":{"m":"light","c":"feet"},"28fe0:Dragonborn.esm":{"m":"light","c":"feet"},"28fe1:Dragonborn.esm":{"m":"light","c":"feet"},"28fe2:Dragonborn.esm":{"m":"light","c":"feet"},"28fe3:Dragonborn.esm":{"m":"light","c":"feet"},"28fe4:Dragonborn.esm":{"m":"light","c":"feet"},"28fe5:Dragonborn.esm":{"m":"light","c":"feet"},"28fe6:Dragonborn.esm":{"m":"light","c":"feet"},"28fe7:Dragonborn.esm":{"m":"light","c":"feet"},"28fe8:Dragonborn.esm":{"m":"light","c":"feet"},"28fe9:Dragonborn.esm":{"m":"light","c":"feet"},"28fea:Dragonborn.esm":{"m":"light","c":"feet"},"28feb:Dragonborn.esm":{"m":"light","c":"feet"},"28fec:Dragonborn.esm":{"m":"light","c":"feet"},"28fed:Dragonborn.esm":{"m":"light","c":"feet"},"28fee:Dragonborn.esm":{"m":"light","c":"feet"},"28fef:Dragonborn.esm":{"m":"light","c":"feet"},"28ff0:Dragonborn.esm":{"m":"light","c":"body"},"28ff1:Dragonborn.esm":{"m":"light","c":"body"},"28ff2:Dragonborn.esm":{"m":"light","c":"body"},"28ff3:Dragonborn.esm":{"m":"light","c":"body"},"28ff4:Dragonborn.esm":{"m":"light","c":"body"},"28ff5:Dragonborn.esm":{"m":"light","c":"body"},"28ff6:Dragonborn.esm":{"m":"light","c":"body"},"28ff7:Dragonborn.esm":{"m":"light","c":"body"},"28ff8:Dragonborn.esm":{"m":"light","c":"body"},"28ff9:Dragonborn.esm":{"m":"light","c":"body"},"28ffa:Dragonborn.esm":{"m":"light","c":"body"},"28ffb:Dragonborn.esm":{"m":"light","c":"body"},"28ffc:Dragonborn.esm":{"m":"light","c":"body"},"28ffd:Dragonborn.esm":{"m":"light","c":"feet"},"28ffe:Dragonborn.esm":{"m":"light","c":"body"},"28fff:Dragonborn.esm":{"m":"light","c":"body"},"29000:Dragonborn.esm":{"m":"light","c":"body"},"29001:Dragonborn.esm":{"m":"light","c":"body"},"29002:Dragonborn.esm":{"m":"light","c":"body"},"29003:Dragonborn.esm":{"m":"light","c":"hands"},"29004:Dragonborn.esm":{"m":"light","c":"hands"},"29005:Dragonborn.esm":{"m":"light","c":"hands"},"29006:Dragonborn.esm":{"m":"light","c":"hands"},"29007:Dragonborn.esm":{"m":"light","c":"hands"},"29008:Dragonborn.esm":{"m":"light","c":"hands"},"29009:Dragonborn.esm":{"m":"light","c":"hands"},"2900a:Dragonborn.esm":{"m":"light","c":"hands"},"2900b:Dragonborn.esm":{"m":"light","c":"hands"},"2900c:Dragonborn.esm":{"m":"light","c":"hands"},"2900d:Dragonborn.esm":{"m":"light","c":"hands"},"2900e:Dragonborn.esm":{"m":"light","c":"hands"},"2900f:Dragonborn.esm":{"m":"light","c":"hands"},"29010:Dragonborn.esm":{"m":"light","c":"hands"},"29011:Dragonborn.esm":{"m":"light","c":"hands"},"29012:Dragonborn.esm":{"m":"light","c":"hands"},"29013:Dragonborn.esm":{"m":"light","c":"hands"},"29014:Dragonborn.esm":{"m":"light","c":"hands"},"29015:Dragonborn.esm":{"m":"light","c":"hands"},"29016:Dragonborn.esm":{"m":"light","c":"hands"},"29017:Dragonborn.esm":{"m":"light","c":"hands"},"29018:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29019:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901a:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901b:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901c:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901d:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901e:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2901f:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29020:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29021:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29022:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29023:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29024:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29025:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29026:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29027:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29028:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29029:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902a:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902b:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902c:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902d:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902e:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2902f:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29093:Dragonborn.esm":{"m":"heavy","c":"feet"},"29094:Dragonborn.esm":{"m":"heavy","c":"feet"},"29095:Dragonborn.esm":{"m":"heavy","c":"feet"},"29096:Dragonborn.esm":{"m":"heavy","c":"feet"},"29097:Dragonborn.esm":{"m":"heavy","c":"feet"},"29098:Dragonborn.esm":{"m":"heavy","c":"feet"},"29099:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909a:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909b:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909c:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909d:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909e:Dragonborn.esm":{"m":"heavy","c":"feet"},"2909f:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a0:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a1:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a2:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a3:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a4:Dragonborn.esm":{"m":"heavy","c":"feet"},"290a5:Dragonborn.esm":{"m":"heavy","c":"body"},"290a6:Dragonborn.esm":{"m":"heavy","c":"body"},"290a7:Dragonborn.esm":{"m":"heavy","c":"body"},"290a8:Dragonborn.esm":{"m":"heavy","c":"body"},"290a9:Dragonborn.esm":{"m":"heavy","c":"body"},"290aa:Dragonborn.esm":{"m":"heavy","c":"body"},"290ab:Dragonborn.esm":{"m":"heavy","c":"body"},"290ac:Dragonborn.esm":{"m":"heavy","c":"body"},"290ad:Dragonborn.esm":{"m":"heavy","c":"body"},"290ae:Dragonborn.esm":{"m":"heavy","c":"body"},"290af:Dragonborn.esm":{"m":"heavy","c":"body"},"290b0:Dragonborn.esm":{"m":"heavy","c":"body"},"290b1:Dragonborn.esm":{"m":"heavy","c":"body"},"290b2:Dragonborn.esm":{"m":"heavy","c":"body"},"290b3:Dragonborn.esm":{"m":"heavy","c":"body"},"290b4:Dragonborn.esm":{"m":"heavy","c":"body"},"290b5:Dragonborn.esm":{"m":"heavy","c":"body"},"290b6:Dragonborn.esm":{"m":"heavy","c":"body"},"290b7:Dragonborn.esm":{"m":"heavy","c":"body"},"290b8:Dragonborn.esm":{"m":"heavy","c":"body"},"290b9:Dragonborn.esm":{"m":"heavy","c":"body"},"290ba:Dragonborn.esm":{"m":"heavy","c":"body"},"290bb:Dragonborn.esm":{"m":"heavy","c":"body"},"290bc:Dragonborn.esm":{"m":"heavy","c":"body"},"290bd:Dragonborn.esm":{"m":"heavy","c":"body"},"290be:Dragonborn.esm":{"m":"heavy","c":"body"},"290bf:Dragonborn.esm":{"m":"heavy","c":"body"},"290c0:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c1:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c2:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c3:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c4:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c5:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c6:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c7:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c8:Dragonborn.esm":{"m":"heavy","c":"hands"},"290c9:Dragonborn.esm":{"m":"heavy","c":"hands"},"290ca:Dragonborn.esm":{"m":"heavy","c":"hands"},"290cb:Dragonborn.esm":{"m":"heavy","c":"hands"},"290cc:Dragonborn.esm":{"m":"heavy","c":"hands"},"290cd:Dragonborn.esm":{"m":"heavy","c":"hands"},"290ce:Dragonborn.esm":{"m":"heavy","c":"hands"},"290cf:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d0:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d1:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d2:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d3:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d4:Dragonborn.esm":{"m":"heavy","c":"hands"},"290d5:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290d6:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290d7:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290d8:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290d9:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290da:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290db:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290dc:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290dd:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290de:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290df:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e0:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e1:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e2:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e3:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e4:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e5:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e6:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e7:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e8:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290e9:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ea:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290eb:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ec:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ed:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ee:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ef:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"290ff:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29100:Dragonborn.esm":{"m":"heavy","c":"feet"},"29153:Dragonborn.esm":{"m":"light","c":"feet"},"29154:Dragonborn.esm":{"m":"light","c":"feet"},"29155:Dragonborn.esm":{"m":"light","c":"feet"},"29156:Dragonborn.esm":{"m":"light","c":"feet"},"29157:Dragonborn.esm":{"m":"light","c":"feet"},"29158:Dragonborn.esm":{"m":"light","c":"feet"},"29159:Dragonborn.esm":{"m":"light","c":"feet"},"2915a:Dragonborn.esm":{"m":"light","c":"feet"},"2915b:Dragonborn.esm":{"m":"light","c":"feet"},"2915c:Dragonborn.esm":{"m":"light","c":"feet"},"2915d:Dragonborn.esm":{"m":"light","c":"feet"},"2915e:Dragonborn.esm":{"m":"light","c":"feet"},"2915f:Dragonborn.esm":{"m":"light","c":"feet"},"29160:Dragonborn.esm":{"m":"light","c":"feet"},"29161:Dragonborn.esm":{"m":"light","c":"feet"},"29162:Dragonborn.esm":{"m":"light","c":"feet"},"29163:Dragonborn.esm":{"m":"light","c":"body"},"29164:Dragonborn.esm":{"m":"light","c":"body"},"29165:Dragonborn.esm":{"m":"light","c":"body"},"29166:Dragonborn.esm":{"m":"light","c":"body"},"29167:Dragonborn.esm":{"m":"light","c":"body"},"29168:Dragonborn.esm":{"m":"light","c":"body"},"29169:Dragonborn.esm":{"m":"light","c":"body"},"2916a:Dragonborn.esm":{"m":"light","c":"body"},"2916b:Dragonborn.esm":{"m":"light","c":"body"},"2916c:Dragonborn.esm":{"m":"light","c":"body"},"2916d:Dragonborn.esm":{"m":"light","c":"body"},"2916e:Dragonborn.esm":{"m":"light","c":"body"},"2916f:Dragonborn.esm":{"m":"light","c":"body"},"29170:Dragonborn.esm":{"m":"light","c":"body"},"29171:Dragonborn.esm":{"m":"light","c":"body"},"29172:Dragonborn.esm":{"m":"light","c":"body"},"29173:Dragonborn.esm":{"m":"light","c":"body"},"29174:Dragonborn.esm":{"m":"light","c":"body"},"29175:Dragonborn.esm":{"m":"light","c":"body"},"29176:Dragonborn.esm":{"m":"light","c":"body"},"29177:Dragonborn.esm":{"m":"light","c":"body"},"29178:Dragonborn.esm":{"m":"light","c":"hands"},"29179:Dragonborn.esm":{"m":"light","c":"hands"},"2917a:Dragonborn.esm":{"m":"light","c":"hands"},"2917b:Dragonborn.esm":{"m":"light","c":"hands"},"2917c:Dragonborn.esm":{"m":"light","c":"hands"},"2917d:Dragonborn.esm":{"m":"light","c":"hands"},"2917e:Dragonborn.esm":{"m":"light","c":"hands"},"2917f:Dragonborn.esm":{"m":"light","c":"hands"},"29180:Dragonborn.esm":{"m":"light","c":"hands"},"29181:Dragonborn.esm":{"m":"light","c":"hands"},"29182:Dragonborn.esm":{"m":"light","c":"hands"},"29183:Dragonborn.esm":{"m":"light","c":"hands"},"29184:Dragonborn.esm":{"m":"light","c":"hands"},"29185:Dragonborn.esm":{"m":"light","c":"hands"},"29186:Dragonborn.esm":{"m":"light","c":"hands"},"29187:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29188:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29189:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918a:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918b:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918c:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918d:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918e:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2918f:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29190:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29191:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29192:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29193:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29194:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29195:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29196:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29197:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29198:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"29199:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919a:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919b:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919c:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919d:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919e:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"2919f:Dragonborn.esm":{"m":"light","c":"head,hair,circlet,ears"},"291a0:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a1:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a2:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a3:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a4:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a5:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a6:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a7:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a8:Dragonborn.esm":{"m":"heavy","c":"feet"},"291a9:Dragonborn.esm":{"m":"heavy","c":"feet"},"291aa:Dragonborn.esm":{"m":"heavy","c":"feet"},"291ab:Dragonborn.esm":{"m":"heavy","c":"feet"},"291ac:Dragonborn.esm":{"m":"heavy","c":"feet"},"291ad:Dragonborn.esm":{"m":"heavy","c":"feet"},"291ae:Dragonborn.esm":{"m":"heavy","c":"feet"},"291af:Dragonborn.esm":{"m":"heavy","c":"feet"},"291b0:Dragonborn.esm":{"m":"heavy","c":"body"},"291b1:Dragonborn.esm":{"m":"heavy","c":"body"},"291b2:Dragonborn.esm":{"m":"heavy","c":"body"},"291b3:Dragonborn.esm":{"m":"heavy","c":"body"},"291b4:Dragonborn.esm":{"m":"heavy","c":"body"},"291b5:Dragonborn.esm":{"m":"heavy","c":"body"},"291b6:Dragonborn.esm":{"m":"heavy","c":"body"},"291b7:Dragonborn.esm":{"m":"heavy","c":"body"},"291b8:Dragonborn.esm":{"m":"heavy","c":"body"},"291b9:Dragonborn.esm":{"m":"heavy","c":"body"},"291ba:Dragonborn.esm":{"m":"heavy","c":"body"},"291bb:Dragonborn.esm":{"m":"heavy","c":"body"},"291bc:Dragonborn.esm":{"m":"heavy","c":"body"},"291bd:Dragonborn.esm":{"m":"heavy","c":"body"},"291be:Dragonborn.esm":{"m":"heavy","c":"body"},"291bf:Dragonborn.esm":{"m":"heavy","c":"body"},"291c0:Dragonborn.esm":{"m":"heavy","c":"body"},"291c1:Dragonborn.esm":{"m":"heavy","c":"body"},"291c2:Dragonborn.esm":{"m":"heavy","c":"body"},"291c3:Dragonborn.esm":{"m":"heavy","c":"body"},"291c4:Dragonborn.esm":{"m":"heavy","c":"body"},"291c5:Dragonborn.esm":{"m":"heavy","c":"hands"},"291c6:Dragonborn.esm":{"m":"heavy","c":"hands"},"291c7:Dragonborn.esm":{"m":"heavy","c":"hands"},"291c8:Dragonborn.esm":{"m":"heavy","c":"hands"},"291c9:Dragonborn.esm":{"m":"heavy","c":"hands"},"291ca:Dragonborn.esm":{"m":"heavy","c":"hands"},"291cb:Dragonborn.esm":{"m":"heavy","c":"hands"},"291cc:Dragonborn.esm":{"m":"heavy","c":"hands"},"291cd:Dragonborn.esm":{"m":"heavy","c":"hands"},"291ce:Dragonborn.esm":{"m":"heavy","c":"hands"},"291cf:Dragonborn.esm":{"m":"heavy","c":"hands"},"291d0:Dragonborn.esm":{"m":"heavy","c":"hands"},"291d1:Dragonborn.esm":{"m":"heavy","c":"hands"},"291d2:Dragonborn.esm":{"m":"heavy","c":"hands"},"291d3:Dragonborn.esm":{"m":"heavy","c":"hands"},"291d4:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291d5:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291d6:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291d7:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291d8:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291d9:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291da:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291db:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291dc:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291dd:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291de:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291df:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e0:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e1:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e2:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e3:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e4:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e5:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e6:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e7:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e8:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291e9:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291ea:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291eb:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291ec:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"291fc:Dragonborn.esm":{"m":"heavy","c":"feet"},"291fd:Dragonborn.esm":{"m":"heavy","c":"feet"},"291fe:Dragonborn.esm":{"m":"heavy","c":"feet"},"291ff:Dragonborn.esm":{"m":"heavy","c":"feet"},"29200:Dragonborn.esm":{"m":"heavy","c":"feet"},"29201:Dragonborn.esm":{"m":"heavy","c":"feet"},"29202:Dragonborn.esm":{"m":"heavy","c":"feet"},"29203:Dragonborn.esm":{"m":"heavy","c":"feet"},"29204:Dragonborn.esm":{"m":"heavy","c":"feet"},"29205:Dragonborn.esm":{"m":"heavy","c":"feet"},"29206:Dragonborn.esm":{"m":"heavy","c":"feet"},"29207:Dragonborn.esm":{"m":"heavy","c":"feet"},"29208:Dragonborn.esm":{"m":"heavy","c":"feet"},"29209:Dragonborn.esm":{"m":"heavy","c":"feet"},"2920a:Dragonborn.esm":{"m":"heavy","c":"feet"},"2920b:Dragonborn.esm":{"m":"heavy","c":"feet"},"2920c:Dragonborn.esm":{"m":"heavy","c":"body"},"2920d:Dragonborn.esm":{"m":"heavy","c":"body"},"2920e:Dragonborn.esm":{"m":"heavy","c":"body"},"2920f:Dragonborn.esm":{"m":"heavy","c":"body"},"29210:Dragonborn.esm":{"m":"heavy","c":"body"},"29211:Dragonborn.esm":{"m":"heavy","c":"body"},"29212:Dragonborn.esm":{"m":"heavy","c":"body"},"29213:Dragonborn.esm":{"m":"heavy","c":"body"},"29214:Dragonborn.esm":{"m":"heavy","c":"body"},"29215:Dragonborn.esm":{"m":"heavy","c":"body"},"29216:Dragonborn.esm":{"m":"heavy","c":"body"},"29217:Dragonborn.esm":{"m":"heavy","c":"body"},"29218:Dragonborn.esm":{"m":"heavy","c":"body"},"29219:Dragonborn.esm":{"m":"heavy","c":"body"},"2921a:Dragonborn.esm":{"m":"heavy","c":"body"},"2921b:Dragonborn.esm":{"m":"heavy","c":"body"},"2921c:Dragonborn.esm":{"m":"heavy","c":"body"},"2921d:Dragonborn.esm":{"m":"heavy","c":"body"},"2921e:Dragonborn.esm":{"m":"heavy","c":"body"},"2921f:Dragonborn.esm":{"m":"heavy","c":"body"},"29220:Dragonborn.esm":{"m":"heavy","c":"body"},"29221:Dragonborn.esm":{"m":"heavy","c":"body"},"29222:Dragonborn.esm":{"m":"heavy","c":"body"},"29223:Dragonborn.esm":{"m":"heavy","c":"body"},"29224:Dragonborn.esm":{"m":"heavy","c":"body"},"29225:Dragonborn.esm":{"m":"heavy","c":"body"},"29226:Dragonborn.esm":{"m":"heavy","c":"body"},"29227:Dragonborn.esm":{"m":"heavy","c":"hands"},"29228:Dragonborn.esm":{"m":"heavy","c":"hands"},"29229:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922a:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922b:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922c:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922d:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922e:Dragonborn.esm":{"m":"heavy","c":"hands"},"2922f:Dragonborn.esm":{"m":"heavy","c":"hands"},"29230:Dragonborn.esm":{"m":"heavy","c":"hands"},"29231:Dragonborn.esm":{"m":"heavy","c":"hands"},"29232:Dragonborn.esm":{"m":"heavy","c":"hands"},"29233:Dragonborn.esm":{"m":"heavy","c":"hands"},"29234:Dragonborn.esm":{"m":"heavy","c":"hands"},"29235:Dragonborn.esm":{"m":"heavy","c":"hands"},"29236:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29237:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29238:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29239:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923a:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923b:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923c:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923d:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923e:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2923f:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29240:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29241:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29242:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29243:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29244:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29245:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29246:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29247:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29248:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29249:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924a:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924b:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924c:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924d:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924e:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"2924f:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29250:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"29251:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"292ab:Dragonborn.esm":{"m":"cloth","c":"feet"},"292ac:Dragonborn.esm":{"m":"cloth","c":"body"},"292ad:Dragonborn.esm":{"m":"cloth","c":"hands"},"292ae:Dragonborn.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"295f3:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"299f:Solitude Arena.esp":{"m":"cloth","c":"body"},"29a1:Solitude Arena.esp":{"m":"cloth","c":"body"},"29a62:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"29a7:Dawnguard.esm":{"m":"cloth","c":"body"},"29efd:Dragonborn.esm":{"m":"cloth","c":"head"},"2a6fc:Dragonborn.esm":{"m":"cloth","c":"body"},"2ac61:Skyrim.esm":{"m":"light","c":"body"},"2ad31:Dragonborn.esm":{"m":"cloth","c":"hair,circlet"},"2ad32:Dragonborn.esm":{"m":"cloth","c":"hands"},"2ad33:Dragonborn.esm":{"m":"cloth","c":"body"},"2ad34:Dragonborn.esm":{"m":"cloth","c":"feet"},"2ae7:Dawnguard.esm":{"m":"cloth","c":"head"},"2b017:Dragonborn.esm":{"m":"cloth","c":"body"},"2b04b:Dragonborn.esm":{"m":"cloth","c":"head"},"2b0f7:Dragonborn.esm":{"m":"light","c":"body"},"2b0f9:Dragonborn.esm":{"m":"light","c":"hands"},"2b16:Dawnguard.esm":{"m":"cloth","c":"body"},"2ba5f0:WindhelmSSE.esp":{"m":"cloth","c":"chest"},"2ba5f1:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet"},"2c04:Dawnguard.esm":{"m":"cloth","c":"body"},"2c180:Skyrim.esm":{"m":"cloth","c":"body"},"2c181:Skyrim.esm":{"m":"cloth","c":"body"},"2c625f:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"2c88e:Dragonborn.esm":{"m":"cloth","c":"body"},"2c890:Dragonborn.esm":{"m":"cloth","c":"body"},"2cb369:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"head"},"2dd5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"2dec:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2ded:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2dee:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2def:Cloaks&Capes.esp":{"m":"cloth","c":"chest"},"2df0:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df1:Cloaks&Capes.esp":{"m":"cloth","c":"chest"},"2df2:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df3:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df4:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df5:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df6:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df7:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df8:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2df9:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2dfa:Cloaks&Capes.esp":{"m":"fur","c":"chest"},"2dfb:Cloaks&Capes.esp":{"m":"cloth","c":"chest"},"305aba:Riften Expansion.esp":{"m":"cloth","c":"hair,circlet"},"30ba:Update.esm":{"m":"cloth","c":"neck"},"30bc:Update.esm":{"m":"cloth","c":"neck"},"30bd:Update.esm":{"m":"cloth","c":"neck"},"30cb:Update.esm":{"m":"cloth","c":"neck"},"30cc:Update.esm":{"m":"cloth","c":"neck"},"31b4d:Dragonborn.esm":{"m":"cloth","c":"back"},"31b4f:Dragonborn.esm":{"m":"cloth","c":"neck"},"31b51:Dragonborn.esm":{"m":"cloth","c":"chest"},"32528:SkyrimSewers.esp":{"m":"cloth","c":"body"},"325848:WindhelmSSE.esp":{"m":"fur","c":"body"},"330b3:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"330bc:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"3329:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"335a2:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"3381:CommonClothes.esp":{"m":"cloth","c":"body"},"3382:CommonClothes.esp":{"m":"cloth","c":"body"},"3452e:Skyrim.esm":{"m":"cloth","c":"body"},"3452f:Skyrim.esm":{"m":"cloth","c":"feet"},"34e526:WindhelmSSE.esp":{"m":"fur","c":"feet"},"354e2:Dragonborn.esm":{"m":"cloth","c":"body"},"354e3:Dragonborn.esm":{"m":"cloth","c":"body"},"354e5:Dragonborn.esm":{"m":"cloth","c":"body"},"354e6:Dragonborn.esm":{"m":"cloth","c":"body"},"354e8:Dragonborn.esm":{"m":"cloth","c":"body"},"354ea:Dragonborn.esm":{"m":"cloth","c":"body"},"354ed:Dragonborn.esm":{"m":"cloth","c":"body"},"35677:Dragonborn.esm":{"m":"cloth","c":"feet"},"35e36a:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"head,body,hands,feet"},"3619e:Skyrim.esm":{"m":"leather","c":"body"},"3636f:Skyrim.esm":{"m":"cloth","c":"body"},"36583:Skyrim.esm":{"m":"cloth","c":"feet"},"36584:Skyrim.esm":{"m":"cloth","c":"body"},"36585:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"36a44:Skyrim.esm":{"m":"cloth","c":"body"},"36a45:Skyrim.esm":{"m":"cloth","c":"hair"},"36a46:Skyrim.esm":{"m":"cloth","c":"feet"},"3705a:Dragonborn.esm":{"m":"cloth","c":"feet"},"37065:Dragonborn.esm":{"m":"cloth","c":"hair,body"},"37066:Dragonborn.esm":{"m":"cloth","c":"hair,body"},"3706a:Dragonborn.esm":{"m":"cloth","c":"body"},"3706b:Dragonborn.esm":{"m":"cloth","c":"body"},"3706c:Dragonborn.esm":{"m":"cloth","c":"body"},"372fa:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"372fb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"372fc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"372fd:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"37302:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"37303:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"37304:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"37305:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3730a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3730c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"3730d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3730e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"37563:Dragonborn.esm":{"m":"fur","c":"body"},"37564:Dragonborn.esm":{"m":"fur","c":"body"},"375ae:ElysiumEstate.esp":{"m":"cloth","c":"body"},"3764b:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"3764f:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"37650:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"37652:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"37653:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"37654:ZIA_Complete Pack.esp":{"m":"heavy","c":"head,hair,circlet,ears"},"376d9:Dragonborn.esm":{"m":"cloth","c":"feet"},"376da:Dragonborn.esm":{"m":"cloth","c":"body"},"376de:Dragonborn.esm":{"m":"cloth","c":"feet"},"376df:Dragonborn.esm":{"m":"cloth","c":"body"},"376ed:Dragonborn.esm":{"m":"cloth","c":"body"},"376f1:Dragonborn.esm":{"m":"cloth","c":"body"},"37b88:Dragonborn.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"37b8a:Dragonborn.esm":{"m":"cloth","c":"body"},"37b8c:Dragonborn.esm":{"m":"cloth","c":"hands"},"37b8e:Dragonborn.esm":{"m":"cloth","c":"feet"},"37fee:Dragonborn.esm":{"m":"heavy","c":"feet"},"37fef:Dragonborn.esm":{"m":"heavy","c":"body"},"37ff0:Dragonborn.esm":{"m":"heavy","c":"hands"},"37ff1:Dragonborn.esm":{"m":"heavy","c":"hair,circlet"},"38404:Dragonborn.esm":{"m":"cloth","c":"body"},"38407:Dragonborn.esm":{"m":"cloth","c":"body"},"3840a:Dragonborn.esm":{"m":"cloth","c":"body"},"38410:Dragonborn.esm":{"m":"cloth","c":"body"},"38411:Dragonborn.esm":{"m":"cloth","c":"body"},"38412:Dragonborn.esm":{"m":"cloth","c":"body"},"38413:Dragonborn.esm":{"m":"cloth","c":"body"},"3882:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"3884:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3885:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"38add:Dragonborn.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"38ce:Dawnguard.esm":{"m":"cloth","c":"body"},"3910e:Dragonborn.esm":{"m":"fur","c":"body"},"39110:Dragonborn.esm":{"m":"fur","c":"hands"},"39112:Dragonborn.esm":{"m":"fur","c":"feet"},"39114:Dragonborn.esm":{"m":"fur","c":"hair,circlet"},"39151:Dragonborn.esm":{"m":"light","c":"body"},"398cc:Dragonborn.esm":{"m":"cloth","c":"body"},"39d1e:Dragonborn.esm":{"m":"light","c":"body"},"39d20:Dragonborn.esm":{"m":"light","c":"body"},"39d22:Dragonborn.esm":{"m":"light","c":"body"},"39d2b:Dragonborn.esm":{"m":"light","c":"hair,circlet"},"39d2e:Dragonborn.esm":{"m":"light","c":"hair,circlet"},"39d2f:Dragonborn.esm":{"m":"light","c":"hair,circlet"},"39fa1:Dragonborn.esm":{"m":"light","c":"hair,circlet,ears"},"39fa2:Dragonborn.esm":{"m":"light","c":"hair,circlet,ears"},"39fa3:Dragonborn.esm":{"m":"light","c":"hair,circlet,ears"},"3ab22:Dragonborn.esm":{"m":"fur","c":"hands"},"3ab23:Dragonborn.esm":{"m":"fur","c":"head,hair,circlet,ears"},"3ab25:Dragonborn.esm":{"m":"fur","c":"feet"},"3ab26:Dragonborn.esm":{"m":"fur","c":"body"},"3b04b:Dragonborn.esm":{"m":"cloth","c":"feet"},"3b04e:Dragonborn.esm":{"m":"cloth","c":"hair,circlet"},"3b5ab:Skyrim.esm":{"m":"cloth","c":"body"},"3b9485:WindhelmSSE.esp":{"m":"cloth","c":"hands"},"3bc81:Skyrim.esm":{"m":"cloth","c":"arms"},"3bc82:Skyrim.esm":{"m":"cloth","c":"arms"},"3bc83:Skyrim.esm":{"m":"cloth","c":"hair"},"3bc84:Skyrim.esm":{"m":"cloth","c":"hair"},"3bd0b:Dragonborn.esm":{"m":"cloth","c":"body"},"3c0f1:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f2:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f3:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f4:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f5:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f6:Dragonborn.esm":{"m":"heavy","c":"head,circlet"},"3c0f7:Dragonborn.esm":{"m":"light","c":"body"},"3c0f9:Dragonborn.esm":{"m":"light","c":"body"},"3c0fa:Dragonborn.esm":{"m":"light","c":"body"},"3c0fb:Dragonborn.esm":{"m":"light","c":"body"},"3c0fc:Dragonborn.esm":{"m":"light","c":"body"},"3c0fd:Dragonborn.esm":{"m":"light","c":"body"},"3c69:Dawnguard.esm":{"m":"cloth","c":"body"},"3c819:Dragonborn.esm":{"m":"cloth","c":"body"},"3c81a:Dragonborn.esm":{"m":"cloth","c":"feet"},"3c81d:Dragonborn.esm":{"m":"cloth","c":"body"},"3c9fe:Skyrim.esm":{"m":"cloth","c":"body"},"3ca00:Skyrim.esm":{"m":"cloth","c":"feet"},"3ca79:Dragonborn.esm":{"m":"cloth","c":"body"},"3cf35:Dragonborn.esm":{"m":"cloth","c":"head,hair,body,hands,arms,feet,calves,circlet,ears"},"3d2af:Dragonborn.esm":{"m":"light","c":"feet"},"3d5d8:Dragonborn.esm":{"m":"cloth","c":"head,hair,body,hands,feet"},"3ded:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"head,hair,circlet,ears"},"3df2b:Skyrim.esm":{"m":"heavy","c":"hands"},"3df4c:Skyrim.esm":{"m":"heavy","c":"hands"},"3df62:Skyrim.esm":{"m":"heavy","c":"hands"},"3df66:Skyrim.esm":{"m":"heavy","c":"hands"},"3df67:Skyrim.esm":{"m":"heavy","c":"hands"},"3df6b:Skyrim.esm":{"m":"heavy","c":"hands"},"3df73:Skyrim.esm":{"m":"heavy","c":"hands"},"3df74:Skyrim.esm":{"m":"heavy","c":"hands"},"3df75:Skyrim.esm":{"m":"heavy","c":"hands"},"3df76:Skyrim.esm":{"m":"heavy","c":"hands"},"3df77:Skyrim.esm":{"m":"heavy","c":"hands"},"3df78:Skyrim.esm":{"m":"heavy","c":"hands"},"3df79:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7a:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7b:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7c:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7d:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7e:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df7f:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df80:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df81:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3df85:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"3e29:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"3e2a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"3e2d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3e2e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3e31:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"3e32:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"3e35:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3e36:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3e6fc2:WindhelmSSE.esp":{"m":"light","c":"hair,circlet"},"3e84:CommonClothes.esp":{"m":"cloth","c":"body"},"3e98ac:Riften Expansion.esp":{"m":"heavy","c":"body"},"3e98ae:Riften Expansion.esp":{"m":"heavy","c":"hair,circlet,ears"},"3e98b0:Riften Expansion.esp":{"m":"heavy","c":"hair,circlet,ears"},"3e98b4:Riften Expansion.esp":{"m":"heavy","c":"body"},"3e98b6:Riften Expansion.esp":{"m":"heavy","c":"hair,circlet,ears"},"3ec0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"3ec1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3ec3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"3ec4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3ec5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"3ec6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"3ec7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"3ec8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet,ears"},"3ec9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"3eca:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"40731:Skyrim.esm":{"m":"cloth","c":"body"},"40975:Skyrim.esm":{"m":"cloth","c":"neck"},"40f8eb:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"head,body,hands,feet"},"4101e:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41020:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41021:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41022:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41027:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"4102c:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41033:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41034:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41035:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41036:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"41037:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"4124a:Skyrim.esm":{"m":"cloth","c":"body"},"4223b:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"4223c:Skyrim.esm":{"m":"cloth","c":"body"},"4223d:Skyrim.esm":{"m":"cloth","c":"feet"},"423f0a:WindhelmSSE.esp":{"m":"heavy","c":"body"},"42528:Skyrim.esm":{"m":"cloth","c":"head"},"42be9:Skyrim.esm":{"m":"cloth","c":"hands"},"4356:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"467bf:Skyrim.esm":{"m":"cloth","c":"body"},"467c0:Skyrim.esm":{"m":"cloth","c":"body"},"46bb4:Skyrim.esm":{"m":"leather","c":"body"},"46bb5:Skyrim.esm":{"m":"leather","c":"body"},"46bb6:Skyrim.esm":{"m":"leather","c":"body"},"46bb7:Skyrim.esm":{"m":"leather","c":"body"},"46bb8:Skyrim.esm":{"m":"leather","c":"body"},"46bb9:Skyrim.esm":{"m":"leather","c":"body"},"46bd0:Skyrim.esm":{"m":"light","c":"hands"},"46bd1:Skyrim.esm":{"m":"light","c":"hands"},"46bd2:Skyrim.esm":{"m":"light","c":"hands"},"46be6:Skyrim.esm":{"m":"light","c":"hands"},"46be7:Skyrim.esm":{"m":"light","c":"hands"},"46be8:Skyrim.esm":{"m":"light","c":"hands"},"46be9:Skyrim.esm":{"m":"light","c":"hands"},"46bea:Skyrim.esm":{"m":"light","c":"hands"},"46beb:Skyrim.esm":{"m":"light","c":"hands"},"46c79:Skyrim.esm":{"m":"light","c":"hands"},"46c7a:Skyrim.esm":{"m":"light","c":"hands"},"46c7c:Skyrim.esm":{"m":"light","c":"hands"},"46c7d:Skyrim.esm":{"m":"light","c":"hands"},"46c7f:Skyrim.esm":{"m":"light","c":"hands"},"46c80:Skyrim.esm":{"m":"light","c":"hands"},"46c9e:Skyrim.esm":{"m":"light","c":"hands"},"46cda:Skyrim.esm":{"m":"light","c":"hands"},"46cea:Skyrim.esm":{"m":"light","c":"hands"},"46cf3:Skyrim.esm":{"m":"light","c":"hands"},"46cf4:Skyrim.esm":{"m":"light","c":"hands"},"46cf5:Skyrim.esm":{"m":"light","c":"hands"},"46cf6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46cf7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46cf8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46d1a:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46d1f:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46d20:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46d21:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46db1:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46db2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46db3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46db4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46db5:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dc2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dc3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dc4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dc7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dca:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dcb:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dd3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dd9:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46de2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46ded:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46dee:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46def:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46df0:Skyrim.esm":{"m":"light","c":"hair,circlet"},"46fd57:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"47cbe:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"47d7:Dawnguard.esm":{"m":"cloth","c":"body"},"47d9:Dawnguard.esm":{"m":"cloth","c":"feet"},"47da:Dawnguard.esm":{"m":"cloth","c":"circlet"},"483c1:Skyrim.esm":{"m":"cloth","c":"feet"},"483c2:Skyrim.esm":{"m":"cloth","c":"body"},"487d1:Skyrim.esm":{"m":"cloth","c":"hands"},"487d8:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"48a5:ZIA_Complete Pack.esp":{"m":"heavy","c":"body"},"48c0e:Skyrim.esm":{"m":"cloth","c":"body"},"48d8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"48d90:Skyrim.esm":{"m":"cloth","c":"body"},"48d93:Skyrim.esm":{"m":"cloth","c":"body"},"48d94:Skyrim.esm":{"m":"cloth","c":"body"},"48d9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"48da:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"48db:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"48dc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"48dd:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"48de:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"48df:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"48e0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"4950e:Skyrim.esm":{"m":"heavy","c":"body"},"49b92:Skyrim.esm":{"m":"heavy","c":"feet"},"4a1b1:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"4b288:Skyrim.esm":{"m":"heavy","c":"feet"},"4b28b:Skyrim.esm":{"m":"heavy","c":"body"},"4b28d:Skyrim.esm":{"m":"heavy","c":"hands"},"4b28f:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"4b2c9:Skyrim.esm":{"m":"cloth","c":"body"},"4c3cb:Skyrim.esm":{"m":"cloth","c":"hair"},"4c3d0:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"4d086:OarsRest.esp":{"m":"cloth","c":"body"},"4e784:Skyrim.esm":{"m":"cloth","c":"body"},"4e886:Skyrim.esm":{"m":"cloth","c":"body"},"4f000:Skyrim.esm":{"m":"cloth","c":"circlet"},"4f006:Skyrim.esm":{"m":"cloth","c":"hands"},"4f21:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"4f22:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"4f23:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"4f24:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"4f38:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"4f39:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"4f3b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"4f3c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"50c5:Dawnguard.esm":{"m":"fur","c":"feet"},"50c6:Dawnguard.esm":{"m":"fur","c":"body"},"50c7:Dawnguard.esm":{"m":"fur","c":"hands"},"50d0:Dawnguard.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"50f30:Skyrim.esm":{"m":"cloth","c":"body"},"50f32:Skyrim.esm":{"m":"cloth","c":"body"},"50f34:Skyrim.esm":{"m":"cloth","c":"body"},"50f36:Skyrim.esm":{"m":"cloth","c":"body"},"50f38:Skyrim.esm":{"m":"cloth","c":"body"},"50f3a:Skyrim.esm":{"m":"cloth","c":"body"},"51fe:Dawnguard.esm":{"m":"cloth","c":"body"},"52794:Skyrim.esm":{"m":"heavy","c":"body"},"52e7b:WindhelmSSE.esp":{"m":"cloth","c":"hair,circlet"},"538f8:Skyrim.esm":{"m":"cloth","c":"head"},"56a9d:Skyrim.esm":{"m":"heavy","c":"feet"},"56a9e:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"56b17:Skyrim.esm":{"m":"heavy","c":"hands"},"575a:Dawnguard.esm":{"m":"cloth","c":"circlet"},"58e2a:Skyrim.esm":{"m":"cloth","c":"body"},"5903:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"head"},"5904:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"5914:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"59253:Skyrim.esm":{"m":"cloth","c":"head"},"59254:Skyrim.esm":{"m":"cloth","c":"head"},"5934:DIS_Heavy_Legion.esp":{"m":"light","c":"body"},"5937:DIS_Heavy_Legion.esp":{"m":"light","c":"hands"},"593f:DIS_Heavy_Legion.esp":{"m":"light","c":"hair,circlet"},"5943:DIS_Heavy_Legion.esp":{"m":"heavy","c":"feet"},"5945:DIS_Heavy_Legion.esp":{"m":"heavy","c":"body"},"5947:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hands"},"594c:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hair,circlet"},"59c2:ElysiumEstate.esp":{"m":"cloth","c":"body"},"5a09:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a0a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a0b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a18:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a19:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a1a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a1b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"head,hair,circlet"},"5a26:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a27:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a28:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a29:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"5a3d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a3e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a3f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a40:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"5a41:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a42:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a43:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a44:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"5a5b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a5c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a5d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a5e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"5a6e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"5a6f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"5a70:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"5a71:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"5a86:Solitude Arena.esp":{"m":"cloth","c":"hands"},"5a9df:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"5a9e3:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"5abc3:Skyrim.esm":{"m":"cloth","c":"body"},"5abc4:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"5b2e7:Skyrim.esm":{"m":"cloth","c":"head"},"5b69e:Skyrim.esm":{"m":"cloth","c":"feet"},"5b69f:Skyrim.esm":{"m":"cloth","c":"body"},"5b6a0:Skyrim.esm":{"m":"cloth","c":"feet"},"5b6a1:Skyrim.esm":{"m":"cloth","c":"body"},"5cbfe:Skyrim.esm":{"m":"heavy","c":"body"},"5d008:Skyrim.esm":{"m":"cloth","c":"body"},"5d009:Skyrim.esm":{"m":"cloth","c":"body"},"5db7b:Skyrim.esm":{"m":"cloth","c":"body"},"5db7e:Skyrim.esm":{"m":"cloth","c":"feet"},"5db85:Skyrim.esm":{"m":"cloth","c":"feet"},"5db86:Skyrim.esm":{"m":"cloth","c":"body"},"5db87:Skyrim.esm":{"m":"cloth","c":"hands"},"5db88:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"5e977:Skyrim.esm":{"m":"cloth","c":"body"},"5e979:Skyrim.esm":{"m":"cloth","c":"body"},"5eb2:DIS_Heavy_Legion.esp":{"m":"heavy","c":"feet"},"5eb4:DIS_Heavy_Legion.esp":{"m":"heavy","c":"body"},"5eb6:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hands"},"5ebb:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hair,circlet"},"5ec2:DIS_Heavy_Legion.esp":{"m":"heavy","c":"hair,circlet"},"603d:Solitude Arena.esp":{"m":"cloth","c":"hands"},"60715:Skyrim.esm":{"m":"cloth","c":"head"},"60797:Skyrim.esm":{"m":"cloth","c":"neck"},"60da7:Skyrim.esm":{"m":"cloth","c":"head"},"61c8b:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61ca5:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cab:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cb9:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cc0:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cc1:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cc2:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cc9:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cca:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"61cd6:Skyrim.esm":{"m":"heavy","c":"head,circlet"},"62303:Skyrim.esm":{"m":"cloth","c":"body"},"6230b:Skyrim.esm":{"m":"cloth","c":"hands"},"62311:Skyrim.esm":{"m":"cloth","c":"feet"},"646a7:Skyrim.esm":{"m":"cloth","c":"body"},"646ab:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"6492a:Skyrim.esm":{"m":"cloth","c":"feet"},"6492c:Skyrim.esm":{"m":"cloth","c":"body"},"6492d:Skyrim.esm":{"m":"cloth","c":"hands"},"6492e:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"65b94:Skyrim.esm":{"m":"cloth","c":"body"},"65b99:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"65b9b:Skyrim.esm":{"m":"cloth","c":"feet"},"65b9d:Skyrim.esm":{"m":"cloth","c":"hands"},"65bac:Skyrim.esm":{"m":"cloth","c":"feet"},"65bb3:Skyrim.esm":{"m":"cloth","c":"hands"},"65bbf:Skyrim.esm":{"m":"cloth","c":"body"},"6881e:Skyrim.esm":{"m":"cloth","c":"head"},"69ce3:Skyrim.esm":{"m":"cloth","c":"body,hands,feet"},"69d1f:Playable Rieklings.esp":{"m":"leather","c":"body"},"69d21:Playable Rieklings.esp":{"m":"leather","c":"hands"},"69d25:Playable Rieklings.esp":{"m":"heavy","c":"body"},"69d26:Playable Rieklings.esp":{"m":"heavy","c":"feet"},"69d27:Playable Rieklings.esp":{"m":"heavy","c":"hands"},"69d2e:Playable Rieklings.esp":{"m":"leather","c":"feet"},"6a0a9:Skyrim.esm":{"m":"cloth","c":"feet"},"6a0ab:Skyrim.esm":{"m":"cloth","c":"body"},"6a0ad:Skyrim.esm":{"m":"cloth","c":"hands"},"6a0af:Skyrim.esm":{"m":"cloth","c":"head,circlet"},"6a9f0:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"6a9f1:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"6a9f2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"6a9f3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"6aa04:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"6aa05:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"6aa06:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"6aa07:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"6aa08:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"6afb:Dawnguard.esm":{"m":"cloth","c":"head"},"6afc:Dawnguard.esm":{"m":"cloth","c":"head"},"6b46b:Skyrim.esm":{"m":"cloth","c":"body"},"6b46c:Skyrim.esm":{"m":"cloth","c":"feet"},"6c1d8:Skyrim.esm":{"m":"cloth","c":"body"},"6c1d9:Skyrim.esm":{"m":"cloth","c":"body"},"6c1da:Skyrim.esm":{"m":"cloth","c":"body"},"6c72d:WindhelmSSE.esp":{"m":"cloth","c":"hair"},"6cbfd:Playable Rieklings.esp":{"m":"cloth","c":"body"},"6cc00:Playable Rieklings.esp":{"m":"cloth","c":"body"},"6d92c:Skyrim.esm":{"m":"cloth","c":"body"},"6dba:Dawnguard.esm":{"m":"cloth","c":"body"},"6dbc:Dawnguard.esm":{"m":"cloth","c":"body"},"6dc9b:Skyrim.esm":{"m":"cloth","c":"body"},"6f278:Skyrim.esm":{"m":"cloth","c":"body"},"6f393:Skyrim.esm":{"m":"cloth","c":"body"},"6f398:Skyrim.esm":{"m":"cloth","c":"feet"},"6f39b:Skyrim.esm":{"m":"cloth","c":"hands"},"6f39e:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"6fc49:Skyrim.esm":{"m":"cloth","c":"body"},"6fe72:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"6ff37:Skyrim.esm":{"m":"cloth","c":"body"},"6ff38:Skyrim.esm":{"m":"cloth","c":"body"},"6ff43:Skyrim.esm":{"m":"cloth","c":"body"},"6ff45:Skyrim.esm":{"m":"cloth","c":"body"},"71ce:Dawnguard.esm":{"m":"cloth","c":"head"},"74c7:Dawnguard.esm":{"m":"heavy","c":"feet"},"74c9:Dawnguard.esm":{"m":"heavy","c":"body"},"74f7:Dawnguard.esm":{"m":"heavy","c":"hands"},"7874b:Skyrim.esm":{"m":"cloth","c":"body"},"79be4:Skyrim.esm":{"m":"cloth","c":"head,body,hands,feet"},"7a0f0:Skyrim.esm":{"m":"heavy","c":"feet"},"7a0f1:Skyrim.esm":{"m":"heavy","c":"feet"},"7a11c:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a120:Skyrim.esm":{"m":"heavy","c":"feet"},"7a123:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a125:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a128:Skyrim.esm":{"m":"heavy","c":"body"},"7a129:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a12c:Skyrim.esm":{"m":"heavy","c":"hands"},"7a12d:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a12e:Skyrim.esm":{"m":"heavy","c":"hands"},"7a131:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"7a132:Skyrim.esm":{"m":"heavy","c":"hands"},"7a134:Skyrim.esm":{"m":"heavy","c":"hands"},"7a135:Skyrim.esm":{"m":"fur","c":"feet"},"7a136:Skyrim.esm":{"m":"fur","c":"feet"},"7a137:Skyrim.esm":{"m":"fur","c":"feet"},"7a138:Skyrim.esm":{"m":"fur","c":"feet"},"7a139:Skyrim.esm":{"m":"fur","c":"feet"},"7a13b:Skyrim.esm":{"m":"fur","c":"body"},"7a13c:Skyrim.esm":{"m":"fur","c":"body"},"7a149:Skyrim.esm":{"m":"fur","c":"hands"},"7a14a:Skyrim.esm":{"m":"fur","c":"hands"},"7a14b:Skyrim.esm":{"m":"fur","c":"hands"},"7a14c:Skyrim.esm":{"m":"fur","c":"hands"},"7a14e:Skyrim.esm":{"m":"fur","c":"hands"},"7a14f:Skyrim.esm":{"m":"fur","c":"hands"},"7a150:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a151:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a152:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a154:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a155:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a157:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7a158:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"7bc15:Skyrim.esm":{"m":"cloth","c":"feet"},"7bc19:Skyrim.esm":{"m":"cloth","c":"body"},"7bc1a:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"7c92e:Skyrim.esm":{"m":"cloth","c":"feet"},"7c932:Skyrim.esm":{"m":"cloth","c":"body"},"7e010:Skyrim.esm":{"m":"cloth","c":"body"},"7eaf1:Skyrim.esm":{"m":"cloth","c":"body,hands,feet"},"800ea:Skyrim.esm":{"m":"cloth","c":"body"},"801:IA CBBE Patch.esp":{"m":"cloth","c":"body"},"801:YokuWeapons.esp":{"m":"leather","c":"body"},"802:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"802:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"803:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"803e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"803f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"8040:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"8041:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"805:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"80697:Skyrim.esm":{"m":"cloth","c":"body"},"80699:Skyrim.esm":{"m":"cloth","c":"feet"},"806:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"807:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"808:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"809:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"80a:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"80b:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"80c:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"80d:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"80e:MoreCraftableEquipment.esp":{"m":"leather","c":"body"},"80e:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"80f:MoreCraftableEquipment.esp":{"m":"leather","c":"feet"},"810:MoreCraftableEquipment.esp":{"m":"leather","c":"hands"},"810:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"811:MoreCraftableEquipment.esp":{"m":"leather","c":"hair,circlet"},"812:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"812:Odin - Skyrim Magic Overhaul.esp":{"m":"cloth","c":"body"},"813:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"814:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"815:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"816:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"816:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"818:MoreCraftableEquipment.esp":{"m":"heavy","c":"hair,circlet"},"819:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"81a:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"81b:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"81c79:Skyrim.esm":{"m":"cloth","c":"body"},"81c:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"81d:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"81e:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"81f:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"820:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"820:YokuWeapons.esp":{"m":"heavy","c":"body"},"821:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"821:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet"},"822:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"822:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet,ears"},"823:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair"},"823:YokuWeapons.esp":{"m":"heavy","c":"body"},"824:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"825:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"826:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"827:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"828:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"829:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"829b4:Skyrim.esm":{"m":"cloth","c":"body"},"829b7:Skyrim.esm":{"m":"cloth","c":"body"},"82a:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"82b:MoreCraftableEquipment.esp":{"m":"cloth","c":"hands"},"82b:YokuWeapons.esp":{"m":"heavy","c":"body"},"82c:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"82d:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"82d:YokuWeapons.esp":{"m":"light","c":"body"},"82eb5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"82eb6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"82eb7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"82eb8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"82f:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"82f:YokuWeapons.esp":{"m":"light","c":"hair,circlet"},"830:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"831:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"832:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"832:YokuWeapons.esp":{"m":"heavy","c":"hands"},"833:MoreCraftableEquipment.esp":{"m":"leather","c":"body"},"833:YokuWeapons.esp":{"m":"heavy","c":"feet"},"834:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"835:MoreCraftableEquipment.esp":{"m":"cloth","c":"feet"},"836:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"837:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"838:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"839:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"839:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body,hands,feet"},"83a:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"83b:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"83c:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"83d:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"83e:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"83f:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"840:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,body,circlet"},"841:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"842:MoreCraftableEquipment.esp":{"m":"cloth","c":"hair,circlet"},"849b2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b4:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b5:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b6:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b7:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b8:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849b9:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849ba:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849bb:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"849bc:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"84f48:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"84f49:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"84f4a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"84f4b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"84f4d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"84f4e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"84f4f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"84f50:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"851:Triumvirate - Mage Archetypes.esp":{"m":"cloth","c":"body"},"85808:Skyrim.esm":{"m":"cloth","c":"body"},"85c:YokuWeapons.esp":{"m":"leather","c":"circlet"},"85fd2:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"85fd3:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"862:YokuWeapons.esp":{"m":"cloth","c":"body"},"86503:Skyrim.esm":{"m":"cloth","c":"head"},"8650d:Skyrim.esm":{"m":"cloth","c":"head"},"8650e:Skyrim.esm":{"m":"cloth","c":"head"},"8650f:Skyrim.esm":{"m":"cloth","c":"head"},"86510:Skyrim.esm":{"m":"cloth","c":"head"},"86810:Skyrim.esm":{"m":"cloth","c":"body"},"868fd:Skyrim.esm":{"m":"cloth","c":"head"},"8691b:Skyrim.esm":{"m":"cloth","c":"head"},"8697e:Skyrim.esm":{"m":"cloth","c":"body"},"86981:Skyrim.esm":{"m":"cloth","c":"feet"},"86983:Skyrim.esm":{"m":"cloth","c":"hands"},"86985:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"8698c:Skyrim.esm":{"m":"cloth","c":"body"},"8698e:Skyrim.esm":{"m":"cloth","c":"feet"},"86990:Skyrim.esm":{"m":"cloth","c":"hands"},"86991:Skyrim.esm":{"m":"cloth","c":"body"},"86993:Skyrim.esm":{"m":"cloth","c":"feet"},"86f42:Skyrim.esm":{"m":"cloth","c":"head"},"86f:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet,ears"},"870:YokuWeapons.esp":{"m":"heavy","c":"feet"},"871:YokuWeapons.esp":{"m":"heavy","c":"body"},"872:YokuWeapons.esp":{"m":"heavy","c":"hands"},"87556:Skyrim.esm":{"m":"cloth","c":"body"},"87557:Skyrim.esm":{"m":"cloth","c":"body"},"883:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet,ears"},"88952:Skyrim.esm":{"m":"cloth","c":"body"},"88954:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"88956:Skyrim.esm":{"m":"cloth","c":"body"},"88958:Skyrim.esm":{"m":"cloth","c":"feet"},"8895a:Skyrim.esm":{"m":"cloth","c":"circlet"},"88b:YokuWeapons.esp":{"m":"heavy","c":"body"},"88f:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet,ears"},"890:YokuWeapons.esp":{"m":"heavy","c":"hands"},"891:YokuWeapons.esp":{"m":"heavy","c":"feet"},"892:YokuWeapons.esp":{"m":"heavy","c":"body"},"894e:Dawnguard.esm":{"m":"cloth","c":"body"},"896:YokuWeapons.esp":{"m":"heavy","c":"feet"},"896a3:Skyrim.esm":{"m":"light","c":"body"},"897:YokuWeapons.esp":{"m":"heavy","c":"hands"},"89e:YokuWeapons.esp":{"m":"light","c":"hands"},"89f:YokuWeapons.esp":{"m":"light","c":"feet"},"8ab:YokuWeapons.esp":{"m":"cloth","c":"body"},"8acad:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"8acb0:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"8b65a:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b662:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b663:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b664:Skyrim.esm":{"m":"light","c":"hair,circlet"},"8b665:Skyrim.esm":{"m":"light","c":"hair,circlet"},"8b666:Skyrim.esm":{"m":"light","c":"hair,circlet"},"8b667:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"8b668:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"8b669:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"8b66a:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b66b:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b66c:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b66d:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b66e:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b66f:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b670:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b671:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b672:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"8b673:Skyrim.esm":{"m":"heavy","c":"hands"},"8b674:Skyrim.esm":{"m":"heavy","c":"hands"},"8b675:Skyrim.esm":{"m":"heavy","c":"hands"},"8b676:Skyrim.esm":{"m":"light","c":"hands"},"8b677:Skyrim.esm":{"m":"light","c":"hands"},"8b678:Skyrim.esm":{"m":"light","c":"hands"},"8b67a:Skyrim.esm":{"m":"heavy","c":"body"},"8b67f:Skyrim.esm":{"m":"fur","c":"hands"},"8b680:Skyrim.esm":{"m":"fur","c":"hands"},"8b681:Skyrim.esm":{"m":"fur","c":"hands"},"8b682:Skyrim.esm":{"m":"light","c":"hands"},"8b683:Skyrim.esm":{"m":"light","c":"hands"},"8b684:Skyrim.esm":{"m":"light","c":"hands"},"8b685:Skyrim.esm":{"m":"leather","c":"hands"},"8b686:Skyrim.esm":{"m":"leather","c":"hands"},"8b687:Skyrim.esm":{"m":"leather","c":"hands"},"8b688:Skyrim.esm":{"m":"heavy","c":"hands"},"8b689:Skyrim.esm":{"m":"heavy","c":"hands"},"8b68a:Skyrim.esm":{"m":"heavy","c":"hands"},"8b68b:Skyrim.esm":{"m":"leather","c":"hands"},"8b68c:Skyrim.esm":{"m":"leather","c":"hands"},"8b68d:Skyrim.esm":{"m":"leather","c":"hands"},"8b691:Skyrim.esm":{"m":"heavy","c":"hands"},"8b692:Skyrim.esm":{"m":"heavy","c":"hands"},"8b693:Skyrim.esm":{"m":"heavy","c":"hands"},"8b694:Skyrim.esm":{"m":"heavy","c":"hands"},"8b695:Skyrim.esm":{"m":"heavy","c":"hands"},"8b699:Skyrim.esm":{"m":"heavy","c":"hands"},"8b69a:Skyrim.esm":{"m":"heavy","c":"hands"},"8b69b:Skyrim.esm":{"m":"heavy","c":"hands"},"8b69f:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b6a0:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b6a1:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"8b6a2:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a3:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a4:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a5:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a6:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a7:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a8:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6a9:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6aa:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6ab:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6ac:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6ad:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b1:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b2:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b3:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b4:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b5:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b6:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b7:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b8:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6b9:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6ba:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6bb:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6bc:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6bd:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6be:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6bf:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c0:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c1:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c2:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c3:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c4:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c5:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c6:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c7:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6c8:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6cc:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6cd:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6ce:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6cf:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8b6d0:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"8c5:YokuWeapons.esp":{"m":"heavy","c":"body"},"8ca6a:Skyrim.esm":{"m":"cloth","c":"body"},"8ceac:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"8cf:YokuWeapons.esp":{"m":"heavy","c":"body"},"8d1:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet,ears"},"8f19a:Skyrim.esm":{"m":"cloth","c":"body"},"8f3:YokuWeapons.esp":{"m":"leather","c":"feet"},"8f4:YokuWeapons.esp":{"m":"leather","c":"body"},"8f5:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"8f6:YokuWeapons.esp":{"m":"leather","c":"hands"},"8f8:YokuWeapons.esp":{"m":"cloth","c":"head"},"9035b:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"912:YokuWeapons.esp":{"m":"leather","c":"body"},"914:YokuWeapons.esp":{"m":"leather","c":"body"},"916:YokuWeapons.esp":{"m":"leather","c":"body"},"918:YokuWeapons.esp":{"m":"leather","c":"body"},"92a75:Skyrim.esm":{"m":"heavy","c":"feet"},"92a86:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"92a89:Skyrim.esm":{"m":"heavy","c":"feet"},"92a8d:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"92a8e:Skyrim.esm":{"m":"heavy","c":"feet"},"92aca:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"92dbe:Skyrim.esm":{"m":"cloth","c":"hands"},"92e29:Skyrim.esm":{"m":"cloth","c":"head"},"940d5:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"9610d:Skyrim.esm":{"m":"light","c":"hair,circlet,ears"},"966c:Dawnguard.esm":{"m":"cloth","c":"head"},"96d9b:Skyrim.esm":{"m":"fur","c":"feet"},"97243:Skyrim.esm":{"m":"cloth","c":"head"},"97a43:Skyrim.esm":{"m":"cloth","c":"body,hands,feet"},"9b8a7:Playable Rieklings.esp":{"m":"leather","c":"hair"},"9b8a8:Playable Rieklings.esp":{"m":"leather","c":"head,hair,ears"},"9da65:Skyrim.esm":{"m":"cloth","c":"body"},"9e6:MoreCraftableEquipment.esp":{"m":"cloth","c":"chest"},"9e7:MoreCraftableEquipment.esp":{"m":"cloth","c":"arms"},"9e8:MoreCraftableEquipment.esp":{"m":"cloth","c":"legs"},"9ea:MoreCraftableEquipment.esp":{"m":"cloth","c":"chest"},"9eb:MoreCraftableEquipment.esp":{"m":"cloth","c":"arms"},"9f0:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"9f3:MoreCraftableEquipment.esp":{"m":"cloth","c":"body"},"a199b:Skyrim.esm":{"m":"cloth","c":"body"},"a2c8:Dawnguard.esm":{"m":"cloth","c":"body"},"a350c:Skyrim.esm":{"m":"cloth","c":"head"},"a490d:WindhelmSSE.esp":{"m":"cloth","c":"body"},"a4911:WindhelmSSE.esp":{"m":"cloth","c":"feet"},"a4917:WindhelmSSE.esp":{"m":"cloth","c":"chest"},"a491b:WindhelmSSE.esp":{"m":"cloth","c":"neck"},"a495d:WindhelmSSE.esp":{"m":"cloth","c":"body,chest"},"a495f:WindhelmSSE.esp":{"m":"fur","c":"hair,circlet,ears"},"a4dcd:Skyrim.esm":{"m":"fur","c":"feet"},"a6748:Playable Rieklings.esp":{"m":"cloth","c":"head,body,hands,feet"},"a6d79:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"a6d7b:Skyrim.esm":{"m":"fur","c":"body"},"a6d7d:Skyrim.esm":{"m":"fur","c":"hands"},"a6d7f:Skyrim.esm":{"m":"fur","c":"feet"},"a919c:Skyrim.esm":{"m":"cloth","c":"body"},"ab5e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"ab60:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"ab61:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"ab62:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"ab63:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"ab64:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"ab65:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"ab66:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"ab67:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"acc93:Skyrim.esm":{"m":"leather","c":"body"},"acc94:Skyrim.esm":{"m":"leather","c":"body"},"acc9d:Skyrim.esm":{"m":"heavy","c":"body"},"acc9e:Skyrim.esm":{"m":"heavy","c":"body"},"accbb:Skyrim.esm":{"m":"light","c":"feet"},"accbc:Skyrim.esm":{"m":"light","c":"feet"},"accbd:Skyrim.esm":{"m":"light","c":"feet"},"accbe:Skyrim.esm":{"m":"light","c":"feet"},"accbf:Skyrim.esm":{"m":"light","c":"feet"},"accc0:Skyrim.esm":{"m":"light","c":"body"},"accc1:Skyrim.esm":{"m":"light","c":"body"},"accc6:Skyrim.esm":{"m":"light","c":"hands"},"accc8:Skyrim.esm":{"m":"light","c":"hands"},"accc9:Skyrim.esm":{"m":"light","c":"hands"},"acccd:Skyrim.esm":{"m":"light","c":"hands"},"accce:Skyrim.esm":{"m":"light","c":"hands"},"accd1:Skyrim.esm":{"m":"light","c":"hands"},"accd2:Skyrim.esm":{"m":"light","c":"hands"},"ad451:Skyrim.esm":{"m":"fur","c":"feet"},"ad452:Skyrim.esm":{"m":"fur","c":"feet"},"ad489:Skyrim.esm":{"m":"fur","c":"feet"},"ad48a:Skyrim.esm":{"m":"fur","c":"feet"},"ad48b:Skyrim.esm":{"m":"fur","c":"feet"},"ad48c:Skyrim.esm":{"m":"fur","c":"feet"},"ad48d:Skyrim.esm":{"m":"fur","c":"feet"},"ad48e:Skyrim.esm":{"m":"fur","c":"feet"},"ad48f:Skyrim.esm":{"m":"fur","c":"feet"},"ad490:Skyrim.esm":{"m":"fur","c":"feet"},"ad491:Skyrim.esm":{"m":"fur","c":"body"},"ad492:Skyrim.esm":{"m":"fur","c":"body"},"ad494:Skyrim.esm":{"m":"fur","c":"body"},"ad495:Skyrim.esm":{"m":"fur","c":"body"},"ad4ad:Skyrim.esm":{"m":"fur","c":"hands"},"ad4ae:Skyrim.esm":{"m":"fur","c":"hands"},"ad4af:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b0:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b1:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b2:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b3:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b4:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b7:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b8:Skyrim.esm":{"m":"fur","c":"hands"},"ad4b9:Skyrim.esm":{"m":"fur","c":"hands"},"ad4ba:Skyrim.esm":{"m":"fur","c":"hands"},"ad4bb:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4bc:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4bd:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4be:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4bf:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c0:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c3:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c4:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c5:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c6:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c7:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c8:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4c9:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4ca:Skyrim.esm":{"m":"fur","c":"hair,circlet"},"ad4d3:Skyrim.esm":{"m":"leather","c":"body"},"ad4d4:Skyrim.esm":{"m":"leather","c":"body"},"ad4d5:Skyrim.esm":{"m":"leather","c":"body"},"ad4d6:Skyrim.esm":{"m":"leather","c":"body"},"ad4df:Skyrim.esm":{"m":"light","c":"feet"},"ad4e0:Skyrim.esm":{"m":"light","c":"feet"},"ad4e1:Skyrim.esm":{"m":"light","c":"feet"},"ad4e2:Skyrim.esm":{"m":"light","c":"feet"},"ad4e3:Skyrim.esm":{"m":"light","c":"feet"},"ad4e4:Skyrim.esm":{"m":"light","c":"feet"},"ad4e5:Skyrim.esm":{"m":"light","c":"feet"},"ad4e6:Skyrim.esm":{"m":"light","c":"feet"},"ad4e7:Skyrim.esm":{"m":"light","c":"feet"},"ad4e8:Skyrim.esm":{"m":"light","c":"feet"},"ad4e9:Skyrim.esm":{"m":"light","c":"body"},"ad4ea:Skyrim.esm":{"m":"light","c":"body"},"ad4eb:Skyrim.esm":{"m":"light","c":"body"},"ad4ec:Skyrim.esm":{"m":"light","c":"body"},"ad4f0:Skyrim.esm":{"m":"light","c":"body"},"ad4f5:Skyrim.esm":{"m":"light","c":"hands"},"ad4f6:Skyrim.esm":{"m":"light","c":"hands"},"ad4f9:Skyrim.esm":{"m":"light","c":"hands"},"ad4fa:Skyrim.esm":{"m":"light","c":"hands"},"ad4fb:Skyrim.esm":{"m":"light","c":"hands"},"ad4fc:Skyrim.esm":{"m":"light","c":"hands"},"ad503:Skyrim.esm":{"m":"light","c":"hands"},"ad504:Skyrim.esm":{"m":"light","c":"hands"},"ad505:Skyrim.esm":{"m":"leather","c":"hands"},"ad506:Skyrim.esm":{"m":"light","c":"hands"},"ad50b:Skyrim.esm":{"m":"light","c":"hands"},"ad50c:Skyrim.esm":{"m":"light","c":"hands"},"ad50d:Skyrim.esm":{"m":"light","c":"hands"},"ad50e:Skyrim.esm":{"m":"light","c":"hands"},"ad51f:Skyrim.esm":{"m":"heavy","c":"body"},"ad520:Skyrim.esm":{"m":"heavy","c":"body"},"ad521:Skyrim.esm":{"m":"heavy","c":"body"},"ad522:Skyrim.esm":{"m":"heavy","c":"body"},"ad55b:Skyrim.esm":{"m":"heavy","c":"feet"},"ad55c:Skyrim.esm":{"m":"heavy","c":"feet"},"ad55d:Skyrim.esm":{"m":"heavy","c":"feet"},"ad55e:Skyrim.esm":{"m":"heavy","c":"feet"},"ad55f:Skyrim.esm":{"m":"heavy","c":"feet"},"ad560:Skyrim.esm":{"m":"heavy","c":"feet"},"ad561:Skyrim.esm":{"m":"heavy","c":"feet"},"ad562:Skyrim.esm":{"m":"heavy","c":"feet"},"ad563:Skyrim.esm":{"m":"heavy","c":"body"},"ad564:Skyrim.esm":{"m":"heavy","c":"body"},"ad565:Skyrim.esm":{"m":"heavy","c":"body"},"ad566:Skyrim.esm":{"m":"heavy","c":"body"},"ad57b:Skyrim.esm":{"m":"heavy","c":"hands"},"ad57c:Skyrim.esm":{"m":"heavy","c":"hands"},"ad57d:Skyrim.esm":{"m":"heavy","c":"hands"},"ad57e:Skyrim.esm":{"m":"heavy","c":"hands"},"ad583:Skyrim.esm":{"m":"heavy","c":"hands"},"ad584:Skyrim.esm":{"m":"heavy","c":"hands"},"ad585:Skyrim.esm":{"m":"heavy","c":"hands"},"ad586:Skyrim.esm":{"m":"heavy","c":"hands"},"ad587:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad588:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad589:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad58a:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad58b:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad58c:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad58f:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad590:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad591:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad592:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad593:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad594:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad595:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad597:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"ad5a0:Skyrim.esm":{"m":"fur","c":"body"},"aea2:Solitude Arena.esp":{"m":"light","c":"head,hair,circlet,ears"},"af635:Skyrim.esm":{"m":"cloth","c":"head"},"b0bcb:Apocalypse - Magic of Skyrim.esp":{"m":"fur","c":"body,arms,calves"},"b0bd7:Apocalypse - Magic of Skyrim.esp":{"m":"fur","c":"feet"},"b0bd8:Apocalypse - Magic of Skyrim.esp":{"m":"fur","c":"hands"},"b144d:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"b145b:Skyrim.esm":{"m":"cloth","c":"hands"},"b1460:Skyrim.esm":{"m":"cloth","c":"feet"},"b1959:Skyrim.esm":{"m":"cloth","c":"body"},"b21a3:Apocalypse - Magic of Skyrim.esp":{"m":"fur","c":"body,arms,calves"},"b21a4:Apocalypse - Magic of Skyrim.esp":{"m":"fur","c":"feet"},"b4225:Skyrim.esm":{"m":"leather","c":"feet"},"b4226:Skyrim.esm":{"m":"leather","c":"feet"},"b4227:Skyrim.esm":{"m":"leather","c":"feet"},"b4228:Skyrim.esm":{"m":"leather","c":"feet"},"b4229:Skyrim.esm":{"m":"leather","c":"feet"},"b422a:Skyrim.esm":{"m":"leather","c":"feet"},"b422b:Skyrim.esm":{"m":"leather","c":"feet"},"b422c:Skyrim.esm":{"m":"leather","c":"feet"},"b422d:Skyrim.esm":{"m":"leather","c":"feet"},"b422e:Skyrim.esm":{"m":"leather","c":"feet"},"b422f:Skyrim.esm":{"m":"leather","c":"feet"},"b4230:Skyrim.esm":{"m":"leather","c":"feet"},"b4231:Skyrim.esm":{"m":"leather","c":"feet"},"b4232:Skyrim.esm":{"m":"leather","c":"feet"},"b4233:Skyrim.esm":{"m":"leather","c":"feet"},"b4234:Skyrim.esm":{"m":"leather","c":"body"},"b4235:Skyrim.esm":{"m":"leather","c":"body"},"b4236:Skyrim.esm":{"m":"leather","c":"body"},"b4237:Skyrim.esm":{"m":"leather","c":"body"},"b4238:Skyrim.esm":{"m":"leather","c":"body"},"b4239:Skyrim.esm":{"m":"leather","c":"body"},"b443:Solitude Arena.esp":{"m":"light","c":"head,hair,circlet,ears"},"b504d:Skyrim.esm":{"m":"leather","c":"hands"},"b504e:Skyrim.esm":{"m":"leather","c":"hands"},"b504f:Skyrim.esm":{"m":"leather","c":"hands"},"b5050:Skyrim.esm":{"m":"leather","c":"hands"},"b5051:Skyrim.esm":{"m":"leather","c":"hands"},"b5052:Skyrim.esm":{"m":"leather","c":"hands"},"b5053:Skyrim.esm":{"m":"leather","c":"hands"},"b5054:Skyrim.esm":{"m":"leather","c":"hands"},"b5055:Skyrim.esm":{"m":"leather","c":"hands"},"b5056:Skyrim.esm":{"m":"leather","c":"hands"},"b5057:Skyrim.esm":{"m":"leather","c":"hands"},"b5058:Skyrim.esm":{"m":"leather","c":"hands"},"b505c:Skyrim.esm":{"m":"leather","c":"hands"},"b505d:Skyrim.esm":{"m":"leather","c":"hands"},"b505e:Skyrim.esm":{"m":"leather","c":"hands"},"b505f:Skyrim.esm":{"m":"leather","c":"hands"},"b5060:Skyrim.esm":{"m":"leather","c":"hands"},"b5061:Skyrim.esm":{"m":"leather","c":"hands"},"b5062:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5063:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5064:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5065:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5066:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5067:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5068:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5069:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b506a:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b506b:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b506c:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b506d:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5077:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5078:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b5079:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507a:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507b:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507c:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507d:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507e:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b507f:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"b509a:Skyrim.esm":{"m":"heavy","c":"feet"},"b509b:Skyrim.esm":{"m":"heavy","c":"feet"},"b509c:Skyrim.esm":{"m":"heavy","c":"feet"},"b509d:Skyrim.esm":{"m":"heavy","c":"feet"},"b509e:Skyrim.esm":{"m":"heavy","c":"feet"},"b509f:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a0:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a1:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a2:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a3:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a4:Skyrim.esm":{"m":"heavy","c":"feet"},"b50a5:Skyrim.esm":{"m":"heavy","c":"body"},"b50a6:Skyrim.esm":{"m":"heavy","c":"body"},"b50a7:Skyrim.esm":{"m":"heavy","c":"body"},"b50a8:Skyrim.esm":{"m":"heavy","c":"body"},"b50a9:Skyrim.esm":{"m":"heavy","c":"body"},"b50aa:Skyrim.esm":{"m":"heavy","c":"body"},"b50be:Skyrim.esm":{"m":"heavy","c":"hands"},"b50bf:Skyrim.esm":{"m":"heavy","c":"hands"},"b50c1:Skyrim.esm":{"m":"heavy","c":"hands"},"b50c2:Skyrim.esm":{"m":"heavy","c":"hands"},"b50cb:Skyrim.esm":{"m":"heavy","c":"hands"},"b50cc:Skyrim.esm":{"m":"heavy","c":"hands"},"b50cd:Skyrim.esm":{"m":"heavy","c":"hands"},"b50ce:Skyrim.esm":{"m":"heavy","c":"hands"},"b50d1:Skyrim.esm":{"m":"heavy","c":"hands"},"b50d2:Skyrim.esm":{"m":"heavy","c":"hands"},"b50d3:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50d4:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50d5:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50d7:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50d8:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50d9:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50da:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50db:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50dc:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50dd:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50de:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50df:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e0:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e3:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e4:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e5:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e6:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e7:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e8:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50e9:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50ea:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b50f9:Skyrim.esm":{"m":"heavy","c":"feet"},"b5a76:Playable Rieklings.esp":{"m":"cloth","c":"body,hands"},"b5a79:Playable Rieklings.esp":{"m":"cloth","c":"body,hands"},"b5db:Dawnguard.esm":{"m":"leather","c":"body"},"b5de:Dawnguard.esm":{"m":"leather","c":"feet"},"b64d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"b64e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"b64f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"b650:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"b6fa0:Skyrim.esm":{"m":"cloth","c":"head"},"b72b4:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hands,arms,calves"},"b781b:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,circlet"},"b799a:Skyrim.esm":{"m":"cloth","c":"head"},"b83cb:Skyrim.esm":{"m":"cloth","c":"body"},"b83cd:Skyrim.esm":{"m":"cloth","c":"feet"},"b83cf:Skyrim.esm":{"m":"cloth","c":"hands"},"b8837:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"b8e80:WindhelmSSE.esp":{"m":"cloth","c":"chest"},"b8e81:WindhelmSSE.esp":{"m":"cloth","c":"chest"},"b8e83:WindhelmSSE.esp":{"m":"cloth","c":"neck"},"b8e85:WindhelmSSE.esp":{"m":"cloth","c":"neck"},"b970d:Skyrim.esm":{"m":"leather","c":"feet"},"b970e:Skyrim.esm":{"m":"leather","c":"feet"},"b970f:Skyrim.esm":{"m":"leather","c":"feet"},"b9710:Skyrim.esm":{"m":"leather","c":"feet"},"b9711:Skyrim.esm":{"m":"leather","c":"feet"},"b9712:Skyrim.esm":{"m":"leather","c":"feet"},"b9713:Skyrim.esm":{"m":"leather","c":"feet"},"b9714:Skyrim.esm":{"m":"leather","c":"feet"},"b9715:Skyrim.esm":{"m":"leather","c":"feet"},"b9716:Skyrim.esm":{"m":"leather","c":"feet"},"b9717:Skyrim.esm":{"m":"leather","c":"feet"},"b9718:Skyrim.esm":{"m":"leather","c":"feet"},"b9719:Skyrim.esm":{"m":"leather","c":"feet"},"b971a:Skyrim.esm":{"m":"leather","c":"feet"},"b971b:Skyrim.esm":{"m":"leather","c":"feet"},"b971c:Skyrim.esm":{"m":"leather","c":"body"},"b971d:Skyrim.esm":{"m":"leather","c":"body"},"b971e:Skyrim.esm":{"m":"leather","c":"body"},"b971f:Skyrim.esm":{"m":"leather","c":"body"},"b9720:Skyrim.esm":{"m":"leather","c":"body"},"b9721:Skyrim.esm":{"m":"leather","c":"body"},"b972e:Skyrim.esm":{"m":"leather","c":"hands"},"b972f:Skyrim.esm":{"m":"leather","c":"hands"},"b9730:Skyrim.esm":{"m":"leather","c":"hands"},"b9734:Skyrim.esm":{"m":"leather","c":"hands"},"b9735:Skyrim.esm":{"m":"leather","c":"hands"},"b9736:Skyrim.esm":{"m":"leather","c":"hands"},"b9737:Skyrim.esm":{"m":"leather","c":"hands"},"b9738:Skyrim.esm":{"m":"leather","c":"hands"},"b9739:Skyrim.esm":{"m":"leather","c":"hands"},"b9740:Skyrim.esm":{"m":"leather","c":"hands"},"b9741:Skyrim.esm":{"m":"leather","c":"hands"},"b9742:Skyrim.esm":{"m":"leather","c":"hands"},"b9743:Skyrim.esm":{"m":"leather","c":"hands"},"b9744:Skyrim.esm":{"m":"leather","c":"hands"},"b9745:Skyrim.esm":{"m":"leather","c":"hands"},"b9746:Skyrim.esm":{"m":"leather","c":"hands"},"b9747:Skyrim.esm":{"m":"light","c":"hands"},"b9748:Skyrim.esm":{"m":"leather","c":"hands"},"b9749:Skyrim.esm":{"m":"leather","c":"hands"},"b974a:Skyrim.esm":{"m":"leather","c":"hands"},"b974b:Skyrim.esm":{"m":"leather","c":"hands"},"b974f:Skyrim.esm":{"m":"leather","c":"hands"},"b9750:Skyrim.esm":{"m":"leather","c":"hands"},"b9751:Skyrim.esm":{"m":"leather","c":"hands"},"b9752:Skyrim.esm":{"m":"leather","c":"hands"},"b9753:Skyrim.esm":{"m":"leather","c":"hands"},"b9754:Skyrim.esm":{"m":"leather","c":"hands"},"b9c2d:Skyrim.esm":{"m":"cloth","c":"body"},"ba546:Skyrim.esm":{"m":"cloth","c":"body"},"ba99a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"ba99b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"ba99c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"babb8:Playable Rieklings.esp":{"m":"leather","c":"body"},"babb9:Playable Rieklings.esp":{"m":"leather","c":"body"},"babca:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babcb:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babcc:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babcd:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babce:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babcf:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babd0:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babd1:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babdd:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babde:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babdf:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babe0:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babe1:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babe3:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babe4:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babe5:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babea:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babeb:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babec:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babed:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babee:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babef:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf0:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf1:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf2:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf3:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf4:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf5:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf6:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf7:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf8:Playable Rieklings.esp":{"m":"cloth","c":"body"},"babf9:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bacd7:Skyrim.esm":{"m":"cloth","c":"feet"},"bacf3:Skyrim.esm":{"m":"cloth","c":"body"},"bbeef:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms"},"bbef7:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"bbef8:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hands"},"bdfb9:Skyrim.esm":{"m":"light","c":"feet"},"bdfba:Skyrim.esm":{"m":"light","c":"feet"},"bdfbb:Skyrim.esm":{"m":"light","c":"feet"},"bdfbc:Skyrim.esm":{"m":"light","c":"feet"},"bdfbd:Skyrim.esm":{"m":"light","c":"feet"},"bdfbe:Skyrim.esm":{"m":"light","c":"feet"},"bdfbf:Skyrim.esm":{"m":"light","c":"feet"},"bdfc0:Skyrim.esm":{"m":"light","c":"feet"},"bdfc1:Skyrim.esm":{"m":"light","c":"feet"},"bdfc2:Skyrim.esm":{"m":"light","c":"feet"},"bdfc3:Skyrim.esm":{"m":"light","c":"feet"},"bdfc4:Skyrim.esm":{"m":"light","c":"body"},"bdfc5:Skyrim.esm":{"m":"light","c":"body"},"bdfc6:Skyrim.esm":{"m":"light","c":"body"},"bdfc7:Skyrim.esm":{"m":"light","c":"body"},"bdfda:Skyrim.esm":{"m":"light","c":"hands"},"bdfdb:Skyrim.esm":{"m":"light","c":"hands"},"bdfdc:Skyrim.esm":{"m":"light","c":"hands"},"bdfdd:Skyrim.esm":{"m":"light","c":"hands"},"bdfde:Skyrim.esm":{"m":"light","c":"hands"},"bdfdf:Skyrim.esm":{"m":"light","c":"hands"},"bdfe0:Skyrim.esm":{"m":"light","c":"hands"},"bdfe1:Skyrim.esm":{"m":"light","c":"hands"},"bdfe4:Skyrim.esm":{"m":"light","c":"hands"},"bdfe5:Skyrim.esm":{"m":"light","c":"hands"},"bdfe6:Skyrim.esm":{"m":"light","c":"hands"},"bdfe7:Skyrim.esm":{"m":"light","c":"hands"},"bdfe8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdfe9:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdfea:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdfeb:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdfec:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdfed:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff0:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff1:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff5:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bdff8:Skyrim.esm":{"m":"light","c":"feet"},"be03a:Skyrim.esm":{"m":"light","c":"feet"},"be03b:Skyrim.esm":{"m":"light","c":"feet"},"be03c:Skyrim.esm":{"m":"light","c":"feet"},"be03d:Skyrim.esm":{"m":"light","c":"body"},"be03e:Skyrim.esm":{"m":"light","c":"body"},"be048:Skyrim.esm":{"m":"light","c":"hands"},"be049:Skyrim.esm":{"m":"light","c":"hands"},"be04a:Skyrim.esm":{"m":"light","c":"hands"},"be04b:Skyrim.esm":{"m":"light","c":"hands"},"be04d:Skyrim.esm":{"m":"light","c":"hands"},"be04e:Skyrim.esm":{"m":"light","c":"hands"},"be04f:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be050:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be051:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be053:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be054:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be055:Skyrim.esm":{"m":"light","c":"hair,circlet"},"be056:Skyrim.esm":{"m":"light","c":"hair,circlet"},"bfd64:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfd65:Playable Rieklings.esp":{"m":"heavy","c":"hands"},"bfd66:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd67:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd68:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd69:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd6a:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd6b:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd6c:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd6d:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd6e:Playable Rieklings.esp":{"m":"fur","c":"body"},"bfd6f:Playable Rieklings.esp":{"m":"fur","c":"hands"},"bfd70:Playable Rieklings.esp":{"m":"light","c":"body"},"bfd71:Playable Rieklings.esp":{"m":"light","c":"hands"},"bfd72:Playable Rieklings.esp":{"m":"leather","c":"body"},"bfd73:Playable Rieklings.esp":{"m":"leather","c":"hands"},"bfd74:Playable Rieklings.esp":{"m":"leather","c":"body"},"bfd75:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfd76:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfd77:Playable Rieklings.esp":{"m":"leather","c":"body"},"bfd78:Playable Rieklings.esp":{"m":"leather","c":"hands"},"bfd7a:Playable Rieklings.esp":{"m":"leather","c":"body"},"bfd7b:Playable Rieklings.esp":{"m":"leather","c":"hands"},"bfd7c:Playable Rieklings.esp":{"m":"light","c":"body"},"bfd7d:Playable Rieklings.esp":{"m":"light","c":"body"},"bfd7e:Playable Rieklings.esp":{"m":"light","c":"hands"},"bfd7f:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfd80:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfd81:Playable Rieklings.esp":{"m":"heavy","c":"hands"},"bfd82:Playable Rieklings.esp":{"m":"heavy","c":"hands"},"bfd83:Playable Rieklings.esp":{"m":"fur","c":"body"},"bfd84:Playable Rieklings.esp":{"m":"fur","c":"body"},"bfd85:Playable Rieklings.esp":{"m":"fur","c":"body"},"bfd86:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd87:Playable Rieklings.esp":{"m":"leather","c":"body"},"bfd88:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfd89:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfd8a:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd8b:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfd8c:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd8d:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfd8f:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd90:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd95:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd96:Playable Rieklings.esp":{"m":"cloth","c":"hair"},"bfd97:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd98:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd99:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd9a:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd9b:Playable Rieklings.esp":{"m":"cloth","c":"hair,body,circlet"},"bfd9c:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd9d:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd9e:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfd9f:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfda4:Playable Rieklings.esp":{"m":"cloth","c":"circlet"},"bfda5:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfda9:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdaa:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdab:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdac:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdad:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdae:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdaf:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdb0:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdb1:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"bfdb2:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdb4:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfdb6:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"bfdb7:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdb9:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdba:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfdbb:Playable Rieklings.esp":{"m":"cloth","c":"circlet"},"bfdbd:Playable Rieklings.esp":{"m":"light","c":"body"},"bfdbe:Playable Rieklings.esp":{"m":"light","c":"body"},"bfdbf:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"bfe25:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe26:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"bfe27:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe2f:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe36:Playable Rieklings.esp":{"m":"heavy","c":"head,hair,ears"},"bfe37:Playable Rieklings.esp":{"m":"heavy","c":"head,hair,ears"},"bfe38:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe39:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe3c:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe3d:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"bfe3e:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe40:Playable Rieklings.esp":{"m":"heavy","c":"body"},"bfe41:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfe42:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe43:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfe44:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfe45:Playable Rieklings.esp":{"m":"cloth","c":"hands"},"bfe46:Playable Rieklings.esp":{"m":"cloth","c":"hair"},"bfe47:Playable Rieklings.esp":{"m":"cloth","c":"hair"},"bfe48:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe49:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe4a:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe4b:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe4c:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe4d:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bfe4e:Playable Rieklings.esp":{"m":"fur","c":"body"},"bff2e:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bff30:Playable Rieklings.esp":{"m":"cloth","c":"body"},"bff36:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"c0165:Skyrim.esm":{"m":"cloth","c":"body"},"c0166:Skyrim.esm":{"m":"cloth","c":"feet"},"c02f8:Skyrim.esm":{"m":"cloth","c":"body"},"c02fb:Skyrim.esm":{"m":"cloth","c":"body"},"c0372:Playable Rieklings.esp":{"m":"cloth","c":"feet"},"c236d:Skyrim.esm":{"m":"cloth","c":"neck"},"c33bd:Skyrim.esm":{"m":"light","c":"body"},"c36e8:Skyrim.esm":{"m":"cloth","c":"feet"},"c36ea:Skyrim.esm":{"m":"cloth","c":"body"},"c39f0:Skyrim.esm":{"m":"cloth","c":"body"},"c3ce6:Skyrim.esm":{"m":"heavy","c":"hands"},"c3ee0:Skyrim.esm":{"m":"cloth","c":"body"},"c5d10:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"c5d11:Skyrim.esm":{"m":"cloth","c":"body"},"c5d12:Skyrim.esm":{"m":"cloth","c":"feet"},"c691:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"c692:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"c693:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"c694:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair"},"c73e:HearthFires.esm":{"m":"cloth","c":"body"},"c740:HearthFires.esm":{"m":"cloth","c":"body"},"c7cbb:Skyrim.esm":{"m":"cloth","c":"body"},"c7cbd:Skyrim.esm":{"m":"cloth","c":"feet"},"c7f5b:Skyrim.esm":{"m":"fur","c":"body"},"c7f5c:Skyrim.esm":{"m":"fur","c":"head,hair,circlet,ears"},"c814:Dawnguard.esm":{"m":"cloth","c":"circlet"},"c815:Dawnguard.esm":{"m":"light","c":"feet"},"c816:Dawnguard.esm":{"m":"light","c":"body"},"c817:Dawnguard.esm":{"m":"light","c":"hands"},"cad3:Dawnguard.esm":{"m":"light","c":"body"},"cae15:Skyrim.esm":{"m":"cloth","c":"body"},"cc84b:Skyrim.esm":{"m":"cloth","c":"body"},"cc84c:Skyrim.esm":{"m":"cloth","c":"body"},"cdd86:Skyrim.esm":{"m":"cloth","c":"body"},"ce1ad:Skyrim.esm":{"m":"light","c":"body"},"ce1ae:Skyrim.esm":{"m":"light","c":"body"},"ce1af:Skyrim.esm":{"m":"light","c":"body"},"ce1b0:Skyrim.esm":{"m":"light","c":"body"},"ce1b1:Skyrim.esm":{"m":"light","c":"body"},"ce1b2:Skyrim.esm":{"m":"light","c":"body"},"cee6e:Skyrim.esm":{"m":"cloth","c":"body"},"cee70:Skyrim.esm":{"m":"cloth","c":"feet"},"cee72:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"cee74:Skyrim.esm":{"m":"cloth","c":"hands"},"cee76:Skyrim.esm":{"m":"cloth","c":"body"},"cee78:Skyrim.esm":{"m":"cloth","c":"feet"},"cee7c:Skyrim.esm":{"m":"cloth","c":"feet"},"cee7e:Skyrim.esm":{"m":"cloth","c":"hands"},"cee80:Skyrim.esm":{"m":"cloth","c":"body"},"cee82:Skyrim.esm":{"m":"cloth","c":"feet"},"cee84:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"cf7af:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b0:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b1:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b2:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b3:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b4:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b5:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b6:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b7:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b8:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7b9:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7ba:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7bb:Skyrim.esm":{"m":"heavy","c":"feet"},"cf7c2:Skyrim.esm":{"m":"heavy","c":"body"},"cf7c3:Skyrim.esm":{"m":"heavy","c":"body"},"cf7c4:Skyrim.esm":{"m":"heavy","c":"body"},"cf7c5:Skyrim.esm":{"m":"heavy","c":"body"},"cf7c6:Skyrim.esm":{"m":"heavy","c":"body"},"cf7c7:Skyrim.esm":{"m":"heavy","c":"body"},"cf7d8:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7d9:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7da:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7ed:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7ee:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7ef:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f0:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f1:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f2:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f6:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f7:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f8:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7f9:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7fa:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7fb:Skyrim.esm":{"m":"heavy","c":"hands"},"cf7fc:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf7fd:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf7fe:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf7ff:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf800:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf801:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf802:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf803:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf804:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf805:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf806:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf807:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf80b:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf80c:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf80d:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf80e:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf80f:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf810:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf811:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf812:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf813:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf814:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf815:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf816:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf817:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"cf824:Skyrim.esm":{"m":"heavy","c":"feet"},"cf825:Skyrim.esm":{"m":"heavy","c":"feet"},"cf826:Skyrim.esm":{"m":"heavy","c":"feet"},"cf827:Skyrim.esm":{"m":"heavy","c":"feet"},"cf828:Skyrim.esm":{"m":"heavy","c":"feet"},"cf829:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82a:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82b:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82c:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82d:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82e:Skyrim.esm":{"m":"heavy","c":"feet"},"cf82f:Skyrim.esm":{"m":"heavy","c":"feet"},"cf830:Skyrim.esm":{"m":"heavy","c":"feet"},"cf837:Skyrim.esm":{"m":"heavy","c":"body"},"cf838:Skyrim.esm":{"m":"heavy","c":"body"},"cf839:Skyrim.esm":{"m":"heavy","c":"body"},"cf83a:Skyrim.esm":{"m":"heavy","c":"body"},"cf83b:Skyrim.esm":{"m":"heavy","c":"body"},"cf83c:Skyrim.esm":{"m":"heavy","c":"body"},"cf84d:Skyrim.esm":{"m":"heavy","c":"hands"},"cf84e:Skyrim.esm":{"m":"heavy","c":"hands"},"cf84f:Skyrim.esm":{"m":"heavy","c":"hands"},"cf862:Skyrim.esm":{"m":"heavy","c":"hands"},"cf863:Skyrim.esm":{"m":"heavy","c":"hands"},"cf864:Skyrim.esm":{"m":"heavy","c":"hands"},"cf865:Skyrim.esm":{"m":"heavy","c":"hands"},"cf866:Skyrim.esm":{"m":"heavy","c":"hands"},"cf867:Skyrim.esm":{"m":"heavy","c":"hands"},"cf86b:Skyrim.esm":{"m":"heavy","c":"hands"},"cf86c:Skyrim.esm":{"m":"heavy","c":"hands"},"cf86d:Skyrim.esm":{"m":"heavy","c":"hands"},"cf86e:Skyrim.esm":{"m":"heavy","c":"hands"},"cf86f:Skyrim.esm":{"m":"heavy","c":"hands"},"cf870:Skyrim.esm":{"m":"heavy","c":"hands"},"cf871:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf872:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf873:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf874:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf875:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf876:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf877:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf878:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf879:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf87a:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf87b:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf87c:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf880:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf881:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf882:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf883:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf884:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf885:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf886:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf887:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf888:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf889:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf88a:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf88b:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf88c:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"cf89c:Skyrim.esm":{"m":"cloth","c":"body"},"cf89f:Skyrim.esm":{"m":"cloth","c":"feet"},"cf8a0:Skyrim.esm":{"m":"cloth","c":"body"},"cf8a1:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"cf8a9:Skyrim.esm":{"m":"cloth","c":"hands"},"cf8b0:Skyrim.esm":{"m":"cloth","c":"feet"},"cf8b1:Skyrim.esm":{"m":"cloth","c":"hands"},"cf8b2:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"cf8b3:Skyrim.esm":{"m":"cloth","c":"body"},"cfaf:Dawnguard.esm":{"m":"heavy","c":"feet"},"cfb0:Dawnguard.esm":{"m":"heavy","c":"body"},"cfb2:Dawnguard.esm":{"m":"fur","c":"hands"},"d15a6:Skyrim.esm":{"m":"cloth","c":"back"},"d15a7:Skyrim.esm":{"m":"cloth","c":"neck"},"d15a8:Skyrim.esm":{"m":"cloth","c":"chest"},"d16d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"head,hair,circlet,ears"},"d16e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d16f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d170:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d171:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d172:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d173:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d174:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"head,hair,circlet,ears"},"d191f:Skyrim.esm":{"m":"cloth","c":"body"},"d1921:Skyrim.esm":{"m":"cloth","c":"feet"},"d1f3b:Skyrim.esm":{"m":"cloth","c":"hair,body,circlet"},"d2842:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"d2843:Skyrim.esm":{"m":"cloth","c":"hands"},"d2844:Skyrim.esm":{"m":"cloth","c":"body"},"d2845:Skyrim.esm":{"m":"cloth","c":"feet"},"d2846:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d30be:WindhelmSSE.esp":{"m":"cloth","c":"hair"},"d3ac2:Skyrim.esm":{"m":"leather","c":"feet"},"d3ac3:Skyrim.esm":{"m":"leather","c":"body"},"d3ac4:Skyrim.esm":{"m":"leather","c":"hands"},"d3ac5:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"d3acb:Skyrim.esm":{"m":"leather","c":"feet"},"d3acc:Skyrim.esm":{"m":"leather","c":"body"},"d3acd:Skyrim.esm":{"m":"leather","c":"hands"},"d3ace:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"d3de8:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"d3de9:Skyrim.esm":{"m":"cloth","c":"body"},"d3dea:Skyrim.esm":{"m":"cloth","c":"body"},"d3ea0:Skyrim.esm":{"m":"cloth","c":"body"},"d3ea7:Skyrim.esm":{"m":"cloth","c":"feet"},"d3eaa:Skyrim.esm":{"m":"cloth","c":"hair"},"d3eab:Skyrim.esm":{"m":"cloth","c":"hands"},"d536e:Skyrim.esm":{"m":"light","c":"feet"},"d536f:Skyrim.esm":{"m":"light","c":"feet"},"d5370:Skyrim.esm":{"m":"light","c":"feet"},"d5371:Skyrim.esm":{"m":"light","c":"feet"},"d5372:Skyrim.esm":{"m":"light","c":"feet"},"d5373:Skyrim.esm":{"m":"light","c":"feet"},"d5374:Skyrim.esm":{"m":"light","c":"feet"},"d5375:Skyrim.esm":{"m":"light","c":"feet"},"d5376:Skyrim.esm":{"m":"light","c":"feet"},"d5377:Skyrim.esm":{"m":"light","c":"feet"},"d5378:Skyrim.esm":{"m":"light","c":"feet"},"d5379:Skyrim.esm":{"m":"light","c":"feet"},"d537a:Skyrim.esm":{"m":"light","c":"feet"},"d5381:Skyrim.esm":{"m":"light","c":"body"},"d5382:Skyrim.esm":{"m":"light","c":"body"},"d5383:Skyrim.esm":{"m":"light","c":"body"},"d5384:Skyrim.esm":{"m":"light","c":"body"},"d5385:Skyrim.esm":{"m":"light","c":"body"},"d5386:Skyrim.esm":{"m":"light","c":"body"},"d5397:Skyrim.esm":{"m":"light","c":"hands"},"d5398:Skyrim.esm":{"m":"light","c":"hands"},"d5399:Skyrim.esm":{"m":"light","c":"hands"},"d53ac:Skyrim.esm":{"m":"light","c":"hands"},"d53ad:Skyrim.esm":{"m":"light","c":"hands"},"d53ae:Skyrim.esm":{"m":"light","c":"hands"},"d53af:Skyrim.esm":{"m":"light","c":"hands"},"d53b0:Skyrim.esm":{"m":"light","c":"hands"},"d53b1:Skyrim.esm":{"m":"light","c":"hands"},"d53b5:Skyrim.esm":{"m":"light","c":"hands"},"d53b6:Skyrim.esm":{"m":"light","c":"hands"},"d53b7:Skyrim.esm":{"m":"light","c":"hands"},"d53bb:Skyrim.esm":{"m":"light","c":"hands"},"d53bc:Skyrim.esm":{"m":"light","c":"hands"},"d53bd:Skyrim.esm":{"m":"light","c":"hands"},"d53be:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53bf:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c0:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c1:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c5:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53c9:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53cd:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53ce:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53cf:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d0:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d1:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d2:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d3:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d5:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53d9:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d53e6:Skyrim.esm":{"m":"light","c":"feet"},"d53e7:Skyrim.esm":{"m":"light","c":"feet"},"d53e8:Skyrim.esm":{"m":"light","c":"feet"},"d53e9:Skyrim.esm":{"m":"light","c":"feet"},"d53ea:Skyrim.esm":{"m":"light","c":"feet"},"d53eb:Skyrim.esm":{"m":"light","c":"feet"},"d53ec:Skyrim.esm":{"m":"light","c":"feet"},"d53ed:Skyrim.esm":{"m":"light","c":"feet"},"d53ee:Skyrim.esm":{"m":"light","c":"feet"},"d53ef:Skyrim.esm":{"m":"light","c":"feet"},"d53f0:Skyrim.esm":{"m":"light","c":"feet"},"d53f1:Skyrim.esm":{"m":"light","c":"feet"},"d53f2:Skyrim.esm":{"m":"light","c":"feet"},"d53f3:Skyrim.esm":{"m":"light","c":"feet"},"d53f4:Skyrim.esm":{"m":"light","c":"feet"},"d53f5:Skyrim.esm":{"m":"light","c":"body"},"d53f6:Skyrim.esm":{"m":"light","c":"body"},"d53f7:Skyrim.esm":{"m":"light","c":"body"},"d53f8:Skyrim.esm":{"m":"light","c":"body"},"d53f9:Skyrim.esm":{"m":"light","c":"body"},"d53fa:Skyrim.esm":{"m":"light","c":"body"},"d62:CommonClothes.esp":{"m":"cloth","c":"body"},"d62:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d63:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"circlet"},"d64:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d64:Skyrim.esm":{"m":"cloth","c":"head,body,hands,feet"},"d65:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d66:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"head,hair,circlet,ears"},"d68:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d69:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d6a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d6b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d6c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d6d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d70:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d71:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d77:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d78:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d79:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d79a7:Skyrim.esm":{"m":"light","c":"feet"},"d79a8:Skyrim.esm":{"m":"light","c":"feet"},"d79a9:Skyrim.esm":{"m":"light","c":"feet"},"d79aa:Skyrim.esm":{"m":"light","c":"feet"},"d79ab:Skyrim.esm":{"m":"light","c":"feet"},"d79ac:Skyrim.esm":{"m":"light","c":"feet"},"d79ad:Skyrim.esm":{"m":"light","c":"feet"},"d79ae:Skyrim.esm":{"m":"light","c":"feet"},"d79af:Skyrim.esm":{"m":"light","c":"feet"},"d79b0:Skyrim.esm":{"m":"light","c":"feet"},"d79b1:Skyrim.esm":{"m":"light","c":"feet"},"d79b2:Skyrim.esm":{"m":"light","c":"feet"},"d79b3:Skyrim.esm":{"m":"light","c":"feet"},"d79ba:Skyrim.esm":{"m":"light","c":"body"},"d79bb:Skyrim.esm":{"m":"light","c":"body"},"d79bc:Skyrim.esm":{"m":"light","c":"body"},"d79bd:Skyrim.esm":{"m":"light","c":"body"},"d79be:Skyrim.esm":{"m":"light","c":"body"},"d79bf:Skyrim.esm":{"m":"light","c":"body"},"d79d0:Skyrim.esm":{"m":"light","c":"hands"},"d79d1:Skyrim.esm":{"m":"light","c":"hands"},"d79d2:Skyrim.esm":{"m":"light","c":"hands"},"d79e5:Skyrim.esm":{"m":"light","c":"hands"},"d79e6:Skyrim.esm":{"m":"light","c":"hands"},"d79e7:Skyrim.esm":{"m":"light","c":"hands"},"d79e8:Skyrim.esm":{"m":"light","c":"hands"},"d79e9:Skyrim.esm":{"m":"light","c":"hands"},"d79ea:Skyrim.esm":{"m":"light","c":"hands"},"d79ee:Skyrim.esm":{"m":"light","c":"hands"},"d79ef:Skyrim.esm":{"m":"light","c":"hands"},"d79f0:Skyrim.esm":{"m":"light","c":"hands"},"d79f1:Skyrim.esm":{"m":"light","c":"hands"},"d79f2:Skyrim.esm":{"m":"light","c":"hands"},"d79f3:Skyrim.esm":{"m":"light","c":"hands"},"d79f4:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79f5:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79f6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79f7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79f8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79f9:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79fa:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79fb:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79fc:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79fd:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79fe:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d79ff:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a03:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a04:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a05:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a06:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a07:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a08:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a09:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0a:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0b:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0c:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0d:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0e:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a0f:Skyrim.esm":{"m":"light","c":"hair,circlet"},"d7a1c:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a1d:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a1e:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a1f:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a20:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a21:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a22:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a23:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a24:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a25:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a26:Skyrim.esm":{"m":"heavy","c":"body"},"d7a27:Skyrim.esm":{"m":"heavy","c":"body"},"d7a28:Skyrim.esm":{"m":"heavy","c":"body"},"d7a29:Skyrim.esm":{"m":"heavy","c":"body"},"d7a2a:Skyrim.esm":{"m":"heavy","c":"body"},"d7a2b:Skyrim.esm":{"m":"heavy","c":"body"},"d7a3c:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a3d:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a3e:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a51:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a52:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a53:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a54:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a55:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a56:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5a:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5b:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5c:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5d:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5e:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a5f:Skyrim.esm":{"m":"heavy","c":"hands"},"d7a60:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a61:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a62:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a63:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a64:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a65:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a66:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a67:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a68:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a69:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a6a:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a6b:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a6f:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a70:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a71:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a72:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a73:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a74:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a75:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a76:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a77:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a78:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a79:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a7a:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a7b:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"d7a88:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a89:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8a:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8b:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8c:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8d:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8e:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a8f:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a90:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a91:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a92:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a93:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a94:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a95:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a96:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a97:Skyrim.esm":{"m":"heavy","c":"feet"},"d7a98:Skyrim.esm":{"m":"heavy","c":"body"},"d7a99:Skyrim.esm":{"m":"heavy","c":"body"},"d7a9a:Skyrim.esm":{"m":"heavy","c":"body"},"d7a9b:Skyrim.esm":{"m":"heavy","c":"body"},"d7a9c:Skyrim.esm":{"m":"heavy","c":"body"},"d7a9d:Skyrim.esm":{"m":"heavy","c":"body"},"d7a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d7aae:Skyrim.esm":{"m":"heavy","c":"hands"},"d7aaf:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ab0:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac3:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac4:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac5:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac6:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac7:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ac8:Skyrim.esm":{"m":"heavy","c":"hands"},"d7acc:Skyrim.esm":{"m":"heavy","c":"hands"},"d7acd:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ace:Skyrim.esm":{"m":"heavy","c":"hands"},"d7acf:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ad0:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ad1:Skyrim.esm":{"m":"heavy","c":"hands"},"d7ad2:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad3:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad4:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad5:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad6:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad7:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad8:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ad9:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ada:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7adb:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7adc:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7add:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae1:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae2:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae3:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae4:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae5:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae6:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae7:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae8:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7ae9:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7aea:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7aeb:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7aec:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7aed:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"d7b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d7c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d7d:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d7e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d7f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d80:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d83:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d84:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d85:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d86:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet,ears"},"d87:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet,ears"},"d88:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d89:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d8a:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d8b:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d8d4e:Skyrim.esm":{"m":"leather","c":"feet"},"d8d50:Skyrim.esm":{"m":"leather","c":"body"},"d8d52:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"d8d55:Skyrim.esm":{"m":"leather","c":"hands"},"d8e:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d8f:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d90:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d91:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"d92:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d93:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d95:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"feet"},"d96:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"body"},"d97:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hands"},"d97f:Dawnguard.esm":{"m":"cloth","c":"body"},"d980:Dawnguard.esm":{"m":"cloth","c":"body"},"d981:Dawnguard.esm":{"m":"cloth","c":"body"},"d98:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"hair,circlet"},"da750:Skyrim.esm":{"m":"heavy","c":"hair"},"dd920:WindhelmSSE.esp":{"m":"heavy","c":"body"},"dd922:WindhelmSSE.esp":{"m":"heavy","c":"hair,circlet"},"dd9d1:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"dd9d2:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,body,circlet"},"dd9d3:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"dd9d4:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,body,circlet"},"dd9d5:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"dd9d6:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,body,circlet"},"dd9d7:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"dd9d8:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,body,circlet"},"dd9d9:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"feet"},"dd9da:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9db:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9dc:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9dd:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9de:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9df:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9e0:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9e1:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9e2:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"dd9e3:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"circlet"},"e0dd0:Skyrim.esm":{"m":"cloth","c":"body"},"e0dd2:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"e0dd4:Skyrim.esm":{"m":"cloth","c":"feet"},"e1643:Skyrim.esm":{"m":"heavy","c":"hands"},"e1f14:Skyrim.esm":{"m":"cloth","c":"feet"},"e1f15:Skyrim.esm":{"m":"cloth","c":"body"},"e1f16:Skyrim.esm":{"m":"cloth","c":"hands"},"e1f17:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"e35d6:Skyrim.esm":{"m":"cloth","c":"feet"},"e35d7:Skyrim.esm":{"m":"cloth","c":"body"},"e35d8:Skyrim.esm":{"m":"cloth","c":"hands"},"e35d9:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"e35da:Skyrim.esm":{"m":"cloth","c":"feet"},"e35db:Skyrim.esm":{"m":"cloth","c":"body"},"e35dc:Skyrim.esm":{"m":"cloth","c":"hands"},"e35dd:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"e35df:Skyrim.esm":{"m":"leather","c":"hair,circlet"},"e35e7:Skyrim.esm":{"m":"cloth","c":"feet"},"e35e8:Skyrim.esm":{"m":"cloth","c":"body"},"e35e9:Skyrim.esm":{"m":"cloth","c":"hands"},"e35ea:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"e40ba:Skyrim.esm":{"m":"cloth","c":"body"},"e40bb:Skyrim.esm":{"m":"cloth","c":"body"},"e40de:Skyrim.esm":{"m":"cloth","c":"feet"},"e40df:Skyrim.esm":{"m":"cloth","c":"body"},"e6a0:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"e739b:Skyrim.esm":{"m":"cloth","c":"body"},"e7711:Skyrim.esm":{"m":"cloth","c":"body"},"e80a8:Skyrim.esm":{"m":"cloth","c":"feet"},"e84c1:Skyrim.esm":{"m":"cloth","c":"hands"},"e84c4:Skyrim.esm":{"m":"cloth","c":"body"},"e84c6:Skyrim.esm":{"m":"cloth","c":"body"},"e8dd:Dawnguard.esm":{"m":"cloth","c":"feet"},"e8de:Dawnguard.esm":{"m":"cloth","c":"body"},"e8df:Dawnguard.esm":{"m":"cloth","c":"hands"},"e8e0:Dawnguard.esm":{"m":"cloth","c":"hair,circlet"},"e9ea:Dawnguard.esm":{"m":"cloth","c":"feet"},"e9eb5:Skyrim.esm":{"m":"cloth","c":"body"},"e9eb:Dawnguard.esm":{"m":"cloth","c":"body"},"ead49:Skyrim.esm":{"m":"cloth","c":"body"},"eafd0:Skyrim.esm":{"m":"cloth","c":"body"},"eafd1:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"eafd2:Skyrim.esm":{"m":"cloth","c":"hands,arms"},"eafd3:Skyrim.esm":{"m":"cloth","c":"feet,calves"},"eb874:Skyrim.esm":{"m":"cloth","c":"head"},"eb875:Skyrim.esm":{"m":"cloth","c":"head"},"eb87c:Skyrim.esm":{"m":"cloth","c":"head"},"ebc0b:Skyrim.esm":{"m":"cloth","c":"body"},"ebe8f:Skyrim.esm":{"m":"cloth","c":"body"},"ee5c0:Skyrim.esm":{"m":"cloth","c":"hair,circlet"},"f0779:Skyrim.esm":{"m":"cloth","c":"body"},"f0cf:ElysiumEstate.esp":{"m":"cloth","c":"body"},"f1187:Skyrim.esm":{"m":"cloth","c":"head"},"f1229:Skyrim.esm":{"m":"cloth","c":"body"},"f17:YokuWeapons.esp":{"m":"heavy","c":"body"},"f1abd:Skyrim.esm":{"m":"heavy","c":"feet"},"f1abe:Skyrim.esm":{"m":"heavy","c":"body"},"f1ac0:Skyrim.esm":{"m":"heavy","c":"hands"},"f1b2c:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1b2d:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1b2e:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1b2f:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1b30:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1b31:Skyrim.esm":{"m":"cloth","c":"circlet"},"f1f:YokuWeapons.esp":{"m":"heavy","c":"feet"},"f20:YokuWeapons.esp":{"m":"heavy","c":"body"},"f21:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet"},"f22:YokuWeapons.esp":{"m":"heavy","c":"hands"},"f25:YokuWeapons.esp":{"m":"leather","c":"body"},"f27:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"f29:YokuWeapons.esp":{"m":"leather","c":"body"},"f2f:YokuWeapons.esp":{"m":"heavy","c":"body"},"f30:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet"},"f31:YokuWeapons.esp":{"m":"heavy","c":"hands"},"f34:YokuWeapons.esp":{"m":"heavy","c":"body"},"f3904:Skyrim.esm":{"m":"cloth","c":"head"},"f39:YokuWeapons.esp":{"m":"heavy","c":"body"},"f3a:YokuWeapons.esp":{"m":"heavy","c":"hands"},"f3b:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet"},"f3e:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"f3f7:Dawnguard.esm":{"m":"cloth","c":"body"},"f3fa:Dawnguard.esm":{"m":"cloth","c":"body"},"f3fb:Dawnguard.esm":{"m":"cloth","c":"body"},"f3fe:Dawnguard.esm":{"m":"cloth","c":"hands"},"f400:Dawnguard.esm":{"m":"cloth","c":"feet"},"f402:Dawnguard.esm":{"m":"cloth","c":"body"},"f404:Dawnguard.esm":{"m":"cloth","c":"body"},"f40:YokuWeapons.esp":{"m":"heavy","c":"feet"},"f42:YokuWeapons.esp":{"m":"heavy","c":"feet"},"f48:YokuWeapons.esp":{"m":"heavy","c":"body"},"f494e:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"f49:YokuWeapons.esp":{"m":"heavy","c":"hair,circlet"},"f4a:YokuWeapons.esp":{"m":"heavy","c":"hands"},"f4b:YokuWeapons.esp":{"m":"heavy","c":"feet"},"f4f:YokuWeapons.esp":{"m":"leather","c":"body"},"f4fd1:Skyrim.esm":{"m":"cloth","c":"body"},"f50:YokuWeapons.esp":{"m":"leather","c":"hair,circlet"},"f5981:Skyrim.esm":{"m":"cloth","c":"hands,arms"},"f69c9:Skyrim.esm":{"m":"cloth","c":"body"},"f6f21:Skyrim.esm":{"m":"heavy","c":"feet"},"f6f22:Skyrim.esm":{"m":"heavy","c":"body"},"f6f23:Skyrim.esm":{"m":"heavy","c":"hands"},"f6f24:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"f71db:Skyrim.esm":{"m":"cloth","c":"body"},"f74c:Hothtrooper44_ArmorCompilation.esp":{"m":"cloth","c":"chest"},"f7ac:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"f7ae:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hands"},"f7af:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"feet"},"f7b2:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body"},"f7c91:Skyrim.esm":{"m":"cloth","c":"body"},"f7c94:Skyrim.esm":{"m":"cloth","c":"body"},"f8713:Skyrim.esm":{"m":"cloth","c":"body"},"f8715:Skyrim.esm":{"m":"cloth","c":"body"},"f9062:Skyrim.esm":{"m":"cloth","c":"body"},"f9670:Skyrim.esm":{"m":"cloth","c":"circlet"},"f9904:Skyrim.esm":{"m":"cloth","c":"circlet"},"fb979:Skyrim.esm":{"m":"cloth","c":"feet"},"fb97b:Skyrim.esm":{"m":"cloth","c":"feet"},"fc000:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc001:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc002:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc003:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc004:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc005:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc006:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc007:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc008:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc009:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00a:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00b:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00c:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00d:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00e:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc00f:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc010:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc011:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc012:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc013:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc014:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc015:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc016:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc017:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc01e:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc01f:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc020:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc021:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc022:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc023:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc024:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc025:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc026:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc027:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc028:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc029:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02a:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02b:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02c:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02d:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02e:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc02f:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc030:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc031:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc032:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc033:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc034:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc035:Skyrim.esm":{"m":"cloth","c":"circlet"},"fc036:Skyrim.esm":{"m":"cloth","c":"circlet"},"fcc0c:Skyrim.esm":{"m":"cloth","c":"feet"},"fcc0d:Skyrim.esm":{"m":"cloth","c":"feet"},"fcc0e:Skyrim.esm":{"m":"cloth","c":"body"},"fcc0f:Skyrim.esm":{"m":"cloth","c":"body"},"fcc10:Skyrim.esm":{"m":"cloth","c":"hands"},"fcc11:Skyrim.esm":{"m":"cloth","c":"hands"},"fcc12:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"fcc13:Skyrim.esm":{"m":"cloth","c":"head,hair,circlet,ears"},"fcef1:Skyrim.esm":{"m":"light","c":"hands"},"fcef2:Skyrim.esm":{"m":"light","c":"hands"},"fcef3:Skyrim.esm":{"m":"light","c":"hands"},"fcef4:Skyrim.esm":{"m":"light","c":"hands"},"fcef5:Skyrim.esm":{"m":"light","c":"hands"},"fcef6:Skyrim.esm":{"m":"light","c":"hands"},"fd17:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"fd18:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,ears"},"fd23:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"body,arms,calves"},"fd24:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"body,arms,calves"},"fd25:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"hands"},"fd26:Apocalypse - Magic of Skyrim.esp":{"m":"heavy","c":"feet"},"fd2a:Apocalypse - Magic of Skyrim.esp":{"m":"cloth","c":"hair,ears"},"fda05:Skyrim.esm":{"m":"light","c":"feet"},"fda06:Skyrim.esm":{"m":"light","c":"feet"},"fda1a:Skyrim.esm":{"m":"light","c":"body"},"fda1b:Skyrim.esm":{"m":"light","c":"body"},"fda1c:Skyrim.esm":{"m":"light","c":"body"},"fda1d:Skyrim.esm":{"m":"light","c":"body"},"fda1e:Skyrim.esm":{"m":"light","c":"body"},"fda1f:Skyrim.esm":{"m":"light","c":"body"},"fe2d7:Skyrim.esm":{"m":"light","c":"body"},"fe2d8:Skyrim.esm":{"m":"light","c":"body"},"fe2d9:Skyrim.esm":{"m":"light","c":"body"},"fe2da:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2db:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2dc:Skyrim.esm":{"m":"light","c":"body"},"fe2dd:Skyrim.esm":{"m":"light","c":"body"},"fe2de:Skyrim.esm":{"m":"light","c":"body"},"fe2df:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2e0:Skyrim.esm":{"m":"light","c":"body"},"fe2e1:Skyrim.esm":{"m":"light","c":"body"},"fe2e2:Skyrim.esm":{"m":"light","c":"body"},"fe2e3:Skyrim.esm":{"m":"light","c":"body"},"fe2e4:Skyrim.esm":{"m":"light","c":"body"},"fe2e5:Skyrim.esm":{"m":"light","c":"body"},"fe2e6:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2e7:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2e8:Skyrim.esm":{"m":"light","c":"hair,circlet"},"fe2e9:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ea:Skyrim.esm":{"m":"heavy","c":"body"},"fe2eb:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ec:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ed:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ee:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ef:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"fe2f0:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"fe2f1:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"fe2f2:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"fe2f3:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"fe2f4:Skyrim.esm":{"m":"heavy","c":"hair,circlet"},"fe2f5:Skyrim.esm":{"m":"heavy","c":"body"},"fe2f6:Skyrim.esm":{"m":"heavy","c":"body"},"fe2f7:Skyrim.esm":{"m":"heavy","c":"body"},"fe2f8:Skyrim.esm":{"m":"heavy","c":"body"},"fe2f9:Skyrim.esm":{"m":"heavy","c":"body"},"fe2fa:Skyrim.esm":{"m":"heavy","c":"body"},"fe2fb:Skyrim.esm":{"m":"heavy","c":"body"},"fe2fc:Skyrim.esm":{"m":"heavy","c":"body"},"fe2fd:Skyrim.esm":{"m":"heavy","c":"body"},"fe2fe:Skyrim.esm":{"m":"heavy","c":"body"},"fe2ff:Skyrim.esm":{"m":"heavy","c":"body"},"fe300:Skyrim.esm":{"m":"heavy","c":"body"},"fe301:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"fe302:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"},"fe303:Skyrim.esm":{"m":"heavy","c":"head,hair,circlet,ears"}}};
 const FOODS = {"items":{"10d666:Skyrim.esm":{"k":"food"},"107a8a:Skyrim.esm":{"k":"ale"},"10394d:Skyrim.esm":{"k":"food"},"10211a:Skyrim.esm":{"k":"food"},"10201e:Skyrim.esm":{"k":"potion"},"10201d:Skyrim.esm":{"k":"potion"},"10201c:Skyrim.esm":{"k":"potion"},"10201b:Skyrim.esm":{"k":"potion"},"10201a:Skyrim.esm":{"k":"potion"},"102019:Skyrim.esm":{"k":"potion"},"ffa02:Skyrim.esm":{"k":"potion"},"ffa01:Skyrim.esm":{"k":"potion"},"ffa00:Skyrim.esm":{"k":"potion"},"ff9ff:Skyrim.esm":{"k":"potion"},"ff9fe:Skyrim.esm":{"k":"potion"},"ff9fd:Skyrim.esm":{"k":"potion"},"ff9fc:Skyrim.esm":{"k":"potion"},"f9642:Skyrim.esm":{"k":"potion"},"f84c6:Skyrim.esm":{"k":"potion"},"f84c5:Skyrim.esm":{"k":"potion"},"f84c4:Skyrim.esm":{"k":"potion"},"f84c3:Skyrim.esm":{"k":"potion"},"f84c2:Skyrim.esm":{"k":"potion"},"f84c1:Skyrim.esm":{"k":"potion"},"f84c0:Skyrim.esm":{"k":"potion"},"f84bf:Skyrim.esm":{"k":"potion"},"f84be:Skyrim.esm":{"k":"potion"},"f84bd:Skyrim.esm":{"k":"potion"},"f84bc:Skyrim.esm":{"k":"potion"},"f84bb:Skyrim.esm":{"k":"potion"},"f84ba:Skyrim.esm":{"k":"potion"},"f84b9:Skyrim.esm":{"k":"potion"},"f84b8:Skyrim.esm":{"k":"potion"},"f84b7:Skyrim.esm":{"k":"potion"},"f84b6:Skyrim.esm":{"k":"potion"},"f84b5:Skyrim.esm":{"k":"potion"},"f84b3:Skyrim.esm":{"k":"potion"},"f84b2:Skyrim.esm":{"k":"potion"},"f84b1:Skyrim.esm":{"k":"potion"},"f84b0:Skyrim.esm":{"k":"potion"},"f84af:Skyrim.esm":{"k":"potion"},"f84ae:Skyrim.esm":{"k":"potion"},"f84ac:Skyrim.esm":{"k":"potion"},"f84ab:Skyrim.esm":{"k":"potion"},"f84aa:Skyrim.esm":{"k":"potion"},"f84a9:Skyrim.esm":{"k":"potion"},"f84a8:Skyrim.esm":{"k":"potion"},"f84a7:Skyrim.esm":{"k":"potion"},"f693f:Skyrim.esm":{"k":"ale"},"f4320:Skyrim.esm":{"k":"food"},"f431e:Skyrim.esm":{"k":"drink"},"f431d:Skyrim.esm":{"k":"drink"},"f431c:Skyrim.esm":{"k":"drink"},"f431b:Skyrim.esm":{"k":"drink"},"f4315:Skyrim.esm":{"k":"drink"},"f4314:Skyrim.esm":{"k":"drink"},"f257e:Skyrim.esm":{"k":"ale"},"e8947:Skyrim.esm":{"k":"food"},"f2011:Skyrim.esm":{"k":"food"},"f1464:Skyrim.esm":{"k":"potion"},"edb2e:Skyrim.esm":{"k":"food"},"eba03:Skyrim.esm":{"k":"food"},"eba02:Skyrim.esm":{"k":"drink"},"eba01:Skyrim.esm":{"k":"drink"},"e8448:Skyrim.esm":{"k":"food"},"d6980:Skyrim.esm":{"k":"potion"},"d697f:Skyrim.esm":{"k":"potion"},"d6949:Skyrim.esm":{"k":"potion"},"d6948:Skyrim.esm":{"k":"potion"},"d055e:Skyrim.esm":{"k":"ale"},"cd883:Skyrim.esm":{"k":"poison"},"cd614:Skyrim.esm":{"k":"food"},"cadfb:Skyrim.esm":{"k":"food"},"b91d7:Skyrim.esm":{"k":"ale"},"85368:Skyrim.esm":{"k":"ale"},"722c7:Skyrim.esm":{"k":"food"},"722c2:Skyrim.esm":{"k":"food"},"722bd:Skyrim.esm":{"k":"food"},"722bb:Skyrim.esm":{"k":"food"},"722b0:Skyrim.esm":{"k":"food"},"7224e:Skyrim.esm":{"k":"food"},"7224c:Skyrim.esm":{"k":"food"},"721e8:Skyrim.esm":{"k":"food"},"669a5:Skyrim.esm":{"k":"food"},"669a4:Skyrim.esm":{"k":"food"},"669a3:Skyrim.esm":{"k":"food"},"669a2:Skyrim.esm":{"k":"food"},"65c9f:Skyrim.esm":{"k":"food"},"65c9e:Skyrim.esm":{"k":"food"},"65c9d:Skyrim.esm":{"k":"food"},"65c9c:Skyrim.esm":{"k":"food"},"65c9b:Skyrim.esm":{"k":"food"},"65c9a:Skyrim.esm":{"k":"food"},"65c99:Skyrim.esm":{"k":"food"},"65c98:Skyrim.esm":{"k":"food"},"65c97:Skyrim.esm":{"k":"food"},"65c39:Skyrim.esm":{"k":"drink"},"65c38:Skyrim.esm":{"k":"drink"},"65c37:Skyrim.esm":{"k":"drink"},"64b43:Skyrim.esm":{"k":"food"},"64b42:Skyrim.esm":{"k":"food"},"64b41:Skyrim.esm":{"k":"food"},"64b40:Skyrim.esm":{"k":"food"},"64b3f:Skyrim.esm":{"k":"food"},"64b3e:Skyrim.esm":{"k":"food"},"64b3d:Skyrim.esm":{"k":"food"},"64b3c:Skyrim.esm":{"k":"food"},"64b3b:Skyrim.esm":{"k":"food"},"64b3a:Skyrim.esm":{"k":"food"},"64b39:Skyrim.esm":{"k":"food"},"64b38:Skyrim.esm":{"k":"food"},"64b36:Skyrim.esm":{"k":"food"},"64b35:Skyrim.esm":{"k":"food"},"64b34:Skyrim.esm":{"k":"food"},"64b33:Skyrim.esm":{"k":"food"},"64b32:Skyrim.esm":{"k":"food"},"64b31:Skyrim.esm":{"k":"food"},"64b30:Skyrim.esm":{"k":"food"},"64b2f:Skyrim.esm":{"k":"food"},"64b2e:Skyrim.esm":{"k":"food"},"5566a:Skyrim.esm":{"k":"potion"},"555e8:Skyrim.esm":{"k":"ale"},"3f4bd:Skyrim.esm":{"k":"food"},"e6df5:Skyrim.esm":{"k":"potion"},"e41b8:Skyrim.esm":{"k":"poison"},"e2d3d:Skyrim.esm":{"k":"poison"},"dc172:Skyrim.esm":{"k":"food"},"c5349:Skyrim.esm":{"k":"ale"},"c5348:Skyrim.esm":{"k":"ale"},"a9661:Skyrim.esm":{"k":"potion"},"5661f:Skyrim.esm":{"k":"potion"},"5629e:Skyrim.esm":{"k":"poison"},"aed90:Skyrim.esm":{"k":"food"},"ae723:Skyrim.esm":{"k":"potion"},"9380d:Skyrim.esm":{"k":"ale"},"76f17:Skyrim.esm":{"k":"potion"},"74a3b:Skyrim.esm":{"k":"poison"},"74a3a:Skyrim.esm":{"k":"poison"},"74a39:Skyrim.esm":{"k":"poison"},"74a38:Skyrim.esm":{"k":"poison"},"73f94:Skyrim.esm":{"k":"poison"},"73f93:Skyrim.esm":{"k":"poison"},"73f92:Skyrim.esm":{"k":"poison"},"73f91:Skyrim.esm":{"k":"poison"},"73f90:Skyrim.esm":{"k":"poison"},"73f8e:Skyrim.esm":{"k":"poison"},"73f8d:Skyrim.esm":{"k":"poison"},"73f8c:Skyrim.esm":{"k":"poison"},"73f8b:Skyrim.esm":{"k":"poison"},"73f61:Skyrim.esm":{"k":"poison"},"73f60:Skyrim.esm":{"k":"poison"},"73f5f:Skyrim.esm":{"k":"poison"},"73f5e:Skyrim.esm":{"k":"poison"},"73f5d:Skyrim.esm":{"k":"poison"},"73f5c:Skyrim.esm":{"k":"poison"},"73f5b:Skyrim.esm":{"k":"poison"},"73f5a:Skyrim.esm":{"k":"poison"},"73f59:Skyrim.esm":{"k":"poison"},"73f58:Skyrim.esm":{"k":"poison"},"73f57:Skyrim.esm":{"k":"poison"},"73f56:Skyrim.esm":{"k":"poison"},"73f55:Skyrim.esm":{"k":"poison"},"73f54:Skyrim.esm":{"k":"poison"},"73f53:Skyrim.esm":{"k":"poison"},"73f52:Skyrim.esm":{"k":"poison"},"73f50:Skyrim.esm":{"k":"poison"},"73f4f:Skyrim.esm":{"k":"poison"},"73f4e:Skyrim.esm":{"k":"poison"},"73f4d:Skyrim.esm":{"k":"poison"},"73f4c:Skyrim.esm":{"k":"poison"},"73f4b:Skyrim.esm":{"k":"poison"},"73f4a:Skyrim.esm":{"k":"poison"},"73f49:Skyrim.esm":{"k":"poison"},"73f48:Skyrim.esm":{"k":"poison"},"73f47:Skyrim.esm":{"k":"poison"},"73f46:Skyrim.esm":{"k":"poison"},"73f45:Skyrim.esm":{"k":"poison"},"73f44:Skyrim.esm":{"k":"poison"},"73f43:Skyrim.esm":{"k":"poison"},"73f42:Skyrim.esm":{"k":"poison"},"73f41:Skyrim.esm":{"k":"poison"},"73f40:Skyrim.esm":{"k":"poison"},"73f3f:Skyrim.esm":{"k":"poison"},"73f3e:Skyrim.esm":{"k":"poison"},"73f3d:Skyrim.esm":{"k":"poison"},"73f3c:Skyrim.esm":{"k":"poison"},"73f3b:Skyrim.esm":{"k":"poison"},"73f3a:Skyrim.esm":{"k":"poison"},"73f39:Skyrim.esm":{"k":"poison"},"73f38:Skyrim.esm":{"k":"poison"},"73f37:Skyrim.esm":{"k":"poison"},"73f36:Skyrim.esm":{"k":"poison"},"73f35:Skyrim.esm":{"k":"poison"},"73f34:Skyrim.esm":{"k":"poison"},"73f33:Skyrim.esm":{"k":"poison"},"73f32:Skyrim.esm":{"k":"poison"},"73f31:Skyrim.esm":{"k":"poison"},"6a07e:Skyrim.esm":{"k":"potion"},"663e1:Skyrim.esm":{"k":"potion"},"65a71:Skyrim.esm":{"k":"poison"},"65a70:Skyrim.esm":{"k":"poison"},"65a6f:Skyrim.esm":{"k":"poison"},"65a6e:Skyrim.esm":{"k":"poison"},"65a6d:Skyrim.esm":{"k":"poison"},"65a6c:Skyrim.esm":{"k":"poison"},"65a6b:Skyrim.esm":{"k":"poison"},"65a6a:Skyrim.esm":{"k":"poison"},"65a69:Skyrim.esm":{"k":"poison"},"65a68:Skyrim.esm":{"k":"poison"},"65a66:Skyrim.esm":{"k":"poison"},"65a65:Skyrim.esm":{"k":"poison"},"65a64:Skyrim.esm":{"k":"potion"},"5f6df:Skyrim.esm":{"k":"potion"},"57a7b:Skyrim.esm":{"k":"potion"},"57a7a:Skyrim.esm":{"k":"food"},"58cfb:Skyrim.esm":{"k":"poison"},"508ca:Skyrim.esm":{"k":"ale"},"3ac31:Skyrim.esm":{"k":"potion"},"3ac30:Skyrim.esm":{"k":"potion"},"3ac2f:Skyrim.esm":{"k":"potion"},"3ac2e:Skyrim.esm":{"k":"potion"},"3a5a4:Skyrim.esm":{"k":"poison"},"39e55:Skyrim.esm":{"k":"potion"},"39e54:Skyrim.esm":{"k":"potion"},"39e53:Skyrim.esm":{"k":"potion"},"39e52:Skyrim.esm":{"k":"potion"},"39d12:Skyrim.esm":{"k":"potion"},"39d0a:Skyrim.esm":{"k":"potion"},"39d02:Skyrim.esm":{"k":"potion"},"39cfb:Skyrim.esm":{"k":"potion"},"39cf3:Skyrim.esm":{"k":"potion"},"39be8:Skyrim.esm":{"k":"potion"},"39be7:Skyrim.esm":{"k":"potion"},"39be6:Skyrim.esm":{"k":"potion"},"39be5:Skyrim.esm":{"k":"potion"},"39be4:Skyrim.esm":{"k":"potion"},"39be3:Skyrim.esm":{"k":"potion"},"39be1:Skyrim.esm":{"k":"potion"},"39bdf:Skyrim.esm":{"k":"potion"},"39b8a:Skyrim.esm":{"k":"potion"},"39b4b:Skyrim.esm":{"k":"potion"},"39b4a:Skyrim.esm":{"k":"potion"},"39b0c:Skyrim.esm":{"k":"potion"},"39aa6:Skyrim.esm":{"k":"potion"},"39980:Skyrim.esm":{"k":"potion"},"39974:Skyrim.esm":{"k":"potion"},"39973:Skyrim.esm":{"k":"potion"},"39971:Skyrim.esm":{"k":"potion"},"39970:Skyrim.esm":{"k":"potion"},"3996f:Skyrim.esm":{"k":"potion"},"39969:Skyrim.esm":{"k":"potion"},"39968:Skyrim.esm":{"k":"potion"},"39967:Skyrim.esm":{"k":"potion"},"39962:Skyrim.esm":{"k":"potion"},"3995d:Skyrim.esm":{"k":"potion"},"3995c:Skyrim.esm":{"k":"potion"},"3995b:Skyrim.esm":{"k":"potion"},"3995a:Skyrim.esm":{"k":"potion"},"39959:Skyrim.esm":{"k":"potion"},"39958:Skyrim.esm":{"k":"potion"},"39957:Skyrim.esm":{"k":"potion"},"39956:Skyrim.esm":{"k":"potion"},"39955:Skyrim.esm":{"k":"potion"},"39954:Skyrim.esm":{"k":"potion"},"39951:Skyrim.esm":{"k":"potion"},"39950:Skyrim.esm":{"k":"potion"},"3994f:Skyrim.esm":{"k":"potion"},"3994e:Skyrim.esm":{"k":"potion"},"3994b:Skyrim.esm":{"k":"potion"},"39949:Skyrim.esm":{"k":"potion"},"39948:Skyrim.esm":{"k":"potion"},"39946:Skyrim.esm":{"k":"potion"},"39945:Skyrim.esm":{"k":"potion"},"39930:Skyrim.esm":{"k":"potion"},"39904:Skyrim.esm":{"k":"potion"},"39903:Skyrim.esm":{"k":"potion"},"398fd:Skyrim.esm":{"k":"potion"},"398f6:Skyrim.esm":{"k":"potion"},"398f5:Skyrim.esm":{"k":"potion"},"398f4:Skyrim.esm":{"k":"potion"},"398f3:Skyrim.esm":{"k":"potion"},"398f1:Skyrim.esm":{"k":"potion"},"398ee:Skyrim.esm":{"k":"potion"},"398ed:Skyrim.esm":{"k":"potion"},"398ec:Skyrim.esm":{"k":"potion"},"398ad:Skyrim.esm":{"k":"potion"},"398ac:Skyrim.esm":{"k":"potion"},"398ab:Skyrim.esm":{"k":"potion"},"3989b:Skyrim.esm":{"k":"potion"},"3989a:Skyrim.esm":{"k":"potion"},"39899:Skyrim.esm":{"k":"potion"},"3988e:Skyrim.esm":{"k":"potion"},"3eb41:Skyrim.esm":{"k":"potion"},"3eb40:Skyrim.esm":{"k":"potion"},"3eb3f:Skyrim.esm":{"k":"potion"},"3eb3e:Skyrim.esm":{"k":"potion"},"3eb3a:Skyrim.esm":{"k":"potion"},"3eb39:Skyrim.esm":{"k":"potion"},"3eb38:Skyrim.esm":{"k":"potion"},"3eb37:Skyrim.esm":{"k":"potion"},"3eb36:Skyrim.esm":{"k":"potion"},"3eb35:Skyrim.esm":{"k":"potion"},"3eb33:Skyrim.esm":{"k":"potion"},"3eb32:Skyrim.esm":{"k":"potion"},"3eb31:Skyrim.esm":{"k":"potion"},"3eb30:Skyrim.esm":{"k":"potion"},"3eb2f:Skyrim.esm":{"k":"potion"},"3eb2e:Skyrim.esm":{"k":"potion"},"3eb2c:Skyrim.esm":{"k":"potion"},"3eb2b:Skyrim.esm":{"k":"potion"},"3eb2a:Skyrim.esm":{"k":"potion"},"3eb14:Skyrim.esm":{"k":"potion"},"3eb12:Skyrim.esm":{"k":"potion"},"3eb11:Skyrim.esm":{"k":"potion"},"3eb10:Skyrim.esm":{"k":"potion"},"3eb0f:Skyrim.esm":{"k":"potion"},"3eb0e:Skyrim.esm":{"k":"potion"},"3eb0d:Skyrim.esm":{"k":"potion"},"3eb0c:Skyrim.esm":{"k":"potion"},"3eb0b:Skyrim.esm":{"k":"potion"},"3eb0a:Skyrim.esm":{"k":"potion"},"3eb09:Skyrim.esm":{"k":"potion"},"3eb05:Skyrim.esm":{"k":"potion"},"3eb04:Skyrim.esm":{"k":"potion"},"3eb03:Skyrim.esm":{"k":"potion"},"3eb02:Skyrim.esm":{"k":"potion"},"3eb00:Skyrim.esm":{"k":"potion"},"3eaff:Skyrim.esm":{"k":"potion"},"3eafe:Skyrim.esm":{"k":"potion"},"3eafd:Skyrim.esm":{"k":"potion"},"3eafc:Skyrim.esm":{"k":"potion"},"3eafb:Skyrim.esm":{"k":"potion"},"3eafa:Skyrim.esm":{"k":"potion"},"3eaf7:Skyrim.esm":{"k":"potion"},"3eaf6:Skyrim.esm":{"k":"potion"},"3eaf5:Skyrim.esm":{"k":"potion"},"3eaf4:Skyrim.esm":{"k":"potion"},"3eaf2:Skyrim.esm":{"k":"potion"},"3eaf1:Skyrim.esm":{"k":"potion"},"3eaf0:Skyrim.esm":{"k":"potion"},"3eaef:Skyrim.esm":{"k":"potion"},"3eaee:Skyrim.esm":{"k":"potion"},"3eaed:Skyrim.esm":{"k":"potion"},"3eae9:Skyrim.esm":{"k":"potion"},"3eae8:Skyrim.esm":{"k":"potion"},"3eae7:Skyrim.esm":{"k":"potion"},"3eae6:Skyrim.esm":{"k":"potion"},"3eae5:Skyrim.esm":{"k":"potion"},"3eae4:Skyrim.esm":{"k":"potion"},"3eae3:Skyrim.esm":{"k":"potion"},"3eae2:Skyrim.esm":{"k":"potion"},"3eae1:Skyrim.esm":{"k":"potion"},"3eae0:Skyrim.esm":{"k":"potion"},"3eadf:Skyrim.esm":{"k":"potion"},"3eade:Skyrim.esm":{"k":"potion"},"3eadd:Skyrim.esm":{"k":"potion"},"3133c:Skyrim.esm":{"k":"ale"},"3133b:Skyrim.esm":{"k":"ale"},"36d53:Skyrim.esm":{"k":"ale"},"34c5e:Skyrim.esm":{"k":"ale"},"34c5d:Skyrim.esm":{"k":"ale"},"1895f:Skyrim.esm":{"k":"ale"},"2c35a:Skyrim.esm":{"k":"ale"},"18ef3:Dawnguard.esm":{"k":"potion"},"15a1e:Dawnguard.esm":{"k":"potion"},"14dc4:Dawnguard.esm":{"k":"food"},"1391d:Dawnguard.esm":{"k":"food"},"9dc:HearthFires.esm":{"k":"food"},"9db:HearthFires.esm":{"k":"food"},"11801:HearthFires.esm":{"k":"food"},"117ff:HearthFires.esm":{"k":"food"},"3541:HearthFires.esm":{"k":"food"},"3540:HearthFires.esm":{"k":"food"},"353f:HearthFires.esm":{"k":"food"},"353e:HearthFires.esm":{"k":"food"},"353d:HearthFires.esm":{"k":"drink"},"353c:HearthFires.esm":{"k":"food"},"353b:HearthFires.esm":{"k":"food"},"353a:HearthFires.esm":{"k":"food"},"3539:HearthFires.esm":{"k":"food"},"3538:HearthFires.esm":{"k":"food"},"3537:HearthFires.esm":{"k":"food"},"3536:HearthFires.esm":{"k":"ale"},"3535:HearthFires.esm":{"k":"ale"},"3534:HearthFires.esm":{"k":"drink"},"3533:HearthFires.esm":{"k":"food"},"3d125:Dragonborn.esm":{"k":"food"},"3cf72:Dragonborn.esm":{"k":"food"},"3cd5b:Dragonborn.esm":{"k":"drink"},"3bd15:Dragonborn.esm":{"k":"food"},"3bd14:Dragonborn.esm":{"k":"food"},"390e0:Dragonborn.esm":{"k":"potion"},"3572f:Dragonborn.esm":{"k":"ale"},"320df:Dragonborn.esm":{"k":"ale"},"24e0b:Dragonborn.esm":{"k":"ale"},"248ce:Dragonborn.esm":{"k":"ale"},"248cc:Dragonborn.esm":{"k":"ale"},"207e6:Dragonborn.esm":{"k":"ale"},"207e5:Dragonborn.esm":{"k":"ale"},"206e7:Dragonborn.esm":{"k":"food"},"1cd7d:Dragonborn.esm":{"k":"poison"},"1aae2:Dragonborn.esm":{"k":"potion"},"1aae1:Dragonborn.esm":{"k":"potion"},"1aae0:Dragonborn.esm":{"k":"potion"},"1aadf:Dragonborn.esm":{"k":"potion"},"1aade:Dragonborn.esm":{"k":"potion"},"1aadd:Dragonborn.esm":{"k":"potion"},"4477e9:WindhelmSSE.esp":{"k":"food"},"12f9c4:WindhelmSSE.esp":{"k":"food"},"367fbe:WindhelmSSE.esp":{"k":"ale"},"13f585:WindhelmSSE.esp":{"k":"ale"},"36d1e5:WindhelmSSE.esp":{"k":"potion"},"15cc6e:WindhelmSSE.esp":{"k":"ale"},"13f593:WindhelmSSE.esp":{"k":"drink"},"17167b:WindhelmSSE.esp":{"k":"drink"},"4477ea:WindhelmSSE.esp":{"k":"food"},"13f598:WindhelmSSE.esp":{"k":"drink"},"4d543:WindhelmSSE.esp":{"k":"ale"},"3206fc:WindhelmSSE.esp":{"k":"drink"},"12010f:WindhelmSSE.esp":{"k":"food"},"936:Gourmet.esp":{"k":"food"},"981:Gourmet.esp":{"k":"food"},"9df:Gourmet.esp":{"k":"drink"},"9e0:Gourmet.esp":{"k":"drink"},"9e1:Gourmet.esp":{"k":"drink"},"9e2:Gourmet.esp":{"k":"drink"},"9e3:Gourmet.esp":{"k":"drink"},"9e4:Gourmet.esp":{"k":"drink"},"9e5:Gourmet.esp":{"k":"drink"},"9e6:Gourmet.esp":{"k":"drink"},"80d:Gourmet.esp":{"k":"food"},"810:Gourmet.esp":{"k":"food"},"815:Gourmet.esp":{"k":"food"},"816:Gourmet.esp":{"k":"drink"},"817:Gourmet.esp":{"k":"drink"},"818:Gourmet.esp":{"k":"drink"},"81c:Gourmet.esp":{"k":"drink"},"821:Gourmet.esp":{"k":"ale"},"822:Gourmet.esp":{"k":"drink"},"8aa:Gourmet.esp":{"k":"food"},"8ac:Gourmet.esp":{"k":"food"},"8ae:Gourmet.esp":{"k":"food"},"8b1:Gourmet.esp":{"k":"drink"},"8b3:Gourmet.esp":{"k":"drink"},"8e2:Gourmet.esp":{"k":"food"},"8e4:Gourmet.esp":{"k":"food"},"8ea:Gourmet.esp":{"k":"drink"},"8eb:Gourmet.esp":{"k":"drink"},"8f5:Gourmet.esp":{"k":"drink"},"8f6:Gourmet.esp":{"k":"drink"},"8f7:Gourmet.esp":{"k":"drink"},"901:Gourmet.esp":{"k":"food"},"902:Gourmet.esp":{"k":"food"},"903:Gourmet.esp":{"k":"food"},"919:Gourmet.esp":{"k":"ale"},"91c:Gourmet.esp":{"k":"ale"},"91d:Gourmet.esp":{"k":"ale"},"2844d3:Triumvirate - Mage Archetypes.esp":{"k":"food"}}};
-const FOOD_GROUPS = {"items":{"10211a:Skyrim.esm":"raw","10394d:Skyrim.esm":"ingredient","10d666:Skyrim.esm":"ingredient","117ff:HearthFires.esm":"cooked","11801:HearthFires.esm":"cooked","12010f:WindhelmSSE.esp":"prepared","12f9c4:WindhelmSSE.esp":"ingredient","1391d:Dawnguard.esm":"drugs","13f593:WindhelmSSE.esp":"ale","14dc4:Dawnguard.esm":"ingredient","17167b:WindhelmSSE.esp":"drink","206e7:Dragonborn.esm":"ingredient","2844d3:Triumvirate - Mage Archetypes.esp":"potion","3206fc:WindhelmSSE.esp":"ale","3533:HearthFires.esm":"cooked","3534:HearthFires.esm":"drink","3537:HearthFires.esm":"cooked","3538:HearthFires.esm":"ingredient","3539:HearthFires.esm":"cooked","353a:HearthFires.esm":"cooked","353b:HearthFires.esm":"cooked","353c:HearthFires.esm":"ingredient","353d:HearthFires.esm":"soup","353e:HearthFires.esm":"soup","353f:HearthFires.esm":"cooked","3540:HearthFires.esm":"raw","3541:HearthFires.esm":"cooked","3bd14:Dragonborn.esm":"raw","3bd15:Dragonborn.esm":"raw","3cd5b:Dragonborn.esm":"soup","3cf72:Dragonborn.esm":"cooked","3d125:Dragonborn.esm":"raw","3f4bd:Skyrim.esm":"drugs","4477e9:WindhelmSSE.esp":"prepared","4477ea:WindhelmSSE.esp":"prepared","57a7a:Skyrim.esm":"drugs","64b2e:Skyrim.esm":"ingredient","64b2f:Skyrim.esm":"ingredient","64b30:Skyrim.esm":"cooked","64b31:Skyrim.esm":"prepared","64b32:Skyrim.esm":"prepared","64b33:Skyrim.esm":"prepared","64b34:Skyrim.esm":"prepared","64b35:Skyrim.esm":"prepared","64b36:Skyrim.esm":"prepared","64b38:Skyrim.esm":"cooked","64b39:Skyrim.esm":"prepared","64b3a:Skyrim.esm":"cooked","64b3b:Skyrim.esm":"cooked","64b3c:Skyrim.esm":"cooked","64b3d:Skyrim.esm":"cooked","64b3e:Skyrim.esm":"cooked","64b3f:Skyrim.esm":"ingredient","64b40:Skyrim.esm":"ingredient","64b41:Skyrim.esm":"ingredient","64b42:Skyrim.esm":"ingredient","64b43:Skyrim.esm":"cooked","65c37:Skyrim.esm":"ale","65c38:Skyrim.esm":"ale","65c39:Skyrim.esm":"ale","65c97:Skyrim.esm":"cooked","65c98:Skyrim.esm":"prepared","65c99:Skyrim.esm":"raw","65c9a:Skyrim.esm":"raw","65c9b:Skyrim.esm":"raw","65c9c:Skyrim.esm":"raw","65c9d:Skyrim.esm":"raw","65c9e:Skyrim.esm":"raw","65c9f:Skyrim.esm":"raw","669a2:Skyrim.esm":"raw","669a3:Skyrim.esm":"prepared","669a4:Skyrim.esm":"raw","669a5:Skyrim.esm":"ingredient","721e8:Skyrim.esm":"cooked","7224c:Skyrim.esm":"cooked","7224e:Skyrim.esm":"cooked","722b0:Skyrim.esm":"cooked","722bb:Skyrim.esm":"cooked","722bd:Skyrim.esm":"cooked","722c2:Skyrim.esm":"cooked","722c7:Skyrim.esm":"cooked","80d:Gourmet.esp":"cooked","810:Gourmet.esp":"cooked","815:Gourmet.esp":"cooked","816:Gourmet.esp":"soup","817:Gourmet.esp":"soup","818:Gourmet.esp":"soup","81c:Gourmet.esp":"soup","822:Gourmet.esp":"ale","8aa:Gourmet.esp":"cooked","8ac:Gourmet.esp":"raw","8ae:Gourmet.esp":"raw","8b1:Gourmet.esp":"soup","8b3:Gourmet.esp":"soup","8e2:Gourmet.esp":"cooked","8e4:Gourmet.esp":"cooked","8ea:Gourmet.esp":"soup","8eb:Gourmet.esp":"soup","8f5:Gourmet.esp":"soup","8f6:Gourmet.esp":"soup","8f7:Gourmet.esp":"soup","901:Gourmet.esp":"cooked","902:Gourmet.esp":"cooked","903:Gourmet.esp":"cooked","936:Gourmet.esp":"drugs","981:Gourmet.esp":"cooked","9db:HearthFires.esm":"cooked","9dc:HearthFires.esm":"cooked","9df:Gourmet.esp":"soup","9e0:Gourmet.esp":"soup","9e1:Gourmet.esp":"soup","9e2:Gourmet.esp":"soup","9e3:Gourmet.esp":"soup","9e4:Gourmet.esp":"soup","9e5:Gourmet.esp":"soup","9e6:Gourmet.esp":"soup","aed90:Skyrim.esm":"drugs","cadfb:Skyrim.esm":"prepared","cd614:Skyrim.esm":"cooked","dc172:Skyrim.esm":"drugs","e8448:Skyrim.esm":"cooked","e8947:Skyrim.esm":"cooked","eba01:Skyrim.esm":"soup","eba02:Skyrim.esm":"soup","eba03:Skyrim.esm":"raw","edb2e:Skyrim.esm":"raw","f2011:Skyrim.esm":"raw","f4314:Skyrim.esm":"soup","f4315:Skyrim.esm":"soup","f431b:Skyrim.esm":"soup","f431c:Skyrim.esm":"soup","f431d:Skyrim.esm":"soup","f431e:Skyrim.esm":"soup","f4320:Skyrim.esm":"cooked"}};
+const FOOD_GROUPS = {"items":{"10211a:Skyrim.esm":"raw","10394d:Skyrim.esm":"ingredient","10d666:Skyrim.esm":"ingredient","117ff:HearthFires.esm":"cooked","11801:HearthFires.esm":"cooked","12010f:WindhelmSSE.esp":"prepared","12f9c4:WindhelmSSE.esp":"ingredient","1391d:Dawnguard.esm":"drugs","13f593:WindhelmSSE.esp":"ale","14dc4:Dawnguard.esm":"ingredient","17167b:WindhelmSSE.esp":"drink","206e7:Dragonborn.esm":"ingredient","2844d3:Triumvirate - Mage Archetypes.esp":"potion","3206fc:WindhelmSSE.esp":"ale","3533:HearthFires.esm":"cooked","3534:HearthFires.esm":"drink","3537:HearthFires.esm":"cooked","3538:HearthFires.esm":"ingredient","3539:HearthFires.esm":"cooked","353a:HearthFires.esm":"cooked","353b:HearthFires.esm":"cooked","353c:HearthFires.esm":"ingredient","353d:HearthFires.esm":"soup","353e:HearthFires.esm":"soup","353f:HearthFires.esm":"cooked","3540:HearthFires.esm":"raw","3541:HearthFires.esm":"cooked","3bd14:Dragonborn.esm":"raw","3bd15:Dragonborn.esm":"raw","3cd5b:Dragonborn.esm":"soup","3cf72:Dragonborn.esm":"cooked","3d125:Dragonborn.esm":"raw","3f4bd:Skyrim.esm":"drugs","4477e9:WindhelmSSE.esp":"prepared","4477ea:WindhelmSSE.esp":"prepared","57a7a:Skyrim.esm":"drugs","64b2e:Skyrim.esm":"ingredient","64b2f:Skyrim.esm":"ingredient","64b30:Skyrim.esm":"cooked","64b31:Skyrim.esm":"prepared","64b32:Skyrim.esm":"prepared","64b33:Skyrim.esm":"prepared","64b34:Skyrim.esm":"prepared","64b35:Skyrim.esm":"prepared","64b36:Skyrim.esm":"prepared","64b38:Skyrim.esm":"cooked","64b39:Skyrim.esm":"prepared","64b3a:Skyrim.esm":"cooked","64b3b:Skyrim.esm":"cooked","64b3c:Skyrim.esm":"cooked","64b3d:Skyrim.esm":"cooked","64b3e:Skyrim.esm":"cooked","64b3f:Skyrim.esm":"ingredient","64b40:Skyrim.esm":"ingredient","64b41:Skyrim.esm":"ingredient","64b42:Skyrim.esm":"ingredient","64b43:Skyrim.esm":"cooked","65c37:Skyrim.esm":"ale","65c38:Skyrim.esm":"ale","65c39:Skyrim.esm":"ale","65c97:Skyrim.esm":"cooked","65c98:Skyrim.esm":"prepared","65c99:Skyrim.esm":"raw","65c9a:Skyrim.esm":"raw","65c9b:Skyrim.esm":"raw","65c9c:Skyrim.esm":"raw","65c9d:Skyrim.esm":"raw","65c9e:Skyrim.esm":"raw","65c9f:Skyrim.esm":"raw","669a2:Skyrim.esm":"raw","669a3:Skyrim.esm":"prepared","669a4:Skyrim.esm":"raw","669a5:Skyrim.esm":"ingredient","721e8:Skyrim.esm":"cooked","7224c:Skyrim.esm":"cooked","7224e:Skyrim.esm":"cooked","722b0:Skyrim.esm":"cooked","722bb:Skyrim.esm":"cooked","722bd:Skyrim.esm":"cooked","722c2:Skyrim.esm":"cooked","722c7:Skyrim.esm":"cooked","80d:Gourmet.esp":"cooked","810:Gourmet.esp":"cooked","815:Gourmet.esp":"cooked","816:Gourmet.esp":"soup","817:Gourmet.esp":"soup","818:Gourmet.esp":"soup","81c:Gourmet.esp":"soup","822:Gourmet.esp":"ale","8aa:Gourmet.esp":"cooked","8ac:Gourmet.esp":"raw","8ae:Gourmet.esp":"raw","8b1:Gourmet.esp":"soup","8b3:Gourmet.esp":"soup","8e2:Gourmet.esp":"cooked","8e4:Gourmet.esp":"cooked","8ea:Gourmet.esp":"soup","8eb:Gourmet.esp":"soup","8f5:Gourmet.esp":"soup","8f6:Gourmet.esp":"soup","8f7:Gourmet.esp":"soup","901:Gourmet.esp":"cooked","902:Gourmet.esp":"cooked","903:Gourmet.esp":"cooked","936:Gourmet.esp":"drugs","981:Gourmet.esp":"cooked","9db:HearthFires.esm":"cooked","9dc:HearthFires.esm":"cooked","9df:Gourmet.esp":"soup","9e0:Gourmet.esp":"soup","9e1:Gourmet.esp":"soup","9e2:Gourmet.esp":"soup","9e3:Gourmet.esp":"soup","9e4:Gourmet.esp":"soup","9e5:Gourmet.esp":"soup","9e6:Gourmet.esp":"soup","aed90:Skyrim.esm":"drugs","cadfb:Skyrim.esm":"prepared","cd614:Skyrim.esm":"cooked","dc172:Skyrim.esm":"drugs","e8448:Skyrim.esm":"cooked","e8947:Skyrim.esm":"cooked","eba01:Skyrim.esm":"soup","eba02:Skyrim.esm":"soup","eba03:Skyrim.esm":"raw","edb2e:Skyrim.esm":"raw","f2011:Skyrim.esm":"raw","f4314:Skyrim.esm":"soup","f4315:Skyrim.esm":"soup","f431b:Skyrim.esm":"soup","f431c:Skyrim.esm":"soup","f431d:Skyrim.esm":"soup","f431e:Skyrim.esm":"soup","f4320:Skyrim.esm":"cooked"},"strip":{"groups":["raw","cooked","soup","ingredient","prepared","drink"],"keep":{"12f9c4:WindhelmSSE.esp":"Sack of Frostwheat Flour: Resist Frost 3 for 60s rides with Restore Health 1","12010f:WindhelmSSE.esp":"Frostwheat Bread: Resist Frost 5 for 60s rides with Restore Health 3","17167b:WindhelmSSE.esp":"Snowberry Juice: Resist Frost 5 for 30s rides with Restore Stamina 5"}},"season":{"plain":{"soup":"warm"},"extras":{"34d22:Skyrim.esm":"guard","34cdf:Skyrim.esm":"stamina"},"dishes":{}}};
 const RACES = {"items":{"100046:Apocalypse - Magic of Skyrim.esp":{"e":"WB_ConjureKyrkrim_Race","p":false},"104f45:Skyrim.esm":{"e":"WhiteStagRace","p":false},"1052a3:Skyrim.esm":{"e":"UndeadDragonRace","p":false},"106c10:Skyrim.esm":{"e":"C06WolfSpiritRace","p":false},"10760a:Skyrim.esm":{"e":"ManakinRace","p":false},"108272:Skyrim.esm":{"e":"BretonRaceChildVampire","p":false},"109c7c:Skyrim.esm":{"e":"FoxRace","p":false},"10d00:Dawnguard.esm":{"e":"DLC1GargoyleVariantBossRace","p":false},"117de:Dawnguard.esm":{"e":"DLC1UndeadDragonRace","p":false},"117f4:Dawnguard.esm":{"e":"DLC1TrollFrostRaceArmored","p":false},"117f5:Dawnguard.esm":{"e":"DLC1TrollRaceArmored","p":false},"122b7:Dawnguard.esm":{"e":"DLC1HuskyBareCompanionRace","p":false},"12e82:Skyrim.esm":{"e":"DragonRace","p":false},"131e7:Skyrim.esm":{"e":"BearBrownRace","p":false},"131e8:Skyrim.esm":{"e":"BearBlackRace","p":false},"131e9:Skyrim.esm":{"e":"BearSnowRace","p":false},"131eb:Skyrim.esm":{"e":"ChaurusRace","p":false},"131ed:Skyrim.esm":{"e":"ElkRace","p":false},"131ee:Skyrim.esm":{"e":"DogRace","p":false},"131ef:Skyrim.esm":{"e":"DragonPriestRace","p":false},"131f0:Skyrim.esm":{"e":"DremoraRace","p":false},"131f1:Skyrim.esm":{"e":"DwarvenCenturionRace","p":false},"131f2:Skyrim.esm":{"e":"DwarvenSphereRace","p":false},"131f3:Skyrim.esm":{"e":"DwarvenSpiderRace","p":false},"131f4:Skyrim.esm":{"e":"FalmerRace","p":false},"131f5:Skyrim.esm":{"e":"AtronachFlameRace","p":false},"131f6:Skyrim.esm":{"e":"AtronachFrostRace","p":false},"131f7:Skyrim.esm":{"e":"AtronachStormRace","p":false},"131f8:Skyrim.esm":{"e":"FrostbiteSpiderRace","p":false},"131f9:Skyrim.esm":{"e":"GiantRace","p":false},"131fa:Skyrim.esm":{"e":"GoatRace","p":false},"131fb:Skyrim.esm":{"e":"HagravenRace","p":false},"131fc:Skyrim.esm":{"e":"HorkerRace","p":false},"131fd:Skyrim.esm":{"e":"HorseRace","p":false},"131fe:Skyrim.esm":{"e":"IceWraithRace","p":false},"131ff:Skyrim.esm":{"e":"MammothRace","p":false},"13200:Skyrim.esm":{"e":"SabreCatRace","p":false},"13201:Skyrim.esm":{"e":"SkeeverRace","p":false},"13202:Skyrim.esm":{"e":"SabreCatSnowyRace","p":false},"13203:Skyrim.esm":{"e":"SlaughterfishRace","p":false},"13204:Skyrim.esm":{"e":"SprigganRace","p":false},"13205:Skyrim.esm":{"e":"TrollRace","p":false},"13206:Skyrim.esm":{"e":"TrollFrostRace","p":false},"13208:Skyrim.esm":{"e":"WispRace","p":false},"13209:Skyrim.esm":{"e":"WitchlightRace","p":false},"1320a:Skyrim.esm":{"e":"WolfRace","p":false},"13740:Skyrim.esm":{"e":"ArgonianRace","p":true},"13741:Skyrim.esm":{"e":"BretonRace","p":true},"13742:Skyrim.esm":{"e":"DarkElfRace","p":true},"13743:Skyrim.esm":{"e":"HighElfRace","p":true},"13744:Skyrim.esm":{"e":"ImperialRace","p":true},"13745:Skyrim.esm":{"e":"KhajiitRace","p":true},"13746:Skyrim.esm":{"e":"NordRace","p":true},"13747:Skyrim.esm":{"e":"OrcRace","p":true},"13748:Skyrim.esm":{"e":"RedguardRace","p":true},"13749:Skyrim.esm":{"e":"WoodElfRace","p":true},"13b77:Dawnguard.esm":{"e":"SprigganEarthMotherRace","p":false},"14449:Dragonborn.esm":{"e":"DLC2ExpSpiderBaseRace","p":false},"14495:Dragonborn.esm":{"e":"DLC2LurkerRace","p":false},"14520f:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Primal_Race_CallSnakes","p":false},"14541e:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Daedra_Race_ConjureClannfear","p":false},"145445:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Daedra_Race_ConjureClannroth","p":false},"145485:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Daedra_Race_ConjureXivilai","p":false},"15136:Dawnguard.esm":{"e":"DLC1_BF_ChaurusRace","p":false},"1545d:Apocalypse - Magic of Skyrim.esp":{"e":"WB_NetherLich_Race","p":false},"1545e:Apocalypse - Magic of Skyrim.esp":{"e":"WB_Lich_Race","p":false},"15c34:Dawnguard.esm":{"e":"DLC1LD_ForgemasterRace","p":false},"169215:ZIA_Complete Pack.esp":{"e":"ZWJ_Polymorph68_GiantMudcrabRace","p":false},"179cf:Dragonborn.esm":{"e":"DLC2MountedRieklingRace","p":false},"17ce32:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Primal_Race_CallWolf","p":false},"17f44:Dragonborn.esm":{"e":"DLC2RieklingRace","p":false},"187045:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Demon_Race_ConjureGremlin","p":false},"18b33:Dawnguard.esm":{"e":"DLC1HuskyArmoredRace","p":false},"18b36:Dawnguard.esm":{"e":"DLC1HuskyBareRace","p":false},"1916a7:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Undead_Race_ConjureGloomWraith","p":false},"19:Skyrim.esm":{"e":"DefaultRace","p":false},"19d86:Dawnguard.esm":{"e":"DLC1GargoyleVariantGreenRace","p":false},"19f47:Playable Rieklings.esp":{"e":"1RieklingPurpleRace","p":true},"19fbb:Playable Rieklings.esp":{"e":"1BoarRideRace","p":false},"19fd3:Dawnguard.esm":{"e":"DLC1BlackSkeletonRace","p":false},"1a50a:Dragonborn.esm":{"e":"DLC2ThirskRieklingRace","p":false},"1aacc:Dawnguard.esm":{"e":"FalmerFrozenVampRace","p":false},"1b637:Dragonborn.esm":{"e":"DLC2AshSpawnRace","p":false},"1b644:Dragonborn.esm":{"e":"DLC2SprigganBurntRace","p":false},"1b647:Dragonborn.esm":{"e":"DLC2MudcrabSolstheimRace","p":false},"1b658:Dragonborn.esm":{"e":"DLC2AshHopperRace","p":false},"1cad8:Dragonborn.esm":{"e":"DLC2GhostFrostGiantRace","p":false},"1dcb9:Dragonborn.esm":{"e":"DLC2SeekerRace","p":false},"1e17b:Dragonborn.esm":{"e":"DLC2WerebearBeastRace","p":false},"1f98f:Dragonborn.esm":{"e":"dlc2SpectralDragonRace","p":false},"1feb8:Dragonborn.esm":{"e":"DLC2NetchRace","p":false},"23e2:Dawnguard.esm":{"e":"SkeletonArmorRace","p":false},"24038:Dragonborn.esm":{"e":"DLC2BoarRace","p":false},"247842:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Demon_Race_ConjureLeviathan","p":false},"27483:Dragonborn.esm":{"e":"DLC2ExpSpiderPackmuleRace","p":false},"27bfc:Dragonborn.esm":{"e":"dlc2AshGuardianRace","p":false},"283a:Dawnguard.esm":{"e":"DLC1VampireBeastRace","p":false},"28580:Dragonborn.esm":{"e":"DLC2NetchCalfRace","p":false},"297a1:Playable Rieklings.esp":{"e":"1RieklingPurpleRaceVampire","p":false},"29da06:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Verdant_Race_Wildshape","p":false},"29ee7:Dragonborn.esm":{"e":"DLC2dunKarstaagIceWraithRace","p":false},"29efc:Dragonborn.esm":{"e":"DLC2dunInstrumentsRace","p":false},"2a6fd:Dragonborn.esm":{"e":"DLC2HulkingDraugrRace","p":false},"2ae0:Dawnguard.esm":{"e":"DLC1SoulCairnSoulWispRace","p":false},"2b014:Dragonborn.esm":{"e":"DLC2DwarvenBallistaRace","p":false},"2c625d:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Warrior_Race_Fylgja","p":false},"2c659:Skyrim.esm":{"e":"ImperialRaceChild","p":false},"2c65a:Skyrim.esm":{"e":"RedguardRaceChild","p":false},"2c65b:Skyrim.esm":{"e":"NordRaceChild","p":false},"2c65c:Skyrim.esm":{"e":"BretonRaceChild","p":false},"2c672:Playable Rieklings.esp":{"e":"1NpcRieklingPurpleRaceVampire","p":false},"2c88b:Dragonborn.esm":{"e":"DragonBlackRace","p":false},"2c88c:Dragonborn.esm":{"e":"DLC2DragonBlackRace","p":false},"2cb368:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Warrior_Race_FylgjaStorm","p":false},"2f74:Update.esm":{"e":"ccBGSSSE035_NixHoundCompanionRace","p":false},"2f93:Update.esm":{"e":"ccBGSSSE036_BoneWolfCompanionRace","p":false},"35538:Dragonborn.esm":{"e":"DLC2DremoraRace","p":false},"35e36b:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Totem_Race_Totem","p":false},"35e387:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Totem_Race_EyesInTheSky","p":false},"36cf:Playable Rieklings.esp":{"e":"1NpcRieklingPurpleRace","p":false},"375ac:ElysiumEstate.esp":{"e":"EE_GoatAnimalRace01","p":false},"377d:Dawnguard.esm":{"e":"SnowElfRace","p":false},"3911a:Dragonborn.esm":{"e":"DLC2AcolyteDragonPriestRace","p":false},"3c35f:Dragonborn.esm":{"e":"DLC2FakeCoffinRace","p":false},"3ca97:Dragonborn.esm":{"e":"DLC2MiraakRace","p":false},"3cecb:Dragonborn.esm":{"e":"DLC2RigidSkeletonRace","p":false},"3d01:Dawnguard.esm":{"e":"DLC1HuskyArmoredCompanionRace","p":false},"3d02:Dawnguard.esm":{"e":"DLC1DeathHoundCompanionRace","p":false},"483b:Dawnguard.esm":{"e":"testDraugrRace","p":false},"4d085:OarsRest.esp":{"e":"OR_ChickenRace","p":false},"4d31:Dawnguard.esm":{"e":"TestRace","p":false},"4e507:Skyrim.esm":{"e":"FrostbiteSpiderRaceGiant","p":false},"4e785:Skyrim.esm":{"e":"CowRace","p":false},"51fb:Dawnguard.esm":{"e":"DLC1ChaurusHunterRace","p":false},"53477:Skyrim.esm":{"e":"FrostbiteSpiderRaceLarge","p":false},"574aa6:aaaGraniteHill.esp":{"e":"DragonRaceLokjun","p":false},"5901:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Undead_Race_ConjureDreadShade","p":false},"5901:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Demon_Race_ConjureOathbreaker","p":false},"5907:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Demon_Race_ConjureTempleGrim","p":false},"59c1:ElysiumEstate.esp":{"e":"EE_ChickenAnimalRace01","p":false},"67cd8:Skyrim.esm":{"e":"ElderRace","p":false},"6afa:Dawnguard.esm":{"e":"DLC1SoulCairnSkeletonNecroRace","p":false},"6dc99:Skyrim.esm":{"e":"HareRace","p":false},"6fc4a:Skyrim.esm":{"e":"GoatDomesticsRace","p":false},"71e6a:Skyrim.esm":{"e":"InvisibleRace","p":false},"7af3:Dawnguard.esm":{"e":"DLC1SoulCairnKeeperRace","p":false},"7eaf3:Skyrim.esm":{"e":"NordRaceAstrid","p":false},"800:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Undead_Race_ConjureSanctifiedWraith","p":false},"804:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Primal_Race_CallSnowLeopard","p":false},"80c:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Primal_Race_CallHoundOfHircine","p":false},"814:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Demon_Race_ConjureRavagor","p":false},"837:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Verdant_Race_ForceOfNature","p":false},"84f:Triumvirate - Mage Archetypes.esp":{"e":"TVR_Primal_Race_CallRaven","p":false},"860:YokuWeapons.esp":{"e":"0_JarBOMBA","p":false},"86b:YokuWeapons.esp":{"e":"0_CombatBlue","p":false},"88794:Skyrim.esm":{"e":"NordRaceVampire","p":false},"8883a:Skyrim.esm":{"e":"ArgonianRaceVampire","p":false},"8883c:Skyrim.esm":{"e":"BretonRaceVampire","p":false},"8883d:Skyrim.esm":{"e":"DarkElfRaceVampire","p":false},"88840:Skyrim.esm":{"e":"HighElfRaceVampire","p":false},"88844:Skyrim.esm":{"e":"ImperialRaceVampire","p":false},"88845:Skyrim.esm":{"e":"KhajiitRaceVampire","p":false},"88846:Skyrim.esm":{"e":"RedguardRaceVampire","p":false},"88884:Skyrim.esm":{"e":"WoodElfRaceVampire","p":false},"894d:Dawnguard.esm":{"e":"DLC1SoulCairnSkeletonArmorRace","p":false},"8ac:YokuWeapons.esp":{"e":"0_SkeleGiantRace","p":false},"8f7:YokuWeapons.esp":{"e":"0_PuppetmanRace","p":false},"91e81:Apocalypse - Magic of Skyrim.esp":{"e":"WB_FeralSpirit_Race","p":false},"97a3d:Skyrim.esm":{"e":"DA13AfflictedRace","p":false},"9aa3c:Skyrim.esm":{"e":"SwarmRace","p":false},"9aa44:Skyrim.esm":{"e":"SprigganSwarmRace","p":false},"a2c6:Dawnguard.esm":{"e":"DLC1GargoyleRace","p":false},"a5601:Skyrim.esm":{"e":"ChaurusReaperRace","p":false},"a6746:Playable Rieklings.esp":{"e":"1RieklingBlueRace","p":true},"a6747:Playable Rieklings.esp":{"e":"1RieklingBlueRaceVampire","p":false},"a82b9:Skyrim.esm":{"e":"OrcRaceVampire","p":false},"a82ba:Skyrim.esm":{"e":"ElderRaceVampire","p":false},"a919d:Skyrim.esm":{"e":"ChickenRace","p":false},"a94b:Dawnguard.esm":{"e":"DLC01SoulCairnBonemanRace","p":false},"ae048:Apocalypse - Magic of Skyrim.esp":{"e":"WB_Skinwalker_Race","p":false},"b0bde:Apocalypse - Magic of Skyrim.esp":{"e":"WB_ConjureBearTotem_Race","p":false},"b1c0e:Apocalypse - Magic of Skyrim.esp":{"e":"WB_ConjureCatTotem_Race","p":false},"b214b:Skyrim.esm":{"e":"dunMiddenEmptyRace","p":false},"b5a7a:Playable Rieklings.esp":{"e":"1NpcRieklingBlueRace","p":false},"b5a7b:Playable Rieklings.esp":{"e":"1NpcRieklingBlueRaceVampire","p":false},"b6f95:Skyrim.esm":{"e":"MagicAnomalyRace","p":false},"b7998:Skyrim.esm":{"e":"SkeletonRace","p":false},"b9fd7:Skyrim.esm":{"e":"RigidSkeletonRace","p":false},"ba395:Apocalypse - Magic of Skyrim.esp":{"e":"WB_ConjureDeadeyeCaptain_Race","p":false},"ba545:Skyrim.esm":{"e":"MudcrabRace","p":false},"babdb:Playable Rieklings.esp":{"e":"1NpcRieklingBlueRace2","p":false},"babdc:Playable Rieklings.esp":{"e":"1NpcRieklingPurpleRace2","p":false},"bbee7:Apocalypse - Magic of Skyrim.esp":{"e":"WB_ConjureCraftlord_Race","p":false},"c034f:Playable Rieklings.esp":{"e":"DLC2MountedRieklingRace","p":false},"c3edf:Skyrim.esm":{"e":"SkeeverWhiteRace","p":false},"c5f0:Dawnguard.esm":{"e":"DLC1DeathHoundRace","p":false},"cae13:Skyrim.esm":{"e":"C00GiantOutsideWhiterunRace","p":false},"cd657:Skyrim.esm":{"e":"DA03BarbasDogRace","p":false},"cdd84:Skyrim.esm":{"e":"WerewolfBeastRace","p":false},"cf89b:Skyrim.esm":{"e":"DeerRace","p":false},"d0b2:Dawnguard.esm":{"e":"DLC1DeerGlowRace","p":false},"d0b6:Dawnguard.esm":{"e":"DLC1SabreCatGlowRace","p":false},"d53:Skyrim.esm":{"e":"DraugrRace","p":false},"de505:Skyrim.esm":{"e":"CartHorseRace","p":false},"e7713:Skyrim.esm":{"e":"AlduinRace","p":false},"e88a:Dawnguard.esm":{"e":"DLC1NordRace","p":false},"eb872:Skyrim.esm":{"e":"SkeletonNecroRace","p":false},"ebe18:Skyrim.esm":{"e":"SkeletonNecroPriestRace","p":false},"f0d3:ElysiumEstate.esp":{"e":"EE_CowAnimalRace01","p":false},"f1182:Skyrim.esm":{"e":"WispShadeRace","p":false},"f1ac4:Skyrim.esm":{"e":"DogCompanionRace","p":false},"f3903:Skyrim.esm":{"e":"SprigganMatronRace","p":false},"f71dc:Skyrim.esm":{"e":"DraugrMagicRace","p":false},"f905f:Skyrim.esm":{"e":"MG07DogRace","p":false},"fb0d:Odin - Skyrim Magic Overhaul.esp":{"e":"ODN_Con_Daedra_Race_ConjureDaedroth","p":false}}};
 
 const PREFER_SLOT = 'temple';
@@ -1682,6 +1682,37 @@ function waitWord(seconds) {
   return said + ' and ' + rest + (rest === 1 ? ' minute' : ' minutes');
 }
 
+/*
+  ENTRIES THE SERVER MADE INTO SOMETHING ELSE ARE NOT THE PLAIN ITEM (#2675).
+
+  A hair dye is a Bowl entry with the dye's name on it: one record, and the
+  entry says which dye, the way a deed says which house. Anything that reads
+  the record alone (addItem stacking onto the first entry of it, takeItem
+  taking from the first, a merchant counting and taking what you carry) would
+  take a dye for a plain bowl and a plain bowl for a dye. So each block that
+  makes such entries registers a test here, by its own name so a reload
+  replaces it, and every one of those readers asks mintedEntry and leaves a
+  made entry alone. An entry nobody registered is plain, exactly as before:
+  a piece's condition in its name (#1719) is still the piece.
+*/
+function mintedBy(owner, test) {
+  if (!globalThis.__thornswoodMinted || typeof globalThis.__thornswoodMinted !== 'object') {
+    globalThis.__thornswoodMinted = {};
+  }
+  globalThis.__thornswoodMinted[owner] = test;
+}
+
+function mintedEntry(entry) {
+  const tests = globalThis.__thornswoodMinted;
+  if (!entry || !tests || typeof tests !== 'object') { return false; }
+  for (const owner of Object.keys(tests)) {
+    if (typeof tests[owner] !== 'function') { continue; }
+    try { if (tests[owner](entry)) { return true; } }
+    catch (e) { log('minted', owner + '\'s test threw on an entry, so it does not count as theirs:', e); }
+  }
+  return false;
+}
+
 function addItem(actorId, itemDesc, count) {
   const baseId = idOf(itemDesc);
   if (!baseId) return false;
@@ -1689,7 +1720,7 @@ function addItem(actorId, itemDesc, count) {
   const entries = inv.entries || [];
   let found = false;
   for (const e of entries) {
-    if (e.baseId === baseId) { e.count += count; found = true; break; }
+    if (e.baseId === baseId && !mintedEntry(e)) { e.count += count; found = true; break; }
   }
   if (!found) entries.push({ baseId: baseId, count: count });
   mp.set(actorId, 'inventory', { entries: entries });
@@ -1711,7 +1742,7 @@ function addItemsAtomic(actorId,goods) {
   if(!inventory || !Array.isArray(inventory.entries)) throw new Error('Inventory unavailable');
   const entries=inventory.entries.map(entry=>({...entry}));
   for(const good of resolved) {
-    const existing=entries.find(entry=>entry.baseId===good.baseId);
+    const existing=entries.find(entry=>entry.baseId===good.baseId && !mintedEntry(entry));
     if(existing) {
       if(!Number.isSafeInteger(existing.count+good.count) || existing.count+good.count>0xffffffff)
         throw new Error('Inventory count overflow');
@@ -1877,7 +1908,7 @@ function takeItem(actorId, itemDesc, count) {
   const inv = mp.get(actorId, 'inventory') || { entries: [] };
   const entries = inv.entries || [];
   for (let i = 0; i < entries.length; i++) {
-    if (entries[i].baseId !== baseId) continue;
+    if (entries[i].baseId !== baseId || mintedEntry(entries[i])) continue;
     if (entries[i].count < count) return false;
     entries[i].count -= count;
     if (entries[i].count <= 0) entries.splice(i, 1);
@@ -1905,7 +1936,7 @@ function takeItemById(actorId, baseId, count) {
   }
   const entries = (inv && inv.entries) || [];
   for (let i = 0; i < entries.length; i++) {
-    if (entries[i].baseId !== baseId) { continue; }
+    if (entries[i].baseId !== baseId || mintedEntry(entries[i])) { continue; }
     if (entries[i].count < count) { return false; }
     entries[i].count -= count;
     if (entries[i].count <= 0) { entries.splice(i, 1); }
@@ -8652,6 +8683,20 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
 
   /*
+    A TRADE SHIP'S DOCK CRATE (#2700): the dock panel, never the container.
+    Any other container a staff member opens is remembered for a minute,
+    for the staff panel, and the press goes on.
+  */
+  try {
+    const shipsDock = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeShips;
+    if (shipsDock && shipsDock.activated && shipsDock.activated(refrId, casterRefrId, baseDesc)) {
+      return false;
+    }
+  } catch (eShip) {
+    log('the dock crate at', Number(refrId).toString(16), 'threw:', eShip);
+  }
+
+  /*
     WATER (#1382). A well activator with an empty bottle fills it; a cooking
     spot starts boiling any unboiled water carried. It answers nothing to the
     engine, so the press goes on down the chain and the cooking menu opens as
@@ -8664,6 +8709,17 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
       try { refDescW = mp.getDescFromId(refrId); } catch (eW) { refDescW = ''; }
       var kwW = (typeof BENCH_BY_BASE !== 'undefined' && BENCH_BY_BASE &&
                  Object.prototype.hasOwnProperty.call(BENCH_BY_BASE, baseDesc)) ? BENCH_BY_BASE[baseDesc] : '';
+      /*
+        HAIR DYE (#2675) at the same cooking spot, asked first: a steep and a
+        boil can start on one press, and the hair dye block says which is
+        settled first. Neither answers the engine.
+      */
+      var dyeW = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHairDye;
+      var dLine = '';
+      try { dLine = (dyeW && dyeW.pressed) ? dyeW.pressed(casterRefrId, kwW) : ''; } catch (eDye) {
+        log('the hair dye at', refrId.toString(16), 'threw:', eDye);
+      }
+      if (dLine) { notify(casterRefrId, dLine); say(casterRefrId, dLine); }
       var wLine = needsW.activatedWater(casterRefrId, refDescW, baseDesc, kwW);
       if (wLine) { notify(casterRefrId, wLine); say(casterRefrId, wLine); }
     }
@@ -26869,8 +26925,10 @@ function raceGate(actorId, row) {
      anyone  the professions page calls it open furniture, or it holds a recipe
              nobody owns, so it opens for everybody
      halves  each half that owns something here, at the LOWEST rank it owns
-             something at, because that is the rank the door asks for. */
-const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"novice","woodwright":"novice"},"name":"CraftingSmithingSharpeningWheel"},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","platewright":"novice"},"name":"CraftingSmithingArmorTable"},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
+             something at, because that is the rank the door asks for
+     shut    nothing can be made here by anybody (SHUT_BENCHES), and this is
+             what the gate says instead of opening it */
+const BENCH_ACCESS = {"117f7:HearthFires.esm":{"anyone":false,"halves":{"confectioner":"novice","hearthcook":"novice"},"name":"BYOHCraftingOven"},"1547f:Thornswood-Content.esp":{"anyone":false,"halves":{"charburner":"novice","woodwright":"novice"},"name":"ThornswoodCraftingCharcoalKiln"},"154e1:Thornswood-Content.esp":{"anyone":false,"halves":{"woodwright":"novice"},"name":"ThornswoodCraftingWoodworking"},"17738:Dragonborn.esm":{"anyone":false,"halves":{"bladebinder":"novice"},"name":"DLC2StaffEnchanter"},"3015:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingCarpenter"},"305c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingDrafting"},"42e6b:Thornswood-Content.esp":{"anyone":false,"halves":{"physicker":"novice"},"name":"ThornswoodCraftingAlchemy"},"5756:Dawnguard.esm":{"anyone":true,"halves":{"bladebinder":"master","platewright":"master"},"name":"DLC1LD_CraftingForgeAetherium"},"59d8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart006Chest01"},"59e1:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart043ShelfTallDisplayCase01"},"59e7:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart024WeaponPlaque01"},"5a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart065MountedHeadSabreCat02"},"6ce000:Update.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"novice"},"name":"MCE_CraftingLoom"},"7866a:Skyrim.esm":{"anyone":true,"halves":{"haberdasher":"novice","liverywright":"advanced","platewright":"novice"},"name":"CraftingTanningRack"},"88105:Skyrim.esm":{"anyone":true,"halves":{"edgewright":"novice","haberdasher":"novice","liverywright":"novice","platewright":"novice","woodwright":"novice"},"name":"CraftingSmithingForge"},"88108:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingSharpeningWheel","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"910:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart199WallSconceExteriorx2"},"9b8:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart201TableSquare02"},"9c6de:Skyrim.esm":{"anyone":false,"halves":{"hearthcook":"novice"},"name":"isGrainMill"},"a0c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart202TableNightx2_02"},"a31b:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase1"},"a31c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingTrophyBase2"},"a5cb3:Skyrim.esm":{"anyone":true,"halves":{"hearthcook":"novice"},"name":"CraftingCookpot"},"a5cce:Skyrim.esm":{"anyone":true,"halves":{"platewright":"novice"},"name":"CraftingSmelter"},"adb78:Skyrim.esm":{"anyone":false,"halves":{},"name":"CraftingSmithingArmorTable","shut":"Tempering is not done here. A piece is mended with a repair kit: with one in your pack, your inventory names the key that mends a piece."},"alchemy":{"anyone":false,"halves":{"blightbrewer":"novice","physicker":"novice"},"name":"the alchemy lab"},"b28:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart205TableNight01"},"b59:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart206ShrineDibella"},"b68f:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart124WallShelf01"},"b696:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart126ChairExterior01"},"d16c:HearthFires.esm":{"anyone":true,"halves":{},"name":"BYOHBuildingInteriorPart158ChestExterior01"},"enchanting":{"anyone":false,"halves":{"bladebinder":"novice","wardweaver":"novice"},"name":"the arcane enchanter"},"f46ce:Skyrim.esm":{"anyone":false,"halves":{"edgewright":"advanced","platewright":"advanced","woodwright":"advanced"},"name":"CraftingSmithingSkyforge"},"f806:Dawnguard.esm":{"anyone":false,"halves":{"woodwright":"advanced"},"name":"DLC1CraftingDawnguard"}};
 // ==== end BENCH_ACCESS ====
 
 /**
@@ -26891,6 +26949,11 @@ function benchGate(actorId, baseDesc) {
     return null;
   }
   const bench = BENCH_ACCESS[key];
+  // A bench nothing can be made at, by anybody, says why and does not open,
+  // so its menu never lists a thing (SHUT_BENCHES in Build-BenchTable.py: the
+  // sharpening wheel and the armour table, where tempering is cut, #1384).
+  // Asked before the character, because it is the same answer for everybody.
+  if (bench.shut) { return String(bench.shut); }
   if (bench.anyone) { return null; }
 
   const C = globalThis.__thornswoodCharacter;
@@ -27460,7 +27523,14 @@ var MIXTURES = {
   '3eaf3:Skyrim.esm': { name: 'Fortify Health', half: 'physicker', rank: 'advanced' },
   '3eaf9:Skyrim.esm': { name: 'Fortify Stamina', half: 'physicker', rank: 'advanced' },
   '3eaf8:Skyrim.esm': { name: 'Fortify Magicka', half: 'physicker', rank: 'advanced' },
-  'ae723:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
+  /*
+    The magic effect AlchCureDisease, 0xAE722 (#1383). It was keyed 'ae723'
+    until 17 October, which is CureDisease, the ALCH record of the potion
+    itself, so every Cure Disease brew the engine named (fork #60 hands over
+    MGEF ids) was refused as off the list. Measured in Skyrim.esm on One:
+    0xAE722 is MGEF AlchCureDisease and 0xAE723 is ALCH CureDisease.
+  */
+  'ae722:Skyrim.esm': { name: 'Cure Disease', half: 'physicker', rank: 'advanced' },
   '3eaea:Skyrim.esm': { name: 'Resist Fire', half: 'physicker', rank: 'expert' },
   '3eaeb:Skyrim.esm': { name: 'Resist Frost', half: 'physicker', rank: 'expert' },
   '3eaec:Skyrim.esm': { name: 'Resist Shock', half: 'physicker', rank: 'expert' },
@@ -28000,6 +28070,23 @@ function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
     try { brewed = mp.getDescFromId(craftedItemBaseId); } catch (e) { brewed = null; }
     if (brewed) {
       masterCraft(actorId, { out: brewed, name: 'brew', owner: 'Alchemist', makes: 1 }, 1);
+    }
+  }
+
+  /*
+    A BREWED BOTTLE OF CURE DISEASE CURES (#1383, disease.md "A potion of
+    cure disease clears one ordinary disease"). The bottle is a runtime form
+    with no record, so when it is drunk the injury block cannot read what it
+    does; the effects are known only here, from the ingredients the engine
+    found in the pack (fork #60). So the injury block is told which runtime id
+    this brew made and whether it cures. Every brew is told, not only a cure,
+    so an id the client hands out again after a relog cannot keep a stale cure.
+  */
+  if (want === 'alchemist' && (Number(craftedItemBaseId) || 0) >= RUNTIME && Array.isArray(effects)) {
+    var hurtBrew = globalThis.__thornswoodHurt;
+    if (hurtBrew && hurtBrew.brewed) {
+      try { hurtBrew.brewed(actorId, Number(craftedItemBaseId), effects); }
+      catch (e) { log('the injury block threw on a brew:', e); }
     }
   }
   return;
@@ -34583,6 +34670,547 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood season ====
 
+// ==== thornswood world stage ====
+/*
+  THE WORLD STAGE AND THE OFFICE PROCLAMATION (#513).
+
+  #513 is the Thalmor war. Patrick, 17 Oct: Thornswood is player driven, so
+  the war is tools for staff and never a script. Nothing here decides what
+  happens next, and no timer moves anything. The stages are data, written by
+  staff in game/data/war-stages.json, and this block knows no stage by name.
+
+  THE STAGE LIST is WAR_STAGES below, the same table as
+  game/data/war-stages.json. The server is sent this file and not game/data,
+  so the table is copied in, and tests/test-513-world-stage.js fails if the
+  two differ. Each stage has an id, a name and its words, and may carry
+  force: free text saying who is behind it (dominion, remnant, proxy, mixed,
+  or whatever staff write). force is handed back as it is written. No code
+  here reads it to choose anything. The first stage in the list is where the
+  world starts, and where it falls back to.
+
+  ONE STAGE FOR THE WHOLE PROVINCE, kept in private/war.json beside
+  season.json, so a restart or a deploy does not reset it. worldStage() is
+  the one place it is read: the stage, its force, when the world reached it
+  and who moved it there. Any block that needs it asks here rather than
+  keeping a copy of its own.
+
+    - No file is the start of the world, the first stage. Nothing is written
+      and nothing is said.
+    - A file that cannot be read, or one whose stage the list does not have,
+      is the first stage too, and the log says so once, when this block
+      loads. The file is left as it is. If a move is made after that, the
+      unreadable file is kept beside it as war.json.unreadable-<time> before
+      the new one is written, so nothing on record is lost.
+
+  THE HISTORY. war.json keeps every move the world has made, oldest first:
+  the stage, when, and who moved it there (and who proposed it, for a move
+  that was proposed). The last entry is where the world is now. A move is
+  never taken off it, so a change that is meant to be permanent stays on
+  record even when a later stage undoes it in the world.
+
+  STAGE IDS FOLLOW THE PATROL FILE'S KEY RULE. thalmor-patrols.json (#1390)
+  gives a patrol cap for each stage under stageMost, keyed by these ids, and
+  it takes a key only when it is 1 to 32 lower case letters, digits and
+  dashes (/^[a-z0-9-]{1,32}$/, the same as its road ids). So the stage list
+  holds ids to that same rule, STAGE_ID below: a stage in war-stages.json
+  whose id breaks it is left out of the list and the log says so once when
+  this block loads, and a move or a proposal to such an id is refused with
+  the rule in words. A stage the patrol file could never key is never a
+  stage the world can reach.
+
+  setWorldStage(id, by) moves it, and is a function only: nothing in play
+  calls it. An id the list does not have is refused. So is the stage the
+  world is already at, so the time it was reached is never reset by
+  accident, and so is a move that does not say who made it. Nothing is
+  written when it refuses. The file is written whole and then renamed into
+  place, so a crash halfway leaves the old stage, not half a file.
+
+  THE SEAM FOR LATER, SERVER PROPOSES AND STAFF CONFIRM. proposeWorldStage
+  (id, by) keeps one proposal in war.json, checked the same way as a move,
+  and moves nothing. A later proposal replaces it. confirmWorldStage(by)
+  makes the move it proposed, as a move by whoever confirmed it, and clears
+  it. dropWorldStageProposal(by) clears it without a move. A direct
+  setWorldStage clears it too, because it no longer says where the world
+  goes from here. pendingWorldStage() reads it. Staff propose, confirm and
+  drop on the Office page of K: THE STAFF CARD, below. Nothing proposes by
+  itself yet.
+
+  proclaim(holds, office, title, body) puts one notice on the board of each
+  hold named, in the name of an office (the Crown, the Jarl of Haafingar),
+  never a person. It is a notice like any other on the wall and under Boards
+  on J, kept in the property register with the rest, so it survives a
+  restart. There is no fee, no gold moves, and nothing is held on any
+  ledger: it is the office's word, not somebody's purchase. The property
+  block's officePost does the writing, with the same 60 and 600 limits as a
+  person's post. Everybody standing at one of those boards, within the
+  board's own reach of 400, is told once in their chat. A hold with no board
+  refuses the whole call, and so does anything else wrong with it, and then
+  nothing is written and nobody is told. 'all' names every hold that has a
+  board.
+
+  THE STAFF CARD below is the only thing in play that calls any of this, and
+  only on a staff member's press. Nothing is scripted. The patrol cap is
+  #1390's, and nothing here touches it.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  // ==== WAR_STAGES ====
+  /* The same table as game/data/war-stages.json. tests/test-513-world-stage.js checks that they agree. */
+  var WAR_STAGES = {"version":1,"stages":[{"id":"peace","name":"Peace","text":"The Kingdom is at peace. Nothing in the world changes."}]};
+  // ==== end WAR_STAGES ====
+
+  var BY_CHARS = 80;
+
+  /* The patrol file's rule for a stage id (#1390, thalmorPatrolTable's
+     stageMost keys and road ids): see STAGE IDS above. */
+  var STAGE_ID = /^[a-z0-9-]{1,32}$/;
+  var STAGE_ID_WORDS = 'lower case letters, digits and dashes, 1 to 32 of them';
+  function idRefusal(id) {
+    return 'A stage id is ' + STAGE_ID_WORDS + ', the rule thalmor-patrols.json keys its stages by, and ' +
+           JSON.stringify(String(id)) + ' is not one.';
+  }
+
+  function wlog() {
+    var a = ['[thornswood world stage]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  function stagePath() {
+    var fs = require('fs');
+    var path = require('path');
+    var priv = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { priv = String(cfg.privDir); }
+    } catch (e) { }
+    try { if (!fs.existsSync(priv)) { fs.mkdirSync(priv, { recursive: true }); } } catch (e2) { }
+    return path.join(priv, 'war.json');
+  }
+
+  /* The list as staff wrote it, less any stage whose id breaks STAGE_ID. */
+  var LISTED = (WAR_STAGES && Array.isArray(WAR_STAGES.stages)) ? WAR_STAGES.stages : [];
+  var STAGES = LISTED.filter(function (s) { return !!s && typeof s.id === 'string' && STAGE_ID.test(s.id); });
+  LISTED.forEach(function (s) {
+    if (STAGES.indexOf(s) < 0) {
+      wlog('war-stages.json has a stage left out of the list:', idRefusal(s && s.id));
+    }
+  });
+  function stageList() { return STAGES; }
+
+  /** The stage row for an id, or null when the list has no such stage. */
+  function stageOf(id) {
+    var list = stageList();
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && typeof list[i].id === 'string' && list[i].id === id) { return list[i]; }
+    }
+    return null;
+  }
+
+  /** Where the world starts: the first stage in the list. */
+  function startId() {
+    var first = stageList()[0];
+    return (first && typeof first.id === 'string') ? first.id : '';
+  }
+
+  function cleanWho(by) { return typeof by === 'string' ? by.replace(/\s+/g, ' ').trim() : ''; }
+
+  /* One history entry as it is kept: a stage, when, who, and who proposed it. */
+  function entryOf(row) {
+    if (!row || typeof row !== 'object' || typeof row.id !== 'string' || !row.id) { return null; }
+    var out = { id: row.id, at: Number(row.at) || 0, by: typeof row.by === 'string' ? row.by : '' };
+    if (typeof row.proposedBy === 'string' && row.proposedBy) { out.proposedBy = row.proposedBy; }
+    return out;
+  }
+
+  function readState() {
+    var fs = require('fs');
+    var file = stagePath();
+    var fresh = { history: [], pending: null, unreadable: false };
+    var text = null;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return fresh; }
+      wlog('could not read', file + ':', (e && e.message) || e, '; the world is at', startId());
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var raw = null;
+    try { raw = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e2) { raw = null; }
+    if (!raw || typeof raw !== 'object' || !Array.isArray(raw.history)) {
+      wlog(file, 'is not readable; the world is at', startId(), 'and the file is left as it is');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var history = [];
+    for (var i = 0; i < raw.history.length; i++) {
+      var en = entryOf(raw.history[i]);
+      if (en) { history.push(en); }
+    }
+    var last = history.length ? history[history.length - 1] : null;
+    var lost = false;
+    if (last && !stageOf(last.id)) {
+      wlog(file, 'puts the world at a stage the list does not have (' + JSON.stringify(last.id) +
+           '); the world is at', startId(), 'and the file is left as it is');
+      lost = true;
+    }
+    var pending = null;
+    if (raw.pending && typeof raw.pending === 'object') {
+      var p = entryOf(raw.pending);
+      if (p && stageOf(p.id)) { pending = p; }
+      else { wlog('the proposal in', file, 'names a stage the list does not have; it is not kept'); }
+    }
+    return { history: history, pending: pending, unreadable: false, lost: lost };
+  }
+
+  var state = readState();
+
+  /* The history entry the world is at now, or null at the start. */
+  function current() {
+    if (state.lost) { return null; }
+    return state.history.length ? state.history[state.history.length - 1] : null;
+  }
+
+  function currentId() { var c = current(); return c ? c.id : startId(); }
+
+  /** Where the world is: the stage, its force, when it was reached and who moved it there. */
+  function worldStage() {
+    var c = current();
+    var row = stageOf(currentId()) || { id: currentId(), name: '', text: '' };
+    return { id: row.id, name: String(row.name || ''), text: String(row.text || ''),
+             force: typeof row.force === 'string' ? row.force : '',
+             since: c ? c.at : 0, by: c ? c.by : '' };
+  }
+
+  /** Every move the world has made, oldest first. A copy. */
+  function worldHistory() { return JSON.parse(JSON.stringify(state.history)); }
+
+  /** The proposal waiting for a yes, or null. A copy. */
+  function pendingWorldStage() { return state.pending ? JSON.parse(JSON.stringify(state.pending)) : null; }
+
+  /* Writes the next state whole, or nothing. Answers true when it is on disk. */
+  function write(next) {
+    var fs = require('fs');
+    var file = stagePath();
+    try {
+      if (state.unreadable && fs.existsSync(file)) {
+        fs.renameSync(file, file + '.unreadable-' + Date.now());
+      }
+      var c = next.history.length ? next.history[next.history.length - 1] : null;
+      fs.writeFileSync(file + '.tmp', JSON.stringify({
+        id: c ? c.id : startId(), since: c ? c.at : 0, by: c ? c.by : '',
+        history: next.history, pending: next.pending
+      }));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      wlog('could not write', file + ':', (e && e.message) || e, '; the world stays at', currentId());
+      return false;
+    }
+    state = { history: next.history, pending: next.pending, unreadable: false, lost: false };
+    return true;
+  }
+
+  /* Why a move to id by who cannot be made, or '' when it can. */
+  function refusal(id, who, doing) {
+    if (typeof id === 'string' && !STAGE_ID.test(id)) { return idRefusal(id); }
+    if (typeof id !== 'string' || !stageOf(id)) { return 'There is no stage called ' + JSON.stringify(String(id)) + '.'; }
+    if (!who) { return 'Say who ' + doing + '.'; }
+    if (who.length > BY_CHARS) { return 'Who ' + doing + ' is up to ' + BY_CHARS + ' characters.'; }
+    // A file whose stage the list lost may still be moved to the start.
+    if (!state.lost && id === currentId()) { return 'The world is already at ' + (stageOf(id).name || id) + '.'; }
+    return '';
+  }
+
+  function move(id, who, proposedBy) {
+    var entry = { id: id, at: Date.now(), by: who };
+    if (proposedBy) { entry.proposedBy = proposedBy; }
+    var was = currentId();
+    var history = state.history.concat([entry]);
+    if (!write({ history: history, pending: null })) {
+      return { ok: false, why: 'The stage could not be written, so the world stays where it was.' };
+    }
+    wlog(who, 'moved the world from', was, 'to', id + (proposedBy ? ', proposed by ' + proposedBy : ''));
+    return { ok: true, stage: worldStage() };
+  }
+
+  /** Moves the world to stage id. Answers { ok: true, stage } or { ok: false, why }, and writes nothing on a no. */
+  function setWorldStage(id, by) {
+    var key = typeof id === 'string' ? id.trim() : id;
+    var who = cleanWho(by);
+    var why = refusal(key, who, 'moved the world');
+    if (why) { return { ok: false, why: why }; }
+    return move(key, who, '');
+  }
+
+  /** Keeps one proposal to move to stage id, and moves nothing. A later one replaces it. */
+  function proposeWorldStage(id, by) {
+    var key = typeof id === 'string' ? id.trim() : id;
+    var who = cleanWho(by);
+    var why = refusal(key, who, 'proposes it');
+    if (why) { return { ok: false, why: why }; }
+    var pending = { id: key, at: Date.now(), by: who };
+    if (!write({ history: state.history, pending: pending })) {
+      return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
+    }
+    wlog(who, 'proposed moving the world from', currentId(), 'to', key);
+    return { ok: true, pending: pendingWorldStage() };
+  }
+
+  /** Makes the move the proposal names, as a move by whoever confirms it. */
+  function confirmWorldStage(by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    var who = cleanWho(by);
+    var why = refusal(p.id, who, 'confirms it');
+    if (why) { return { ok: false, why: why }; }
+    return move(p.id, who, p.by);
+  }
+
+  /** Clears the proposal without a move. */
+  function dropWorldStageProposal(by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is dropping it.' }; }
+    if (!write({ history: state.history, pending: null })) {
+      return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
+    }
+    wlog(who, 'dropped the proposal to move the world to', p.id);
+    return { ok: true };
+  }
+
+  /*
+    A notice in an office's name on the boards named, and a line to everybody
+    standing at one of them. Answers { ok: true, holds, told } or
+    { ok: false, why }. See the top of this block.
+  */
+  function proclaim(holds, office, title, body) {
+    var W = g.__thornswoodProperty;
+    if (!W || typeof W.officePost !== 'function' || typeof W.boardHere !== 'function') {
+      return { ok: false, why: 'The boards are not loaded, so nothing was put up.' };
+    }
+    var r = W.officePost(holds, office, title, body);
+    if (!r || !r.ok) { return r || { ok: false, why: 'Nothing was put up.' }; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    var line = 'A notice from ' + r.office + ' is up on the board: ' + r.title +
+               (/[.!?]$/.test(r.title) ? '' : '.');
+    var told = 0;
+    for (var i = 0; i < online.length; i++) {
+      var hold = null;
+      try { hold = W.boardHere(online[i]); } catch (e2) { hold = null; }
+      if (!hold || r.holds.indexOf(hold) < 0) { continue; }
+      try { say(online[i], line); told++; } catch (e3) { }
+      // A board panel that is open shows the new notice now, not at the next push.
+      try {
+        var soc = g.__thornswoodSocial;
+        if (soc && soc.push) { soc.push(online[i], true); }
+      } catch (e4) { }
+    }
+    wlog(r.office, 'proclaimed on', r.holds.join(', ') + ':', r.title, '; told', told);
+    return { ok: true, holds: r.holds.slice(), told: told };
+  }
+
+  /*
+    THE STAFF CARD ON THE OFFICE PAGE (#513, Patrick, 17 Oct): server
+    proposes, staff confirm, and nothing is typed. Staff see a card on the
+    Office page of K: where the world is, its force when the stage names one,
+    and any proposal waiting, with the stage it moves to, who proposed it and
+    when. They propose a move to any other stage in the list, and confirm or
+    drop the one waiting. The card's buttons send /world, which nobody is
+    told to type, and Confirm asks twice on the page before it sends.
+
+    STAFF ONLY, CHECKED HERE ON EVERY LINE. The card is drawn only for staff,
+    and the line is never trusted for that: each one asks the same two things
+    the #2551 staff buttons ask (settleAs in the property block). Who is staff
+    is the chat block's isStaff (__thornswoodIsStaff), and the staff block's
+    proof (unproven) wants a chat connection the voice service proved and the
+    launcher's pass on hand. Somebody who is not staff is told only that this
+    is staff's, and nothing changes.
+
+    A CONFIRM OR A DROP NAMES THE PROPOSAL, its stage and when it was made,
+    so a press on a card drawn before somebody else's proposal cannot confirm
+    or drop the newer one.
+
+    THE LOG is the staff log, the record the #2551 buttons write: one line in
+    thornswood.log and one in for-bot/moderation.log, which the Discord bot
+    says in the staff channel (worldpropose, worldconfirm, worlddrop). No
+    press is taken when that log is not loaded.
+
+    THE STAGE'S NOTICE. A stage may carry proclamation, { office, holds,
+    title, body }, in war-stages.json. When a confirm moves the world to it,
+    that notice goes up through proclaim above. It is optional, and a stage
+    with none puts nothing up. If the notice is refused, the move still
+    stands, the staff member is told why, and the log says so.
+  */
+  var STAFF_LOG_GONE = 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.';
+
+  function isStaffNow(pid) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+  }
+
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  /* One stage as the card shows it: id, name, force, and the office of its notice when it has one. */
+  function stageCard(row) {
+    var out = { id: row.id, name: String(row.name || row.id), force: typeof row.force === 'string' ? row.force : '' };
+    var p = row.proclamation;
+    if (p && typeof p === 'object' && typeof p.office === 'string' && p.office) { out.notice = p.office; }
+    return out;
+  }
+
+  /** What the staff card on the Office page draws, or null for anybody who is not staff. */
+  function staffView(profileId) {
+    if (!isStaffNow(profileId)) { return null; }
+    var st = worldStage();
+    var p = state.pending;
+    var target = p ? stageOf(p.id) : null;
+    var tc = target ? stageCard(target) : null;
+    return {
+      stage: { id: st.id, name: st.name || st.id, force: st.force, text: st.text, since: st.since, by: st.by },
+      pending: tc ? { id: p.id, name: tc.name, force: tc.force, notice: tc.notice || '', at: p.at, by: p.by } : null,
+      stages: stageList().filter(function (r) { return r && typeof r.id === 'string'; }).map(stageCard)
+    };
+  }
+
+  /* Every staff member's K panel again, so each card says what is true now. */
+  function redrawStaff() {
+    var c = g.__thornswoodCharacter;
+    if (!c || !c.stateOf || !c.writeState) { return; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e2) { pid = 0; }
+      if (!pid || !isStaffNow(pid)) { continue; }
+      try {
+        var s = c.stateOf(online[i]);
+        if (s) { c.writeState(online[i], s); }
+      } catch (e3) { }
+    }
+  }
+
+  function samePending(id, at) {
+    var p = state.pending;
+    return !!p && p.id === String(id || '') && String(at) === String(p.at);
+  }
+
+  /*
+    The staff card's lines: propose <stage>, confirm <stage> <when> and
+    drop <when>. Answers true, because the word is always this block's.
+  */
+  function command(parts, actorId, profileId, toProfile, cmd) {
+    var pid = Number(profileId) || 0;
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    if (!isStaffNow(pid)) {
+      wlog('a line for the world from profile', pid, 'who is not staff; nothing changed');
+      toProfile(profileId, 'Moving the world is staff\'s. Nothing changed.');
+      return true;
+    }
+    var log = g['__thornswoodStaff'];
+    if (!log || typeof log.unproven !== 'function' || typeof log.record !== 'function') {
+      toProfile(profileId, STAFF_LOG_GONE);
+      return true;
+    }
+    var unproven = log.unproven(cmd, pid);
+    if (unproven) { toProfile(profileId, unproven); return true; }
+    var name = nameOfActor(actorId);
+    // Who, as the history keeps it: the name cut to 60, so it always fits.
+    var by = name.slice(0, 60) + ' (profile ' + pid + ')';
+    var from = currentId();
+    var r;
+
+    if (verb === 'propose') {
+      var want = String((parts && parts[2]) || '');
+      var replaced = state.pending ? state.pending.id : '';
+      r = proposeWorldStage(want, by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      var row = stageOf(want);
+      var force = typeof row.force === 'string' ? row.force : '';
+      log.record('worldpropose', pid, name, 0, String(row.name || want),
+                 'from ' + from + ' to ' + want + (force ? ', force: ' + force : '') +
+                 (replaced ? ', in place of the proposal to ' + replaced : ''),
+                 0, { stage: want, from: from, force: force });
+      toProfile(profileId, 'You propose moving the world to ' + (row.name || want) + '. It moves only when staff ' +
+                'confirm it on this page. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    if (verb === 'confirm' || verb === 'drop') {
+      if (!state.pending) { toProfile(profileId, 'Nothing is proposed. Nothing changed.'); return true; }
+      var id = verb === 'confirm' ? String((parts && parts[2]) || '') : state.pending.id;
+      var at = verb === 'confirm' ? (parts && parts[3]) : (parts && parts[2]);
+      if (!samePending(id, at)) {
+        toProfile(profileId, 'That is not the proposal waiting now. Open the page again to see the one that is. Nothing changed.');
+        return true;
+      }
+      var p = state.pending;
+      var target = stageOf(p.id);
+      var tname = String((target && target.name) || p.id);
+      if (verb === 'drop') {
+        r = dropWorldStageProposal(by);
+        if (!r.ok) { toProfile(profileId, r.why); return true; }
+        log.record('worlddrop', pid, name, 0, tname, 'proposed by ' + p.by + '; the world stays at ' + from,
+                   0, { stage: p.id, from: from });
+        toProfile(profileId, 'You drop the proposal to move the world to ' + tname +
+                  '. The world stays where it is. It is in the staff log.');
+        redrawStaff();
+        return true;
+      }
+      r = confirmWorldStage(by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      var tforce = typeof target.force === 'string' ? target.force : '';
+      var notice = target.proclamation;
+      var put = (notice && typeof notice === 'object')
+        ? proclaim(notice.holds, notice.office, notice.title, notice.body) : null;
+      if (put && !put.ok) { wlog('the notice for', p.id, 'was refused:', put.why); }
+      log.record('worldconfirm', pid, name, 0, tname,
+                 'from ' + from + ' to ' + p.id + ', proposed by ' + p.by + (tforce ? ', force: ' + tforce : '') +
+                 (put ? (put.ok ? '; its notice is up in ' + put.holds.join(', ') : '; its notice was refused: ' + put.why) : ''),
+                 0, { stage: p.id, from: from, force: tforce, proposedBy: p.by,
+                      notice: put ? (put.ok ? put.holds.slice() : false) : null });
+      toProfile(profileId, 'The world moves to ' + tname + '. It is in the staff log.' +
+                (put ? (put.ok ? ' Its notice is up on the board in ' + put.holds.length +
+                                 (put.holds.length === 1 ? ' hold.' : ' holds.')
+                               : ' Its notice did not go up: ' + put.why) : ''));
+      redrawStaff();
+      return true;
+    }
+
+    toProfile(profileId, 'The world\'s card on the Office page of K proposes, confirms and drops. Nothing changed.');
+    return true;
+  }
+
+  g.__thornswoodWorldStage = {
+    worldStage: worldStage,
+    worldHistory: worldHistory,
+    setWorldStage: setWorldStage,
+    proposeWorldStage: proposeWorldStage,
+    confirmWorldStage: confirmWorldStage,
+    dropWorldStageProposal: dropWorldStageProposal,
+    pendingWorldStage: pendingWorldStage,
+    proclaim: proclaim,
+    // The staff card on the Office page of K: what it draws, and its lines.
+    staffView: staffView,
+    command: command,
+    stages: function () { return JSON.parse(JSON.stringify(stageList())); }
+  };
+  if (!startId()) { wlog('the stage list is empty; nothing here can move'); }
+  wlog('the world is at', currentId());
+})();
+// ==== end thornswood world stage ====
+
 // ==== thornswood release of deleted characters ====
 /*
   WHAT A DELETED CHARACTER HELD IS LET GO AT SERVER START (#2351).
@@ -34619,15 +35247,22 @@ log('gamemode loaded:',
               the log)
     embassy   the embassy and remnant rolls (the embassy block)
     dungeon   the character on each dungeon chest's reservation (dungeon loot)
+    cargo     the character on every line and hand out of the trade ships'
+              manifest, every piece kept where it was (the trade ships
+              block, #511)
     books     members, their book chat, books they own, when they last left
               (the books)
+    merchants the guild traders' supply waits, commission promises and a
+              trade still waiting on the character (the purse service, at
+              NPC startup, #2652)
 
   A part that answers that it took is marked done in the file, the time it
   ran, so it never runs again; when every part is done the file is deleted,
   and nothing about who was released stays on the server. A part whose write
   did not take is said in the log and waits for the next start, and so does
   one whose block never got as far as asking; only those run then
-  (__thornswoodReleaseWaiting, at the end of the books, says which).
+  (__thornswoodReleaseWaiting, after the NPC startup, the last block that
+  asks, says which).
   Delete-Person.ps1 merges a new request into a list still waiting and clears
   done, so every part runs for the new ids too; running again for an id
   already let go finds nothing.
@@ -34635,16 +35270,11 @@ log('gamemode loaded:',
   The log says counts and nothing else: never a name, a profile id or a form
   id. A list that cannot be read, or does not have the shape above, releases
   nothing, is left as it is, and the log says so.
-
-  The merchant ledger (merchant-ledger.json) is not a part: its supply waits
-  and a trade still waiting on a character name them by form id and
-  profile, and that code belongs to the work on #1373. #2351 says what its
-  release has to do.
 */
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'books'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {
@@ -36312,6 +36942,625 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood farming ====
 
+// ==== thornswood company terms ====
+/*
+  THE FREE SKYRIM TRADING COMPANY'S TERMS, READ IN ONE PLACE (#512, #2695).
+
+  Patrick, 18 Oct 2026 (#2695): staff change the company's terms on an
+  in-game staff panel where staff confirm a proposal; the Trading Company
+  role charters a ship hold by default; there is no freight fee by default,
+  with a ledger fee as a setting; and the haul fee stays apart from the
+  notice board's job fee.
+
+  THE TERMS are game/data/trading-company.json, and the arithmetic that reads
+  them is game/trading-company.js (its own header says what each term is).
+  The server is sent this file and not game/, so both are copied in between
+  the TRADING_COMPANY markers below by
+  scripts/dev/Build-TradingCompanyGamemode.js, and
+  tests/test-512-trading-company.js fails when they differ.
+
+  THE TERMS IN FORCE are kept in private/company-terms.json beside war.json
+  and season.json, so a restart or a deploy keeps them: the terms, every
+  confirmed change (when, from and to), and the one proposal waiting. The
+  file names nobody: who proposed, confirmed or dropped a change is in the
+  staff log, which keeps it for the staff log's own time (#2353). Who made
+  the proposal waiting now is held in memory for the card and the log lines,
+  and after a restart the card says only when it was made.
+  With no file they are the shipped terms. A file that does not read, or
+  terms in it that do not check, are logged and left on disk, and the
+  shipped terms stand until the next confirm writes a good file (it puts the
+  bad one aside first). Terms are never half used and never guessed.
+
+  globalThis.__thornswoodCompany IS THE ONE PLACE ANYTHING ASKS:
+    terms()          a copy of the terms in force
+    haulFee()        gold a haul costs to post, on top of its pay
+    stampHaul(n)     a copy of haul n with the cut it was posted under on it
+    haulCut(n)       the company's cut of haul n's pay, by its stamp
+    saleCuts(price)  a sale out of the world: worker, gone and seller
+    mayCharter(who)  game/trading-company.js mayCharter(who, terms) over the
+                     terms in force (#511, #2700 builds on it)
+    freightFor()     { gold, to } for one load into a ship hold
+  The property block posts and pays hauls by these, and the trade block
+  splits a sale by them. Nothing loads a ship yet; that is #2700's.
+
+  THE STAFF CARD ON THE OFFICE PAGE OF K, the same way as #2685's world
+  card: the server proposes, staff confirm, and nothing is typed. Staff see
+  the terms in force and the proposal waiting, with each change, who
+  proposed it, when, and how many open hauls keep the terms they were posted
+  under. They set the terms on the card and press Propose; Confirm (pressed
+  twice) and Drop name the proposal by when it was made, so a press on a card
+  drawn before somebody else's proposal cannot act on the newer one. The
+  card's buttons send /companyterms, which nobody is told to type, and every line
+  is checked here again: staff by the chat block's isStaff, and the staff
+  block's proof (unproven). Every press goes in the staff log
+  (companypropose, companyconfirm, companydrop), and no press is taken when
+  that log is not loaded. A confirm made against terms that changed since
+  the proposal is refused, so two staff never overwrite each other unseen.
+
+  WHAT IT NEVER DECIDES. Who hauls, for whom, between which holds, when or
+  for how long, and who charters which ship: those are the players' RP.
+  Nothing here proposes by itself, and no timer changes anything.
+*/
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined') ? globalThis : this;
+
+  // ==== TRADING_COMPANY ====
+  /* Built by scripts\dev\Build-TradingCompanyGamemode.js out of game\data\trading-company.json
+     and game\trading-company.js. Do not hand edit: change those two and run it again. */
+  var COMPANY_TERMS = {"v":1,"haulFee":30,"haulCutPercent":10,"haulCutFrom":10,"saleWorkerPercent":10,"saleGonePercent":10,"saleCutFrom":10,"charter":"company","freightPerLoad":0,"freightTo":"ledger"};
+  var LIB = (function () {
+  var module = { exports: {} };
+'use strict';
+/*
+  THE FREE SKYRIM TRADING COMPANY: ITS TERMS (#512).
+
+  The company is Skyrim's hauler and a business (docs/systems/trading-company.md,
+  #1393, #1646). Its hauls, its tenth and its sales out of the world are in the
+  property block of gamemode.js. This file is the company's terms as data staff
+  can change, and the arithmetic that reads them. It never touches the world, a
+  pack, a ledger, a purse or a price, and it is not wired in yet: the design and
+  Patrick's questions are on #512 (issuecomment-6245906394).
+
+  THE TERMS are one object, kept in game/data/trading-company.json:
+
+    haulFee            gold a haul costs to post, on top of its pay
+    haulCutPercent     the company's cut of a delivered haul's pay, in whole percent
+    haulCutFrom        a pay under this keeps no cut, and the hauler gets it all
+    saleWorkerPercent  on a sale out of the world, the worker's percent
+    saleGonePercent    on a sale out of the world, the percent that leaves the server
+    saleCutFrom        a price under this takes neither cut
+    charter            who may charter a trade ship hold (#511): 'company', 'anyone' or 'staff'
+    freightPerLoad     gold one load into a ship hold costs; 0 is no freight
+    freightTo          where freight goes: 'ledger' (the loading hold's) or 'gone'
+
+  The file's numbers are today's numbers in gamemode.js, and
+  tests/test-512-trading-company.js fails the day the two differ.
+
+  WHAT IT REFUSES. Terms that do not check are refused, never replaced with a
+  default: a negative fee, a percent outside 0 to 100, two sale cuts over 100,
+  an unknown or missing key. A server that silently fell back would charge
+  people a number nobody chose.
+
+  THE SERVER PROPOSES, STAFF CONFIRM (Patrick, 17 Oct 2026, 10:13 PM MT).
+  proposeTerms() says what would change and how many open hauls keep the terms
+  they were posted under. It changes nothing. adoptTerms() is the confirm, and
+  it refuses a proposal made against terms that have changed since.
+
+  A HAUL KEEPS ITS TERMS. stampHaul() writes the cut a haul was posted under
+  onto the haul, and haulCut() reads that stamp before the current terms, so a
+  haul already on the road is paid the way it was posted.
+
+  WHAT IT NEVER DECIDES. Who hauls, for whom, between which holds, when or for
+  how long: those are the players' RP. Nothing here names a person, a hold, a
+  port, a time or a length.
+*/
+
+var KEYS = ['v', 'haulFee', 'haulCutPercent', 'haulCutFrom', 'saleWorkerPercent', 'saleGonePercent',
+            'saleCutFrom', 'charter', 'freightPerLoad', 'freightTo'];
+var CHARTER = ['company', 'anyone', 'staff'];
+var FREIGHT_TO = ['ledger', 'gone'];
+var MAX_GOLD = 100000;
+
+function own(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function object(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
+function copy(o) { return JSON.parse(JSON.stringify(o)); }
+function gold(n) { return Number.isInteger(n) && n >= 0 && n <= MAX_GOLD; }
+function percent(n) { return Number.isInteger(n) && n >= 0 && n <= 100; }
+function whole(n) { var p = Math.floor(Number(n)); return Number.isFinite(p) && p > 0 ? p : 0; }
+function canonical(t) {
+  var out = {};
+  KEYS.forEach(function (k) { out[k] = t[k]; });
+  return JSON.stringify(out);
+}
+
+/** The reasons a terms object is refused; empty when it checks. */
+function checkTerms(t) {
+  var why = [];
+  if (!object(t)) { return ['The terms are not an object.']; }
+  Object.keys(t).forEach(function (k) { if (KEYS.indexOf(k) < 0) { why.push('Unknown term: ' + k + '.'); } });
+  KEYS.forEach(function (k) { if (!own(t, k)) { why.push('Missing term: ' + k + '.'); } });
+  if (why.length) { return why; }
+  if (t.v !== 1) { why.push('Terms version must be 1.'); }
+  ['haulFee', 'haulCutFrom', 'saleCutFrom', 'freightPerLoad'].forEach(function (k) {
+    if (!gold(t[k])) { why.push(k + ' must be a whole number of gold from 0 to ' + MAX_GOLD + '.'); }
+  });
+  ['haulCutPercent', 'saleWorkerPercent', 'saleGonePercent'].forEach(function (k) {
+    if (!percent(t[k])) { why.push(k + ' must be a whole percent from 0 to 100.'); }
+  });
+  if (percent(t.saleWorkerPercent) && percent(t.saleGonePercent) && t.saleWorkerPercent + t.saleGonePercent > 100) {
+    why.push('The two sale cuts come to more than the price.');
+  }
+  if (CHARTER.indexOf(t.charter) < 0) { why.push('charter must be one of ' + CHARTER.join(', ') + '.'); }
+  if (FREIGHT_TO.indexOf(t.freightTo) < 0) { why.push('freightTo must be one of ' + FREIGHT_TO.join(', ') + '.'); }
+  return why;
+}
+
+/** Terms from the file's text. Throws on anything that does not check. */
+function loadTerms(text) {
+  var t;
+  try { t = JSON.parse(String(text)); } catch (e) { throw new Error('The company terms are not readable JSON.'); }
+  var why = checkTerms(t);
+  if (why.length) { throw new Error('The company terms are refused: ' + why.join(' ')); }
+  return copy(t);
+}
+
+function must(t) {
+  var why = checkTerms(t);
+  if (why.length) { throw new Error('The company terms are refused: ' + why.join(' ')); }
+}
+
+/** A copy of a haul with the cut it was posted under written on it. */
+function stampHaul(haul, terms) {
+  must(terms);
+  var h = copy(haul || {});
+  h.cut = { percent: terms.haulCutPercent, from: terms.haulCutFrom };
+  return h;
+}
+
+/** The cut a haul is paid under: its own stamp, or the current terms for one posted before stamps. */
+function cutOf(haul, terms) {
+  var c = haul && haul.cut;
+  if (object(c) && percent(c.percent) && gold(c.from)) { return { percent: c.percent, from: c.from }; }
+  must(terms);
+  return { percent: terms.haulCutPercent, from: terms.haulCutFrom };
+}
+
+/** The company's cut of a delivered haul, rounded down. */
+function haulCut(haul, terms) {
+  var c = cutOf(haul, terms), p = whole(haul && haul.pay);
+  return p < c.from ? 0 : Math.floor(p * c.percent / 100);
+}
+
+/** A sale out of the world: the worker's cut, the cut that leaves, and the seller's rest. */
+function saleCuts(price, terms) {
+  must(terms);
+  var p = whole(price);
+  if (p < terms.saleCutFrom) { return { price: p, worker: 0, gone: 0, seller: p }; }
+  var w = Math.floor(p * terms.saleWorkerPercent / 100), g = Math.floor(p * terms.saleGonePercent / 100);
+  return { price: p, worker: w, gone: g, seller: p - w - g };
+}
+
+/*
+  The #511 hook: may this person charter (load or sail) a ship hold. who is
+  what the server already knows about the pressing character: { company }
+  for the Trading Company role (__thornswoodIsCompany), { staff } for an admin.
+  An admin testing the chain counts as the company, the same as inCompany.
+*/
+function mayCharter(who, terms) {
+  must(terms);
+  var w = object(who) ? who : {};
+  if (terms.charter === 'anyone') { return true; }
+  if (terms.charter === 'staff') { return w.staff === true; }
+  return w.company === true || w.staff === true;
+}
+
+/** What one load into a ship hold costs, and where the gold goes. */
+function freightFor(terms) {
+  must(terms);
+  return { gold: terms.freightPerLoad, to: terms.freightTo };
+}
+
+/*
+  The server's proposal. Changes nothing. openHauls is the hauls on the boards
+  now; each keeps the cut it was posted under.
+*/
+function proposeTerms(current, next, openHauls) {
+  must(current);
+  var why = checkTerms(next);
+  if (why.length) { return { ok: false, why: why }; }
+  var changes = [];
+  KEYS.forEach(function (k) { if (current[k] !== next[k]) { changes.push({ term: k, from: current[k], to: next[k] }); } });
+  var keep = (Array.isArray(openHauls) ? openHauls : []).length;
+  return { ok: true, base: canonical(current), next: copy(next), changes: changes, openHaulsKeepTerms: keep };
+}
+
+/*
+  Staff confirm a proposal. state is { terms, history }; at is the time. The
+  history keeps when and what changed, never who: who proposed and who
+  confirmed are in the staff log, which keeps them for its own time, and the
+  terms file is not a place that names people (#2353). Refused when the
+  proposal was not ok, changes nothing, or was made against other terms.
+*/
+function adoptTerms(state, proposal, at) {
+  if (!object(state)) { throw new Error('There are no company terms to change.'); }
+  must(state.terms);
+  if (!object(proposal) || proposal.ok !== true) { throw new Error('That proposal was refused.'); }
+  if (!proposal.changes.length) { throw new Error('That proposal changes nothing.'); }
+  if (proposal.base !== canonical(state.terms)) { throw new Error('The terms changed since that proposal. Propose again.'); }
+  if (!Number.isInteger(at) || at < 0) { throw new Error('A confirm says when.'); }
+  must(proposal.next);
+  var history = Array.isArray(state.history) ? state.history.slice() : [];
+  history.push({ at: at, changes: copy(proposal.changes) });
+  return { terms: copy(proposal.next), history: history };
+}
+
+module.exports = {
+  KEYS: KEYS, CHARTER: CHARTER, FREIGHT_TO: FREIGHT_TO,
+  checkTerms: checkTerms, loadTerms: loadTerms, stampHaul: stampHaul, cutOf: cutOf, haulCut: haulCut,
+  saleCuts: saleCuts, mayCharter: mayCharter, freightFor: freightFor,
+  proposeTerms: proposeTerms, adoptTerms: adoptTerms
+};
+  return module.exports;
+  })();
+  // ==== end TRADING_COMPANY ====
+
+  var BY_CHARS = 80;
+  var FILE_NAME = 'company-terms.json';
+
+  /* What the card calls each term, and what kind of value it takes. v is not staff's to change. */
+  var FIELDS = [
+    { key: 'haulFee', label: 'Haul fee', kind: 'gold' },
+    { key: 'haulCutPercent', label: 'The company\'s cut of a haul\'s pay', kind: 'percent' },
+    { key: 'haulCutFrom', label: 'No haul cut on a pay under', kind: 'gold' },
+    { key: 'saleWorkerPercent', label: 'The worker\'s cut of a sale', kind: 'percent' },
+    { key: 'saleGonePercent', label: 'The part of a sale that leaves Skyrim', kind: 'percent' },
+    { key: 'saleCutFrom', label: 'No sale cuts on a price under', kind: 'gold' },
+    { key: 'charter', label: 'Who charters a ship hold', kind: 'choice', choices: LIB.CHARTER },
+    { key: 'freightPerLoad', label: 'Freight for one load into a ship hold (0 is none)', kind: 'gold' },
+    { key: 'freightTo', label: 'Where freight goes', kind: 'choice', choices: LIB.FREIGHT_TO }
+  ];
+
+  function clog() {
+    var a = ['[thornswood company]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+  function copy(o) { return JSON.parse(JSON.stringify(o)); }
+  function fsOf() { try { return require('fs'); } catch (e) { return null; } }
+
+  function termsPath() {
+    var fs = fsOf();
+    if (!fs) { return null; }
+    var path = require('path');
+    var priv = 'private';
+    try {
+      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
+      if (cfg && cfg.privDir) { priv = String(cfg.privDir); }
+    } catch (e) { }
+    try { if (!fs.existsSync(priv)) { fs.mkdirSync(priv, { recursive: true }); } } catch (e2) { }
+    return path.join(priv, FILE_NAME);
+  }
+
+  // The shipped terms. They check, or this throws at load: tests/test-512-trading-company.js holds that.
+  var SHIPPED = LIB.loadTerms(JSON.stringify(COMPANY_TERMS));
+
+  function cleanWho(by) { return typeof by === 'string' ? by.replace(/\s+/g, ' ').trim().slice(0, BY_CHARS) : ''; }
+
+  function historyOf(rows) {
+    var out = [];
+    (Array.isArray(rows) ? rows : []).forEach(function (r) {
+      if (r && typeof r === 'object' && Number.isInteger(r.at) && Array.isArray(r.changes)) {
+        out.push({ at: r.at, changes: copy(r.changes) });
+      }
+    });
+    return out;
+  }
+
+  function pendingOf(p) {
+    if (!p || typeof p !== 'object' || !Number.isInteger(p.at) ||
+        typeof p.base !== 'string' || !Array.isArray(p.changes) || !p.changes.length) { return null; }
+    if (LIB.checkTerms(p.next).length) { return null; }
+    return { at: p.at, base: p.base, next: copy(p.next), changes: copy(p.changes),
+             openHaulsKeepTerms: Number(p.openHaulsKeepTerms) || 0 };
+  }
+
+  function readState() {
+    var fresh = { terms: copy(SHIPPED), history: [], pending: null, unreadable: false };
+    var fs = fsOf();
+    var file = termsPath();
+    if (!fs || !file) { return fresh; }
+    var text = null;
+    try {
+      text = fs.readFileSync(file, 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return fresh; }
+      clog('could not read', file + ':', (e && e.message) || e, '; the shipped terms stand');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var raw = null;
+    try { raw = JSON.parse(String(text).replace(/^\uFEFF/, '')); } catch (e2) { raw = null; }
+    var why = raw && typeof raw === 'object' ? LIB.checkTerms(raw.terms) : ['it is not readable JSON'];
+    if (why.length) {
+      clog(file, 'is refused (' + why.join(' ') + '); the shipped terms stand and the file is left as it is');
+      fresh.unreadable = true;
+      return fresh;
+    }
+    var pending = pendingOf(raw.pending);
+    if (raw.pending && !pending) { clog('the proposal in', file, 'does not check; it is not kept'); }
+    return { terms: copy(raw.terms), history: historyOf(raw.history), pending: pending, unreadable: false };
+  }
+
+  var state = readState();
+  // Who made the proposal waiting now, as the staff log names them. Memory
+  // only: the file names nobody, so after a restart this is ''.
+  var proposedBy = '';
+
+  /* Writes the next state whole, or nothing. Answers true when it is on disk. */
+  function write(next) {
+    var fs = fsOf();
+    var file = termsPath();
+    if (!fs || !file) { return false; }
+    try {
+      if (state.unreadable && fs.existsSync(file)) {
+        fs.renameSync(file, file + '.unreadable-' + Date.now());
+      }
+      fs.writeFileSync(file + '.tmp', JSON.stringify({ terms: next.terms, history: next.history, pending: next.pending }));
+      fs.renameSync(file + '.tmp', file);
+    } catch (e) {
+      clog('could not write', file + ':', (e && e.message) || e, '; nothing changed');
+      return false;
+    }
+    state = { terms: copy(next.terms), history: next.history, pending: next.pending, unreadable: false };
+    return true;
+  }
+
+  function terms() { return copy(state.terms); }
+  function pending() { return state.pending ? copy(state.pending) : null; }
+  function history() { return copy(state.history); }
+
+  /* The hauls on the boards now, not yet delivered or down, that carry the cut they were posted under. */
+  function openHauls() {
+    var out = [];
+    var P = g.__thornswoodProperty;
+    var all = null;
+    try { all = (P && typeof P.notices === 'function') ? P.notices() : null; } catch (e) { all = null; }
+    for (var hold in (all || {})) {
+      if (!Object.prototype.hasOwnProperty.call(all, hold) || !Array.isArray(all[hold])) { continue; }
+      all[hold].forEach(function (n) { if (n && n.haul && n.cut && !n.down && !n.paid) { out.push(n); } });
+    }
+    return out;
+  }
+
+  /** Keeps one proposal, checked whole, and changes nothing else. A later one replaces it. */
+  function propose(next, by) {
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is proposing it.' }; }
+    var p = LIB.proposeTerms(state.terms, next, openHauls());
+    if (!p.ok) { return { ok: false, why: p.why.join(' ') }; }
+    if (!p.changes.length) { return { ok: false, why: 'Those are the terms in force already.' }; }
+    var was = state.pending;
+    var wasBy = proposedBy;
+    var row = { at: Date.now(), base: p.base, next: p.next, changes: p.changes,
+                openHaulsKeepTerms: p.openHaulsKeepTerms };
+    if (was && row.at <= was.at) { row.at = was.at + 1; }
+    if (!write({ terms: state.terms, history: state.history, pending: row })) {
+      return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
+    }
+    proposedBy = who;
+    clog(who, 'proposed', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
+    return { ok: true, pending: pending(), replaced: was ? copy(was) : null, replacedBy: was ? wasBy : '' };
+  }
+
+  /** Adopts the proposal made at at, as a change by whoever confirms it. */
+  function confirm(at, by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    if (String(at) !== String(p.at)) { return { ok: false, why: 'That is not the proposal waiting now.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is confirming it.' }; }
+    var adopted;
+    try {
+      adopted = LIB.adoptTerms({ terms: state.terms, history: state.history },
+                               { ok: true, base: p.base, next: p.next, changes: p.changes }, Date.now());
+    } catch (e) {
+      return { ok: false, why: String((e && e.message) || e) };
+    }
+    if (!write({ terms: adopted.terms, history: adopted.history, pending: null })) {
+      return { ok: false, why: 'The new terms could not be written, so nothing changed.' };
+    }
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'confirmed', (byWas || 'an earlier') + '\'s proposal:', p.changes.map(function (c) { return c.term + ' ' + c.from + ' to ' + c.to; }).join(', '));
+    return { ok: true, terms: terms(), changes: copy(p.changes), proposedBy: byWas };
+  }
+
+  /** Clears the proposal made at at, and changes nothing else. */
+  function drop(at, by) {
+    var p = state.pending;
+    if (!p) { return { ok: false, why: 'Nothing is proposed.' }; }
+    if (String(at) !== String(p.at)) { return { ok: false, why: 'That is not the proposal waiting now.' }; }
+    var who = cleanWho(by);
+    if (!who) { return { ok: false, why: 'Say who is dropping it.' }; }
+    if (!write({ terms: state.terms, history: state.history, pending: null })) {
+      return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
+    }
+    var byWas = proposedBy;
+    proposedBy = '';
+    clog(who, 'dropped', (byWas || 'an earlier') + '\'s proposal');
+    return { ok: true, dropped: copy(p), proposedBy: byWas };
+  }
+
+  /* ------------------------------------------------------- the staff card */
+  var STAFF_LOG_GONE = 'The staff log is not loaded on this server, so no staff press is taken. Say so in the dev channel.';
+
+  function isStaffNow(pid) {
+    var f = g['__thornswoodIsStaff'];
+    try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+  }
+
+  function nameOfActor(actorId) {
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      if (ap && ap.name) { return String(ap.name); }
+    } catch (e) { }
+    return 'somebody';
+  }
+
+  function labelOf(key) {
+    for (var i = 0; i < FIELDS.length; i++) { if (FIELDS[i].key === key) { return FIELDS[i].label; } }
+    return key;
+  }
+  function said(changes) {
+    return changes.map(function (c) { return labelOf(c.term) + ' from ' + c.from + ' to ' + c.to; }).join('; ');
+  }
+
+  /** What the staff card on the Office page draws, or null for anybody who is not staff. */
+  function staffView(profileId) {
+    if (!isStaffNow(profileId)) { return null; }
+    var t = state.terms;
+    var p = state.pending;
+    return {
+      fields: FIELDS.map(function (f) {
+        var row = { key: f.key, label: f.label, kind: f.kind, value: t[f.key] };
+        if (f.choices) { row.choices = f.choices.slice(); }
+        return row;
+      }),
+      pending: p ? { at: p.at, by: proposedBy, openHaulsKeepTerms: p.openHaulsKeepTerms,
+                     changes: p.changes.map(function (c) { return { term: c.term, label: labelOf(c.term), from: c.from, to: c.to }; }) } : null,
+      openHauls: openHauls().length,
+      changed: state.history.length ? { at: state.history[state.history.length - 1].at } : null
+    };
+  }
+
+  /* Every staff member's K panel again, so each card says what is true now. */
+  function redrawStaff() {
+    var c = g.__thornswoodCharacter;
+    if (!c || !c.stateOf || !c.writeState) { return; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = 0;
+      try { pid = Number(mp.get(online[i], 'profileId')) || 0; } catch (e2) { pid = 0; }
+      if (!pid || !isStaffNow(pid)) { continue; }
+      try {
+        var s = c.stateOf(online[i]);
+        if (s) { c.writeState(online[i], s); }
+      } catch (e3) { }
+    }
+  }
+
+  /* The terms a propose line names: term=value pairs over the terms in force. null and why when one is wrong. */
+  function nextFrom(pairs) {
+    var next = copy(state.terms);
+    var seen = {};
+    for (var i = 0; i < pairs.length; i++) {
+      var m = /^([A-Za-z]+)=([a-z0-9]+)$/.exec(String(pairs[i] || ''));
+      var f = null;
+      for (var j = 0; m && j < FIELDS.length; j++) { if (FIELDS[j].key === m[1]) { f = FIELDS[j]; } }
+      if (!f) { return { why: 'The card sent a term the server does not know.' }; }
+      if (seen[f.key]) { return { why: 'The card sent ' + f.label + ' twice.' }; }
+      seen[f.key] = true;
+      if (f.kind === 'choice') { next[f.key] = m[2]; } else if (/^\d+$/.test(m[2])) { next[f.key] = Number(m[2]); } else {
+        return { why: f.label + ' is a whole number.' };
+      }
+    }
+    if (!pairs.length) { return { why: 'Change a term on the card first.' }; }
+    return { next: next };
+  }
+
+  /*
+    The staff card's lines: propose <term>=<value>..., confirm <when> and
+    drop <when>. Answers true, because the word is always this block's.
+  */
+  function command(parts, actorId, profileId, toProfile, cmd) {
+    var pid = Number(profileId) || 0;
+    var verb = String((parts && parts[1]) || '').toLowerCase();
+    if (!isStaffNow(pid)) {
+      clog('a line for the company\'s terms from profile', pid, 'who is not staff; nothing changed');
+      toProfile(profileId, 'The company\'s terms are staff\'s. Nothing changed.');
+      return true;
+    }
+    var log = g['__thornswoodStaff'];
+    if (!log || typeof log.unproven !== 'function' || typeof log.record !== 'function') {
+      toProfile(profileId, STAFF_LOG_GONE);
+      return true;
+    }
+    var unproven = log.unproven(cmd, pid);
+    if (unproven) { toProfile(profileId, unproven); return true; }
+    var name = nameOfActor(actorId);
+    var by = name.slice(0, 60) + ' (profile ' + pid + ')';
+    var r;
+
+    if (verb === 'propose') {
+      var n = nextFrom((parts || []).slice(2));
+      if (!n.next) { toProfile(profileId, n.why + ' Nothing changed.'); return true; }
+      r = propose(n.next, by);
+      if (!r.ok) { toProfile(profileId, r.why + ' Nothing changed.'); return true; }
+      log.record('companypropose', pid, name, 0, 'the company\'s terms',
+                 said(r.pending.changes) + (r.replaced ? ', in place of ' + (r.replacedBy || 'an earlier') + '\'s proposal' : ''),
+                 0, { changes: r.pending.changes });
+      toProfile(profileId, 'You propose new terms for the company: ' + said(r.pending.changes) + '. They change only ' +
+                'when staff confirm them on this page. ' + r.pending.openHaulsKeepTerms +
+                (r.pending.openHaulsKeepTerms === 1 ? ' open haul keeps' : ' open hauls keep') +
+                ' the terms it was posted under. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    if (verb === 'confirm' || verb === 'drop') {
+      var at = parts && parts[2];
+      var p = state.pending;
+      r = verb === 'confirm' ? confirm(at, by) : drop(at, by);
+      var from = r.proposedBy ? 'proposed by ' + r.proposedBy : 'proposed before the last restart';
+      if (!r.ok) {
+        toProfile(profileId, r.why + (/waiting now/.test(r.why) ? ' Open the page again to see the one that is.' : '') +
+                  ' Nothing changed.');
+        return true;
+      }
+      if (verb === 'drop') {
+        log.record('companydrop', pid, name, 0, 'the company\'s terms', from + ': ' + said(p.changes),
+                   0, { changes: p.changes, proposedBy: r.proposedBy });
+        toProfile(profileId, 'You drop the proposal. The company\'s terms stay as they are. It is in the staff log.');
+        redrawStaff();
+        return true;
+      }
+      log.record('companyconfirm', pid, name, 0, 'the company\'s terms', from + ': ' + said(r.changes),
+                 0, { changes: r.changes, proposedBy: r.proposedBy });
+      toProfile(profileId, 'The company\'s terms change: ' + said(r.changes) + '. Hauls already posted keep the ' +
+                'terms they were posted under. It is in the staff log.');
+      redrawStaff();
+      return true;
+    }
+
+    toProfile(profileId, 'The company\'s card on the Office page of K proposes, confirms and drops. Nothing changed.');
+    return true;
+  }
+
+  g.__thornswoodCompany = {
+    terms: terms,
+    haulFee: function () { return state.terms.haulFee; },
+    stampHaul: function (n) { return LIB.stampHaul(n, state.terms); },
+    haulCut: function (n) { return LIB.haulCut(n, state.terms); },
+    saleCuts: function (price) { return LIB.saleCuts(price, state.terms); },
+    mayCharter: function (who) { return LIB.mayCharter(who, state.terms); },
+    freightFor: function () { return LIB.freightFor(state.terms); },
+    pending: pending,
+    history: history,
+    propose: propose,
+    confirm: confirm,
+    drop: drop,
+    // The staff card on the Office page of K: what it draws, and its lines.
+    staffView: staffView,
+    command: command,
+    FIELDS: copy(FIELDS)
+  };
+  clog('the company\'s terms are read: haul fee', state.terms.haulFee, ', haul cut', state.terms.haulCutPercent + '%',
+       ', charter', state.terms.charter, ', freight', state.terms.freightPerLoad);
+})();
+// ==== end thornswood company terms ====
+
 // ==== thornswood property ====
 /*
   PROPERTY: CLAIMING A BUILDING, AND THE DEED THAT SAYS SO.
@@ -36326,17 +37575,18 @@ log('gamemode loaded:',
   Claiming hands you the deed there and then, which is why it has to happen at
   the door.
 
-  WHAT THIS BLOCK IS AND IS NOT, because the system is bigger than what is built.
-  This is the claim, the deed and the lapse. Locks, keys, key molds, the offices
-  that grant stewardship, rent and the drop box are not here yet and are their
-  own entries on the list.
+  WHAT THIS BLOCK IS. It began as the claim, the deed and the lapse. Locks,
+  keys and key molds (#615, #1637), the master key (#2254), the hold offices
+  (#2551), rent, the drop box (#2298), beds (#1603) and the notice boards
+  (#1627) have joined it since, each with its own note further down.
 
   WHERE THE DOOR COMES FROM. mp.onActivate is handed the door, so the door a
-  person last opened is written on them and /claim reads it back. That is why
+  person last opened is written on them and the lock key's Claim, which sends
+  /claim (#1637), reads it back. That is why
   there is no proximity search here: the engine has already told us which door
   they touched, and searching for the nearest one would be a worse answer to a
   question already answered. A door touched longer ago than DOOR_MEMORY_MS does
-  not count, so /claim typed in a field claims nothing.
+  not count, so a /claim that reaches the server from a field claims no house.
 
   A DEED IS ONE RECORD. ThornswoodBookDeed, and the property it is for is the
   per-instance name on the inventory entry: Inventory::Entry in the fork carries
@@ -36344,7 +37594,8 @@ log('gamemode loaded:',
   to Breezehome' in one pack and 'Deed to Honeyside' in another. 852 buildings,
   one record.
 
-  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in data/property.json,
+  THE SERVER KEEPS ITS OWN RECORD of every claim it made, in private/property.json
+  (registerPath, #541),
   and that record is what decides who holds a building. The deed in somebody's
   pack is the thing that can be stolen; it is not the register. A book somebody
   renamed by hand is not a deed, because the server never issued it.
@@ -36566,7 +37817,7 @@ log('gamemode loaded:',
       require('fs').writeFileSync(registerPath(),
         JSON.stringify({ claims: claims,
                         funds: funds, notices: notices, boards: boards, steps: steps,
-                        masters: masterCut, dropbox: dropbox }, null, 1));
+                        masters: masterCut, dropbox: dropbox, word: wordBook }, null, 1));
       return true;
     } catch (e) {
       plog('could not write the register:', e);
@@ -36576,6 +37827,56 @@ log('gamemode loaded:',
 
   var claims = load();
   var masterCut = loadMasterCut();
+  var wordBook = loadWord();
+
+  /*
+    The holders' word (#2680), from the register's word key, rebuilt row by
+    row the way the claims are: a row that is not a word is dropped and
+    counted. See word to the holder. Plain numbers here, because this runs
+    before that section's own values are set.
+  */
+  function loadWord() {
+    var out = { list: [] };
+    var raw = null;
+    try { raw = JSON.parse(require('fs').readFileSync(registerPath(), 'utf8')); } catch (e) { return out; }
+    var src = (raw && raw.word && typeof raw.word === 'object' &&
+               Object.prototype.toString.call(raw.word.list) === '[object Array]') ? raw.word.list : [];
+    var dropped = 0;
+    for (var i = 0; i < src.length; i++) {
+      var w = wordRow(src[i]);
+      if (w) { out.list.push(w); } else { dropped++; }
+    }
+    if (dropped) { plog('word: dropped', dropped, 'row(s) of the holders\' word that were not words'); }
+    if (out.list.length) { plog('word: read', out.list.length, 'word(s) for holders'); }
+    return out;
+  }
+  function wordRow(r) {
+    if (!r || typeof r !== 'object') { return null; }
+    var kind = (r.kind === 'pick' || r.kind === 'deed') ? r.kind : null;
+    var building = typeof r.building === 'string' ? r.building : '';
+    var holder = Number(r.holder) || 0;
+    var at = Number(r.at) || 0;
+    var last = Number(r.last) || at;
+    var due = Number(r.due) || 0;
+    if (!kind || !building || building === '__proto__' || !(holder > 0) || !(at > 0) ||
+        !(due > 0) || last < at) { return null; }
+    var by = [];
+    var rb = Object.prototype.toString.call(r.by) === '[object Array]' ? r.by : [];
+    for (var b = 0; b < rb.length && by.length < 10; b++) {
+      var p = Number(rb[b]) || 0;
+      if (p > 0 && by.indexOf(p) === -1) { by.push(p); }
+    }
+    var looks = [];
+    var rl = Object.prototype.toString.call(r.looks) === '[object Array]' ? r.looks : [];
+    for (var j = 0; j < rl.length && looks.length < 3; j++) {
+      var s = String(rl[j] || '').slice(0, 40);
+      if (s && looks.indexOf(s) === -1) { looks.push(s); }
+    }
+    var count = Math.floor(Number(r.count)) || 1;
+    return { kind: kind, building: building, holder: holder, by: by, at: at, last: last,
+             count: Math.max(1, Math.min(99, count)), due: due, looks: looks,
+             sent: Number(r.sent) > 0 ? Number(r.sent) : 0 };
+  }
 
   /*
     The last number a master key was cut with (#2254), from the register. Never
@@ -37440,10 +38741,13 @@ log('gamemode loaded:',
       deed still has to get through the door, which is exactly the story
       Patrick described rather than a hole in it.
 
-      THE OLD HOLDER IS NOT TOLD BY THE SERVER. They find out the way they
-      would in the world, by trying their own door, and their deed is gone
-      from their pack because that is how it left. A notification here would
-      turn a theft into an alarm system.
+      THE OLD HOLDER IS TOLD, LATE AND IN THE WORLD (#2680). Until Patrick's
+      decision 6B on #507 they were not told at all: they found out by trying
+      their own door, with the deed gone from their pack because that is how
+      it left, since a notice at the moment would turn a theft into an alarm
+      system. It is still not one. A runner from the steward's office brings
+      word deed.delayMinutes later, or when they are next in the world, and
+      names nobody. See word to the holder.
     */
     /*
       A JAIL'S DEED IS PAPER IN ANY HAND BUT ITS JARL'S (#502): the jail is
@@ -37480,6 +38784,13 @@ log('gamemode loaded:',
       plog(who2, 'presented the deed at', nameOf(building), 'and now holds it',
            was ? '(it was ' + was + '\'s)' : '(it was nobody\'s)',
            master2 ? 'with master key no. ' + master2 : '');
+      // The old holder is sent word of it (#2680). A lapsed claim is no
+      // claim, so its holder had already lost the place and is not.
+      if (held && held.by && held.by !== mine) {
+        var wordSaid = recordWord('deed', building, held.by, actorId, mine, now2);
+        plog('word: the deed to', nameOf(building), 'presented by', who2, '(profile ' + mine + '), for',
+             was, '(profile ' + held.by + '):', WORD_SAID[wordSaid] || wordSaid);
+      }
       var told = 'You present the deed at ' + nameOf(building) +
                  '. It is yours now' + (was ? ', and no longer ' + was + '\'s' : '') + '.' +
                  (master2 ? ' ' + masterHandedLine(building) : '');
@@ -37906,6 +39217,10 @@ log('gamemode loaded:',
       '    for (var j = 0; j < (v.open || []).length; j++) {',
       '      try {',
       '        var o = sp.ObjectReference.from(sp.Game.getFormEx(v.open[j]));',
+      // OFF THE PUBLISHED LIST BEFORE IT OPENS (#2680). The front plugin
+      // reads a door on __thornswoodPropertyShut that opens as a pick, so
+      // a door this script opens is taken off the list first.
+      '        try { var pub = globalThis.__thornswoodPropertyShut; if (pub) { delete pub[v.open[j]]; } } catch (e3) { }',
       '        if (o) { var shut = true; try { shut = o.isLocked(); } catch (e2) { }',
       '          if (shut !== false) { o.lock(false, false); } }',
       '        delete shutMap[v.open[j]];',
@@ -40880,7 +42195,7 @@ log('gamemode loaded:',
           var hp = Math.floor(Number(hl.pay)) || 0;
           arrivals.push({ from: from, where: (boards[from] && boards[from].where) || from,
                           n: a + 1, name: hl.name || 'somebody', text: hl.text || '',
-                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp) });
+                          hauler: hl.takenName || 'somebody', pay: hp, kept: haulTenth(hp, hl) || 0 });
         }
       }
     }
@@ -41599,6 +42914,64 @@ log('gamemode loaded:',
     return true;
   }
 
+  /*
+    A NOTICE IN AN OFFICE'S NAME (#513). The world stage block's proclaim is
+    the only caller, and nothing calls that in play yet.
+
+    An office's notice is the office's word, not somebody's purchase: no fee
+    is taken, nothing goes onto any hold's ledger and nothing is held there,
+    so funds and heldOn are as they were. It is otherwise a notice like a
+    person's, on the wall and under Boards on J, with the same 60 and 600
+    limits. It is put up by nobody: by is 0, which is no profile, so no
+    person sees it as their own and only that hold's Guard or Jarl takes it
+    down, the same as any post on their board (#502, #2551). name is the
+    office, which is what the wall shows, and office marks it as one.
+
+    Every hold named has to have a board, and the words have to fit, or the
+    whole call is refused and nothing is written. 'all' is every hold that
+    has a board. A hold named twice gets one notice.
+  */
+  function officePost(holdList, office, title, body) {
+    var named = holdList === 'all'
+      ? LEDGER_HOLDS.filter(function (h) { return Object.prototype.hasOwnProperty.call(boards, h); })
+      : (typeof holdList === 'string' ? [holdList] : holdList);
+    if (!Array.isArray(named) || !named.length) { return { ok: false, why: 'Name a hold. Nothing was put up.' }; }
+    var keys = [];
+    for (var i = 0; i < named.length; i++) {
+      var k = String(named[i] || '').trim().toLowerCase();
+      if (LEDGER_HOLDS.indexOf(k) < 0 || !Object.prototype.hasOwnProperty.call(boards, k)) {
+        return { ok: false, why: 'No board in ' + String(named[i]) + '. Nothing was put up.' };
+      }
+      if (keys.indexOf(k) < 0) { keys.push(k); }
+    }
+    var who = String(office || '').replace(/\s+/g, ' ').trim();
+    if (!who) { return { ok: false, why: 'Name the office it is from. Nothing was put up.' }; }
+    if (who.length > POST_TITLE_CHARS) {
+      return { ok: false, why: 'An office is up to ' + POST_TITLE_CHARS + ' characters. Nothing was put up.' };
+    }
+    var head = String(title || '').replace(/\s+/g, ' ').trim();
+    if (!head) { return { ok: false, why: 'Give the notice a title. Nothing was put up.' }; }
+    if (head.length > POST_TITLE_CHARS) {
+      return { ok: false, why: 'A title is up to ' + POST_TITLE_CHARS + ' characters. That one is ' +
+               head.length + '. Nothing was put up.' };
+    }
+    var text = String(body || '').trim();
+    if (!text) { return { ok: false, why: 'Say what the notice says. Nothing was put up.' }; }
+    if (text.length > POST_BODY_CHARS) {
+      return { ok: false, why: 'What the notice says is up to ' + POST_BODY_CHARS + ' characters. That is ' +
+               text.length + '. Nothing was put up.' };
+    }
+    var at = Date.now();
+    for (var j = 0; j < keys.length; j++) {
+      if (!notices[keys[j]]) { notices[keys[j]] = []; }
+      notices[keys[j]].push({ by: 0, office: true, name: who, title: head, text: text, at: at,
+                              job: false, taken: 0 });
+    }
+    save();
+    plog(who, 'put a notice up in', keys.join(', '), 'with no fee:', head);
+    return { ok: true, holds: keys, office: who, title: head };
+  }
+
   function board(parts, actorId, profileId, toProfile) {
     var arg = (parts && parts.length > 1) ? String(parts[1]).trim().toLowerCase() : '';
     var standing = boardHere(actorId);
@@ -41721,7 +43094,7 @@ log('gamemode loaded:',
       return true;
     }
     if (n.haul) {
-      var tenth = haulTenth(n.pay);
+      var tenth = haulTenth(n.pay, n) || 0;
       plog(who, 'took a haul in', hold, 'to', n.dest + ':', n.text);
       toProfile(profileId, 'You take the haul to ' + n.dest + ': ' + n.text + '. At ' + n.dest + '\'s board, ' +
                 n.name + ' or a steward confirms it on the board, and ' +
@@ -42288,8 +43661,10 @@ log('gamemode loaded:',
     open or taken. Nothing was delivered, so the company keeps no tenth.
 
     On a confirm, by the poster or a steward, standing at the board the haul
-    named, the company keeps a tenth of the pay, rounded down, and nothing
-    under 10 gold. The hauler is handed the rest out of the ledger, so the
+    named, the company keeps its cut of the pay: the cut the haul was posted
+    under, from the company's terms (#512, #2695; a tenth, rounded down, and
+    nothing under 10 gold as they ship). The haul fee is the company's too,
+    and apart from the board's job fee. The hauler is handed the rest out of the ledger, so the
     ledger drops by what the hauler received and keeps the fee and the tenth.
     It is the poster's gold moving, never new gold.
 
@@ -42305,13 +43680,19 @@ log('gamemode loaded:',
     they are in the world, the way a bed's takings wait for a holder who is
     away (#1392). Nothing else can spend it in the meantime.
   */
-  var HAUL_TENTH_FROM = 10;
   var HAUL_EVERY_MS = 5000;
 
-  /** The company's tenth of a pay: rounded down, and nothing under 10. */
-  function haulTenth(pay) {
-    var p = Math.floor(Number(pay)) || 0;
-    return p < HAUL_TENTH_FROM ? 0 : Math.floor(p / 10);
+  /*
+    The company's cut of a haul's pay (#512, #2695): the cut haul n was
+    posted under, read by the company terms block (a tenth, rounded down, and
+    nothing under 10 gold, as the terms ship). null when the terms are not
+    loaded, and then nothing is paid. The name is the one it had when the cut
+    was a fixed tenth.
+  */
+  function haulTenth(pay, n) {
+    var c = g.__thornswoodCompany;
+    if (!c || typeof c.haulCut !== 'function') { return null; }
+    return c.haulCut({ pay: Math.floor(Number(pay)) || 0, cut: n && n.cut });
   }
 
   /** A haul's line on the wall and in Your jobs: where it goes and the pay. */
@@ -42359,9 +43740,16 @@ log('gamemode loaded:',
       toProfile(profileId, 'Say what it carries. ' + HAUL_HOW);
       return true;
     }
-    var cost = JOB_FEE + pay;
+    // The haul fee and the cut are the company's terms (#512, #2695), apart from the board's job fee.
+    var co = g.__thornswoodCompany;
+    if (!co || typeof co.haulFee !== 'function' || typeof co.stampHaul !== 'function') {
+      toProfile(profileId, 'The company\'s terms are not loaded on this server, so no haul is posted. Say so in the dev channel.');
+      return true;
+    }
+    var fee = co.haulFee();
+    var cost = fee + pay;
     if (!Number.isSafeInteger(cost) || !takeGold(actorId, cost)) {
-      toProfile(profileId, 'That costs ' + cost + ' gold, ' + JOB_FEE + ' for the board and the ' + pay +
+      toProfile(profileId, 'That costs ' + cost + ' gold, ' + fee + ' for the board and the ' + pay +
                 ' pay, and you do not have it. Nothing was taken.');
       return true;
     }
@@ -42371,18 +43759,19 @@ log('gamemode loaded:',
       if (ap && ap.name) { who = String(ap.name); }
     } catch (e) { }
     if (!notices[hold]) { notices[hold] = []; }
-    notices[hold].push({ by: profileId, name: who, text: text, at: Date.now(),
-                         job: true, haul: true, dest: dest, pay: pay, taken: 0 });
+    // The haul carries the cut it was posted under, so a change of terms never re-prices it.
+    notices[hold].push(co.stampHaul({ by: profileId, name: who, text: text, at: Date.now(),
+                                      job: true, haul: true, dest: dest, pay: pay, taken: 0 }));
     // deposit saves the notice with the coin, so the two cannot part.
-    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + JOB_FEE + ' fee, and ' + pay + ' pay held')) {
+    if (!deposit(hold, cost, 'a haul to ' + dest + ': the ' + fee + ' fee, and ' + pay + ' pay held')) {
       notices[hold].pop();
       payOut(actorId, cost);
       toProfile(profileId, 'That did not work. Nothing was taken.');
       return true;
     }
-    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', JOB_FEE, 'fee');
+    plog(who, 'posted a haul in', hold, 'to', dest, 'for', pay, 'gold and the', fee, 'fee');
     toProfile(profileId, 'Your haul to ' + dest + ' is on the board in ' + hold + ', number ' +
-              notices[hold].length + '. That cost ' + cost + ' gold: ' + JOB_FEE + ' for the board, and the ' +
+              notices[hold].length + '. That cost ' + cost + ' gold: ' + fee + ' for the board, and the ' +
               pay + ' pay, held until it is confirmed at ' + dest + '.');
     refreshPanel(actorId);
     return true;
@@ -42435,7 +43824,11 @@ log('gamemode loaded:',
       return true;
     }
     var pay = Math.floor(Number(n.pay)) || 0;
-    var tenth = haulTenth(pay);
+    var tenth = haulTenth(pay, n);
+    if (tenth === null) {
+      toProfile(profileId, 'The company\'s terms are not loaded on this server, so nothing was paid. Say so in the dev channel.');
+      return true;
+    }
     var got = pay - tenth;
     var r = handHaul(from, n, Number(n.taken), got,
                      'haul ' + num + ' to ' + n.dest + ' delivered, ' + tenth + ' kept for the company', 'hauled');
@@ -42566,6 +43959,376 @@ log('gamemode loaded:',
   g.__thornswoodHaulTimer = setInterval(
     (typeof guard === 'function') ? guard('haulTick', haulTick) : haulTick, HAUL_EVERY_MS);
 
+  /*
+    ------------------------------------------------ word to the holder (#2680)
+
+    Patrick, 17 October, decision 6B on #507: a holder is told, in the world,
+    when somebody picks their door's lock or presents their deed, so they can
+    answer it through RP. Nothing is typed, and it decides nothing: a dispute
+    about who should have the place is the court's.
+
+    WHY NOBODY WAS TOLD BEFORE. A locked reference is never announced to this
+    server (activationService.ts in the fork), so that Skyrim's own
+    lockpicking runs, and the only thing that ever saw a lock open was the
+    front plugin's lockChanged handler, which said nothing. A presented deed
+    was kept quiet on purpose (the deed in claim()), because a notice at the
+    moment turns a theft into an alarm.
+
+    SO THE WORD IS LATE, AND IT COMES FROM SOMEBODY IN THE WORLD. A runner
+    from the steward's office of the building's hold, or a neighbour where no
+    hold covers it, finds the holder delayMinutes after the act, or the next
+    time they are in the world after that. They learn what happened, where,
+    roughly when and, with describe on, what the person looked like: race and
+    sex, never a name, a profile or an account. A name is for RP to bring out.
+    The log keeps who, for staff and the court, the way every other property
+    act is logged.
+
+    THE PICK IS A CLIENT'S REPORT, /tspicked with the door's id, so it is
+    checked here before it counts (picked, below): a property door that is
+    not a way out or a cell, held and locked, the reporter with no way through
+    it, standing at it or already inside, and carrying a lockpick. So a
+    changed client can at most report a pick it could have made, and the
+    limits below hold even that down. They are staff data,
+    game/data/property-word.json; anything missing or wrong there is
+    WORD_DEFAULTS, and the log says so.
+
+    THE BOOK is the register's word key (wordBook, read beside the claims), so
+    a restart keeps a word that has not gone out and a wipe moves it aside
+    with the claims. A word that has gone out stays only as long as the limits
+    need to count it.
+  */
+  var WORD_DEFAULTS = {
+    pick: { on: true, delayMinutes: 20, describe: true, samePickerMinutes: 360 },
+    deed: { on: true, delayMinutes: 10, describe: true },
+    bundle: true, perHolderPerDay: 6, maxPending: 20, keepDays: 14,
+    reach: 400, needLockpick: true, everySeconds: 30
+  };
+  var LOCKPICK_DESC = 'a:Skyrim.esm';
+
+  /* What the log says a report came to. */
+  var WORD_SAID = {
+    'new': 'word goes to the holder',
+    bundled: 'added to the word that has not reached them yet',
+    same: 'already counted for that person at that door',
+    day: 'the holder has had as much word of picks today as the limit allows',
+    full: 'as much word as the limit allows is already waiting for the holder',
+    off: 'word of this is turned off',
+    nobody: 'there is nobody to tell'
+  };
+
+  /* The ten playable races, as a neighbour would put it. */
+  var WORD_RACE = {
+    nord: 'Nord', imperial: 'Imperial', breton: 'Breton', redguard: 'Redguard',
+    highelf: 'High Elf', woodelf: 'Wood Elf', darkelf: 'Dark Elf', orc: 'Orc',
+    argonian: 'Argonian', khajiit: 'Khajiit'
+  };
+
+  /*
+    The limits, read once at start out of game/data/property-word.json and
+    checked key by key: a number has to be a number at or above its floor and
+    a switch has to be true or false, or that key stays the default.
+  */
+  var wordRulesRead = null;
+  function wordRules() {
+    if (wordRulesRead) { return wordRulesRead; }
+    var out = JSON.parse(JSON.stringify(WORD_DEFAULTS));
+    var doc = null;
+    try {
+      var fs = require('fs');
+      var path = require('path');
+      var root = typeof __dirname === 'string' ? __dirname : path.dirname(__filename);
+      doc = JSON.parse(fs.readFileSync(path.join(root, 'data', 'property-word.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      plog('word: game/data/property-word.json would not read, so the limits are the defaults:',
+           e && e.message ? e.message : e);
+      doc = null;
+    }
+    var bad = [];
+    function has(o, k) { return !!o && Object.prototype.hasOwnProperty.call(o, k); }
+    function num(src, key, dst, floor, where) {
+      if (!has(src, key)) { return; }
+      if (typeof src[key] !== 'number' || !isFinite(src[key]) || src[key] < floor) { bad.push(where + key); return; }
+      dst[key] = src[key];
+    }
+    function flag(src, key, dst, where) {
+      if (!has(src, key)) { return; }
+      if (typeof src[key] !== 'boolean') { bad.push(where + key); return; }
+      dst[key] = src[key];
+    }
+    if (doc && typeof doc === 'object') {
+      ['pick', 'deed'].forEach(function (k) {
+        if (!has(doc, k)) { return; }
+        var s = doc[k];
+        if (!s || typeof s !== 'object') { bad.push(k); return; }
+        flag(s, 'on', out[k], k + '.');
+        flag(s, 'describe', out[k], k + '.');
+        num(s, 'delayMinutes', out[k], 0, k + '.');
+        if (k === 'pick') { num(s, 'samePickerMinutes', out[k], 0, k + '.'); }
+      });
+      flag(doc, 'bundle', out, '');
+      flag(doc, 'needLockpick', out, '');
+      num(doc, 'perHolderPerDay', out, 0, '');
+      num(doc, 'maxPending', out, 1, '');
+      num(doc, 'keepDays', out, 1, '');
+      num(doc, 'reach', out, 1, '');
+      num(doc, 'everySeconds', out, 5, '');
+      if (bad.length) {
+        plog('word: property-word.json has', bad.join(', '), 'wrong, so those keep the defaults');
+      }
+    }
+    wordRulesRead = out;
+    return out;
+  }
+
+  /*
+    What a neighbour saw: "a Nord man", "an Orc woman". The race is the
+    character's own, read the way the recipes read it (raceOf), and anything
+    that is not one of the ten playable races is no description at all
+    rather than a guess.
+  */
+  function lookOf(actorId) {
+    var race = '';
+    try { race = (typeof raceOf === 'function') ? String(raceOf(actorId) || '') : ''; } catch (e) { race = ''; }
+    race = race.toLowerCase().replace(/vampire$/, '').replace(/race$/, '');
+    var word = Object.prototype.hasOwnProperty.call(WORD_RACE, race) ? WORD_RACE[race] : '';
+    if (!word) { return ''; }
+    var female = false;
+    try {
+      var ap = mp.get(actorId, 'appearance');
+      female = !!(ap && ap.isFemale);
+    } catch (e2) { female = false; }
+    return (/^[AEIOU]/.test(word) ? 'an ' : 'a ') + word + (female ? ' woman' : ' man');
+  }
+
+  /*
+    One act, written down for the holder. Answers which of WORD_SAID it came
+    to. A pick by the same person at the same building inside
+    samePickerMinutes is one pick. With bundle on, a second act at a building
+    whose word has not gone out yet is added to that word rather than sent as
+    another. Picks are held to perHolderPerDay (0 is no limit) and maxPending;
+    a deed is never held back, because it is one word for one transfer.
+  */
+  function recordWord(kind, building, holder, actorId, by, now) {
+    var R = wordRules();
+    var K = R[kind];
+    if (!K || !K.on) { return 'off'; }
+    holder = Number(holder) || 0;
+    by = Number(by) || 0;
+    if (!(holder > 0)) { return 'nobody'; }
+    var list = wordBook.list;
+    var look = K.describe ? lookOf(actorId) : '';
+    var i, w;
+    if (kind === 'pick' && R.pick.samePickerMinutes > 0 && by > 0) {
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (w.kind === 'pick' && w.building === building && w.holder === holder &&
+            w.by.indexOf(by) !== -1 && now - w.last < R.pick.samePickerMinutes * 60000) {
+          return 'same';
+        }
+      }
+    }
+    if (R.bundle) {
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (!w.sent && w.kind === kind && w.building === building && w.holder === holder) {
+          w.count = Math.min(99, w.count + 1);
+          w.last = now;
+          if (by > 0 && w.by.indexOf(by) === -1 && w.by.length < 10) { w.by.push(by); }
+          if (look && w.looks.indexOf(look) === -1 && w.looks.length < 3) { w.looks.push(look); }
+          save();
+          return 'bundled';
+        }
+      }
+    }
+    if (kind === 'pick') {
+      var pending = 0, today = 0;
+      for (i = 0; i < list.length; i++) {
+        w = list[i];
+        if (w.holder !== holder) { continue; }
+        if (!w.sent) { pending++; }
+        if (w.kind === 'pick' && now - w.at < 86400000) { today++; }
+      }
+      if (R.perHolderPerDay > 0 && today >= R.perHolderPerDay) { return 'day'; }
+      if (pending >= R.maxPending) { return 'full'; }
+    }
+    list.push({ kind: kind, building: building, holder: holder, by: by > 0 ? [by] : [],
+                at: now, last: now, count: 1, due: now + K.delayMinutes * 60000,
+                looks: look ? [look] : [], sent: 0 });
+    save();
+    return 'new';
+  }
+
+  /* A lockpick in the server's copy of the pack. A pick that opens a lock is not spent. */
+  function holdsLockpick(actorId) {
+    var baseId = idOf(LOCKPICK_DESC);
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { return false; }
+    var entries = (inv && inv.entries) || [];
+    for (var i = 0; i < entries.length; i++) {
+      var e = entries[i];
+      if (e && e.baseId === baseId && e.count > 0) { return true; }
+    }
+    return false;
+  }
+
+  /*
+    At the door or already through it. The report rides the chat socket and
+    arrives a second or two late, and a picked load door has usually taken the
+    person inside by then, so the building's own cell counts as well as
+    standing within reach of the door in its cell.
+  */
+  function atPickedDoor(actorId, doorId, building, reach) {
+    var cell = '';
+    try { cell = String(mp.get(actorId, 'worldOrCellDesc') || ''); } catch (e) { return false; }
+    if (!cell) { return false; }
+    if (cell === building) { return true; }
+    try {
+      var dc = String(mp.get(doorId, 'worldOrCellDesc') || '');
+      if (!dc || dc !== cell) { return false; }
+      var pa = mp.get(actorId, 'pos'), pb = mp.get(doorId, 'pos');
+      if (!pa || !pb) { return false; }
+      var dx = pa[0] - pb[0], dy = pa[1] - pb[1], dz = pa[2] - pb[2];
+      return (dx * dx + dy * dy + dz * dz) <= reach * reach;
+    } catch (e2) { return false; }
+  }
+
+  /*
+        /tspicked 1a2b3        the door's form id, in hex
+
+    NOBODY TYPES THIS. The front plugin sends it when a door the server shut
+    to this person opens on their machine, which is a pick (the lock script
+    takes a door off that list before it opens one itself). Every check is
+    made again here and a report that fails one is logged and counts for
+    nothing. Answers which of WORD_SAID it came to, or why it did not count.
+  */
+  function picked(actorId, profileId, idText) {
+    var now = Date.now();
+    var R = wordRules();
+    profileId = Number(profileId) || 0;
+    var who = personName(actorId);
+    function no(why) {
+      plog('word: a pick reported by', who, '(profile ' + profileId + ') did not count:', why);
+      return why;
+    }
+    if (!R.pick.on) { return 'off'; }
+    var id = parseInt(String(idText || ''), 16);
+    if (!(id > 0)) { return no('it named no door'); }
+    var desc = '';
+    try { desc = String(mp.getDescFromId(id) || ''); } catch (e) { desc = ''; }
+    var building = desc ? buildingOf(desc) : null;
+    if (!building) { return no('that is not a door of a building'); }
+    if (wayOut(desc)) { return no('that door is a way out of ' + nameOf(building)); }
+    if (jailHoldOf(desc)) { return no('that is a cell door'); }
+    var held = holderOf(building);
+    if (!held) { return no(nameOf(building) + ' is held by nobody'); }
+    if (!held.locked) { return no(nameOf(building) + ' is not locked'); }
+    if (mayPass(actorId, profileId, building)) { return no('they may go through ' + nameOf(building) + '\'s doors anyway'); }
+    if (!atPickedDoor(actorId, id, building, R.reach)) { return no('they are not at that door or inside ' + nameOf(building)); }
+    if (R.needLockpick && !holdsLockpick(actorId)) { return no('they carry no lockpick'); }
+    var r = recordWord('pick', building, held.by, actorId, profileId, now);
+    plog('word:', who, '(profile ' + profileId + ') picked the lock of', nameOf(building), 'held by',
+         held.name, '(profile ' + held.by + '):', WORD_SAID[r] || r);
+    return r;
+  }
+
+  /* Roughly when, the way somebody passing it on would say it. */
+  function wordWhen(ms) {
+    var m = Math.max(0, Math.round(ms / 60000));
+    if (m < 15) { return 'only a few minutes ago'; }
+    if (m < 60) { return 'within the hour'; }
+    var h = Math.round(m / 60);
+    if (h < 2) { return 'about an hour ago'; }
+    if (h < 24) { return 'about ' + h + ' hours ago'; }
+    var d = Math.floor(m / 1440);
+    if (d < 2) { return 'yesterday'; }
+    return d + ' days ago';
+  }
+
+  /* The words the holder is handed. Nobody is named in them. */
+  function wordText(w, now) {
+    var hold = holdOfBuilding(w.building);
+    var town = hold ? (HOLD_TOWN[hold] || hold) : '';
+    var from = town ? 'A runner from the steward\'s office of ' + town + ' finds you with word: '
+                    : 'A neighbour finds you with word: ';
+    var when = (w.count > 1 ? ' more than once, the last time ' : ' ') + wordWhen(now - w.last);
+    var body = w.kind === 'pick'
+      ? 'somebody was seen working the lock on the door of ' + nameOf(w.building) + when + '.'
+      : 'the deed to ' + nameOf(w.building) + ' was presented at its door' + when +
+        ', and the register named somebody else as its holder.';
+    var looks = '';
+    if (w.looks.length === 1) { looks = ' Whoever it was looked like ' + w.looks[0] + '.'; }
+    else if (w.looks.length > 1) {
+      looks = ' Those seen looked like ' + w.looks.slice(0, -1).join(', ') + ' and ' +
+              w.looks[w.looks.length - 1] + '.';
+    }
+    var tail = town ? ' The office takes no side. A grievance is for the court.'
+                    : ' Nobody here takes a side. A grievance is for the court.';
+    return from + body + looks + tail;
+  }
+
+  /* Who is in the world, by profile. */
+  function onlineByProfile() {
+    var here = {};
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return here; }
+    for (var i = 0; i < online.length; i++) {
+      var pid = profileOf(online[i]);
+      if (pid) { here[pid] = online[i]; }
+    }
+    return here;
+  }
+
+  /*
+    Every word that is due, to a holder who is in the world; the rest wait.
+    A word nobody could be handed in keepDays (the lapse) is dropped, and a
+    word that has gone out is kept only while the limits still count it: a
+    day, or samePickerMinutes when that is longer.
+  */
+  function wordTick() {
+    var now = Date.now();
+    var R = wordRules();
+    var keepSent = Math.max(86400000, R.pick.samePickerMinutes * 60000);
+    var kept = [];
+    var changed = false;
+    var here = null;
+    var list = wordBook.list;
+    for (var i = 0; i < list.length; i++) {
+      var w = list[i];
+      if (w.sent) {
+        if (now - w.sent >= keepSent && now - w.last >= keepSent) { changed = true; continue; }
+        kept.push(w);
+        continue;
+      }
+      if (now - w.last >= R.keepDays * 86400000) {
+        plog('word: the', w.kind, 'word about', nameOf(w.building), 'for profile', w.holder,
+             'did not reach them in', R.keepDays, 'days and is dropped');
+        changed = true;
+        continue;
+      }
+      kept.push(w);
+      if (w.due > now) { continue; }
+      if (!here) { here = onlineByProfile(); }
+      var to = here[w.holder];
+      if (!to) { continue; }
+      var line = wordText(w, now);
+      w.sent = now;
+      changed = true;
+      plog('word: the', w.kind, 'word about', nameOf(w.building), 'reached', personName(to),
+           '(profile ' + w.holder + ')');
+      notify(to, line);
+      say(to, line);
+    }
+    if (changed) {
+      wordBook.list = kept;
+      save();
+    }
+  }
+
+  if (g.__thornswoodWordTimer) { try { clearInterval(g.__thornswoodWordTimer); } catch (e) { } }
+  g.__thornswoodWordTimer = setInterval(
+    (typeof guard === 'function') ? guard('wordTick', wordTick) : wordTick, wordRules().everySeconds * 1000);
+
+
   // The boards and boxes stood where they should be (#2516), once, at start.
   // The ten second check that was here is gone: a timer repairing state.
   if (g.__thornswoodBoardTimer) { try { clearInterval(g.__thornswoodBoardTimer); } catch (e) { } }
@@ -42644,8 +44407,9 @@ log('gamemode loaded:',
     puts up and the two of them agree to on the panel, the way any trade is
     agreed. Any change to either side takes both agreements back.
 
-    THE CUTS. The worker takes 10% of the price, rounded down, and another 10%
-    leaves the server. The seller receives the rest. Under 10 gold neither cut
+    THE CUTS are the company's terms (#512, #2695), and as they ship: the
+    worker takes 10% of the price, rounded down, and another 10% leaves the
+    server. The seller receives the rest. Under 10 gold neither cut
     is taken and the seller receives the whole price. The price comes out of
     the worker's pack, the company's coin in their hands, and the worker's own
     10% is never taken from it, so the worker pays the price less their cut.
@@ -42656,14 +44420,15 @@ log('gamemode loaded:',
     role an application in Discord leads to (__thornswoodIsCompany), or an
     admin testing the chain, the same as a Jarl.
   */
-  var SALE_CUT_FROM = 10;
-
-  /** A price split: the worker's 10%, the 10% that leaves, and the seller's rest. */
+  /*
+    A price split by the company's terms (#512, #2695): the worker's cut, the
+    cut that leaves, and the seller's rest. null when the terms are not
+    loaded, and then the trade block refuses the sale.
+  */
   function saleCuts(price) {
-    var p = Math.floor(Number(price)) || 0;
-    if (p < SALE_CUT_FROM) { return { price: p, worker: 0, gone: 0, seller: p }; }
-    var tenth = Math.floor(p / 10);
-    return { price: p, worker: tenth, gone: tenth, seller: p - tenth - tenth };
+    var c = g.__thornswoodCompany;
+    if (!c || typeof c.saleCuts !== 'function') { return null; }
+    return c.saleCuts(price);
   }
 
   function inCompany(profileId) {
@@ -42716,8 +44481,26 @@ log('gamemode loaded:',
     // A Jarl gives or takes an office of their hold (#2551): the Office page sends it.
     if (word === '/office') { return officeCmd(parts, actorId, profileId, toProfile); }
     if (word === '/evict') { return evict(actorId, profileId, toProfile, cmd); }
+    // The world's card on the Office page, for staff (#513): the world stage block answers it.
+    if (word === '/world') {
+      var worldStage = g['__thornswoodWorldStage'];
+      if (worldStage && typeof worldStage.command === 'function') {
+        return worldStage.command(parts, actorId, profileId, toProfile, cmd);
+      }
+      toProfile(profileId, 'The world stage is not running on this server. Say so in the dev channel.');
+      return true;
+    }
     if (word === '/dropbox') { return dropboxCmd(parts, actorId, profileId, toProfile); }
     if (word === '/rent') { return rentCmd(parts, actorId, profileId, toProfile, cmd); }
+    // The company's terms card on the Office page, for staff (#512, #2695): the company terms block answers it.
+    if (word === '/companyterms') {
+      var companyTerms = g['__thornswoodCompany'];
+      if (companyTerms && typeof companyTerms.command === 'function') {
+        return companyTerms.command(parts, actorId, profileId, toProfile, cmd);
+      }
+      toProfile(profileId, 'The company\'s terms are not running on this server. Say so in the dev channel.');
+      return true;
+    }
     if (word === '/sleephere') { return sleepHere(parts, actorId, profileId, toProfile); }
     if (word === '/notice') { return post(parts, actorId, profileId, toProfile, false); }
     if (word === '/job') {
@@ -43116,7 +44899,13 @@ log('gamemode loaded:',
                    return { office: t.office, hold: t.hold, where: HOLD_TOWN[t.hold], role: officeRole(t.office, t.hold),
                             by: t.by ? t.by.name : null };
                  }),
-                 steward: keeps.length > 0, staff: staff, door: null, boards: [] };
+                 steward: keeps.length > 0, staff: staff, door: null, boards: [],
+                 // The trade ships' ports and routes (#2700), for staff while the ships are on.
+                 ships: staff && !!(g.__thornswoodTradeShips && g.__thornswoodTradeShips.command) };
+    // Where the world is, for staff only (#513): the world stage block's staff card.
+    var worldStageApi = g['__thornswoodWorldStage'];
+    try { view.world = (staff && worldStageApi && worldStageApi.staffView) ? worldStageApi.staffView(pid) : null; }
+    catch (eWorld) { view.world = null; }
     for (var j = 0; j < o.jarl.length; j++) {
       var hold = o.jarl[j];
       var row = { hold: hold, where: HOLD_TOWN[hold], offices: {} };
@@ -43145,6 +44934,10 @@ log('gamemode loaded:',
       view.jarls.push(row);
     }
     if (!view.steward && !staff) { return view; }
+    // The company's terms, for staff only (#512, #2695): the company terms block's card.
+    var companyApi = g['__thornswoodCompany'];
+    try { view.company = (staff && companyApi && companyApi.staffView) ? companyApi.staffView(pid) : null; }
+    catch (eCompany) { view.company = null; }
 
     var building = here(actorId);
     if (building) {
@@ -43361,6 +45154,10 @@ log('gamemode loaded:',
     masterKeysOf: masterKeysOf, MASTER_KEY: MASTER_KEY,
     giveNamed: giveNamed, doorsOf: doorsOf, shutFor: shutFor, push: push,
     wayOut: wayOut,
+    // Word to the holder (#2680): a picked lock and a presented deed.
+    picked: picked, recordWord: recordWord, wordTick: wordTick, wordText: wordText,
+    wordWhen: wordWhen, wordRules: wordRules, lookOf: lookOf, WORD_DEFAULTS: WORD_DEFAULTS,
+    wordBook: function () { return wordBook; },
     pushAll: pushAll, touchedBench: touchedBench, moldInHand: moldInHand,
     takeBlankMold: takeBlankMold, nameFreshKey: nameFreshKey, blankMoldsExist: blankMoldsExist,
     keyLabel: keyLabel, moldLabel: moldLabel, deedLabel: deedLabel,
@@ -43390,13 +45187,17 @@ log('gamemode loaded:',
     holdStanding: holdStanding,
     rentDue: rentDue, funds: function () { return funds; },
     notices: function () { return notices; }, takedown: takedown,
+    // A notice in an office's name, with no fee (#513). See the world stage block.
+    officePost: officePost,
     boards: function () { return boards; }, boardHere: boardHere, boardPanel: boardPanel,
     standBoard: standBoard, standBoards: standBoards, boardActivated: boardActivated,
     boxOffset: boxOffset, boardAngle: boardAngle,
     standBench: standBench, standBenches: standBenches,
     benchRefs: function () { return Object.assign({}, benchRefs); },
     WOODWORKING_BENCHES: WOODWORKING_BENCHES,
-    boardsView: boardsView, lettersCarried: lettersCarried
+    boardsView: boardsView, lettersCarried: lettersCarried,
+    // An item's name the way the box names it, for the trade ships' dock (#2700).
+    itemName: itemName
   };
   plog('ready,', Object.keys(BUILDING_BY_DOOR).length, 'doors across',
        Object.keys(BUILDING_NAME).length, 'buildings,',
@@ -43454,13 +45255,9 @@ log('gamemode loaded:',
   robes are not race locked: races.md says Thalmor robes are a faction,
   not a people.
 
-  THE PATROLS ARE NOT HERE. "A patrol is 2 to 4. They are on the roads
-  between holds. At most 3 patrols in the province at once, and only one on
-  a given road." Every actor the server stands up goes through the NPC
-  population policy and the shared NPC runtime: placeActors admits and
-  enrolls what it places, and the policy switches off any runtime actor it
-  has no rule for. Those are the NPC lane's, so the patrols wait on it.
-  What a patrol needs from it is written on issue #1390.
+  THE PATROLS ARE NOT IN THIS BLOCK. They are the Thalmor patrols block,
+  after the NPC startup, and a patrol rule in the NPC population policy
+  (#1390). Nothing here waits on them, and they do not read either roll.
 */
 (function () {
   'use strict';
@@ -44732,6 +46529,8 @@ log('gamemode loaded:',
     if (baseId === GOLD) { return true; }
     if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
+    // #2479: the cut rows (#1511) are held back the way a sword is.
+    if (isCutOut(baseId)) { return true; }
     return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
   }
 
@@ -46021,6 +47820,1398 @@ log('gamemode loaded:',
 })();
 // ==== end thornswood dungeon loot ====
 
+// ==== thornswood trade ships ====
+/*
+  TRADE SHIPS ON THE SERVER (#511), SWITCHED OFF BY DEFAULT.
+
+  The manifest is game\trade-cargo.js, bundled just below so the one file the
+  server loads carries it (scripts\dev\Build-TradeCargoGamemode.js writes the
+  bundle; tests\test-511-trade-cargo.js fails when it is stale). This block is
+  the server's side of it: the register on disk, the release of deleted
+  characters, the line the load says and, with the switch on, the dock, the
+  staff panel and the clock (#2700, game\trade-ship-dock.js, bundled below
+  it). Nothing is placed in the world: a port's dock is a crate already in it.
+
+  THE REGISTER is private\trade-cargo.json, beside the other registers that
+  name characters, because the data folder is served to anybody (#541). It
+  keeps the staff list of ports, routes and crews in force with the manifest,
+  in one file, so the two are always written together (trade-cargo.js, THE
+  REGISTER). No file is a world with no ships. A file that is there and does
+  not verify is refused whole: the ships hold nothing at this start, nothing
+  is written over it, and the log says so, because writing would throw away
+  every piece aboard.
+
+  Every change is written before it is made, as the embassy's rolls are: the
+  next register goes to disk and only then becomes the register, so what the
+  server holds is what a restart reads, and a write that fails changes
+  nothing.
+
+  THE SWITCH. "thornswoodTradeShips": true in server-settings.json switches
+  the ships on: this block then puts the register's handle on globalThis as
+  __thornswoodTradeShips, which mp.onActivate asks about a pressed crate and
+  the word /ship from the panel reaches. Off, which is every
+  server today, the register is still read, still let go of deleted
+  characters and still counted in the log, so a list of deleted characters
+  never waits on a switch and staff can see what is aboard before turning
+  anything on; but there is no handle, so nothing can load, sail or hand out.
+
+  THE RELEASE (#2351, #2668). As this block loads it asks for the part
+  'cargo' through __thornswoodRelease, before anything else acts on the
+  register. A deleted, reset, wiped or replaced character comes off every
+  line and hand out by form id, or by profile when Delete-Person names the
+  profile; every piece stays where it was (trade-cargo.js, release). The log
+  says counts only, never a name, a profile id or a form id.
+*/
+// TRADE CARGO BUNDLE BEGIN
+// Built by scripts\dev\Build-TradeCargoGamemode.js out of game\trade-cargo.js. Do not hand edit.
+const TRADE_CARGO = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  TRADE SHIPS: THE MANIFEST (#511).
+
+  A trade ship is a hold, a container the server places at a dock, that is
+  loaded at one port, is away for a voyage, and is emptied at another. This
+  file is only the manifest: what is in each hold, whose pack every piece came
+  out of, who it is for, and where it went. It never touches the world, a
+  pack, a purse or a price. The design, its boundaries and the questions for
+  Patrick are on #511 (issuecomment-6245473792).
+
+  WHAT IT REFUSES TO DO, because a cargo worth robbing is a cargo worth making
+  out of nothing (the trap #511 names):
+
+  - A piece is written aboard only with the receipt of the debit that already
+    took it out of somebody's pack. One receipt loads once.
+  - A piece leaves only in two steps. begin() takes it off the hold and holds
+    it as pending; finish() records the receipt of the credit that put it into
+    exactly one pack or drop box. A pending piece is still counted, so a crash
+    between the two steps neither loses it nor pays it twice.
+  - Every change runs the audit: for every line, what was loaded equals what
+    is aboard plus what is pending plus what went out. A hold never grows.
+  - Coin is not cargo. Gold (base 0xF) is refused; freight is #512's rule.
+  - Saved state that does not verify is refused. It never starts empty.
+
+  WHO IS NAMED. A person on the manifest is a character, { actor, profile }:
+  the character's form id and the profile it is on, the two numbers the
+  release list of deleted characters (#2351, #2668) names people by. Never a
+  name: what a panel shows is read off the character when it is shown. When
+  a character is deleted, reset, wiped or replaced by New-Character,
+  release() takes them off: every place they are named becomes null, and
+  every piece stays exactly where it was. A line whose recipient is gone
+  cannot be delivered or left for them, and one whose loader is gone cannot
+  be returned to them; it stays aboard for the world to settle (a piece can
+  still be taken, and staff can narrate what became of it).
+
+  WHAT IT NEVER DECIDES. Thornswood is a player-driven RP server (Patrick,
+  17 Oct 2026, 10:13 PM MT): a trade ship is a tool, and the players decide
+  what happens with it in the world. So nothing here says who sails, where,
+  when or for how long. The ports, the routes, their leg times and the crews
+  are staff data: checkRoutes() below reads and checks them, and
+  proposeRoutes() lists what a change would do so staff can confirm it before
+  it is kept. Who may load, and whether opening a hold is a crime, are the
+  world's business, not this file's.
+
+  Ownership of who may run a ship, contracts and freight belong to #512 (the
+  Free Skyrim Trading Company). Prices, purses and trading belong to #1373.
+  Nothing here calls either.
+*/
+
+var GOLD_BASE = 15;
+var MAX_COUNT = 2147483647;
+var MAX_LINES_DEFAULT = 24;
+var MAX_STATE_BYTES = 512 * 1024;
+var ID_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+var HOWS = { delivered: 1, left: 1, returned: 1, taken: 1 };
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function has(o, k) { return Object.prototype.hasOwnProperty.call(o, k); }
+function count(n) { return Number.isInteger(n) && n > 0 && n <= MAX_COUNT; }
+function text(s, max) { return typeof s === 'string' && s.length > 0 && s.length <= (max || 128) && s.trim() === s; }
+function time(t) { return Number.isInteger(t) && t >= 0; }
+
+/* A character: its form id and its profile (0 when it has none). */
+function party(p) {
+  return isObj(p) && Object.keys(p).length === 2 &&
+    Number.isInteger(p.actor) && p.actor > 0 && p.actor <= 0xffffffff &&
+    Number.isSafeInteger(p.profile) && p.profile >= 0;
+}
+function partyOf(p, what) {
+  if (!party(p)) { throw new Error(what + ' has to be a character.'); }
+  return { actor: p.actor, profile: p.profile };
+}
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+
+/* A piece as the inventory holds it: base, count and every other field kept. */
+function entryOf(e) {
+  if (!isObj(e) || !Number.isInteger(e.baseId) || e.baseId <= 0 || e.baseId > 0xffffffff || !count(e.count)) {
+    throw new Error('A piece of cargo cannot be verified.');
+  }
+  if (e.baseId === GOLD_BASE) { throw new Error('Coin is not cargo.'); }
+  return copy(e);
+}
+
+function canonical(v) {
+  if (Array.isArray(v)) { return v.map(canonical); }
+  if (!isObj(v)) { return v; }
+  var out = {};
+  Object.keys(v).sort().forEach(function (k) { out[k] = canonical(v[k]); });
+  return out;
+}
+
+/*
+  opts.ports is the port keys a hold may stand at, and may be empty (a world
+  with no ships). opts.routes, when given, is the one-way legs a hold may sail.
+*/
+function createTradeCargo(opts) {
+  opts = opts || {};
+  if (!Array.isArray(opts.ports)) { throw new Error('The ports cannot be verified.'); }
+  var ports = {};
+  opts.ports.forEach(function (p) {
+    if (typeof p !== 'string' || !ID_RE.test(p) || ports[p]) { throw new Error('A port cannot be verified: ' + p); }
+    ports[p] = true;
+  });
+  var routes = null;
+  if (opts.routes !== undefined) {
+    routes = {};
+    if (!Array.isArray(opts.routes)) { throw new Error('The routes cannot be verified.'); }
+    opts.routes.forEach(function (r) {
+      if (!isObj(r) || !ports[r.from] || !ports[r.to] || r.from === r.to) { throw new Error('A route cannot be verified.'); }
+      routes[r.from + '>' + r.to] = true;
+    });
+  }
+  var maxLines = opts.maxLines === undefined ? MAX_LINES_DEFAULT : opts.maxLines;
+  if (!Number.isInteger(maxLines) || maxLines < 1 || maxLines > 256) { throw new Error('The line limit cannot be verified.'); }
+
+  function empty() { return { v: 1, seq: 0, holds: {}, receipts: {} }; }
+
+  function holdOf(state, id) {
+    var h = has(state.holds, id) ? state.holds[id] : null;
+    if (!h) { throw new Error('No hold ' + id + '.'); }
+    return h;
+  }
+
+  function useReceipt(state, receipt) {
+    if (!text(receipt, 200)) { throw new Error('A receipt cannot be verified.'); }
+    if (has(state.receipts, receipt)) { throw new Error('That receipt was already used.'); }
+    state.receipts[receipt] = true;
+  }
+
+  /*
+    The audit. Throws on the first thing that does not add up, so a caller that
+    catches it can refuse the change and keep the state it had. Answers the
+    counts a load banner says.
+  */
+  function audit(state) {
+    if (!isObj(state) || state.v !== 1 || !Number.isInteger(state.seq) || state.seq < 0 ||
+        !isObj(state.holds) || !isObj(state.receipts)) {
+      throw new Error('The manifest cannot be verified.');
+    }
+    var seen = {}, used = {}, holds = 0, sailing = 0, aboard = 0, pending = 0, out = 0;
+    function receipt(r) {
+      if (!text(r, 200) || used[r] || state.receipts[r] !== true) { throw new Error('A receipt does not match the manifest.'); }
+      used[r] = true;
+    }
+    function named(p) { return p === null || party(p); }
+    Object.keys(state.holds).forEach(function (id) {
+      var h = state.holds[id];
+      if (!ID_RE.test(id) || !isObj(h) || !ports[h.port] || !isObj(h.lines) || !Array.isArray(h.outs)) {
+        throw new Error('Hold ' + id + ' cannot be verified.');
+      }
+      holds++;
+      if (h.sailing !== null) {
+        var s = h.sailing;
+        if (!isObj(s) || s.from !== h.port || !ports[s.to] || s.to === s.from || !time(s.at) || !time(s.arriveAt) || s.arriveAt <= s.at) {
+          throw new Error('Hold ' + id + '\'s voyage cannot be verified.');
+        }
+        sailing++;
+      }
+      var left = {};
+      var lines = Object.keys(h.lines);
+      if (lines.length > maxLines) { throw new Error('Hold ' + id + ' carries more lines than it may.'); }
+      lines.forEach(function (k) {
+        var l = h.lines[k];
+        if (!isObj(l) || String(l.seq) !== k || !Number.isInteger(l.seq) || l.seq < 1 || l.seq > state.seq || seen[l.seq] ||
+            !named(l.by) || !named(l.for) || !ports[l.from] || !Number.isInteger(l.aboard) || l.aboard < 0) {
+          throw new Error('A line in hold ' + id + ' cannot be verified.');
+        }
+        seen[l.seq] = true;
+        entryOf(l.entry);
+        if (l.aboard > l.entry.count) { throw new Error('A line in hold ' + id + ' grew.'); }
+        receipt(l.receipt);
+        left[k] = l.entry.count - l.aboard;
+        aboard += l.aboard;
+      });
+      h.outs.forEach(function (o) {
+        if (!isObj(o) || !Number.isInteger(o.seq) || o.seq < 1 || o.seq > state.seq || seen[o.seq] || !HOWS[o.how] ||
+            !named(o.who) || !count(o.count) || !time(o.at) || !has(h.lines, String(o.line))) {
+          throw new Error('Something that left hold ' + id + ' cannot be verified.');
+        }
+        seen[o.seq] = true;
+        left[o.line] -= o.count;
+        if (left[o.line] < 0) { throw new Error('More left hold ' + id + ' than was loaded.'); }
+        if (o.receipt === null) { pending += o.count; } else { receipt(o.receipt); out += o.count; }
+      });
+      Object.keys(left).forEach(function (k) {
+        if (left[k] !== 0) { throw new Error('Hold ' + id + ' does not add up.'); }
+      });
+    });
+    Object.keys(state.receipts).forEach(function (r) {
+      if (!used[r]) { throw new Error('A receipt is not on the manifest.'); }
+    });
+    return { holds: holds, sailing: sailing, aboard: aboard, pending: pending, out: out };
+  }
+
+  /* Every change works on a copy and replaces the state only once it audits. */
+  function change(state, fn) {
+    var next = copy(state);
+    var result = fn(next);
+    audit(next);
+    Object.keys(state).forEach(function (k) { delete state[k]; });
+    Object.keys(next).forEach(function (k) { state[k] = next[k]; });
+    return result;
+  }
+
+  function open(state, id, port) {
+    return change(state, function (s) {
+      if (typeof id !== 'string' || !ID_RE.test(id)) { throw new Error('A hold needs a plain name.'); }
+      if (has(s.holds, id)) { throw new Error('There is already a hold ' + id + '.'); }
+      if (!ports[port]) { throw new Error('No port ' + port + '.'); }
+      s.holds[id] = { port: port, sailing: null, lines: {}, outs: [] };
+      return id;
+    });
+  }
+
+  /*
+    Loads one piece. The caller has already taken it out of a pack, and
+    receipt names that debit. by is the character who loaded it, for the
+    character it is for.
+  */
+  function load(state, id, piece) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (h.sailing) { throw new Error('The hold is at sea.'); }
+      if (!isObj(piece)) { throw new Error('A load needs who loaded it and who it is for.'); }
+      var by = partyOf(piece.by, 'Who loaded it');
+      var to = partyOf(piece.for, 'Who it is for');
+      var e = entryOf(piece.entry);
+      if (Object.keys(h.lines).length >= maxLines) { throw new Error('The hold is full.'); }
+      useReceipt(s, piece.receipt);
+      var seq = ++s.seq;
+      h.lines[seq] = { seq: seq, by: by, for: to, from: h.port, receipt: piece.receipt, entry: e, aboard: e.count };
+      return seq;
+    });
+  }
+
+  function depart(state, id, to, at, arriveAt) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (h.sailing) { throw new Error('The hold is already at sea.'); }
+      if (!ports[to] || to === h.port || (routes && !routes[h.port + '>' + to])) {
+        throw new Error('No voyage from ' + h.port + ' to ' + to + '.');
+      }
+      if (!time(at) || !time(arriveAt) || arriveAt <= at) { throw new Error('A voyage needs a time to leave and a later time to arrive.'); }
+      var carrying = Object.keys(h.lines).some(function (k) { return h.lines[k].aboard > 0; });
+      if (!carrying) { throw new Error('The hold is empty.'); }
+      if (h.outs.some(function (o) { return o.receipt === null; })) { throw new Error('Something is still being handed out.'); }
+      h.sailing = { from: h.port, to: to, at: at, arriveAt: arriveAt };
+      return h.sailing;
+    });
+  }
+
+  /*
+    A staff tool, for narration: change a voyage that is under way, to another
+    port on the list or to another time to arrive, or both. It never touches
+    what is aboard. Staff routes do not bind it, because staff are the ones
+    who wrote them; the port still has to be one a hold can stand at.
+  */
+  function amend(state, id, change_) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      if (!h.sailing) { throw new Error('The hold is not at sea.'); }
+      if (!isObj(change_)) { throw new Error('Say what changes.'); }
+      var to = change_.to === undefined ? h.sailing.to : change_.to;
+      var arriveAt = change_.arriveAt === undefined ? h.sailing.arriveAt : change_.arriveAt;
+      if (!ports[to] || to === h.sailing.from) { throw new Error('No voyage from ' + h.sailing.from + ' to ' + to + '.'); }
+      if (!time(arriveAt) || arriveAt <= h.sailing.at) { throw new Error('A voyage arrives after it left.'); }
+      h.sailing.to = to;
+      h.sailing.arriveAt = arriveAt;
+      return h.sailing;
+    });
+  }
+
+  /* Every hold whose voyage is over by now is docked at its destination. */
+  function arrive(state, now) {
+    if (!time(now)) { throw new Error('The time cannot be verified.'); }
+    return change(state, function (s) {
+      var landed = [];
+      Object.keys(s.holds).sort().forEach(function (id) {
+        var h = s.holds[id];
+        if (h.sailing && h.sailing.arriveAt <= now) {
+          h.port = h.sailing.to;
+          h.sailing = null;
+          landed.push(id);
+        }
+      });
+      return landed;
+    });
+  }
+
+  /*
+    Takes count of a line off the hold and holds it as pending, then hands
+    back what the caller must put into one pack or drop box. how is
+    delivered (to the recipient), left (in the drop box under the
+    recipient's name), returned (to the loader, at the port it was loaded
+    in) or taken (by whoever opened it; when that is allowed is the
+    caller's rule, not this file's). who is the character receiving it.
+  */
+  function begin(state, id, line, n, how, who, at) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var l = has(h.lines, String(line)) ? h.lines[String(line)] : null;
+      if (!l) { throw new Error('No such line in the hold.'); }
+      if (!HOWS[how]) { throw new Error('Not a way for cargo to leave.'); }
+      var to = partyOf(who, 'Who receives it');
+      if (!count(n) || n > l.aboard) { throw new Error('There is not that much aboard.'); }
+      if (!time(at)) { throw new Error('The time cannot be verified.'); }
+      if (how !== 'taken' && h.sailing) { throw new Error('The hold is at sea.'); }
+      if ((how === 'delivered' || how === 'left') && (!same(to, l.for) || h.port === l.from)) {
+        throw new Error('Only the person it is for receives it, at the far end.');
+      }
+      if (how === 'returned' && (!same(to, l.by) || h.port !== l.from)) {
+        throw new Error('Only the person who loaded it takes it back, where it was loaded.');
+      }
+      l.aboard -= n;
+      var seq = ++s.seq;
+      h.outs.push({ seq: seq, line: l.seq, count: n, how: how, who: to, at: at, receipt: null });
+      var e = copy(l.entry);
+      e.count = n;
+      return { out: seq, entry: e };
+    });
+  }
+
+  /* The credit happened; receipt names it. */
+  function finish(state, id, out, receipt) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var o = h.outs.filter(function (x) { return x.seq === out; })[0];
+      if (!o || o.receipt !== null) { throw new Error('Nothing is waiting to be handed out under that number.'); }
+      useReceipt(s, receipt);
+      o.receipt = receipt;
+      return o.seq;
+    });
+  }
+
+  /* The credit was refused for certain; the piece goes back aboard. */
+  function undo(state, id, out) {
+    return change(state, function (s) {
+      var h = holdOf(s, id);
+      var i = -1;
+      h.outs.forEach(function (x, j) { if (x.seq === out && x.receipt === null) { i = j; } });
+      if (i < 0) { throw new Error('Nothing is waiting to be handed out under that number.'); }
+      var o = h.outs.splice(i, 1)[0];
+      h.lines[String(o.line)].aboard += o.count;
+      return o.seq;
+    });
+  }
+
+  /*
+    THE RELEASE OF DELETED CHARACTERS (#2351, #2668). who is what the
+    release list answers: who.actor(formId) and who.profile(profileId), each
+    true for one the list names. A character the list names by form id, or
+    whose profile it names (Delete-Person.ps1, which deletes the profile and
+    every character on it), comes off every line and every hand out: the
+    place becomes null. A list of characters only (Reset-Character.ps1,
+    Wipe-Saves.ps1, New-Character.ps1) never names a profile, so a profile's
+    other characters stay. Nothing aboard, pending or gone out changes by one
+    piece, which the audit holds it to. Answers the counts, for the log.
+  */
+  function release(state, who) {
+    if (!isObj(who) || typeof who.actor !== 'function' || typeof who.profile !== 'function') {
+      throw new Error('The release list cannot be verified.');
+    }
+    function gone(p) { return !!p && (who.actor(p.actor) === true || (p.profile > 0 && who.profile(p.profile) === true)); }
+    return change(state, function (s) {
+      var c = { loaders: 0, recipients: 0, receivers: 0 };
+      Object.keys(s.holds).forEach(function (id) {
+        var h = s.holds[id];
+        Object.keys(h.lines).forEach(function (k) {
+          var l = h.lines[k];
+          if (gone(l.by)) { l.by = null; c.loaders++; }
+          if (gone(l.for)) { l.for = null; c.recipients++; }
+        });
+        h.outs.forEach(function (o) { if (gone(o.who)) { o.who = null; c.receivers++; } });
+      });
+      return c;
+    });
+  }
+
+  /* What is aboard a hold now, line by line, for a panel. */
+  function aboard(state, id) {
+    var h = holdOf(state, id);
+    return Object.keys(h.lines).map(Number).sort(function (a, b) { return a - b; })
+      .map(function (k) { return h.lines[k]; })
+      .filter(function (l) { return l.aboard > 0; })
+      .map(function (l) {
+        var e = copy(l.entry); e.count = l.aboard;
+        return { line: l.seq, for: l.for && copy(l.for), by: l.by && copy(l.by), entry: e };
+      });
+  }
+
+  function save(state) {
+    audit(state);
+    var out = JSON.stringify(canonical(state));
+    if (Buffer.byteLength(out, 'utf8') > MAX_STATE_BYTES) { throw new Error('The manifest is too large to keep.'); }
+    return out;
+  }
+
+  function load_(textIn) {
+    if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES) {
+      throw new Error('The saved manifest cannot be verified.');
+    }
+    var s;
+    try { s = JSON.parse(textIn); } catch (e) { throw new Error('The saved manifest cannot be verified.'); }
+    audit(s);
+    return s;
+  }
+
+  return {
+    empty: empty, audit: audit, open: open, load: load, depart: depart, amend: amend, arrive: arrive,
+    begin: begin, finish: finish, undo: undo, release: release, aboard: aboard, save: save, parse: load_,
+    PORTS: Object.keys(ports), MAX_LINES: maxLines
+  };
+}
+
+/*
+  STAFF DATA: THE PORTS, ROUTES AND CREWS.
+
+  Nothing about where ships go is written in code. Staff keep one list:
+
+    { v: 1,
+      ports:  [{ key, name, hold, world, pos: [x, y, z], crate: '<ref>' }],
+      routes: [{ from, to, minutes, crew: ['<ref>', ...] }] }
+
+  A port is a place a hold can stand: its key, the name people read, the hold
+  whose drop box takes what nobody collects, and where it stands. crate is
+  the reference of the container already in the world that is its dock
+  (Patrick, 18 Oct 2026: a ship at the dock is a crate, with no new plugin;
+  #2700): E on it opens the dock, never the container. One crate is one
+  port's. A port with no crate yet is on the list with nothing to press. A route is
+  one way between two ports with the real minutes a leg takes; the way back is
+  its own row, so staff can make it longer, shorter or absent. crew is the
+  references of any NPCs or special characters staff have stood up for it;
+  empty is a route nobody crews. An empty list is a world with no ships.
+
+  checkRoutes() refuses the whole list on the first thing wrong, so a bad edit
+  never half applies. proposeRoutes() compares the list in force with an edit
+  and says, line by line, what would change, including the holds a removed
+  port or route would strand, so staff confirm it knowing that.
+*/
+var HOLD_KEYS = { whiterun: 1, solitude: 1, riften: 1, markarth: 1, windhelm: 1, falkreath: 1,
+  morthal: 1, dawnstar: 1, winterhold: 1, ravenrock: 1 };
+var REF_RE = /^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i;
+var MAX_ROUTE_MINUTES = 7 * 24 * 60;
+var NO_ROUTES = { v: 1, ports: [], routes: [] };
+var PORT_KEYS = ['key', 'name', 'hold', 'world', 'pos', 'crate'];
+
+function checkRoutes(cfg) {
+  if (!isObj(cfg) || cfg.v !== 1 || !Array.isArray(cfg.ports) || !Array.isArray(cfg.routes) ||
+      Object.keys(cfg).some(function (k) { return k !== 'v' && k !== 'ports' && k !== 'routes'; })) {
+    throw new Error('The ship routes cannot be verified.');
+  }
+  var keys = {}, pairs = {}, crates = {};
+  var ports = cfg.ports.map(function (p, i) {
+    if (!isObj(p) || typeof p.key !== 'string' || !ID_RE.test(p.key) || keys[p.key] || !text(p.name, 64) ||
+        !HOLD_KEYS[p.hold] || typeof p.world !== 'string' || !REF_RE.test(p.world) ||
+        !Array.isArray(p.pos) || p.pos.length !== 3 || !p.pos.every(function (n) { return typeof n === 'number' && isFinite(n); }) ||
+        Object.keys(p).some(function (k) { return PORT_KEYS.indexOf(k) < 0; }) ||
+        (p.crate !== undefined && (typeof p.crate !== 'string' || !REF_RE.test(p.crate) || crates[p.crate.toLowerCase()]))) {
+      throw new Error('Port ' + (i + 1) + ' cannot be verified.');
+    }
+    keys[p.key] = true;
+    var out = { key: p.key, name: p.name, hold: p.hold, world: p.world, pos: p.pos.slice() };
+    if (p.crate !== undefined) { crates[p.crate.toLowerCase()] = true; out.crate = p.crate; }
+    return out;
+  });
+  var routes = cfg.routes.map(function (r, i) {
+    var crew = r && r.crew === undefined ? [] : r && r.crew;
+    if (!isObj(r) || !keys[r.from] || !keys[r.to] || r.from === r.to || pairs[r.from + '>' + r.to] ||
+        !Number.isInteger(r.minutes) || r.minutes < 1 || r.minutes > MAX_ROUTE_MINUTES ||
+        !Array.isArray(crew) || crew.length > 64 ||
+        !crew.every(function (c, j) { return typeof c === 'string' && REF_RE.test(c) && crew.indexOf(c) === j; })) {
+      throw new Error('Route ' + (i + 1) + ' cannot be verified.');
+    }
+    pairs[r.from + '>' + r.to] = true;
+    return { from: r.from, to: r.to, minutes: r.minutes, crew: crew.slice() };
+  });
+  return { v: 1, ports: ports, routes: routes };
+}
+
+/*
+  What an edit would do, for staff to confirm. state is the manifest in force
+  (or null), so a port or route that holds are at or sailing on is named.
+*/
+function proposeRoutes(current, next, state) {
+  var a = checkRoutes(current), b = checkRoutes(next);
+  var lines = [], strands = [];
+  function byKey(list) { var o = {}; list.forEach(function (p) { o[p.key] = p; }); return o; }
+  function byPair(list) { var o = {}; list.forEach(function (r) { o[r.from + '>' + r.to] = r; }); return o; }
+  var pa = byKey(a.ports), pb = byKey(b.ports), ra = byPair(a.routes), rb = byPair(b.routes);
+  Object.keys(pb).forEach(function (k) {
+    if (!pa[k]) { lines.push('Add the port ' + pb[k].name + ' (' + k + ').'); }
+    else if (JSON.stringify(pa[k]) !== JSON.stringify(pb[k])) { lines.push('Change the port ' + pb[k].name + ' (' + k + ').'); }
+  });
+  Object.keys(pa).forEach(function (k) { if (!pb[k]) { lines.push('Remove the port ' + pa[k].name + ' (' + k + ').'); } });
+  Object.keys(rb).forEach(function (k) {
+    var r = rb[k];
+    if (!ra[k]) { lines.push('Add the route ' + r.from + ' to ' + r.to + ', ' + r.minutes + ' minutes.'); }
+    else {
+      if (ra[k].minutes !== r.minutes) { lines.push('The route ' + r.from + ' to ' + r.to + ' takes ' + r.minutes + ' minutes, not ' + ra[k].minutes + '.'); }
+      if (JSON.stringify(ra[k].crew) !== JSON.stringify(r.crew)) { lines.push('The route ' + r.from + ' to ' + r.to + ' has a new crew of ' + r.crew.length + '.'); }
+    }
+  });
+  Object.keys(ra).forEach(function (k) { if (!rb[k]) { lines.push('Remove the route ' + ra[k].from + ' to ' + ra[k].to + '.'); } });
+  if (state && isObj(state.holds)) {
+    Object.keys(state.holds).sort().forEach(function (id) {
+      var h = state.holds[id];
+      if (!pb[h.port]) { strands.push(id + ' is at ' + h.port + ', which this removes.'); }
+      if (h.sailing && (!pb[h.sailing.to] || !rb[h.sailing.from + '>' + h.sailing.to])) {
+        strands.push(id + ' is sailing ' + h.sailing.from + ' to ' + h.sailing.to + ', which this removes.');
+      }
+    });
+  }
+  return { changes: lines, strands: strands, next: b };
+}
+
+/*
+  THE REGISTER: what the server keeps on disk, one file in the private
+  folder (it names characters, and the data folder is served to anybody,
+  #541):
+
+    { v: 1, routes: <the staff list in force>, cargo: <the manifest> }
+
+  The list in force is kept beside the manifest, in the same file, because
+  the manifest names ports and routes off that list: written apart, a crash
+  between the two writes could leave a manifest naming a port the list does
+  not have, and that manifest would no longer verify. Where staff write an
+  edit before it is confirmed (#511 question 1) is a separate thing; a
+  confirmed edit becomes the list in force here, through adoptRoutes().
+
+  openRegister(null) is the register of a server that never had one: no
+  ports, no routes, no holds. A text that is there and does not verify is
+  refused whole, never read as empty.
+*/
+function registerOf(routes, state) {
+  var ships = createTradeCargo({ ports: routes.ports.map(function (p) { return p.key; }), routes: routes.routes });
+  ships.audit(state);
+  return { routes: routes, ships: ships, state: state };
+}
+
+function openRegister(textIn) {
+  if (textIn === null || textIn === undefined) {
+    var none = checkRoutes(NO_ROUTES);
+    return registerOf(none, createTradeCargo({ ports: [] }).empty());
+  }
+  if (typeof textIn !== 'string' || Buffer.byteLength(textIn, 'utf8') > MAX_STATE_BYTES * 2) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  var raw;
+  try { raw = JSON.parse(textIn.replace(/^\uFEFF/, '')); } catch (e) { throw new Error('The ship register cannot be verified.'); }
+  if (!isObj(raw) || raw.v !== 1 || Object.keys(raw).length !== 3 || !has(raw, 'routes') || !has(raw, 'cargo')) {
+    throw new Error('The ship register cannot be verified.');
+  }
+  return registerOf(checkRoutes(raw.routes), raw.cargo);
+}
+
+function saveRegister(reg) {
+  if (!isObj(reg) || !reg.ships || !isObj(reg.routes)) { throw new Error('The ship register cannot be verified.'); }
+  var routes = checkRoutes(reg.routes);
+  var cargo = JSON.parse(reg.ships.save(reg.state));
+  return JSON.stringify(canonical({ v: 1, routes: routes, cargo: cargo }));
+}
+
+/* The register with a staff-confirmed list in force. It strands no hold. */
+function adoptRoutes(reg, next) {
+  var p = proposeRoutes(reg.routes, next, reg.state);
+  if (p.strands.length) { throw new Error('The edit strands a hold: ' + p.strands.join(' ')); }
+  return registerOf(p.next, copy(reg.state));
+}
+
+/* The counts a load banner says. */
+function countsOf(reg) {
+  var c = reg.ships.audit(reg.state);
+  c.ports = reg.routes.ports.length;
+  c.routes = reg.routes.routes.length;
+  return c;
+}
+
+module.exports = {
+  createTradeCargo: createTradeCargo, checkRoutes: checkRoutes, proposeRoutes: proposeRoutes,
+  openRegister: openRegister, saveRegister: saveRegister, adoptRoutes: adoptRoutes, countsOf: countsOf,
+  GOLD_BASE: GOLD_BASE, MAX_LINES_DEFAULT: MAX_LINES_DEFAULT
+};
+return module.exports;
+})();
+// TRADE CARGO BUNDLE END
+// TRADE DOCK BUNDLE BEGIN
+// Built by scripts\dev\Build-TradeCargoGamemode.js out of game\trade-ship-dock.js. Do not hand edit.
+const TRADE_DOCK = (function () {
+const module = { exports: {} };
+'use strict';
+/*
+  TRADE SHIPS: THE DOCK, THE STAFF PANEL AND THE CLOCK (#2700, split from #511).
+
+  game\trade-cargo.js is the manifest and the staff list of ports and routes.
+  This file is what a person meets in the world, as views and as the words the
+  panel sends back, and it never touches the world itself: the trade ships
+  block of gamemode.js hands it what the server knows and does what it says.
+
+  PATRICK'S ANSWERS (18 Oct 2026, 11:30 AM MT, via Smeagle; #2700):
+    1. Staff edit ports, routes and crews in an in-game staff panel.
+    2. A ship at the dock is a crate, with no new plugin.
+    3. Arrivals happen on their own.
+    4. Coin cannot be cargo.
+    5. One hold carries 24 lines.
+
+  THE CRATE. A port's crate is a container already in the world that staff
+  picked (its reference, port.crate in the staff list). E on it opens the dock
+  panel and never the container, so what the engine keeps in it is never
+  cargo and no record is added to any plugin. portOfCrate() answers which
+  port a pressed reference is.
+
+  THE STAFF PANEL. Staff edit a draft of the list in force (editDraft); an edit
+  changes nothing in force. The server proposes (staffView, through
+  trade-cargo's proposeRoutes: every change and every hold the draft would
+  strand) and staff confirm. A confirm names the list it was proposed against
+  (baseOf), and one made against a list that has changed since is refused.
+
+  THE CLOCK. A voyage takes the minutes staff gave its route (voyage), so
+  nothing here says how long anything takes. nextArrival() is the earliest
+  arrival among the holds at sea, for the one timer the block keeps; the
+  manifest's arrive() docks every hold that is due. Nobody confirms an
+  arrival and nobody is told: people find out at the dock.
+
+  COIN. isCoin() is the one test; the dock never offers gold out of a pack and
+  a load of it is refused before the pack is touched. trade-cargo refuses it
+  again.
+
+  THE CHARTER (#512). Loading and sailing are a charter; charterOf() is the one
+  place it is asked, through the Trading Company's mayCharter(who, terms)
+  (game\trading-company.js, #2687). who is { company, staff }: the Trading
+  Company role and an admin. Collecting what was shipped to you, or taking
+  back your own where you loaded it, is not a charter. With no company rule
+  running, nobody charters, and the panel says why.
+
+  WHAT IT NEVER DECIDES. Who sails, where, when or for how long: those are the
+  players' RP (Patrick, 17 Oct 2026, 10:13 PM MT). Ports, routes, minutes and
+  crews are staff data. Taking cargo that is not yours, and leaving goods in a
+  drop box for somebody who never comes, wait on their own answer (#2700).
+*/
+
+var GOLD_BASE = 15;
+var MINUTE = 60 * 1000;
+var KEY_RE = /^[a-z0-9][a-z0-9:_.-]{0,63}$/;
+var HOLD_KEYS = ['whiterun', 'solitude', 'riften', 'markarth', 'windhelm', 'falkreath',
+  'morthal', 'dawnstar', 'winterhold', 'ravenrock'];
+var NO_CHARTER = 'The Trading Company\'s charter rule is not running on this server yet, so nobody can load or sail a ship.';
+var BAD_TERMS = 'The Trading Company\'s terms could not be read, so nobody can load or sail a ship until staff put them right.';
+var NOT_CHARTERED = 'Only those the Trading Company charters may load or sail a ship.';
+
+function copy(v) { return JSON.parse(JSON.stringify(v)); }
+function isObj(v) { return !!v && typeof v === 'object' && !Array.isArray(v); }
+function whole(n) { return Number.isInteger(n) && n > 0; }
+function hex(n) { return (Number(n) >>> 0).toString(16); }
+function same(a, b) { return !!a && !!b && a.actor === b.actor && a.profile === b.profile; }
+
+function isCoin(baseId) { return (Number(baseId) >>> 0) === GOLD_BASE; }
+
+/* A short, stable name for the list in force, so a confirm says what it was proposed against. */
+function baseOf(routes) {
+  var s = JSON.stringify(routes), h = 5381;
+  for (var i = 0; i < s.length; i++) { h = ((h * 33) ^ s.charCodeAt(i)) >>> 0; }
+  return h.toString(36) + '.' + s.length.toString(36);
+}
+
+function routeOf(routes, from, to) {
+  var list = (routes && routes.routes) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (list[i].from === from && list[i].to === to) { return list[i]; }
+  }
+  return null;
+}
+function portOf(routes, key) {
+  var list = (routes && routes.ports) || [];
+  for (var i = 0; i < list.length; i++) { if (list[i].key === key) { return list[i]; } }
+  return null;
+}
+
+/* The port whose crate this reference is, or ''. */
+function portOfCrate(routes, desc) {
+  if (typeof desc !== 'string' || !desc) { return ''; }
+  var d = desc.toLowerCase();
+  var list = (routes && routes.ports) || [];
+  for (var i = 0; i < list.length; i++) {
+    if (typeof list[i].crate === 'string' && list[i].crate.toLowerCase() === d) { return list[i].key; }
+  }
+  return '';
+}
+
+/* When a voyage leaves and arrives: now, and now plus its route's minutes. */
+function voyage(routes, from, to, now) {
+  var r = routeOf(routes, from, to);
+  if (!r) { throw new Error('No ship sails from here to there.'); }
+  if (!Number.isInteger(now) || now < 0) { throw new Error('The time cannot be verified.'); }
+  return { at: now, arriveAt: now + r.minutes * MINUTE };
+}
+
+/* The earliest arrival among the holds at sea, or null when none is. */
+function nextArrival(state) {
+  var next = null;
+  var holds = (state && state.holds) || {};
+  Object.keys(holds).forEach(function (id) {
+    var s = holds[id] && holds[id].sailing;
+    if (s && Number.isInteger(s.arriveAt) && (next === null || s.arriveAt < next)) { next = s.arriveAt; }
+  });
+  return next;
+}
+
+/*
+  THE CHARTER, ASKED IN ONE PLACE. tc is what the Trading Company publishes:
+  { mayCharter(who, terms), terms() } (#2687). Answers { may, why }.
+*/
+function charterOf(tc, who) {
+  if (!tc || typeof tc.mayCharter !== 'function') { return { may: false, why: NO_CHARTER }; }
+  var w = { company: !!(who && who.company === true), staff: !!(who && who.staff === true) };
+  var may = false;
+  try {
+    var terms = typeof tc.terms === 'function' ? tc.terms() : tc.terms;
+    may = tc.mayCharter(w, terms) === true;
+  } catch (e) {
+    return { may: false, why: BAD_TERMS };
+  }
+  return may ? { may: true, why: '' } : { may: false, why: NOT_CHARTERED };
+}
+
+/*
+  THE PANEL'S WORDS. Sent by game\ui\thornswood-ship.js, never typed (Patrick,
+  4 Oct: no chat commands for what people do). Answers { verb, ... } or
+  { why } for anything it does not know.
+
+    /ship close
+    /ship load <hold> <base hex> <nth> <count> <for actor hex>
+    /ship sail <hold> <port>
+    /ship collect <hold> <line> <count>
+    /ship return <hold> <line> <count>
+    /ship staff
+    /ship draft <edit ...>           see editDraft
+    /ship confirm <base>
+    /ship add <port>                 a new hold (ship) at a port, staff only
+*/
+function parse(parts) {
+  var p = Array.isArray(parts) ? parts.map(function (x) { return String(x); }) : [];
+  var verb = String(p[1] || '').toLowerCase();
+  var n = function (s) { return /^[0-9]{1,9}$/.test(String(s)) ? Number(s) : NaN; };
+  var h = function (s) { return /^[0-9a-f]{1,8}$/i.test(String(s)) ? parseInt(s, 16) >>> 0 : NaN; };
+  var key = function (s) { return typeof s === 'string' && KEY_RE.test(s) ? s : ''; };
+  if (verb === 'close' || verb === 'staff') { return { verb: verb }; }
+  if (verb === 'load') {
+    var l = { verb: 'load', hold: key(p[2]), base: h(p[3]), nth: n(p[4]), count: n(p[5]), forActor: h(p[6]) };
+    if (!l.hold || !whole(l.base) || !Number.isInteger(l.nth) || !whole(l.count) || !whole(l.forActor)) { return { why: 'That load cannot be read.' }; }
+    return l;
+  }
+  if (verb === 'sail') {
+    var s = { verb: 'sail', hold: key(p[2]), to: key(p[3]) };
+    return s.hold && s.to ? s : { why: 'That voyage cannot be read.' };
+  }
+  if (verb === 'collect' || verb === 'return') {
+    var c = { verb: verb, hold: key(p[2]), line: n(p[3]), count: n(p[4]) };
+    return c.hold && whole(c.line) && whole(c.count) ? c : { why: 'That cannot be read.' };
+  }
+  if (verb === 'draft') { return { verb: 'draft', edit: p.slice(2) }; }
+  if (verb === 'confirm') { return p[2] ? { verb: 'confirm', base: String(p[2]) } : { why: 'That confirm cannot be read.' }; }
+  if (verb === 'add') {
+    var a = { verb: 'add', port: key(p[2]) };
+    return a.port ? a : { why: 'Say which port.' };
+  }
+  return { why: 'The ship does not know that.' };
+}
+
+/*
+  A STAFF EDIT TO THE DRAFT. Answers the next draft, checked whole by
+  trade-cargo's checkRoutes, or throws what is wrong. crate is the container
+  this staff member opened in the last minute, { desc, world, pos }, or null.
+
+    port <key> <hold> <name ...>     a port at that crate
+    crate <key>                      that port's crate is now the one opened
+    unport <key>                     the port off the list
+    route <from> <to> <minutes>      a one way route, or its new minutes
+    unroute <from> <to>              the route off the list
+    crew <from> <to> <ref ...>       the route's crew references; none is no crew
+    reset                            the draft back to the list in force
+*/
+function editDraft(cargo, inForce, draft, edit, crate) {
+  var d = copy(draft || inForce);
+  var e = Array.isArray(edit) ? edit.map(String) : [];
+  var op = (e[0] || '').toLowerCase();
+  function needCrate() {
+    if (!isObj(crate) || typeof crate.desc !== 'string' || typeof crate.world !== 'string' || !Array.isArray(crate.pos)) {
+      throw new Error('Open the crate first, then press this within a minute.');
+    }
+    if (!/^[0-9a-f]{1,8}:[^:\s][^:]{0,95}$/i.test(crate.desc)) {
+      throw new Error('That container is not one of the world\'s own, so it cannot be a dock.');
+    }
+    var taken = portOfCrate(d, crate.desc);
+    if (taken) { throw new Error('That crate is already the dock of ' + taken + '.'); }
+    return crate;
+  }
+  if (op === 'reset') { return cargo.checkRoutes(inForce); }
+  if (op === 'port') {
+    var c = needCrate();
+    if (!e[1] || portOf(d, e[1])) { throw new Error('A port needs a new plain name.'); }
+    if (HOLD_KEYS.indexOf(e[2]) < 0) { throw new Error('A port is in one of the holds.'); }
+    var name = e.slice(3).join(' ').trim();
+    d.ports.push({ key: e[1], name: name, hold: e[2], world: c.world, pos: c.pos.slice(0, 3), crate: c.desc });
+  } else if (op === 'crate') {
+    var c2 = needCrate();
+    var pc = portOf(d, e[1]);
+    if (!pc) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    pc.crate = c2.desc; pc.world = c2.world; pc.pos = c2.pos.slice(0, 3);
+  } else if (op === 'unport') {
+    if (!portOf(d, e[1])) { throw new Error('No port ' + e[1] + ' in the draft.'); }
+    d.ports = d.ports.filter(function (p) { return p.key !== e[1]; });
+    d.routes = d.routes.filter(function (r) { return r.from !== e[1] && r.to !== e[1]; });
+  } else if (op === 'route') {
+    var m = /^[0-9]{1,6}$/.test(e[3] || '') ? Number(e[3]) : NaN;
+    var r = routeOf(d, e[1], e[2]);
+    if (r) { r.minutes = m; } else { d.routes.push({ from: e[1], to: e[2], minutes: m, crew: [] }); }
+  } else if (op === 'unroute') {
+    if (!routeOf(d, e[1], e[2])) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    d.routes = d.routes.filter(function (x) { return !(x.from === e[1] && x.to === e[2]); });
+  } else if (op === 'crew') {
+    var rc = routeOf(d, e[1], e[2]);
+    if (!rc) { throw new Error('No route from ' + e[1] + ' to ' + e[2] + ' in the draft.'); }
+    rc.crew = e.slice(3);
+  } else {
+    throw new Error('The staff panel does not know that edit.');
+  }
+  return cargo.checkRoutes(d);
+}
+
+/*
+  WHAT STAFF SEE: the list in force, the draft, and the server's proposal of
+  what confirming the draft would do. Never a person's name or id.
+*/
+function staffView(cargo, reg, draft, crate) {
+  var d = draft || reg.routes;
+  var p = cargo.proposeRoutes(reg.routes, d, reg.state);
+  var c = cargo.countsOf(reg);
+  var holdsAt = {};
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var h = reg.state.holds[id];
+    (holdsAt[h.port] = holdsAt[h.port] || []).push({ id: id, sailing: !!h.sailing });
+  });
+  return {
+    open: true, mode: 'staff',
+    base: baseOf(reg.routes),
+    counts: c,
+    holdKeys: HOLD_KEYS.slice(),
+    inForce: { ports: reg.routes.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate, ships: holdsAt[x.key] || [] }; }),
+               routes: reg.routes.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+    draft: { ports: d.ports.map(function (x) { return { key: x.key, name: x.name, hold: x.hold, crate: !!x.crate }; }),
+             routes: d.routes.map(function (r) { return { from: r.from, to: r.to, minutes: r.minutes, crew: r.crew.length }; }) },
+    changes: p.changes.slice(), strands: p.strands.slice(),
+    canConfirm: p.changes.length > 0 && p.strands.length === 0,
+    crate: crate ? { here: true, dockOf: portOfCrate(d, crate.desc) || null } : null
+  };
+}
+
+/*
+  WHAT A PERSON SEES AT A DOCK. input:
+    reg       the register (routes, ships, state)
+    port      the port key of the crate pressed
+    viewer    { actor, profile }, the character at the crate
+    charter   charterOf()'s answer for them
+    pack      [{ baseId, nth, count, name }], what they carry, coin left out by the caller
+    people    [{ actor, profile, name }], who a load can be for, the viewer first
+    nameOf    function (party) -> the name to show, or '' when it cannot be read
+    itemName  function (entry) -> the name of a piece
+    now       the time
+  Lines are shown only to whoever they concern: the one they are for, the one
+  who loaded them, and staff (input.staff).
+*/
+function dockView(input) {
+  var reg = input.reg, port = portOf(reg.routes, input.port);
+  if (!port) { return { open: false }; }
+  var me = input.viewer, max = reg.ships.MAX_LINES, now = input.now;
+  var nameOf = input.nameOf || function () { return ''; };
+  var itemName = input.itemName || function () { return 'Goods'; };
+  var holds = [], incoming = [];
+  Object.keys(reg.state.holds).sort().forEach(function (id) {
+    var h = reg.state.holds[id];
+    if (h.sailing) {
+      if (h.sailing.to === port.key) {
+        var from = portOf(reg.routes, h.sailing.from);
+        incoming.push({ id: id, from: from ? from.name : h.sailing.from,
+                        dueIn: Math.max(0, Math.ceil((h.sailing.arriveAt - now) / MINUTE)) });
+      }
+      return;
+    }
+    if (h.port !== port.key) { return; }
+    var lines = reg.ships.aboard(reg.state, id).map(function (l) {
+      var line = reg.state.holds[id].lines[String(l.line)];
+      var mine = same(l.for, me), loaded = same(l.by, me);
+      return {
+        line: l.line, item: itemName(l.entry), count: l.entry.count,
+        shown: mine || loaded || input.staff === true,
+        forName: l.for ? (same(l.for, me) ? 'you' : (nameOf(l.for) || 'someone')) : 'nobody now',
+        canCollect: mine && line.from !== h.port,
+        canReturn: loaded && line.from === h.port
+      };
+    });
+    var used = Object.keys(h.lines).length;
+    var others = lines.filter(function (l) { return !l.shown; }).length;
+    holds.push({
+      id: id, used: used, max: max,
+      lines: lines.filter(function (l) { return l.shown; }).map(function (l) { delete l.shown; return l; }),
+      others: others,
+      canLoad: input.charter.may && used < max,
+      sail: input.charter.may ? reg.routes.routes.filter(function (r) { return r.from === port.key; }).map(function (r) {
+        var to = portOf(reg.routes, r.to);
+        return { to: r.to, name: to ? to.name : r.to, minutes: r.minutes };
+      }) : []
+    });
+  });
+  return {
+    open: true, mode: 'dock',
+    port: { key: port.key, name: port.name },
+    holds: holds, incoming: incoming,
+    charter: { may: input.charter.may, why: input.charter.why },
+    pack: input.charter.may ? (input.pack || []).filter(function (p) { return !isCoin(p.baseId); }).map(function (p) {
+      return { base: hex(p.baseId), nth: p.nth, count: p.count, name: p.name };
+    }) : [],
+    people: input.charter.may ? (input.people || []).map(function (p) {
+      return { actor: hex(p.actor), name: same(p, me) ? 'Yourself' : p.name };
+    }) : []
+  };
+}
+
+module.exports = {
+  GOLD_BASE: GOLD_BASE, HOLD_KEYS: HOLD_KEYS,
+  isCoin: isCoin, baseOf: baseOf, portOfCrate: portOfCrate, voyage: voyage, nextArrival: nextArrival,
+  charterOf: charterOf, parse: parse, editDraft: editDraft, staffView: staffView, dockView: dockView
+};
+return module.exports;
+})();
+// TRADE DOCK BUNDLE END
+(function () {
+  'use strict';
+  var g = (typeof globalThis !== 'undefined' ? globalThis : this);
+  var fs = require('fs'), path = require('path');
+  function slog() {
+    var a = Array.prototype.slice.call(arguments);
+    if (typeof log === 'function') { log.apply(null, ['[ships]'].concat(a)); } else { console.log('[thornswood] [ships] ' + a.join(' ')); }
+  }
+  function copy(v) { return JSON.parse(JSON.stringify(v)); }
+
+  var on = false;
+  try { var settings = mp.getServerSettings(); on = !!settings && settings.thornswoodTradeShips === true; } catch (e) { on = false; }
+
+  var privDir = 'private';
+  try {
+    var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
+    if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
+  } catch (e) { }
+  // Resolved once, at load, against the server's own folder.
+  var FILE = path.resolve(privDir, 'trade-cargo.json');
+
+  var unreadable = '';
+  var reg = null;
+  (function read() {
+    var t = null;
+    try { t = fs.readFileSync(FILE, 'utf8'); }
+    catch (e) { if (!e || e.code !== 'ENOENT') { unreadable = String((e && e.code) || e); } }
+    if (unreadable) { return; }
+    try { reg = TRADE_CARGO.openRegister(t); }
+    catch (e2) { unreadable = String((e2 && e2.message) || e2); reg = null; }
+  })();
+  if (unreadable) {
+    slog(FILE, 'could not be read (' + unreadable + '), so the ships hold nothing at this start and nothing is written over it until it is put right');
+  }
+
+  function commit(next) {
+    if (unreadable || !reg) { return false; }
+    try {
+      var text = TRADE_CARGO.saveRegister(next);
+      fs.mkdirSync(path.dirname(FILE), { recursive: true });
+      fs.writeFileSync(FILE + '.tmp', text);
+      fs.renameSync(FILE + '.tmp', FILE);
+    } catch (e) {
+      slog('could not write', FILE + ':', (e && e.message) || e);
+      return false;
+    }
+    reg = next;
+    return true;
+  }
+
+  function release(who) {
+    var none = { loaders: 0, recipients: 0, receivers: 0 };
+    if (unreadable || !reg) { return { counts: none, saved: false }; }
+    var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+    var c = reg.ships.release(next.state, who);
+    if (!c.loaders && !c.recipients && !c.receivers) { return { counts: c, saved: true }; }
+    return { counts: c, saved: commit(next) };
+  }
+  if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('cargo', release); }
+
+  if (reg) {
+    var n = TRADE_CARGO.countsOf(reg);
+    slog('ready,', on ? 'on:' : 'off ("thornswoodTradeShips": true in server-settings.json switches it on):',
+         n.ports, 'port(s),', n.routes, 'route(s),', n.holds, 'hold(s),', n.sailing, 'at sea,',
+         n.aboard, 'piece(s) aboard,', n.pending, 'being handed out');
+    if (n.pending) {
+      slog(n.pending, 'piece(s) were being handed out when the server stopped; they stay counted on the manifest until each is finished or undone, and their hold cannot sail before');
+    }
+  }
+
+  if (on && reg) {
+    var act = function (name) {
+      return function () {
+        var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+        var r = reg.ships[name].apply(null, [next.state].concat(Array.prototype.slice.call(arguments)));
+        if (!commit(next)) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        // Every write that went through sets the clock again: a departure or an
+        // amended voyage moves the next arrival, and a hold whose docking could
+        // not be written (arriveNow) docks now that the register writes again.
+        schedule();
+        return r;
+      };
+    };
+
+    /*
+      THE DOCK, THE STAFF PANEL AND THE CLOCK (#2700). game\trade-ship-dock.js
+      is the views and the panel's words; this is the world's side of them.
+      Patrick, 18 Oct 2026, 11:30 AM MT (via Smeagle): an in-game staff panel,
+      a crate at the dock with no new plugin, arrivals on their own, no coin
+      as cargo, 24 lines a hold.
+    */
+    var SHIP_VIEW_PROPERTY = 'thornswoodShipView';
+    try {
+      mp.makeProperty(SHIP_VIEW_PROPERTY, {
+        isVisibleByOwner: true, isVisibleByNeighbors: false,
+        updateOwner: [
+          '(function(){',
+          '  try {',
+          '    var v = ctx.value;',
+          '    if (!v || typeof v !== "object") { return; }',
+          '    var st = ctx.state;',
+          '    if (!st || st.thornswoodShipAt === v.at) { return; }',
+          '    st.thornswoodShipAt = v.at;',
+          '    var body = JSON.stringify(v);',
+          '    ctx.sp.browser.executeJavaScript("(function(){try{var d=" + body + ";if(window.thornswoodShip&&window.thornswoodShip.setData){window.thornswoodShip.setData(d);}}catch(e){}})();");',
+          '  } catch (e) { }',
+          '})();'
+        ].join('\n'),
+        updateNeighbor: ''
+      });
+    } catch (eProp) { /* made by an earlier load, or no world here. harmless. */ }
+
+    var SESSION_MS = 10 * 60 * 1000;   // a dock panel left open this long asks for the crate again
+    var CRATE_MS = 60 * 1000;          // staff press a container, then the staff panel, within a minute
+    var NEAR = 400;                    // the reach of a dock crate, the same as a hold's box
+    var sessions = {}, drafts = {}, crateSeen = {}, viewAt = 0, receiptN = 0, timer = null;
+    var RUN = (function () {
+      try { if (typeof serverRunId === 'function') { return String(serverRunId()); } } catch (eRun) { }
+      return Date.now().toString(36) + '-' + Math.floor(Math.random() * 1e9).toString(36);
+    })();
+    function receipt(kind) { return kind + ':' + RUN + ':' + (++receiptN); }
+
+    function hook(name, pid) {
+      var f = g[name];
+      try { return typeof f === 'function' && !!f(Number(pid) || 0); } catch (e) { return false; }
+    }
+    function profileOf(actorId) {
+      try { return Number(mp.get(actorId, 'profileId')) || 0; } catch (e) { return 0; }
+    }
+    function partyOf(actorId) { return { actor: Number(actorId) >>> 0, profile: profileOf(actorId) }; }
+    function nameOf(p) {
+      try { var ap = mp.get(p.actor, 'appearance'); return ap && ap.name ? String(ap.name) : ''; } catch (e) { return ''; }
+    }
+    function itemName(entry) {
+      var prop = g.__thornswoodProperty;
+      try { if (prop && typeof prop.itemName === 'function') { return String(prop.itemName(entry)); } } catch (e) { }
+      return entry && typeof entry.name === 'string' && entry.name ? entry.name : 'Goods';
+    }
+
+    /*
+      THE ONE CHARTER SPOT (#512, #2687). The Trading Company publishes
+      globalThis.__thornswoodCompany, whose mayCharter(who) and terms() read the terms in force;
+      who is the Trading Company role and an admin, the same two inCompany reads.
+    */
+    function charter(profileId) {
+      return TRADE_DOCK.charterOf(g.__thornswoodCompany, {
+        company: hook('__thornswoodIsCompany', profileId),
+        staff: hook('__thornswoodIsAdmin', profileId)
+      });
+    }
+
+    function near(actorId, refrId) {
+      try {
+        var cell = mp.get(actorId, 'worldOrCellDesc');
+        if (typeof cell !== 'string' || !cell || cell !== mp.get(refrId, 'worldOrCellDesc')) { return false; }
+        var a = mp.get(actorId, 'pos'), b = mp.get(refrId, 'pos');
+        var dx = a[0] - b[0], dy = a[1] - b[1], dz = a[2] - b[2];
+        return dx * dx + dy * dy + dz * dz <= NEAR * NEAR;
+      } catch (e) { return false; }
+    }
+
+    /* What they carry, coin left out: [{ baseId, nth, count, name }]. nth is which stack of that base. */
+    function packList(actorId) {
+      var inv = null;
+      try { inv = mp.get(actorId, 'inventory'); } catch (e) { return []; }
+      var nth = {}, out = [];
+      ((inv && inv.entries) || []).forEach(function (e) {
+        if (!e || !Number.isInteger(e.baseId) || !(e.count > 0)) { return; }
+        var k = nth[e.baseId] = (nth[e.baseId] === undefined ? 0 : nth[e.baseId] + 1);
+        if (TRADE_DOCK.isCoin(e.baseId)) { return; }
+        out.push({ baseId: e.baseId, nth: k, count: e.count, name: itemName(e) });
+      });
+      return out.slice(0, 200);
+    }
+
+    /* The debit: n of that stack out of the pack, every other field kept. Coin is refused before the pack is read. */
+    function packTake(actorId, base, nthOf, n) {
+      if (TRADE_DOCK.isCoin(base)) { throw new Error('Coin is not cargo.'); }
+      var inv = mp.get(actorId, 'inventory');
+      var entries = copy((inv && inv.entries) || []);
+      var seen = -1, at = -1;
+      for (var i = 0; i < entries.length; i++) {
+        if (entries[i] && entries[i].baseId === base && ++seen === nthOf) { at = i; break; }
+      }
+      if (at < 0 || !(entries[at].count >= n)) { throw new Error('You do not carry that many.'); }
+      var piece = copy(entries[at]);
+      piece.count = n;
+      entries[at].count -= n;
+      if (entries[at].count <= 0) { entries.splice(at, 1); }
+      mp.set(actorId, 'inventory', { entries: entries });
+      return piece;
+    }
+
+    /* The credit: a piece the manifest handed out, onto the stack it matches or as its own. */
+    function packGive(actorId, entry) {
+      var inv = mp.get(actorId, 'inventory');
+      var entries = copy((inv && inv.entries) || []);
+      var shape = function (e) { var c = copy(e); delete c.count; return JSON.stringify(c); };
+      var want = shape(entry), done = false;
+      for (var i = 0; i < entries.length && !done; i++) {
+        if (entries[i] && shape(entries[i]) === want) { entries[i].count += entry.count; done = true; }
+      }
+      if (!done) { entries.push(copy(entry)); }
+      mp.set(actorId, 'inventory', { entries: entries });
+    }
+
+    function people(actorId) {
+      var me = partyOf(actorId), out = [me], online = [];
+      try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+      online.forEach(function (id) {
+        if ((Number(id) >>> 0) === me.actor || out.length >= 60) { return; }
+        var p = partyOf(id), nm = nameOf(p);
+        if (nm) { p.name = nm; out.push(p); }
+      });
+      return out;
+    }
+
+    function push(actorId, view) {
+      viewAt = Math.max(Date.now(), viewAt + 1);
+      view.at = viewAt;
+      try { mp.set(actorId, SHIP_VIEW_PROPERTY, view); } catch (e) { }
+      return view;
+    }
+    function crateOf(actorId) {
+      var c = crateSeen[actorId];
+      return c && Date.now() - c.at <= CRATE_MS ? c : null;
+    }
+    function pushDock(actorId, profileId, said) {
+      var s = sessions[actorId];
+      var me = partyOf(actorId);
+      var v = TRADE_DOCK.dockView({
+        reg: reg, port: s.port, viewer: me, charter: charter(profileId), staff: hook('__thornswoodIsStaff', profileId),
+        pack: packList(actorId), people: people(actorId), nameOf: nameOf, itemName: itemName, now: Date.now()
+      });
+      v.note = said || '';
+      return push(actorId, v);
+    }
+    function pushStaff(actorId, profileId, said) {
+      var v = TRADE_DOCK.staffView(TRADE_CARGO, reg, drafts[profileId] || null, crateOf(actorId));
+      v.note = said || '';
+      return push(actorId, v);
+    }
+
+    /* The next hold to dock, on one timer; anything overdue docks now. */
+    function schedule(wait) {
+      if (typeof setTimeout !== 'function') { return; }
+      if (timer) { clearTimeout(timer); timer = null; }
+      var next = TRADE_DOCK.nextArrival(reg.state);
+      if (next === null && wait === undefined) { return; }
+      var ms = wait !== undefined ? wait : Math.min(Math.max(0, next - Date.now()), 60 * 60 * 1000);
+      timer = setTimeout(function () { timer = null; arriveNow(); }, ms);
+    }
+    function arriveNow() {
+      var due = TRADE_DOCK.nextArrival(reg.state);
+      if (due === null || due > Date.now()) { schedule(); return; }
+      var next = { routes: reg.routes, ships: reg.ships, state: copy(reg.state) };
+      var landed = reg.ships.arrive(next.state, Date.now());
+      // No timed retry: a register that will not write is said once, and the
+      // overdue holds dock at the next write that goes through, or at the next
+      // start, which docks every overdue ship.
+      if (!commit(next)) { slog('could not write the register, so', landed.length, 'ship(s) stay at sea past their time; they dock at the next change to the register or the next start'); return; }
+      slog(landed.length, 'ship(s) docked');
+      schedule();
+    }
+
+    function hand(actorId, w, how) {
+      var h = reg.state.holds[w.hold];
+      if (!h || h.sailing || h.port !== sessions[actorId].port) { throw new Error('That ship is not at this dock.'); }
+      var out = act('begin')(w.hold, w.line, w.count, how, partyOf(actorId), Date.now());
+      try { packGive(actorId, out.entry); } catch (eGive) {
+        act('undo')(w.hold, out.out);
+        throw new Error('It could not be put in your pack, so it stays aboard.');
+      }
+      try { act('finish')(w.hold, out.out, receipt('credit')); } catch (eFinish) {
+        // The piece is in the pack and the line is still being handed out on
+        // the manifest. Said, with what staff need to settle it by hand.
+        slog('handed', JSON.stringify(out.entry), 'from', w.hold, 'to', String(actorId.toString(16)),
+             'but could not mark it finished:', (eFinish && eFinish.message) || eFinish);
+        throw new Error('It is in your pack, but the ship\'s book could not be written. Say so in the dev channel.');
+      }
+      return how === 'delivered' ? 'Collected.' : 'Taken back.';
+    }
+
+    function dockWord(w, actorId, profileId) {
+      var port = sessions[actorId].port;
+      var h = reg.state.holds[w.hold];
+      if (w.verb === 'collect') { return hand(actorId, w, 'delivered'); }
+      if (w.verb === 'return') { return hand(actorId, w, 'returned'); }
+      if (!h || h.sailing || h.port !== port) { throw new Error('That ship is not at this dock.'); }
+      var c = charter(profileId);
+      if (!c.may) { throw new Error(c.why); }
+      if (w.verb === 'sail') {
+        var t = TRADE_DOCK.voyage(reg.routes, port, w.to, Date.now());
+        act('depart')(w.hold, w.to, t.at, t.arriveAt);
+        return 'The ship has sailed.';
+      }
+      // load: coin, a full hold and the recipient are refused before the pack is touched.
+      if (TRADE_DOCK.isCoin(w.base)) { throw new Error('Coin is not cargo.'); }
+      if (Object.keys(h.lines).length >= reg.ships.MAX_LINES) { throw new Error('The hold is full.'); }
+      var to = null;
+      people(actorId).forEach(function (p) { if (p.actor === w.forActor) { to = { actor: p.actor, profile: p.profile }; } });
+      if (!to) { throw new Error('Who it is for has to be here, in the world.'); }
+      var piece = packTake(actorId, w.base, w.nth, w.count);
+      try {
+        act('load')(w.hold, { by: partyOf(actorId), for: to, receipt: receipt('debit'), entry: piece });
+      } catch (eLoad) {
+        try { packGive(actorId, piece); } catch (eBack) {
+          slog('could not load', JSON.stringify(piece), 'for', String(actorId.toString(16)),
+               'and could not put it back in their pack:', (eBack && eBack.message) || eBack);
+          throw new Error('It could not be loaded, and it could not be put back in your pack. Say so in the dev channel.');
+        }
+        throw eLoad;
+      }
+      return 'Loaded.';
+    }
+
+    function staffWord(w, actorId, profileId) {
+      if (w.verb === 'draft') {
+        drafts[profileId] = TRADE_DOCK.editDraft(TRADE_CARGO, reg.routes, drafts[profileId] || null, w.edit, crateOf(actorId));
+        return 'The draft changed. Nothing is in force until you confirm.';
+      }
+      if (w.verb === 'confirm') {
+        if (w.base !== TRADE_DOCK.baseOf(reg.routes)) { throw new Error('The list in force changed since. Look again before you confirm.'); }
+        if (!drafts[profileId]) { throw new Error('There is no draft to confirm.'); }
+        if (!commit(TRADE_CARGO.adoptRoutes(reg, drafts[profileId]))) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        drafts[profileId] = null;
+        var n = TRADE_CARGO.countsOf(reg);
+        slog('staff confirmed the ship list:', n.ports, 'port(s),', n.routes, 'route(s)');
+        return 'Confirmed. The new list is in force.';
+      }
+      if (w.verb === 'add') {
+        if (!reg.routes.ports.some(function (p) { return p.key === w.port; })) { throw new Error('No port ' + w.port + ' in force.'); }
+        var k = 1;
+        while (reg.state.holds['ship-' + k]) { k++; }
+        act('open')('ship-' + k, w.port);
+        slog('staff put a ship at a port:', Object.keys(reg.state.holds).length, 'ship(s) in all');
+        return 'A ship is at the dock.';
+      }
+      return '';
+    }
+
+    /* The panel's words (game\ui\thornswood-ship.js). Answers a line for the chat, or ''. */
+    function command(parts, actorId, profileId) {
+      var w = TRADE_DOCK.parse(parts);
+      if (w.why) { return w.why; }
+      var said = '';
+      if (w.verb === 'close') { sessions[actorId] = null; push(actorId, { open: false }); return ''; }
+      if (w.verb === 'staff' || w.verb === 'draft' || w.verb === 'confirm' || w.verb === 'add') {
+        if (!hook('__thornswoodIsStaff', profileId)) { return 'Only staff keep the ports and routes.'; }
+        try { said = staffWord(w, actorId, profileId); } catch (eStaff) { said = String((eStaff && eStaff.message) || eStaff); }
+        sessions[actorId] = { mode: 'staff', at: Date.now() };
+        pushStaff(actorId, profileId, said);
+        return '';
+      }
+      var s = sessions[actorId];
+      if (!s || s.mode !== 'dock' || Date.now() - s.at > SESSION_MS || !near(actorId, s.ref)) {
+        sessions[actorId] = null;
+        push(actorId, { open: false });
+        return 'Stand at the dock and press its crate.';
+      }
+      s.at = Date.now();
+      try { said = dockWord(w, actorId, profileId); } catch (eDock) { said = String((eDock && eDock.message) || eDock); }
+      pushDock(actorId, profileId, said);
+      return '';
+    }
+
+    /*
+      E on anything (mp.onActivate). A dock crate opens the dock and answers
+      true, so the container never opens. Any other container a staff member
+      opens is remembered for a minute, for the staff panel's port and crate
+      edits, and the press goes on.
+    */
+    function activated(refrId, actorId, baseDesc) {
+      var desc = '';
+      try { desc = mp.getDescFromId(refrId); } catch (e) { desc = ''; }
+      var port = TRADE_DOCK.portOfCrate(reg.routes, desc);
+      var pid = profileOf(actorId);
+      if (!port) {
+        if (desc && hook('__thornswoodIsStaff', pid) && typeof kindIsContainer === 'function' && kindIsContainer(baseDesc)) {
+          try {
+            crateSeen[actorId] = { desc: desc, world: mp.get(refrId, 'worldOrCellDesc'), pos: mp.get(refrId, 'pos').slice(0, 3), at: Date.now() };
+          } catch (eSeen) { }
+        }
+        return false;
+      }
+      sessions[actorId] = { mode: 'dock', port: port, ref: refrId, at: Date.now() };
+      pushDock(actorId, pid, '');
+      return true;
+    }
+
+    g.__thornswoodTradeShips = {
+      counts: function () { return TRADE_CARGO.countsOf(reg); },
+      routes: function () { return copy(reg.routes); },
+      aboard: function (id) { return reg.ships.aboard(reg.state, id); },
+      propose: function (next) { return TRADE_CARGO.proposeRoutes(reg.routes, next, reg.state); },
+      adopt: function (next) {
+        if (!commit(TRADE_CARGO.adoptRoutes(reg, next))) { throw new Error('The ship register could not be written, so nothing changed.'); }
+        return TRADE_CARGO.countsOf(reg);
+      },
+      open: act('open'), load: act('load'), depart: act('depart'), amend: act('amend'), arrive: act('arrive'),
+      begin: act('begin'), finish: act('finish'), undo: act('undo'),
+      activated: activated, command: command
+    };
+    // Anything that came due while the server was down docks now; then the clock runs.
+    arriveNow();
+  }
+})();
+// ==== end thornswood trade ships ====
+
 
 
 
@@ -46997,6 +50188,11 @@ log('gamemode loaded:',
       var W = g.__thornswoodProperty;
       var desk = (W && W.officeView) ? W.officeView(actorId, pid) : null;
       if (desk) { view.officePage = desk; }
+      // The Hair dye page (#2675): the dyes carried, or nothing at all.
+      var HD = g.__thornswoodHairDye;
+      var dyePage = null;
+      try { dyePage = (HD && HD.view) ? HD.view(actorId) : null; } catch (eDye) { dyePage = null; }
+      if (dyePage) { view.hairDye = dyePage; }
     }
     var sig = drawn(view);
     var sending = !!redraw || lastDrawn[actorId] !== sig;
@@ -47782,10 +50978,11 @@ log('gamemode loaded:',
     if (word === '/plant' || word === '/claim' || word === '/plot' ||
         word === '/deed' || word === '/deeds' || word === '/lock' ||
         word === '/unlock' || word === '/mold' || word === '/moldhere' || word === '/key' ||
+        word === '/companyterms' ||
         word === '/office' || word === '/evict' || word === '/dropbox' ||
         word === '/rent' || word === '/sleephere' || word === '/notice' || word === '/job' ||
         word === '/board' || word === '/take' ||
-        word === '/haul' ||
+        word === '/haul' || word === '/world' ||
         word === '/letter' || word === '/deliver' ||
         word === '/dropjob' || word === '/unpin') {
       if (!actorId) {
@@ -47802,8 +50999,10 @@ log('gamemode loaded:',
         to guess: the property block answers false unless the engine has just
         told us they opened a door of a building it knows.
 
-        A home and its farm are one claim in the design and they are two claims
-        in the code today. That is the next piece of this and it is on the list.
+        A home and its farm are one claim, in the code as in the design: the
+        house's claim carries the ground outside its front door, and
+        claimCovering asks the property block (coversGround) before this
+        block's own claims.
       */
       var prop = g.__thornswoodProperty;
       if (prop && prop.command) {
@@ -48308,9 +51507,13 @@ log('gamemode loaded:',
     Windwalker         +4 speed, through the tree's totals. The fall is the
                        game's own sum on your own machine, so the front plugin
                        holds its multiplier at nothing there.
-    Pack Mule          NOT IN THE GAME YET. Being overloaded makes the game
-                       walk you, on your own machine, and no game setting
-                       changes that. What it should be is Patrick's (#1385).
+    Pack Mule          Being overloaded makes the game walk you, on your own
+                       machine, and no game setting changes that. So the
+                       engine fork's client keeps a list of characters the
+                       game does not hold to their carry weight (Patrick, 12
+                       Oct: the engine change), and the front plugin puts your
+                       own character on it while Pack Mule is held. Nothing
+                       here reads carry weight.
     Lethal Aim         An arrow or a bolt takes what it would have taken
                        against half the armour: the engine's own armour sum
                        (TES5DamageFormula, worn ARMO and their enchantments),
@@ -48394,9 +51597,8 @@ log('gamemode loaded:',
                          say: 'When stamina hits 0 it fills, once every 5 minutes.' },
     windwalker:        { name: 'Windwalker', skill: 'agility',
                          say: '+4 speed, and a fall deals no damage.' },
-    packmule:          { name: 'Pack Mule', skill: 'burden', none: true,
-                         say: 'Being overloaded does not slow you.',
-                         not: 'That is not in the game yet: the slowing is the game\'s own, on your machine.' },
+    packmule:          { name: 'Pack Mule', skill: 'burden',
+                         say: 'Being overloaded does not slow you.' },
     lethalaim:         { name: 'Lethal Aim', skill: 'precision', armour: 0.5,
                          say: 'An arrow ignores half the armour it hits.' }
   };
@@ -49767,7 +52969,11 @@ log('gamemode loaded:',
     threw away took nothing and costs nothing. The stamina comes off the
     person's real most, the way spend() takes a maneuver's, and stops at
     nothing: a block with no stamina left still blocks, as in the game. Set
-    halves the charge for a hit that lands while it runs.
+    halves the charge for a hit that lands while it runs. A broken arm
+    doubles it while the break lasts, splinted or set (docs/systems/injury.md,
+    #1383): the injury block's record says which limb is broken (limbsOf), so
+    the charge is decided here with the rest of it, never measured off the
+    client's stamina afterwards.
 
     A person's block only, which is what was decided ("when a hit lands
     blocked on a person"). A spell is not one: the engine's spell damage
@@ -49777,7 +52983,7 @@ log('gamemode loaded:',
     and a block only the server saw, which is every block against a server
     NPC, costs stamina like any other.
   */
-  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5 };
+  var BLOCK = { base: 0, perStopped: 0.25, through: 0.1, set: 0.5, brokenArm: 2 };
 
   /** The stamina a blocked hit costs, in points: took is the health share it
       took, mult 1, or Set's half. NaN when the most health cannot be read. */
@@ -49827,6 +53033,8 @@ log('gamemode loaded:',
     if (guarded) {
       var mine = has(ST.on, target) ? ST.on[target] : null;
       e.block = (mine && mine.set && mine.set > t) ? BLOCK.set : 1;
+      var hurt = globalThis.__thornswoodHurt;
+      if (hurt && hurt.limbsOf(hurt.read(target)).arm) { e.block *= BLOCK.brokenArm; }
     }
     var a = (identity && has(ST.on, by)) ? ST.on[by] : null;
     if (a && !isSpell(source)) {
@@ -52662,9 +55870,6 @@ function thornswoodBooks(env) {
   }
 })();
 
-// The release of deleted characters (#2351): which parts did not let go at
-// this start, now that every block that keeps a register has loaded.
-if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__thornswoodReleaseWaiting(); }
 
 // ==== thornswood chat commands ====
 /*
@@ -52758,11 +55963,22 @@ const WORDS = ['/ooc', '/o',
                // /letter, and the look prompt's Hand over the letter sends
                // /deliver. Never typed, and not in PLAYER_WORDS either.
                '/letter', '/deliver',
+               // The company's terms card on the Office page of K, for staff
+               // (#512, #2695): propose, confirm and drop. Sent by the page,
+               // never typed, and so NOT in PLAYER_WORDS.
+               '/companyterms',
                // A haul (#1393). Sent by the board panel's Send a haul and
                // Confirm buttons, never typed, and so deliberately NOT in
                // PLAYER_WORDS. See the property block.
                '/haul',
+               // The world's card on the Office page of K, for staff (#513):
+               // propose, confirm and drop a move of the world stage. Sent by
+               // the page, never typed, and so NOT in PLAYER_WORDS.
+               '/world',
                '/tp', '/goto', '/face', '/restart', '/shutdown', '/tspicks',
+               // A property door's lock opening on the client, a pick (#2680):
+               // the front plugin's, never typed.
+               '/tspicked',
                // Playtesters', like /tp, and gated the same way. Deliberately
                // absent from PLAYER_WORDS: naming them in /help would be an
                // invitation, and the gate answers everybody else anyway.
@@ -52810,6 +56026,10 @@ const WORDS = ['/ooc', '/o',
                // so deliberately NOT in PLAYER_WORDS. See the injury and
                // disease block.
                '/treat',
+               // Hair dye (#2675): the Hair dye page of K and Dye hair under
+               // Near you on P send it, never typed, and so NOT in
+               // PLAYER_WORDS. See the hair dye block.
+               '/hairdye',
                // The client's weather report and its "I am on fire". Never typed; see
                // the branches.
                '/place', '/burn', '/ate',
@@ -52839,6 +56059,9 @@ const WORDS = ['/ooc', '/o',
                // which the P panel's Name buttons send and which was missing
                // here, so it ran before the character was in the world (#1628).
                '/friend', '/party', '/mute', '/hidename', '/trade', '/journal', '/book', '/merchant',
+               // The trade ships' panel, at a dock crate or on the Office page
+               // for staff (#2700). Never typed, so not in PLAYER_WORDS.
+               '/ship',
                '/yes', '/no',
                // The dice. Rolled here now rather than on the roller's own
                // machine; see the branch for why that matters.
@@ -53068,7 +56291,7 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
   var HOLD_MAX = 20;
   var HOLD_ALL = 200;
   // The client's reports of a moment, never kept for later (see runsNow).
-  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown'];
+  var MOMENTS = ['/place', '/burn', '/chopped', '/racemenu', '/racedown', '/tspicked'];
   // Lines from a chat connection that did not prove who it is, logged at most
   // this often per profile (#410).
   var unprovenSaid = {};
@@ -54070,6 +57293,15 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       return true;
     }
 
+    if (word === '/ship') {
+      var shipsApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodTradeShips;
+      if (!shipsApi || !shipsApi.command) { toProfile(profileId, 'Trade ships are not running on this server.'); return true; }
+      if (!actorId) { toProfile(profileId, 'You are not in the world yet.'); return true; }
+      var shipSaid = shipsApi.command(parts, actorId, profileId);
+      if (shipSaid) { toProfile(profileId, shipSaid); }
+      return true;
+    }
+
     if (word === '/book') {
       var booksApi = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodBooks;
       if (!booksApi) { toProfile(profileId, 'That is not running on this server.'); return true; }
@@ -54137,6 +57369,14 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
           if (!tr || !tr.begin) { toProfile(profileId, 'Trading is not running on this server.'); return true; }
           var started = tr.begin(themActor, actorId);
           if (started) { toProfile(profileId, started); return true; }
+        } else if (o.kind === 'dye') {
+          /* Somebody offered to dye this person's hair (#2675). The hair dye
+             block checks it all again and makes the one write. */
+          var hdYes = (typeof globalThis !== 'undefined' ? globalThis : this).__thornswoodHairDye;
+          if (!hdYes || !hdYes.accept) { toProfile(profileId, 'Hair dye is not running on this server.'); return true; }
+          var dyed = hdYes.accept(actorId, themActor, o);
+          toProfile(profileId, dyed.them);
+          if (dyed.dyer) { say(themActor, dyed.dyer); }
         } else if (o.kind === 'apprentice') {
           /* A Master offered to take this person on (#1388). The character
              block holds the record, so it checks again and writes both. */
@@ -54513,6 +57753,18 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       var picks = Math.max(1, Math.min(20, Number(parts[1]) || 1));
       if (takeItem(actorId, 'a:Skyrim.esm', picks)) {
         log('spent ' + picks + ' lockpick(s) for ' + actorId.toString(16));
+      }
+      return;
+    }
+
+    // A property door's lock opened on this person's machine: a pick
+    // (#2680). The property block checks it all again and sends the
+    // holder word if it counts.
+    if (word === '/tspicked') {
+      if (!needCharacter()) { return; }
+      var propPick = g.__thornswoodProperty;
+      if (propPick && propPick.picked) {
+        try { propPick.picked(actorId, profileId, parts[1]); } catch (ePick) { log('/tspicked failed:', ePick); }
       }
       return;
     }
@@ -54967,6 +58219,17 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
       if (!wear) { toProfile(profileId, 'Repair is not running on this server.'); return; }
       var mended = wear.panel(actorId, parts.slice(1));
       if (mended) { toProfile(profileId, mended); }
+      return;
+    }
+
+    // Hair dye (#2675), from the Hair dye page of K and Dye hair on P. The
+    // work is in the hair dye block; this only hands it the character.
+    if (word === '/hairdye') {
+      if (!needCharacter()) { return; }
+      var hairDye = g.__thornswoodHairDye;
+      if (!hairDye || !hairDye.command) { toProfile(profileId, 'Hair dye is not running on this server.'); return; }
+      var dyeSaid = hairDye.command(parts, actorId);
+      if (dyeSaid) { toProfile(profileId, dyeSaid); }
       return;
     }
 
@@ -56268,17 +59531,36 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return by > 0 ? { pid: by, what: 'container' } : null;
   }
 
-  /* How many of this item the body or container holds before the take. */
-  function stackOf(refrId, baseId) {
+  /*
+    How many of this item the body or container holds before the take.
+
+    A STACK IS ONE RECORD AND ONE NAME (#2675). A hair dye is a Bowl entry
+    with the dye's name, and three dyes beside forty plain bowls are a stack
+    of three, not of forty three. The engine tells this handler the record
+    and the count and not which entry they came from (TakeItemEvent in the
+    fork: "TODO: implement extra data"), so of the named stacks that could
+    have given that many, the smallest is the one counted: the share is never
+    worked out in the taker's favour. With one name on the record, which is
+    every record but a named one, it is the whole stack, as before.
+  */
+  function stackOf(refrId, baseId, n) {
     var inv = null;
     try { inv = mp.get(refrId, 'inventory'); } catch (e) { inv = null; }
     var entries = (inv && inv.entries) || [];
-    var n = 0;
+    var byName = {};
     for (var i = 0; i < entries.length; i++) {
       var e = entries[i];
-      if (e && Number(e.baseId) === Number(baseId)) { n += Number(e.count) || 0; }
+      if (!e || Number(e.baseId) !== Number(baseId)) { continue; }
+      var key = typeof e.name === 'string' ? 'n:' + e.name : '-';
+      byName[key] = (byName[key] || 0) + (Number(e.count) || 0);
     }
-    return n;
+    var least = 0, total = 0;
+    for (var k in byName) {
+      if (!Object.prototype.hasOwnProperty.call(byName, k)) { continue; }
+      total += byName[k];
+      if (byName[k] >= (n || 1) && (!least || byName[k] < least)) { least = byName[k]; }
+    }
+    return least || total;
   }
 
   /* Send the taker their pack as the server has it, so a refused item leaves it. */
@@ -56318,7 +59600,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
                     'the limit of ' + TAKE_LIMIT + ' takes');
     }
 
-    var stack = stackOf(sourceRefrId, baseId);
+    var stack = stackOf(sourceRefrId, baseId, n);
     if (stack < n) { stack = n; }
     if (stack > 1) {
       var share = Math.max(1, Math.floor(stack * STACK_SHARE));
@@ -57904,6 +61186,27 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       drugs: { food: 15, drug: true }
     },
     /*
+      A COOKED MEAL'S HELP (#2682). Patrick, 18 October 2026: a cooked meal
+      gives only its temperature help by default, so a soup, stew or chowder
+      warms; stamina recovery or the disease guard comes only when the cook
+      adds one extra ingredient at the pot. Which group warms by default,
+      which extra gives which help and which seasoned dish is which are data,
+      in FOOD_GROUPS.season (game/data/food-groups.json). These are the
+      numbers, from docs/systems/food.md: the temperature target 4 degrees
+      warmer, or stamina recovery +10%, for 20 real minutes. The disease
+      guard's own numbers are the injury block's MEAL_GUARD (#2684), and it
+      is that block's guarded() that gives it; there is no second guard here.
+      One help at a time: a meal with a help replaces the one before it.
+    */
+    mealHelp: {
+      minutes: 20, warm: 4, stamina: 10,
+      lines: {
+        warm: 'The heat of it settles in your chest.',
+        stamina: 'It sits well. You could walk a long way on that.',
+        guard: 'It is sharp with the seasoning. You feel hale for it.'
+      }
+    },
+    /*
       THE DRUG (#1382). docs/systems/exhaustion.md, A stimulant: "Skooma holds
       the drain at zero for 10 minutes, then costs 30 rest and 10 hunger. A
       second dose inside the window does not stack. It refreshes the clock and
@@ -58160,6 +61463,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // The first two ales' damage help, and a hangover (#1382).
       aleHelpUntil: Number(v.aleHelpUntil) || 0,
       hangover: !!v.hangover,
+      // A cooked meal's warmth or stamina help and when it ends (#2682).
+      // The disease guard is kept by the injury block, not here.
+      mealHelp: String(v.mealHelp || ''),
+      mealHelpUntil: Number(v.mealHelpUntil) || 0,
       // Water carried, by where it came from, a boil under way, and the
       // wells this person has filled at lately (#1382).
       water: waterHeld(v.water),
@@ -58424,13 +61731,25 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     raw = raw + outdoorSeason(n) + weathered(actorId, n) + fireWarmth(n, actorId) + waterKind(actorId, n);
     if (raw < 0) { raw = 0; }
     if (raw > 100) { raw = 100; }
-    if (raw === NEEDS.comfort) { return raw; }
+    if (raw === NEEDS.comfort) { return mealWarmed(n, raw); }
     var ins = insulation(actorId);
     var away = raw - NEEDS.comfort;
     var out = (away < 0)
       ? NEEDS.comfort + away * (1 - ins)
       : NEEDS.comfort + away * (1 + ins * NEEDS.wear.heat);
     if (out < 0) { out = 0; }
+    if (out > 100) { out = 100; }
+    return mealWarmed(n, out);
+  }
+
+  /*
+    A WARMING MEAL (#2682): the target itself is NEEDS.mealHelp.warm degrees
+    warmer while the help lasts, after the clothes, so it is the same 4
+    degrees whatever somebody is wearing, as food.md says.
+  */
+  function mealWarmed(n, target) {
+    if (!n || n.mealHelp !== 'warm' || !(Date.now() < (Number(n.mealHelpUntil) || 0))) { return target; }
+    var out = target + NEEDS.mealHelp.warm;
     if (out > 100) { out = 100; }
     return out;
   }
@@ -58687,6 +62006,106 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return groupIndex[baseId] || '';
   }
 
+  // One key of FOOD_GROUPS, or null.
+  function foodGroupsKey(key) {
+    try {
+      return (typeof FOOD_GROUPS !== 'undefined' && FOOD_GROUPS && FOOD_GROUPS[key] &&
+              typeof FOOD_GROUPS[key] === 'object') ? FOOD_GROUPS[key] : null;
+    } catch (e) { return null; }
+  }
+
+  /*
+    WHETHER A FOOD'S OWN MAGIC IS TAKEN AWAY (#2682). Patrick, 18 October
+    2026: vanilla food's extra magic effects go, except temperature ones, so
+    alchemy matters more. FOOD_GROUPS.strip says which groups lose them and
+    which records keep them. The engine scales a record's effects as a whole
+    (EatItemEvent, eatItemScale), so a record whose temperature effect rides
+    with another effect is kept whole until the engine can drop one effect
+    and keep another. Hunger and thirst are this block's own numbers, not
+    record effects, and are not touched.
+  */
+  var stripIndex = null;
+
+  function stripped(baseId) {
+    if (!baseId) { return false; }
+    if (!stripIndex) {
+      stripIndex = { groups: {}, keep: {} };
+      var s = foodGroupsKey('strip');
+      if (s) {
+        var gs = Array.isArray(s.groups) ? s.groups : [];
+        for (var i = 0; i < gs.length; i++) { stripIndex.groups[String(gs[i])] = true; }
+        var keep = (s.keep && typeof s.keep === 'object') ? s.keep : {};
+        for (var d in keep) {
+          if (!Object.prototype.hasOwnProperty.call(keep, d)) { continue; }
+          var id = 0;
+          try { id = idOf(d); } catch (e) { id = 0; }
+          if (id) { stripIndex.keep[id] = true; }
+        }
+      }
+    }
+    if (stripIndex.keep[baseId]) { return false; }
+    var grp = foodGroup(baseId);
+    return !!grp && stripIndex.groups[grp] === true;
+  }
+
+  /*
+    WHICH HELP A MEAL GIVES (#2682), out of FOOD_GROUPS.season: a seasoned
+    dish's help is what its extra ingredient gives (season.extras), and any
+    other meal's is its group's (season.plain: a soup warms). '' for none.
+    season.dishes names each seasoned record the content plugin makes, with
+    the plain dish it is made from and the extra that went in at the pot. It
+    is empty until those records exist, and then only the plain help is live.
+  */
+  var MEAL_HELPS = ['warm', 'stamina', 'guard'];
+  var seasonIndex = null;
+
+  function mealHelpOf(baseId, group) {
+    var s = foodGroupsKey('season');
+    if (!seasonIndex) {
+      seasonIndex = {};
+      var dishes = (s && s.dishes && typeof s.dishes === 'object') ? s.dishes : {};
+      var extras = (s && s.extras && typeof s.extras === 'object') ? s.extras : {};
+      for (var d in dishes) {
+        if (!Object.prototype.hasOwnProperty.call(dishes, d)) { continue; }
+        var row = dishes[d];
+        var help = (row && Object.prototype.hasOwnProperty.call(extras, row.extra)) ? extras[row.extra] : '';
+        if (MEAL_HELPS.indexOf(help) === -1) { continue; }
+        var id = 0;
+        try { id = idOf(d); } catch (e) { id = 0; }
+        if (id) { seasonIndex[id] = help; }
+      }
+    }
+    if (baseId && seasonIndex[baseId]) { return seasonIndex[baseId]; }
+    var plain = (s && s.plain && typeof s.plain === 'object') ? s.plain : {};
+    var byGroup = Object.prototype.hasOwnProperty.call(plain, group) ? plain[group] : '';
+    return (MEAL_HELPS.indexOf(byGroup) !== -1) ? byGroup : '';
+  }
+
+  /*
+    A MEAL'S HELP LANDS (#2682). The latest meal's help is the one that
+    counts. The disease guard is the injury block's (guarded(), #2684), so a
+    guard clears the warmth or stamina kept here, and warmth or stamina takes
+    the guard off through unguarded() where that block has it. Answers the
+    line to tell them, or '' when nothing landed.
+  */
+  function mealHelped(actorId, help) {
+    var H = g.__thornswoodHurt;
+    var n = settle(actorId);
+    if (help === 'guard') {
+      if (!H || !H.guarded) { return ''; }
+      H.guarded(actorId, false);
+      n.mealHelp = '';
+      n.mealHelpUntil = 0;
+    } else {
+      if (H && H.unguarded) { H.unguarded(actorId); }
+      n.mealHelp = help;
+      n.mealHelpUntil = Date.now() + NEEDS.mealHelp.minutes * 60000;
+    }
+    write(actorId, n);
+    pushEffects(actorId);
+    return NEEDS.mealHelp.lines[help] || '';
+  }
+
   function foodKind(baseId) {
     if (!foodIndex) {
       foodIndex = {};
@@ -58742,6 +62161,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     return scale;
   }
 
+  /*
+    HOW MUCH OF A SWALLOWED RECORD'S OWN MAGIC THE ENGINE APPLIES, asked by
+    mp.onEatItem before the engine applies it. A food in FOOD_GROUPS.strip
+    gets none of it (#2682); anything else is the potion window's answer,
+    which is 1 for everything that is not a potion.
+  */
+  function effectScale(actorId, baseId) {
+    if (stripped(baseId)) { return 0; }
+    return potionScale(actorId, baseId);
+  }
+
   function consumed(actorId, baseId) {
     if (!baseId) { return ''; }
     if (isWaterItem(baseId)) { return drankWater(actorId); }
@@ -58771,6 +62201,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       var ate1 = meal(actorId, row);
       // A drug refused inside the 8 seconds does nothing, the same as any meal.
       if (row.drug && ate1.taken) { dosed(actorId); }
+      // A cooked meal's help (#2682), only for a meal that went down: not
+      // inside the 8 seconds, and not on a full stomach, where it sits badly.
+      if (ate1.taken && !ate1.full) {
+        var help = mealHelpOf(baseId, group);
+        var helpLine = help ? mealHelped(actorId, help) : '';
+        if (helpLine) { return helpLine + (ate1.line ? ' ' + ate1.line : ''); }
+      }
       return ate1.line;
     }
     if (kind !== 'ale') { return ate(actorId, kind === 'drink' ? 'drink' : 'food'); }
@@ -59160,6 +62597,10 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     add(hurt.add || {});
     // The first two ales: +0.05 melee damage for 5 minutes (#1382).
     if (n.aleHelpUntil && Date.now() < n.aleHelpUntil) { add({ attackDamageMult: NEEDS.ale.help }); }
+    // A cooked meal's stamina help: +10% stamina recovery while it lasts (#2682).
+    if (n.mealHelp === 'stamina' && Date.now() < (Number(n.mealHelpUntil) || 0)) {
+      add({ staminaRateMult: NEEDS.mealHelp.stamina });
+    }
     return out;
   }
 
@@ -59446,27 +62887,79 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     n.boilFrom = null;
     n.boilFire = false;
     write(actorId, n);
-    return 'The water has boiled. It is safe to drink.';
+    // A hair dye's steep can have spent the last unboiled bottle first
+    // (#2675): with nothing boiled there is nothing to say.
+    return moved ? 'The water has boiled. It is safe to drink.' : '';
+  }
+
+  /*
+    EVERYTHING AT THE FIRE, in one order, wherever it is settled from (#2675):
+    a hair dye steeping there first, then the boil. The steep spends its
+    bottle through spendWater, which writes the record, so the boil reads the
+    record again rather than writing back the one it was handed. Answers the
+    lines and the record as it now is. boilSay and a drink both come here, so
+    a drink before the next place report cannot boil the bottle a finished
+    steep was about to take.
+  */
+  function fireSettle(actorId, n) {
+    var lines = [];
+    var D = g.__thornswoodHairDye;
+    if (D && D.fireCheck) {
+      var dyeLine = '';
+      try { dyeLine = D.fireCheck(actorId, nearFire(n)) || ''; } catch (eDye) { log('the hair dye steep threw:', eDye); }
+      if (dyeLine) { lines.push(dyeLine); n = settle(actorId); }
+    }
+    var line = boilCheck(actorId, n);
+    if (line) { lines.push(line); }
+    return { lines: lines, n: n };
   }
 
   function boilSay(actorId, n) {
-    var line = boilCheck(actorId, n);
-    if (line && typeof say === 'function') { try { say(actorId, line); } catch (e) { } }
-    return line;
+    var lines = fireSettle(actorId, n).lines;
+    for (var i = 0; i < lines.length; i++) {
+      if (typeof say === 'function') { try { say(actorId, lines[i]); } catch (e) { } }
+    }
+    return lines.join(' ');
   }
 
-  function drankWater(actorId) {
-    var n = settle(actorId);
-    var first = boilCheck(actorId, n);
-    var src = 'safe';
+  /*
+    ONE BOTTLE OUT OF THE LEDGER, by the rule a drink uses: the worst source
+    carried first, never a guess in anybody's favour. Answers the source, or
+    'safe' for a bottle the ledger never counted (an inn's). A drink and a
+    hair dye's steep (#2675) both spend through here, so the count of bottles
+    by source stays the count of bottles carried.
+  */
+  function spendBottle(n) {
     for (var i = 0; i < NEEDS.waterOrder.length; i++) {
-      if (n.water[NEEDS.waterOrder[i]] > 0) { src = NEEDS.waterOrder[i]; break; }
+      var src = NEEDS.waterOrder[i];
+      if (n.water[src] > 0) {
+        n.water[src]--;
+        if (!n.water[src]) { delete n.water[src]; }
+        return src;
+      }
     }
-    if (src !== 'safe') {
-      n.water[src]--;
-      if (!n.water[src]) { delete n.water[src]; }
-      write(actorId, n);
-    }
+    return 'safe';
+  }
+
+  /* Bottles of water used up by something other than a drink (#2675). */
+  function spendWater(actorId, count) {
+    var n = settle(actorId);
+    var k = Math.max(0, Math.floor(Number(count) || 0));
+    var spent = [];
+    for (var i = 0; i < k; i++) { spent.push(spendBottle(n)); }
+    if (k) { write(actorId, n); }
+    return spent;
+  }
+
+  /* Whether the client last said a fire is in reach, without settling (#2675). */
+  function fireNear(actorId) { return nearFire(read(actorId)); }
+
+  function drankWater(actorId) {
+    var atFire = fireSettle(actorId, settle(actorId));
+    var n = atFire.n;
+    var first = atFire.lines.join(' ');
+    var src = spendBottle(n);
+    if (src !== 'safe') { write(actorId, n); }
     var row = NEEDS.waterSource[src];
     var line = ate(actorId, 'drink', row.thirst);
     if (row.fouled) {
@@ -59502,8 +62995,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     instead." row is what the meal is worth: food, and for a group a soup's
     drink or raw meat's sick. A meal refused inside the 8 seconds gives
     nothing at all, so a soup's thirst and raw meat's risk are decided here
-    with the hunger rather than after it. Answers { taken, line }: taken is
-    false only inside the 8 seconds.
+    with the hunger rather than after it. Answers { taken, full, line }: taken
+    is false only inside the 8 seconds, and full is true when the meal sat
+    badly on a full stomach and raised nothing.
   */
   function meal(actorId, row) {
     var n = settle(actorId);
@@ -59516,7 +63010,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       // Full: the meter does not rise, and the meal starts food sickness.
       write(actorId, n);
       if (hurt && hurt.exposed) { hurt.exposed(actorId, 'food', 'full'); }
-      return { taken: true, line: 'You are already full. It sits badly.' };
+      return { taken: true, full: true, line: 'You are already full. It sits badly.' };
     }
     n.food = clamp(n.food + (Number(row.food) || NEEDS.food.def));
     if (row.drink) { n.drink = clamp(n.drink + Number(row.drink)); }
@@ -59848,6 +63342,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         // The ale help running out changes the character, not a band (#1382).
         if (n.aleHelpUntil && Date.now() >= n.aleHelpUntil) {
           n.aleHelpUntil = 0;
+          write(who, n);
+          pushEffects(who);
+        }
+        // And a cooked meal's help running out (#2682).
+        if (n.mealHelpUntil && Date.now() >= n.mealHelpUntil) {
+          n.mealHelp = '';
+          n.mealHelpUntil = 0;
           write(who, n);
           pushEffects(who);
         }
@@ -60279,8 +63780,14 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     bandOf: bandOf, tempBand: tempBand, consumed: consumed, kindOf: foodKind, groupOf: foodGroup,
     // Water at a well and over a cooking fire, from mp.onActivate (#1382).
     activatedWater: activatedWater, drankWater: drankWater,
+    // A bottle used up by a hair dye's steep, and the fire it steeps at (#2675).
+    spendWater: spendWater, fireNear: fireNear,
+    waterItem: function () { return NEEDS.waterItems.full; },
     // The potion window (#1382), asked by mp.onEatItem before the engine applies it.
     potionScale: potionScale,
+    // What the engine applies of a swallowed record: 0 for a food whose own
+    // magic is taken away (#2682), else the potion window's scale.
+    effectScale: effectScale, stripped: stripped, mealHelpOf: mealHelpOf,
     settle: settle, view: view, effects: effects,
     // The bars as a line of text, for /needs (#2267).
     textView: textView,
@@ -60305,6 +63812,693 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
        'rest in', Math.round(100 / NEEDS.drain.rest) + 'h');
 })();
 // ==== end thornswood needs ====
+
+// ==== thornswood hair dye ====
+/*
+  HAIR DYE (#2675). docs/systems/hair-dye.md is the page; game/data/hair-dyes.json
+  is the staff's list, and game/hair-dye.js the sums. Both are carried below,
+  between the HAIR_DYES markers, by scripts/dev/Build-HairDyeGamemode.js.
+
+  WHO MAKES ONE is the list's who, in BENCH_ACCESS's shape: as it ships, a
+  Tailor, either half from novice (Patrick, 18 Oct 2026). Anybody else
+  pressing E there with a dye's inputs is told whose work it is and nothing
+  is taken; their water still boils. Using a dye is anybody's.
+
+  MAKING ONE. E on a cooking spot (the list's steepAt, the bench keyword water
+  boils at) while carrying one dye's inputs starts a steep. It answers nothing
+  to the engine, so the cooking menu opens as it always has. After the list's
+  steepSeconds by the fire the inputs are taken and the dye is in the pack,
+  one entry on the list's item with the dye's name, the way a deed is named.
+  Walking away from the fire before then loses the steep and takes nothing:
+  the boil's rule. One steep at a time. A relog loses a steep the same way.
+
+  THE BOTTLE OF WATER A DYE TAKES IS SPENT FROM THE WATER LEDGER. The game
+  cannot mark where a bottle's water came from, so the needs block counts
+  bottles by source (n.water). Taking a bottle for a dye without telling it
+  would leave a bottle counted that is no longer carried, and the next drink
+  would be judged by a bottle that is gone. So the steep hands the count to
+  the needs block's spendWater, the same worst-first rule a drink uses.
+
+  ONE PRESS, A DYE AND UNBOILED WATER. The same press starts both, and they
+  are settled in one order: the steep first, spending its bottle (the worst
+  one carried, an unboiled one when there is one), then the boil, which turns
+  whatever unboiled water is still carried into boiled. Neither eats the
+  other, and a boil left with nothing to boil says nothing.
+
+  USING ONE. Your own hair from the Hair dye page on K, anywhere. Somebody
+  else's from that page with them in front of you (the look prompt's K), or
+  from Dye hair beside them under Near you on P: an offer, the trade's and the
+  party's, with Accept and Refuse on their prompt. Nothing is taken and
+  nothing is written until they press Accept, and then everything is checked
+  again: the dye still carried, both of you within the list's reach.
+
+  THE ONE WRITE. The stored appearance is read (never anything a client sent),
+  withHairColour changes the hair colour and nothing else, bodyShapeGuard has
+  the last word as it does on every appearance, mp.set stores it and sends it
+  to the person and everybody near them, and one log line says who, whose
+  hair, which dye, and the colour before and after. The first dye on somebody
+  stores the colour they were made with, which a wash goes back towards. The
+  person's own game redraws the hair in the front plugin ("hair colour").
+
+  A DYE IS NOT A PLAIN ITEM. Each dye is registered with mintedEntry, so
+  addItem, takeItem, the merchants and anything else that reads the record
+  alone never counts a dye as the plain item or the plain item as a dye.
+
+  The words are /hairdye, sent by K and P and never typed, so they are in
+  WORDS and not PLAYER_WORDS.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+
+  // ==== HAIR_DYES ====
+  /* Built by scripts\dev\Build-HairDyeGamemode.js out of game\data\hair-dyes.json and
+     game\hair-dye.js. Do not hand edit: change those two and run it again. */
+  var HAIR_DYES = {"about":"Hair dye (#2675). The staff's list: what a dye is carried as, where and how long it steeps, how close you stand to dye somebody else's hair, who may steep, and each dye's colour and what it takes. game/hair-dye.js reads it and names none of it. docs/systems/hair-dye.md says what each field does.","item":"98626:Skyrim.esm","steepSeconds":60,"steepAt":"a5cb3:Skyrim.esm","reach":300,"who":{"anyone":false,"halves":{"haberdasher":"novice","liverywright":"novice"}},"dyes":[{"id":"black","name":"Black Hair Dye","colour":"#1b1918","strength":0.75,"wander":10,"inputs":[{"item":"15482:Thornswood-Content.esp","count":1},{"item":"16e26:Dragonborn.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"brown","name":"Brown Hair Dye","colour":"#4a3020","strength":0.6,"wander":14,"inputs":[{"item":"5076e:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"red","name":"Red Hair Dye","colour":"#7a2418","strength":0.55,"wander":16,"inputs":[{"item":"1b3bd:Skyrim.esm","count":2},{"item":"77e1d:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"deep-red","name":"Deep Red Hair Dye","colour":"#5a1014","strength":0.6,"wander":12,"inputs":[{"item":"4da20:Skyrim.esm","count":1},{"item":"b701a:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"gold","name":"Gold Hair Dye","colour":"#b8945a","strength":0.5,"wander":14,"inputs":[{"item":"4b0ba:Skyrim.esm","count":2},{"item":"2a78:Dawnguard.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"copper","name":"Copper Hair Dye","colour":"#a4512a","strength":0.55,"wander":16,"inputs":[{"item":"889a2:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"blue","name":"Blue Hair Dye","colour":"#2b3f6e","strength":0.5,"wander":18,"inputs":[{"item":"77e1c:Skyrim.esm","count":3},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"purple","name":"Purple Hair Dye","colour":"#4e2c5e","strength":0.5,"wander":18,"inputs":[{"item":"77e1e:Skyrim.esm","count":2},{"item":"45c28:Skyrim.esm","count":2},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"nightshade","name":"Nightshade Hair Dye","colour":"#2a1a30","strength":0.65,"wander":10,"inputs":[{"item":"516c8:Skyrim.esm","count":1},{"item":"2f44c:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"green","name":"Green Hair Dye","colour":"#3d5a2c","strength":0.5,"wander":18,"inputs":[{"item":"57f91:Skyrim.esm","count":2},{"item":"134aa:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]},{"id":"hair-wash","name":"Hair Wash","wash":true,"strength":0.6,"wander":6,"inputs":[{"item":"34cdd:Skyrim.esm","count":1},{"item":"34cdf:Skyrim.esm","count":1},{"item":"3f7f8:Skyrim.esm","count":1},{"item":"13f598:WindhelmSSE.esp","count":1}]}]};
+  var HAIR_DYE = (function () {
+  var module = { exports: {} };
+'use strict';
+/*
+  game/hair-dye.js (#2675): hair dye, the data check and the colour sums.
+
+  Pure. It reads only what it is handed: the staff list in
+  game/data/hair-dyes.json, what somebody carries, an inventory entry, a
+  stored appearance. It names no colour, no ingredient, no item and no bench;
+  every one of those is in the data, which is the staff's to change.
+
+  The gamemode carries this file and the list inside its hair dye block
+  (scripts/dev/Build-HairDyeGamemode.js writes them there), and that block
+  does the steep, the K panel's button, the offer and the one write.
+
+  A hair colour is the engine's int32 RGB, 0xRRGGBB. TESModPlatform's
+  SetNpcHairColor reads red, green and blue out of bits 16 to 23, 8 to 15 and
+  0 to 7 and ignores the top byte, so a stored colour is read by its low
+  24 bits and every colour written here is 0 to 0xFFFFFF.
+*/
+// The rank ladder, the gamemode's RANK_LADDER: a half named at expert is a real rank.
+var RANKS = ['novice', 'advanced', 'expert', 'master'];
+var TOP_KEYS = ['about', 'item', 'steepSeconds', 'steepAt', 'reach', 'who', 'dyes'];
+var WHO_KEYS = ['anyone', 'halves'];
+var DYE_KEYS = ['id', 'name', 'colour', 'wash', 'strength', 'wander', 'inputs'];
+var INPUT_KEYS = ['item', 'count'];
+var WANDER_MAX = 64;
+var REACH_MAX = 2000;
+var FORM = /^[0-9a-f]{1,8}:[^:\\\/]+\.(esm|esp|esl)$/;
+var HEX = /^#[0-9a-f]{6}$/;
+var ID = /^[a-z][a-z0-9-]*$/;
+
+function own(o, key) { return Object.prototype.hasOwnProperty.call(o, key); }
+function object(o) { return !!o && typeof o === 'object' && !Array.isArray(o); }
+function form(s) { return typeof s === 'string' && FORM.test(s); }
+function count(n) { return Number.isSafeInteger(n) && n > 0; }
+function strays(o, keys, where, out) {
+  Object.keys(o).forEach(function (k) { if (keys.indexOf(k) < 0) { out.push(where + ' has a key nobody reads: ' + k); } });
+}
+function colourOf(n) {
+  if (!Number.isSafeInteger(n)) { return null; }
+  return (n >>> 0) & 0xFFFFFF;
+}
+function hexColour(s) { return parseInt(s.slice(1), 16); }
+
+// Every problem with the staff list, as sentences. Empty means it is good.
+// Nothing here falls back: a list with any problem is a list nobody uses.
+function checkDyes(data) {
+  var out = [];
+  if (!object(data)) { return ['the dye list is not an object']; }
+  strays(data, TOP_KEYS, 'the dye list', out);
+  if (own(data, 'about') && typeof data.about !== 'string') { out.push('about is not words'); }
+  if (!form(data.item)) { out.push('item is not a record such as 1a2b:Skyrim.esm'); }
+  if (!count(data.steepSeconds)) { out.push('steepSeconds is not a whole number above 0'); }
+  if (!form(data.steepAt)) { out.push('steepAt is not a bench keyword record'); }
+  if (typeof data.reach !== 'number' || !(data.reach > 0 && data.reach <= REACH_MAX)) {
+    out.push('reach is not a distance above 0 and at most ' + REACH_MAX);
+  }
+  if (!object(data.who)) { out.push('who is not an object'); }
+  else {
+    strays(data.who, WHO_KEYS, 'who', out);
+    if (typeof data.who.anyone !== 'boolean') { out.push('who.anyone is not true or false'); }
+    if (!object(data.who.halves)) { out.push('who.halves is not an object'); }
+    else {
+      Object.keys(data.who.halves).forEach(function (h) {
+        if (!ID.test(h)) { out.push('who.halves names ' + JSON.stringify(h) + ', which is not a half'); }
+        if (RANKS.indexOf(data.who.halves[h]) < 0) { out.push('who.halves.' + h + ' is not novice, advanced, expert or master'); }
+      });
+      if (data.who.anyone === false && !Object.keys(data.who.halves).length) {
+        out.push('who lets nobody make a dye: anyone is false and no half is named');
+      }
+    }
+  }
+  if (!Array.isArray(data.dyes) || !data.dyes.length) { out.push('dyes is not a list with a dye in it'); return out; }
+  var ids = {}, names = {};
+  data.dyes.forEach(function (d, i) {
+    var at = 'dye ' + (i + 1);
+    if (!object(d)) { out.push(at + ' is not an object'); return; }
+    if (typeof d.id === 'string') { at += ' (' + d.id + ')'; }
+    strays(d, DYE_KEYS, at, out);
+    if (typeof d.id !== 'string' || !ID.test(d.id)) { out.push(at + ' has no id of lower-case letters, digits and dashes'); }
+    else if (own(ids, d.id)) { out.push(at + ' has the same id as an earlier dye'); }
+    else { ids[d.id] = true; }
+    if (typeof d.name !== 'string' || !d.name.trim() || d.name !== d.name.trim()) { out.push(at + ' has no name'); }
+    else if (own(names, d.name.toLowerCase())) { out.push(at + ' has the same name as an earlier dye'); }
+    else { names[d.name.toLowerCase()] = true; }
+    if (own(d, 'wash') && d.wash !== true) { out.push(at + ' has wash set to something other than true'); }
+    if (d.wash === true) {
+      if (own(d, 'colour')) { out.push(at + ' is a wash and has a colour: a wash goes back to the colour somebody was made with'); }
+    } else if (typeof d.colour !== 'string' || !HEX.test(d.colour)) {
+      out.push(at + ' has no colour written #rrggbb in lower case');
+    }
+    if (typeof d.strength !== 'number' || !(d.strength > 0 && d.strength <= 1)) { out.push(at + ' has a strength that is not above 0 and at most 1'); }
+    if (!Number.isSafeInteger(d.wander) || d.wander < 0 || d.wander > WANDER_MAX) { out.push(at + ' has a wander that is not a whole number from 0 to ' + WANDER_MAX); }
+    if (!Array.isArray(d.inputs) || !d.inputs.length) { out.push(at + ' takes nothing to make'); return; }
+    var seen = {};
+    d.inputs.forEach(function (p, j) {
+      var pat = at + ' input ' + (j + 1);
+      if (!object(p)) { out.push(pat + ' is not an object'); return; }
+      strays(p, INPUT_KEYS, pat, out);
+      if (!form(p.item)) { out.push(pat + ' is not a record such as 1a2b:Skyrim.esm'); }
+      else if (own(seen, p.item)) { out.push(pat + ' names ' + p.item + ' twice'); }
+      else { seen[p.item] = true; }
+      if (form(p.item) && p.item === data.item) { out.push(pat + ' is the dye item itself'); }
+      if (!count(p.count)) { out.push(pat + ' has a count that is not a whole number above 0'); }
+    });
+  });
+  // A dye whose inputs hold all of an earlier dye's, as many or more of each,
+  // can never be made: dyeFor gives the earlier one first.
+  if (!out.length) {
+    data.dyes.forEach(function (later, b) {
+      for (var a = 0; a < b; a++) {
+        if (covers(data.dyes[a].inputs, inputsOf(later))) {
+          out.push('dye ' + (b + 1) + ' (' + later.id + ') can never be made: it takes everything ' +
+                   data.dyes[a].id + ', earlier in the list, takes');
+          break;
+        }
+      }
+    });
+  }
+  return out;
+}
+
+function inputsOf(dye) {
+  var held = {};
+  dye.inputs.forEach(function (p) { held[p.item] = p.count; });
+  return held;
+}
+function covers(inputs, carried) {
+  return inputs.every(function (p) { return own(carried, p.item) && count(carried[p.item]) && carried[p.item] >= p.count; });
+}
+
+// Whether everything this one dye takes is carried, as many of each as it takes.
+function hasInputs(dye, carried) {
+  return object(dye) && Array.isArray(dye.inputs) && object(carried) && covers(dye.inputs, carried);
+}
+
+// The first dye in the staff list whose inputs are all carried, or null.
+// carried is record -> how many, as the caller counted the pack.
+function dyeFor(carried, data) {
+  if (!object(carried)) { return null; }
+  for (var i = 0; i < data.dyes.length; i++) {
+    if (covers(data.dyes[i].inputs, carried)) { return data.dyes[i]; }
+  }
+  return null;
+}
+
+// Whether the list lets this person steep. canWork(half, rank) is the
+// caller's: true when they work that half at that rank or above.
+function mayMake(data, canWork) {
+  if (data.who.anyone === true) { return true; }
+  if (typeof canWork !== 'function') { return false; }
+  return Object.keys(data.who.halves).some(function (h) { return canWork(h, data.who.halves[h]) === true; });
+}
+
+/*
+  The colour a dye leaves. old is the colour on the head now, made the colour
+  they were made with (the server keeps it from the first dye on), rand the
+  caller's random number from 0 up to 1. Each channel goes strength of the way
+  from old to the dye's colour, or for a wash to made, then wanders by up to
+  wander either way, so two heads under one dye come out a little different.
+  null when it cannot be worked out: an old colour that is not a number, a wash
+  with no made colour, or a rand that is not a function giving 0 up to 1.
+*/
+function mixColour(old, dye, made, rand) {
+  var from = colourOf(old);
+  if (from === null || !object(dye) || typeof rand !== 'function') { return null; }
+  var to = dye.wash === true ? colourOf(made) : (typeof dye.colour === 'string' && HEX.test(dye.colour) ? hexColour(dye.colour) : null);
+  if (to === null) { return null; }
+  var s = dye.strength, w = dye.wander;
+  if (typeof s !== 'number' || !(s >= 0 && s <= 1) || !Number.isSafeInteger(w) || w < 0) { return null; }
+  var out = 0;
+  for (var shift = 16; shift >= 0; shift -= 8) {
+    var r = rand();
+    if (typeof r !== 'number' || !(r >= 0 && r < 1)) { return null; }
+    var o = (from >> shift) & 0xFF, t = (to >> shift) & 0xFF;
+    var c = Math.round(o + (t - o) * s + (r * 2 - 1) * w);
+    out = out * 256 + Math.max(0, Math.min(255, c));
+  }
+  return out;
+}
+
+// The name a dye's inventory entry carries, the way a deed carries its own.
+function dyeName(dye) { return dye.name; }
+
+// The dye an inventory entry is, or null. itemBaseId, when given, is the
+// dye item's base as the engine numbers it; an entry on any other base is
+// not a dye whatever it is called.
+function dyeOf(entry, data, itemBaseId) {
+  if (!object(entry) || typeof entry.name !== 'string') { return null; }
+  if (itemBaseId !== undefined && entry.baseId !== itemBaseId) { return null; }
+  for (var i = 0; i < data.dyes.length; i++) {
+    if (data.dyes[i].name === entry.name) { return data.dyes[i]; }
+  }
+  return null;
+}
+
+/*
+  THE PACK. entries is an inventory's entries as the engine keeps them. A dye
+  is an entry on the list's item with a dye's name; every other entry on that
+  item, and every entry on any other record, is plain. Nothing a dye is ever
+  counts as a plain item, and nothing plain is ever taken as a dye.
+*/
+function isDyeEntry(entry, data, itemBaseId) { return dyeOf(entry, data, itemBaseId) !== null; }
+
+// How many of a record's plain entries the pack holds.
+function plainCount(entries, baseId, data, itemBaseId) {
+  var n = 0;
+  (Array.isArray(entries) ? entries : []).forEach(function (e) {
+    if (object(e) && e.baseId === baseId && !isDyeEntry(e, data, itemBaseId) && count(e.count)) { n += e.count; }
+  });
+  return n;
+}
+
+// record -> how many plain ones are carried, for every record any dye takes.
+// ids is record -> the engine's base id, as the caller resolved it.
+function carriedFor(entries, data, ids, itemBaseId) {
+  var out = {};
+  data.dyes.forEach(function (d) {
+    d.inputs.forEach(function (p) {
+      if (!own(out, p.item)) { out[p.item] = own(ids, p.item) && ids[p.item] ? plainCount(entries, ids[p.item], data, itemBaseId) : 0; }
+    });
+  });
+  return out;
+}
+
+// The dyes carried, in the list's order: [{ id, name, count }].
+function dyesCarried(entries, data, itemBaseId) {
+  var held = {};
+  (Array.isArray(entries) ? entries : []).forEach(function (e) {
+    var d = dyeOf(e, data, itemBaseId);
+    if (d && count(e.count)) { held[d.id] = (held[d.id] || 0) + e.count; }
+  });
+  return data.dyes.filter(function (d) { return own(held, d.id); })
+    .map(function (d) { return { id: d.id, name: d.name, count: held[d.id] }; });
+}
+
+function copyEntries(entries) { return JSON.parse(JSON.stringify(Array.isArray(entries) ? entries : [])); }
+
+// Take n plain entries of one record out of a copy. False when short.
+function takePlain(next, baseId, n, data, itemBaseId) {
+  var left = n;
+  for (var i = 0; i < next.length && left > 0; i++) {
+    var e = next[i];
+    if (!object(e) || e.baseId !== baseId || isDyeEntry(e, data, itemBaseId) || !count(e.count)) { continue; }
+    var k = Math.min(left, e.count);
+    e.count -= k; left -= k;
+  }
+  return left === 0;
+}
+function tidy(next) { return next.filter(function (e) { return !object(e) || !own(e, 'count') || e.count > 0; }); }
+
+// The pack after a steep: the dye's inputs taken from plain entries and one
+// of the dye added under its name, on a plain entry of its own. null when an
+// input is short or a record has no base id, and then nothing changes.
+function afterSteep(entries, dye, data, ids, itemBaseId) {
+  if (!object(dye) || !Number.isSafeInteger(itemBaseId) || itemBaseId <= 0) { return null; }
+  var next = copyEntries(entries);
+  for (var i = 0; i < dye.inputs.length; i++) {
+    var p = dye.inputs[i];
+    if (!own(ids, p.item) || !ids[p.item] || !takePlain(next, ids[p.item], p.count, data, itemBaseId)) { return null; }
+  }
+  next = tidy(next);
+  var same = null;
+  for (var j = 0; j < next.length; j++) {
+    var e = next[j];
+    if (object(e) && e.baseId === itemBaseId && e.name === dye.name && Object.keys(e).length === 3) { same = e; break; }
+  }
+  if (same) { same.count += 1; } else { next.push({ baseId: itemBaseId, count: 1, name: dyeName(dye) }); }
+  return next;
+}
+
+// The pack with one of that dye used up, or null when none is carried.
+function afterUse(entries, dye, data, itemBaseId) {
+  var next = copyEntries(entries);
+  for (var i = 0; i < next.length; i++) {
+    if (dyeOf(next[i], data, itemBaseId) === dye && count(next[i].count)) {
+      next[i].count -= 1;
+      return tidy(next);
+    }
+  }
+  return null;
+}
+
+// A copy of a stored appearance with only its hair colour changed, or null
+// when it is not an appearance or the colour is not 0 to 0xFFFFFF. It never
+// touches the one it is handed.
+function withHairColour(appearance, rgb) {
+  if (!object(appearance) || !own(appearance, 'hairColor') || !Number.isSafeInteger(appearance.hairColor) ||
+      !own(appearance, 'raceId') || !Array.isArray(appearance.headpartIds)) { return null; }
+  if (!Number.isSafeInteger(rgb) || rgb < 0 || rgb > 0xFFFFFF) { return null; }
+  var out = JSON.parse(JSON.stringify(appearance));
+  out.hairColor = rgb;
+  return out;
+}
+
+module.exports = {
+  checkDyes: checkDyes, dyeFor: dyeFor, hasInputs: hasInputs, mayMake: mayMake, mixColour: mixColour,
+  dyeName: dyeName, dyeOf: dyeOf, withHairColour: withHairColour,
+  isDyeEntry: isDyeEntry, plainCount: plainCount, carriedFor: carriedFor, dyesCarried: dyesCarried,
+  afterSteep: afterSteep, afterUse: afterUse, WANDER_MAX: WANDER_MAX, REACH_MAX: REACH_MAX
+};
+  return module.exports;
+  })();
+  // ==== end HAIR_DYES ====
+
+  function hlog() {
+    var a = ['[thornswood hair dye]'];
+    for (var i = 0; i < arguments.length; i++) { a.push(arguments[i]); }
+    try { console.log(a.join(' ')); } catch (e) { }
+  }
+
+  var problems = HAIR_DYE.checkDyes(HAIR_DYES);
+  var LIST = problems.length ? null : HAIR_DYES;
+  if (!LIST) { hlog('the dye list is refused, so no dye is made or used:', problems.join('; ')); }
+
+  var MADE_PROPERTY = 'thornswoodHairMade';
+  try {
+    mp.makeProperty(MADE_PROPERTY, {
+      isVisibleByOwner: false, isVisibleByNeighbors: false, updateOwner: '', updateNeighbor: ''
+    });
+  } catch (e) { /* already made by a previous load */ }
+
+  var itemBase = 0;
+  function dyeItemId() {
+    if (!itemBase && LIST) { try { itemBase = idOf(LIST.item) || 0; } catch (e) { itemBase = 0; } }
+    return itemBase;
+  }
+  var ids = null;
+  function inputIds() {
+    if (!ids && LIST) {
+      ids = {};
+      LIST.dyes.forEach(function (d) {
+        d.inputs.forEach(function (p) {
+          if (!Object.prototype.hasOwnProperty.call(ids, p.item)) {
+            try { ids[p.item] = idOf(p.item) || 0; } catch (e) { ids[p.item] = 0; }
+          }
+        });
+      });
+    }
+    return ids || {};
+  }
+  function byId(id) {
+    if (!LIST) { return null; }
+    for (var i = 0; i < LIST.dyes.length; i++) { if (LIST.dyes[i].id === id) { return LIST.dyes[i]; } }
+    return null;
+  }
+
+  function packOf(actorId) {
+    var inv = null;
+    try { inv = mp.get(actorId, 'inventory'); } catch (e) { inv = null; }
+    return (inv && Array.isArray(inv.entries)) ? inv.entries : [];
+  }
+  function setPack(actorId, entries) {
+    mp.set(actorId, 'inventory', { entries: entries });
+  }
+
+  // A dye entry, for mintedEntry: never the plain item.
+  function isDye(entry) {
+    return !!LIST && !!dyeItemId() && HAIR_DYE.isDyeEntry(entry, LIST, dyeItemId());
+  }
+  mintedBy('hair dye', isDye);
+
+  function carried(actorId) {
+    if (!LIST || !dyeItemId()) { return []; }
+    return HAIR_DYE.dyesCarried(packOf(actorId), LIST, dyeItemId());
+  }
+  function carries(actorId) { return carried(actorId).length > 0; }
+
+  /*
+    Whether somebody works a half at a rank, asked the way a bench asks it
+    (benchGate): the progression block's canWork on their character, so an
+    apprentice's sister half and every rank on the ladder count the same at
+    the cooking spot as at the loom. Without the character or progression
+    block nobody may steep: the list is closed, and the press says so.
+  */
+  function canWork(actorId) {
+    return function (half, rank) {
+      var C = g.__thornswoodCharacter, P = g.__thornswoodProgression;
+      if (!C || !C.stateOf || !P || !P.canWork) { return false; }
+      try { return !!P.canWork(C.stateOf(actorId), half, rank); } catch (e) { return false; }
+    };
+  }
+
+  /*
+    THE LINE FOR SOMEBODY THE LIST DOES NOT LET STEEP (Patrick, 18 Oct: making
+    dye is a tailor's job). Built from the list's own halves, named the way
+    the bench refusal names them, so it says whose work it is without naming
+    a half in code. Nothing is taken, and the boil on the same press still
+    runs: this answers only for the dye.
+  */
+  function notYours() {
+    var C = g.__thornswoodCharacter;
+    var who = Object.keys(LIST.who.halves).map(function (h) {
+      var name = h;
+      try { name = (C && C.nameOf) ? C.nameOf(h) : h; } catch (e) { name = h; }
+      var rank = LIST.who.halves[h];
+      return name + (rank === 'novice' ? '' : ' at ' + rank);
+    });
+    var whose = who.length === 1 ? who[0] : who.slice(0, -1).join(', ') + ' or ' + who[who.length - 1];
+    return 'Steeping hair dye is ' + (whose ? 'work for a ' + whose : 'nobody\'s work here') +
+           '. Nothing was taken from your pack.';
+  }
+
+  function hex6(c) { return '#' + ('000000' + ((Number(c) >>> 0) & 0xFFFFFF).toString(16)).slice(-6); }
+
+  function redraw(actorId) {
+    try {
+      var C = g.__thornswoodCharacter;
+      if (C && C.writeState && C.stateOf) { C.writeState(actorId, C.stateOf(actorId)); }
+    } catch (e) { hlog('could not redraw K for', Number(actorId).toString(16) + ':', e); }
+    try {
+      var S = g.__thornswoodSocial;
+      if (S && S.push) { S.push(actorId); }
+    } catch (e2) { }
+  }
+
+  // ------------------------------------------------------------ the steep --
+  var steeps = {};   // actorId -> { dye, from, fire }
+
+  /*
+    E on something. Starts a steep at the list's cooking spot when one dye's
+    inputs are carried and none is steeping. Answers a line, or '' when this
+    press is none of the dye's business. Never refuses anything.
+  */
+  function pressed(actorId, benchKeyword) {
+    if (!LIST || !benchKeyword || benchKeyword !== LIST.steepAt) { return ''; }
+    if (Object.prototype.hasOwnProperty.call(steeps, actorId)) { return ''; }
+    var dye = HAIR_DYE.dyeFor(HAIR_DYE.carriedFor(packOf(actorId), LIST, inputIds(), dyeItemId()), LIST);
+    if (!dye) { return ''; }
+    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return notYours(); }
+    var N = g.__thornswoodNeeds;
+    var fire = !!(N && N.fireNear && N.fireNear(actorId));
+    steeps[actorId] = { dye: dye.id, from: Date.now(), fire: fire };
+    var secs = LIST.steepSeconds;
+    return 'You set ' + dye.name + ' to steep. Stay by the fire for ' +
+           (secs % 60 === 0 ? (secs / 60) + (secs === 60 ? ' minute.' : ' minutes.') : secs + ' seconds.');
+  }
+
+  /*
+    What the client just said about the fire, from the needs block's boilSay,
+    BEFORE the boil is settled (see the note over this block). Finishes a
+    steep that has had its time, loses one left early. Answers a line or ''.
+  */
+  function fireCheck(actorId, near) {
+    if (!Object.prototype.hasOwnProperty.call(steeps, actorId)) { return ''; }
+    var st = steeps[actorId];
+    var dye = byId(st.dye);
+    if (!dye) { delete steeps[actorId]; return ''; }
+    if (st.fire && !near) {
+      delete steeps[actorId];
+      return 'You left the fire, and ' + dye.name + ' did not steep.';
+    }
+    if (Date.now() - st.from < LIST.steepSeconds * 1000) { return ''; }
+    delete steeps[actorId];
+    return finishSteep(actorId, dye);
+  }
+
+  function finishSteep(actorId, dye) {
+    if (!HAIR_DYE.mayMake(LIST, canWork(actorId))) { return notYours(); }
+    var pack = packOf(actorId);
+    var next = HAIR_DYE.afterSteep(pack, dye, LIST, inputIds(), dyeItemId());
+    if (!next) { return 'You no longer carry everything ' + dye.name + ' takes, so nothing steeped.'; }
+    var N = g.__thornswoodNeeds;
+    var water = (N && N.waterItem) ? N.waterItem() : '';
+    var bottles = 0;
+    dye.inputs.forEach(function (p) { if (p.item === water) { bottles += p.count; } });
+    try { setPack(actorId, next); } catch (e) {
+      hlog('could not write the pack of', Number(actorId).toString(16), 'for', dye.name + ':', e);
+      return 'The dye would not steep. Say so in the dev channel.';
+    }
+    if (bottles && N && N.spendWater) { N.spendWater(actorId, bottles); }
+    hlog(auditPerson(actorId), 'steeped', dye.name);
+    redraw(actorId);
+    return dye.name + ' has steeped. It is in your pack.';
+  }
+
+  // ------------------------------------------------------------ the write --
+
+  function madeOf(actorId) {
+    var m = null;
+    try { m = mp.get(actorId, MADE_PROPERTY); } catch (e) { m = null; }
+    return (m && Number.isSafeInteger(m.c)) ? m.c : null;
+  }
+
+  /*
+    Dye the hair of target with one of by's dyes. Everything is read again
+    here. Answers { ok, why }.
+  */
+  function applyDye(target, dye, by) {
+    var stored = null;
+    try { stored = mp.get(target, 'appearance'); } catch (e) { stored = null; }
+    if (!stored || typeof stored !== 'object') { return { ok: false, why: 'There is no stored look to dye yet.' }; }
+    var old = stored.hairColor;
+    var made = madeOf(target);
+    var first = made === null;
+    if (first) { made = (Number.isSafeInteger(old) ? (old >>> 0) & 0xFFFFFF : null); }
+    var rgb = HAIR_DYE.mixColour(old, dye, made, Math.random);
+    var next = rgb === null ? null : HAIR_DYE.withHairColour(stored, rgb);
+    var guarded = next ? bodyShapeGuard(next) : null;
+    if (!guarded) { return { ok: false, why: 'That hair cannot be dyed. Say so in the dev channel.' }; }
+    var pack = packOf(by);
+    var used = HAIR_DYE.afterUse(pack, dye, LIST, dyeItemId());
+    if (!used) { return { ok: false, why: 'You are not carrying ' + dye.name + '.' }; }
+    // The colour the hair was made with is kept before the first dye takes, so
+    // a wash always has it to go back to; without it nothing is dyed.
+    if (first && made !== null) {
+      try { mp.set(target, MADE_PROPERTY, { c: made, at: Date.now() }); } catch (e4) {
+        hlog('could not keep the made hair colour of', Number(target).toString(16) + ':', e4);
+        return { ok: false, why: 'The dye would not take. Say so in the dev channel.' };
+      }
+    }
+    try { setPack(by, used); } catch (e) { return { ok: false, why: 'The dye would not come out of the pack.' }; }
+    try {
+      mp.set(target, 'appearance', guarded.appearance);
+    } catch (e2) {
+      hlog('could not write the hair of', Number(target).toString(16) + ':', e2);
+      try { setPack(by, pack); } catch (e3) {
+        hlog('and could not put the dye back in the pack of', Number(by).toString(16) + ':', e3);
+      }
+      return { ok: false, why: 'The dye would not take. Say so in the dev channel.' };
+    }
+    log('hair dye:', auditPerson(by), by === target ? 'dyed their own hair' : 'dyed the hair of ' + auditPerson(target),
+        'with', dye.name + ',', 'from', hex6(old), 'to', hex6(rgb) +
+        (guarded.changes.length ? ' (body shape: ' + guarded.changes.join(', ') + ')' : ''));
+    redraw(by);
+    if (by !== target) { redraw(target); }
+    return { ok: true, why: '' };
+  }
+
+  // Both in one cell, within the list's reach of each other.
+  function within(a, b) {
+    try {
+      if (String(mp.get(a, 'worldOrCellDesc')) !== String(mp.get(b, 'worldOrCellDesc'))) { return false; }
+      var p = mp.get(a, 'pos'), q = mp.get(b, 'pos');
+      var dx = p[0] - q[0], dy = p[1] - q[1], dz = p[2] - q[2];
+      return dx * dx + dy * dy + dz * dz <= LIST.reach * LIST.reach;
+    } catch (e) { return false; }
+  }
+
+  // ---------------------------------------------------------- the words --
+  /*
+    /hairdye self <dye>          K's Dye my hair.
+    /hairdye offer <form id> <dye>  K with somebody in front of you, or P's
+                                 Dye hair beside them: an offer they answer.
+  */
+  function command(parts, actorId) {
+    if (!LIST) { return 'Hair dye is not running on this server. Say so in the dev channel.'; }
+    var verb = String(parts[1] || '').toLowerCase();
+    if (verb === 'self') {
+      var mine = byId(String(parts[2] || ''));
+      if (!mine) { return 'There is no such dye.'; }
+      var r = applyDye(actorId, mine, actorId);
+      return r.ok ? 'You dye your hair with ' + mine.name + '.' : r.why;
+    }
+    if (verb === 'offer') {
+      var dye = byId(String(parts[3] || ''));
+      if (!dye) { return 'There is no such dye.'; }
+      if (!carried(actorId).some(function (c) { return c.id === dye.id; })) { return 'You are not carrying ' + dye.name + '.'; }
+      var soc = g.__thornswoodSocial;
+      if (!soc || !soc.findPerson || !soc.offer) { return 'Asking somebody is not running on this server right now.'; }
+      var found = soc.findPerson(String(parts[2] || ''));
+      if (!found.actorId) { return found.why; }
+      var them = found.actorId;
+      if (them === actorId) { return 'That is you. Dye my hair on the Hair dye page of K is for your own.'; }
+      var name = soc.nameOfPerson(them);
+      if (!within(actorId, them)) { return 'Stand closer to ' + name + ' to dye their hair.'; }
+      var refused = soc.offer('dye', actorId, them, dye.name);
+      if (refused) { return refused; }
+      var pid = soc.profileOf(them);
+      var o = soc.offers[pid];
+      if (o) { o.dye = dye.id; o.dyer = actorId; }
+      var me = soc.nameOfPerson(actorId);
+      try { say(them, me + ' offers to dye your hair with ' + dye.name + '. Accept or refuse on the prompt.'); } catch (e) { }
+      try { notify(them, me + ' offers to dye your hair'); } catch (e2) { }
+      try { soc.push(them); soc.push(actorId); } catch (e3) { }
+      return 'Asked ' + name + '. They have ' + Math.round(soc.SOCIAL.offerFor / 1000) + ' seconds.';
+    }
+    return 'Hair dye is the Hair dye page on K.';
+  }
+
+  /*
+    They pressed Accept. The offer is checked again from the start, because
+    anything can have moved in the seconds it stood. Answers { them, dyer }:
+    the line for each.
+  */
+  function accept(actorId, dyerId, o) {
+    if (!LIST) { return { them: 'Hair dye is not running on this server.', dyer: '' }; }
+    if (!o || o.dyer !== dyerId) { return { them: 'That offer came from another of their characters, and it has gone.', dyer: '' }; }
+    var dye = byId(o.dye);
+    var soc = g.__thornswoodSocial;
+    var me = soc ? soc.nameOfPerson(actorId) : 'They';
+    var them = soc ? soc.nameOfPerson(dyerId) : 'They';
+    if (!dye) { return { them: 'That dye is not on the list any more.', dyer: '' }; }
+    if (!within(actorId, dyerId)) {
+      return { them: them + ' has to stand closer to dye your hair.', dyer: 'Stand closer to ' + me + ' to dye their hair.' };
+    }
+    var r = applyDye(actorId, dye, dyerId);
+    if (!r.ok) { return { them: 'Your hair is as it was. ' + r.why, dyer: r.why }; }
+    return { them: them + ' dyes your hair with ' + dye.name + '.', dyer: 'You dye ' + me + '\'s hair with ' + dye.name + '.' };
+  }
+
+  // ------------------------------------------------------------- the view --
+  // The Hair dye page of K: the dyes carried and a steep under way, or null.
+  function view(actorId) {
+    if (!LIST) { return null; }
+    var dyes = carried(actorId);
+    var st = Object.prototype.hasOwnProperty.call(steeps, actorId) ? steeps[actorId] : null;
+    var steeping = st && byId(st.dye) ? { name: byId(st.dye).name,
+      left: Math.max(0, Math.ceil((st.from + LIST.steepSeconds * 1000 - Date.now()) / 1000)) } : null;
+    if (!dyes.length && !steeping) { return null; }
+    return { dyes: dyes, steeping: steeping };
+  }
+
+  g.__thornswoodHairDye = {
+    list: function () { return LIST; },
+    pressed: pressed, fireCheck: fireCheck, command: command, accept: accept,
+    view: view, carried: carried, carries: carries, isDye: isDye, applyDye: applyDye,
+    steeps: steeps
+  };
+  hlog(LIST ? 'ready: ' + LIST.dyes.length + ' dyes on the list' : 'not ready: the list was refused');
+})();
+// ==== end thornswood hair dye ====
+
 
 // ==== thornswood injury and disease ====
 /*
@@ -60391,8 +64585,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       The broken limb and the crooked one, as the engine actor values the
       skills panel already carries. attackDamageMult is a multiplier, which is
       why its numbers are small (see TUNING.perPoint). "A block costs twice the
-      stamina" and "sprint is refused" are not actor values and are not here:
-      the issue says what they need.
+      stamina" and "sprint is refused" are not actor values: the record carries
+      limbs (write, below). The maneuvers block reads it when it charges a
+      block's stamina and doubles the charge for a broken arm (BLOCK.brokenArm),
+      and the screen script hands it to the front plugin as
+      thornswoodBrokenLimbs, which shuts the sprint gate on a broken leg (#1383).
     */
     broken: { arm: { attackDamageMult: -0.15 }, leg: { speedMult: -8 } },
     crooked: { arm: { attackDamageMult: -0.05 }, leg: { speedMult: -4 } },
@@ -60477,10 +64674,32 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /*
     THE POTION OF CURE DISEASE. The one ALCH record in this load order whose
     effect is Cure Disease, CureDisease in Skyrim.esm (game\data\food.json).
-    A potion somebody brews has no record (it is made above 0xff000000) and
-    the server cannot read what it does yet; the issue says what that needs.
+    A potion somebody brews has no record (it is made above 0xff000000), so
+    it cures by the brew instead: the alchemy gate tells brewed() which
+    runtime id a brew carrying CURE_DISEASE_EFFECT (the magic effect
+    AlchCureDisease) made, and swallowed() cures for that id too. The engine
+    raises onEatItem for a brewed bottle from fork #78 on (#1383).
   */
   var CURE_DISEASE = ['ae723:Skyrim.esm'];
+  var CURE_DISEASE_EFFECT = 'ae722:Skyrim.esm';
+  var RUNTIME = 0xff000000;
+  // The most brewed bottles one record remembers, newest kept.
+  var BREWS_MOST = 16;
+
+  /*
+    A COOKED MEAL'S HELP AGAINST DISEASE, the guard. food.md: "the chance of
+    catching a disease cut in half while it lasts", for 20 real minutes, and
+    a feast is "double the help and half the time, so the disease chance is a
+    quarter". chanceFor reads it. Patrick, 18 October (#2682): a cooked meal
+    gives only its temperature help unless the cook adds one extra ingredient
+    at the pot, so the guard comes ONLY from a dish seasoned at the cooking
+    pot with garlic. Which extra that is stays data (the one
+    FOOD_GROUPS.season.extras maps to 'guard'). This is the only guard; there
+    is no second one. The needs block's meal help (#2682) calls
+    guarded(actorId, false) for it, and unguarded() when a later meal's
+    warmth or stamina replaces it.
+  */
+  var MEAL_GUARD = { cooked: { mult: 0.5, min: 20 }, feast: { mult: 0.25, min: 10 } };
 
   /*
     BENCHES THAT TAKE BOTH HANDS, by the keyword a bench carries (BENCH_BY_BASE).
@@ -60508,7 +64727,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   // ------------------------------------------------------------ the record --
 
   function fresh() {
-    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [] };
+    return { wounds: [], ills: [], crooked: {}, agreed: {}, cold: 0, ground: 0, show: [], brews: [], guard: null };
   }
 
   /*
@@ -60554,6 +64773,32 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     out.cold = num(v.cold, 0);
     out.ground = num(v.ground, 0);
     out.show = Array.isArray(v.show) ? v.show.map(String) : [];
+    var bs = Array.isArray(v.brews) ? v.brews : [];
+    for (var b = 0; b < bs.length; b++) {
+      var bid = num(bs[b], 0);
+      if (bid >= RUNTIME && out.brews.indexOf(bid) === -1) { out.brews.push(bid); }
+    }
+    while (out.brews.length > BREWS_MOST) { out.brews.shift(); }
+    var gd = (v.guard && typeof v.guard === 'object') ? v.guard : null;
+    if (gd && num(gd.until, 0) > 0 && num(gd.mult, 1) > 0 && num(gd.mult, 1) < 1) {
+      out.guard = { until: num(gd.until, 0), mult: num(gd.mult, 1) };
+    }
+    return out;
+  }
+
+  /*
+    WHICH LIMB IS BROKEN (#1383). injury.md: a broken arm makes a block cost
+    twice the stamina and a broken leg refuses sprint. Neither is an actor
+    value, so the record carries the answer: the maneuvers block reads the arm
+    when it charges a block, and the screen script hands the leg to the front
+    plugin for the sprint gate. As long as the break lasts,
+    splinted or set, the same as the -8 speed and the -0.15 melee in forNeeds.
+  */
+  function limbsOf(rec) {
+    var out = { arm: 0, leg: 0 };
+    for (var i = 0; i < rec.wounds.length; i++) {
+      if (rec.wounds[i].k === 'break') { out[rec.wounds[i].limb === 'leg' ? 'leg' : 'arm'] = 1; }
+    }
     return out;
   }
 
@@ -60562,6 +64807,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // Whether anybody could tend something here: the inventory's line and
     // the look prompt's row are offered only then (#1383).
     rec.care = (needsCare(rec) || hungOver(actorId)) ? 1 : 0;
+    rec.limbs = limbsOf(rec);
     try { mp.set(actorId, HURT_PROPERTY, rec); return true; }
     catch (e) { hlog('could not write', actorId.toString(16) + ':', e); return false; }
   }
@@ -60606,9 +64852,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     (TUNING.perPoint.toughness.diseaseResist), the one the client puts on the
     actor, so the two cannot disagree.
   */
-  function chanceFor(actorId, chance) {
+  function chanceFor(actorId, chance, rec) {
     var K = g.__thornswoodPerks;
     try { if (K && K.holds && K.holds(actorId, 'purifiedblood')) { return 0; } } catch (e) { }
+    // A cooked meal's help (MEAL_GUARD), while it lasts.
+    var r = rec || read(actorId);
+    if (r.guard && Date.now() < r.guard.until) { chance = chance * r.guard.mult; }
     var P = g.__thornswoodProgression;
     var s = stateOf(actorId);
     if (!P || !s) { return chance; }
@@ -60622,7 +64871,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   /* One roll at a disease. True when it took. A kind already held is not caught twice. */
   function catchIll(actorId, rec, k, chance, now) {
     if (!has(DISEASE, k) || hasIll(rec, k)) { return false; }
-    var c = chanceFor(actorId, chance);
+    var c = chanceFor(actorId, chance, rec);
     if (!(c > 0) || Math.random() >= c) { return false; }
     rec.ills.push({ k: k, at: now, cold: false, told: '' });
     hlog(actorId.toString(16), 'caught', DISEASE[k].name);
@@ -61311,14 +65560,73 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       try { id = idOf(CURE_DISEASE[i]); } catch (e) { id = 0; }
       if (id && id === baseId) { cure = true; }
     }
-    if (!cure) { return ''; }
     var rec = read(actorId);
+    // A bottle of cure disease somebody brewed (brewed, below).
+    var brew = !cure && baseId >= RUNTIME && rec.brews.indexOf(baseId) !== -1;
+    if (!cure && !brew) { return ''; }
     var gone = cureOne(rec, Date.now());
     if (!gone) { return ''; }
     write(actorId, rec);
     redraw(actorId);
-    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, 'by a potion');
+    hlog(actorId.toString(16), 'cured of', DISEASE[gone.ill.k].name, brew ? 'by a brewed potion' : 'by a potion');
     return gone.shown ? ('The ' + DISEASE[gone.ill.k].name + ' is gone.') : '';
+  }
+
+  /*
+    A BREW AT A LAB, from the alchemy gate (recipelessCraft), with the magic
+    effects the engine worked out from the ingredients. Remembers baseId as
+    a bottle of cure disease when the brew carries CURE_DISEASE_EFFECT, and
+    forgets it when it does not, because a runtime id is the brewing client's
+    and the same number can be handed out again for another brew after a
+    relog. Answers whether this brew cures.
+  */
+  function brewed(actorId, baseId, effects) {
+    baseId = Number(baseId) || 0;
+    if (baseId < RUNTIME || !Array.isArray(effects)) { return false; }
+    var cureEffect = 0;
+    try { cureEffect = idOf(CURE_DISEASE_EFFECT); } catch (e) { cureEffect = 0; }
+    var cures = false;
+    for (var i = 0; i < effects.length; i++) {
+      if (cureEffect && (Number(effects[i]) || 0) === cureEffect) { cures = true; }
+    }
+    var rec = read(actorId);
+    var at = rec.brews.indexOf(baseId);
+    if (at === -1 && !cures) { return false; }
+    if (at !== -1) { rec.brews.splice(at, 1); }
+    if (cures) {
+      rec.brews.push(baseId);
+      while (rec.brews.length > BREWS_MOST) { rec.brews.shift(); }
+    }
+    write(actorId, rec);
+    return cures;
+  }
+
+  /*
+    A COOKED MEAL THAT GUARDS AGAINST DISEASE (MEAL_GUARD). feast is true for
+    a feast. The latest meal's help is the one that counts: a cooked meal's
+    help is "one of these, not all of them". Answers true.
+  */
+  function guarded(actorId, feast) {
+    var row = feast ? MEAL_GUARD.feast : MEAL_GUARD.cooked;
+    var rec = read(actorId);
+    rec.guard = { until: Date.now() + row.min * MIN, mult: row.mult };
+    write(actorId, rec);
+    return true;
+  }
+
+  /*
+    THE GUARD TAKEN OFF (#2682). The latest meal's help is the one that
+    counts, so a later meal's warmth or stamina replaces the guard. The 20
+    minutes is rec.guard.until, which chanceFor compares against; there is no
+    timer to stop. True when a guard was on the record and is now gone; false
+    when there was none, and then nothing is written.
+  */
+  function unguarded(actorId) {
+    var rec = read(actorId);
+    if (!rec.guard) { return false; }
+    rec.guard = null;
+    write(actorId, rec);
+    return true;
   }
 
   /*
@@ -61869,13 +66177,18 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       '    var st = ctx.state;',
       '    if (!st) { return; }',
       '    var show = (v && v.show && v.show.length) ? v.show : [];',
-      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "");',
+      '    var limbs = (v && v.limbs) ? v.limbs : {};',
+      '    var sig = "hurt:" + show.join("|") + ((v && v.care) ? "|care" : "") +',
+      '      (limbs.arm ? "|arm" : "") + (limbs.leg ? "|leg" : "");',
       '    if (st.thornswoodHurtHud === sig) { return; }',
       '    st.thornswoodHurtHud = sig;',
       // The front plugin offers Tend your wounds in the inventory while there
       // is something to tend (#1383). The globalThis a plugin sees; see the
       // note over thornswoodCatchFire.
       '    try { globalThis.thornswoodHurtCare = (v && v.care) ? 1 : 0; } catch (e) { }',
+      // And whether a leg is broken (#1383): the plugin shuts the sprint gate.
+      // A broken arm's dearer block is charged by the server (BLOCK.brokenArm).
+      '    try { globalThis.thornswoodBrokenLimbs = { leg: limbs.leg ? 1 : 0 }; } catch (e) { }',
       '    var html = "";',
       '    for (var i = 0; i < show.length; i++) {',
       '      html += "<div>" + String(show[i]).replace(/[<>&]/g, "") + "</div>";',
@@ -61956,12 +66269,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       eatItemScale is the engine's (skymp #62). An engine without it does not
       read it, and the potion lands whole, as it always has.
     */
+    /*
+      AND A FOOD'S OWN MAGIC (#2682): a food in FOOD_GROUPS.strip lands at
+      nothing, so its vanilla regen boost is gone and only the needs block's
+      hunger, thirst and meal help are left. effectScale answers both.
+    */
     var needsApi = g.__thornswoodNeeds;
-    if (needsApi && needsApi.potionScale) {
+    if (needsApi && needsApi.effectScale) {
       try {
-        var scale = needsApi.potionScale(actorId, Number(baseId) || 0);
+        var scale = needsApi.effectScale(actorId, Number(baseId) || 0);
         if (scale < 1) { mp.set(actorId, 'eatItemScale', scale); }
-      } catch (e) { hlog('the potion window threw:', e); }
+      } catch (e) { hlog('the eat scale threw:', e); }
     }
     try { tell(actorId, swallowed(actorId, Number(baseId) || 0)); } catch (e) { hlog('the drink threw:', e); }
     // Withered (#1387), in the college block, on its own: five potions in an hour.
@@ -61994,6 +66312,8 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   g.__thornswoodHurt = {
     HURT: HURT, DISEASE: DISEASE, EXPOSED: EXPOSED, HEALING: HEALING, TWO_HANDS: TWO_HANDS,
     CURE_DISEASE: CURE_DISEASE, CAUGHT_MIN: CAUGHT_MIN, BAD_AFTER_MIN: BAD_AFTER_MIN,
+    CURE_DISEASE_EFFECT: CURE_DISEASE_EFFECT, MEAL_GUARD: MEAL_GUARD, BREWS_MOST: BREWS_MOST,
+    brewed: brewed, guarded: guarded, unguarded: unguarded, limbsOf: limbsOf,
     CHILL_AFTER_MIN: CHILL_AFTER_MIN,
     read: read, write: write, step: step, tick: tick, bleedTick: bleedTick, bleedRate: bleedRate,
     stageOf: stageOf, lines: lines, chanceFor: chanceFor,
@@ -62334,9 +66654,12 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     // And whether it offers a Master "Take on as apprentice" (#1634). See
     // takeOnMark in the character block.
     var ch = g.__thornswoodCharacter;
+    // And whether it offers "Dye their hair" (#2675): you carry a dye.
+    var dyes = g.__thornswoodHairDye;
     for (var a = 0; a < at.length; a++) {
       var me = at[a];
       var s = read(me.id) || fresh();
+      var dyeing = -1;   // asked once, and only with somebody near
       var party = partyOf(me.pid);
       var teacher = (ch && ch.masterRecord) ? ch.masterRecord(me.id) : null;
       var w = {};
@@ -62366,6 +66689,11 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
         if (canTake) { w[them.id.toString(16)].a = canTake; }
         // t: they have a wound to tend, and the prompt offers it (#1383).
         if (them.care) { w[them.id.toString(16)].t = 1; }
+        // hd: you carry a hair dye, and the prompt offers to dye theirs (#2675).
+        if (dyeing < 0) {
+          try { dyeing = (dyes && dyes.carries && dyes.carries(me.id)) ? 1 : 0; } catch (eDy) { dyeing = 0; }
+        }
+        if (dyeing) { w[them.id.toString(16)].hd = 1; }
       }
       var sig = JSON.stringify(w) + (s.namesAll ? ':all' : '');
       if (nearWas[me.id] === sig) { continue; }
@@ -62880,7 +67208,17 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     var s = stateOf(actorId);
     var j = findJournal(s, journalId);
     if (!j) { return 'No such journal.'; }
-    var body = String(text || '').slice(0, SOCIAL.pageChars);
+    /*
+      TOO LONG IS REFUSED, NOT CUT (#2563). A cut page was saved short and the
+      writer was never told. The panel holds the text box to pageChars and the
+      chat socket carries a page this long whole, so a longer one only comes
+      from a hand typed line, and it is told how long it is.
+    */
+    var body = String(text || '');
+    if (body.length > SOCIAL.pageChars) {
+      return 'That page is too long: ' + body.length + ' characters, and a page holds ' +
+             SOCIAL.pageChars + '. Nothing was saved.';
+    }
     var page = null;
     for (var i = 0; i < j.pages.length; i++) {
       if (j.pages[i].id === pageId) { page = j.pages[i]; break; }
@@ -63098,6 +67436,13 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       namesAll: !!s.namesAll,
       offer: offerNow ? { kind: offerNow.kind, from: offerNow.from, name: offerNow.fromName,
                           about: offerNow.about || '' } : null,
+      // The hair dyes carried, for Dye hair under Near you (#2675).
+      dyes: (function () {
+        try {
+          var HDv = g.__thornswoodHairDye;
+          return (HDv && HDv.carried) ? HDv.carried(actorId) : [];
+        } catch (eDyes) { return []; }
+      })(),
       journals: s.journals,
       shared: sharedWithMe(actorId),
       muted: s.muted,
@@ -63726,7 +68071,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
   function saleView(t, actorId) {
     var pr = g.__thornswoodProperty;
     var price = t.sale === t.a ? t.goldA : t.goldB;
-    var cuts = (pr && pr.saleCuts) ? pr.saleCuts(price) : { price: price, worker: 0, gone: 0, seller: price };
+    var cuts = (pr && pr.saleCuts && pr.saleCuts(price)) || { price: price, worker: 0, gone: 0, seller: price };
     return { mine: t.sale === actorId, worker: nameOf(t.sale), price: cuts.price,
              cut: cuts.worker, gone: cuts.gone, seller: cuts.seller };
   }
@@ -63847,6 +68192,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       }
     }
     var cuts = pr.saleCuts(price);
+    if (!cuts) { return refuse('The company\'s terms are not loaded on this server. Say so in the dev channel.'); }
     var cost = cuts.price - cuts.worker;
     if (!saleById(seller, worker, things, cuts.seller, cost)) {
       return refuse('Something went wrong moving it. Nothing was taken.');
@@ -66827,13 +71173,179 @@ function createNpcMerchantPurses(api,data,storage) {
     return Array.from(catalogue,([merchantId,identity])=>({merchantId,reference:identity.reference,
       state:JSON.parse(JSON.stringify(ledger.entries[identity.reference]))}));
   }
+  // LETTING GO OF A DELETED CHARACTER (#2351, #2652). who is the release
+  // block's: who.profile(profile id) and who.actor(form id) say whether a
+  // character is on private\deleted-characters.json. In every entry, retired
+  // traders' too:
+  //   supply       a supply wait keyed by [desc, profile, what] of theirs
+  //                is dropped
+  //   commissions  a promise the trader holds for them (commissions.held)
+  //                is dropped, so its gold is the trader's to spend again
+  //                and it no longer counts toward MAX_HELD; a finished one
+  //                cooling down (commissions.cool) goes too. Both are keyed
+  //                by the owner merchant-commission-state.js writes,
+  //                [local form id, plugin, profile]
+  //   a trade      still waiting on them is cleared:
+  //     debit      the trader's state is still pending.previous (records()
+  //                in the trading checks it), so clearing pending leaves it
+  //                as it was, as a refused debit does; for a commission the
+  //                promise it would have paid is dropped above
+  //     credit     the trader already holds pending.next; what was due to
+  //                the character goes with their pack, so next stays, and
+  //                nothing stamped for them (a supply wait, a commission
+  //                cooling down) is kept
+  // Purse and stock are never touched: no coin or goods are made or lost.
+  // A trader holding something of theirs while a trade with somebody else
+  // is still waiting is not changed at all: that trade's saved snapshots
+  // and terms are what the trader's state is checked against, so taking
+  // the row out of the state alone would stop every trade. The part says so
+  // and waits for the next start, by when that trade has settled.
+  // Every changed entry goes out in one acknowledged save, as
+  // compareAndCommit's are, before the ledger in memory changes; a save
+  // that fails revokes this service, as a failed commit does. The trader's
+  // own mirror (property) is not written here: prepare() is its one reader
+  // and puts it right from the ledger before the trader is used.
+  function characterOf(desc) {
+    // A runtime human's desc is its form id in hex alone (FormDesc); a
+    // placed form's has a plugin and is never a character.
+    return typeof desc==='string' && /^[0-9a-f]{1,8}$/i.test(desc) ? parseInt(desc,16) : 0;
+  }
+  function release(who) {
+    return mutate(()=>{
+      const counts={merchants:0,supply:0,commissions:0,trades:0};
+      const theirs=(desc,profile)=>!!(who.profile(profile) || who.actor(characterOf(desc)));
+      // A commission key is JSON [owner, job], the owner JSON [local form id, plugin, profile].
+      const promisedTo=key=>{
+        const row=JSON.parse(JSON.parse(key)[0]);
+        return !!(who.profile(row[2]) || (!row[1] && who.actor(row[0])));
+      };
+      const next=JSON.parse(JSON.stringify(ledger)),changed=[];
+      let busy=0;
+      for(const [id,identity] of catalogue) {
+        const state=next.entries[identity.reference];
+        if(!state) continue;
+        let rows=0;
+        for(const k of Object.keys(state.supply || {})) {
+          let owner=null;
+          try {owner=JSON.parse(k);} catch(error) {owner=null;}
+          if(Array.isArray(owner) && owner.length===3 && theirs(owner[0],owner[1])) {delete state.supply[k];counts.supply++;rows++;}
+        }
+        if(state.commissions!==undefined) {
+          for(const book of ['held','cool']) {
+            for(const k of Object.keys(state.commissions[book])) {
+              if(promisedTo(k)) {delete state.commissions[book][k];counts.commissions++;rows++;}
+            }
+          }
+        }
+        const pending=state.pending;
+        const trade=!!(pending && pending.human && theirs(pending.human.desc,pending.human.profileId));
+        if(!trade && !rows) continue;
+        if(pending && !trade) {busy++;continue;}
+        if(trade) {state.pending=null;counts.trades++;}
+        if(!valid(state,identity)) throw new Error('Merchant state cannot be verified');
+        const revision=state.revision || 0;
+        if(revision>=Number.MAX_SAFE_INTEGER) throw new Error('Merchant revision is exhausted');
+        state.revision=revision+1;
+        counts.merchants++;
+        changed.push([id,identity,state]);
+      }
+      if(busy) throw new Error(busy+' trader(s) holding something of theirs are waiting on a trade with somebody else, so nothing was let go');
+      if(!changed.length) return {counts,saved:true};
+      try {
+        assertOwner();
+        if(storage.save(next)!==true) throw new Error('Durable merchant save acknowledgement is missing');
+      } catch(error) {active=false;throw error;}
+      assertOwner();
+      ledger=next;
+      return {counts,saved:true};
+    });
+  }
   const activeCount=Array.from(catalogue.values()).filter(identity=>identity.active).length;
-  return {prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,callerGuard:true,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
+  return {prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,release,callerGuard:true,durable:storage.durable===true,namespace:storage.namespace,shutdown:()=>{active=false;},stats:()=>({catalogue:activeCount,retired:catalogue.size-activeCount,verified:verified.size,initialized})};
   } finally {lease.busy=false;}
 }
 // NPC MERCHANT PURSES END
 
 // NPC POPULATION POLICY BEGIN
+/*
+  THALMOR PATROLS (#1390). docs/systems/thalmor.md: "A patrol is 2 to 4. They
+  are on the roads between holds. They do not spawn inside a walled city. At
+  most 3 patrols in the province at once, and only one on a given road."
+
+  Which roads, how many on each, how long a dead one takes to come back, how
+  far one strays and whether any patrol is out at all are staff settings in
+  game/data/thalmor-patrols.json, never code. thalmorPatrolTable checks that
+  file and answers the roads that may stand: on, in Tamriel, clear of every
+  walled town and village, 2 to 4 points each, and no more roads than
+  thalmorPatrolCap. A road that fails is refused with its reason and the rest
+  still stand. A file that is not version 1, or has a setting out of range, is
+  thrown out whole, and then nothing is stood up or taken down.
+
+  WALLED TOWNS. A city worldspace is not Tamriel, so the world check keeps a
+  patrol out of every walled city with its own worldspace. A town or village
+  on Tamriel's own ground is known by the catalogue's kept city placements
+  (traders and the few town animals, habitat city): no point of a road may be
+  closer to one than THALMOR_PATROL_CITY_CLEARANCE plus the road's leash, so
+  a member never strays into the street either.
+*/
+const THALMOR_PATROL_WORLD='3c:Skyrim.esm';
+const THALMOR_PATROL_CITY_CLEARANCE=8192;
+// The one place the province cap is read (#2697). Staff may give a cap for
+// each world stage in the same file (stageMost, by stage id); the patrol
+// keeper reads the current stage from the world stage register (#2685) and
+// hands it in as table.stage. With no stage, no register, or no entry for the
+// stage, the cap is the plain most. Code names no stage and no number.
+function thalmorPatrolCap(table) {
+  if(typeof table.stage==='string' && table.stageMost &&
+      Object.prototype.hasOwnProperty.call(table.stageMost,table.stage)) return table.stageMost[table.stage];
+  return table.most;
+}
+function thalmorPatrolTable(doc,keep,stage) {
+  const desc=/^[0-9a-f]{1,8}:[^:\\/]+\.es[mpl]$/i;
+  const whole=(v,lo,hi)=>Number.isInteger(v) && v>=lo && v<=hi;
+  if(!doc || typeof doc!=='object' || Array.isArray(doc) || doc.version!==1 ||
+      typeof doc.on!=='boolean' || !Array.isArray(doc.roads))
+    throw new Error('thalmor-patrols.json needs version 1, on and roads');
+  const most=doc.most===undefined ? 3 : doc.most;
+  const returnMinutes=doc.returnMinutes===undefined ? 45 : doc.returnMinutes;
+  const leash=doc.leash===undefined ? 1536 : doc.leash;
+  const tier=doc.tier===undefined ? null : doc.tier;
+  if(!whole(most,0,10) || !whole(returnMinutes,1,1440) || !whole(leash,256,8192) ||
+      !(tier===null || whole(tier,0,5)))
+    throw new Error('thalmor-patrols.json has most, returnMinutes, leash or tier out of range');
+  const stageMost=doc.stageMost===undefined ? {} : doc.stageMost;
+  if(!stageMost || typeof stageMost!=='object' || Array.isArray(stageMost) ||
+      !Object.keys(stageMost).every(k=>/^[a-z0-9-]{1,32}$/.test(k) && whole(stageMost[k],0,10)))
+    throw new Error('thalmor-patrols.json has a stageMost that is not stage ids with a cap of 0 to 10');
+  const towns=(Array.isArray(keep) ? keep : []).filter(r=>Array.isArray(r) && r[7]==='city' &&
+    r[2]===THALMOR_PATROL_WORLD && Array.isArray(r[3]) && r[3].length===3);
+  const table={on:doc.on,most,stageMost:Object.assign({},stageMost),
+    stage:typeof stage==='string' && stage ? stage : null,roads:[],refused:[]},seen=new Set();
+  for(const r of doc.roads) {
+    const id=r && typeof r.id==='string' ? r.id : '';
+    const refuse=why=>table.refused.push({id:id || '?',why});
+    if(!/^[a-z0-9-]{1,32}$/.test(id) || seen.has(id)) {refuse('needs an id of its own: lower case letters, digits and dashes');continue;}
+    seen.add(id);
+    if(typeof r.on!=='boolean') {refuse('needs on, true or false');continue;}
+    if(r.world!==THALMOR_PATROL_WORLD) {refuse('is not on Tamriel\'s roads ('+THALMOR_PATROL_WORLD+')');continue;}
+    if(!Array.isArray(r.points) || r.points.length<2 || r.points.length>4 ||
+        !r.points.every(p=>Array.isArray(p) && p.length===3 && p.every(Number.isFinite)))
+      {refuse('needs 2 to 4 points, one for each of the patrol');continue;}
+    if(!Array.isArray(r.bases) || r.bases.length!==r.points.length ||
+        !r.bases.every(b=>typeof b==='string' && desc.test(b)))
+      {refuse('needs one base, an NPC record as a descriptor, for each point');continue;}
+    const back=r.returnMinutes===undefined ? returnMinutes : r.returnMinutes;
+    const reach=r.leash===undefined ? leash : r.leash;
+    if(!whole(back,1,1440) || !whole(reach,256,8192)) {refuse('has returnMinutes or leash out of range');continue;}
+    const town=towns.find(t=>r.points.some(p=>Math.hypot(p[0]-t[3][0],p[1]-t[3][1])<THALMOR_PATROL_CITY_CLEARANCE+reach));
+    if(town) {refuse('has a point in or beside a walled town or village (near '+town[0]+')');continue;}
+    if(!r.on || !doc.on) continue;
+    if(table.roads.length>=thalmorPatrolCap(table)) {refuse('is over the province cap of '+thalmorPatrolCap(table));continue;}
+    table.roads.push({id,name:typeof r.name==='string' ? r.name.slice(0,80) : id,bases:r.bases.slice(),
+      points:r.points.map(p=>p.slice()),returnMinutes:back,leash:reach,tier});
+  }
+  return table;
+}
 function createNpcPopulation(api,data,plugins,merchants,options) {
   const invoke=Reflect.apply;
   if(data.version!==1 || JSON.stringify(data.plugins)!==JSON.stringify(plugins))
@@ -66870,6 +71382,38 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
   }
   api.makeProperty('thornswoodNpcHome',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
   api.makeProperty('thornswoodNpcCommanded',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  // A Thalmor patrol member (#1390) carries {road, slot}, set by the patrol
+  // keeper before admission. Never the commanded marker: a patrol is not a
+  // staff spawn, and it never joins a natural habitat bucket either.
+  api.makeProperty('thornswoodNpcPatrol',{isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
+  const patrolSlots=new Map();
+  // The rule for a patrol member, from the staff's road: its home is its own
+  // point, its leash and return are the road's, its bucket is the road, capped
+  // at the road's points, so there is only one group on a road. 'discard'
+  // takes it out of the world: its road is off, gone or over the province cap,
+  // its slot is past the road's points or already filled, or staff changed the
+  // record for that point. With no readable table nothing is decided: it stays
+  // switched off and nothing is deleted. A held table (the keeper could not
+  // read the world stage, so this stage's cap is not known) keeps what stands:
+  // a member that is its road's, slot's and record's own is admitted with no
+  // cap, and anything else stays switched off, never deleted.
+  function patrolRule(id,mark,base,call) {
+    const table=options && typeof options.patrols==='function' ? options.patrols() : null;
+    if(!table || !Array.isArray(table.roads)) return null;
+    const out=table.hold===true ? null : 'discard';
+    const road=table.roads.find(r=>r.id===mark.road);
+    if(!road || !Number.isInteger(mark.slot) || mark.slot<0 || mark.slot>=road.points.length) return out;
+    let wanted=0;
+    try {wanted=resolve(road.bases[mark.slot],call);} catch(e) {return null;}
+    if(wanted!==base) return out;
+    const key=road.id+'#'+mark.slot,holder=patrolSlots.get(key);
+    if(holder!==undefined && holder!==id) return out;
+    const up=new Set([...patrolSlots.keys()].map(k=>k.split('#')[0]));
+    if(table.hold!==true && !up.has(road.id) && up.size>=thalmorPatrolCap(table)) return 'discard';
+    return {cell:resolve(THALMOR_PATROL_WORLD,call),patrol:key,bucket:'patrol:'+road.id,
+      row:[null,road.bases[mark.slot],THALMOR_PATROL_WORLD,road.points[mark.slot].slice(),road.leash,
+        road.returnMinutes,'enemy','road',road.tier,road.points.length,'patrol:'+road.id,0,'highelf']};
+  }
   let committed=false,closed=false,attempted=false;
   function commit() {
     if(closed) throw new Error('NPC population activation is revoked');
@@ -66912,10 +71456,22 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
       const validHome=saved && Number.isInteger(saved.cell) && Array.isArray(saved.home) &&
         saved.home.length===3 && saved.home.every(Number.isFinite);
       const anchor=validHome ? saved.home : state.pos,cell=validHome ? saved.cell : state.cellOrWorld;
+      // A Thalmor patrol member (#1390): its road and slot decide, never a
+      // habitat row or the spawn command's marker.
+      const patrolMark=call('get',id,'thornswoodNpcPatrol');
+      const patrolled=!!patrolMark && typeof patrolMark==='object' && typeof patrolMark.road==='string';
+      if(patrolled) {
+        const verdict=patrolRule(id,patrolMark,base,call);
+        if(verdict==='discard') {
+          if(options && typeof options.discard==='function') options.discard(id);
+          return null;
+        }
+        rule=verdict;
+      }
       // The spawn command's marker (#2623): {keep:true} for one staff kept,
       // {run} for a temporary one, and plain true from before that split,
       // which nobody chose to keep.
-      const marker=call('get',id,'thornswoodNpcCommanded');
+      const marker=patrolled ? null : call('get',id,'thornswoodNpcCommanded');
       const commanded=marker===true || (!!marker && typeof marker==='object' &&
         (marker.keep===true || typeof marker.run==='string'));
       const kept=commanded && marker!==true && marker.keep===true;
@@ -66931,16 +71487,19 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
         // Only trusted spawn commands set this private marker. They keep
         // authority and a saved home without joining a natural habitat cap.
         rule={cell,commanded:true,keep:kept,row:[null,base,call('getDescFromId',cell),anchor,1024,45,null,null,0]};
-      } else if(!commanded) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
+      } else if(!commanded && !patrolled) rule=(byBase.get(base)||[]).filter(r=>r.cell===cell &&
         (!saved || !saved.source || saved.source===r.row[0]) &&
         Math.hypot(...r.row[3].map((v,j)=>v-anchor[j]))<=r.row[4])
         .sort((a,b)=>Math.hypot(...a.row[3].map((v,j)=>v-anchor[j]))-
           Math.hypot(...b.row[3].map((v,j)=>v-anchor[j])))[0];
-      if(rule && !rule.commanded && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
+      if(rule && !rule.commanded && !rule.patrol && (counts.get(rule.bucket)||0)>=(rule.row[9]||4)) rule=null;
       if(closed) return null;
       if(rule) {
-        home=validHome ? saved.home.slice() : state.pos.slice();
-        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,source:rule.commanded ? 'command' : rule.row[0]});
+        // A patrol member's home is always its road's point, so staff moving
+        // a point moves the member's home at the next start.
+        home=rule.patrol ? rule.row[3].slice() : validHome ? saved.home.slice() : state.pos.slice();
+        call('set',id,'thornswoodNpcHome',{home,cell:rule.cell,
+          source:rule.commanded ? 'command' : rule.patrol ? rule.bucket : rule.row[0]});
         if(closed) return null;
         call('set',id,'spawnPoint',{cellOrWorldDesc:rule.row[2],pos:home,rot:[0,0,0]});
         if(closed) return null;
@@ -66969,6 +71528,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     if(policy.swims) policy.top=rule.row[3][2];
     if(id>=0xff000000 && !rule.commanded) counts.set(rule.bucket,(counts.get(rule.bucket)||0)+1);
     configured.set(id,{policy,rule});
+    if(rule.patrol) patrolSlots.set(rule.patrol,id);
     return policy;
   }
   function afterOwnership(id,owner) {
@@ -66984,6 +71544,7 @@ function createNpcPopulation(api,data,plugins,merchants,options) {
     const entry=configured.get(id);
     if(id>=0xff000000 && entry) {
       if(!entry.rule.commanded) counts.set(entry.rule.bucket,Math.max(0,(counts.get(entry.rule.bucket)||0)-1));
+      if(entry.rule.patrol && patrolSlots.get(entry.rule.patrol)===id) patrolSlots.delete(entry.rule.patrol);
       configured.delete(id);
     }
   }
@@ -68140,6 +72701,7 @@ const MERCHANT_COMMISSION_STATE = (function () { const module = {exports:{}};
 // Promise existing NPC gold before asking for goods. This state belongs to
 // the same private ledger entry as the purse, never a character projection.
 const WAIT=6*60*60*1000,MAX_GOLD=2147483647,MAX_HELD=100,MAX_COOL=1024;
+const CADENCES=[6,12,24,48];
 const owns=(value,key)=>Object.prototype.hasOwnProperty.call(value,key);
 const integer=(value,min,max=Number.MAX_SAFE_INTEGER)=>Number.isSafeInteger(value)&&value>=min&&value<=max;
 const object=value=>value&&typeof value==='object'&&!Array.isArray(value);
@@ -68166,24 +72728,47 @@ function keyParts(value) {
   JSON.stringify(row)===value?row:null;}catch(error){return null;}
 }
 function empty(){return {v:1,serial:0,held:{},cool:{}};}
+function item(value) {
+ return fields(value,['baseId','name'])&&integer(value.baseId,1,0xffffffff)&&value.baseId!==15&&
+  typeof value.name==='string'&&!!value.name.trim()&&value.name.length<=160&&!/[\x00-\x1f\x7f]/.test(value.name);
+}
+function goods(value) {
+ if(!Array.isArray(value)||value.length<1||value.length>5)return false;
+ const seen=new Set();
+ for(let i=0;i<value.length;i++) {
+  if(!owns(value,i))return false;
+  const row=value[i];
+  if(!fields(row,['item','count','unit'])||!item(row.item)||seen.has(row.item.baseId)||
+    !integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||!integer(row.count*row.unit,0,MAX_GOLD))return false;
+  seen.add(row.item.baseId);
+ }
+ return integer(value.reduce((sum,row)=>sum+row.count*row.unit,0),0,MAX_GOLD);
+}
+function cooldownAt(value){return Array.isArray(value)?value[0]:value;}
+function cooldownWait(value){return Array.isArray(value)?value[1]*3600000:WAIT;}
 function read(raw) {
  if(raw===undefined)return empty();
  function bad(){throw Error('Saved commission promises cannot be verified.');}
- if(!fields(raw,['v','serial','held','cool'])||raw.v!==1||!integer(raw.serial,0)||!object(raw.held)||!object(raw.cool)||
+ if(!fields(raw,['v','serial','held','cool'])||![1,2].includes(raw.v)||!integer(raw.serial,0)||!object(raw.held)||!object(raw.cool)||
    Object.keys(raw.held).length>MAX_HELD||Object.keys(raw.cool).length+Object.keys(raw.held).length>MAX_COOL)bad();
  const tokens=new Set();
  for(const name of Object.keys(raw.held)) {
   const parts=keyParts(name),row=raw.held[name];
-  if(!parts||!fields(row,['token','owner','job','hash','item','count','unit','gold','at'])||
+  const bundle=raw.v===2&&object(row)&&owns(row,'goods');
+  if(!parts||!fields(row,bundle?['token','owner','job','hash','goods','hours','gold','at']:['token','owner','job','hash','item','count','unit','gold','at'])||
     !integer(row.token,1,raw.serial)||tokens.has(row.token)||row.owner!==parts[0]||row.job!==parts[1]||
     typeof row.hash!=='string'||!/^[0-9a-f]{64}$/.test(row.hash)||
-    !fields(row.item,['baseId','name'])||!integer(row.item.baseId,1,0xffffffff)||row.item.baseId===15||
-    typeof row.item.name!=='string'||!row.item.name.trim()||row.item.name.length>160||/[\x00-\x1f\x7f]/.test(row.item.name)||
-    !integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||!integer(row.gold,0,MAX_GOLD)||
-    row.gold!==row.count*row.unit||!integer(row.at,1)||owns(raw.cool,name))bad();
+    !integer(row.gold,0,MAX_GOLD)||!integer(row.at,1)||owns(raw.cool,name))bad();
+  if(bundle) {
+   if(!goods(row.goods)||!CADENCES.includes(row.hours)||row.gold!==row.goods.reduce((sum,part)=>sum+part.count*part.unit,0))bad();
+  }else if(!item(row.item)||!integer(row.count,1,100000)||!integer(row.unit,0,MAX_GOLD)||row.gold!==row.count*row.unit)bad();
   tokens.add(row.token);
  }
- for(const name of Object.keys(raw.cool))if(!keyParts(name)||!integer(raw.cool[name],1))bad();
+ for(const name of Object.keys(raw.cool)) {
+  const stamp=raw.cool[name],bundle=Array.isArray(stamp);
+  if(!keyParts(name)||bundle&&(raw.v!==2||stamp.length!==2||!owns(stamp,0)||!owns(stamp,1)||!CADENCES.includes(stamp[1]))||
+    !integer(cooldownAt(stamp),1))bad();
+ }
  return copy(raw);
 }
 function reserved(raw){return Object.values(read(raw).held).reduce((sum,row)=>sum+row.gold,0);}
@@ -68199,34 +72784,38 @@ function openCount(states,human) {
 function prepare(raw,at) {
  if(!integer(at,1))throw Error('Commission time cannot be verified.');
  const next=read(raw);
- for(const name of Object.keys(next.cool))if(at-next.cool[name]>=WAIT)delete next.cool[name];
+ for(const name of Object.keys(next.cool))if(at-cooldownAt(next.cool[name])>=cooldownWait(next.cool[name]))delete next.cool[name];
  return next;
 }
 function reserve(raw,human,id,terms,at,purse) {
  const next=prepare(raw,at),name=key(human,id);
  if(!name)return {ok:false,why:'session'};
- if(!terms||!integer(terms.unit,0,MAX_GOLD)||!integer(terms.count,1,100000)||
-   !integer(terms.unit*terms.count,0,MAX_GOLD))return {ok:false,why:'price'};
+ const bundle=terms&&owns(terms,'goods');
+ if(!terms||typeof terms.hash!=='string'||!/^[0-9a-f]{64}$/.test(terms.hash)||
+   (bundle?!goods(terms.goods)||!CADENCES.includes(terms.hours):!item(terms.item)||terms.hours!==undefined||
+    !integer(terms.unit,0,MAX_GOLD)||!integer(terms.count,1,100000)||!integer(terms.unit*terms.count,0,MAX_GOLD)))return {ok:false,why:'price'};
+ const gold=bundle?terms.goods.reduce((sum,row)=>sum+row.count*row.unit,0):terms.unit*terms.count;
  if(owns(next.held,name))return {ok:false,why:'open'};
  if(owns(next.cool,name))return {ok:false,why:'cooldown'};
  if(Object.keys(next.held).length>=MAX_HELD||Object.keys(next.cool).length+Object.keys(next.held).length>=MAX_COOL)return {ok:false,why:'capacity'};
  if(next.serial===Number.MAX_SAFE_INTEGER)return {ok:false,why:'counter'};
- if(spendable({purse,commissions:next})<terms.unit*terms.count)return {ok:false,why:'purse'};
+ if(spendable({purse,commissions:next})<gold)return {ok:false,why:'purse'};
  const token=++next.serial;
- next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,item:copy(terms.item),count:terms.count,
-   unit:terms.unit,gold:terms.unit*terms.count,at};
+ if(bundle){next.v=2;next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,goods:copy(terms.goods),hours:terms.hours,gold,at};}
+ else next.held[name]={token,owner:owner(human),job:id,hash:terms.hash,item:copy(terms.item),count:terms.count,unit:terms.unit,gold,at};
  read(next);
  return {ok:true,next,token};
 }
 function close(raw,human,id,token,at,pay) {
  const next=prepare(raw,at),name=key(human,id),row=name&&next.held[name];
  if(!row||!integer(token,1)||row.token!==token)return {ok:false,why:'session'};
+ if(at<row.at)return {ok:false,why:'time'};
  if(pay&&Object.keys(next.cool).length>=MAX_COOL)return {ok:false,why:'capacity'};
  delete next.held[name];
- if(pay)next.cool[name]=at;
+ if(pay)next.cool[name]=owns(row,'goods')?[at,row.hours]:at;
  return {ok:true,next,gold:pay?row.gold:0,terms:row};
 }
-module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,
+module.exports={WAIT,MAX_HELD,MAX_COOL,empty,read,owner,key,reserved,spendable,openCount,reserve,cooldownAt,cooldownWait,
  cancel:(raw,human,id,token,at)=>close(raw,human,id,token,at,false),
  finish:(raw,human,id,token,at)=>close(raw,human,id,token,at,true)};
 return module.exports;})();
@@ -68289,11 +72878,14 @@ function addEntries(snapshot, entries) {
   });
   return inventory(next);
 }
-function takeEntries(snapshot, baseId, count) {
+// skip, when given, names entries that are not the plain item even though
+// they are on its record (a hair dye on the Bowl, #2675): they are never taken.
+function takeEntries(snapshot, baseId, count, skip) {
   var next = inventory(snapshot), taken = [], left = count;
   for (var i = 0; i < next.entries.length && left > 0; i++) {
     var row = next.entries[i];
     if (row.baseId !== baseId) continue;
+    if (typeof skip === 'function' && skip(row)) continue;
     var n = Math.min(left, row.count);
     taken.push(Object.assign({}, copy(row), {count:n}));
     row.count -= n; left -= n;
@@ -68480,14 +73072,20 @@ function createSettlement(deps) {
     }
     var removed=Object.keys(previous.commissions.held).filter(function(key){return !Object.prototype.hasOwnProperty.call(next.commissions.held,key);});
     if(removed.length!==1)throw new Error('Commission completion must release exactly one promise.');
-    var key=removed[0],row=previous.commissions.held[key],at=next.commissions.cool[key];
+    var key=removed[0],row=previous.commissions.held[key],at=COMMISSION_STATE.cooldownAt(next.commissions.cool[key]);
     if(COMMISSION_STATE.key(pending.human,row.job)!==key||!Number.isSafeInteger(at)||at<row.at||gold!==row.gold)
       throw new Error('Commission owner or payment cannot be verified.');
     var finished=COMMISSION_STATE.finish(previous.commissions,pending.human,row.job,row.token,at);
     if(!finished.ok||!equal(canonical(finished.next),canonical(next.commissions)))throw new Error('Commission promise transition cannot be verified.');
-    if(moved&&(moved.some(function(item){return item.entry.baseId!==row.item.baseId||item.label!==row.item.name;})||
-      moved.reduce(function(total,item){return total+item.entry.count;},0)!==row.count))
-      throw new Error('Commission goods cannot be verified.');
+    if(moved) {
+      var promised=row.goods||[{item:row.item,count:row.count,unit:row.unit}],totals=new Map();
+      moved.forEach(function(item){
+        var good=promised.find(function(good){return item.entry.baseId===good.item.baseId&&item.label===good.item.name;});
+        if(!good)throw new Error('Commission goods cannot be verified.');
+        totals.set(item.entry.baseId,(totals.get(item.entry.baseId)||0)+item.entry.count);
+      });
+      if(promised.some(function(good){return totals.get(good.item.baseId)!==good.count;}))throw new Error('Commission goods cannot be verified.');
+    }
   }
   function records() {
     try {
@@ -68604,9 +73202,10 @@ function createSettlement(deps) {
     if(pending.kind==='commission') {
       var keys=Object.keys(pending.previous.commissions.held).filter(function(key){return !Object.prototype.hasOwnProperty.call(pending.next.commissions.held,key);});
       var completedAt=now();
-      if(keys.length!==1||!Number.isSafeInteger(completedAt)||completedAt<pending.next.commissions.cool[keys[0]])
+      if(keys.length!==1||!Number.isSafeInteger(completedAt)||completedAt<COMMISSION_STATE.cooldownAt(pending.next.commissions.cool[keys[0]]))
         throw new Error('Commission settlement time cannot be verified.');
-      next.commissions.cool[keys[0]]=completedAt;
+      if(Array.isArray(next.commissions.cool[keys[0]]))next.commissions.cool[keys[0]][0]=completedAt;
+      else next.commissions.cool[keys[0]]=completedAt;
     }
     return !!save(id, state, next, pending.id);
   }
@@ -68822,38 +73421,54 @@ const publication=Object.freeze({
  'q-rift-woodworker-spare-pole':'5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74',
  'q-falkreath-tailor-trail-boots':'c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1',
  'q-haafingar-cook-field-soup':'7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac',
- 'q-hjaalmarch-alchemist-cotton-dressings':'7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9'
+ 'q-hjaalmarch-alchemist-cotton-dressings':'7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9',
+ 'q-whiterun-smith-ebony-seam-account':'d09451fa3306f0743d0e68bd78ae43bde11dcd0fdc2761abe37c350d37a70faa',
+ 'q-whiterun-woodworker-outfitter-reserve':'a94934368484eaf0bcfa65564909260c8b1da3e198a11495b31a8d1c070836e0',
+ 'q-whiterun-tailor-winter-vestments':'68f0406f1fe3db80d3b820d13413c0419a960da038eef3a54ac103091d9af2e0',
+ 'q-whiterun-enchanter-ward-demonstration':'8f19b0da990fc2102dd312016717dc92a48f23d6bcfdec622aaf3adc621d169e',
+ 'q-whiterun-cook-mammoth-supper':'d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4',
+ 'q-whiterun-alchemist-ash-expedition':'75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df',
+ 'q-whiterun-alchemist-travelling-case':'7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da',
+ 'q-whiterun-enchanter-commission-rack':'531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787'
 });
 function prepareCommissions(author,catalog,native) {
  if(!Array.isArray(author)||author.length!==Object.keys(publication).length)throw Error('Invalid published commission catalogue.');
  author=copy(author);catalog=copy(catalog);
  if(new Set(author.map(row=>row&&row.id)).size!==author.length||author.some(row=>{
    if(!row||publication[row.id]!==row.sourceHash)return true;
-   const {sourceHash,itemType,...definition}=row;return hash(definition)!==sourceHash;
+   const {sourceHash,itemType,itemTypes,...definition}=row;return hash(definition)!==sourceHash;
   }))
   throw Error('Published commission definitions must remain available.');
  const ids=new Set();
  return author.map(source=>{
   const row=copy(source),merchant=row.merchant,place=merchant&&catalog.byRef[merchant.reference];
-  if(row.kind!=='commission'||row.tier!=='novice'||row.cooldownHours!==6||ids.has(row.id)||
+  const bundle=row.deliveryVersion===2;
+  if(row.kind!=='commission'||!['novice','advanced','expert','master'].includes(row.tier)||
+    row.cooldownHours!==[6,12,24,48][['novice','advanced','expert','master'].indexOf(row.tier)]||ids.has(row.id)||
     !place||place.role!==merchant.role||place.hold!==merchant.hold||place.bookHold!==merchant.bookHold||
-    !Array.isArray(row.goods)||row.goods.length!==1||!row.reward||row.reward.source!=='merchant-purse'||
+    !Array.isArray(row.goods)||row.goods.length<(bundle?2:1)||row.goods.length>(bundle?5:1)||!row.reward||row.reward.source!=='merchant-purse'||
     row.reward.pricing!=='submitted-hold-price')throw Error('Commission source or appointed merchant cannot be verified.');
   ids.add(row.id);
   const good=row.goods[0];
   return {id:row.id,name:row.name,text:row.text,tier:row.tier,gate:row.gate,
-   who:[row.gate.classKey||row.gate.profession,row.gate.half,row.gate.rank].filter(Boolean).join(', '),
+   who:[row.gate.classKey||row.gate.profession,row.gate.half||row.gate.school,row.gate.rank].filter(Boolean).join(', '),
    merchantId:native.resolveMerchant(merchant.reference,merchant.base),merchantRef:merchant.reference,
    role:merchant.role,hold:merchant.hold,bookHold:merchant.bookHold,
-   itemId:native.resolveItem(good.item,row.itemType),itemDesc:good.item,count:good.count,sourceHash:row.sourceHash};
+   ...(bundle?{deliveryVersion:2,hours:row.cooldownHours,goods:row.goods.map(part=>({
+     itemId:native.resolveItem(part.item,row.itemTypes[part.item]),itemDesc:part.item,count:part.count}))}:
+     {itemId:native.resolveItem(good.item,row.itemType),itemDesc:good.item,count:good.count}),sourceHash:row.sourceHash};
  });
 }
 function createCommissions(deps) {
  const rows=new Map(),now=deps.now||Date.now,purses=deps.purses,transfer=deps.transfer;
  for(const source of deps.rows||[]) {
   const row=copy(source);
+  const goods=row.deliveryVersion===2?row.goods:[row];
   if(!/^q-[a-z0-9-]{1,46}$/.test(row.id)||rows.has(row.id)||!Number.isInteger(row.merchantId)||row.merchantId<=0||
-    !Number.isInteger(row.itemId)||row.itemId<=0||row.itemId===15||!Number.isSafeInteger(row.count)||row.count<1||row.count>100000||
+    !Array.isArray(goods)||goods.length<1||goods.length>5||new Set(goods.map(good=>good.itemId)).size!==goods.length||
+    goods.some(good=>!Number.isInteger(good.itemId)||good.itemId<=0||good.itemId===15||
+      !Number.isSafeInteger(good.count)||good.count<1||good.count>100000)||
+    row.deliveryVersion===2&&![6,12,24,48].includes(row.hours)||
     typeof row.sourceHash!=='string'||!/^[0-9a-f]{64}$/.test(row.sourceHash)||typeof row.role!=='string'||!row.role)
    throw Error('Published commission authority cannot be verified.');
   rows.set(row.id,row);
@@ -68866,19 +73481,36 @@ function createCommissions(deps) {
     new Set(all.map(row=>row.reference)).size!==size)throw Error('The complete commission ledger cannot be verified.');
   return all.filter(row=>row.state!==null).map(row=>{STATE.spendable(row.state);return row.state;});
  }
- function quoted(row) {
+ function quoteGood(row,good) {
   const catalog=deps.prices.catalog(row.bookHold)||[],matches=[];
   for(const item of catalog) {
    const resolved=deps.resolve(item.name);
-   if(resolved&&!resolved.error&&resolved.baseId===row.itemId) {
+   if(resolved&&!resolved.error&&resolved.baseId===good.itemId) {
     const price=deps.prices.quote(row.bookHold,item.name);
     if(price&&Number.isSafeInteger(price.buy)&&price.buy>=0&&price.buy<=2147483647&&
-      Number.isSafeInteger(price.buy*row.count)&&price.buy*row.count<=2147483647)
+      Number.isSafeInteger(price.buy*good.count)&&price.buy*good.count<=2147483647)
      matches.push({unit:price.buy,name:resolved.name||item.name});
    }
   }
   // Ambiguous names or two aliases are never a guess at an accepted promise.
   return matches.length===1?matches[0]:null;
+ }
+ function quoted(row) {
+  const parts=row.deliveryVersion===2?row.goods:[row],goods=[];
+  for(const part of parts) {
+   const quote=quoteGood(row,part);if(!quote)return null;
+   goods.push({item:{baseId:part.itemId,name:quote.name},count:part.count,unit:quote.unit});
+  }
+  const gold=goods.reduce((sum,good)=>sum+good.count*good.unit,0);
+  if(!Number.isSafeInteger(gold)||gold>2147483647)return null;
+  return {goods,gold,argument:row.deliveryVersion===2?hash([row.sourceHash,goods]):String(goods[0].unit)};
+ }
+ function promised(row,held) {
+  const goods=held.goods||[{item:held.item,count:held.count,unit:held.unit}];
+  const parts=row.deliveryVersion===2?row.goods:[row];
+  return held.hash===row.sourceHash&&goods.length===parts.length&&goods.every((part,i)=>
+   part.item.baseId===parts[i].itemId&&part.count===parts[i].count)&&
+   (row.deliveryVersion===2?held.hours===row.hours:held.goods===undefined);
  }
  function eligible(actor,row) {return typeof deps.eligible==='function'&&deps.eligible(actor,row.gate)===true;}
  function context(actor,merchant,row) {
@@ -68896,16 +73528,17 @@ function createCommissions(deps) {
    const pending=state.pending&&state.pending.kind==='commission'&&state.pending.human&&
      STATE.owner(state.pending.human)===STATE.owner(human)&&state.pending.previous.commissions&&
      state.pending.previous.commissions.held[key];
-   const original=held||pending,quote=original?{unit:original.unit,name:original.item.name}:quoted(row);
+   const original=held||pending,quote=original?{goods:original.goods||[{item:original.item,count:original.count,unit:original.unit}],gold:original.gold}:quoted(row);
    const gate=original?true:eligible(actor,row),waiting=!!state.pending;
-   const cooldown=last&&at-last<STATE.WAIT;
-   const enough=!!original&&INVENTORY.inventory(transfer.inventory(actor)).entries.filter(item=>item.baseId===row.itemId)
-     .reduce((sum,item)=>sum+item.count,0)>=original.count;
+   const cooldown=last&&at-STATE.cooldownAt(last)<STATE.cooldownWait(last);
+   const inventory=original?INVENTORY.inventory(transfer.inventory(actor)):null;
+   const enough=!!original&&quote.goods.every(good=>inventory.entries.filter(item=>item.baseId===good.item.baseId)
+     .reduce((sum,item)=>sum+item.count,0)>=good.count);
    const open=!!original,openLimit=STATE.openCount(namespace(),human)>=3;
-   const activeCool=Object.keys(jobs.cool).filter(key=>at-jobs.cool[key]<STATE.WAIT).length;
+   const activeCool=Object.keys(jobs.cool).filter(key=>at-STATE.cooldownAt(jobs.cool[key])<STATE.cooldownWait(jobs.cool[key])).length;
    const room=jobs.serial<Number.MAX_SAFE_INTEGER&&Object.keys(jobs.held).length<STATE.MAX_HELD&&
      Object.keys(jobs.held).length+activeCool<STATE.MAX_COOL;
-   const funds=quote&&STATE.spendable(state)>=quote.unit*row.count;
+   const funds=quote&&STATE.spendable(state)>=quote.gold;
    const ready=deps.settlement.available()&&deps.settlement.canInventoryMutation(actor);
    const reason=waiting?'This trader is finishing a saved transfer.':!ready?'Trading is waiting for a saved inventory.':
      !gate?'You do not meet this work\'s requirements.':cooldown?'This work is still resting.':!quote?'No submitted buy price is available for this work.':
@@ -68914,9 +73547,11 @@ function createCommissions(deps) {
    result.push({id:row.id,name:row.tier[0].toUpperCase()+row.tier.slice(1)+': '+row.name,kind:'commission',
     who:row.who,check:row.text+' '+reason,locations:row.hold+'; return to this '+row.role+'.',exactMerchant:true,
     state:open?'open':cooldown?'cooldown':!gate?'locked':reason?'unavailable':'available',
-    hours:6,count:row.count,item:quote?quote.name:row.itemName||'the requested goods',gold:quote?quote.unit*row.count:null,
-    quotedUnit:quote?quote.unit:null,token:original?original.token:null,waiting:waiting,
-    waitMinutes:cooldown?Math.ceil((STATE.WAIT-at+last)/60000):0,
+    hours:original&&original.hours||row.hours||6,count:row.count,item:quote?quote.goods[0].item.name:row.itemName||'the requested goods',gold:quote?quote.gold:null,
+    goods:row.deliveryVersion===2?(row.goods.map((part,i)=>({count:part.count,name:quote?quote.goods[i].item.name:part.itemDesc}))):undefined,
+    quoteToken:row.deliveryVersion===2&&quote&&!original?quote.argument:null,
+    quotedUnit:row.deliveryVersion!==2&&quote?quote.goods[0].unit:null,token:original?original.token:null,waiting:waiting,
+    waitMinutes:cooldown?Math.ceil((STATE.cooldownWait(last)-at+STATE.cooldownAt(last))/60000):0,
     canTake:!open&&!reason,canReturn:open&&!waiting&&ready&&enough,canAbandon:open&&!waiting&&ready});
   }
   return result;
@@ -68926,22 +73561,24 @@ function createCommissions(deps) {
   if(!ctx||!guards||typeof guards.current!=='function'||typeof guards.alive!=='function')return {ok:false,why:'session'};
   const {state,human,key,jobs}=ctx;
   if(state.pending||!deps.settlement.available()||!deps.settlement.canInventoryMutation(actor))return {ok:false,why:'waiting'};
-  if(typeof argument!=='string'||!/^@(0|[1-9][0-9]*)$/.test(argument))return {ok:false,why:'session'};
-  const number=Number(argument.slice(1));if(!Number.isSafeInteger(number))return {ok:false,why:'session'};
+  if(typeof argument!=='string')return {ok:false,why:'session'};
+  const number=/^@(0|[1-9][0-9]*)$/.test(argument)?Number(argument.slice(1)):NaN;
+  if(!(verb==='take'&&row.deliveryVersion===2? /^@[0-9a-f]{64}$/.test(argument):Number.isSafeInteger(number)))return {ok:false,why:'session'};
   function current(fresh,quote) {
    if(!guards.current()||STATE.owner(transfer.identity(actor))!==STATE.owner(human))return false;
    if(fresh) {
     const again=quoted(row);
-    if(!again||again.unit!==quote.unit||again.name!==quote.name||!eligible(actor,row))return false;
+    if(!again||again.argument!==quote.argument||!eligible(actor,row))return false;
    }
    const count=STATE.openCount(namespace(),human);
    return (!fresh||count<3)&&guards.current()&&guards.alive();
   }
   if(verb==='take') {
    if(!eligible(actor,row))return {ok:false,why:'eligibility'};
-   const quote=quoted(row);if(!quote||quote.unit!==number)return {ok:false,why:'price'};
+   const quote=quoted(row);if(!quote||'@'+quote.argument!==argument)return {ok:false,why:'price'};
    if(STATE.openCount(namespace(),human)>=3)return {ok:false,why:'open-limit'};
-   const terms={hash:row.sourceHash,item:{baseId:row.itemId,name:quote.name},count:row.count,unit:quote.unit},at=now();
+   const terms=row.deliveryVersion===2?{hash:row.sourceHash,goods:quote.goods,hours:row.hours}:
+     {hash:row.sourceHash,...quote.goods[0]},at=now();
    const accepted=STATE.reserve(jobs,human,id,terms,at,state.purse);
    if(!accepted.ok)return accepted;
    const next=Object.assign({},state,{commissions:accepted.next});
@@ -68957,14 +73594,19 @@ function createCommissions(deps) {
    return {ok:!!saved,why:saved?'':'session'};
   }
   if(verb!=='return')return {ok:false,why:'request'};
-  if(held.hash!==row.sourceHash||held.item.baseId!==row.itemId||held.count!==row.count)return {ok:false,why:'recovery'};
+  if(!promised(row,held))return {ok:false,why:'recovery'};
   const completed=STATE.finish(jobs,human,id,number,now());if(!completed.ok)return completed;
   const expected=INVENTORY.inventory(transfer.inventory(actor));
-  let outgoing;try{outgoing=INVENTORY.takeEntries(expected,held.item.baseId,held.count);}catch(error){return {ok:false,why:'short'};}
-  const stock=deps.addStock(copy(state.stock),outgoing.entries,held.item.name);
+  let debit=expected,stock=copy(state.stock);
+  try {
+   for(const good of held.goods||[{item:held.item,count:held.count,unit:held.unit}]) {
+    const outgoing=INVENTORY.takeEntries(debit,good.item.baseId,good.count);
+    debit=outgoing.inventory;stock=deps.addStock(stock,outgoing.entries,good.item.name);
+   }
+  }catch(error){return {ok:false,why:'short'};}
   const next={purse:state.purse-held.gold,stock,supply:copy(state.supply||{}),commissions:completed.next};
   const moved=deps.settlement.begin({merchantId:merchant,humanId:actor,profileId:human.profileId,kind:'commission',
-   previous:state,next,expected,debit:outgoing.inventory,credit:held.gold?[{baseId:15,count:held.gold}]:[],caller:()=>current(false)});
+   previous:state,next,expected,debit,credit:held.gold?[{baseId:15,count:held.gold}]:[],caller:()=>current(false)});
   return {ok:!!moved.done,why:moved.done?'':'waiting'};
  }
  return {has:id=>rows.has(id),view,act};
@@ -69755,6 +74397,9 @@ function createMerchantTrading(deps) {
   var prices = deps.prices;
   var transfer = deps.transfer;
   var world = deps.world;
+  // An entry the server made into something else on a plain record (a hair
+  // dye on the Bowl, #2675) is neither counted nor taken as the plain item.
+  var minted = typeof deps.minted === 'function' ? deps.minted : function () { return false; };
   var places = deps.places || {};
   var permits = createRolePermissions(places,deps.roleTables);
   var now = deps.now || function () { return Date.now(); };
@@ -69900,6 +74545,7 @@ function createMerchantTrading(deps) {
     if (settlement.available()) {
       try {
         SETTLEMENT.inventory(transfer.inventory(actorId)).entries.forEach(function (entry) {
+          if (minted(entry)) return;
           counts[entry.baseId] = (counts[entry.baseId] || 0) + entry.count;
         });
       } catch (error) { packReady = false; }
@@ -70247,7 +74893,7 @@ function createMerchantTrading(deps) {
       if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
         return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
-      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
+      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold, minted);
       var stock = stockCopy(state.stock), credit;
       if (npcBuys) {
         stock = addStock(stock, outgoing.entries, itemName);
@@ -70361,8 +75007,10 @@ function installMerchantTrading(env) {
       } catch (e) {}
     });
   }
+  var minted = typeof env.minted === 'function' ? env.minted : function () { return false; };
   var trading = createMerchantTrading({
     purses: env.purses,
+    minted: minted,
     log:log,
     prices: {
       quote: function (hold, item) {
@@ -70409,7 +75057,7 @@ function installMerchantTrading(env) {
         var entries = (inv && inv.entries) || [];
         var n = 0;
         for (var i = 0; i < entries.length; i++) {
-          if (entries[i] && Number(entries[i].baseId) === Number(baseId)) n += Number(entries[i].count) || 0;
+          if (entries[i] && Number(entries[i].baseId) === Number(baseId) && !minted(entries[i])) n += Number(entries[i].count) || 0;
         }
         return n;
       }
@@ -70529,13 +75177,13 @@ module.exports.installMerchantTrading = function (env) {
 module.exports.prepareRoles = function (population, mp) {
   const native=MERCHANT_NATIVE.createLedgerNativeValidators(mp);
   const prepared=MERCHANT_ROLES.prepareMerchantRoleStage(population, {"version":1,"count":60,"byRef":{"13c008:Arena - Markarth Side.esp":{"name":"Tailor","role":"Tailor","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"f9a47:Arena - Markarth Side.esp","world":null,"pos":[-56,0,0]},"177da:Dragonborn.esm":{"name":"Enchanter","role":"Enchanter","hold":"Solstheim","bookHold":"ravenrock","locationName":"Tel Mithryn","cell":"17787:Dragonborn.esm","world":null,"pos":[102.66351318359375,1159.6314697265625,-8.091889381408691]},"1828f:Dragonborn.esm":{"name":"Smith","role":"Smith","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ec4:Dragonborn.esm","world":null,"pos":[-663.4784545898438,-301.1336669921875,0]},"18291:Dragonborn.esm":{"name":"Cook","role":"Cook","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ec0:Dragonborn.esm","world":null,"pos":[-39.04017639160156,-178.24331665039062,0]},"18293:Dragonborn.esm":{"name":"Woodworker","role":"Woodworker","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"17ebf:Dragonborn.esm","world":null,"pos":[-149.79263305664062,-146.8022918701172,0]},"182a2:Dragonborn.esm":{"name":"Alchemist","role":"Alchemist","hold":"Solstheim","bookHold":"ravenrock","locationName":"Raven Rock","cell":"18277:Dragonborn.esm","world":null,"pos":[-3.5353641510009766,232.098876953125,0]},"18fc0:Dragonborn.esm":{"name":"Tailor","role":"Tailor","hold":"Solstheim","bookHold":"ravenrock","locationName":"Skaal Village","cell":"18f4a:Dragonborn.esm","world":null,"pos":[-472.4573669433594,846.078857421875,40.82240295410156]},"1939ba:aaaGraniteHill.esp":{"name":"Tailor","role":"Tailor","hold":"Falkreath","bookHold":"falkreath","locationName":"Granite Hill","cell":"626a:aaaGraniteHill.esp","world":null,"pos":[-1024,0,512]},"1981e:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"13a76:Skyrim.esm","world":null,"pos":[-1219.1793212890625,-180.9888458251953,-0.1077728271484375]},"198a0:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0e:Skyrim.esm","world":null,"pos":[-204.85626220703125,-453.2304382324219,0]},"198ac:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a0f:Skyrim.esm","world":null,"pos":[21.030447006225586,-535.8790283203125,0]},"198b1:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"169fe:Skyrim.esm","world":null,"pos":[-247.2842254638672,-1140.2867431640625,0.0000152587890625]},"198c5:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a04:Skyrim.esm","world":null,"pos":[-1115.4222412109375,1085.11181640625,576.4193725585938]},"198d2:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a11:Skyrim.esm","world":null,"pos":[21.52102279663086,-248.43890380859375,0]},"198d8:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"Haafingar","bookHold":"solitude","locationName":"Solitude","cell":"16a10:Skyrim.esm","world":null,"pos":[-277.358154296875,-1007.031494140625,0.000003814697265625]},"198ea:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dff:Skyrim.esm","world":null,"pos":[439.7211608886719,2819.8076171875,0]},"198eb:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16dff:Skyrim.esm","world":null,"pos":[-351.8253479003906,2705.2294921875,2.836996078491211]},"198f7:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df6:Skyrim.esm","world":null,"pos":[-166.40286254882812,1063.5419921875,-112]},"19906:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[519.8775634765625,2151.841064453125,6911.1318359375]},"19908:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[-5168.5185546875,-167.9541778564453,6635.326171875]},"1990a:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"the Reach","bookHold":"markarth","locationName":"Markarth","cell":"16df2:Skyrim.esm","world":null,"pos":[-4416,1952,6896]},"19dd0:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd9:Skyrim.esm","world":null,"pos":[-42.64916229248047,-54.30506896972656,64]},"19df0:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bd2:Skyrim.esm","world":null,"pos":[-1226.40966796875,1024.047119140625,128]},"19df1:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"53081:Skyrim.esm","world":null,"pos":[-181.75938415527344,-184.0110321044922,64]},"19dfb:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"16bce:Skyrim.esm","world":null,"pos":[0,784,112]},"19e14:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"9ccde:Skyrim.esm","world":null,"pos":[2084.01806640625,2835.379638671875,176]},"1a66d:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b6:Skyrim.esm","world":null,"pos":[-520,-248,64]},"1a66e:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"1605e:Skyrim.esm","world":null,"pos":[336,-416,64]},"1a672:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b3:Skyrim.esm","world":null,"pos":[119.512451171875,-23.152530670166016,69.51840209960938]},"1a67c:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"Whiterun","bookHold":"whiterun","locationName":"Warmaiden's","cell":"1db4e:Skyrim.esm","world":null,"pos":[-16,128,64]},"1a681:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b7:Skyrim.esm","world":null,"pos":[-16.498863220214844,-1200.2633056640625,80]},"1a684:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"Whiterun","bookHold":"whiterun","locationName":"Whiterun","cell":"165b2:Skyrim.esm","world":null,"pos":[-800,-320,320]},"1a6b5:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a86:Skyrim.esm","world":null,"pos":[1088.7137451171875,-91.87908172607422,2.565845489501953]},"1a6be:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a83:Skyrim.esm","world":null,"pos":[909.4266357421875,18.256004333496094,272]},"1a6bf:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a83:Skyrim.esm","world":null,"pos":[822.4622192382812,18.16551971435547,272]},"1a6c3:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"13a80:Skyrim.esm","world":null,"pos":[-776.2161865234375,1119.9918212890625,0]},"1aa5e:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138d0:Skyrim.esm","world":null,"pos":[693.3634643554688,28.15774154663086,272.34967041015625]},"1aa61:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138cf:Skyrim.esm","world":null,"pos":[860.4638671875,-160.4937744140625,272]},"1aa62:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"138ce:Skyrim.esm","world":null,"pos":[794.4549560546875,-143.3380584716797,10.95335578918457]},"1b115:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1678c:Skyrim.esm","world":null,"pos":[1587.1324462890625,-4987.16552734375,72.77753448486328]},"1b11a:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16789:Skyrim.esm","world":null,"pos":[-432,-3872,320]},"1b123:Skyrim.esm":{"name":"Woodworker","role":"Woodworker","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16782:Skyrim.esm","world":null,"pos":[-1072.8953857421875,-1134.9822998046875,-128]},"1b124:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"16781:Skyrim.esm","world":null,"pos":[-2954.65576171875,356.79949951171875,-448]},"1b132:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"1677c:Skyrim.esm","world":null,"pos":[-2832,-2752,64]},"1b135:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"Eastmarch","bookHold":"windhelm","locationName":"Windhelm","cell":"7d033:Skyrim.esm","world":null,"pos":[1312.3782958984375,-5028.5703125,58.14128494262695]},"1c18c:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13813:Skyrim.esm","world":null,"pos":[-1035.252197265625,-131.28944396972656,10.275467872619629]},"1c18d:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1470.461181640625,17.313034057617188,0.00006103515625]},"1c18e:Skyrim.esm":{"name":"Tailor","role":"Tailor","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1986.1158447265625,-209.83944702148438,0.000034332275390625]},"1c1aa:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold College","cell":"cab91:Skyrim.esm","world":null,"pos":[413.85235595703125,348.97003173828125,0.00002288818359375]},"1e7d6:Skyrim.esm":{"name":"Enchanter","role":"Enchanter","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[1944.821533203125,696.4560546875,0.00000762939453125]},"31efc3:Riften Expansion.esp":{"name":"Tailor","role":"Tailor","hold":"the Rift","bookHold":"riften","locationName":"Riften","cell":"cc3f6:Riften Expansion.esp","world":null,"pos":[-273.2473449707031,-81.94912719726562,63.99998474121094]},"33a2:JKs Skyrim.esp":{"name":"Woodworker","role":"Woodworker","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"32b8:JKs Skyrim.esp","world":null,"pos":[1486.3250732421875,1923.6727294921875,228.70834350585938]},"3a198:Skyrim.esm":{"name":"Cook","role":"Cook","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"3a184:Skyrim.esm","world":null,"pos":[-348.84991455078125,-99.87165832519531,0]},"3a19b:Skyrim.esm":{"name":"Alchemist","role":"Alchemist","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"3a183:Skyrim.esm","world":null,"pos":[-630.467041015625,23.01331329345703,0.5730171203613281]},"3a19f:Skyrim.esm":{"name":"Smith","role":"Smith","hold":"Falkreath","bookHold":"falkreath","locationName":"Falkreath","cell":"13a73:Skyrim.esm","world":null,"pos":[1587.974609375,132.00314331054688,240]},"3a22:JKs Skyrim.esp":{"name":"Cook","role":"Cook","hold":"the Pale","bookHold":"dawnstar","locationName":"Dawnstar","cell":"32b8:JKs Skyrim.esp","world":null,"pos":[1204.6116943359375,1890.033203125,228.7083740234375]},"72c89:North Keep.esp":{"name":"Enchanter","role":"Enchanter","hold":"Falkreath","bookHold":"falkreath","locationName":"The Estates' Edge","cell":"3a988:North Keep.esp","world":null,"pos":[224.81382751464844,-550.4144287109375,15.826522827148438]},"b4a3:Populated Cities Towns Villages Legendary.esp":{"name":"Woodworker","role":"Woodworker","hold":"Winterhold","bookHold":"winterhold","locationName":"Winterhold","cell":"13814:Skyrim.esm","world":null,"pos":[2143.7470703125,154.48138427734375,0.000091552734375]},"b818d:Arena - Markarth Side.esp":{"name":"Woodworker","role":"Woodworker","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Markarth Side","cell":"5c591:Arena - Markarth Side.esp","world":null,"pos":[-237.17320251464844,-167.08517456054688,261.5469055175781]},"e24:JKs Skyrim.esp":{"name":"Smith","role":"Smith","hold":"Hjaalmarch","bookHold":"morthal","locationName":"Morthal","cell":"93be:Skyrim.esm","world":"3c:Skyrim.esm","pos":[-37173.703125,64145.35546875,-13940.6337890625]}}}, {"version":1,"history":[["1000a:Populated Cities Towns Villages Legendary.esp","ffd3:Populated Cities Towns Villages Legendary.esp"],["1021:Solitude Arena.esp","1039:Solitude Arena.esp"],["109aa9:Arena - Markarth Side.esp","109aa3:Arena - Markarth Side.esp"],["127bb6:Arena - Markarth Side.esp","127bb4:Arena - Markarth Side.esp"],["13482:Skyrim.esm","13475:Skyrim.esm"],["13487:Skyrim.esm","1347a:Skyrim.esm"],["13488:Skyrim.esm","1347b:Skyrim.esm"],["135227:WindhelmSSE.esp","135226:WindhelmSSE.esp"],["136edc:Arena - Markarth Side.esp","136ed8:Arena - Markarth Side.esp"],["13bffc:Arena - Markarth Side.esp","13bffb:Arena - Markarth Side.esp"],["13c008:Arena - Markarth Side.esp","13c004:Arena - Markarth Side.esp"],["149aca:WindhelmSSE.esp","10682d:WindhelmSSE.esp"],["15cfcd:WindhelmSSE.esp","15cfcc:WindhelmSSE.esp"],["160715:Riften Expansion.esp","15b609:Riften Expansion.esp"],["16acf:Skyrim.esm","16ace:Skyrim.esm"],["16d752:WindhelmSSE.esp","16d74f:WindhelmSSE.esp"],["172ca7:WindhelmSSE.esp","172ca6:WindhelmSSE.esp"],["177da:Dragonborn.esm","1773a:Dragonborn.esm"],["177db:Dragonborn.esm","17777:Dragonborn.esm"],["177dc:Dragonborn.esm","17778:Dragonborn.esm"],["179c40:Riften Expansion.esp","15b60a:Riften Expansion.esp"],["1828f:Dragonborn.esm","1828e:Dragonborn.esm"],["18291:Dragonborn.esm","18290:Dragonborn.esm"],["18293:Dragonborn.esm","18292:Dragonborn.esm"],["182a0:Dragonborn.esm","1829f:Dragonborn.esm"],["182a2:Dragonborn.esm","182a1:Dragonborn.esm"],["18fac:Dragonborn.esm","18fa9:Dragonborn.esm"],["18fb8:Dragonborn.esm","18fb5:Dragonborn.esm"],["18fc0:Dragonborn.esm","18fbd:Dragonborn.esm"],["1939ba:aaaGraniteHill.esp","18e8b6:aaaGraniteHill.esp"],["1981e:Skyrim.esm","13652:Skyrim.esm"],["198a0:Skyrim.esm","13266:Skyrim.esm"],["198ac:Skyrim.esm","132ab:Skyrim.esm"],["198ad:Skyrim.esm","1326f:Skyrim.esm"],["198af:Skyrim.esm","1328c:Skyrim.esm"],["198b1:Skyrim.esm","13275:Skyrim.esm"],["198b3:Skyrim.esm","13273:Skyrim.esm"],["198b6:Skyrim.esm","1327a:Skyrim.esm"],["198c5:Skyrim.esm","132aa:Skyrim.esm"],["198c9:Skyrim.esm","1329a:Skyrim.esm"],["198d2:Skyrim.esm","13260:Skyrim.esm"],["198d3:Skyrim.esm","132ae:Skyrim.esm"],["198d4:Skyrim.esm","13255:Skyrim.esm"],["198d5:Skyrim.esm","1327d:Skyrim.esm"],["198d8:Skyrim.esm","13261:Skyrim.esm"],["198ea:Skyrim.esm","133a5:Skyrim.esm"],["198eb:Skyrim.esm","133a1:Skyrim.esm"],["198ec:Skyrim.esm","133a3:Skyrim.esm"],["198ed:Skyrim.esm","13398:Skyrim.esm"],["198f2:Skyrim.esm","133a2:Skyrim.esm"],["198f7:Skyrim.esm","1338b:Skyrim.esm"],["198f8:Skyrim.esm","1406b:Skyrim.esm"],["19906:Skyrim.esm","1339a:Skyrim.esm"],["19907:Skyrim.esm","1402d:Skyrim.esm"],["19908:Skyrim.esm","1338e:Skyrim.esm"],["19909:Skyrim.esm","1402e:Skyrim.esm"],["1990a:Skyrim.esm","13387:Skyrim.esm"],["19929:Skyrim.esm","13b7a:Skyrim.esm"],["1992b:Skyrim.esm","13b7c:Skyrim.esm"],["199cf:Skyrim.esm","13b77:Skyrim.esm"],["199d0:Skyrim.esm","13b78:Skyrim.esm"],["19dc8:Skyrim.esm","13365:Skyrim.esm"],["19dc9:Skyrim.esm","13373:Skyrim.esm"],["19dce:Skyrim.esm","13370:Skyrim.esm"],["19dcf:Skyrim.esm","13354:Skyrim.esm"],["19dd0:Skyrim.esm","1334d:Skyrim.esm"],["19ddc:Skyrim.esm","1334f:Skyrim.esm"],["19ddd:Skyrim.esm","1337e:Skyrim.esm"],["19df0:Skyrim.esm","19def:Skyrim.esm"],["19df1:Skyrim.esm","1334c:Skyrim.esm"],["19df3:Skyrim.esm","19df2:Skyrim.esm"],["19df9:Skyrim.esm","13380:Skyrim.esm"],["19dfa:Skyrim.esm","1336d:Skyrim.esm"],["19dfb:Skyrim.esm","13357:Skyrim.esm"],["19dfc:Skyrim.esm","13360:Skyrim.esm"],["19e02:Skyrim.esm","136bb:Skyrim.esm"],["19e03:Skyrim.esm","136bc:Skyrim.esm"],["19e09:Skyrim.esm","136c3:Skyrim.esm"],["19e14:Skyrim.esm","13369:Skyrim.esm"],["19e19:Skyrim.esm","19e18:Skyrim.esm"],["1a51b:Dragonborn.esm","1a51a:Dragonborn.esm"],["1a51d:Dragonborn.esm","1a51c:Dragonborn.esm"],["1a66d:Skyrim.esm","13ba4:Skyrim.esm"],["1a66e:Skyrim.esm","13ba3:Skyrim.esm"],["1a672:Skyrim.esm","13ba1:Skyrim.esm"],["1a675:Skyrim.esm","13b99:Skyrim.esm"],["1a67c:Skyrim.esm","13bb9:Skyrim.esm"],["1a680:Skyrim.esm","13b97:Skyrim.esm"],["1a681:Skyrim.esm","13b9e:Skyrim.esm"],["1a683:Skyrim.esm","13b9d:Skyrim.esm"],["1a684:Skyrim.esm","13b9c:Skyrim.esm"],["1a69a:Skyrim.esm","13bab:Skyrim.esm"],["1a6a5:Skyrim.esm","13bbe:Skyrim.esm"],["1a6a8:Skyrim.esm","136b6:Skyrim.esm"],["1a6b5:Skyrim.esm","13614:Skyrim.esm"],["1a6be:Skyrim.esm","1361e:Skyrim.esm"],["1a6bf:Skyrim.esm","1361f:Skyrim.esm"],["1a6c3:Skyrim.esm","1361d:Skyrim.esm"],["1aa35:The Great City of Solitude.esp","1aa31:The Great City of Solitude.esp"],["1aa5e:Skyrim.esm","135e9:Skyrim.esm"],["1aa61:Skyrim.esm","135ef:Skyrim.esm"],["1aa62:Skyrim.esm","135ed:Skyrim.esm"],["1b085:Skyrim.esm","13662:Skyrim.esm"],["1b086:Skyrim.esm","13663:Skyrim.esm"],["1b08b:Skyrim.esm","1365f:Skyrim.esm"],["1b097:Skyrim.esm","1b076:Skyrim.esm"],["1b099:Skyrim.esm","1b079:Skyrim.esm"],["1b115:Skyrim.esm","14148:Skyrim.esm"],["1b116:Skyrim.esm","1414c:Skyrim.esm"],["1b118:Skyrim.esm","1412a:Skyrim.esm"],["1b11a:Skyrim.esm","1414b:Skyrim.esm"],["1b11c:Skyrim.esm","14123:Skyrim.esm"],["1b123:Skyrim.esm","1413a:Skyrim.esm"],["1b124:Skyrim.esm","14140:Skyrim.esm"],["1b128:Skyrim.esm","1413e:Skyrim.esm"],["1b129:Skyrim.esm","1414e:Skyrim.esm"],["1b12e:Skyrim.esm","1411f:Skyrim.esm"],["1b132:Skyrim.esm","14146:Skyrim.esm"],["1b135:Skyrim.esm","14142:Skyrim.esm"],["1b136:Skyrim.esm","1412d:Skyrim.esm"],["1b145:Skyrim.esm","14141:Skyrim.esm"],["1c18c:Skyrim.esm","1c187:Skyrim.esm"],["1c18d:Skyrim.esm","1c183:Skyrim.esm"],["1c18e:Skyrim.esm","1c184:Skyrim.esm"],["1c1a1:Skyrim.esm","1c19e:Skyrim.esm"],["1c1a5:Skyrim.esm","1c197:Skyrim.esm"],["1c1a6:Skyrim.esm","1c198:Skyrim.esm"],["1c1a7:Skyrim.esm","1c199:Skyrim.esm"],["1c1a8:Skyrim.esm","1c19a:Skyrim.esm"],["1c1aa:Skyrim.esm","1c19c:Skyrim.esm"],["1c1b4:Skyrim.esm","1c193:Skyrim.esm"],["1d4bc:Skyrim.esm","1d4b7:Skyrim.esm"],["1d503:The Great City of Solitude.esp","800a:The Great City of Solitude.esp"],["1e7d6:Skyrim.esm","1e7d5:Skyrim.esm"],["1e9f92:Riften Expansion.esp","16070c:Riften Expansion.esp"],["1e9f93:Riften Expansion.esp","1d076a:Riften Expansion.esp"],["1eec1:Dragonborn.esm","1eeb1:Dragonborn.esm"],["1f9c2:Dragonborn.esm","1dc67:Dragonborn.esm"],["2005a:Skyrim.esm","13627:Skyrim.esm"],["207af8:WindhelmSSE.esp","149ab9:WindhelmSSE.esp"],["21612:aaaGraniteHill.esp","21611:aaaGraniteHill.esp"],["21ea6:Skyrim.esm","1b072:Skyrim.esm"],["2214de:WindhelmSSE.esp","2214dd:WindhelmSSE.esp"],["24004:JKs Skyrim.esp","24005:JKs Skyrim.esp"],["25906:FishingInSkyrim.esp","25905:FishingInSkyrim.esp"],["284ad:Skyrim.esm","284ac:Skyrim.esm"],["2b82e:aaaGraniteHill.esp","2b82d:aaaGraniteHill.esp"],["2ba8d:Skyrim.esm","2ba8c:Skyrim.esm"],["2c1ea:Dragonborn.esm","2c1eb:Dragonborn.esm"],["31861:Dragonborn.esm","31862:Dragonborn.esm"],["31efc3:Riften Expansion.esp","1d0769:Riften Expansion.esp"],["33a2:JKs Skyrim.esp","342f:JKs Skyrim.esp"],["33b45:OarsRest.esp","2ea43:OarsRest.esp"],["3a198:Skyrim.esm","13655:Skyrim.esm"],["3a19b:Skyrim.esm","3a19a:Skyrim.esm"],["3a19f:Skyrim.esm","13650:Skyrim.esm"],["3a22:JKs Skyrim.esp","3a21:JKs Skyrim.esp"],["3abab:aaaGraniteHill.esp","e164:aaaGraniteHill.esp"],["3abac:aaaGraniteHill.esp","5c0c:aaaGraniteHill.esp"],["3abad:aaaGraniteHill.esp","e6db:aaaGraniteHill.esp"],["3fcce:aaaGraniteHill.esp","3fccd:aaaGraniteHill.esp"],["4031:HearthFires.esm","403b:HearthFires.esm"],["418a:JKs Skyrim.esp","4189:JKs Skyrim.esp"],["41dae:AnotherOakwood.esp","41dad:AnotherOakwood.esp"],["44dd7:aaaGraniteHill.esp","44dd5:aaaGraniteHill.esp"],["4d53e:WindhelmSSE.esp","4d53d:WindhelmSSE.esp"],["4d593:WindhelmSSE.esp","4d592:WindhelmSSE.esp"],["4d594:WindhelmSSE.esp","4d58f:WindhelmSSE.esp"],["4e0b3:Skyrim.esm","136c5:Skyrim.esm"],["52e7f:WindhelmSSE.esp","52e7e:WindhelmSSE.esp"],["52e81:WindhelmSSE.esp","52e80:WindhelmSSE.esp"],["542f:OarsRest.esp","542d:OarsRest.esp"],["55a63:Skyrim.esm","55a5e:Skyrim.esm"],["5b685:Skyrim.esm","19953:Skyrim.esm"],["5b687:Skyrim.esm","19957:Skyrim.esm"],["5cbf8:SkyrimSewers.esp","5cbf7:SkyrimSewers.esp"],["5cc07:SkyrimSewers.esp","5cc06:SkyrimSewers.esp"],["5d16:aaaGraniteHill.esp","5d15:aaaGraniteHill.esp"],["5d1b8:SkyrimSewers.esp","5d1b7:SkyrimSewers.esp"],["5f3a5c:aaaGraniteHill.esp","5f3a5b:aaaGraniteHill.esp"],["5f3a63:aaaGraniteHill.esp","5f3a62:aaaGraniteHill.esp"],["60752:SkyrimSewers.esp","60751:SkyrimSewers.esp"],["6311:JKs Skyrim.esp","62e2:JKs Skyrim.esp"],["684a1:North Keep.esp","5900c:North Keep.esp"],["68b0:aaaGraniteHill.esp","68af:aaaGraniteHill.esp"],["6c730:WindhelmSSE.esp","6c72f:WindhelmSSE.esp"],["6d8e8:North Keep.esp","5900f:North Keep.esp"],["6d8e9:North Keep.esp","59011:North Keep.esp"],["72c89:North Keep.esp","59028:North Keep.esp"],["74340:Skyrim.esm","1b1db:Skyrim.esm"],["74345:Skyrim.esm","1b1d1:Skyrim.esm"],["7434a:Skyrim.esm","1b1d6:Skyrim.esm"],["7e5b:aaaGraniteHill.esp","7e59:aaaGraniteHill.esp"],["80c5e:WindhelmSSE.esp","80c60:WindhelmSSE.esp"],["80c73:WindhelmSSE.esp","85da5:WindhelmSSE.esp"],["80c74:WindhelmSSE.esp","80c77:WindhelmSSE.esp"],["8472:aaaGraniteHill.esp","8471:aaaGraniteHill.esp"],["8751:OarsRest.esp","874e:OarsRest.esp"],["8755:OarsRest.esp","8754:OarsRest.esp"],["8759:OarsRest.esp","8758:OarsRest.esp"],["8c5a:The Great City of Solitude.esp","8c55:The Great City of Solitude.esp"],["9226:OarsRest.esp","9223:OarsRest.esp"],["922b:OarsRest.esp","9227:OarsRest.esp"],["9ea8:Populated Cities Towns Villages Legendary.esp","61eb:Populated Cities Towns Villages Legendary.esp"],["9eae:Populated Cities Towns Villages Legendary.esp","61f0:Populated Cities Towns Villages Legendary.esp"],["a3d26:Arena - Markarth Side.esp","a3d21:Arena - Markarth Side.esp"],["a453:Populated Cities Towns Villages Legendary.esp","6205:Populated Cities Towns Villages Legendary.esp"],["a4910:WindhelmSSE.esp","a490e:WindhelmSSE.esp"],["a4982:WindhelmSSE.esp","a4983:WindhelmSSE.esp"],["a547:AnotherOakwood.esp","a545:AnotherOakwood.esp"],["a553:AnotherOakwood.esp","a552:AnotherOakwood.esp"],["aadd:AnotherOakwood.esp","aad7:AnotherOakwood.esp"],["ab16:AnotherOakwood.esp","ab14:AnotherOakwood.esp"],["b4a3:Populated Cities Towns Villages Legendary.esp","7da1:Populated Cities Towns Villages Legendary.esp"],["b818c:Arena - Markarth Side.esp","a8e2c:Arena - Markarth Side.esp"],["b818d:Arena - Markarth Side.esp","52308:Arena - Markarth Side.esp"],["b882a:Skyrim.esm","b8827:Skyrim.esm"],["bd300:Arena - Markarth Side.esp","b8195:Arena - Markarth Side.esp"],["c7261:JK's Whiterun's Outskirts.esp","c7260:JK's Whiterun's Outskirts.esp"],["c7264:JK's Whiterun's Outskirts.esp","c7263:JK's Whiterun's Outskirts.esp"],["c7596:Arena - Markarth Side.esp","c7595:Arena - Markarth Side.esp"],["d15b0:Skyrim.esm","13b9f:Skyrim.esm"],["d587:The Great City of Solitude.esp","d586:The Great City of Solitude.esp"],["d6ad9:Skyrim.esm","d6ad8:Skyrim.esm"],["d7505:Skyrim.esm","13ba2:Skyrim.esm"],["e1c1:JKs Skyrim.esp","e1c2:JKs Skyrim.esp"],["e24:JKs Skyrim.esp","2453c:JKs Skyrim.esp"],["e2d7:Populated Cities Towns Villages Legendary.esp","6d2c:Populated Cities Towns Villages Legendary.esp"],["e2d9:Populated Cities Towns Villages Legendary.esp","6d2d:Populated Cities Towns Villages Legendary.esp"],["e897:Populated Cities Towns Villages Legendary.esp","67ad:Populated Cities Towns Villages Legendary.esp"],["e898:Populated Cities Towns Villages Legendary.esp","67ae:Populated Cities Towns Villages Legendary.esp"],["e899:Populated Cities Towns Villages Legendary.esp","67af:Populated Cities Towns Villages Legendary.esp"],["eee3:Populated Cities Towns Villages Legendary.esp","678e:Populated Cities Towns Villages Legendary.esp"],["eee8:Populated Cities Towns Villages Legendary.esp","678f:Populated Cities Towns Villages Legendary.esp"],["eee9:Populated Cities Towns Villages Legendary.esp","6790:Populated Cities Towns Villages Legendary.esp"],["fe498:Skyrim.esm","16973:Skyrim.esm"],["fe4aa:Skyrim.esm","16973:Skyrim.esm"],["fe4bc:Skyrim.esm","16973:Skyrim.esm"],["fe4c1:Skyrim.esm","16973:Skyrim.esm"],["fe4c2:Skyrim.esm","16973:Skyrim.esm"],["fe4cb:Skyrim.esm","16ace:Skyrim.esm"],["fe4e4:Skyrim.esm","16ace:Skyrim.esm"],["fe4e7:Skyrim.esm","16ace:Skyrim.esm"],["fe4f0:Skyrim.esm","16ace:Skyrim.esm"],["ffe0:Populated Cities Towns Villages Legendary.esp","f9cf:Populated Cities Towns Villages Legendary.esp"],["ffec:Populated Cities Towns Villages Legendary.esp","fa05:Populated Cities Towns Villages Legendary.esp"],["fff0:Populated Cities Towns Villages Legendary.esp","ff74:Populated Cities Towns Villages Legendary.esp"],["fff2:Populated Cities Towns Villages Legendary.esp","ff77:Populated Cities Towns Villages Legendary.esp"],["fffe:Populated Cities Towns Villages Legendary.esp","ff97:Populated Cities Towns Villages Legendary.esp"]],"merchants":[{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},{"reference":"1a681:Skyrim.esm","base":"13b9e:Skyrim.esm","role":"Woodworker","hold":"Whiterun","bookHold":"whiterun"},{"reference":"1a684:Skyrim.esm","base":"13b9c:Skyrim.esm","role":"Tailor","hold":"Whiterun","bookHold":"whiterun"},{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},{"reference":"1a66e:Skyrim.esm","base":"13ba3:Skyrim.esm","role":"Cook","hold":"Whiterun","bookHold":"whiterun"},{"reference":"1a66d:Skyrim.esm","base":"13ba4:Skyrim.esm","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun"},{"reference":"198d8:Skyrim.esm","base":"13261:Skyrim.esm","role":"Smith","hold":"Haafingar","bookHold":"solitude"},{"reference":"198b1:Skyrim.esm","base":"13275:Skyrim.esm","role":"Woodworker","hold":"Haafingar","bookHold":"solitude"},{"reference":"198ac:Skyrim.esm","base":"132ab:Skyrim.esm","role":"Tailor","hold":"Haafingar","bookHold":"solitude"},{"reference":"198c5:Skyrim.esm","base":"132aa:Skyrim.esm","role":"Enchanter","hold":"Haafingar","bookHold":"solitude"},{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},{"reference":"198d2:Skyrim.esm","base":"13260:Skyrim.esm","role":"Alchemist","hold":"Haafingar","bookHold":"solitude"},{"reference":"19df1:Skyrim.esm","base":"1334c:Skyrim.esm","role":"Smith","hold":"the Rift","bookHold":"riften"},{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},{"reference":"31efc3:Riften Expansion.esp","base":"1d0769:Riften Expansion.esp","role":"Tailor","hold":"the Rift","bookHold":"riften"},{"reference":"19df0:Skyrim.esm","base":"19def:Skyrim.esm","role":"Enchanter","hold":"the Rift","bookHold":"riften"},{"reference":"19e14:Skyrim.esm","base":"13369:Skyrim.esm","role":"Cook","hold":"the Rift","bookHold":"riften"},{"reference":"19dfb:Skyrim.esm","base":"13357:Skyrim.esm","role":"Alchemist","hold":"the Rift","bookHold":"riften"},{"reference":"19906:Skyrim.esm","base":"1339a:Skyrim.esm","role":"Smith","hold":"the Reach","bookHold":"markarth"},{"reference":"198eb:Skyrim.esm","base":"133a1:Skyrim.esm","role":"Woodworker","hold":"the Reach","bookHold":"markarth"},{"reference":"198ea:Skyrim.esm","base":"133a5:Skyrim.esm","role":"Tailor","hold":"the Reach","bookHold":"markarth"},{"reference":"19908:Skyrim.esm","base":"1338e:Skyrim.esm","role":"Enchanter","hold":"the Reach","bookHold":"markarth"},{"reference":"1990a:Skyrim.esm","base":"13387:Skyrim.esm","role":"Cook","hold":"the Reach","bookHold":"markarth"},{"reference":"198f7:Skyrim.esm","base":"1338b:Skyrim.esm","role":"Alchemist","hold":"the Reach","bookHold":"markarth"},{"reference":"1b135:Skyrim.esm","base":"14142:Skyrim.esm","role":"Smith","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"1b123:Skyrim.esm","base":"1413a:Skyrim.esm","role":"Woodworker","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"1b124:Skyrim.esm","base":"14140:Skyrim.esm","role":"Tailor","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"1b132:Skyrim.esm","base":"14146:Skyrim.esm","role":"Enchanter","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"1b11a:Skyrim.esm","base":"1414b:Skyrim.esm","role":"Cook","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"1b115:Skyrim.esm","base":"14148:Skyrim.esm","role":"Alchemist","hold":"Eastmarch","bookHold":"windhelm"},{"reference":"e24:JKs Skyrim.esp","base":"2453c:JKs Skyrim.esp","role":"Smith","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"b818d:Arena - Markarth Side.esp","base":"52308:Arena - Markarth Side.esp","role":"Woodworker","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"13c008:Arena - Markarth Side.esp","base":"13c004:Arena - Markarth Side.esp","role":"Tailor","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"1aa5e:Skyrim.esm","base":"135e9:Skyrim.esm","role":"Enchanter","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"1aa62:Skyrim.esm","base":"135ed:Skyrim.esm","role":"Cook","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},{"reference":"1a6be:Skyrim.esm","base":"1361e:Skyrim.esm","role":"Smith","hold":"the Pale","bookHold":"dawnstar"},{"reference":"33a2:JKs Skyrim.esp","base":"342f:JKs Skyrim.esp","role":"Woodworker","hold":"the Pale","bookHold":"dawnstar"},{"reference":"1a6bf:Skyrim.esm","base":"1361f:Skyrim.esm","role":"Tailor","hold":"the Pale","bookHold":"dawnstar"},{"reference":"1a6c3:Skyrim.esm","base":"1361d:Skyrim.esm","role":"Enchanter","hold":"the Pale","bookHold":"dawnstar"},{"reference":"3a22:JKs Skyrim.esp","base":"3a21:JKs Skyrim.esp","role":"Cook","hold":"the Pale","bookHold":"dawnstar"},{"reference":"1a6b5:Skyrim.esm","base":"13614:Skyrim.esm","role":"Alchemist","hold":"the Pale","bookHold":"dawnstar"},{"reference":"1c18c:Skyrim.esm","base":"1c187:Skyrim.esm","role":"Smith","hold":"Winterhold","bookHold":"winterhold"},{"reference":"b4a3:Populated Cities Towns Villages Legendary.esp","base":"7da1:Populated Cities Towns Villages Legendary.esp","role":"Woodworker","hold":"Winterhold","bookHold":"winterhold"},{"reference":"1c18e:Skyrim.esm","base":"1c184:Skyrim.esm","role":"Tailor","hold":"Winterhold","bookHold":"winterhold"},{"reference":"1e7d6:Skyrim.esm","base":"1e7d5:Skyrim.esm","role":"Enchanter","hold":"Winterhold","bookHold":"winterhold"},{"reference":"1c18d:Skyrim.esm","base":"1c183:Skyrim.esm","role":"Cook","hold":"Winterhold","bookHold":"winterhold"},{"reference":"1c1aa:Skyrim.esm","base":"1c19c:Skyrim.esm","role":"Alchemist","hold":"Winterhold","bookHold":"winterhold"},{"reference":"3a19f:Skyrim.esm","base":"13650:Skyrim.esm","role":"Smith","hold":"Falkreath","bookHold":"falkreath"},{"reference":"1981e:Skyrim.esm","base":"13652:Skyrim.esm","role":"Woodworker","hold":"Falkreath","bookHold":"falkreath"},{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},{"reference":"72c89:North Keep.esp","base":"59028:North Keep.esp","role":"Enchanter","hold":"Falkreath","bookHold":"falkreath"},{"reference":"3a198:Skyrim.esm","base":"13655:Skyrim.esm","role":"Cook","hold":"Falkreath","bookHold":"falkreath"},{"reference":"3a19b:Skyrim.esm","base":"3a19a:Skyrim.esm","role":"Alchemist","hold":"Falkreath","bookHold":"falkreath"},{"reference":"1828f:Dragonborn.esm","base":"1828e:Dragonborn.esm","role":"Smith","hold":"Solstheim","bookHold":"ravenrock"},{"reference":"18293:Dragonborn.esm","base":"18292:Dragonborn.esm","role":"Woodworker","hold":"Solstheim","bookHold":"ravenrock"},{"reference":"18fc0:Dragonborn.esm","base":"18fbd:Dragonborn.esm","role":"Tailor","hold":"Solstheim","bookHold":"ravenrock"},{"reference":"177da:Dragonborn.esm","base":"1773a:Dragonborn.esm","role":"Enchanter","hold":"Solstheim","bookHold":"ravenrock"},{"reference":"18291:Dragonborn.esm","base":"18290:Dragonborn.esm","role":"Cook","hold":"Solstheim","bookHold":"ravenrock"},{"reference":"182a2:Dragonborn.esm","base":"182a1:Dragonborn.esm","role":"Alchemist","hold":"Solstheim","bookHold":"ravenrock"}],"tables":{"Smith":{"buy":["10aa19:Skyrim.esm","10c6fb:Skyrim.esm","12e46:Skyrim.esm","12e49:Skyrim.esm","12e4b:Skyrim.esm","12e4d:Skyrim.esm","12eb6:Skyrim.esm","12eb7:Skyrim.esm","1359d:Skyrim.esm","13790:Skyrim.esm","13910:Skyrim.esm","13911:Skyrim.esm","13912:Skyrim.esm","13913:Skyrim.esm","13914:Skyrim.esm","1391a:Skyrim.esm","1391c:Skyrim.esm","1391d:Skyrim.esm","1391e:Skyrim.esm","13920:Skyrim.esm","13921:Skyrim.esm","13922:Skyrim.esm","13938:Skyrim.esm","13939:Skyrim.esm","1393a:Skyrim.esm","1393b:Skyrim.esm","1393c:Skyrim.esm","13946:Skyrim.esm","13948:Skyrim.esm","1394b:Skyrim.esm","1394c:Skyrim.esm","1394d:Skyrim.esm","1394e:Skyrim.esm","1394f:Skyrim.esm","13950:Skyrim.esm","13952:Skyrim.esm","13954:Skyrim.esm","13955:Skyrim.esm","13956:Skyrim.esm","13957:Skyrim.esm","13958:Skyrim.esm","13959:Skyrim.esm","1395b:Skyrim.esm","1395c:Skyrim.esm","1395d:Skyrim.esm","1395e:Skyrim.esm","13960:Skyrim.esm","13961:Skyrim.esm","13962:Skyrim.esm","13963:Skyrim.esm","13964:Skyrim.esm","1397e:Skyrim.esm","13980:Skyrim.esm","13981:Skyrim.esm","13982:Skyrim.esm","13983:Skyrim.esm","13984:Skyrim.esm","13986:Skyrim.esm","13987:Skyrim.esm","13988:Skyrim.esm","13989:Skyrim.esm","1398a:Skyrim.esm","1398b:Skyrim.esm","1398c:Skyrim.esm","1398e:Skyrim.esm","1398f:Skyrim.esm","13990:Skyrim.esm","13991:Skyrim.esm","13992:Skyrim.esm","13993:Skyrim.esm","13994:Skyrim.esm","13996:Skyrim.esm","13997:Skyrim.esm","13998:Skyrim.esm","13999:Skyrim.esm","1399a:Skyrim.esm","1399b:Skyrim.esm","1399c:Skyrim.esm","1399e:Skyrim.esm","1399f:Skyrim.esm","139a0:Skyrim.esm","139a1:Skyrim.esm","139a2:Skyrim.esm","139a3:Skyrim.esm","139a4:Skyrim.esm","139a6:Skyrim.esm","139a7:Skyrim.esm","139a8:Skyrim.esm","139a9:Skyrim.esm","139aa:Skyrim.esm","139ab:Skyrim.esm","139ac:Skyrim.esm","139ae:Skyrim.esm","139af:Skyrim.esm","139b0:Skyrim.esm","139b1:Skyrim.esm","139b2:Skyrim.esm","14757:Dawnguard.esm","14758:Dawnguard.esm","150b8:Dawnguard.esm","15490:Thornswood-Content.esp","15494:Thornswood-Content.esp","15495:Thornswood-Content.esp","154b0:Thornswood-Content.esp","154b1:Thornswood-Content.esp","16e26:Dragonborn.esm","17e97:Dragonborn.esm","18388:Skyrim.esm","19f5f:Playable Rieklings.esp","19f60:Playable Rieklings.esp","19f61:Playable Rieklings.esp","19f62:Playable Rieklings.esp","19f6a:Playable Rieklings.esp","19f71:Playable Rieklings.esp","1b39f:Skyrim.esm","1b3a0:Skyrim.esm","1b3a1:Skyrim.esm","1b3a3:Skyrim.esm","1cd7c:Dragonborn.esm","1cd7e:Dragonborn.esm","1cd82:Dragonborn.esm","1cd86:Dragonborn.esm","1cd87:Dragonborn.esm","1cd88:Dragonborn.esm","1cd89:Dragonborn.esm","1cd8a:Dragonborn.esm","1cd8b:Dragonborn.esm","1cd8c:Dragonborn.esm","1cd92:Dragonborn.esm","1cd93:Dragonborn.esm","1cd94:Dragonborn.esm","1cd95:Dragonborn.esm","1cd96:Dragonborn.esm","1cd97:Dragonborn.esm","1cd98:Dragonborn.esm","1cd99:Dragonborn.esm","1cd9e:Dragonborn.esm","1cd9f:Dragonborn.esm","1cda0:Dragonborn.esm","1cda1:Dragonborn.esm","1cda2:Dragonborn.esm","1cda3:Dragonborn.esm","1cda5:Dragonborn.esm","1cdad:Dragonborn.esm","1cdae:Dragonborn.esm","1cdaf:Dragonborn.esm","1cdb0:Dragonborn.esm","1cdb1:Dragonborn.esm","1cdb2:Dragonborn.esm","1cdb3:Dragonborn.esm","1cdb4:Dragonborn.esm","1cdb5:Dragonborn.esm","1cdb6:Dragonborn.esm","1cdb7:Dragonborn.esm","1cdb8:Dragonborn.esm","1cdb9:Dragonborn.esm","1cdba:Dragonborn.esm","214a1:Hothtrooper44_ArmorCompilation.esp","23146:Hothtrooper44_ArmorCompilation.esp","2314b:Hothtrooper44_ArmorCompilation.esp","23150:Hothtrooper44_ArmorCompilation.esp","23155:Hothtrooper44_ArmorCompilation.esp","2315f:Hothtrooper44_ArmorCompilation.esp","23164:Hothtrooper44_ArmorCompilation.esp","23169:Hothtrooper44_ArmorCompilation.esp","2316e:Hothtrooper44_ArmorCompilation.esp","238e0:Hothtrooper44_ArmorCompilation.esp","238e2:Hothtrooper44_ArmorCompilation.esp","238eb:Hothtrooper44_ArmorCompilation.esp","238f1:Hothtrooper44_ArmorCompilation.esp","23e9:Dawnguard.esm","23eb:Dawnguard.esm","23ed:Dawnguard.esm","23ef:Dawnguard.esm","26234:Dragonborn.esm","26235:Dragonborn.esm","26236:Dragonborn.esm","26237:Dragonborn.esm","2b04e:Dragonborn.esm","2b06b:Dragonborn.esm","2e4e6:Skyrim.esm","2e6d1:Skyrim.esm","2f2f4:Skyrim.esm","302cd:Skyrim.esm","34cd6:Skyrim.esm","34cdd:Skyrim.esm","3619e:Skyrim.esm","3ad52:Skyrim.esm","3ad57:Skyrim.esm","3ad5f:Skyrim.esm","3ad6d:Skyrim.esm","3ad90:Skyrim.esm","441003:Immersive Weapons.esp","4c3cb:Skyrim.esm","4c3d0:Skyrim.esm","50d0:Dawnguard.esm","56a9d:Skyrim.esm","56a9e:Skyrim.esm","56b17:Skyrim.esm","5acdb:Skyrim.esm","5acdc:Skyrim.esm","5acdd:Skyrim.esm","5acde:Skyrim.esm","5acdf:Skyrim.esm","5ace0:Skyrim.esm","5ace1:Skyrim.esm","5ace2:Skyrim.esm","5ace3:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad93:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9e:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","5c06c:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc0b:Skyrim.esm","6f393:Skyrim.esm","6f39b:Skyrim.esm","6f39e:Skyrim.esm","71cf3:Skyrim.esm","747df:Immersive Weapons.esp","747e0:Immersive Weapons.esp","800e4:Skyrim.esm","8697e:Skyrim.esm","86981:Skyrim.esm","86983:Skyrim.esm","86985:Skyrim.esm","896a3:Skyrim.esm","9b8a4:Playable Rieklings.esp","a6d79:Skyrim.esm","a6d7b:Skyrim.esm","a6d7f:Skyrim.esm","ab64:Hothtrooper44_ArmorCompilation.esp","ab65:Hothtrooper44_ArmorCompilation.esp","ab66:Hothtrooper44_ArmorCompilation.esp","ab67:Hothtrooper44_ArmorCompilation.esp","b83cb:Skyrim.esm","b83cd:Skyrim.esm","b83cf:Skyrim.esm","cade9:Skyrim.esm","cae15:Skyrim.esm","cc829:Skyrim.esm","cee7c:Skyrim.esm","cee7e:Skyrim.esm","d284d:Skyrim.esm","d8d4e:Skyrim.esm","d8d50:Skyrim.esm","d8d52:Skyrim.esm","d8d55:Skyrim.esm","da0b12:Update.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm","e3c16:Skyrim.esm","f3f7:Dawnguard.esm","f3fb:Dawnguard.esm","f3fe:Dawnguard.esm","f400:Dawnguard.esm","f5d05:Skyrim.esm","f6f21:Skyrim.esm"],"sell":["10aa19:Skyrim.esm","10c6fb:Skyrim.esm","12e46:Skyrim.esm","12e49:Skyrim.esm","12e4b:Skyrim.esm","12e4d:Skyrim.esm","12eb6:Skyrim.esm","12eb7:Skyrim.esm","1359d:Skyrim.esm","13790:Skyrim.esm","13910:Skyrim.esm","13911:Skyrim.esm","13912:Skyrim.esm","13913:Skyrim.esm","13914:Skyrim.esm","1391a:Skyrim.esm","1391c:Skyrim.esm","1391d:Skyrim.esm","1391e:Skyrim.esm","13920:Skyrim.esm","13921:Skyrim.esm","13922:Skyrim.esm","13938:Skyrim.esm","13939:Skyrim.esm","1393a:Skyrim.esm","1393b:Skyrim.esm","1393c:Skyrim.esm","13946:Skyrim.esm","13948:Skyrim.esm","1394b:Skyrim.esm","1394c:Skyrim.esm","1394d:Skyrim.esm","1394e:Skyrim.esm","1394f:Skyrim.esm","13950:Skyrim.esm","13952:Skyrim.esm","13954:Skyrim.esm","13955:Skyrim.esm","13956:Skyrim.esm","13957:Skyrim.esm","13958:Skyrim.esm","13959:Skyrim.esm","1395b:Skyrim.esm","1395c:Skyrim.esm","1395d:Skyrim.esm","1395e:Skyrim.esm","13960:Skyrim.esm","13961:Skyrim.esm","13962:Skyrim.esm","13963:Skyrim.esm","13964:Skyrim.esm","1397e:Skyrim.esm","13980:Skyrim.esm","13981:Skyrim.esm","13982:Skyrim.esm","13983:Skyrim.esm","13984:Skyrim.esm","13986:Skyrim.esm","13987:Skyrim.esm","13988:Skyrim.esm","13989:Skyrim.esm","1398a:Skyrim.esm","1398b:Skyrim.esm","1398c:Skyrim.esm","1398e:Skyrim.esm","1398f:Skyrim.esm","13990:Skyrim.esm","13991:Skyrim.esm","13992:Skyrim.esm","13993:Skyrim.esm","13994:Skyrim.esm","13996:Skyrim.esm","13997:Skyrim.esm","13998:Skyrim.esm","13999:Skyrim.esm","1399a:Skyrim.esm","1399b:Skyrim.esm","1399c:Skyrim.esm","1399e:Skyrim.esm","1399f:Skyrim.esm","139a0:Skyrim.esm","139a1:Skyrim.esm","139a2:Skyrim.esm","139a3:Skyrim.esm","139a4:Skyrim.esm","139a6:Skyrim.esm","139a7:Skyrim.esm","139a8:Skyrim.esm","139a9:Skyrim.esm","139aa:Skyrim.esm","139ab:Skyrim.esm","139ac:Skyrim.esm","139ae:Skyrim.esm","139af:Skyrim.esm","139b0:Skyrim.esm","139b1:Skyrim.esm","139b2:Skyrim.esm","14757:Dawnguard.esm","14758:Dawnguard.esm","150b8:Dawnguard.esm","15490:Thornswood-Content.esp","15494:Thornswood-Content.esp","15495:Thornswood-Content.esp","154b0:Thornswood-Content.esp","154b1:Thornswood-Content.esp","16e26:Dragonborn.esm","17e97:Dragonborn.esm","18388:Skyrim.esm","19f5f:Playable Rieklings.esp","19f60:Playable Rieklings.esp","19f61:Playable Rieklings.esp","19f62:Playable Rieklings.esp","19f6a:Playable Rieklings.esp","19f71:Playable Rieklings.esp","1b39f:Skyrim.esm","1b3a0:Skyrim.esm","1b3a1:Skyrim.esm","1b3a3:Skyrim.esm","1cd7c:Dragonborn.esm","1cd7e:Dragonborn.esm","1cd82:Dragonborn.esm","1cd86:Dragonborn.esm","1cd87:Dragonborn.esm","1cd88:Dragonborn.esm","1cd89:Dragonborn.esm","1cd8a:Dragonborn.esm","1cd8b:Dragonborn.esm","1cd8c:Dragonborn.esm","1cd92:Dragonborn.esm","1cd93:Dragonborn.esm","1cd94:Dragonborn.esm","1cd95:Dragonborn.esm","1cd96:Dragonborn.esm","1cd97:Dragonborn.esm","1cd98:Dragonborn.esm","1cd99:Dragonborn.esm","1cd9e:Dragonborn.esm","1cd9f:Dragonborn.esm","1cda0:Dragonborn.esm","1cda1:Dragonborn.esm","1cda2:Dragonborn.esm","1cda3:Dragonborn.esm","1cda5:Dragonborn.esm","1cdad:Dragonborn.esm","1cdae:Dragonborn.esm","1cdaf:Dragonborn.esm","1cdb0:Dragonborn.esm","1cdb1:Dragonborn.esm","1cdb2:Dragonborn.esm","1cdb3:Dragonborn.esm","1cdb4:Dragonborn.esm","1cdb5:Dragonborn.esm","1cdb6:Dragonborn.esm","1cdb7:Dragonborn.esm","1cdb8:Dragonborn.esm","1cdb9:Dragonborn.esm","1cdba:Dragonborn.esm","214a1:Hothtrooper44_ArmorCompilation.esp","23146:Hothtrooper44_ArmorCompilation.esp","2314b:Hothtrooper44_ArmorCompilation.esp","23150:Hothtrooper44_ArmorCompilation.esp","23155:Hothtrooper44_ArmorCompilation.esp","2315f:Hothtrooper44_ArmorCompilation.esp","23164:Hothtrooper44_ArmorCompilation.esp","23169:Hothtrooper44_ArmorCompilation.esp","2316e:Hothtrooper44_ArmorCompilation.esp","238e0:Hothtrooper44_ArmorCompilation.esp","238e2:Hothtrooper44_ArmorCompilation.esp","238eb:Hothtrooper44_ArmorCompilation.esp","238f1:Hothtrooper44_ArmorCompilation.esp","23e9:Dawnguard.esm","23eb:Dawnguard.esm","23ed:Dawnguard.esm","23ef:Dawnguard.esm","26234:Dragonborn.esm","26235:Dragonborn.esm","26236:Dragonborn.esm","26237:Dragonborn.esm","2b04e:Dragonborn.esm","2b06b:Dragonborn.esm","2e4e6:Skyrim.esm","2e6d1:Skyrim.esm","2f2f4:Skyrim.esm","302cd:Skyrim.esm","34cd6:Skyrim.esm","34cdd:Skyrim.esm","3619e:Skyrim.esm","3ad52:Skyrim.esm","3ad57:Skyrim.esm","3ad5f:Skyrim.esm","3ad6d:Skyrim.esm","3ad90:Skyrim.esm","441003:Immersive Weapons.esp","4c3cb:Skyrim.esm","4c3d0:Skyrim.esm","50d0:Dawnguard.esm","56a9d:Skyrim.esm","56a9e:Skyrim.esm","56b17:Skyrim.esm","5acdb:Skyrim.esm","5acdc:Skyrim.esm","5acdd:Skyrim.esm","5acde:Skyrim.esm","5acdf:Skyrim.esm","5ace0:Skyrim.esm","5ace1:Skyrim.esm","5ace2:Skyrim.esm","5ace3:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad93:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9e:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","5c06c:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc0b:Skyrim.esm","6f393:Skyrim.esm","6f39b:Skyrim.esm","6f39e:Skyrim.esm","71cf3:Skyrim.esm","747df:Immersive Weapons.esp","747e0:Immersive Weapons.esp","800e4:Skyrim.esm","8697e:Skyrim.esm","86981:Skyrim.esm","86983:Skyrim.esm","86985:Skyrim.esm","896a3:Skyrim.esm","9b8a4:Playable Rieklings.esp","a6d79:Skyrim.esm","a6d7b:Skyrim.esm","a6d7f:Skyrim.esm","ab64:Hothtrooper44_ArmorCompilation.esp","ab65:Hothtrooper44_ArmorCompilation.esp","ab66:Hothtrooper44_ArmorCompilation.esp","ab67:Hothtrooper44_ArmorCompilation.esp","b83cb:Skyrim.esm","b83cd:Skyrim.esm","b83cf:Skyrim.esm","cade9:Skyrim.esm","cae15:Skyrim.esm","cc829:Skyrim.esm","cee7c:Skyrim.esm","cee7e:Skyrim.esm","d284d:Skyrim.esm","d8d4e:Skyrim.esm","d8d50:Skyrim.esm","d8d52:Skyrim.esm","d8d55:Skyrim.esm","da0b12:Update.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm","e3c16:Skyrim.esm","f3f7:Dawnguard.esm","f3fb:Dawnguard.esm","f3fe:Dawnguard.esm","f400:Dawnguard.esm","f5d05:Skyrim.esm","f6f21:Skyrim.esm"],"supply":["15490:Thornswood-Content.esp","16e26:Dragonborn.esm","17e97:Dragonborn.esm","1cd7c:Dragonborn.esm","2b04e:Dragonborn.esm","2b06b:Dragonborn.esm","2e4e6:Skyrim.esm","34cd6:Skyrim.esm","34cdd:Skyrim.esm","3ad52:Skyrim.esm","3ad57:Skyrim.esm","3ad5f:Skyrim.esm","3ad6d:Skyrim.esm","3ad90:Skyrim.esm","5acdb:Skyrim.esm","5acdc:Skyrim.esm","5acdd:Skyrim.esm","5acde:Skyrim.esm","5acdf:Skyrim.esm","5ace0:Skyrim.esm","5ace1:Skyrim.esm","5ace2:Skyrim.esm","5ace3:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad93:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc0b:Skyrim.esm","71cf3:Skyrim.esm","800e4:Skyrim.esm","d284d:Skyrim.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm"]},"Woodworker":{"buy":["1397d:Skyrim.esm","1397f:Skyrim.esm","1398d:Skyrim.esm","13995:Skyrim.esm","1399d:Skyrim.esm","139a5:Skyrim.esm","139ad:Skyrim.esm","139bb:Skyrim.esm","139bc:Skyrim.esm","139bd:Skyrim.esm","139be:Skyrim.esm","139bf:Skyrim.esm","15481:Thornswood-Content.esp","15482:Thornswood-Content.esp","15484:Thornswood-Content.esp","15485:Thornswood-Content.esp","15490:Thornswood-Content.esp","15498:Thornswood-Content.esp","15499:Thornswood-Content.esp","1549a:Thornswood-Content.esp","1549b:Thornswood-Content.esp","154c1:Thornswood-Content.esp","17720:Dragonborn.esm","1b935:Dragonborn.esm","1d9b:PlayFluteLuteDrum.esp","26231:Dragonborn.esm","26232:Dragonborn.esm","26239:Dragonborn.esm","2623b:Dragonborn.esm","287f:PlayFluteLuteDrum.esp","2b06b:Dragonborn.esm","38340:Skyrim.esm","38341:Skyrim.esm","3ad57:Skyrim.esm","3c337:Dragonborn.esm","3f7f8:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","6f993:Skyrim.esm","800e4:Skyrim.esm","801:Dawnguard.esm","b647:Dawnguard.esm","bb3:Dawnguard.esm","d099:Dawnguard.esm","d62:PlayFluteLuteDrum.esp","daba7:Skyrim.esm","daba9:Skyrim.esm","dabab:Skyrim.esm","db8a2:Skyrim.esm"],"sell":["1397d:Skyrim.esm","1397f:Skyrim.esm","1398d:Skyrim.esm","13995:Skyrim.esm","1399d:Skyrim.esm","139a5:Skyrim.esm","139ad:Skyrim.esm","139bb:Skyrim.esm","139bc:Skyrim.esm","139bd:Skyrim.esm","139be:Skyrim.esm","139bf:Skyrim.esm","15481:Thornswood-Content.esp","15482:Thornswood-Content.esp","15484:Thornswood-Content.esp","15485:Thornswood-Content.esp","15490:Thornswood-Content.esp","15498:Thornswood-Content.esp","15499:Thornswood-Content.esp","1549a:Thornswood-Content.esp","1549b:Thornswood-Content.esp","154c1:Thornswood-Content.esp","17720:Dragonborn.esm","1b935:Dragonborn.esm","1d9b:PlayFluteLuteDrum.esp","26231:Dragonborn.esm","26232:Dragonborn.esm","26239:Dragonborn.esm","2623b:Dragonborn.esm","287f:PlayFluteLuteDrum.esp","2b06b:Dragonborn.esm","38340:Skyrim.esm","38341:Skyrim.esm","3ad57:Skyrim.esm","3c337:Dragonborn.esm","3f7f8:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","6f993:Skyrim.esm","800e4:Skyrim.esm","801:Dawnguard.esm","b647:Dawnguard.esm","bb3:Dawnguard.esm","d099:Dawnguard.esm","d62:PlayFluteLuteDrum.esp","daba7:Skyrim.esm","daba9:Skyrim.esm","dabab:Skyrim.esm","db8a2:Skyrim.esm"],"supply":["2b06b:Dragonborn.esm","3ad57:Skyrim.esm","3f7f8:Skyrim.esm","5ace4:Skyrim.esm","5ace5:Skyrim.esm","5ad99:Skyrim.esm","5ad9d:Skyrim.esm","5ad9f:Skyrim.esm","5ada0:Skyrim.esm","5ada1:Skyrim.esm","6f993:Skyrim.esm","800e4:Skyrim.esm","daba7:Skyrim.esm","daba9:Skyrim.esm","dabab:Skyrim.esm","db8a2:Skyrim.esm"]},"Tailor":{"buy":["106661:Skyrim.esm","107106:Skyrim.esm","107108:Skyrim.esm","10710a:Skyrim.esm","10cee3:Skyrim.esm","10cee6:Skyrim.esm","10cee8:Skyrim.esm","10cfe4:Skyrim.esm","10cfea:Skyrim.esm","10cfeb:Skyrim.esm","10cfec:Skyrim.esm","10cfef:Skyrim.esm","10cff0:Skyrim.esm","10cff1:Skyrim.esm","10cff2:Skyrim.esm","10d2b4:Skyrim.esm","10d2b5:Skyrim.esm","10d662:Skyrim.esm","10d664:Skyrim.esm","10e2ce:Skyrim.esm","10e2dc:Skyrim.esm","1199a:Dawnguard.esm","12c7:Cloaks&Capes.esp","13104:Skyrim.esm","13105:Skyrim.esm","13106:Skyrim.esm","154b2:Thornswood-Content.esp","154c0:Thornswood-Content.esp","15516:Skyrim.esm","17695:Skyrim.esm","17696:Skyrim.esm","18801:Skyrim.esm","19ade:Dawnguard.esm","19adf:Dawnguard.esm","19ae1:Dawnguard.esm","19ae3:Dawnguard.esm","1bc82:Skyrim.esm","1bca7:Skyrim.esm","1be1a:Skyrim.esm","1be1b:Skyrim.esm","1d8e:Cloaks&Capes.esp","1d8e:Hothtrooper44_ArmorCompilation.esp","209a5:Skyrim.esm","209a6:Skyrim.esm","209aa:Skyrim.esm","22fc:Hothtrooper44_ArmorCompilation.esp","23060:Hothtrooper44_ArmorCompilation.esp","23061:Hothtrooper44_ArmorCompilation.esp","2317c:Hothtrooper44_ArmorCompilation.esp","2317d:Hothtrooper44_ArmorCompilation.esp","2317e:Hothtrooper44_ArmorCompilation.esp","2317f:Hothtrooper44_ArmorCompilation.esp","23180:Hothtrooper44_ArmorCompilation.esp","23181:Hothtrooper44_ArmorCompilation.esp","23182:Hothtrooper44_ArmorCompilation.esp","23183:Hothtrooper44_ArmorCompilation.esp","23184:Hothtrooper44_ArmorCompilation.esp","23185:Hothtrooper44_ArmorCompilation.esp","23186:Hothtrooper44_ArmorCompilation.esp","23187:Hothtrooper44_ArmorCompilation.esp","23188:Hothtrooper44_ArmorCompilation.esp","23189:Hothtrooper44_ArmorCompilation.esp","2318a:Hothtrooper44_ArmorCompilation.esp","2318b:Hothtrooper44_ArmorCompilation.esp","2318c:Hothtrooper44_ArmorCompilation.esp","2318d:Hothtrooper44_ArmorCompilation.esp","2318e:Hothtrooper44_ArmorCompilation.esp","2318f:Hothtrooper44_ArmorCompilation.esp","2325c:Hothtrooper44_ArmorCompilation.esp","23262:Hothtrooper44_ArmorCompilation.esp","238e9:Hothtrooper44_ArmorCompilation.esp","238ea:Hothtrooper44_ArmorCompilation.esp","238fb:Hothtrooper44_ArmorCompilation.esp","238fc:Hothtrooper44_ArmorCompilation.esp","23a09:Playable Rieklings.esp","261bd:Skyrim.esm","261c0:Skyrim.esm","261c1:Skyrim.esm","285f:Hothtrooper44_ArmorCompilation.esp","2883:Cloaks&Capes.esp","2884:Cloaks&Capes.esp","2885:Cloaks&Capes.esp","2886:Cloaks&Capes.esp","2887:Cloaks&Capes.esp","2888:Cloaks&Capes.esp","2889:Cloaks&Capes.esp","2a78:Dawnguard.esm","2dd5:Hothtrooper44_ArmorCompilation.esp","2dec:Cloaks&Capes.esp","2ded:Cloaks&Capes.esp","2dee:Cloaks&Capes.esp","2def:Cloaks&Capes.esp","2df0:Cloaks&Capes.esp","2df2:Cloaks&Capes.esp","2df3:Cloaks&Capes.esp","2df4:Cloaks&Capes.esp","2df5:Cloaks&Capes.esp","2df6:Cloaks&Capes.esp","2df7:Cloaks&Capes.esp","2df8:Cloaks&Capes.esp","2df9:Cloaks&Capes.esp","2dfa:Cloaks&Capes.esp","2dfb:Cloaks&Capes.esp","2e4e6:Skyrim.esm","330b3:Skyrim.esm","330bc:Skyrim.esm","3329:Hothtrooper44_ArmorCompilation.esp","3452e:Skyrim.esm","3452f:Skyrim.esm","34cd6:Skyrim.esm","3705a:Dragonborn.esm","372fa:Hothtrooper44_ArmorCompilation.esp","372fb:Hothtrooper44_ArmorCompilation.esp","372fc:Hothtrooper44_ArmorCompilation.esp","372fd:Hothtrooper44_ArmorCompilation.esp","37302:Hothtrooper44_ArmorCompilation.esp","37303:Hothtrooper44_ArmorCompilation.esp","37304:Hothtrooper44_ArmorCompilation.esp","37305:Hothtrooper44_ArmorCompilation.esp","37b8a:Dragonborn.esm","37b8c:Dragonborn.esm","37b8e:Dragonborn.esm","3ad52:Skyrim.esm","3ad54:Skyrim.esm","3ad6d:Skyrim.esm","3ad6e:Skyrim.esm","3ad72:Skyrim.esm","3b04b:Dragonborn.esm","3b04e:Dragonborn.esm","3c9fe:Skyrim.esm","3ca00:Skyrim.esm","3f7f8:Skyrim.esm","4223b:Skyrim.esm","4223c:Skyrim.esm","4223d:Skyrim.esm","47d7:Dawnguard.esm","47d9:Dawnguard.esm","48d8:Hothtrooper44_ArmorCompilation.esp","48d9:Hothtrooper44_ArmorCompilation.esp","48e0:Hothtrooper44_ArmorCompilation.esp","57f91:Skyrim.esm","5ace3:Skyrim.esm","5ad9d:Skyrim.esm","5ad9e:Skyrim.esm","5b69e:Skyrim.esm","5b69f:Skyrim.esm","5b6a0:Skyrim.esm","5b6a1:Skyrim.esm","5db7b:Skyrim.esm","5db7e:Skyrim.esm","62303:Skyrim.esm","6230b:Skyrim.esm","62311:Skyrim.esm","646a7:Skyrim.esm","646ab:Skyrim.esm","65b94:Skyrim.esm","65b99:Skyrim.esm","65b9b:Skyrim.esm","65b9d:Skyrim.esm","6b46b:Skyrim.esm","6b46c:Skyrim.esm","6c1d8:Skyrim.esm","6c1d9:Skyrim.esm","6c1da:Skyrim.esm","6ce001:Update.esm","6ff37:Skyrim.esm","6ff38:Skyrim.esm","6ff43:Skyrim.esm","6ff45:Skyrim.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","7bc15:Skyrim.esm","7bc19:Skyrim.esm","7bc1a:Skyrim.esm","800e4:Skyrim.esm","80697:Skyrim.esm","80699:Skyrim.esm","806:MoreCraftableEquipment.esp","807:MoreCraftableEquipment.esp","808:MoreCraftableEquipment.esp","809:MoreCraftableEquipment.esp","80a:MoreCraftableEquipment.esp","80b:MoreCraftableEquipment.esp","80c:MoreCraftableEquipment.esp","80d:MoreCraftableEquipment.esp","812:MoreCraftableEquipment.esp","822:MoreCraftableEquipment.esp","823:MoreCraftableEquipment.esp","824:MoreCraftableEquipment.esp","825:MoreCraftableEquipment.esp","826:MoreCraftableEquipment.esp","827:MoreCraftableEquipment.esp","828:MoreCraftableEquipment.esp","829:MoreCraftableEquipment.esp","82a:MoreCraftableEquipment.esp","82c:MoreCraftableEquipment.esp","82d:MoreCraftableEquipment.esp","82eb5:Hothtrooper44_ArmorCompilation.esp","82eb6:Hothtrooper44_ArmorCompilation.esp","82eb7:Hothtrooper44_ArmorCompilation.esp","82eb8:Hothtrooper44_ArmorCompilation.esp","82f:MoreCraftableEquipment.esp","830:MoreCraftableEquipment.esp","831:MoreCraftableEquipment.esp","832:MoreCraftableEquipment.esp","834:MoreCraftableEquipment.esp","835:MoreCraftableEquipment.esp","839:MoreCraftableEquipment.esp","83a:MoreCraftableEquipment.esp","83b:MoreCraftableEquipment.esp","83c:MoreCraftableEquipment.esp","83d:MoreCraftableEquipment.esp","83e:MoreCraftableEquipment.esp","83f:MoreCraftableEquipment.esp","840:MoreCraftableEquipment.esp","841:MoreCraftableEquipment.esp","842:MoreCraftableEquipment.esp","8698c:Skyrim.esm","8698e:Skyrim.esm","86990:Skyrim.esm","86991:Skyrim.esm","86993:Skyrim.esm","88956:Skyrim.esm","88958:Skyrim.esm","8895a:Skyrim.esm","8f19a:Skyrim.esm","9151b:Skyrim.esm","9f0:MoreCraftableEquipment.esp","9f3:MoreCraftableEquipment.esp","a199b:Skyrim.esm","b145b:Skyrim.esm","b1460:Skyrim.esm","ba99a:Hothtrooper44_ArmorCompilation.esp","bacd7:Skyrim.esm","bacf3:Skyrim.esm","bfd98:Playable Rieklings.esp","bfdb1:Playable Rieklings.esp","c36e8:Skyrim.esm","c742:HearthFires.esm","c743:HearthFires.esm","c744:HearthFires.esm","c745:HearthFires.esm","c746:HearthFires.esm","cee76:Skyrim.esm","cee78:Skyrim.esm","cee80:Skyrim.esm","cee82:Skyrim.esm","cee84:Skyrim.esm","d191f:Skyrim.esm","d1921:Skyrim.esm","d81e:HearthFires.esm","d81f:HearthFires.esm","d820:HearthFires.esm","d821:HearthFires.esm","d822:HearthFires.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm","e0dd0:Skyrim.esm","e0dd2:Skyrim.esm","e0dd4:Skyrim.esm","e84c1:Skyrim.esm","e84c4:Skyrim.esm","e84c6:Skyrim.esm","ead49:Skyrim.esm","f74c:Hothtrooper44_ArmorCompilation.esp","f8713:Skyrim.esm","f8715:Skyrim.esm"],"sell":["106661:Skyrim.esm","107106:Skyrim.esm","107108:Skyrim.esm","10710a:Skyrim.esm","10cee3:Skyrim.esm","10cee6:Skyrim.esm","10cee8:Skyrim.esm","10cfe4:Skyrim.esm","10cfea:Skyrim.esm","10cfeb:Skyrim.esm","10cfec:Skyrim.esm","10cfef:Skyrim.esm","10cff0:Skyrim.esm","10cff1:Skyrim.esm","10cff2:Skyrim.esm","10d2b4:Skyrim.esm","10d2b5:Skyrim.esm","10d662:Skyrim.esm","10d664:Skyrim.esm","10e2ce:Skyrim.esm","10e2dc:Skyrim.esm","1199a:Dawnguard.esm","12c7:Cloaks&Capes.esp","13104:Skyrim.esm","13105:Skyrim.esm","13106:Skyrim.esm","154b2:Thornswood-Content.esp","154c0:Thornswood-Content.esp","15516:Skyrim.esm","17695:Skyrim.esm","17696:Skyrim.esm","18801:Skyrim.esm","19ade:Dawnguard.esm","19adf:Dawnguard.esm","19ae1:Dawnguard.esm","19ae3:Dawnguard.esm","1bc82:Skyrim.esm","1bca7:Skyrim.esm","1be1a:Skyrim.esm","1be1b:Skyrim.esm","1d8e:Cloaks&Capes.esp","1d8e:Hothtrooper44_ArmorCompilation.esp","209a5:Skyrim.esm","209a6:Skyrim.esm","209aa:Skyrim.esm","22fc:Hothtrooper44_ArmorCompilation.esp","23060:Hothtrooper44_ArmorCompilation.esp","23061:Hothtrooper44_ArmorCompilation.esp","2317c:Hothtrooper44_ArmorCompilation.esp","2317d:Hothtrooper44_ArmorCompilation.esp","2317e:Hothtrooper44_ArmorCompilation.esp","2317f:Hothtrooper44_ArmorCompilation.esp","23180:Hothtrooper44_ArmorCompilation.esp","23181:Hothtrooper44_ArmorCompilation.esp","23182:Hothtrooper44_ArmorCompilation.esp","23183:Hothtrooper44_ArmorCompilation.esp","23184:Hothtrooper44_ArmorCompilation.esp","23185:Hothtrooper44_ArmorCompilation.esp","23186:Hothtrooper44_ArmorCompilation.esp","23187:Hothtrooper44_ArmorCompilation.esp","23188:Hothtrooper44_ArmorCompilation.esp","23189:Hothtrooper44_ArmorCompilation.esp","2318a:Hothtrooper44_ArmorCompilation.esp","2318b:Hothtrooper44_ArmorCompilation.esp","2318c:Hothtrooper44_ArmorCompilation.esp","2318d:Hothtrooper44_ArmorCompilation.esp","2318e:Hothtrooper44_ArmorCompilation.esp","2318f:Hothtrooper44_ArmorCompilation.esp","2325c:Hothtrooper44_ArmorCompilation.esp","23262:Hothtrooper44_ArmorCompilation.esp","238e9:Hothtrooper44_ArmorCompilation.esp","238ea:Hothtrooper44_ArmorCompilation.esp","238fb:Hothtrooper44_ArmorCompilation.esp","238fc:Hothtrooper44_ArmorCompilation.esp","23a09:Playable Rieklings.esp","261bd:Skyrim.esm","261c0:Skyrim.esm","261c1:Skyrim.esm","285f:Hothtrooper44_ArmorCompilation.esp","2883:Cloaks&Capes.esp","2884:Cloaks&Capes.esp","2885:Cloaks&Capes.esp","2886:Cloaks&Capes.esp","2887:Cloaks&Capes.esp","2888:Cloaks&Capes.esp","2889:Cloaks&Capes.esp","2a78:Dawnguard.esm","2dd5:Hothtrooper44_ArmorCompilation.esp","2dec:Cloaks&Capes.esp","2ded:Cloaks&Capes.esp","2dee:Cloaks&Capes.esp","2def:Cloaks&Capes.esp","2df0:Cloaks&Capes.esp","2df2:Cloaks&Capes.esp","2df3:Cloaks&Capes.esp","2df4:Cloaks&Capes.esp","2df5:Cloaks&Capes.esp","2df6:Cloaks&Capes.esp","2df7:Cloaks&Capes.esp","2df8:Cloaks&Capes.esp","2df9:Cloaks&Capes.esp","2dfa:Cloaks&Capes.esp","2dfb:Cloaks&Capes.esp","2e4e6:Skyrim.esm","330b3:Skyrim.esm","330bc:Skyrim.esm","3329:Hothtrooper44_ArmorCompilation.esp","3452e:Skyrim.esm","3452f:Skyrim.esm","34cd6:Skyrim.esm","3705a:Dragonborn.esm","372fa:Hothtrooper44_ArmorCompilation.esp","372fb:Hothtrooper44_ArmorCompilation.esp","372fc:Hothtrooper44_ArmorCompilation.esp","372fd:Hothtrooper44_ArmorCompilation.esp","37302:Hothtrooper44_ArmorCompilation.esp","37303:Hothtrooper44_ArmorCompilation.esp","37304:Hothtrooper44_ArmorCompilation.esp","37305:Hothtrooper44_ArmorCompilation.esp","37b8a:Dragonborn.esm","37b8c:Dragonborn.esm","37b8e:Dragonborn.esm","3ad52:Skyrim.esm","3ad54:Skyrim.esm","3ad6d:Skyrim.esm","3ad6e:Skyrim.esm","3ad72:Skyrim.esm","3b04b:Dragonborn.esm","3b04e:Dragonborn.esm","3c9fe:Skyrim.esm","3ca00:Skyrim.esm","3f7f8:Skyrim.esm","4223b:Skyrim.esm","4223c:Skyrim.esm","4223d:Skyrim.esm","47d7:Dawnguard.esm","47d9:Dawnguard.esm","48d8:Hothtrooper44_ArmorCompilation.esp","48d9:Hothtrooper44_ArmorCompilation.esp","48e0:Hothtrooper44_ArmorCompilation.esp","57f91:Skyrim.esm","5ace3:Skyrim.esm","5ad9d:Skyrim.esm","5ad9e:Skyrim.esm","5b69e:Skyrim.esm","5b69f:Skyrim.esm","5b6a0:Skyrim.esm","5b6a1:Skyrim.esm","5db7b:Skyrim.esm","5db7e:Skyrim.esm","62303:Skyrim.esm","6230b:Skyrim.esm","62311:Skyrim.esm","646a7:Skyrim.esm","646ab:Skyrim.esm","65b94:Skyrim.esm","65b99:Skyrim.esm","65b9b:Skyrim.esm","65b9d:Skyrim.esm","6b46b:Skyrim.esm","6b46c:Skyrim.esm","6c1d8:Skyrim.esm","6c1d9:Skyrim.esm","6c1da:Skyrim.esm","6ce001:Update.esm","6ff37:Skyrim.esm","6ff38:Skyrim.esm","6ff43:Skyrim.esm","6ff45:Skyrim.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","7bc15:Skyrim.esm","7bc19:Skyrim.esm","7bc1a:Skyrim.esm","800e4:Skyrim.esm","80697:Skyrim.esm","80699:Skyrim.esm","806:MoreCraftableEquipment.esp","807:MoreCraftableEquipment.esp","808:MoreCraftableEquipment.esp","809:MoreCraftableEquipment.esp","80a:MoreCraftableEquipment.esp","80b:MoreCraftableEquipment.esp","80c:MoreCraftableEquipment.esp","80d:MoreCraftableEquipment.esp","812:MoreCraftableEquipment.esp","822:MoreCraftableEquipment.esp","823:MoreCraftableEquipment.esp","824:MoreCraftableEquipment.esp","825:MoreCraftableEquipment.esp","826:MoreCraftableEquipment.esp","827:MoreCraftableEquipment.esp","828:MoreCraftableEquipment.esp","829:MoreCraftableEquipment.esp","82a:MoreCraftableEquipment.esp","82c:MoreCraftableEquipment.esp","82d:MoreCraftableEquipment.esp","82eb5:Hothtrooper44_ArmorCompilation.esp","82eb6:Hothtrooper44_ArmorCompilation.esp","82eb7:Hothtrooper44_ArmorCompilation.esp","82eb8:Hothtrooper44_ArmorCompilation.esp","82f:MoreCraftableEquipment.esp","830:MoreCraftableEquipment.esp","831:MoreCraftableEquipment.esp","832:MoreCraftableEquipment.esp","834:MoreCraftableEquipment.esp","835:MoreCraftableEquipment.esp","839:MoreCraftableEquipment.esp","83a:MoreCraftableEquipment.esp","83b:MoreCraftableEquipment.esp","83c:MoreCraftableEquipment.esp","83d:MoreCraftableEquipment.esp","83e:MoreCraftableEquipment.esp","83f:MoreCraftableEquipment.esp","840:MoreCraftableEquipment.esp","841:MoreCraftableEquipment.esp","842:MoreCraftableEquipment.esp","8698c:Skyrim.esm","8698e:Skyrim.esm","86990:Skyrim.esm","86991:Skyrim.esm","86993:Skyrim.esm","88956:Skyrim.esm","88958:Skyrim.esm","8895a:Skyrim.esm","8f19a:Skyrim.esm","9151b:Skyrim.esm","9f0:MoreCraftableEquipment.esp","9f3:MoreCraftableEquipment.esp","a199b:Skyrim.esm","b145b:Skyrim.esm","b1460:Skyrim.esm","ba99a:Hothtrooper44_ArmorCompilation.esp","bacd7:Skyrim.esm","bacf3:Skyrim.esm","bfd98:Playable Rieklings.esp","bfdb1:Playable Rieklings.esp","c36e8:Skyrim.esm","c742:HearthFires.esm","c743:HearthFires.esm","c744:HearthFires.esm","c745:HearthFires.esm","c746:HearthFires.esm","cee76:Skyrim.esm","cee78:Skyrim.esm","cee80:Skyrim.esm","cee82:Skyrim.esm","cee84:Skyrim.esm","d191f:Skyrim.esm","d1921:Skyrim.esm","d81e:HearthFires.esm","d81f:HearthFires.esm","d820:HearthFires.esm","d821:HearthFires.esm","d822:HearthFires.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm","e0dd0:Skyrim.esm","e0dd2:Skyrim.esm","e0dd4:Skyrim.esm","e84c1:Skyrim.esm","e84c4:Skyrim.esm","e84c6:Skyrim.esm","ead49:Skyrim.esm","f74c:Hothtrooper44_ArmorCompilation.esp","f8713:Skyrim.esm","f8715:Skyrim.esm"],"supply":["1199a:Dawnguard.esm","2a78:Dawnguard.esm","2e4e6:Skyrim.esm","34cd6:Skyrim.esm","3ad52:Skyrim.esm","3ad54:Skyrim.esm","3ad6d:Skyrim.esm","3ad6e:Skyrim.esm","3ad72:Skyrim.esm","3f7f8:Skyrim.esm","57f91:Skyrim.esm","5ace3:Skyrim.esm","5ad9d:Skyrim.esm","5ad9e:Skyrim.esm","6ce001:Update.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","800e4:Skyrim.esm","9151b:Skyrim.esm","da0bf1:Update.esm","db5d2:Skyrim.esm","db8a2:Skyrim.esm"]},"Enchanter":{"buy":["106661:Skyrim.esm","107106:Skyrim.esm","107108:Skyrim.esm","10710a:Skyrim.esm","10cee3:Skyrim.esm","10cee6:Skyrim.esm","10cee8:Skyrim.esm","10cfe4:Skyrim.esm","10cfea:Skyrim.esm","10cfeb:Skyrim.esm","10cfec:Skyrim.esm","10cfef:Skyrim.esm","10cff0:Skyrim.esm","10cff1:Skyrim.esm","10cff2:Skyrim.esm","10d2b4:Skyrim.esm","10d2b5:Skyrim.esm","10d662:Skyrim.esm","10d664:Skyrim.esm","10e2ce:Skyrim.esm","10e2dc:Skyrim.esm","10fcf2:Skyrim.esm","10fcf4:Skyrim.esm","10fcf7:Skyrim.esm","12c7:Cloaks&Capes.esp","12e46:Skyrim.esm","12e49:Skyrim.esm","12e4b:Skyrim.esm","12e4d:Skyrim.esm","12eb6:Skyrim.esm","13104:Skyrim.esm","13105:Skyrim.esm","13106:Skyrim.esm","13910:Skyrim.esm","13911:Skyrim.esm","13912:Skyrim.esm","13913:Skyrim.esm","13914:Skyrim.esm","1391a:Skyrim.esm","1391c:Skyrim.esm","1391d:Skyrim.esm","1391e:Skyrim.esm","13920:Skyrim.esm","13921:Skyrim.esm","13922:Skyrim.esm","13938:Skyrim.esm","13939:Skyrim.esm","1393a:Skyrim.esm","1393b:Skyrim.esm","1393c:Skyrim.esm","13946:Skyrim.esm","13948:Skyrim.esm","1394b:Skyrim.esm","1394c:Skyrim.esm","1394d:Skyrim.esm","1394e:Skyrim.esm","1394f:Skyrim.esm","13950:Skyrim.esm","13952:Skyrim.esm","13954:Skyrim.esm","13955:Skyrim.esm","13956:Skyrim.esm","13957:Skyrim.esm","13958:Skyrim.esm","13959:Skyrim.esm","1395b:Skyrim.esm","1395c:Skyrim.esm","1395d:Skyrim.esm","1395e:Skyrim.esm","13960:Skyrim.esm","13961:Skyrim.esm","13962:Skyrim.esm","13963:Skyrim.esm","13964:Skyrim.esm","14757:Dawnguard.esm","14758:Dawnguard.esm","150b8:Dawnguard.esm","15516:Skyrim.esm","17695:Skyrim.esm","17696:Skyrim.esm","17749:Dragonborn.esm","18388:Skyrim.esm","18801:Skyrim.esm","19ade:Dawnguard.esm","19adf:Dawnguard.esm","19ae1:Dawnguard.esm","19ae3:Dawnguard.esm","19f5f:Playable Rieklings.esp","19f60:Playable Rieklings.esp","19f61:Playable Rieklings.esp","19f62:Playable Rieklings.esp","19f6a:Playable Rieklings.esp","19f71:Playable Rieklings.esp","1b39f:Skyrim.esm","1b3a0:Skyrim.esm","1b3a1:Skyrim.esm","1b3a3:Skyrim.esm","1bc82:Skyrim.esm","1bca7:Skyrim.esm","1be1a:Skyrim.esm","1be1b:Skyrim.esm","1cd7e:Dragonborn.esm","1cd82:Dragonborn.esm","1cd86:Dragonborn.esm","1cd87:Dragonborn.esm","1cd88:Dragonborn.esm","1cd89:Dragonborn.esm","1cd8a:Dragonborn.esm","1cd8b:Dragonborn.esm","1cd8c:Dragonborn.esm","1cd92:Dragonborn.esm","1cd93:Dragonborn.esm","1cd94:Dragonborn.esm","1cd95:Dragonborn.esm","1cd96:Dragonborn.esm","1cd97:Dragonborn.esm","1cd98:Dragonborn.esm","1cd99:Dragonborn.esm","1cd9e:Dragonborn.esm","1cd9f:Dragonborn.esm","1cda0:Dragonborn.esm","1cda1:Dragonborn.esm","1cda2:Dragonborn.esm","1cda3:Dragonborn.esm","1cda5:Dragonborn.esm","1d8e:Cloaks&Capes.esp","1d8e:Hothtrooper44_ArmorCompilation.esp","209a5:Skyrim.esm","209a6:Skyrim.esm","209aa:Skyrim.esm","214a1:Hothtrooper44_ArmorCompilation.esp","22fc:Hothtrooper44_ArmorCompilation.esp","23060:Hothtrooper44_ArmorCompilation.esp","23061:Hothtrooper44_ArmorCompilation.esp","23146:Hothtrooper44_ArmorCompilation.esp","2314b:Hothtrooper44_ArmorCompilation.esp","23150:Hothtrooper44_ArmorCompilation.esp","23155:Hothtrooper44_ArmorCompilation.esp","2315f:Hothtrooper44_ArmorCompilation.esp","23164:Hothtrooper44_ArmorCompilation.esp","23169:Hothtrooper44_ArmorCompilation.esp","2316e:Hothtrooper44_ArmorCompilation.esp","2317c:Hothtrooper44_ArmorCompilation.esp","2317d:Hothtrooper44_ArmorCompilation.esp","2317e:Hothtrooper44_ArmorCompilation.esp","2317f:Hothtrooper44_ArmorCompilation.esp","23180:Hothtrooper44_ArmorCompilation.esp","23181:Hothtrooper44_ArmorCompilation.esp","23182:Hothtrooper44_ArmorCompilation.esp","23183:Hothtrooper44_ArmorCompilation.esp","23184:Hothtrooper44_ArmorCompilation.esp","23185:Hothtrooper44_ArmorCompilation.esp","23186:Hothtrooper44_ArmorCompilation.esp","23187:Hothtrooper44_ArmorCompilation.esp","23188:Hothtrooper44_ArmorCompilation.esp","23189:Hothtrooper44_ArmorCompilation.esp","2318a:Hothtrooper44_ArmorCompilation.esp","2318b:Hothtrooper44_ArmorCompilation.esp","2318c:Hothtrooper44_ArmorCompilation.esp","2318d:Hothtrooper44_ArmorCompilation.esp","2318e:Hothtrooper44_ArmorCompilation.esp","2318f:Hothtrooper44_ArmorCompilation.esp","2325c:Hothtrooper44_ArmorCompilation.esp","23262:Hothtrooper44_ArmorCompilation.esp","238e0:Hothtrooper44_ArmorCompilation.esp","238e2:Hothtrooper44_ArmorCompilation.esp","238e9:Hothtrooper44_ArmorCompilation.esp","238ea:Hothtrooper44_ArmorCompilation.esp","238eb:Hothtrooper44_ArmorCompilation.esp","238f1:Hothtrooper44_ArmorCompilation.esp","238fb:Hothtrooper44_ArmorCompilation.esp","238fc:Hothtrooper44_ArmorCompilation.esp","23a09:Playable Rieklings.esp","23e9:Dawnguard.esm","23eb:Dawnguard.esm","23ed:Dawnguard.esm","23ef:Dawnguard.esm","261bd:Skyrim.esm","261c0:Skyrim.esm","261c1:Skyrim.esm","26234:Dragonborn.esm","26235:Dragonborn.esm","26236:Dragonborn.esm","26237:Dragonborn.esm","285f:Hothtrooper44_ArmorCompilation.esp","2883:Cloaks&Capes.esp","2884:Cloaks&Capes.esp","2885:Cloaks&Capes.esp","2886:Cloaks&Capes.esp","2887:Cloaks&Capes.esp","2888:Cloaks&Capes.esp","2889:Cloaks&Capes.esp","29b83:Skyrim.esm","29b95:Skyrim.esm","29b97:Skyrim.esm","2dd5:Hothtrooper44_ArmorCompilation.esp","2dec:Cloaks&Capes.esp","2ded:Cloaks&Capes.esp","2dee:Cloaks&Capes.esp","2def:Cloaks&Capes.esp","2df0:Cloaks&Capes.esp","2df2:Cloaks&Capes.esp","2df3:Cloaks&Capes.esp","2df4:Cloaks&Capes.esp","2df5:Cloaks&Capes.esp","2df6:Cloaks&Capes.esp","2df7:Cloaks&Capes.esp","2df8:Cloaks&Capes.esp","2df9:Cloaks&Capes.esp","2dfa:Cloaks&Capes.esp","2dfb:Cloaks&Capes.esp","2e4e2:Skyrim.esm","2e4e3:Skyrim.esm","2e4e4:Skyrim.esm","2e4e5:Skyrim.esm","2e4e6:Skyrim.esm","2e4f3:Skyrim.esm","2e4f4:Skyrim.esm","2e4fb:Skyrim.esm","2e4fc:Skyrim.esm","2e4ff:Skyrim.esm","2e500:Skyrim.esm","2e504:Skyrim.esm","330b3:Skyrim.esm","330bc:Skyrim.esm","3329:Hothtrooper44_ArmorCompilation.esp","3452e:Skyrim.esm","3452f:Skyrim.esm","3619e:Skyrim.esm","3705a:Dragonborn.esm","372fa:Hothtrooper44_ArmorCompilation.esp","372fb:Hothtrooper44_ArmorCompilation.esp","372fc:Hothtrooper44_ArmorCompilation.esp","372fd:Hothtrooper44_ArmorCompilation.esp","37302:Hothtrooper44_ArmorCompilation.esp","37303:Hothtrooper44_ArmorCompilation.esp","37304:Hothtrooper44_ArmorCompilation.esp","37305:Hothtrooper44_ArmorCompilation.esp","37b8a:Dragonborn.esm","37b8c:Dragonborn.esm","37b8e:Dragonborn.esm","3b04b:Dragonborn.esm","3b04e:Dragonborn.esm","3c9fe:Skyrim.esm","3ca00:Skyrim.esm","4223b:Skyrim.esm","4223c:Skyrim.esm","4223d:Skyrim.esm","47d7:Dawnguard.esm","47d9:Dawnguard.esm","48d8:Hothtrooper44_ArmorCompilation.esp","48d9:Hothtrooper44_ArmorCompilation.esp","48e0:Hothtrooper44_ArmorCompilation.esp","4c3cb:Skyrim.esm","4c3d0:Skyrim.esm","4c6ca:Skyrim.esm","4ded8:Skyrim.esm","4dee0:Skyrim.esm","4dee1:Skyrim.esm","4dee2:Skyrim.esm","4dee3:Skyrim.esm","50d0:Dawnguard.esm","51b0c:Skyrim.esm","56a9d:Skyrim.esm","56a9e:Skyrim.esm","56b17:Skyrim.esm","5b69e:Skyrim.esm","5b69f:Skyrim.esm","5b6a0:Skyrim.esm","5b6a1:Skyrim.esm","5c06c:Skyrim.esm","5db7b:Skyrim.esm","5db7e:Skyrim.esm","62303:Skyrim.esm","6230b:Skyrim.esm","62311:Skyrim.esm","646a7:Skyrim.esm","646ab:Skyrim.esm","65b94:Skyrim.esm","65b99:Skyrim.esm","65b9b:Skyrim.esm","65b9d:Skyrim.esm","6b46b:Skyrim.esm","6b46c:Skyrim.esm","6c1d8:Skyrim.esm","6c1d9:Skyrim.esm","6c1da:Skyrim.esm","6f393:Skyrim.esm","6f39b:Skyrim.esm","6f39e:Skyrim.esm","6ff37:Skyrim.esm","6ff38:Skyrim.esm","6ff43:Skyrim.esm","6ff45:Skyrim.esm","7bc15:Skyrim.esm","7bc19:Skyrim.esm","7bc1a:Skyrim.esm","7e647:Skyrim.esm","80697:Skyrim.esm","80699:Skyrim.esm","806:MoreCraftableEquipment.esp","807:MoreCraftableEquipment.esp","808:MoreCraftableEquipment.esp","809:MoreCraftableEquipment.esp","80a:MoreCraftableEquipment.esp","80b:MoreCraftableEquipment.esp","80c:MoreCraftableEquipment.esp","80d:MoreCraftableEquipment.esp","812:MoreCraftableEquipment.esp","822:MoreCraftableEquipment.esp","823:MoreCraftableEquipment.esp","824:MoreCraftableEquipment.esp","825:MoreCraftableEquipment.esp","826:MoreCraftableEquipment.esp","827:MoreCraftableEquipment.esp","828:MoreCraftableEquipment.esp","829:MoreCraftableEquipment.esp","82a:MoreCraftableEquipment.esp","82c:MoreCraftableEquipment.esp","82d:MoreCraftableEquipment.esp","82eb5:Hothtrooper44_ArmorCompilation.esp","82eb6:Hothtrooper44_ArmorCompilation.esp","82eb7:Hothtrooper44_ArmorCompilation.esp","82eb8:Hothtrooper44_ArmorCompilation.esp","82f:MoreCraftableEquipment.esp","830:MoreCraftableEquipment.esp","831:MoreCraftableEquipment.esp","832:MoreCraftableEquipment.esp","834:MoreCraftableEquipment.esp","835:MoreCraftableEquipment.esp","839:MoreCraftableEquipment.esp","83a:MoreCraftableEquipment.esp","83b:MoreCraftableEquipment.esp","83c:MoreCraftableEquipment.esp","83d:MoreCraftableEquipment.esp","83e:MoreCraftableEquipment.esp","83f:MoreCraftableEquipment.esp","840:MoreCraftableEquipment.esp","841:MoreCraftableEquipment.esp","842:MoreCraftableEquipment.esp","8697e:Skyrim.esm","86981:Skyrim.esm","86983:Skyrim.esm","86985:Skyrim.esm","8698c:Skyrim.esm","8698e:Skyrim.esm","86990:Skyrim.esm","86991:Skyrim.esm","86993:Skyrim.esm","88956:Skyrim.esm","88958:Skyrim.esm","8895a:Skyrim.esm","896a3:Skyrim.esm","8f19a:Skyrim.esm","9f0:MoreCraftableEquipment.esp","9f3:MoreCraftableEquipment.esp","a199b:Skyrim.esm","a6d79:Skyrim.esm","a6d7b:Skyrim.esm","a6d7f:Skyrim.esm","ab64:Hothtrooper44_ArmorCompilation.esp","ab65:Hothtrooper44_ArmorCompilation.esp","ab66:Hothtrooper44_ArmorCompilation.esp","ab67:Hothtrooper44_ArmorCompilation.esp","b145b:Skyrim.esm","b1460:Skyrim.esm","b83cb:Skyrim.esm","b83cd:Skyrim.esm","b83cf:Skyrim.esm","ba99a:Hothtrooper44_ArmorCompilation.esp","bacd7:Skyrim.esm","bacf3:Skyrim.esm","be11f:Skyrim.esm","be122:Skyrim.esm","bfd98:Playable Rieklings.esp","bfdb1:Playable Rieklings.esp","c36e8:Skyrim.esm","cae15:Skyrim.esm","cee76:Skyrim.esm","cee78:Skyrim.esm","cee7c:Skyrim.esm","cee7e:Skyrim.esm","cee80:Skyrim.esm","cee82:Skyrim.esm","cee84:Skyrim.esm","d191f:Skyrim.esm","d1921:Skyrim.esm","d8d4e:Skyrim.esm","d8d50:Skyrim.esm","d8d52:Skyrim.esm","d8d55:Skyrim.esm","e0dd0:Skyrim.esm","e0dd2:Skyrim.esm","e0dd4:Skyrim.esm","e84c1:Skyrim.esm","e84c4:Skyrim.esm","e84c6:Skyrim.esm","ead49:Skyrim.esm","f3f7:Dawnguard.esm","f3fb:Dawnguard.esm","f3fe:Dawnguard.esm","f400:Dawnguard.esm","f6f21:Skyrim.esm","f74c:Hothtrooper44_ArmorCompilation.esp","f8713:Skyrim.esm","f8715:Skyrim.esm"],"sell":["106661:Skyrim.esm","107106:Skyrim.esm","107108:Skyrim.esm","10710a:Skyrim.esm","10cee3:Skyrim.esm","10cee6:Skyrim.esm","10cee8:Skyrim.esm","10cfe4:Skyrim.esm","10cfea:Skyrim.esm","10cfeb:Skyrim.esm","10cfec:Skyrim.esm","10cfef:Skyrim.esm","10cff0:Skyrim.esm","10cff1:Skyrim.esm","10cff2:Skyrim.esm","10d2b4:Skyrim.esm","10d2b5:Skyrim.esm","10d662:Skyrim.esm","10d664:Skyrim.esm","10e2ce:Skyrim.esm","10e2dc:Skyrim.esm","10fcf2:Skyrim.esm","10fcf4:Skyrim.esm","10fcf7:Skyrim.esm","12c7:Cloaks&Capes.esp","12e46:Skyrim.esm","12e49:Skyrim.esm","12e4b:Skyrim.esm","12e4d:Skyrim.esm","12eb6:Skyrim.esm","13104:Skyrim.esm","13105:Skyrim.esm","13106:Skyrim.esm","13910:Skyrim.esm","13911:Skyrim.esm","13912:Skyrim.esm","13913:Skyrim.esm","13914:Skyrim.esm","1391a:Skyrim.esm","1391c:Skyrim.esm","1391d:Skyrim.esm","1391e:Skyrim.esm","13920:Skyrim.esm","13921:Skyrim.esm","13922:Skyrim.esm","13938:Skyrim.esm","13939:Skyrim.esm","1393a:Skyrim.esm","1393b:Skyrim.esm","1393c:Skyrim.esm","13946:Skyrim.esm","13948:Skyrim.esm","1394b:Skyrim.esm","1394c:Skyrim.esm","1394d:Skyrim.esm","1394e:Skyrim.esm","1394f:Skyrim.esm","13950:Skyrim.esm","13952:Skyrim.esm","13954:Skyrim.esm","13955:Skyrim.esm","13956:Skyrim.esm","13957:Skyrim.esm","13958:Skyrim.esm","13959:Skyrim.esm","1395b:Skyrim.esm","1395c:Skyrim.esm","1395d:Skyrim.esm","1395e:Skyrim.esm","13960:Skyrim.esm","13961:Skyrim.esm","13962:Skyrim.esm","13963:Skyrim.esm","13964:Skyrim.esm","14757:Dawnguard.esm","14758:Dawnguard.esm","150b8:Dawnguard.esm","15516:Skyrim.esm","17695:Skyrim.esm","17696:Skyrim.esm","17749:Dragonborn.esm","18388:Skyrim.esm","18801:Skyrim.esm","19ade:Dawnguard.esm","19adf:Dawnguard.esm","19ae1:Dawnguard.esm","19ae3:Dawnguard.esm","19f5f:Playable Rieklings.esp","19f60:Playable Rieklings.esp","19f61:Playable Rieklings.esp","19f62:Playable Rieklings.esp","19f6a:Playable Rieklings.esp","19f71:Playable Rieklings.esp","1b39f:Skyrim.esm","1b3a0:Skyrim.esm","1b3a1:Skyrim.esm","1b3a3:Skyrim.esm","1bc82:Skyrim.esm","1bca7:Skyrim.esm","1be1a:Skyrim.esm","1be1b:Skyrim.esm","1cd7e:Dragonborn.esm","1cd82:Dragonborn.esm","1cd86:Dragonborn.esm","1cd87:Dragonborn.esm","1cd88:Dragonborn.esm","1cd89:Dragonborn.esm","1cd8a:Dragonborn.esm","1cd8b:Dragonborn.esm","1cd8c:Dragonborn.esm","1cd92:Dragonborn.esm","1cd93:Dragonborn.esm","1cd94:Dragonborn.esm","1cd95:Dragonborn.esm","1cd96:Dragonborn.esm","1cd97:Dragonborn.esm","1cd98:Dragonborn.esm","1cd99:Dragonborn.esm","1cd9e:Dragonborn.esm","1cd9f:Dragonborn.esm","1cda0:Dragonborn.esm","1cda1:Dragonborn.esm","1cda2:Dragonborn.esm","1cda3:Dragonborn.esm","1cda5:Dragonborn.esm","1d8e:Cloaks&Capes.esp","1d8e:Hothtrooper44_ArmorCompilation.esp","209a5:Skyrim.esm","209a6:Skyrim.esm","209aa:Skyrim.esm","214a1:Hothtrooper44_ArmorCompilation.esp","22fc:Hothtrooper44_ArmorCompilation.esp","23060:Hothtrooper44_ArmorCompilation.esp","23061:Hothtrooper44_ArmorCompilation.esp","23146:Hothtrooper44_ArmorCompilation.esp","2314b:Hothtrooper44_ArmorCompilation.esp","23150:Hothtrooper44_ArmorCompilation.esp","23155:Hothtrooper44_ArmorCompilation.esp","2315f:Hothtrooper44_ArmorCompilation.esp","23164:Hothtrooper44_ArmorCompilation.esp","23169:Hothtrooper44_ArmorCompilation.esp","2316e:Hothtrooper44_ArmorCompilation.esp","2317c:Hothtrooper44_ArmorCompilation.esp","2317d:Hothtrooper44_ArmorCompilation.esp","2317e:Hothtrooper44_ArmorCompilation.esp","2317f:Hothtrooper44_ArmorCompilation.esp","23180:Hothtrooper44_ArmorCompilation.esp","23181:Hothtrooper44_ArmorCompilation.esp","23182:Hothtrooper44_ArmorCompilation.esp","23183:Hothtrooper44_ArmorCompilation.esp","23184:Hothtrooper44_ArmorCompilation.esp","23185:Hothtrooper44_ArmorCompilation.esp","23186:Hothtrooper44_ArmorCompilation.esp","23187:Hothtrooper44_ArmorCompilation.esp","23188:Hothtrooper44_ArmorCompilation.esp","23189:Hothtrooper44_ArmorCompilation.esp","2318a:Hothtrooper44_ArmorCompilation.esp","2318b:Hothtrooper44_ArmorCompilation.esp","2318c:Hothtrooper44_ArmorCompilation.esp","2318d:Hothtrooper44_ArmorCompilation.esp","2318e:Hothtrooper44_ArmorCompilation.esp","2318f:Hothtrooper44_ArmorCompilation.esp","2325c:Hothtrooper44_ArmorCompilation.esp","23262:Hothtrooper44_ArmorCompilation.esp","238e0:Hothtrooper44_ArmorCompilation.esp","238e2:Hothtrooper44_ArmorCompilation.esp","238e9:Hothtrooper44_ArmorCompilation.esp","238ea:Hothtrooper44_ArmorCompilation.esp","238eb:Hothtrooper44_ArmorCompilation.esp","238f1:Hothtrooper44_ArmorCompilation.esp","238fb:Hothtrooper44_ArmorCompilation.esp","238fc:Hothtrooper44_ArmorCompilation.esp","23a09:Playable Rieklings.esp","23e9:Dawnguard.esm","23eb:Dawnguard.esm","23ed:Dawnguard.esm","23ef:Dawnguard.esm","261bd:Skyrim.esm","261c0:Skyrim.esm","261c1:Skyrim.esm","26234:Dragonborn.esm","26235:Dragonborn.esm","26236:Dragonborn.esm","26237:Dragonborn.esm","285f:Hothtrooper44_ArmorCompilation.esp","2883:Cloaks&Capes.esp","2884:Cloaks&Capes.esp","2885:Cloaks&Capes.esp","2886:Cloaks&Capes.esp","2887:Cloaks&Capes.esp","2888:Cloaks&Capes.esp","2889:Cloaks&Capes.esp","29b83:Skyrim.esm","29b95:Skyrim.esm","29b97:Skyrim.esm","2dd5:Hothtrooper44_ArmorCompilation.esp","2dec:Cloaks&Capes.esp","2ded:Cloaks&Capes.esp","2dee:Cloaks&Capes.esp","2def:Cloaks&Capes.esp","2df0:Cloaks&Capes.esp","2df2:Cloaks&Capes.esp","2df3:Cloaks&Capes.esp","2df4:Cloaks&Capes.esp","2df5:Cloaks&Capes.esp","2df6:Cloaks&Capes.esp","2df7:Cloaks&Capes.esp","2df8:Cloaks&Capes.esp","2df9:Cloaks&Capes.esp","2dfa:Cloaks&Capes.esp","2dfb:Cloaks&Capes.esp","2e4e2:Skyrim.esm","2e4e3:Skyrim.esm","2e4e4:Skyrim.esm","2e4e5:Skyrim.esm","2e4e6:Skyrim.esm","2e4f3:Skyrim.esm","2e4f4:Skyrim.esm","2e4fb:Skyrim.esm","2e4fc:Skyrim.esm","2e4ff:Skyrim.esm","2e500:Skyrim.esm","2e504:Skyrim.esm","330b3:Skyrim.esm","330bc:Skyrim.esm","3329:Hothtrooper44_ArmorCompilation.esp","3452e:Skyrim.esm","3452f:Skyrim.esm","3619e:Skyrim.esm","3705a:Dragonborn.esm","372fa:Hothtrooper44_ArmorCompilation.esp","372fb:Hothtrooper44_ArmorCompilation.esp","372fc:Hothtrooper44_ArmorCompilation.esp","372fd:Hothtrooper44_ArmorCompilation.esp","37302:Hothtrooper44_ArmorCompilation.esp","37303:Hothtrooper44_ArmorCompilation.esp","37304:Hothtrooper44_ArmorCompilation.esp","37305:Hothtrooper44_ArmorCompilation.esp","37b8a:Dragonborn.esm","37b8c:Dragonborn.esm","37b8e:Dragonborn.esm","3b04b:Dragonborn.esm","3b04e:Dragonborn.esm","3c9fe:Skyrim.esm","3ca00:Skyrim.esm","4223b:Skyrim.esm","4223c:Skyrim.esm","4223d:Skyrim.esm","47d7:Dawnguard.esm","47d9:Dawnguard.esm","48d8:Hothtrooper44_ArmorCompilation.esp","48d9:Hothtrooper44_ArmorCompilation.esp","48e0:Hothtrooper44_ArmorCompilation.esp","4c3cb:Skyrim.esm","4c3d0:Skyrim.esm","4c6ca:Skyrim.esm","4ded8:Skyrim.esm","4dee0:Skyrim.esm","4dee1:Skyrim.esm","4dee2:Skyrim.esm","4dee3:Skyrim.esm","50d0:Dawnguard.esm","51b0c:Skyrim.esm","56a9d:Skyrim.esm","56a9e:Skyrim.esm","56b17:Skyrim.esm","5b69e:Skyrim.esm","5b69f:Skyrim.esm","5b6a0:Skyrim.esm","5b6a1:Skyrim.esm","5c06c:Skyrim.esm","5db7b:Skyrim.esm","5db7e:Skyrim.esm","62303:Skyrim.esm","6230b:Skyrim.esm","62311:Skyrim.esm","646a7:Skyrim.esm","646ab:Skyrim.esm","65b94:Skyrim.esm","65b99:Skyrim.esm","65b9b:Skyrim.esm","65b9d:Skyrim.esm","6b46b:Skyrim.esm","6b46c:Skyrim.esm","6c1d8:Skyrim.esm","6c1d9:Skyrim.esm","6c1da:Skyrim.esm","6f393:Skyrim.esm","6f39b:Skyrim.esm","6f39e:Skyrim.esm","6ff37:Skyrim.esm","6ff38:Skyrim.esm","6ff43:Skyrim.esm","6ff45:Skyrim.esm","7bc15:Skyrim.esm","7bc19:Skyrim.esm","7bc1a:Skyrim.esm","7e647:Skyrim.esm","80697:Skyrim.esm","80699:Skyrim.esm","806:MoreCraftableEquipment.esp","807:MoreCraftableEquipment.esp","808:MoreCraftableEquipment.esp","809:MoreCraftableEquipment.esp","80a:MoreCraftableEquipment.esp","80b:MoreCraftableEquipment.esp","80c:MoreCraftableEquipment.esp","80d:MoreCraftableEquipment.esp","812:MoreCraftableEquipment.esp","822:MoreCraftableEquipment.esp","823:MoreCraftableEquipment.esp","824:MoreCraftableEquipment.esp","825:MoreCraftableEquipment.esp","826:MoreCraftableEquipment.esp","827:MoreCraftableEquipment.esp","828:MoreCraftableEquipment.esp","829:MoreCraftableEquipment.esp","82a:MoreCraftableEquipment.esp","82c:MoreCraftableEquipment.esp","82d:MoreCraftableEquipment.esp","82eb5:Hothtrooper44_ArmorCompilation.esp","82eb6:Hothtrooper44_ArmorCompilation.esp","82eb7:Hothtrooper44_ArmorCompilation.esp","82eb8:Hothtrooper44_ArmorCompilation.esp","82f:MoreCraftableEquipment.esp","830:MoreCraftableEquipment.esp","831:MoreCraftableEquipment.esp","832:MoreCraftableEquipment.esp","834:MoreCraftableEquipment.esp","835:MoreCraftableEquipment.esp","839:MoreCraftableEquipment.esp","83a:MoreCraftableEquipment.esp","83b:MoreCraftableEquipment.esp","83c:MoreCraftableEquipment.esp","83d:MoreCraftableEquipment.esp","83e:MoreCraftableEquipment.esp","83f:MoreCraftableEquipment.esp","840:MoreCraftableEquipment.esp","841:MoreCraftableEquipment.esp","842:MoreCraftableEquipment.esp","8697e:Skyrim.esm","86981:Skyrim.esm","86983:Skyrim.esm","86985:Skyrim.esm","8698c:Skyrim.esm","8698e:Skyrim.esm","86990:Skyrim.esm","86991:Skyrim.esm","86993:Skyrim.esm","88956:Skyrim.esm","88958:Skyrim.esm","8895a:Skyrim.esm","896a3:Skyrim.esm","8f19a:Skyrim.esm","9f0:MoreCraftableEquipment.esp","9f3:MoreCraftableEquipment.esp","a199b:Skyrim.esm","a6d79:Skyrim.esm","a6d7b:Skyrim.esm","a6d7f:Skyrim.esm","ab64:Hothtrooper44_ArmorCompilation.esp","ab65:Hothtrooper44_ArmorCompilation.esp","ab66:Hothtrooper44_ArmorCompilation.esp","ab67:Hothtrooper44_ArmorCompilation.esp","b145b:Skyrim.esm","b1460:Skyrim.esm","b83cb:Skyrim.esm","b83cd:Skyrim.esm","b83cf:Skyrim.esm","ba99a:Hothtrooper44_ArmorCompilation.esp","bacd7:Skyrim.esm","bacf3:Skyrim.esm","be11f:Skyrim.esm","be122:Skyrim.esm","bfd98:Playable Rieklings.esp","bfdb1:Playable Rieklings.esp","c36e8:Skyrim.esm","cae15:Skyrim.esm","cee76:Skyrim.esm","cee78:Skyrim.esm","cee7c:Skyrim.esm","cee7e:Skyrim.esm","cee80:Skyrim.esm","cee82:Skyrim.esm","cee84:Skyrim.esm","d191f:Skyrim.esm","d1921:Skyrim.esm","d8d4e:Skyrim.esm","d8d50:Skyrim.esm","d8d52:Skyrim.esm","d8d55:Skyrim.esm","e0dd0:Skyrim.esm","e0dd2:Skyrim.esm","e0dd4:Skyrim.esm","e84c1:Skyrim.esm","e84c4:Skyrim.esm","e84c6:Skyrim.esm","ead49:Skyrim.esm","f3f7:Dawnguard.esm","f3fb:Dawnguard.esm","f3fe:Dawnguard.esm","f400:Dawnguard.esm","f6f21:Skyrim.esm","f74c:Hothtrooper44_ArmorCompilation.esp","f8713:Skyrim.esm","f8715:Skyrim.esm"],"supply":["17749:Dragonborn.esm","2e4e2:Skyrim.esm","2e4e3:Skyrim.esm","2e4e4:Skyrim.esm","2e4e5:Skyrim.esm","2e4e6:Skyrim.esm","2e4f3:Skyrim.esm","2e4f4:Skyrim.esm","2e4fb:Skyrim.esm","2e4fc:Skyrim.esm","2e4ff:Skyrim.esm","2e500:Skyrim.esm","2e504:Skyrim.esm","51b0c:Skyrim.esm","7e647:Skyrim.esm","be11f:Skyrim.esm"]},"Cook":{"buy":["10394d:Skyrim.esm","10d666:Skyrim.esm","117ff:HearthFires.esm","11801:HearthFires.esm","14dc4:Dawnguard.esm","1b3bd:Skyrim.esm","1cd72:Dragonborn.esm","206e7:Dragonborn.esm","23d77:Skyrim.esm","3133c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3533:HearthFires.esm","3534:HearthFires.esm","3537:HearthFires.esm","3538:HearthFires.esm","3539:HearthFires.esm","353a:HearthFires.esm","353b:HearthFires.esm","353c:HearthFires.esm","353d:HearthFires.esm","353e:HearthFires.esm","353f:HearthFires.esm","3540:HearthFires.esm","3ad5e:Skyrim.esm","3bd14:Dragonborn.esm","3bd15:Dragonborn.esm","3cd5b:Dragonborn.esm","3cf72:Dragonborn.esm","3d125:Dragonborn.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da24:Skyrim.esm","5076e:Skyrim.esm","64b2e:Skyrim.esm","64b2f:Skyrim.esm","64b30:Skyrim.esm","64b34:Skyrim.esm","64b35:Skyrim.esm","64b38:Skyrim.esm","64b3a:Skyrim.esm","64b3b:Skyrim.esm","64b3c:Skyrim.esm","64b3d:Skyrim.esm","64b3e:Skyrim.esm","64b3f:Skyrim.esm","64b40:Skyrim.esm","64b41:Skyrim.esm","64b42:Skyrim.esm","64b43:Skyrim.esm","65c97:Skyrim.esm","65c99:Skyrim.esm","65c9a:Skyrim.esm","65c9b:Skyrim.esm","65c9c:Skyrim.esm","65c9d:Skyrim.esm","65c9e:Skyrim.esm","65c9f:Skyrim.esm","669a2:Skyrim.esm","669a3:Skyrim.esm","669a4:Skyrim.esm","669a5:Skyrim.esm","6ac4a:Skyrim.esm","6f950:Skyrim.esm","721e8:Skyrim.esm","7224c:Skyrim.esm","7224e:Skyrim.esm","722b0:Skyrim.esm","722bb:Skyrim.esm","722bd:Skyrim.esm","722c2:Skyrim.esm","722c7:Skyrim.esm","7ee01:Skyrim.esm","80d:Gourmet.esp","810:Gourmet.esp","815:Gourmet.esp","816:Gourmet.esp","817:Gourmet.esp","818:Gourmet.esp","81c:Gourmet.esp","8aa:Gourmet.esp","8ac:Gourmet.esp","8ae:Gourmet.esp","8b1:Gourmet.esp","8b3:Gourmet.esp","8e2:Gourmet.esp","8e4:Gourmet.esp","8ea:Gourmet.esp","8eb:Gourmet.esp","8f5:Gourmet.esp","8f6:Gourmet.esp","8f7:Gourmet.esp","901:Gourmet.esp","902:Gourmet.esp","903:Gourmet.esp","92d3:FishingInSkyrim.esp","981:Gourmet.esp","9db:HearthFires.esm","9dc:HearthFires.esm","e8448:Skyrim.esm","e8947:Skyrim.esm","eba01:Skyrim.esm","eba02:Skyrim.esm","eba03:Skyrim.esm","edb2e:Skyrim.esm","f11c0:Skyrim.esm","f2011:Skyrim.esm","f4314:Skyrim.esm","f4315:Skyrim.esm","f431b:Skyrim.esm","f431c:Skyrim.esm","f431d:Skyrim.esm","f431e:Skyrim.esm","f4320:Skyrim.esm"],"sell":["10394d:Skyrim.esm","10d666:Skyrim.esm","117ff:HearthFires.esm","11801:HearthFires.esm","14dc4:Dawnguard.esm","1b3bd:Skyrim.esm","1cd72:Dragonborn.esm","206e7:Dragonborn.esm","23d77:Skyrim.esm","3133c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3533:HearthFires.esm","3534:HearthFires.esm","3537:HearthFires.esm","3538:HearthFires.esm","3539:HearthFires.esm","353a:HearthFires.esm","353b:HearthFires.esm","353c:HearthFires.esm","353d:HearthFires.esm","353e:HearthFires.esm","353f:HearthFires.esm","3540:HearthFires.esm","3ad5e:Skyrim.esm","3bd14:Dragonborn.esm","3bd15:Dragonborn.esm","3cd5b:Dragonborn.esm","3cf72:Dragonborn.esm","3d125:Dragonborn.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da24:Skyrim.esm","5076e:Skyrim.esm","64b2e:Skyrim.esm","64b2f:Skyrim.esm","64b30:Skyrim.esm","64b34:Skyrim.esm","64b35:Skyrim.esm","64b38:Skyrim.esm","64b3a:Skyrim.esm","64b3b:Skyrim.esm","64b3c:Skyrim.esm","64b3d:Skyrim.esm","64b3e:Skyrim.esm","64b3f:Skyrim.esm","64b40:Skyrim.esm","64b41:Skyrim.esm","64b42:Skyrim.esm","64b43:Skyrim.esm","65c97:Skyrim.esm","65c99:Skyrim.esm","65c9a:Skyrim.esm","65c9b:Skyrim.esm","65c9c:Skyrim.esm","65c9d:Skyrim.esm","65c9e:Skyrim.esm","65c9f:Skyrim.esm","669a2:Skyrim.esm","669a3:Skyrim.esm","669a4:Skyrim.esm","669a5:Skyrim.esm","6ac4a:Skyrim.esm","6f950:Skyrim.esm","721e8:Skyrim.esm","7224c:Skyrim.esm","7224e:Skyrim.esm","722b0:Skyrim.esm","722bb:Skyrim.esm","722bd:Skyrim.esm","722c2:Skyrim.esm","722c7:Skyrim.esm","7ee01:Skyrim.esm","80d:Gourmet.esp","810:Gourmet.esp","815:Gourmet.esp","816:Gourmet.esp","817:Gourmet.esp","818:Gourmet.esp","81c:Gourmet.esp","8aa:Gourmet.esp","8ac:Gourmet.esp","8ae:Gourmet.esp","8b1:Gourmet.esp","8b3:Gourmet.esp","8e2:Gourmet.esp","8e4:Gourmet.esp","8ea:Gourmet.esp","8eb:Gourmet.esp","8f5:Gourmet.esp","8f6:Gourmet.esp","8f7:Gourmet.esp","901:Gourmet.esp","902:Gourmet.esp","903:Gourmet.esp","92d3:FishingInSkyrim.esp","981:Gourmet.esp","9db:HearthFires.esm","9dc:HearthFires.esm","e8448:Skyrim.esm","e8947:Skyrim.esm","eba01:Skyrim.esm","eba02:Skyrim.esm","eba03:Skyrim.esm","edb2e:Skyrim.esm","f11c0:Skyrim.esm","f2011:Skyrim.esm","f4314:Skyrim.esm","f4315:Skyrim.esm","f431b:Skyrim.esm","f431c:Skyrim.esm","f431d:Skyrim.esm","f431e:Skyrim.esm","f4320:Skyrim.esm"],"supply":["10394d:Skyrim.esm","10d666:Skyrim.esm","14dc4:Dawnguard.esm","1b3bd:Skyrim.esm","1cd72:Dragonborn.esm","206e7:Dragonborn.esm","23d77:Skyrim.esm","3133c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3534:HearthFires.esm","3538:HearthFires.esm","353c:HearthFires.esm","3540:HearthFires.esm","3ad5e:Skyrim.esm","3bd14:Dragonborn.esm","3bd15:Dragonborn.esm","3d125:Dragonborn.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da24:Skyrim.esm","5076e:Skyrim.esm","64b2e:Skyrim.esm","64b2f:Skyrim.esm","64b34:Skyrim.esm","64b35:Skyrim.esm","64b3f:Skyrim.esm","64b40:Skyrim.esm","64b41:Skyrim.esm","64b42:Skyrim.esm","65c99:Skyrim.esm","65c9a:Skyrim.esm","65c9b:Skyrim.esm","65c9c:Skyrim.esm","65c9d:Skyrim.esm","65c9e:Skyrim.esm","65c9f:Skyrim.esm","669a2:Skyrim.esm","669a3:Skyrim.esm","669a4:Skyrim.esm","669a5:Skyrim.esm","6ac4a:Skyrim.esm","6f950:Skyrim.esm","7ee01:Skyrim.esm","8ac:Gourmet.esp","8ae:Gourmet.esp","e8448:Skyrim.esm","eba03:Skyrim.esm","edb2e:Skyrim.esm","f11c0:Skyrim.esm","f2011:Skyrim.esm"]},"Alchemist":{"buy":["106e18:Skyrim.esm","106e19:Skyrim.esm","106e1a:Skyrim.esm","106e1b:Skyrim.esm","106e1c:Skyrim.esm","134aa:Skyrim.esm","154c2:Thornswood-Content.esp","154c3:Thornswood-Content.esp","16e26:Dragonborn.esm","17008:Dragonborn.esm","17e97:Dragonborn.esm","183b7:Dawnguard.esm","1b3bd:Skyrim.esm","1cd71:Dragonborn.esm","1cd72:Dragonborn.esm","1cd74:Dragonborn.esm","1ff75:Dragonborn.esm","23d6f:Skyrim.esm","23d77:Skyrim.esm","2a78:Dawnguard.esm","2f44c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3ad56:Skyrim.esm","3ad5e:Skyrim.esm","3ad5f:Skyrim.esm","3ad60:Skyrim.esm","3ad6f:Skyrim.esm","3ad70:Skyrim.esm","3ad72:Skyrim.esm","3f7f8:Skyrim.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da00:Skyrim.esm","4da20:Skyrim.esm","4da22:Skyrim.esm","4da23:Skyrim.esm","4da24:Skyrim.esm","4da25:Skyrim.esm","5076e:Skyrim.esm","516c8:Skyrim.esm","57f91:Skyrim.esm","59b86:Skyrim.esm","6abcb:Skyrim.esm","6ac4a:Skyrim.esm","6bc00:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc07:Skyrim.esm","6f950:Skyrim.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","7e8b7:Skyrim.esm","7e8c1:Skyrim.esm","7e8c5:Skyrim.esm","7e8c8:Skyrim.esm","7edf5:Skyrim.esm","7ee01:Skyrim.esm","83e64:Skyrim.esm","854fe:Skyrim.esm","85500:Skyrim.esm","889a2:Skyrim.esm","b08c5:Skyrim.esm","b097:Dawnguard.esm","b2183:Skyrim.esm","ec870:Skyrim.esm","f1cc:HearthFires.esm"],"sell":["106e18:Skyrim.esm","106e19:Skyrim.esm","106e1a:Skyrim.esm","106e1b:Skyrim.esm","106e1c:Skyrim.esm","134aa:Skyrim.esm","154c2:Thornswood-Content.esp","154c3:Thornswood-Content.esp","16e26:Dragonborn.esm","17008:Dragonborn.esm","17e97:Dragonborn.esm","183b7:Dawnguard.esm","1b3bd:Skyrim.esm","1cd71:Dragonborn.esm","1cd72:Dragonborn.esm","1cd74:Dragonborn.esm","1ff75:Dragonborn.esm","23d6f:Skyrim.esm","23d77:Skyrim.esm","2a78:Dawnguard.esm","2f44c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3ad56:Skyrim.esm","3ad5e:Skyrim.esm","3ad5f:Skyrim.esm","3ad60:Skyrim.esm","3ad6f:Skyrim.esm","3ad70:Skyrim.esm","3ad72:Skyrim.esm","3f7f8:Skyrim.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da00:Skyrim.esm","4da20:Skyrim.esm","4da22:Skyrim.esm","4da23:Skyrim.esm","4da24:Skyrim.esm","4da25:Skyrim.esm","5076e:Skyrim.esm","516c8:Skyrim.esm","57f91:Skyrim.esm","59b86:Skyrim.esm","6abcb:Skyrim.esm","6ac4a:Skyrim.esm","6bc00:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc07:Skyrim.esm","6f950:Skyrim.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","7e8b7:Skyrim.esm","7e8c1:Skyrim.esm","7e8c5:Skyrim.esm","7e8c8:Skyrim.esm","7edf5:Skyrim.esm","7ee01:Skyrim.esm","83e64:Skyrim.esm","854fe:Skyrim.esm","85500:Skyrim.esm","889a2:Skyrim.esm","b08c5:Skyrim.esm","b097:Dawnguard.esm","b2183:Skyrim.esm","ec870:Skyrim.esm","f1cc:HearthFires.esm"],"supply":["106e18:Skyrim.esm","106e19:Skyrim.esm","106e1a:Skyrim.esm","106e1b:Skyrim.esm","106e1c:Skyrim.esm","134aa:Skyrim.esm","16e26:Dragonborn.esm","17008:Dragonborn.esm","17e97:Dragonborn.esm","183b7:Dawnguard.esm","1b3bd:Skyrim.esm","1cd71:Dragonborn.esm","1cd72:Dragonborn.esm","1cd74:Dragonborn.esm","1ff75:Dragonborn.esm","23d6f:Skyrim.esm","23d77:Skyrim.esm","2a78:Dawnguard.esm","2f44c:Skyrim.esm","34cdf:Skyrim.esm","34d22:Skyrim.esm","34d31:Skyrim.esm","34d32:Skyrim.esm","3ad56:Skyrim.esm","3ad5e:Skyrim.esm","3ad5f:Skyrim.esm","3ad60:Skyrim.esm","3ad6f:Skyrim.esm","3ad70:Skyrim.esm","3ad72:Skyrim.esm","3f7f8:Skyrim.esm","45c28:Skyrim.esm","4b0ba:Skyrim.esm","4da00:Skyrim.esm","4da20:Skyrim.esm","4da22:Skyrim.esm","4da23:Skyrim.esm","4da24:Skyrim.esm","4da25:Skyrim.esm","5076e:Skyrim.esm","516c8:Skyrim.esm","57f91:Skyrim.esm","59b86:Skyrim.esm","6abcb:Skyrim.esm","6ac4a:Skyrim.esm","6bc00:Skyrim.esm","6bc02:Skyrim.esm","6bc04:Skyrim.esm","6bc07:Skyrim.esm","6f950:Skyrim.esm","77e1c:Skyrim.esm","77e1d:Skyrim.esm","77e1e:Skyrim.esm","7e8b7:Skyrim.esm","7e8c1:Skyrim.esm","7e8c5:Skyrim.esm","7e8c8:Skyrim.esm","7edf5:Skyrim.esm","7ee01:Skyrim.esm","83e64:Skyrim.esm","854fe:Skyrim.esm","85500:Skyrim.esm","889a2:Skyrim.esm","b08c5:Skyrim.esm","b097:Dawnguard.esm","b2183:Skyrim.esm","ec870:Skyrim.esm","f1cc:HearthFires.esm"]}},"types":{"10aa19:Skyrim.esm":"WEAP","10c6fb:Skyrim.esm":"WEAP","12e46:Skyrim.esm":"ARMO","12e49:Skyrim.esm":"ARMO","12e4b:Skyrim.esm":"ARMO","12e4d:Skyrim.esm":"ARMO","12eb6:Skyrim.esm":"ARMO","12eb7:Skyrim.esm":"WEAP","1359d:Skyrim.esm":"WEAP","13790:Skyrim.esm":"WEAP","13910:Skyrim.esm":"ARMO","13911:Skyrim.esm":"ARMO","13912:Skyrim.esm":"ARMO","13913:Skyrim.esm":"ARMO","13914:Skyrim.esm":"ARMO","1391a:Skyrim.esm":"ARMO","1391c:Skyrim.esm":"ARMO","1391d:Skyrim.esm":"ARMO","1391e:Skyrim.esm":"ARMO","13920:Skyrim.esm":"ARMO","13921:Skyrim.esm":"ARMO","13922:Skyrim.esm":"ARMO","13938:Skyrim.esm":"ARMO","13939:Skyrim.esm":"ARMO","1393a:Skyrim.esm":"ARMO","1393b:Skyrim.esm":"ARMO","1393c:Skyrim.esm":"ARMO","13946:Skyrim.esm":"ARMO","13948:Skyrim.esm":"ARMO","1394b:Skyrim.esm":"ARMO","1394c:Skyrim.esm":"ARMO","1394d:Skyrim.esm":"ARMO","1394e:Skyrim.esm":"ARMO","1394f:Skyrim.esm":"ARMO","13950:Skyrim.esm":"ARMO","13952:Skyrim.esm":"ARMO","13954:Skyrim.esm":"ARMO","13955:Skyrim.esm":"ARMO","13956:Skyrim.esm":"ARMO","13957:Skyrim.esm":"ARMO","13958:Skyrim.esm":"ARMO","13959:Skyrim.esm":"ARMO","1395b:Skyrim.esm":"ARMO","1395c:Skyrim.esm":"ARMO","1395d:Skyrim.esm":"ARMO","1395e:Skyrim.esm":"ARMO","13960:Skyrim.esm":"ARMO","13961:Skyrim.esm":"ARMO","13962:Skyrim.esm":"ARMO","13963:Skyrim.esm":"ARMO","13964:Skyrim.esm":"ARMO","1397e:Skyrim.esm":"WEAP","13980:Skyrim.esm":"WEAP","13981:Skyrim.esm":"WEAP","13982:Skyrim.esm":"WEAP","13983:Skyrim.esm":"WEAP","13984:Skyrim.esm":"WEAP","13986:Skyrim.esm":"WEAP","13987:Skyrim.esm":"WEAP","13988:Skyrim.esm":"WEAP","13989:Skyrim.esm":"WEAP","1398a:Skyrim.esm":"WEAP","1398b:Skyrim.esm":"WEAP","1398c:Skyrim.esm":"WEAP","1398e:Skyrim.esm":"WEAP","1398f:Skyrim.esm":"WEAP","13990:Skyrim.esm":"WEAP","13991:Skyrim.esm":"WEAP","13992:Skyrim.esm":"WEAP","13993:Skyrim.esm":"WEAP","13994:Skyrim.esm":"WEAP","13996:Skyrim.esm":"WEAP","13997:Skyrim.esm":"WEAP","13998:Skyrim.esm":"WEAP","13999:Skyrim.esm":"WEAP","1399a:Skyrim.esm":"WEAP","1399b:Skyrim.esm":"WEAP","1399c:Skyrim.esm":"WEAP","1399e:Skyrim.esm":"WEAP","1399f:Skyrim.esm":"WEAP","139a0:Skyrim.esm":"WEAP","139a1:Skyrim.esm":"WEAP","139a2:Skyrim.esm":"WEAP","139a3:Skyrim.esm":"WEAP","139a4:Skyrim.esm":"WEAP","139a6:Skyrim.esm":"WEAP","139a7:Skyrim.esm":"WEAP","139a8:Skyrim.esm":"WEAP","139a9:Skyrim.esm":"WEAP","139aa:Skyrim.esm":"WEAP","139ab:Skyrim.esm":"WEAP","139ac:Skyrim.esm":"WEAP","139ae:Skyrim.esm":"WEAP","139af:Skyrim.esm":"WEAP","139b0:Skyrim.esm":"WEAP","139b1:Skyrim.esm":"WEAP","139b2:Skyrim.esm":"WEAP","14757:Dawnguard.esm":"ARMO","14758:Dawnguard.esm":"ARMO","150b8:Dawnguard.esm":"ARMO","15490:Thornswood-Content.esp":"MISC","15494:Thornswood-Content.esp":"MISC","15495:Thornswood-Content.esp":"MISC","154b0:Thornswood-Content.esp":"MISC","154b1:Thornswood-Content.esp":"MISC","16e26:Dragonborn.esm":"INGR","17e97:Dragonborn.esm":"INGR","18388:Skyrim.esm":"ARMO","19f5f:Playable Rieklings.esp":"ARMO","19f60:Playable Rieklings.esp":"ARMO","19f61:Playable Rieklings.esp":"ARMO","19f62:Playable Rieklings.esp":"ARMO","19f6a:Playable Rieklings.esp":"ARMO","19f71:Playable Rieklings.esp":"ARMO","1b39f:Skyrim.esm":"ARMO","1b3a0:Skyrim.esm":"ARMO","1b3a1:Skyrim.esm":"ARMO","1b3a3:Skyrim.esm":"ARMO","1cd7c:Dragonborn.esm":"MISC","1cd7e:Dragonborn.esm":"ARMO","1cd82:Dragonborn.esm":"ARMO","1cd86:Dragonborn.esm":"ARMO","1cd87:Dragonborn.esm":"ARMO","1cd88:Dragonborn.esm":"ARMO","1cd89:Dragonborn.esm":"ARMO","1cd8a:Dragonborn.esm":"ARMO","1cd8b:Dragonborn.esm":"ARMO","1cd8c:Dragonborn.esm":"ARMO","1cd92:Dragonborn.esm":"ARMO","1cd93:Dragonborn.esm":"ARMO","1cd94:Dragonborn.esm":"ARMO","1cd95:Dragonborn.esm":"ARMO","1cd96:Dragonborn.esm":"ARMO","1cd97:Dragonborn.esm":"ARMO","1cd98:Dragonborn.esm":"ARMO","1cd99:Dragonborn.esm":"ARMO","1cd9e:Dragonborn.esm":"ARMO","1cd9f:Dragonborn.esm":"ARMO","1cda0:Dragonborn.esm":"ARMO","1cda1:Dragonborn.esm":"ARMO","1cda2:Dragonborn.esm":"ARMO","1cda3:Dragonborn.esm":"ARMO","1cda5:Dragonborn.esm":"ARMO","1cdad:Dragonborn.esm":"WEAP","1cdae:Dragonborn.esm":"WEAP","1cdaf:Dragonborn.esm":"WEAP","1cdb0:Dragonborn.esm":"WEAP","1cdb1:Dragonborn.esm":"WEAP","1cdb2:Dragonborn.esm":"WEAP","1cdb3:Dragonborn.esm":"WEAP","1cdb4:Dragonborn.esm":"WEAP","1cdb5:Dragonborn.esm":"WEAP","1cdb6:Dragonborn.esm":"WEAP","1cdb7:Dragonborn.esm":"WEAP","1cdb8:Dragonborn.esm":"WEAP","1cdb9:Dragonborn.esm":"WEAP","1cdba:Dragonborn.esm":"WEAP","214a1:Hothtrooper44_ArmorCompilation.esp":"ARMO","23146:Hothtrooper44_ArmorCompilation.esp":"ARMO","2314b:Hothtrooper44_ArmorCompilation.esp":"ARMO","23150:Hothtrooper44_ArmorCompilation.esp":"ARMO","23155:Hothtrooper44_ArmorCompilation.esp":"ARMO","2315f:Hothtrooper44_ArmorCompilation.esp":"ARMO","23164:Hothtrooper44_ArmorCompilation.esp":"ARMO","23169:Hothtrooper44_ArmorCompilation.esp":"ARMO","2316e:Hothtrooper44_ArmorCompilation.esp":"ARMO","238e0:Hothtrooper44_ArmorCompilation.esp":"ARMO","238e2:Hothtrooper44_ArmorCompilation.esp":"ARMO","238eb:Hothtrooper44_ArmorCompilation.esp":"ARMO","238f1:Hothtrooper44_ArmorCompilation.esp":"ARMO","23e9:Dawnguard.esm":"ARMO","23eb:Dawnguard.esm":"ARMO","23ed:Dawnguard.esm":"ARMO","23ef:Dawnguard.esm":"ARMO","26234:Dragonborn.esm":"ARMO","26235:Dragonborn.esm":"ARMO","26236:Dragonborn.esm":"ARMO","26237:Dragonborn.esm":"ARMO","2b04e:Dragonborn.esm":"MISC","2b06b:Dragonborn.esm":"MISC","2e4e6:Skyrim.esm":"SLGM","2e6d1:Skyrim.esm":"WEAP","2f2f4:Skyrim.esm":"WEAP","302cd:Skyrim.esm":"WEAP","34cd6:Skyrim.esm":"MISC","34cdd:Skyrim.esm":"INGR","3619e:Skyrim.esm":"ARMO","3ad52:Skyrim.esm":"MISC","3ad57:Skyrim.esm":"MISC","3ad5f:Skyrim.esm":"INGR","3ad6d:Skyrim.esm":"MISC","3ad90:Skyrim.esm":"MISC","441003:Immersive Weapons.esp":"WEAP","4c3cb:Skyrim.esm":"ARMO","4c3d0:Skyrim.esm":"ARMO","50d0:Dawnguard.esm":"ARMO","56a9d:Skyrim.esm":"ARMO","56a9e:Skyrim.esm":"ARMO","56b17:Skyrim.esm":"ARMO","5acdb:Skyrim.esm":"MISC","5acdc:Skyrim.esm":"MISC","5acdd:Skyrim.esm":"MISC","5acde:Skyrim.esm":"MISC","5acdf:Skyrim.esm":"MISC","5ace0:Skyrim.esm":"MISC","5ace1:Skyrim.esm":"MISC","5ace2:Skyrim.esm":"MISC","5ace3:Skyrim.esm":"MISC","5ace4:Skyrim.esm":"MISC","5ace5:Skyrim.esm":"MISC","5ad93:Skyrim.esm":"MISC","5ad99:Skyrim.esm":"MISC","5ad9d:Skyrim.esm":"MISC","5ad9e:Skyrim.esm":"MISC","5ad9f:Skyrim.esm":"MISC","5ada0:Skyrim.esm":"MISC","5ada1:Skyrim.esm":"MISC","5c06c:Skyrim.esm":"ARMO","6bc02:Skyrim.esm":"INGR","6bc04:Skyrim.esm":"INGR","6bc0b:Skyrim.esm":"INGR","6f393:Skyrim.esm":"ARMO","6f39b:Skyrim.esm":"ARMO","6f39e:Skyrim.esm":"ARMO","71cf3:Skyrim.esm":"MISC","747df:Immersive Weapons.esp":"WEAP","747e0:Immersive Weapons.esp":"WEAP","800e4:Skyrim.esm":"MISC","8697e:Skyrim.esm":"ARMO","86981:Skyrim.esm":"ARMO","86983:Skyrim.esm":"ARMO","86985:Skyrim.esm":"ARMO","896a3:Skyrim.esm":"ARMO","9b8a4:Playable Rieklings.esp":"WEAP","a6d79:Skyrim.esm":"ARMO","a6d7b:Skyrim.esm":"ARMO","a6d7f:Skyrim.esm":"ARMO","ab64:Hothtrooper44_ArmorCompilation.esp":"ARMO","ab65:Hothtrooper44_ArmorCompilation.esp":"ARMO","ab66:Hothtrooper44_ArmorCompilation.esp":"ARMO","ab67:Hothtrooper44_ArmorCompilation.esp":"ARMO","b83cb:Skyrim.esm":"ARMO","b83cd:Skyrim.esm":"ARMO","b83cf:Skyrim.esm":"ARMO","cade9:Skyrim.esm":"WEAP","cae15:Skyrim.esm":"ARMO","cc829:Skyrim.esm":"WEAP","cee7c:Skyrim.esm":"ARMO","cee7e:Skyrim.esm":"ARMO","d284d:Skyrim.esm":"MISC","d8d4e:Skyrim.esm":"ARMO","d8d50:Skyrim.esm":"ARMO","d8d52:Skyrim.esm":"ARMO","d8d55:Skyrim.esm":"ARMO","da0b12:Update.esm":"MISC","da0bf1:Update.esm":"MISC","db5d2:Skyrim.esm":"MISC","db8a2:Skyrim.esm":"MISC","e3c16:Skyrim.esm":"WEAP","f3f7:Dawnguard.esm":"ARMO","f3fb:Dawnguard.esm":"ARMO","f3fe:Dawnguard.esm":"ARMO","f400:Dawnguard.esm":"ARMO","f5d05:Skyrim.esm":"MISC","f6f21:Skyrim.esm":"ARMO","1397d:Skyrim.esm":"AMMO","1397f:Skyrim.esm":"AMMO","1398d:Skyrim.esm":"WEAP","13995:Skyrim.esm":"WEAP","1399d:Skyrim.esm":"WEAP","139a5:Skyrim.esm":"WEAP","139ad:Skyrim.esm":"WEAP","139bb:Skyrim.esm":"AMMO","139bc:Skyrim.esm":"AMMO","139bd:Skyrim.esm":"AMMO","139be:Skyrim.esm":"AMMO","139bf:Skyrim.esm":"AMMO","15481:Thornswood-Content.esp":"MISC","15482:Thornswood-Content.esp":"MISC","15484:Thornswood-Content.esp":"MISC","15485:Thornswood-Content.esp":"MISC","15498:Thornswood-Content.esp":"MISC","15499:Thornswood-Content.esp":"MISC","1549a:Thornswood-Content.esp":"MISC","1549b:Thornswood-Content.esp":"MISC","154c1:Thornswood-Content.esp":"MISC","17720:Dragonborn.esm":"AMMO","1b935:Dragonborn.esm":"WEAP","1d9b:PlayFluteLuteDrum.esp":"WEAP","26231:Dragonborn.esm":"WEAP","26232:Dragonborn.esm":"WEAP","26239:Dragonborn.esm":"AMMO","2623b:Dragonborn.esm":"AMMO","287f:PlayFluteLuteDrum.esp":"WEAP","38340:Skyrim.esm":"WEAP","38341:Skyrim.esm":"AMMO","3c337:Dragonborn.esm":"WEAP","3f7f8:Skyrim.esm":"INGR","6f993:Skyrim.esm":"MISC","801:Dawnguard.esm":"WEAP","b647:Dawnguard.esm":"WEAP","bb3:Dawnguard.esm":"AMMO","d099:Dawnguard.esm":"AMMO","d62:PlayFluteLuteDrum.esp":"WEAP","daba7:Skyrim.esm":"MISC","daba9:Skyrim.esm":"MISC","dabab:Skyrim.esm":"MISC","106661:Skyrim.esm":"ARMO","107106:Skyrim.esm":"ARMO","107108:Skyrim.esm":"ARMO","10710a:Skyrim.esm":"ARMO","10cee3:Skyrim.esm":"ARMO","10cee6:Skyrim.esm":"ARMO","10cee8:Skyrim.esm":"ARMO","10cfe4:Skyrim.esm":"ARMO","10cfea:Skyrim.esm":"ARMO","10cfeb:Skyrim.esm":"ARMO","10cfec:Skyrim.esm":"ARMO","10cfef:Skyrim.esm":"ARMO","10cff0:Skyrim.esm":"ARMO","10cff1:Skyrim.esm":"ARMO","10cff2:Skyrim.esm":"ARMO","10d2b4:Skyrim.esm":"ARMO","10d2b5:Skyrim.esm":"ARMO","10d662:Skyrim.esm":"ARMO","10d664:Skyrim.esm":"ARMO","10e2ce:Skyrim.esm":"ARMO","10e2dc:Skyrim.esm":"ARMO","1199a:Dawnguard.esm":"MISC","12c7:Cloaks&Capes.esp":"ARMO","13104:Skyrim.esm":"ARMO","13105:Skyrim.esm":"ARMO","13106:Skyrim.esm":"ARMO","154b2:Thornswood-Content.esp":"MISC","154c0:Thornswood-Content.esp":"MISC","15516:Skyrim.esm":"ARMO","17695:Skyrim.esm":"ARMO","17696:Skyrim.esm":"ARMO","18801:Skyrim.esm":"ARMO","19ade:Dawnguard.esm":"ARMO","19adf:Dawnguard.esm":"ARMO","19ae1:Dawnguard.esm":"ARMO","19ae3:Dawnguard.esm":"ARMO","1bc82:Skyrim.esm":"ARMO","1bca7:Skyrim.esm":"ARMO","1be1a:Skyrim.esm":"ARMO","1be1b:Skyrim.esm":"ARMO","1d8e:Cloaks&Capes.esp":"ARMO","1d8e:Hothtrooper44_ArmorCompilation.esp":"ARMO","209a5:Skyrim.esm":"ARMO","209a6:Skyrim.esm":"ARMO","209aa:Skyrim.esm":"ARMO","22fc:Hothtrooper44_ArmorCompilation.esp":"ARMO","23060:Hothtrooper44_ArmorCompilation.esp":"ARMO","23061:Hothtrooper44_ArmorCompilation.esp":"ARMO","2317c:Hothtrooper44_ArmorCompilation.esp":"ARMO","2317d:Hothtrooper44_ArmorCompilation.esp":"ARMO","2317e:Hothtrooper44_ArmorCompilation.esp":"ARMO","2317f:Hothtrooper44_ArmorCompilation.esp":"ARMO","23180:Hothtrooper44_ArmorCompilation.esp":"ARMO","23181:Hothtrooper44_ArmorCompilation.esp":"ARMO","23182:Hothtrooper44_ArmorCompilation.esp":"ARMO","23183:Hothtrooper44_ArmorCompilation.esp":"ARMO","23184:Hothtrooper44_ArmorCompilation.esp":"ARMO","23185:Hothtrooper44_ArmorCompilation.esp":"ARMO","23186:Hothtrooper44_ArmorCompilation.esp":"ARMO","23187:Hothtrooper44_ArmorCompilation.esp":"ARMO","23188:Hothtrooper44_ArmorCompilation.esp":"ARMO","23189:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318a:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318b:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318c:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318d:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318e:Hothtrooper44_ArmorCompilation.esp":"ARMO","2318f:Hothtrooper44_ArmorCompilation.esp":"ARMO","2325c:Hothtrooper44_ArmorCompilation.esp":"ARMO","23262:Hothtrooper44_ArmorCompilation.esp":"ARMO","238e9:Hothtrooper44_ArmorCompilation.esp":"ARMO","238ea:Hothtrooper44_ArmorCompilation.esp":"ARMO","238fb:Hothtrooper44_ArmorCompilation.esp":"ARMO","238fc:Hothtrooper44_ArmorCompilation.esp":"ARMO","23a09:Playable Rieklings.esp":"ARMO","261bd:Skyrim.esm":"ARMO","261c0:Skyrim.esm":"ARMO","261c1:Skyrim.esm":"ARMO","285f:Hothtrooper44_ArmorCompilation.esp":"ARMO","2883:Cloaks&Capes.esp":"ARMO","2884:Cloaks&Capes.esp":"ARMO","2885:Cloaks&Capes.esp":"ARMO","2886:Cloaks&Capes.esp":"ARMO","2887:Cloaks&Capes.esp":"ARMO","2888:Cloaks&Capes.esp":"ARMO","2889:Cloaks&Capes.esp":"ARMO","2a78:Dawnguard.esm":"INGR","2dd5:Hothtrooper44_ArmorCompilation.esp":"ARMO","2dec:Cloaks&Capes.esp":"ARMO","2ded:Cloaks&Capes.esp":"ARMO","2dee:Cloaks&Capes.esp":"ARMO","2def:Cloaks&Capes.esp":"ARMO","2df0:Cloaks&Capes.esp":"ARMO","2df2:Cloaks&Capes.esp":"ARMO","2df3:Cloaks&Capes.esp":"ARMO","2df4:Cloaks&Capes.esp":"ARMO","2df5:Cloaks&Capes.esp":"ARMO","2df6:Cloaks&Capes.esp":"ARMO","2df7:Cloaks&Capes.esp":"ARMO","2df8:Cloaks&Capes.esp":"ARMO","2df9:Cloaks&Capes.esp":"ARMO","2dfa:Cloaks&Capes.esp":"ARMO","2dfb:Cloaks&Capes.esp":"ARMO","330b3:Skyrim.esm":"ARMO","330bc:Skyrim.esm":"ARMO","3329:Hothtrooper44_ArmorCompilation.esp":"ARMO","3452e:Skyrim.esm":"ARMO","3452f:Skyrim.esm":"ARMO","3705a:Dragonborn.esm":"ARMO","372fa:Hothtrooper44_ArmorCompilation.esp":"ARMO","372fb:Hothtrooper44_ArmorCompilation.esp":"ARMO","372fc:Hothtrooper44_ArmorCompilation.esp":"ARMO","372fd:Hothtrooper44_ArmorCompilation.esp":"ARMO","37302:Hothtrooper44_ArmorCompilation.esp":"ARMO","37303:Hothtrooper44_ArmorCompilation.esp":"ARMO","37304:Hothtrooper44_ArmorCompilation.esp":"ARMO","37305:Hothtrooper44_ArmorCompilation.esp":"ARMO","37b8a:Dragonborn.esm":"ARMO","37b8c:Dragonborn.esm":"ARMO","37b8e:Dragonborn.esm":"ARMO","3ad54:Skyrim.esm":"MISC","3ad6e:Skyrim.esm":"MISC","3ad72:Skyrim.esm":"INGR","3b04b:Dragonborn.esm":"ARMO","3b04e:Dragonborn.esm":"ARMO","3c9fe:Skyrim.esm":"ARMO","3ca00:Skyrim.esm":"ARMO","4223b:Skyrim.esm":"ARMO","4223c:Skyrim.esm":"ARMO","4223d:Skyrim.esm":"ARMO","47d7:Dawnguard.esm":"ARMO","47d9:Dawnguard.esm":"ARMO","48d8:Hothtrooper44_ArmorCompilation.esp":"ARMO","48d9:Hothtrooper44_ArmorCompilation.esp":"ARMO","48e0:Hothtrooper44_ArmorCompilation.esp":"ARMO","57f91:Skyrim.esm":"INGR","5b69e:Skyrim.esm":"ARMO","5b69f:Skyrim.esm":"ARMO","5b6a0:Skyrim.esm":"ARMO","5b6a1:Skyrim.esm":"ARMO","5db7b:Skyrim.esm":"ARMO","5db7e:Skyrim.esm":"ARMO","62303:Skyrim.esm":"ARMO","6230b:Skyrim.esm":"ARMO","62311:Skyrim.esm":"ARMO","646a7:Skyrim.esm":"ARMO","646ab:Skyrim.esm":"ARMO","65b94:Skyrim.esm":"ARMO","65b99:Skyrim.esm":"ARMO","65b9b:Skyrim.esm":"ARMO","65b9d:Skyrim.esm":"ARMO","6b46b:Skyrim.esm":"ARMO","6b46c:Skyrim.esm":"ARMO","6c1d8:Skyrim.esm":"ARMO","6c1d9:Skyrim.esm":"ARMO","6c1da:Skyrim.esm":"ARMO","6ce001:Update.esm":"MISC","6ff37:Skyrim.esm":"ARMO","6ff38:Skyrim.esm":"ARMO","6ff43:Skyrim.esm":"ARMO","6ff45:Skyrim.esm":"ARMO","77e1c:Skyrim.esm":"INGR","77e1d:Skyrim.esm":"INGR","77e1e:Skyrim.esm":"INGR","7bc15:Skyrim.esm":"ARMO","7bc19:Skyrim.esm":"ARMO","7bc1a:Skyrim.esm":"ARMO","80697:Skyrim.esm":"ARMO","80699:Skyrim.esm":"ARMO","806:MoreCraftableEquipment.esp":"ARMO","807:MoreCraftableEquipment.esp":"ARMO","808:MoreCraftableEquipment.esp":"ARMO","809:MoreCraftableEquipment.esp":"ARMO","80a:MoreCraftableEquipment.esp":"ARMO","80b:MoreCraftableEquipment.esp":"ARMO","80c:MoreCraftableEquipment.esp":"ARMO","80d:MoreCraftableEquipment.esp":"ARMO","812:MoreCraftableEquipment.esp":"ARMO","822:MoreCraftableEquipment.esp":"ARMO","823:MoreCraftableEquipment.esp":"ARMO","824:MoreCraftableEquipment.esp":"ARMO","825:MoreCraftableEquipment.esp":"ARMO","826:MoreCraftableEquipment.esp":"ARMO","827:MoreCraftableEquipment.esp":"ARMO","828:MoreCraftableEquipment.esp":"ARMO","829:MoreCraftableEquipment.esp":"ARMO","82a:MoreCraftableEquipment.esp":"ARMO","82c:MoreCraftableEquipment.esp":"ARMO","82d:MoreCraftableEquipment.esp":"ARMO","82eb5:Hothtrooper44_ArmorCompilation.esp":"ARMO","82eb6:Hothtrooper44_ArmorCompilation.esp":"ARMO","82eb7:Hothtrooper44_ArmorCompilation.esp":"ARMO","82eb8:Hothtrooper44_ArmorCompilation.esp":"ARMO","82f:MoreCraftableEquipment.esp":"ARMO","830:MoreCraftableEquipment.esp":"ARMO","831:MoreCraftableEquipment.esp":"ARMO","832:MoreCraftableEquipment.esp":"ARMO","834:MoreCraftableEquipment.esp":"ARMO","835:MoreCraftableEquipment.esp":"ARMO","839:MoreCraftableEquipment.esp":"ARMO","83a:MoreCraftableEquipment.esp":"ARMO","83b:MoreCraftableEquipment.esp":"ARMO","83c:MoreCraftableEquipment.esp":"ARMO","83d:MoreCraftableEquipment.esp":"ARMO","83e:MoreCraftableEquipment.esp":"ARMO","83f:MoreCraftableEquipment.esp":"ARMO","840:MoreCraftableEquipment.esp":"ARMO","841:MoreCraftableEquipment.esp":"ARMO","842:MoreCraftableEquipment.esp":"ARMO","8698c:Skyrim.esm":"ARMO","8698e:Skyrim.esm":"ARMO","86990:Skyrim.esm":"ARMO","86991:Skyrim.esm":"ARMO","86993:Skyrim.esm":"ARMO","88956:Skyrim.esm":"ARMO","88958:Skyrim.esm":"ARMO","8895a:Skyrim.esm":"ARMO","8f19a:Skyrim.esm":"ARMO","9151b:Skyrim.esm":"INGR","9f0:MoreCraftableEquipment.esp":"ARMO","9f3:MoreCraftableEquipment.esp":"ARMO","a199b:Skyrim.esm":"ARMO","b145b:Skyrim.esm":"ARMO","b1460:Skyrim.esm":"ARMO","ba99a:Hothtrooper44_ArmorCompilation.esp":"ARMO","bacd7:Skyrim.esm":"ARMO","bacf3:Skyrim.esm":"ARMO","bfd98:Playable Rieklings.esp":"ARMO","bfdb1:Playable Rieklings.esp":"ARMO","c36e8:Skyrim.esm":"ARMO","c742:HearthFires.esm":"MISC","c743:HearthFires.esm":"MISC","c744:HearthFires.esm":"MISC","c745:HearthFires.esm":"MISC","c746:HearthFires.esm":"MISC","cee76:Skyrim.esm":"ARMO","cee78:Skyrim.esm":"ARMO","cee80:Skyrim.esm":"ARMO","cee82:Skyrim.esm":"ARMO","cee84:Skyrim.esm":"ARMO","d191f:Skyrim.esm":"ARMO","d1921:Skyrim.esm":"ARMO","d81e:HearthFires.esm":"MISC","d81f:HearthFires.esm":"MISC","d820:HearthFires.esm":"MISC","d821:HearthFires.esm":"MISC","d822:HearthFires.esm":"MISC","e0dd0:Skyrim.esm":"ARMO","e0dd2:Skyrim.esm":"ARMO","e0dd4:Skyrim.esm":"ARMO","e84c1:Skyrim.esm":"ARMO","e84c4:Skyrim.esm":"ARMO","e84c6:Skyrim.esm":"ARMO","ead49:Skyrim.esm":"ARMO","f74c:Hothtrooper44_ArmorCompilation.esp":"ARMO","f8713:Skyrim.esm":"ARMO","f8715:Skyrim.esm":"ARMO","10fcf2:Skyrim.esm":"WEAP","10fcf4:Skyrim.esm":"WEAP","10fcf7:Skyrim.esm":"WEAP","17749:Dragonborn.esm":"MISC","29b83:Skyrim.esm":"WEAP","29b95:Skyrim.esm":"WEAP","29b97:Skyrim.esm":"WEAP","2e4e2:Skyrim.esm":"SLGM","2e4e3:Skyrim.esm":"SLGM","2e4e4:Skyrim.esm":"SLGM","2e4e5:Skyrim.esm":"SLGM","2e4f3:Skyrim.esm":"SLGM","2e4f4:Skyrim.esm":"SLGM","2e4fb:Skyrim.esm":"SLGM","2e4fc:Skyrim.esm":"SLGM","2e4ff:Skyrim.esm":"SLGM","2e500:Skyrim.esm":"SLGM","2e504:Skyrim.esm":"SLGM","4c6ca:Skyrim.esm":"WEAP","4ded8:Skyrim.esm":"WEAP","4dee0:Skyrim.esm":"WEAP","4dee1:Skyrim.esm":"WEAP","4dee2:Skyrim.esm":"WEAP","4dee3:Skyrim.esm":"WEAP","51b0c:Skyrim.esm":"WEAP","7e647:Skyrim.esm":"WEAP","be11f:Skyrim.esm":"WEAP","be122:Skyrim.esm":"WEAP","10394d:Skyrim.esm":"ALCH","10d666:Skyrim.esm":"ALCH","117ff:HearthFires.esm":"ALCH","11801:HearthFires.esm":"ALCH","14dc4:Dawnguard.esm":"ALCH","1b3bd:Skyrim.esm":"INGR","1cd72:Dragonborn.esm":"INGR","206e7:Dragonborn.esm":"ALCH","23d77:Skyrim.esm":"INGR","3133c:Skyrim.esm":"ALCH","34cdf:Skyrim.esm":"INGR","34d22:Skyrim.esm":"INGR","34d31:Skyrim.esm":"INGR","34d32:Skyrim.esm":"INGR","3533:HearthFires.esm":"ALCH","3534:HearthFires.esm":"ALCH","3537:HearthFires.esm":"ALCH","3538:HearthFires.esm":"ALCH","3539:HearthFires.esm":"ALCH","353a:HearthFires.esm":"ALCH","353b:HearthFires.esm":"ALCH","353c:HearthFires.esm":"ALCH","353d:HearthFires.esm":"ALCH","353e:HearthFires.esm":"ALCH","353f:HearthFires.esm":"ALCH","3540:HearthFires.esm":"ALCH","3ad5e:Skyrim.esm":"INGR","3bd14:Dragonborn.esm":"ALCH","3bd15:Dragonborn.esm":"ALCH","3cd5b:Dragonborn.esm":"ALCH","3cf72:Dragonborn.esm":"ALCH","3d125:Dragonborn.esm":"ALCH","45c28:Skyrim.esm":"INGR","4b0ba:Skyrim.esm":"INGR","4da24:Skyrim.esm":"INGR","5076e:Skyrim.esm":"INGR","64b2e:Skyrim.esm":"ALCH","64b2f:Skyrim.esm":"ALCH","64b30:Skyrim.esm":"ALCH","64b34:Skyrim.esm":"ALCH","64b35:Skyrim.esm":"ALCH","64b38:Skyrim.esm":"ALCH","64b3a:Skyrim.esm":"ALCH","64b3b:Skyrim.esm":"ALCH","64b3c:Skyrim.esm":"ALCH","64b3d:Skyrim.esm":"ALCH","64b3e:Skyrim.esm":"ALCH","64b3f:Skyrim.esm":"ALCH","64b40:Skyrim.esm":"ALCH","64b41:Skyrim.esm":"ALCH","64b42:Skyrim.esm":"ALCH","64b43:Skyrim.esm":"ALCH","65c97:Skyrim.esm":"ALCH","65c99:Skyrim.esm":"ALCH","65c9a:Skyrim.esm":"ALCH","65c9b:Skyrim.esm":"ALCH","65c9c:Skyrim.esm":"ALCH","65c9d:Skyrim.esm":"ALCH","65c9e:Skyrim.esm":"ALCH","65c9f:Skyrim.esm":"ALCH","669a2:Skyrim.esm":"ALCH","669a3:Skyrim.esm":"ALCH","669a4:Skyrim.esm":"ALCH","669a5:Skyrim.esm":"ALCH","6ac4a:Skyrim.esm":"INGR","6f950:Skyrim.esm":"INGR","721e8:Skyrim.esm":"ALCH","7224c:Skyrim.esm":"ALCH","7224e:Skyrim.esm":"ALCH","722b0:Skyrim.esm":"ALCH","722bb:Skyrim.esm":"ALCH","722bd:Skyrim.esm":"ALCH","722c2:Skyrim.esm":"ALCH","722c7:Skyrim.esm":"ALCH","7ee01:Skyrim.esm":"INGR","80d:Gourmet.esp":"ALCH","810:Gourmet.esp":"ALCH","815:Gourmet.esp":"ALCH","816:Gourmet.esp":"ALCH","817:Gourmet.esp":"ALCH","818:Gourmet.esp":"ALCH","81c:Gourmet.esp":"ALCH","8aa:Gourmet.esp":"ALCH","8ac:Gourmet.esp":"ALCH","8ae:Gourmet.esp":"ALCH","8b1:Gourmet.esp":"ALCH","8b3:Gourmet.esp":"ALCH","8e2:Gourmet.esp":"ALCH","8e4:Gourmet.esp":"ALCH","8ea:Gourmet.esp":"ALCH","8eb:Gourmet.esp":"ALCH","8f5:Gourmet.esp":"ALCH","8f6:Gourmet.esp":"ALCH","8f7:Gourmet.esp":"ALCH","901:Gourmet.esp":"ALCH","902:Gourmet.esp":"ALCH","903:Gourmet.esp":"ALCH","92d3:FishingInSkyrim.esp":"INGR","981:Gourmet.esp":"ALCH","9db:HearthFires.esm":"ALCH","9dc:HearthFires.esm":"ALCH","e8448:Skyrim.esm":"ALCH","e8947:Skyrim.esm":"ALCH","eba01:Skyrim.esm":"ALCH","eba02:Skyrim.esm":"ALCH","eba03:Skyrim.esm":"ALCH","edb2e:Skyrim.esm":"ALCH","f11c0:Skyrim.esm":"INGR","f2011:Skyrim.esm":"ALCH","f4314:Skyrim.esm":"ALCH","f4315:Skyrim.esm":"ALCH","f431b:Skyrim.esm":"ALCH","f431c:Skyrim.esm":"ALCH","f431d:Skyrim.esm":"ALCH","f431e:Skyrim.esm":"ALCH","f4320:Skyrim.esm":"ALCH","106e18:Skyrim.esm":"INGR","106e19:Skyrim.esm":"INGR","106e1a:Skyrim.esm":"INGR","106e1b:Skyrim.esm":"INGR","106e1c:Skyrim.esm":"INGR","134aa:Skyrim.esm":"INGR","154c2:Thornswood-Content.esp":"MISC","154c3:Thornswood-Content.esp":"MISC","17008:Dragonborn.esm":"INGR","183b7:Dawnguard.esm":"INGR","1cd71:Dragonborn.esm":"INGR","1cd74:Dragonborn.esm":"INGR","1ff75:Dragonborn.esm":"INGR","23d6f:Skyrim.esm":"INGR","2f44c:Skyrim.esm":"INGR","3ad56:Skyrim.esm":"INGR","3ad60:Skyrim.esm":"INGR","3ad6f:Skyrim.esm":"INGR","3ad70:Skyrim.esm":"INGR","4da00:Skyrim.esm":"INGR","4da20:Skyrim.esm":"INGR","4da22:Skyrim.esm":"INGR","4da23:Skyrim.esm":"INGR","4da25:Skyrim.esm":"INGR","516c8:Skyrim.esm":"INGR","59b86:Skyrim.esm":"INGR","6abcb:Skyrim.esm":"INGR","6bc00:Skyrim.esm":"INGR","6bc07:Skyrim.esm":"INGR","7e8b7:Skyrim.esm":"INGR","7e8c1:Skyrim.esm":"INGR","7e8c5:Skyrim.esm":"INGR","7e8c8:Skyrim.esm":"INGR","7edf5:Skyrim.esm":"INGR","83e64:Skyrim.esm":"INGR","854fe:Skyrim.esm":"INGR","85500:Skyrim.esm":"INGR","889a2:Skyrim.esm":"INGR","b08c5:Skyrim.esm":"INGR","b097:Dawnguard.esm":"INGR","b2183:Skyrim.esm":"INGR","ec870:Skyrim.esm":"INGR","f1cc:HearthFires.esm":"INGR"}}, native);
-  prepared.commissions=MERCHANT_COMMISSIONS.prepareCommissions([{"id":"q-whiterun-smith-straps","name":"Straps for the forge","text":"The Smith needs six pieces of leather for straps at the forge. Bring them back as one delivery.","tier":"novice","gate":{"profession":"smith","rank":"novice","half":"platewright"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"db5d2:Skyrim.esm","count":6,"recipe":{"reference":"1033de:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"novice","out":"db5d2:Skyrim.esm","makes":2,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"d284d:Skyrim.esm","name":"Deer Hide","type":"MISC","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(DeerHide02) >= 1","function":47,"of":"DeerHide02","ofType":"MISC","serverSees":true}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734","itemType":"MISC"},{"id":"q-rift-woodworker-hunt-arrows","name":"Arrows for the hunt","text":"The Woodworker needs a bundle of twenty-four iron arrows for hunters in the Rift. Bring the full bundle.","tier":"novice","gate":{"profession":"woodworker","rank":"novice","half":"woodwright"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"1397d:Skyrim.esm","count":24,"recipe":{"reference":"b64f:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"1397d:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"84b31663cd265c9b26068ff7343622f04b332ddce394e58b52a55b0b6cbb3a89","itemType":"AMMO"},{"id":"q-falkreath-tailor-mourning-thread","name":"Thread for mourning cloth","text":"The Tailor needs four spools of thread for mourning cloth in Falkreath. Bring the thread as one delivery.","tier":"novice","gate":{"profession":"tailor","rank":"novice","half":"haberdasher"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"6ce001:Update.esm","count":4,"recipe":{"reference":"84a:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"6ce001:Update.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8dded80c9b0e56c8a18158136ca200481a444582a41cc98000fe8ad612ec0aef","itemType":"MISC"},{"id":"q-haafingar-cook-dock-supper","name":"A supper for the docks","text":"The Cook needs two salmon steaks for a supper near the docks. Bring both steaks for the order.","tier":"novice","gate":{"profession":"cook","rank":"novice","half":"hearthcook"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"64b3b:Skyrim.esm","count":2,"recipe":{"reference":"f4310:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"64b3b:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"65c9f:Skyrim.esm","name":"Salmon Meat","type":"ALCH","count":1,"producedBy":"fisher","producedAt":"novice","suppliedBy":"fisher","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodSalmon) >= 1","function":47,"of":"MAG_FoodSalmon","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"cfd57250d82ce20c23fa8db5c802509e103d6dd8c0e0a55654b1ed4da12c8a11","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-marsh-poultices","name":"Poultices for the marsh road","text":"The Alchemist needs two poultices for travellers on the marsh road. Bring both poultices for the order.","tier":"novice","gate":{"profession":"alchemist","rank":"novice","half":"physicker"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"154c2:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c6:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"novice","out":"154c2:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5b8b08e462680c7249f9359498a84f1e1ccbc7ff30020ed1d15fbdd204703652","itemType":"MISC"},{"id":"q-whiterun-smith-spare-pick","name":"A spare pick for the mine","text":"A spare pick keeps a mining crew working when a tool breaks. Bring one pickaxe for the Whiterun Smith's reserve.","tier":"novice","gate":{"classKey":"miner","rank":"novice"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"df7c54b9f75be97be6c525080c59640af7448efa017dc9d3ed0c7d5c649f00b0","itemType":"WEAP"},{"id":"q-rift-woodworker-spare-pole","name":"A spare pole for the lake","text":"Bring one crude fishing pole to the Rift Woodworker, to replace poles lost or broken around the lake.","tier":"novice","gate":{"classKey":"fisher","rank":"novice"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"15498:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549c:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"15498:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":2,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74","itemType":"MISC"},{"id":"q-falkreath-tailor-trail-boots","name":"Boots for the trail","text":"Bring one pair of boots to Falkreath's Tailor for hunters setting out along the forest trails.","tier":"novice","gate":{"classKey":"hunter","rank":"novice"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"d1921:Skyrim.esm","count":1,"recipe":{"reference":"928:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"d1921:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1","itemType":"ARMO"},{"id":"q-haafingar-cook-field-soup","name":"Soup for the field hands","text":"Bring two bowls of potato soup to Haafingar's Cook for field hands after their work.","tier":"novice","gate":{"classKey":"farmer","rank":"novice"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"353d:HearthFires.esm","count":2,"recipe":{"reference":"3542:HearthFires.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"353d:HearthFires.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"64b41:Skyrim.esm","name":"Potato","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0},{"item":"669a5:Skyrim.esm","name":"Leek","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkPotatoSoup) == 1","function":448,"of":"MAG_RecipePerkPotatoSoup","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-cotton-dressings","name":"Cotton for marsh-road dressings","text":"Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.","tier":"novice","gate":{"classKey":"gatherer","rank":"novice"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"3f7f8:Skyrim.esm","count":3,"harvest":{"reference":"bb947:Skyrim.esm","produce":"3f7f8:Skyrim.esm","name":"Tundra Cotton","rank":"novice"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9","itemType":"INGR"}],prepared.catalog,native);
+  prepared.commissions=MERCHANT_COMMISSIONS.prepareCommissions([{"id":"q-whiterun-smith-straps","name":"Straps for the forge","text":"The Smith needs six pieces of leather for straps at the forge. Bring them back as one delivery.","tier":"novice","gate":{"profession":"smith","rank":"novice","half":"platewright"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"db5d2:Skyrim.esm","count":6,"recipe":{"reference":"1033de:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"novice","out":"db5d2:Skyrim.esm","makes":2,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"d284d:Skyrim.esm","name":"Deer Hide","type":"MISC","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(DeerHide02) >= 1","function":47,"of":"DeerHide02","ofType":"MISC","serverSees":true}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734","itemType":"MISC"},{"id":"q-rift-woodworker-hunt-arrows","name":"Arrows for the hunt","text":"The Woodworker needs a bundle of twenty-four iron arrows for hunters in the Rift. Bring the full bundle.","tier":"novice","gate":{"profession":"woodworker","rank":"novice","half":"woodwright"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"1397d:Skyrim.esm","count":24,"recipe":{"reference":"b64f:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"1397d:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"84b31663cd265c9b26068ff7343622f04b332ddce394e58b52a55b0b6cbb3a89","itemType":"AMMO"},{"id":"q-falkreath-tailor-mourning-thread","name":"Thread for mourning cloth","text":"The Tailor needs four spools of thread for mourning cloth in Falkreath. Bring the thread as one delivery.","tier":"novice","gate":{"profession":"tailor","rank":"novice","half":"haberdasher"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"6ce001:Update.esm","count":4,"recipe":{"reference":"84a:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"6ce001:Update.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8dded80c9b0e56c8a18158136ca200481a444582a41cc98000fe8ad612ec0aef","itemType":"MISC"},{"id":"q-haafingar-cook-dock-supper","name":"A supper for the docks","text":"The Cook needs two salmon steaks for a supper near the docks. Bring both steaks for the order.","tier":"novice","gate":{"profession":"cook","rank":"novice","half":"hearthcook"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"64b3b:Skyrim.esm","count":2,"recipe":{"reference":"f4310:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"64b3b:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"65c9f:Skyrim.esm","name":"Salmon Meat","type":"ALCH","count":1,"producedBy":"fisher","producedAt":"novice","suppliedBy":"fisher","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodSalmon) >= 1","function":47,"of":"MAG_FoodSalmon","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"cfd57250d82ce20c23fa8db5c802509e103d6dd8c0e0a55654b1ed4da12c8a11","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-marsh-poultices","name":"Poultices for the marsh road","text":"The Alchemist needs two poultices for travellers on the marsh road. Bring both poultices for the order.","tier":"novice","gate":{"profession":"alchemist","rank":"novice","half":"physicker"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"154c2:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c6:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"novice","out":"154c2:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5b8b08e462680c7249f9359498a84f1e1ccbc7ff30020ed1d15fbdd204703652","itemType":"MISC"},{"id":"q-whiterun-smith-spare-pick","name":"A spare pick for the mine","text":"A spare pick keeps a mining crew working when a tool breaks. Bring one pickaxe for the Whiterun Smith's reserve.","tier":"novice","gate":{"classKey":"miner","rank":"novice"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"df7c54b9f75be97be6c525080c59640af7448efa017dc9d3ed0c7d5c649f00b0","itemType":"WEAP"},{"id":"q-rift-woodworker-spare-pole","name":"A spare pole for the lake","text":"Bring one crude fishing pole to the Rift Woodworker, to replace poles lost or broken around the lake.","tier":"novice","gate":{"classKey":"fisher","rank":"novice"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"15498:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549c:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"15498:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":2,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74","itemType":"MISC"},{"id":"q-falkreath-tailor-trail-boots","name":"Boots for the trail","text":"Bring one pair of boots to Falkreath's Tailor for hunters setting out along the forest trails.","tier":"novice","gate":{"classKey":"hunter","rank":"novice"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"d1921:Skyrim.esm","count":1,"recipe":{"reference":"928:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"d1921:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1","itemType":"ARMO"},{"id":"q-haafingar-cook-field-soup","name":"Soup for the field hands","text":"Bring two bowls of potato soup to Haafingar's Cook for field hands after their work.","tier":"novice","gate":{"classKey":"farmer","rank":"novice"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"353d:HearthFires.esm","count":2,"recipe":{"reference":"3542:HearthFires.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"353d:HearthFires.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"64b41:Skyrim.esm","name":"Potato","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0},{"item":"669a5:Skyrim.esm","name":"Leek","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkPotatoSoup) == 1","function":448,"of":"MAG_RecipePerkPotatoSoup","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-cotton-dressings","name":"Cotton for marsh-road dressings","text":"Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.","tier":"novice","gate":{"classKey":"gatherer","rank":"novice"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"3f7f8:Skyrim.esm","count":3,"harvest":{"reference":"bb947:Skyrim.esm","produce":"3f7f8:Skyrim.esm","name":"Tundra Cotton","rank":"novice"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9","itemType":"INGR"},{"id":"q-whiterun-smith-ebony-seam-account","name":"An ebony seam's account","text":"The Smith needs an ebony and silver parcel for the next furnace run, with a spare pick for the mine. Bring the complete parcel.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"classKey":"miner","rank":"master"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"5acdc:Skyrim.esm","count":4,"mining":{"reference":"10e101:Skyrim.esm","ore":"5acdc:Skyrim.esm","name":"Ebony Ore","rank":"master","yield":[[0,0],[0,0],[0,0],[1,2]]}},{"item":"5acdf:Skyrim.esm","count":4,"mining":{"reference":"10dcb9:Skyrim.esm","ore":"5acdf:Skyrim.esm","name":"Silver Ore","rank":"advanced","yield":[[0,0],[1,2],[1,2],[1,2]]}},{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-source","note":"Four Master-gated Ebony Ore, four Advanced Silver Ore and one public spare pick; no mine or yield is changed."},"sourceHash":"d09451fa3306f0743d0e68bd78ae43bde11dcd0fdc2761abe37c350d37a70faa","itemType":"MISC","itemTypes":{"5acdc:Skyrim.esm":"MISC","5acdf:Skyrim.esm":"MISC","e3c16:Skyrim.esm":"WEAP"}},{"id":"q-whiterun-woodworker-outfitter-reserve","name":"An outfitter's last reserve","text":"The Woodworker needs a master fishing pole and a full bundle of ebony arrows for an outfitter's reserve. Bring both parts.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"woodworker","half":"woodwright","rank":"master"},"merchant":{"reference":"1a681:Skyrim.esm","base":"13b9e:Skyrim.esm","role":"Woodworker","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"1549a:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549e:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"master","out":"1549a:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":3,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":2,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"5ace5:Skyrim.esm","name":"Steel Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"advanced","hops":1,"suppliedVia":"RecipeIngotSteel"},{"item":"5ad9f:Skyrim.esm","name":"Refined Moonstone","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"expert","hops":1,"suppliedVia":"RecipeIngotMoonstone"}],"needs":[]}},{"item":"139bf:Skyrim.esm","count":24,"recipe":{"reference":"b651:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"master","out":"139bf:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ad9d:Skyrim.esm","name":"Ebony Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"master","hops":1,"suppliedVia":"RecipeIngotEbony"}],"needs":[{"asks":"HasPerk(EbonySmithing) == 1","function":448,"of":"EbonySmithing","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"One Master pole batch and one Master arrow batch; the arrows make24 per batch."},"sourceHash":"a94934368484eaf0bcfa65564909260c8b1da3e198a11495b31a8d1c070836e0","itemType":"MISC","itemTypes":{"1549a:Thornswood-Content.esp":"MISC","139bf:Skyrim.esm":"AMMO"}},{"id":"q-whiterun-tailor-winter-vestments","name":"Winter vestments for a caravan","text":"The Tailor needs three sets of ragged robes and three snowy-sabre fur cloaks for a winter caravan. This is a complete outfitting order.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"tailor","half":"liverywright","rank":"master"},"merchant":{"reference":"1a684:Skyrim.esm","base":"13b9c:Skyrim.esm","role":"Tailor","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"13105:Skyrim.esm","count":3,"recipe":{"reference":"924:MoreCraftableEquipment.esp","owner":"Tailor","half":"Liverywright","rank":"novice","out":"13105:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}},{"item":"2885:Cloaks&Capes.esp","count":3,"recipe":{"reference":"2e06:Cloaks&Capes.esp","owner":"Tailor","half":"Haberdasher","rank":"expert","out":"2885:Cloaks&Capes.esp","makes":1,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"3ad6e:Skyrim.esm","name":"Sabre Cat Snow Pelt","type":"MISC","count":1,"producedBy":"hunter","producedAt":"expert","suppliedBy":"hunter","suppliedAt":"expert","hops":0},{"item":"5ad9e:Skyrim.esm","name":"Gold Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"expert","hops":1,"suppliedVia":"RecipeIngotGold"}],"needs":[{"asks":"function 74(MCE_CraftingLoomEnabled) == 0","function":74,"of":"MCE_CraftingLoomEnabled","ofType":"GLOB","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"expert-logistics","minimumBatches":6,"note":"Six production batches, including three Expert fur cloaks. This is Master logistical work, not a new Master clothing recipe or an enchanting claim."},"sourceHash":"68f0406f1fe3db80d3b820d13413c0419a960da038eef3a54ac103091d9af2e0","itemType":"ARMO","itemTypes":{"13105:Skyrim.esm":"ARMO","2885:Cloaks&Capes.esp":"ARMO"}},{"id":"q-whiterun-enchanter-ward-demonstration","name":"A ward tutor's demonstration stock","text":"The Enchanter needs two ebony shields and two sets of ragged robes for an Alteration tutor's demonstration stock. No particular enchantment is required.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"mage","school":"alteration","rank":"master"},"merchant":{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"13964:Skyrim.esm","count":2,"recipe":{"reference":"dd98c:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"master","out":"13964:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"5ad9d:Skyrim.esm","name":"Ebony Ingot","type":"MISC","count":4,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"master","hops":1,"suppliedVia":"RecipeIngotEbony"}],"needs":[{"asks":"HasPerk(EbonySmithing) == 1","function":448,"of":"EbonySmithing","ofType":"PERK","serverSees":false}]}},{"item":"13105:Skyrim.esm","count":2,"recipe":{"reference":"924:MoreCraftableEquipment.esp","owner":"Tailor","half":"Liverywright","rank":"novice","out":"13105:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"Two Master shield batches, with two additional robe batches. These are public equipment supplies, not a promise of blank or enchanted gear."},"sourceHash":"8f19b0da990fc2102dd312016717dc92a48f23d6bcfdec622aaf3adc621d169e","itemType":"ARMO","itemTypes":{"13964:Skyrim.esm":"ARMO","13105:Skyrim.esm":"ARMO"}},{"id":"q-whiterun-cook-mammoth-supper","name":"A mammoth supper for the hall","text":"The Cook needs two mammoth steaks and two mammoth stews for a supper in the hall. Bring both courses together.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"cook","half":"hearthcook","rank":"master"},"merchant":{"reference":"1a66e:Skyrim.esm","base":"13ba3:Skyrim.esm","role":"Cook","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"722bb:Skyrim.esm","count":2,"recipe":{"reference":"f430d:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"master","out":"722bb:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"669a4:Skyrim.esm","name":"Mammoth Snout","type":"ALCH","count":1,"producedBy":"hunter","producedAt":"master","suppliedBy":"hunter","suppliedAt":"master","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodMammothMeat) >= 1","function":47,"of":"MAG_FoodMammothMeat","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}},{"item":"818:Gourmet.esp","count":2,"recipe":{"reference":"819:Gourmet.esp","owner":"Cook","half":"Hearthcook","rank":"master","out":"818:Gourmet.esp","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d32:Skyrim.esm","name":"Frost Mirriam","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"669a4:Skyrim.esm","name":"Mammoth Snout","type":"ALCH","count":1,"producedBy":"hunter","producedAt":"master","suppliedBy":"hunter","suppliedAt":"master","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkMammothStew) == 1","function":448,"of":"MAG_RecipePerkMammothStew","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"Both dishes have Master supply provenance; recipe conditions still apply to whoever cooks them."},"sourceHash":"d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4","itemType":"ALCH","itemTypes":{"722bb:Skyrim.esm":"ALCH","818:Gourmet.esp":"ALCH"}},{"id":"q-whiterun-alchemist-ash-expedition","name":"Remedies for the ash-road expedition","text":"The Alchemist needs two physicker remedies and four ash creep clusters for an expedition's supplies. Bring the finished remedies and the separate reagents.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"alchemist","half":"physicker","rank":"master"},"merchant":{"reference":"1a66d:Skyrim.esm","base":"13ba4:Skyrim.esm","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"154c3:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c7:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"advanced","out":"154c3:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"6bc00:Skyrim.esm","name":"Mudcrab Chitin","type":"INGR","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0},{"item":"77e1c:Skyrim.esm","name":"Blue Mountain Flower","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"advanced","suppliedBy":"gatherer","suppliedAt":"advanced","hops":0}],"needs":[]}},{"item":"1cd74:Dragonborn.esm","count":4,"harvest":{"reference":"195dc:Dragonborn.esm","produce":"1cd74:Dragonborn.esm","name":"Ash Creep Cluster","rank":"master"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-source","note":"Master-gated Ash Creep Cluster and two Advanced remedies. No effect is claimed for brewing the supplied reagents."},"sourceHash":"75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df","itemType":"MISC","itemTypes":{"154c3:Thornswood-Content.esp":"MISC","1cd74:Dragonborn.esm":"INGR"}},{"id":"q-whiterun-alchemist-travelling-case","name":"A field medic's travelling case","text":"The Alchemist needs two physicker remedies and four nirnroots for a travelling case. Bring both parts as one delivery.","kind":"commission","deliveryVersion":2,"tier":"expert","gate":{"profession":"alchemist","half":"physicker","rank":"expert"},"merchant":{"reference":"1a66d:Skyrim.esm","base":"13ba4:Skyrim.esm","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"154c3:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c7:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"advanced","out":"154c3:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"6bc00:Skyrim.esm","name":"Mudcrab Chitin","type":"INGR","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0},{"item":"77e1c:Skyrim.esm","name":"Blue Mountain Flower","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"advanced","suppliedBy":"gatherer","suppliedAt":"advanced","hops":0}],"needs":[]}},{"item":"59b86:Skyrim.esm","count":4,"harvest":{"reference":"110c8:HearthFires.esm","produce":"59b86:Skyrim.esm","name":"Nirnroot","rank":"expert"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":24,"difficulty":{"basis":"expert-source","note":"Expert-gated Nirnroot with two Advanced remedy batches; no particular plant placement or harvest event is promised."},"sourceHash":"7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da","itemType":"MISC","itemTypes":{"154c3:Thornswood-Content.esp":"MISC","59b86:Skyrim.esm":"INGR"}},{"id":"q-whiterun-enchanter-commission-rack","name":"Clothes for the commission rack","text":"The Enchanter needs a set of common clothes and a pair of shoes for the commission rack. Bring both pieces; no enchantment is required.","kind":"commission","deliveryVersion":2,"tier":"novice","gate":{"profession":"enchanter","half":"wardweaver","rank":"novice"},"merchant":{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"5b6a1:Skyrim.esm","count":1,"recipe":{"reference":"91f:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"5b6a1:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":4,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}},{"item":"5b6a0:Skyrim.esm","count":1,"recipe":{"reference":"920:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"5b6a0:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"difficulty":{"basis":"novice-batches","minimumBatches":2,"note":"Two public Novice wearable batches with measured Novice inputs; the source does not promise unenchanted blanks."},"sourceHash":"531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787","itemType":"ARMO","itemTypes":{"5b6a1:Skyrim.esm":"ARMO","5b6a0:Skyrim.esm":"ARMO"}}],prepared.catalog,native);
   return prepared;
 };
 module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;
 module.exports.sceneBudget = SCENE_BUDGET;
 module.exports.expandedScenes = function () { return [{"id":"q-whiterun-tailor-cloth-road","name":"A clear road for cloth","text":"The Tailor needs the approach to Redoran's Retreat made safer for the next cloth delivery. Defeat the marked bandit inside the retreat, then return.","tier":"novice","gate":{"profession":"warrior","rank":"novice"},"merchant":{"reference":"1a684:Skyrim.esm","base":"13b9c:Skyrim.esm","role":"Tailor","hold":"Whiterun","bookHold":"whiterun"},"kind":"kill","count":1,"targets":[{"ref":"36ce1:Skyrim.esm","base":"1e79d:Skyrim.esm","cell":"15224:Skyrim.esm","world":null,"pos":[-2136.4208984375,1534.8690185546875,-212.0419921875],"leash":2048,"role":"enemy","species":"nord","location":"19295:Skyrim.esm","locationName":"Redoran's Retreat","hold":"Whiterun","habitat":"bandit-camp","tier":null,"returnMinutes":45}],"rewardGold":15,"cooldownHours":6,"sourceHash":"6f6cf4c63de266dff8edfee2ab72213ed9699756c274004d62f775ec3cbfb68f"},{"id":"q-winterhold-enchanter-coast","name":"Coastal preparations","text":"The Enchanter needs the marked stretch of Winterhold's coast cleared before taking measurements there. Defeat its skeever and report back.","tier":"novice","gate":{"profession":"mage","rank":"novice"},"merchant":{"reference":"1e7d6:Skyrim.esm","base":"1e7d5:Skyrim.esm","role":"Enchanter","hold":"Winterhold","bookHold":"winterhold"},"kind":"kill","count":1,"targets":[{"ref":"ef60f:Skyrim.esm","base":"23ab7:Skyrim.esm","cell":"8dea:Skyrim.esm","world":"3c:Skyrim.esm","pos":[99232,128672,-13824],"leash":1536,"role":"animal","species":"skeever","location":"8dea:Skyrim.esm","locationName":"POINorthernCoast18","hold":"Winterhold","habitat":"wilderness","tier":null,"returnMinutes":20}],"rewardGold":10,"cooldownHours":6,"sourceHash":"518c9b2210f63ee6ec1b6b6f388c862c6f5ed9dca284dfb21b115f9350928146"},{"id":"q-rift-tailor-northwind-work","name":"Northwind work clothes","text":"Before I fit out a work party for Northwind, deal with the two marked skeletons inside Northwind Mine.","tier":"advanced","gate":{"profession":"warrior","rank":"advanced"},"merchant":{"reference":"31efc3:Riften Expansion.esp","base":"1d0769:Riften Expansion.esp","role":"Tailor","hold":"the Rift","bookHold":"riften"},"kind":"kill","count":2,"targets":[{"ref":"476c9:Skyrim.esm","base":"2d1fc:Skyrim.esm","cell":"15294:Skyrim.esm","world":null,"pos":[407.26873779296875,3681.330322265625,159.30126953125],"leash":1536,"role":"enemy","species":"skeleton","location":"fdbdf:Skyrim.esm","locationName":"Northwind Mine","hold":"the Rift","habitat":"dungeon","tier":2,"returnMinutes":45},{"ref":"476ca:Skyrim.esm","base":"2d1fd:Skyrim.esm","cell":"15294:Skyrim.esm","world":null,"pos":[-145.48818969726562,2940.852783203125,153.1743927001953],"leash":1536,"role":"enemy","species":"skeleton","location":"fdbdf:Skyrim.esm","locationName":"Northwind Mine","hold":"the Rift","habitat":"dungeon","tier":2,"returnMinutes":45}],"rewardGold":35,"cooldownHours":6,"sourceHash":"fcddb1a76415ade5c37bd149b28a0235a90d9a57ffb7c07176a6ccfd6a0ad239"},{"id":"q-whiterun-enchanter-shimmermist","name":"Shimmermist preparations","text":"Before I plan wards for a Shimmermist survey, deal with the two marked Falmer inside Shimmermist Cave.","tier":"advanced","gate":{"profession":"mage","rank":"advanced"},"merchant":{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},"kind":"kill","count":2,"targets":[{"ref":"530c0:Skyrim.esm","base":"1e7b3:Skyrim.esm","cell":"1521c:Skyrim.esm","world":null,"pos":[3485.25244140625,-723.4301147460938,-624.6600341796875],"leash":1536,"role":"enemy","species":"falmer","location":"1929d:Skyrim.esm","locationName":"Shimmermist Cave","hold":"Whiterun","habitat":"cave","tier":2,"returnMinutes":45},{"ref":"530c4:Skyrim.esm","base":"1e7b4:Skyrim.esm","cell":"1521c:Skyrim.esm","world":null,"pos":[5013.04150390625,-3487.726806640625,-631.1539916992188],"leash":1536,"role":"enemy","species":"falmer","location":"1929d:Skyrim.esm","locationName":"Shimmermist Cave","hold":"Whiterun","habitat":"cave","tier":2,"returnMinutes":45}],"rewardGold":40,"cooldownHours":6,"sourceHash":"402f870a3f8d330987e97d83c14a5ef54f1474fd3b3fbb644ec38e00928041f4"}]; };
-module.exports.commissionRows = function () { return [{"id":"q-whiterun-smith-straps","name":"Straps for the forge","text":"The Smith needs six pieces of leather for straps at the forge. Bring them back as one delivery.","tier":"novice","gate":{"profession":"smith","rank":"novice","half":"platewright"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"db5d2:Skyrim.esm","count":6,"recipe":{"reference":"1033de:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"novice","out":"db5d2:Skyrim.esm","makes":2,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"d284d:Skyrim.esm","name":"Deer Hide","type":"MISC","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(DeerHide02) >= 1","function":47,"of":"DeerHide02","ofType":"MISC","serverSees":true}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734","itemType":"MISC"},{"id":"q-rift-woodworker-hunt-arrows","name":"Arrows for the hunt","text":"The Woodworker needs a bundle of twenty-four iron arrows for hunters in the Rift. Bring the full bundle.","tier":"novice","gate":{"profession":"woodworker","rank":"novice","half":"woodwright"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"1397d:Skyrim.esm","count":24,"recipe":{"reference":"b64f:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"1397d:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"84b31663cd265c9b26068ff7343622f04b332ddce394e58b52a55b0b6cbb3a89","itemType":"AMMO"},{"id":"q-falkreath-tailor-mourning-thread","name":"Thread for mourning cloth","text":"The Tailor needs four spools of thread for mourning cloth in Falkreath. Bring the thread as one delivery.","tier":"novice","gate":{"profession":"tailor","rank":"novice","half":"haberdasher"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"6ce001:Update.esm","count":4,"recipe":{"reference":"84a:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"6ce001:Update.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8dded80c9b0e56c8a18158136ca200481a444582a41cc98000fe8ad612ec0aef","itemType":"MISC"},{"id":"q-haafingar-cook-dock-supper","name":"A supper for the docks","text":"The Cook needs two salmon steaks for a supper near the docks. Bring both steaks for the order.","tier":"novice","gate":{"profession":"cook","rank":"novice","half":"hearthcook"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"64b3b:Skyrim.esm","count":2,"recipe":{"reference":"f4310:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"64b3b:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"65c9f:Skyrim.esm","name":"Salmon Meat","type":"ALCH","count":1,"producedBy":"fisher","producedAt":"novice","suppliedBy":"fisher","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodSalmon) >= 1","function":47,"of":"MAG_FoodSalmon","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"cfd57250d82ce20c23fa8db5c802509e103d6dd8c0e0a55654b1ed4da12c8a11","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-marsh-poultices","name":"Poultices for the marsh road","text":"The Alchemist needs two poultices for travellers on the marsh road. Bring both poultices for the order.","tier":"novice","gate":{"profession":"alchemist","rank":"novice","half":"physicker"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"154c2:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c6:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"novice","out":"154c2:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5b8b08e462680c7249f9359498a84f1e1ccbc7ff30020ed1d15fbdd204703652","itemType":"MISC"},{"id":"q-whiterun-smith-spare-pick","name":"A spare pick for the mine","text":"A spare pick keeps a mining crew working when a tool breaks. Bring one pickaxe for the Whiterun Smith's reserve.","tier":"novice","gate":{"classKey":"miner","rank":"novice"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"df7c54b9f75be97be6c525080c59640af7448efa017dc9d3ed0c7d5c649f00b0","itemType":"WEAP"},{"id":"q-rift-woodworker-spare-pole","name":"A spare pole for the lake","text":"Bring one crude fishing pole to the Rift Woodworker, to replace poles lost or broken around the lake.","tier":"novice","gate":{"classKey":"fisher","rank":"novice"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"15498:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549c:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"15498:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":2,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74","itemType":"MISC"},{"id":"q-falkreath-tailor-trail-boots","name":"Boots for the trail","text":"Bring one pair of boots to Falkreath's Tailor for hunters setting out along the forest trails.","tier":"novice","gate":{"classKey":"hunter","rank":"novice"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"d1921:Skyrim.esm","count":1,"recipe":{"reference":"928:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"d1921:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1","itemType":"ARMO"},{"id":"q-haafingar-cook-field-soup","name":"Soup for the field hands","text":"Bring two bowls of potato soup to Haafingar's Cook for field hands after their work.","tier":"novice","gate":{"classKey":"farmer","rank":"novice"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"353d:HearthFires.esm","count":2,"recipe":{"reference":"3542:HearthFires.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"353d:HearthFires.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"64b41:Skyrim.esm","name":"Potato","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0},{"item":"669a5:Skyrim.esm","name":"Leek","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkPotatoSoup) == 1","function":448,"of":"MAG_RecipePerkPotatoSoup","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-cotton-dressings","name":"Cotton for marsh-road dressings","text":"Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.","tier":"novice","gate":{"classKey":"gatherer","rank":"novice"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"3f7f8:Skyrim.esm","count":3,"harvest":{"reference":"bb947:Skyrim.esm","produce":"3f7f8:Skyrim.esm","name":"Tundra Cotton","rank":"novice"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9","itemType":"INGR"}]; };
+module.exports.commissionRows = function () { return [{"id":"q-whiterun-smith-straps","name":"Straps for the forge","text":"The Smith needs six pieces of leather for straps at the forge. Bring them back as one delivery.","tier":"novice","gate":{"profession":"smith","rank":"novice","half":"platewright"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"db5d2:Skyrim.esm","count":6,"recipe":{"reference":"1033de:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"novice","out":"db5d2:Skyrim.esm","makes":2,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"d284d:Skyrim.esm","name":"Deer Hide","type":"MISC","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(DeerHide02) >= 1","function":47,"of":"DeerHide02","ofType":"MISC","serverSees":true}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734","itemType":"MISC"},{"id":"q-rift-woodworker-hunt-arrows","name":"Arrows for the hunt","text":"The Woodworker needs a bundle of twenty-four iron arrows for hunters in the Rift. Bring the full bundle.","tier":"novice","gate":{"profession":"woodworker","rank":"novice","half":"woodwright"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"1397d:Skyrim.esm","count":24,"recipe":{"reference":"b64f:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"1397d:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"84b31663cd265c9b26068ff7343622f04b332ddce394e58b52a55b0b6cbb3a89","itemType":"AMMO"},{"id":"q-falkreath-tailor-mourning-thread","name":"Thread for mourning cloth","text":"The Tailor needs four spools of thread for mourning cloth in Falkreath. Bring the thread as one delivery.","tier":"novice","gate":{"profession":"tailor","rank":"novice","half":"haberdasher"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"6ce001:Update.esm","count":4,"recipe":{"reference":"84a:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"6ce001:Update.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"8dded80c9b0e56c8a18158136ca200481a444582a41cc98000fe8ad612ec0aef","itemType":"MISC"},{"id":"q-haafingar-cook-dock-supper","name":"A supper for the docks","text":"The Cook needs two salmon steaks for a supper near the docks. Bring both steaks for the order.","tier":"novice","gate":{"profession":"cook","rank":"novice","half":"hearthcook"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"64b3b:Skyrim.esm","count":2,"recipe":{"reference":"f4310:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"64b3b:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"65c9f:Skyrim.esm","name":"Salmon Meat","type":"ALCH","count":1,"producedBy":"fisher","producedAt":"novice","suppliedBy":"fisher","suppliedAt":"novice","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodSalmon) >= 1","function":47,"of":"MAG_FoodSalmon","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"cfd57250d82ce20c23fa8db5c802509e103d6dd8c0e0a55654b1ed4da12c8a11","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-marsh-poultices","name":"Poultices for the marsh road","text":"The Alchemist needs two poultices for travellers on the marsh road. Bring both poultices for the order.","tier":"novice","gate":{"profession":"alchemist","rank":"novice","half":"physicker"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"154c2:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c6:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"novice","out":"154c2:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5b8b08e462680c7249f9359498a84f1e1ccbc7ff30020ed1d15fbdd204703652","itemType":"MISC"},{"id":"q-whiterun-smith-spare-pick","name":"A spare pick for the mine","text":"A spare pick keeps a mining crew working when a tool breaks. Bring one pickaxe for the Whiterun Smith's reserve.","tier":"novice","gate":{"classKey":"miner","rank":"novice"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"kind":"commission","goods":[{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"df7c54b9f75be97be6c525080c59640af7448efa017dc9d3ed0c7d5c649f00b0","itemType":"WEAP"},{"id":"q-rift-woodworker-spare-pole","name":"A spare pole for the lake","text":"Bring one crude fishing pole to the Rift Woodworker, to replace poles lost or broken around the lake.","tier":"novice","gate":{"classKey":"fisher","rank":"novice"},"merchant":{"reference":"19dd0:Skyrim.esm","base":"1334d:Skyrim.esm","role":"Woodworker","hold":"the Rift","bookHold":"riften"},"kind":"commission","goods":[{"item":"15498:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549c:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"novice","out":"15498:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":2,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"3f7f8:Skyrim.esm","name":"Tundra Cotton","type":"INGR","count":2,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74","itemType":"MISC"},{"id":"q-falkreath-tailor-trail-boots","name":"Boots for the trail","text":"Bring one pair of boots to Falkreath's Tailor for hunters setting out along the forest trails.","tier":"novice","gate":{"classKey":"hunter","rank":"novice"},"merchant":{"reference":"1939ba:aaaGraniteHill.esp","base":"18e8b6:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","bookHold":"falkreath"},"kind":"commission","goods":[{"item":"d1921:Skyrim.esm","count":1,"recipe":{"reference":"928:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"d1921:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1","itemType":"ARMO"},{"id":"q-haafingar-cook-field-soup","name":"Soup for the field hands","text":"Bring two bowls of potato soup to Haafingar's Cook for field hands after their work.","tier":"novice","gate":{"classKey":"farmer","rank":"novice"},"merchant":{"reference":"198a0:Skyrim.esm","base":"13266:Skyrim.esm","role":"Cook","hold":"Haafingar","bookHold":"solitude"},"kind":"commission","goods":[{"item":"353d:HearthFires.esm","count":2,"recipe":{"reference":"3542:HearthFires.esm","owner":"Cook","half":"Hearthcook","rank":"novice","out":"353d:HearthFires.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"64b41:Skyrim.esm","name":"Potato","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0},{"item":"669a5:Skyrim.esm","name":"Leek","type":"ALCH","count":1,"producedBy":"farmer","producedAt":"novice","suppliedBy":"farmer","suppliedAt":"novice","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkPotatoSoup) == 1","function":448,"of":"MAG_RecipePerkPotatoSoup","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac","itemType":"ALCH"},{"id":"q-hjaalmarch-alchemist-cotton-dressings","name":"Cotton for marsh-road dressings","text":"Bring three bundles of tundra cotton to Hjaalmarch's Alchemist for marsh-road dressings.","tier":"novice","gate":{"classKey":"gatherer","rank":"novice"},"merchant":{"reference":"1aa61:Skyrim.esm","base":"135ef:Skyrim.esm","role":"Alchemist","hold":"Hjaalmarch","bookHold":"morthal"},"kind":"commission","goods":[{"item":"3f7f8:Skyrim.esm","count":3,"harvest":{"reference":"bb947:Skyrim.esm","produce":"3f7f8:Skyrim.esm","name":"Tundra Cotton","rank":"novice"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"sourceHash":"7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9","itemType":"INGR"},{"id":"q-whiterun-smith-ebony-seam-account","name":"An ebony seam's account","text":"The Smith needs an ebony and silver parcel for the next furnace run, with a spare pick for the mine. Bring the complete parcel.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"classKey":"miner","rank":"master"},"merchant":{"reference":"1a67c:Skyrim.esm","base":"13bb9:Skyrim.esm","role":"Smith","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"5acdc:Skyrim.esm","count":4,"mining":{"reference":"10e101:Skyrim.esm","ore":"5acdc:Skyrim.esm","name":"Ebony Ore","rank":"master","yield":[[0,0],[0,0],[0,0],[1,2]]}},{"item":"5acdf:Skyrim.esm","count":4,"mining":{"reference":"10dcb9:Skyrim.esm","ore":"5acdf:Skyrim.esm","name":"Silver Ore","rank":"advanced","yield":[[0,0],[1,2],[1,2],[1,2]]}},{"item":"e3c16:Skyrim.esm","count":1,"recipe":{"reference":"1548d:Thornswood-Content.esp","owner":"Smith","half":"Edgewright","rank":"novice","out":"e3c16:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"5ace4:Skyrim.esm","name":"Iron Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeIngotIron"},{"item":"15490:Thornswood-Content.esp","name":"Tool Handle","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"woodworker","suppliedAt":"novice","hops":1,"suppliedVia":"ThornswoodRecipeToolHandle"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-source","note":"Four Master-gated Ebony Ore, four Advanced Silver Ore and one public spare pick; no mine or yield is changed."},"sourceHash":"d09451fa3306f0743d0e68bd78ae43bde11dcd0fdc2761abe37c350d37a70faa","itemType":"MISC","itemTypes":{"5acdc:Skyrim.esm":"MISC","5acdf:Skyrim.esm":"MISC","e3c16:Skyrim.esm":"WEAP"}},{"id":"q-whiterun-woodworker-outfitter-reserve","name":"An outfitter's last reserve","text":"The Woodworker needs a master fishing pole and a full bundle of ebony arrows for an outfitter's reserve. Bring both parts.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"woodworker","half":"woodwright","rank":"master"},"merchant":{"reference":"1a681:Skyrim.esm","base":"13b9e:Skyrim.esm","role":"Woodworker","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"1549a:Thornswood-Content.esp","count":1,"recipe":{"reference":"1549e:Thornswood-Content.esp","owner":"Woodworker","half":"Woodwright","rank":"master","out":"1549a:Thornswood-Content.esp","makes":1,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":3,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":2,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"5ace5:Skyrim.esm","name":"Steel Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"advanced","hops":1,"suppliedVia":"RecipeIngotSteel"},{"item":"5ad9f:Skyrim.esm","name":"Refined Moonstone","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"expert","hops":1,"suppliedVia":"RecipeIngotMoonstone"}],"needs":[]}},{"item":"139bf:Skyrim.esm","count":24,"recipe":{"reference":"b651:Dawnguard.esm","owner":"Woodworker","half":"Woodwright","rank":"master","out":"139bf:Skyrim.esm","makes":24,"bench":"154e1:Thornswood-Content.esp","inputItems":[{"item":"6f993:Skyrim.esm","name":"Firewood","type":"MISC","count":1,"producedBy":"woodworker","producedAt":"novice","suppliedBy":"woodworker","suppliedAt":"novice","hops":0},{"item":"5ad9d:Skyrim.esm","name":"Ebony Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"master","hops":1,"suppliedVia":"RecipeIngotEbony"}],"needs":[{"asks":"HasPerk(EbonySmithing) == 1","function":448,"of":"EbonySmithing","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"One Master pole batch and one Master arrow batch; the arrows make24 per batch."},"sourceHash":"a94934368484eaf0bcfa65564909260c8b1da3e198a11495b31a8d1c070836e0","itemType":"MISC","itemTypes":{"1549a:Thornswood-Content.esp":"MISC","139bf:Skyrim.esm":"AMMO"}},{"id":"q-whiterun-tailor-winter-vestments","name":"Winter vestments for a caravan","text":"The Tailor needs three sets of ragged robes and three snowy-sabre fur cloaks for a winter caravan. This is a complete outfitting order.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"tailor","half":"liverywright","rank":"master"},"merchant":{"reference":"1a684:Skyrim.esm","base":"13b9c:Skyrim.esm","role":"Tailor","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"13105:Skyrim.esm","count":3,"recipe":{"reference":"924:MoreCraftableEquipment.esp","owner":"Tailor","half":"Liverywright","rank":"novice","out":"13105:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}},{"item":"2885:Cloaks&Capes.esp","count":3,"recipe":{"reference":"2e06:Cloaks&Capes.esp","owner":"Tailor","half":"Haberdasher","rank":"expert","out":"2885:Cloaks&Capes.esp","makes":1,"bench":"7866a:Skyrim.esm","inputItems":[{"item":"3ad6e:Skyrim.esm","name":"Sabre Cat Snow Pelt","type":"MISC","count":1,"producedBy":"hunter","producedAt":"expert","suppliedBy":"hunter","suppliedAt":"expert","hops":0},{"item":"5ad9e:Skyrim.esm","name":"Gold Ingot","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"expert","hops":1,"suppliedVia":"RecipeIngotGold"}],"needs":[{"asks":"function 74(MCE_CraftingLoomEnabled) == 0","function":74,"of":"MCE_CraftingLoomEnabled","ofType":"GLOB","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"expert-logistics","minimumBatches":6,"note":"Six production batches, including three Expert fur cloaks. This is Master logistical work, not a new Master clothing recipe or an enchanting claim."},"sourceHash":"68f0406f1fe3db80d3b820d13413c0419a960da038eef3a54ac103091d9af2e0","itemType":"ARMO","itemTypes":{"13105:Skyrim.esm":"ARMO","2885:Cloaks&Capes.esp":"ARMO"}},{"id":"q-whiterun-enchanter-ward-demonstration","name":"A ward tutor's demonstration stock","text":"The Enchanter needs two ebony shields and two sets of ragged robes for an Alteration tutor's demonstration stock. No particular enchantment is required.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"mage","school":"alteration","rank":"master"},"merchant":{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"13964:Skyrim.esm","count":2,"recipe":{"reference":"dd98c:Skyrim.esm","owner":"Smith","half":"Platewright","rank":"master","out":"13964:Skyrim.esm","makes":1,"bench":"88105:Skyrim.esm","inputItems":[{"item":"800e4:Skyrim.esm","name":"Leather Strips","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":2,"suppliedVia":"RecipeLeatherStrips"},{"item":"5ad9d:Skyrim.esm","name":"Ebony Ingot","type":"MISC","count":4,"producedBy":null,"producedAt":null,"suppliedBy":"miner","suppliedAt":"master","hops":1,"suppliedVia":"RecipeIngotEbony"}],"needs":[{"asks":"HasPerk(EbonySmithing) == 1","function":448,"of":"EbonySmithing","ofType":"PERK","serverSees":false}]}},{"item":"13105:Skyrim.esm","count":2,"recipe":{"reference":"924:MoreCraftableEquipment.esp","owner":"Tailor","half":"Liverywright","rank":"novice","out":"13105:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"Two Master shield batches, with two additional robe batches. These are public equipment supplies, not a promise of blank or enchanted gear."},"sourceHash":"8f19b0da990fc2102dd312016717dc92a48f23d6bcfdec622aaf3adc621d169e","itemType":"ARMO","itemTypes":{"13964:Skyrim.esm":"ARMO","13105:Skyrim.esm":"ARMO"}},{"id":"q-whiterun-cook-mammoth-supper","name":"A mammoth supper for the hall","text":"The Cook needs two mammoth steaks and two mammoth stews for a supper in the hall. Bring both courses together.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"cook","half":"hearthcook","rank":"master"},"merchant":{"reference":"1a66e:Skyrim.esm","base":"13ba3:Skyrim.esm","role":"Cook","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"722bb:Skyrim.esm","count":2,"recipe":{"reference":"f430d:Skyrim.esm","owner":"Cook","half":"Hearthcook","rank":"master","out":"722bb:Skyrim.esm","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"669a4:Skyrim.esm","name":"Mammoth Snout","type":"ALCH","count":1,"producedBy":"hunter","producedAt":"master","suppliedBy":"hunter","suppliedAt":"master","hops":0}],"needs":[{"asks":"GetItemCount(MAG_FoodMammothMeat) >= 1","function":47,"of":"MAG_FoodMammothMeat","ofType":"ALCH","serverSees":true},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}},{"item":"818:Gourmet.esp","count":2,"recipe":{"reference":"819:Gourmet.esp","owner":"Cook","half":"Hearthcook","rank":"master","out":"818:Gourmet.esp","makes":1,"bench":"a5cb3:Skyrim.esm","inputItems":[{"item":"34cdf:Skyrim.esm","name":"Salt Pile","type":"INGR","count":1,"producedBy":"miner","producedAt":"novice","suppliedBy":"miner","suppliedAt":"novice","hops":0},{"item":"34d22:Skyrim.esm","name":"Garlic","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"34d32:Skyrim.esm","name":"Frost Mirriam","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"novice","suppliedBy":"gatherer","suppliedAt":"novice","hops":0},{"item":"669a4:Skyrim.esm","name":"Mammoth Snout","type":"ALCH","count":1,"producedBy":"hunter","producedAt":"master","suppliedBy":"hunter","suppliedAt":"master","hops":0}],"needs":[{"asks":"HasPerk(MAG_RecipePerkMammothStew) == 1","function":448,"of":"MAG_RecipePerkMammothStew","ofType":"PERK","serverSees":false},{"asks":"HasPerk(MAG_FoodUpgradePerk03) == 0","function":448,"of":"MAG_FoodUpgradePerk03","ofType":"PERK","serverSees":false}]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-batches","minimumBatches":2,"note":"Both dishes have Master supply provenance; recipe conditions still apply to whoever cooks them."},"sourceHash":"d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4","itemType":"ALCH","itemTypes":{"722bb:Skyrim.esm":"ALCH","818:Gourmet.esp":"ALCH"}},{"id":"q-whiterun-alchemist-ash-expedition","name":"Remedies for the ash-road expedition","text":"The Alchemist needs two physicker remedies and four ash creep clusters for an expedition's supplies. Bring the finished remedies and the separate reagents.","kind":"commission","deliveryVersion":2,"tier":"master","gate":{"profession":"alchemist","half":"physicker","rank":"master"},"merchant":{"reference":"1a66d:Skyrim.esm","base":"13ba4:Skyrim.esm","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"154c3:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c7:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"advanced","out":"154c3:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"6bc00:Skyrim.esm","name":"Mudcrab Chitin","type":"INGR","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0},{"item":"77e1c:Skyrim.esm","name":"Blue Mountain Flower","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"advanced","suppliedBy":"gatherer","suppliedAt":"advanced","hops":0}],"needs":[]}},{"item":"1cd74:Dragonborn.esm","count":4,"harvest":{"reference":"195dc:Dragonborn.esm","produce":"1cd74:Dragonborn.esm","name":"Ash Creep Cluster","rank":"master"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":48,"difficulty":{"basis":"master-source","note":"Master-gated Ash Creep Cluster and two Advanced remedies. No effect is claimed for brewing the supplied reagents."},"sourceHash":"75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df","itemType":"MISC","itemTypes":{"154c3:Thornswood-Content.esp":"MISC","1cd74:Dragonborn.esm":"INGR"}},{"id":"q-whiterun-alchemist-travelling-case","name":"A field medic's travelling case","text":"The Alchemist needs two physicker remedies and four nirnroots for a travelling case. Bring both parts as one delivery.","kind":"commission","deliveryVersion":2,"tier":"expert","gate":{"profession":"alchemist","half":"physicker","rank":"expert"},"merchant":{"reference":"1a66d:Skyrim.esm","base":"13ba4:Skyrim.esm","role":"Alchemist","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"154c3:Thornswood-Content.esp","count":2,"recipe":{"reference":"154c7:Thornswood-Content.esp","owner":"Alchemist","half":"Physicker","rank":"advanced","out":"154c3:Thornswood-Content.esp","makes":1,"bench":"42e6b:Thornswood-Content.esp","inputItems":[{"item":"6bc00:Skyrim.esm","name":"Mudcrab Chitin","type":"INGR","count":1,"producedBy":"hunter","producedAt":"novice","suppliedBy":"hunter","suppliedAt":"novice","hops":0},{"item":"77e1c:Skyrim.esm","name":"Blue Mountain Flower","type":"INGR","count":1,"producedBy":"gatherer","producedAt":"advanced","suppliedBy":"gatherer","suppliedAt":"advanced","hops":0}],"needs":[]}},{"item":"59b86:Skyrim.esm","count":4,"harvest":{"reference":"110c8:HearthFires.esm","produce":"59b86:Skyrim.esm","name":"Nirnroot","rank":"expert"}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":24,"difficulty":{"basis":"expert-source","note":"Expert-gated Nirnroot with two Advanced remedy batches; no particular plant placement or harvest event is promised."},"sourceHash":"7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da","itemType":"MISC","itemTypes":{"154c3:Thornswood-Content.esp":"MISC","59b86:Skyrim.esm":"INGR"}},{"id":"q-whiterun-enchanter-commission-rack","name":"Clothes for the commission rack","text":"The Enchanter needs a set of common clothes and a pair of shoes for the commission rack. Bring both pieces; no enchantment is required.","kind":"commission","deliveryVersion":2,"tier":"novice","gate":{"profession":"enchanter","half":"wardweaver","rank":"novice"},"merchant":{"reference":"1a672:Skyrim.esm","base":"13ba1:Skyrim.esm","role":"Enchanter","hold":"Whiterun","bookHold":"whiterun"},"goods":[{"item":"5b6a1:Skyrim.esm","count":1,"recipe":{"reference":"91f:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"5b6a1:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":4,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}},{"item":"5b6a0:Skyrim.esm","count":1,"recipe":{"reference":"920:MoreCraftableEquipment.esp","owner":"Tailor","half":"Haberdasher","rank":"novice","out":"5b6a0:Skyrim.esm","makes":1,"bench":"6ce000:Update.esm","inputItems":[{"item":"db5d2:Skyrim.esm","name":"Leather","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"hunter","suppliedAt":"novice","hops":1,"suppliedVia":"RecipeLeatherFoxSnowHide"},{"item":"6ce001:Update.esm","name":"Thread","type":"MISC","count":1,"producedBy":null,"producedAt":null,"suppliedBy":"gatherer","suppliedAt":"novice","hops":1,"suppliedVia":"MCERecipeThreadTundraCotton"}],"needs":[]}}],"reward":{"source":"merchant-purse","pricing":"submitted-hold-price"},"cooldownHours":6,"difficulty":{"basis":"novice-batches","minimumBatches":2,"note":"Two public Novice wearable batches with measured Novice inputs; the source does not promise unenchanted blanks."},"sourceHash":"531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787","itemType":"ARMO","itemTypes":{"5b6a1:Skyrim.esm":"ARMO","5b6a0:Skyrim.esm":"ARMO"}}]; };
 module.exports.createQuestEligibility = QUEST_ELIGIBILITY.createQuestEligibility;
 return module.exports;
 })();
@@ -70599,9 +75247,16 @@ try {
         npcMerchantManifest(populationData).map(identity=>identity.reference),
         typeof mp.writePrivateEconomyLedger==='function' ? mp.writePrivateEconomyLedger.bind(mp) : null));
     current();
+    // A deleted character's supply waits and waiting trade are let go here,
+    // once the purses are read and before trading or any tick can act on
+    // them (#2351, #2652).
+    if(typeof globalThis.__thornswoodRelease==='function') globalThis.__thornswoodRelease('merchants',merchants.release);
+    current();
     trading = MERCHANT_TRADING.installMerchantTrading({
         mp: mp,
         g: globalThis,
+        // A hair dye is not the plain Bowl a merchant would buy (#2675).
+        minted: mintedEntry,
         purses: merchants,
         catalog: roleStage.catalog,
         roleTables: roleStage.roleTables,
@@ -70621,7 +75276,9 @@ try {
       // #2623: a temporary spawn left from an earlier run is taken out of
       // the world on the next turn of the event loop, never inside the
       // runtime's own preparation pass that asked about it.
-      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0)});
+      run:serverRunId(),discard:id=>setTimeout(()=>removeSpawned(id),0),
+      // #1390: the staff's patrol roads, as the patrol keeper below read them.
+      patrols:()=>globalThis.__thornswoodThalmorPatrols});
     current();
     runtime = startSharedNpcServerRuntime(
       mp, {setTimeout, clearTimeout}, Date.now, text=>log(text),population,{suspended:true});
@@ -70647,6 +75304,11 @@ try {
 }
 })();
 // NPC SERVER STARTUP END
+
+// The release of deleted characters (#2351): which parts did not let go at
+// this start, now that every block that keeps a register has loaded. The
+// NPC startup, where the merchant purses are read (#2652), is the last.
+if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__thornswoodReleaseWaiting(); }
 
 // ==== thornswood custom quests ====
 /*
@@ -71397,3 +76059,270 @@ try {
   globalThis.__thornswoodCustomQuestsCreate = createCustomQuests;
 })();
 // ==== end thornswood custom quests ====
+
+// ==== thornswood thalmor patrols ====
+/*
+  THE THALMOR PATROLS ARE STOOD UP HERE (#1390). docs/systems/thalmor.md,
+  Patrols: 2 to 4 on a road between holds, never inside a walled city, at
+  most 3 patrols in the province and one on a road; not people; no coin.
+
+  WHAT STAFF DECIDE. game/data/thalmor-patrols.json: whether any patrol is
+  out (on, false as shipped), the province cap (most), and for each road its
+  points (one member each, 2 to 4), the record each member is made from, how
+  long a dead one takes to come back and how far one strays. The three roads
+  it ships with are the cut Immersive Patrols II Justiciar placements in the
+  Pale, Haafingar and Hjaalmarch, at their own positions: candidates, all on,
+  under the file's own on. thalmorPatrolTable (the NPC population policy)
+  checks the file; nothing in code names a road, a number of members or a
+  time.
+
+  WHAT THIS DOES, ONCE AT START AND ON A GAMEMODE RELOAD, WITH NO TIMER. For
+  each road that may stand, each point is a slot. The register, in the
+  private folder and naming nobody, says which form fills each slot. A slot
+  whose form is still there and still carries that road's marker and record
+  is left alone, standing or dead: the engine brings a dead member back at
+  its point after the road's return time (spawnDelay, set by the policy), so a
+  return replaces it and never stacks a second group. A slot whose form is
+  gone gets a new member: made from its record at its point, marked with
+  {road, slot}, admitted by the population (which gives it the road's rule)
+  and enrolled in the shared NPC runtime. Members of a road that is off, gone,
+  over the cap or changed are taken out of the world (removeSpawned). Running
+  it again changes nothing.
+
+  WHAT IT NEVER DOES. With the file unreadable or the register unreadable it
+  stands nobody up and takes nobody down, and writes nothing. It sets no
+  timer, adds no command, and tells nobody to do anything: a patrol is a fight
+  on the road for whoever meets it, and the people decide what comes of it.
+
+  NOT PEOPLE, NO COIN. A member has no profile, so it does not wake in a
+  temple, and killing one is a warrior's work as for a bandit. Nobody can open
+  a body (the spoils block), and the dungeon body roll answers no key for a
+  runtime reference, so a body gives no coin and nothing else.
+
+  WALKING THE ROAD. The shared runtime keeps an NPC inside a leash around its
+  home. A member's home is its own point on the road and the leash is the
+  road's, so the group keeps to its stretch of road. A route between holds is
+  not built.
+*/
+(function () {
+  'use strict';
+  var g = globalThis;
+  var fs = require('fs');
+  var path = require('path');
+  var REGISTER = 'thalmor-patrol-slots.json';
+  var HEX = /^[0-9a-f]{1,8}$/;
+
+  function tlog() {
+    var a = Array.prototype.slice.call(arguments);
+    a.unshift('[patrols]');
+    console.log(a.join(' '));
+  }
+
+  function privateDir() {
+    var dir = 'private';
+    try {
+      var cfg = mp.getServerSettings();
+      if (cfg && cfg.privDir) { dir = String(cfg.privDir); }
+    } catch (e) { }
+    return dir;
+  }
+
+  /*
+    THE WORLD STAGE, FOR THE PER-STAGE CAP (#2697). The one read of the world
+    stage register (#2685): its worldStage().id and its stages(), nothing else.
+    No register (not merged, or it failed to load), no worldStage or no id is
+    no stage, and then the cap is the plain most. A register that is there
+    and throws is not "no stage": the cap for the stage the world is at is not
+    known, so, as for an unreadable slot register, no patrol is stood up or
+    taken down (broken, below). Read once per start or reload, so a stage staff
+    confirm takes effect the next time the gamemode loads.
+  */
+  function stageRegister() {
+    var reg = g.__thornswoodWorldStage;
+    return reg && typeof reg.worldStage === 'function' ? reg : null;
+  }
+
+  // { id: the stage id or null, broken: the error when the register threw }
+  function currentStage(reg) {
+    if (!reg) { return { id: null, broken: null }; }
+    try {
+      var st = reg.worldStage();
+      return { id: st && typeof st.id === 'string' && st.id ? st.id : null, broken: null };
+    } catch (e) {
+      return { id: null, broken: String((e && e.message) || e) };
+    }
+  }
+
+  // Each stageMost key the register does not list (a typo, or a stage taken
+  // out of war-stages.json): logged, never refused. No register, or no list
+  // from it, logs nothing.
+  function unknownStageKeys(table, reg) {
+    var keys = Object.keys(table.stageMost || {});
+    if (!reg || typeof reg.stages !== 'function' || !keys.length) { return []; }
+    var list;
+    try { list = reg.stages(); } catch (e) { return []; }
+    if (!Array.isArray(list)) { return []; }
+    var known = {};
+    list.forEach(function (s) { if (s && typeof s.id === 'string') { known[s.id] = true; } });
+    return keys.filter(function (k) { return !Object.prototype.hasOwnProperty.call(known, k); });
+  }
+
+  // The staff's file, checked. null when it cannot be used at all.
+  function readTable(stage) {
+    var doc = null;
+    try {
+      doc = JSON.parse(fs.readFileSync(path.join(__dirname, 'data', 'thalmor-patrols.json'), 'utf8').replace(/^\uFEFF/, ''));
+    } catch (e) {
+      tlog('game/data/thalmor-patrols.json would not read, so no patrol is stood up or taken down:', e && e.message);
+      return null;
+    }
+    try {
+      return thalmorPatrolTable(doc, NPC_POPULATION_DATA.keep, stage.id);
+    } catch (e2) {
+      tlog(String(e2 && e2.message) + ', so no patrol is stood up or taken down');
+      return null;
+    }
+  }
+
+  // { roads: { <road>: { <slot>: <form id in hex> } } }. No file yet is an
+  // empty register. A file that is there and will not read is null, and then
+  // nothing is changed or written over.
+  function readRegister() {
+    var text = null;
+    try {
+      text = fs.readFileSync(path.join(privateDir(), REGISTER), 'utf8');
+    } catch (e) {
+      if (e && e.code === 'ENOENT') { return { version: 1, roads: {} }; }
+      return null;
+    }
+    try {
+      var doc = JSON.parse(String(text).replace(/^\uFEFF/, ''));
+      if (!doc || doc.version !== 1 || !doc.roads || typeof doc.roads !== 'object' || Array.isArray(doc.roads)) { return null; }
+      var clean = { version: 1, roads: {} };
+      Object.keys(doc.roads).forEach(function (road) {
+        var slots = doc.roads[road];
+        if (!/^[a-z0-9-]{1,32}$/.test(road) || !slots || typeof slots !== 'object') { return; }
+        var keep = {};
+        Object.keys(slots).forEach(function (s) {
+          if (/^[0-3]$/.test(s) && typeof slots[s] === 'string' && HEX.test(slots[s])) { keep[s] = slots[s]; }
+        });
+        clean.roads[road] = keep;
+      });
+      return clean;
+    } catch (e2) {
+      return null;
+    }
+  }
+
+  function writeRegister(reg) {
+    var dir = privateDir();
+    try { fs.mkdirSync(dir, { recursive: true }); } catch (e) { }
+    var file = path.join(dir, REGISTER);
+    fs.writeFileSync(file + '.tmp', JSON.stringify(reg, null, 2) + '\n', 'utf8');
+    fs.renameSync(file + '.tmp', file);
+  }
+
+  // The form is still there, still this road's slot, still made from the
+  // record staff gave that point. A form id the engine reused for something
+  // else carries no such marker.
+  function holds(id, road, slot, base) {
+    try {
+      var mark = mp.get(id, 'thornswoodNpcPatrol');
+      if (!mark || mark.road !== road || mark.slot !== slot) { return false; }
+      if (base === undefined) { return true; }
+      return mp.getIdFromDesc(String(mp.get(id, 'baseDesc'))) === mp.getIdFromDesc(base);
+    } catch (e) {
+      return false;
+    }
+  }
+
+  function place(road, slot, population, runtime) {
+    var ref = 0;
+    try {
+      ref = mp.place(mp.getIdFromDesc(road.bases[slot]));
+      mp.set(ref, 'locationalData', {
+        cellOrWorldDesc: THALMOR_PATROL_WORLD,
+        pos: road.points[slot].slice(),
+        rot: [0, 0, 0]
+      });
+      // Before admission, so the population and every later start read it.
+      mp.set(ref, 'thornswoodNpcPatrol', { road: road.id, slot: slot });
+      if (!population.admit(ref, mp.getNpcAIState(ref))) { throw new Error('the NPC population did not admit it'); }
+      if (runtime && typeof runtime.enroll === 'function') { runtime.enroll(ref); }
+      return ref;
+    } catch (e) {
+      tlog(road.id, 'slot', slot, 'could not be stood up:', e && e.message);
+      if (ref) {
+        try { mp.destroyActor(ref); } catch (e2) { }
+        try { population.release(ref); } catch (e3) { }
+      }
+      return 0;
+    }
+  }
+
+  function keepPatrols() {
+    var worldReg = stageRegister();
+    var stage = currentStage(worldReg);
+    var table = readTable(stage);
+    if (table && stage.broken !== null) {
+      // The cap for this stage is not known. The population keeps what stands
+      // (hold) and the keeper stands nobody up and takes nobody down.
+      table.hold = true;
+      g.__thornswoodThalmorPatrols = table;
+      tlog('the world stage register failed (' + stage.broken + '), so no patrol is stood up or taken down');
+      return;
+    }
+    g.__thornswoodThalmorPatrols = table;
+    if (!table) { return; }
+    table.refused.forEach(function (r) { tlog('road', r.id, r.why); });
+    unknownStageKeys(table, worldReg).forEach(function (k) {
+      tlog('stageMost names', k, 'but the world stage list has no such stage, so that cap is never used');
+    });
+    var population = g.__thornswoodNpcPopulation;
+    var runtime = g.__thornswoodNpcRuntime;
+    if (!population || typeof population.admit !== 'function') {
+      tlog('no NPC population on this server, so no patrol is stood up or taken down');
+      return;
+    }
+    var reg = readRegister();
+    if (!reg) {
+      tlog(REGISTER, 'would not read, so no patrol is stood up or taken down');
+      return;
+    }
+    var standing = {};
+    table.roads.forEach(function (r) { standing[r.id] = r; });
+    var changed = false, made = 0, kept = 0, gone = 0;
+
+    Object.keys(reg.roads).forEach(function (rid) {
+      var slots = reg.roads[rid], road = standing[rid];
+      Object.keys(slots).forEach(function (s) {
+        var slot = Number(s), id = parseInt(slots[s], 16) >>> 0;
+        if (road && slot < road.points.length && (!holds(id, rid, slot) || holds(id, rid, slot, road.bases[slot]))) { return; }
+        if (holds(id, rid, slot)) { removeSpawned(id); gone++; }
+        delete slots[s];
+        changed = true;
+      });
+      if (!Object.keys(slots).length) { delete reg.roads[rid]; changed = true; }
+    });
+
+    table.roads.forEach(function (road) {
+      var slots = reg.roads[road.id] || {};
+      for (var slot = 0; slot < road.points.length; slot++) {
+        var had = slots[slot] ? parseInt(slots[slot], 16) >>> 0 : 0;
+        if (had && holds(had, road.id, slot, road.bases[slot])) { kept++; continue; }
+        var ref = place(road, slot, population, runtime);
+        if (ref) { slots[slot] = (ref >>> 0).toString(16); made++; changed = true; }
+        else if (had) { delete slots[slot]; changed = true; }
+      }
+      if (Object.keys(slots).length) { reg.roads[road.id] = slots; }
+    });
+
+    if (changed) {
+      try { writeRegister(reg); } catch (e) { tlog('the register could not be written:', e && e.message); }
+    }
+    tlog(table.on ? 'on' : 'off', '- stage', table.stage || '(none)', 'cap', thalmorPatrolCap(table), '-', table.roads.length, 'road(s) may stand;', made, 'stood up,', kept, 'already there,', gone, 'taken down');
+  }
+
+  try { keepPatrols(); } catch (e) { tlog('the patrol keeper failed:', e && e.message); }
+})();
+// ==== end thornswood thalmor patrols ====

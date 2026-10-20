@@ -17,7 +17,7 @@ const begin = source.indexOf('// SHARED RESOURCE STOCK BEGIN'),end = source.inde
 assert.ok(begin >= 0 && end > begin);
 const code = [source.slice(begin,end),...['FISH_BY_BASE','HUNTS_BY_BASE','FISH_TUNING','HUNT_TUNING','GAME_BY_BASE','GAME_TUNING'].map(table),
   "const RANK_LADDER=['novice','advanced','expert','master']; const lastUse=new Map(); const COOLDOWN_MS=20000; let lastUseSweepAt=5000; const PARTY_BANK={};",
-  ...['isFish','isGame','isCarcass','idOf','addItem','cooldownLeft','stampCooldown','waitWord','classGate','rankStep','rankWord','creditWork','saidInOrder','fish','loot','game'].map(name => fn(name)),
+  ...['isFish','isGame','isCarcass','idOf','mintedEntry','addItem','cooldownLeft','stampCooldown','waitWord','classGate','rankStep','rankWord','creditWork','saidInOrder','fish','loot','game'].map(name => fn(name)),
   fn('withinResourceReach',true),fn('addItemsAtomic',true)].join('\n');
 const copy = value => value == null ? null : JSON.parse(JSON.stringify(value));
 const fishBase = '108e35:Skyrim.esm',expertFish = '3828c:Dragonborn.esm';

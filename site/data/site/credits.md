@@ -36,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`9d3139ca`](https://github.com/EvilPatrick06/skymp/tree/9d3139cadbd857a6159eb96507ee6b5f6a4d1a87).
+[`90591081`](https://github.com/EvilPatrick06/skymp/tree/90591081ba6646838a19428274ee22cc6b4cee7c).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...9d3139ca)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...90591081)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -106,10 +106,10 @@ one SkyMP script above. The licence texts come with it, in
 `Data\Docs\Thornswood Client Runtime`.
 
 **The main menu's interface file**, `Data\Interface\startmenu.swf`, is
-Skyrim's own, edited so the menu shows no logo and no button list. It is the
-one file of the game Thornswood hands on. The notice board and drop box meshes
-are Thornswood's, put together from pieces of Skyrim's own meshes with the
-game's own textures.
+Skyrim's own, edited so the menu shows no logo and no button list. The notice
+board and drop box meshes are put together from pieces of Skyrim's own meshes
+with the game's own textures. Thornswood ships none of the three: the launcher
+makes them on your computer from your own copy of the game.
 
 **SkyHUD's settings**, `Data\Interface\skyhud\skyhud.txt`, are Thornswood's
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection

@@ -453,18 +453,27 @@ if ($list.Patches.Count) {
 }
 
 $sets = @()
-if ($list.Sets.Count) {
+# The bodies first, then the outfits fitted to them (#2454): one group each,
+# every one at its defaults and under the same rules.
+$wanted = @(@($list.Sets | ForEach-Object { [pscustomobject]@{ Name = $_; Outfit = $false } }) + @($list.Outfits | ForEach-Object { [pscustomobject]@{ Name = $_; Outfit = $true } }))
+if ($wanted.Count) {
     if (-not (Test-Path -LiteralPath $bsExe)) {
         Die "BodySlide is not in this folder ($bsExe). It comes with the collection: deploy it in Vortex and bring the folder up to date in the launcher."
     }
     $bad = @()
-    foreach ($name in $list.Sets) {
+    foreach ($w in $wanted) {
+        $name = $w.Name
         try { $set = Get-BodySlideSet (Join-Path $bsDir 'SliderSets') $name } catch { Die $_.Exception.Message }
+        try { $expect = Get-BodySlideSetOutputs $set } catch { Die $_.Exception.Message }
+        if ($w.Outfit) {
+            $body = @($expect | Where-Object { Test-GeneratedBodyPath $_ })
+            if ($body.Count) { Die "The outfit set '$name' writes a body ($($body[0])). Bodies are built from bodyslide.sets only. Nothing was built." }
+        }
         $moves = $null
         if ($list.Sliders.ContainsKey($name)) { $moves = $list.Sliders[$name] }
         $values = Get-BodySlideValues $set $moves
         $bad += (Test-BodySlideRules $set $values $moves)
-        $sets += [pscustomobject]@{ Set = $set; Values = $values }
+        $sets += [pscustomobject]@{ Set = $set; Values = $values; Outfit = $w.Outfit; Expect = $expect }
         $zaps = @($set.Sliders | Where-Object { $_.Zap } | ForEach-Object { $_.Name })
         Say ("  BodySlide, '{0}' ({1}): shapes {2}; {3} sliders at their defaults{4}" -f $name, (Split-Path -Leaf $set.File), ($set.Shapes -join ', '),
             $set.Sliders.Count, $(if ($zaps.Count) { '; zaps ' + ($zaps -join ', ') + ' as the set has them' } else { '' })) 'Green'
@@ -735,6 +744,15 @@ if ($sets.Count) {
     if (-not $built.Count) { Die 'BodySlide finished and built nothing. Nothing was recorded. Its log is Log_BS.txt beside it.' }
     $tri = @($built | Where-Object { $_.Extension -ieq '.tri' })
     if ($tri.Count) { Die ('BodySlide built RaceMenu morph files (' + (($tri | ForEach-Object { $_.Name }) -join ', ') + '), which the body rules do not allow (issue #1004). Nothing was put in the folder.') }
+    # Every outfit built exactly the files its set names, and nothing else
+    # landed beside them (#2454): what Ship-Rules lists as ours is what was made.
+    $builtRel = @($built | ForEach-Object { 'Data\' + $_.FullName.Substring($stageData.Length + 1) })
+    $expectAll = @($sets | ForEach-Object { $_.Expect } | ForEach-Object { $_ })
+    $missing = @($sets | Where-Object { $_.Outfit } | ForEach-Object { $_.Expect } | ForEach-Object { $_ } | Where-Object { $builtRel -inotcontains $_ })
+    if ($missing.Count) { Die ('BodySlide did not build every outfit file its sets name (' + (($missing | Select-Object -First 5) -join ', ') + '). Nothing was put in the folder.') }
+    $outfitDirs = @($sets | Where-Object { $_.Outfit } | ForEach-Object { $_.Expect } | ForEach-Object { Split-Path -Parent $_ } | Sort-Object -Unique)
+    $extra = @($builtRel | Where-Object { $outfitDirs -icontains (Split-Path -Parent $_) -and $expectAll -inotcontains $_ })
+    if ($extra.Count) { Die ('BodySlide built files no set names (' + (($extra | Select-Object -First 5) -join ', ') + '). Nothing was put in the folder.') }
 
     # The bodies it built, read before any is put in place.
     $global:LASTEXITCODE = 0

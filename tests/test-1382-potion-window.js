@@ -78,10 +78,13 @@ if (N && typeof N.potionScale === 'function') {
 }
 
 const eat = slice("mp.onEatItem = guard('onEatItem', function (actorId, baseId) {", '\n  });');
-yes('onEatItem asks the needs block for the scale', !!eat && /potionScale\(actorId, Number\(baseId\) \|\| 0\)/.test(eat));
+// It asks effectScale since #2682, which is the potion window for anything a
+// food strip does not take to nothing (test-2682-meal-help.js has the strip).
+yes('onEatItem asks the needs block for the scale', !!eat && /effectScale\(actorId, Number\(baseId\) \|\| 0\)/.test(eat));
+yes('and effectScale is the potion window for a potion', !!N && typeof N.effectScale === 'function' && /function effectScale\(actorId, baseId\) \{[\s\S]{0,160}?return potionScale\(actorId, baseId\);/.test(gm));
 yes('and hands anything under whole to the engine as eatItemScale',
   !!eat && /if \(scale < 1\) \{ mp\.set\(actorId, 'eatItemScale', scale\); \}/.test(eat));
-yes('before the cure and the withered count', !!eat && eat.indexOf('potionScale') < eat.indexOf('swallowed('));
+yes('before the cure and the withered count', !!eat && eat.indexOf('effectScale') !== -1 && eat.indexOf('effectScale') < eat.indexOf('swallowed('));
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);
