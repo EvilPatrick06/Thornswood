@@ -138,6 +138,9 @@ function rig(opts) {
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
     'function apprenticePress() { return false; }\n' +
+    // K on a person while you carry a hair dye (#2675), asked after it; nobody
+    // is looked at here. test-2675-hair-dye-wiring.js has what it does.
+    'function hairDyePress() { return false; }\n' +
     'function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +

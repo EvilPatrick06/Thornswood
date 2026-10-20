@@ -520,7 +520,8 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
         press({ lookingAt: hex(LINA), near: near, open: true }) === false &&
         press({ lookingAt: hex(LINA), near: near, busy: true }) === false && calls.length === 0);
     yes('E3: and the key handler asks it before K opens or shuts the panel',
-        /if \(e\.code === APPRENTICE_KEY && apprenticePress\(\)\) \{ return; \}\n    if \(e\.code === SKILLS_KEY\) \{/.test(front));
+        // The hair dye's K (#2675) may come between: it is asked after this one.
+        /if \(e\.code === APPRENTICE_KEY && apprenticePress\(\)\) \{ return; \}\n(?:    \/\/[^\n]*\n    if \(e\.code === HAIR_DYE_KEY && hairDyePress\(\)\) \{ return; \}\n)?    if \(e\.code === SKILLS_KEY\) \{/.test(front));
   }
   const keysCs = read('launcher', 'app', 'Keys.cs');
   const ini = read('launcher', 'Thornswood.ini');
