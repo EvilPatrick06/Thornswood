@@ -368,6 +368,7 @@ function Get-NetUDPEndpoint { }
 function Get-NetTCPConnection { }
 function Get-ThornswoodProcessHeld { }
 function Stop-ThornswoodProcessHeld { }
+$ThornswoodNotHeld = @()
 function Start-Sleep { }
 function Held { $false }
 

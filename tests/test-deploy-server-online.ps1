@@ -216,6 +216,7 @@ try {
                     "function Get-NetUDPEndpoint { }`r`n" +
                     "function Get-ThornswoodProcessHeld { }`r`n" +
                     "function Stop-ThornswoodProcessHeld { }`r`n" +
+                    "`$ThornswoodNotHeld = @()`r`n" +
                     "function Start-Sleep { }`r`n" +
                     "function Held { `$false }`r`n"
 
