@@ -626,7 +626,7 @@ if ($NoVps) {
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
-    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Add-VpsKey.ps1 to put the public half on the box' 'either'
+    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Grant-BoxAccess.ps1 with the line it prints (docs\BOX-ACCESS.md)' 'either'
   Say '  note  a Ship needs ssh: the feed, its baseline and every download go to the VPS (#897, #907).' 'DarkGray'
   # The feed store beside the feed the site serves (Feed-Store.ps1, #907).
   # Read only: asks what is there, sends nothing.

@@ -217,9 +217,13 @@ Yes '  and no key material beside them' ($raw -notmatch '(?i)PRIVATE KEY|BEGIN O
 
 # ---- 5: the setup step --------------------------------------------------------------------
 $setup = [IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Setup-SshKey.ps1'))
-Yes 'Setup-SshKey.ps1 writes StrictHostKeyChecking yes into the Host block, both times' (([regex]::Matches($setup, '(?m)^\s+StrictHostKeyChecking yes\s*$')).Count -eq 2)
+# Since #2891 the Host block is written by Set-ThornswoodBridgeSsh in Vps.ps1,
+# for the bridge and for -NewBox alike.
+$vpsPs1 = [IO.File]::ReadAllText((Join-Path $repo 'scripts\vps\Vps.ps1'))
+Yes 'Setup-SshKey.ps1 writes its Host block, both times, with Set-ThornswoodBridgeSsh, which writes StrictHostKeyChecking yes' (
+    ([regex]::Matches($setup, 'Set-ThornswoodBridgeSsh -Address \$VpsHost')).Count -eq 2 -and ([regex]::Matches($vpsPs1, "(?m)^\s+'    StrictHostKeyChecking yes',\s*$")).Count -eq 1)
 Yes '  and writes known_hosts only through the pinned check' ($setup -match 'Add-ThornswoodKnownHost' -and $setup -notmatch 'Add-Content[^\r\n]*known_hosts')
-Yes '  and -Test does not write it' ($setup -match '(?s)elseif \(\$Test\) \{.*?\} else \{\s*try \{ \$n = Add-ThornswoodKnownHost')
+Yes '  and -Test ends before anything is written' ($setup -match '(?s)if \(\$Test\) \{.*?Done 1\s*\}' -and $setup.IndexOf('if ($Test) {') -lt $setup.IndexOf('Add-ThornswoodKnownHost'))
 
 # ---- 6: the pinned check itself, against throwaway keys --------------------------------
 $keygen = Get-Command ssh-keygen -ErrorAction SilentlyContinue

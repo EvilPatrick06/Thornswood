@@ -224,3 +224,170 @@ function Add-ThornswoodKnownHost {
     [IO.File]::WriteAllText($KnownHosts, $text, (New-Object Text.UTF8Encoding($false)))
     return $keep.Count
 }
+
+# ------------------------------------------------------------ the bridge ----
+# Every machine reaches the box's ssh through the bridge (#2753 for cloud
+# threads, #2891 for One and each person's PC): ssh's ProxyCommand is
+# connect.js, which carries the session inside a WebSocket to
+# wss://thornswood.net/box/, and bridge.js on the box joins it to sshd on
+# 127.0.0.1. Each machine sends a token of its own (Grant-BoxAccess.ps1
+# issues and takes them away one name at a time) and logs in with a key of
+# its own, which the box takes only from 127.0.0.1, so only through here.
+# Port 22 then needs no outside address, and a home address that changes
+# stops nothing. A Host block for the box's address in .ssh\config, between
+# two marker lines, points plain "ssh Administrator@<address>" through it, so
+# every script that runs ssh and scp goes this way without being told.
+
+# Where a PC keeps its token: readable by its owner only, read by connect.js
+# when THORNSWOOD_BOX_TOKEN is not set (a cloud thread sets that instead).
+function Get-ThornswoodBridgeTokenPath {
+    return (Join-Path (Join-Path $HOME '.ssh') 'thornswood-box-token')
+}
+
+# What a token looks like: 32 random bytes as base64url, 43 characters.
+function Test-ThornswoodBridgeToken([string]$Token) {
+    return ($Token -match '^[A-Za-z0-9_-]{40,}$')
+}
+
+function New-ThornswoodBridgeToken {
+    $bytes = New-Object byte[] 32
+    ([Security.Cryptography.RandomNumberGenerator]::Create()).GetBytes($bytes)
+    return [Convert]::ToBase64String($bytes).TrimEnd('=').Replace('+', '-').Replace('/', '_')
+}
+
+# What the box holds for a token: its SHA-256 in lower case hex, never the
+# token itself, so nothing read off the box opens the bridge.
+function Get-ThornswoodBridgeDigest([string]$Token) {
+    $sha = [Security.Cryptography.SHA256]::Create()
+    try { $h = $sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($Token)) } finally { $sha.Dispose() }
+    return (-join ($h | ForEach-Object { $_.ToString('x2') }))
+}
+
+# A file nobody but this account can read, from its first byte: made empty,
+# locked, then filled.
+function Write-ThornswoodPrivateFile([string]$Path, [string]$Text) {
+    $dir = Split-Path -Parent $Path
+    if ($dir -and -not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    [IO.File]::WriteAllText($Path, '')
+    if ($env:OS -eq 'Windows_NT') {
+        $null = & icacls $Path /inheritance:r /grant:r ('{0}:F' -f [Security.Principal.WindowsIdentity]::GetCurrent().Name) 2>&1
+        if ($LASTEXITCODE -ne 0) { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue; throw "could not make $Path readable by this account alone, so nothing was written to it" }
+    } else {
+        & chmod 600 $Path
+    }
+    [IO.File]::WriteAllText($Path, $Text, (New-Object Text.UTF8Encoding($false)))
+}
+
+# The bridge client, copied out of the checkout into .ssh\thornswood-bridge,
+# so ssh keeps working when the checkout it came from moves or goes (a
+# worktree is removed after its merge). Run again to take a newer one.
+# Returns the folder.
+function Install-ThornswoodBridgeClient([string]$From) {
+    $to = Join-Path (Join-Path $HOME '.ssh') 'thornswood-bridge'
+    if (-not (Test-Path -LiteralPath $to)) { New-Item -ItemType Directory -Path $to -Force | Out-Null }
+    foreach ($f in 'connect.js', 'listen.js', 'ws.js') {
+        $src = Join-Path $From $f
+        if (-not (Test-Path -LiteralPath $src)) { throw "not found: $src" }
+        Copy-Item -LiteralPath $src -Destination (Join-Path $to $f) -Force
+    }
+    return $to
+}
+
+# Writes the Host block that sends ssh to the address through the bridge,
+# first in .ssh\config. ssh takes the first value it finds for each option,
+# so this block's User, key, host key checking and ProxyCommand win over any
+# Host entry for the address further down, which can only add to what
+# accumulates (another IdentityFile to try); nothing here has to read,
+# rewrite or refuse a block it did not write. A second run replaces this
+# one. Returns what the file held before, for a caller that has to put it
+# back.
+function Set-ThornswoodBridgeSsh {
+    param(
+        [Parameter(Mandatory = $true)][string]$Address,
+        [Parameter(Mandatory = $true)][string]$User,
+        [Parameter(Mandatory = $true)][string]$KeyPath,
+        [string]$Node = '',
+        [string]$Connect = '',
+        # A box with no bridge yet (Setup-SshKey.ps1 -NewBox): the same block
+        # without the ProxyCommand, so ssh goes straight to port 22 until
+        # Grant-BoxAccess.ps1 -ThisMachine writes the block over it.
+        [switch]$Direct,
+        [string]$Begin = '# >>> thornswood bridge (Setup-SshKey.ps1)',
+        [string]$End = '# <<< thornswood bridge',
+        [string]$Config = (Join-Path (Join-Path $HOME '.ssh') 'config')
+    )
+    $before = ''
+    if (Test-Path -LiteralPath $Config) { $before = [IO.File]::ReadAllText($Config) }
+    $rest = [regex]::Replace($before, '(?s)' + [regex]::Escape($Begin) + '.*?' + [regex]::Escape($End) + '\r?\n?', '')
+    if (-not $Direct -and (-not $Node -or -not $Connect)) { throw 'Set-ThornswoodBridgeSsh needs -Node and -Connect, or -Direct.' }
+    $block = @(
+        $Begin,
+        "Host $Address",
+        "    User $User",
+        "    IdentityFile $KeyPath",
+        '    IdentitiesOnly yes',
+        '    StrictHostKeyChecking yes',
+        $(if ($Direct) { '    # straight to port 22: this box has no bridge yet' } else { "    ProxyCommand `"$Node`" `"$Connect`"" }),
+        $End
+    ) -join "`n"
+    $text = $block + "`n" + $(if ($rest.Trim()) { "`n" + $rest.TrimStart() } else { '' })
+    $dir = Split-Path -Parent $Config
+    if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Path $dir -Force | Out-Null }
+    [IO.File]::WriteAllText($Config, $text, (New-Object Text.UTF8Encoding($false)))
+    if ($env:OS -ne 'Windows_NT') { & chmod 600 $Config }
+    return $before
+}
+
+# Whether ssh to the address goes through the bridge from here, by what ssh
+# itself makes of its config (ssh -G), so a Host block anywhere counts.
+function Test-ThornswoodBridgeSsh([string]$Address) {
+    $out = @(Invoke-ThornswoodNative { & ssh -o StrictHostKeyChecking=yes -G $Address } 2>$null | ForEach-Object { [string]$_ })
+    return [bool](@($out | Where-Object { $_ -match '^proxycommand .*connect\.js' }).Count)
+}
+
+# The box's host key through the bridge. ssh-keyscan cannot run a
+# ProxyCommand, so it asks listen.js, a port on this machine's loopback that
+# carries each connection to the box through the bridge the same way, and
+# what it is shown goes through the same pin as every other key
+# (Add-ThornswoodKnownHost -Scanned). The token comes from the environment or
+# the token file, as it does for ssh. Returns how many lines were added.
+function Add-ThornswoodKnownHostThroughBridge {
+    param(
+        [Parameter(Mandatory = $true)][string]$Address,
+        [Parameter(Mandatory = $true)][string]$Node,
+        [Parameter(Mandatory = $true)][string]$Listen
+    )
+    $now = Test-ThornswoodKnownHost -Address $Address
+    if ($now.Status -eq 'wrong') {
+        throw ("known_hosts here holds a key for $Address that scripts\vps\vps.json does not pin (" + ($now.Wrong -join ', ') + "). ssh-keygen -R $Address, then run this again.")
+    }
+    if ($now.Status -eq 'trusted') { return 0 }
+    # listen.js prints the port it took, then carries each connection to the
+    # box until its standard input closes. Arguments as one string, which
+    # Windows PowerShell 5.1's .NET takes as well as 7's.
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = $Node
+    $psi.Arguments = '"' + $Listen + '"'
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $listener = [Diagnostics.Process]::Start($psi)
+    try {
+        $port = [string]$listener.StandardOutput.ReadLine()
+        if ($port -notmatch '^\d+$') { throw 'the bridge listener did not start, so the box''s key could not be asked for. Nothing was written.' }
+        $scan = @(Invoke-ThornswoodNative { & ssh-keyscan -T 20 -p $port 127.0.0.1 } 2>&1 | ForEach-Object { "$_" })
+        # Each line names [127.0.0.1]:port, the listener; the key is the box's,
+        # so it is written under the box's address, after the pin has seen it.
+        $lines = @($scan | Where-Object { $_ -match '^\[127\.0\.0\.1\]:\d+ ' } | ForEach-Object { $Address + ' ' + ($_ -replace '^\S+\s+', '') })
+        if (-not $lines.Count) {
+            throw ('the box showed no host key through the bridge, so nothing was written. ssh-keyscan said: ' + (($scan | Select-Object -Last 3) -join ' '))
+        }
+        return (Add-ThornswoodKnownHost -Address $Address -Scanned $lines)
+    }
+    finally {
+        # Closing its input is how listen.js is told to stop. Either step can
+        # find it already gone, which is the end wanted, so neither says more.
+        try { $listener.StandardInput.Close() } catch { <# already ended, its input closed with it #> }
+        if (-not $listener.WaitForExit(3000)) { try { $listener.Kill() } catch { <# ended between the wait and the kill #> } }
+    }
+}
