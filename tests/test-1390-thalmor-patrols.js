@@ -297,6 +297,26 @@ const ON = clone(SHIPPED); ON.on = true;
   yes('K10 an unreadable register changes nothing and is not written over', r10.made.length === 0 && files[REG_FILE] === 'garbage');
 }
 
+// #2873: on a server the gamemode runs from a temp copy with no data folder
+// beside it, so the file is never there. STAFF_DATA, built into gamemode.js
+// by scripts\dev\Build-StaffData.js, carries it instead.
+{
+  const files = {};
+  const s = server(files);
+  s.ctx.STAFF_DATA = { 'thalmor-patrols.json': clone(ON) };
+  const r = s.start();
+  yes('K2b with no data folder (the server), STAFF_DATA stands the patrols up: twelve members',
+      r.made.length === 12 && !r.logs.some(l => /would not read/.test(l)));
+  yes('K2b the keeper never opened game/data for the file', !(DATA_FILE in files));
+}
+{
+  const files = {};
+  const s = server(files);
+  const r = s.start();
+  yes('K2c with no data folder and no STAFF_DATA it says the file would not read and stands nobody up',
+      r.made.length === 0 && r.logs.some(l => /would not read, so no patrol is stood up or taken down/.test(l)));
+}
+
 {
   // the policy's own province cap holds even if a table had more roads than its cap
   const s = server(withFile(ON));
