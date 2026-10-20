@@ -63,6 +63,10 @@ if (-not (Test-Path -LiteralPath $forms)) { Write-Host 'no characters saved yet,
 # A list there that is not one would be neither read by the server nor safe
 # to write over, so nothing is thrown away until somebody has looked at it.
 $list = Get-ThornswoodReleaseListPath $Root
+if (-not $list) {
+    Write-Host ("STOP. " + (Join-Path $Root 'server-settings.json') + " will not parse, so the server's private folder, where the release list goes, is not known. Nothing was thrown away.")
+    exit 1
+}
 if (-not (Read-ThornswoodReleaseList $list).ok) {
     Write-Host ("STOP. $list is not a list of deleted characters, so nothing was thrown away. Look at it, then run this again.")
     exit 1
@@ -81,7 +85,8 @@ if ($moved.Count -eq 0) { Write-Host 'there was no character on the server to th
 Write-Host ("thrown away: {0} change form(s), kept at {1}" -f $moved.Count, $bin)
 # Only the characters, never the profile (#2668): Release-List.ps1 says why.
 $bad = $false
-foreach ($l in @(Write-ThornswoodReleaseList -Root $Root -Actors (Get-ThornswoodCharacterIds $moved))) {
+$found = Get-ThornswoodCharacterIds $moved
+foreach ($l in @($found.notes) + @(Write-ThornswoodReleaseList -Root $Root -Actors $found.ids)) {
     $b = "$l" -split '\|'
     switch ($b[0]) {
         'RELEASE'     { if ($b[1] -ne 'none') { Write-Host ("release list: {0}, {1} character(s); the server lets go of what it holds of them at its next start" -f $b[1], $b[3]) } }

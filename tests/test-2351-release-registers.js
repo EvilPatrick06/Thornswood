@@ -155,7 +155,6 @@ function registers(dir) {
       'b2:Skyrim.esm': { by: PY, name: 'Yours', at: NOW, touched: NOW, master: { for: P1, no: 3 } },
       'b3:Skyrim.esm': { by: PZ, name: 'Theirs', at: NOW, touched: NOW, master: { for: PZ, no: 4 } }
     },
-    boxes: {},
     funds: { whiterun: 200, riften: 50 },
     notices: {
       whiterun: [
@@ -255,7 +254,8 @@ function registers(dir) {
   fs.writeFileSync(path.join(P, 'merchant-ledger.json'), JSON.stringify({ version: merchants.version, entries: merchants.entries, sha256: checksum(merchants) }));
   fs.writeFileSync(path.join(P, 'merchant-ledger.initialized'), '1');
   w('trade-cargo.json', JSON.parse(cargoRegister()));
-  w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2] });
+  // Its saves already taken by server-log.js before the engine started (#2758).
+  w('deleted-characters.json', { profiles: [P1, P2], actors: [A1, A2], done: { saves: NOW } });
   return P;
 }
 
@@ -506,8 +506,8 @@ try {
   yes('W1 a roll file that cannot be read keeps the embassy\'s part waiting, said in the log',
       w1.logged.some(function (l) { return l === 'release: embassy could not write what it let go, so its part waits for the next start'; }) &&
       w1.logged.some(function (l) { return l === 'release: embassy did not let go at this start, so the list waits for the next one'; }));
-  yes('W2 the list stays with the other five parts marked done',
-      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'farms', 'merchants', 'property']) &&
+  yes('W2 the list stays with every other part marked done',
+      JSON.stringify(Object.keys(list1.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'farms', 'merchants', 'property', 'saves']) &&
       JSON.stringify(list1.profiles) === JSON.stringify([P1, P2]));
   // A claim made by a listed profile after the first start is not a released one.
   const p2 = j(dir2, 'property.json');
@@ -537,6 +537,18 @@ try {
   yes('W5 a list that is not one lets go of nothing and is left as it is, said in the log',
       same && n1.logged.some(function (l) { return /is not a list of deleted characters, so nothing was let go and it is left as it is/.test(l); }));
 
+  // ============================================================ S: saves not taken yet
+  // A list whose saves server-log.js has not taken (#2758): the registers go,
+  // and the list stays for the start that takes the saves, said in the log.
+  const dir4 = path.join(scratch, 'saves-wait');
+  registers(dir4);
+  fs.writeFileSync(path.join(dir4, 'private', 'deleted-characters.json'), JSON.stringify({ profiles: [P1, P2], actors: [A1, A2] }));
+  const s1 = start(dir4);
+  const list4 = j(dir4, 'deleted-characters.json');
+  yes('S1 with the saves not taken, every register part is done and the list stays',
+      JSON.stringify(Object.keys(list4.done).sort()) === JSON.stringify(['books', 'cargo', 'dungeon', 'embassy', 'farms', 'merchants', 'property']));
+  yes('S2 and the log says the saves wait for the next start',
+      s1.logged.some(function (l) { return l === 'release: saves did not let go at this start, so the list waits for the next one'; }));
   // ============================================================ C: characters only (#2668)
   // Reset-Character.ps1 and Wipe-Saves.ps1 name the characters they throw
   // away by form id and never a profile, which keeps its id and what it holds.
@@ -556,7 +568,8 @@ try {
     }).sort();
     return { dir: d, run: r, keep: k, changed: changed, lines: r.logged.filter(function (l) { return /^release: /.test(l); }) };
   }
-  const c = charactersOnly('characters-only', { profiles: [], actors: [A1, A2] });
+  // As Release-List.ps1 writes it: naming no profile, it has 'saves' done.
+  const c = charactersOnly('characters-only', { profiles: [], actors: [A1, A2], done: { saves: NOW } });
   yes('C1 the list of characters only is read and every part runs (' + c.lines.length + ' lines)',
       /a list of 0 profile\(s\) and 2 character\(s\) to let go, at server start/.test(c.lines[0] || '') &&
       /every part is done, and the list is gone/.test(c.lines[c.lines.length - 1] || '') &&
@@ -587,7 +600,7 @@ try {
 
   // ============================================================ X: a wipe's list (#2668)
   const x = charactersOnly('wipe-list', { profiles: [], actors: [A1],
-    done: { farms: NOW, property: NOW, embassy: NOW, dungeon: NOW, cargo: NOW, books: NOW } });
+    done: { saves: NOW, farms: NOW, property: NOW, embassy: NOW, dungeon: NOW, cargo: NOW, books: NOW } });
   yes('X1 only the merchants\' part runs, and then the list is gone (' + x.lines.join(' / ') + ')',
       x.lines.length === 3 && /^release: merchants: /.test(x.lines[1]) && /the list is gone/.test(x.lines[2]) &&
       !fs.existsSync(path.join(x.dir, 'private', 'deleted-characters.json')));

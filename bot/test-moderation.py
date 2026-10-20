@@ -275,6 +275,30 @@ try:
     yes('M14 no em dash and never the forbidden word',
         all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (ev, rn, nr)))
 
+    # M15: staff on the world's card, the Office page of K (#513, Patrick,
+    # 17 Oct): each press comes through the staff block's record with the
+    # stage as the who, and reads as who did what to the world.
+    yes('M15 the world stage block records each staff press on the card, and each has a sentence here',
+        all(("log.record('%s'" % d) in gm and d in bot._MOD_DID
+            for d in ('worldpropose', 'worldconfirm', 'worlddrop')))
+    wp = bot.moderation_text('dev', {'did': 'worldpropose', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                     'whoName': 'A landing', 'why': 'from peace to landing, force: remnant'})
+    yes('M15 a proposal says who proposed which stage, and from where',
+        wp == '**Staff on the dev server:** Aela (profile 1001) proposed moving the world to A landing: '
+              'from peace to landing, force: remnant')
+    wc = bot.moderation_text('live', {'did': 'worldconfirm', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                      'whoName': 'A landing', 'why': 'from peace to landing, proposed by Bjorn (profile 2002)'})
+    yes('M15 a confirm says who confirmed it and who proposed it',
+        wc == '**Staff on the live server:** Aela (profile 1001) confirmed moving the world to A landing: '
+              'from peace to landing, proposed by Bjorn (profile 2002)')
+    wd = bot.moderation_text('dev', {'did': 'worlddrop', 'by': 1001, 'byName': 'Aela', 'who': 0,
+                                     'whoName': '@everyone', 'why': '<@&111111111111111111>'})
+    yes('M15 a drop says so, and nothing in it pings anybody',
+        wd.startswith('**Staff on the dev server:** Aela (profile 1001) dropped the proposal to move the world to ')
+        and '@everyone' not in wd and '<@&111111111111111111>' not in wd)
+    yes('M15 no em dash and never the forbidden word',
+        all(chr(0x2014) not in t and ('pla' + 'yer') not in t.lower() for t in (wp, wc, wd)))
+
     # M9: started with the others, and sent through report_say (mentions off).
     src = inspect.getsource(bot.on_ready)
     yes('M9 on_ready starts it', 'asyncio.create_task(watch_moderation())' in src)

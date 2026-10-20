@@ -291,13 +291,15 @@ function Get-ThornswoodTaskSid {
     } catch { return '' }
 }
 function Get-ThornswoodServiceNeverReach {
-    param([string]$Own = '')
+    param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @('C:\Thornswood-Backup', 'C:\Thornswood-Deploys', 'C:\Thornswood-Watch', 'C:\Thornswood-Maint')
-    foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
     }
-    foreach ($r in 'C:\Thornswood-Voice', 'C:\Thornswood-Voice-Dev') {
+    foreach ($r in 'Thornswood-Voice', 'Thornswood-Voice-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
     }
     return $list
@@ -309,7 +311,11 @@ function Test-ThornswoodServiceCannotReach {
     $read = [long]0x90000001
     $problems = @()
     foreach ($p in @($Paths)) {
-        if (-not $p -or -not (Test-Path -LiteralPath $p)) { continue }
+        if (-not $p) { continue }
+        # A denied look is an error, not a no: without Stop, Test-Path says
+        # False and the path would be passed over as if it were not there.
+        try { if (-not (Test-Path -LiteralPath $p -ErrorAction Stop)) { continue } }
+        catch { $problems += ($p + ': whether it is there could not be checked (' + $_.Exception.Message + ')'); continue }
         try { $acl = Get-Acl -LiteralPath $p }
         catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
         foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {
@@ -372,7 +378,7 @@ function Grant-ThornswoodServiceFolder {
 # goes onto LOCAL SERVICE only where LOCAL SERVICE can read none of what no
 # service may.
 if (-not $AsSystem -and -not $NoTask) {
-    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root))
+    $cannot = @(Test-ThornswoodServiceCannotReach (Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)))
     if ($cannot.Count) {
         Say 'LOCAL SERVICE could read what no service may, so the server is not moved onto it:' 'Red'
         foreach ($c in $cannot) { Say ('  ' + $c) 'Red' }
@@ -396,11 +402,17 @@ $script:running = $null
 # The game port a root's settings name, and the resources port that follows
 # from it: skymp5-server/ts/ui.ts gives 3000 for 7777 and the game port plus
 # one otherwise. Publish-Server and Deploy-Server use the same rule.
+#
+# No settings file, or one with no port, is the server's own default, 7777.
+# One that is there and does not read stops the run: guessing 7777 for it
+# would have a dev root take the live server's answer for its own (#2711).
 function GamePortOf([string]$dir) {
-    try {
-        $cfg = [IO.File]::ReadAllText((Join-Path $dir 'server-settings.json')) | ConvertFrom-Json
-        if ($cfg.port) { return [int]$cfg.port }
-    } catch { }
+    $sp = Join-Path $dir 'server-settings.json'
+    if (-not (Test-Path -LiteralPath $sp)) { return 7777 }
+    $cfg = $null
+    try { $cfg = [IO.File]::ReadAllText($sp) | ConvertFrom-Json }
+    catch { throw ("$sp does not read, so the port this server answers on is not known: " + $_.Exception.Message) }
+    if ($null -ne $cfg -and $cfg.port) { return [int]$cfg.port }
     return 7777
 }
 
@@ -451,16 +463,25 @@ function ServerProcesses([string]$dir) {
 function StopServer([string]$dir) {
     # Found before the task is stopped.
     $ids = @(ServerProcesses $dir | ForEach-Object { [int]$_.ProcessId })
-    if (-not $NoTask) { try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop } catch { } }
-    $port = GamePortOf $dir
+    # No task yet is nothing to stop. One that is there and will not stop is
+    # said: its processes are stopped by id below whatever it does.
+    if (-not $NoTask -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
+        try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
+        catch { Say ("the task {0} would not stop ({1}); its processes are stopped by id instead" -f $TaskName, $_.Exception.Message) 'Yellow' }
+    }
     foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
         Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
         Say ("stopped pid {0}" -f $id) 'Yellow'
     }
-    # The port let go, when it was ours that held it.
+    # The ports let go, every one the stopped processes held. Listed whole and
+    # filtered: -LocalPort with nothing on it is an error, and nothing there is
+    # what this waits for. A box that cannot list them says so and goes on: the
+    # processes are stopped by id above either way, and this is a rollback's
+    # path as well as an install's, so it does not stop half way.
     for ($i = 0; $i -lt 20; $i++) {
         $held = @()
-        try { $held = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) } catch { }
+        try { $held = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) }
+        catch { Say ("could not list the UDP ports to see them let go ({0}), going on without that wait" -f $_.Exception.Message) 'Yellow'; break }
         if (-not $held.Count) { break }
         Start-Sleep -Milliseconds 500
     }
@@ -474,20 +495,28 @@ function Answers([string]$dir) {
     $port = GamePortOf $dir
     $res = if ($port -eq 7777) { 3000 } else { $port + 1 }
     $until = (Get-Date).AddSeconds($Wait)
+    $why = ''
     while ($true) {
+        # Listed whole and filtered, as StopServer does: nothing on the port yet
+        # is what an empty list says, not an error. A list that cannot be had
+        # is not answering, and is said when the wait runs out.
         $udp = $false
-        try { $udp = @(Get-NetUDPEndpoint -LocalPort $port -ErrorAction Stop).Count -gt 0 } catch { }
+        try { $udp = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $_.LocalPort -eq $port }).Count -gt 0 }
+        catch { $why = 'the UDP ports could not be listed: ' + $_.Exception.Message }
         $tcp = $false
         if ($udp) {
+            $c = New-Object Net.Sockets.TcpClient
             try {
-                $c = New-Object Net.Sockets.TcpClient
                 $null = $c.BeginConnect('127.0.0.1', $res, $null, $null).AsyncWaitHandle.WaitOne(500)
                 $tcp = $c.Connected
-                $c.Close()
-            } catch { }
+            } catch { $why = $_.Exception.Message }
+            finally { $c.Close() }
         }
         if ($tcp) { return $true }
-        if ((Get-Date) -gt $until) { return $false }
+        if ((Get-Date) -gt $until) {
+            if ($why) { Say ("not answering on {0} or {1}; the last try said: {2}" -f $port, $res, $why) 'Yellow' }
+            return $false
+        }
         Start-Sleep -Milliseconds 700
     }
 }
@@ -756,7 +785,9 @@ function Show-ServerPriority([string]$dir) {
     if (-not $nodes.Count) { Say "no node is running under $dir, so there is no priority to read" 'Yellow'; return }
     foreach ($p in $nodes) {
         $class = 'unreadable'
-        try { $class = [string](Get-Process -Id ([int]$p.ProcessId) -ErrorAction Stop).PriorityClass } catch { }
+        $proc = Get-Process -Id ([int]$p.ProcessId) -ErrorAction SilentlyContinue
+        if (-not $proc) { Say ("node, pid {0}, has already gone" -f $p.ProcessId) 'Yellow'; continue }
+        try { $class = [string]$proc.PriorityClass } catch { $class = 'unreadable (' + $_.Exception.Message + ')' }
         Say ("node, pid {0}, runs at {1} priority" -f $p.ProcessId, $class) $(if ($class -eq 'High') { 'Green' } else { 'Yellow' })
     }
 }
@@ -1105,11 +1136,13 @@ function GoBack([string]$keptAs) {
 if ($hadRoot -and $null -ne $script:running) {
     $was = $null
     $now = $null
-    try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { }
-    try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { }
-    $moved = @('server-settings.json, which cannot be read')
+    $unread = @()
+    try { $was = [IO.File]::ReadAllText((Join-Path $aside 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the server-settings.json the server had, which cannot be read: ' + $_.Exception.Message) }
+    try { $now = [IO.File]::ReadAllText((Join-Path $Root 'server-settings.json')) | ConvertFrom-Json } catch { $unread += ('the server-settings.json now in place, which cannot be read: ' + $_.Exception.Message) }
+    if (-not $unread.Count -and ($null -eq $was -or $null -eq $now)) { $unread += 'server-settings.json, which is empty' }
+    $moved = $unread
     # What this run asked for (#1804) moved on purpose, as the release's keys did.
-    if ($null -ne $was -and $null -ne $now) { $moved = @(Compare-ThornswoodCarried $was $now @($ThornswoodInstallKeys + $askedKeys)) }
+    if (-not $unread.Count) { $moved = @(Compare-ThornswoodCarried $was $now @($ThornswoodInstallKeys + $askedKeys)) }
     if ($moved.Count) {
         Say ('read back: ' + ($moved -join ', ') + ' would not be what the server had, so nothing is started and the previous folder goes back') 'Red'
         GoBack 'the folder whose settings did not read back'
@@ -1223,9 +1256,12 @@ if ($hadRoot -and (Test-Path -LiteralPath $aside)) { Lock-ServerRoot $aside '' }
 $siteTask = Get-ScheduledTask -TaskName 'Thornswood Docs' -ErrorAction SilentlyContinue
 if ($siteTask -and $siteTask.Principal.UserId -and $siteTask.Principal.UserId -notmatch '(?i)^(NT AUTHORITY\\)?SYSTEM$') {
     $siteSid = ''
-    try { $siteSid = (New-Object Security.Principal.NTAccount([string]$siteTask.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value } catch { }
-    $has = @((Get-Acl -LiteralPath $Root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $siteSid })
-    if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
+    try { $siteSid = (New-Object Security.Principal.NTAccount([string]$siteTask.Principal.UserId)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { Say ("the site's task runs as {0}, which does not translate to an account here ({1}), so whether it may read server.log is not known" -f $siteTask.Principal.UserId, $_.Exception.Message) 'Yellow' }
+    if ($siteSid) {
+        $has = @((Get-Acl -LiteralPath $Root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $siteSid })
+        if (-not $has.Count) { Say "the site's account has no rule on $Root yet, so it cannot read server.log: run .\scripts\deploy\Deploy-Docs.ps1 once" 'Yellow' }
+    }
 }
 
 # The log writer the task runs the server under (#2349), into the root.

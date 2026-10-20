@@ -158,7 +158,7 @@ Yes 'the blocks are plain ASCII, which the far end reads right with or without a
 # The narrowing on 17 September was a fix. The TCP port one above the game
 # port is 7778 on the live root, which is the voice service.
 Yes 'the stop is still by the UDP port and nothing else' (
-    $swapBlock -match 'Get-NetUDPEndpoint -LocalPort \$port' -and
+    $swapBlock.Contains('Get-NetUDPEndpoint -EA Stop | Where-Object { $_.LocalPort -eq $port }') -and
     $swapBlock -notmatch 'Get-NetTCPConnection' -and
     $swapBlock -notmatch 'Win32_Process' -and
     $swapBlock -notmatch 'CommandLine')

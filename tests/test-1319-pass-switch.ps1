@@ -112,6 +112,23 @@ try {
     Yes 'live holding "true" as text, -RequirePass on: carried as a real true' ($r.Carried -and $r.Staged.thornswoodRequirePass -is [bool] -and $r.Staged.thornswoodRequirePass)
     $r = Carry (With $live 'thornswoodRequirePass' $true) (With $build 'thornswoodRequirePass' '')
     Yes 'a build holding an empty value over live true: carried, and live keeps true, never empty' ($r.Carried -and $r.Staged.thornswoodRequirePass -eq $true)
+
+    # #2711: the two reads sat in a try with an empty catch, so the refusal
+    # never said which file did not read, or why. Each is run here not reading.
+    foreach ($which in 'running', 'sent') {
+        $Root = Join-Path $tmp ([Guid]::NewGuid().ToString('N'))
+        $Stage = '.stage-20261018-000000'
+        $Asked = $null; $ReleaseKeys = @($ThornswoodGamemodeKeys)
+        New-Item -ItemType Directory -Path (Join-Path $Root $Stage) -Force | Out-Null
+        $good = ((With $live 'thornswoodRequirePass' $true) | ConvertTo-Json -Depth 10)
+        [IO.File]::WriteAllText((Join-Path $Root 'server-settings.json'), $(if ($which -eq 'running') { '{"port":' } else { $good }))
+        [IO.File]::WriteAllText((Join-Path (Join-Path $Root $Stage) 'server-settings.json'), $(if ($which -eq 'sent') { '{"port":' } else { ($build | ConvertTo-Json -Depth 10) }))
+        $said = @(& ([scriptblock]::Create($settingsCarryBlock)) | ForEach-Object { "$_" })
+        $named = $(if ($which -eq 'running') { 'the settings the server runs on: ' } else { 'the settings sent: ' })
+        Yes ('settings ' + $which + ' that do not read: CARRY REFUSED, saying which and why, the stage cleared') (
+            ($said -contains 'CARRY REFUSED') -and @($said | Where-Object { $_.Trim().StartsWith($named) -and $_.Trim().Length -gt $named.Length }).Count -eq 1 -and
+            -not (Test-Path -LiteralPath (Join-Path $Root $Stage)))
+    }
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }

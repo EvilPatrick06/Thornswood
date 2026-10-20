@@ -302,6 +302,224 @@ function rollNow(log, now, o) {
   return out.concat(sweep(log, now, o.days), ageAlsos(o, now));
 }
 
+/*
+  DELETION REQUESTS, TAKEN BEFORE THE PROGRAM STARTS (#2758).
+
+  Patrick, 18 Oct 2026, after the first real deletion on his own account: "it
+  should not restart everytime we want to delete a person it should just fully
+  apply the rest upon a server restart". So scripts\vps\Delete-Person.ps1
+  stops nothing. It writes the request into the folder of each service that
+  holds something of the person's, and each service takes it out of its own
+  files as it next starts. For the game server and voice that is here: this
+  process starts them, so between its start and the program's nothing else
+  has those files open, and a file changed now is never written back over.
+
+  The game server (a server-settings.json in the folder it runs). Its list is
+  private\deleted-characters.json (the privDir server-settings.json names),
+  the list the gamemode's release block reads at its start (#2351):
+
+      { "profiles": [ 5001 ], "actors": [ 4278192641 ], "done": { ... } }
+
+  Here is its part "saves": every change form of theirs in the engine's own
+  folder (<databaseName, world>\changeForms, the files the engine loads at its
+  start), their card (characters.json), their mod menu choices
+  (mod-settings.json), their take counts (take-limit.json) and when they last
+  left (last-left.json). The gamemode's blocks let go of the registers as they
+  load, after this (game\gamemode.js, the release block). A part done is marked
+  with the time in the list; the one that finds every part done deletes it.
+  RELEASE_PARTS is the gamemode's PARTS, and tests\test-2758-start-deletions.js
+  holds the two to the same list.
+
+  An unfinished save (.pending-batch in changeForms) that holds one of their
+  characters waits for the next start: the engine replays it as it starts,
+  before anything could take it out, and writing it again without their
+  character would mean writing the engine's own journal. Everything else of
+  theirs goes now and the part waits, and the line says so. A batch that is
+  not theirs is the engine's to replay and changes nothing here.
+
+  Voice (deletion-requests.json in the folder it runs):
+
+      { "people": [ { "discordId": "...", "profiles": [ 5001 ] } ],
+        "kept": [ { "profile": 5001, "from": 99000, "to": 201000 } ] }
+
+  Every chat line their characters wrote goes out of each day's file
+  (THORNSWOOD_CHAT_DIR, or chat beside it, as voice-server.js reads it),
+  except a line said inside a session staff marked kept (#2166), whose
+  windows Delete-Person.ps1 read off the site. Then the list is deleted.
+
+  A file that is there and will not parse, or a change that did not take,
+  leaves the request where it is, for the next start, and is said. Each line
+  here says counts and never a name, a Discord id, a profile id or a form id.
+*/
+const RELEASE_PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
+
+function startDeletions(dir, now) {
+  const out = [];
+  const say = (m) => out.push('deletions: ' + m);
+  const isObj = (v) => !!v && typeof v === 'object' && !Array.isArray(v);
+  const has = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+  // undefined for a file that is not there, null for one that will not
+  // parse or be read (said), the value otherwise, its text kept for writeJson.
+  const texts = new Map();
+  function readJson(p) {
+    let t;
+    try { t = fs.readFileSync(p, 'utf8'); }
+    catch (e) { if (e.code === 'ENOENT') return undefined; say(path.basename(p) + ' could not be read (' + e.code + ')'); return null; }
+    texts.set(p, t);
+    try { return JSON.parse(t.replace(/^\uFEFF/, '')); }
+    catch (e) { say(path.basename(p) + ' will not parse'); return null; }
+  }
+  function writeFile(p, body) {
+    const tmp = path.join(path.dirname(p), '.' + path.basename(p) + '.deletions.tmp');
+    try { fs.writeFileSync(tmp, body, 'utf8'); fs.renameSync(tmp, p); return true; }
+    catch (e) {
+      say(path.basename(p) + ' could not be written (' + (e.code || e.message) + ')');
+      if (fs.existsSync(tmp)) { try { fs.unlinkSync(tmp); } catch (e2) { say(path.basename(tmp) + ' is left behind (' + (e2.code || e2.message) + ')'); } }
+      return false;
+    }
+  }
+  // A JSON file back the shape it came in: indented if it was, its last line ending kept.
+  function writeJson(p, v) {
+    const was = texts.get(p) || '';
+    const indent = /^[\[{]\s*\r?\n/.test(was) ? 2 : 0;
+    return writeFile(p, JSON.stringify(v, null, indent || undefined) + (/\n$/.test(was) ? '\n' : ''));
+  }
+  const ids = (a) => Array.isArray(a) && a.every((n) => Number.isSafeInteger(n) && n > 0);
+  const counts = {};
+  const count = (k, n) => { if (n) counts[k] = (counts[k] || 0) + n; };
+  const said = () => Object.keys(counts).map((k) => k + ' ' + counts[k]).join(', ') || 'nothing of theirs';
+
+  // ---- the game server
+  const settings = readJson(path.join(dir, 'server-settings.json'));
+  if (isObj(settings)) {
+    const priv = path.join(dir, settings.privDir ? String(settings.privDir) : 'private');
+    const listFile = path.join(priv, 'deleted-characters.json');
+    const list = readJson(listFile);
+    const ok = isObj(list) && ids(list.profiles) && (list.actors === undefined || ids(list.actors)) &&
+      (list.done === undefined || (isObj(list.done) && Object.keys(list.done).every((k) => Number.isSafeInteger(list.done[k]) && list.done[k] > 0)));
+    if (list === null || (list !== undefined && !ok)) {
+      say(path.basename(listFile) + ' is not a list of deleted characters, so nothing was removed and it is left as it is');
+    } else if (list !== undefined && !(isObj(list.done) && has(list.done, 'saves'))) {
+      const P = new Set(list.profiles);
+      const mine = (v) => P.has(Number(v));
+      let whole = true;
+      if (settings.databaseDriver && settings.databaseDriver !== 'file') {
+        say('the saves are in ' + settings.databaseDriver + ', not in files, so their characters were not removed and the part waits');
+        whole = false;
+      } else {
+        const forms = path.join(dir, settings.databaseName ? String(settings.databaseName) : 'world', 'changeForms');
+        const batchFile = path.join(forms, '.pending-batch');
+        if (fs.existsSync(batchFile)) {
+          let theirs = true;
+          try {
+            const j = JSON.parse(fs.readFileSync(batchFile, 'utf8'));
+            theirs = !Array.isArray(j.batch) || j.batch.some((e) => {
+              try { return mine(JSON.parse(e.json).profileId); } catch (e2) { return true; }
+            });
+          } catch (e) { theirs = true; }
+          if (theirs) {
+            say('an unfinished save in ' + path.relative(dir, forms) + ' holds one of their characters, or could not be read; the server replays it as it starts, so their characters go at the next start');
+            whole = false;
+          }
+        }
+        let names = [];
+        try { names = fs.readdirSync(forms); }
+        catch (e) { if (e.code !== 'ENOENT') { say(path.relative(dir, forms) + ' could not be listed (' + e.code + ')'); whole = false; } }
+        for (const n of names) {
+          if (!/\.json$/i.test(n) || n[0] === '.') continue;
+          const p = path.join(forms, n);
+          let o;
+          try { o = JSON.parse(fs.readFileSync(p, 'utf8').replace(/^\uFEFF/, '')); }
+          catch (e) { count('change forms that would not parse, so were not read', 1); continue; }
+          if (!isObj(o) || !(Number(o.profileId) > 0) || !mine(o.profileId)) continue;
+          try { fs.unlinkSync(p); count('characters', 1); }
+          catch (e) { say('a change form could not be deleted (' + e.code + ')'); whole = false; }
+        }
+      }
+      // Each file keyed by profile, in its own shape.
+      const keyed = [
+        ['characters.json', 'cards', (v) => isObj(v.who) ? [v.who, (k) => mine(k)] : null],
+        ['mod-settings.json', 'mod menu choices', (v) => isObj(v.who) ? [v.who, (k) => mine(k)] : null],
+        ['take-limit.json', 'take counts', (v) => isObj(v.counts) ? [v.counts, (k) => mine(k.split('|')[0])] : null],
+        ['last-left.json', 'last-left times', (v) => [v, (k) => mine(k)]]
+      ];
+      for (const [f, label, pick] of keyed) {
+        const p = path.join(priv, f);
+        const v = readJson(p);
+        if (v === undefined) continue;
+        if (!isObj(v)) { if (v !== null) say(f + ' is not the shape it should be'); whole = false; continue; }
+        const at = pick(v);
+        if (!at) continue;
+        let n = 0;
+        for (const k of Object.keys(at[0])) if (at[1](k)) { delete at[0][k]; n++; }
+        if (!n) continue;
+        if (writeJson(p, v)) count(label, n);
+        else whole = false;
+      }
+      if (whole) {
+        const done = Object.assign({}, isObj(list.done) ? list.done : {}, { saves: now });
+        if (RELEASE_PARTS.every((k) => has(done, k))) {
+          try { fs.unlinkSync(listFile); say('saves: ' + said() + '; every part is done, and the list is gone'); }
+          catch (e) { say('saves: ' + said() + '; the list could not be deleted (' + e.code + ')'); }
+        } else if (writeFile(listFile, JSON.stringify({ profiles: list.profiles, actors: list.actors || [], done }))) {
+          say('saves: ' + said() + '; the gamemode lets go of the registers as it loads');
+        } else {
+          say('saves: ' + said() + '; the list could not be marked, so this part runs again at the next start');
+        }
+      } else {
+        say('saves: ' + said() + '; the part waits for the next start');
+      }
+    }
+  }
+
+  // ---- voice
+  const voiceFile = path.join(dir, 'deletion-requests.json');
+  const req = readJson(voiceFile);
+  if (req !== undefined) {
+    const okReq = isObj(req) && Array.isArray(req.people) && req.people.every((x) => isObj(x) && ids(x.profiles)) &&
+      (req.kept === undefined || (Array.isArray(req.kept) && req.kept.every((w) => isObj(w) && Number.isFinite(w.profile) && Number.isFinite(w.from) && Number.isFinite(w.to))));
+    if (!okReq) {
+      say(path.basename(voiceFile) + ' is not a list of deletion requests, so nothing was removed and it is left as it is');
+    } else {
+      const P = new Set();
+      for (const x of req.people) for (const n of x.profiles) P.add(n);
+      const kept = req.kept || [];
+      const chat = process.env.THORNSWOOD_CHAT_DIR || path.join(dir, 'chat');
+      let whole = true, inKept = 0;
+      let names = [];
+      try { names = fs.readdirSync(chat).sort(); }
+      catch (e) { if (e.code !== 'ENOENT') { say('the chat folder could not be listed (' + e.code + ')'); whole = false; } }
+      for (const n of names) {
+        if (!/^\d{4}-\d{2}-\d{2}\.jsonl$/.test(n)) continue;
+        const p = path.join(chat, n);
+        let raw;
+        try { raw = fs.readFileSync(p, 'utf8'); } catch (e) { say(n + ' could not be read (' + e.code + ')'); whole = false; continue; }
+        const lines = raw.split('\n');
+        if (lines.length && lines[lines.length - 1] === '') lines.pop();
+        const keep = lines.filter((line) => {
+          let o = null;
+          try { o = JSON.parse(line); } catch (e) { return true; }
+          if (!isObj(o) || !P.has(Number(o.profileId))) return true;
+          const at = Number(o.at) || 0;
+          if (kept.some((w) => w.profile === Number(o.profileId) && at >= w.from && at <= w.to)) { inKept++; return true; }
+          return false;
+        });
+        if (keep.length === lines.length) continue;
+        if (writeFile(p, keep.length ? keep.join('\n') + '\n' : '')) { count('chat lines', lines.length - keep.length); count('days edited', 1); }
+        else whole = false;
+      }
+      count('chat lines kept with a session staff marked kept', inKept);
+      if (whole) {
+        try { fs.unlinkSync(voiceFile); say('chat: ' + said() + '; the request is done, and gone'); }
+        catch (e) { say('chat: ' + said() + '; the request could not be deleted (' + e.code + '), so it runs again at the next start'); }
+      } else {
+        say('chat: ' + said() + '; the request waits for the next start');
+      }
+    }
+  }
+  return out;
+}
+
 function run(o) {
   const log = o.log;
   const state = { fd: null, bytes: 0, day: 0, atLineStart: true, rollAfter: 0, lost: 0, lostSince: 0, lostWhy: '' };
@@ -416,6 +634,8 @@ function run(o) {
   pending.push(...sweep(log, now, o.days), ...ageAlsos(o, now));
   try { open(now); } catch (e) { lose(Buffer.alloc(0), e); }
   for (const l of pending) say(l);
+  // Before the program, so nothing of theirs is open when it goes (#2758).
+  for (const l of startDeletions(process.cwd(), now)) say(l);
 
   if (!o.program.length) {
     say('nothing to run: server-log.js was started with no program after its own switches');
@@ -455,5 +675,5 @@ if (require.main === module) {
   }
   run(o);
 } else {
-  module.exports = { KEEP_DAYS, ALSO_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs, ageAlso };
+  module.exports = { KEEP_DAYS, ALSO_DAYS, MAX_BYTES, rolledFiles, trimFile, sweep, rollFile, rollAtStart, rollNow, lineTime, parseArgs, ageAlso, startDeletions, RELEASE_PARTS };
 }

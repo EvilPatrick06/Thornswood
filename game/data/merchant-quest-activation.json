@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "killScenes": [
+    {
+      "id": "q-whiterun-tailor-cloth-road",
+      "sha256": "6f6cf4c63de266dff8edfee2ab72213ed9699756c274004d62f775ec3cbfb68f"
+    },
+    {
+      "id": "q-winterhold-enchanter-coast",
+      "sha256": "518c9b2210f63ee6ec1b6b6f388c862c6f5ed9dca284dfb21b115f9350928146"
+    },
+    {
+      "id": "q-rift-tailor-northwind-work",
+      "sha256": "fcddb1a76415ade5c37bd149b28a0235a90d9a57ffb7c07176a6ccfd6a0ad239"
+    },
+    {
+      "id": "q-whiterun-enchanter-shimmermist",
+      "sha256": "402f870a3f8d330987e97d83c14a5ef54f1474fd3b3fbb644ec38e00928041f4"
+    }
+  ],
+  "commissions": [
+    {
+      "id": "q-whiterun-smith-straps",
+      "sha256": "8f03bdc903aaf1e37727f54a3e49bfdea5a2b817bc7534ba0111c88d25502734"
+    },
+    {
+      "id": "q-rift-woodworker-hunt-arrows",
+      "sha256": "84b31663cd265c9b26068ff7343622f04b332ddce394e58b52a55b0b6cbb3a89"
+    },
+    {
+      "id": "q-falkreath-tailor-mourning-thread",
+      "sha256": "8dded80c9b0e56c8a18158136ca200481a444582a41cc98000fe8ad612ec0aef"
+    },
+    {
+      "id": "q-haafingar-cook-dock-supper",
+      "sha256": "cfd57250d82ce20c23fa8db5c802509e103d6dd8c0e0a55654b1ed4da12c8a11"
+    },
+    {
+      "id": "q-hjaalmarch-alchemist-marsh-poultices",
+      "sha256": "5b8b08e462680c7249f9359498a84f1e1ccbc7ff30020ed1d15fbdd204703652"
+    },
+    {
+      "id": "q-whiterun-smith-spare-pick",
+      "sha256": "df7c54b9f75be97be6c525080c59640af7448efa017dc9d3ed0c7d5c649f00b0"
+    },
+    {
+      "id": "q-rift-woodworker-spare-pole",
+      "sha256": "5c443c243872afe4c5068bc66345def10fc3efdb3c4bb8291a4bc2222c1f2e74"
+    },
+    {
+      "id": "q-falkreath-tailor-trail-boots",
+      "sha256": "c80cf0cfa03d0d7bbd02dac97a3ba10a92d6b112c6f18a21df6c77404e22acb1"
+    },
+    {
+      "id": "q-haafingar-cook-field-soup",
+      "sha256": "7f3e208a1bf02b1e44e007a77e18baa712e74a70c12c06efeea716f6af0210ac"
+    },
+    {
+      "id": "q-hjaalmarch-alchemist-cotton-dressings",
+      "sha256": "7dd3a8f94cecd900b4211180e69ed764bd684b32512d1d262ae97feb972b78a9"
+    },
+    {
+      "id": "q-whiterun-smith-ebony-seam-account",
+      "sha256": "d09451fa3306f0743d0e68bd78ae43bde11dcd0fdc2761abe37c350d37a70faa"
+    },
+    {
+      "id": "q-whiterun-woodworker-outfitter-reserve",
+      "sha256": "a94934368484eaf0bcfa65564909260c8b1da3e198a11495b31a8d1c070836e0"
+    },
+    {
+      "id": "q-whiterun-tailor-winter-vestments",
+      "sha256": "68f0406f1fe3db80d3b820d13413c0419a960da038eef3a54ac103091d9af2e0"
+    },
+    {
+      "id": "q-whiterun-enchanter-ward-demonstration",
+      "sha256": "8f19b0da990fc2102dd312016717dc92a48f23d6bcfdec622aaf3adc621d169e"
+    },
+    {
+      "id": "q-whiterun-cook-mammoth-supper",
+      "sha256": "d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4"
+    },
+    {
+      "id": "q-whiterun-alchemist-ash-expedition",
+      "sha256": "75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df"
+    },
+    {
+      "id": "q-whiterun-alchemist-travelling-case",
+      "sha256": "7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da"
+    },
+    {
+      "id": "q-whiterun-enchanter-commission-rack",
+      "sha256": "531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787"
+    }
+  ]
+}

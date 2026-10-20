@@ -91,7 +91,7 @@ and help text never lists it.
 | `/lock`, `/unlock` | The holder, or whoever carries the deed, at the door | Locks and unlocks the building | The property block's `command`, `setLock` | Nowhere since #1637; [Property](property.md) names the key | X at a door just opened sends `/lock <id>` or `/unlock <id>`, as its line says. Out of the list and the help. | #1637 |
 | `/mold`, `/key` | A smith | A mold at a door, a key at a forge | The property block's `command`, `mold` and `cutKey` | Nowhere since #1637; [Property](property.md) names the keys | U presses a blank mold into the door; X at a forge, carrying a mold that has been pressed into a door, sends `/key <id>` and cuts a key for an iron ingot; U there sends `/key <id> master` and cuts the building's master key for 2 iron ingots (#2254). Out of the list and the help. | #1637 |
 | `/office <court|steward|guard> <hold> <id>`, `-<id>`, `/office hold <office> <hold>` | The Jarl of that hold, by the "Jarl of <Hold>" Discord role, alone, on the character that holds it; `hold`: any character whose account holds that role | Gives or takes that hold's Court, Steward or Guard role: the server asks the site, which sets the Discord role with the bot's token | `officeCmd` in the property block, through the character block's `command`; `/api/office` on the site | Nowhere. [Offices](offices.md) names the page | Name beside a person in the world, and Remove beside a holder (asked twice), on the Office page of K, send the person's profile id; Hold it here, pressed twice beside an office the account holds, sends `/office hold`, and that character holds the office (one character an office, Patrick, 16 Oct). It replaced `/jarl`, `/guard` and `/steward`. Never in the list or the help. | #2551 |
-| `/evict`, `/rent`, `/box` | A steward (the Steward or the Jarl of a hold, by the Discord role), in their own hold; staff evict and set rent at any building, logged for staff (#2551); anybody asks the rent or which box | Ends a claim, sets rent, marks the hold's box | `evict`, `rentCmd` and `boxCmd` in the property block | Nowhere. [Property](property.md) names the page | Evict, Set rent and No rent for the door opened in the last minute, and a hold's town for the container opened in the last minute, on the Office page of K. The board panel says what the box has been paid. Never in the list or the help. | #1638 |
+| `/evict`, `/rent` | A steward (the Steward or the Jarl of a hold, by the Discord role), in their own hold; staff evict and set rent at any building, logged for staff (#2551); anybody asks the rent | Ends a claim, sets rent | `evict` and `rentCmd` in the property block | Nowhere. [Property](property.md) names the page | Evict, Set rent and No rent for the door opened in the last minute, on the Office page of K. The board panel says what the hold has been paid. `/box`, which marked a container as a hold's box, is gone (Patrick, 15 Oct, #2298): the drop box on the board is the only box. Never in the list or the help. | #1638 |
 | `/dropbox gold`, `/dropbox leave`, `/dropbox take`, `/dropbox records` | Anybody at a hold's drop box; Records only that hold's officers | Puts gold in, leaves something for somebody, takes out what is yours (an officer anything), shows the records | `dropboxCmd` in the property block | Nowhere. [Notice boards](noticeboards.md) names the box | Put in, Leave it, Take back or Take, and Records on the drop box's panel, which E on the box opens. Never in the list or the help. | #2298 |
 | `/board move <hold>`, `/board here` | A steward of that hold (its Steward or its Jarl) | Moves a notice board | `board` and `moveBoard` in the property block | Nowhere. [Notice boards](noticeboards.md) names the page | A board's town on the Office page of K, pressed twice, sends `/board move <hold>`. Nothing sends `/board here`. Never in the list or the help. | #1638 |
 | `/me`, `/do`, `/whisper`, `/w`, `/shout`, `/s`, `/yell`, `/y` | Anybody | How a line is said, and how far it carries | `voice/voice-server.js:CHAT_VERBS`, `voice/headlines.js:SHOUT` | The list, as `/me`, `/do`, `/w`, `/s` and `/y`; the help panel's Talking; Help page "How a line is said"; [Text chat](chat.md), [People beside you](people.md), [Emotes](emotes.md); the voice service's usage lines | Stays a command, with no buttons, and the help names it (Patrick, 4 Oct). | None |
@@ -136,6 +136,18 @@ These stay commands. How to run each one, with examples:
 Nobody types these, and nothing tells anybody to. They are how the
 client reports what only it can see. They stay.
 
+The voice service's chat log, which staff read for a report, leaves out
+the ones the front plugin sends by itself (#2723,
+`voice/voice-server.js:PLUGIN_REPORTS`): `/joinpass`, `/place`, `/burn`,
+`/loadorder` and `/loadorderlight`, `/afk active`, `/face done`,
+`/racemenu` and `/racedown`, `/modset`, `/ate`, `/chopped`, `/tspicks`,
+`/rest`, and the panels' `refresh`. It writes the ones a key, E, a pick
+or a button sends, marked as a key press (#2251; the chat page marks
+every line that does not come from the chat box, #2732), and the wait in line
+once when it starts and once when it ends (#1131). Every one of them
+still reaches the game server, and the same line typed in the chat box
+is written as typed.
+
 | Line | Sent by | What it reports | Read at |
 | --- | --- | --- | --- |
 | `/joinpass <pass>` | The front plugin | The launcher's join pass | `gamemode.js:word === '/joinpass'` |
@@ -148,6 +160,7 @@ client reports what only it can see. They stay.
 | `/chopped` | The front plugin | A fall of the axe at a chopping block | `gamemode.js:if (word === '/chopped') {` |
 | `/loadorder` | The front plugin | The client's load order | `gamemode.js:word === '/loadorder'` |
 | `/tspicks <n>` | The front plugin | Lockpicks that broke | `gamemode.js:word === '/tspicks'` |
+| `/tspicked <id>` | The front plugin | A property door shut to you opened on its lock, a pick, so its holder is sent word (#2680) | `gamemode.js:word === '/tspicked'` |
 | `/moldhere <id>` | U at a door | A key mold pressed into that door | `gamemode.js:word === '/moldhere'` |
 | `/claim <id>`, `/lock <id>`, `/unlock <id>`, `/key <id>` | X at a door just opened, or at a forge (#1637) | Claims, locks or unlocks the building of the door just opened; cuts a key from the mold in the pack | The property block's `command`, `forgeHere` |
 | `/plot <id>`, `/claim <id>` at a crop | A crop under the crosshair, and X at it (#1636) | Asks for the line at that plot; claims the farm around it | The farming block's `command`, `plotLine` and `claim` |

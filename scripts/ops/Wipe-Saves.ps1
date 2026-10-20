@@ -74,18 +74,22 @@
   stays as they set it. private\merchant-ledger.json is the guild traders'
   purses and shelves, and the merchant code refuses to start without it
   (requireMerchantEvidence), so it is never moved by hand. A deleted
-  character's supply waits and waiting trade are let go by the purse service
-  from the list (#2351, #2652), and so are a wiped character's (#2668):
-  once everything is moved, each server gets a new
+  character's supply waits, commission promises and waiting trade are let
+  go by the purse service from the list (#2351, #2652), and so are a wiped
+  character's (#2668): once everything is moved, each server gets a new
   private\deleted-characters.json (Release-List.ps1, the list Delete-Person
   writes) naming every character in the world it set aside, by form id only,
   since a profile keeps its id through a wipe and is never named. The parts
-  whose registers were just set aside (farms, property, embassy, dungeon,
-  cargo, books) are marked done in it, so only the merchant ledger waits on it, and
-  the first start lets go and deletes it. The fresh world hands those form
-  ids to new characters, which is why it is written before that start and
-  not left to chance. A server whose move did not finish gets no list.
-  Season, the benches and the door are the server's, not anybody's.
+  whose registers were just set aside ($WipeDone: farms, property, embassy,
+  dungeon, cargo, books) are marked done in it. 'saves', server-log.js's
+  part, is not among them, because mod-settings.json stays; it takes only
+  what a profile holds, so Release-List marks it done when the list names
+  no profile, which is so unless a deletion still waiting was carried over.
+  So only the merchant ledger waits on it, and the first start lets go and
+  deletes it. The fresh world hands those form ids to new characters, which
+  is why it is written before that start and not left to chance. A server
+  whose move did not finish gets no list. Season, the benches and the door
+  are the server's, not anybody's.
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
@@ -163,6 +167,8 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
 # The release parts (game\gamemode.js PARTS) whose registers are all in
 # $Moves, so a fresh start has nothing of anybody's in them: the new release
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
+# Not 'saves': mod-settings.json stays (Release-List.ps1 marks it done for a
+# list that names no profile, the only thing that part acts on).
 $WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
@@ -343,7 +349,9 @@ else {
   if (Test-Path -LiteralPath `$cf) {
     `$files = @(Get-ChildItem -LiteralPath `$cf -Filter *.json -File | Where-Object { `$_.BaseName -match '^[0-9]+`$' } | ForEach-Object { `$_.FullName })
   }
-  Write-ThornswoodReleaseList -Root `$r -Actors (Get-ThornswoodCharacterIds `$files) -Carry (Join-Path `$r 'private\deleted-characters-before-$stamp.json') -Done @($wipeDoneLit)
+  `$found = Get-ThornswoodCharacterIds `$files
+  `$found.notes
+  Write-ThornswoodReleaseList -Root `$r -Actors `$found.ids -Carry (Join-Path `$r 'private\deleted-characters-before-$stamp.json') -Done @($wipeDoneLit)
 }
 }
 "@

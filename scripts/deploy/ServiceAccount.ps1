@@ -63,15 +63,20 @@ function Get-ThornswoodTaskSid {
 }
 
 # The places no service that runs our code may read. -Own is the root of the
-# service asking, whose own private folder or key it does need.
+# service asking, whose own private folder or key it does need. -Box is the
+# folder the Thornswood folders sit side by side in, C:\ on the box; a caller
+# passes the folder its own root is in, so an install into a scratch box is
+# checked against that box and not the real one (#1273).
 function Get-ThornswoodServiceNeverReach {
-    param([string]$Own = '')
+    param([string]$Own = '', [string]$Box = 'C:\')
     $own = $Own.TrimEnd('\')
-    $list = @('C:\Thornswood-Backup', 'C:\Thornswood-Deploys', 'C:\Thornswood-Watch', 'C:\Thornswood-Maint')
-    foreach ($r in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev') {
+    $list = @(foreach ($n in 'Thornswood-Backup', 'Thornswood-Deploys', 'Thornswood-Watch', 'Thornswood-Maint') { Join-Path $Box $n })
+    foreach ($r in 'Thornswood-Server', 'Thornswood-Server-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'private') }
     }
-    foreach ($r in 'C:\Thornswood-Voice', 'C:\Thornswood-Voice-Dev') {
+    foreach ($r in 'Thornswood-Voice', 'Thornswood-Voice-Dev') {
+        $r = Join-Path $Box $r
         if ($r -ine $own) { $list += (Join-Path $r 'token-key.txt') }
     }
     return $list
@@ -79,7 +84,8 @@ function Get-ThornswoodServiceNeverReach {
 
 # Each rule that lets a broad group, LOCAL SERVICE or one of -Sids read one of
 # -Paths, as a line. None means the move is safe. A path that is not there is
-# passed over; one whose rules cannot be read is a problem.
+# passed over; one this account cannot even look for, or whose rules cannot be
+# read, is a problem.
 function Test-ThornswoodServiceCannotReach {
     param([string[]]$Paths, [string[]]$Sids = @())
     $who = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19') + @($Sids | Where-Object { $_ })
@@ -87,7 +93,11 @@ function Test-ThornswoodServiceCannotReach {
     $read = [long]0x90000001
     $problems = @()
     foreach ($p in @($Paths)) {
-        if (-not $p -or -not (Test-Path -LiteralPath $p)) { continue }
+        if (-not $p) { continue }
+        # A denied look is an error, not a no: without Stop, Test-Path says
+        # False and the path would be passed over as if it were not there.
+        try { if (-not (Test-Path -LiteralPath $p -ErrorAction Stop)) { continue } }
+        catch { $problems += ($p + ': whether it is there could not be checked (' + $_.Exception.Message + ')'); continue }
         try { $acl = Get-Acl -LiteralPath $p }
         catch { $problems += ($p + ': its rules could not be read (' + $_.Exception.Message + ')'); continue }
         foreach ($r in @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]))) {

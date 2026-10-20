@@ -92,8 +92,7 @@ working directory (`gamemode.js:logPath`). The gamemode reads `dataDir`
 (`gamemode.js:voicePort`), `thornswoodChargen` (`gamemode.js:s.thornswoodChargen === false`),
 `thornswoodAdmins` (`gamemode.js:cfg.thornswoodAdmins`), `thornswoodTradeShips`
 (`gamemode.js:settings.thornswoodTradeShips === true`, off unless it is true: the trade ships of
-issue #511, whose register is still read and counted while off; on, a port's crate opens the dock and staff
-keep the ports and routes from the Office page of K, issue #2700) and `loadOrder`
+issue #511, whose register is still read and counted while off) and `loadOrder`
 (`gamemode.js:Array.isArray(doc.loadOrder)`). `Deploy-Gamemode.ps1` writes that file on every deploy
 (`scripts\deploy\Deploy-Gamemode.ps1:-NotePropertyName dataDir -NotePropertyValue 'data'`).
 
@@ -201,9 +200,9 @@ and carried by the deed (`giveDeed`). Locks and keys follow
 door reads from the site (`__thornswoodOffices`, read through `officeOf`,
 #2551): a Jarl gives their hold's Court, Steward and Guard on the Office
 page (`officeCmd`, which asks the site to set the role), and only a
-steward can `evict`. A hold's box takes gold only (`putIn`);
-rent (`rentDue`, `rentCmd`) and board fees (`takeGold`)
-land in it. Notice boards come after them. Coin enters the world in one
+steward can `evict`. A hold's box is the drop box on its board
+(`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
+(`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
 moves by trade (`gold`). The spoils block strips spawned gold from the
 world, and a coin purse found in it counts as gold.
@@ -252,9 +251,8 @@ There is no custom packet. Two paths:
 The voice feed (`gamemode.js:path: '/positions'`) posts every position to
 `POST /positions` every 200 ms. `voicePort()` reads the port from
 `server-settings.json`, so the dev server talks to the dev voice service.
-Do not run `scripts\deploy\Add-VoiceFeed.ps1`: it writes the older
-`voice\gamemode-voice.js` over this block, with 7778 written in and no
-party field (`voice\README.md:the dev service, where this file still has 7778 written in`).
+This block is the only copy: the older one beside the voice service, and the
+deploy script that wrote it in, went in #2736.
 
 ## Where its data lives on the VPS
 
@@ -281,13 +279,16 @@ person's menu choices, and `merchant-ledger.json`, which the merchant code
 needs to start. Once everything has moved it writes a new
 `deleted-characters.json` (`scripts\ops\Release-List.ps1`, issue #2668)
 naming every character in the world it set aside, by form id only, with the
-ids of a list it set aside carried over and every part but the merchants'
-marked done, so the first start lets the merchant ledger go of a wiped
-character's supply waits and waiting trade and deletes the list.
-`scripts\ops\Reset-Character.ps1` and, on a local test server,
+ids of a list it set aside carried over and every part whose register it
+moved marked done, so the first start lets the merchant ledger go of a wiped
+character's supply waits, commission promises and waiting trade and deletes
+the list. `scripts\ops\Reset-Character.ps1` and, on a local test server,
 `scripts\ops\New-Character.ps1` (issue #2673) write the same list for the
 characters they throw away, with nothing marked done; a profile keeps its id
-and what it holds either way.
+and what it holds either way. The part `saves` (`server-log.js`, on the VPS)
+acts only on the profiles a list names, and a server on this machine does
+not start under `server-log.js` at all, so the writer marks `saves` done
+whenever the list it writes names no profile.
 
 ## Generated tables
 
@@ -397,7 +398,7 @@ These read `gamemode.js`, most by running one block against a stubbed `mp`.
 | Chargen and arrival | `test-arrivals.js`, `test-arrival-line.js`, `test-creation-close.js`, `test-creation-lines.js`, `test-creation-quiet.js`, `test-dressed-at-creation.js`, `test-new-character.js`, `test-stuck-in-the-hall.js`, `test-1269-kept-character.js` |
 | Gathering and mining | `test-deposit.js`, `test-chopping-gate.js`, `test-cooldown-sweep.js`, `test-mine-buildings.js`, `test-farming.js`, `test-eggs.js` |
 | Crafting and rules | `test-rulebook.js`, `test-nobody-makes.js`, `test-race-gate.js`, `test-race-table.js`, `test-recipeless-craft.js`, `test-bard-instruments.js`, `test-staff-spells.js`, `test-spell-tomes.js`, `test-enchanter-staff-spells.js`, `test-classes-page.js` |
-| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
+| Property and economy | `test-deed-title.js`, `test-locks.js`, `test-key-chain.js`, `test-mold-key.js`, `test-cut-key.js`, `test-offices.js`, `test-coffers.js`, `test-2298-box-retired.js`, `test-boards.js`, `test-unpin.js`, `test-spoils.js`, `test-one-mint.js` |
 | Needs | `test-needs.js`, `test-temp.js`, `test-food-table.js`, `test-hud.js` |
 | Chat, commands, door | `test-command-ack.js`, `test-held-commands.js`, `test-help.js`, `test-tp.js`, `test-dice.js`, `test-door.js`, `test-allowed-failed.js`, `test-audit-handlers.js` |
 | Social | `test-social.js`, `test-party-markers.js`, `test-2474-heads.js` |

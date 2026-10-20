@@ -19,18 +19,26 @@
 
     S  both scripts carry the one writer, and the wipe marks done exactly
        the release parts (game\gamemode.js PARTS) whose registers it moves,
-       which is every part but the merchants'
+       which is every part but the merchants' and the saves (server-log.js's,
+       and mod-settings.json stays)
     R  a reset: the list names the characters it threw away by form id and
        no profile, merges into a list waiting there with done cleared, goes
        in the server's privDir, and is not written when nobody was thrown
-       away; a list there that is not one stops the reset with nothing moved
+       away; a list that names no profile has 'saves' done, the part that
+       acts only on profiles and that no server on this machine runs; a list
+       there that is not one, or a server-settings.json that will not parse,
+       stops the reset with nothing moved; a change form that will not parse
+       is named
     W  a wipe: the list names every character in the world it set aside,
        carries the ids of the list it set aside (which stays as it was), is
-       marked done for every part but the merchants'; nobody to name writes
-       nothing; a list set aside that is not one is said and not carried; a
-       server whose move did not finish gets no list
+       marked done for every part but the merchants' and, while it carries a
+       deleted profile, the saves; nobody to name writes nothing; a list set
+       aside that is not one is said and not carried; a server whose move
+       did not finish gets no list
     G  each list the scripts wrote is read by the gamemode's own release
-       block: a reset's waits on every part, a wipe's only on the merchants'
+       block: a reset's waits on every part (with no profile, all but the
+       saves), a wipe's only on the merchants' (and the saves while it
+       carries a deleted profile)
 
   Nothing leaves this machine. The scratch folder goes at the end.
 #>
@@ -82,8 +90,10 @@ Yes ('S4 the gamemode''s release parts are read (' + ($parts -join ', ') + ')') 
 $assign = @($W.ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Left)" -in '$Moves', '$WipeDone' }, $true))
 $Moves = @(); $WipeDone = @()
 foreach ($a in $assign) { Set-Variable -Name ("$($a.Left)".TrimStart('$')) -Value @(& ([scriptblock]::Create($a.Right.Extent.Text))) }
-$expect = @($parts | Where-Object { $_ -ne 'merchants' })
-Yes ('S5 the wipe marks done every part but the merchants'' (' + ($WipeDone -join ', ') + ')') (
+# Not 'merchants', the ledger a wipe keeps, nor 'saves' (server-log.js's),
+# since mod-settings.json stays too.
+$expect = @($parts | Where-Object { $_ -ne 'merchants' -and $_ -ne 'saves' })
+Yes ('S5 the wipe marks done every part but the merchants'' and the saves (' + ($WipeDone -join ', ') + ')') (
     $WipeDone.Count -eq $expect.Count -and @($expect | Where-Object { $WipeDone -notcontains $_ }).Count -eq 0)
 $registers = @{ farms = @('farm-claims.json'); property = @('property.json', 'law.json', 'beds.json'); embassy = @('embassy.json')
                 dungeon = @('dungeon-rewards-ledger.json'); cargo = @('trade-cargo.json'); books = @('books.json', 'last-left.json') }
@@ -113,7 +123,8 @@ $resetBody = $null
 if ($bodyAssign.Count -eq 1) { $resetBody = & ([scriptblock]::Create($bodyAssign[0].Right.Extent.Text)) }
 Yes 'S9 the reset''s body carries the writer and asks it for a list with no profile and nothing carried' (
     $resetBody -and $resetBody.StartsWith('param([string]$Root)') -and $resetBody.Contains('function Write-ThornswoodReleaseList') -and
-    ([regex]::Matches($resetBody, 'Write-ThornswoodReleaseList -Root \$Root -Actors \(Get-ThornswoodCharacterIds \$moved\)\)\)')).Count -eq 1)
+    $resetBody.Contains('$found = Get-ThornswoodCharacterIds $moved') -and
+    ([regex]::Matches($resetBody, 'Write-ThornswoodReleaseList -Root \$Root -Actors \$found\.ids\)\)')).Count -eq 1)
 
 $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
 if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
@@ -176,8 +187,8 @@ try {
     $file = Join-Path $r2 'secret\deleted-characters.json'
     $l = ListOf $file
     Yes 'R6 with no list there, the list goes in the server''s own privDir' ($x.code -eq 0 -and $l -and -not (Test-Path -LiteralPath (Join-Path $r2 'private\deleted-characters.json')))
-    Yes ('R7 and is exactly the characters, with no profile and no done (' + [IO.File]::ReadAllText($file) + ')') (
-        [IO.File]::ReadAllText($file) -eq ('{"profiles":[],"actors":[' + $A1 + ',' + $A2 + ']}'))
+    Yes ('R7 and is exactly the characters, with no profile, and only saves done, which acts on profiles alone (' + [IO.File]::ReadAllText($file) + ')') (
+        [IO.File]::ReadAllText($file) -match ('^\{"profiles":\[\],"actors":\[' + $A1 + ',' + $A2 + '\],"done":\{"saves":[1-9][0-9]*\}\}$'))
     $lists.resetFresh = [IO.File]::ReadAllText($file)
 
     $r3 = Server 'reset-bad' '{}'
@@ -193,6 +204,21 @@ try {
     Put (Join-Path $r4 'world\changeForms\13164_JKs Whiterun.esp.json') '{}'
     $x = Run51 $resetBody @('-Root', $r4)
     Yes 'R10 with nobody to throw away, no list is written' ($x.code -eq 0 -and -not (Test-Path -LiteralPath (Join-Path $r4 'private\deleted-characters.json')))
+
+    $r5 = Server 'reset-badsettings' '{"privDir": '
+    $x = Run51 $resetBody @('-Root', $r5)
+    Yes ('R11 a server-settings.json that will not parse stops the reset: where the list goes is not guessed (' + ($x.out -join ' / ') + ')') (
+        $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *server-settings.json will not parse*Nothing was thrown away.' }).Count -eq 1 -and
+        @(Get-ChildItem -LiteralPath (Join-Path $r5 'world\changeForms') -Filter '*.json' -File).Count -eq 4 -and
+        -not (Test-Path -LiteralPath (Join-Path $r5 'private')))
+
+    $r6 = Server 'reset-badform' '{}'
+    Put (Join-Path $r6 'world\changeForms\3.json') '{"formDesc":"ff000a0'
+    $x = Run51 $resetBody @('-Root', $r6)
+    $l = ListOf (Join-Path $r6 'private\deleted-characters.json')
+    Yes ('R12 a change form that will not parse is named, and the others are still listed (' + ($x.out -join ' / ') + ')') (
+        $x.code -eq 0 -and @($x.out | Where-Object { $_ -like '*3.json will not parse, so its character, if it is one, is not on the release list' }).Count -eq 1 -and
+        $l -and (Ids $l.actors) -eq "$A1,$A2")
 
     # ---- W: a wipe -----------------------------------------------------------------
     $stamp = '20261017-2100'
@@ -221,7 +247,7 @@ try {
     Yes ('W2 it names every character in the world it set aside, with the ids of the list it set aside (' + (Ids $l.actors) + ')') ($l -and (Ids $l.actors) -eq "$A1,$A2,$A9")
     Yes ('W3 the only profile is the deleted one carried over: a wiped character''s is never named (' + (Ids $l.profiles) + ')') ((Ids $l.profiles) -eq '7001')
     $dk = @(); if ($l -and $l.done) { $dk = @($l.done.PSObject.Properties | ForEach-Object { $_.Name }) }
-    Yes ('W4 done is every part but the merchants'', each a time (' + ($dk -join ', ') + ')') (
+    Yes ('W4 done is every part but the merchants'' and, with a deleted profile carried over, the saves, each a time (' + ($dk -join ', ') + ')') (
         $dk.Count -eq $expect.Count -and @($expect | Where-Object { $dk -notcontains $_ }).Count -eq 0 -and
         @($l.done.PSObject.Properties | Where-Object { -not ([long]$_.Value -gt 0) }).Count -eq 0)
     Yes 'W5 the list it set aside stays as it was, for an undo' ([IO.File]::ReadAllText((Join-Path $w1 "private\deleted-characters-before-$stamp.json")) -eq $old)
@@ -245,6 +271,10 @@ try {
         @($x.out | Where-Object { $_ -like 'RELEASENOTE|*not a list of deleted characters, so nothing was carried from it*' }).Count -eq 1 -and
         $l -and (Ids $l.actors) -eq "$A1,$A2" -and @($l.profiles).Count -eq 0 -and
         [IO.File]::ReadAllText((Join-Path $w3 "private\deleted-characters-before-$stamp.json")) -eq '{"file":"not a list"}')
+    $dk3 = @(); if ($l -and $l.done) { $dk3 = @($l.done.PSObject.Properties | ForEach-Object { $_.Name }) }
+    Yes ('W8b with no profile carried, the saves are marked done as well, so only the merchants'' part waits (' + ($dk3 -join ', ') + ')') (
+        $dk3.Count -eq ($expect.Count + 1) -and ($dk3 -contains 'saves') -and @($expect | Where-Object { $dk3 -notcontains $_ }).Count -eq 0)
+    $lists.wipeNoProfile = [IO.File]::ReadAllText((Join-Path $w3 'private\deleted-characters.json'))
 
     $w4 = Server 'wipe-held' '{}'
     Registers $w4
@@ -278,7 +308,7 @@ try {
 } finally { process.chdir(was); }
 '@)
         $G = @{}
-        foreach ($k in 'reset', 'resetFresh', 'wipe') {
+        foreach ($k in 'reset', 'resetFresh', 'wipe', 'wipeNoProfile') {
             $d = Join-Path $T ('g-' + $k)
             Put (Join-Path $d 'server-settings.json') '{}'
             Put (Join-Path $d 'private\deleted-characters.json') $lists[$k]
@@ -291,8 +321,12 @@ try {
             $G.reset -and -not $G.reset.unread -and (@($G.reset.waiting) -join ',') -eq ($others -join ','))
         Yes 'G2 it names the thrown-away character, and the profile of neither the character nor another' (
             $G.resetFresh -and -not $G.resetFresh.unread -and (@($G.resetFresh.seen) -join ',') -eq 'True,False,False')
-        Yes ('G3 the release block reads the wipe''s list and only the merchants'' part waits on it (' + (@($G.wipe.waiting) -join ', ') + ')') (
-            $G.wipe -and -not $G.wipe.unread -and (@($G.wipe.waiting) -join ',') -eq 'merchants')
+        Yes ('G2b a reset''s list with no profile has every part but the saves waiting on it, the saves being done already (' + (@($G.resetFresh.waiting) -join ', ') + ')') (
+            $G.resetFresh -and (@($G.resetFresh.waiting) -join ',') -eq (@($others | Where-Object { $_ -ne 'saves' }) -join ','))
+        Yes ('G3 the release block reads the wipe''s list, carrying a deleted profile, and only the saves and the merchants'' part wait on it (' + (@($G.wipe.waiting) -join ', ') + ')') (
+            $G.wipe -and -not $G.wipe.unread -and (@($G.wipe.waiting) -join ',') -eq 'saves,merchants')
+        Yes ('G4 a wipe''s list with no profile has only the merchants'' part waiting on it (' + (@($G.wipeNoProfile.waiting) -join ', ') + ')') (
+            $G.wipeNoProfile -and -not $G.wipeNoProfile.unread -and (@($G.wipeNoProfile.waiting) -join ',') -eq 'merchants')
     }
 }
 catch {

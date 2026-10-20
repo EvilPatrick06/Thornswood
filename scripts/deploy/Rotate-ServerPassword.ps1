@@ -115,7 +115,7 @@ Write-Host 'Handing it to the site...'
 # Only serverPassword changes in config.json, through the same block
 # Deploy-Docs -Password uses (SiteConfigSet.ps1). Until #2317 this had its own
 # copy: it read with Get-Content, which on the box's Windows PowerShell 5.1
-# misreads a file with no byte order mark, inside try { } catch { }, so a file
+# misreads a file with no byte order mark, inside a try with an empty catch, so a file
 # that was there and did not parse left an empty table, and {"serverPassword"}
 # was written over the whole file, the Discord secret, the bot token, botKey
 # and the cookie secret with it. Now such a file is left as it is, nothing is

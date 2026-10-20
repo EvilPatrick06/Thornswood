@@ -556,7 +556,8 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
   console.log('ODD ADDRESSES');
   const SHA = 'ab'.repeat(32);
   fs.mkdirSync(path.join(work, 'feed', 'assets'), { recursive: true });
-  fs.writeFileSync(path.join(work, 'feed', 'version.json'), '{"launcherVersion":"1.0.0"}');
+  fs.mkdirSync(path.join(work, 'feed', 'version'), { recursive: true });
+  fs.writeFileSync(path.join(work, 'feed', 'version', '00000001.json'), '{"launcherVersion":"1.0.0"}');
   fs.writeFileSync(path.join(work, 'feed', 'assets', SHA), 'a pack');
   const BS = String.fromCharCode(92);
   function raw(p, method) {
@@ -594,7 +595,7 @@ const siteLog = function () { return read(path.join(work, 'site.log')) || ''; };
     ['/feed/version.json', 200], ['/feed/assets/' + SHA, 200],
     ['/config.json', 404], ['/example.com', 404], ['/data/board.json', 404], ['/server.js', 404],
     ['/site.log', 404], ['/feed/assets/' + SHA.toUpperCase(), 404], ['/feed/assets/' + SHA + '0', 404],
-    ['/feed/assets/..%2Fversion.json', 404], ['/feed/assets/%2E%2E%2F..%2Fconfig.json', 404],
+    ['/feed/assets/..%2Fversion%2F00000001.json', 404], ['/feed/assets/%2E%2E%2F..%2Fconfig.json', 404],
     ['/feed/assets/' + SHA.slice(0, 60) + '%2F..', 404], ['/..%2Fconfig.json', 404], ['/%2E%2E/config.json', 404],
     ['/%2Fexample.com', 404], ['/%00', 404], ['/rules%00', 404], ['/fonts.css%00', 404],
     ['/%5C', 404], ['/%5Cconfig.json', 404], ['/%', 400], ['//%', 400], ['/%2F', 200]

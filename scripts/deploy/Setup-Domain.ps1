@@ -66,17 +66,21 @@ function Remote($script) {
 # ------------------------------------------------------------------- dns --
 if (-not $SkipDnsCheck -and -not $TaskOnly) {
   Write-Host "Checking where $Domain points..."
+  # A name with no record yet is an error from Resolve-DnsName, as is a DNS
+  # server that cannot be reached; what it said goes into the stop.
   $ips = @()
+  $dnsSaid = @()
   foreach ($name in @($Domain, "www.$Domain")) {
     try {
       $ips += (Resolve-DnsName $name -Type A -ErrorAction Stop |
                Where-Object { $_.IPAddress }).IPAddress
-    } catch { }
+    } catch { $dnsSaid += ($name + ': ' + $_.Exception.Message) }
   }
   $ips = $ips | Sort-Object -Unique
   if (-not $ips) {
-    throw "$Domain does not resolve yet. Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour."
+    throw ("$Domain does not resolve yet" + $(if ($dnsSaid.Count) { " (" + ($dnsSaid -join ' | ') + ")" } else { "" }) + ". Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour.")
   }
+  foreach ($d in $dnsSaid) { Write-Host ("  " + $d) -ForegroundColor Yellow }
   if ($ips -notcontains $Vps) {
     throw "$Domain resolves to $($ips -join ', ') and not $Vps. Fix the A record first."
   }
@@ -155,7 +159,7 @@ if (-not (Test-Path (Join-Path `$dir 'caddy.exe'))) {
   # The pin is for a fresh box. One that already has caddy keeps it, and says
   # which it is, so a box on some other version is plain to see.
   `$have = 'a version it would not say'
-  try { `$have = ((& (Join-Path `$dir 'caddy.exe') version) -join ' ').Trim() } catch { }
+  try { `$have = ((& (Join-Path `$dir 'caddy.exe') version) -join ' ').Trim() } catch { `$have = 'a version it would not say (' + (`$_.Exception.Message -replace '\s+', ' ') + ')' }
   'caddy already here, ' + `$have + '. A fresh box gets $CaddyVersion.'
 }
 

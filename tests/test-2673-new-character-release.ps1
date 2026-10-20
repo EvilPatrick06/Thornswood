@@ -18,16 +18,19 @@
   server folders in a scratch folder:
 
     S  it loads the one writer and writes no list of its own; the launcher
-       keeps no discard of player change forms; Reset-Character no longer
+       keeps no discard of characters' change forms; Reset-Character no longer
        points at a launcher switch
     N  the list names the characters it threw away by form id and no
        profile, merges into a list waiting there with done cleared, goes in
        the server's privDir, is written with -NoBackup too, is not written
-       for -WhatIf or when nobody was thrown away; a list there that is not
-       one, or a -World that is not a server's world\changeForms, stops it
-       with nothing moved
+       for -WhatIf or when nobody was thrown away; a list naming no profile
+       has 'saves' done (it acts only on profiles, and no server on this
+       machine starts under server-log.js); a list there that is not one, a
+       server-settings.json that will not parse, or a -World that is not a
+       server's world\changeForms, stops it with nothing moved; a change
+       form that will not parse is named
     G  the list it wrote is read by the gamemode's own release block, and
-       every part waits on it
+       every part but the saves waits on it
 
   Nothing leaves this machine. The scratch folder goes at the end.
 #>
@@ -75,7 +78,7 @@ Yes 'S4 each form id is read before its change form is moved or deleted' (
     $N.text.IndexOf('Get-ThornswoodCharacterIds @($f.FullName)') -lt $N.text.IndexOf('Remove-Item -LiteralPath $f.FullName'))
 $discard = @(Get-ChildItem -LiteralPath $App -Filter '*.cs' -File | Where-Object {
     $t = [IO.File]::ReadAllText($_.FullName); $t.Contains('_discarded-') -or $t -match 'world\\\\changeForms' })
-Yes ('S5 the launcher keeps no discard of player change forms of its own (' + (($discard | ForEach-Object { $_.Name }) -join ', ') + ')') ($discard.Count -eq 0)
+Yes ('S5 the launcher keeps no discard of characters'' change forms of its own (' + (($discard | ForEach-Object { $_.Name }) -join ', ') + ')') ($discard.Count -eq 0)
 Yes 'S6 SkyMp.Fresh is gone' (-not ([IO.File]::ReadAllText((Join-Path $App 'SkyMp.cs'))).Contains('static string Fresh('))
 Yes 'S7 Reset-Character no longer points at a launcher switch that is not there' ($R.text -notmatch 'launcher has a switch for this')
 
@@ -139,7 +142,8 @@ try {
     Yes 'N6 with no list there, the list goes in the server''s own privDir' (
         $x.code -eq 0 -and (Test-Path -LiteralPath $file) -and -not (Test-Path -LiteralPath (Join-Path $n2 'private\deleted-characters.json')))
     $got = ''; if (Test-Path -LiteralPath $file) { $got = [IO.File]::ReadAllText($file) }
-    Yes ('N7 and is exactly the characters, with no profile and no done (' + $got + ')') ($got -eq ('{"profiles":[],"actors":[' + $A1 + ',' + $A2 + ']}'))
+    Yes ('N7 and is exactly the characters, with no profile, and only saves done, which acts on profiles alone and which no server on this machine runs (' + $got + ')') (
+        $got -match ('^\{"profiles":\[\],"actors":\[' + $A1 + ',' + $A2 + '\],"done":\{"saves":[1-9][0-9]*\}\}$'))
     $lists.fresh = $got
 
     $n3 = Server 'nobackup' '{}'
@@ -182,8 +186,24 @@ try {
         $x = RunNew $pwsh.Source @('-World', (Join-Path $n8 'world\changeForms'))
         $f8 = Join-Path $n8 'secret\deleted-characters.json'
         $g8 = ''; if (Test-Path -LiteralPath $f8) { $g8 = [IO.File]::ReadAllText($f8) }
-        Yes ('N15 under pwsh it writes the same list, byte for byte (' + $g8 + ')') ($x.code -eq 0 -and $g8 -eq $lists.fresh)
+        # The same but for the time 'saves' was marked done.
+        $shape = { param($s) $s -replace '"saves":[0-9]+', '"saves":T' }
+        Yes ('N15 under pwsh it writes the same list (' + $g8 + ')') ($x.code -eq 0 -and $g8 -and (& $shape $g8) -eq (& $shape $lists.fresh))
     }
+
+    $n9 = Server 'badsettings' '{"privDir": '
+    $x = RunNew $ps51 @('-World', (Join-Path $n9 'world\changeForms'))
+    Yes ('N16 a server-settings.json that will not parse stops it: where the list goes is not guessed (' + (@($x.out | Where-Object { $_ -like 'STOP*' }) -join ' / ') + ')') (
+        $x.code -eq 1 -and @($x.out | Where-Object { $_ -like 'STOP. *server-settings.json will not parse*Nothing was thrown away.' }).Count -eq 1 -and
+        (Forms $n9).Count -eq 4 -and -not (Test-Path -LiteralPath (Join-Path $n9 'private')))
+
+    $n10 = Server 'badform' '{}'
+    Put (Join-Path $n10 'world\changeForms\3.json') '{"formDesc":"ff000a0'
+    $x = RunNew $ps51 @('-World', (Join-Path $n10 'world\changeForms'))
+    $l = ListOf (Join-Path $n10 'private\deleted-characters.json')
+    Yes ('N17 a change form that will not parse is named, and the others are still listed (' + (@($x.out | Where-Object { $_ -like '*will not parse*' }) -join ' / ') + ')') (
+        $x.code -eq 0 -and @($x.out | Where-Object { $_ -like '*3.json will not parse, so its character, if it is one, is not on the release list' }).Count -eq 1 -and
+        $l -and (Ids $l.actors) -eq "$A1,$A2")
 
     # ---- G: the gamemode reads what it wrote -----------------------------------------
     $node = Get-Command node -ErrorAction SilentlyContinue
@@ -217,8 +237,8 @@ try {
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $G = (& $node.Source $js $Gm $d $A1 2>&1 | Out-String) | ConvertFrom-Json } catch { $G = $null }
         finally { $ErrorActionPreference = $eap }
-        $others = @($parts | Where-Object { $_ -ne 'embassy' })
-        Yes ('G1 the release block reads the list and every part waits on it (' + (@($G.waiting) -join ', ') + ')') (
+        $others = @($parts | Where-Object { $_ -ne 'embassy' -and $_ -ne 'saves' })
+        Yes ('G1 the release block reads the list and every part but the saves, already done, waits on it (' + (@($G.waiting) -join ', ') + ')') (
             $G -and -not $G.unread -and $parts.Count -ge 6 -and (@($G.waiting) -join ',') -eq ($others -join ','))
         Yes 'G2 it names the thrown-away character, and the profile of neither the character nor another' (
             $G -and (@($G.seen) -join ',') -eq 'True,False,False')

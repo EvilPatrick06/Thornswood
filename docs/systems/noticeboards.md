@@ -23,8 +23,11 @@ two Windhelm sign posts, a face of stockade planks between two log
 rails, a gable of shingle boards, a candle lantern on a bracket, and
 notices nailed to it. On a shelf on its right post sits the hold's drop
 box. It is about 3.5 metres tall and 4.4 wide with the shelf.
-`scripts/mods/Build-NoticeBoard.py` builds both meshes from the game's
-own archives; only the meshes ship, never a texture.
+Neither mesh ships (#2827): they are put together from Bethesda's, so
+the launcher makes both on each machine from that machine's own game
+archives before every Play (`launcher/app/MadeFromGame.cs`), byte for
+byte. `scripts/mods/Build-NoticeBoard.py` writes the recipe it follows,
+`launcher/app/FromGameBoard.cs`, on a machine with the game.
 
 A steward moves it. Standing where it should be, facing the way its
 notices should face, they press its town under the notice boards on the

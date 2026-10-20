@@ -102,7 +102,7 @@ try {
     Put (Join-Path $site 'data\linked.json') '{}'
     $common = @('-GameRoot', (Join-Path $work 'no-game'), '-DevGameRoot', (Join-Path $work 'no-dev'),
                 '-SiteRoot', $site, '-BotRoot', (Join-Path $work 'no-bot'),
-                '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'),
+                '-CaddyRoot', (Join-Path $work 'no-caddy'), '-VoiceRoot', (Join-Path $work 'no-voice'), '-DeletionRoot', (Join-Path $work 'no-del'),
                 '-Out', $out, '-Plain')
     $failedList = Join-Path $out 'retention-failed.txt'
 

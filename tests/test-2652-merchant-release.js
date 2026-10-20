@@ -20,9 +20,16 @@
        stamped for them; a trade waiting on somebody else stays
     C  no coin or goods are made or lost: every purse and shelf is the same
     V  each changed entry's revision rises by one, the file verifies and
-       loads again, and the service goes on (read, compareAndCommit)
+       loads again, and the service goes on (read, compareAndCommit); the
+       release writes no trader's mirror, prepare() puts it right
     A  a retired trader's waiting trade is let go too
     N  a second run, or a list naming nobody there, writes nothing
+    P  a commission promise held for them, and a finished one cooling down,
+       goes (by profile, and by form id when the owner names no plugin);
+       a commission waiting on them in debit is cleared with its promise;
+       what is left still reads as promises
+    B  a trader holding something of theirs while somebody else's trade
+       waits there stops the part with nothing written, said
     F  a save that fails writes nothing, revokes the service, and the part
        waits for the next start (through the release block)
     L  the release block's log line is counts, never an id
@@ -69,7 +76,7 @@ yes('S3 merchants is a part of the release', /var PARTS = \[[^\]]*'merchants'[^\
 const waitAt = gm.indexOf('globalThis.__thornswoodReleaseWaiting();');
 yes('S4 the parts still waiting are said once, after the NPC startup',
     waitAt > gm.indexOf('// NPC SERVER STARTUP END') && gm.indexOf('globalThis.__thornswoodReleaseWaiting();', waitAt + 1) < 0);
-yes('S5 the purse service answers release beside compareAndCommit', /return \{prepare,read,commit,compareAndCommit,pendingRecords,release,/.test(purseSrc));
+yes('S5 the purse service answers release beside compareAndCommit', /return \{prepare,read,commit,compareAndCommit,pendingRecords,ledgerStates,release,/.test(purseSrc));
 const dp = fs.readFileSync(path.join(REPO, 'scripts', 'vps', 'Delete-Person.ps1'), 'utf8');
 yes('S6 Delete-Person counts the merchant ledger as released', /const RELEASED = \/\^\([^)]*\|merchant-ledger\)\\\.json\$\/i;/.test(dp));
 const ops = fs.readFileSync(path.join(REPO, 'docs', 'WEBSITE-OPERATIONS.md'), 'utf8');
@@ -183,12 +190,14 @@ try {
   yes('V1 each changed entry\'s revision rises by one, the other\'s does not',
       e9.revision === 5 && e8.revision === 5 && e6.revision === 5 && e7.revision === 4);
   yes('V2 the answer is counts and saved', r && r.saved === true &&
-      JSON.stringify(r.counts) === JSON.stringify({ merchants: 3, supply: 2, trades: 3 }));
+      JSON.stringify(r.counts) === JSON.stringify({ merchants: 3, supply: 2, commissions: 0, trades: 3 }));
   yes('V3 the file verifies', after.sha256 === sum(after));
   yes('V4 the service goes on: it reads what it wrote, and one waiting trade is left towards the limit',
       s1.purses.read(9).pending === null && s1.purses.pendingRecords().length === 1);
-  yes('V5 an active trader\'s own mirror is the new state, a retired one has none',
-      s1.mirror.get(9) && s1.mirror.get(9).revision === 5 && !s1.mirror.has(6));
+  const mirrored = s1.mirror.size;
+  s1.purses.prepare(9);
+  yes('V5 the release writes no trader\'s mirror; prepare() puts an active trader\'s right from the ledger, a retired one has none',
+      mirrored === 0 && s1.mirror.get(9) && s1.mirror.get(9).revision === 5 && s1.mirror.get(9).pending === null && !s1.mirror.has(6));
   const c = s1.purses.compareAndCommit(9, 5, Object.assign({}, s1.purses.read(9), { purse: 281 }));
   yes('V6 and a trade after it commits on the new revision', !!c && c.revision === 6);
   s1.purses.shutdown();
@@ -203,12 +212,78 @@ try {
   yes('N2 a list naming nobody there writes nothing', n2.saved === true && n2.counts.merchants === 0 && fs.readFileSync(fileOf(dir), 'utf8') === bytes);
   s2.purses.shutdown();
 
+  // ============================================================ P: commission promises
+  // merchant-commission-state.js keys a promise by [owner, job], the owner
+  // [local form id, plugin, profile] (owner()); a runtime character's desc
+  // has no plugin.
+  const COMMISSIONS = require(path.join(REPO, 'game', 'merchant-commission-state.js'));
+  const A3 = 0xa03;
+  const ownerOf = (local, plugin, p) => JSON.stringify([local, plugin, p]);
+  const pkey = (owner, job) => JSON.stringify([owner, job]);
+  const held = (token, owner, job, gold) => ({ token: token, owner: owner, job: job, hash: 'a'.repeat(64),
+    item: { baseId: 4096, name: 'Iron Ore' }, count: 1, unit: gold, gold: gold, at: NOW - 5000 });
+  const OWN_P1 = ownerOf(0xa01, '', P1), OWN_PY = ownerOf(0xa09, '', PY), OWN_A3 = ownerOf(A3, '', 77), OWN_PLACED = ownerOf(A3, 'skyrim.esm', 78);
+  const dir3 = path.join(scratch, 'promises');
+  fs.mkdirSync(path.join(dir3, 'private'), { recursive: true });
+  const promised = {
+    '9:Skyrim.esm': entry('9:Skyrim.esm', { commissions: { v: 2, serial: 3,
+      held: { [pkey(OWN_P1, 'q-iron-1')]: held(1, OWN_P1, 'q-iron-1', 50), [pkey(OWN_PY, 'q-iron-2')]: held(2, OWN_PY, 'q-iron-2', 20) },
+      cool: { [pkey(OWN_A3, 'q-iron-3')]: [NOW - 100, 6], [pkey(OWN_PLACED, 'q-iron-4')]: NOW - 100 } } }),
+    // A commission they were being paid for, still in debit: the promise is
+    // what the trade would have paid out.
+    '8:Skyrim.esm': entry('8:Skyrim.esm', { commissions: { v: 1, serial: 1, held: { [pkey(OWN_P1, 'q-wheat-1')]: held(1, OWN_P1, 'q-wheat-1', 30) }, cool: {} },
+      pending: { version: 4, id: 'dev:8:4', human: { desc: 'a01', profileId: P1 }, kind: 'commission', phase: 'debit',
+                 previous: { purse: 300, stock: [{ baseId: 4096, count: 2 }], supply: {} }, next: { purse: 270, stock: [{ baseId: 4096, count: 3 }], supply: {} } } }),
+    '7:Skyrim.esm': entry('7:Skyrim.esm', {}),
+    '6:Skyrim.esm': entry('6:Skyrim.esm', {})
+  };
+  fs.writeFileSync(fileOf(dir3), JSON.stringify({ version: 1, entries: promised, sha256: sum({ version: 1, entries: promised }) }));
+  fs.writeFileSync(path.join(dir3, 'private', 'merchant-ledger.initialized'), '1');
+  const before3 = readFile(dir3);
+  const p1 = open(dir3);
+  const rp = p1.purses.release(whoOf([P1], [A3]));
+  const after3 = readFile(dir3);
+  const c9 = after3.entries['9:Skyrim.esm'].commissions, c8 = after3.entries['8:Skyrim.esm'].commissions;
+  yes('P1 a promise held for them goes by profile, and its gold is the trader\'s to spend again',
+      !(pkey(OWN_P1, 'q-iron-1') in c9.held) && COMMISSIONS.spendable(after3.entries['9:Skyrim.esm']) === 300 - 20);
+  yes('P2 somebody else\'s promise stays as it was', JSON.stringify(c9.held[pkey(OWN_PY, 'q-iron-2')]) === JSON.stringify(held(2, OWN_PY, 'q-iron-2', 20)));
+  yes('P3 a finished one of theirs cooling down goes by form id; one whose owner names a plugin is never a character',
+      !(pkey(OWN_A3, 'q-iron-3') in c9.cool) && c9.cool[pkey(OWN_PLACED, 'q-iron-4')] === NOW - 100);
+  yes('P4 a commission waiting on them in debit is cleared with its promise, the trader as it was',
+      after3.entries['8:Skyrim.esm'].pending === null && Object.keys(c8.held).length === 0 && after3.entries['8:Skyrim.esm'].purse === 300);
+  yes('P5 what is left reads as promises (merchant-commission-state.js read), serials kept',
+      !!COMMISSIONS.read(c9) && !!COMMISSIONS.read(c8) && c9.serial === 3 && c8.serial === 1);
+  yes('P6 no coin or goods are made or lost', JSON.stringify(coin(after3)) === JSON.stringify(coin(before3)));
+  yes('P7 the answer counts the promises', rp && rp.saved === true &&
+      JSON.stringify(rp.counts) === JSON.stringify({ merchants: 2, supply: 0, commissions: 3, trades: 1 }));
+  p1.purses.shutdown();
+
+  // ============================================================ B: a trade with somebody else
+  // The trading checks a trader's state against the saved snapshots of the
+  // trade waiting on it, so a row of theirs is not taken from a trader while
+  // somebody else's trade waits there: nothing changes and the part waits.
+  const dir4 = path.join(scratch, 'busy');
+  seed(path.join(dir4, 'private'));
+  const busyDoc = readFile(dir4);
+  busyDoc.entries['7:Skyrim.esm'].supply[key(A1, P1, 'wheat')] = NOW;
+  delete busyDoc.sha256;
+  fs.writeFileSync(fileOf(dir4), JSON.stringify({ version: 1, entries: busyDoc.entries, sha256: sum(busyDoc) }));
+  const keep4 = fs.readFileSync(fileOf(dir4), 'utf8');
+  const b1 = open(dir4);
+  let busyWhy = '';
+  try { b1.purses.release(whoOf([P1], [A1, A2])); } catch (e) { busyWhy = String(e.message); }
+  yes('B1 a trader holding something of theirs while somebody else\'s trade waits there stops the part, said',
+      /1 trader\(s\) holding something of theirs are waiting on a trade with somebody else, so nothing was let go/.test(busyWhy));
+  yes('B2 and nothing is written, the other traders\' rows of theirs included', fs.readFileSync(fileOf(dir4), 'utf8') === keep4);
+  yes('B3 the service goes on, so trading can settle that trade', b1.purses.pendingRecords().length === 4);
+  b1.purses.shutdown();
+
   // ============================================================ F, through the release block
   const dir2 = path.join(scratch, 'fails');
   seed(path.join(dir2, 'private'));
   fs.writeFileSync(path.join(dir2, 'server-settings.json'), JSON.stringify({ privDir: 'private', dataDir: 'data' }));
   fs.writeFileSync(path.join(dir2, 'private', 'deleted-characters.json'),
-    JSON.stringify({ profiles: [P1], actors: [A1, A2], done: { farms: 1, property: 1, embassy: 1, dungeon: 1, cargo: 1, books: 1 } }));
+    JSON.stringify({ profiles: [P1], actors: [A1, A2], done: { saves: 1, farms: 1, property: 1, embassy: 1, dungeon: 1, cargo: 1, books: 1 } }));
   const was = process.cwd();
   process.chdir(dir2);
   let f1, f2;

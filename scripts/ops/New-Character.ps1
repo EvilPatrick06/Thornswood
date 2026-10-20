@@ -9,7 +9,7 @@
   the town menu every single launch, and you want nothing carried over from the
   last attempt.
 
-  So this deletes the player change forms outright. The server then has no actor
+  So this deletes the characters' change forms outright. The server then has no actor
   for your profile, takes its create path, and the whole flow runs from the top.
   World objects are left alone.
 
@@ -47,13 +47,13 @@ if (Get-Process -Name node -ErrorAction SilentlyContinue) {
     Write-Host 'A node process is running. If that is the Thornswood server, stop it first or this will be undone.' -ForegroundColor Yellow
 }
 
-# Player change forms are the numerically named ones. Everything else is a world
+# Characters' change forms are the numerically named ones. Everything else is a world
 # object keyed by form id and plugin, like 13164_JKs Whiterun.esp.json.
-$players = Get-ChildItem -LiteralPath $World -Filter '*.json' |
+$characters = Get-ChildItem -LiteralPath $World -Filter '*.json' |
            Where-Object { $_.BaseName -match '^\d+$' }
 
-if (-not $players) {
-    Write-Host 'No player change forms. The next connect already builds a fresh character.' -ForegroundColor Green
+if (-not $characters) {
+    Write-Host 'No character change forms. The next connect already builds a fresh character.' -ForegroundColor Green
     return
 }
 
@@ -66,6 +66,10 @@ if ((Split-Path -Leaf $World) -ne 'changeForms' -or (Split-Path -Leaf $worldDir)
     exit 1
 }
 $list = Get-ThornswoodReleaseListPath $Root
+if (-not $list) {
+    Write-Host ("STOP. " + (Join-Path $Root 'server-settings.json') + " will not parse, so the server's private folder, where the release list goes, is not known. Nothing was thrown away.") -ForegroundColor Red
+    exit 1
+}
 if (-not (Read-ThornswoodReleaseList $list).ok) {
     Write-Host "STOP. $list is not a list of deleted characters, so nothing was thrown away. Look at it, then run this again." -ForegroundColor Red
     exit 1
@@ -75,8 +79,9 @@ $stamp = Get-Date -Format 'yyyyMMdd-HHmmss'
 $bin = Join-Path $World "_discarded-$stamp"
 $gone = 0
 $ids = @()
+$notes = @()
 
-foreach ($f in $players) {
+foreach ($f in $characters) {
     $name = 'unnamed'
     try {
         $j = Get-Content -LiteralPath $f.FullName -Raw | ConvertFrom-Json
@@ -87,8 +92,7 @@ foreach ($f in $players) {
     if (-not $PSCmdlet.ShouldProcess("$($f.Name) (profile $profile, '$name')", 'discard')) { continue }
 
     # Read before it goes: with -NoBackup there is nothing left to read after.
-    $mine = @()
-    foreach ($i in (Get-ThornswoodCharacterIds @($f.FullName))) { $mine += [long]$i }
+    $found = Get-ThornswoodCharacterIds @($f.FullName)
     try {
         if ($NoBackup) {
             Remove-Item -LiteralPath $f.FullName -Force -ErrorAction Stop
@@ -101,7 +105,8 @@ foreach ($f in $players) {
         continue
     }
     Write-Host ("  discarded {0}  profile {1}  '{2}'" -f $f.Name, $profile, $name) -ForegroundColor Cyan
-    $ids += $mine
+    $ids += @($found.ids)
+    $notes += @($found.notes)
     $gone++
 }
 
@@ -116,7 +121,7 @@ if ($gone -gt 0) {
 
 # Only the characters, never the profile (#2668, #2673): Release-List.ps1 says why.
 $bad = $false
-foreach ($l in @(Write-ThornswoodReleaseList -Root $Root -Actors $ids)) {
+foreach ($l in @($notes) + @(Write-ThornswoodReleaseList -Root $Root -Actors $ids)) {
     $b = "$l" -split '\|'
     switch ($b[0]) {
         'RELEASE'     { if ($b[1] -ne 'none') { Write-Host ("  release list: {0}, {1} character(s); the server lets go of what it holds of them at its next start" -f $b[1], $b[3]) -ForegroundColor DarkGray } }

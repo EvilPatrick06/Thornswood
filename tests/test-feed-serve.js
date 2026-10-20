@@ -12,6 +12,11 @@
   Since #445 version.json also carries an ETag and answers 304 to a launcher
   that already holds that copy, because every launcher asks for it every
   thirty seconds in a session.
+
+  Since #2727 the feed on disk is a folder of write-once generations,
+  <channel>\version\<8 digits>.json, and the newest is the one served, so
+  this lifts the generations block (feedFile) too and writes a new
+  generation where it changes the feed.
 */
 const fs = require('fs');
 const path = require('path');
@@ -50,10 +55,24 @@ function route(first, guard) {
   if (g < 0) return '';
   return src.slice(at, block(g));
 }
+// The generations block, from const feedNewest through the end of feedFile.
+function generations() {
+  const at = src.indexOf('const feedNewest = {};');
+  if (at < 0) return '';
+  const fn = src.indexOf('function feedFile(', at);
+  if (fn < 0) return '';
+  return src.slice(at, block(fn));
+}
 
 const ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-feed-'));
 fs.mkdirSync(path.join(ROOT, 'feed', 'assets'), { recursive: true });
+fs.mkdirSync(path.join(ROOT, 'feed', 'version'), { recursive: true });
 fs.mkdirSync(path.join(ROOT, 'feed-dev', 'assets'), { recursive: true });
+fs.mkdirSync(path.join(ROOT, 'feed-dev', 'version'), { recursive: true });
+
+const genSrc = generations();
+yes('server.js has the feed generations block (feedFile)', !!genSrc);
+const feedFile = eval('(function () {\n' + genSrc + '\nreturn feedFile;\n})()');
 
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
@@ -76,10 +95,10 @@ const assetRoute = eval('(function (p, req, res, head) {\n' + assetSrc + '\n})')
 
 const SHA = 'a'.repeat(64);
 const BODY = Buffer.from('pack-bytes-for-feed-test-0123456789');
-fs.writeFileSync(path.join(ROOT, 'feed', 'version.json'),
+fs.writeFileSync(path.join(ROOT, 'feed', 'version', '00000001.json'),
   JSON.stringify({ launcherUrl: 'https://thornswood.net/feed/assets/' + SHA }));
 fs.writeFileSync(path.join(ROOT, 'feed', 'assets', SHA), BODY);
-fs.writeFileSync(path.join(ROOT, 'feed-dev', 'version.json'),
+fs.writeFileSync(path.join(ROOT, 'feed-dev', 'version', '00000001.json'),
   JSON.stringify({ launcherUrl: 'https://thornswood.net/feed-dev/assets/' + SHA }));
 fs.writeFileSync(path.join(ROOT, 'feed-dev', 'assets', SHA), BODY);
 
@@ -133,13 +152,13 @@ async function main() {
   yes('a stale ETag gets the whole document', other.code === 200 && other.body.equals(v.body));
 
   // The one risk in answering 304: a shipped release hidden behind a tag that
-  // did not move. The tag is size and modified time, so a written feed changes
-  // it and the launcher holding the old one is given the new document.
+  // did not move. The tag is size and modified time, so a new generation of the
+  // feed changes it and the launcher holding the old one is given the new document.
   const shipped = JSON.stringify({
     launcherUrl: 'https://thornswood.net/feed/assets/' + SHA,
     launcherVersion: '1.1.102'
   });
-  fs.writeFileSync(path.join(ROOT, 'feed', 'version.json'), shipped);
+  fs.writeFileSync(path.join(ROOT, 'feed', 'version', '00000002.json'), shipped);
   const after = await ask('GET', '/feed/version.json', { 'If-None-Match': v.h['etag'] });
   yes('a feed written since is 200 and not 304', after.code === 200);
   yes('with the new document', after.body.toString('utf8') === shipped);

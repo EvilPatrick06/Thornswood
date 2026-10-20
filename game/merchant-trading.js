@@ -47,6 +47,8 @@ function guildSite(bookHold) {
 }
 
 var SETTLEMENT = typeof MERCHANT_SETTLEMENT !== 'undefined' ? MERCHANT_SETTLEMENT : require('./merchant-settlement');
+var COMMISSION_STATE=typeof MERCHANT_COMMISSION_STATE!=='undefined'?MERCHANT_COMMISSION_STATE:require('./merchant-commission-state');
+var COMMISSIONS=typeof MERCHANT_COMMISSIONS!=='undefined'?MERCHANT_COMMISSIONS:require('./merchant-commissions');
 var QUEST_TRANSFER = typeof QUEST_TRANSACTIONS !== 'undefined' ? QUEST_TRANSACTIONS : require('./quest-transactions');
 
 function createRolePermissions(places, tables) {
@@ -128,6 +130,9 @@ function createMerchantTrading(deps) {
   var prices = deps.prices;
   var transfer = deps.transfer;
   var world = deps.world;
+  // An entry the server made into something else on a plain record (a hair
+  // dye on the Bowl, #2675) is neither counted nor taken as the plain item.
+  var minted = typeof deps.minted === 'function' ? deps.minted : function () { return false; };
   var places = deps.places || {};
   var permits = createRolePermissions(places,deps.roleTables);
   var now = deps.now || function () { return Date.now(); };
@@ -138,6 +143,8 @@ function createMerchantTrading(deps) {
   var settlement = SETTLEMENT.createSettlement({purses:purses,transfer:transfer,world:deps.namespace || purses.namespace,log:deps.log,now:now});
   var retirementRequired=deps.retirementRequired===true;
   var active = deps.suspended !== true && !retirementRequired, closed = false;
+  var commissions=COMMISSIONS.createCommissions({rows:deps.commissions||[],purses:purses,transfer:transfer,prices:prices,
+    resolve:deps.resolve,eligible:deps.commissionEligible,settlement:settlement,addStock:addStock,now:now});
 
   function placeOf(reference) {
     return places[reference] || null;
@@ -214,7 +221,7 @@ function createMerchantTrading(deps) {
 
   function questView(actorId,merchantId) {
     var quests=typeof deps.quests==='function' && deps.quests();
-    return quests ? quests.describe(actorId,merchantId) : [];
+    return (quests ? quests.describe(actorId,merchantId) : []).concat(commissions.view(actorId,merchantId));
   }
 
   function supplyKey(human, itemName) {
@@ -266,11 +273,12 @@ function createMerchantTrading(deps) {
     var viewSession = owner ? owner.session : sessions.get(profileId);
     var viewIdentity = owner ? owner.identity : (viewSession && viewSession.identity);
     var catalog = prices.catalog ? prices.catalog(place.bookHold) : [];
-    var offers = [], supplyIds = [];
+    var offers = [], supplyIds = [], availablePurse=COMMISSION_STATE.spendable(state);
     var counts = Object.create(null), packReady = true;
     if (settlement.available()) {
       try {
         SETTLEMENT.inventory(transfer.inventory(actorId)).entries.forEach(function (entry) {
+          if (minted(entry)) return;
           counts[entry.baseId] = (counts[entry.baseId] || 0) + entry.count;
         });
       } catch (error) { packReady = false; }
@@ -310,7 +318,7 @@ function createMerchantTrading(deps) {
         buy: buy,
         sell: sell,
         carried: carried,
-        maxSell: canTrade && buy !== null ? Math.min(carried, MAX_COUNT, buy === 0 ? MAX_COUNT : Math.floor(state.purse / buy)) : 0,
+        maxSell: canTrade && buy !== null ? Math.min(carried, MAX_COUNT, buy === 0 ? MAX_COUNT : Math.floor(availablePurse / buy)) : 0,
         stock: count,
         baseId: held ? held.baseId : null
       });
@@ -324,7 +332,7 @@ function createMerchantTrading(deps) {
       if (offers[k].buy == null || !permits(state.reference,'supply',supplyIds[k])) continue;
       var pay = offers[k].buy * SUPPLY_COUNT;
       var last = owns ? lastSupply(state, supplyKey(human, offers[k].canonicalName), offers[k].canonicalName) : 0;
-      var ready = !!owns && canTrade && state.purse >= pay && (!last || at - last >= SUPPLY_WAIT);
+      var ready = !!owns && canTrade && availablePurse >= pay && (!last || at - last >= SUPPLY_WAIT);
       supply.push({ name: offers[k].name, pay: pay, unit: offers[k].buy, count: SUPPLY_COUNT, ready: ready });
     }
     var view = {
@@ -335,6 +343,7 @@ function createMerchantTrading(deps) {
       place: place.locationName || '',
       hold: place.bookHold,
       purse: state.purse,
+      reservedPurse:state.purse-availablePurse,
       offers: offers,
       sellReason: offers.some(function (offer) { return offer.maxSell > 0; }) ? '' :
         !settlement.available() ? 'Trading is unavailable. Nothing has moved.' :
@@ -483,7 +492,7 @@ function createMerchantTrading(deps) {
       sessions.delete(profileId);
       return fail(text, closedView(actorId,profileId,originalSession));
     }
-    if (verb === 'quest') {
+    if (verb === 'quest' && !commissions.has(String(parts[3]))) {
       quests = typeof deps.quests==='function' && deps.quests();
       if (!quests || typeof quests.capture!=='function') return fail('Quest work is unavailable.');
       heldQuest = quests.capture(actorId);
@@ -502,15 +511,26 @@ function createMerchantTrading(deps) {
     }
     if (verb === 'quest') {
       if (parts.length<4 || parts.length>5) return fail('Choose the work in the trader panel.');
-      var result=quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest,
-        function(){return sessionCurrent(actorId,profileId,originalSession);});
+      var isCommission=commissions.has(String(parts[3]));
+      var result=isCommission?commissions.act(actorId,merchantId,String(parts[2]),String(parts[3]),parts[4],{
+        current:function(){return ownsSession(actorId,profileId,originalSession);},
+        alive:function(){return sessionCurrent(actorId,profileId,originalSession);}}):
+        quests.act(actorId,String(parts[2]),String(parts[3]),parts[4],merchantId,heldQuest,
+          function(){return sessionCurrent(actorId,profileId,originalSession);});
       var reasons={class:'This work takes a different class.',rank:'This work takes a higher rank.',
+        eligibility:'You do not meet this work\'s class or profession requirements.',
         cooldown:'This work is still resting.',open:'You already hold this work.',gem:'Choose a gem first.',
         short:'You have not drawn enough to turn this work in.',none:'You do not hold this work.',
         unbound:'This work has no appointed place yet.',unwritten:'The work could not be committed just now.',
         unavailable:'Quest work is unavailable.',role:'This trader does not handle that work.',
+        allowance:'Your new scene work has reached its shared daily gold allowance.',
+        price:'The submitted price changed or is missing. Choose the work again.',
+        purse:'This trader cannot reserve the quoted payment.',capacity:'This trader cannot accept more work yet.',
+        counter:'This trader cannot accept more work yet.',waiting:'The transfer is waiting for its saved inventory.',
+        'open-limit':'Finish or leave one of your three open jobs of this kind first.',
+        recovery:'This work needs its saved payment checked. You can leave it without payment, or ask staff for recovery.',
         session:'Choose the work again from the trader.'};
-      var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':'You give back what you drew and leave the work.') :
+      var text=result.ok ? (parts[2]==='take'?'You take the work.':parts[2]==='return'?'The work is turned in.':isCommission?'You leave the work without payment.':'You give back what you drew and leave the work.') :
         reasons[result.why] || 'The work could not be changed.';
       if (!ownsSession(actorId,profileId,originalSession)) return {text:'',view:null};
       var questState=purses.prepare(merchantId),questPlace=questState && placeOf(questState.reference);
@@ -579,7 +599,7 @@ function createMerchantTrading(deps) {
       var last = lastSupply(state, completedSupplyKey, itemName);
       if (last && now() - last < SUPPLY_WAIT) return fail('That supply is not due.');
     }
-    if (npcBuys && state.purse < gold) return fail('The trader cannot pay.');
+    if (npcBuys && COMMISSION_STATE.spendable(state) < gold) return fail('The trader cannot pay from its unreserved purse.');
     if (!npcBuys && gold > 0 && world.carry(actorId, GOLD_BASE) < gold) return fail('You cannot pay.');
     if (npcBuys && world.carry(actorId, resolved.baseId) < asked.count) return fail('You are not carrying that.');
     if (!settlement.available()) {
@@ -606,7 +626,7 @@ function createMerchantTrading(deps) {
       if (!currentHuman || currentHuman.desc !== tradingHuman.desc || currentHuman.profileId !== tradingHuman.profileId)
         return fail('That request is not yours.');
       var expected = SETTLEMENT.inventory(transfer.inventory(actorId));
-      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold);
+      var outgoing = SETTLEMENT.takeEntries(expected, npcBuys ? resolved.baseId : GOLD_BASE, npcBuys ? asked.count : gold, minted);
       var stock = stockCopy(state.stock), credit;
       if (npcBuys) {
         stock = addStock(stock, outgoing.entries, itemName);
@@ -619,8 +639,10 @@ function createMerchantTrading(deps) {
       if (verb === 'supply') nextSupply[completedSupplyKey] = now();
       if (!ownsSession(actorId,profileId,originalSession)) return fail('The offer changed. Choose the trade again.');
       moved = settlement.begin({merchantId:merchantId,humanId:actorId,profileId:profileId,
+        caller:function(){return ownsSession(actorId,profileId,originalSession);},
         previous:state,expected:expected,debit:outgoing.inventory,credit:credit,kind:verb,
-        next:{purse:nextPurse,stock:stock,supply:nextSupply}});
+        next:Object.assign({purse:nextPurse,stock:stock,supply:nextSupply},
+          state.commissions===undefined?{}:{commissions:JSON.parse(JSON.stringify(state.commissions))})});
     } catch (error) {
       return fail(settlement.available() ? String(error.message || error) : 'Trading is unavailable. The saved transfer is retained.');
     }
@@ -718,8 +740,10 @@ function installMerchantTrading(env) {
       } catch (e) {}
     });
   }
+  var minted = typeof env.minted === 'function' ? env.minted : function () { return false; };
   var trading = createMerchantTrading({
     purses: env.purses,
+    minted: minted,
     log:log,
     prices: {
       quote: function (hold, item) {
@@ -766,13 +790,23 @@ function installMerchantTrading(env) {
         var entries = (inv && inv.entries) || [];
         var n = 0;
         for (var i = 0; i < entries.length; i++) {
-          if (entries[i] && Number(entries[i].baseId) === Number(baseId)) n += Number(entries[i].count) || 0;
+          if (entries[i] && Number(entries[i].baseId) === Number(baseId) && !minted(entries[i])) n += Number(entries[i].count) || 0;
         }
         return n;
       }
     },
     places: doc.byRef || {},
     roleTables: env.roleTables,
+    commissions: env.commissions,
+    commissionEligible:function(actor,gate) {
+      var progression=g.__thornswoodProgression,character=g.__thornswoodCharacter;
+      if(!progression||!character||!character.PROPERTY)return false;
+      try {
+        var rule=QUEST_ELIGIBILITY.createQuestEligibility({table:progression.TABLE,spellIds:progression.SPELL_IDS});
+        var allowed=rule.allows(rule.validate(gate),mp.get(actor,character.PROPERTY));
+        return allowed&&g.__thornswoodProgression===progression&&g.__thornswoodCharacter===character;
+      }catch(error){return false;}
+    },
     suspended: env.suspended,
     retirementRequired: env.retirementRequired,
     quests: function () { return g.__thornswoodQuests; },
