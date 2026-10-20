@@ -1,0 +1,8 @@
+{
+  "why": "Loose string tables of the localized masters the content tools read whose names are not in Skyrim's archives (#2899). Build-LastPlugin.py copies records from every master in game\\data\\last-plugin.json, and a localized master keeps its names in a .STRINGS, .DLSTRINGS and .ILSTRINGS file. Measured 20 Oct 2026: of those masters, Skyrim's five and RaceCompatibility.esm are localized; Skyrim's tables are in Skyrim - Interface.bsa, and RaceCompatibility's are loose in the game's Data\\Strings, in no archive. scripts\\mods\\Send-GameArchives.ps1 sends each file named here, held to these bytes, to the box's C:\\Thornswood-GameData\\Strings, and Run-OnBox.ps1 links them into a run. Changed by hand, in a pull request, when a localized master that keeps its tables loose joins the last plugin's masters (Build-LastPlugin stops with 'no strings for <plugin>' until it is).",
+  "files": {
+    "Strings\\RaceCompatibility_English.STRINGS": { "bytes": 350, "sha256": "7a09192d002f422467bd41010e67feb4b8a1d80628170e2d98e60a27c7ed1095" },
+    "Strings\\RaceCompatibility_English.DLSTRINGS": { "bytes": 363, "sha256": "6aa5a10261d9691425dfdda0dc92193d63522ddee0c15a20a949596095add3dc" },
+    "Strings\\RaceCompatibility_English.ILSTRINGS": { "bytes": 1506, "sha256": "698efbce815775c7a7ea9b0b43787f2f26a91e8be9aa641f80f8e0441812bf14" }
+  }
+}
