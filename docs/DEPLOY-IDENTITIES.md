@@ -169,8 +169,10 @@ section.
   (section 1).
 - What uses the key from One: every Ship and deploy; `Fetch-Backups.ps1`
   every night, which pulls backups that hold every secret (an admin row in
-  the map); and `Watch-Outside.ps1` every five minutes, which logs in only
-  when it has an alert to hand to the watchdog's outbox.
+  the map), and which since #2755 also writes the name of the newest copy
+  it checked into the watchdog's `offbox.txt`. `Watch-Outside.ps1` logged in
+  every five minutes until #2755 moved it to GitHub's runners, which have no
+  key and post to Discord themselves.
 
 ### 6.2 What a stolen key can do, now and after each change
 
@@ -203,8 +205,8 @@ Patrick's console login check, not on work).
   note), and `Set-SshScope.ps1 -From Any`. A port 22 change whose new login
   fails is put back by the box itself within ten minutes.
 - Risk of the change: a machine whose address changes loses ssh until the
-  list is changed. If that is One, every Ship, deploy, backup fetch and
-  Watch-Outside login fails until someone in the list, or Patrick at the
+  list is changed. If that is One, every Ship, deploy and backup fetch
+  fails until someone in the list, or Patrick at the
   console, runs `Set-SshScope.ps1` again.
 
 **7.4, the deploy identity** (undecided).
@@ -265,9 +267,9 @@ since 16 Oct).
   OpenSSH log on the box (agents are refused box reads).
 - Days of work for the deploy identity and for own accounts: whoever takes
   own accounts first.
-- `Watch-Outside.ps1` reaches the box with ssh through a variable (`& $ssh`)
-  in two places, and `records\remote-commands.json` has no row for either:
-  the map test finds only commands named `ssh` or `scp`. Recorded on #2182.
+- `Watch-Outside.ps1` reached the box with ssh through a variable (`& $ssh`)
+  in two places that `records\remote-commands.json` had no row for (#2182).
+  Since #2755 it runs on GitHub's runners and has no ssh at all.
 
 ## 7. Decisions (Patrick, 11 Oct 2026)
 
