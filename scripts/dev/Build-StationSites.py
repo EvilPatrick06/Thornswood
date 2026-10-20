@@ -193,6 +193,10 @@ KINDS = {
              'user': (-35.0, -180.0, 35.0, -115.0), 'flat': 40.0, 'reach': 1200, 'step': 32},
     'lab': {'base': 0x42E69, 'edid': 'ThornswoodCraftingAlchemyWorkbench', 'name': 'alchemy lab',
             'user': (-35.0, -55.0, 35.0, 8.0), 'flat': 8.0, 'reach': 900, 'step': 16},
+    # The well bucket (#1382) is an activator somebody walks up to and
+    # presses: they stand in front of it, inside the game's reach of it.
+    'well': {'base': 0x18030, 'edid': 'ThornswoodActivatorWellBucket', 'name': 'well bucket',
+             'user': (-30.0, -80.0, 30.0, -18.0), 'flat': 8.0, 'reach': 400, 'step': 16},
 }
 
 RULES = {
@@ -211,6 +215,10 @@ RULES = {
              'within 2,400 units, the farm claim\'s circle, of the farm\'s point: its map marker, or the '
              'farmhouse\'s outside door where that marker is inside the house. It stands beside the crop plot '
              'nearest that point. A placed hive is a farmer verb (farmer.md).'),
+    'well': ('One beside each of the placed wells in game/data/wells.json (#1382): the wells are statics and '
+             'raise no activation, so the bucket is what somebody activates to draw water there (Patrick, 12 '
+             'October 2026, approved on #1382). A well in a cell no master of the content plugin carries is left '
+             'out, because the plugin can only place into its masters\' cells.'),
     'lab': ('One in the apothecary of each of the nine hold capitals, the shop Skyrim marks as a store that holds '
             'Skyrim\'s own alchemy lab, beside that lab; Winterhold has no apothecary in town, so the College\'s '
             'Hall of Countenance. The poultice and the remedy are made only at Thornswood\'s lab (physicker.md, '
@@ -292,6 +300,37 @@ SITES = {
                     'ref': 0x15547},
     'lab-winterhold': {'kind': 'lab', 'where': 'The College\'s Hall of Countenance, Winterhold',
                        'anchors': ['86775:Skyrim.esm'], 'ref': 0x15548},
+    # Well buckets (#1382): beside each placed well of game/data/wells.json, by its cell.
+    'well-01': {'kind': 'well', 'where': 'DLC2SkaalVilFarmWell01 in 142ec:Dragonborn.esm', 'anchors': ['2b245:Dragonborn.esm'], 'ref': 0x18100},
+    'well-02': {'kind': 'well', 'where': 'FarmWell01 in 965b:Skyrim.esm', 'anchors': ['1f99b:ElysiumEstate.esp'], 'ref': 0x18101},
+    'well-03': {'kind': 'well', 'where': 'ImpWell01 in 9722:Skyrim.esm', 'anchors': ['10aaa6:Skyrim.esm'], 'ref': 0x18102},
+    'well-04': {'kind': 'well', 'where': 'FarmWell01 in 9ad9:Skyrim.esm', 'anchors': ['2b2c:aaaGraniteHill.esp'], 'ref': 0x18103},
+    'well-05': {'kind': 'well', 'where': 'ImpWell01 in BloatedMansRuins', 'anchors': ['95342:Skyrim.esm'], 'ref': 0x18104},
+    'well-06': {'kind': 'well', 'where': 'FarmWell01 in DLC1RedwaterDen01', 'anchors': ['8c34:Dawnguard.esm'], 'ref': 0x18105},
+    'well-07': {'kind': 'well', 'where': 'FarmBWellEnt01 in DLC2HrodulfsHouse', 'anchors': ['21093:Dragonborn.esm'], 'ref': 0x18106},
+    'well-08': {'kind': 'well', 'where': 'RedoranWell01 in DLC2RavenRock02', 'anchors': ['1caff:Dragonborn.esm'], 'ref': 0x18107},
+    'well-09': {'kind': 'well', 'where': 'GenericWell01 in DushnikhYalExterior02', 'anchors': ['5a646:Skyrim.esm'], 'ref': 0x18108},
+    'well-10': {'kind': 'well', 'where': 'FarmBWellEnt01 in FalkreathBarracksJail', 'anchors': ['ef416:Skyrim.esm'], 'ref': 0x18109},
+    'well-11': {'kind': 'well', 'where': 'FarmBWell01 in FalkreathBarracksJail', 'anchors': ['ef43d:Skyrim.esm'], 'ref': 0x1810A},
+    'well-12': {'kind': 'well', 'where': 'FarmWell01 in FalkreathExterior02', 'anchors': ['ef327:Skyrim.esm'], 'ref': 0x1810B},
+    'well-13': {'kind': 'well', 'where': 'ImpWell01 in FellglowKeepExterior02', 'anchors': ['71a9a:Skyrim.esm'], 'ref': 0x1810C},
+    'well-14': {'kind': 'well', 'where': 'ImpExtIceWell01 in FortDunstadExterior02', 'anchors': ['2088b:Skyrim.esm'], 'ref': 0x1810D},
+    'well-15': {'kind': 'well', 'where': 'ImpWell01 in FortGreenwall04', 'anchors': ['5c535:Skyrim.esm'], 'ref': 0x1810E},
+    'well-16': {'kind': 'well', 'where': 'ImpWell01 in FortGreymoorExterior03', 'anchors': ['51762:Skyrim.esm'], 'ref': 0x1810F},
+    'well-17': {'kind': 'well', 'where': 'ImpExtIceWell01 in FortNeugradExterior04', 'anchors': ['33ed9:Skyrim.esm'], 'ref': 0x18110},
+    'well-18': {'kind': 'well', 'where': 'ImpWell01 in FortSnowhawkExterior04', 'anchors': ['6f3de:Skyrim.esm'], 'ref': 0x18111},
+    'well-19': {'kind': 'well', 'where': 'ImpWell01 in FortSungardCourtyard', 'anchors': ['352a9:Skyrim.esm'], 'ref': 0x18112},
+    'well-20': {'kind': 'well', 'where': 'ImpWell01 in FortSungardExterior01', 'anchors': ['798a0:Skyrim.esm'], 'ref': 0x18113},
+    'well-21': {'kind': 'well', 'where': 'ImpExtIceWell01 in FrostflowLighthouseExterior01', 'anchors': ['cd4cc:Skyrim.esm'], 'ref': 0x18114},
+    'well-22': {'kind': 'well', 'where': 'ImpWell01 in POIPineForest08', 'anchors': ['2107b:North Keep.esp'], 'ref': 0x18115},
+    'well-23': {'kind': 'well', 'where': 'FarmWell01 in POITundra08', 'anchors': ['5448:OarsRest.esp'], 'ref': 0x18116},
+    'well-24': {'kind': 'well', 'where': 'FarmWell01 in POITundra08', 'anchors': ['5449:OarsRest.esp'], 'ref': 0x18117},
+    'well-25': {'kind': 'well', 'where': 'RTPlazaWell01 in RiftenOrigin', 'anchors': ['f0ebc:Skyrim.esm'], 'ref': 0x18118},
+    'well-26': {'kind': 'well', 'where': 'GenericWell01 in SSewersSolitude02', 'anchors': ['27172:SkyrimSewers.esp'], 'ref': 0x18119},
+    'well-27': {'kind': 'well', 'where': 'FarmBWell01 in SSewersWRBurrow', 'anchors': ['3907d:SkyrimSewers.esp'], 'ref': 0x1811A},
+    'well-28': {'kind': 'well', 'where': 'ImpWell01 in TrevasWatchExterior01', 'anchors': ['69f82:Skyrim.esm'], 'ref': 0x1811B},
+    'well-29': {'kind': 'well', 'where': 'FarmBWell01 in WindhelmMarketplaceExterior', 'anchors': ['9283:JKs Skyrim.esp'], 'ref': 0x1811C},
+    'well-30': {'kind': 'well', 'where': 'RTPlazaWell01 in bcd0:Skyrim.esm', 'anchors': ['10060d:Skyrim.esm'], 'ref': 0x1811D},
 }
 
 # Farms the rule leaves out, measured over the same load order.
@@ -825,6 +864,11 @@ def main():
     candidates = {}
     for site, s in sorted(SITES.items()):
         got = anchors_for(site, s, world, first, benches)
+        if isinstance(got, str) and got.startswith('left out: '):
+            got = got[len('left out: '):]
+            skipped[site] = {'kind': s['kind'], 'where': s['where'], 'triedAnchors': [], 'why': got}
+            print('  %-18s LEFT OUT. %s' % (site, got))
+            continue
         if isinstance(got, str) and got.startswith('no ') and ' stands in the open world within ' in got:
             # The rule gives this town no anchor at all: left out, and why.
             skipped[site] = {'kind': s['kind'], 'where': s['where'], 'triedAnchors': [], 'why': got}
@@ -854,12 +898,26 @@ def main():
 
     rows = {}
     taken = {}   # space -> the stations already chosen
+    buckets = []   # (space, x, y, site) of each well bucket already chosen
     for site in sorted(candidates):
         s = SITES[site]
         kind = KINDS[s['kind']]
         say = '  %-18s ' % site
         passed = []
         found = None
+        if s['kind'] == 'well':
+            # Two wells side by side are one place to draw water: the second
+            # shares the first one's bucket rather than standing another beside it.
+            r = candidates[site][0][1]
+            near = [(math.hypot(r['pos'][0] - x, r['pos'][1] - y), other) for sp, x, y, other in buckets
+                    if sp == r['space']]
+            near = [n for n in near if n[0] < WELL_SHARED]
+            if near:
+                d, other = min(near)
+                why = 'it shares the bucket of %s, %d units away' % (other, round(d))
+                skipped[site] = {'kind': s['kind'], 'where': s['where'], 'triedAnchors': [], 'why': why}
+                print(say + 'LEFT OUT. ' + why)
+                continue
         for k, r in candidates[site]:
             r = scan.refs.get(k, r)
             got = search(s, kind, r, world, scan, gate, benches, boards, taken, bases[s['kind']][2], skip)
@@ -881,6 +939,8 @@ def main():
         space = r['space']
         taken.setdefault(space, []).append(
             thing('the %s at %s' % (kind['name'], s['where']), 'another station (#2553)', outline, z - 40, z + 300, True))
+        if s['kind'] == 'well':
+            buckets.append((space, x, y, site))
         cinfo = scan.cellinfo.get((b'CELL', ck), {})
         row = {
             'kind': s['kind'],
@@ -1006,6 +1066,10 @@ PLOT_APART = 400.0
 # off stands by another town or farm (Markarth's nearest is Salvius Farm's,
 # 15,707 units out, and Solitude's Katla's Farm's, 18,204).
 TOWN_REACH = {'kiln': 12000.0, 'salt': 12000.0}
+# A well this close to one that already has its bucket shares that bucket.
+WELL_SHARED = 300.0
+# The well bases, by editor id: game/data/wells.json's.
+WELL_BASES = set(json.load(io.open(os.path.join(ROOT, 'game', 'data', 'wells.json'), encoding='utf-8'))['wells'])
 
 
 def usable(r):
@@ -1029,6 +1093,18 @@ def anchors_for(site, s, world, first, benches):
                 return 'the lab %s is not indoors' % a
             out.append((key_of(a), r))
         return out
+    if kind == 'well':
+        a = s['anchors'][0]
+        r = first.refs.get(key_of(a))
+        b = world.bases.get(r['base']) if r else None
+        if not r or not usable(r):
+            return 'left out: the well %s is not placed, or is switched off or has an enable parent' % a
+        if not b or b[1] not in WELL_BASES:
+            return '%s is not one of the wells in game/data/wells.json' % a
+        if r['cell'] and r['cell'][0] not in [m.lower() for m in MASTERS]:
+            return ('left out: the well %s stands in a cell of %s, which is not a master of %s'
+                    % (a, r['cell'][0], CONTENT))
+        return [(key_of(a), r)]
     pt = first.refs.get(key_of(s['point']))
     if not pt or pt['space'][0] != 'world':
         return 'its point %s is not placed out of doors' % s['point']

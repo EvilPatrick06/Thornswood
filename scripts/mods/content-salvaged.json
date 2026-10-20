@@ -88,8 +88,8 @@
  "counts": {
   "ACTI remade": 1,
   "BOOK gone before #2553": 15,
-  "CELL Bethesda's": 5,
-  "CELL dropped": 96,
+  "CELL Bethesda's": 8,
+  "CELL dropped": 93,
   "COBJ remade": 6,
   "CONT dropped": 1,
   "FLOR remade": 1,
@@ -99,8 +99,8 @@
   "MISC remade": 4,
   "REFR dropped": 234,
   "REFR gone before #2553": 1,
-  "WRLD Bethesda's": 1,
-  "WRLD dropped": 5
+  "WRLD Bethesda's": 2,
+  "WRLD dropped": 4
  },
  "records": [
   {
@@ -1411,7 +1411,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "862af51be639b0f2de501c48e2e48e653b1ad08bb20674247d0ba4f5c7ebd8fb"
-   ]
+   ],
+   "bethesdaSha256": "30b29d6b4de0eb4960dad96e1b97dcdf80ca63a8640948f7025ae9a0c33749e3"
   },
   {
    "formId": "16dc1:Skyrim.esm",
@@ -1510,7 +1511,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "763ac39cfa02ebd886dda2e2527480e00276960e4727feaf3dff4403f07a291f"
-   ]
+   ],
+   "bethesdaSha256": "6f002e9d3f3690b57008aa70800d02477565d3c877b88ec207c673535922efee"
   },
   {
    "formId": "c6e45:Skyrim.esm",
@@ -1845,11 +1847,12 @@
    "formId": "5eab:Dawnguard.esm",
    "type": "CELL",
    "editorId": "DLC1RedwaterDen01",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "7cb32d45faf476258d5dd3979e346c26c2a1283a76e90ccbe946b81c268a447f"
-   ]
+   ],
+   "bethesdaSha256": "cf168e340f0316649b7ec32a0a045a7019ca21e9d894c64e1f793216aaa8df8e"
   },
   {
    "formId": "13e87:Dawnguard.esm",
@@ -2898,7 +2901,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "cd291d0c3fc1ffa45e60e6823c9393f747572a6b42a234c3c917119ad897bd6e"
-   ]
+   ],
+   "bethesdaSha256": "5dc0b34797ae1f60c5229233138a8db0e8cba50a227da9a2c4ca9681842dcd34"
   },
   {
    "formId": "c6ce9:Skyrim.esm",
@@ -2990,7 +2994,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "499fd2f9506ddafd80e3bd942ce7540d869047508fbad0cd821cc80c2c10e473"
-   ]
+   ],
+   "bethesdaSha256": "a1a39ac37ab53c0537447d72d0d077ad4932673c458d14ff21e2b2a238a8f5b4"
   },
   {
    "formId": "d74:Skyrim.esm",
@@ -4163,11 +4168,12 @@
    "formId": "7660:Skyrim.esm",
    "type": "CELL",
    "editorId": "DushnikhYalExterior02",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "0ef60833c0731947a002d1dba451015e5f0803aa8f80d7e6a35064bc1c788ee7"
-   ]
+   ],
+   "bethesdaSha256": "4d6e9b475c13258ae2966c5d09eb38c3f91fbb376335a6dcba9061058ce00565"
   },
   {
    "formId": "5a63f:Skyrim.esm",
@@ -4236,7 +4242,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "e75e33bcc27e881563b8a3534626b3615982a597ced1856bba5d764c04a78fef"
-   ]
+   ],
+   "bethesdaSha256": "2ac7853c52e4a20e614dd08f60e4dabf6f5fe036d50831cb70e215f0cbc09739"
   },
   {
    "formId": "dc9f58:Thornswood-Content.esp",
@@ -4258,7 +4265,8 @@
    "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "b30db61a20c3e9088eff098a4e2e5c71f6d18717e89171865d8a3cc7bfde562d"
-   ]
+   ],
+   "bethesdaSha256": "d970fd19fafd5404de418d5880ea515fe3f17accfea3e48ab93d1da5156eec4b"
   },
   {
    "formId": "521a2:Thornswood-Content.esp",
@@ -4503,11 +4511,12 @@
    "formId": "16bb4:Skyrim.esm",
    "type": "WRLD",
    "editorId": "RiftenWorld",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "b7ade121dfd9b12c22b30d82b9b7785eb4f9326b70db4bb0e743d065dfeba740"
-   ]
+   ],
+   "bethesdaSha256": "b7ade121dfd9b12c22b30d82b9b7785eb4f9326b70db4bb0e743d065dfeba740"
   },
   {
    "formId": "42244:Skyrim.esm",
@@ -4538,11 +4547,12 @@
    "formId": "42247:Skyrim.esm",
    "type": "CELL",
    "editorId": "RiftenOrigin",
-   "disposition": "dropped",
-   "why": "nothing of Thornswood's is placed in it once the placements above go",
+   "disposition": "Bethesda's",
+   "why": "a station Thornswood places stands in it (game/data/station-sites.json), so it stays, written by the tool from the winning master's own record",
    "dataSha256": [
     "e754012a592121f3455a3e952b7698658fc7943c0eba9b652274ef9a6a8026b0"
-   ]
+   ],
+   "bethesdaSha256": "a78c347daf15ad85196ec8ec8fdd47e32e9ff95a6dea41ed3cbb47b4e9d75de9"
   },
   {
    "formId": "53481:Skyrim.esm",
