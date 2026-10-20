@@ -489,8 +489,8 @@ const BOWL = idFor(DATA.item);
   yes('U5 the look prompt offers Dye their hair on hd, and K is Take on\'s first', /row\.hd && !\(Array\.isArray\(row\.a\)/.test(FR) &&
       /'\|' \+ \(row\.hd \|\| 0\) \+/.test(FR) &&
       FR.indexOf('apprenticePress()) { return; }') < FR.indexOf('hairDyePress()) { return; }') && /const HAIR_DYE_KEY = SKILLS_KEY;/.test(FR));
-  yes('U6 the front redraws the hair once on a change', /sp\.on\('update', guard\('hair colour'/.test(FR) &&
-      (FR.match(/sp\.Game\.updateHairColor\(\)/g) || []).length === 1 && /now - hairReadAt < 500/.test(FR));
+  yes('U6 the front does not poll the hair colour: the redraw belongs to the engine fork', !/guard\('hair colour'/.test(FR) &&
+      !/hairReadAt|hairSeen/.test(FR));
   // The panels run in a browser; make sure what was added parses.
   [['game/ui/thornswood-skills.js', SK], ['game/ui/thornswood-party.js', PA], ['game/plugins/thornswood-front.js', FR]].forEach((p) => {
     let ok = true; try { new vm.Script(p[1], { filename: p[0] }); } catch (e) { ok = false; }

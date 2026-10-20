@@ -87,7 +87,10 @@ less of the same things.
   `tests/test-2675-hair-dye-wiring.js` fails until the two match.
 - The Hair dye page of K: `game/ui/thornswood-skills.js`. Dye hair under Near
   you and the offer's words: `game/ui/thornswood-party.js`. The look prompt's
-  "Dye their hair" and the redraw of the hair once a new colour arrives:
-  `game/plugins/thornswood-front.js`.
+  "Dye their hair": `game/plugins/thornswood-front.js`.
+- Not in yet: your own hair keeps its old colour on your screen until the
+  next load, because the engine does not redraw hair whose colour changed
+  (#2867, a fork change). The colour is on your character from the moment
+  it is dyed.
 - Every dye written puts one line in the server log: `hair dye:`, who did it,
   whose hair, which dye, and the colour before and after.

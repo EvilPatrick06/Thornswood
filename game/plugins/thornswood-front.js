@@ -5360,33 +5360,6 @@
   }
 
   /*
-    HAIR COLOUR (#2675). The server writes a dyed hair colour into the
-    stored appearance, and the client puts it on the character's record, but
-    the hair already drawn keeps its old colour until the game is told to
-    redraw it. So the colour on the record is read twice a second, and the
-    first time it changes after the first reading, Game.updateHairColor runs
-    once. Reading costs nothing and changes nothing; only a change redraws.
-  */
-  let hairSeen = null, hairReadAt = 0;
-  sp.on('update', guard('hair colour', () => {
-    const now = Date.now();
-    if (now - hairReadAt < 500) { return; }
-    hairReadAt = now;
-    let colour = null;
-    try {
-      const pc = sp.Game.getPlayer();
-      const form = pc ? sp.ActorBase.from(pc.getBaseObject()).getHairColor() : null;
-      colour = form ? (form.getColor() & 0xFFFFFF) : null;
-    } catch (e) { colour = null; }
-    if (colour === null) { return; }
-    if (hairSeen === null) { hairSeen = colour; return; }
-    if (colour === hairSeen) { return; }
-    hairSeen = colour;
-    try { sp.Game.updateHairColor(); } catch (e) { log('hair colour: could not redraw the hair:', e); return; }
-    log('hair colour: redrawn as ' + ('000000' + colour.toString(16)).slice(-6));
-  }));
-
-  /*
     Tend the wounds of the person under the crosshair (#1383). Only while the
     prompt offers it, which is the server's near list saying they have a
     wound somebody could tend. It sends /treat with their form id, and the

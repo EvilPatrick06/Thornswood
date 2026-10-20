@@ -1706,7 +1706,9 @@ function mintedEntry(entry) {
   const tests = globalThis.__thornswoodMinted;
   if (!entry || !tests || typeof tests !== 'object') { return false; }
   for (const owner of Object.keys(tests)) {
-    try { if (typeof tests[owner] === 'function' && tests[owner](entry)) { return true; } } catch (e) { }
+    if (typeof tests[owner] !== 'function') { continue; }
+    try { if (tests[owner](entry)) { return true; } }
+    catch (e) { log('minted', owner + '\'s test threw on an entry, so it does not count as theirs:', e); }
   }
   return false;
 }
@@ -62433,15 +62435,24 @@ module.exports = {
     var pack = packOf(by);
     var used = HAIR_DYE.afterUse(pack, dye, LIST, dyeItemId());
     if (!used) { return { ok: false, why: 'You are not carrying ' + dye.name + '.' }; }
+    // The colour the hair was made with is kept before the first dye takes, so
+    // a wash always has it to go back to; without it nothing is dyed.
+    if (first && made !== null) {
+      try { mp.set(target, MADE_PROPERTY, { c: made, at: Date.now() }); } catch (e4) {
+        hlog('could not keep the made hair colour of', Number(target).toString(16) + ':', e4);
+        return { ok: false, why: 'The dye would not take. Say so in the dev channel.' };
+      }
+    }
     try { setPack(by, used); } catch (e) { return { ok: false, why: 'The dye would not come out of the pack.' }; }
     try {
       mp.set(target, 'appearance', guarded.appearance);
     } catch (e2) {
-      try { setPack(by, pack); } catch (e3) { }
       hlog('could not write the hair of', Number(target).toString(16) + ':', e2);
+      try { setPack(by, pack); } catch (e3) {
+        hlog('and could not put the dye back in the pack of', Number(by).toString(16) + ':', e3);
+      }
       return { ok: false, why: 'The dye would not take. Say so in the dev channel.' };
     }
-    if (first && made !== null) { try { mp.set(target, MADE_PROPERTY, { c: made, at: Date.now() }); } catch (e4) { } }
     log('hair dye:', auditPerson(by), by === target ? 'dyed their own hair' : 'dyed the hair of ' + auditPerson(target),
         'with', dye.name + ',', 'from', hex6(old), 'to', hex6(rgb) +
         (guarded.changes.length ? ' (body shape: ' + guarded.changes.join(', ') + ')' : ''));
