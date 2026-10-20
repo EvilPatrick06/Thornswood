@@ -20,10 +20,16 @@ $ThornswoodGameArchiveStore = 'C:\Thornswood-GameData'
 $ThornswoodGameArchives = @('Skyrim - Interface.bsa', 'Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa') +
     @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' })
 
-# Text for the box: makes a file readable and nothing more to everyone but
-# SYSTEM. A run reaches the archives through hard links, which share the
-# file's rules, so a tool that opens one to write is refused and the store
-# keeps its bytes; deleting the link needs only the run folder's own rules.
+# Text for the box: makes a file readable, and linkable, and nothing more to
+# everyone but SYSTEM. A run reaches the archives through hard links, which
+# share the file's rules, so a tool that opens one to write is refused and
+# the store keeps its bytes; deleting the link needs only the run folder's
+# own rules. Making a hard link opens the file for its attributes, so the
+# account that links needs WriteAttributes: measured 20 Oct, the build
+# runner's account (not elevated) was refused "Access is denied" at the link
+# with read alone (run 39470283490), where Administrator on the box was not
+# refused. Attributes are not the bytes: writing still needs
+# WriteData, which nobody but SYSTEM has.
 function Get-ThornswoodArchiveReadOnlyScript {
     return @'
 function Set-ThornswoodArchiveReadOnly([string]$Path) {
@@ -31,7 +37,7 @@ function Set-ThornswoodArchiveReadOnly([string]$Path) {
   $acl.SetAccessRuleProtection($true, $false)
   $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-18')), 'FullControl', 'Allow')))
   foreach ($s in @('S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
-    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'ReadAndExecute, Synchronize', 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'ReadAndExecute, WriteAttributes, Synchronize', 'Allow')))
   }
   (Get-Item -LiteralPath $Path -Force).SetAccessControl($acl)
 }
