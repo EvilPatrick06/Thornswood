@@ -41,7 +41,7 @@ normal rank and tool rules. Ordinary harvesting must not bypass a scarce gate.
 Eight dedicated [longfin markers](merchant-quest-content.md) now have authored
 references `17200` through `17207:Thornswood-Content.esp`, using the existing
 base `154a5:Thornswood-Content.esp`. Each is48 units east of its listed clam
-anchor, at the same height and in the same CELL. Exact positions and authoring
+anchor,32 units below the recorded sea surface and in the same CELL. Exact positions and authoring
 checks are in `quest-content.json`. The original clams remain independent.
 The runtime quest still needs its interaction and matching content delivery.
 The Fisher page requires master rank for longfin; the quest's broad Fisher

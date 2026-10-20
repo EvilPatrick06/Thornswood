@@ -38,6 +38,10 @@ for(const [i,row] of doc.items.entries()) {
 const ledger=records.get(0x05017100);assert(ledger,'dedicated ledger activator missing');assert.equal(ledger.tag,'ACTI');
 assert.deepEqual([...fields(ledger.body).keys()],['EDID','OBND','FULL','MODL']);
 const expectedKeys=Array.from({length:8},(_,i)=>'longfin'+(i+1)).concat('ledger');assert.deepEqual(Object.keys(doc.sites),expectedKeys);
+// Sea water uses Tamriel DNAM's default height -14000: these CELLs have
+// HasWater and XCLW's max-float sentinel. A seabed clam is not a reachable
+// surface fishing marker, even though its CELL and world are correct.
+for(const key of expectedKeys.filter(k=>k!=='ledger'))assert(Math.abs(doc.sites[key].pos[2]+14000)<=128,'longfin marker must be reachable from the recorded sea surface: '+key);
 for(const [i,key] of expectedKeys.entries()) {
  const row=doc.sites[key],r=records.get(0x05017200+i);assert(r,'missing placement '+key);assert.equal(r.tag,'REFR');assert.equal(r.flags,0);
  assert.equal(fid(row.ref),0x05017200+i);const f=fields(r.body);assert.deepEqual([...f.keys()],['EDID','NAME','DATA']);assert.equal(text(f.get('EDID')),'ThornswoodQuestSite'+key[0].toUpperCase()+key.slice(1));assert.equal(f.get('NAME').readUInt32LE(),fid(row.base));
@@ -45,7 +49,7 @@ for(const [i,key] of expectedKeys.entries()) {
  assert.deepEqual(values,row.pos.concat([0,0,row.angle*Math.PI/180]).map(Math.fround));
  const cell=parseInt(row.cell.split(':')[0],16);assert(r.groups.some(g=>g[0]===cell&&g[1]===9));
  if(key==='ledger') {assert.equal(row.cell,'133c9:Skyrim.esm');assert.equal(row.base,'17100:Thornswood-Content.esp');assert.equal(row.pos[2],row.anchorPosition[2]+12);}
- else {assert.equal(row.base,'154a5:Thornswood-Content.esp');assert.equal(row.pos[0],row.anchorPosition[0]+48);assert.equal(row.pos[1],row.anchorPosition[1]);assert.equal(row.pos[2],row.anchorPosition[2]);assert.equal(row.space,'3c:Skyrim.esm');}
+ else {assert.equal(row.base,'154a5:Thornswood-Content.esp');assert.equal(row.pos[0],row.anchorPosition[0]+48);assert.equal(row.pos[1],row.anchorPosition[1]);assert.equal(row.pos[2],doc.seaWater.height-doc.seaWater.depth);assert.equal(row.space,'3c:Skyrim.esm');}
 }
 // Every old station and every new quest placement is accounted for. An extra
 // accidental placement cannot hide behind filtering to the station bases.
@@ -67,6 +71,8 @@ bad=copy.deepcopy(good);bad['sites']['longfin1']['pos'][0]+=1;cases.append(bad)
 bad=copy.deepcopy(good);bad['sites']['longfin1']['pos'][0]=float('nan');cases.append(bad)
 bad=copy.deepcopy(good);bad['sites']['longfin1']['interior']=True;cases.append(bad)
 bad=copy.deepcopy(good);bad['items'][0]['bounds']=[0]*5;cases.append(bad)
+bad=copy.deepcopy(good);bad['seaWater']['height']=0;cases.append(bad)
+bad=copy.deepcopy(good);bad['sites']['longfin1']['pos'][2]=bad['sites']['longfin1']['anchorPosition'][2];cases.append(bad)
 for bad in cases:
  m.json.load=lambda ignored:bad
  try:m.quest_content()

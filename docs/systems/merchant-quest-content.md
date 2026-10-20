@@ -41,9 +41,9 @@ The original book remains; activating the dedicated source grants no skill.
 
 All eight use the existing longfin FLOR base `154a5:Thornswood-Content.esp`
 in Tamriel. Each final point is48 units east of its measured clam anchor,
-at the same height, with zero rotation. Exact final positions are in the
+with zero rotation and32 units below the recorded sea surface. Exact final positions are in the
 manifest. Native CELL grids verify that every shifted point remains in its
-declared exterior cell. The clams and their stock remain independent.
+declared exterior cell. Native HasWater, XCLW and Tamriel DNAM resolve the sea level to -14000; markers stand at -14032 rather than on deep seabed clam heights. The clams and their stock remain independent.
 
 Source measurement used the enabled winning references under the population
 catalogue's103-plugin order. The ledger CELL's Embers, populated-town and

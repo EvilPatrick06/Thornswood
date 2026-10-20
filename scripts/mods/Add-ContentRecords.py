@@ -1119,6 +1119,8 @@ def quest_content(path=QUEST_CONTENT):
     if (doc.get('version') != 1 or not isinstance(doc.get('items'), list) or
             [r.get('key') for r in doc['items']] != keys or list(doc.get('sites', {})) != sites):
         raise ValueError('Invalid dedicated quest content catalogue')
+    if doc.get('seaWater') != {'world': '3c:Skyrim.esm', 'height': -14000, 'depth': 32}:
+        raise ValueError('Invalid measured sea water level')
     for i, row in enumerate(doc['items']):
         if (row.get('ref') != '%x:Thornswood-Content.esp' % (0x17000 + i) or row.get('weight') != 0 or
                 row.get('edid') != 'ThornswoodQuest' + keys[i].title() or not row.get('name') or
@@ -1139,6 +1141,8 @@ def quest_content(path=QUEST_CONTENT):
             raise ValueError('Invalid dedicated quest placement: ' + key)
         expected = list(row['anchorPosition'])
         expected[2 if ledger else 0] += 12 if ledger else 48
+        if not ledger:
+            expected[2] = doc['seaWater']['height'] - doc['seaWater']['depth']
         if row['pos'] != expected or ledger and row['cell'] != '133c9:Skyrim.esm':
             raise ValueError('Quest placement differs from its measured anchor: ' + key)
     return doc
@@ -1849,7 +1853,8 @@ def main():
     sites = json.load(open(STATION_SITES, encoding='utf-8'))
     want, want_cell, want_world = {}, {}, {}
     own_index = len(plugin_masters)
-    quest_sites = quest_content()['sites']
+    quest_doc = quest_content()
+    quest_sites = quest_doc['sites']
     authored_sites = dict(sites['sites'])
     if set(authored_sites) & set(quest_sites):
         raise ValueError('A quest and a station share a site name')
@@ -1881,6 +1886,7 @@ def main():
     # against Bethesda's CELL data, rather than assuming its anchor's cell.
     exterior = {(b'CELL', local_fid(r['cell'], plugin_masters, args.plugin))
                 for r in quest_sites.values() if not r['interior']}
+    exterior.add((b'WRLD', 0x3C))
     quest_cells = bethesdas_world_records(args.masters, plugin_masters, sorted(exterior))
     if quest_cells is not None:
         for name, row in quest_sites.items():
@@ -1893,6 +1899,16 @@ def main():
             grid = struct.unpack_from('<ii', data[b'XCLC'])
             if grid != tuple(math.floor(n / 4096) for n in row['pos'][:2]):
                 raise ValueError('Quest sea marker crosses its declared CELL: ' + name)
+            water = data.get(b'XCLW', b'')
+            flags = data.get(b'DATA', b'')
+            world = dict(subrecords(quest_cells[(b'WRLD', 0x3C)][1]))
+            if len(water) != 4 or not flags or not flags[0] & 2 or len(world.get(b'DNAM', b'')) != 8:
+                raise ValueError('Quest sea marker has no verified native water: ' + name)
+            level = struct.unpack('<f', water)[0]
+            if level > 3e38:
+                level = struct.unpack('<2f', world[b'DNAM'])[1]
+            if level != quest_doc['seaWater']['height']:
+                raise ValueError('Native sea water changed; remeasure quest markers: ' + name)
     stays, moved, to_place = set(), set(), []
     for r, parent, cell in placements_in(tree):
         if r.fid in removing:
