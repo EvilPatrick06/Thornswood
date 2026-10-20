@@ -144,7 +144,7 @@ if (P && RECIPES && craftSrc && rowSrc && KEPT) {
   yes("the forge stays open furniture", bench("CraftingSmithingForge") && bench("CraftingSmithingForge").anyone === true);
 
   const onCraft = cut("mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {") ||
-    slice(gm, "mp.onCraft = guard('onCraft'", "KEY_NAME_DELAY");
+    slice(gm, "mp.onCraft = guard('onCraft'", "desc === KEY_RECIPE");
   yes("onCraft asks craftRow instead of letting an unlisted smelt straight through",
     /const row = craftRow\(desc\);/.test(gm) && !/ingots, leather, tanning, smelting\. Straight through/.test(gm));
 }
