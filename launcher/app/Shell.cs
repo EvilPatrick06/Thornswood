@@ -2376,7 +2376,7 @@ namespace Thornswood
                 cfg.CrashSnapshots = chkCrashSnapshots.IsChecked == true;
                 try { cfg.Save(Paths.CfgFile); } catch (Exception ex) { Swallow.Note("Shell.Wire, cfg save", ex); }
                 Log(cfg.CrashSnapshots
-                    ? "Crash snapshots on. From the next Play, a crash saves one in " + CrashDump.KeptIn(cfg) + ". One can be 9 GB or more; only the newest is kept."
+                    ? "Crash snapshots on. From the next Play, a crash saves one in " + CrashDump.KeptIn(cfg) + ". One can be 9 GB or more; each is kept until staff have looked at that crash, two at most."
                     : "Crash snapshots off. From the next Play none are written. Any already saved are left where they are.");
             };
             btnCrashFolder.Click += delegate { PickCrashFolder(); };
@@ -4163,15 +4163,20 @@ namespace Thornswood
             // Owned by the launcher's window, so it opens in front of it.
             var r = MessageBox.Show(win,
                 "The game crashed, and a full crash snapshot was saved:\n\n" + snapshot + "\n" + CrashDump.Size(size) +
-                "\n\nIt is only needed if somebody is going to look into this crash. Keep it?\n\nYes keeps it. No deletes it now.",
+                "\n\nIt is only needed if somebody is going to look into this crash. Keep it?\n\n" +
+                "Yes keeps it until staff mark this crash looked at on the sessions page; the launcher deletes it at a Play after that. " +
+                "Two are kept at most, so a third crash replaces the oldest. No deletes it now.",
                 "Thornswood", MessageBoxButton.YesNo, MessageBoxImage.Question);
             if (r == MessageBoxResult.Yes)
             {
                 // Only now are older ones tidied, so a No below never leaves
-                // somebody with none at all. This one is the newest.
-                int gone = CrashDump.Tidy(keptIn);
-                Log("Kept the crash snapshot " + snapshot + "." +
-                    (gone > 0 ? " Deleted " + gone + " older one" + (gone == 1 ? "" : "s") + "; only the newest is kept." : ""));
+                // somebody with fewer than they had. This one is the newest,
+                // and nobody has looked at it yet (#2319).
+                int looked;
+                int gone = CrashDump.Tidy(keptIn, out looked);
+                string tidied = CrashDump.TidyLine(gone, looked);
+                Log("Kept the crash snapshot " + snapshot + " until staff have looked at this crash." +
+                    (tidied != null ? " " + tidied : ""));
                 return;
             }
             try
