@@ -621,6 +621,9 @@ async function join(standing, status, channel) {
     accountBanned: function () { return 'banned'; },
     gameStatus: status, seatsFull: seatsFull, worldFull: worldFull,
     mostOnlineFallback: function () { return 25; },
+    // No crash snapshots asked about here (#2319); test-2319-crash-looked-at.js runs that answer.
+    sessionRows: function () { return []; },
+    lookedAtFor: function () { return []; },
     departed: async function () { return new Set(); },
     // Play's doors answer inside PLAY_ANSWER_MS (#1094); Discord answers at
     // once here, so the real within() never reaches standingLate.

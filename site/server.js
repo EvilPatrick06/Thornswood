@@ -3319,6 +3319,48 @@ function findSession(rows, key, who) {
   return -1;
 }
 
+/*
+  A CRASH STAFF HAVE LOOKED AT (#2319, decided by Patrick on 12 Oct).
+
+  A crash snapshot is every byte of the game's memory, 3.7 to 9.7 GB, and it
+  never leaves the PC it was written on. Until this, the launcher kept only
+  the newest, so the next crash on that install deleted the one before it
+  whether anybody had read it or not: none of the four written from 29 Sep to
+  6 Oct was. Now staff mark a crashed session looked at on the sessions page
+  (/api/session-looked), and the launcher, which remembers which session each
+  snapshot it holds crashed in, asks at its next check in which of those are
+  marked (/api/play/join, snapshots in and lookedAt out) and deletes only
+  those, or the oldest past two.
+
+  Only a crash can be marked: a session whose trouble came from its crash.log
+  (crashOf). The mark says who and when, like keep.
+*/
+function crashedRow(row) {
+  return !!(row && row.troubleFile === 'crash.log');
+}
+function markLooked(row, on, by, now) {
+  if (on) { row.looked = true; row.lookedBy = String(by || ''); row.lookedAt = Number(now) || Date.now(); }
+  else { delete row.looked; delete row.lookedBy; delete row.lookedAt; }
+  return row;
+}
+/* The most snapshot sessions one check in may ask about; the launcher
+   remembers eight. */
+const SNAPSHOTS_ASKED = 8;
+/* Of the session ids a launcher asked about, the ones that are THIS account's
+   and marked looked at. Another account's session is never answered for, so
+   a check in cannot learn anything about somebody else's crashes. */
+function lookedAtFor(rows, who, asked) {
+  const list = Array.isArray(asked) ? asked : String(asked == null ? '' : asked).split(',');
+  const out = [];
+  for (const one of list.slice(0, SNAPSHOTS_ASKED)) {
+    const key = sessionKey(one);
+    if (!key || out.indexOf(key) >= 0) continue;
+    const at = findSession(rows, key, who);
+    if (at >= 0 && rows[at].looked) out.push(key);
+  }
+  return out;
+}
+
 /* ------------------------------------------------------- session logs -- */
 /*
   The logs from one session, so a report can be read without asking the person
@@ -6951,7 +6993,10 @@ async function handle(req, res) {
       message: wait ? worldFull(gameStatus.online) : '',
       online: gameStatus.online,
       max: gameStatus.max || mostOnlineFallback(),
-      line: gameStatus.line
+      line: gameStatus.line,
+      // Which crashes behind the snapshots this launcher holds staff have
+      // marked looked at (#2319, lookedAtFor): those it may delete.
+      lookedAt: lookedAtFor(sessionRows(), t.d, o.snapshots).join(',')
     });
   }
 
@@ -7920,6 +7965,27 @@ async function handle(req, res) {
       /* The chat it rests on is held with it (#2166), or let go with it. */
       const chatCopy = on ? copyKeptChat(rows[at]) : dropKeptChat(key);
       return sendJson(res, 200, { ok: true, keep: on, chatCopy });
+    }
+
+    /* Mark a crash looked at, or take the mark off again (#2319, crashedRow
+       and markLooked). The person's launcher deletes that crash's snapshot
+       at a Play after its next check in, so the mark is the word that
+       nobody needs it any more. Admins only, like the page, and it records
+       who and when. */
+    if (p === '/api/session-looked' && req.method === 'PUT') {
+      let obj;
+      try { obj = JSON.parse(await body(req)); }
+      catch (e) { passBodyFailure(e); return sendJson(res, 400, { error: 'bad json' }); }
+      const key = sessionKey(obj && obj.session);
+      const rows = sessionRows();
+      const at = key ? findSession(rows, key, obj.who) : -1;
+      if (at < 0) return sendJson(res, 404, { error: 'no such session' });
+      if (!crashedRow(rows[at])) return sendJson(res, 400, { error: 'not a crash',
+        message: 'Only a session that crashed can be marked looked at.' });
+      markLooked(rows[at], !!(obj && obj.looked), w.name, Date.now());
+      if (!putSessions(rows)) return sendJson(res, 500, { error: 'could not save' });
+      const row = rows[at];
+      return sendJson(res, 200, { ok: true, looked: !!row.looked, lookedBy: row.lookedBy || '', lookedAt: row.lookedAt || 0 });
     }
 
     /* The sheet part: what a staff member writes against one session.
