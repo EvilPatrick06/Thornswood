@@ -118,7 +118,7 @@ function whole(channel, min) {
   // The shape of main's feed on 19 Oct, every field it carries.
   return {
     launcherVersion: min, launcherUrl: A(channel) + H('1'), launcherSha256: H('1'),
-    serverAddress: '192.135.112.23', serverPort: '7777', message: '', packs: [], news: [], voicePort: '7778',
+    serverAddress: '203.0.113.7', serverPort: '7777', message: '', packs: [], news: [], voicePort: '7778',
     collectionUrl: 'https://www.nexusmods.com/games/skyrimspecialedition/collections/x', maxOnline: 0, mainVersion: '',
     voiceUrl: '', discordAppId: '123456789012345678', siteUrl: 'https://thornswood.net',
     presenceImage: 'https://thornswood.net/i.png', collectionRevision: 1,

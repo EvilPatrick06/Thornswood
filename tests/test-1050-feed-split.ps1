@@ -132,7 +132,7 @@ function Hex([string]$c) { return ($c * 64) }
 $A = 'https://thornswood.net/feed/assets/'
 $whole = [ordered]@{
     launcherVersion = '1.2.6'; launcherUrl = $A + (Hex '1'); launcherSha256 = (Hex '1')
-    serverAddress = '192.135.112.23'; serverPort = '7777'; message = ''; packs = @(); news = @(); voicePort = '7778'
+    serverAddress = '203.0.113.7'; serverPort = '7777'; message = ''; packs = @(); news = @(); voicePort = '7778'
     collectionUrl = 'https://www.nexusmods.com/games/skyrimspecialedition/collections/x'; maxOnline = 30; mainVersion = ''
     voiceUrl = ''; discordAppId = '123456789012345678'; siteUrl = 'https://thornswood.net'; presenceImage = 'https://thornswood.net/i.png'
     collectionRevision = 4
@@ -216,7 +216,7 @@ function Run {
     [IO.File]::WriteAllBytes($cache, $setBytes)
     Restart
     $v = Read-Feed $topBytes 'https://thornswood.net/feed/version.json' $null
-    Yes 'the split feed reads whole, with its settings from Profile' ($null -ne $v -and $v.serverAddress -eq '192.135.112.23' -and $v.serverPort -eq '7777' -and
+    Yes 'the split feed reads whole, with its settings from Profile' ($null -ne $v -and $v.serverAddress -eq '203.0.113.7' -and $v.serverPort -eq '7777' -and
         $v.maxOnline -eq 30 -and $v.collectionRevision -eq 4 -and @($v.depots).Count -eq 2 -and $v.discordAppId -eq '123456789012345678' -and $v.voiceUrl -eq '')
     Yes '  with the update fields from version.json' ($v.launcherVersion -eq '1.2.6' -and $v.minLauncher -eq '1.2.6' -and $v.launcherUrl -eq ($A + (Hex '1')) -and
         $null -ne $v.packs -and @($v.packs).Count -eq 0 -and $null -ne $v.news)
@@ -238,7 +238,7 @@ function Run {
         $srv.Body = $setBytes
         $v = Read-Feed $topBytes $feedUrl $cfg
         Yes 'the settings are downloaded from the feed''s assets folder by their sha256' ($srv.Count() -eq 1 -and $srv.Seen[0] -eq ('/feed/assets/' + $setSha))
-        Yes '  read whole, every address beside the feed' ($v.serverAddress -eq '192.135.112.23' -and $v.record.url -eq ('http://127.0.0.1:' + $srv.Port + '/feed/assets/' + (Hex '3')))
+        Yes '  read whole, every address beside the feed' ($v.serverAddress -eq '203.0.113.7' -and $v.record.url -eq ('http://127.0.0.1:' + $srv.Port + '/feed/assets/' + (Hex '3')))
         Yes '  and kept in Profile\feed-settings.json' ((Test-Path -LiteralPath $cache) -and (ShaOf ([IO.File]::ReadAllBytes($cache))) -eq $setSha)
         [void](Read-Feed $topBytes $feedUrl $cfg)
         Yes '  the next check asks for nothing more' ($srv.Count() -eq 1)
@@ -255,7 +255,7 @@ function Run {
     # 4. a feed that is not split, and one whose settings say nothing usable
     Restart
     $v = Read-Feed ([Text.Encoding]::UTF8.GetBytes($wholeJson)) 'https://thornswood.net/feed/version.json' $cfg
-    Yes 'a feed that is not split reads as before, with the addresses it spells out' ($v.serverAddress -eq '192.135.112.23' -and $v.record.url -eq ($A + (Hex '3')) -and $null -eq $v.settingsRef)
+    Yes 'a feed that is not split reads as before, with the addresses it spells out' ($v.serverAddress -eq '203.0.113.7' -and $v.record.url -eq ($A + (Hex '3')) -and $null -eq $v.settingsRef)
     $why = Threw { Read-Feed ([Text.Encoding]::UTF8.GetBytes('{"launcherVersion":"1.2.6","packs":[],"settings":{"sha256":"x"}}')) 'https://thornswood.net/feed/version.json' $cfg }
     Yes ('settings named without a sha256 are a feed it cannot read: ' + $why) ($why -match 'without a checksum')
 
