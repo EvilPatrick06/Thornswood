@@ -263,7 +263,15 @@ if (mode === 'watch') {
   udp.on('error', function (e) { why = 'UDP ' + s.port + ' taken: ' + e.code; process.exit(1); });
   udp.bind(s.port, '127.0.0.1');
   function listen() {
-    const srv = net.createServer(function (c) { c.end(); });
+    // Swap.ps1's probe connects and closes its socket at once, which Windows
+    // may send as a reset. A socket with no error listener throws that, and
+    // the stand-in died of it the moment its slow port opened (20 Oct
+    // nightly: ECONNRESET, read). A real server takes a reset as one client
+    // gone, so this one does too, and says so.
+    const srv = net.createServer(function (c) {
+      c.on('error', function (e) { log('a connection on ' + res + ' ended: ' + e.code); });
+      c.end();
+    });
     srv.on('listening', function () { log('resources port ' + res + ' open'); });
     srv.on('error', function (e) { why = 'resources port ' + res + ' taken: ' + e.code; process.exit(1); });
     srv.listen(res, '127.0.0.1');

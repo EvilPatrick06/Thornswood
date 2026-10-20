@@ -389,6 +389,10 @@ else:
                 '-BotRoot', botroot,
                 '-CaddyRoot', os.path.join(box, 'caddy'),
                 '-VoiceRoot', os.path.join(box, 'voice'),
+                # And the deletion record's, or it reads the real
+                # C:\Thornswood-Deletions, which Delete-Person.ps1 locks to
+                # the backup task, and fails on NO ACCESS (20 Oct nightly).
+                '-DeletionRoot', os.path.join(box, 'deletions'),
                 '-Out', out,
                 '-KeyFile', os.path.join(box, 'no-key.txt'),
                 '-Plain']
