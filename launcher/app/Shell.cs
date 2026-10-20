@@ -2139,6 +2139,14 @@ namespace Thornswood
             boxSearch.Foreground = Res("Faint");
 
             DrawBuildLine();
+            // Source code, under the version lines: the fork at the commit the
+            // six files beside this launcher were built from, or the credits
+            // page's source section when the exe carries no record (#421).
+            Button btnSource = F<Button>("BtnSource");
+            string source = ClientRuntime.SourceUrl;
+            if (string.IsNullOrEmpty(source)) source = cfg.SiteUrl.TrimEnd('/') + "/credits#source";
+            btnSource.ToolTip = "SkyMP is free software. This opens its source, with every change Thornswood made: " + source;
+            btnSource.Click += delegate { Open(source); };
             txtStatusRight.Text = Paths.Root;
             chkKeepOpen.IsChecked = cfg.KeepLauncherOpen;
             chkCrashSnapshots.IsChecked = cfg.CrashSnapshots;

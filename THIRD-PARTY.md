@@ -277,7 +277,7 @@ agrees with the mod's README wherever the README gives one.
 | ICU data | ICU 71, by the name inside the file, `icudt71l` | `RuntimeDependencies\icudtl.dat` | Unicode's licence, below | `ICU-LICENSE.txt` |
 | ANGLE | 2.1.19724, git ceec659ac60b | `RuntimeDependencies\libEGL.dll`, `libGLESv2.dll` | BSD-3-Clause | `ANGLE-LICENSE.txt` |
 | Node.js | 23.2.0 | `RuntimeDependencies\libnode.dll` | MIT, with the licences of the libraries built into it | `Node-LICENSE.txt` |
-| Microsoft Direct3D HLSL Compiler | 10.0.20348.1 | `RuntimeDependencies\d3dcompiler_47.dll` | Microsoft's own. The file describes itself as "Direct3D HLSL Compiler for Redistribution", by Microsoft Corporation. | None |
+| Microsoft Direct3D HLSL Compiler | 10.0.20348.1 | `RuntimeDependencies\d3dcompiler_47.dll` | Microsoft's, handed on under the Windows SDK's terms for Distributable Code, below | None |
 | Skyrim Platform | upstream's last copy, below | `___systemPolyfill.js` | GPL-3.0 | `SkyrimPlatform-LICENSE.txt` |
 
 The programs, the ICU data and the script, by sha256:
@@ -302,6 +302,54 @@ travels with the mod.
 `icudtl.dat` is ICU 71's data. The `ICU-LICENSE.txt` beside it is the Unicode
 License V3, with a copyright line that runs from 1991 to 2026. That is the text
 of a far later ICU than 71, which came out in 2022.
+
+### d3dcompiler_47.dll, Microsoft's shader compiler
+
+Read on 20 October 2026 (#421). The file is Microsoft's and unmodified: its
+Authenticode signature is valid, signed by Microsoft Corporation, its version
+resource says "Direct3D HLSL Compiler for Redistribution", version
+10.0.20348.1, "© Microsoft Corporation. All rights reserved.", and its sha256
+is the one in the table above. It is the copy the Chromium Embedded
+Framework's own binary download carries beside `libEGL.dll` and
+`libGLESv2.dll`, for ANGLE. It is not the copy a newer Windows SDK carries:
+the 10.0.26100 SDK's `Redist\D3D\x64\d3dcompiler_47.dll` on the shipping
+machine has another sha256 (`3e56c1a0`).
+
+Its terms are the Windows SDK's licence. Microsoft's list of the SDK's
+redistributable files, which the licence's "Distributable Code" section
+points at (https://learn.microsoft.com/en-us/legal/windows-sdk/redist,
+"Windows SDK redist lists", updated 21 October 2024), names
+`Redist\D3D\x64\d3dcompiler_47.dll` among the files that "may only be
+redistributed with your Classic Windows applications". The licence itself
+(`sdk_license.rtf` in the 10.0.26100 SDK, section 2.a) lets that code be
+copied and handed on in its object code form, with these conditions, read
+from that file:
+
+- Add significant primary functionality to it in your programs, and hand it
+  on only with them. Here it goes out with the client the Thornswood
+  collection installs, which loads it through Chromium.
+- Do not alter any copyright, trademark or patent notice in it, and do not
+  use Microsoft's trademarks in a program's name or in a way that suggests
+  Microsoft made or endorses it. It goes out byte for byte as Microsoft
+  signed it.
+- Only for Windows, and never in a malicious, deceptive or unlawful program.
+- Never modify or hand it on so that any part of it falls under a licence
+  that requires its source to be disclosed or lets others modify it. It goes
+  out as its own file beside GPL code, not built into it, so the GPL does not
+  reach it.
+- Display your own valid copyright notice on your programs.
+- Indemnify Microsoft against claims arising from handing it on or using the
+  programs it goes out with.
+- Require distributors and external end users to agree to terms that
+  protect it at least as much as the licence does. Nothing Thornswood hands
+  out says so today: not the Client Runtime's README on Nexus, and not the
+  site's terms page. That is under "What is still missing".
+
+No licence text travels with it, and the SDK licence does not ask for one.
+Windows 8.1 and later carry their own `d3dcompiler_47.dll` in `System32`
+(the shipping machine's is 10.0.26100.9711), and Steam, which the game runs
+through, has needed Windows 10 or later since 1 January 2024. Whether Chromium in the game draws the same
+without the copy in `RuntimeDependencies` has not been measured.
 
 `___systemPolyfill.js`, 2,605 bytes, is the SystemJS module loader that Skyrim
 Platform used to run before a plugin's `index.js`. Line endings aside, it is
@@ -731,6 +779,18 @@ README still gives the source of CEF (https://github.com/chromiumembedded/cef),
 Chromium (https://chromium.googlesource.com/chromium/src) and Node
 (https://github.com/nodejs/node).
 
+The fork says it is modified (GPL and AGPL section 5(a)): its README on
+`thornswood/engine-changes` opens with a dated notice that the branch is
+SkyMP as changed by Thornswood since 17 September 2026, with a link to every
+change since upstream's `2849e676` (#421).
+
+The offer is also made where the server is used (AGPL section 13), not only
+where files are handed out (#421). The launcher's sidebar has Source code
+under its version lines, which opens the fork at the commit the launcher's
+own `client-build.json` names (`ClientRuntime.SourceUrl`), and the game's
+help panel says under Getting help where the source is.
+`tests\test-421-source-offer-ui.js` holds both.
+
 The directions reach people in four places. The installer carries
 `SOURCE CODE.txt`, which Package-Thornswood.ps1 writes from the two build
 records and Setup-Thornswood.ps1 copies into the install folder (entry 170).
@@ -766,8 +826,11 @@ branch any more.
   `___systemPolyfill.js` is gone from that branch, so the README's directions
   do not lead to that file's source. The exact place is under "Where the
   source is". Nothing in the shipped client loads that file.
-- `d3dcompiler_47.dll` goes out in the Client Runtime with no licence text,
-  and this file names none.
+- `d3dcompiler_47.dll` goes out in the Client Runtime under the Windows SDK's
+  terms for Distributable Code ("d3dcompiler_47.dll, Microsoft's shader
+  compiler", above), and one of their conditions is not met: nothing asks
+  the people who install it to agree to terms that protect it at least as
+  much as Microsoft's do.
 - The `ICU-LICENSE.txt` in the Client Runtime is a later ICU's text than the
   ICU 71 data it sits beside.
 - The permissive vcpkg licence texts do not travel with the client runtime,

@@ -530,6 +530,10 @@
               <StackPanel Margin="25,12,18,0">
                 <TextBlock x:Name="TxtVersion" Style="{StaticResource Mono}" Foreground="{DynamicResource Faint}" FontSize="10.5"/>
                 <TextBlock x:Name="TxtBuildLine" Style="{StaticResource Mono}" Foreground="{DynamicResource Faint}" FontSize="10.5" Margin="0,3,0,0"/>
+                <!-- The SkyMP source offer, where everybody who connects
+                     starts (#421, AGPL section 13). -->
+                <Button x:Name="BtnSource" Style="{StaticResource Link}" FontSize="10.5"
+                        Content="Source code" HorizontalAlignment="Left" Margin="0,3,0,0"/>
               </StackPanel>
             </StackPanel>
 

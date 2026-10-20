@@ -7,6 +7,13 @@
   each shown commit to clientRuntime.forkCommit in that channel's
   version.json.
 
+  Since #421 the two rows in credits.md are hand text that names no commit,
+  because a hash typed there went stale with every Ship (f1e18a4a on both
+  rows while both feeds served 20083278). site\server.js fills each row
+  from the feed it serves. So the page half holds what the site would serve:
+  credits.md run through fillCreditsCommits, cut out of server.js by its
+  markers, with the commits these feed files name.
+
   It reads feed files on disk. It does not fetch thornswood.net, and it does
   not treat the live site as the proof.
 
@@ -58,6 +65,28 @@ function Get-ShownCommit([string]$text, [string]$channel, [string]$feed) {
     return $null
 }
 
+$Server = Join-Path $Repo 'site\server.js'
+$FillJs = @'
+const fs = require('fs');
+const src = fs.readFileSync(process.env.TS_SERVER, 'utf8');
+const cut = /\/\/ ==== thornswood credits fill ====([\s\S]*?)\/\/ ==== end thornswood credits fill ====/.exec(src);
+if (!cut) { process.stderr.write('server.js has no credits fill between its markers'); process.exit(2); }
+const fill = new Function(cut[1] + '\nreturn fillCreditsCommits;')();
+const feeds = {};
+if (process.env.TS_PUB) feeds.public = process.env.TS_PUB;
+if (process.env.TS_DEV) feeds.dev = process.env.TS_DEV;
+process.stdout.write(fill(fs.readFileSync(process.env.TS_PAGE, 'utf8'), null, feeds));
+'@
+
+# The page as the site serves it with these two feed commits.
+function Get-ServedPage([string]$pagePath, [string]$pub, [string]$dev, [string]$dir) {
+    $js = Join-Path $dir 'fill.js'
+    [IO.File]::WriteAllText($js, $FillJs)
+    $env:TS_SERVER = $Server; $env:TS_PAGE = $pagePath; $env:TS_PUB = $pub; $env:TS_DEV = $dev
+    try { $out = & node $js; if ($LASTEXITCODE -ne 0) { return $null }; return ($out -join "`n") }
+    finally { Remove-Item Env:TS_SERVER, Env:TS_PAGE, Env:TS_PUB, Env:TS_DEV -ErrorAction SilentlyContinue }
+}
+
 function Test-Holds([string]$text, [string]$publicPath, [string]$devPath, [string]$label) {
     $shownPublic = Get-ShownCommit $text 'Public' 'feed/version.json'
     $shownDev = Get-ShownCommit $text 'Dev' 'feed-dev/version.json'
@@ -98,6 +127,14 @@ try {
     Yes 'a swapped page does not match the public feed' ($shownSwapPublic -ne $feedPublic)
     [IO.File]::WriteAllText((Join-Path $tmp 'empty.json'), '{}')
     Yes 'a feed with no clientRuntime has no commit' ($null -eq (Read-FeedFork (Join-Path $tmp 'empty.json')))
+
+    # The real page, with nothing typed into its rows (#421).
+    $hand = [IO.File]::ReadAllText($Credits)
+    Yes 'credits.md names no commit in either feed row' (
+        $null -eq (Get-ShownCommit $hand 'Public' 'feed/version.json') -and $null -eq (Get-ShownCommit $hand 'Dev' 'feed-dev/version.json'))
+    $served = Get-ServedPage $Credits 'aaaaaaa1' 'bbbbbbb2' $tmp
+    Yes 'the site''s fill runs on credits.md' ($null -ne $served)
+    if ($null -ne $served) { Test-Holds $served $pubPath $devPath 'credits.md as served, fixture feeds' }
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
@@ -113,8 +150,14 @@ if ($asked -or ($hasPublic -and $hasDev)) {
     if (-not ($hasPublic -and $hasDev)) {
         Yes 'both channel feeds are on disk when one of them is' $false
     } else {
-        $page = [IO.File]::ReadAllText($Credits)
-        Test-Holds $page $PublicFeed $DevFeed 'credits.md'
+        $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-credits-channels-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        $null = New-Item -ItemType Directory -Force -Path $tmp
+        try {
+            $page = Get-ServedPage $Credits ([string](Read-FeedFork $PublicFeed)) ([string](Read-FeedFork $DevFeed)) $tmp
+            Yes 'the site''s fill runs on credits.md with these feeds' ($null -ne $page)
+            if ($null -ne $page) { Test-Holds $page $PublicFeed $DevFeed 'credits.md as served' }
+        }
+        finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
     }
 } elseif ($hasPublic -or $hasDev) {
     Yes 'both channel feeds are on disk when one of them is' $false

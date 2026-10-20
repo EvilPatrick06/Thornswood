@@ -148,7 +148,11 @@
         'These are typed in the chat: ' + k.chat + ' opens it, or ' + k.command +
           ' with the slash already typed.',
         'The rules are on thornswood.net and in the Discord, and a ticket there reaches ' +
-          'staff too.'
+          'staff too.',
+        // The AGPL's offer, where the server is used (#421).
+        'Thornswood runs on SkyMP, which is free software. Its source, with every change ' +
+          'Thornswood made to it, is at thornswood.net/credits#source, and Source code on ' +
+          'the launcher opens it.'
       ];
     } }
   ];
