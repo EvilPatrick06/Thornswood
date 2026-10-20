@@ -13,8 +13,8 @@ const ffile=path.join(__dirname,'test-merchant-trading.js'),fixtureContext={requ
 vm.createContext(fixtureContext);
 vm.runInContext(fs.readFileSync(ffile,'utf8').split('const roleMarket=')[0]+';this.fixture={memoryPurses,worldOf};',fixtureContext);
 const fixture=fixtureContext.fixture,catalog=require('../game/data/merchant-traders.json'),tables=require('../game/data/merchant-role-tables.json');
-const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests;
-assert.equal(raw.length,10);
+const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests.concat(require('../game/data/merchant-ranked-quests.json').quests);
+assert.equal(raw.length,18);
 for(const defect of ['missing','empty','hash','substitution','definition']) {
  const damaged=copy(raw);if(defect==='missing')damaged.pop();if(defect==='empty')damaged.length=0;
  if(defect==='hash')damaged[0].sourceHash='0'.repeat(64);
@@ -27,14 +27,15 @@ for(const defect of ['missing','empty','hash','substitution','definition']) {
 }
 for(const row of raw)assert.equal(row.sourceHash,crypto.createHash('sha256').update(JSON.stringify(source.find(q=>q.id===row.id))).digest('hex'));
 const ids=new Map();function id(desc){if(!ids.has(desc))ids.set(desc,1000+ids.size);return ids.get(desc);}
-const rows=prepareCommissions(raw,catalog,{
+const allRows=prepareCommissions(raw,catalog,{
  resolveMerchant(reference,base){assert.equal(require('../game/data/merchant-roster.json').merchants.find(q=>q.reference===reference).base,base);return id(reference);},
  resolveItem(desc,type){assert.equal(tables.records[desc].type,type);return id(desc);}
 });
+const rows=allRows.filter(row=>row.deliveryVersion!==2),ranked=allRows.filter(row=>row.deliveryVersion===2);
 const roles=Object.fromEntries(Object.entries(tables.tables).map(([name,table])=>[name,
  Object.fromEntries(Object.entries(table).map(([direction,descs])=>[direction,descs.map(id)]))]));
-const itemNames=new Map(rows.map(row=>[row.itemId,'Goods '+row.itemId]));
-const merchants=[...new Map(rows.map(row=>[row.merchantId,row])).values()];
+const itemNames=new Map(allRows.flatMap(row=>(row.goods||[row]).map(good=>[good.itemId,'Goods '+good.itemId])));
+const merchants=[...new Map(allRows.map(row=>[row.merchantId,row])).values()];
 function world() {
  const native={on:true},box=fixture.worldOf(native);let time=2000000000000,unit=2,standing;
  for(const row of merchants)box.actors[row.merchantId]={...box.actors[1],pos:[100,0,0]};
@@ -44,7 +45,7 @@ function world() {
  purses.stats=()=>({catalogue:merchants.length,retired:1});
  purses.ledgerStates=()=>merchants.map(row=>({merchantId:row.merchantId,reference:row.merchantRef,state:purses.read(row.merchantId)}))
   .concat([{merchantId:999,reference:'f:Skyrim.esm',state:null}]);
- const deps={purses,world:box,transfer:box.transfer,places:catalog.byRef,roleTables:roles,commissions:rows,
+ const deps={purses,world:box,transfer:box.transfer,places:catalog.byRef,roleTables:roles,commissions:allRows,
   isTrader:merchant=>merchants.some(row=>row.merchantId===merchant),now:()=>time,
   resolve:name=>{const found=[...itemNames].find(([,label])=>label===name);return found?{baseId:found[0],name:found[1]}:null;},
   prices:{catalog:()=>[...itemNames.values()].map(name=>({name,buy:unit,sell:unit+1})),quote:()=>({buy:unit,sell:unit+1})},
@@ -53,9 +54,11 @@ function world() {
  const command=(...parts)=>api.command({actorId:10,profileId:7,parts:['/merchant',...parts]});
  const open=row=>command(row.merchantId.toString(16)).view;
  const select=row=>{standing=row.gate.classKey?{v:1,cls:row.gate.classKey,ranks:{[row.gate.classKey]:'master'}}:
+  row.gate.profession==='mage'?{v:1,prof:'mage',schools:[row.gate.school],ranks:{[row.gate.school]:'master'},
+    spells:{known:[runtime.__thornswoodProgression.TABLE.spells[row.gate.school].master.find(name=>runtime.__thornswoodProgression.SPELL_IDS[name])]}}:
   {v:1,prof:row.gate.profession,ranks:{[row.gate.half]:'master'}};return open(row);};
  const quote=row=>select(row).quests.find(q=>q.id===row.id);
- const take=row=>{const q=quote(row);return command('quest','take',row.id,'@'+q.quotedUnit);};
+ const take=row=>{const q=quote(row);return command('quest','take',row.id,'@'+(q.quoteToken||q.quotedUnit));};
  const token=row=>'@'+purses.read(row.merchantId).commissions.held[policy.key(box.transfer.identity(10),row.id)].token;
  return {get api(){return api;},box,purses,deps,native,command,open,select,quote,take,token,
   reload:()=>{api.shutdown();api=bundle.createMerchantTrading(deps);},unit:n=>{unit=n;},rank:n=>{standing=n;},
@@ -136,11 +139,46 @@ for(const row of rows) {
  assert.match(w.command('quest','take',row.id,'@2').text,/requirements/);
  assert.equal(w.purses.read(row.merchantId).commissions,undefined);
 }
-{
- const row=rows[0],w=world();w.quote(row);let reads=0;
+console.log('PASS all ten compiled commissions: exact specialists, actual gates, pre-goods acceptance, original reserved payment, native settlement and stale-panel refusal');
+for(const row of ranked) {
+ const w=world(),q=w.quote(row);assert.equal(q.canTake,true,row.id);assert.equal(q.goods.length,row.goods.length);
+ assert.equal(q.hours,row.hours);assert.equal(q.gold,row.goods.reduce((sum,good)=>sum+good.count*2,0));
+ assert.match(q.quoteToken,/^[0-9a-f]{64}$/);assert.equal(q.quotedUnit,null);
+ assert.match(w.take(row).text,/take the work/);const token=w.token(row);
+ const state=w.purses.read(row.merchantId),held=state.commissions.held[policy.key(w.box.transfer.identity(10),row.id)];
+ assert.equal(held.hours,row.hours);assert.equal(held.gold,q.gold);
+ // A partial parcel makes no inventory, stock or purse write.
+ row.goods.slice(0,-1).forEach(good=>{w.box.inv[10][good.itemId]=good.count;});
+ const before=copy(w.box.inv[10]);w.command('quest','return',row.id,token);
+ assert.deepEqual(w.box.inv[10],before);assert.deepEqual(w.purses.read(row.merchantId),state);
+ row.goods.forEach(good=>{w.box.inv[10][good.itemId]=good.count;});
+ w.unit(9);w.rank({v:1,prof:'other',ranks:{}});w.reload();w.open(row);
+ w.command('quest','return',row.id,token);w.settle();
+ const paid=w.purses.read(row.merchantId);assert.equal(paid.purse,250-q.gold);assert.equal(w.box.inv[10][15],40+q.gold);
+ assert.equal(paid.stock.length,row.goods.length);assert.deepEqual(copy(paid.commissions.cool[policy.key(w.box.transfer.identity(10),row.id)]),[w.now(),row.hours]);
+ row.goods.forEach(good=>assert.equal(w.box.inv[10][good.itemId]||0,0));
+ w.command('quest','return',row.id,token);assert.equal(w.box.inv[10][15],40+q.gold);
+ w.clock(w.now()+row.hours*3600000-1);assert.equal(w.quote(row).state,'cooldown');
+ w.clock(w.now()+1);assert.notEqual(w.quote(row).state,'cooldown');
+}
+for(const row of ranked) {
+ const w=world(),q=w.quote(row);w.unit(3);w.command('quest','take',row.id,'@'+q.quoteToken);
+ assert.equal(w.purses.read(row.merchantId).commissions,undefined,'changed parcel prices refuse before a reservation');
+ w.unit(2);w.select(row);let armed=true;w.deps.onRankRead=()=>{if(armed){armed=false;w.open(row);}};
+ w.command('quest','take',row.id,'@'+q.quoteToken);
+ assert.equal(w.purses.read(row.merchantId).commissions,undefined,'replacement panels never inherit bundle acceptance');
+}
+for(const row of ranked.filter(row=>row.tier==='master')) {
+ const wrong=row.gate.classKey?{v:1,cls:row.gate.classKey,ranks:{[row.gate.classKey]:'expert'}}:
+  row.gate.profession==='mage'?{v:1,prof:'mage',schools:[row.gate.school],ranks:{[row.gate.school]:'master'},spells:{known:[]}}:
+  {v:1,prof:row.gate.profession,ranks:{wronghalf:'master',[row.gate.half]:'expert'}};
+ assert.equal(rules.allows(row.gate,wrong),false,'Master class/half and mapped school spell are required');
+}
+for(const row of [rows[0],ranked[0]]) {
+ const w=world(),q=w.quote(row);let reads=0;
  w.deps.onRankRead=()=>{if(++reads===2)w.box.actors[10].runtimeIdentity='101';};
- w.command('quest','take',row.id,'@2');assert.ok(reads>=2);
- assert.equal(w.purses.read(row.merchantId).commissions,undefined,
+ w.command('quest','take',row.id,'@'+(q.quoteToken||q.quotedUnit));
+ assert.ok(reads>=2);assert.equal(w.purses.read(row.merchantId).commissions,undefined,
   'native replacement during the final eligibility callback cannot reserve a promise');
 }
-console.log('PASS all ten compiled commissions: exact specialists, actual gates, pre-goods acceptance, original reserved payment, native settlement and stale-panel refusal');
+console.log('PASS eight ranked compiled parcel jobs: actual mastery gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');

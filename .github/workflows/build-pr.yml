@@ -475,6 +475,7 @@ jobs:
                  'test-1380-rare-mines.js',
                  'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
+                 'test-merchant-commission-bundles.js', 'test-merchant-ranked-sources.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-512-trading-company.js',
                  'test-1383-injury.js',
@@ -505,10 +506,13 @@ jobs:
                  'test-1382-drug.js',
                  'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
+                 'test-513-world-staff.js',
+                 'test-513-world-stage.js',
                  'test-1390-thalmor-patrols.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1382-potion-window.js',
+                 'test-2682-meal-help.js',
                  'test-1382-water.js',
                  'test-1734-rest-reconnect.js',
                  'test-1676-rest-gate.js',
@@ -620,6 +624,7 @@ jobs:
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
                  'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1', 'test-2727-feed-swap-readers.ps1', 'test-2180-feed-sends.ps1', 'test-feed-store.ps1', 'test-2740-whole-writes.js', 'test-2740-shared-reads.ps1',
+                 'test-2599-whole-swaps.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
                  'test-docs-pwfile.ps1', 'test-docs-password.ps1', 'test-2317-rotate-config.ps1',
@@ -684,6 +689,7 @@ jobs:
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
                  'test-storage-forecast.ps1',
+                 'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1'
           $failed = @()
           foreach ($n in $six) {
