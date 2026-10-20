@@ -341,9 +341,13 @@ from that file:
 - Indemnify Microsoft against claims arising from handing it on or using the
   programs it goes out with.
 - Require distributors and external end users to agree to terms that
-  protect it at least as much as the licence does. Nothing Thornswood hands
-  out says so today: not the Client Runtime's README on Nexus, and not the
-  site's terms page. That is under "What is still missing".
+  protect it at least as much as the licence does. Patrick decided on
+  20 October 2026 (#421, option A) that the Client Runtime's README says so:
+  by installing the file you accept Microsoft's terms for it, use it only
+  with the Thornswood client, keep its notices, do not hand it on apart from
+  the mod, and Microsoft gives no warranty. That README goes up with the
+  mod's next upload on Nexus. Until then the README Vortex installs, version
+  1.0.0, does not say it, which is under "What is still missing".
 
 No licence text travels with it, and the SDK licence does not ask for one.
 Windows 8.1 and later carry their own `d3dcompiler_47.dll` in `System32`
@@ -828,9 +832,11 @@ branch any more.
   source is". Nothing in the shipped client loads that file.
 - `d3dcompiler_47.dll` goes out in the Client Runtime under the Windows SDK's
   terms for Distributable Code ("d3dcompiler_47.dll, Microsoft's shader
-  compiler", above), and one of their conditions is not met: nothing asks
-  the people who install it to agree to terms that protect it at least as
-  much as Microsoft's do.
+  compiler", above), and one of their conditions is not met yet: nothing
+  asks the people who install it to agree to terms that protect it at least
+  as much as Microsoft's do. The README for the mod's next upload says so
+  (Patrick, 20 Oct 2026, #421), and this line goes when that upload is in
+  the collection.
 - The `ICU-LICENSE.txt` in the Client Runtime is a later ICU's text than the
   ICU 71 data it sits beside.
 - The permissive vcpkg licence texts do not travel with the client runtime,
