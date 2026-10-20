@@ -518,6 +518,61 @@ which 2,956 were the whole release note in `baseline.notes`; dev 3,015 (release
 1.2.4 on shows the same way, and the whole note stays on the News tab as the
 newest entry of `newsFile`. That takes main to about 2,040 bytes and dev to
 about 2,480 (dev also names its `signedManifest`, 391 bytes).
+
+## version.json in two (#1050)
+
+Patrick's answer of 19 Oct: version.json carries only what the update check
+needs, names the rest of the feed as one more asset, and names every asset by
+its sha256 alone. A launcher reads the feed on every check, every thirty
+seconds in a session, and almost none of it moves between releases.
+
+The store is unchanged: every generation on the VPS is the whole feed, and
+every script, backup and page reads it whole. The split is what the site
+answers (`site\server.js` `feedView`), once the feed's `minLauncher` is at or
+above `FEED_SPLIT_LAUNCHER`, 1.2.6, the first launcher that reads it
+(`launcher\app\FeedSettings.cs`). Below that the generation is answered byte
+for byte, as before.
+
+- **version.json** holds `launcherVersion`, `minLauncher`, `launcherUrl`,
+  `launcherSha256`, `baseline`, `newsFile`, `packs` and `news` (the last two
+  the empty lists every launcher has read), and `settings: { sha256 }`.
+  `launcherUrl` keeps its address, because a launcher below minLauncher needs
+  it to update itself; `baseline` and `newsFile` carry no `url`.
+- **The settings** are every other field, as one line of JSON, answered at
+  `/feed[-dev]/assets/<sha256>` by the site from the generation itself, never
+  a file in the assets folder, so a Scrub or a restore cannot lose them.
+  `clientRuntime` and `signedManifest` in them carry no `url` or `catalogUrl`.
+  The last four generations' settings stay answerable, for a launcher that
+  read version.json just before a Ship.
+- **Every asset's address** is the feed's own folder plus `assets/` plus its
+  sha256 (`Updater.AssetsOf`, `RecordRef.AssetUrl`), which is where
+  Publish-Update has always put every asset.
+- **The launcher** (`Updater.ReadFeed`) joins the two into one `VersionDoc`
+  (`VersionDoc.Join`), so nothing that reads it knows which file a field came
+  from. The settings are fetched only when their sha256 is not the one in
+  memory or in `Profile\feed-settings.json`, checked against it, and kept
+  there. Settings that cannot be had or do not hash are a feed it cannot
+  read, and the check fails with the reason.
+- **The ETag** is the generation's size and time as before, with `-split` on
+  a split one, and `/watch` hands out the same tag.
+- **A script that reads the site's feed** over https, not the store, reads it
+  through `Join-FeedSettings` (`Feed-Json.ps1`): `Read-SiteFeed`,
+  `Check-Outside.ps1`, `Setup-ShipMachine.ps1` and
+  `Copy-ReleaseAssets-ToSite.ps1`. The rest read the launcher fields alone.
+
+Projected from the 19 Oct main feed with the note's title, version.json is
+about 650 bytes. `tests\test-1050-feed-split.js` holds the site to this, and
+`tests\test-1050-feed-split.ps1` the launcher, `Join-FeedSettings`, and (with
+`-OldSrc`) every older launcher reading the split version.json as a feed that
+is behind and offers only the launcher update.
+
+It reaches launchers with the site deployed and the first launcher at 1.2.6
+or above on a channel: Publish-Update writes minLauncher as the launcher it
+publishes, so that Ship is the one the site starts splitting on. Bump-Version
+moves main's number to 1.2.6, and dev's numbers climb from main's, so dev
+splits from its first 1.2.6.N and main from its 1.2.6 Ship. A launcher at 1.2.6
+reads a feed that is not split the same as before, so the site can go first.
+
 ## Checks on every download
 
 - **Host allow list.** https only, and the host must be `github.com`,

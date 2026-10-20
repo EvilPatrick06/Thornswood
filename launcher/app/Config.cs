@@ -677,7 +677,25 @@ namespace Thornswood
         /// </summary>
         public ManifestRef manifestRef;
 
+        /// <summary>
+        /// The rest of the feed as a file of its own, "settings" (#1050,
+        /// FeedSettings.cs). Null when the feed carries every field itself.
+        /// </summary>
+        public SettingsRef settingsRef;
+
         public static VersionDoc Parse(byte[] raw)
+        {
+            return ParseFeed(raw, null);
+        }
+
+        /// <summary>
+        /// The feed, with every asset it names by sha256 alone given the
+        /// address it has beside every other asset (#1050): assets is the
+        /// feed's own folder plus "assets/" (Updater.AssetsOf). Null for a
+        /// reader that has no feed address, which then has only the assets
+        /// whose address the feed spells out.
+        /// </summary>
+        public static VersionDoc ParseFeed(byte[] raw, string assets)
         {
             // A UTF-8 byte order mark is not JSON. The serializer stops on it and
             // reports an unexpected character, which would break the update
@@ -689,11 +707,34 @@ namespace Thornswood
                 doc = (VersionDoc)new DataContractJsonSerializer(typeof(VersionDoc)).ReadObject(ms);
             if (doc != null)
             {
-                doc.record = RecordRef.FromFeed(raw, at);
-                doc.newsRef = NewsRef.FromFeed(raw, at);
-                doc.manifestRef = ManifestRef.FromFeed(raw, at);
+                doc.record = RecordRef.FromFeed(raw, at, assets);
+                doc.newsRef = NewsRef.FromFeed(raw, at, assets);
+                doc.manifestRef = ManifestRef.FromFeed(raw, at, assets);
+                doc.settingsRef = SettingsRef.FromFeed(raw, at);
+                if (doc.clientRuntime != null)
+                    doc.clientRuntime.url = RecordRef.AssetUrl(doc.clientRuntime.url, (doc.clientRuntime.sha256 ?? "").ToLowerInvariant(), assets);
             }
             return doc;
+        }
+
+        /// <summary>
+        /// The feed whose update fields are top's and every other field rest's:
+        /// version.json and the settings file it names (#1050). The packs and
+        /// the news "news" carries stay in version.json, as empty lists, for
+        /// every launcher from before the split.
+        /// </summary>
+        public static VersionDoc Join(VersionDoc top, VersionDoc rest)
+        {
+            rest.launcherVersion = top.launcherVersion;
+            rest.launcherUrl = top.launcherUrl;
+            rest.launcherSha256 = top.launcherSha256;
+            rest.minLauncher = top.minLauncher;
+            rest.packs = top.packs;
+            rest.news = top.news;
+            rest.record = top.record;
+            rest.newsRef = top.newsRef;
+            rest.settingsRef = top.settingsRef;
+            return rest;
         }
     }
 
@@ -713,7 +754,7 @@ namespace Thornswood
 
         /// <summary>The feed's "signedManifest", or null when it names none
         /// this launcher can use. Never throws.</summary>
-        public static ManifestRef FromFeed(byte[] raw, int at)
+        public static ManifestRef FromFeed(byte[] raw, int at, string assets)
         {
             try
             {
@@ -725,9 +766,9 @@ namespace Thornswood
                 if (o == null) return null;
                 var r = new ManifestRef();
                 r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
-                r.url = Json.Str(o, "url").Trim();
+                r.url = RecordRef.AssetUrl(Json.Str(o, "url"), r.sha256, assets);
                 r.catalogSha256 = Json.Str(o, "catalogSha256").ToLowerInvariant();
-                r.catalogUrl = Json.Str(o, "catalogUrl").Trim();
+                r.catalogUrl = RecordRef.AssetUrl(Json.Str(o, "catalogUrl"), r.catalogSha256, assets);
                 if (!RecordRef.IsSha(r.sha256) || r.url.Length == 0) return null;
                 if (!RecordRef.IsSha(r.catalogSha256) || r.catalogUrl.Length == 0) return null;
                 return r;
@@ -737,6 +778,46 @@ namespace Thornswood
                 // A feed whose "signedManifest" cannot be read has none: the
                 // check says so in the log, and the rest of the feed stands.
                 return null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// The feed's "settings" (#1050): { sha256 }, every field of the feed that
+    /// is not about the update itself, as one asset stored under its own
+    /// sha256 beside every other one. Its address is never taken from the
+    /// feed: it is the feed's own assets folder plus the sha256, so it is on
+    /// the host the feed came from (FeedSettings.cs). Unlike the record and the
+    /// news file, a "settings" this launcher cannot use is not read as none,
+    /// because the server, voice and Skyrim pin are in it: FromFeed gives one
+    /// with an empty sha256, and the update check says the feed is unreadable.
+    /// </summary>
+    public class SettingsRef
+    {
+        public string sha256 = "";
+
+        /// <summary>The feed's "settings", or null when it names none. Never
+        /// throws.</summary>
+        public static SettingsRef FromFeed(byte[] raw, int at)
+        {
+            var r = new SettingsRef();
+            try
+            {
+                var root = Json.Parse(Encoding.UTF8.GetString(raw, at, raw.Length - at)) as Dictionary<string, object>;
+                if (root == null) return null;
+                object b;
+                if (!root.TryGetValue("settings", out b)) return null;
+                var o = b as Dictionary<string, object>;
+                if (o == null) return r;
+                string sha = Json.Str(o, "sha256").ToLowerInvariant();
+                if (RecordRef.IsSha(sha)) r.sha256 = sha;
+                return r;
+            }
+            catch (Exception)
+            {
+                // The serializer has read this same text already, so this is
+                // a feed that parsed and a "settings" that did not: unusable.
+                return r;
             }
         }
     }
@@ -754,7 +835,7 @@ namespace Thornswood
 
         /// <summary>The feed's "newsFile", or null when it names none this
         /// launcher can use. Never throws.</summary>
-        public static NewsRef FromFeed(byte[] raw, int at)
+        public static NewsRef FromFeed(byte[] raw, int at, string assets)
         {
             try
             {
@@ -766,7 +847,7 @@ namespace Thornswood
                 if (o == null) return null;
                 var r = new NewsRef();
                 r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
-                r.url = Json.Str(o, "url").Trim();
+                r.url = RecordRef.AssetUrl(Json.Str(o, "url"), r.sha256, assets);
                 if (!RecordRef.IsSha(r.sha256) || r.url.Length == 0) return null;
                 return r;
             }
@@ -802,7 +883,7 @@ namespace Thornswood
 
         /// <summary>The "baseline" of a feed, or null when it names none or
         /// names one this launcher cannot use. Never throws.</summary>
-        public static RecordRef FromFeed(byte[] raw, int at)
+        public static RecordRef FromFeed(byte[] raw, int at, string assets)
         {
             try
             {
@@ -815,7 +896,7 @@ namespace Thornswood
                 var r = new RecordRef();
                 r.id = Json.Str(o, "id");
                 r.sha256 = Json.Str(o, "sha256").ToLowerInvariant();
-                r.url = Json.Str(o, "url").Trim();
+                r.url = RecordRef.AssetUrl(Json.Str(o, "url"), r.sha256, assets);
                 r.notes = Json.Str(o, "notes").Trim();
                 if (!IsSha(r.sha256) || r.url.Length == 0) return null;
                 if (r.id.Length == 0) r.id = r.sha256.Substring(0, 12);
@@ -827,6 +908,19 @@ namespace Thornswood
                 // launcher takes the packs, and the rest of the feed stands.
                 return null;
             }
+        }
+
+        /// <summary>
+        /// An asset's address: the one the feed spells out, or, when it gives
+        /// only the sha256 (#1050), the feed's assets folder plus it, which is
+        /// where Publish-Update puts every asset. "" when neither is had.
+        /// </summary>
+        public static string AssetUrl(string given, string sha, string assets)
+        {
+            string u = given == null ? "" : given.Trim();
+            if (u.Length > 0) return u;
+            if (string.IsNullOrEmpty(assets) || !IsSha(sha)) return "";
+            return assets + sha;
         }
 
         /// <summary>64 lowercase hex characters.</summary>

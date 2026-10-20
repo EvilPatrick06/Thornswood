@@ -844,6 +844,85 @@ const DEPLOYED_BUILD = path.join(DATA, 'deployed-build.json');
    channel has no feed. */
 const feedNewest = {};
 function feedGeneration(n) { return String(n).padStart(8, '0') + '.json'; }
+/* THE FEED LAUNCHERS READ, IN TWO (#1050, Patrick's answer of 19 Oct). The
+   store keeps every generation whole, and every script, backup and page reads
+   it whole. What /feed[-dev]/version.json answers is feedView's: once the
+   feed's minLauncher is at or above FEED_SPLIT_LAUNCHER, the first launcher
+   that reads it this way (launcher\app\FeedSettings.cs), version.json holds
+   only what the update check needs, FEED_TOP, and names everything else as
+   one more asset, "settings": { sha256 }, the rest of the feed as one line
+   of JSON, answered at /feed[-dev]/assets/<sha256> from here. And every asset
+   the feed names is named by its sha256 alone: the launcher finds it in the
+   feed's own assets folder. A launcher reads the feed on every check, every
+   thirty seconds in a session, and on 19 Oct main's was 4,928 bytes, almost
+   none of which moves between releases. Below that minLauncher the file is
+   answered as the store holds it, byte for byte. The launcher fields, and
+   "packs" and "news" as the empty lists every launcher has read, stay in
+   version.json either way, so a launcher from before this can still read
+   that it is behind and update itself. Kept beside the generations because
+   everything that answers the feed reads through both. */
+const FEED_SPLIT_LAUNCHER = '1.2.6';
+const FEED_TOP = ['launcherVersion', 'minLauncher', 'launcherUrl', 'launcherSha256', 'baseline', 'newsFile', 'packs', 'news'];
+const feedViews = {};
+function feedAtLeast(v, min) {
+  const a = String(v || '').trim().split('.'), b = min.split('.');
+  if (a.some((x) => !/^\d+$/.test(x))) return false;
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = Number(a[i] || 0), y = Number(b[i] || 0);
+    if (x !== y) return x > y;
+  }
+  return true;
+}
+function feedHashOnly(o, keys) {
+  if (!o || typeof o !== 'object' || Array.isArray(o)) return;
+  for (const pair of keys) {
+    if (/^[0-9a-f]{64}$/.test(String(o[pair[1]] || ''))) delete o[pair[0]];
+  }
+}
+function feedSplit(doc) {
+  const top = {}, rest = {};
+  for (const k of Object.keys(doc)) (FEED_TOP.indexOf(k) >= 0 ? top : rest)[k] = doc[k];
+  feedHashOnly(top.baseline, [['url', 'sha256']]);
+  feedHashOnly(top.newsFile, [['url', 'sha256']]);
+  feedHashOnly(rest.clientRuntime, [['url', 'sha256']]);
+  feedHashOnly(rest.signedManifest, [['url', 'sha256'], ['catalogUrl', 'catalogSha256']]);
+  const settings = Buffer.from(JSON.stringify(rest), 'utf8');
+  const sha = require('crypto').createHash('sha256').update(settings).digest('hex');
+  top.settings = { sha256: sha };
+  return { body: Buffer.from(JSON.stringify(top), 'utf8'), sha: sha, settings: settings };
+}
+/* The answer for one generation file: { body, tag, sha, settings }, sha and
+   settings null when it is answered whole. The tag is the file's size and
+   time, as it always was, with "-split" on a split one, so turning the split
+   on gives every launcher a new document once. The last four are kept per
+   channel, so a launcher that read version.json just before a Ship still
+   finds the settings it names. Throws when the file is gone. */
+function feedView(channel, file) {
+  const st = fs.statSync(file);
+  const list = feedViews[channel] || (feedViews[channel] = []);
+  for (const v of list) if (v.file === file && v.size === st.size && v.mtimeMs === st.mtimeMs) return v;
+  const raw = fs.readFileSync(file);
+  const v = { file: file, size: st.size, mtimeMs: st.mtimeMs, body: raw, sha: null, settings: null,
+              tag: '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"' };
+  let doc = null;
+  try { doc = JSON.parse(raw.toString('utf8').replace(/^﻿/, '')); } catch (e) { doc = null; }
+  if (doc && typeof doc === 'object' && !Array.isArray(doc) && feedAtLeast(doc.minLauncher, FEED_SPLIT_LAUNCHER)) {
+    const s = feedSplit(doc);
+    v.body = s.body; v.sha = s.sha; v.settings = s.settings;
+    v.tag = v.tag.slice(0, -1) + '-split"';
+  }
+  list.unshift(v);
+  if (list.length > 4) list.length = 4;
+  return v;
+}
+/* The settings a view of this channel names, or null. The newest generation
+   is looked at first, for a site that restarted since the feed was read. */
+function feedSettings(channel, sha) {
+  const newest = feedFile(channel);
+  if (newest) feedView(channel, newest);
+  for (const v of feedViews[channel] || []) if (v.sha === sha) return v.settings;
+  return null;
+}
 function feedFile(channel) {
   const dir = path.join(ROOT, channel, 'version');
   let n = feedNewest[channel] || 0;
@@ -6255,8 +6334,10 @@ async function handle(req, res) {
       The tag is size and modified time, the same shape the static and asset
       branches use, so every new generation of the feed changes it.
     */
-    const vst = fs.statSync(file);
-    const vtag = '"' + vst.size.toString(16) + '-' + Math.floor(vst.mtimeMs).toString(16) + '"';
+    // What the launcher is answered: the whole generation, or once the
+    // feed's minLauncher reads it, the update fields alone (feedView, #1050).
+    const view = feedView(feedVer[1], file);
+    const vtag = view.tag;
     if (String(req.headers['if-none-match'] || '') === vtag) {
       res.writeHead(304, {
         'etag': vtag,
@@ -6265,7 +6346,7 @@ async function handle(req, res) {
       });
       return res.end();
     }
-    return send(res, 200, fs.readFileSync(file), 'application/json; charset=utf-8',
+    return send(res, 200, view.body, 'application/json; charset=utf-8',
       { 'Cache-Control': 'no-cache', 'ETag': vtag });
   }
 
@@ -6289,13 +6370,14 @@ async function handle(req, res) {
       // Generations are never deleted, so only a feed folder taken away by
       // hand ends the wait, with the 404 a channel with no feed answers.
       const file = feedFile(channel);
-      let st;
-      try { st = fs.statSync(file); }
+      let view;
+      try { view = feedView(channel, file); }
       catch (e) {
         if (!res.headersSent) return send(res, 404, 'no such file', 'text/plain');
         return;
       }
-      const tag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      // The tag version.json answers with, split or whole (feedView, #1050).
+      const tag = view.tag;
       if (!have || have !== tag) {
         if (res.headersSent) return;
         res.writeHead(200, {
@@ -6326,6 +6408,18 @@ async function handle(req, res) {
     const dir = path.join(ROOT, feedAsset[1], 'assets');
     const file = path.join(dir, feedAsset[2]);
     if (!file.startsWith(dir + path.sep) || !fs.existsSync(file)) {
+      // The rest of the feed, which version.json names as "settings" and
+      // which is only ever here (feedView, #1050). Small, so no Range.
+      const settings = feedSettings(feedAsset[1], feedAsset[2]);
+      if (settings) {
+        res.writeHead(200, {
+          'content-type': 'application/json; charset=utf-8',
+          'content-length': settings.length,
+          'cache-control': 'public, max-age=31536000, immutable',
+          'x-content-type-options': 'nosniff'
+        });
+        return res.end(head ? undefined : settings);
+      }
       return send(res, 404, 'no such file', 'text/plain');
     }
     const st = fs.statSync(file);
