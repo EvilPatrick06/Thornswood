@@ -754,6 +754,7 @@ jobs:
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
                  'test-storage-forecast.ps1',
+                 'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1'
           $failed = @()
           foreach ($n in $six) {
