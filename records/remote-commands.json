@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  59,
-    "callCount":  254,
+    "scriptCount":  61,
+    "callCount":  262,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2300,6 +2300,78 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script \"New-Item -ItemType Directory -Force -Path \u0027$run\u0027 | Out-Null; \u0027MADE\u0027\"",
+                      "does":  "makes the run\u0027s own folder under C:\\Windows\\Temp",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile $artifact.Zip $target $ssh ($runFar + \u0027/tools.zip\u0027)",
+                      "does":  "uploads the tools artifact to the run\u0027s folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodArtifactRemote $target $ssh $farRun",
+                      "does":  "copies a game server\u0027s plugins into the run\u0027s folder, links Skyrim\u0027s archives, runs a repository Python tool there and zips what it wrote",
+                      "class":  "admin",
+                      "reason":  "runs a tool on the box, work outside the gate verbs"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "\u0026 scp @ssh ($target + \u0027:\u0027 + $runFar + \u0027/back.zip\u0027) $back",
+                      "does":  "downloads what the tool wrote",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$gone = @(Invoke-ThornswoodArtifactRemote $target $ssh $farClean",
+                      "does":  "removes the run\u0027s folder",
+                      "class":  "stage",
+                      "reason":  "removes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$answer = @(Invoke-ThornswoodArtifactRemote $target $ssh $ask)",
+                      "does":  "makes and locks C:\\Thornswood-GameData and hashes the archives it holds",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessRule"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
+                      "does":  "uploads one Skyrim archive to C:\\Thornswood-GameData",
+                      "class":  "admin",
+                      "reason":  "writes into a folder only SYSTEM and Administrators reach"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$out = @(Invoke-ThornswoodArtifactRemote $target $ssh $place)",
+                      "does":  "checks an arrived archive\u0027s sha1, gives it its name and makes it read only",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessControl"
                   }
               ]
 }
