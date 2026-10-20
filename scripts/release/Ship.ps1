@@ -775,6 +775,16 @@ function Get-DevLauncherLine([bool]$aligned, [string]$current, [string]$inputs, 
         $out.Why = "main has not published $current yet and dev already carries $current from other launcher sources, so this takes a dev number"
         return $out
     }
+    # Dev went past $current with a dev number (a launcher change after dev
+    # took $current): dev carrying $current again would be a downgrade every
+    # dev launcher refuses, so it stays on dev numbers until main ships past.
+    # Until 20 Oct this fell through to "dev carries $current", and the next
+    # dev Ship from 1.2.6 stopped on "Dev cannot downgrade the published
+    # version 1.2.6.1 to 1.2.6".
+    if ($null -ne $devPub -and $devPub.Version -and (Cmp ([string]$devPub.Version) $current) -gt 0) {
+        $out.Why = "main has not published $current yet and dev already carries $($devPub.Version), past it, so the launcher stays on a dev number"
+        return $out
+    }
     $out.MainEquivalent = $true
     $out.Why = "main has not published $current yet and this is the source it will ship it from, so dev carries $current"
     return $out
