@@ -216,6 +216,8 @@ function rig(opts) {
     (opts.asks ? 'say("asked the person looked at"); return true;' : 'return false;') + ' }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
+    'function furniturePress() { return false; }\n' +
+    'function arrangePress() { return false; }\n' +
     // The lock key, X, since #1472, asked only for its own scan code. What it
     // does is test-lock-keypress.js's business.
     'function lockPress() { return false; }\n' +

@@ -453,6 +453,7 @@ const PLUGIN_REPORTS = [
   /^\/rest (?:bed|sit|up)$/,
   /^\/tspicks \d+$/,
   /^\/tspicked [0-9a-f]+$/,
+  /^\/furniture look$/,
   /^\/modset(?: [A-Za-z0-9_]+=-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)+$/
 ];
 function pluginReport(text) {

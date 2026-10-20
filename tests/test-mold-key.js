@@ -295,6 +295,11 @@ function client(opt) {
     'const SLEEP_KEY = MOLD_KEY;',
     'function sleepPress() { return false; }',
     'function repairPress() { return false; }',
+    // The furniture keys (#2679): a piece in hand or under the crosshair, and
+    // Arrange furniture in the inventory. No piece and no inventory here;
+    // test-2679-furniture.js has what they do.
+    'function furniturePress() { return false; }',
+    'function arrangePress() { return false; }',
     // And at a forge with a stamped mold, the master key (#2254). No forge
     // is looked at here; test-1637-door-gui.js has what it does.
     'function masterPress() { return false; }',
