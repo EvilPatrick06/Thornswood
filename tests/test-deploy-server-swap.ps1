@@ -101,6 +101,10 @@ Yes 'Swap.ps1 puts Read-JsonFile.ps1 and RecordShape.ps1 in front of the stage c
     $lib.Substring($b).Contains('$checkBlock = $ThornswoodRecordShapeText + $checkBlock'))
 $checkBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Read-JsonFile.ps1')) + "`r`n" +
               [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\RecordShape.ps1')) + "`r`n" + $checkBlock
+# And the stop and the renames (#2928), the way Swap.ps1 puts them in front.
+Yes 'Swap.ps1 puts StopAndMove.ps1 in front of the swap' (
+    $lib.Substring($b).Contains('$swapBlock = $ThornswoodStopAndMoveText + $swapBlock'))
+$swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\StopAndMove.ps1')) + "`r`n" + $swapBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.

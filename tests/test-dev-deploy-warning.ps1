@@ -366,6 +366,8 @@ function Stop-ScheduledTask { }
 function Stop-Process { 'stand-in asked to stop ' + ($args -join ' ') }
 function Get-NetUDPEndpoint { }
 function Get-NetTCPConnection { }
+function Get-ThornswoodProcessHeld { }
+function Stop-ThornswoodProcessHeld { }
 function Start-Sleep { }
 function Held { $false }
 

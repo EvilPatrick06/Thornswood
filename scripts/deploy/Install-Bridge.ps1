@@ -147,23 +147,34 @@ if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Cont
 }
 
 # The task, then anything of ours still running: server-log.js names
-# bridge.log on its command line, and bridge.js is its child.
-$stopIt = @"
+# bridge.log on its command line, and bridge.js is its child. Each found and
+# opened before the task is asked to stop, then waited for until it has
+# exited (StopAndMove.ps1, which goes up in front, #2928), so the port is free
+# and no file is open when the install renames it. Until 20 Oct this waited
+# for the port to close instead, ten seconds at most. Says what it stopped,
+# and leaves in $stopOk whether everything of ours exited and the port is
+# free: a function that returned that as well as saying lines gave its caller
+# the lines, and a stop that failed was never refused.
+$stopIt = [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
 function StopIt {
-    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
     `$all = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)
     `$mine = @(`$all | Where-Object { `$_.CommandLine -and `$_.CommandLine -like ('*' + '$log' + '*') })
+    `$ids = @()
     foreach (`$p in `$mine) {
-        foreach (`$c in @(`$all | Where-Object { `$_.ParentProcessId -eq `$p.ProcessId })) { Stop-Process -Id `$c.ProcessId -Force -EA SilentlyContinue }
-        Stop-Process -Id `$p.ProcessId -Force -EA SilentlyContinue
+        `$ids += [int]`$p.ProcessId
+        `$ids += @(`$all | Where-Object { `$_.ParentProcessId -eq `$p.ProcessId } | ForEach-Object { [int]`$_.ProcessId })
     }
+    `$held = @(Get-ThornswoodProcessHeld `$ids)
+    `$ThornswoodNotHeld
+    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
+    Stop-ThornswoodProcessHeld `$held
     if (`$mine.Count) { 'stopped ' + `$mine.Count + ' bridge process(es)' }
-    for (`$i = 0; `$i -lt 20; `$i++) {
-        if (-not (Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue)) { return `$true }
-        Start-Sleep -Milliseconds 500
+    `$script:stopOk = -not @(@(`$ThornswoodStillRunning) + @(`$ThornswoodNotHeld) | Where-Object { `$_ }).Count
+    # Ours have exited, so anything still listening is not ours.
+    if (`$stopOk -and (Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue)) {
+        'something that is not ours is listening on port $Port'
+        `$script:stopOk = `$false
     }
-    'something is still listening on port $Port and would not let go'
-    return `$false
 }
 "@
 
@@ -172,7 +183,7 @@ if ($Remove) {
     Head 'Removing'
     $out = @(Remote @"
 $stopIt
-`$null = StopIt
+StopIt
 Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { 'STILL THERE' } elseif (Test-Path -LiteralPath '$Root') { 'FOLDER STILL THERE' } else { 'REMOVED' }
@@ -307,7 +318,8 @@ function Answers([string[]]`$Lines) {
     return `$false
 }
 
-if (-not (StopIt)) { 'BRIDGE REFUSED'; exit 1 }
+StopIt
+if (-not `$stopOk) { 'BRIDGE REFUSED'; exit 1 }
 New-Item -ItemType Directory -Force -Path '$Root\$prev' | Out-Null
 foreach (`$f in `$want.Keys) {
     `$live = Join-Path '$Root' `$f
@@ -337,7 +349,7 @@ if (Answers @('$Plain')) {
 }
 'it did not answer on 127.0.0.1:$Port within $Wait seconds. bridge.log says:'
 if (Test-Path -LiteralPath '$log') { Get-Content -LiteralPath '$log' -Tail 15 } else { 'nothing was written' }
-`$null = StopIt
+StopIt
 `$back = @(Get-ChildItem -LiteralPath '$Root\$prev' -File -EA SilentlyContinue)
 foreach (`$f in `$back) { Move-Item -LiteralPath `$f.FullName -Destination (Join-Path '$Root' `$f.Name) -Force }
 if (`$oldXml) {

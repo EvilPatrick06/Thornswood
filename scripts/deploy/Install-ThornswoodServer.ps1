@@ -416,12 +416,151 @@ function GamePortOf([string]$dir) {
     return 7777
 }
 
-# A folder rename on one volume, retried, because a process that has just been
-# told to stop does not always let go of its files the same instant.
-function MoveDir([string]$from, [string]$to) {
-    for ($i = 0; $i -lt 10; $i++) {
-        try { [IO.Directory]::Move($from, $to); return $true } catch { Start-Sleep -Milliseconds 700 }
+# Stopping the server and waiting until each of its processes has exited,
+# and each folder rename tried once, saying why when Windows refuses it
+# (#2928). A copy of scripts\deploy\StopAndMove.ps1 below its header, kept
+# here for the reason the ServiceAccount.ps1 copy above is: every file
+# Publish-Server.ps1 sends is a call in records\remote-commands.json.
+# tests\test-2928-stop-and-move.ps1 fails when this copy and StopAndMove.ps1
+# differ. Until 20 Oct the renames were tried ten times, 0.7 s apart.
+# ---- StopAndMove.ps1 (copy) ----
+
+# How long a process that has been ended may take to exit before its caller
+# is told it has not. Measured on the box: 8 to 403 ms (#2928). One still there
+# after this is stuck in the kernel, and moving its files would be refused.
+$ThornswoodExitSeconds = 30
+
+# The processes with these ids that are running, each with its handle open,
+# so that Stop-ThornswoodProcessHeld waits on that process and no other.
+# Opened before anything is asked to stop; the caller takes them with @().
+# An id with nothing running is left out: there is nothing to wait for. One
+# that is running and cannot be opened goes in $ThornswoodNotHeld, a line
+# each, for the caller to say and to move nothing it holds.
+$ThornswoodNotHeld = @()
+function Get-ThornswoodProcessHeld([int[]]$Ids) {
+  $script:ThornswoodNotHeld = @()
+  foreach ($id in @($Ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
+    $p = Get-Process -Id $id -EA SilentlyContinue
+    if (-not $p) { continue }
+    $name = $p.ProcessName
+    try { $null = $p.Handle; $p }
+    catch {
+      if (Get-Process -Id $id -EA SilentlyContinue) {
+        $script:ThornswoodNotHeld += ('COULD NOT OPEN pid ' + $id + ' (' + $name + ') to wait for it to exit: ' + $_.Exception.Message)
+      }
     }
+  }
+}
+
+# Ends each process Get-ThornswoodProcessHeld opened that is still running,
+# and returns once every one has exited. Says nothing for one that exits,
+# because each caller says what it stopped in its own words; says each one
+# that had not exited after $ThornswoodExitSeconds, and leaves its id in
+# $ThornswoodStillRunning, so the caller moves nothing it holds.
+$ThornswoodStillRunning = @()
+function Stop-ThornswoodProcessHeld($Held) {
+  $script:ThornswoodStillRunning = @()
+  $why = @{}
+  $names = @{}
+  foreach ($p in @($Held | Where-Object { $_ })) {
+    if ($p.HasExited) { continue }
+    $names[$p.Id] = $p.ProcessName
+    # Refused when it is already on its way out, which the wait below sees.
+    try { $p.Kill() } catch { $why[$p.Id] = $_.Exception.Message }
+  }
+  $until = (Get-Date).AddSeconds($ThornswoodExitSeconds)
+  foreach ($p in @($Held | Where-Object { $_ })) {
+    $left = [int][Math]::Max(0, ($until - (Get-Date)).TotalMilliseconds)
+    if ($p.WaitForExit($left)) { continue }
+    $script:ThornswoodStillRunning += $p.Id
+    $line = 'pid ' + $p.Id + ' (' + $names[$p.Id] + ') was ended and had not exited after ' + $ThornswoodExitSeconds + ' seconds'
+    if ($why.ContainsKey($p.Id)) { $line += '; ending it said: ' + $why[$p.Id] }
+    $line
+  }
+}
+
+# What the Restart Manager says has a file at or under $Path open right now,
+# as "pid name" pairs, or why it could not be asked. A refusal it names
+# nothing for is held by a driver or by a process that is still exiting.
+function Get-ThornswoodPathHolders([string]$Path) {
+  if (-not ('ThornswoodRestartManager' -as [type])) {
+    try {
+      Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+public static class ThornswoodRestartManager {
+  [StructLayout(LayoutKind.Sequential)] struct FILETIME { public uint Low; public uint High; }
+  [StructLayout(LayoutKind.Sequential)] struct RM_UNIQUE_PROCESS { public int Pid; public FILETIME Start; }
+  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct RM_PROCESS_INFO {
+    public RM_UNIQUE_PROCESS Process;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string AppName;
+    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string ServiceShortName;
+    public int AppType; public uint AppStatus; public uint TSSessionId;
+    [MarshalAs(UnmanagedType.Bool)] public bool Restartable;
+  }
+  [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)] static extern int RmStartSession(out uint session, int flags, string key);
+  [DllImport("rstrtmgr.dll")] static extern int RmEndSession(uint session);
+  [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)] static extern int RmRegisterResources(uint session, uint files, string[] names, uint apps, IntPtr unique, uint services, string[] serviceNames);
+  [DllImport("rstrtmgr.dll")] static extern int RmGetList(uint session, out uint needed, ref uint count, [In, Out] RM_PROCESS_INFO[] info, ref uint reasons);
+  public static string Holders(string[] files) {
+    uint session;
+    int r = RmStartSession(out session, 0, Guid.NewGuid().ToString());
+    if (r != 0) return "the Restart Manager would not start (" + r + ")";
+    try {
+      r = RmRegisterResources(session, (uint)files.Length, files, 0, IntPtr.Zero, 0, null);
+      if (r != 0) return "the Restart Manager would not take the files (" + r + ")";
+      uint needed = 0, count = 0, reasons = 0;
+      r = RmGetList(session, out needed, ref count, null, ref reasons);
+      if (r == 0) return "";
+      if (r != 234) return "the Restart Manager would not list them (" + r + ")";
+      RM_PROCESS_INFO[] info = new RM_PROCESS_INFO[needed];
+      count = needed;
+      r = RmGetList(session, out needed, ref count, info, ref reasons);
+      if (r != 0) return "the Restart Manager would not list them (" + r + ")";
+      List<string> said = new List<string>();
+      for (int i = 0; i < count; i++) said.Add("pid " + info[i].Process.Pid + " " + info[i].AppName);
+      return string.Join(", ", said.ToArray());
+    } finally { RmEndSession(session); }
+  }
+}
+'@
+    } catch { return 'the Restart Manager could not be asked: ' + $_.Exception.Message }
+  }
+  $files = @($Path)
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -EA SilentlyContinue | ForEach-Object { $_.FullName })
+    if (-not $files.Count) { return 'the folder holds no files, so only an open handle on a folder in it can be holding it' }
+  }
+  $who = [ThornswoodRestartManager]::Holders([string[]]$files)
+  if (-not $who) { return 'no process the Restart Manager can see, so a driver or a process still exiting' }
+  return $who
+}
+
+# Moves a file or a folder on one volume, once, making the folder it goes
+# into. $false when Windows refuses, with why in $ThornswoodMoveWhy.
+$ThornswoodMoveWhy = ''
+function Move-ThornswoodPath([string]$From, [string]$To) {
+  $script:ThornswoodMoveWhy = ''
+  try {
+    $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $To))
+    if (Test-Path -LiteralPath $From -PathType Container) { [IO.Directory]::Move($From, $To) }
+    else { [IO.File]::Move($From, $To) }
+    return $true
+  } catch {
+    $e = $_.Exception
+    while ($e.InnerException) { $e = $e.InnerException }
+    $script:ThornswoodMoveWhy = ('{0} (0x{1:X8}); open under it then: {2}' -f $e.Message.Trim(), $e.HResult, (Get-ThornswoodPathHolders $From))
+    return $false
+  }
+}
+# ---- end StopAndMove.ps1 ----
+
+# A folder rename on one volume, once (Move-ThornswoodPath above), saying why
+# when it is refused.
+function MoveDir([string]$from, [string]$to) {
+    if (Move-ThornswoodPath $from $to) { return $true }
+    Say ("could not move {0} to {1}: {2}" -f $from, $to, $ThornswoodMoveWhy) 'Red'
     return $false
 }
 
@@ -432,7 +571,10 @@ function MoveDir([string]$from, [string]$to) {
   and node does not drop its file handles the instant it is asked: the
   resources server under data\api holds the plugin files it is serving. A
   folder cannot be renamed while anything in it is open, so what is still
-  running under this root is stopped outright and the handles are waited for.
+  running under this root is stopped outright and each process is waited for
+  until it has exited, which is when its handles are closed (#2928: on the box
+  a folder whose file a just-stopped node held was refused 15 times in 15 when
+  renamed at once, and 0 in 15 once that node had exited).
 
   By this root and nothing else, because the live and the dev server are both
   node. The task runs cmd.exe, which starts server-log.js under node with this
@@ -461,30 +603,23 @@ function ServerProcesses([string]$dir) {
 }
 
 function StopServer([string]$dir) {
-    # Found before the task is stopped.
+    # Found and opened before the task is stopped, so what is waited for
+    # below is these processes and nothing given their ids afterwards.
     $ids = @(ServerProcesses $dir | ForEach-Object { [int]$_.ProcessId })
+    $held = @(Get-ThornswoodProcessHeld $ids)
+    foreach ($l in @($ThornswoodNotHeld)) { Say $l 'Red' }
     # No task yet is nothing to stop. One that is there and will not stop is
-    # said: its processes are stopped by id below whatever it does.
+    # said: its processes are ended by id below whatever it does.
     if (-not $NoTask -and (Get-ScheduledTask -TaskName $TaskName -ErrorAction SilentlyContinue)) {
         try { Stop-ScheduledTask -TaskName $TaskName -ErrorAction Stop }
         catch { Say ("the task {0} would not stop ({1}); its processes are stopped by id instead" -f $TaskName, $_.Exception.Message) 'Yellow' }
     }
-    foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
-        Stop-Process -Id $id -Force -ErrorAction SilentlyContinue
-        Say ("stopped pid {0}" -f $id) 'Yellow'
-    }
-    # The ports let go, every one the stopped processes held. Listed whole and
-    # filtered: -LocalPort with nothing on it is an error, and nothing there is
-    # what this waits for. A box that cannot list them says so and goes on: the
-    # processes are stopped by id above either way, and this is a rollback's
-    # path as well as an install's, so it does not stop half way.
-    for ($i = 0; $i -lt 20; $i++) {
-        $held = @()
-        try { $held = @(Get-NetUDPEndpoint -ErrorAction Stop | Where-Object { $ids -contains [int]$_.OwningProcess }) }
-        catch { Say ("could not list the UDP ports to see them let go ({0}), going on without that wait" -f $_.Exception.Message) 'Yellow'; break }
-        if (-not $held.Count) { break }
-        Start-Sleep -Milliseconds 500
-    }
+    foreach ($p in $held) { Say ("stopped pid {0}" -f $p.Id) 'Yellow' }
+    # Each waited for until it has exited, which is when its files and its
+    # ports are closed. One that has not is said, and the folder rename that
+    # follows is refused and says what holds it; this is a rollback's path as
+    # well as an install's, so it does not stop half way.
+    foreach ($l in @(Stop-ThornswoodProcessHeld $held)) { Say $l 'Red' }
 }
 
 # Both of its ports, from the box itself, for up to -Wait seconds (the shared
@@ -1066,15 +1201,9 @@ if ($hadRoot) {
     Say 'stopping the server' 'Cyan'
     StopServer $Root
     if (-not (MoveDir $Root $aside)) {
-        # Name what is still open, start the old one again, and stop rather than
-        # half installing. The old folder is exactly as it was.
-        $stuck = @(Get-ChildItem -LiteralPath $Root -Recurse -File -Force -ErrorAction SilentlyContinue |
-                   Where-Object {
-                       try { $h = [IO.File]::Open($_.FullName, 'Open', 'ReadWrite', 'None'); $h.Close(); $false }
-                       catch { $true }
-                   } | Select-Object -First 5)
-        foreach ($f in $stuck) { Say ("still open: {0}" -f $f.FullName) 'Red' }
-        Say "could not move $Root aside after ten tries. Something outside this script is holding those files." 'Red'
+        # MoveDir has said what holds it. Start the old one again, and stop
+        # rather than half installing. The old folder is exactly as it was.
+        Say "could not move $Root aside, so nothing was swapped." 'Red'
         if (-not $PutBack) { Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue }
         if ($StartNow -and -not $NoTask) { Start-ScheduledTask -TaskName $TaskName; Say 'the old server was started again, as it was' 'Yellow' }
         Finish 'INSTALL REFUSED' 1
