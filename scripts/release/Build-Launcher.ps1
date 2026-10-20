@@ -147,7 +147,7 @@ Head 'Setup stub'
 $stub = Join-Path (Join-Path $Here '..\..\out') 'setup-stub.exe'
 if ($StubOut) { $stub = $StubOut }
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $stub) | Out-Null
-$stubBuild = Join-Path $env:TEMP 'ThornswoodSetupBuild'
+$stubBuild = Join-Path ([IO.Path]::GetTempPath()) 'ThornswoodSetupBuild'
 if (Test-Path -LiteralPath $stubBuild) { Remove-Item -LiteralPath $stubBuild -Recurse -Force }
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 & $found.MSBuild (Resolve-Path -LiteralPath $stubProj).Path @msbArgs ('-p:OutDir=' + $stubBuild + '\')
