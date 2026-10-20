@@ -45,6 +45,7 @@
 // the load order being unusual.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -340,7 +341,7 @@ let parsed = 0;
   it, which the engine cannot handle either.
 */
 for (const pl of order) {
-  const p = path.join(DATA, pl);
+  const p = pluginPath(DATA, pl);
   if (!fs.existsSync(p)) { continue; }
   let b;
   try { b = fs.readFileSync(p); } catch (e) { fail('could not read ' + pl); continue; }

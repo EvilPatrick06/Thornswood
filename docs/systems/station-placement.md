@@ -146,4 +146,4 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
   - the river at Windhelm: 98048 not by river or lake water.
 - Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
 
-To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, and rebuild what hashes the plugin (Build-LastPlugin.py, Build-NpcPopulation.py, Build-MerchantRoleTables.py, Build-WoodworkingBenches.py).
+To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`.

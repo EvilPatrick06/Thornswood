@@ -71,6 +71,9 @@ import os
 import struct
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import own_plugins  # noqa: E402
+
 COMPRESSED = 0x00040000
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
 RANKS = ['novice', 'advanced', 'expert', 'master']
@@ -320,7 +323,7 @@ def main():
         print('  %d line(s) in that list are switched off and were left out' % off)
     print('')
 
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d plugin(s) in the load order are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))
@@ -332,7 +335,7 @@ def main():
     # leaves open to everybody.
     keywords = {}
     for name in order:
-        scan(os.path.join(args.data, name), name, set(), keywords)
+        scan(own_plugins.plugin_path(args.data, name), name, set(), keywords)
 
     # An unowned recipe is one anybody may make, so its bench opens for everyone.
     no_desc = set()
@@ -409,7 +412,7 @@ def main():
     wanted = set(access)
     by_base = {}
     for name in order:
-        for base, keyword in scan(os.path.join(args.data, name), name, wanted):
+        for base, keyword in scan(own_plugins.plugin_path(args.data, name), name, wanted):
             # Last in the load order wins, because that is the record the game
             # is using, the same rule Build-RecipeTable settles overrides with.
             by_base[base] = keyword
