@@ -271,7 +271,7 @@ money at their accepted submitted prices, which are not invented or
 included as newly created gold in that bound.
 
 Further definitions need their own source evidence, reward/cadence review,
-bounded state, exact bindings and explicit pinned admission. The original scarce-resource and retrieval interactions remain unfinished; aggregate authoring flags remain false. Existing
+bounded state, exact bindings and explicit pinned admission. Four remaining scarce-resource interactions and seven retrieval interactions are unfinished; aggregate authoring flags remain false. Existing
 accepted quests keep their original terms. Editing a draft or changing the
 aggregate flags does not enable another quest. Published definitions use
 stable hashes and IDs; changing an objective or reward needs a new ID.
