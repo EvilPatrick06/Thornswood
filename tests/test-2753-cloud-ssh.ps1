@@ -5,9 +5,10 @@
       powershell -NoProfile -File .\tests\test-2753-cloud-ssh.ps1
 
   The PowerShell half of ssh from cloud Claude threads (#2753):
-  Install-Bridge.ps1 (the box's end, as a task), New-CloudAccess.ps1 (the
-  cloud key and the bridge's token, made on One) and Setup-CloudSsh.ps1 (the
-  cloud thread's end). tests\test-2753-box-bridge.js runs the bridge itself.
+  Install-Bridge.ps1 (the box's end, as a task) and Setup-CloudSsh.ps1 (the
+  cloud thread's end). tests\test-2753-box-bridge.js runs the bridge itself,
+  and tests\test-2891-box-access.ps1 holds Grant-BoxAccess.ps1, which makes
+  the cloud's key and token on One as it does everybody's.
 
   WHAT IT HOLDS THEM TO.
     1. Each parses, and each script it sends to the box, built the way the
@@ -18,13 +19,11 @@
        (ServiceAccount.ps1, #2578), priority 4 (#1968), the log through
        server-log.js kept 90 days (#2166), the folder taking nothing from C:\,
        and the old files and task back when the new one does not answer.
-    3. New-CloudAccess.ps1: the token goes on standard input
-       (Invoke-ThornswoodSecretRemote, #451) and is never printed, the key
-       line carries from="127.0.0.1", and a run takes the old cloud line off
-       by its comment and touches no other key.
+    3. (Grant-BoxAccess.ps1, in tests\test-2891-box-access.ps1.)
     4. Setup-CloudSsh.ps1: ssh with StrictHostKeyChecking yes from the first
        connection, the box's key only through Add-ThornswoodKnownHost -Scanned
-       (the pin), neither secret printed.
+       (the pin, by way of Add-ThornswoodKnownHostThroughBridge), neither
+       secret printed.
     5. Add-ThornswoodKnownHost -Scanned, against throwaway keys: a pinned line
        is written under the box's address, one that is not pinned is refused
        with nothing written, and ssh-keyscan is not asked.
@@ -60,14 +59,14 @@ function ParseErrors([string]$code) {
 }
 
 $installPath = P 'scripts', 'deploy', 'Install-Bridge.ps1'
-$accessPath  = P 'scripts', 'vps', 'New-CloudAccess.ps1'
 $setupPath   = P 'scripts', 'vps', 'Setup-CloudSsh.ps1'
+$vpsPath     = P 'scripts', 'vps', 'Vps.ps1'
 $install = Text $installPath
-$access  = Text $accessPath
 $setup   = Text $setupPath
+$vpsText = Text $vpsPath
 
 # ---- 1. they parse --------------------------------------------------------
-foreach ($p in $installPath, $accessPath, $setupPath) {
+foreach ($p in $installPath, $setupPath) {
     $e = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($p, [ref]$null, [ref]$e)
     Yes ((Split-Path -Leaf $p) + ' parses') (@($e).Count -eq 0)
@@ -117,23 +116,6 @@ Yes ('every script Install-Bridge.ps1 sends parses once built (' + $hs.Count + '
 
 $installCode = Build (@($hs | Where-Object { $_.Extent.Text -match 'BRIDGE OK' })[0])
 
-# New-CloudAccess.ps1: its key file function, defined from its own text.
-$e = $null
-$aast = [System.Management.Automation.Language.Parser]::ParseFile($accessPath, [ref]$null, [ref]$e)
-$fn = @($aast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-KeyFileScript' }, $true))
-Yes 'New-CloudAccess.ps1 builds the key file script in one function' ($fn.Count -eq 1)
-$comment = 'thornswood-cloud'; $BridgeRoot = 'C:\Thornswood-Bridge'; $NewLine = 'from="127.0.0.1" ssh-ed25519 AAAA thornswood-cloud'
-Invoke-Expression $fn[0].Extent.Text
-$pub = 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIGRZxJ2G1nGDrjqLMTed+Bui13icdTMAODXpx0ZQd55T thornswood-cloud'
-$keyScript = Get-KeyFileScript ('from="127.0.0.1" ' + $pub)
-$bad = @()
-foreach ($h in (HereStrings $accessPath)) {
-    try { $code = Build $h } catch { $bad += ('line ' + $h.Extent.StartLineNumber + ' does not build: ' + $_.Exception.Message); continue }
-    $errs = @(ParseErrors $code)
-    if ($errs.Count) { $bad += ('line ' + $h.Extent.StartLineNumber + ': ' + $errs[0].Message) }
-}
-Yes ('every script New-CloudAccess.ps1 sends parses once built' + $(if ($bad.Count) { ': ' + ($bad -join '; ') })) ($bad.Count -eq 0)
-
 # ---- 2. Install-Bridge.ps1 ------------------------------------------------
 Yes 'Install-Bridge.ps1 builds an artifact from the commit and checks it before sending' (
     $install -match 'New-ThornswoodArtifact -Component bridge' -and $install -match 'Assert-ThornswoodSourceIntegrity' -and
@@ -167,39 +149,13 @@ Yes '  each through Get-PlainAnswer, which goes with the scripts that call it' (
 # On the box's Windows PowerShell 5.1 a 404 leaves Invoke-WebRequest's
 # ErrorDetails empty, so a body read that way is never seen (#2875).
 Yes '  and none through Invoke-WebRequest or ErrorDetails' ($install -notmatch 'Invoke-WebRequest -' -and $install -notmatch '\.ErrorDetails')
-Yes 'the status says whether a token is there, never what it is' ($install -match "token     there" -and $install -notmatch 'Get-Content[^\r\n]*token\.txt')
-
-# ---- 3. New-CloudAccess.ps1 ----------------------------------------------
-Yes 'the token goes on standard input, never on a command line (#451)' ($access -match 'Invoke-ThornswoodSecretRemote -Target \$target -SshArgs \$ssh -Secret \$token' -and $access -match '`\$tok = `\$ThornswoodSecret; `\$ThornswoodSecret = `\$null')
-Yes '  and is never printed' (-not ($access -match '(?m)^\s*(Say|Write-Host)[^\r\n]*\$token') -and -not ($access -match '(?m)^\s*(Say|Write-Host)[^\r\n]*\$keyB64'))
-Yes 'the cloud key line is taken only from 127.0.0.1' ($keyScript.Contains("`$new = 'from=""127.0.0.1"" " + $pub + "'"))
-Yes 'a run takes off only lines ending in the cloud comment' ($keyScript.Contains("Where-Object { `$_.Trim() -notmatch ' thornswood-cloud$' }"))
-# The key file edit, run here on a scratch copy.
-$tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2753-' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Path $tmp -Force | Out-Null
-try {
-    $kf = Join-Path $tmp 'administrators_authorized_keys'
-    [IO.File]::WriteAllLines($kf, [string[]]@('ssh-ed25519 AAAAone patrick', 'from="127.0.0.1" ssh-ed25519 AAAAold thornswood-cloud', 'ssh-rsa AAAAtwo djinn'))
-    $run = $keyScript.Replace('C:\ProgramData\ssh\administrators_authorized_keys', $kf) -replace '(?m)^icacls .*$', ''
-    $said = & ([scriptblock]::Create($run))
-    $after = @([IO.File]::ReadAllLines($kf))
-    Yes 'run on a scratch key file: the old cloud line goes, the new one comes, the others stay' (
-        $after.Count -eq 3 -and $after[0] -eq 'ssh-ed25519 AAAAone patrick' -and $after[1] -eq 'ssh-rsa AAAAtwo djinn' -and
-        $after[2] -eq ('from="127.0.0.1" ' + $pub) -and "$said" -match 'taken off: 1')
-    $remove = (Get-KeyFileScript '').Replace('C:\ProgramData\ssh\administrators_authorized_keys', $kf) -replace '(?m)^icacls .*$', ''
-    $null = & ([scriptblock]::Create($remove))
-    $after = @([IO.File]::ReadAllLines($kf))
-    Yes '  and -Remove leaves every other key' ($after.Count -eq 2 -and ($after -join '|') -eq 'ssh-ed25519 AAAAone patrick|ssh-rsa AAAAtwo djinn')
-}
-finally { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }
-Yes 'it proves the way in before it writes the file for the cloud environment' ($access.IndexOf("'echo THORNSWOOD_OK'") -lt $access.IndexOf('WriteAllText($Out, ("THORNSWOOD_BOX_KEY_B64'))
-Yes '  and the copy of the private key it made in is deleted however it ends' ($access -match '(?s)finally \{\s*Remove-Item -LiteralPath \$work -Recurse -Force')
+Yes 'the status names whose tokens are there, never what they are' ($install -match "'tokens    for '" -and $install -notmatch 'Get-Content[^\r\n]*tokens')
 
 # ---- 4. Setup-CloudSsh.ps1 -----------------------------------------------
-Yes 'Setup-CloudSsh.ps1 writes StrictHostKeyChecking yes into the Host block' ($setup -match "'    StrictHostKeyChecking yes'")
-Yes '  never turns checking down' ($setup -notmatch '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b')
-Yes '  writes known_hosts only through the pin' ($setup -match 'Add-ThornswoodKnownHost -Address \$VpsHost -Scanned \$lines' -and $setup -notmatch 'Add-Content[^\r\n]*known_hosts')
-Yes '  asks ssh-keyscan through listen.js, never the box''s own port' ($setup -match "listen\.js" -and $setup -match 'ssh-keyscan -T 20 -p \$port 127\.0\.0\.1')
+Yes 'Setup-CloudSsh.ps1 writes its Host block with Set-ThornswoodBridgeSsh, which writes StrictHostKeyChecking yes' ($setup -match 'Set-ThornswoodBridgeSsh -Address \$VpsHost' -and $vpsText -match "'    StrictHostKeyChecking yes'")
+Yes '  never turns checking down' ($setup -notmatch '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b' -and $vpsText -notmatch '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b')
+Yes '  writes known_hosts only through the pin' ($setup -match 'Add-ThornswoodKnownHostThroughBridge -Address \$VpsHost' -and $vpsText -match 'Add-ThornswoodKnownHost -Address \$Address -Scanned \$lines' -and $setup -notmatch 'Add-Content[^\r\n]*known_hosts')
+Yes '  asks ssh-keyscan through listen.js, never the box''s own port' ($setup -match "'listen\.js'" -and $vpsText -match 'ssh-keyscan -T 20 -p \$port 127\.0\.0\.1')
 Yes '  and prints neither secret' (-not ($setup -match '(?m)^\s*(Say|Write-Host)[^\r\n]*\$(keyB64|keyText|env:THORNSWOOD_BOX_TOKEN\b[^)])'))
 
 # ---- 5. Add-ThornswoodKnownHost -Scanned ----------------------------------
@@ -277,12 +233,12 @@ if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     New-Item -ItemType Directory -Path $ptmp -Force | Out-Null
     $procs = @()
     try {
-        [IO.File]::WriteAllText((Join-Path $ptmp 'token.txt'), 'stand-in-token')
+        New-Item -ItemType Directory -Path (Join-Path $ptmp 'tokens') -Force | Out-Null
         $sitePath = Join-Path $ptmp 'site.js'
         # The site's own 404, as site/server.js sends it.
         [IO.File]::WriteAllText($sitePath, "require('http').createServer((q, s) => { s.writeHead(404, { 'Content-Type': 'text/plain' }); s.end('not here'); }).listen(Number(process.env.PORT), '127.0.0.1');")
         $bridgePort = FreePort; $sitePort = FreePort; $nobody = FreePort
-        $procs += StartNode (P 'scripts', 'vps', 'bridge', 'bridge.js') @{ THORNSWOOD_BRIDGE_PORT = $bridgePort; THORNSWOOD_BRIDGE_TOKEN_FILE = (Join-Path $ptmp 'token.txt'); THORNSWOOD_BRIDGE_TARGET = ('127.0.0.1:' + $nobody) }
+        $procs += StartNode (P 'scripts', 'vps', 'bridge', 'bridge.js') @{ THORNSWOOD_BRIDGE_PORT = $bridgePort; THORNSWOOD_BRIDGE_TOKENS = (Join-Path $ptmp 'tokens'); THORNSWOOD_BRIDGE_TARGET = ('127.0.0.1:' + $nobody) }
         $procs += StartNode $sitePath @{ PORT = $sitePort }
         Yes 'bridge.js and the stand-in site start' ((Until "http://127.0.0.1:$bridgePort/") -and (Until "http://127.0.0.1:$sitePort/"))
         $shells = @()

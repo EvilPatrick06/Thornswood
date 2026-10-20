@@ -118,8 +118,8 @@ New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 # Built, never written whole: this file is scanned for webhook addresses.
 $script:goodHook = 'https://discord.com/api/' + 'webhooks/12345/' + 'harness-not-a-real-token'
-$ports = @{ 3001 = 'website'; 3000 = 'game'; 7778 = 'voice'; 7788 = 'dev game'; 7789 = 'dev voice' }
-$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice' }
+$ports = @{ 3001 = 'website'; 3000 = 'game'; 7778 = 'voice'; 7788 = 'dev game'; 7789 = 'dev voice'; 7790 = 'bridge' }
+$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice'; 'Thornswood Bridge' = 'bridge' }
 
 function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     $script:boxRoot = Join-Path $tmp $name
@@ -128,7 +128,7 @@ function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     elseif (-not $NoHook) { Set-Content -LiteralPath (Join-Path $script:boxRoot 'alerts-webhook.txt') -Value $script:goodHook -Encoding ASCII }
     $script:clock = New-Object DateTime (2026, 9, 28, 12, 0, 0, [DateTimeKind]::Local)
     $script:world = @{}
-    foreach ($n in @('caddy', 'website', 'game', 'voice', 'bot', 'dev game', 'dev voice')) {
+    foreach ($n in @('caddy', 'website', 'game', 'voice', 'bot', 'dev game', 'dev voice', 'bridge')) {
         $script:world[$n] = @{ Up = $true; Restart = 'up'; Health = '' }
     }
     $script:backupWhy = ''
