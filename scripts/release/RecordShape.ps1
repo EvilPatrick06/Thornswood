@@ -8,6 +8,7 @@
 
       server-build        records\server-build.json      the server build every deploy is held to
       client-build        records\client-build.json      the client build Ship and the launcher are held to
+      front-build         records\front-build.json       the front build Go.ps1 unpacks into Data\Platform\UI (#2754)
       most-online         records\most-online.json       the seat count the engine and gamemode take, main's and dev's
       collection-plugins  records\collection-plugins.json  the collection's plugin bytes (#2019)
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
@@ -40,6 +41,8 @@ if (-not (Get-Command ConvertFrom-ThornswoodJson -EA SilentlyContinue)) { . (Joi
 $script:ThornswoodRecordKinds = [ordered]@{
     'server-build'       = @{ File = 'records\server-build.json';       Versions = @(1); MustSay = $false }
     'client-build'       = @{ File = 'records\client-build.json';       Versions = @(1); MustSay = $false }
+    # #2754: the front, built from the same fork commit (Build-Front.ps1).
+    'front-build'        = @{ File = 'records\front-build.json';        Versions = @(1); MustSay = $false }
     'most-online'        = @{ File = 'records\most-online.json';        Versions = @(1); MustSay = $false }
     'collection-plugins' = @{ File = 'records\collection-plugins.json'; Versions = @(1); MustSay = $true }
     # Slice 3 (#2180): the release records the launcher and Ship are built on.
@@ -137,6 +140,10 @@ function Get-ThornswoodRecordProblems {
         }
         'client-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 7 40)) { $out += 'forkCommit is missing or not a commit SHA' }
+            $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+        }
+        'front-build' {
+            if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 40 40)) { $out += 'forkCommit is missing or not a full commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
         }
         'most-online' {

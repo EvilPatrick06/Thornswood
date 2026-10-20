@@ -146,7 +146,7 @@ try {
                    'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1',
                    # Dot-sourced for the signed manifest (#2163); -NoUpload signs nothing.
-                   'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-ReleaseCatalog.ps1', 'scripts\release\Assert-PublishSigned.ps1',
+                   'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-ReleaseCatalog.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\ShippedBytes.ps1', 'scripts\release\Assert-PublishSigned.ps1',
                    'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt',
                    'scripts\release\Where.ps1', 'records\client-build.json', 'records\ui-gone.json',
                    'scripts\mods\Generated.ps1', 'records\generated.json',
