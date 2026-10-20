@@ -775,6 +775,7 @@ jobs:
                  'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1',
                  'test-2914-nexus-scripts.ps1',
+                 'test-say-staff.ps1',
                  'test-prove-secret.ps1'
           $failed = @()
           foreach ($n in $six) {

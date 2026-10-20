@@ -70,7 +70,7 @@
 # Then: "we don't need the required check/reviewer at all anymore for
 # anyone as long as we give verbal agreement and the VPS check goes
 # through". So nothing is required in GitHub's settings; the team merges
-# once this is green and it has been said in #staff-general.
+# once this is green and it has been said in #staff-updates.
 name: Build check
 on:
   push:
@@ -848,6 +848,7 @@ jobs:
                  'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1',
                  'test-2914-nexus-scripts.ps1',
+                 'test-say-staff.ps1',
                  'test-prove-secret.ps1'
           $failed = @()
           foreach ($n in $six) {
