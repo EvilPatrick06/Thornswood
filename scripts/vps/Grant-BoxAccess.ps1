@@ -18,6 +18,9 @@
       .\scripts\vps\Grant-BoxAccess.ps1 -Name cloud -MakeKey
                        cloud Claude threads: a key made here, and both halves
                        into one file for the cloud environment
+      .\scripts\vps\Grant-BoxAccess.ps1 -Name codex -MakeKey -NoticesOnly
+                       an agent that only posts staff notices: a key that can
+                       do nothing on the box but put one in #staff-updates
       .\scripts\vps\Grant-BoxAccess.ps1 -Name djinn -Remove
                        take that one name's key and token off the box
       .\scripts\vps\Grant-BoxAccess.ps1 -List
@@ -25,6 +28,20 @@
 
   A second grant for a name replaces that name's key and token, so the old
   pair stops working.
+
+  A NOTICES KEY (-NoticesOnly, with -MakeKey; #2934). Every other key logs
+  in as the box's Administrator. This one's line carries
+      restrict,command="powershell.exe ... -File C:\Thornswood-Watch\say-staff.ps1 -From <name>"
+  so sshd runs say-staff.ps1 whatever the client asks for, with no shell,
+  no file copy and no forwarding, and the notice it queues says it is from
+  <name>. That script only appends one notice line to the watchdog's outbox
+  (scripts\vps\vps-say-staff.ps1 says its limits), which the bot says in
+  #staff-updates. It is for an agent that needs to post the notices
+  Developer-Guide.md asks for and nothing else on the box. The grant stops
+  first when say-staff.ps1 is not on the box (Watch-Services.ps1 -Install
+  puts it there). Its file is <OutDir>\notice-access.txt, with
+  THORNSWOOD_NOTICE_KEY_B64=... and THORNSWOOD_NOTICE_TOKEN=..., for that
+  agent's environment; scripts\ops\Say-Staff.ps1 uses them.
 
   THE TWO HALVES, and why neither is any use alone:
     the key     the public half goes on the box as
@@ -68,6 +85,8 @@ param(
     [switch]$FromClipboard,
     [switch]$ThisMachine,
     [switch]$MakeKey,
+    # With -MakeKey: a key that can only post a staff notice (see above).
+    [switch]$NoticesOnly,
     [switch]$Remove,
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.
@@ -101,6 +120,33 @@ $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 $PutBack = 'Thornswood box access put back'
 $BridgeDir = Join-Path $Here 'bridge'
+# What a notices key may run, and all it may run (scripts\vps\vps-say-staff.ps1).
+$SayStaff = 'C:\Thornswood-Watch\say-staff.ps1'
+
+# ------------------------------------------------------ the box's line ----
+# The line the box holds for a name: taken only from 127.0.0.1, so only
+# through the bridge, and for a notices key only to run say-staff.ps1 as that
+# name. The name is already one lower case word, so nothing in it can close
+# the quotes.
+function Get-BoxKeyLine([string]$Bare, [string]$Who, [bool]$Notices) {
+    $opts = 'from="127.0.0.1"'
+    if ($Notices) { $opts += ',restrict,command="powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ' + $SayStaff + ' -From ' + $Who + '"' }
+    return ($opts + ' ' + $Bare + ' thornswood-' + $Who)
+}
+
+# A line off the box in parts: its options, its key ("type key"), and what
+# they allow. '' for the key when the line holds none.
+function Read-BoxKeyLine([string]$Line) {
+    $m = [regex]::Match($Line.Trim(), '^(?:(?<opts>(?:[A-Za-z-]+(?:="(?:[^"\\]|\\.)*")?)(?:,(?:[A-Za-z-]+(?:="(?:[^"\\]|\\.)*")?))*)\s+)?(?<key>(?:ssh-ed25519|ssh-rsa|ecdsa-sha2-nistp256) [A-Za-z0-9+/=]+)(?:\s|$)')
+    if (-not $m.Success) { return [pscustomobject]@{ Options = ''; Key = ''; Bridge = $false; Notices = $false } }
+    $o = $m.Groups['opts'].Value
+    return [pscustomobject]@{
+        Options = $o
+        Key     = $m.Groups['key'].Value
+        Bridge  = ($o -match '(^|,)from="127\.0\.0\.1"(,|$)')
+        Notices = ($o -match '(^|,)command="[^"]*\\say-staff\.ps1 -From [a-z0-9-]+"(,|$)' -and $o -match '(^|,)restrict(,|$)')
+    }
+}
 
 # ------------------------------------------------------------- the line ----
 # A public key line however it was copied: on its own, inside a Discord
@@ -138,7 +184,9 @@ function Find-PublicKeyLine([string]$Text) {
 # The change, as one script. It saves what is there and arms the put back
 # before it changes anything, and says ARMED, then CHANGED lines, then DONE.
 # $Digest and $KeyLine both '' take the name away.
-function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob) {
+# $Need, when given, is a file the key's forced command runs: without it on
+# the box the key would open nothing, so nothing is changed.
+function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob, [string]$Need = '') {
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
@@ -147,6 +195,8 @@ function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [s
 `$save = 'C:\ProgramData\ssh\box-access-before'
 `$task = '$PutBack'
 if (-not (Test-Path -LiteralPath '$BridgeRoot\bridge.js')) { 'STOP there is no bridge in $BridgeRoot. Run scripts\deploy\Install-Bridge.ps1 first. Nothing was changed.'; exit 1 }
+`$need = '$Need'
+if (`$need -and -not (Test-Path -LiteralPath `$need)) { 'STOP there is no ' + `$need + ' on the box, and a notices key runs only that. Run scripts\vps\Watch-Services.ps1 -Install first. Nothing was changed.'; exit 1 }
 if (Get-ScheduledTask -TaskName `$task -EA SilentlyContinue) { 'STOP the put back from an earlier run is still armed, so that run is not finished: it puts its key file and tokens back within ten minutes of when it started. Run this again after that. Nothing was changed.'; exit 1 }
 
 # What is there now, for the put back. The folder is under ProgramData\ssh,
@@ -242,6 +292,9 @@ foreach ($t in 'ssh', 'ssh-keygen') {
 }
 $ways = @(@($PublicKey -or $FromClipboard, $ThisMachine, $MakeKey, $Remove, $List) | Where-Object { $_ }).Count
 if ($ways -ne 1) { Die 'Pass one of: -PublicKey (or -FromClipboard), -ThisMachine, -MakeKey, -Remove, -List. Nothing was changed.' }
+# A notices key is made here, so its private half is never asked of anybody
+# and its file names what it is for.
+if ($NoticesOnly -and -not $MakeKey) { Die '-NoticesOnly goes with -MakeKey. Nothing was changed.' }
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  who may reach the box' -ForegroundColor White
@@ -255,9 +308,10 @@ if ($List) {
     foreach ($l in @($said | Where-Object { $_ -like 'KEY *' })) {
         $k = $l.Substring(4)
         $who = if ($k -match ' thornswood-([a-z0-9][a-z0-9-]*)$') { $Matches[1] } else { '(no thornswood- name)' }
-        $bare = $k -replace '^from="[^"]*"\s+', ''
-        $fp = Get-ThornswoodSshFingerprint ('x ' + $bare)
-        $how = if ($k -match '^from="127\.0\.0\.1"\s') { 'only through the bridge' } else { 'from any address that reaches port 22' }
+        $parts = Read-BoxKeyLine $k
+        $fp = if ($parts.Key) { Get-ThornswoodSshFingerprint ('x ' + $parts.Key) } else { '(no key on the line)' }
+        $how = if ($parts.Bridge) { 'only through the bridge' } else { 'from any address that reaches port 22' }
+        if ($parts.Notices) { $how += ', and only to post a staff notice' }
         Say ('  key    {0,-22} {1}  {2}' -f $who, $fp, $how) $(if ($how -like 'only*') { 'Green' } else { 'Yellow' })
     }
     foreach ($l in @($said | Where-Object { $_ -like 'TOKEN *' })) {
@@ -270,7 +324,7 @@ if ($List) {
 
 # ------------------------------------------------------------- the name ----
 if ($Name -notmatch '^[a-z0-9][a-z0-9-]{0,31}$') { Die 'The name is one word, lower case letters, digits and hyphens, the way the bridge logs it: djinn, one, cloud. Nothing was changed.' }
-if ($MakeKey -and $Name -ne 'cloud') { Say "  -MakeKey makes a key here, for the cloud environment; it is named $Name." 'Yellow' }
+if ($MakeKey -and -not $NoticesOnly -and $Name -ne 'cloud') { Say "  -MakeKey makes a key here, for the cloud environment; it is named $Name." 'Yellow' }
 
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (($ThisMachine -or $MakeKey) -and -not $node) { Die 'node is not on PATH, and the bridge client is node. Nothing was changed.' }
@@ -318,8 +372,8 @@ try {
         if (-not $bare) {
             Die 'No public key line in what was given. It starts with ssh-ed25519 or ssh-rsa, then a long run of letters and digits; Setup-SshKey.ps1 prints it on the PC it was made on. Nothing was changed.'
         }
-        $keyLine = 'from="127.0.0.1" ' + $bare + ' thornswood-' + $Name
-        Say ('  ' + (Get-ThornswoodSshFingerprint ('x ' + $bare)) + ', taken only through the bridge') 'Green'
+        $keyLine = Get-BoxKeyLine $bare $Name ([bool]$NoticesOnly)
+        Say ('  ' + (Get-ThornswoodSshFingerprint ('x ' + $bare)) + ', taken only through the bridge' + $(if ($NoticesOnly) { ', and only to post a staff notice as ' + $Name } else { '' })) 'Green'
     }
     $blob = if ($bare) { ($bare -split ' ')[1] } else { '' }
     $token = ''
@@ -331,7 +385,7 @@ try {
 
     # ---------------------------------------------------------- the box ----
     Head 'On the box'
-    $said = Clean (Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-BoxChangeScript $Name $digest $keyLine $blob))
+    $said = Clean (Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' })))
     foreach ($l in $said) { Say "  $l" $(if ($l -like 'STOP*') { 'Red' } elseif ($l -like 'CHANGED*') { 'Green' } else { 'Gray' }) }
     if ($said -notcontains 'DONE') {
         if (@($said | Where-Object { $_ -like 'ARMED*' }).Count) { Die "the box did not finish. It puts the key file and tokens back by itself within ten minutes (the task '$PutBack')." }
@@ -384,23 +438,39 @@ try {
         $env:THORNSWOOD_BOX_TOKEN = $token
         $env:THORNSWOOD_BOX_URL = $BoxUrl
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        # A notices key runs say-staff.ps1 whatever is asked; with nothing on
+        # its input (-n) that says READY and writes nothing.
+        $proved = if ($NoticesOnly) { '^READY$' } else { 'THORNSWOOD_OK' }
         $proof = @(Invoke-ThornswoodNative {
-            & ssh -F none -i $newKey -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 `
+            & ssh -n -F none -i $newKey -o IdentitiesOnly=yes -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 `
                 -o ("ProxyCommand=`"" + $node.Source + "`" `"" + (Join-Path $BridgeDir 'connect.js') + "`"") $target 'echo THORNSWOOD_OK'
-        } 2>&1 | ForEach-Object { "$_" })
+        } 2>&1 | ForEach-Object { "$_".Trim() })
         $ErrorActionPreference = $old
         Remove-Item Env:THORNSWOOD_BOX_TOKEN, Env:THORNSWOOD_BOX_URL -ErrorAction SilentlyContinue
-        if (($proof -join '') -notmatch 'THORNSWOOD_OK') {
+        if ($NoticesOnly -and @($proof | Where-Object { $_ -match 'THORNSWOOD_OK' }).Count) {
+            Die "the box ran the command it was asked for, so the key's forced command is not holding and the key can do anything. No file was written. Take it off now: .\scripts\vps\Grant-BoxAccess.ps1 -Name $Name -Remove"
+        }
+        if (-not @($proof | Where-Object { $_ -match $proved }).Count) {
             $proof | Select-Object -Last 5 | ForEach-Object { Say "  $_" 'DarkGray' }
             Die "it did not get in, so no file was written. Its key and token are on the box; run this again once the lines above are dealt with, or -Name $Name -Remove to take them off."
         }
-        Say '  ssh through the bridge with the new key got in' 'Green'
-        $out = Join-Path $OutDir 'cloud-access.txt'
-        Write-ThornswoodPrivateFile -Path $out -Text ("THORNSWOOD_BOX_KEY_B64=" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) + "`nTHORNSWOOD_BOX_TOKEN=$token`n")
-        Head 'The file for the cloud environment'
-        Say "  $out" 'Green'
-        Say '  Its two lines go into the cloud environment''s variables as they are: Project settings, Cloud environment, the gear' 'White'
-        Say '  beside the environment. Then delete the file. A new cloud session picks them up and runs scripts/vps/Setup-CloudSsh.ps1.' 'White'
+        if ($NoticesOnly) {
+            Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
+            $out = Join-Path $OutDir 'notice-access.txt'
+            Write-ThornswoodPrivateFile -Path $out -Text ("THORNSWOOD_NOTICE_KEY_B64=" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) + "`nTHORNSWOOD_NOTICE_TOKEN=$token`n")
+            Head "The file for $Name's environment"
+            Say "  $out" 'Green'
+            Say "  Its two lines go into the environment variables of the agent named $Name, as they are. Then delete the file." 'White'
+            Say '  There, scripts/ops/Say-Staff.ps1 -Text "..." posts a notice in #staff-updates with them.' 'White'
+        } else {
+            Say '  ssh through the bridge with the new key got in' 'Green'
+            $out = Join-Path $OutDir 'cloud-access.txt'
+            Write-ThornswoodPrivateFile -Path $out -Text ("THORNSWOOD_BOX_KEY_B64=" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) + "`nTHORNSWOOD_BOX_TOKEN=$token`n")
+            Head 'The file for the cloud environment'
+            Say "  $out" 'Green'
+            Say '  Its two lines go into the cloud environment''s variables as they are: Project settings, Cloud environment, the gear' 'White'
+            Say '  beside the environment. Then delete the file. A new cloud session picks them up and runs scripts/vps/Setup-CloudSsh.ps1.' 'White'
+        }
     } else {
         $out = Join-Path (Join-Path $OutDir $Name) 'box-token.txt'
         Write-ThornswoodPrivateFile -Path $out -Text ($token + "`n")

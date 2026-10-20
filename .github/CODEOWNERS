@@ -1,7 +1,7 @@
 # The files every machine touches.
 #
 # Developer-Guide.md says these six need a word in
-# #staff-general before they are edited, because a change in any of them lands on
+# #staff-updates before they are edited, because a change in any of them lands on
 # everybody else's work without warning. Until now that rule was prose with nothing
 # behind it: nothing asked, nothing checked, and it was forgotten as often as
 # it was kept.
@@ -21,7 +21,7 @@
 # September: enforce_admins is off; there is no required check; required
 # approving reviews is 0; and Require review from Code Owners is off. The
 # team's rule is to merge once the build check on the VPS is green and it
-# has been said in #staff-general, whether or not anybody named here has
+# has been said in #staff-updates, whether or not anybody named here has
 # read it.
 #
 # Switching the code owner review on is Patrick's decision, and it is not
