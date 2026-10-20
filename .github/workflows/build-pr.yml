@@ -562,6 +562,7 @@ jobs:
                  'test-513-world-staff.js',
                  'test-513-world-stage.js',
                  'test-1390-thalmor-patrols.js',
+                 'test-2873-staff-data.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1382-potion-window.js',
