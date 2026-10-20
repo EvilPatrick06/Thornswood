@@ -294,11 +294,13 @@ function Install-ThornswoodBridgeClient([string]$From) {
 }
 
 # Writes the Host block that sends ssh to the address through the bridge,
-# first in .ssh\config, since ssh takes the first value it finds for each
-# option. A second run replaces it. A Host entry for the address that this
-# did not write would be read first or fight it, so that stops it instead,
-# with the file as it was. Returns what the file held before, for a caller
-# that has to put it back.
+# first in .ssh\config. ssh takes the first value it finds for each option,
+# so this block's User, key, host key checking and ProxyCommand win over any
+# Host entry for the address further down, which can only add to what
+# accumulates (another IdentityFile to try); nothing here has to read,
+# rewrite or refuse a block it did not write. A second run replaces this
+# one. Returns what the file held before, for a caller that has to put it
+# back.
 function Set-ThornswoodBridgeSsh {
     param(
         [Parameter(Mandatory = $true)][string]$Address,
@@ -312,17 +314,11 @@ function Set-ThornswoodBridgeSsh {
         [switch]$Direct,
         [string]$Begin = '# >>> thornswood bridge (Setup-SshKey.ps1)',
         [string]$End = '# <<< thornswood bridge',
-        [string]$Config = (Join-Path (Join-Path $HOME '.ssh') 'config'),
-        # Only whether it could: throws as it would, writes nothing.
-        [switch]$CheckOnly
+        [string]$Config = (Join-Path (Join-Path $HOME '.ssh') 'config')
     )
     $before = ''
     if (Test-Path -LiteralPath $Config) { $before = [IO.File]::ReadAllText($Config) }
     $rest = [regex]::Replace($before, '(?s)' + [regex]::Escape($Begin) + '.*?' + [regex]::Escape($End) + '\r?\n?', '')
-    if ($rest -match ('(?m)^[ \t]*Host[ \t]+([^\r\n]*[ \t])?' + [regex]::Escape($Address) + '([ \t]|\r?$)')) {
-        throw "$Config already has a Host entry for $Address that this did not write, and ssh would read it first. Take that entry out (from its Host line to the next Host line), then run this again. Nothing was changed."
-    }
-    if ($CheckOnly) { return $before }
     if (-not $Direct -and (-not $Node -or -not $Connect)) { throw 'Set-ThornswoodBridgeSsh needs -Node and -Connect, or -Direct.' }
     $block = @(
         $Begin,

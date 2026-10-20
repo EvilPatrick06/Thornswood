@@ -25,10 +25,10 @@
     4. The digest is the SHA-256 bridge.js computes, in hex, and a token is
        43 characters bridge.js and Setup-SshKey.ps1 take.
     5. Set-ThornswoodBridgeSsh against a scratch config: the block goes first
-       with the ProxyCommand, a second run replaces it, a Host entry it did
-       not write stops it with the file as it was, -CheckOnly writes nothing,
-       -Direct leaves the ProxyCommand out, and ssh itself reads the file it
-       writes (ssh -G).
+       with the ProxyCommand, a second run replaces it, -Direct leaves the
+       ProxyCommand out, and ssh itself reads the file it writes (ssh -G),
+       taking the block's values over a Host entry for the same address
+       further down that it did not write and leaves alone.
     6. Write-ThornswoodPrivateFile leaves a file only this account can read.
     7. The order and the secrets: the token never goes to the box (only its
        digest), is never printed, and the change is kept only after a new
@@ -225,14 +225,18 @@ try {
     $d = $a.Clone(); $d.Remove('Node'); $d.Remove('Connect'); $d.Direct = $true
     $null = Set-ThornswoodBridgeSsh @d
     Yes '-Direct writes the same block with no ProxyCommand' ((Text $cfg) -notmatch 'ProxyCommand' -and ([regex]::Matches((Text $cfg), 'Host 203\.0\.113\.9')).Count -eq 1)
-    [IO.File]::WriteAllText($cfg, "Host 203.0.113.9`n    User someone`n")
-    $was = Text $cfg
-    $threw = $false
-    try { $null = Set-ThornswoodBridgeSsh @a } catch { $threw = $_.Exception.Message -match 'already has a Host entry' }
-    Yes 'a Host entry it did not write stops it, with the file as it was' ($threw -and (Text $cfg) -eq $was)
-    [IO.File]::WriteAllText($cfg, '')
-    $null = Set-ThornswoodBridgeSsh @a -CheckOnly
-    Yes '-CheckOnly writes nothing' ((Text $cfg) -eq '')
+    # The block an older Setup-SshKey.ps1 wrote, as One's config holds it,
+    # and a stranger one: both stay, below, and lose to the bridge block.
+    $old = "Host 203.0.113.9`n    User someone`n    IdentityFile C:\k\other_ed25519`n    ProxyCommand none`n    StrictHostKeyChecking no`n"
+    [IO.File]::WriteAllText($cfg, $old)
+    $null = Set-ThornswoodBridgeSsh @a
+    $t = Text $cfg
+    Yes 'a Host entry it did not write is left as it was, below the bridge block' ($t.StartsWith('# >>> thornswood bridge') -and $t.EndsWith($old))
+    if (Get-Command ssh -ErrorAction SilentlyContinue) {
+        $g = @(Invoke-ThornswoodNative { & ssh -F $cfg -G 203.0.113.9 } 2>$null | ForEach-Object { "$_" })
+        Yes '  and ssh takes the bridge block''s user, ProxyCommand and host key checking over it' ($g -contains 'user Administrator' -and
+            @($g | Where-Object { $_ -match '^proxycommand .*connect\.js' }).Count -eq 1 -and $g -contains 'stricthostkeychecking true')
+    }
 
     # ---- 6. a private file -----------------------------------------------------
     $pf = Join-Path $tmp 'private.txt'
@@ -249,7 +253,6 @@ try {
     Yes 'only the digest goes to the box, never the token' ($grant.Contains('Get-BoxChangeScript $Name $digest $keyLine $blob') -and $grant -notmatch 'Get-BoxChangeScript[^\r\n]*\$token')
     Yes 'the token is never printed' (-not ($grant -match '(?m)^\s*(Say|Write-Host)[^\r\n]*\$token\b') -and -not ($setup -match '(?m)^\s*(Say|Write-Host)[^\r\n]*\$token\b'))
     Yes 'the change is kept only after a new login gets in' ($grant.IndexOf('$w = Test-Login') -gt 0 -and $grant.IndexOf('$w = Test-Login') -lt $grant.IndexOf('-Script (Get-BoxKeepScript)'))
-    Yes '-ThisMachine checks the ssh config before the box is touched' ($grant.IndexOf('-CheckOnly') -lt $grant.IndexOf('-Script (Get-BoxChangeScript'))
     Yes '  and puts the config and token file back when its proof fails' ($grant -match '(?s)if \(-not \$w\.Ok\) \{.*WriteAllText\(\(Join-Path \(Join-Path \$HOME ''\.ssh''\) ''config''\), \$cfgBefore')
     Yes 'Setup-SshKey.ps1 reads the token where nothing shows it, and keeps it readable by its owner only' ($setup -match 'Read-Host -AsSecureString' -and $setup -match 'Write-ThornswoodPrivateFile -Path \$tokenPath')
     Yes 'Setup-SshKey.ps1 never turns host key checking down' ($setup -notmatch '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b')

@@ -326,13 +326,6 @@ try {
         $digest = Get-ThornswoodBridgeDigest $token
     }
 
-    # This machine's ssh config is checked before the box is touched, so a
-    # Host entry in the way stops it with nothing changed anywhere.
-    if ($ThisMachine) {
-        try { $null = Set-ThornswoodBridgeSsh -Address $VpsHost -User $VpsUser -KeyPath $KeyPath -Node $node.Source -Connect 'x' -CheckOnly }
-        catch { Die $_.Exception.Message }
-    }
-
     # ---------------------------------------------------------- the box ----
     Head 'On the box'
     $said = Clean (Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-BoxChangeScript $Name $digest $keyLine $blob))
