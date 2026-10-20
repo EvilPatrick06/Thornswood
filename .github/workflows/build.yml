@@ -467,6 +467,11 @@ jobs:
           # Read-Availability.ps1, the reader of the watchdog's down and back
           # lines, to its counting on made-up lines, under pwsh and Windows
           # PowerShell 5.1, and to reading only. About ten seconds.
+          # Issue #2755: tests\test-watch-outside.ps1 drives the outside
+          # watcher, which runs from a public repository on GitHub's runners,
+          # against fake answers: could not check is never "down" (#2857),
+          # what -Export writes there, and a public run log that names
+          # nothing private. A few seconds.
           # Issue #2319: tests\test-crash-snapshot.ps1 compiles CrashDump.cs and
           # holds crash snapshots to the person's setting, kept until staff mark
           # the crash looked at, two at most; tests\test-2319-crash-looked-at.js
@@ -835,6 +840,7 @@ jobs:
                  'test-storage-forecast.ps1',
                  'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1',
+                 'test-watch-outside.ps1',
                  'test-2914-nexus-scripts.ps1'
           $failed = @()
           foreach ($n in $six) {

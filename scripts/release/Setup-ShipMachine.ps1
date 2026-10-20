@@ -285,8 +285,7 @@ function Get-SigningPathsMissing([string]$ConfigPath, [string]$Repo) {
   return $missing
 }
 
-# The durable identities the launcher accepts, read out of Signature.cs the
-# way Watch-Outside.ps1 reads them.
+# The durable identities the launcher accepts, read out of Signature.cs.
 function Get-SignatureIdentities([string]$SignatureCs) {
   if (-not (Test-Path -LiteralPath $SignatureCs)) { return @() }
   $sig = [IO.File]::ReadAllText($SignatureCs)

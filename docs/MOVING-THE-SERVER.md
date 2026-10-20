@@ -371,8 +371,11 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
 30. **The watchers on this machine**, last, from a checkout of main that has
     step 27 in it, because each keeps its own copy of the address:
     `.\scripts\vps\Fetch-Backups.ps1 -Schedule` brings the new box's backups
-    here every day, and `.\scripts\vps\Watch-Outside.ps1 -Install` watches the
-    site, the feeds, the certificate, the name and the runner from outside it.
+    here every day. The outside watcher runs on GitHub's runners from its own
+    public repository and asks for the address it was exported with, so
+    `.\scripts\vps\Watch-Outside.ps1 -Export "C:\ThornswoodTemps&Worktrees\temp\watch-outside"`
+    into a clone of that repository, then commit and push it there, and its
+    dns check expects the new box.
 
 ## Then leave the old box alone for a week
 

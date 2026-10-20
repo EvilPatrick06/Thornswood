@@ -48,9 +48,10 @@
 
   Anything else on this box that needs to tell staff something (the bot's own
   wrapper, issue #449) appends a line of the same shape to alerts.jsonl and
-  this delivers it the same way. So does Watch-Outside.ps1 on One, over ssh,
-  for what it sees from outside (issue #448); when the box cannot be reached
-  it posts through its own copy of the same webhook. tests\test-watch-alerts.ps1 drives the real
+  this delivers it the same way. Watch-Outside.ps1, which asks from outside
+  (issue #448), runs on GitHub's runners since #2755 and posts through the
+  same webhook itself, because a runner cannot reach this box over ssh.
+  tests\test-watch-alerts.ps1 drives the real
   code below against fakes: down, back, flapping, the bot down, a webhook
   that fails. bot\test-watch-services.py reads what that harness writes.
 
@@ -88,6 +89,11 @@
               cannot tell hung from idle. That was the 18 September case.
     backup    the Thornswood Backup task's last result, and a backup file in
               C:\Thornswood-Backup less than 26 hours old
+    offbox    the copy of the backups off this box is less than 26 hours
+              old: the newest copy Fetch-Backups.ps1 on One has checked, by
+              the name it writes into offbox.txt in this folder after each
+              run (#2755). Judged here, not on One, so a One that is off is
+              told about, since that is when the copy falls behind
     runner    every build runner's Windows service is running: the first,
               thornswood-vps, and the numbered ones Install-Runner.ps1
               -Number puts beside it (4 October)
@@ -377,6 +383,22 @@ function BackupProblem($task, $folder, $hours) {
   return ''
 }
 
+# '' when the newest copy off this box is younger than $hours, else why not
+# (#2755). Fetch-Backups.ps1 on One writes the name of the newest copy it has
+# checked into offbox.txt after each run, so this box knows how far behind the
+# copy off it is even while One is off, which is when it falls behind. The
+# age is read from the name, stamped by this box's clock when it took the
+# backup, so the two machines' clocks never meet.
+function OffBoxProblem($file, $hours) {
+  if (-not (Test-Path -LiteralPath $file)) { return ('One has not said it holds a copy: there is no ' + $file + ', which Fetch-Backups.ps1 writes after each copy it checks') }
+  $name = ('' + (Get-Content -LiteralPath $file -TotalCount 1 -EA SilentlyContinue)).Trim()
+  if ($name -notmatch '^thornswood-(\d{8}-\d{6})\.zip(\.enc)?$') { return ($file + ' does not name a backup') }
+  $taken = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
+  $age = ($now - $taken).TotalHours
+  if ($age -gt $hours) { return ('the newest copy One has checked is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
+  return ''
+}
+
 # What is down, one line per thing: name|down or up|bad runs|good runs|first
 # bad|first good. Only this script writes it.
 function ReadOutages() {
@@ -426,7 +448,10 @@ function HowWords($c, $how) {
     }
     'gaveup'  { return 'The watchdog has restarted it three times this hour and has stopped trying. It needs a person.' }
     'soft'    { return 'It is still running, so the watchdog does not restart it for this. It may be hung. It needs a person.' }
-    default   { return 'Nothing restarts this by itself. It needs a person.' }
+    default   {
+      if ($c.ContainsKey('Fix')) { return $c.Fix }
+      return 'Nothing restarts this by itself. It needs a person.'
+    }
   }
 }
 
@@ -621,6 +646,8 @@ $checks = @(
 # and the name ends in -<n> for every runner after the first.
 $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
+  @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS'; Fails = 'is out of date'; Recovers = 'is up to date again'; OffBox = (Join-Path $root 'offbox.txt'); Hours = 26
+     Fix = 'Fetch-Backups.ps1 on One brings the nightly backup down at 04:15 while One is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 there, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
   @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' }
 )
 
@@ -701,6 +728,7 @@ if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
 foreach ($c in $tellOnly) {
   $why = ''
   if ($c.ContainsKey('Backup')) { $why = BackupProblem $c.Backup $c.Folder $c.Hours }
+  elseif ($c.ContainsKey('OffBox')) { $why = OffBoxProblem $c.OffBox $c.Hours }
   else { $why = ServiceProblem $c.Service }
   if ($why) { Observe $told $c $true $false ($why.Substring(0, 1).ToUpper() + $why.Substring(1)) 'nobody' }
   else { Observe $told $c $false $false '' '' }
