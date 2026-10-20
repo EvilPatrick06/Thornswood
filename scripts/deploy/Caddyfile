@@ -30,6 +30,15 @@
 # signalling socket needs nothing more than this. Take these blocks out
 # (Setup-Domain.ps1 writes a Caddyfile without them) and voice is gone.
 # ---------------------------------------------------------------------------
+# THE BOX BLOCK IS HOW A CLOUD CLAUDE THREAD REACHES SSH (#2753).
+#
+# A cloud thread's proxy carries HTTPS only, so ssh from there goes inside a
+# WebSocket on 443: /box/ goes to the bridge on 127.0.0.1:7790
+# (scripts\vps\bridge\bridge.js, Install-Bridge.ps1), which opens one only
+# for its token and joins it to the box's own sshd. A plain request there
+# gets the bridge's 404, so the site's pages are untouched. Take it out and
+# cloud threads lose the box; One's own ssh on port 22 does not go through it.
+# ---------------------------------------------------------------------------
 
 {
 	email 187923600+EvilPatrick06@users.noreply.github.com
@@ -45,6 +54,10 @@ thornswood.net, www.thornswood.net {
 
 	handle_path /voice-dev/* {
 		reverse_proxy 127.0.0.1:7789
+	}
+
+	handle_path /box/* {
+		reverse_proxy 127.0.0.1:7790
 	}
 	reverse_proxy 127.0.0.1:3001
 }

@@ -125,7 +125,7 @@ if (-not (Test-Path -LiteralPath $tracked)) { throw "not found: $tracked. The si
 $caddyfile = [IO.File]::ReadAllText($tracked, [Text.Encoding]::UTF8)
 if ($Domain -ne 'thornswood.net') { $caddyfile = $caddyfile.Replace('thornswood.net', $Domain) }
 if ($Email) { $caddyfile = [regex]::Replace($caddyfile, '(?m)^(\s*email\s+)\S+', { param($m) $m.Groups[1].Value + $Email }) }
-foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'reverse_proxy 127.0.0.1:3001')) {
+foreach ($need in @('handle_path /voice/*', 'handle_path /voice-dev/*', 'handle_path /box/*', 'reverse_proxy 127.0.0.1:3001')) {
   if ($caddyfile.IndexOf($need) -lt 0) { throw "scripts\deploy\Caddyfile has no '$need' line, so it would take part of the site away. Nothing was sent." }
 }
 $cfg64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($caddyfile))
