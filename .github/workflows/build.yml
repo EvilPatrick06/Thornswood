@@ -574,6 +574,7 @@ jobs:
                  'test-1382-drug.js',
                  'test-1590-hunter-lists.js',
                  'test-1390-embassy.js',
+                 'test-1390-thalmor-patrols.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1382-potion-window.js',
