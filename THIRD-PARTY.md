@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `14d9fcd2` (in full, `14d9fcd287737a43a20f8b83a6b94c5a23262364`). That
+commit `ba6d8911` (in full, `ba6d8911ce8168cba6124d05b268755dc8d3d7d3`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -623,7 +623,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `14d9fcd287737a43a20f8b83a6b94c5a23262364` on the public fork. The
+  name `ba6d8911ce8168cba6124d05b268755dc8d3d7d3` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -654,10 +654,14 @@ with.
   decides a block before it hands the gamemode the hit, so the hit's blocked
   flag is the server's own and a block against a character the server runs is
   seen (#1386), and lets a plugin keep a character from being slowed by what it
-  carries, here and on everybody else's screen (#1385). The server module's
-  SHA256
-  is `6bd0b70a9b901b6448c62087e8f0c229fc0b09a40f8d37b1a05f24a7b29beeca`, built
-  2026-10-19T21:01:38Z. This is the recorded next release, not a deployment
+  carries, here and on everybody else's screen (#1385). Since `14d9fcd2` it also
+  has a kept NPC take the reference its plugin placed instead of spawning a
+  second one (#2483), lets a cast hold its effects longer, counted on the
+  caster's machine and agreed by the server (#2848), and keeps the cursor
+  menu's queued show and hide until the game handles it (#2384). The server
+  module's SHA256
+  is `544098874a6f54b57a9139bfa218e0876230dbddd4b341a0a9bc63b047b5e824`, built
+  2026-10-20T01:31:42Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -692,7 +696,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/14d9fcd287737a43a20f8b83a6b94c5a23262364
+https://github.com/EvilPatrick06/skymp/tree/ba6d8911ce8168cba6124d05b268755dc8d3d7d3
 
 For the engine Main runs until then:
 
