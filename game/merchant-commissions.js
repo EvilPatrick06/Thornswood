@@ -22,7 +22,20 @@ const publication=Object.freeze({
  'q-whiterun-cook-mammoth-supper':'d8731860a77c3864c7b01ab6fa45c5311e0dfc1b68e8fbfec91e7b2b34fab5d4',
  'q-whiterun-alchemist-ash-expedition':'75d2ee9fbfc5902fe6b9d200feeb7ede1b0773d57c1dbad4e6b14db5b11479df',
  'q-whiterun-alchemist-travelling-case':'7131990508cefa6f7c7601227b888ed4f4c70c28990dda2a863b37436760a9da',
- 'q-whiterun-enchanter-commission-rack':'531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787'
+ 'q-whiterun-enchanter-commission-rack':'531aabc2aaf3355f9867da014fb417e68b0a6171df577e82d7b39b61c5713787',
+ 'q-whiterun-smith-steel-blade-set':'b40b831c7c694b54bc1ae5d771e78136855044c542e78c02b492d0232970a43c',
+ 'q-whiterun-smith-glass-defence':'014841f818c26e6d1cf81ce9343f7554256fe0f12fd649d27d0a21a3e8ff91d3',
+ 'q-whiterun-woodworker-first-water-kit':'853bb28de7faec0ea0bdf90055369f01567e22b984055c9c835994db1c38ed06',
+ 'q-whiterun-woodworker-orcish-bow-kit':'7bdfd4fe29bd068d09aca13dddb8622317c7dda4d7410a07876a0bce1799d72c',
+ 'q-whiterun-woodworker-briquette-tools':'40fc07a8bd93a29fdaabc2cbbeb9fc97ac872cf2cafdbd8dfbe61341575c3507',
+ 'q-whiterun-tailor-hunt-feast-ribbons':'ebc1fece8c87c358e29c25945d428355036fd4bfe89d2c220c4f630d78b9ad89',
+ 'q-whiterun-tailor-white-fur-trimmings':'c914eff5b96246ef00a834b319b63d4289ba6f8c925c85220d732a0ca083f4f4',
+ 'q-whiterun-enchanter-glass-blade-supplies':'9b7585d22ff171b69fdd036ac4a72b191f34797d92350b77dde6c766d24eab37',
+ 'q-whiterun-cook-field-meal-parcel':'2ea942805da47f530b5bacfac762e1d6fa70c4c2f8d04603e0d06b266c977d79',
+ 'q-whiterun-cook-tomato-bread-order':'cc4f4f0682b62ef1b3029f500cf17baa8aa0fe689e93bbeaaf7e58260adcff63',
+ 'q-whiterun-cook-apple-dessert-order':'8abf81285bad8141f47e8908b28158537dd2856e240ba88317a541ede5411ddf',
+ 'q-whiterun-alchemist-lavender-cotton':'67ab5bbdfc39ab76203ab4b745ee9273277966436811ea357144d99efa1107ae',
+ 'q-whiterun-alchemist-fungal-collection':'5cb145a895c223d243bdb074f7ff5bd9f5704b75567358fbfab6b87105d87286'
 });
 function prepareCommissions(author,catalog,native) {
  if(!Array.isArray(author)||author.length!==Object.keys(publication).length)throw Error('Invalid published commission catalogue.');

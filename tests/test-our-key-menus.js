@@ -17,7 +17,7 @@
 // and no cursor after that last line until F6.
 //
 // WHAT THIS RUNS. The real text of thornswood-front.js: the focus arbiter
-// (claims down to the typing section, keepCursor included), everything from
+// (claims down to the typing section), everything from
 // the J block to the key handler (the J block, ourKeyMenu, the / block) and
 // the key handler. Under them is a pretend game in the order that log shows:
 //   - the game takes the key first. The menu it opens (Journal for J, Quick
@@ -32,7 +32,11 @@
 //     the J block's one repair;
 //   - browser.setFocused(true) raises the Cursor Menu only when it is not up
 //     already, and setFocused(false) lowers it only when focus raised it
-//     (BrowserApiTilted.cpp in the fork).
+//     (BrowserApiTilted.cpp in the fork);
+//   - since #2384 the fork also shows the Cursor Menu again, on the next UI
+//     pass, when it closes under a focus that is still up (the Cursor Menu's
+//     own close event, CursorFocus.h). The plugin no longer lowers and
+//     raises focus to get it back.
 //
 // Run it against the code before the change with FRONT=<that file>: the P,
 // / and cursor scenarios fail there.
@@ -71,8 +75,11 @@ const keys = (ka >= 0 && kb >= 0) ? src.slice(ka, kb + SHUT.length) : null;
 yes('the focus arbiter is in the plugin', arbiter !== null);
 yes('the J block, the / block and the rest up to the key handler are in the plugin', middle !== null);
 yes('the key handler is in the plugin', keys !== null);
-yes('the tick asks for the cursor after it puts the focus right',
-    /applyFocus\(\);\n\s*\/\/ And a claim holding the keyboard has its cursor \(issue 958\)\.\n\s*keepCursor\(\);/.test(src));
+yes('#2384: no keepCursor, and nothing in the plugin calls it',
+    !/keepCursor|CURSOR_TRIES|CURSOR_AGAIN_MS|cursorTries/.test(src));
+yes('#2384: no lower and raise of focus to bring the cursor back, and no log line for one',
+    !/raised it again/.test(src) &&
+    !/setFocused\(false\);\s*sp\.browser\.setFocused\(true\)/.test(src));
 
 const JOURNAL = 'Journal Menu', MAGIC = 'MagicMenu', STATS = 'StatsMenu', CURSOR = 'Cursor Menu';
 /*
@@ -103,7 +110,7 @@ function rig(opts) {
   const clock = { t: 7000000 };
   const game = {
     frame: 0, open: {}, ui: [], closing: [], tasks: [], shut: [], history: [],
-    focus: false, cursorByFocus: false, cursorTakes: [],
+    focus: false, cursorByFocus: false, cursorTakes: [], cursorBack: [],
     controls: Object.assign({ 36: 'Journal', 1: 'Pause', 25: 'Quick Magic', 53: 'Quick Stats' }, opts.controls || {})
   };
   const page = { pending: [], shown: {}, typed: [] };
@@ -125,9 +132,19 @@ function rig(opts) {
     if (!game.open[menu]) { return; }
     delete game.open[menu];
     game.history.forEach(function (h) { if (h.menu === menu && h.closedAt < 0) { h.closedAt = game.frame; } });
-    delete game.open[CURSOR];
+    cursorGone();
     if (opts.cursorLate) { game.cursorTakes.push(game.frame + opts.cursorLate); }
     later(0, ['menuClose', { name: menu }]);
+  }
+
+  // The Cursor Menu taken down by something that is not our focus. The fork
+  // (#2384) answers it from the close event: shown again next pass while
+  // focus is still up.
+  function cursorGone() {
+    if (!game.open[CURSOR]) { return; }
+    delete game.open[CURSOR];
+    game.cursorByFocus = false;
+    if (game.focus) { game.cursorBack.push(game.frame + 1); }
   }
 
   const sp = {
@@ -220,8 +237,7 @@ function rig(opts) {
     keyPrelude('');
   const api = new Function('sp', 'say', 'T', 'Date', 'guard', 'typed',
     prelude + arbiter + '\n' + middle + '\n' + keys +
-    '\nreturn { claims: claims, applyFocus: applyFocus,' +
-    ' keepCursor: typeof keepCursor === "function" ? keepCursor : function () { } };')(
+    '\nreturn { claims: claims, applyFocus: applyFocus };')(
     sp, say, T, { now: function () { return clock.t; } }, guard, page.typed);
 
   // The plugin's main browserMessage handler, the lines that move the claims.
@@ -239,12 +255,15 @@ function rig(opts) {
     game.ui.splice(0).forEach(function (m) { if (m[0] === 'hide') { gameCloses(m[1]); } });
     if (game.cursorTakes.length && game.cursorTakes[0] <= game.frame) {
       game.cursorTakes.shift();
-      delete game.open[CURSOR];
+      cursorGone();
+    }
+    if (game.cursorBack.length && game.cursorBack[0] <= game.frame) {
+      game.cursorBack.shift();
+      if (game.focus && !game.open[CURSOR]) { game.open[CURSOR] = true; game.cursorByFocus = true; }
     }
     fire('update');
-    // The tick: applyFocus, then keepCursor.
+    // The tick: applyFocus.
     api.applyFocus();
-    api.keepCursor();
     const due = game.tasks.filter(function (t) { return t.due <= game.frame; });
     game.tasks = game.tasks.filter(function (t) { return t.due > game.frame; });
     due.forEach(function (t) { fire(t.task[0], t.task[1]); });
@@ -258,7 +277,7 @@ function rig(opts) {
   }
 
   const h = {
-    game: game, page: page, logs: logs, threw: threw, api: api,
+    game: game, page: page, logs: logs, threw: threw, api: api, takeCursor: cursorGone,
     press: function (code) {
       if (game.focus) {
         if (code === ESC) {
@@ -473,21 +492,14 @@ if (arbiter !== null && middle !== null && keys !== null) {
     T_claim(h, 'party', true);
     h.run(5);
     yes('C1 a claim gets the keyboard and a cursor', h.game.focus && !!h.game.open[CURSOR]);
-    delete h.game.open[CURSOR];
-    h.run(3);
-    yes('C1 a cursor the game takes while a claim holds the keyboard comes back', !!h.game.open[CURSOR]);
-    yes('C1 and the log says so', h.said(/cursor was down, raised it again \(1 of 4\)/));
-    for (let i = 0; i < 10; i++) { delete h.game.open[CURSOR]; h.run(60); }
-    yes('C1 a game that keeps taking it is answered four times for one claim, and no more',
-        h.logs.filter(function (l) { return /raised it again/.test(l); }).length === 4);
+    let flips = 0;
+    for (let i = 0; i < 10; i++) { h.takeCursor(); h.run(3); if (h.game.open[CURSOR]) { flips++; } }
+    yes('C1 a cursor something else takes while a claim holds the keyboard comes back, every time (the fork, #2384)',
+        flips === 10);
+    yes('C1 and the plugin did not lower and raise focus for it', !h.said(/raised it again/) && h.game.focus);
     T_claim(h, 'party', false);
     h.run(5);
     yes('C1 the claim let go takes focus and the cursor down', !h.game.focus && !h.game.open[CURSOR]);
-    T_claim(h, 'party', true);
-    h.run(5);
-    delete h.game.open[CURSOR];
-    h.run(3);
-    yes('C1 and the next claim starts counting again', !!h.game.open[CURSOR]);
   }
   {
     const h = rig();
@@ -495,14 +507,13 @@ if (arbiter !== null && middle !== null && keys !== null) {
     h.run(5);
     h.menuUp(MAGIC);
     h.run(1);
-    delete h.game.open[CURSOR];
+    h.takeCursor();
     h.run(20);
-    yes('C2 not while one of the game\'s own menus is up: that menu is on its way out',
-        !h.game.open[CURSOR] && !h.said(/raised it again/));
+    yes('C2 a game menu up over a claim: the plugin still does nothing to the cursor', !h.said(/raised it again/));
   }
   {
     const h = rig();
-    delete h.game.open[CURSOR];
+    h.takeCursor();
     h.run(20);
     yes('C3 no claim, no focus: nothing is raised', !h.game.focus && !h.game.open[CURSOR]);
   }
