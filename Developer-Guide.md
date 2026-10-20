@@ -1002,8 +1002,15 @@ How to use it:
   reaches dev sends testers to look for a fix that main does not have. Write
   `Server: Main` on the line under the title, or no `Server:` line at all.
 - Most test tasks are Main, because testers play on main in the alpha and dev
-  is where the team checks nothing is broken (Patrick, 12 Oct). When the code
-  is done and someone on dev has to measure something first, write a
+  is where the team checks nothing is broken (Patrick, 12 Oct). Patrick, 20
+  Oct: "the dev test-tasks is only for ones that require a dev everything
+  else goes to main test-tasks once they are on main". So a check that is
+  done by playing is a Main test task, posted
+  when the change is on main, never a to-do on Patrick's page and never a dev
+  test task. Only a Patreon, Vortex or Nexus step is a page to-do. When the
+  code is done and a developer has to measure something on dev first (a
+  setting only a developer can switch, a log only the machine that ran the
+  session holds, a server change made on the box during the check), write a
   `Test task:` comment with `Server: Dev` on the line under the title, and
   leave the issue open. That one is for developers, so write it in developer
   terms: the files, log lines and commands to run, and what each should
