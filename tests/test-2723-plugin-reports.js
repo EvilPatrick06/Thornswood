@@ -68,6 +68,7 @@ const SITES = {
   "'/rest up'": { n: 1, kind: 'report', lines: ['/rest up'] },
   "'/chopped'": { n: 1, kind: 'report', lines: ['/chopped'] },
   "'/tspicks ' + n": { n: 1, kind: 'report', lines: ['/tspicks 1', '/tspicks 20'] },
+  "'/tspicked ' + id.toString(16)": { n: 1, kind: 'report', lines: ['/tspicked 1a2b3'] },
   "'/racemenu'": { n: 1, kind: 'report', lines: ['/racemenu'] },
   "'/racedown'": { n: 1, kind: 'report', lines: ['/racedown'] },
   "'/face done'": { n: 1, kind: 'report', lines: ['/face done'] },

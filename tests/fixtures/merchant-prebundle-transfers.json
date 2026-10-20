@@ -1,0 +1,282 @@
+{
+  "full": {
+    "reference": "1:Skyrim.esm",
+    "base": "a:Skyrim.esm",
+    "revision": 1,
+    "purse": 250,
+    "stock": [],
+    "supply": {},
+    "commissions": {
+      "v": 1,
+      "serial": 1,
+      "held": {
+        "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": {
+          "token": 1,
+          "owner": "[16,\"\",7]",
+          "job": "q-whiterun-smith-straps",
+          "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+          "item": {
+            "baseId": 100,
+            "name": "Iron Ingot"
+          },
+          "count": 1,
+          "unit": 3,
+          "gold": 3,
+          "at": 2000000000000
+        }
+      },
+      "cool": {}
+    },
+    "pending": {
+      "version": 4,
+      "id": "dev:test-ledger:1:Skyrim.esm:0",
+      "world": "dev:test-ledger",
+      "reference": "1:Skyrim.esm",
+      "base": "a:Skyrim.esm",
+      "human": {
+        "desc": "10",
+        "profileId": 7
+      },
+      "kind": "commission",
+      "phase": "debit",
+      "previous": {
+        "purse": 250,
+        "stock": [],
+        "supply": {},
+        "commissions": {
+          "v": 1,
+          "serial": 1,
+          "held": {
+            "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": {
+              "token": 1,
+              "owner": "[16,\"\",7]",
+              "job": "q-whiterun-smith-straps",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "item": {
+                "baseId": 100,
+                "name": "Iron Ingot"
+              },
+              "count": 1,
+              "unit": 3,
+              "gold": 3,
+              "at": 2000000000000
+            }
+          },
+          "cool": {}
+        }
+      },
+      "next": {
+        "purse": 247,
+        "stock": [
+          {
+            "baseId": 100,
+            "count": 1,
+            "name": "Iron Ingot",
+            "entry": {
+              "baseId": 100,
+              "count": 1,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          }
+        ],
+        "supply": {},
+        "commissions": {
+          "v": 1,
+          "serial": 1,
+          "held": {},
+          "cool": {
+            "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": 2000000000000
+          }
+        }
+      },
+      "expected": {
+        "entries": [
+          {
+            "baseId": 15,
+            "count": 40
+          },
+          {
+            "baseId": 100,
+            "count": 8,
+            "name": "Tempered iron",
+            "health": 0.7
+          }
+        ]
+      },
+      "expectedReceipt": "null",
+      "debit": {
+        "entries": [
+          {
+            "baseId": 15,
+            "count": 40
+          },
+          {
+            "baseId": 100,
+            "count": 7,
+            "name": "Tempered iron",
+            "health": 0.7
+          }
+        ]
+      },
+      "credit": [
+        {
+          "baseId": 15,
+          "count": 3
+        }
+      ],
+      "sequence": 1,
+      "debitReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":1}",
+      "finalReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":2}",
+      "terms": {
+        "version": 2,
+        "kind": "commission",
+        "gold": 3,
+        "goods": "347d24b9ed7f6917ecb5e3bc8464585e5e4618ce25c1c5ddf63fb494efa7c12a",
+        "credit": "8afe34a104e0df4a1d7b9ca3531507199002b2772a0fdeef27c010e6443ca77d",
+        "next": "fa00cc0b5f220597bd8101d181ac13e3245dc58c85fc45c43629b3d3e2b053a0",
+        "previousSupply": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "previousCommissions": "41a7badf25acfbf6d3d77391243242c8abad81f3cd78672c10021f1a54a064d5"
+      }
+    }
+  },
+  "compact": {
+    "reference": "1:Skyrim.esm",
+    "base": "a:Skyrim.esm",
+    "revision": 3,
+    "purse": 247,
+    "stock": [
+      {
+        "baseId": 100,
+        "count": 1,
+        "name": "Iron Ingot",
+        "entry": {
+          "baseId": 100,
+          "count": 1,
+          "name": "Tempered iron",
+          "health": 0.7
+        }
+      }
+    ],
+    "supply": {},
+    "commissions": {
+      "v": 1,
+      "serial": 1,
+      "held": {},
+      "cool": {
+        "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": 2000000000000
+      }
+    },
+    "pending": {
+      "version": 4,
+      "id": "dev:test-ledger:1:Skyrim.esm:0",
+      "world": "dev:test-ledger",
+      "reference": "1:Skyrim.esm",
+      "base": "a:Skyrim.esm",
+      "human": {
+        "desc": "10",
+        "profileId": 7
+      },
+      "kind": "commission",
+      "phase": "credit",
+      "previous": {
+        "supply": {},
+        "commissions": {
+          "v": 1,
+          "serial": 1,
+          "held": {
+            "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": {
+              "token": 1,
+              "owner": "[16,\"\",7]",
+              "job": "q-whiterun-smith-straps",
+              "hash": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+              "item": {
+                "baseId": 100,
+                "name": "Iron Ingot"
+              },
+              "count": 1,
+              "unit": 3,
+              "gold": 3,
+              "at": 2000000000000
+            }
+          },
+          "cool": {}
+        }
+      },
+      "next": {
+        "purse": 247,
+        "stock": [
+          {
+            "baseId": 100,
+            "count": 1,
+            "name": "Iron Ingot",
+            "entry": {
+              "baseId": 100,
+              "count": 1,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          }
+        ],
+        "supply": {},
+        "commissions": {
+          "v": 1,
+          "serial": 1,
+          "held": {},
+          "cool": {
+            "[\"[16,\\\"\\\",7]\",\"q-whiterun-smith-straps\"]": 2000000000000
+          }
+        }
+      },
+      "credit": [
+        {
+          "baseId": 15,
+          "count": 3
+        }
+      ],
+      "sequence": 1,
+      "debitReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":1}",
+      "finalReceipt": "{\"actor\":\"10\",\"profile\":7,\"sequence\":2}",
+      "terms": {
+        "version": 2,
+        "kind": "commission",
+        "gold": 3,
+        "goods": "347d24b9ed7f6917ecb5e3bc8464585e5e4618ce25c1c5ddf63fb494efa7c12a",
+        "credit": "8afe34a104e0df4a1d7b9ca3531507199002b2772a0fdeef27c010e6443ca77d",
+        "next": "fa00cc0b5f220597bd8101d181ac13e3245dc58c85fc45c43629b3d3e2b053a0",
+        "previousSupply": "44136fa355b3678a1146ad16f7e8649e94fb4fc21fe77e8310c060f61caaff8a",
+        "previousCommissions": "41a7badf25acfbf6d3d77391243242c8abad81f3cd78672c10021f1a54a064d5"
+      },
+      "creditAttempt": {
+        "expected": {
+          "entries": [
+            {
+              "baseId": 15,
+              "count": 40
+            },
+            {
+              "baseId": 100,
+              "count": 7,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          ]
+        },
+        "replacement": {
+          "entries": [
+            {
+              "baseId": 15,
+              "count": 43
+            },
+            {
+              "baseId": 100,
+              "count": 7,
+              "name": "Tempered iron",
+              "health": 0.7
+            }
+          ]
+        }
+      }
+    }
+  }
+}

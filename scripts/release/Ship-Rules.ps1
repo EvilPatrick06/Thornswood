@@ -782,6 +782,37 @@ function Test-ShipBethesdaLeftAlone([string]$rel) {
     return $false
 }
 
+# MADE FROM THE GAME ON EACH MACHINE, NEVER SHIPPED (#2827).
+#
+# The main menu (Skyrim's own startmenu.swf with its logo shapes taken out,
+# #2177) and the notice board's two meshes (pieces of Skyrim's own meshes,
+# #2298) are Bethesda's files, edited or put together, and Bethesda's terms
+# grant no right to hand those on (#2792). Patrick chose on 19 Oct that each
+# machine makes them from its own game (#2827, option 2): the launcher before
+# every Play (launcher\app\MadeFromGame.cs) and Go.ps1 for a ship root. So
+# they are in every game folder Ship reads, and none of them may leave it: a
+# pack, the installer or a record that carried one would hand on Bethesda's
+# file again. Test-ShipBethesda says yes to them, so the record guard refuses
+# them and Scrub-Feed.ps1 takes them out of what is already on the site.
+#
+# NEVER LISTED AS REMOVED either (Test-ShipMachine): an install that took one
+# from an earlier pack has the very bytes the launcher makes, and a delete.txt
+# line would only take it away until the next Play made it again. The
+# launcher's list is FromGame.Files; tests\test-2827-from-game.ps1 holds the
+# two to each other.
+$ShipMadeFromGame = @(
+    'Data\Interface\startmenu.swf',
+    'Data\meshes\thornswood\noticeboard01.nif',
+    'Data\meshes\thornswood\dropbox01.nif'
+)
+
+function Test-ShipMadeFromGame([string]$rel) {
+    foreach ($f in $ShipMadeFromGame) {
+        if ($rel -ieq $f) { return $true }
+    }
+    return $false
+}
+
 # A mod Thornswood has taken out. Never shipped, and never listed as removed:
 # the launcher takes these out of its own game folder itself (OwnGame.Retired,
 # rules 7), so a pack has nothing to delete and no Vortex file in the Steam
@@ -933,7 +964,8 @@ function Test-ShipBackup([string]$rel) {
 # drops. Measured the same day, no pack, record or loose file on the site names
 # it.
 function Test-ShipBethesda([string]$rel) {
-    return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel))
+    return ((Test-ShipBethesdaTool $rel) -or (Test-ShipVanilla $rel) -or (Test-ShipBethesdaLeftAlone $rel) -or
+            (Test-ShipMadeFromGame $rel))
 }
 
 # ---------------------------------------------------------------------------
@@ -1070,6 +1102,8 @@ function Test-ShipMachine([string]$rel) {
     if (Test-ShipVanilla $rel) { return $true }
     if (Test-ShipForeignFramework $rel) { return $true }
     if (Test-ShipBethesdaLeftAlone $rel) { return $true }
+    # Made on each machine from its own game (#2827).
+    if (Test-ShipMadeFromGame $rel) { return $true }
     # One machine's own by kind (#1239), the named files and Vortex's records
     # among them. The runtime folders are the one kind left to Test-ShipRuntime,
     # which lists them as removed when a baseline once had them.
@@ -1245,11 +1279,11 @@ $ShipOursFiles = @(
     'Data\Thornswood-Last.esp',
     # The SkyMP client's compiled script, from the engine fork.
     'Data\Scripts\MpClientPlugin.pex',
-    # Our main menu: no Bethesda logo and no button list, an empty loading
-    # spinner (Checks.cs, since 16 September), and the menu music's silent
-    # stand in for the game's theme. Go.ps1 writes these four from
-    # game\ours ($oursMenuFiles there; change the two together).
-    'Data\Interface\startmenu.swf',
+    # An empty loading spinner (Checks.cs, since 16 September) and the menu
+    # music's silent stand in for the game's theme. Go.ps1 writes these
+    # three from game\ours ($oursMenuFiles there; change the two together).
+    # The main menu itself, with no Bethesda logo, is made on each machine
+    # from the game's own since #2827 ($ShipMadeFromGame).
     'Data\Interface\loadwaitspinner.swf',
     'Data\music\special\mus_maintheme.xwm',
     # SkyHUD's settings as Thornswood set them (16 September, after the first
@@ -1257,13 +1291,7 @@ $ShipOursFiles = @(
     # were Daedric Online's by their own first lines and are one machine's
     # (#1239); TrueHUD\RP_Bosses.ini is Daedric Online's boss list (#1253), so
     # neither is named here.
-    'Data\Interface\skyhud\skyhud.txt',
-    # The notice board and the hold's drop box, Thornswood's own meshes,
-    # built from vanilla Skyrim pieces by scripts\mods\Build-NoticeBoard.py
-    # (#2298). Every texture they name is the game's own, so only the two
-    # meshes ship. Go.ps1 writes them from game\ours with the four above.
-    'Data\meshes\thornswood\noticeboard01.nif',
-    'Data\meshes\thornswood\dropbox01.nif'
+    'Data\Interface\skyhud\skyhud.txt'
 )
 
 # NEMESIS'S OUTPUT IS OURS, because we generate it from the collection.
@@ -1285,7 +1313,16 @@ $ShipGeneratedBodyFiles = @(
     'Data\meshes\actors\character\character assets\malebody_0.nif',
     'Data\meshes\actors\character\character assets\malebody_1.nif'
 )
-$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + @(
+# THE OUTFITS FITTED TO THOSE BODIES ARE OURS (#2454), built by the same
+# scripted build from the collection's BodySlide projects named in
+# records\generated.json (bodyslide.outfits), at their own slider defaults and
+# with no RaceMenu morphs (#1004). Exact paths, the OutputPath and OutputFile
+# (_0 and _1) of each set. None yet: the travel clothes and the executioner
+# come with the collection revision that deploys their projects (#2454). Never
+# anything from Immersive Armors: Patrick, 17 Oct, it is used as-is through the
+# collection and nothing built from it is redistributed (permission-held.txt).
+$ShipGeneratedOutfitFiles = @()
+$ShipGeneratedPatterns = $ShipGeneratedBodyFiles + $ShipGeneratedOutfitFiles + @(
     'Data\meshes\animationdatasinglefile.txt',
     'Data\meshes\animationsetdatasinglefile.txt',
     'Data\meshes\actors\*\behaviors\*.hkx',
@@ -1473,9 +1510,9 @@ $ShipRequiredDataFiles = @(& {
     }
 })
 
-# OURS FOR NOW, UNTIL #1259: 140 outfit meshes built in BodySlide on some other
-# machine (Common Clothes' travel clothes, Immersive Armours' Bosmer armour,
-# More Craftable Equipment's executioner). Patrick, 29 September: Thornswood
+# OURS FOR NOW, UNTIL #1259: 122 outfit meshes built in BodySlide on some other
+# machine (Common Clothes' travel clothes, More Craftable Equipment's
+# executioner; the Bosmer armour's morphs left in #2454, and nothing is built from it). Patrick, 29 September: Thornswood
 # builds the outfits itself from the collection's BodySlide projects, and until
 # that build replaces these they keep shipping so nothing looks broken. Exact
 # paths, in built-until-1259.txt beside this file; the build that closes #1259
@@ -1565,7 +1602,7 @@ function Assert-ShipGeneratedBodyFiles([string]$GameDir, [string]$ProfileDir) {
             [pscustomobject]@{ Sha=$matches[1]; Rel=$matches[2].Replace('/', '\'); Destination=[IO.Path]::GetFullPath((Join-Path $GameDir $matches[2])) }
         }
     })
-    foreach ($rel in $ShipGeneratedBodyFiles) {
+    foreach ($rel in @($ShipGeneratedBodyFiles) + @($ShipGeneratedOutfitFiles)) {
         $file = Join-Path $GameDir $rel
         $destination = [IO.Path]::GetFullPath($file)
         $matching = @($rows | Where-Object { $_.Destination -ieq $destination })

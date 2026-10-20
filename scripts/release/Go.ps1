@@ -285,10 +285,9 @@ foreach ($pair in $menuPairs) {
 }
 
 # ------------------------------------------------ our own menu files --
-# The main menu with no Bethesda logo, the empty loading spinner, the
-# silent stand-in for the game's theme, SkyHUD's settings as Thornswood
-# set them, and the notice board's and drop box's meshes. From
-# game\ours, beside game\menu. Each path is
+# The empty loading spinner, the silent stand-in for the game's theme and
+# SkyHUD's settings as Thornswood set them. From game\ours, beside
+# game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
 # is removed before the copy: in an own game folder these can be hard
@@ -297,17 +296,9 @@ foreach ($pair in $menuPairs) {
 Head 'Our menu files'
 $oursSrc = Join-Path $Here '..\..\game\ours'
 $oursMenuFiles = @(
-  'Data\Interface\startmenu.swf',
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
-  'Data\Interface\skyhud\skyhud.txt',
-  # The notice board and the drop box of the hold beside it, the meshes
-  # Thornswood builds from vanilla pieces with scripts\mods\Build-NoticeBoard.py,
-  # issue 2298. The board and drop box of Thornswood-Content.esp name them.
-  # No brackets and no apostrophes in these comments: test-ship-rules.ps1
-  # reads this list up to the first closing bracket, quote by quote.
-  'Data\meshes\thornswood\noticeboard01.nif',
-  'Data\meshes\thornswood\dropbox01.nif'
+  'Data\Interface\skyhud\skyhud.txt'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -317,6 +308,32 @@ foreach ($rel in $oursMenuFiles) {
   if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
   Copy-Item -LiteralPath $src -Destination $dst -Force
   Note $rel
+}
+
+# ------------------------------------------------ made from the game --
+# The main menu with no Bethesda logo and no button list, and the notice
+# board's and drop box's meshes. Each is Bethesda's own file edited or put
+# together, so none of them ships (#2827, Ship-Rules $ShipMadeFromGame): they
+# are made here from this game's own archives by the launcher's own code,
+# launcher\app\FromGame*.cs with the recipes beside it, so this writes the
+# very bytes the launcher makes before every Play. Each is checked against
+# the sha256 it must have, and one that comes out different is not written;
+# the line says which of the game's files differs. Not a failed run: nothing
+# here ships, and the launcher says the same thing at Play. The destination is
+# removed first, for the hard link reason above.
+Head 'Made from the game'
+if (-not ('Thornswood.FromGame' -as [type])) {
+  $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |
+    ForEach-Object { $_.FullName })
+  Add-Type -Path $fromGameCs
+}
+foreach ($made in [Thornswood.FromGame]::Build((Join-Path $Game 'Data'))) {
+  if ($made.Problem) { Bad ($made.Rel + ' was not made: ' + $made.Problem); continue }
+  $dst = Join-Path $Game $made.Rel
+  New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
+  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
+  [System.IO.File]::WriteAllBytes($dst, $made.Bytes)
+  Note $made.Rel
 }
 
 # ---------------------------------------------------------- required data --

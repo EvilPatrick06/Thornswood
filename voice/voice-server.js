@@ -228,11 +228,18 @@ const COMMAND_REFUSED_EVERY_MS = 10000;
   and a backslash sent as two characters each and a colon in the title as
   two, so a job at its longest is about 1,350. A command cut at 400 lost
   the end of the body without a word, and the gamemode, which checks the
-  lengths, could never see what was missing. 2,000 covers it; the queue
-  still holds at most COMMAND_CAP of them.
+  lengths, could never see what was missing.
+
+  The longest command is a journal page (#2563): "/journal page " (14), two
+  ids of about 12 each, a title of up to 60, " :: " (4) and a page of up to
+  SOCIAL.pageChars (4,000) with every newline sent as two characters, so
+  8,000 at worst. 2,000 cut any page past about 1,900 without a word. 8,200
+  carries the longest page whole (tests/test-2563-journal-length.js holds the
+  sum to this number); the queue still holds at most COMMAND_CAP of them, so
+  about 1.6 MB at the very most.
 */
 const SAID_CHARS = 400;
-const COMMAND_CHARS = 2000;
+const COMMAND_CHARS = 8200;
 
 // What the gamemode is handed. The offer count is this service's business.
 // proven says this connection's join token checked out, which the gamemode's
@@ -445,6 +452,7 @@ const PLUGIN_REPORTS = [
   /^\/ate [0-9a-f]+$/,
   /^\/rest (?:bed|sit|up)$/,
   /^\/tspicks \d+$/,
+  /^\/tspicked [0-9a-f]+$/,
   /^\/modset(?: [A-Za-z0-9_]+=-?\d+(?:\.\d+)?(?:e[+-]?\d+)?)+$/
 ];
 function pluginReport(text) {

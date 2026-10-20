@@ -117,6 +117,14 @@
       '/apprentice <id> <half>'. The server answers in the chat and by
       rewriting this.
 
+    hairDye: { dyes: [ { id, name, count } ], steeping: { name, left } | null }
+      Hair dye (#2675), sent only while you carry a dye or one is steeping.
+      Dye my hair sends '/hairdye self <id>' through window.thornswoodNet.say.
+      The look prompt's K hands dyeFor the person under the crosshair,
+      { id, name }, and Offer to dye sends '/hairdye offer <id> <dye>': they
+      answer on their own prompt. The server answers in the chat and by
+      rewriting this.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -284,7 +292,7 @@
             { key: 'endurance', name: 'Endurance', desc: 'Most stamina', perk: 'Tireless: running and swinging cost half stamina.' },
             { key: 'vigor', name: 'Vigor', desc: 'Regeneration', perk: 'Second Wind: when stamina hits 0 it fills, once every 5 minutes.' },
             { key: 'agility', name: 'Agility', desc: 'Speed', perk: 'Windwalker: +4 speed, and a fall deals no damage.' },
-            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you. Not in the game yet.' },
+            { key: 'burden', name: 'Burden', desc: 'Carry weight', perk: 'Pack Mule: being overloaded does not slow you.' },
             { key: 'precision', name: 'Precision', desc: 'Critical chance, which the game ignores', perk: 'Lethal Aim: an arrow ignores half the armour it hits.' }] }
       ]
     },
@@ -381,6 +389,15 @@
       rows: []
     },
     /*
+      Hair dye (#2675). What you carry is the server's, under mine.hairDye;
+      this is the title and the sentence over the page.
+    */
+    hairdye: {
+      title: 'Hair dye',
+      lead: 'A dye you carry colours your own hair, or the hair of somebody in front of you once they say yes. Each one is used up.',
+      rows: []
+    },
+    /*
       The property page (#1637, #1603). What you hold and carry a key to is
       the server's, under mine.property; this is the title and nothing else,
       because the page draws its own line over the cards.
@@ -462,6 +479,7 @@
   var candidate = null;    // who the look prompt's K opened the page on: { id, name, halves: [{ h, k }] } (#1634)
   var endArmed = null;     // an End pressed once, waiting for the second press: { key, at }
   var apprSent = null;     // an End sent and not yet answered: { key, name, at }
+  var dyeTarget = null;    // who the look prompt's K opened Hair dye on: { id, name } (#2675)
 
   // ------------------------------------------------------------------ css --
   /*
@@ -1022,6 +1040,18 @@
       });
     }
   }
+  /* Hair dye (#2675): the server's, under mine.hairDye, or null when you carry none. */
+  function dyeView() {
+    var got = mine && mine.hairDye;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function dyeList() {
+    var v = dyeView();
+    return (v && Array.isArray(v.dyes)) ? v.dyes.filter(function (d) {
+      return d && typeof d.id === 'string' && /^[a-z0-9-]+$/.test(d.id);
+    }) : [];
+  }
   /* Masters and apprentices (#1634): the server's, under mine.apprentice, or null with no profession. */
   function apprView() {
     var got = mine && mine.apprentice;
@@ -1352,6 +1382,8 @@
     if (section === 'college') return 0;
     // Masters and apprentices: its buttons are on its cards.
     if (section === 'apprentice') return 0;
+    // Hair dye: its buttons are on its cards.
+    if (section === 'hairdye') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1393,7 +1425,7 @@
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
     return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape(),
-                           candidate, endArmed]);
+                           candidate, endArmed, dyeTarget]);
   }
 
   function draw() {
@@ -1435,6 +1467,8 @@
     // Masters and apprentices (#1634), before Property: the server sends it to
     // anybody with a profession, and the look prompt's K opens it on a person.
     if (!creating() && (apprView() || candidate)) sections.push('apprentice');
+    // Hair dye (#2675): only while you carry one or one is steeping.
+    if (!creating() && dyeView()) sections.push('hairdye');
     if (propertyRows().length) sections.push('property');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
@@ -1532,6 +1566,12 @@
       if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
       return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
     }
+    if (sec === 'hairdye') {
+      var hdN = dyeList().length, hdV = dyeView();
+      if (dyeTarget && hdN) return { t: 'dye ' + dyeTarget.name, c: 'need' };
+      if (hdV && hdV.steeping && !hdN) return { t: 'steeping', c: '' };
+      return { t: hdN + (hdN === 1 ? ' dye' : ' dyes'), c: 'set' };
+    }
     if (sec === 'body') {
       var bv = bodyView();
       var bw = bodyWorries(bv);
@@ -1623,6 +1663,7 @@
     else if (section === 'staff') drawStaff();
     else if (section === 'college') drawCollege();
     else if (section === 'apprentice') drawApprentice();
+    else if (section === 'hairdye') drawHairDye();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
@@ -2042,6 +2083,81 @@
     drawFoot();
   }
 
+  /*
+    THE COMPANY'S TERMS, FOR STAFF (#512, #2695, Patrick, 18 Oct): the server
+    proposes, staff confirm. The terms in force, the proposal waiting with
+    each change, who proposed it and when, and every term to set and
+    propose. Confirm asks twice. Everything here is the server's, under
+    officePage.company, and the server checks staff again on every line.
+  */
+  function officeCompany(c) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The company\'s terms'));
+    var fields = Array.isArray(c && c.fields) ? c.fields : [];
+    card.appendChild(el('div', 'desc', (c && c.changed)
+      ? 'Last changed ' + whenOpens(Number(c.changed.at) || 0) + '. Who changed it is in the staff log.'
+      : 'These are the terms the company shipped with.'));
+    var p = c && c.pending;
+    if (p) {
+      var list = (Array.isArray(p.changes) ? p.changes : []).map(function (ch) {
+        return String(ch.label || ch.term) + ' from ' + String(ch.from) + ' to ' + String(ch.to);
+      }).join('; ');
+      officeRow(card, 'Proposed: ' + list, (p.by ? 'by ' + String(p.by) + ', ' : '') + whenOpens(Number(p.at) || 0), [
+        officeButton('Confirm', '/companyterms confirm ' + String(Number(p.at) || 0), 'Press again to change the company\'s terms'),
+        officeButton('Drop', '/companyterms drop ' + String(Number(p.at) || 0))
+      ]);
+      var keep = Number(p.openHaulsKeepTerms) || 0;
+      card.appendChild(el('div', 'desc', keep + (keep === 1 ? ' open haul keeps' : ' open hauls keep') +
+        ' the terms it was posted under.'));
+    } else {
+      card.appendChild(el('div', 'desc', 'Nothing is proposed.'));
+    }
+    var inputs = [];
+    fields.forEach(function (f) {
+      if (!f || typeof f.key !== 'string') return;
+      var box;
+      if (f.kind === 'choice') {
+        box = document.createElement('select');
+        (Array.isArray(f.choices) ? f.choices : []).forEach(function (ch) {
+          var opt = document.createElement('option');
+          opt.value = String(ch);
+          opt.textContent = String(ch);
+          if (String(ch) === String(f.value)) opt.selected = true;
+          box.appendChild(opt);
+        });
+      } else {
+        box = document.createElement('input');
+        box.value = String(f.value);
+        box.placeholder = f.kind === 'percent' ? 'percent' : 'gold';
+      }
+      inputs.push({ f: f, box: box });
+      officeRow(card, String(f.label || f.key), f.kind === 'percent' ? String(f.value) + '%' : String(f.value), [box]);
+    });
+    var send = officeButton('Propose', function () {
+      var pairs = [];
+      for (var i = 0; i < inputs.length; i++) {
+        var f = inputs[i].f;
+        var v = String(inputs[i].box.value || '').trim();
+        if (f.kind !== 'choice' && !/^\d+$/.test(v)) {
+          status = String(f.label || f.key) + ' is a whole number.'; statusKind = 'no';
+          drawFoot();
+          return '';
+        }
+        if (v !== String(f.value)) pairs.push(f.key + '=' + v);
+      }
+      if (!pairs.length) {
+        status = 'Change a term first. Those are the terms in force.'; statusKind = 'no';
+        drawFoot();
+        return '';
+      }
+      return '/companyterms propose ' + pairs.join(' ');
+    });
+    officeRow(card, '', '', [send]);
+    card.appendChild(el('div', 'desc', 'The terms change only when staff confirm a proposal here, and every press ' +
+      'goes in the staff log with your name. Hauls already posted keep the terms they were posted under.'));
+    return card;
+  }
+
   /* A button on the Office page. With twice, the first press only says what the second does. */
   function officeButton(text, line, twice) {
     var b = el('span', 'stop', text);
@@ -2170,8 +2286,12 @@
         'hold or none. At a building whose hold you do not keep you act as staff, and every press goes in the ' +
         'staff log with your name.');
     }
+    // Where the world is, for staff (#513): propose, confirm and drop a move.
+    if (o.world) wrap.appendChild(officeWorld(o.world));
     if (o.steward || o.staff) wrap.appendChild(officeDoor(o.door));
     if (o.steward) wrap.appendChild(officeBoards(o.boards));
+    // The company's terms, for staff (#512, #2695): propose, confirm and drop.
+    if (o.company) wrap.appendChild(officeCompany(o.company));
     elBody.appendChild(wrap);
   }
 
@@ -2214,6 +2334,51 @@
     var buttons = [input, set];
     if (r) buttons.push(officeButton('No rent', '/rent -'));
     officeRow(card, 'Rent every 7 days', '', buttons);
+    return card;
+  }
+
+  /*
+    THE WORLD, FOR STAFF (#513, Patrick, 17 Oct): server proposes, staff
+    confirm. Where the world is, with its force when the stage names one, the
+    proposal waiting with who made it and when, and a button for every other
+    stage to propose it. Confirm asks twice, because it moves the world for
+    everybody. Everything here is the server's, under officePage.world, and
+    the server checks staff again on every line.
+  */
+  function officeWorld(w) {
+    var card = el('div', 'card');
+    card.appendChild(el('div', 'name', 'The world'));
+    var st = (w && w.stage) || {};
+    var name = String(st.name || st.id || 'the start');
+    card.appendChild(el('div', 'desc', 'The world is at ' + name + '.' +
+      (st.force ? ' Behind it: ' + String(st.force) + '.' : '') +
+      (Number(st.since) > 0
+        ? ' It got there ' + whenOpens(Number(st.since)) + (st.by ? ', moved by ' + String(st.by) : '') + '.'
+        : ' It has been there from the start.') +
+      (st.text ? ' ' + String(st.text) : '')));
+    var p = w && w.pending;
+    if (p) {
+      var pname = String(p.name || p.id);
+      officeRow(card, 'Proposed: ' + pname + (p.force ? ' (' + String(p.force) + ')' : ''),
+        'by ' + String(p.by || 'somebody') + ', ' + whenOpens(Number(p.at) || 0), [
+          officeButton('Confirm', '/world confirm ' + String(p.id) + ' ' + String(Number(p.at) || 0),
+            'Press again to move the world to ' + pname + (p.notice ? ' and put up its notice' : '')),
+          officeButton('Drop', '/world drop ' + String(Number(p.at) || 0))
+        ]);
+    } else {
+      card.appendChild(el('div', 'desc', 'Nothing is proposed.'));
+    }
+    var others = (w && Array.isArray(w.stages) ? w.stages : []).filter(function (s) { return s && s.id !== st.id; });
+    if (others.length) {
+      var row = officeRow(card, 'Propose', '', []);
+      others.forEach(function (s) {
+        row.appendChild(officeButton(String(s.name || s.id), '/world propose ' + String(s.id)));
+      });
+    } else {
+      card.appendChild(el('div', 'desc', 'There is no other stage in the list to propose.'));
+    }
+    card.appendChild(el('div', 'desc', 'The world moves only when staff confirm a proposal here, and every press ' +
+      'goes in the staff log with your name.'));
     return card;
   }
 
@@ -2711,7 +2876,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'body');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -2757,6 +2922,10 @@
       if (candidate) return 'Take on asks them. They answer on their own prompt.';
       if (apprList('took').length || apprList('by').length) return 'End asks twice. Either of you can end it, and the ranks earned stay.';
       return 'A Master takes somebody on by looking at them and pressing the key the prompt names.';
+    }
+    if (section === 'hairdye') {
+      if (dyeTarget) return 'Offer to dye asks them. They answer on their own prompt.';
+      return 'Dye my hair uses the dye at once. The server answers in the chat.';
     }
     if (section === 'college') {
       if (studyWaiting()) return 'Sent. The server is checking.';
@@ -2904,6 +3073,56 @@
     } catch (e) { }
     status = 'The connection is loading. Try again in a moment.'; statusKind = 'no';
     return false;
+  }
+  /*
+    HAIR DYE (#2675). Dye my hair sends '/hairdye self <id>'; with somebody
+    from the look prompt, Offer to dye sends '/hairdye offer <id> <dye>' and
+    they answer on their own prompt. The server checks it all again.
+  */
+  function dyePress(line, done) {
+    if (!sayLine(line)) { draw(); return; }
+    status = done; statusKind = '';
+    draw();
+  }
+  function drawHairDye() {
+    var v = dyeView();
+    var dyes = dyeList();
+    if (v && v.steeping && typeof v.steeping.name === 'string') {
+      var bar = el('div', 'spellbar');
+      var left = Math.max(0, Number(v.steeping.left) || 0);
+      bar.appendChild(el('div', 'spellpts', v.steeping.name + ' is steeping'));
+      bar.appendChild(el('div', 'spellnote', left ? 'About ' + left + ' seconds as K opened. Stay by the fire.' : 'Nearly done. Stay by the fire.'));
+      elBody.appendChild(bar);
+    }
+    var wrap = el('div', 'cards');
+    dyes.forEach(function (d) {
+      var card = el('div', 'card');
+      var nm = el('div', 'name', String(d.name || d.id));
+      if (Number(d.count) > 1) nm.appendChild(el('span', 'tag', 'x' + Number(d.count)));
+      card.appendChild(nm);
+      var mineLine = el('div', 'guest');
+      mineLine.appendChild(el('span', '', 'Your own hair.'));
+      var go = el('span', 'act', 'Dye my hair');
+      go.onclick = function (ev) { ev.stopPropagation(); dyePress('/hairdye self ' + d.id, 'Sent. The server answers in the chat.'); };
+      mineLine.appendChild(go);
+      card.appendChild(mineLine);
+      if (dyeTarget) {
+        var who = dyeTarget;
+        var theirs = el('div', 'guest');
+        theirs.appendChild(el('span', '', who.name + ', in front of you. Nothing is used until they say yes.'));
+        var ask = el('span', 'act', 'Offer to dye');
+        ask.onclick = function (ev) {
+          ev.stopPropagation();
+          dyeTarget = null;
+          dyePress('/hairdye offer ' + who.id + ' ' + d.id, 'Asked ' + who.name + '. They answer on their own prompt.');
+        };
+        theirs.appendChild(ask);
+        card.appendChild(theirs);
+      }
+      wrap.appendChild(card);
+    });
+    if (wrap.children.length) elBody.appendChild(wrap);
+    if (!dyes.length) elBody.appendChild(el('div', 'desc', 'You carry no dye right now.'));
   }
   function takeOnPress(half) {
     if (!candidate) return;
@@ -3383,6 +3602,7 @@
       root.className = 'gone';
       quitArmed = 0;   // a panel put down with Close Skyrim armed comes back unarmed
       candidate = null;   // the person the look prompt opened it on is that moment's, not the next
+      dyeTarget = null;   // and the same for Hair dye's (#2675)
       endArmed = null;
       tell('closed');
     },
@@ -3418,6 +3638,20 @@
       candidate = { id: id, name: String(who.name || 'Somebody'), halves: halves };
       endArmed = null;
       goTo('apprentice');
+      if (root.className === 'gone') api.open(); else draw();
+    },
+    /*
+      The look prompt's K on somebody while you carry a hair dye (#2675): the
+      front hands over the form id under the crosshair and the name, and the
+      panel opens on Hair dye with an Offer to dye on each dye. Never while
+      creating, and never when you carry none.
+    */
+    dyeFor: function (who) {
+      if (creating() || !who || typeof who !== 'object' || !dyeList().length) return;
+      var id = String(who.id || '');
+      if (!/^[0-9a-f]+$/i.test(id)) return;
+      dyeTarget = { id: id, name: String(who.name || 'Somebody') };
+      goTo('hairdye');
       if (root.className === 'gone') api.open(); else draw();
     },
     /*
