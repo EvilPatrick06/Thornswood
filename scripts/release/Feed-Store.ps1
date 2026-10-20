@@ -167,6 +167,14 @@ function Get-FeedStoreVps([hashtable]$To) {
 # neither can load the other's rename first in one session.
 $script:FeedStoreSwap = @'
 function Move-FeedStoreInto([string]$from, [string]$to) {
+  # Off Windows (a Ship from the feed in the cloud, #2903) there is no
+  # kernel32, and loading FeedSwap fails with "Value cannot be null (path1)".
+  # There File.Move with overwrite is rename(2), which already replaces the
+  # name in one step with the POSIX semantics asked of Windows below: a
+  # reader holding the old file keeps it, and a new reader gets the new one.
+  # Windows PowerShell 5.1 never reaches this line, so the overload it lacks
+  # is never asked of it.
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { [IO.File]::Move($from, $to, $true); return }
   if (-not ('Thornswood.FeedSwap' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;
