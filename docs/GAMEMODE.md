@@ -270,7 +270,9 @@ In the server's folder, `C:\Thornswood-Server` live and
 `private\characters.json`, `private\property.json`, `private\farm-claims.json`
 and, since 17 October (issue #2351), every other register naming a character:
 `law.json`, `beds.json`, `embassy.json`, `books.json`, `last-left.json`,
-`take-limit.json`, the dungeon chests' ledger with its `.initialized` mark,
+`take-limit.json`, the trade ships' `trade-cargo.json` (issue #511, with the
+staff list of ports and routes in force beside the goods aboard), the dungeon
+chests' ledger with its `.initialized` mark,
 and a waiting `deleted-characters.json` (and the old copies in `data`, for a
 server still on the older gamemode). It leaves `mod-settings.json`, each
 person's menu choices, and `merchant-ledger.json`, which the merchant code

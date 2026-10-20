@@ -34650,6 +34650,9 @@ log('gamemode loaded:',
               the log)
     embassy   the embassy and remnant rolls (the embassy block)
     dungeon   the character on each dungeon chest's reservation (dungeon loot)
+    cargo     the character on every line and hand out of the trade ships'
+              manifest, every piece kept where it was (the trade ships
+              block, #511)
     books     members, their book chat, books they own, when they last left
               (the books)
     merchants the guild traders' supply waits, commission promises and a
@@ -34674,7 +34677,7 @@ log('gamemode loaded:',
 (function () {
   'use strict';
   var g = (typeof globalThis !== 'undefined' ? globalThis : this);
-  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'books', 'merchants'];
+  var PARTS = ['saves', 'farms', 'property', 'embassy', 'dungeon', 'cargo', 'books', 'merchants'];
   var has = function (o, k) { return Object.prototype.hasOwnProperty.call(o, k); };
   // Into thornswood.log with the rest of the gamemode's own lines (log, at the top of the file).
   function rlog(line) {

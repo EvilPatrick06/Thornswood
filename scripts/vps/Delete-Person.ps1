@@ -97,7 +97,10 @@
   record; a farm in farm-claims.json; an office in law.json; a bed's guests
   and takings in beds.json; the embassy and remnant rolls in embassy.json; a
   dungeon chest's reservation in dungeon-rewards-ledger.json; a faction or
-  business book's members, chat and owner in books.json. This script never
+  business book's members, chat and owner in books.json; a line or a hand
+  out on the trade ships' manifest in trade-cargo.json (#511); a guild
+  trader's supply waits, commission promises and a trade waiting on them in
+  merchant-ledger.json (#2652). This script never
   edits those: what happens to a house or a post held by somebody who is gone
   is each register's own rule, and that rule is in the gamemode. So it counts
   them ("release" in what it prints) and, for every server that holds
@@ -809,7 +812,7 @@ for (const person of people) {
         left: the old copies in data.
       */
       const LIST = 'deleted-characters.json';
-      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|merchant-ledger)\.json$/i;
+      const RELEASED = /^(property|law|beds|farm-claims|embassy|books|dungeon-rewards-ledger|trade-cargo|merchant-ledger)\.json$/i;
       handled.add(path.join(priv, LIST).toLowerCase());
       let theirs = 0;
       if (P.size) {
