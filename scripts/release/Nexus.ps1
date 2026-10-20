@@ -399,6 +399,19 @@ function Send-NexusUpload($Facts, [scriptblock]$Said, [int]$WaitSeconds = 600) {
     if (-not $id -or $partSize -le 0 -or -not $parts.Count -or -not $complete) { throw 'Nexus started a multipart upload but did not say its id, part size and addresses, so nothing was sent.' }
     $need = [long][Math]::Ceiling($Facts.Size / [double]$partSize)
     if ($need -ne $parts.Count) { throw ('Nexus gave ' + $parts.Count + ' part addresses for upload ' + $id + ', but ' + $Facts.Size + ' bytes in parts of ' + $partSize + ' is ' + $need + ' parts, so nothing was sent.') }
+    # The CRC binds the complete address through its own signed query
+    # (x-amz-checksum-crc64nvme, X-Amz-SignedHeaders=host), so storage checks
+    # the whole file against it. Measured on 20 Oct: the spec says to send the
+    # value as a header as well, but Nexus's storage (Cloudflare R2) answers
+    # that with 403 SignatureDoesNotMatch, because the header is not signed.
+    $bound = ''
+    $q = ''
+    if ($complete.Contains('?')) { $q = $complete.Substring($complete.IndexOf('?') + 1) }
+    foreach ($kv in $q.Split('&')) {
+      $eq = $kv.IndexOf('=')
+      if ($eq -gt 0 -and $kv.Substring(0, $eq) -eq 'x-amz-checksum-crc64nvme') { $bound = [Uri]::UnescapeDataString($kv.Substring($eq + 1)) }
+    }
+    if ($bound -cne $crc) { throw ('Nexus''s complete address for upload ' + $id + ' is not bound to the archive''s CRC-64/NVME ' + $crc + ', so storage would not check the whole file. Nothing was sent.') }
     & $Said ('upload ' + $id + ' started, ' + $parts.Count + ' parts of up to ' + $partSize + ' bytes, crc64nvme ' + $crc)
     $etags = New-Object System.Collections.Generic.List[string]
     $fs = [IO.File]::OpenRead($Facts.Path)
@@ -424,8 +437,8 @@ function Send-NexusUpload($Facts, [scriptblock]$Said, [int]$WaitSeconds = 600) {
     [void]$sb.Append("<CompleteMultipartUpload>`n")
     for ($i = 0; $i -lt $etags.Count; $i++) { [void]$sb.Append('  <Part>' + "`n" + '    <PartNumber>' + ($i + 1) + '</PartNumber>' + "`n" + '    <ETag>' + $etags[$i] + '</ETag>' + "`n" + '  </Part>' + "`n") }
     [void]$sb.Append('</CompleteMultipartUpload>')
-    $content = New-Object System.Net.Http.StringContent($sb.ToString(), (New-Object Text.UTF8Encoding($false)), 'application/xml')
-    [void]$content.Headers.TryAddWithoutValidation('x-amz-checksum-crc64nvme', $crc)
+    $content = New-Object System.Net.Http.ByteArrayContent(, ((New-Object Text.UTF8Encoding($false)).GetBytes($sb.ToString())))
+    $content.Headers.ContentType = New-Object System.Net.Http.Headers.MediaTypeHeaderValue('application/xml')
     $r = Send-NexusPresigned 'POST' $complete $content ('Putting the parts of upload ' + $id + ' together')
     if ($r.Code -lt 200 -or $r.Code -ge 300) { throw ('Nexus''s storage would not put the parts of upload ' + $id + ' together: ' + (Format-NexusProblem $r)) }
     & $Said ('the ' + $parts.Count + ' parts are one file')
