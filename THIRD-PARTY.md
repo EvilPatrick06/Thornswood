@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `596055b2` (in full, `596055b229f428c0b6ae4dc9835207c3429975a0`). That
+commit `b6c76e45` (in full, `b6c76e451426371baf192e36f86b2eb14ddcae5f`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -675,7 +675,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `596055b229f428c0b6ae4dc9835207c3429975a0` on the public fork. The
+  name `b6c76e451426371baf192e36f86b2eb14ddcae5f` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -712,9 +712,10 @@ with.
   caster's machine and agreed by the server (#2848), and keeps the cursor
   menu's queued show and hide until the game handles it (#2384). Since
   `bb14b324` it also redraws a character's hair when the server changes its
-  colour (#2867). The server module's SHA256
-  is `6b488e61b8fb1aa8d69239c846f9d2bb2666be1398ed26024b062a5e037301fd`, built
-  2026-10-20T04:21:56Z. This is the recorded next release, not a deployment
+  colour (#2867), and since `596055b2` its front end is written with LF line
+  endings on every machine that builds it (#2754). The server module's SHA256
+  is `24828ce4fd26dc3a5bc52f8c3f7505fd37dea3b00e775bdf1f2358437976aa97`, built
+  2026-10-20T19:13:24Z. This is the recorded next release, not a deployment
   claim. Main remains on `0714e444047a994b1013dfe4cac187aef29ad65a` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -749,7 +750,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/596055b229f428c0b6ae4dc9835207c3429975a0
+https://github.com/EvilPatrick06/skymp/tree/b6c76e451426371baf192e36f86b2eb14ddcae5f
 
 For the engine Main runs until then:
 
