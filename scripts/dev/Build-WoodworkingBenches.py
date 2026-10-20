@@ -92,13 +92,17 @@ import zlib
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import own_plugins  # noqa: E402
 COMPRESSED = 0x00040000
 DELETED, DISABLED = 0x20, 0x800
 
 BENCH = ('thornswood-content.esp', 0x154e2)
 BENCH_KEYWORD = ('thornswood-content.esp', 0x154e1)
 FORGE_KEYWORD_EDID = 'CraftingSmithingForge'
-# The repository's own plugins, read from game\content rather than the game folder.
+# The repository's own plugins, read from game\content rather than the game folder
+# (own_plugins.py reads every file there that way, #2923).
 OURS = ['Thornswood-Content.esp']
 AFTER = ['Thornswood-Last.esp', 'Thornswood-WoodworkerTrail.esp']
 
@@ -554,10 +558,7 @@ def load_order(data):
     lo = json.load(io.open(os.path.join(ROOT, 'game', 'data', 'last-plugin.json'), encoding='utf-8'))['loadOrder']
     out = []
     for name in lo + AFTER:
-        if name in OURS or name in AFTER:
-            out.append((os.path.join(ROOT, 'game', 'content', name), name))
-        else:
-            out.append((os.path.join(data, name), name))
+        out.append((own_plugins.plugin_path(data, name), name))
     return out
 
 

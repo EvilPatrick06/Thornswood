@@ -48,6 +48,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { pluginPath } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const ROOT = path.join(__dirname, '..', '..');
@@ -129,7 +130,7 @@ function readWorldspaces(dataDir, pluginsTxt) {
   const last = {};
   const problems = [];
   for (const pl of order) {
-    const p = path.join(dataDir, pl);
+    const p = pluginPath(dataDir, pl);
     if (!fs.existsSync(p)) { problems.push(pl + ' is switched on and is not in ' + dataDir); continue; }
     let rows;
     try { rows = worldsOf(fs.readFileSync(p), pl); }

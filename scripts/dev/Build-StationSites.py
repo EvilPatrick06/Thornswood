@@ -130,6 +130,9 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
+if HERE not in sys.path:
+    sys.path.insert(0, HERE)
+import own_plugins  # noqa: E402
 
 
 def _module(name, path):
@@ -813,8 +816,7 @@ def main():
 
     lo_doc = json.load(io.open(os.path.join(ROOT, 'game', 'data', 'last-plugin.json'), encoding='utf-8'))
     lo = lo_doc['loadOrder']
-    order = [(os.path.join(ROOT, 'game', 'content', n) if n == CONTENT else os.path.join(args.data, n), n)
-             for n in lo]
+    order = [(own_plugins.plugin_path(args.data, n), n) for n in lo]
     missing = [n for p, n in order if not os.path.isfile(p)]
     if missing:
         print('STOP. %d plugin(s) of the load order are not there: %s' % (len(missing), ', '.join(missing[:6])))

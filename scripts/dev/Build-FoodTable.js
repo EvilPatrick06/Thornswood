@@ -56,6 +56,7 @@
 //   node scripts\dev\Build-FoodTable.js --plugins "C:\path\to\plugins.txt"
 const fs = require('fs');
 const path = require('path');
+const { pluginPath } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -270,7 +271,7 @@ const order = loadOrder();
 here.order = order;
 const missing = [];
 for (const file of order) {
-  const full = path.join(DATA, file);
+  const full = pluginPath(DATA, file);
   if (!fs.existsSync(full)) { missing.push(file); continue; }
   here.file = file;
   let buf = null;

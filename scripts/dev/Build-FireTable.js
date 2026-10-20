@@ -61,6 +61,7 @@
 // check passed.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -297,7 +298,7 @@ function walk(b, start, end) {
 }
 
 for (const pl of PLUGINS) {
-  const p = path.join(DATA, pl);
+  const p = pluginPath(DATA, pl);
   // A name in plugins.txt with no file behind it is somebody's list being
   // ahead of their mods, which is not this script's problem to fail over.
   if (!fs.existsSync(p)) { missing.push(pl); continue; }

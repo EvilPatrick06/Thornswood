@@ -129,7 +129,11 @@ function audit(reg, files, hash, uiGone, shipRules) {
     if (!/^[0-9a-f]{64}$/.test(a.sha256 || '')) { bad.push(a.path + ': no sha256'); continue; }
     if (files.indexOf(a.path) < 0) { bad.push(a.path + ': registered, but no such file is tracked'); continue; }
     const h = hash(a.path);
-    if (h !== a.sha256) bad.push(a.path + ': changed since it was registered (now ' + h + '). Look at where the new file came from, then write its entry and hash again');
+    if (h !== a.sha256) {
+      bad.push(a.path + ': changed since it was registered (now ' + h + '). ' + (/^game\/content\//.test(a.path)
+        ? 'It is one of Thornswood\'s own plugins: run scripts/mods/Rebuild-ContentTables.ps1, which rebuilds the tables read out of it and writes this hash, then say in its entry what the change put in it'
+        : 'Look at where the new file came from, then write its entry and hash again'));
+    }
     if (a.status === 'derived') {
       const src = byPath.get(a.from);
       if (!src) bad.push(a.path + ': derived from "' + a.from + '", which is not registered');
