@@ -14,7 +14,7 @@ vm.createContext(fixtureContext);
 vm.runInContext(fs.readFileSync(ffile,'utf8').split('const roleMarket=')[0]+';this.fixture={memoryPurses,worldOf};',fixtureContext);
 const fixture=fixtureContext.fixture,catalog=require('../game/data/merchant-traders.json'),tables=require('../game/data/merchant-role-tables.json');
 const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests.concat(require('../game/data/merchant-ranked-quests.json').quests);
-assert.equal(raw.length,31);
+assert.equal(raw.length,100);
 for(const defect of ['missing','empty','hash','substitution','definition']) {
  const damaged=copy(raw);if(defect==='missing')damaged.pop();if(defect==='empty')damaged.length=0;
  if(defect==='hash')damaged[0].sourceHash='0'.repeat(64);
@@ -36,12 +36,13 @@ const roles=Object.fromEntries(Object.entries(tables.tables).map(([name,table])=
  Object.fromEntries(Object.entries(table).map(([direction,descs])=>[direction,descs.map(id)]))]));
 const itemNames=new Map(allRows.flatMap(row=>(row.goods||[row]).map(good=>[good.itemId,'Goods '+good.itemId])));
 const merchants=[...new Map(allRows.map(row=>[row.merchantId,row])).values()];
-function world() {
+const legacyMerchants=[...new Map(rows.map(row=>[row.merchantId,row])).values()];
+function world(startingPurse=250) {
  const native={on:true},box=fixture.worldOf(native);let time=2000000000000,unit=2,standing;
  for(const row of merchants)box.actors[row.merchantId]={...box.actors[1],pos:[100,0,0]};
  box.inv[10]={15:40};
  const purses=fixture.memoryPurses(merchants.map(row=>[row.merchantId,
-  {version:1,reference:row.merchantRef,base:'a:Skyrim.esm',purse:250,stock:[],supply:{}}]));
+  {version:1,reference:row.merchantRef,base:'a:Skyrim.esm',purse:startingPurse,stock:[],supply:{}}]));
  purses.stats=()=>({catalogue:merchants.length,retired:1});
  purses.ledgerStates=()=>merchants.map(row=>({merchantId:row.merchantId,reference:row.merchantRef,state:purses.read(row.merchantId)}))
   .concat([{merchantId:999,reference:'f:Skyrim.esm',state:null}]);
@@ -115,13 +116,13 @@ function seedPromise(w,row) {
  assert.equal(made.ok,true);w.purses.commit(row.merchantId,{...state,commissions:made.next});
 }
 {
- const w=world(),row=rows[0],elsewhere=merchants.filter(other=>other.merchantId!==row.merchantId).slice(0,3);
+ const w=world(),row=rows[0],elsewhere=legacyMerchants.filter(other=>other.merchantId!==row.merchantId).slice(0,3);
  elsewhere.forEach(other=>seedPromise(w,other));
  assert.equal(w.quote(row).canTake,false);assert.match(w.take(row).text,/three open jobs/);
  assert.equal(w.purses.read(row.merchantId).commissions,undefined,'all merchants share the character limit');
 }
 {
- const w=world(),row=rows[0],elsewhere=merchants.filter(other=>other.merchantId!==row.merchantId).slice(0,3);
+ const w=world(),row=rows[0],elsewhere=legacyMerchants.filter(other=>other.merchantId!==row.merchantId).slice(0,3);
  elsewhere.slice(0,2).forEach(other=>seedPromise(w,other));w.select(row);let reads=0;
  w.deps.onRankRead=()=>{if(++reads===2)seedPromise(w,elsewhere[2]);};
  w.command('quest','take',row.id,'@2');assert.ok(reads>=2);
@@ -181,4 +182,10 @@ for(const row of [rows[0],ranked[0]]) {
  assert.ok(reads>=2);assert.equal(w.purses.read(row.merchantId).commissions,undefined,
   'native replacement during the final eligibility callback cannot reserve a promise');
 }
-console.log('PASS21 ranked compiled parcel jobs: actual gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');
+console.log('PASS90 ranked compiled parcel jobs: actual gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');
+{
+ const row=ranked[ranked.length-1],w=world(1),quote=w.quote(row);
+ assert.ok(quote.gold>1);assert.equal(quote.canTake,false);w.take(row);
+ assert.equal(w.purses.read(row.merchantId).purse,1);assert.equal(w.purses.read(row.merchantId).commissions,undefined,
+  'a valid source parcel cannot create the missing gold or reserve beyond a poor purse');
+}
