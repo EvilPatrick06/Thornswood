@@ -61932,7 +61932,9 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       WHAT A MEAL IS WORTH, BY ITS GROUP (#1382, the approved list,
       issuecomment-6127545395). docs/systems/food.md: raw meat or fish 8 and
       can start food sickness, cooked 25, ordinary food 15, and a soup, stew
-      or chowder is food and 10 thirst. Ingredient, prepared and drugs are
+      or chowder is food and 10 thirst. A soup counts as cooked, so it is 25
+      and 10 (Patrick, 12 Oct 2026, decision 2 on #1382): cooking a stew is
+      never worse than cooking a chop. Ingredient, prepared and drugs are
       ordinary until the drug effect lands. FOOD_GROUPS (game/data/
       food-groups.json) says which record is in which group, by record, never
       by name. Burnt is a quality level a cook can come out at, not a group.
@@ -61940,7 +61942,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     foodGroup: {
       raw: { food: 8, sick: 'raw' },
       cooked: { food: 25 },
-      soup: { food: 15, drink: 10 },
+      soup: { food: 25, drink: 10 },
       ingredient: { food: 15 },
       prepared: { food: 15 },
       drugs: { food: 15, drug: true }
@@ -61997,20 +61999,6 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     */
     wetMinutes: 3,
     wetPlaces: { rain: true, water: true, shallow: true },
-    /*
-      EATING TAKES TIME, AND A FULL STOMACH SICKENS (#1382). docs/systems/
-      food.md: "Eating takes 8 seconds. Another meal in that window does
-      nothing. At 90 hunger or above, another meal does not raise the meter
-      and starts food sickness instead." The sickness is the disease block's
-      exposed(actorId, 'food', 'full'), which owns the chance.
-    */
-    meal: { eatSeconds: 8, fullAt: 90 },
-    /*
-      COLD SPEEDS HUNGER AND THIRST (#1382). docs/systems/hunger.md and
-      thirst.md: while the cold band is weary the clock runs at 1.25, at bad
-      1.5, at spent 2. Heat does not speed it.
-    */
-    coldDrain: { fine: 1, weary: 1.25, bad: 1.5, spent: 2 },
     /*
       ALE, AND IT GETS WORSE WITH EVERY ONE.
 

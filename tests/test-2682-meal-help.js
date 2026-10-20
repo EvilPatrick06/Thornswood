@@ -153,8 +153,8 @@ if (ok) {
     yes('venison stew warms: the help is kept on the needs record', s.mealHelp === 'warm');
     yes('for 20 real minutes', Math.abs(s.mealHelpUntil - (Date.now() + 20 * 60000)) < 5000);
     yes('and says so', String(line).indexOf('The heat of it settles in your chest.') === 0);
-    yes('hunger and thirst are what they were: 15 and 10',
-      Math.round(s.food - 30) === 15 && Math.round(s.drink - 30) === 10);
+    yes('hunger and thirst are a cooked soup\'s: 25 and 10',
+      Math.round(s.food - 30) === 25 && Math.round(s.drink - 30) === 10);
     yes('a read keeps the help', N.read(id).mealHelp === 'warm' && N.read(id).mealHelpUntil === s.mealHelpUntil);
     let warmT = null, coldT = null;
     try { warmT = N.view(id).tempTarget; coldT = N.view(plain).tempTarget; } catch (e) { console.log('view threw: ' + e.message); }
@@ -168,7 +168,7 @@ if (ok) {
     const line2 = N.consumed(id, idOf('722bd:Skyrim.esm'));
     yes('a plain venison chop gives no help and leaves the warmth', r.store[id].mealHelp === 'warm' &&
       String(line2).indexOf('heat') === -1);
-    yes('a chop is still 25 hunger', Math.round(r.store[id].food - 45) === 25);
+    yes('a chop is still 25 hunger', Math.round(r.store[id].food - 55) === 25);
   }
   {
     const id = person(r);
@@ -218,8 +218,8 @@ if (ok) {
     yes('and replaces the stamina help (one help at a time)', !rs.store[id].mealHelp && !(S.effects(id, S.read(id)).staminaRateMult > 10));
     yes('and does not warm, though it is a soup', !rs.store[id].mealHelp && !rs.store[id].mealHelpUntil);
     yes('and says so', String(line).indexOf('You feel hale for it.') !== -1);
-    yes('hunger and thirst as a soup: 15 and 10 more',
-      Math.round(rs.store[id].food - 55) === 15 && Math.round(rs.store[id].drink - 30) === 10);
+    yes('hunger and thirst as a soup, which counts as cooked: 25 and 10 more',
+      Math.round(rs.store[id].food - 55) === 25 && Math.round(rs.store[id].drink - 30) === 10);
   }
   // No guard without the injury block's guarded().
   {
