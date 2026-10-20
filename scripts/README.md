@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 216 of them, by area: `release` builds and
+Every `.ps1` under this folder, 224 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -105,8 +105,11 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [mods/Generated.ps1](mods/Generated.ps1) | What Thornswood's generated files are, what they were built from, and whether the ones in a game folder are still current. Dot-sourced by Build-Generated.ps1, Ship.ps1 and Check-ShipReady.ps1. |
 | [mods/LoadOrder.ps1](mods/LoadOrder.ps1) | The load order as the game counts it, and how to put a plugin list into the server's order. |
 | [mods/New-CollectionPluginRecord.ps1](mods/New-CollectionPluginRecord.ps1) | Writes records\collection-plugins.json, the collection's plugins with the size and sha256 of each, which the full deploys hold the plugins they send to (#2019, CollectionPlugins.ps1). |
+| [mods/OnBox.ps1](mods/OnBox.ps1) | The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the run, and the clean-up of its folder. |
 | [mods/Remove-DeadRecords.ps1](mods/Remove-DeadRecords.ps1) | Deletes records from Thornswood-Content.esp that nothing uses any more, and refuses to delete one that anything still points at. |
 | [mods/Remove-Plugin.ps1](mods/Remove-Plugin.ps1) | RETIRED. DO NOT RUN. Issue #1179: took one plugin out of the build by hand. |
+| [mods/Run-OnBox.ps1](mods/Run-OnBox.ps1) | Runs one of the repository's Python tools on the VPS box, against the game plugins a game server there already holds, and brings back what the tool wrote into the repository's game\ and records\ folders. |
+| [mods/Send-GameArchives.ps1](mods/Send-GameArchives.ps1) | Puts Skyrim's own archives that the content tools read on the VPS box, in C:\Thornswood-GameData, each checked against records\skyrim-files.json on this machine before it goes and on the box after it lands. |
 | [mods/Set-UnboundMenu.ps1](mods/Set-UnboundMenu.ps1) | RETIRED. DO NOT RUN. Issue #1179: swapped Skyrim Unbound's MCM script by hand. |
 | [mods/Show-EslCascade.ps1](mods/Show-EslCascade.ps1) | Answers one question: if the server load order drops every ESL-flagged plugin, how much else has to go with it? |
 | [mods/Sync-LoadOrder.ps1](mods/Sync-LoadOrder.ps1) | Build the server's load order from the client's. |
@@ -153,8 +156,10 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
 | [release/New-FeedRoot.ps1](release/New-FeedRoot.ps1) | Stages the folder a release from the feed is built from: every file the channel's last release left installed, from the site, by its sha256. |
+| [release/New-NexusRevision.ps1](release/New-NexusRevision.ps1) | Makes the next revision of the Thornswood collection on Nexus Mods (slug 7essxf), as a draft, from the revision published now with one or more of its mods moved to a new Nexus file; and publishes a draft once it has been checked (#2914). |
 | [release/New-ServerBuildRecord.ps1](release/New-ServerBuildRecord.ps1) | Records every server file the fork builds and the one commit they were built from, into records\server-build.json. |
 | [release/New-SkyrimFilesRecord.ps1](release/New-SkyrimFilesRecord.ps1) | Records every file of the pinned Skyrim build, from the depot manifests the Downgrade asks Steam for, into records\skyrim-files.json. |
+| [release/Nexus.ps1](release/Nexus.ps1) | The one place the release scripts talk to Nexus Mods from, with Patrick's personal API key (#2914). |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
 | [release/Package-ClientRecord.ps1](release/Package-ClientRecord.ps1) | The client runtime an installer is held to. |
 | [release/Package-Thornswood.ps1](release/Package-Thornswood.ps1) | Turns the built install at C:\Thornswood into the single file your friends run. |
@@ -175,6 +180,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Resolve-ReleaseTag.ps1](release/Resolve-ReleaseTag.ps1) | Says which commit a launcher release builds, or refuses (#2202). |
 | [release/Rollback-Feed.ps1](release/Rollback-Feed.ps1) | Puts a channel's feed back to an earlier release, so every launcher on that channel moves its game files back to what that release installed, with no hand editing of version.json (#442). |
 | [release/Scrub-Feed.ps1](release/Scrub-Feed.ps1) | Takes Bethesda's files and one machine's own files out of what a channel's feed has already published: every pack that carries one is rebuilt without it, every release record that names one is written again without it, the feed and the store's baseline are sent through Feed-Store.ps1 like any other feed edit, and the old bytes are then deleted from the site once no feed names them (#1152, #1227, #1229, #1239). |
+| [release/Send-NexusFile.ps1](release/Send-NexusFile.ps1) | Uploads a new version of one of our files on Nexus Mods, in place of the version it has now, from a local archive (#2914). |
+| [release/Set-NexusDescription.ps1](release/Set-NexusDescription.ps1) | Adds a line to the description of one or more of our mods on Nexus Mods, or puts back a description from a file, and reads the page back to prove what Nexus kept (#2914). |
+| [release/Set-NexusKey.ps1](release/Set-NexusKey.ps1) | Puts Patrick's Nexus Mods API key on One, asked at a prompt and never shown, or says whether the key this machine has works (#2914). |
 | [release/Setup-ShipMachine.ps1](release/Setup-ShipMachine.ps1) | Checks and prepares a Windows machine to Ship dev, and says what is left for a person to do. |
 | [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |
 | [release/Ship-Stack.ps1](release/Ship-Stack.ps1) | One Dev or Main command that runs gamemode deploy, the installer package, and the host feed remirror. |
