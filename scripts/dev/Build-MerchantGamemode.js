@@ -18,6 +18,9 @@ const questSource = fs.readFileSync(path.join(root, 'game/quest-transactions.js'
 const eligibilitySource = fs.readFileSync(path.join(root, 'game/quest-eligibility.js'), 'utf8').replace(/\r\n/g, '\n');
 const killSource = fs.readFileSync(path.join(root, 'game/kill-contracts.js'), 'utf8').replace(/\r\n/g, '\n');
 const roleSource = fs.readFileSync(path.join(root, 'game/merchant-role-stage.js'), 'utf8').replace(/\r\n/g, '\n');
+const fishingSource = fs.readFileSync(path.join(root, 'game/quest-fishing-sources.js'), 'utf8').replace(/\r\n/g, '\n');
+const scarceFishing=require(path.join(root,'scripts/dev/MerchantScarceFishingSources.js')).validateScarceFishing(
+ require(path.join(root,'game/data/merchant-scarce-fishing.json')),require(path.join(root,'game/data/resource-locations.json')));
 const nativeSource = fs.readFileSync(path.join(root, 'game/merchant-ledger-native.js'), 'utf8').replace(/\r\n/g, '\n');
 const budgetSource = fs.readFileSync(path.join(root, 'game/scene-reward-budget.js'), 'utf8').replace(/\r\n/g, '\n');
 const sites = JSON.parse(fs.readFileSync(path.join(root, 'game/data/guild-sites.json'), 'utf8')).sites;
@@ -68,6 +71,7 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   'const KILL_CONTRACTS = (function () { const module = {exports:{}};\n' + killSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const MERCHANT_ROLES = (function () { const module = {exports:{}};\n' + roleSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const MERCHANT_NATIVE = (function () { const module = {exports:{}};\n' + nativeSource.trimEnd() + '\nreturn module.exports;})();\n' +
+  'const QUEST_FISHING_SOURCES = (function () { const module = {exports:{}};\n' + fishingSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const SCENE_BUDGET = (function () { const module = {exports:{}};\n' + budgetSource.trimEnd() + '\nreturn module.exports;})();\n' +
   moduleSource.trimEnd() + '\nconst install = module.exports.installMerchantTrading;\n' +
   'module.exports.installMerchantTrading = function (env) {\n' +
@@ -77,6 +81,8 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   '  const prepared=MERCHANT_ROLES.prepareMerchantRoleStage(population, ' + JSON.stringify(traders) + ', ' + JSON.stringify(stage) + ', native);\n' +
   '  prepared.commissions=MERCHANT_COMMISSIONS.prepareCommissions(' + JSON.stringify(commissionRows) + ',prepared.catalog,native);\n' +
   '  return prepared;\n};\n' +
+  'module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFishingSources;\n' +
+  'module.exports.scarceFishing = function () { return '+JSON.stringify(scarceFishing)+'; };\n' +
   'module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;\n' +
   'module.exports.sceneBudget = SCENE_BUDGET;\n' +
   'module.exports.expandedScenes = function () { return ' + JSON.stringify(expandedRows) + '; };\n' +
