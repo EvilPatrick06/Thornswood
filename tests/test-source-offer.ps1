@@ -40,9 +40,9 @@
     - Setup-Thornswood.ps1 copies that note into the install folder, and
       Uninstall.cs takes it out again.
     - credits.md names the fork, the branch, the recorded commits and every
-      shipped file. A commit that is not in a record fails here, except the
-      two channel rows: those name each feed's client commit, and
-      test-credits-channels.ps1 holds each one to that feed.
+      shipped file. A commit that is not in a record fails here. The two
+      channel rows name no commit: the site fills in each feed's client
+      commit, and test-credits-channels.ps1 holds that to each feed.
       It names the files not built here apart, with the gap said.
     - the download page points at it.
     - with the fork on this machine, every licence and every file to folder
@@ -336,23 +336,25 @@ Yes 'the page names the upstream commit it starts from, where the record has one
 $missing = @($files | Where-Object { -not $section.Contains((Leaf $_)) })
 Yes ('the page names every recorded file' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
 Yes 'the page names the server binary' ($section.Contains([string]$server.binary))
-# The two channel rows name the commit each feed is serving. That commit is
-# not always the one records\client-build.json holds. test-credits-channels.ps1
-# holds each row to its own version.json. Every other hash on the page still
-# has to be a record.
-function Get-ChannelCommit([string]$text, [string]$channel, [string]$feed) {
-    $re = '(?m)^\|\s*' + [regex]::Escape($channel) + '\s*\|\s*`' + [regex]::Escape($feed) + '`\s*\|\s*\[`([0-9a-f]{7,40})`\]'
+# The two channel rows say which commit each feed is serving. That commit is
+# not always the one records\client-build.json holds, and it moves with every
+# Ship, so the rows are hand text that names none (#421: they named 1afaf2ef
+# while both feeds served 0714e444). site\server.js puts each feed's commit in
+# at serve time; test-site-credits-fill.js and test-credits-channels.ps1 hold
+# that. Every hash on the page has to be a record.
+function Get-ChannelCell([string]$text, [string]$channel, [string]$feed) {
+    $re = '(?m)^\|\s*' + [regex]::Escape($channel) + '\s*\|\s*`' + [regex]::Escape($feed) + '`\s*\|([^\r\n]*)\r?$'
     $m = [regex]::Match($text, $re)
     if ($m.Success) { return $m.Groups[1].Value }
     return $null
 }
-$publicCommit = Get-ChannelCommit $section 'Public' 'feed/version.json'
-$devCommit = Get-ChannelCommit $section 'Dev' 'feed-dev/version.json'
-Yes 'the page names the public feed client commit' ([bool]$publicCommit)
-Yes 'the page names the dev feed client commit' ([bool]$devCommit)
-$channelCommits = @($publicCommit, $devCommit) | Where-Object { $_ }
-$stray = @([regex]::Matches($section, '\b[0-9a-f]{7,40}\b') | ForEach-Object { $_.Value } | Where-Object { -not (Test-Known $_) -and ($channelCommits -notcontains $_) })
-Yes ('every commit on the page is one a record names, apart from the two channel feeds' + $(if ($stray.Count) { ', stale: ' + ($stray -join ', ') } else { '' })) ($stray.Count -eq 0)
+$publicCell = Get-ChannelCell $section 'Public' 'feed/version.json'
+$devCell = Get-ChannelCell $section 'Dev' 'feed-dev/version.json'
+Yes 'the page has the public feed row' ($null -ne $publicCell)
+Yes 'the page has the dev feed row' ($null -ne $devCell)
+Yes 'neither feed row names a commit of its own, so neither can go stale' (-not (([string]$publicCell + [string]$devCell) -match '[0-9a-f]{7,40}'))
+$stray = @([regex]::Matches($section, '\b[0-9a-f]{7,40}\b') | ForEach-Object { $_.Value } | Where-Object { -not (Test-Known $_) })
+Yes ('every commit on the page is one a record names' + $(if ($stray.Count) { ', stale: ' + ($stray -join ', ') } else { '' })) ($stray.Count -eq 0)
 Yes 'the page has no em dash and never says player' (Test-Words $credits)
 Yes 'the page does not claim all of it is built from the fork' (-not ($section -match '(?i)All of it'))
 

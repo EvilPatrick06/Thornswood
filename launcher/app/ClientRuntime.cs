@@ -108,6 +108,10 @@ namespace Thornswood
                     }
                     if (list.Count == 0)
                         recordError = "client-build.json is embedded but no files could be read out of it";
+                    Match f = Regex.Match(text, "\"fork\"\\s*:\\s*\"(https://github\\.com/[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+)\"");
+                    Match c = Regex.Match(text, "\"forkCommit\"\\s*:\\s*\"([0-9a-fA-F]{7,40})\"");
+                    if (f.Success && c.Success)
+                        source = f.Groups[1].Value + "/tree/" + c.Groups[1].Value.ToLowerInvariant();
                 }
             }
             catch (Exception ex)
@@ -119,6 +123,18 @@ namespace Thornswood
         }
 
         public static string RecordError { get { Recorded(); return recordError; } }
+
+        static string source = "";
+
+        /// <summary>
+        /// The source of the six files beside this launcher: the public fork
+        /// at the commit the embedded record names. The AGPL asks for the
+        /// source to be offered where the server is used (section 13), and
+        /// the launcher is where everybody who connects starts, so its
+        /// sidebar links here (#421). Empty when the record names no fork or
+        /// commit, which is the build fault RecordError already reports.
+        /// </summary>
+        public static string SourceUrl { get { Recorded(); return source; } }
 
         public static string Sha256Of(string file)
         {

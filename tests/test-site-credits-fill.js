@@ -47,6 +47,14 @@ yes('credits.md still has the hand sentence the fill replaces', HAND.test(CREDIT
 const para = (/then to the main server\.[\s\S]*?(?=\n\s*\n)/.exec(CREDITS) || [''])[0];
 yes('and the hand text names no commit for either server (#2303)', para.length > 0 && !/[0-9a-f]{7,40}/.test(para));
 yes('credits.md names the recorded commit the fill compares with', /^[0-9a-f]{40}$/.test(recorded || ''));
+// The channel rows are hand text too (#421): a hash typed into them went stale
+// with every Ship, while the page served the feed's.
+const rowOf = function (text, ch, feed) {
+  return (new RegExp('^\\|\\s*' + ch + '\\s*\\|\\s*`' + feed.replace(/[./]/g, '\\$&') + '`\\s*\\|([^\\n]*)$', 'm').exec(text) || [])[1];
+};
+const pubRow = rowOf(CREDITS, 'Public', 'feed/version.json'), devRow = rowOf(CREDITS, 'Dev', 'feed-dev/version.json');
+yes('credits.md has both channel rows', pubRow !== undefined && devRow !== undefined);
+yes('  and neither row names a commit of its own (#421)', !/[0-9a-f]{7,40}/.test((pubRow || '') + (devRow || '')));
 
 yes('no file: the page is the hand text, unchanged', fill(CREDITS, null, {}) === CREDITS);
 let one = fill(CREDITS, { live: { commit: A } }, {});
@@ -82,6 +90,13 @@ out = fill(CREDITS, null, { public: B, dev: A });
 yes('the feeds: the Public row names the public feed commit', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\(https:\/\/github\.com\/EvilPatrick06\/skymp\/tree\/b{40}\)/.test(out));
 yes('the feeds: the Dev row names the dev feed commit', /\|\s*Dev\s*\|\s*`feed-dev\/version\.json`\s*\|\s*\[`aaaaaaaa`\]/.test(out));
 yes('the feeds: the server sentence is left alone', HAND.test(out));
+yes('the feeds: each row is still a three cell table row', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]\([^)]+\)\s*\|\s*$/m.test(out) &&
+  /\|\s*Dev\s*\|\s*`feed-dev\/version\.json`\s*\|\s*\[`aaaaaaaa`\]\([^)]+\)\s*\|\s*$/m.test(out));
+out = fill(CREDITS.replace(/\n/g, '\r\n'), null, { public: B });
+yes('the feeds: a CRLF copy of the page is filled the same', /\|\s*Public\s*\|\s*`feed\/version\.json`\s*\|\s*\[`bbbbbbbb`\]/.test(out));
+out = fill(CREDITS, null, { dev: A });
+yes('the feeds: only the dev feed read leaves the Public row as hand text',
+  /\|\s*Dev\s*\|\s*`feed-dev\/version\.json`\s*\|\s*\[`aaaaaaaa`\]/.test(out) && rowOf(out, 'Public', 'feed/version.json') === pubRow);
 out = fill(CREDITS, null, { public: 'not a commit' });
 yes('a feed commit that is not hex: the row keeps its hand text', out === CREDITS);
 out = fill(CREDITS, { live: { commit: '<img src=x onerror=alert(1)>' }, dev: { commit: A } }, { public: '"><script>' });

@@ -778,7 +778,8 @@ function pageMarkdown(name) {
 // either channel (scripts/deploy/DeployedBuild.ps1), and the feeds this site
 // serves carry the client commit. fillCreditsCommits puts both into the page
 // at serve time. The markdown keeps its hand text, which names no commit for
-// either server, and is what goes out when neither server is in the record.
+// either server or either feed, and is what goes out when the record or a
+// feed cannot be read.
 // ==== thornswood credits fill ====
 function fillCreditsCommits(md, deployed, feeds) {
   const FULL = /^[0-9a-f]{40}$/;
@@ -819,12 +820,15 @@ function fillCreditsCommits(md, deployed, feeds) {
     out = out.replace(/(then to the main server\.\s+)(?:(?!\n\s*\n)[\s\S])+?(?=\n\s*\n|$)/,
                       function (m, lead) { return lead + said; });
   }
+  // A channel row's last cell is hand text that names no commit (#421: a
+  // hash typed there went stale with every Ship), and the feed's commit takes
+  // its place, whatever it says.
   for (const row of [['Public', 'feed/version.json', 'public'], ['Dev', 'feed-dev/version.json', 'dev']]) {
     const c = feeds && typeof feeds === 'object' ? String(feeds[row[2]] || '') : '';
     if (!SOME.test(c)) continue;
     const re = new RegExp('(^|\\n)(\\|\\s*' + row[0] + '\\s*\\|\\s*`' + row[1].replace(/[./]/g, '\\$&') +
-                          '`\\s*\\|\\s*)\\[`[0-9a-f]{7,40}`\\]\\([^)\\s]*\\)');
-    out = out.replace(re, function (m, a, b) { return a + b + link(c); });
+                          '`\\s*\\|[ \\t]*)[^|\\n]*?([ \\t]*\\|[ \\t\\r]*(?=\\n|$))');
+    out = out.replace(re, function (m, a, b, end) { return a + b + link(c) + end; });
   }
   return out;
 }
