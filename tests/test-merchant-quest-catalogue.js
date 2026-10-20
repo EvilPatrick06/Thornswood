@@ -14,7 +14,7 @@ const activation=JSON.parse(read('game/data/merchant-quest-activation.json'));
 assert.deepEqual(Object.keys(activation).sort(),['commissions','killScenes','version']);
 assert.equal(activation.version,1);assert.equal(activation.killScenes.length,4);
 const pins=activation.killScenes.concat(activation.commissions),enabled=new Set(pins.map(row=>row.id));
-assert.equal(enabled.size,pins.length);assert.equal(activation.commissions.length,31);
+assert.equal(enabled.size,pins.length);assert.equal(activation.commissions.length,100);
 const begin = gm.indexOf('// ==== thornswood progression ====');
 const end = gm.indexOf('// ==== end thornswood progression ====');
 assert.ok(begin >= 0 && end > begin);
