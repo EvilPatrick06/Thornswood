@@ -477,9 +477,14 @@ namespace Thornswood
                 return st;
             }
             int pid = profileId;
+            // The sessions of the crash snapshots kept on this PC, so the
+            // answer can say which of those crashes staff have looked at
+            // (#2319, CrashDump.Tidy).
+            string held = CrashDump.HeldSessions();
             string body = "{\"ticket\":\"" + Escape(Ticket) + "\"" +
                           (pid > 0 ? ",\"profileId\":" + pid : "") +
-                          (string.IsNullOrEmpty(Channel) ? "" : ",\"channel\":\"" + Escape(Channel) + "\"") + "}";
+                          (string.IsNullOrEmpty(Channel) ? "" : ",\"channel\":\"" + Escape(Channel) + "\"") +
+                          (held.Length > 0 ? ",\"snapshots\":\"" + Escape(held) + "\"" : "") + "}";
             string reply;
             int code = PostJson(Site + "/api/play/join", body, out reply);
 
@@ -505,6 +510,9 @@ namespace Thornswood
             // Only an answer that carried the flag moves it. An older site
             // that says nothing about dev leaves the last answer standing.
             if (reply.Contains("\"dev\"")) NoteDev(st.Dev);
+            // Likewise only an answer that carried it: which crashes staff
+            // have marked looked at, whose snapshots Tidy may now delete.
+            if (st.Ok && reply.Contains("\"lookedAt\"")) CrashDump.NoteLookedAt(Field(reply, "lookedAt"));
 
             if (st.Ok && st.Name.Length > 0 && st.Name != Name) Save(Ticket, st.Name);
             string av = Field(reply, "avatar");
@@ -732,6 +740,11 @@ namespace Thornswood
                     // which the tail is sent.
                     new string[] { "skyrim-platform.log",        Path.Combine(Files.SkseLogDir, "skyrim-platform.log") }
                 };
+
+                // The crash's snapshot is tied to this session here, the one
+                // moment both are known, so a looked-at mark on the sessions
+                // page can reach it (#2319, CrashDump.Remember).
+                CrashDump.Remember(want[1][1], session);
 
                 var sb = new StringBuilder();
                 sb.Append("{\"ticket\":\"").Append(Escape(Ticket)).Append("\"");

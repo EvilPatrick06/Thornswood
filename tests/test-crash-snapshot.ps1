@@ -16,15 +16,20 @@
 
     1. off for everybody until ticked (Config.CrashSnapshots is false);
     2. turning it off stops new snapshots and deletes none already saved;
-    3. on: Max Minidumps = 1, and the launcher deletes all but the newest,
-       in Crash Logger's folder and the chosen one;
+    3. on: Max Minidumps = 2, and the launcher deletes all but the newest
+       two, in Crash Logger's folder and the chosen one;
     4. written into that install's file only: a CrashLogger.ini that is a
        hard link to another copy is split first, and nothing goes in the
        registry or asks for administrator;
     5. as the game closes after a crash with it on, the snapshot is moved to
        the chosen folder, the line names it and its size, and the launcher
        asks whether to keep it;
-    6. nothing sends a snapshot anywhere (session logs, the report zip).
+    6. nothing sends a snapshot anywhere (session logs, the report zip);
+    7. kept until looked at (#2319, Patrick, 12 Oct): each snapshot is
+       remembered against the session it crashed in, the check in asks the
+       site which of those staff marked looked at, and Tidy deletes those,
+       keeping the rest up to two. tests\test-2319-crash-looked-at.js runs
+       the site's half.
 
   HOW. Compiles the shipped CrashDump.cs and Enforce.cs with the build's own
   compiler (Launcher-Csc.ps1), with small stand-ins for Paths, Files,
@@ -56,11 +61,20 @@ if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $driver = @'
 using System;
+using System.Collections.Generic;
 using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 
 namespace Thornswood
 {
-    static class Paths { public static string Game = ""; public static string LiveMyGames = ""; }
+    // Enforce.MakeItOurs splits a hard link with OwnGame.SwapCopyIn (#2599).
+    // The real code, lifted out of OwnGame.cs below, as test-2599-whole-swaps.ps1 does.
+    static class OwnGame
+    {
+__OWNGAME__
+    }
+    static class Paths { public static string Game = ""; public static string LiveMyGames = ""; public static string ProfileDir = ""; }
     // The same line as Files.cs; the text check below holds the two together.
     static class Files { public static string SkseLogDir { get { return Path.Combine(Paths.LiveMyGames, "SKSE"); } } }
     static class Swallow { public static void Note(string where, Exception e) { Console.WriteLine("SWALLOW=" + where + ": " + e.Message); } }
@@ -72,11 +86,14 @@ namespace Thornswood
 
         // apply   <game> <mygames> <on 0|1> <folder or ->
         // after   <game> <mygames> <on 0|1> <folder or -> <since, local ticks>
-        // tidy    <game> <mygames> <on 0|1> <folder or ->   (what Keep does)
+        // tidy    <game> <mygames> <on 0|1> <folder or -> [looked at, csv or -]   (what Keep does)
+        // remember <game> <mygames> <on 0|1> <folder or -> <crash log> <session>
         public static int Main(string[] a)
         {
             Paths.Game = a[1];
             Paths.LiveMyGames = a[2];
+            // Profile\MyGames, so the profile folder is the one above it, as Paths.cs lays it out.
+            Paths.ProfileDir = Path.GetDirectoryName(a[2]);
             var cfg = new Config();
             cfg.CrashSnapshots = a[3] == "1";
             cfg.CrashSnapshotFolder = a[4] == "-" ? "" : a[4];
@@ -97,7 +114,19 @@ namespace Thornswood
             }
             if (a[0] == "tidy")
             {
-                Console.WriteLine("GONE=" + CrashDump.Tidy(CrashDump.KeptIn(cfg)));
+                if (a.Length > 5) CrashDump.NoteLookedAt(a[5] == "-" ? "" : a[5]);
+                int looked;
+                int gone = CrashDump.Tidy(CrashDump.KeptIn(cfg), out looked);
+                Console.WriteLine("GONE=" + gone);
+                Console.WriteLine("LOOKED=" + looked);
+                Console.WriteLine("LINE=" + Flat(CrashDump.TidyLine(gone, looked)));
+                Console.WriteLine("HELD=" + CrashDump.HeldSessions());
+                return 0;
+            }
+            if (a[0] == "remember")
+            {
+                CrashDump.Remember(a[5], a[6]);
+                Console.WriteLine("HELD=" + CrashDump.HeldSessions());
                 return 0;
             }
             return 2;
@@ -112,6 +141,15 @@ $tmp = Join-Path $tempBase ('test-crash-snapshot-' + [Guid]::NewGuid().ToString(
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 try {
+    # The same two pieces of OwnGame.cs test-2599-whole-swaps.ps1 lifts: the
+    # #2599 swaps, and ReplaceName with the MoveFileEx they rest on.
+    $og = [IO.File]::ReadAllText((Join-Path $app 'OwnGame.cs')) -replace "`r`n", "`n"
+    $region = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
+    $block = [regex]::Match($og, '(?s)\n(        // ---- #2599: one name of the game folder replaced whole.*?        // ---- end #2599[^\n]*\n)')
+    Yes 'OwnGame.SwapCopyIn and what it rests on are found in OwnGame.cs, to compile with Enforce.cs' ($region.Success -and $block.Success -and $block.Groups[1].Value -match 'internal static void SwapCopyIn\(')
+    if (-not ($region.Success -and $block.Success)) { Done }
+    $driver = $driver.Replace('__OWNGAME__', $region.Groups[1].Value.TrimEnd() + "`n" + $block.Groups[1].Value.TrimEnd())
+
     $driverFile = Join-Path $tmp 'CrashSnapshotTest.cs'
     [IO.File]::WriteAllText($driverFile, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $tmp 'crash-snapshot-test.exe'
@@ -196,8 +234,8 @@ try {
     $chosen = Join-Path $tmp 'chosen-on'
     $r = Apply $inst $true $chosen
     $t = IniText $inst
-    Yes 'on: Crash Log Write Minidump = true and Max Minidumps = 1' ((Live $t 'Crash Log Write Minidump')[0] -eq 'true' -and (Live $t 'Max Minidumps')[0] -eq '1' -and $r['WANTED'] -eq 'True')
-    Yes 'on: the log says where they go, how big they get, and that they stay on this PC' ($r['SAID'] -match [regex]::Escape($chosen) -and $r['SAID'] -match '9 GB or more' -and $r['SAID'] -match 'stays on this PC')
+    Yes 'on: Crash Log Write Minidump = true and Max Minidumps = 2' ((Live $t 'Crash Log Write Minidump')[0] -eq 'true' -and (Live $t 'Max Minidumps')[0] -eq '2' -and $r['WANTED'] -eq 'True')
+    Yes 'on: the log says where they go, how big they get, that each is kept until looked at, two at most, and that they stay on this PC' ($r['SAID'] -match [regex]::Escape($chosen) -and $r['SAID'] -match '9 GB or more' -and $r['SAID'] -match 'kept until staff have looked at that crash, two at most' -and $r['SAID'] -match 'stays on this PC')
     $again = Apply $inst $true $chosen
     Yes 'on: a second Play changes nothing and says nothing' ($again['SAID'] -eq '(none)' -and (IniText $inst) -eq $t)
     Yes 'on: the rest of Crash Logger''s file is left alone' ((Live $t 'Max Crash Logs')[0] -eq '20' -and (Live $t 'Auto Open Crash Log')[0] -eq 'true' -and (Live $t 'Thread Dump Write Minidump')[0] -eq 'false' -and (Live $t 'Log Level')[0] -eq '2')
@@ -206,8 +244,8 @@ try {
     $new = Dump $chosen 'crash-2026-09-29-10-00-00.dmp' 10
     [IO.File]::WriteAllText((Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'), 'log')
     $r = Apply $inst $true $chosen
-    Yes 'on: the older snapshots are deleted in both folders, the newest kept' (-not (Test-Path -LiteralPath $old) -and -not (Test-Path -LiteralPath $mid) -and (Test-Path -LiteralPath $new))
-    Yes 'on: and the log says so' ($r['SAID'] -match 'Deleted 2 older crash snapshots\. Only the newest is kept\.')
+    Yes 'on: past two, the oldest is deleted, across both folders, and the newest two kept' (-not (Test-Path -LiteralPath $old) -and (Test-Path -LiteralPath $mid) -and (Test-Path -LiteralPath $new))
+    Yes 'on: and the log says so' ($r['SAID'] -match 'Deleted 1 older crash snapshot past the 2 kept\.')
     Yes 'crash logs are never touched' (Test-Path -LiteralPath (Join-Path $inst.Skse 'crash-2026-09-20-10-00-00.log'))
 
     # ------------------------------------------- 4. only that install's file
@@ -222,7 +260,7 @@ try {
     $m = NewInstall 'noini' $false $true
     $null = Apply $m $true
     $t = IniText $m
-    Yes 'on, Crash Logger there but its ini missing: made with both lines under [Debug]' ($t -match '(?s)\[Debug\].*Crash Log Write Minidump = true' -and (Live $t 'Max Minidumps')[0] -eq '1')
+    Yes 'on, Crash Logger there but its ini missing: made with both lines under [Debug]' ($t -match '(?s)\[Debug\].*Crash Log Write Minidump = true' -and (Live $t 'Max Minidumps')[0] -eq '2')
     $m = NewInstall 'nocrashlogger' $false $false
     $null = Apply $m $true
     Yes 'no Crash Logger at all: nothing is made' (-not (Test-Path -LiteralPath $m.Ini))
@@ -250,7 +288,10 @@ try {
     Yes 'crashed, on: nothing older is deleted before the person answers' ((Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved))
     $other = Dump $chosen 'crash-report-from-another-program.dmp' 3000
     $r = Run @('tidy', $s.Game, $s.My, '1', $chosen)
-    Yes 'kept: the older snapshot is deleted, the new one kept' (-not (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved) -and $r['GONE'] -eq '1')
+    Yes 'kept, with one older: both are kept, nobody has looked at either' ((Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved) -and $r['GONE'] -eq '0')
+    $oldest = Dump $chosen 'crash-2026-09-27-09-00-00.dmp' 2000
+    $r = Run @('tidy', $s.Game, $s.My, '1', $chosen)
+    Yes 'kept, a third: the oldest is deleted, the newest two kept' (-not (Test-Path -LiteralPath $oldest) -and (Test-Path -LiteralPath $older) -and (Test-Path -LiteralPath $moved) -and $r['GONE'] -eq '1' -and $r['LOOKED'] -eq '0')
     Yes 'kept: a file in the chosen folder that is not one of Crash Logger''s is never deleted' (Test-Path -LiteralPath $other)
     $s2 = NewInstall 'session-off'
     [IO.File]::WriteAllText((Join-Path $s2.Skse 'crash-2026-10-17-14-00-00.log'), 'today')
@@ -267,7 +308,7 @@ try {
     Yes 'the game closing works from what Crash Logger was told at Play, off the window''s thread' ($shell -match 'bool keptAtPlay = CrashDump\.AppliedAtPlay;' -and $shell -match 'ThreadPool\.QueueUserWorkItem\(delegate\s*\{\s*string snapshot = null, crashed = null;' -and $shell -match 'CrashDump\.AfterSession\(crashSince, keptAtPlay, keptIn, out snapshot\)')
     Yes 'and asks about a saved snapshot back on the window''s thread' ($shell -match 'if \(snapshot != null\) AskKeepSnapshot\(snapshot, keptIn\);' -and $shell -match 'MessageBox\.Show\(win,')
     Yes 'Apply remembers what it wrote at Play' ($src -match 'AppliedAtPlay = Wanted\(cfg\);')
-    Yes 'asking: Yes keeps it and only then tidies older ones, No deletes it' ($shell -match 'MessageBoxButton\.YesNo' -and $shell -match 'static void AskKeepSnapshot\(string snapshot, string keptIn\)' -and $shell -match 'int gone = CrashDump\.Tidy\(keptIn\);' -and $shell -match 'File\.Delete\(snapshot\);')
+    Yes 'asking: Yes keeps it and only then tidies older ones, No deletes it' ($shell -match 'MessageBoxButton\.YesNo' -and $shell -match 'static void AskKeepSnapshot\(string snapshot, string keptIn\)' -and $shell -match 'int gone = CrashDump\.Tidy\(keptIn, out looked\);' -and $shell -match 'File\.Delete\(snapshot\);')
     Yes 'Wanted(cfg) is the person''s own setting and nothing else' ($src -match 'return cfg != null && cfg\.CrashSnapshots;' -and $src -notmatch 'Discord\.' -and $src -notmatch 'IsDev')
     $ui = Read 'launcher\ui.xaml'
     Yes 'Settings has the box, the size said beside it, and a folder button' ($ui -match 'x:Name="ChkCrashSnapshots"' -and $ui -match 'One can be 9 GB or more' -and $ui -match 'x:Name="BtnCrashFolder"' -and $ui -match 'x:Name="TxtCrashFolder"')
@@ -279,6 +320,53 @@ try {
     $diag = Read 'launcher\app\Diag.cs'
     $report = [regex]::Match($diag, '(?s)Entry crash = Files\.NewestCrash\(\);\s*if \(crash != null\) Grab\(work, crash\.FullPath\);')
     Yes 'the report zip takes the crash log, not the snapshot' ($report.Success -and $diag -notmatch '\.dmp' -and $files -match '"crash-\*\.log"')
+    # ------------------------------------------- 7. kept until looked at (#2319)
+    $l = NewInstall 'looked'
+    $chosen = Join-Path $tmp 'chosen-looked'
+    $profDir = Split-Path -Parent $l.My
+    $held = Join-Path $profDir 'crash-snapshots.txt'
+    $sA = 'a' * 32; $sB = 'b' * 32; $sC = 'c' * 32
+    $dA = Dump $chosen 'crash-2026-10-18-20-00-00.dmp' 10
+    $dB = Dump $chosen 'crash-2026-10-18-19-00-00.dmp' 70
+    $dC = Dump $l.Skse 'crash-2026-10-18-18-00-00.dmp' 130
+    $r = Run @('remember', $l.Game, $l.My, '1', $chosen, (Join-Path $l.Skse 'crash-2026-10-18-20-00-00.log'), $sA)
+    $null = Run @('remember', $l.Game, $l.My, '1', $chosen, (Join-Path $l.Skse 'crash-2026-10-18-19-00-00.log'), $sB)
+    $r = Run @('remember', $l.Game, $l.My, '1', $chosen, (Join-Path $l.Skse 'crash-2026-10-18-18-00-00.log'), $sC)
+    Yes 'each snapshot is remembered against the session it crashed in, in the profile folder' ((Test-Path -LiteralPath $held) -and $r['HELD'] -eq "$sA,$sB,$sC")
+    Yes '  and never beside the snapshots, in the folder the person chose' (-not (Test-Path -LiteralPath (Join-Path $chosen 'crash-snapshots.txt')))
+    $r = Run @('remember', $l.Game, $l.My, '1', $chosen, (Join-Path $l.Skse 'crash-2026-10-18-17-00-00.log'), 'not-a-session')
+    Yes '  a session id that is not one is not remembered' ($r['HELD'] -eq "$sA,$sB,$sC")
+    $r = Run @('remember', $l.Game, $l.My, '1', $chosen, (Join-Path $l.Skse 'thing.log'), ('e' * 32))
+    Yes '  nor a log that is not Crash Logger''s' ($r['HELD'] -eq "$sA,$sB,$sC")
+    $r = Run @('tidy', $l.Game, $l.My, '1', $chosen, '-')
+    Yes 'nobody has looked at any: the newest two kept, the third deleted' ((Test-Path -LiteralPath $dA) -and (Test-Path -LiteralPath $dB) -and -not (Test-Path -LiteralPath $dC) -and $r['GONE'] -eq '1' -and $r['LOOKED'] -eq '0')
+    Yes '  and the deleted one is no longer asked about' ($r['HELD'] -eq "$sA,$sB")
+    $r = Run @('tidy', $l.Game, $l.My, '1', $chosen, $sB)
+    Yes 'staff looked at one: that snapshot is deleted, the other kept' ((Test-Path -LiteralPath $dA) -and -not (Test-Path -LiteralPath $dB) -and $r['GONE'] -eq '1' -and $r['LOOKED'] -eq '1')
+    Yes '  and the log says it went because it was looked at' ($r['LINE'] -eq 'Deleted 1 crash snapshot staff have looked at.')
+    Yes '  and it is no longer asked about' ($r['HELD'] -eq $sA)
+    $r = Run @('tidy', $l.Game, $l.My, '1', $chosen, '-')
+    Yes 'a mark taken off: the snapshot is kept' ((Test-Path -LiteralPath $dA) -and $r['GONE'] -eq '0')
+    $dD = Dump $chosen 'crash-2026-10-18-21-00-00.dmp' 5
+    $dE = Dump $chosen 'crash-2026-10-18-22-00-00.dmp' 2
+    $dX = Dump $l.Skse 'crash-2026-10-18-15-00-00.dmp' 300
+    $r = Run @('tidy', $l.Game, $l.My, '1', $chosen, $sA)
+    Yes 'looked at and past two in one tidy: both go, counted apart' (-not (Test-Path -LiteralPath $dA) -and -not (Test-Path -LiteralPath $dX) -and $r['GONE'] -eq '2' -and $r['LOOKED'] -eq '1')
+    Yes '  and said apart' ($r['LINE'] -eq 'Deleted 1 crash snapshot staff have looked at and 1 older crash snapshot past the 2 kept.')
+    Yes '  a snapshot with no session remembered is kept like an unread one' ((Test-Path -LiteralPath $dD) -and (Test-Path -LiteralPath $dE))
+    $o = NewInstall 'looked-off'
+    $chosenOff = Join-Path $tmp 'chosen-looked-off'
+    $dF = Dump $o.Skse 'crash-2026-10-18-20-00-00.dmp' 10
+    $null = Run @('remember', $o.Game, $o.My, '0', '-', (Join-Path $o.Skse 'crash-2026-10-18-20-00-00.log'), $sA)
+    $null = Apply $o $false
+    Yes 'snapshots turned off: even one staff looked at is left where it is' (Test-Path -LiteralPath $dF)
+    $many = NewInstall 'looked-many'
+    for ($i = 0; $i -lt 10; $i++) { $r = Run @('remember', $many.Game, $many.My, '1', '-', (Join-Path $many.Skse ('crash-2026-10-18-10-00-0' + $i + '.log')), ([string]$i * 32)) }
+    Yes 'at most eight sessions are remembered, the newest' (($r['HELD'] -split ',').Count -eq 8 -and $r['HELD'] -notmatch ('0' * 32) -and $r['HELD'] -match ('9' * 32))
+    Yes 'the check in sends the sessions held and takes the site''s lookedAt only from an answer that carried it' ($discord -match 'string held = CrashDump\.HeldSessions\(\);' -and $discord -match '",\\"snapshots\\":\\"" \+ Escape\(held\)' -and $discord -match 'if \(st\.Ok && reply\.Contains\("\\"lookedAt\\""\)\) CrashDump\.NoteLookedAt\(Field\(reply, "lookedAt"\)\);')
+    Yes 'the session logs remember the crash''s session before they go up' ($discord -match 'CrashDump\.Remember\(want\[1\]\[1\], session\);' -and $discord.IndexOf('CrashDump.Remember(') -lt $discord.IndexOf('/api/play/logs", sb.ToString()'))
+    Yes 'the person is told at the prompt that a kept snapshot waits for staff, two at most' ($shell -match 'Yes keeps it until staff mark this crash looked at on the sessions page' -and $shell -match 'Two are kept at most')
+    Yes 'and the setting says so before it is ticked' ($ui -match 'Each is kept until staff have looked at that crash, two at most\.' -and $src -match 'Each is kept until staff have looked at that crash, two at most\.')
 }
 finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue

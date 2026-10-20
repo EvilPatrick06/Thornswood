@@ -93,6 +93,9 @@ const gameStatus = { up: false, online: 0, max: 0 };
 const seatsFull = () => false;
 const worldFull = () => '';
 const mostOnlineFallback = () => 0;
+// No crash snapshots asked about here (#2319); test-2319-crash-looked-at.js runs that answer.
+const sessionRows = () => [];
+const lookedAtFor = () => [];
 
 // standingCached, hasLeft and departed because the join route asks whether an
 // account holding the id has left the Discord before it reads the file it
