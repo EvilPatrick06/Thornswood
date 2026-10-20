@@ -43,6 +43,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here '..\deploy\ServerOrder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $fail = 0
@@ -57,33 +58,74 @@ if ($From -eq 'build') {
     Write-Host ''
     Write-Host "reading the build at $settingsPath" -ForegroundColor DarkGray
 } else {
-    # The file is read where it lives and only the text comes back. Nothing
+    # The files are read where they live and only text comes back. Nothing
     # is written on either machine.
+    #
+    # WHICH PLUGINS ARE LIGHT IS THE BOX'S TOO (#2947): each file the
+    # settings' loadOrder names is read there by Test-ThornswoodPluginLight,
+    # and whether the engine loads light plugins comes from the server's own
+    # server-build.json. Until then both came from this machine (the game
+    # folder in -Data and this checkout's record), so on a machine with no
+    # game folder (a cloud one) this stopped on the first plugin it could
+    # not find, and a game folder with another copy of a plugin answered for
+    # a file the server does not load.
     $root = if ($From -eq 'dev') { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
     $settingsPath = "$root\server-settings.json"
-    $remote = "`$ProgressPreference='SilentlyContinue'; Get-Content -LiteralPath '$settingsPath' -Raw"
+    $lightDef = 'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}"
+    $remote = @"
+`$ProgressPreference = 'SilentlyContinue'
+$lightDef
+`$raw = Get-Content -LiteralPath '$settingsPath' -Raw
+`$rp = '$root\server-build.json'
+if (-not (Test-Path -LiteralPath `$rp)) { 'ENGINE none' }
+else { try { `$r = Get-Content -LiteralPath `$rp -Raw | ConvertFrom-Json; 'ENGINE ' + [string](`$r.lightPlugins -eq `$true) } catch { 'ENGINE unreadable' } }
+foreach (`$o in @((`$raw | ConvertFrom-Json).loadOrder)) {
+  `$f = [string]`$o
+  try { 'LIGHT ' + [int](Test-ThornswoodPluginLight `$f) + ' ' + [IO.Path]::GetFileName(`$f) } catch { 'UNREAD ' + [IO.Path]::GetFileName(`$f) }
+}
+'SETTINGS'
+`$raw
+"@
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($remote))
     $text = Invoke-ThornswoodNative { & ssh -o BatchMode=yes -o StrictHostKeyChecking=yes "$User@$Vps" "powershell -NoProfile -EncodedCommand $enc" } 2>&1
-    $json = (@($text) -join "`n")
-    # The warning ssh prints about key exchange arrives on the same stream as
-    # the answer, so the JSON is taken from its first brace rather than from
-    # the first line.
-    $at = $json.IndexOf('{')
-    if ($at -lt 0) { throw "could not read $settingsPath from $Vps : $json" }
-    $s = $json.Substring($at) | ConvertFrom-Json
+    $lines = @($text | ForEach-Object { "$_" })
+    $at = [Array]::IndexOf([string[]]$lines, 'SETTINGS')
+    if ($at -lt 0) { throw "could not read $settingsPath from $Vps : $($lines -join "`n")" }
+    $json = (@($lines | Select-Object -Skip ($at + 1)) -join "`n")
+    if ($json.IndexOf('{') -lt 0) { throw "could not read $settingsPath from $Vps : $json" }
+    $s = $json.Substring($json.IndexOf('{')) | ConvertFrom-Json
+    $boxEngine = @($lines | Where-Object { $_ -like 'ENGINE *' } | Select-Object -First 1)
+    $boxLight = @{}
+    $boxUnread = @()
+    foreach ($l in $lines) {
+        if ($l -match '^LIGHT ([01]) (.+)$') { $boxLight[$Matches[2].Trim().ToLowerInvariant()] = ($Matches[1] -eq '1') }
+        elseif ($l -match '^UNREAD (.+)$') { $boxUnread += $Matches[1].Trim() }
+    }
     Write-Host ''
     Write-Host "reading the $From server at $Vps, $settingsPath" -ForegroundColor DarkGray
+    Write-Host '  and which of its plugins are light, from the files it loads there' -ForegroundColor DarkGray
     Write-Host '  the plugin and gamemode checks below still read this machine' -ForegroundColor DarkGray
 }
-$order = @($s.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+$order = @($s.loadOrder | ForEach-Object { @("$_".Trim() -split '[\\/]')[-1] })
 
 Write-Host ''
 Write-Host 'load order' -ForegroundColor Cyan
 # Full indices: an engine that loads light plugins lists them and gives them
-# none (#1715). Which engine is this machine's record, and which plugins are
-# light is read from this machine's Data, like the checks below.
-. (Join-Path $Here '..\deploy\ServerOrder.ps1')
-$lightTest = Get-ThornswoodLightTest ([string[]]@($order | ForEach-Object { Join-Path $Data $_ })) (Join-Path $Here '..\..\records\server-build.json')
+# none (#1715). For the build on this machine, which engine is this
+# checkout's record and which plugins are light is read from -Data, like the
+# checks below; for a server, both are the box's own (above).
+if ($From -eq 'build') {
+    $lightTest = Get-ThornswoodLightTest ([string[]]@($order | ForEach-Object { Join-Path $Data $_ })) (Join-Path $Here '..\..\records\server-build.json')
+} else {
+    if ($boxEngine -notcontains 'ENGINE True' -and $boxEngine -notcontains 'ENGINE False') {
+        throw ("the $From server's server-build.json said " + ($boxEngine -join ' ') + ', so it is not known whether its engine loads light plugins')
+    }
+    if ($boxUnread.Count) {
+        throw ("the $From server cannot read whether " + ($boxUnread -join ', ') + ' is light, so no full index can be counted')
+    }
+    $lightTest = $null
+    if ($boxEngine -contains 'ENGINE True') { $lightTest = { param($n) [bool]$boxLight[$n.ToLowerInvariant()] }.GetNewClosure() }
+}
 $idxContent = Get-ThornswoodFullIndex ([string[]]$order) $lightTest 'Thornswood-Content.esp'
 $idxUnbound = Get-ThornswoodFullIndex ([string[]]$order) $lightTest 'Skyrim Unbound.esp'
 
