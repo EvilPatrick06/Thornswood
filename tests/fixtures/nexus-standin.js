@@ -173,6 +173,9 @@ function api(req, res, url, body, json) {
   if (req.method === 'PATCH' && (m = p.match(/^\/v3\/mods\/([^/]+)$/))) {
     const mod = Object.values(mods).find(x => x.uid === m[1]); if (!mod) return problem(res, 404, 'No mod');
     if (!json || typeof json.description !== 'string' || !json.description.trim()) return problem(res, 422, 'description');
+    // legacyModsByDomain goes on answering what was there before, as some of Nexus's
+    // nodes did for this edit on 20 Oct; mod(modId, gameId) answers the edit at once.
+    mod.cached = mod.description;
     mod.description = control.storeOdd ? json.description : storedOf(json.description);
     res.writeHead(204); return res.end();
   }
@@ -206,7 +209,12 @@ function graph(req, res, json) {
   }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
-    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.description }] : [] } } });
+    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
+  }
+  if ((m = q.match(/(?:^|[{\s])mod\(modId: (\d+), gameId: (\d+)\)/))) {
+    const mod = m[2] === '1704' ? mods[m[1]] : undefined;
+    if (!mod) return send(res, 200, { data: { mod: null }, errors: [{ message: 'Mod not found' }] });
+    return send(res, 200, { data: { mod: { modId: Number(m[1]), name: mod.name, description: mod.description } } });
   }
   if ((m = q.match(/collectionRevision\(slug: "7essxf", revision: (\d+)/))) {
     const r = collection.revisions[m[1]];
@@ -280,7 +288,7 @@ const server = http.createServer((req, res) => {
     if (url.pathname === '/_control') {
       const c = Object.assign({}, json || {});
       // A description put straight into the stored form, to give the scripts one they cannot read back.
-      if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; delete c.setStored; }
+      if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
