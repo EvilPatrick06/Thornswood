@@ -115,6 +115,17 @@ $layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
 if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
 try { $layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
 
+# This machine's own data (feed copies, ship-roots.json, engine-build.json):
+# %LOCALAPPDATA%\Thornswood, which tests point elsewhere by setting it. Off
+# Windows there is no LOCALAPPDATA, and Join-Path stopped on the null before
+# saying anything (#2872); the platform's own folder for it, ~/.local/share,
+# takes its place, and holds none of those files until something writes them.
+function Get-MachineData {
+    $d = $env:LOCALAPPDATA
+    if (-not $d) { $d = [Environment]::GetFolderPath('LocalApplicationData') }
+    return Join-Path $d 'Thornswood'
+}
+
 function Join-Under([string]$root, [string]$rel) {
     if (-not $rel) { return $root }
     $parts = $rel -split '[\\/]+' | Where-Object { $_ -and $_ -ne '.' }
@@ -193,17 +204,17 @@ function Get-Place([string]$name) {
         'Repo'   { return $repo }
         # This machine's working copies of the feeds (Feed-Store.ps1, #907),
         # not clones of Thornswood-Releases beside the repository any more.
-        'Releases'    { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main' }
-        'ReleasesDev' { return Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev' }
+        'Releases'    { return Join-Path (Get-MachineData) 'feed\main' }
+        'ReleasesDev' { return Join-Path (Get-MachineData) 'feed\dev' }
         # The folder a release is built from here, and the file that names it (#1692).
-        'ShipRoots'   { return Join-Path $env:LOCALAPPDATA 'Thornswood\ship-roots.json' }
+        'ShipRoots'   { return Join-Path (Get-MachineData) 'ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }
         # Only what ShipRoots names, '' for the install rule (#2662).
         'ShipRootNamed'    { return Get-NamedShipRoot 'main' }
         'ShipRootNamedDev' { return Get-NamedShipRoot 'dev' }
         # This machine's engine build, and the file that names it (#2019).
-        'EngineBuilds' { return Join-Path $env:LOCALAPPDATA 'Thornswood\engine-build.json' }
+        'EngineBuilds' { return Join-Path (Get-MachineData) 'engine-build.json' }
         'EngineBuild'  { return Get-EngineBuild }
     }
     $place = Get-Named $layout.places $name
