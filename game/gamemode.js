@@ -43658,8 +43658,8 @@ module.exports = {
       changed = true;
       plog('word: the', w.kind, 'word about', nameOf(w.building), 'reached', personName(to),
            '(profile ' + w.holder + ')');
-      try { notify(to, line); } catch (e) { }
-      try { say(to, line); } catch (e2) { }
+      notify(to, line);
+      say(to, line);
     }
     if (changed) {
       wordBook.list = kept;
