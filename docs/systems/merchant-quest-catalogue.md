@@ -353,3 +353,5 @@ remaining paid list and1024 retained unknown bytes is3523 UTF-8 bytes. Native
 property capacity remains16384 bytes. Oversized existing records refuse new
 acceptance without deleting unknown or legacy fields. This is a source and
 synthetic transaction measurement, not a connected playtest.
+
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.

@@ -8,7 +8,7 @@ cast in `npc-population.json`. Counts and rewards come from [Custom quests](ques
 This is the binding specification. The four rare-mine offers have an
 implementation in PR2065. The six kill contracts have bindings in PR2130;
 their matching native and gamemode changes still need to be released by
-Claude. The [pearl bed](merchant-pearl-bed.md) now has its source interaction in code. Five other scarce offers and seven retrieval offers still need their resource or scene interaction connected before they can be taken. A
+Claude. The [pearl bed](merchant-pearl-bed.md) now has its source interaction in code. Four other scarce offers and seven retrieval offers still need their resource or scene interaction connected before they can be taken. A
 reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
@@ -115,3 +115,5 @@ interior or another worldspace. The source CELL list alone is insufficient.
 These scene contracts add no enemy spawns and change no dungeon tier,
 camp difficulty, ordinary loot, population cap, or NPC return clock.
 Connected acceptance is tracked separately from these source-record choices.
+
+The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.

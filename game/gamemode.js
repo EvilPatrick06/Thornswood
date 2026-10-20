@@ -7378,7 +7378,24 @@ function bless(actorId, baseDesc) {
  * map is still there, holding those same two, because they are ACTI records
  * the pass does not read. Everything else now comes out of HARVESTS_BY_BASE.
  */
+// These are Skyrim.esm reference IDs, so interception does not depend on
+// a working quest controller, source lookup or the object's current base.
+function harvestCrimson(actorId,refrId,baseDesc) {
+  const unavailable='This crimson plant is unavailable for now.';
+  if(baseDesc!=='b6fb9:Skyrim.esm')return unavailable;
+  let result;
+  try {
+    const quests=globalThis.__thornswoodQuests;
+    if(!quests || typeof quests.harvestScarce!=='function')return unavailable;
+    result=quests.harvestScarce(actorId,refrId);
+    if(!result || !result.ok)return result && result.text || unavailable;
+  }catch(error){return unavailable;}
+  const rank=creditWork(actorId,'harvest');
+  return 'You pick 1 Crimson Nirnroot.'+(rank?' '+rank:'');
+}
+
 function harvest(actorId, refrId, baseDesc) {
+  if([0xf3b51,0xf3b54,0xf3b5d,0x10ffac,0x10ffaf,0x10ffb0,0xf3b56,0x10ffa9].includes(refrId))return harvestCrimson(actorId,refrId,baseDesc);
   /*
     A CROP IS NOT A PLANT TO BE PICKED HERE, whatever the pass says about it.
 
@@ -8698,6 +8715,15 @@ function kindIsContainer(baseDesc) {
 }
 
 mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
+  if([0xf3b51,0xf3b54,0xf3b5d,0x10ffac,0x10ffaf,0x10ffb0,0xf3b56,0x10ffa9].includes(refrId)) {
+    if(!casterRefrId)return false;
+    try {
+      notify(casterRefrId,harvest(casterRefrId,refrId,mp.get(refrId,'baseDesc')));
+    }catch(error){
+      try {log('Crimson harvesting refused:',String(error));}catch(logError){}
+    }
+    return false;
+  }
   if (!casterRefrId) return;
   let baseDesc;
   try {
@@ -75155,8 +75181,8 @@ const apply=Reflect.apply;
 const vector=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
 const distance=(a,b)=>a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);
 const staticId=id=>Number.isInteger(id)&&id>0&&id<0xff000000;
-function createQuestFishingSources(mp,input) {
- const fail=()=>{throw new Error('Quest fishing source evidence cannot be verified.');};
+function createQuestSources(mp,input,contract) {
+ const fail=()=>{throw new Error('Quest '+contract.label+' source evidence cannot be verified.');};
  const methods={};
  for(const key of ['get','getIdFromDesc','getDescFromId','lookupEspmRecordById']) {
   if(typeof mp[key]!=='function')fail();methods[key]=mp[key];
@@ -75178,13 +75204,13 @@ function createQuestFishingSources(mp,input) {
     r.flags&0x820)fail();return lookup;
  }
  const byId=new Map(),byDesc=new Set();
- if(!Array.isArray(input)||input.length!==3)fail();
+ if(!Array.isArray(input)||input.length!==contract.count)fail();
  for(const original of input) {
   const row=JSON.parse(JSON.stringify(original));
-  if(!vector(original.position)||row.itemType!=='INGR'||row.rank!=='expert'||row.returnMinutes!==60||byDesc.has(row.reference))fail();
+  if(!vector(original.position)||row.itemType!==contract.itemType||row.rank!==contract.rank||row.returnMinutes!==contract.returnMinutes||byDesc.has(row.reference))fail();
   const id=resolve(row.reference),base=resolve(row.base),item=resolve(row.item),world=resolve(row.world);
-  if(item===15||byId.has(id))fail();
-  winner(base,'FLOR');winner(item,'INGR');winner(world,'WRLD');
+  if(item===15||byId.has(id)||contract.vanillaIds&&id!==parseInt(row.reference.split(':')[0],16))fail();
+  winner(base,contract.baseType);winner(item,contract.itemType);winner(world,'WRLD');
   byId.set(id,{...row,id,baseId:base});byDesc.add(row.reference);
  }
  function source(row) {
@@ -75209,7 +75235,13 @@ function createQuestFishingSources(mp,input) {
   }catch(error){return false;}
  }});
 }
-module.exports={createQuestFishingSources};
+function createQuestFishingSources(mp,input) {
+ return createQuestSources(mp,input,{label:'fishing',count:3,baseType:'FLOR',itemType:'INGR',rank:'expert',returnMinutes:60});
+}
+function createQuestHarvestSources(mp,input) {
+ return createQuestSources(mp,input,{label:'harvest',count:8,baseType:'ACTI',itemType:'INGR',rank:'novice',returnMinutes:10,vanillaIds:true});
+}
+module.exports={createQuestFishingSources,createQuestHarvestSources};
 return module.exports;})();
 const SCENE_BUDGET = (function () { const module = {exports:{}};
 'use strict';
@@ -76226,6 +76258,8 @@ module.exports.prepareRoles = function (population, mp) {
   return prepared;
 };
 module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFishingSources;
+module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;
+module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"2f985c165e7d3185dfe1354279a58fa3fef6c1916254180436889dcd06c9b388","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
 module.exports.scarceFishing = function () { return {"version":1,"quest":"pearl","label":"Raven Rock coast","sources":[{"reference":"3828e:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27197.439453125,33044.234375,-82.0891342163086],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"38894:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27077.59765625,28003.259765625,-167.68028259277344],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"3919c:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[25586.798828125,33730.1015625,280.6593017578125],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60}]}; };
 module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;
 module.exports.sceneBudget = SCENE_BUDGET;
@@ -76449,13 +76483,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   var byId = {};
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
   var LEGACY_TRADE = {pearl:'Enchanter',ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
-    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith'};
+    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist'};
   // New legacy work has one appointed specialist. Already accepted work
   // keeps its former compatible trade and destination rules after the cut.
   var LEGACY_OFFER_REF = {pearl:'177da:Dragonborn.esm',ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
     stalhrim:'1828f:Dragonborn.esm',heartstone:'1828f:Dragonborn.esm',
     wolf:'1a684:Skyrim.esm',sabre:'1b124:Skyrim.esm',camp:'1a67c:Skyrim.esm',
-    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm'};
+    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm'};
 
   function createCustomQuests(deps) {
     deps = deps || {};
@@ -76716,6 +76750,27 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       b.open[id] = { drawn: 0, kills: 0, gem: opts && opts.gem, itemDesc: null };
       if (!keep(actor, b, [], eligible)) return { ok: false, why: 'unwritten' };
       return { ok: true };
+    }
+    function harvestScarce(actor,ref) {
+      var row=byId.crimson,data=deps.harvestData,sources=deps.harvestSources;
+      var unavailable={ok:false,text:'This crimson plant is unavailable for now.'};
+      if(!active || !data || !sources || typeof deps.harvestStock!=='function')return unavailable;
+      var held=questsOf(actor),open=held && held.open.crimson,item=data.sources[0].item;
+      if(!held)return unavailable;
+      if(!open)return {ok:false,text:'Take the crimson work from the Winterhold Alchemist first.'};
+      if(open.drawn>=row.holds)return {ok:false,text:'This work has given you all eight plants. Return or abandon it first.'};
+      if(open.drawn>0 && open.itemDesc!==item)return unavailable;
+      var eligible=function(){return active && sources.verify(actor,ref) && !deps.harvestRules(actor) && qualify(actor,row,held,true).ok;};
+      if(!eligible())return {ok:false,text:'This plant needs Gatherer standing and a closer approach.'};
+      var stock=deps.harvestStock(),wrote=false;
+      if(!stock || typeof stock.take!=='function')return unavailable;
+      open.drawn+=1;open.itemDesc=item;
+      var taken=stock.take(ref,data.sources[0].returnMinutes*60000,function(){
+        wrote=keep(actor,held,[{item:item,count:1}],eligible);
+        return wrote || typeof deps.available==='function' && !deps.available();
+      });
+      if(!wrote)return taken.waitMs>0?{ok:false,text:'This crimson plant has already been picked. Come back after it returns.'}:unavailable;
+      return {ok:true,count:1};
     }
     function fishScarce(actor,ref) {
       var row=byId.pearl, data=deps.fishingData, sources=deps.fishingSources;
@@ -77034,7 +77089,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce,
+      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, harvestScarce:harvestScarce,
       shutdown: function () { active = false; }
     };
   }
@@ -77080,7 +77135,22 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         try {fishingSources=MERCHANT_TRADING.createQuestFishingSources(mp,fishingData.sources);}
         catch(error){log('The pearl bed stays unavailable: '+String(error));}
       }
+      var harvestData=typeof MERCHANT_TRADING.scarceHarvest==='function'?MERCHANT_TRADING.scarceHarvest():null;
+      var harvestSources=null;
+      if(harvestData) {
+        try {harvestSources=MERCHANT_TRADING.createQuestHarvestSources(mp,harvestData.sources);}
+        catch(error){log('The crimson work stays unavailable: '+String(error));}
+      }
       globalThis.__thornswoodQuests = createCustomQuests({
+        harvestData:harvestData,harvestSources:harvestSources,
+        harvestStock:function(){return globalThis.__thornswoodResourceStock;},
+        harvestRules:function(actor){
+          var plant=plantAt('b6fb9:Skyrim.esm');
+          if(!plant || plant.produce!=='b701a:Skyrim.esm')return 'The crimson plant cannot be verified.';
+          var refusal=classGate(actor,'harvest');if(refusal)return refusal;
+          var want=RANK_LADDER.indexOf(plant.rank);
+          return want>0 && rankStep(actor,'gatherer')<want ? 'This plant needs a higher Gatherer rank.' : null;
+        },
         fishingData:fishingData,fishingSources:fishingSources,
         fishingStock:function(){return globalThis.__thornswoodResourceStock;},
         fishingRules:function(actor){return classGate(actor,'fish') || toolGate(actor,'fisher') ||
@@ -77149,6 +77219,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
           return merchants && typeof merchants.questAdmission==='function' ? merchants.questAdmission(actor,ref) : null;
         }
       });
+      if(harvestSources)globalThis.__thornswoodQuests.bindPlace('crimson',{cell:'1ee62:Skyrim.esm'});
       Object.keys(RARE_PLACES).forEach(function (id) {
         globalThis.__thornswoodQuests.bindPlace(id, RARE_PLACES[id]);
       });
