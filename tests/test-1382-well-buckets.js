@@ -63,5 +63,18 @@ yes('the plugin places one bucket for each row (' + placed.length + ')', placed.
   rows.every(function (r) { return placed.some(function (p) { return p.fid === ((5 << 24) | parseInt(r.ref, 16)); }); }));
 yes('and the server lists the bucket as the well activator', /wellActivators: \['18030:Thornswood-Content\.esp'\]/.test(gm));
 
+// The water bucket at a river or a lake (Patrick, 12 Oct 2026; and 20 Oct: lake water is a river's).
+const water = recs.find(function (r) { return r.tag === 'ACTI' && r.fid === 0x5018031; });
+yes('the plugin has the water bucket activator, saying Draw Water', !!water &&
+  String(water.subs.EDID).indexOf('ThornswoodActivatorWaterBucket') === 0 && String(water.subs.RNAM).indexOf('Draw Water') === 0);
+const banks = Object.keys(sites.sites).filter(function (k) { return sites.sites[k].kind === 'river'; }).map(function (k) { return sites.sites[k]; });
+const bankLeft = Object.keys(sites.skipped).filter(function (k) { return sites.skipped[k].kind === 'river'; });
+yes('one site for each of the nine towns with a forge, placed or left out (' + banks.length + ' + ' + bankLeft.length + ')',
+  banks.length > 0 && banks.length + bankLeft.length === 9);
+const onBank = recs.filter(function (r) { return r.tag === 'REFR' && r.subs.NAME && r.subs.NAME.readUInt32LE(0) === 0x5018031; });
+yes('the plugin places one water bucket for each row (' + onBank.length + ')', onBank.length === banks.length &&
+  banks.every(function (r) { return onBank.some(function (p) { return p.fid === ((5 << 24) | parseInt(r.ref, 16)); }); }));
+yes('and the server lists it as the river activator', /riverActivators: \['18031:Thornswood-Content\.esp'\]/.test(gm));
+
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

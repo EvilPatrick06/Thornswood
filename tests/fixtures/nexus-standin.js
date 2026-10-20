@@ -14,7 +14,8 @@
 // API request without the key or the Application headers, a storage request
 // WITH the key, an upload whose Content-MD5, Content-Disposition or size does
 // not match what it was started with, parts that do not match their ETags, a
-// whole file whose CRC-64/NVME is not the one it was started with, and a
+// storage request with an x-amz header its address does not sign, a whole
+// file whose CRC-64/NVME is not the one its complete address carries, and a
 // version made from an upload that is not available. Everything it was asked
 // is kept for GET /_requests; POST /_control changes how it answers.
 
@@ -33,6 +34,7 @@ const control = {
   versionFails: false,    // POST /mod-files/<id>/versions answers 422
   storeOdd: false,        // PATCH /mods/<id> keeps the text without the stored line breaks
   partSize: 65536,        // multipart part size
+  unboundComplete: false, // the complete address leaves out the CRC it was started with
 };
 
 const requests = [];
@@ -128,8 +130,11 @@ function api(req, res, url, body, json) {
     uploads[id] = u;
     if (!u.multipart) return send(res, 201, { data: { id, user: { id: 'user-1' }, state: 'created', presigned_url: base + '/s3/single/' + id + '?X-Amz-Signature=x' } });
     const n = Math.max(1, Math.ceil(u.size / control.partSize));
-    const urls = []; for (let i = 1; i <= n; i++) urls.push(base + '/s3/part/' + id + '/' + i + '?X-Amz-Signature=x');
-    return send(res, 201, { data: { id, user: { id: 'user-1' }, state: 'created', part_size_bytes: control.partSize, part_presigned_urls: urls, complete_presigned_url: base + '/s3/complete/' + id + '?X-Amz-Signature=x' } });
+    const urls = []; for (let i = 1; i <= n; i++) urls.push(base + '/s3/part/' + id + '/' + i + '?partNumber=' + i + '&X-Amz-SignedHeaders=host&X-Amz-Signature=x');
+    // As Nexus's storage (Cloudflare R2) hands it out, measured 20 Oct: the CRC
+    // is in the signed query and only host is a signed header.
+    const bound = u.crc && !control.unboundComplete ? 'x-amz-checksum-crc64nvme=' + encodeURIComponent(u.crc) + '&x-amz-checksum-type=FULL_OBJECT&' : '';
+    return send(res, 201, { data: { id, user: { id: 'user-1' }, state: 'created', part_size_bytes: control.partSize, part_presigned_urls: urls, complete_presigned_url: base + '/s3/complete/' + id + '?' + bound + 'X-Amz-SignedHeaders=host&X-Amz-Signature=x' } });
   }
   if (req.method === 'POST' && (m = p.match(/^\/v3\/uploads\/([^/]+)\/finalise$/))) {
     const u = uploads[m[1]]; if (!u) return problem(res, 404, 'No upload');
@@ -168,6 +173,9 @@ function api(req, res, url, body, json) {
   if (req.method === 'PATCH' && (m = p.match(/^\/v3\/mods\/([^/]+)$/))) {
     const mod = Object.values(mods).find(x => x.uid === m[1]); if (!mod) return problem(res, 404, 'No mod');
     if (!json || typeof json.description !== 'string' || !json.description.trim()) return problem(res, 422, 'description');
+    // legacyModsByDomain goes on answering what was there before, as some of Nexus's
+    // nodes did for this edit on 20 Oct; mod(modId, gameId) answers the edit at once.
+    mod.cached = mod.description;
     mod.description = control.storeOdd ? json.description : storedOf(json.description);
     res.writeHead(204); return res.end();
   }
@@ -201,7 +209,12 @@ function graph(req, res, json) {
   }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
-    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.description }] : [] } } });
+    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
+  }
+  if ((m = q.match(/(?:^|[{\s])mod\(modId: (\d+), gameId: (\d+)\)/))) {
+    const mod = m[2] === '1704' ? mods[m[1]] : undefined;
+    if (!mod) return send(res, 200, { data: { mod: null }, errors: [{ message: 'Mod not found' }] });
+    return send(res, 200, { data: { mod: { modId: Number(m[1]), name: mod.name, description: mod.description } } });
   }
   if ((m = q.match(/collectionRevision\(slug: "7essxf", revision: (\d+)/))) {
     const r = collection.revisions[m[1]];
@@ -218,6 +231,9 @@ function storage(req, res, url, body) {
   const p = url.pathname;
   let m;
   if (req.headers.apikey !== undefined) { violations.push('the key went to storage: ' + req.method + ' ' + p); return problem(res, 400, 'apikey sent to storage'); }
+  // Storage takes an x-amz header only when the address signs it, and none of these do.
+  const unsigned = Object.keys(req.headers).filter(h => h.startsWith('x-amz-'));
+  if (unsigned.length) return problem(res, 403, 'SignatureDoesNotMatch: ' + unsigned.join(', ') + ' is not signed');
   if (req.method === 'PUT' && (m = p.match(/^\/s3\/single\/([^/]+)$/))) {
     const u = uploads[m[1]]; if (!u || u.multipart) return problem(res, 404, 'No upload');
     const md5 = crypto.createHash('md5').update(body).digest();
@@ -251,9 +267,8 @@ function storage(req, res, url, body) {
     const whole = Buffer.concat(bufs);
     if (whole.length !== u.size) return problem(res, 400, 'size');
     const crc = crc64nvme(whole);
-    const sent = req.headers['x-amz-checksum-crc64nvme'];
-    if (u.crc && sent !== u.crc) return problem(res, 403, 'x-amz-checksum-crc64nvme does not match the signature');
-    if (sent && sent !== crc) return problem(res, 400, 'BadDigest: the file\'s CRC-64/NVME is ' + crc);
+    const bound = url.searchParams.get('x-amz-checksum-crc64nvme');
+    if (bound && bound !== crc) return problem(res, 400, 'BadDigest: the file\'s CRC-64/NVME is ' + crc);
     finishUpload(u, whole);
     return send(res, 200, '<CompleteMultipartUploadResult/>', 'application/xml');
   }
@@ -273,7 +288,7 @@ const server = http.createServer((req, res) => {
     if (url.pathname === '/_control') {
       const c = Object.assign({}, json || {});
       // A description put straight into the stored form, to give the scripts one they cannot read back.
-      if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; delete c.setStored; }
+      if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
@@ -282,7 +297,7 @@ const server = http.createServer((req, res) => {
       key: req.headers.apikey === undefined ? 'none' : (req.headers.apikey === KEY ? 'right' : 'wrong'),
       appName: req.headers['application-name'] || '', appVersion: req.headers['application-version'] || '',
       contentMd5: req.headers['content-md5'] || '', contentDisposition: req.headers['content-disposition'] || '', contentType: req.headers['content-type'] || '',
-      crc: req.headers['x-amz-checksum-crc64nvme'] || '', length: body.length, json: isApi ? json : null });
+      crc: req.headers['x-amz-checksum-crc64nvme'] || '', boundCrc: url.searchParams.get('x-amz-checksum-crc64nvme') || '', length: body.length, json: isApi ? json : null });
     if (isApi) {
       if (req.headers.apikey !== KEY) { violations.push('an API request without the key: ' + req.method + ' ' + url.pathname); return problem(res, 401, 'apikey'); }
       if (!req.headers['application-name'] || !req.headers['application-version']) { violations.push('an API request without Application-Name and Application-Version: ' + url.pathname); return problem(res, 400, 'Application headers'); }

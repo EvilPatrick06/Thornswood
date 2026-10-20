@@ -133,6 +133,8 @@ Yes 'and only inside the lookup' (@($assigns | Where-Object { $_.Extent.StartOff
 function Run-Lookup([string]$appData, [string]$passed) {
     $ReleaseDir = $passed
     $vLive = ''
+    # The packager's own folder, where it finds Where.ps1 (#2903).
+    $Here = Split-Path -Parent $PackagePath
     function Die($m) { throw ('DIE: ' + $m) }
     $died = ''
     $oldApp = $env:LOCALAPPDATA

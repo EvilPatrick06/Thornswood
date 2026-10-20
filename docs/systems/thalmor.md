@@ -92,7 +92,10 @@ not attack on sight, because most of them are still the game's own
 actors and the server does not run their AI. The server knows no item
 that is a Dominion flag, so a flag is not read yet.
 
-The patrols are staff settings in `game/data/thalmor-patrols.json`:
+The patrols are staff settings in `game/data/thalmor-patrols.json`
+(carried inside gamemode.js by `scripts/dev/Build-StaffData.js`, because the
+server runs the gamemode with no `game/data` beside it, #2873; run it after a
+change and deploy the gamemode):
 whether any patrol is out at all, the most roads with one at once (and,
 if staff set one, a different most for a world stage, read at each start
 from the world stage the staff confirmed), and

@@ -135,10 +135,13 @@ try {
     Yes '-OffBox -Status says what the firewall has' ($r.Text -match [regex]::Escape('Get-RunnerFirewall $grdGroup'))
     $r = Dry @('-OffBox', '-Number', '2')
     Yes '-Number 2 gets a firewall group of its own' ($r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-pr2'"))
-    foreach ($m in @(@(), @('-Remove'), @('-Lock'), @('-Status'))) {
+    foreach ($m in @(@(), @('-Lock'), @('-Status'))) {
         $r = Dry $m
         Yes ("the VPS (no -OffBox) $($m -join ' ') gets no firewall rule and no read deny") ($r.Code -eq 0 -and $r.Text -notmatch 'RunnerFirewall|RunnerReads')
     }
+    # Since #2161 a VPS account may carry -NetworkOnly's rules, so its removal takes them off, and still no read deny.
+    $r = Dry @('-Remove')
+    Yes 'the VPS (no -OffBox) -Remove takes off its outbound rules and touches no read deny' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch 'Set-RunnerFirewall \$grdAcct|Open-RunnerReads \$grdAcct|Close-RunnerReads \$grdAcct')
 
     # ---- -NetworkOnly (#2161): the outbound rules alone ---------------------
     # A step run, not a function the guard library defines: a line that starts with it.
@@ -155,6 +158,8 @@ try {
     Yes "-NetworkOnly is let through with the VPS label (exit $($r.Code))" ($r.Code -eq 0 -and $r.Said -notmatch 'never takes the VPS label' -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -notmatch $noLock)
     $r = Dry @('-OffBox', '-Label', 'thornswood-vps')
     Yes "  while full -OffBox with the VPS label is still refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
+    $r = Dry @('-Number', '5', '-Remove')
+    Yes '-Remove on the VPS takes off the outbound rules, the Defender skip and the account''s profile too' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner5'") -and $r.Text -match [regex]::Escape("Remove-MpPreference -ExclusionPath 'C:\Thornswood-Runner5'") -and $r.Text -match 'Win32_UserProfile -Filter "SID=' -and $r.Text -match 'Remove-CimInstance' -and $r.Text.IndexOf('$u.SID.Value') -lt $r.Text.IndexOf("Remove-LocalUser -Name 'thornswood-runner5'"))
     $r = Dry @('-NetworkOnly', '-Number', '4', '-Remove')
     Yes '-NetworkOnly -Remove takes the firewall group off and nothing else' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch $noLock)
     $r = Dry @('-NetworkOnly', '-Number', '4', '-Status')

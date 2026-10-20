@@ -9,7 +9,7 @@
     "tier: the difficulty tier the members fight at, or null for none.",
     "roads: one patrol each. A road is refused if it is not in Tamriel, has fewer than 2 or more than 4 points, or a point is near a walled town.",
     "Each point is one member, made from the base at the same place in bases. A road may set its own returnMinutes and leash.",
-    "Changes take effect at the next start or gamemode reload. A road turned off loses its members then."
+    "After a change, run node scripts/dev/Build-StaffData.js, which carries this file inside gamemode.js (the server has no game/data beside it, #2873), commit both and deploy the gamemode. It takes effect at the next start or gamemode reload. A road turned off loses its members then."
   ],
   "on": false,
   "most": 3,

@@ -85,11 +85,12 @@ function Get-FeedStorePrefix([string]$Channel) {
 
 # This machine's working folder for a channel. Under LOCALAPPDATA beside the
 # pending-release notes, so every worktree on the machine shares one, and the
-# uninstaller cannot reach it.
+# uninstaller cannot reach it. Where.ps1 says where that is, off Windows too
+# (#2903): this used to join $env:LOCALAPPDATA itself, which is null on Linux.
 function Get-FeedStoreDir([string]$Channel) {
     $prefix = Get-FeedStorePrefix $Channel
-    $name = if ($prefix -eq 'feed-dev') { 'dev' } else { 'main' }
-    return (Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') $name)
+    $place = if ($prefix -eq 'feed-dev') { 'ReleasesDev' } else { 'Releases' }
+    return (& (Join-Path $PSScriptRoot 'Where.ps1') $place)
 }
 
 function Get-FeedStoreSiteDir([string]$SiteDir) {

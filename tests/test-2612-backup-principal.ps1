@@ -118,7 +118,8 @@ $allowed = @(
     @('scripts/deploy/Install-ThornswoodServer.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
     @('scripts/vps/vps-dev-instance.ps1', "-UserId 'SYSTEM'", 'its copy of ServiceAccount.ps1, -AsSystem (#2578)'),
     @('scripts/vps/vps-harden.ps1', "-UserId 'SYSTEM'", 'one-shot sshd restart and config rollback: rewrites ProgramData\ssh\sshd_config and restarts sshd, which need administrator, and must outlive the ssh session they cut (#2612)'),
-    @('scripts/vps/vps-ssh-scope.ps1', "-UserId 'SYSTEM'", 'one-shot firewall rollback: sets rules'' remote addresses, which needs administrator, and must outlive a session the change may lock out (#2612)')
+    @('scripts/vps/vps-ssh-scope.ps1', "-UserId 'SYSTEM'", 'one-shot firewall rollback: sets rules'' remote addresses, which needs administrator, and must outlive a session the change may lock out (#2612)'),
+    @('scripts/vps/Grant-BoxAccess.ps1', "-UserId 'SYSTEM'", 'one-shot put back of the ssh key file and the bridge tokens: rewrites ProgramData\ssh\administrators_authorized_keys, which needs administrator, and must outlive a session the change may lock out (#2891); inline, removes itself, tests\test-2891-box-access.ps1 holds it')
 )
 $names = @($allowed | ForEach-Object { $_[0] })
 $found = @()

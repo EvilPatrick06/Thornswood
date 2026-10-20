@@ -709,8 +709,24 @@ Remove-RunnerWatchers
 foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
   if (Test-Path -LiteralPath `$d) { & icacls.exe `$d /remove:d '$Account' /T /C /Q 2>&1 | Out-Null }
 }
-$(if ($OffBox) { Get-GuardScript 'remove' } else { '' })
+$(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remove' })
+# What the install put outside the folder goes too: the Defender skip, which
+# would leave a later folder at this path unscanned, and the account's
+# profile, which Remove-LocalUser leaves (a later account of the same name
+# then gets a <name>.<computer> profile beside it). Measured on the VPS on
+# 20 Oct 2026: C:\Users\thornswood-runner5 and 6 left from removed runners.
+if (@((Get-MpPreference -EA SilentlyContinue).ExclusionPath) -contains '$Root') {
+  try { Remove-MpPreference -ExclusionPath '$Root' -EA Stop; 'Defender scans $Root again' } catch { 'COULD NOT take off the Defender skip for $Root' + ': ' + `$_.Exception.Message }
+}
+`$sid = ''
+`$u = Get-LocalUser -Name '$Account' -EA SilentlyContinue
+if (`$u) { `$sid = `$u.SID.Value }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
+if (`$sid) {
+  foreach (`$p in @(Get-CimInstance Win32_UserProfile -Filter "SID='`$sid'" -EA SilentlyContinue)) {
+    try { `$p | Remove-CimInstance -EA Stop; 'profile ' + `$p.LocalPath + ' removed' } catch { 'COULD NOT remove the profile ' + `$p.LocalPath + ': ' + `$_.Exception.Message }
+  }
+}
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
 "@) | ForEach-Object { Say "  $_" }

@@ -90,9 +90,10 @@ try {
     # put in at each break. On the nightly runner the scratch path is long
     # enough that the break fell inside 'is not valid JSON' (#1273), so the
     # sentence is read from the exception itself, the way the Ship-Rules
-    # case below reads its throw.
+    # case below reads its throw. It asks for Out, a place layout.json
+    # holds: Repo and this machine's own places never read it (#2903).
     $whCall = Join-Path $wh 'call.ps1'
-    W $whCall ("`$ErrorActionPreference = 'Stop'`ntry { `$null = & '" + (Join-Path $wh 'scripts\release\Where.ps1').Replace("'", "''") + "' Repo; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
+    W $whCall ("`$ErrorActionPreference = 'Stop'`ntry { `$null = & '" + (Join-Path $wh 'scripts\release\Where.ps1').Replace("'", "''") + "' Out; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
     foreach ($k in $bad.Keys) {
         W (Join-Path $wh 'layout.json') $bad[$k]
         $r = Child @($whCall)

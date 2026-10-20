@@ -228,8 +228,8 @@ yes('2 every cell and world the register keeps is there and holds a placement ('
 // ------------------------------- 3. the placements are Thornswood's own --
 // Every placement is one game/data/station-sites.json measures (written by
 // scripts/dev/Build-StationSites.py), at its point and turn, in its cell.
-// The kiln, the lab, the hive, the salt quarry, and the well bucket (#1382).
-const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF, 0x05018030]);
+// The kiln, the lab, the hive, the salt quarry, and the well and water buckets (#1382).
+const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF, 0x05018030, 0x05018031]);
 const table = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'station-sites.json'), 'utf8'));
 const sites = Object.keys(table.sites).map(k => table.sites[k]);
 const refs = plugin.records.filter(r => r.tag === 'REFR');

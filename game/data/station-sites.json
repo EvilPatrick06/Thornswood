@@ -585,6 +585,31 @@
     8.0
    ]
   },
+  "river": {
+   "amongPlants": false,
+   "base": "18031:Thornswood-Content.esp",
+   "bounds": [
+    -18,
+    -18,
+    0,
+    18,
+    18,
+    46
+   ],
+   "count": 2,
+   "edid": "ThornswoodActivatorWaterBucket",
+   "flat": 8.0,
+   "name": "water bucket",
+   "reach": 3000,
+   "rule": "One on the river nearest each of the nine towns with a forge (#1382), the nearest clear spot to the forge within 3,000 units whose cell's water is river water by game/data/waters.json, and one on Lake Honrich at Riften, whose water the records call deep. At the edge: ground no lower than that water and no more than 120 units above it, and navmesh under the water within 160 units, so the water is there to reach. Patrick, 12 October 2026, approved drawing spots at rivers and lakes on #1382, and 20 October 2026: lake water is worth what river water is, so one bucket serves both, and both must be boiled.",
+   "setIntoRock": false,
+   "user": [
+    -30.0,
+    -80.0,
+    30.0,
+    -18.0
+   ]
+  },
   "salt": {
    "amongPlants": false,
    "base": "dde4ef:Thornswood-Content.esp",
@@ -1932,6 +1957,102 @@
    "turn": 135,
    "where": "The College's Hall of Countenance, Winterhold"
   },
+  "river-riften": {
+   "anchor": "53481:Skyrim.esm",
+   "anchorAngle": 2.34,
+   "anchorAt": [
+    172414.7,
+    -97164.6,
+    11128.0
+   ],
+   "anchorEdid": "CraftingBlackSmithForge",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 2.34,
+   "base": "18031:Thornswood-Content.esp",
+   "cell": "42247:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RiftenOrigin",
+   "fromAnchor": 754,
+   "groundUnder": [
+    10687.7,
+    10690.1
+   ],
+   "interior": false,
+   "kind": "river",
+   "nearest": {
+    "edid": "XJKboatoar",
+    "ref": "16bf:JKs Skyrim.esp",
+    "units": 55
+   },
+   "offset": [
+    120,
+    -744
+   ],
+   "passedOver": [],
+   "point": "53481:Skyrim.esm",
+   "pos": [
+    172504.3,
+    -97912.9,
+    10687.7
+   ],
+   "ref": "18144:Thornswood-Content.esp",
+   "space": "16bb4:Skyrim.esm",
+   "spaceEdid": "RiftenWorld",
+   "turn": 0,
+   "where": "Lake Honrich at Riften",
+   "worldCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins"
+  },
+  "river-riverwood": {
+   "anchor": "d6987:Skyrim.esm",
+   "anchorAngle": 152.8,
+   "anchorAt": [
+    20459.2,
+    -45225.1,
+    -83.4
+   ],
+   "anchorEdid": "CraftingBlackSmithForge",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 242.8,
+   "base": "18031:Thornswood-Content.esp",
+   "cell": "9712:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "Riverwood02",
+   "fromAnchor": 2338,
+   "groundUnder": [
+    -138.4,
+    -133.5
+   ],
+   "interior": false,
+   "kind": "river",
+   "nearest": {
+    "edid": "TreeSwordFernCluster02",
+    "ref": "a5b:Update.esm",
+    "units": 252
+   },
+   "offset": [
+    -2232,
+    -696
+   ],
+   "passedOver": [],
+   "point": "d6987:Skyrim.esm",
+   "pos": [
+    22126.2,
+    -43585.7,
+    -138.4
+   ],
+   "ref": "18145:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 90,
+   "where": "the river at Riverwood",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
   "salt-dawnstar": {
    "anchor": "1b3f:JKs Skyrim.esp",
    "anchorAngle": 84.27,
@@ -3157,6 +3278,76 @@
     }
    ],
    "where": "The White Phial, Windhelm"
+  },
+  "river-dawnstar": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "cadf6:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Dawnstar"
+  },
+  "river-falkreath": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "99b8a:Skyrim.esm",
+     "why": "no clear spot within 3000 units (97936 not by river or lake water; 64 touches TreeThicket01; 47 off the navmesh; 1 not at the water's edge)"
+    }
+   ],
+   "where": "the river at Falkreath"
+  },
+  "river-markarth": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "514d8:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Markarth"
+  },
+  "river-morthal": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "24588:JKs Skyrim.esp",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Morthal"
+  },
+  "river-solitude": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "4e3e9:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Solitude"
+  },
+  "river-whiterun": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "c430a:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Whiterun"
+  },
+  "river-windhelm": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "f7798:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Windhelm"
   },
   "well-01": {
    "kind": "well",

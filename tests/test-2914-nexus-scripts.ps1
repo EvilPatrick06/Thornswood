@@ -225,7 +225,7 @@ $crc = Get-NexusCrc64Nvme $archive
 Yes 'POST /v3/uploads/multipart carries the CRC-64/NVME and no md5' ($null -ne $mk -and $mk.json.crc64nvme -eq $crc -and $null -eq $mk.json.PSObject.Properties['md5'])
 $parts = @($got | Where-Object { $_.path -like '/s3/part/*' })
 $done = @($got | Where-Object { $_.path -like '/s3/complete/*' }) | Select-Object -First 1
-Yes ('the ' + $parts.Count + ' parts and the complete go to storage with no key, and the complete carries the CRC the stand-in checked') ($parts.Count -eq 5 -and @($parts | Where-Object { $_.key -ne 'none' }).Count -eq 0 -and $null -ne $done -and $done.key -eq 'none' -and $done.crc -eq $crc)
+Yes ('the ' + $parts.Count + ' parts and the complete go to storage with no key, and the complete goes to the address bound to the CRC, with no unsigned x-amz header') ($parts.Count -eq 5 -and @($parts | Where-Object { $_.key -ne 'none' }).Count -eq 0 -and $null -ne $done -and $done.key -eq 'none' -and $done.boundCrc -eq $crc -and $done.crc -eq '' -and $done.contentType -eq 'application/xml')
 
 if ($winps) {
     $n0 = Count
@@ -235,6 +235,14 @@ if ($winps) {
     Yes 'with the same Content-MD5 and Content-Disposition' ($null -ne $put -and $put.contentMd5 -eq $facts.Md5Base64 -and $put.contentDisposition -eq 'attachment; filename="Thornswood Client Runtime-1.0.1.7z"')
 }
 else { Skip 'one part under Windows PowerShell 5.1: it is not on this machine' }
+
+Control @{ unboundComplete = $true }
+$env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = '100000'
+$n0 = Count
+$r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.3')
+$env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = $null
+Control @{ unboundComplete = $false }
+YesR 'a complete address not bound to the CRC stops before any part is sent' ($r.Code -eq 1 -and $r.Out -match 'is not bound to the archive''s CRC-64/NVME' -and @((Since $n0) | Where-Object { $_.path -like '/s3/*' }).Count -eq 0) $r
 
 Control @{ versionFails = $true }
 $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.3')
