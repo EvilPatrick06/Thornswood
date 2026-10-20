@@ -14,7 +14,7 @@ vm.createContext(fixtureContext);
 vm.runInContext(fs.readFileSync(ffile,'utf8').split('const roleMarket=')[0]+';this.fixture={memoryPurses,worldOf};',fixtureContext);
 const fixture=fixtureContext.fixture,catalog=require('../game/data/merchant-traders.json'),tables=require('../game/data/merchant-role-tables.json');
 const raw=copy(bundle.commissionRows()),source=require('../game/data/merchant-quests.json').quests.concat(require('../game/data/merchant-ranked-quests.json').quests);
-assert.equal(raw.length,18);
+assert.equal(raw.length,31);
 for(const defect of ['missing','empty','hash','substitution','definition']) {
  const damaged=copy(raw);if(defect==='missing')damaged.pop();if(defect==='empty')damaged.length=0;
  if(defect==='hash')damaged[0].sourceHash='0'.repeat(64);
@@ -181,4 +181,4 @@ for(const row of [rows[0],ranked[0]]) {
  assert.ok(reads>=2);assert.equal(w.purses.read(row.merchantId).commissions,undefined,
   'native replacement during the final eligibility callback cannot reserve a promise');
 }
-console.log('PASS eight ranked compiled parcel jobs: actual mastery gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');
+console.log('PASS21 ranked compiled parcel jobs: actual gates, complete delivery, original multi-item quote, exact cadence and stale-panel refusal');

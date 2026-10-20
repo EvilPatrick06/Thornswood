@@ -35,6 +35,7 @@ function validateRankedQuests(doc,source) {
    if(good.recipe) {
     const proof=good.recipe,actual=source.recipes[proof.reference];
     if(!actual||actual.fires!==true||actual.book==='cut'||actual.roll!==undefined||actual.race!==''||actual.inputsWithNoProducer!==0||actual.out!==good.item||
+      !(source.roles.evidence[good.item]||[]).includes(actual.owner+':recipe:'+proof.reference+':out')||
       !same(proof,{reference:proof.reference,...Object.fromEntries(recipeFields.map(key=>[key,actual[key]]))})||
       !actual.inputItems.every(item=>item.suppliedBy&&ranks.indexOf(item.suppliedAt)>=0&&ranks.indexOf(item.suppliedAt)<=tier)||
       actual.owner!==merchant.role&&!(merchant.role==='Enchanter'&&

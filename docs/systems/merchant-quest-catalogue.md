@@ -1,18 +1,19 @@
 # Merchant quest catalogue
 
-There are **22 authored definitions** in
+There are **35 authored definitions** in
 `game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, toward the required 240 or more distinct
 offers for the60 retained merchants. Four kill scenes are explicitly admitted
-by the pinned activation manifest, along with eighteen delivery commissions.
+by the pinned activation manifest, along with thirty-one delivery commissions.
 The aggregate authoring file stays `active:false` and
 `complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these twenty-two offers. Source
+legacy definitions and ten bound routes plus these thirty-five offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
 Novice commissions request goods for specific trades and holds. Eight more
 commissions add six Master offers, one Expert offer and one Novice Enchanter
-offer in Whiterun. These fill17 of the240 unique merchant/rank slots;
+offer in Whiterun. Thirteen further parcels complete all24 Whiterun slots.
+Together these fill30 of the240 unique merchant/rank slots;
 the five class Novice extras share already covered slots. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -70,6 +71,43 @@ and transaction fences. A similarly named bandit or skeever elsewhere does
 not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Finite-purse commissions
+
+### Complete Whiterun rank coverage
+
+Every retained Whiterun specialist now has at least one Novice, Advanced,
+Expert and Master offer. The following thirteen additions complete that
+coverage. Their full source references, counts, gates and recipe conditions
+are pinned in `merchant-ranked-quests.json`. No existing published terms change.
+
+| Trade | Rank and requirement | Work | Complete parcel | Personal rest |
+| --- | --- | --- | --- | --- |
+| Smith | Advanced Edgewright | Steel for the work rack | 1 Steel Sword, 2 Steel Daggers | 12 hours |
+| Smith | Expert Platewright | A glass defence set | 1 Glass Shield, 1 Glass Helmet | 24 hours |
+| Woodworker | Novice Fisher class | A first water kit | 1 Crude Fishing Pole, 1 Fish Trap | 6 hours |
+| Woodworker | Advanced Woodwright | An orcish bow kit | 1 Orcish Bow, 24 Orcish Arrows | 12 hours |
+| Woodworker | Expert Charburner | Fuel and spare handles | 3 Charcoal Briquettes, 2 Tool Handles | 24 hours |
+| Tailor | Advanced Hunter class | Ribbons for a hunt feast | 2 Wedding Wreaths, 4 Thread | 12 hours |
+| Tailor | Expert Haberdasher | White fur and gilded trimmings | 2 White Fur Cloaks, 2 Gilded Wristguards | 24 hours |
+| Enchanter | Expert Wardweaver | A shield and cloak for the workbench | 1 Glass Shield, 1 Brown Fur Cloak | 24 hours |
+| Cook | Novice Farmer class | A meal parcel for field work | 2 Potato Soups, 2 Cooked Beef | 6 hours |
+| Cook | Advanced Hearthcook | Tomato soup and bread | 2 Tomato Soups, 2 Bread Loaves | 12 hours |
+| Cook | Expert Confectioner | Two apple courses | 2 Apple Pies, 2 Apple Dumplings | 24 hours |
+| Alchemist | Novice Gatherer class | Lavender and cotton | 3 Lavender, 3 Tundra Cotton | 6 hours |
+| Alchemist | Advanced Blightbrewer | A fungal collection | 3 Fly Amanita, 3 Swamp Fungal Pods | 12 hours |
+
+These additions also bring each class and each profession to at least two
+distinct authored jobs across the catalogue. Source checks enforce both that
+coverage and all24 Whiterun merchant/rank slots. Remaining holds and Master
+halves/schools are still unfinished. Displayed payments use the offering
+hold's submitted buy prices and existing finite purse; no default quote,
+additional money, stock refill, source placement or yield is added.
+
+Each new item set differs from every earlier commission, independent of
+quantities or titles. Recipe quantities align with finished goods; a single
+orcish arrow batch makes24 arrows. Accepted terms, complete-parcel settlement
+and original cooldowns use the same reviewed bundle protocol as the eight
+ranked parcels below. The Enchanter's delivery uses only its existing public
+wearable permission and makes no particular enchantment claim.
 
 ### Ranked parcels in Whiterun
 
@@ -273,7 +311,7 @@ the current protocol does not preserve. Reconnecting does not move an already
 committed cooldown. Pending saves, missing goods and native inventory/stock
 capacity refusals preserve the accepted job and its original payment.
 
-The eighteen commissions add no actor, spawn, harvest, purse refill, new currency
+The thirty-one commissions add no actor, spawn, harvest, purse refill, new currency
 or character inventory grant. Native inventory, pending-record and private
 ledger byte limits remain in force. No alpha reset is required for this slice.
 
@@ -290,7 +328,7 @@ The four published scene IDs and their full authored hashes are pinned in
 `merchant-quest-activation.json`. Published definitions are immutable; new
 deeds or rewards need new IDs while the old definitions remain available
 for accepted work. These are the four scene IDs admitted to the hot-reload bundle;
-the eighteen commissions have their separate permanent publication contract above.
+the thirty-one commissions have their separate permanent publication contract above.
 
 At acceptance, the server reserves the original reward in the same character
 property transaction as its objective and copied terms. At completion,
