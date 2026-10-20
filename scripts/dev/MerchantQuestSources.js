@@ -55,7 +55,7 @@ function validateRankedQuests(doc,source) {
     rank=ranks.indexOf(actual.rank);const quantity=Math.ceil(good.count/actual.makes);
     if(!Number.isSafeInteger(quantity)||quantity<1)fail();
     batches+=quantity;if(rank===3&&minimum.get(good.item)===3)masterBatches+=quantity;
-    if(minimum.get(good.item)===2)expertBatches+=quantity;
+    if(rank===2&&actual.owner==='Tailor'&&minimum.get(good.item)===2)expertBatches+=quantity;
    }else if(good.harvest) {
     const proof=good.harvest,actual=source.harvests[proof.reference];
     if(!actual||!same(proof,{reference:proof.reference,...actual})||actual.produce!==good.item||merchant.role!=='Alchemist')fail();
