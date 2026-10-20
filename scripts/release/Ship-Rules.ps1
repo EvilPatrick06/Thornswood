@@ -1932,7 +1932,7 @@ function Ensure-ShipRequiredData([string]$GameDir, [string]$RepoDir) {
 # pdb to customers as a second launcher asset needs a #dev decision first.
 
 function Get-ShipSymbolDir([string]$Version) {
-    $root = Join-Path $env:LOCALAPPDATA 'Thornswood\symbols'
+    $root = Join-Path (& (Join-Path $PSScriptRoot 'Where.ps1') MachineData) 'symbols'
     if ([string]::IsNullOrWhiteSpace($Version)) { return $root }
     return (Join-Path $root $Version)
 }

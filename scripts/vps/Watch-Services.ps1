@@ -72,6 +72,10 @@
               restarted by that name, under the same three an hour
     dev game  answers on 7788, the dev server's resources port
     dev voice answers on 7789
+    bridge    answers on 7790, the ssh bridge (#2753), which is the only way
+              into the box over ssh once port 22 takes no outside address
+              (#2891). Down, it locks everybody out but the VNC console, so
+              it is restarted like the rest
     disk      free space on C:, which every one of the above shares. Under
               twenty percent it writes DISK LOW, under ten DISK CRITICAL,
               once when the line is crossed and once when it comes back. It
@@ -606,7 +610,10 @@ $checks = @(
   # cannot be connected to, so its resources port stands in, exactly as
   # 3000 does for the live one.
   @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = 7788; Say = 'The dev game server'; Health = 'http://127.0.0.1:7788/api/servers/thornswood/manifest.json' },
-  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789; Say = 'Dev voice'; Health = 'http://127.0.0.1:7789/health' }
+  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789; Say = 'Dev voice'; Health = 'http://127.0.0.1:7789/health' },
+  # The way in over ssh (#2891). A plain request answers 404 on purpose, so
+  # the port answering is the whole check.
+  @{ Name = 'bridge';    Task = 'Thornswood Bridge';     Port = 7790; Say = 'The ssh bridge, the way into the box' }
 )
 
 # Told about and never restarted. The runner's service name is the one
@@ -989,6 +996,7 @@ if (Test-Path `$hb) {
 } else { 'heartbeat none. The bot writes C:\Thornswood-Bot\data\heartbeat.json once Install-Bot.ps1 -NoToken has run' }
 'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
 'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
+'bridge    ' + `$(if (Answers 7790) { 'up' } else { 'DOWN' })
 # Free space right now, and LOW or CRITICAL when the watcher's last run found
 # it under a line. The twenty and the ten are kept in the watcher only, so
 # this reads its verdict from disk.txt rather than holding a second copy.

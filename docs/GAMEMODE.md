@@ -305,6 +305,7 @@ because each reads the one before.
 | `WARMTH` | `Build-WarmthTable.js` | `warmth.json` | `Build-WarmthTable.js:install` |
 | `FOODS` | `Build-FoodTable.js` | `food.json` | `Build-FoodTable.js:install` |
 | `RACES` | `Build-RaceTable.js` | `races.json` | `Build-RaceTable.js:install` |
+| `STAFF_DATA` | `Build-StaffData.js` (#2873): the staff files the gamemode reads at run time, carried because the server's copy has no `game\data` beside it | `furniture.json`, `property-word.json`, `thalmor-patrols.json` | `Build-StaffData.js:const LINE` |
 | `ORES_BY_BASE` | `Build-OreTable.ps1` | `ores.json` | `Build-OreTable.ps1:// ==== end ORES_BY_BASE ====` |
 | `HARVESTS_BY_BASE`, `FISH_BY_BASE`, `GAME_BY_BASE`, `CROPS_BY_BASE` | `Build-HarvestTable.ps1` | `harvests.json` | `Build-HarvestTable.ps1:All four installs work on the text of gamemode.js` |
 | `HUNTS_BY_BASE` | `Build-HuntTable.ps1` | `hunts.json` | `Build-HuntTable.ps1:// ==== end HUNTS_BY_BASE ====` |
