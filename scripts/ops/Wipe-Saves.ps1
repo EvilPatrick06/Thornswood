@@ -45,6 +45,16 @@
                              has not let go of yet (#2351). It names entries in
                              the registers above, so it goes aside with them
                              and comes back with them if the wipe is undone.
+                             The new list this writes (below) carries its ids
+                             over, so a deletion still waiting is not lost.
+    private\trade-cargo.json the trade ships' register (#511): what each
+                             hold carries and for which character, and the
+                             staff list of ports and routes in force beside
+                             it. The goods aboard came out of packs in the
+                             world set aside, so they go aside with it, every
+                             piece kept, and come back with it if the wipe is
+                             undone. The staff list is in that copy too, for
+                             staff to confirm again on the fresh world.
     private\furniture.json   the furniture set down in held buildings (#2679).
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
@@ -67,9 +77,23 @@
   not the world, and a profile keeps its id through a wipe, so the menu
   stays as they set it. private\merchant-ledger.json is the guild traders'
   purses and shelves, and the merchant code refuses to start without it
-  (requireMerchantEvidence), so it is never moved by hand; its supply waits
-  and any trade waiting on a character are the merchant code's (#1373,
-  #2351). Season, the benches and the door are the server's, not anybody's.
+  (requireMerchantEvidence), so it is never moved by hand. A deleted
+  character's supply waits, commission promises and waiting trade are let
+  go by the purse service from the list (#2351, #2652), and so are a wiped
+  character's (#2668): once everything is moved, each server gets a new
+  private\deleted-characters.json (Release-List.ps1, the list Delete-Person
+  writes) naming every character in the world it set aside, by form id only,
+  since a profile keeps its id through a wipe and is never named. The parts
+  whose registers were just set aside ($WipeDone: farms, property, embassy,
+  dungeon, cargo, books) are marked done in it. 'saves', server-log.js's
+  part, is not among them, because mod-settings.json stays; it takes only
+  what a profile holds, so Release-List marks it done when the list names
+  no profile, which is so unless a deletion still waiting was carried over.
+  So only the merchant ledger waits on it, and the first start lets go and
+  deletes it. The fresh world hands those form ids to new characters, which
+  is why it is written before that start and not left to chance. A server
+  whose move did not finish gets no list. Season, the benches and the door
+  are the server's, not anybody's.
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
@@ -116,6 +140,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
+. (Join-Path $Here 'Release-List.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ErrorActionPreference = 'Stop'
@@ -139,14 +164,21 @@ $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
 $Moves = @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
-           'private\last-left.json', 'private\take-limit.json',
+           'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
            'private\deleted-characters.json',
            'data\property.json', 'data\farm-claims.json')
+# The release parts (game\gamemode.js PARTS) whose registers are all in
+# $Moves, so a fresh start has nothing of anybody's in them: the new release
+# list marks them done and only 'merchants', the ledger a wipe keeps, waits.
+# Not 'saves': mod-settings.json stays (Release-List.ps1 marks it done for a
+# list that names no profile, the only thing that part acts on).
+$WipeDone = @('farms', 'property', 'embassy', 'dungeon', 'cargo', 'books')
 # Both lists go across as literals. A single quote inside either would end the
 # string early on the far side, so it is doubled first.
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
 $movesLit = Lit $Moves
+$wipeDoneLit = Lit $WipeDone
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  wipe the characters' -ForegroundColor White
@@ -292,7 +324,9 @@ if ($running) { Die 'A server is still running, so nothing was moved. Find what 
 Head 'Moving the old storage aside'
 $moved = Remote @"
 `$ErrorActionPreference = 'Continue'
+$ThornswoodReleaseList
 foreach (`$r in @($rootsLit)) {
+`$failed = `$false
 foreach (`$n in @($movesLit)) {
   `$p = Join-Path `$r `$n
   if (-not (Test-Path `$p)) { continue }
@@ -307,13 +341,36 @@ foreach (`$n in @($movesLit)) {
   # Anything else (the dungeon ledger's .initialized mark) keeps its own name too.
   else { `$to = Join-Path `$dir (`$leaf + '-before-$stamp') }
   try { Move-Item -LiteralPath `$p -Destination `$to -Force -EA Stop; 'moved  ' + `$p + '  ->  ' + `$to }
-  catch { 'FAILED ' + `$p + '  ' + `$_.Exception.Message }
+  catch { `$failed = `$true; 'FAILED ' + `$p + '  ' + `$_.Exception.Message }
+}
+# The release list (#2668): every character in the world just set aside, by
+# form id, with the ids of a list set aside carried over. Not on a server
+# whose move did not finish, where a register marked done would still be there.
+if (`$failed) { 'RELEASENOTE|' + `$r + ': no release list, because the move did not finish' }
+else {
+  `$cf = Join-Path `$r 'world-before-$stamp\changeForms'
+  `$files = @()
+  if (Test-Path -LiteralPath `$cf) {
+    `$files = @(Get-ChildItem -LiteralPath `$cf -Filter *.json -File | Where-Object { `$_.BaseName -match '^[0-9]+`$' } | ForEach-Object { `$_.FullName })
+  }
+  `$found = Get-ThornswoodCharacterIds `$files
+  `$found.notes
+  Write-ThornswoodReleaseList -Root `$r -Actors `$found.ids -Carry (Join-Path `$r 'private\deleted-characters-before-$stamp.json') -Done @($wipeDoneLit)
 }
 }
 "@
 $bad = $false
 foreach ($l in $moved) {
-  if ("$l" -match '^FAILED') { $bad = $true; Say "  $l" 'Red' } else { Say "  $l" 'Green' }
+  $b = "$l" -split '\|'
+  if ("$l" -match '^FAILED') { $bad = $true; Say "  $l" 'Red' }
+  elseif ($b[0] -eq 'RELEASE') {
+    if ($b[1] -eq 'none') { Say '  release list: nobody to name' 'DarkGray' }
+    else { Say ("  release list: {0}, {1} character(s) and {2} profile(s) carried over; the first start lets the merchant ledger go of them" -f $b[1], $b[3], $b[2]) 'Green' }
+  }
+  elseif ($b[0] -eq 'RELEASENOTE') { Say "  $($b[1])" 'Yellow' }
+  # Everything moved, so the wipe stands; what holds the list is said in red.
+  elseif ($b[0] -eq 'RELEASEBAD') { Say "  $($b[1])" 'Red' }
+  else { Say "  $l" 'Green' }
 }
 if ($bad) {
   Say '  The server is stopped. Start it again from the panel or re-run once' 'Yellow'

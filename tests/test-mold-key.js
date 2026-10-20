@@ -315,6 +315,10 @@ function client(opt) {
     // is looked at here; test-1634-apprentice-gui.js has what it does.
     'const APPRENTICE_KEY = SKILLS_KEY;',
     'function apprenticePress() { return false; }',
+    // K on a person while you carry a hair dye (#2675), asked after it. Nobody
+    // is looked at here; test-2675-hair-dye-wiring.js has what it does.
+    'const HAIR_DYE_KEY = SKILLS_KEY;',
+    'function hairDyePress() { return false; }',
     PIECES_FRONT.keys,
     'return { MOLD_KEY: MOLD_KEY, MOLD_NAME: MOLD_NAME, moldPress: moldPress };'
   ].join('\n');

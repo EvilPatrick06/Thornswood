@@ -347,6 +347,25 @@ jobs:
           # server-log.js on a stand-in game server and voice folder, and the
           # site's start block on a stand-in data folder, each taking a
           # deletion request out of its own files as it starts. A few seconds.
+          # Issue #2652: tests\test-2652-merchant-release.js runs the real
+          # merchant purse service on a real ledger file and holds what its
+          # release lets go of for a deleted character: supply waits,
+          # commission promises, a waiting trade in debit and in credit,
+          # purses and shelves the same, a trader busy with somebody else's
+          # trade and a failed save waiting. A second.
+          # Issue #2668: tests\test-2668-reset-wipe-release.ps1 runs the body
+          # Reset-Character.ps1 sends and the move Wipe-Saves.ps1 sends, under
+          # Windows PowerShell 5.1 on stand-in server folders, and holds the
+          # release list each writes: characters by form id and never a
+          # profile, merged, a wipe's waiting only on the merchants' part, and
+          # read by the gamemode's own release block. Half a minute.
+          # Issue #2673: tests\test-2673-new-character-release.ps1 runs the
+          # real New-Character.ps1 under Windows PowerShell 5.1 (and once
+          # under pwsh) on stand-in local servers and holds the release list
+          # it writes through Release-List.ps1: characters by form id and
+          # never a profile, merged, in the privDir, with -NoBackup too, none
+          # for -WhatIf; and that the launcher keeps no discard of its own.
+          # Half a minute.
           # Issue #2166: tests\test-2166-retention-fixes.js holds three
           # retention fixes to what the privacy page already says: trouble.json
           # ages by 365 days in the hourly sweep on a scratch site (a kept
@@ -635,6 +654,7 @@ jobs:
                  'test-2460-winps-module-path.ps1',
                  'test-feed-watch.js', 'test-2636-feed-watch-quiet.ps1',
                  'test-session-cards.js', 'test-staff-bans.js', 'test-hub-staff-gallery.js', 'test-2736-hub-says-failures.js', 'test-known-issues.js', 'test-known-page.js', 'test-sunhelm-gone.js', 'test-known-npcs.js', 'test-2414-known-one-copy.js', 'test-2560-roadmap-done.js',
+                 'test-2705-hair-dye-help.js',
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-2180-site-state.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
@@ -666,6 +686,8 @@ jobs:
                  'test-spawn-reply.js',
                  'test-2623-temporary-spawns.js',
                  'test-2622-start-spots.js',
+                 'test-2675-hair-dye.js',
+                 'test-2675-hair-dye-wiring.js',
                  'test-nightly-stray.ps1',
                  'test-discord-callback-hang.js',
                  'test-member-role-wording.js',
@@ -675,6 +697,9 @@ jobs:
                  'test-2351-release-registers.js',
                  'test-2351-wipe-registers.ps1',
                  'test-2758-start-deletions.js',
+                 'test-2652-merchant-release.js',
+                 'test-2668-reset-wipe-release.ps1',
+                 'test-2673-new-character-release.ps1',
                  'test-2166-retention-fixes.js',
                  'test-2353-keeping-times.js',
                  'test-2166-kept-chat-and-logs.js',

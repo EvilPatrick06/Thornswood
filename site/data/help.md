@@ -143,6 +143,27 @@ closed.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.
 
+## Dyeing your hair
+
+A Tailor (Haberdasher or Liverywright) steeps hair dye at a cooking spot.
+Anyone can use one: on yourself from the **K** panel, or on someone else once
+they accept.
+
+If you are a Tailor, carry a bottle of water and what the dye needs, press
+**E** on the cooking spot, and stay by the fire until the dye is done. Walk
+away before then and nothing is made or used. The dye goes into your pack,
+under its own name. Anyone who is not a Haberdasher or Liverywright and
+tries it is turned away and keeps everything they carry. They are told:
+"Steeping hair dye is work for a Haberdasher or Liverywright. Nothing was
+taken from your pack."
+
+To dye your own hair, open the Hair dye page of the **K** panel and press Dye
+my hair. To dye somebody else's, look at them and press **K**, then Offer to
+dye, or press Dye hair beside them under Near you on the **P** panel. With
+more than one dye in your pack, that button names the dye. They get Accept
+and Refuse, and nothing is used or changed until they press Accept. Hair,
+beard and brows take the one colour, and it stays until it is dyed again.
+
 ## Voice
 
 Voice runs in the launcher, not in the game. Leave the launcher open while you

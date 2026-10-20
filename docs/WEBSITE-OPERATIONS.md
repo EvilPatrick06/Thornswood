@@ -194,13 +194,18 @@ starts. `Restore-Box.ps1` does it as its last step;
 [RESTORING.md](RESTORING.md) has the commands for every other restore,
 putting back a folder an install or a wipe set aside among them.
 
-**What the game does not let go of yet.** The guild traders' ledger
-(`private\merchant-ledger.json`) keys a supply wait, and a trade still waiting
-on a character, by that character's form id and profile; the dry run counts
-those as `left`. The merchant code is the work on #1373, and #2351 says what
-its release has to do. A crop they sowed stays in the ground with their
-number as the one who sowed it, which nobody holds any more; whoever brings
-it in empties it, and a wipe takes it.
+**The guild traders' ledger** (`private\merchant-ledger.json`) keys a supply
+wait, a commission promise and a trade still waiting on a character by that
+character's form id and profile.
+The dry run counts those as `release`, and the game server lets
+go of them as its merchant purses are read (#2652): the waits and the
+promises go, so the gold a promise held back is the trader's to spend again,
+and a waiting trade is cleared, the trader keeping what it already held. The
+traders' purses and shelves name nobody and stay, like a hold's ledger.
+
+**What the game does not let go of yet.** A crop they sowed stays in the
+ground with their number as the one who sowed it, which nobody holds any
+more; whoever brings it in empties it, and a wipe takes it.
 
 ## Accessibility scope
 

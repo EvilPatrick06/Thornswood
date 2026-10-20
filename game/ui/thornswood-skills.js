@@ -117,6 +117,14 @@
       '/apprentice <id> <half>'. The server answers in the chat and by
       rewriting this.
 
+    hairDye: { dyes: [ { id, name, count } ], steeping: { name, left } | null }
+      Hair dye (#2675), sent only while you carry a dye or one is steeping.
+      Dye my hair sends '/hairdye self <id>' through window.thornswoodNet.say.
+      The look prompt's K hands dyeFor the person under the crosshair,
+      { id, name }, and Offer to dye sends '/hairdye offer <id> <dye>': they
+      answer on their own prompt. The server answers in the chat and by
+      rewriting this.
+
     staff: { points: <number>, rank: '<Bladebinder rank>',
              mine: [ '<spell desc>' ], spells: [ [ desc, name, rank ] ] }
       An Enchanter's staff spells (#1128), sent to an Enchanter and nobody
@@ -381,6 +389,15 @@
       rows: []
     },
     /*
+      Hair dye (#2675). What you carry is the server's, under mine.hairDye;
+      this is the title and the sentence over the page.
+    */
+    hairdye: {
+      title: 'Hair dye',
+      lead: 'A dye you carry colours your own hair, or the hair of somebody in front of you once they say yes. Each one is used up.',
+      rows: []
+    },
+    /*
       The property page (#1637, #1603). What you hold and carry a key to is
       the server's, under mine.property; this is the title and nothing else,
       because the page draws its own line over the cards.
@@ -462,6 +479,7 @@
   var candidate = null;    // who the look prompt's K opened the page on: { id, name, halves: [{ h, k }] } (#1634)
   var endArmed = null;     // an End pressed once, waiting for the second press: { key, at }
   var apprSent = null;     // an End sent and not yet answered: { key, name, at }
+  var dyeTarget = null;    // who the look prompt's K opened Hair dye on: { id, name } (#2675)
 
   // ------------------------------------------------------------------ css --
   /*
@@ -1022,6 +1040,18 @@
       });
     }
   }
+  /* Hair dye (#2675): the server's, under mine.hairDye, or null when you carry none. */
+  function dyeView() {
+    var got = mine && mine.hairDye;
+    if (!got || typeof got !== 'object' || Array.isArray(got)) return null;
+    return got;
+  }
+  function dyeList() {
+    var v = dyeView();
+    return (v && Array.isArray(v.dyes)) ? v.dyes.filter(function (d) {
+      return d && typeof d.id === 'string' && /^[a-z0-9-]+$/.test(d.id);
+    }) : [];
+  }
   /* Masters and apprentices (#1634): the server's, under mine.apprentice, or null with no profession. */
   function apprView() {
     var got = mine && mine.apprentice;
@@ -1352,6 +1382,8 @@
     if (section === 'college') return 0;
     // Masters and apprentices: its buttons are on its cards.
     if (section === 'apprentice') return 0;
+    // Hair dye: its buttons are on its cards.
+    if (section === 'hairdye') return 0;
     // Nothing in the recipe book is picked, marked or sent, so there is no
     // row for the arrow keys to walk. Left and right still move sections.
     if (section === 'recipes') return 0;
@@ -1393,7 +1425,7 @@
     var v = null;
     if (mine) { v = {}; for (var k in mine) if (!NOT_DRAWN[k]) v[k] = mine[k]; }
     return JSON.stringify([tableGen, sections, section, rowAt, picked, later, marked, markedStaff, v, progressShape(),
-                           candidate, endArmed]);
+                           candidate, endArmed, dyeTarget]);
   }
 
   function draw() {
@@ -1435,6 +1467,8 @@
     // Masters and apprentices (#1634), before Property: the server sends it to
     // anybody with a profession, and the look prompt's K opens it on a person.
     if (!creating() && (apprView() || candidate)) sections.push('apprentice');
+    // Hair dye (#2675): only while you carry one or one is steeping.
+    if (!creating() && dyeView()) sections.push('hairdye');
     if (propertyRows().length) sections.push('property');
     if (sections.indexOf(section) < 0) section = sections[0];
     var n = countRows();
@@ -1532,6 +1566,12 @@
       if (apB.length) return { t: apB.length === 1 ? 'taken on by ' + apB[0].name : apB.length + ' Masters', c: 'set' };
       return { t: apV ? (Number(apV.used) || 0) + ' of ' + (Number(apV.of) || 0) + ' trades used' : 'nobody yet', c: '' };
     }
+    if (sec === 'hairdye') {
+      var hdN = dyeList().length, hdV = dyeView();
+      if (dyeTarget && hdN) return { t: 'dye ' + dyeTarget.name, c: 'need' };
+      if (hdV && hdV.steeping && !hdN) return { t: 'steeping', c: '' };
+      return { t: hdN + (hdN === 1 ? ' dye' : ' dyes'), c: 'set' };
+    }
     if (sec === 'body') {
       var bv = bodyView();
       var bw = bodyWorries(bv);
@@ -1623,6 +1663,7 @@
     else if (section === 'staff') drawStaff();
     else if (section === 'college') drawCollege();
     else if (section === 'apprentice') drawApprentice();
+    else if (section === 'hairdye') drawHairDye();
     else if (section === 'recipes') drawRecipes();
     else if (section === 'property') drawProperty();
     else if (section === 'office') drawOffice();
@@ -2835,7 +2876,7 @@
     // the tree's own sending, so neither carries a Confirm.
     var showConfirm = cr ? section === 'review'
       : (section !== 'tree' && section !== 'recipes' && section !== 'property' && section !== 'office' &&
-         section !== 'apprentice' && section !== 'body');
+         section !== 'apprentice' && section !== 'hairdye' && section !== 'body');
     var shut = closeWord();
     var key = JSON.stringify([line, statusKind, can, label, showConfirm, cr, shut, keyName]);
     if (key === footKey) return;
@@ -2881,6 +2922,10 @@
       if (candidate) return 'Take on asks them. They answer on their own prompt.';
       if (apprList('took').length || apprList('by').length) return 'End asks twice. Either of you can end it, and the ranks earned stay.';
       return 'A Master takes somebody on by looking at them and pressing the key the prompt names.';
+    }
+    if (section === 'hairdye') {
+      if (dyeTarget) return 'Offer to dye asks them. They answer on their own prompt.';
+      return 'Dye my hair uses the dye at once. The server answers in the chat.';
     }
     if (section === 'college') {
       if (studyWaiting()) return 'Sent. The server is checking.';
@@ -3028,6 +3073,56 @@
     } catch (e) { }
     status = 'The connection is loading. Try again in a moment.'; statusKind = 'no';
     return false;
+  }
+  /*
+    HAIR DYE (#2675). Dye my hair sends '/hairdye self <id>'; with somebody
+    from the look prompt, Offer to dye sends '/hairdye offer <id> <dye>' and
+    they answer on their own prompt. The server checks it all again.
+  */
+  function dyePress(line, done) {
+    if (!sayLine(line)) { draw(); return; }
+    status = done; statusKind = '';
+    draw();
+  }
+  function drawHairDye() {
+    var v = dyeView();
+    var dyes = dyeList();
+    if (v && v.steeping && typeof v.steeping.name === 'string') {
+      var bar = el('div', 'spellbar');
+      var left = Math.max(0, Number(v.steeping.left) || 0);
+      bar.appendChild(el('div', 'spellpts', v.steeping.name + ' is steeping'));
+      bar.appendChild(el('div', 'spellnote', left ? 'About ' + left + ' seconds as K opened. Stay by the fire.' : 'Nearly done. Stay by the fire.'));
+      elBody.appendChild(bar);
+    }
+    var wrap = el('div', 'cards');
+    dyes.forEach(function (d) {
+      var card = el('div', 'card');
+      var nm = el('div', 'name', String(d.name || d.id));
+      if (Number(d.count) > 1) nm.appendChild(el('span', 'tag', 'x' + Number(d.count)));
+      card.appendChild(nm);
+      var mineLine = el('div', 'guest');
+      mineLine.appendChild(el('span', '', 'Your own hair.'));
+      var go = el('span', 'act', 'Dye my hair');
+      go.onclick = function (ev) { ev.stopPropagation(); dyePress('/hairdye self ' + d.id, 'Sent. The server answers in the chat.'); };
+      mineLine.appendChild(go);
+      card.appendChild(mineLine);
+      if (dyeTarget) {
+        var who = dyeTarget;
+        var theirs = el('div', 'guest');
+        theirs.appendChild(el('span', '', who.name + ', in front of you. Nothing is used until they say yes.'));
+        var ask = el('span', 'act', 'Offer to dye');
+        ask.onclick = function (ev) {
+          ev.stopPropagation();
+          dyeTarget = null;
+          dyePress('/hairdye offer ' + who.id + ' ' + d.id, 'Asked ' + who.name + '. They answer on their own prompt.');
+        };
+        theirs.appendChild(ask);
+        card.appendChild(theirs);
+      }
+      wrap.appendChild(card);
+    });
+    if (wrap.children.length) elBody.appendChild(wrap);
+    if (!dyes.length) elBody.appendChild(el('div', 'desc', 'You carry no dye right now.'));
   }
   function takeOnPress(half) {
     if (!candidate) return;
@@ -3507,6 +3602,7 @@
       root.className = 'gone';
       quitArmed = 0;   // a panel put down with Close Skyrim armed comes back unarmed
       candidate = null;   // the person the look prompt opened it on is that moment's, not the next
+      dyeTarget = null;   // and the same for Hair dye's (#2675)
       endArmed = null;
       tell('closed');
     },
@@ -3542,6 +3638,20 @@
       candidate = { id: id, name: String(who.name || 'Somebody'), halves: halves };
       endArmed = null;
       goTo('apprentice');
+      if (root.className === 'gone') api.open(); else draw();
+    },
+    /*
+      The look prompt's K on somebody while you carry a hair dye (#2675): the
+      front hands over the form id under the crosshair and the name, and the
+      panel opens on Hair dye with an Offer to dye on each dye. Never while
+      creating, and never when you carry none.
+    */
+    dyeFor: function (who) {
+      if (creating() || !who || typeof who !== 'object' || !dyeList().length) return;
+      var id = String(who.id || '');
+      if (!/^[0-9a-f]+$/i.test(id)) return;
+      dyeTarget = { id: id, name: String(who.name || 'Somebody') };
+      goTo('hairdye');
       if (root.className === 'gone') api.open(); else draw();
     },
     /*

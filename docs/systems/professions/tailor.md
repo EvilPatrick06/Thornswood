@@ -10,6 +10,8 @@ Clothes, robes, and the dress of a faction.
 The loom is open furniture. The garment's recipe is what refuses you.
 The tanning rack is open, and leather from a hide is anybody's work.
 The forge is open furniture too. A few tailor rows are made there.
+Hair dye is a Tailor's work as well, either half, steeped at a cooking
+spot: [Hair dye](../hair-dye.md).
 The forge table names Liverywright at master and then marks the forge
 open, so that master line is not a door. The recipe rank is the door.
 
