@@ -108,6 +108,18 @@ if (ready) {
   N.consumed(A, FULL);
   yes('well water is 20 and safe without boiling', Math.round(r.thirst(A) - before) === 20 && r.fouled.length === 0);
 
+  // The water bucket by a river or a lake (#1382; Patrick, 20 Oct 2026: lake water is a river's).
+  {
+    const RIVER_ACT = '18031:Thornswood-Content.esp';
+    const C = 9; r.seed(C);
+    yes('the water bucket is the one river activator listed', JSON.stringify(N.NEEDS.riverActivators) === JSON.stringify([RIVER_ACT]));
+    yes('with no empty bottle it fills nothing', /empty bottle/.test(N.activatedWater(C, 'b1:Test.esm', RIVER_ACT, '')));
+    r.addItem(C, 'f2012:Skyrim.esm', 2);
+    yes('with one it fills river water, to be boiled', /Boil it/.test(N.activatedWater(C, 'b1:Test.esm', RIVER_ACT, '')) &&
+      r.water(C).river === 1 && r.count(C, FULL) === 1);
+    yes('and has no cooldown', /Boil it/.test(N.activatedWater(C, 'b1:Test.esm', RIVER_ACT, '')) && r.water(C).river === 2);
+  }
+
   // Unsafe water, worst first.
   r.carry(A, 'well', 0); delete r.store[A].water.well;
   r.carry(A, 'river', 1); r.carry(A, 'standing', 1);

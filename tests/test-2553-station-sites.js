@@ -45,7 +45,7 @@ const CONTENT = 'Thornswood-Content.esp';
 const BASES = {
   kiln: '1547e:Thornswood-Content.esp', salt: 'dde4ef:Thornswood-Content.esp',
   hive: 'dbf8b3:Thornswood-Content.esp', lab: '42e69:Thornswood-Content.esp',
-  well: '18030:Thornswood-Content.esp',
+  well: '18030:Thornswood-Content.esp', river: '18031:Thornswood-Content.esp',
 };
 
 let pass = 0, fail = 0;
