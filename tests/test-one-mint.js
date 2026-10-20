@@ -335,7 +335,6 @@ const WRITERS = {
   'property/giveDeed': [1, 'one deed, DEED'],
   'property/giveNamed': [1, 'one named key or mold, KEY or MOLD'],
   'property/takeBlankMold': [1, 'only takes a mold away'],
-  'property/nameFreshKey': [1, 'names one key off a stack, and the count is the same after'],
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
   'spoils/strip': [1, 'only takes things out of a container the world stocked'],
