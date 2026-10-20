@@ -19,7 +19,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
 | Fork pull requests | Do not run workflows, get no write token and no secrets (`fork-pr-workflows-private-repos` all false) |
-| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write) |
+| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use) |
 | Actions sharing | `access_level: none` (no other repository may use these workflows) |
 | Allowed actions | all, SHA pinning not required by the setting; the workflows pin every action to a full SHA by their own rule (release.yml) |
 

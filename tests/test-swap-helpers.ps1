@@ -88,7 +88,7 @@ try {
     Check 'Get-ThornswoodVpsLocalPath: otherwise %LOCALAPPDATA%\Thornswood\vps.json' ((Get-ThornswoodVpsLocalPath) -eq (Join-Path $env:SystemDrive 'AppLocal\Thornswood\vps.json'))
     $env:LOCALAPPDATA = ''
     Check 'Get-ThornswoodVpsLocalPath: no LOCALAPPDATA is no file, not a path at the drive root' ((Get-ThornswoodVpsLocalPath) -eq '')
-    Check 'Get-ThornswoodKnownHostsPath: the user''s own .ssh\known_hosts' ((Get-ThornswoodKnownHostsPath) -eq (Join-Path $HOME '.ssh\known_hosts'))
+    Check 'Get-ThornswoodKnownHostsPath: the user''s own .ssh\known_hosts' ((Get-ThornswoodKnownHostsPath) -eq (Join-Path (Join-Path $HOME '.ssh') 'known_hosts'))
 } finally {
     $env:THORNSWOOD_VPS_LOCAL = $savedLocal
     $env:LOCALAPPDATA = $savedApp

@@ -115,16 +115,17 @@ if (-not (Test-Path -LiteralPath $WorkflowDir)) { Done }
 $files = @(Get-ChildItem -LiteralPath $WorkflowDir -File | Where-Object { $_.Extension -in '.yml', '.yaml' } | Sort-Object Name)
 Yes ("it holds workflows to read ({0}: {1})" -f $files.Count, (($files | ForEach-Object { $_.Name }) -join ', ')) ($files.Count -ge 1)
 
-# The four that exist today. Named rather than counted, so a renamed or
+# The ones that exist today. Named rather than counted, so a renamed or
 # deleted workflow says so here instead of this harness reading two files and
 # reporting that everything is fine.
-foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml') {
+foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 'board-status.yml') {
     Yes "$want is one of them" (@($files | Where-Object { $_.Name -eq $want }).Count -eq 1)
 }
 # drop-claims.yml (#1863) runs no action on purpose: it checks out nothing and
 # makes its label calls from its own script, so there is nothing in it to pin.
-# tests\test-1863-drop-claims.ps1 holds it to that.
-$noActions = @('drop-claims.yml')
+# tests\test-1863-drop-claims.ps1 holds it to that. board-status.yml (#2863)
+# is the same shape, held by tests\test-2863-board-status.ps1.
+$noActions = @('drop-claims.yml', 'board-status.yml')
 
 $all = @()
 foreach ($f in $files) {
