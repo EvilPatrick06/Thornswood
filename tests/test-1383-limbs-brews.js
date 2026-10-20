@@ -248,9 +248,10 @@ if (LIMBS_SRC) {
     yes('and says so in the world, once', f.s.notes.length === 1 && /broken leg/.test(f.s.notes[0]));
     f.L.refuseSprint(f.pc);
     yes('not every frame', f.s.notes.length === 1);
-    const gate = slice(FRONT, '  function holdSprintGate(pc) {', '\n  }\n');
-    yes('holdSprintGate asks the broken leg before it holds the gate open',
-      !!gate && gate.indexOf('brokenLimbs.refuseSprint(pc)') !== -1 && gate.indexOf('brokenLimbs.refuseSprint(pc)') < gate.indexOf("setAnimationVariableBool('bSprintOK', true)"));
+    const gate = slice(FRONT, '  function holdSprintShut() {', '\n  }\n');
+    yes('while the sprint key is down, a broken leg holds the gate shut each frame, and nothing holds it open',
+      !!gate && gate.indexOf('brokenLimbs.leg()') !== -1 && gate.indexOf('brokenLimbs.refuseSprint(') !== -1 &&
+      FRONT.indexOf("setAnimationVariableBool('bSprintOK', true)") === -1 && /\n    holdSprintShut\(\);\n/.test(FRONT));
   }
 }
 

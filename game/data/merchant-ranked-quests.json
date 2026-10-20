@@ -1,0 +1,909 @@
+{
+  "version": 1,
+  "active": false,
+  "complete": false,
+  "source": "Exact copied public recipe, Gatherer and Miner evidence; explicit pinned admission required.",
+  "quests": [
+    {
+      "id": "q-whiterun-smith-ebony-seam-account",
+      "name": "An ebony seam's account",
+      "text": "The Smith needs an ebony and silver parcel for the next furnace run, with a spare pick for the mine. Bring the complete parcel.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "classKey": "miner",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a67c:Skyrim.esm",
+        "base": "13bb9:Skyrim.esm",
+        "role": "Smith",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "5acdc:Skyrim.esm",
+          "count": 4,
+          "mining": {
+            "reference": "10e101:Skyrim.esm",
+            "ore": "5acdc:Skyrim.esm",
+            "name": "Ebony Ore",
+            "rank": "master",
+            "yield": [
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                0
+              ],
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                2
+              ]
+            ]
+          }
+        },
+        {
+          "item": "5acdf:Skyrim.esm",
+          "count": 4,
+          "mining": {
+            "reference": "10dcb9:Skyrim.esm",
+            "ore": "5acdf:Skyrim.esm",
+            "name": "Silver Ore",
+            "rank": "advanced",
+            "yield": [
+              [
+                0,
+                0
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                1,
+                2
+              ],
+              [
+                1,
+                2
+              ]
+            ]
+          }
+        },
+        {
+          "item": "e3c16:Skyrim.esm",
+          "count": 1,
+          "recipe": {
+            "reference": "1548d:Thornswood-Content.esp",
+            "owner": "Smith",
+            "half": "Edgewright",
+            "rank": "novice",
+            "out": "e3c16:Skyrim.esm",
+            "makes": 1,
+            "bench": "88105:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "5ace4:Skyrim.esm",
+                "name": "Iron Ingot",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotIron"
+              },
+              {
+                "item": "15490:Thornswood-Content.esp",
+                "name": "Tool Handle",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "woodworker",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "ThornswoodRecipeToolHandle"
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "master-source",
+        "note": "Four Master-gated Ebony Ore, four Advanced Silver Ore and one public spare pick; no mine or yield is changed."
+      }
+    },
+    {
+      "id": "q-whiterun-woodworker-outfitter-reserve",
+      "name": "An outfitter's last reserve",
+      "text": "The Woodworker needs a master fishing pole and a full bundle of ebony arrows for an outfitter's reserve. Bring both parts.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "profession": "woodworker",
+        "half": "woodwright",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a681:Skyrim.esm",
+        "base": "13b9e:Skyrim.esm",
+        "role": "Woodworker",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "1549a:Thornswood-Content.esp",
+          "count": 1,
+          "recipe": {
+            "reference": "1549e:Thornswood-Content.esp",
+            "owner": "Woodworker",
+            "half": "Woodwright",
+            "rank": "master",
+            "out": "1549a:Thornswood-Content.esp",
+            "makes": 1,
+            "bench": "154e1:Thornswood-Content.esp",
+            "inputItems": [
+              {
+                "item": "6f993:Skyrim.esm",
+                "name": "Firewood",
+                "type": "MISC",
+                "count": 3,
+                "producedBy": "woodworker",
+                "producedAt": "novice",
+                "suppliedBy": "woodworker",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "800e4:Skyrim.esm",
+                "name": "Leather Strips",
+                "type": "MISC",
+                "count": 2,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 2,
+                "suppliedVia": "RecipeLeatherStrips"
+              },
+              {
+                "item": "5ace5:Skyrim.esm",
+                "name": "Steel Ingot",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "advanced",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotSteel"
+              },
+              {
+                "item": "5ad9f:Skyrim.esm",
+                "name": "Refined Moonstone",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "expert",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotMoonstone"
+              }
+            ],
+            "needs": []
+          }
+        },
+        {
+          "item": "139bf:Skyrim.esm",
+          "count": 24,
+          "recipe": {
+            "reference": "b651:Dawnguard.esm",
+            "owner": "Woodworker",
+            "half": "Woodwright",
+            "rank": "master",
+            "out": "139bf:Skyrim.esm",
+            "makes": 24,
+            "bench": "154e1:Thornswood-Content.esp",
+            "inputItems": [
+              {
+                "item": "6f993:Skyrim.esm",
+                "name": "Firewood",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": "woodworker",
+                "producedAt": "novice",
+                "suppliedBy": "woodworker",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "5ad9d:Skyrim.esm",
+                "name": "Ebony Ingot",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "master",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotEbony"
+              }
+            ],
+            "needs": [
+              {
+                "asks": "HasPerk(EbonySmithing) == 1",
+                "function": 448,
+                "of": "EbonySmithing",
+                "ofType": "PERK",
+                "serverSees": false
+              }
+            ]
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "master-batches",
+        "minimumBatches": 2,
+        "note": "One Master pole batch and one Master arrow batch; the arrows make24 per batch."
+      }
+    },
+    {
+      "id": "q-whiterun-tailor-winter-vestments",
+      "name": "Winter vestments for a caravan",
+      "text": "The Tailor needs three sets of ragged robes and three snowy-sabre fur cloaks for a winter caravan. This is a complete outfitting order.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "profession": "tailor",
+        "half": "liverywright",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a684:Skyrim.esm",
+        "base": "13b9c:Skyrim.esm",
+        "role": "Tailor",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "13105:Skyrim.esm",
+          "count": 3,
+          "recipe": {
+            "reference": "924:MoreCraftableEquipment.esp",
+            "owner": "Tailor",
+            "half": "Liverywright",
+            "rank": "novice",
+            "out": "13105:Skyrim.esm",
+            "makes": 1,
+            "bench": "6ce000:Update.esm",
+            "inputItems": [
+              {
+                "item": "6ce001:Update.esm",
+                "name": "Thread",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "MCERecipeThreadTundraCotton"
+              }
+            ],
+            "needs": []
+          }
+        },
+        {
+          "item": "2885:Cloaks&Capes.esp",
+          "count": 3,
+          "recipe": {
+            "reference": "2e06:Cloaks&Capes.esp",
+            "owner": "Tailor",
+            "half": "Haberdasher",
+            "rank": "expert",
+            "out": "2885:Cloaks&Capes.esp",
+            "makes": 1,
+            "bench": "7866a:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "3ad6e:Skyrim.esm",
+                "name": "Sabre Cat Snow Pelt",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": "hunter",
+                "producedAt": "expert",
+                "suppliedBy": "hunter",
+                "suppliedAt": "expert",
+                "hops": 0
+              },
+              {
+                "item": "5ad9e:Skyrim.esm",
+                "name": "Gold Ingot",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "expert",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotGold"
+              }
+            ],
+            "needs": [
+              {
+                "asks": "function 74(MCE_CraftingLoomEnabled) == 0",
+                "function": 74,
+                "of": "MCE_CraftingLoomEnabled",
+                "ofType": "GLOB",
+                "serverSees": false
+              }
+            ]
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "expert-logistics",
+        "minimumBatches": 6,
+        "note": "Six production batches, including three Expert fur cloaks. This is Master logistical work, not a new Master clothing recipe or an enchanting claim."
+      }
+    },
+    {
+      "id": "q-whiterun-enchanter-ward-demonstration",
+      "name": "A ward tutor's demonstration stock",
+      "text": "The Enchanter needs two ebony shields and two sets of ragged robes for an Alteration tutor's demonstration stock. No particular enchantment is required.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "profession": "mage",
+        "school": "alteration",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a672:Skyrim.esm",
+        "base": "13ba1:Skyrim.esm",
+        "role": "Enchanter",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "13964:Skyrim.esm",
+          "count": 2,
+          "recipe": {
+            "reference": "dd98c:Skyrim.esm",
+            "owner": "Smith",
+            "half": "Platewright",
+            "rank": "master",
+            "out": "13964:Skyrim.esm",
+            "makes": 1,
+            "bench": "88105:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "800e4:Skyrim.esm",
+                "name": "Leather Strips",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 2,
+                "suppliedVia": "RecipeLeatherStrips"
+              },
+              {
+                "item": "5ad9d:Skyrim.esm",
+                "name": "Ebony Ingot",
+                "type": "MISC",
+                "count": 4,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "miner",
+                "suppliedAt": "master",
+                "hops": 1,
+                "suppliedVia": "RecipeIngotEbony"
+              }
+            ],
+            "needs": [
+              {
+                "asks": "HasPerk(EbonySmithing) == 1",
+                "function": 448,
+                "of": "EbonySmithing",
+                "ofType": "PERK",
+                "serverSees": false
+              }
+            ]
+          }
+        },
+        {
+          "item": "13105:Skyrim.esm",
+          "count": 2,
+          "recipe": {
+            "reference": "924:MoreCraftableEquipment.esp",
+            "owner": "Tailor",
+            "half": "Liverywright",
+            "rank": "novice",
+            "out": "13105:Skyrim.esm",
+            "makes": 1,
+            "bench": "6ce000:Update.esm",
+            "inputItems": [
+              {
+                "item": "6ce001:Update.esm",
+                "name": "Thread",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "MCERecipeThreadTundraCotton"
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "master-batches",
+        "minimumBatches": 2,
+        "note": "Two Master shield batches, with two additional robe batches. These are public equipment supplies, not a promise of blank or enchanted gear."
+      }
+    },
+    {
+      "id": "q-whiterun-cook-mammoth-supper",
+      "name": "A mammoth supper for the hall",
+      "text": "The Cook needs two mammoth steaks and two mammoth stews for a supper in the hall. Bring both courses together.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "profession": "cook",
+        "half": "hearthcook",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a66e:Skyrim.esm",
+        "base": "13ba3:Skyrim.esm",
+        "role": "Cook",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "722bb:Skyrim.esm",
+          "count": 2,
+          "recipe": {
+            "reference": "f430d:Skyrim.esm",
+            "owner": "Cook",
+            "half": "Hearthcook",
+            "rank": "master",
+            "out": "722bb:Skyrim.esm",
+            "makes": 1,
+            "bench": "a5cb3:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "34cdf:Skyrim.esm",
+                "name": "Salt Pile",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "miner",
+                "producedAt": "novice",
+                "suppliedBy": "miner",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "669a4:Skyrim.esm",
+                "name": "Mammoth Snout",
+                "type": "ALCH",
+                "count": 1,
+                "producedBy": "hunter",
+                "producedAt": "master",
+                "suppliedBy": "hunter",
+                "suppliedAt": "master",
+                "hops": 0
+              }
+            ],
+            "needs": [
+              {
+                "asks": "GetItemCount(MAG_FoodMammothMeat) >= 1",
+                "function": 47,
+                "of": "MAG_FoodMammothMeat",
+                "ofType": "ALCH",
+                "serverSees": true
+              },
+              {
+                "asks": "HasPerk(MAG_FoodUpgradePerk03) == 0",
+                "function": 448,
+                "of": "MAG_FoodUpgradePerk03",
+                "ofType": "PERK",
+                "serverSees": false
+              }
+            ]
+          }
+        },
+        {
+          "item": "818:Gourmet.esp",
+          "count": 2,
+          "recipe": {
+            "reference": "819:Gourmet.esp",
+            "owner": "Cook",
+            "half": "Hearthcook",
+            "rank": "master",
+            "out": "818:Gourmet.esp",
+            "makes": 1,
+            "bench": "a5cb3:Skyrim.esm",
+            "inputItems": [
+              {
+                "item": "34cdf:Skyrim.esm",
+                "name": "Salt Pile",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "miner",
+                "producedAt": "novice",
+                "suppliedBy": "miner",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "34d22:Skyrim.esm",
+                "name": "Garlic",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "gatherer",
+                "producedAt": "novice",
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "34d32:Skyrim.esm",
+                "name": "Frost Mirriam",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "gatherer",
+                "producedAt": "novice",
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "669a4:Skyrim.esm",
+                "name": "Mammoth Snout",
+                "type": "ALCH",
+                "count": 1,
+                "producedBy": "hunter",
+                "producedAt": "master",
+                "suppliedBy": "hunter",
+                "suppliedAt": "master",
+                "hops": 0
+              }
+            ],
+            "needs": [
+              {
+                "asks": "HasPerk(MAG_RecipePerkMammothStew) == 1",
+                "function": 448,
+                "of": "MAG_RecipePerkMammothStew",
+                "ofType": "PERK",
+                "serverSees": false
+              },
+              {
+                "asks": "HasPerk(MAG_FoodUpgradePerk03) == 0",
+                "function": 448,
+                "of": "MAG_FoodUpgradePerk03",
+                "ofType": "PERK",
+                "serverSees": false
+              }
+            ]
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "master-batches",
+        "minimumBatches": 2,
+        "note": "Both dishes have Master supply provenance; recipe conditions still apply to whoever cooks them."
+      }
+    },
+    {
+      "id": "q-whiterun-alchemist-ash-expedition",
+      "name": "Remedies for the ash-road expedition",
+      "text": "The Alchemist needs two physicker remedies and four ash creep clusters for an expedition's supplies. Bring the finished remedies and the separate reagents.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "master",
+      "gate": {
+        "profession": "alchemist",
+        "half": "physicker",
+        "rank": "master"
+      },
+      "merchant": {
+        "reference": "1a66d:Skyrim.esm",
+        "base": "13ba4:Skyrim.esm",
+        "role": "Alchemist",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "154c3:Thornswood-Content.esp",
+          "count": 2,
+          "recipe": {
+            "reference": "154c7:Thornswood-Content.esp",
+            "owner": "Alchemist",
+            "half": "Physicker",
+            "rank": "advanced",
+            "out": "154c3:Thornswood-Content.esp",
+            "makes": 1,
+            "bench": "42e6b:Thornswood-Content.esp",
+            "inputItems": [
+              {
+                "item": "6bc00:Skyrim.esm",
+                "name": "Mudcrab Chitin",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "hunter",
+                "producedAt": "novice",
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "77e1c:Skyrim.esm",
+                "name": "Blue Mountain Flower",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "gatherer",
+                "producedAt": "advanced",
+                "suppliedBy": "gatherer",
+                "suppliedAt": "advanced",
+                "hops": 0
+              }
+            ],
+            "needs": []
+          }
+        },
+        {
+          "item": "1cd74:Dragonborn.esm",
+          "count": 4,
+          "harvest": {
+            "reference": "195dc:Dragonborn.esm",
+            "produce": "1cd74:Dragonborn.esm",
+            "name": "Ash Creep Cluster",
+            "rank": "master"
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 48,
+      "difficulty": {
+        "basis": "master-source",
+        "note": "Master-gated Ash Creep Cluster and two Advanced remedies. No effect is claimed for brewing the supplied reagents."
+      }
+    },
+    {
+      "id": "q-whiterun-alchemist-travelling-case",
+      "name": "A field medic's travelling case",
+      "text": "The Alchemist needs two physicker remedies and four nirnroots for a travelling case. Bring both parts as one delivery.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "expert",
+      "gate": {
+        "profession": "alchemist",
+        "half": "physicker",
+        "rank": "expert"
+      },
+      "merchant": {
+        "reference": "1a66d:Skyrim.esm",
+        "base": "13ba4:Skyrim.esm",
+        "role": "Alchemist",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "154c3:Thornswood-Content.esp",
+          "count": 2,
+          "recipe": {
+            "reference": "154c7:Thornswood-Content.esp",
+            "owner": "Alchemist",
+            "half": "Physicker",
+            "rank": "advanced",
+            "out": "154c3:Thornswood-Content.esp",
+            "makes": 1,
+            "bench": "42e6b:Thornswood-Content.esp",
+            "inputItems": [
+              {
+                "item": "6bc00:Skyrim.esm",
+                "name": "Mudcrab Chitin",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "hunter",
+                "producedAt": "novice",
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 0
+              },
+              {
+                "item": "77e1c:Skyrim.esm",
+                "name": "Blue Mountain Flower",
+                "type": "INGR",
+                "count": 1,
+                "producedBy": "gatherer",
+                "producedAt": "advanced",
+                "suppliedBy": "gatherer",
+                "suppliedAt": "advanced",
+                "hops": 0
+              }
+            ],
+            "needs": []
+          }
+        },
+        {
+          "item": "59b86:Skyrim.esm",
+          "count": 4,
+          "harvest": {
+            "reference": "110c8:HearthFires.esm",
+            "produce": "59b86:Skyrim.esm",
+            "name": "Nirnroot",
+            "rank": "expert"
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 24,
+      "difficulty": {
+        "basis": "expert-source",
+        "note": "Expert-gated Nirnroot with two Advanced remedy batches; no particular plant placement or harvest event is promised."
+      }
+    },
+    {
+      "id": "q-whiterun-enchanter-commission-rack",
+      "name": "Clothes for the commission rack",
+      "text": "The Enchanter needs a set of common clothes and a pair of shoes for the commission rack. Bring both pieces; no enchantment is required.",
+      "kind": "commission",
+      "deliveryVersion": 2,
+      "tier": "novice",
+      "gate": {
+        "profession": "enchanter",
+        "half": "wardweaver",
+        "rank": "novice"
+      },
+      "merchant": {
+        "reference": "1a672:Skyrim.esm",
+        "base": "13ba1:Skyrim.esm",
+        "role": "Enchanter",
+        "hold": "Whiterun",
+        "bookHold": "whiterun"
+      },
+      "goods": [
+        {
+          "item": "5b6a1:Skyrim.esm",
+          "count": 1,
+          "recipe": {
+            "reference": "91f:MoreCraftableEquipment.esp",
+            "owner": "Tailor",
+            "half": "Haberdasher",
+            "rank": "novice",
+            "out": "5b6a1:Skyrim.esm",
+            "makes": 1,
+            "bench": "6ce000:Update.esm",
+            "inputItems": [
+              {
+                "item": "6ce001:Update.esm",
+                "name": "Thread",
+                "type": "MISC",
+                "count": 4,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "MCERecipeThreadTundraCotton"
+              }
+            ],
+            "needs": []
+          }
+        },
+        {
+          "item": "5b6a0:Skyrim.esm",
+          "count": 1,
+          "recipe": {
+            "reference": "920:MoreCraftableEquipment.esp",
+            "owner": "Tailor",
+            "half": "Haberdasher",
+            "rank": "novice",
+            "out": "5b6a0:Skyrim.esm",
+            "makes": 1,
+            "bench": "6ce000:Update.esm",
+            "inputItems": [
+              {
+                "item": "db5d2:Skyrim.esm",
+                "name": "Leather",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "hunter",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "RecipeLeatherFoxSnowHide"
+              },
+              {
+                "item": "6ce001:Update.esm",
+                "name": "Thread",
+                "type": "MISC",
+                "count": 1,
+                "producedBy": null,
+                "producedAt": null,
+                "suppliedBy": "gatherer",
+                "suppliedAt": "novice",
+                "hops": 1,
+                "suppliedVia": "MCERecipeThreadTundraCotton"
+              }
+            ],
+            "needs": []
+          }
+        }
+      ],
+      "reward": {
+        "source": "merchant-purse",
+        "pricing": "submitted-hold-price"
+      },
+      "cooldownHours": 6,
+      "difficulty": {
+        "basis": "novice-batches",
+        "minimumBatches": 2,
+        "note": "Two public Novice wearable batches with measured Novice inputs; the source does not promise unenchanted blanks."
+      }
+    }
+  ]
+}

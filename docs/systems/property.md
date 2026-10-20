@@ -283,6 +283,38 @@ The Hearthfire building rows, 487 of them, stay out of
 [Cut items](cut-items.md). They are not a public craft and they are
 not company wares.
 
+## Word to the holder
+
+Patrick, 17 Oct, decision 6B on #507. When somebody picks the lock of a
+building you hold, or presents its deed at its door, you are sent word
+in the world, so you can answer it through RP. Nothing is typed.
+
+The word comes late, on purpose, so a theft is not an alarm. A runner
+from the steward's office of the building's hold finds you 20 minutes
+after a pick, or 10 after a deed. A building no hold covers sends word
+by a neighbour. If you are away, the word waits and reaches you the next
+time you are in the world.
+
+You learn what happened, which building, and roughly when, such as
+"about 3 hours ago". You also learn what the person looked like: race
+and sex only, such as a Nord man. You never learn their name. That is
+for RP to bring out, through a witness or the court.
+
+The word decides nothing. No claim changes and no lock turns. Nobody is
+marked or punished. The office takes no side, and a grievance is the
+court's. A deed presented at the door still moves the building, as it
+always has.
+
+Limits on picks, so nobody can spam you:
+- The same person at the same building counts once in 6 hours.
+- A second pick before the word reaches you is added to that word, and
+  the word says it happened more than once.
+- You get at most 6 words of picks a day, and at most 20 wait for you.
+- Word that cannot reach you within 14 days, the lapse, is dropped.
+
+A deed's word is never held back, because it is one word for one
+transfer. All of these numbers are staff data.
+
 ## Where this is
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
@@ -393,3 +425,26 @@ E on it opens its own panel (#2298). Standing at the board and clicking
 it opens the board's panel. A price list is left from that
 panel. The book stays in the journal. The guild average of those
 copies is kept.
+
+Word to the holder (#2680) is the property block's word section. When
+a door the server shut to you opens on your machine, the front plugin
+sends `/tspicked` with the door's id. The lock script takes a door off
+its published list before it opens that door itself, so only a pick is
+reported. The server counts a report only when all of these hold:
+- the door is a property door, not a way out and not a cell
+- the building is held and locked
+- you have no key, master key or deed
+- you are within `reach` of the door in its cell, or already inside
+  the building
+- you carry a lockpick in the server's copy of your pack
+
+Every report is logged as `[property] word:`, with who reported it, so
+staff and the court can see it. `claim()` records a deed's word for the
+old holder. The limits are `game/data/property-word.json`: per kind
+`on`, `delayMinutes`, `describe`, and for picks `samePickerMinutes`, plus
+`bundle`, `perHolderPerDay` (0 means no limit), `maxPending`, `keepDays`,
+`reach`, `needLockpick` and `everySeconds`. Anything missing or wrong
+there keeps the default and is logged. The words wait in the register,
+`private/property.json`, under `word`, so a restart keeps them and a
+wipe moves them aside. A word that has gone out is kept only while the
+limits count it. `tests\test-2680-holder-word.js` drives all of it.

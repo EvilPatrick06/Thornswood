@@ -2747,6 +2747,9 @@
 
     Containers and doors only. An unlocked display case is still Skyrim's.
   */
+  // When each property door last told the server it opened (#2680), so one
+  // pick is one line.
+  const pickSaid = {};
   sp.on('lockChanged', guard('lockchanged', (e) => {
     const ref = e ? e.lockedObject : null;
     if (!ref) { return; }
@@ -2770,6 +2773,24 @@
       say('lock opened on ' + id.toString(16) + ', handed it back to the server');
     } catch (err) {
       say('could not hand ' + id.toString(16) + ' back to the server: ' + err);
+    }
+
+    /*
+      A PROPERTY DOOR THAT OPENED HERE IS A PICK (#2680), and the server is
+      told, so its holder can be sent word. The lock script publishes the
+      doors the server shut to this person and takes a door off that list
+      before it opens one itself, so a door still on it that is open now was
+      opened by Skyrim's lockpicking. The server checks it all again.
+    */
+    if (type === 29 && id) {
+      let shutHere = null;
+      try { shutHere = globalThis.__thornswoodPropertyShut; } catch (err) { shutHere = null; }
+      const now = Date.now();
+      if (shutHere && shutHere[id] && !(pickSaid[id] && now - pickSaid[id] < 10000)) {
+        pickSaid[id] = now;
+        say('property door ' + id.toString(16) + ' opened on its lock, telling the server');
+        tellServer('/tspicked ' + id.toString(16));
+      }
     }
   }));
 
@@ -2828,7 +2849,7 @@
   */
   let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
-     watchdog, stuck rescue and ownTheCharacter all refuse to fight that
+     watchdog and the stuck rescue both refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
      null while still seated, so furnitureEnter/Exit keep a seated flag too. */
   let seatedInFurniture = false;
@@ -7021,6 +7042,15 @@
    * stay because AI driven has no getter and nothing else keeps it off, but
    * they are not a fix for this and must not be reported as one.
    *
+   * #2387, 16 October: the corrections are gone. The real cause was the other
+   * launcher's build of MpClientPlugin.dll, replaced by the fork's own client
+   * on 20 September (1.1.61.1), after which jump and sprint work. Nothing in
+   * the fork writes IsNPC, bSprintOK or AI driven on the local character, and
+   * no log since has a line saying a correction had to act. The heartbeat that
+   * cleared IsNPC, the per-frame clear and the held sprint gate are removed
+   * rather than kept as insurance: a flag put back on a timer hides the next
+   * real cause. The probe below still names any gate that reads wrong.
+   *
    * The useful part is bSprintOK. It is the ONLY condition on the sprint
    * transition, in 0_master and mt_behavior both. A transition being evaluated
    * cannot refuse with its only condition satisfied, so that transition is not
@@ -7086,13 +7116,6 @@
   let probeHookOk = 0;
   let probeHookNo = 0;
   let probeTallyAt = 0;
-
-  let sprintHeldSince = 0;   // while the sprint key is down, and only then
-  let ownedAt = 0;           // last heartbeat that put the character back
-  let saidIsNpc = false;     // each of these is worth saying once, not every tick
-  let saidSprintGate = false;
-  let saidNpcStuck = false;  // the readback disagreeing with the write
-  let saidNpcThrew = false;
 
   function probeStart(kind, name) {
     return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
@@ -7162,37 +7185,6 @@
     try { return String(pc.getAnimationVariableInt(name)); } catch (e) { return 'unknown'; }
   }
 
-  /**
-   * The character is the person's to drive.
-   *
-   * Both of these are switched on by somebody and switched back off by the
-   * same somebody, so anything that throws, disconnects or is never told it
-   * has finished leaves them on, and AI driven has no getter to ask. Setting
-   * them off when they were already off is not a state change and costs a
-   * native call, so this runs on a timer rather than trying to find out who
-   * did it.
-   */
-  function ownTheCharacter(pc) {
-    // The game switches controls off for its own menus, and race creation
-    // hands the character over on purpose.
-    if (busyMenuOpen()) { return; }
-    // Dead or sitting in something, which includes the cart.
-    if (notOurs()) { return; }
-    try { if (pc.isOnMount()) { return; } } catch (e) { }
-
-    try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
-
-    if (varBool(pc, 'IsNPC')) {
-      try {
-        pc.setAnimationVariableBool('IsNPC', false);
-        if (!saidIsNpc) {
-          saidIsNpc = true;
-          say('jump and sprint: the character was flagged IsNPC, which is what takes both out of the graph. Cleared.');
-        }
-      } catch (e) { }
-    }
-  }
-
   // ==== broken limbs (#1383) ====
   /*
     A BROKEN LEG REFUSES SPRINT, the half of a break that is not an actor
@@ -7242,85 +7234,20 @@
   // ==== end broken limbs ====
 
   /**
-   * Hold the sprint gate open while the key is down.
-   *
-   * bSprintOK is the only condition on the sprint transition, in 0_master and
-   * in mt_behavior both, so with it shut SprintStart is refused however much
-   * stamina there is. Skyrim's own rule is repeated here rather than
-   * overridden: no sprinting while over encumbered, out of stamina, swimming
-   * or on a horse. Only while the key is actually down, so nothing is held
-   * open for somebody who is not asking for it.
+   * A broken leg holds the sprint gate shut while the sprint key is down
+   * (#1383). bSprintOK is the only condition on the sprint transition, in
+   * 0_master and in mt_behavior both, so with it shut SprintStart is refused
+   * however much stamina there is. Nothing here holds the gate open any more
+   * (#2387): that chased another launcher's client, which the fork replaced.
    */
-  function holdSprintGate(pc) {
-    if (!sprintHeldSince) { return; }
+  let sprintHeldSince = 0;   // while the sprint key is down, and only then
+  function holdSprintShut() {
+    if (!sprintHeldSince || !brokenLimbs.leg()) { return; }
     // A release this file never saw, because a menu or the wheel took the
     // keyboard mid press. Eight seconds is longer than anybody sprints in one
     // hold and short enough that it cannot stay stuck.
     if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
-    // A broken leg refuses sprint (#1383): the gate is held shut instead.
-    if (brokenLimbs.refuseSprint(pc)) { return; }
-    if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
-    try {
-      if (pc.isOverEncumbered()) { return; }
-      if (pc.isSwimming() || pc.isOnMount()) { return; }
-      if (pc.getActorValue('Stamina') <= 0) { return; }
-    } catch (e) { return; }
-    if (varBool(pc, 'bSprintOK')) { return; }
-    try {
-      pc.setAnimationVariableBool('bSprintOK', true);
-      if (!saidSprintGate) {
-        saidSprintGate = true;
-        say('jump and sprint: bSprintOK was shut with stamina left, which is what refuses SprintStart. Held open while the key is down.');
-      }
-    } catch (e) { }
-  }
-
-  /**
-   * Clear IsNPC on the frame the graph reads it, rather than every two seconds.
-   *
-   * ownTheCharacter() above already clears this on the heartbeat and that is
-   * not enough. On 20 September seven presses in a row were refused with
-   * IsNPC reading yes, in the same session whose log says the heartbeat had
-   * already found it set and cleared it. So it comes back, and a clear that
-   * runs up to two seconds before the press is a clear that is not there when
-   * it counts.
-   *
-   * This is the same reason bSprintOK is held every frame just above rather
-   * than polled: the graph reads the variable on the frame it handles the
-   * event. A variable the graph reads on the event frame has to be written on
-   * the event frame.
-   *
-   * The readback is the measurement the last session could not make, and it
-   * splits the two remaining answers without anybody having to be in the
-   * world twice. If it reads true immediately after being written false, the
-   * write is not taking and no amount of timing will help. If it reads false
-   * here and yes again at the press, something re-sets it in between and the
-   * question becomes what.
-   */
-  function holdNpcClear(pc) {
-    /* The same three ownTheCharacter refuses on, and for the same reasons. The
-       first one matters most here: race creation hands the character over on
-       purpose, and this runs on every heartbeat frame rather than only while
-       somebody is asking to jump, so without it this would be writing to the
-       graph all the way through a face being made. Nobody jumps while dead,
-       sitting or mounted either, so none of them costs a press. */
-    if (busyMenuOpen()) { return; }
-    if (notOurs()) { return; }
-    try { if (pc.isOnMount()) { return; } } catch (e) { }
-    if (!varBool(pc, 'IsNPC')) { return; }
-    try {
-      pc.setAnimationVariableBool('IsNPC', false);
-      if (!saidNpcStuck && varBool(pc, 'IsNPC')) {
-        saidNpcStuck = true;
-        say('jump and sprint: IsNPC was written false and read back true on the same frame. ' +
-            'The write is not taking, so this is not the heartbeat being too slow.');
-      }
-    } catch (e) {
-      if (!saidNpcThrew) {
-        saidNpcThrew = true;
-        say('jump and sprint: clearing IsNPC threw, which the heartbeat has been swallowing: ' + e);
-      }
-    }
+    brokenLimbs.refuseSprint(sp.Game.getPlayer());
   }
 
   function probeState() {
@@ -7388,8 +7315,8 @@
     if (e.userEventName === 'Sprint' || (!e.userEventName && e.code === probeKeys.sprint)) { kind = 'sprint'; }
     if (!kind) return;
 
-    // Sprint is a hold, not a press, and the gate is only worth holding open
-    // for as long as somebody is holding the key.
+    // Sprint is a hold, not a press: a broken leg holds the gate shut for as
+    // long as somebody is holding the key (#1383).
     if (kind === 'sprint') {
       if (e.isUp) { sprintHeldSince = 0; }
       else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
@@ -7405,13 +7332,6 @@
     // The chat or the wheel has the keyboard, or a menu does: not a jump.
     if (anyClaim() || busyMenuOpen()) return;
 
-    // The earliest point in the frame this file gets. buttonEvent runs from
-    // the input handler, before the graph updates, so a flag cleared here is
-    // clear when the graph reads it. The heartbeat two seconds ago was not.
-    try {
-      const pressPc = sp.Game.getPlayer();
-      if (pressPc) { holdNpcClear(pressPc); }
-    } catch (e2) { }
     const now = Date.now();
     if (now - probeLast[kind] < PROBE_GAP_MS) return;
     probeLast[kind] = now;
@@ -7433,26 +7353,12 @@
       }
     }
 
-    // The character is only fetched on a frame that has something to do with
-    // it. Three handlers in this file already ask for it every frame and that
-    // is three too many.
-    const heartbeat = now - ownedAt >= 2000;
+    holdSprintShut();
+
+    // The character is only fetched on a frame that has a press to resolve.
     let pc = null;
-    if (heartbeat || sprintHeldSince || probePresses.length) {
+    if (probePresses.length) {
       try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-    }
-    if (pc) {
-      // Two seconds, because this is a state that has to be wrong for a whole
-      // key press to matter and nothing here is worth a native call a frame.
-      if (heartbeat) { ownedAt = now; ownTheCharacter(pc); }
-      // Every frame, but only while the key is down: the graph reads the gate
-      // on the frame it handles the event, so a timer would miss it.
-      holdSprintGate(pc);
-      // Same reasoning, and this block only runs on a frame that already has
-      // the character in hand: a heartbeat, a held sprint key, or a press
-      // still being resolved. Sprint is a hold, so the frame the graph acts
-      // on is not always the frame the key arrived.
-      holdNpcClear(pc);
     }
 
     if (!probePresses.length) return;
