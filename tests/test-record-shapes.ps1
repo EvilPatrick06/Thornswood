@@ -59,6 +59,11 @@ try {
     $d = $real['server-build'] | ConvertFrom-Json; $d.source.commit = '9284855'; $d.bytes = '5775872'
     $b = Bad 'server-build' ($d | ConvertTo-Json -Depth 10)
     Yes 'server-build: a short source.commit and bytes as a string are refused, both named' ($b.Why -match 'source\.commit is missing or not a full commit SHA' -and $b.Why -match 'bytes is missing or not a whole number')
+    # The front (#2754): built from the pinned commit, written out in full.
+    $d = $real['front-build'] | ConvertFrom-Json; $d.forkCommit = '3d2cb747'
+    Yes 'front-build: a short forkCommit is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'forkCommit is missing or not a full commit SHA')
+    $d = $real['front-build'] | ConvertFrom-Json; $d.files = [pscustomobject]@{}
+    Yes 'front-build: an empty files map is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'files is missing, empty')
     $d = $real['server-build'] | ConvertFrom-Json; $d | Add-Member -NotePropertyName lightPlugins -NotePropertyValue 'yes' -Force
     $b = Bad 'server-build' ($d | ConvertTo-Json -Depth 10)
     Yes 'server-build: lightPlugins that is not true or false is refused' ($b.Why -match 'lightPlugins is there and not true or false')

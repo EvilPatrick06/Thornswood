@@ -176,11 +176,25 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
 
 # ------------------------------------------------------------------- front --
 Head 'Front'
-# The front build, made outside the repository and kept in local\, which git
-# ignores (in tools\ until 29 September, issue #440 phase 10).
+# The front build, skymp5-front from the pinned fork commit, which
+# Build-Front.ps1 makes into local\, which git ignores, and records\front-build.json
+# records (#2754). Until 20 October the zip was made on One from nobody knew
+# which commit and nothing checked it, and every release still shipped four
+# fonts nobody may hand out, a month after the fork had taken them out
+# (#1317). So a zip that is not the recorded build is not unpacked: that fails
+# the run, as a missing file of ours does, and Ship stops.
+. (Join-Path $Here 'Front.ps1')
 $zip = Join-Path $Here '..\..\local\thornswood-front.zip'
+$frontWhy = @()
 if (-not (Test-Path -LiteralPath $zip)) {
-  Bad 'thornswood-front.zip is not in local\ in the repository folder'
+  $frontWhy = @('local\thornswood-front.zip is not there')
+} else {
+  try { $frontWhy = @(Get-ThornswoodFrontProblems (Get-ThornswoodZipFiles $zip) (Read-ThornswoodFrontRecord)) }
+  catch { $frontWhy = @('it could not be read against records\front-build.json: ' + $_.Exception.Message) }
+}
+if ($frontWhy.Count) {
+  foreach ($w in @($frontWhy | Select-Object -First 5)) { Bad $w }
+  Gone 'the front is not the recorded build; .\scripts\release\Build-Front.ps1 builds it from the pinned fork commit'
 } else {
   New-Item -ItemType Directory -Force -Path $ui | Out-Null
   Expand-Archive -LiteralPath $zip -DestinationPath $ui -Force
@@ -191,7 +205,7 @@ if (-not (Test-Path -LiteralPath $zip)) {
     finally { $z.Dispose() }
   } catch { Bad ('could not read what the front zip holds, so its kept copies were not refreshed: ' + $_.Exception.Message) }
   if (Test-Path -LiteralPath (Join-Path $ui 'index.html')) {
-    Note 'index.html and build.js are in place'
+    Note 'the recorded front build: index.html and build.js are in place'
   } else {
     Bad 'index.html did not land'
   }

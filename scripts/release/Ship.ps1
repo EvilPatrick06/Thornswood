@@ -1763,6 +1763,19 @@ if ($Package -and -not $Dev -and -not $DryRun -and $ModsOnly) {
 # and has no business talking to the VPS. $GameDir is the game folder the
 # generated files were checked in, above, or '' when there is none.
 
+# ------------------------------------------------------------ the front
+# The front Go.ps1 unpacks is built here from the pinned fork commit and held
+# to records\front-build.json (#2754, Build-Front.ps1), never a zip left in
+# local\ by an earlier build: the one One kept still carried four fonts the
+# fork had taken out a month before (#1317). Before Go.ps1, which refuses a
+# zip that is not the recorded build.
+Head 'The front'
+try { & (Join-Path $Here 'Build-Front.ps1') }
+catch {
+    Unbump 'the front could not be built'
+    Die ('The front could not be built from the pinned fork commit: ' + $_.Exception.Message)
+}
+
 Head 'The in game plugins'
 $goArgs = @{ SkipServer = $true }
 if ($GameDir) { $goArgs['Game'] = $GameDir } else { $goArgs['Vortex'] = $true }

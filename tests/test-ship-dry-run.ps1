@@ -349,6 +349,7 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 [IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
+    Stub 'Build-Front' '[string]$Fork, [string]$Commit, [string]$Out, [switch]$Record' ''
     Stub 'Sync-Client' '[switch]$Check, [switch]$NoPause, [string]$Game' ''
     # The ship root (#2019): passes unless TS_SHIPROOT_EXIT says otherwise, for N.
     # tests\test-2019-ship-roots.ps1 runs the real one on a stand-in root.
