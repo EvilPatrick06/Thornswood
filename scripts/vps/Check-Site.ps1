@@ -76,7 +76,7 @@ if (-not $Vps) {
   if ($m.Success) { $Vps = $m.Groups[1].Value }
 }
 if (-not $User -and $Vps) {
-  $sshCfg = Join-Path $HOME '.ssh\config'
+  $sshCfg = Join-Path (Join-Path $HOME '.ssh') 'config'
   if (Test-Path -LiteralPath $sshCfg) {
     $inHost = $false
     foreach ($line in [IO.File]::ReadAllLines($sshCfg)) {

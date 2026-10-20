@@ -143,8 +143,10 @@ function Get-ThornswoodSshFingerprint([string]$Line) {
     finally { Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue }
 }
 
+# One folder at a time, so the path is right in a cloud thread too (#2753):
+# PowerShell on Linux takes '.ssh\known_hosts' as one file name in $HOME.
 function Get-ThornswoodKnownHostsPath {
-    return (Join-Path $HOME '.ssh\known_hosts')
+    return (Join-Path (Join-Path $HOME '.ssh') 'known_hosts')
 }
 
 # What known_hosts holds for the address, against the pin. Read only.
@@ -179,11 +181,18 @@ function Test-ThornswoodKnownHost {
 # known_hosts already holds a key that is not pinned or when the machine shows
 # none of the pinned keys. Returns how many lines it added (0 when it already
 # trusted the box).
+#   -Scanned  the key lines, already asked for some other way, in place of
+#             ssh-keyscan, which cannot go through a ProxyCommand. A cloud
+#             thread reaches the box only through the bridge (#2753), so
+#             Setup-CloudSsh.ps1 has ssh itself write the key it was shown to
+#             a scratch file and hands those lines here, where they meet the
+#             same pin.
 function Add-ThornswoodKnownHost {
     param(
         [Parameter(Mandatory = $true)][string]$Address,
         [string]$KnownHosts = (Get-ThornswoodKnownHostsPath),
-        [string[]]$Pinned = (Get-ThornswoodVpsHostKeys)
+        [string[]]$Pinned = (Get-ThornswoodVpsHostKeys),
+        [string[]]$Scanned = $null
     )
     if (-not $Pinned.Count) { throw 'scripts\vps\vps.json pins no host keys, so there is nothing to check the box against. Nothing was written.' }
     $now = Test-ThornswoodKnownHost -Address $Address -KnownHosts $KnownHosts -Pinned $Pinned
@@ -193,7 +202,8 @@ function Add-ThornswoodKnownHost {
     }
     if ($now.Status -eq 'trusted') { return 0 }
 
-    $scan = @(Invoke-ThornswoodNative { & ssh-keyscan -T 10 $Address } 2>$null)
+    if ($null -ne $Scanned) { $scan = @($Scanned) }
+    else { $scan = @(Invoke-ThornswoodNative { & ssh-keyscan -T 10 $Address } 2>$null) }
     $keep = @()
     foreach ($line in $scan) {
         $l = ([string]$line).Trim()
