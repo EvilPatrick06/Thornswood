@@ -154,12 +154,16 @@ function Get-FeedBaselinePointer($doc) {
 }
 
 # $Notes is the release note, Ship's whole note, title first. A launcher that
-# syncs to the record shows it on its update card (Sync.cs RecordDue, #1050):
-# once the packs are off the feed, their notes field is gone with them, and
-# this is where the card reads it instead. Left out when there is none.
+# syncs to the record shows "notes" on its update card (Sync.cs RecordDue,
+# #1050): once the packs are off the feed, their notes field is gone with them,
+# and this is where the card reads it instead. Only the title goes here. The
+# whole note is the newest entry of the news file the News tab reads, and on
+# the card it was most of version.json (2,956 of main's 4,928 bytes on 19 Oct)
+# and its 29 lines of text above Play. Left out when there is none.
 function New-FeedBaselinePointer([string]$Id, [string]$Sha, [string]$Url, [int]$Entries, [string]$Notes = '') {
     $o = [ordered]@{ id = $Id; sha256 = $Sha.ToLowerInvariant(); url = $Url; entries = $Entries }
-    if ($Notes -and $Notes.Trim()) { $o['notes'] = $Notes.Trim() }
+    $title = @(([string]$Notes -split "`r?`n") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) | Select-Object -First 1
+    if ($title) { $o['notes'] = $title }
     return [pscustomobject]$o
 }
 

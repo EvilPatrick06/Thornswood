@@ -755,7 +755,7 @@ Yes '  the release names no pack, and its record says every file is up' (@($d5.r
     @((Get-RecordFileShas $m5).Keys | Where-Object { -not (Test-Path -LiteralPath (Join-Path $feedDir "assets\$_")) }).Count -eq 0)
 $zip5 = @(Get-ChildItem -LiteralPath (Join-Path $pub 'dist') -Recurse -File -Filter "pack-$R5.zip")
 Yes '  its pack was built for the secrets check and kept here, and never sent' ($zip5.Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $feedDir ("assets\" + (Get-BaselineFileSha $zip5[0].FullName)))))
-Yes '  the record''s pointer carries the note, for the update card' ([string]$d5.baseline.notes -eq ($note5 + "`n- what changed"))
+Yes '  the record''s pointer carries the note''s title, for the update card' ([string]$d5.baseline.notes -ceq $note5)
 $list5 = @(Get-StoreReleases $feedDir (Feed))
 Yes '  the store''s list starts with it, ending on no pack' ([string]$list5[0].id -eq $R5 -and [string]$list5[0].lastPack -eq '' -and -not $d5.PSObject.Properties['releases'])
 $bad5 = @(Get-ReleaseDisagreements $d5 $list5)
@@ -766,7 +766,7 @@ Yes ("  version.json is {0:n0} bytes" -f $sz) ($sz -gt 0)
 Use-Install $fresh
 $pend5 = @(Pending-Of (Parse-Feed))
 Yes 'a launcher on the last release is offered this one, with its note on the card' ($pend5.Count -eq 1 -and $null -ne $pend5[0].Record -and $pend5[0].Record.id -eq $R5 -and
-    [string]$pend5[0].notes -eq ($note5 + "`n- what changed"))
+    [string]$pend5[0].notes -ceq $note5)
 [void](Update-New $fresh)
 Yes '  and syncs to it, downloading the one file that changed' ((Test-Lands $fresh $m5) -and (Fetched) -eq 1 -and (Pending-Of (Parse-Feed)).Count -eq 0)
 $noApplied5 = New-Install 'no-applied-5' $installerFiles $null
