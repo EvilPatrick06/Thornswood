@@ -84,7 +84,9 @@ const PAPYRUS = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'records', 'papyr
 // The console commands the client forwards, consoleCommandsService.ts.
 const CONSOLE = ['additem', 'equipitem', 'placeatme', 'disable', 'mp'];
 
-const guardSrc = lift('function guard(name, fn) {', '\n}\n');
+// guard() counts its time through countSpent() since #385, so both are lifted.
+const guardSrc = lift('function guard(name, fn) {', '\n}\n') &&
+  lift('function guard(name, fn) {', '\n}\n') + '\n' + (lift('function countSpent(name, began) {', '\n}\n') || '');
 const auditSrc = liftThrough('function auditProfile(refrId) {', 'mp.onDropItem = guard(', '\n});');
 const handlersSrc = liftThrough('mp.onTakeItem = guard(', 'mp.onDropItem = guard(', '\n});');
 const listSrc = lift('  WHAT A CLIENT CAN ASK THIS SERVER, AND WHAT IT IS TOLD.', '*/');

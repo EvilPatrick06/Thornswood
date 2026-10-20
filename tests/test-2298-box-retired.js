@@ -65,7 +65,8 @@ yes('the property block is in the gamemode, between its markers', prop.length > 
 
 // ------------------------------------------------- 1. a put, driven for real
 {
-  const guardText = fnText(gm, 'function guard(name, fn) {');
+  // guard() counts its time through countSpent() since #385, so both are lifted.
+  const guardText = fnText(gm, 'function guard(name, fn) {') + '\n' + fnText(gm, 'function countSpent(name, began) {');
   const at = gm.indexOf("mp.onPutItem = guard('onPutItem'");
   const putText = at < 0 ? '' : gm.slice(at, gm.indexOf('\n});', at) + 4);
   yes('guard() and the put hook are in the gamemode', guardText.length > 0 && putText.length > 0);
