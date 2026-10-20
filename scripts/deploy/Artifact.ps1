@@ -38,19 +38,23 @@
   tree against the commit's own blobs. If any of that differs, it throws
   and those scripts do not send. Issue #1335.
 
-  The zip is expanded next to itself, laid out like the repository, and the
-  deploy scripts send from that folder instead of from the working tree, so
-  what goes up is exactly what the zip holds.
+  The zip is expanded next to itself, laid out like the repository, into a
+  folder <same name>.<32 hex> that is never renamed, and <same name>.folder
+  names it (#2888). The deploy scripts send from that folder instead of from
+  the working tree, so what goes up is exactly what the zip holds.
 
   TWO RUNS AT ONE COMMIT (#2459, #2742). Two runs from one checkout at one
   commit (a deploy and a Ship, two dev deploys) build the same artifact under
-  the same names. Each run writes its zip, its record and its unpacked folder
+  the same names. Each run writes its zip, its record and its .folder file
   under names of its own, then gives each its real name in one step that
   either takes the name or finds it taken (Set-ThornswoodArtifactName), with no
-  look first and never replacing what is there. A run that finds the name
-  taken holds what is there to what it built (the zip by its sha256, the
-  record field by field, the folder by every file's size), uses it when it is
-  the same and says so, and refuses, changing nothing, when it is not.
+  look first and never replacing what is there. Only files are named that way,
+  never a folder: Windows refuses to rename a folder while anything has a file
+  in it open, and a virus scanner opens the files an unpack has just closed
+  (#2888). A run that finds the name taken holds what is there to what it
+  built (the zip by its sha256, the record field by field, the folder the
+  .folder file names by every file's size), uses it when it is the same and
+  says so, and refuses, changing nothing, when it is not.
 
   ON THE BOX, C:\Thornswood-Deploys:
     <component>\<name>.zip and <name>.json   every artifact sent, kept
@@ -294,7 +298,7 @@ function Get-ThornswoodSha256Hex([byte[]]$Bytes) {
 }
 
 <#
-  The one step that gives an artifact's zip, record or unpacked folder its
+  The one step that gives an artifact's zip, record or .folder file its
   name (#2742): $true when this run's took the name, $false when the name was
   taken already. Nothing at the name is ever replaced. Until #2742 the zip was
   looked for and then moved, so two runs could both find it missing and the
@@ -354,6 +358,31 @@ function Save-ThornswoodArtifactRecord([string]$RecordPath, $Record) {
   Remove-Item -LiteralPath $building -Force
   $why = Get-ThornswoodArtifactRecordDifference $Record $RecordPath
   if ($why) { throw ("$RecordPath is already there and is not the record of the zip this run built: $why. Nothing was replaced: remove it and run again.") }
+}
+
+# Names the folder this run unpacked ($Leaf, beside $FolderName) as the
+# artifact's folder (#2888): <zip basename>.folder, holding that one name,
+# written under a name of this run's and then named the way the zip and the
+# record are. $true when this run's took the name, $false when another run's
+# was there first, which is then the folder used. A folder is never what gets
+# named: Windows refuses that while a scanner has one of its files open.
+function Save-ThornswoodArtifactFolderName([string]$FolderName, [string]$Leaf) {
+  $building = Join-Path (Split-Path -Parent $FolderName) ('.building-' + [Guid]::NewGuid().ToString('N') + '.folder')
+  [IO.File]::WriteAllText($building, $Leaf, (New-Object Text.UTF8Encoding($false)))
+  if (Set-ThornswoodArtifactName $building $FolderName) { return $true }
+  Remove-Item -LiteralPath $building -Force
+  return $false
+}
+
+# The full path of the unpacked folder a <zip basename>.folder file names. It
+# holds one name, <zip basename>.<32 hex>, of a folder beside it; anything
+# else is refused and left as it is.
+function Get-ThornswoodArtifactFolderNamed([string]$FolderName, [string]$Base) {
+  $leaf = ([IO.File]::ReadAllText($FolderName)).Trim()
+  if ($leaf -notmatch ('^' + [regex]::Escape($Base) + '\.[0-9a-f]{32}$')) {
+    throw ("$FolderName does not name an unpacked folder of $Base (it holds '" + $leaf + "'). Nothing was changed: remove it and run again.")
+  }
+  return (Join-Path (Split-Path -Parent $FolderName) $leaf)
 }
 
 # The first file of the record an unpacked folder does not hold at its size,
@@ -504,34 +533,41 @@ function New-ThornswoodArtifact {
   Save-ThornswoodArtifactRecord $recordPath $record
 
   # Laid out like the repository, so a script that sent <repo>\site\server.js
-  # sends <folder>\site\server.js. The folder name is the zip basename (commit
-  # + hash), so two runs at one commit in one checkout share it (#2459). Never
-  # Remove-Item that shared folder: a second call (or a concurrent first) would
-  # delete it under another run that is reading game\gamemode.js from it. A
-  # folder only ever gets that name whole, unpacked under a name of this run's
-  # and then named (Set-ThornswoodArtifactName), so one that is there is used;
-  # when another run names its copy first, this run's goes. Either way it has
-  # to hold every recorded file at its recorded size.
-  $folder = Join-Path $OutDir ([IO.Path]::GetFileNameWithoutExtension($name))
-  if (-not (Test-Path -LiteralPath $folder)) {
-    $staging = Join-Path $OutDir ('.unpacking-' + [Guid]::NewGuid().ToString('N'))
+  # sends <folder>\site\server.js. Two runs at one commit in one checkout
+  # share one folder (#2459), so it is never Remove-Item'd: a second call (or
+  # a concurrent first) would delete it under another run that is reading
+  # game\gamemode.js from it. Each run unpacks into a folder of its own,
+  # <zip basename>.<32 hex>, that is never renamed (#2888: Windows refuses to
+  # rename a folder while anything has a file in it open, and a virus scanner
+  # opens the files an unpack has just closed). The artifact's folder is the
+  # one its <zip basename>.folder file names, and that small file is what is
+  # named (Save-ThornswoodArtifactFolderName), only once the folder is whole.
+  # When another run names its folder first, that one is used and this run's
+  # goes. Either way it has to hold every recorded file at its recorded size.
+  $base = [IO.Path]::GetFileNameWithoutExtension($name)
+  $folderName = Join-Path $OutDir ($base + '.folder')
+  if (-not (Test-Path -LiteralPath $folderName)) {
+    $mine = Join-Path $OutDir ($base + '.' + [Guid]::NewGuid().ToString('N'))
+    $named = $false
     try {
-      [IO.Compression.ZipFile]::ExtractToDirectory($zip, $staging)
-      if (-not (Set-ThornswoodArtifactName $staging $folder)) {
-        Write-Host ('  ' + [IO.Path]::GetFileName($folder) + ' was unpacked by another run at this commit first, so that folder is used') -ForegroundColor DarkGray
+      [IO.Compression.ZipFile]::ExtractToDirectory($zip, $mine)
+      $named = Save-ThornswoodArtifactFolderName $folderName ([IO.Path]::GetFileName($mine))
+      if (-not $named) {
+        Write-Host ('  ' + $base + ' was unpacked by another run at this commit first, so that folder is used') -ForegroundColor DarkGray
       }
     } finally {
-      if (Test-Path -LiteralPath $staging) {
-        try { Remove-Item -LiteralPath $staging -Recurse -Force -ErrorAction Stop }
-        catch { Write-Warning ("This run's spare unpacked copy " + $staging + ' could not be removed and is left there: ' + $_.Exception.Message) }
+      if (-not $named -and (Test-Path -LiteralPath $mine)) {
+        try { Remove-Item -LiteralPath $mine -Recurse -Force -ErrorAction Stop }
+        catch { Write-Warning ("This run's spare unpacked copy " + $mine + ' could not be removed and is left there: ' + $_.Exception.Message) }
       }
     }
   }
+  $folder = Get-ThornswoodArtifactFolderNamed $folderName $base
   # Its own name: $short is the commit's twelve, which the result hands on
   # (#2747 reused the name here, and every artifact after it named no commit).
   $folderGap = Get-ThornswoodArtifactFolderShort $folder $contents
   if ($folderGap) {
-    throw ("The $Component artifact folder $folder is not what $name holds ($folderGap). Nothing in it was changed: remove that folder and run again.")
+    throw ("The $Component artifact folder $folder, which $folderName names, is not what $name holds ($folderGap). Nothing in it was changed: remove that folder and $folderName, and run again.")
   }
 
   return [pscustomobject]@{
