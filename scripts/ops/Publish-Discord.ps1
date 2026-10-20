@@ -85,7 +85,7 @@ param(
   # one would post a release nobody shipped. Since #907 it is this machine's
   # working copy of the live feed, which the Ship that runs this has just
   # received from the VPS and sent back (Feed-Store.ps1).
-  [string]$ReleaseDir = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'),
+  [string]$ReleaseDir = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Releases),
   [string]$Site = 'https://thornswood.net',
   [switch]$Quiet,
   # Post this note instead of reading a feed. The first line is the title, "- "
