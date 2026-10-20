@@ -67,8 +67,10 @@
   VPS is judged by the watchdog on the box now, from what Fetch-Backups.ps1
   tells it after each copy it checks (Watch-Services.ps1 offbox), so it is
   told while One is off, which is when it falls behind. Code signing was
-  asked with One's own az sign in, which a runner does not have; where it is
-  asked now is Patrick's decision on #2755.
+  asked with One's own az sign in, which a runner does not have. Decided by
+  Patrick on 20 Oct 2026 (#2755, option A): it is asked only when a machine
+  signs, by Ship and Setup-ShipMachine.ps1 with the pinned identity, so no
+  new identity gets any access to the signing account.
 
   Also measured and not asked on every run: the VPS is BisectHosting
   (NET-192-135-112-0-1, RDAP), which has no status page to ask, and the site
