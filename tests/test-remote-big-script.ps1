@@ -120,7 +120,8 @@ $global:TsRemoteCalls = New-Object System.Collections.ArrayList
 # The far paths go bare, so what stands in for C:/Windows/Temp on the line has
 # to be as bare as it is: a space or an & in it would fail a line for a reason
 # the real path cannot have. The temp folder here may hold either (every temp
-# file on the shipping machine goes under C:\ThornswoodTemps&Worktrees, and
+# file on the shipping machine went under C:\ThornswoodTemps&Worktrees until
+# #2900, and
 # cmd.exe ends a command at a bare &, issues #1042 and #1115). So the line
 # names the stand-in folder as ./, and the shell runs in it: the folder's own
 # path is never on a command line.

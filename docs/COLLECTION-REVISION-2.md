@@ -177,10 +177,10 @@ scripts\release\Update-ShipRoot.ps1 (issue #2019), never by hard linking an
 install's folder.
 Never generate directly inside a folder containing vortex.deployment.json.
 The release's Dev own folder is local\release-devbuild in the repository
-folder, C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild on
+folder, C:\Thornswood-Repo\local\release-devbuild on
 One since 5 October (C:\Thornswood-Release-DevBuild before); its launcher
 and server still use Dev's channel and ports. Record it once with
-scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild,
+scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild,
 so Ship, Check-ShipReady and Build-Generated take it without -Root; Ship
 refuses any folder Vortex deploys into before anything is built
 (issue #1692). After the folder moves, run

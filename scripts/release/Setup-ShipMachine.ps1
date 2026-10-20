@@ -139,7 +139,7 @@
   Prepares what it can for a dev Ship, then runs Check-ShipReady -Channel dev.
 
 .EXAMPLE
-  .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild
   The same, and records that a dev release on this machine is built from
   local\release-devbuild in the repository, One's dev release folder since
   5 October. Give the whole path: it is recorded for every clone and
@@ -148,7 +148,7 @@
   generated files record the game folder they were built for.
 
 .EXAMPLE
-  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-main -EngineBuild "C:\ThornswoodTemps&Worktrees\worktrees\claude-skymp-e31a579a"
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -EngineBuild C:\Thornswood-Repo\worktrees\engine-cf4515d6
   Gives main a release folder of its own, made by Update-ShipRoot.ps1 from
   Vortex's deployment and the main feed's release, and records the fork
   folder whose build is this machine's engine build (#2019). Then
@@ -156,7 +156,7 @@
   files.
 
 .EXAMPLE
-  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\you\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\you\Downloads\Thornswood-Repo\local\release-devbuild\Game
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -SkyrimFrom C:\Thornswood-Repo\local\release-devbuild\Game
   The same on a machine whose Steam copy is not on 1.6.1170, as One's is
   not since 16 Oct: the game's own files are copied from the dev root's
   Game, each checked against records\skyrim-files.json first (#2603).
