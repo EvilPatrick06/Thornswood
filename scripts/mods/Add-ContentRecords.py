@@ -696,6 +696,18 @@ TEAS = (
 )
 TEA_HERBS = 2
 
+# THE WELL BUCKET (#1382). Patrick, 12 October 2026: water is drawn at a well
+# by activating it, and the 30 placed wells in the load order are statics,
+# which raise no activation (game\data\wells.json). So the plugin stands a
+# bucket beside each well, an activator wearing Skyrim's wooden bucket
+# (Bucket02a, MISC 0x747FB, its mesh and bounds), and activating it fills an
+# empty bottle at that well (NEEDS.wellActivators in gamemode.js). Where each
+# one stands is game\data\station-sites.json, kind well, measured by
+# scripts\dev\Build-StationSites.py.
+WELL_BUCKET = 0x5018030
+WELL_BUCKET_MODEL = 'Clutter\\Bucket02a.nif'
+WELL_BUCKET_BOUNDS = (-18, -18, 0, 18, 18, 46)
+
 # THE DRUNK SCREEN. docs/systems/drink.md: from the third ale "the client draws
 # a sway and a soft edge". Skyrim has no drunk image space modifier (measured
 # on #1382, 12 October), so this is Thornswood's own: a little double vision,
@@ -932,6 +944,10 @@ def needs_records():
         out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'),
                         [(herb, TEA_HERBS)], item, COOKPOT_KEYWORD))
     out.append(drunk_imad())
+    # The verb on the crosshair says what activating it does.
+    out.append(own_record(b'ACTI', WELL_BUCKET, [
+        (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
+        (b'FULL', zstr('Well Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
     return out
 
 
@@ -1231,7 +1247,7 @@ def bethesdas_world_records(masters_dir, plugin_masters, wanted):
 STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                               'game', 'data', 'station-sites.json'))
 STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
-                 ALCHEMY_LAB: 'alchemy labs'}
+                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets'}
 STATION_BASES = set(STATION_NAMES)
 
 
@@ -1753,6 +1769,10 @@ def main():
     plugin_masters = masters_of(raw)
     salvaged_hashes = {}
     dropping, bethesdas, remade, same_by_design = set(), set(), set(), set()
+    # A Bethesda's cell or worldspace whose winning master's own bytes the
+    # register hashed: the record may be those bytes even where the salvaged
+    # copy was too (List-SalvagedRecords.py, bethesdaSha256).
+    bethesda_hash = {}
     gone_before = set()
     for row in register['records']:
         fid = local_fid(row['formId'], plugin_masters, args.plugin)
@@ -1772,6 +1792,8 @@ def main():
             dropping.add(fid)
         elif d == "Bethesda's":
             bethesdas.add(fid)
+            if row.get('bethesdaSha256'):
+                bethesda_hash[fid] = row['bethesdaSha256']
         elif d == 'remade':
             remade.add(fid)
             if row.get('sameByDesign'):
@@ -1988,7 +2010,8 @@ def main():
         # One the register says left before #2553 (the skill manuals, the
         # Execution Block and its placement) is refused by its form id too,
         # however it was edited since.
-        salvaged_bytes = body_hash(plain(r)) in salvaged_hashes and r.fid not in same_by_design
+        h = body_hash(plain(r))
+        salvaged_bytes = h in salvaged_hashes and r.fid not in same_by_design and bethesda_hash.get(r.fid) != h
         if r.fid in gone_before or salvaged_bytes:
             print('')
             print('STOP. %s 0x%07X %s is a salvaged record (#2553), by its %s, and the register '
@@ -2212,7 +2235,7 @@ def main():
     left_salvaged = []
     for r in after_records:
         h = body_hash(plain(r))
-        if h in salvaged_hashes and r.fid not in same_by_design:
+        if h in salvaged_hashes and r.fid not in same_by_design and bethesda_hash.get(r.fid) != h:
             left_salvaged.append(r)
     if left_salvaged:
         for r in left_salvaged:

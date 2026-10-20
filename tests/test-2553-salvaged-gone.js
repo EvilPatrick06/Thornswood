@@ -172,6 +172,8 @@ function recipeBody(d) {
   parts.push(sub('CNAM', u32(d.out)), sub('BNAM', u32(d.bench)), sub('NAM1', nam1));
   return Buffer.concat(parts);
 }
+// The winning master's own hash of each cell or worldspace kept as Bethesda's.
+const bethesdaOwn = new Map(reg.records.filter(r => r.bethesdaSha256).map(r => [localFid(r.formId), r.bethesdaSha256]));
 const byDesign = new Set();
 for (const r of reg.records) {
   if (!r.sameByDesign) { continue; }
@@ -196,6 +198,9 @@ for (const r of plugin.records) {
   const h = bodyHash(r);
   if (!byHash.has(h)) { continue; }
   if (byDesign.has(r.fid)) { continue; }
+  // A cell or worldspace kept as Bethesda's that is the winning master's own
+  // bytes, which the salvaged copy happened to be as well (#1382).
+  if (bethesdaOwn.get(r.fid) === h) { continue; }
   left.push(r.tag + ' ' + hex(r.fid) + ' ' + edid(r) + ', the bytes of salvaged ' + hex(byHash.get(h)));
 }
 yes('1 no record is a salvaged record, under any editor id, but the six by design', left.length === 0);
@@ -223,14 +228,15 @@ yes('2 every cell and world the register keeps is there and holds a placement ('
 // ------------------------------- 3. the placements are Thornswood's own --
 // Every placement is one game/data/station-sites.json measures (written by
 // scripts/dev/Build-StationSites.py), at its point and turn, in its cell.
-const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF]);
+// The kiln, the lab, the hive, the salt quarry, and the well bucket (#1382).
+const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF, 0x05018030]);
 const table = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'station-sites.json'), 'utf8'));
 const sites = Object.keys(table.sites).map(k => table.sites[k]);
 const refs = plugin.records.filter(r => r.tag === 'REFR');
 const bySite = new Map(sites.map(s => [localFid(s.ref), s]));
 yes('3 the placements in the plugin are exactly the station table\'s ' + sites.length,
     sites.length > 0 && refs.length === sites.length && refs.every(r => bySite.has(r.fid)));
-yes('3 each is of the kiln, the salt quarry, the hive or the lab, switched on, the table\'s base',
+yes('3 each is of the kiln, the salt quarry, the hive, the lab or the well bucket, switched on, the table\'s base',
     refs.every(r => {
       const n = r.subs.find(s => s.tag === 'NAME');
       const s = bySite.get(r.fid);

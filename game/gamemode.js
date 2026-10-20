@@ -61997,13 +61997,16 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
       is a STAT, and a static raises no activation, so nothing reaches the
       server from one (#1382, issuecomment-6129142274). wellActivators is the
       list of activator bases the content plugin puts on each well (WELLS,
-      scripts\dev\Build-WellTable.py, has where they go). It is EMPTY
-      until those activators exist; nothing fills from a well before then.
+      scripts\dev\Build-WellTable.py, has where they go). Since #1382 that is
+      the well bucket, ThornswoodActivatorWellBucket, which the content
+      plugin stands beside each well scripts\dev\Build-StationSites.py finds
+      a clear spot at (game\data\station-sites.json, kind well: 18 of the
+      30, and why each other one is left out).
       Once somebody fills at a well, that well is done for THEM for one
       in-game day. The game clock runs twenty times real time, so a day is
       72 real minutes. This is the one number to change.
     */
-    wellActivators: [],
+    wellActivators: ['18030:Thornswood-Content.esp'],
     wellCooldownMinutes: 72,
     // Boiling is activating a cooking spot (Patrick, 12 Oct 2026): the
     // workbench keyword the cooking recipes are made at, CraftingCookpot,
