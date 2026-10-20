@@ -2128,54 +2128,16 @@
   T.hasFocus = function (who) { return !!claims[who]; };
 
   /*
-    A PANEL THAT HOLDS THE KEYBOARD HAS A CURSOR. Issue 958.
-
-    Patrick on dev, 28 September: "Journal doesn't make your cursor appear so
-    I have to click F6 to make it appear to do anything". His log has the J
-    block's one repair firing, "the game's journal took the cursor with it,
-    raised it again for ours", and still no cursor after it: something in the
-    game's closing of its book took the cursor down again later, and one
-    try inside two seconds of the shut did not cover it. F6 did, because
-    skymp5-client's F6 lowers focus and applyFocus raises it again, and the
-    raise is what opens the Cursor Menu (BrowserApiTilted.cpp in the fork).
-
-    The cursor the page shows is drawn by the browser only while the game's
-    Cursor Menu is open (main.cpp in the fork parks it off screen otherwise),
-    so focus up for a claim with that menu down is a panel nobody can click.
-    This does what F6 did, whenever that is the state: lowered and raised
-    once, a quarter of a second apart at most, and no more than CURSOR_TRIES
-    times for one claim, so a game that keeps taking it cannot make this
-    flicker for ever. Not while one of the game's own menus is up, because
-    that menu is on its way out and its closing is what takes the cursor.
+    A PANEL THAT HOLDS THE KEYBOARD HAS A CURSOR (#958) is the fork's job,
+    not this file's (#2384). browser.setFocused only queues the Cursor
+    Menu's show, so a check on the next frame always found it down, and the
+    lower and raise that used to answer it fired on every claim and queued
+    a hide on top of the show still on its way. BrowserApiTilted.cpp now
+    keeps the show it asked for until the game opens the menu, and shows it
+    again from the Cursor Menu's own close event when something else (the
+    console closing, a game menu that used the cursor) takes it down while
+    focus is up. Nothing here lowers and raises focus to bring it back.
   */
-  const CURSOR_MENU = 'Cursor Menu';
-  const CURSOR_AGAIN_MS = 250;
-  const CURSOR_TRIES = 4;
-  let cursorTries = 0;
-  let cursorTriedAt = 0;
-
-  function keepCursor() {
-    if (!anyClaim()) { cursorTries = 0; return; }
-    let up = false, shown = true;
-    try {
-      up = !!sp.browser.isFocused();
-      shown = !!sp.Ui.isMenuOpen(CURSOR_MENU);
-    } catch (e) { return; }
-    if (!up || shown) { return; }
-    if (cursorTries >= CURSOR_TRIES) { return; }
-    const now = Date.now();
-    if (now - cursorTriedAt < CURSOR_AGAIN_MS) { return; }
-    if (busyMenuOpen()) { return; }
-    cursorTries++;
-    cursorTriedAt = now;
-    try {
-      sp.browser.setFocused(false);
-      sp.browser.setFocused(true);
-    } catch (e) { return; }
-    const who = Object.keys(claims).filter(function (k) { return claims[k]; }).join(', ');
-    say('the keyboard is with ' + who + ' and the cursor was down, raised it again (' +
-        cursorTries + ' of ' + CURSOR_TRIES + ')');
-  }
 
   // ---------------------------------------------------------------- typing --
   // Asked for, not taken.
@@ -7780,15 +7742,10 @@
     asked once more, because a book left open behind ours is the thing this
     block is for, and one still up after two seconds is said in the log.
 
-    The cursor. browser.setFocused(true) only raises the game's Cursor Menu
-    when it is not up already (BrowserApiTilted.cpp in the fork), and the
-    game's book raises one of its own. So when our panel takes the keyboard
-    while the book is still on screen, the cursor showing is the book's, and
-    it goes when the book does: our panel holding the keyboard with no
-    cursor. Which of the two lands first is a race between the page answering
-    and the game closing the book. Focus held with no Cursor Menu up is
-    lowered and raised once, which is the call that raises the cursor and
-    marks it as ours to lower when the panel closes.
+    The cursor is not this block's business any more (#2384). The book
+    taking the Cursor Menu down with it as it closes, under a panel of ours
+    that holds focus, is answered in the fork, from the Cursor Menu's close
+    event (BrowserApiTilted.cpp, CursorFocus.h).
   */
   sp.on('update', guard('journal after', () => {
     if (!journalShutAt) { return; }
@@ -7809,12 +7766,7 @@
         say('J: the game\'s journal opened ' + journalLag + 'ms after the press and was gone ' +
             since + 'ms after it was shut');
       }
-      if (since > JOURNAL_WATCH_MS) { journalShutAt = 0; return; }
-      if (!sp.browser.isFocused() || sp.Ui.isMenuOpen('Cursor Menu')) { return; }
       journalShutAt = 0;
-      sp.browser.setFocused(false);
-      sp.browser.setFocused(true);
-      say('J: the game\'s journal took the cursor with it, raised it again for ours');
     } catch (err) { journalShutAt = 0; }
   }));
 
@@ -8769,8 +8721,6 @@
       }
 
       applyFocus();
-      // And a claim holding the keyboard has its cursor (issue 958).
-      keepCursor();
     } catch (e) { }
 
     // Two watchdogs, because the worst outcome here is somebody standing in a
