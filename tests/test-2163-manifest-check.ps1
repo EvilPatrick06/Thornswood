@@ -137,7 +137,7 @@ try {
 $cfg = [IO.File]::ReadAllText((Join-Path $App 'Config.cs'))
 $fm = [IO.File]::ReadAllText((Join-Path $App 'FeedManifest.cs'))
 $su = [IO.File]::ReadAllText((Join-Path $App 'ShellUpdate.cs'))
-Yes 'VersionDoc.Parse reads "signedManifest" apart, like the record and the news file' ($cfg.Contains('doc.manifestRef = ManifestRef.FromFeed(raw, at);') -and $cfg.Contains('root.TryGetValue("signedManifest", out b)'))
+Yes 'VersionDoc.Parse reads "signedManifest" apart, like the record and the news file' ($cfg.Contains('doc.manifestRef = ManifestRef.FromFeed(raw, at, assets);') -and $cfg.Contains('root.TryGetValue("signedManifest", out b)'))
 Yes 'the manifest must list the launcher, the client runtime, the packs, the optional packs and the record' ($fm.Contains('v.launcherSha256') -and $fm.Contains('v.clientRuntime.sha256') -and $fm.Contains('new[] { v.packs, v.optional }') -and $fm.Contains('v.record.sha256'))
 Yes 'each file is fetched by a url on the list, stored under its sha256, and must hash to it' ($fm.Contains('CheckUrl(url);') -and $fm.Contains('EndsWith("/" + sha') -and $fm.Contains('if (got != sha) throw'))
 Yes 'it checks with the launcher''s own signer' ($fm.Contains('ReleaseManifest.Refusal(cat, json, assets, ExpectedSigner, out said)'))
