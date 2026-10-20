@@ -163,7 +163,8 @@ section(function () {
 
 // ---------------------------------------------------------------- 2. guard()
 section(function () {
-  const gText = fnText(src, 'function guard(name, fn) {');
+  // guard() counts its time through countSpent() since #385, so both are lifted.
+  const gText = fnText(src, 'function guard(name, fn) {') + '\n' + fnText(src, 'function countSpent(name, began) {');
   yes('guard(), with the table of who acts in each engine event, is in gamemode.js', gText.indexOf('const ACTS_AS = ') > 0);
   const heldPids = { 700: true };
   const box = {
