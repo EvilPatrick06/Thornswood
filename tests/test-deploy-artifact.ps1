@@ -82,13 +82,19 @@ function Put([string]$path, [string]$text) {
 function Run-Git { $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'; & git @args 2>&1 | Out-Null; $ErrorActionPreference = $old }
 function Head-Of([string]$dir) { return ((& git -C $dir rev-parse HEAD) | Out-String).Trim() }
 function Blob([string]$dir, [string]$spec) {
-    # The commit's own bytes, through a file, since a pipe would decode them.
-    $out = Join-Path $tmp ('blob-' + [Guid]::NewGuid().ToString('N'))
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $p = Start-Process -FilePath 'git' -ArgumentList @('-C', ('"' + $dir + '"'), 'cat-file', 'blob', $spec) -NoNewWindow -Wait -PassThru -RedirectStandardOutput $out
-    $ErrorActionPreference = $old
-    $b = [IO.File]::ReadAllBytes($out)
-    Remove-Item -LiteralPath $out -Force
+    # The commit's own bytes, read from git's output stream itself. A pipe
+    # would decode them, and so does Start-Process -RedirectStandardOutput
+    # off Windows (on Linux it turned 14 bytes into 18, #2872).
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = 'git'
+    $psi.Arguments = '-C "' + $dir + '" cat-file blob ' + $spec
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardOutput = $true
+    $p = [Diagnostics.Process]::Start($psi)
+    $ms = New-Object IO.MemoryStream
+    $p.StandardOutput.BaseStream.CopyTo($ms)
+    $p.WaitForExit()
+    $b = $ms.ToArray()
     return ,$b
 }
 function Hex([byte[]]$b) { return (Get-ThornswoodSha256Hex $b) }
@@ -379,7 +385,7 @@ try {
         $c = Get-Content -LiteralPath $cur -Raw | ConvertFrom-Json
         Yes 'and says the commit, the zip and its hash' ($c.commit -eq $g.Commit -and $c.name -eq $g.Name -and $c.sha256 -eq $g.Sha256 -and $c.component -eq 'gamemode' -and -not ($c.PSObject.Properties.Name -contains 'edited'))
         # Read as text: PowerShell 7's ConvertFrom-Json turns a date into a DateTime.
-        Yes 'and when, and from which machine' ((Get-Content -LiteralPath $cur -Raw) -match '"deployedUtc":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"' -and $c.from -eq $env:COMPUTERNAME)
+        Yes 'and when, and from which machine' ((Get-Content -LiteralPath $cur -Raw) -match '"deployedUtc":\s*"\d{4}-\d\d-\d\dT\d\d:\d\d:\d\dZ"' -and $c.from -eq [Environment]::MachineName)
         $beside = Join-Path $partRoot 'data/thornswood-deploy.json'
         Yes 'the same record is beside what the part runs' ((Test-Path -LiteralPath $beside) -and (Get-Content -LiteralPath $beside -Raw) -eq (Get-Content -LiteralPath $cur -Raw))
         $bb = [IO.File]::ReadAllBytes($beside)

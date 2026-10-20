@@ -44,8 +44,9 @@ small heal that rides with it, because the game applies a record's
 effects all together or not at all. Drugs, ale and potions are not
 food here and keep their own effects.
 
-A soup, a stew or a chowder is food and 10 thirst. A dry ration is food
-only.
+A soup, a stew or a chowder counts as cooked: 25 hunger and 10 thirst
+(Patrick, 12 Oct 2026), so cooking a stew is never worse than cooking
+a chop. A dry ration is food only.
 
 ## Time and a full stomach
 
@@ -67,4 +68,4 @@ recipe does not yet become a burnt item. There is no timing minigame.
 
 ## Where this is
 
-The table that marks food, drink, ale, potion and poison is in the server, and an unknown edible is 15 hunger. The 8 seconds and the full-stomach sickness are in it too. The groups are in the server too (#1382), by record in game/data/food-groups.json: raw meat or fish is 8 and can start food sickness, cooked is 25 (the Homecooked Meal is cooked), a soup, stew or chowder is 15 hunger and 10 thirst, and ingredients (vegetables, fruit, honey, butter, flour), prepared food (bread, cheese, sweets, spiced beef) and the six drugs are 15. The six drugs also take the stimulant in [Exhaustion](exhaustion.md). The Bee and Barb's mixed drinks, the Battle-Brew meads and Red Eagle's Rye are ale, milk and snowberry juice are drink, and Goodberry is a potion. Tea is a group of its own: the three teas are drinks, 20 thirst, and take the tea stimulant in [Exhaustion](exhaustion.md). There is no feast group: no item is one. Burnt is a cooking quality level, not a group; a failed cook does not yet make burnt food. The cooked help and food's own magic are in the server too (#2682), in the same file: which groups lose their own magic and the three records kept whole (`strip`), which group warms on its own and which extra ingredient gives which help (`season`). The disease guard is the injury system's, from [Disease](disease.md). The seasoned dishes are not in the content plugin yet, so until they are, only the warmth and the taking away of food's own magic are live.
+The table that marks food, drink, ale, potion and poison is in the server, and an unknown edible is 15 hunger. The 8 seconds and the full-stomach sickness are in it too. The groups are in the server too (#1382), by record in game/data/food-groups.json: raw meat or fish is 8 and can start food sickness, cooked is 25 (the Homecooked Meal is cooked), a soup, stew or chowder counts as cooked and is 25 hunger and 10 thirst, and ingredients (vegetables, fruit, honey, butter, flour), prepared food (bread, cheese, sweets, spiced beef) and the six drugs are 15. The six drugs also take the stimulant in [Exhaustion](exhaustion.md). The Bee and Barb's mixed drinks, the Battle-Brew meads and Red Eagle's Rye are ale, milk and snowberry juice are drink, and Goodberry is a potion. Tea is a group of its own: the three teas are drinks, 20 thirst, and take the tea stimulant in [Exhaustion](exhaustion.md). There is no feast group: no item is one. Burnt is a cooking quality level, not a group; a failed cook does not yet make burnt food. The cooked help and food's own magic are in the server too (#2682), in the same file: which groups lose their own magic and the three records kept whole (`strip`), which group warms on its own and which extra ingredient gives which help (`season`). The disease guard is the injury system's, from [Disease](disease.md). The seasoned dishes are not in the content plugin yet, so until they are, only the warmth and the taking away of food's own magic are live.

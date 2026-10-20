@@ -3,7 +3,8 @@
 // #1382, the approved food list (issuecomment-6127545395) and docs/systems/
 // food.md: raw meat or fish 8 hunger and can start food sickness, cooked 25,
 // ordinary 15 (ingredient, prepared, and drugs until their effect lands), a
-// soup, stew or chowder 15 hunger and 10 thirst. Six drinks are ale, milk and
+// soup, stew or chowder 25 hunger and 10 thirst, because a soup counts as
+// cooked (Patrick, 12 Oct 2026, decision 2). Six drinks are ale, milk and
 // juice are drink, and Goodberry is a potion.
 //
 // Root cause (issuecomment-6129878434): no table said which group a record
@@ -88,7 +89,7 @@ if (ok) {
   e = eat('cd614:Skyrim.esm');           // Homecooked Meal
   yes('the Homecooked Meal is cooked, 25', e.food === 25);
   e = eat('f431d:Skyrim.esm');           // Venison Stew
-  yes('venison stew is 15 hunger and 10 thirst', e.food === 15 && e.drink === 10);
+  yes('venison stew counts as cooked: 25 hunger and 10 thirst', e.food === 25 && e.drink === 10);
   e = eat('64b3f:Skyrim.esm');           // Cabbage
   yes('a cabbage is an ingredient, 15', e.food === 15 && e.drink === 0);
   e = eat('65c98:Skyrim.esm');           // Bread
