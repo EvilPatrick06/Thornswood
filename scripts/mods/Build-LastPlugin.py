@@ -115,9 +115,10 @@ WHAT IT READS
 
   The load order is the NPC catalogue's own (npc-population.json loadOrder),
   read from --data, and every plugin has to be the bytes the catalogue was
-  built from (sha256), except Thornswood-Content.esp, which is read from the
-  repository's game/content, where it is made and shipped from. A load order that moved means the catalogue
-  is rebuilt first (scripts/dev/Build-NpcPopulation.py), then this. This
+  built from (sha256), except Thornswood's own (every file in game/content,
+  scripts/dev/own_plugins.py), which are read from the repository's
+  game/content, where they are made and shipped from. A load order that moved
+  means the catalogue is rebuilt first (scripts/dev/Build-NpcPopulation.py), then this. This
   plugin is never read as an input: it is what the catalogue and the policy
   produce, and the catalogue reads past it too.
 
@@ -186,6 +187,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
 sys.path.insert(0, os.path.join(ROOT, 'scripts', 'dev'))
 import bsa  # noqa: E402  (the repository's archive reader)
+import own_plugins  # noqa: E402  (where each plugin of the load order is read from, #2923)
 
 PLUGIN = 'Thornswood-Last.esp'
 CONTENT = 'Thornswood-Content.esp'
@@ -195,7 +197,6 @@ CATALOGUE = os.path.join(ROOT, 'game', 'data', 'npc-population.json')
 POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
-REPO_CONTENT = os.path.join(ROOT, 'game', 'content', CONTENT)
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -751,15 +752,16 @@ def load(data_dir, catalogue):
     canon = {n.lower(): n for n in order}
     plugins, problems = [], []
     for i, row in enumerate([r for r in catalogue['loadOrder'] if r['name'] != PLUGIN]):
-        # The content plugin is read where it is made and shipped from, the
-        # repository: a game folder holds whichever release last reached it.
-        path = REPO_CONTENT if row['name'] == CONTENT else os.path.join(data_dir, row['name'])
+        # Thornswood's own plugins are read where they are made and shipped
+        # from, the repository: a game folder holds whichever release last
+        # reached it.
+        path = own_plugins.plugin_path(data_dir, row['name'])
         if not os.path.isfile(path):
             problems.append('%s is not in %s' % (row['name'], data_dir))
             continue
         p = Plugin(path, row['name'], i)
         sha = hashlib.sha256(p.buf).hexdigest()
-        if row['name'] == CONTENT:
+        if own_plugins.is_own(row['name']):
             pass
         elif sha != row['sha256']:
             problems.append('%s in %s is not the bytes npc-population.json was built from '

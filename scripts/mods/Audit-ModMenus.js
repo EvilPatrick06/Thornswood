@@ -62,6 +62,7 @@
 // its own, which only its source says. Those need the game or the source.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath } = require('../dev/OwnPlugins.js');
 const zlib = require('zlib');
 
 const BASE_MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'];
@@ -557,7 +558,7 @@ function audit(opts) {
   const globs = {};
 
   order.forEach(function (name) {
-    const file = path.join(data, name);
+    const file = pluginPath(data, name);
     if (!fs.existsSync(file)) { missing.push(name); return; }
     let p;
     try { p = readPlugin(file, name); } catch (e) { problem(name + ' would not read: ' + e.message); return; }

@@ -180,7 +180,7 @@ const stale = OURS.filter((n) => {
   const p = path.join(ROOT, 'game', 'content', n);
   return !row || !fs.existsSync(p) || row.sha256 !== crypto.createHash('sha256').update(fs.readFileSync(p)).digest('hex');
 });
-yes('B3 and ours are the repository\'s (rebuild the table after a content change)' +
+yes('B3 and ours are the repository\'s (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)' +
     (stale.length ? ' (not: ' + stale.join(', ') + ')' : ''), stale.length === 0);
 
 // ---------------------------------------------------------------- S

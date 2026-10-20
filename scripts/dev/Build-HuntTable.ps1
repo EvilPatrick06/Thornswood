@@ -244,6 +244,10 @@ param(
     [switch] $NoInstall
 )
 
+# Thornswood's own plugins are read from game\content, every other plugin
+# from -Data (#2923, OwnPlugins.ps1).
+. (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+
 # ---------------------------------------------------------------- knobs ----
 # classes.md is the rulebook. It gives the hunter the carcass and gives nobody
 # else any part of it, and it sets four ranks and says what each rung means. It
@@ -709,7 +713,7 @@ Ok ("{0} plugins: the 5 masters and {1} from {2}" -f $order.Count, ($order.Count
 if ($offCount -gt 0) { Note "$offCount line(s) in that list are switched off and were left out" }
 
 $missing = New-Object 'System.Collections.Generic.List[string]'
-foreach ($pl in $order) { if (-not (Test-Path -LiteralPath (Join-Path $Data $pl))) { $missing.Add($pl) } }
+foreach ($pl in $order) { if (-not (Test-Path -LiteralPath (Get-PluginPath $Data $pl))) { $missing.Add($pl) } }
 if ($missing.Count -gt 0) {
     Bad ("{0} plugin(s) the list enables are not in {1}: {2}" -f $missing.Count, $Data, ($missing -join ', '))
 } else {
@@ -741,7 +745,7 @@ function Get-BsaCached([string]$name) {
 }
 
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $head = New-Object byte[] 12
     $fs = [System.IO.File]::OpenRead($path)
@@ -808,7 +812,7 @@ $nam7Min = [double]::MaxValue; $nam7Max = [double]::MinValue
 $nam8Min = [long]::MaxValue;   $nam8Max = [long]::MinValue
 
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }

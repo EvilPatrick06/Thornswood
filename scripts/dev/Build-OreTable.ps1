@@ -63,6 +63,10 @@ param(
     [switch]   $NoInstall
 )
 
+# Thornswood's own plugins are read from game\content, every other plugin
+# from -Data (#2923, OwnPlugins.ps1).
+. (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+
 # ---------------------------------------------------------------- knobs ----
 # classes.md is the rulebook. It settles who may mine and that rank decides
 # what a source gives, and it settles nothing below. These are the judgement
@@ -450,7 +454,7 @@ if ($Plugins.Count -gt 0) {
 }
 
 $missing = New-Object 'System.Collections.Generic.List[string]'
-foreach ($p in $order) { if (-not (Test-Path -LiteralPath (Join-Path $Data $p))) { $missing.Add($p) } }
+foreach ($p in $order) { if (-not (Test-Path -LiteralPath (Get-PluginPath $Data $p))) { $missing.Add($p) } }
 if ($missing.Count -gt 0) {
     Bad ("{0} plugin(s) in the load order are not in {1}: {2}" -f $missing.Count, $Data, ($missing -join ', '))
 } else {
@@ -465,7 +469,7 @@ $tables = @{}
 $looseDir = Join-Path $Data 'Strings'
 $bsaFiles = $null
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     # only a plugin flagged localised keeps its names in a string table
     $head = New-Object byte[] 12
@@ -522,7 +526,7 @@ $perType = @{}
 $oreNameFromEdid = 0
 
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }
