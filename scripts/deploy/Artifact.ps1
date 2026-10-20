@@ -85,6 +85,40 @@ $script:ThornswoodDeployStore = 'C:/Thornswood-Deploys'
 function Initialize-ThornswoodArtifactType {
   # Its own type, so a session that loaded ThornswoodArtifactZip before this
   # was added still gets it.
+  if (-not ('ThornswoodArtifactName' -as [type]) -and [Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+    # Off Windows (a cloud thread, #2872) there is no kernel32: loading it
+    # failed inside Claim with "Value cannot be null (path1)". Linux's
+    # renameat2 with RENAME_NOREPLACE is the same promise as MoveFileEx
+    # without MOVEFILE_REPLACE_EXISTING, for a file and a folder alike: it
+    # names in one step, or answers EEXIST and leaves what is there. A plain
+    # rename would replace a file, and an empty folder, at the name.
+    Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.IO;
+using System.Runtime.InteropServices;
+
+public static class ThornswoodArtifactName {
+    [DllImport("libc", SetLastError = true)]
+    [DefaultDllImportSearchPaths(DllImportSearchPath.SafeDirectories)]
+    static extern int renameat2(int olddirfd, string oldpath, int newdirfd, string newpath, uint flags);
+
+    const int AT_FDCWD = -100;
+    const uint RENAME_NOREPLACE = 1;
+    const int EEXIST = 17;
+
+    // Gives a finished file or folder its name in one rename, or answers
+    // false when the name is already taken. Any other refusal is thrown with
+    // its reason.
+    public static bool Claim(string from, string to) {
+        string source = Path.GetFullPath(from), target = Path.GetFullPath(to);
+        if (renameat2(AT_FDCWD, source, AT_FDCWD, target, RENAME_NOREPLACE) == 0) return true;
+        int code = Marshal.GetLastWin32Error();
+        if (code == EEXIST) return false;
+        throw new IOException(source + " could not be named " + target + ": " + Marshal.GetPInvokeErrorMessage(code) + " (errno " + code + ")");
+    }
+}
+'@
+  }
   if (-not ('ThornswoodArtifactName' -as [type])) {
     Add-Type -Language CSharp -TypeDefinition @'
 using System;
@@ -740,7 +774,7 @@ function New-ThornswoodDeployRecord($Artifact, [string]$Root) {
     files       = @($Artifact.Record.files).Count
     root        = $Root.Replace('\', '/')
     deployedUtc = [DateTime]::UtcNow.ToString("yyyy-MM-dd'T'HH:mm:ss'Z'", [Globalization.CultureInfo]::InvariantCulture)
-    from        = [string]$env:COMPUTERNAME
+    from        = [Environment]::MachineName  # COMPUTERNAME is Windows only (#2872)
   }
 }
 
@@ -872,7 +906,7 @@ function Get-ThornswoodServerRestoreScript {
   param(
     [Parameter(Mandatory = $true)][string]$Root,
     [Parameter(Mandatory = $true)][string]$At,
-    [string]$From = [string]$env:COMPUTERNAME,
+    [string]$From = [Environment]::MachineName,
     [string]$Store = $script:ThornswoodDeployStore
   )
   $q = { param($s) "'" + ([string]$s).Replace("'", "''") + "'" }

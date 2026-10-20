@@ -105,8 +105,10 @@ function New-ThornswoodBuildStamp {
 
   if (-not $FeedDir) {
     # This machine's working copy of the channel's feed (Feed-Store.ps1), the
-    # same folder whichever checkout or worktree this runs from.
-    $c = Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') $Channel
+    # same folder whichever checkout or worktree this runs from. Where.ps1
+    # names it, off Windows too (#2872), where there is no copy until
+    # something stores one, so the stamp says ''.
+    $c = & (Join-Path $PSScriptRoot 'Where.ps1') $(if ($Channel -eq 'main') { 'Releases' } else { 'ReleasesDev' })
     if (Test-Path -LiteralPath (Join-Path $c 'version.json')) { $FeedDir = $c }
   }
   $feed = ''

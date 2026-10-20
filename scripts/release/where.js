@@ -14,6 +14,7 @@
  */
 
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const here = __dirname;
@@ -40,19 +41,29 @@ function own(obj, name) {
   return obj && Object.prototype.hasOwnProperty.call(obj, name) ? obj[name] : undefined;
 }
 
+// This machine's own data, the same folder Where.ps1's Get-MachineData names:
+// %LOCALAPPDATA%\Thornswood, or off Windows the folder .NET gives for it
+// ($XDG_DATA_HOME, else ~/.local/share). Before #2872 a missing LOCALAPPDATA
+// made these paths relative to wherever node was started.
+function machineData() {
+  let d = process.env.LOCALAPPDATA;
+  if (!d) d = process.env.XDG_DATA_HOME && path.isAbsolute(process.env.XDG_DATA_HOME) ? process.env.XDG_DATA_HOME : path.join(os.homedir(), '.local', 'share');
+  return path.join(d, 'Thornswood');
+}
+
 function getPlace(layout, name) {
   if (name === 'Repo') return repo;
   // This machine's working copies of the feeds (Feed-Store.ps1, #907), not
   // clones of Thornswood-Releases beside the repository any more.
   if (name === 'Releases' || name === 'ReleasesDev') {
-    return path.join(process.env.LOCALAPPDATA || '', 'Thornswood', 'feed', name === 'Releases' ? 'main' : 'dev');
+    return path.join(machineData(), 'feed', name === 'Releases' ? 'main' : 'dev');
   }
   // This machine's engine build (#2019), the same answer as Where.ps1's
   // EngineBuild: the fork folder %LOCALAPPDATA%\Thornswood\engine-build.json
   // names, or the checkout's own engine when it names none. A record naming
   // a folder with no build in it throws rather than falling back.
   if (name === 'EngineBuilds') {
-    return path.join(process.env.LOCALAPPDATA || '', 'Thornswood', 'engine-build.json');
+    return path.join(machineData(), 'engine-build.json');
   }
   if (name === 'EngineBuild') {
     const file = getPlace(layout, 'EngineBuilds');
