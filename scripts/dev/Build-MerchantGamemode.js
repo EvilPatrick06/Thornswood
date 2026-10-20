@@ -25,6 +25,8 @@ const scarceHarvest=require(path.join(root,'scripts/dev/MerchantScarceHarvestSou
  require(path.join(root,'game/data/merchant-scarce-harvest.json')),require(path.join(root,'game/data/npc-population.json')));
 const scarceFishing=require(path.join(root,'scripts/dev/MerchantScarceFishingSources.js')).validateScarceFishing(
  require(path.join(root,'game/data/merchant-scarce-fishing.json')),require(path.join(root,'game/data/resource-locations.json')));
+const scarceLongfin=require(path.join(root,'scripts/dev/MerchantScarceLongfinSources.js')).longfinSources(
+ require(path.join(root,'game/data/quest-content.json')));
 const nativeSource = fs.readFileSync(path.join(root, 'game/merchant-ledger-native.js'), 'utf8').replace(/\r\n/g, '\n');
 const budgetSource = fs.readFileSync(path.join(root, 'game/scene-reward-budget.js'), 'utf8').replace(/\r\n/g, '\n');
 const sites = JSON.parse(fs.readFileSync(path.join(root, 'game/data/guild-sites.json'), 'utf8')).sites;
@@ -88,6 +90,8 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   'module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFishingSources;\n' +
   'module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;\n' +
   'module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeSources;\n' +
+  'module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;\n' +
+  'module.exports.scarceLongfin = function () { return '+JSON.stringify(scarceLongfin)+'; };\n' +
   'module.exports.scarceGeodes = function () { return '+JSON.stringify(scarceGeodes)+'; };\n' +
   'module.exports.scarceHarvest = function () { return '+JSON.stringify(scarceHarvest)+'; };\n' +
   'module.exports.scarceFishing = function () { return '+JSON.stringify(scarceFishing)+'; };\n' +

@@ -7690,15 +7690,18 @@ function fish(actorId, refrId, baseDesc) {
   // empty their pack over a broken build is the wrong answer twice.
   const source=globalThis.__thornswoodQuestFishingRefs && globalThis.__thornswoodQuestFishingRefs[refrId];
   if(source && source!==baseDesc)return 'This pearl bed is unavailable for now.';
-  let result,selected=!!source;
+  const longfin=baseDesc==='154a5:Thornswood-Content.esp';
+  const method=longfin?'longfinScarce':'fishScarce';
+  const unavailable=longfin?'This longfin water is unavailable for now.':'This pearl bed is unavailable for now.';
+  let result,selected=!!source || longfin;
   if(selected) {
     try {
       const quests=globalThis.__thornswoodQuests;
-      if(!quests || typeof quests.fishScarce!=='function')return 'This pearl bed is unavailable for now.';
-      result=quests.fishScarce(actorId,refrId);
-      if(!result || !result.ok)return result && result.text || 'This pearl bed is unavailable for now.';
+      if(!quests || typeof quests[method]!=='function')return unavailable;
+      result=quests[method](actorId,refrId);
+      if(!result || !result.ok)return result && result.text || unavailable;
       got=result.count;
-    }catch(error){return 'This pearl bed is unavailable for now.';}
+    }catch(error){return unavailable;}
   }else result=stock.take(refrId,span,()=>addItemsAtomic(actorId,[{item:caught.produce,count:got}]));
   if (!result.ok) {
     return 'There is ' + caught.name + ' here and nothing in this load order to ' +
@@ -8752,6 +8755,15 @@ function kindIsContainer(baseDesc) {
 }
 
 mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
+  const questFishBase=globalThis.__thornswoodQuestFishingRefs && globalThis.__thornswoodQuestFishingRefs[refrId];
+  if(questFishBase) {
+    if(!casterRefrId)return false;
+    try {
+      const base=mp.get(refrId,'baseDesc');
+      notify(casterRefrId,base===questFishBase?fish(casterRefrId,refrId,base):'This quest water is unavailable for now.');
+    }catch(error){try {log('Scarce fishing refused:',String(error));}catch(logError){}}
+    return false;
+  }
   if([0x10fc57,0x10eb24,0x10e994,0x10e955,0x10e8bb,0x10fc4c].includes(refrId)) {
     if(!casterRefrId)return false;
     try {notify(casterRefrId,drawGeode(casterRefrId,refrId,mp.get(refrId,'baseDesc')));}
@@ -8775,12 +8787,6 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     return;
   }
 
-  // The reference register is independent of the fallible quest service.
-  const questFishBase=globalThis.__thornswoodQuestFishingRefs && globalThis.__thornswoodQuestFishingRefs[refrId];
-  if(questFishBase && questFishBase!==baseDesc) {
-    notify(casterRefrId,'This pearl bed is unavailable for now.');
-    return false;
-  }
 
   /*
     A NOTICE BOARD OR ITS DROP BOX (#2516, #2298): the server's own
@@ -75240,6 +75246,12 @@ function createQuestSources(mp,input,contract) {
    if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==1||fields[0].data[0]!==value)fail();
   }
  }
+ function produce(lookup,row) {
+  const fields=(lookup.record.fields||[]).filter(f=>f&&f.type==='PFIG');
+  if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==4)fail();
+  const data=fields[0].data,raw=Buffer.from(data.buffer,data.byteOffset,4).readUInt32LE();
+  if(mapped(lookup,raw)!==row.itemId)fail();
+ }
  const byId=new Map(),byDesc=new Set();
  if(!Array.isArray(input)||input.length!==contract.count)fail();
  for(const original of input) {
@@ -75252,7 +75264,8 @@ function createQuestSources(mp,input,contract) {
   byId.set(id,{...row,id,baseId:base,itemId:item,worldId:world});byDesc.add(row.reference);
  }
  function source(row) {
-  winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  const baseRecord=winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  if(contract.produce)produce(baseRecord,row);
   const itemRecord=winner(row.itemId,contract.itemType);
   if(contract.emptyPetty)emptyPetty(itemRecord);
   if(call('getDescFromId',row.id)!==row.reference||call('get',row.id,'isDisabled')!==false||
@@ -75291,7 +75304,10 @@ function createQuestHarvestSources(mp,input) {
 function createQuestGeodeSources(mp,input) {
  return createQuestSources(mp,input,{label:'geode',count:6,baseType:'ACTI',itemType:'SLGM',rank:'novice',returnMinutes:30,vanillaIds:true,emptyPetty:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources};
+function createQuestLongfinSources(mp,input) {
+ return createQuestSources(mp,input,{label:'longfin',count:8,baseType:'FLOR',itemType:'INGR',rank:'master',returnMinutes:240,produce:true});
+}
+module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources};
 return module.exports;})();
 const SCENE_BUDGET = (function () { const module = {exports:{}};
 'use strict';
@@ -76310,6 +76326,8 @@ module.exports.prepareRoles = function (population, mp) {
 module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFishingSources;
 module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;
 module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeSources;
+module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;
+module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
 module.exports.scarceFishing = function () { return {"version":1,"quest":"pearl","label":"Raven Rock coast","sources":[{"reference":"3828e:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27197.439453125,33044.234375,-82.0891342163086],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"38894:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27077.59765625,28003.259765625,-167.68028259277344],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"3919c:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[25586.798828125,33730.1015625,280.6593017578125],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60}]}; };
@@ -76500,7 +76518,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     { gate: {classKey: 'miner', rank: 'master'}, id: 'gem', name: 'A gem', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 2, holds: 6, hours: 24, scarce: true, gems: GEMS },
     { gate: {classKey: 'miner', rank: 'master'}, id: 'stalhrim', name: 'The stalhrim', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 3, holds: 8, hours: 24, scarce: true },
     { gate: {classKey: 'miner', rank: 'master'}, id: 'heartstone', name: 'The heart stone', who: 'Miner, master', classKey: 'miner', rank: 'master', ask: 3, holds: 8, hours: 24, scarce: true },
-    { gate: {classKey: 'fisher', rank: 'novice'}, id: 'longfin', name: 'The longfin', who: 'Fisher', classKey: 'fisher', rank: '', ask: 2, holds: 8, hours: 12, scarce: true },
+    { gate: {classKey: 'fisher', rank: 'master'}, id: 'longfin', name: 'The longfin', who: 'Fisher, master', classKey: 'fisher', rank: 'master', ask: 2, holds: 8, hours: 12, scarce: true },
     { gate: {classKey: 'fisher', rank: 'expert'}, id: 'pearl', name: 'The pearl bed', who: 'Fisher, expert', classKey: 'fisher', rank: 'expert', ask: 1, holds: 3, hours: 8, scarce: true },
     { gate: {classKey: 'gatherer', rank: 'novice'}, id: 'crimson', name: 'The crimson', who: 'Gatherer', classKey: 'gatherer', rank: '', ask: 3, holds: 8, hours: 12, scarce: true },
     { gate: {classKey: 'hunter', rank: 'master'}, id: 'mammoth', name: 'The mammoth ground', who: 'Hunter, master', classKey: 'hunter', rank: 'master', ask: 1, holds: 3, hours: 24, scarce: true },
@@ -76534,11 +76552,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   }));
   var byId = {};
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
-  var LEGACY_TRADE = {pearl:'Enchanter',ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
+  var LEGACY_TRADE = {longfin:'Alchemist',pearl:'Enchanter',ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
     wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist',geode:'Enchanter'};
   // New legacy work has one appointed specialist. Already accepted work
   // keeps its former compatible trade and destination rules after the cut.
-  var LEGACY_OFFER_REF = {pearl:'177da:Dragonborn.esm',ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
+  var LEGACY_OFFER_REF = {longfin:'198d2:Skyrim.esm',pearl:'177da:Dragonborn.esm',ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
     stalhrim:'1828f:Dragonborn.esm',heartstone:'1828f:Dragonborn.esm',
     wolf:'1a684:Skyrim.esm',sabre:'1b124:Skyrim.esm',camp:'1a67c:Skyrim.esm',
     bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm',geode:'1e7d6:Skyrim.esm'};
@@ -76838,6 +76856,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         refused:'This bed needs Expert Fisher standing, a suitable pole and a closer approach.',
         wait:'This pearl bed has already been gathered. Come back after it returns.'});
     }
+    function longfinScarce(actor,ref) {
+      return drawScarce(actor,ref,byId.longfin,deps.longfinData,deps.longfinSources,deps.longfinRules,deps.fishingStock,{
+        unavailable:'This longfin water is unavailable for now.',closed:'Take the longfin work from the Haafingar Alchemist first.',
+        full:'This work has given you all eight fish. Return or abandon it first.',
+        refused:'This water needs Master Fisher standing, a suitable pole and a closer approach.',
+        wait:'This longfin water has already been gathered. Come back after it returns.'});
+    }
     function geodeScarce(actor,ref) {
       return drawScarce(actor,ref,byId.geode,deps.geodeData,deps.geodeSources,deps.geodeRules,deps.geodeStock,{
         unavailable:'This geode is unavailable for now.',closed:'Take the geode work from the Winterhold Enchanter first.',
@@ -77053,6 +77078,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       gem: {Ruby: 'White Ridge Sanctum', Sapphire: 'Highpoint Tower', Emerald: 'Kolbjorn Barrow', Amethyst: 'Highpoint Tower'}
     };
     function bound(row) {
+      if(row.id==='longfin')return !!deps.longfinSources && !!deps.longfinData;
       if(row.id==='pearl')return !!deps.fishingSources && !!deps.fishingData;
       if(row.id==='geode')return !!deps.geodeSources && !!deps.geodeData;
       var place = places[row.id];
@@ -77141,7 +77167,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, harvestScarce:harvestScarce, geodeScarce:geodeScarce,
+      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, longfinScarce:longfinScarce, harvestScarce:harvestScarce, geodeScarce:geodeScarce,
       shutdown: function () { active = false; }
     };
   }
@@ -77172,20 +77198,26 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       var questRulesSource=globalThis.__thornswoodProgression;
       var questCharacterSource=globalThis.__thornswoodCharacter;
       var fishingData=typeof MERCHANT_TRADING.scarceFishing==='function'?MERCHANT_TRADING.scarceFishing():null;
-      var fishingSources=null;
-      if(fishingData) {
-        // Resolve the three stable references once, separately from source
-        // validation, so a failed quest service cannot turn them ordinary.
-        var fishingRefs=Object.create(null);
-        fishingData.sources.forEach(function(source){
+      var longfinData=typeof MERCHANT_TRADING.scarceLongfin==='function'?MERCHANT_TRADING.scarceLongfin():null;
+      var fishingSources=null,longfinSources=null,fishingRefs=Object.create(null);
+      // Register every selected water before fallible source construction.
+      // Missing services cannot make a selected reference ordinary fishing.
+      [fishingData,longfinData].filter(Boolean).forEach(function(data){
+        data.sources.forEach(function(source){
           var ref=mp.getIdFromDesc(source.reference);
-          if(!Number.isInteger(ref) || ref<=0 || ref>=0xff000000 || mp.getDescFromId(ref)!==source.reference)
-            throw new Error('The pearl-bed reference register cannot be resolved.');
+          if(!Number.isInteger(ref) || ref<=0 || ref>=0xff000000 || mp.getDescFromId(ref)!==source.reference || fishingRefs[ref])
+            throw new Error('The scarce fishing reference register cannot be resolved.');
           fishingRefs[ref]=source.base;
         });
-        globalThis.__thornswoodQuestFishingRefs=Object.freeze(fishingRefs);
+      });
+      globalThis.__thornswoodQuestFishingRefs=Object.freeze(fishingRefs);
+      if(fishingData) {
         try {fishingSources=MERCHANT_TRADING.createQuestFishingSources(mp,fishingData.sources);}
         catch(error){log('The pearl bed stays unavailable: '+String(error));}
+      }
+      if(longfinData) {
+        try {longfinSources=MERCHANT_TRADING.createQuestLongfinSources(mp,longfinData.sources);}
+        catch(error){log('The longfin work stays unavailable: '+String(error));}
       }
       var harvestData=typeof MERCHANT_TRADING.scarceHarvest==='function'?MERCHANT_TRADING.scarceHarvest():null;
       var harvestSources=null;
@@ -77211,6 +77243,9 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
           var want=RANK_LADDER.indexOf(plant.rank);
           return want>0 && rankStep(actor,'gatherer')<want ? 'This plant needs a higher Gatherer rank.' : null;
         },
+        longfinData:longfinData,longfinSources:longfinSources,
+        longfinRules:function(actor){return classGate(actor,'fish') || toolGate(actor,'fisher') ||
+          (typeof poleTooWeak==='function'?poleTooWeak(actor,'master'):null);},
         fishingData:fishingData,fishingSources:fishingSources,
         fishingStock:function(){return globalThis.__thornswoodResourceStock;},
         fishingRules:function(actor){return classGate(actor,'fish') || toolGate(actor,'fisher') ||
@@ -77279,6 +77314,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
           return merchants && typeof merchants.questAdmission==='function' ? merchants.questAdmission(actor,ref) : null;
         }
       });
+      if(longfinSources)globalThis.__thornswoodQuests.bindPlace('longfin',{cell:'3c:Skyrim.esm'});
       if(geodeSources)globalThis.__thornswoodQuests.bindPlace('geode',{cell:'1ee62:Skyrim.esm'});
       if(harvestSources)globalThis.__thornswoodQuests.bindPlace('crimson',{cell:'1ee62:Skyrim.esm'});
       Object.keys(RARE_PLACES).forEach(function (id) {

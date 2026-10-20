@@ -31,6 +31,12 @@ function createQuestSources(mp,input,contract) {
    if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==1||fields[0].data[0]!==value)fail();
   }
  }
+ function produce(lookup,row) {
+  const fields=(lookup.record.fields||[]).filter(f=>f&&f.type==='PFIG');
+  if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==4)fail();
+  const data=fields[0].data,raw=Buffer.from(data.buffer,data.byteOffset,4).readUInt32LE();
+  if(mapped(lookup,raw)!==row.itemId)fail();
+ }
  const byId=new Map(),byDesc=new Set();
  if(!Array.isArray(input)||input.length!==contract.count)fail();
  for(const original of input) {
@@ -43,7 +49,8 @@ function createQuestSources(mp,input,contract) {
   byId.set(id,{...row,id,baseId:base,itemId:item,worldId:world});byDesc.add(row.reference);
  }
  function source(row) {
-  winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  const baseRecord=winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  if(contract.produce)produce(baseRecord,row);
   const itemRecord=winner(row.itemId,contract.itemType);
   if(contract.emptyPetty)emptyPetty(itemRecord);
   if(call('getDescFromId',row.id)!==row.reference||call('get',row.id,'isDisabled')!==false||
@@ -82,4 +89,7 @@ function createQuestHarvestSources(mp,input) {
 function createQuestGeodeSources(mp,input) {
  return createQuestSources(mp,input,{label:'geode',count:6,baseType:'ACTI',itemType:'SLGM',rank:'novice',returnMinutes:30,vanillaIds:true,emptyPetty:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources};
+function createQuestLongfinSources(mp,input) {
+ return createQuestSources(mp,input,{label:'longfin',count:8,baseType:'FLOR',itemType:'INGR',rank:'master',returnMinutes:240,produce:true});
+}
+module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources};
