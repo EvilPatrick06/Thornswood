@@ -1,0 +1,12 @@
+{
+  "v": 1,
+  "haulFee": 30,
+  "haulCutPercent": 10,
+  "haulCutFrom": 10,
+  "saleWorkerPercent": 10,
+  "saleGonePercent": 10,
+  "saleCutFrom": 10,
+  "charter": "company",
+  "freightPerLoad": 0,
+  "freightTo": "ledger"
+}

@@ -7193,6 +7193,54 @@
     }
   }
 
+  // ==== broken limbs (#1383) ====
+  /*
+    A BROKEN LEG REFUSES SPRINT, the half of a break that is not an actor
+    value. docs/systems/injury.md: "A leg: ... sprint is refused." The server
+    keeps the break on the character and its screen script hands this file
+    globalThis.thornswoodBrokenLimbs, { leg }, the same way it hands
+    thornswoodHurtCare. The -8 speed and the -0.15 melee already ride on the
+    skills panel, and a broken arm's dearer block is charged by the server
+    when it charges the block (gamemode.js, BLOCK.brokenArm), so nothing of
+    the arm is done here.
+
+    bSprintOK is the only condition on the sprint transition (see
+    holdSprintGate below, measured on 20 September), so with a broken leg the
+    gate is held SHUT while the sprint key is down instead of open, and a
+    sprint already running is stopped. The game's own refusals work the same
+    way: over encumbered, out of stamina.
+
+    Both callers run under guard(), so a call the game refuses reaches the
+    guard's log rather than being swallowed here. Self contained, with sp
+    handed in, so tests/test-1383-limbs-brews.js can run it over a fake sp.
+  */
+  const brokenLimbs = (function (sp) {
+    const TELL_EVERY_MS = 30000;
+    let toldLegAt = 0;
+
+    function leg() {
+      const l = globalThis.thornswoodBrokenLimbs;
+      return !!(l && l.leg);
+    }
+
+    /* Shut the sprint gate on a broken leg. True when it did, so the caller
+       does not hold the gate open again on the same frame. */
+    function refuseSprint(pc) {
+      if (!pc || !leg()) { return false; }
+      if (pc.getAnimationVariableBool('bSprintOK')) { pc.setAnimationVariableBool('bSprintOK', false); }
+      if (pc.isSprinting()) { sp.Debug.sendAnimationEvent(pc, 'SprintStop'); }
+      const now = Date.now();
+      if (now - toldLegAt > TELL_EVERY_MS) {
+        toldLegAt = now;
+        sp.Debug.notification('Your broken leg will not take a sprint.');
+      }
+      return true;
+    }
+
+    return { refuseSprint: refuseSprint, leg: leg };
+  })(sp);
+  // ==== end broken limbs ====
+
   /**
    * Hold the sprint gate open while the key is down.
    *
@@ -7209,6 +7257,8 @@
     // keyboard mid press. Eight seconds is longer than anybody sprints in one
     // hold and short enough that it cannot stay stuck.
     if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
+    // A broken leg refuses sprint (#1383): the gate is held shut instead.
+    if (brokenLimbs.refuseSprint(pc)) { return; }
     if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
     try {
       if (pc.isOverEncumbered()) { return; }
@@ -7343,6 +7393,12 @@
     if (kind === 'sprint') {
       if (e.isUp) { sprintHeldSince = 0; }
       else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
+      // A broken leg (#1383): shut on the press itself, the frame the graph
+      // reads the gate, not only on the next update.
+      if (e.isDown && !e.isUp && brokenLimbs.leg()) {
+        const legPc = sp.Game.getPlayer();
+        if (legPc) { brokenLimbs.refuseSprint(legPc); }
+      }
     }
 
     if (!e.isDown || e.isUp) return;

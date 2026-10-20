@@ -809,17 +809,29 @@
       "issue": 2298
     },
     {
-      "path": "The 140 outfit meshes in scripts\\release\\built-until-1259.txt",
-      "what": "Outfits built in BodySlide on another machine from the collection's BodySlide projects, shipped as Thornswood's until Thornswood builds them itself.",
-      "published": "Packs and the installer, until #1259",
-      "source": "BodySlide output from mods in the collection",
-      "creator": "Those mods' authors, built by BodySlide",
-      "licence": "not recorded: those mods' permissions were not read",
-      "attribution": "not recorded",
-      "approved": "Shipped as ours for now (#1259)",
-      "evidence": "scripts\\release\\built-until-1259.txt; THIRD-PARTY.md, Shipped today with no licence this file can name.",
+      "path": "The 120 travel clothes meshes in scripts\\release\\built-until-1259.txt (Data\\meshes\\armor\\travel clothes\\)",
+      "what": "Common Clothes and Armors' women's outfits refitted to the 3BA body in BodySlide on another machine. Ship as Thornswood's until Build-Generated builds them from the collection's Common Clothes and Armors -3BA- Bodyslide project (#2454 part two).",
+      "published": "Packs and the installer, until #2454 part two replaces them with our own build",
+      "source": "Common Clothes and Armors -3BA- Bodyslide (Nexus SE 83980, by JamesDogg) over Common Clothes and Armors (Nexus SE 21305); some meshes from 3BA Vanilla Clothes and Armor (Nexus SE 51610)",
+      "creator": "Franklin Zunge and thetrader (Common Clothes and Armors), JamesDogg (3BA project), the authors 51610 credits; built by BodySlide",
+      "licence": "83980: \"Follow the permissions of the original mod\". 21305: asset use allowed without asking as long as the author is credited, not in anything sold, Donation Points allowed. 51610: not read (its Nexus page is shown only with adult content turned on).",
+      "attribution": "Common Clothes and Armors by Franklin Zunge and thetrader (Nexus SE 21305); 3BA BodySlide project by JamesDogg (Nexus SE 83980); 3BA Vanilla Clothes and Armor (Nexus SE 51610). Not yet on any credits page.",
+      "approved": "Shipped as ours for now (#1259); Patrick, 29 Sep: build them ourselves",
+      "evidence": "Nexus SE 83980 and 21305 permission sections, read on Nexus 17 Oct 2026 (#2454); scripts\\release\\built-until-1259.txt.",
       "status": "no-licence-found",
-      "issue": 1259
+      "issue": 2454
+    },
+    {
+      "path": "The 2 executioner meshes in scripts\\release\\built-until-1259.txt (Data\\meshes\\MCE\\clothes\\executioner\\f\\body_0.nif and body_1.nif)",
+      "what": "More Craftable Equipment's women's Executioner's Robes refitted in BodySlide on another machine. Ship as Thornswood's until Build-Generated builds them from More Craftable Equipment's CBBE BodySlide file (#2454 part two).",
+      "published": "Packs and the installer, until #2454 part two replaces them with our own build",
+      "source": "More Craftable Equipment - Unenchanted Clothing and Specialty Gear (Nexus SE 44666, by Parapets), its CBBE BodySlide file",
+      "creator": "Parapets (female and CBBE Executioner Robes, per the mod's file credits); built by BodySlide",
+      "licence": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International, named by the author on the mod page for the whole mod. A mesh we build from it is an adaptation: it goes out under the same licence, never in anything sold, with credit to every contributor of the assets used.",
+      "attribution": "Executioner Robes (female and CBBE) by Parapets, from More Craftable Equipment (Nexus SE 44666), CC BY-NC-SA 4.0. Not yet on any credits page.",
+      "approved": "Shipped as ours for now (#1259); Patrick, 29 Sep: build them ourselves",
+      "evidence": "Nexus SE 44666 Permissions and credits (Author's instructions and File credits), read on Nexus 17 Oct 2026 (#2454).",
+      "status": "cleared"
     },
     {
       "path": "Thornswood Content (Nexus mod 192001): SkyrimSoulsRE.ini, OpenAnimationReplacer.ini and four face files",
