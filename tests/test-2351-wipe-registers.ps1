@@ -101,9 +101,16 @@ function Put([string]$path, [string]$body) {
 }
 function Lit($a) { return (($a | ForEach-Object { "'" + ($_ -replace "'", "''") + "'" }) -join ',') }
 # Filled in the way the script fills them: its own variables, expanded.
+# The move sends the release list's writer too (#2668), so it is loaded here
+# as the script loads it, with the parts a wipe marks done.
+. (Join-Path $Repo 'scripts\ops\Release-List.ps1')
+$wd = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and "$($n.Left)" -eq '$WipeDone' }, $true))
+$WipeDone = @()
+if ($wd.Count -eq 1) { $WipeDone = @(& ([scriptblock]::Create($wd[0].Right.Extent.Text))) }
 function Fill([string]$body, [string]$stamp) {
     $rootsLit = Lit @($Root)
     $movesLit = Lit $Moves
+    $wipeDoneLit = Lit $WipeDone
     $tasksLit = ''
     $stamp = $stamp
     return $ExecutionContext.InvokeCommand.ExpandString($body)
@@ -119,6 +126,8 @@ function RunBox([string]$body) {
 try {
     Put (Join-Path $Root 'server-settings.json') '{}'
     Put (Join-Path $Root 'world\changeForms\ff000a01.json') '{"formDesc":"ff000a01","profileId":5001}'
+    # A character's change form is named by its slot number (0.json); the new release list names it (#2668).
+    Put (Join-Path $Root 'world\changeForms\0.json') '{"formDesc":"ff000a01","profileId":5001}'
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
                    'take-limit.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
@@ -166,10 +175,17 @@ try {
     $P = Join-Path $Root 'private'
     Yes 'the world goes aside as world-before-<date>' ((Test-Path (Join-Path $Root "world-before-$stamp\changeForms\ff000a01.json")) -and -not (Test-Path (Join-Path $Root 'world')))
     $ok = $true
-    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'dungeon-rewards-ledger', 'deleted-characters') {
+    foreach ($f in 'characters', 'property', 'farm-claims', 'law', 'beds', 'embassy', 'books', 'last-left', 'take-limit', 'dungeon-rewards-ledger') {
         if (-not (Test-Path (Join-Path $P "$f-before-$stamp.json")) -or (Test-Path (Join-Path $P "$f.json"))) { $ok = $false; Write-Host "      not moved: $f.json" }
     }
     Yes 'every register naming a character goes aside under its own name with the date' $ok
+    # The waiting list goes aside as it was, and a new one names the wiped
+    # character by form id (#2668; test-2668-reset-wipe-release.ps1 has the rest).
+    $newList = Join-Path $P 'deleted-characters.json'
+    Yes 'the waiting list goes aside as it was, and the new release list names the wiped character' (
+        (Test-Path (Join-Path $P "deleted-characters-before-$stamp.json")) -and
+        [IO.File]::ReadAllText((Join-Path $P "deleted-characters-before-$stamp.json")) -eq '{"file":"deleted-characters.json"}' -and
+        (Test-Path $newList) -and ([IO.File]::ReadAllText($newList) -like '{"profiles":`[`],"actors":`[4278192641`],"done":{*'))
     Yes 'the dungeon ledger''s mark goes with it under its own name, so the next start makes a fresh ledger' (
         (Test-Path (Join-Path $P "dungeon-rewards-ledger.initialized-before-$stamp")) -and -not (Test-Path (Join-Path $P 'dungeon-rewards-ledger.initialized')))
     $kept = $true
