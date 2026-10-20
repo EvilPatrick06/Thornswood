@@ -4,8 +4,10 @@
   Ship and Install-Thornswood stage the launcher under the temps folder, not
   %TEMP%. Issue #1272.
 
-  Patrick, 28 September: every build scratch root goes under
-  C:\ThornswoodTemps&Worktrees\temp\<task>, never [IO.Path]::GetTempPath().
+  Patrick, 28 September: every build scratch root goes under the temps
+  folder, never [IO.Path]::GetTempPath(). Since #2900 (20 Oct) that is the
+  repository's own temp\<task>, the main checkout's from a worktree; until
+  then it was C:\ThornswoodTemps&Worktrees\temp\<task> on One.
   Until #1272 both scripts joined GetTempPath() for Thornswood-launcher-*,
   and Ship also did for Thornswood-setup-*, so a Ship could write under the
   system temp folder and two Ships for the same Root could share one folder.
@@ -75,9 +77,9 @@ Yes 'Ship.ps1 buildOut calls Get-ScratchDir.ps1' ($ship -match '\$buildOut\s*=\s
 Yes 'Ship.ps1 stubDir calls Get-ScratchDir.ps1' ($ship -match '\$stubDir\s*=\s*&\s*\(Join-Path \$Here ''Get-ScratchDir\.ps1''\)')
 Yes 'Install-Thornswood.ps1 launcherBuild calls Get-ScratchDir.ps1' ($inst -match '\$launcherBuild\s*=\s*&\s*\(Join-Path \$Here ''\.\.\\release\\Get-ScratchDir\.ps1''\)')
 
-Yes 'Get-ScratchDir names the temps folder' ($help -match [regex]::Escape('C:\ThornswoodTemps&Worktrees\temp'))
+Yes 'Get-ScratchDir takes the temps folder from the main checkout' ($help -match 'commondir')
 Yes 'Get-ScratchDir honours THORNSWOOD_SCRATCH_ROOT' ($help -match 'THORNSWOOD_SCRATCH_ROOT')
-Yes 'Get-ScratchDir falls back to GetTempPath only when temps is missing' ($help -match 'GetTempPath\(\)')
+Yes 'Get-ScratchDir falls back to GetTempPath only outside a checkout' ($help -match 'GetTempPath\(\)')
 
 # ---- drive the helper under a sandbox -----------------------------------------
 $sysTemp = [IO.Path]::GetTempPath().TrimEnd('\', '/')
@@ -99,11 +101,15 @@ try {
     )
     Yes 'Get-ScratchDir joins the task name' ($got.EndsWith($task, [StringComparison]::OrdinalIgnoreCase))
 
-    # Without override, on this shipping machine the temps folder exists, so
-    # the answer must live under it and must not be under GetTempPath().
+    # Without override, in a checkout the answer is the main checkout's temp
+    # folder, which git itself names here as a check on how the helper reads
+    # git's files, and not under GetTempPath().
     Remove-Item Env:THORNSWOOD_SCRATCH_ROOT -ErrorAction SilentlyContinue
-    $tempsRoot = 'C:\ThornswoodTemps&Worktrees\temp'
-    if (Test-Path -LiteralPath $tempsRoot) {
+    $helperDir = Split-Path -Parent $ScratchHelper
+    $common = [string](git -C $helperDir rev-parse --git-common-dir)
+    if ($LASTEXITCODE -eq 0 -and $common) {
+        $common = [IO.Path]::GetFullPath([IO.Path]::Combine($helperDir, $common.Trim()))
+        $tempsRoot = Join-Path (Split-Path -Parent $common) 'temp'
         $live = & $ScratchHelper $task
         Yes ("Get-ScratchDir default is under the temps folder ($live)") (
             $live.StartsWith($tempsRoot, [StringComparison]::OrdinalIgnoreCase)
@@ -114,7 +120,7 @@ try {
             -not $liveFull.StartsWith($sysFull, [StringComparison]::OrdinalIgnoreCase)
         )
     } else {
-        Yes 'temps folder missing on this machine; default-path check skipped' $true
+        Yes 'git names the main checkout of this harness''s own checkout' $false
     }
 
     # What a Ship -DryRun build step would pass as OutDir: same formula Ship uses.

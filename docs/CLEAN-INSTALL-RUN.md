@@ -352,7 +352,7 @@ Get-ChildItem "$env:USERPROFILE\Downloads\Thornswood-Setup*.exe" | Sort-Object L
 goes to the repo folder.
 
 ```powershell
-cd C:\Users\you\Downloads\Thornswood-Repo
+cd C:\Thornswood-Repo
 .\scripts\release\Check-Build.ps1 -Data C:\ts-clean-run\Game\Data -NoPause
 .\scripts\mods\Check-Manifest.ps1 -Client C:\ts-clean-run -NoPause
 ```

@@ -27,9 +27,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Nightly = Join-Path (Join-Path (Split-Path -Parent $Here) 'scripts\vps') 'vps-nightly-backup.ps1'
 
-$base = 'C:\ThornswoodTemps&Worktrees\temp'
-if (-not (Test-Path -LiteralPath $base)) { $base = [IO.Path]::GetTempPath() }
-$work = Join-Path $base ('longtemp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$work = & (Join-Path (Split-Path -Parent $Here) 'scripts\release\Get-ScratchDir.ps1') ('longtemp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $long = Join-Path $work 'LongTempNameForShortPath'
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP

@@ -35,7 +35,8 @@
   never goes to GitHub. Backups is local\backups, where Backup-Server.ps1 and
   Fetch-Backups.ps1 put what they bring off the VPS and Clean-Everything.ps1
   looks for old ones. Patrick's rule that day: Thornswood work on One lives
-  only in the repository, the vault and C:\ThornswoodTemps&Worktrees, and the
+  only in the repository, the vault and C:\ThornswoodTemps&Worktrees (moved
+  into the repository's temp and worktrees on 20 Oct, #2900), and the
   backups were the last of it in Downloads\Thornswood-Backups. A worktree has
   a local folder of its own that goes with it, so the scripts that write
   backups stop when this answer is inside a worktree rather than leave the
@@ -55,7 +56,7 @@
   launcher there and then stopped at its generated files. ShipRoots is the
   file in this machine's own data (not in the repository, so every clone and
   worktree reads it) that names the folder for a channel, as
-  {"dev": "C:\\Users\\you\\Downloads\\Thornswood-Repo\\local\\release-devbuild"}
+  {"dev": "C:\\Thornswood-Repo\\local\\release-devbuild"}
   on One since 5 October; Setup-ShipMachine.ps1 -Root writes it. A channel
   it does not name is the rule above. These three are this machine's, and
   only the PowerShell release scripts ask, so where.js does not answer them.
