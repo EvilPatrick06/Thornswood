@@ -27,6 +27,10 @@ const scarceFishing=require(path.join(root,'scripts/dev/MerchantScarceFishingSou
  require(path.join(root,'game/data/merchant-scarce-fishing.json')),require(path.join(root,'game/data/resource-locations.json')));
 const scarceLongfin=require(path.join(root,'scripts/dev/MerchantScarceLongfinSources.js')).longfinSources(
  require(path.join(root,'game/data/quest-content.json')));
+const retrievalData=require(path.join(root,'scripts/dev/MerchantRetrievalSources.js')).validateRetrievalSources(
+ require(path.join(root,'game/data/merchant-retrievals.json')),require(path.join(root,'game/data/npc-population.json')),
+ fs.readFileSync(path.join(root,'game/content/Thornswood-Content.esp')),require(path.join(root,'game/data/merchant-roster.json')));
+const questItemSource=fs.readFileSync(path.join(root,'game/quest-items.js'),'utf8').replace(/\r\n/g,'\n');
 const nativeSource = fs.readFileSync(path.join(root, 'game/merchant-ledger-native.js'), 'utf8').replace(/\r\n/g, '\n');
 const budgetSource = fs.readFileSync(path.join(root, 'game/scene-reward-budget.js'), 'utf8').replace(/\r\n/g, '\n');
 const sites = JSON.parse(fs.readFileSync(path.join(root, 'game/data/guild-sites.json'), 'utf8')).sites;
@@ -78,6 +82,7 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   'const MERCHANT_ROLES = (function () { const module = {exports:{}};\n' + roleSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const MERCHANT_NATIVE = (function () { const module = {exports:{}};\n' + nativeSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const QUEST_FISHING_SOURCES = (function () { const module = {exports:{}};\n' + fishingSource.trimEnd() + '\nreturn module.exports;})();\n' +
+  'const QUEST_ITEMS = (function () { const module = {exports:{}};\n' + questItemSource.trimEnd() + '\nreturn module.exports;})();\n' +
   'const SCENE_BUDGET = (function () { const module = {exports:{}};\n' + budgetSource.trimEnd() + '\nreturn module.exports;})();\n' +
   moduleSource.trimEnd() + '\nconst install = module.exports.installMerchantTrading;\n' +
   'module.exports.installMerchantTrading = function (env) {\n' +
@@ -91,6 +96,9 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   'module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;\n' +
   'module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeSources;\n' +
   'module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;\n' +
+  'module.exports.createQuestRetrievalSources = QUEST_FISHING_SOURCES.createQuestRetrievalSources;\n' +
+  'module.exports.createQuestItemPolicy = QUEST_ITEMS.createQuestItemPolicy;\n' +
+  'module.exports.retrievalSources = function () { return '+JSON.stringify(retrievalData)+'; };\n' +
   'module.exports.scarceLongfin = function () { return '+JSON.stringify(scarceLongfin)+'; };\n' +
   'module.exports.scarceGeodes = function () { return '+JSON.stringify(scarceGeodes)+'; };\n' +
   'module.exports.scarceHarvest = function () { return '+JSON.stringify(scarceHarvest)+'; };\n' +

@@ -75252,25 +75252,48 @@ function createQuestSources(mp,input,contract) {
   const data=fields[0].data,raw=Buffer.from(data.buffer,data.byteOffset,4).readUInt32LE();
   if(mapped(lookup,raw)!==row.itemId)fail();
  }
+ function token(lookup) {
+  const fields=(lookup.record.fields||[]).filter(f=>f&&f.type==='DATA');
+  if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==8)fail();
+  const bytes=fields[0].data,data=Buffer.from(bytes.buffer,bytes.byteOffset,8);
+  if(data.readUInt32LE()!==0||data.readFloatLE(4)!==0)fail();
+ }
  const byId=new Map(),byDesc=new Set();
  if(!Array.isArray(input)||input.length!==contract.count)fail();
  for(const original of input) {
   const row=JSON.parse(JSON.stringify(original));
   if(!vector(original.position)||row.itemType!==contract.itemType||row.rank!==contract.rank||row.returnMinutes!==contract.returnMinutes||byDesc.has(row.reference))fail();
+  if(contract.retrieval&&(!['CONT','ACTI'].includes(row.baseType)||!['WRLD','CELL'].includes(row.spaceType)||
+    !row.provenance||!Number.isInteger(row.provenance.fileIndex)||row.provenance.fileIndex<0||
+    !/^[a-f0-9]{64}$/.test(row.provenance.recordSha256)))fail();
   const id=resolve(row.reference),base=resolve(row.base),item=resolve(row.item),world=resolve(row.world);
   if(item===15||byId.has(id)||contract.vanillaIds&&id!==parseInt(row.reference.split(':')[0],16))fail();
-  winner(base,contract.baseType);const itemRecord=winner(item,contract.itemType);winner(world,'WRLD');
+  winner(base,contract.retrieval?row.baseType:contract.baseType);const itemRecord=winner(item,contract.itemType);
+  winner(world,contract.retrieval?row.spaceType:'WRLD');
   if(contract.emptyPetty)emptyPetty(itemRecord);
+  if(contract.retrieval)token(itemRecord);
   byId.set(id,{...row,id,baseId:base,itemId:item,worldId:world});byDesc.add(row.reference);
  }
  function source(row) {
-  const baseRecord=winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  const baseRecord=winner(row.baseId,contract.retrieval?row.baseType:contract.baseType);
+  winner(row.worldId,contract.retrieval?row.spaceType:'WRLD');
   if(contract.produce)produce(baseRecord,row);
   const itemRecord=winner(row.itemId,contract.itemType);
   if(contract.emptyPetty)emptyPetty(itemRecord);
+  if(contract.retrieval)token(itemRecord);
   if(call('getDescFromId',row.id)!==row.reference||call('get',row.id,'isDisabled')!==false||
     call('get',row.id,'baseDesc')!==row.base)return false;
   const placement=winner(row.id,'REFR'),names=(placement.record.fields||[]).filter(f=>f&&f.type==='NAME');
+  if(contract.retrieval) {
+   const record=placement.record;
+   if(placement.fileIndex!==row.provenance.fileIndex||record.id!==row.provenance.rawId)return false;
+   const nativeFields=(record.fields||[]).map(f=>{
+    if(!f||typeof f.type!=='string'||!(f.data instanceof Uint8Array))fail();
+    return [f.type,Buffer.from(f.data.buffer,f.data.byteOffset,f.data.byteLength).toString('hex')];
+   });
+   const hash=require('node:crypto').createHash('sha256').update(JSON.stringify([record.type,record.id,record.flags,nativeFields])).digest('hex');
+   if(hash!==row.provenance.recordSha256)return false;
+  }
   if(names.length!==1||!(names[0].data instanceof Uint8Array)||names[0].data.byteLength!==4)return false;
   const bytes=names[0].data,raw=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength).readUInt32LE();
   if(mapped(placement,raw)!==row.baseId)return false;
@@ -75307,7 +75330,28 @@ function createQuestGeodeSources(mp,input) {
 function createQuestLongfinSources(mp,input) {
  return createQuestSources(mp,input,{label:'longfin',count:8,baseType:'FLOR',itemType:'INGR',rank:'master',returnMinutes:240,produce:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources};
+function createQuestRetrievalSources(mp,input) {
+ return createQuestSources(mp,input,{label:'retrieval',count:7,itemType:'MISC',retrieval:true});
+}
+module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};
+return module.exports;})();
+const QUEST_ITEMS = (function () { const module = {exports:{}};
+'use strict';
+function createQuestItemPolicy(mp) {
+ if(!mp||typeof mp.getDescFromId!=='function')throw new Error('Quest item identity lookup is unavailable');
+ const lookup=mp.getDescFromId;
+ const tokens=new Set(Array.from({length:7},(_,i)=>(0x17000+i).toString(16)+':thornswood-content.esp'));
+ return Object.freeze({blocked(baseId) {
+  if(!Number.isInteger(baseId)||baseId<=0||baseId>0xffffffff)return true;
+  try {
+   const desc=Reflect.apply(lookup,mp,[baseId]);
+   if(typeof desc!=='string'||!/^[0-9a-f]{1,8}:[^:\0\r\n]+\.(?:esm|esp|esl)$/i.test(desc))return true;
+   const colon=desc.indexOf(':'),canonical=parseInt(desc.slice(0,colon),16).toString(16)+desc.slice(colon).toLowerCase();
+   return tokens.has(canonical);
+  }catch(error){return true;}
+ }});
+}
+module.exports={createQuestItemPolicy};
 return module.exports;})();
 const SCENE_BUDGET = (function () { const module = {exports:{}};
 'use strict';
@@ -76327,6 +76371,9 @@ module.exports.createQuestFishingSources = QUEST_FISHING_SOURCES.createQuestFish
 module.exports.createQuestHarvestSources = QUEST_FISHING_SOURCES.createQuestHarvestSources;
 module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeSources;
 module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;
+module.exports.createQuestRetrievalSources = QUEST_FISHING_SOURCES.createQuestRetrievalSources;
+module.exports.createQuestItemPolicy = QUEST_ITEMS.createQuestItemPolicy;
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };

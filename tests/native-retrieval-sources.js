@@ -1,0 +1,30 @@
+'use strict';
+// Opt-in metadata integration against an already compiled addon. This creates
+// an isolated offline fixture on an ephemeral port, never a live/dev instance.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
+const root=path.resolve(__dirname,'..'),doc=require('../game/data/merchant-retrievals.json');
+const addon=require(path.resolve(process.argv[2])),data=path.resolve(process.argv[3]),scratch=path.resolve(process.argv[4]);
+assert(scratch.startsWith('C:\\ThornswoodTemps&Worktrees\\temp\\'),'fixture stays in the approved scratch area');
+const loadOrder=require('../game/data/npc-population.json').loadOrder.map(row=>{
+ const owned=path.join(root,'game/content',row.name),file=fs.existsSync(owned)?owned:path.join(data,row.name);
+ const sha=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+ assert.equal(sha,row.name==='Thornswood-Content.esp'?doc.contentSha256:row.sha256,row.name);return file;
+});
+fs.mkdirSync(path.join(scratch,'resources/scripts'),{recursive:true});
+process.chdir(scratch);
+const mp=new addon.ScampServer(JSON.stringify({port:0,maxPlayers:1,offlineMode:true,logLevel:'error',
+ dataDir:path.join(scratch,'resources'),privDir:path.join(scratch,'private'),loadOrder}));
+mp._setSelf(mp);
+for(const row of doc.sources) {
+ const id=mp.getIdFromDesc(row.reference),lookup=mp.lookupEspmRecordById(id),r=lookup.record;
+ assert.equal(mp.getDescFromId(id),row.reference);
+ assert.equal(lookup.fileIndex,row.provenance.fileIndex,row.quest+' winner index');
+ assert.equal(r.id,row.provenance.rawId,row.quest+' original raw ID');
+ const fields=r.fields.map(f=>[f.type,Buffer.from(f.data.buffer,f.data.byteOffset,f.data.byteLength).toString('hex')]);
+ const sha=crypto.createHash('sha256').update(JSON.stringify([r.type,r.id,r.flags,fields])).digest('hex');
+ assert.equal(sha,row.provenance.recordSha256,row.quest+' native ordered field hash');
+ const names=r.fields.filter(f=>f.type==='NAME');assert.equal(names.length,1);
+ assert.equal(mp.getDescFromId(lookup.toGlobalRecordId(Buffer.from(names[0].data).readUInt32LE())),row.base);
+}
+console.log('PASS all seven actual native winning file indices, raw identities and complete ordered record hashes');
+process.exit(0);
