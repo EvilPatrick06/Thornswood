@@ -59,6 +59,7 @@ import sys
 import zlib
 
 import bsa
+import own_plugins
 
 COMPRESSED = 0x00040000
 MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
@@ -244,7 +245,7 @@ def main():
             line = line[1:]
         if line not in order:
             order.append(line)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d plugin(s) are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))
@@ -260,7 +261,7 @@ def main():
     doors, out = {}, {'cells': {}, 'doors': {}}
     failed = 0
     for name in order:
-        pl = Plugin(os.path.join(args.data, name), name)
+        pl = Plugin(own_plugins.plugin_path(args.data, name), name)
         if pl.ok:
             walk(pl, doors, out, set())
     print('')
@@ -269,7 +270,7 @@ def main():
 
     localised = 0
     for name in order:
-        pl = Plugin(os.path.join(args.data, name), name)
+        pl = Plugin(own_plugins.plugin_path(args.data, name), name)
         if not pl.ok:
             continue
         # A localised plugin's cell names are string ids, and the text is in a

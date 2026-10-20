@@ -37,6 +37,7 @@ import sys
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import own_plugins  # noqa: E402
 _spec = importlib.util.spec_from_file_location('doortable', os.path.join(HERE, 'Build-DoorTable.py'))
 dt = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(dt)
@@ -147,7 +148,7 @@ def main():
             line = line[1:]
         if line not in order:
             order.append(line)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         # Said, written into wells.json, and skipped: a plugin that is not on
         # this machine cannot be read, and the table says so rather than
@@ -159,7 +160,7 @@ def main():
     # Two passes, as the door table: the bases first, then the placements.
     bases, seen, placed = {}, {}, {}
     for name in order:
-        pl = dt.Plugin(os.path.join(args.data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(args.data, name), name)
         if pl.ok:
             walk(pl, bases, seen, {})
     lost = sorted(set(WELLS) - set(seen))
@@ -167,7 +168,7 @@ def main():
         print('STOP. well base(s) not in the load order: %s' % ', '.join(lost))
         return 1
     for name in order:
-        pl = dt.Plugin(os.path.join(args.data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(args.data, name), name)
         if pl.ok:
             walk(pl, bases, {}, placed)
 
