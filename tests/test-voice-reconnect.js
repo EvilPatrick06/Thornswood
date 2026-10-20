@@ -104,7 +104,19 @@ function sockets() {
 }
 
 // ------------------------------------------------- the launcher's voice page
-function hostPage() {
+// The page's backoff waits a random half to whole of its cap. With the real
+// Math.random a count could land either side of a bound from one run to the
+// next (13 tries against 12 on the build runner, 20 Oct), so the sandbox's
+// Math.random always answers `jitter`: 0 is the shortest waits and so the
+// most tries, 0.999 the longest, and 0.5 is every other test here.
+function pinned(jitter) {
+  const m = Object.create(Math);
+  m.random = function () { return jitter; };
+  return m;
+}
+
+function hostPage(jitter) {
+  if (jitter === undefined) { jitter = 0.5; }
   const html = read('../launcher/voice-host.html');
   const m = /<script>([\s\S]*)<\/script>/.exec(html);
   if (!m) { throw new Error('voice-host.html has no script'); }
@@ -145,7 +157,7 @@ function hostPage() {
     fetch: function () { return Promise.reject(new Error('no network here')); },
     setTimeout: c.setTimeout, clearTimeout: c.clear,
     setInterval: c.setInterval, clearInterval: c.clear,
-    console: console, Promise: Promise, Map: Map, Math: Math, Number: Number, String: String,
+    console: console, Promise: Promise, Map: Map, Math: pinned(jitter), Number: Number, String: String,
     JSON: JSON, Date: { now: c.now }, Object: Object, Array: Array, isFinite: isFinite
   };
   vm.createContext(sandbox);
@@ -207,16 +219,36 @@ function hostPage() {
     Five minutes of refused handshakes, the old page's 134 tries: a fresh
     token every time, so only the backoff holds it down.
   */
-  const q = hostPage();
-  q.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: 'dead',
-           base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
-  for (let i = 0; i < 300; i++) {
-    const last = q.made[q.made.length - 1];
-    if (!last.closed) { last.refuse(); }
-    q.clock.advance(1000);
+  for (const jitter of [0, 0.999]) {
+    const q = hostPage(jitter);
+    q.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: 'dead',
+             base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
+    for (let i = 0; i < 300; i++) {
+      const last = q.made[q.made.length - 1];
+      if (!last.closed) { last.refuse(); }
+      q.clock.advance(1000);
+    }
+    console.log('      five minutes of refusals, jitter ' + jitter + ': ' + q.made.length + ' tries (the old page made 134 in the same five minutes)');
+    // At the shortest waits (half of each cap: 1, 2, 4, 8 and 16 seconds, then
+    // 30) five minutes holds 14 tries, against the old page's 134.
+    yes('five minutes of refusals is a handful of tries, jitter ' + jitter, q.made.length <= 14);
   }
-  console.log('      five minutes of refusals: ' + q.made.length + ' tries (the old page made 134 in the same five minutes)');
-  yes('five minutes of refusals is a handful of tries', q.made.length <= 12);
+  // And the half hour offline at both ends.
+  for (const jitter of [0, 0.999]) {
+    const o = hostPage(jitter);
+    o.tell({ t: 'config', host: 'h', port: '1', profileId: 7, name: '', token: 'old',
+             base: 'https://example.invalid/voice', socket: 'wss://example.invalid/voice/' });
+    for (let i = 0; i < 30 * 60; i++) {
+      const last = o.made[o.made.length - 1];
+      if (!last.closed && last.readyState === 0) { last.fail(); }
+      o.clock.advance(1000);
+    }
+    const n = o.made.length - 1;
+    console.log('      thirty minutes with no network, jitter ' + jitter + ': ' + n + ' tries');
+    // At the shortest waits: 5 tries in the first 31 seconds, then one every
+    // 30 at most, so no more than 64 in the half hour.
+    yes('thirty minutes offline is a few dozen tries, jitter ' + jitter, n > 10 && n <= 64);
+  }
 
   // The launcher has no token to give: the page waits and asks again, and
   // never opens a socket without one.
