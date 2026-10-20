@@ -357,7 +357,17 @@ function counted(name, fn) {
   process as the engine:
 
     process   the whole server's CPU as a share of one core: the engine's tick,
-              its NPCs and networking, and this file, all together
+              its NPCs and networking, and this file, all together. On the
+              Windows box this undercounts: Windows charges CPU time to
+              whatever thread is running at each 15.6 ms clock tick, and the
+              timers here wake on that tick and are done before the next, so
+              short timer work is never charged. Measured 20 Oct on dev with
+              the NPCs off: process 0.0% while the timed handlers below came
+              to 1.3% (#385)
+    busy      the share of the time the event loop was running something
+              rather than waiting, read from the clock: the engine's tick and
+              every handler and timer here, which share the one thread. This
+              is the figure to trust for how loaded the server's thread is
     gamemode  the part of that spent inside guard(), which wraps every event
               handler and most of the timers here, and inside the shared NPC
               runtime's own timers, which show as "npc <task>" (#385, 20 Oct:
@@ -368,8 +378,8 @@ function counted(name, fn) {
     and the five costliest handlers, with their worst single call.
 
   READ IT AS a before and after in one place: stand in the same spot with the
-  NPCs on and off, and the process and loop figures say whether the server
-  side moved. Process high with gamemode low is the engine. Loop worst high is
+  NPCs on and off, and the busy and loop figures say whether the server
+  side moved. Busy high with gamemode low is the engine. Loop worst high is
   a tick that stalls, which people feel as others jumping about. Every minute
   while somebody is on, every ten when nobody is, so an idle server still
   leaves a baseline. Reads only; it changes nothing the server does.
@@ -390,6 +400,12 @@ try { (function () {
     try { if (g.__thornswoodServerBeat.loop) { g.__thornswoodServerBeat.loop.disable(); } } catch (e) { }
   }
   let cpuWas = process.cpuUsage();
+  let perf = null;
+  let busyWas = null;
+  try {
+    perf = require('perf_hooks').performance;
+    busyWas = perf.eventLoopUtilization();
+  } catch (e) { perf = null; }
   let wasAt = Date.now();
   let quiet = 0;
 
@@ -403,6 +419,11 @@ try { (function () {
     const cpu = process.cpuUsage(cpuWas);
     cpuWas = process.cpuUsage();
     wasAt = now;
+    let busy = 'not measured';
+    if (perf) {
+      busy = (perf.eventLoopUtilization(busyWas).utilization * 100).toFixed(1) + '%';
+      busyWas = perf.eventLoopUtilization();
+    }
 
     const rows = [];
     let gm = 0;
@@ -426,7 +447,7 @@ try { (function () {
     try { rss = Math.round(process.memoryUsage().rss / 1048576); } catch (e) { rss = 0; }
 
     log('server: ' + Math.round(secs) + 's, ' + on + ' on, process ' +
-        pct((cpu.user + cpu.system) / 1000) + ' of one core, gamemode ' + pct(gm) +
+        pct((cpu.user + cpu.system) / 1000) + ' of one core, busy ' + busy + ', gamemode ' + pct(gm) +
         ', ' + lag + ', ' + rss + ' MB; costliest: ' +
         (rows.slice(0, 5).map(function (r) {
           return r.k + ' ' + r.ms.toFixed(0) + 'ms/' + r.runs + ' worst ' + r.worst.toFixed(1) + 'ms';

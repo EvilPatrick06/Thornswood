@@ -503,8 +503,40 @@ if (beat) {
       /startSharedNpcServerRuntime\(\s*mp, \{setTimeout:\(fn,delay\)=>setTimeout\(counted\('npc '\+\(fn\.npcRuntimeTask\|\|'task'\),fn\),delay\), clearTimeout\}/.test(startup));
 }
 
-process.chdir(home);
-try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { }
-console.log('');
-console.log(pass + ' passed, ' + fail + ' failed');
-process.exit(fail ? 1 : 0);
+function finish() {
+  process.chdir(home);
+  try { fs.rmSync(scratch, { recursive: true, force: true }); } catch (e) { }
+  console.log('');
+  console.log(pass + ' passed, ' + fail + ' failed');
+  process.exit(fail ? 1 : 0);
+}
+
+// #385, 20 Oct: process time undercounts timer work on Windows, so the
+// minute line also gives the loop's busy share, read from the clock. The
+// loop only counts once it is running, so this is done from timers: about
+// 100 ms of work inside a window of about 200 ms reads as roughly half.
+if (beat) {
+  setTimeout(function () {
+    beat.beat();
+    const began = Date.now();
+    setTimeout(function () {
+      const t = Date.now(); while (Date.now() - t < 100) { }
+      setTimeout(function () {
+        const logFile = path.join(scratch, 'thornswood.log');
+        let before3 = '';
+        try { before3 = fs.readFileSync(logFile, 'utf8'); } catch (e) { before3 = ''; }
+        beat.beat();
+        let after3 = '';
+        try { after3 = fs.readFileSync(logFile, 'utf8'); } catch (e) { after3 = ''; }
+        const line3 = after3.slice(before3.length).split('\n').filter(function (l) { return / server: /.test(l); })[0] || '';
+        console.log('  ' + line3.replace(/^\S+ \S+ /, '') + ' (window ' + (Date.now() - began) + ' ms)');
+        const busy = /, busy ([\d.]+)%, gamemode /.exec(line3);
+        yes('the minute line says how busy the event loop was, from the clock: 100 ms of work in about 200 reads 25 to 90%',
+            !!busy && Number(busy[1]) >= 25 && Number(busy[1]) <= 90);
+        finish();
+      }, 100);
+    }, 0);
+  }, 0);
+} else {
+  finish();
+}
