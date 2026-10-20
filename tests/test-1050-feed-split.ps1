@@ -277,8 +277,11 @@ function Run {
     Yes '  a feed with no settings comes back as it is' ([object]::ReferenceEquals((Join-FeedSettings $plain 'https://thornswood.net/feed/version.json'), $plain))
 
     # ---- no launcher at or past the split without the reader ----------------
-    $src = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
-    $ver = [regex]::Match($src, 'public const string Version = "([^"]+)"').Groups[1].Value
+    # Its own name: PowerShell names are not case sensitive, so a $src here
+    # would replace the -Src folder with Updater.cs's text, and the
+    # FeedSettings.cs check below would throw once the launcher reached the split.
+    $updaterText = [IO.File]::ReadAllText((Join-Path $Src 'Updater.cs'))
+    $ver = [regex]::Match($updaterText, 'public const string Version = "([^"]+)"').Groups[1].Value
     $site = [IO.File]::ReadAllText((Join-Path $Here 'site\server.js'))
     $gate = [regex]::Match($site, "const FEED_SPLIT_LAUNCHER = '([^']+)'").Groups[1].Value
     . (Join-Path $Here 'scripts\release\Release-Baseline.ps1')
