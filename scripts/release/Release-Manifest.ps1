@@ -75,7 +75,9 @@ function Get-ReleaseManifestField($o, [string]$k) {
 
 # Writes files\release.json and release.cat under $Dir, which it empties
 # first. Returns Json, Catalog and Files (the folder the catalog covers).
-function New-ReleaseManifestFiles($doc, [string]$Id, [string]$Channel, [string]$Dir) {
+# -NoCatalog writes release.json alone: the fork's signing job makes the
+# catalog (Sign-OnGitHub.ps1, #2903), and New-FileCatalog is Windows only.
+function New-ReleaseManifestFiles($doc, [string]$Id, [string]$Channel, [string]$Dir, [switch]$NoCatalog) {
     if (-not $Id) { throw 'New-ReleaseManifestFiles needs the release id.' }
     if (-not $Dir) { throw 'New-ReleaseManifestFiles needs a folder to write into.' }
     $assets = @(Get-ReleaseManifestAssets $doc)
@@ -101,6 +103,7 @@ function New-ReleaseManifestFiles($doc, [string]$Id, [string]$Channel, [string]$
     $json = Join-Path $files 'release.json'
     [IO.File]::WriteAllText($json, ($m | ConvertTo-Json -Depth 8 -Compress), (New-Object Text.UTF8Encoding($false)))
     $cat = Join-Path $Dir 'release.cat'
+    if ($NoCatalog) { return [pscustomobject]@{ Json = $json; Catalog = $cat; Files = $files } }
     New-FileCatalog -Path $files -CatalogFilePath $cat -CatalogVersion 2.0 | Out-Null
     if (-not (Test-Path -LiteralPath $cat -PathType Leaf)) { throw "New-FileCatalog wrote no catalog at $cat." }
     return [pscustomobject]@{ Json = $json; Catalog = $cat; Files = $files }
@@ -109,11 +112,15 @@ function New-ReleaseManifestFiles($doc, [string]$Id, [string]$Channel, [string]$
 # '' when the catalog still holds release.json as written, the manifest is the
 # release it says, and it lists every asset $doc names; else what is wrong. The
 # catalog's signature is Sign-ReleaseCatalog.ps1's to check, not this.
-function Get-ReleaseManifestRefusal($Files, $doc) {
-    $st = ''
-    try { $st = [string](Test-FileCatalog -Path $Files.Files -CatalogFilePath $Files.Catalog) }
-    catch { return ('the catalog could not be checked against release.json: ' + $_.Exception.Message) }
-    if ($st -ne 'Valid') { return ("the catalog does not hold release.json as it is on disk (Test-FileCatalog said $st)") }
+# -CatalogChecked: Sign-OnGitHub.ps1 has held the catalog to release.json
+# already, on the box when this is not Windows, so only the listing is left.
+function Get-ReleaseManifestRefusal($Files, $doc, [switch]$CatalogChecked) {
+    if (-not $CatalogChecked) {
+        $st = ''
+        try { $st = [string](Test-FileCatalog -Path $Files.Files -CatalogFilePath $Files.Catalog) }
+        catch { return ('the catalog could not be checked against release.json: ' + $_.Exception.Message) }
+        if ($st -ne 'Valid') { return ("the catalog does not hold release.json as it is on disk (Test-FileCatalog said $st)") }
+    }
     $m = $null
     try { $m = [IO.File]::ReadAllText($Files.Json) | ConvertFrom-Json }
     catch { return ('release.json does not parse: ' + $_.Exception.Message) }

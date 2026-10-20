@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  61,
-    "callCount":  262,
+    "callCount":  265,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1636,13 +1636,13 @@
                       "reason":  "reads files, settings, logs or status only"
                   },
                   {
-                      "script":  "scripts/vps/Add-VpsKey.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$VpsUser@$VpsHost\" \"powershell -NoProfile -EncodedCommand $b64\" } 2\u003e\u00261",
-                      "does":  "install-time or outside-the-gate work",
-                      "class":  "admin",
-                      "reason":  "sends authorized_keys"
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedCatalogRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
                   {
                       "script":  "scripts/vps/Backup-Server.ps1",
@@ -1868,33 +1868,6 @@
                       "does":  "cancels a pending hardening step",
                       "class":  "admin",
                       "reason":  "hardening"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "\u0027REVOKED\u0027",
-                      "does":  "takes the cloud key line off the box and deletes the bridge token",
-                      "class":  "admin",
-                      "reason":  "sends authorized_keys"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodSecretRemote",
-                      "anchor":  "\u0027ACCESS ON\u0027",
-                      "does":  "writes the bridge token and replaces the cloud key line",
-                      "class":  "admin",
-                      "reason":  "secret; sends authorized_keys"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "\u0026 ssh -F none -i $key -o IdentitiesOnly=yes",
-                      "does":  "logs in through the bridge with the new cloud key and echoes a word",
-                      "class":  "read-status",
-                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Remote.ps1",
@@ -2158,20 +2131,11 @@
                       "reason":  "reads files, settings, logs or status only"
                   },
                   {
-                      "script":  "scripts/vps/Setup-CloudSsh.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh-keyscan",
-                      "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
-                      "does":  "asks the box for its host keys through the bridge listener",
-                      "class":  "read-status",
-                      "reason":  "reads files, settings, logs or status only"
-                  },
-                  {
                       "script":  "scripts/vps/Setup-SshKey.ps1",
                       "scope":  "Works",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 $target \u0027echo THORNSWOOD_OK\u0027 } 2\u003e$null",
-                      "does":  "reads files, settings, logs or status",
+                      "anchor":  "\u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 $target \u0027echo THORNSWOOD_OK\u0027",
+                      "does":  "logs in through the bridge and echoes a word",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },
@@ -2201,6 +2165,24 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads the box host keys from port 22, no login"
+                  },
+                  {
+                      "script":  "scripts/vps/Vps.ps1",
+                      "scope":  "Add-ThornswoodKnownHostThroughBridge",
+                      "via":  "ssh-keyscan",
+                      "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
+                      "does":  "asks the box for its host keys through the bridge listener",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Vps.ps1",
+                      "scope":  "Test-ThornswoodBridgeSsh",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -o StrictHostKeyChecking=yes -G $Address",
+                      "does":  "prints what ssh makes of this machine\u0027s config; connects to nothing",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Watch-Load.ps1",
@@ -2372,6 +2354,51 @@
                       "does":  "checks an arrived archive\u0027s sha1, gives it its name and makes it read only",
                       "class":  "admin",
                       "reason":  "sends SetAccessControl"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob)",
+                      "does":  "saves the key file and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
+                      "class":  "admin",
+                      "reason":  "sends authorized_keys; task registration"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxKeepScript)",
+                      "does":  "cancels the put back task once a new login proves the change",
+                      "class":  "admin",
+                      "reason":  "task registration"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxListScript)",
+                      "does":  "lists the key lines and the names of the bridge tokens",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -F none -i $newKey -o IdentitiesOnly=yes",
+                      "does":  "logs in through the bridge with the new cloud key and echoes a word",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "Test-Login",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh @ssh -o ConnectTimeout=20 $target \u0027echo THORNSWOOD_OK\u0027",
+                      "does":  "logs in from this machine, the way every script does, and echoes a word",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   }
               ]
 }

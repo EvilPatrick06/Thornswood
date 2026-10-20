@@ -7,7 +7,7 @@
   whether the backups are real.
 
       .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-20260918-030000.zip.enc
-      .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -To C:\test-restore -Work C:\ThornswoodTemps&Worktrees\temp\restore
+      .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -To C:\test-restore -Work C:\Thornswood-Repo\temp\restore
       .\scripts\vps\Restore-Backup.ps1 -Backup ...\thornswood-...enc -CheckOnly
 
   The passphrase is the one in the key file that Install-Backup.ps1 made. Pass

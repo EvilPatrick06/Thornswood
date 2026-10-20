@@ -12,7 +12,8 @@ section 7.
 How the scripts get in. Every script that reaches the box goes through
 `scripts\vps\Remote.ps1` (`Invoke-ThornswoodRemote`) or plain `ssh`/`scp`,
 34 scripts under `scripts\` in all, as `Administrator` with a key
-(`docs\OWNERSHIP.md`, "VPS access"; `Setup-SshKey.ps1`; `Add-VpsKey.ps1`).
+(`docs\OWNERSHIP.md`, "VPS access"; `Setup-SshKey.ps1`; `Add-VpsKey.ps1`,
+replaced since by `Grant-BoxAccess.ps1`, #2891).
 Runbooks do the same by hand (`docs\IT-IS-DOWN.md`, `docs\RESTORING.md`,
 `docs\MOVING-THE-SERVER.md`).
 
@@ -47,7 +48,7 @@ folder locks from `Lock-VpsFolders.ps1`).
 | Register or change a task that runs as SYSTEM | Install-*, Install-Backup, Install-Runner | Yes |
 | Install a service, change a virtual account, set folder ACLs | Install-Bot, Install-Runner, Lock-VpsFolders | Yes |
 | Firewall, sshd, Windows Update, hardening | Harden-VPS, Maint Update | Yes |
-| Add or remove an ssh key | Add-VpsKey, Setup-SshKey | Yes |
+| Add or remove an ssh key | Grant-BoxAccess, Setup-SshKey | Yes |
 
 Most day to day traffic (every Ship, deploy and feed write) is in the first
 three rows. The admin rows are install-time and rare. This table was first
@@ -117,7 +118,7 @@ verb is refused rather than retrying as admin.
 
 - One key per person per machine, comment `<person>-<machine>-<date>`, so a
   line can be traced and removed without touching anyone else's.
-- Added with `Add-VpsKey.ps1` (it gains `-Role deploy|admin`).
+- Added with `Grant-BoxAccess.ps1` (it gains `-Role deploy|admin`).
 - Reviewed quarterly against `docs\OWNERSHIP.md`; a key with no login in 90
   days (OpenSSH log) is proposed for removal.
 - Removal on leaving or loss: delete the line, nothing else changes. No
@@ -215,7 +216,7 @@ Patrick's console login check, not on work).
   time; the process stop in the swap blocks moves into a gate verb that runs
   elevated; and the three admin calls on every `Deploy-Docs.ps1` run (the
   firewall rule, the task's account, the site password) leave the deploy
-  path. Then `Remote.ps1 -As`, the gate itself, `Add-VpsKey.ps1 -Role`, the
+  path. Then `Remote.ps1 -As`, the gate itself, `Grant-BoxAccess.ps1 -Role`, the
   account, the folder rights and task rights on the box, and a week on dev
   (section 5). Nobody has put days on it; the issue says large.
 - What it buys, measured: while the game servers run as SYSTEM, very little

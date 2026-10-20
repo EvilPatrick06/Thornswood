@@ -90,6 +90,9 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+# Text from the repo goes in with CRLF line endings on every machine, as every
+# release has carried it (ShippedBytes.ps1, #2903).
+. (Join-Path $Here 'ShippedBytes.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
@@ -176,11 +179,25 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
 
 # ------------------------------------------------------------------- front --
 Head 'Front'
-# The front build, made outside the repository and kept in local\, which git
-# ignores (in tools\ until 29 September, issue #440 phase 10).
+# The front build, skymp5-front from the pinned fork commit, which
+# Build-Front.ps1 makes into local\, which git ignores, and records\front-build.json
+# records (#2754). Until 20 October the zip was made on One from nobody knew
+# which commit and nothing checked it, and every release still shipped four
+# fonts nobody may hand out, a month after the fork had taken them out
+# (#1317). So a zip that is not the recorded build is not unpacked: that fails
+# the run, as a missing file of ours does, and Ship stops.
+. (Join-Path $Here 'Front.ps1')
 $zip = Join-Path $Here '..\..\local\thornswood-front.zip'
+$frontWhy = @()
 if (-not (Test-Path -LiteralPath $zip)) {
-  Bad 'thornswood-front.zip is not in local\ in the repository folder'
+  $frontWhy = @('local\thornswood-front.zip is not there')
+} else {
+  try { $frontWhy = @(Get-ThornswoodFrontProblems (Get-ThornswoodZipFiles $zip) (Read-ThornswoodFrontRecord)) }
+  catch { $frontWhy = @('it could not be read against records\front-build.json: ' + $_.Exception.Message) }
+}
+if ($frontWhy.Count) {
+  foreach ($w in @($frontWhy | Select-Object -First 5)) { Bad $w }
+  Gone 'the front is not the recorded build; .\scripts\release\Build-Front.ps1 builds it from the pinned fork commit'
 } else {
   New-Item -ItemType Directory -Force -Path $ui | Out-Null
   Expand-Archive -LiteralPath $zip -DestinationPath $ui -Force
@@ -191,7 +208,7 @@ if (-not (Test-Path -LiteralPath $zip)) {
     finally { $z.Dispose() }
   } catch { Bad ('could not read what the front zip holds, so its kept copies were not refreshed: ' + $_.Exception.Message) }
   if (Test-Path -LiteralPath (Join-Path $ui 'index.html')) {
-    Note 'index.html and build.js are in place'
+    Note 'the recorded front build: index.html and build.js are in place'
   } else {
     Bad 'index.html did not land'
   }
@@ -211,7 +228,7 @@ Head 'Overlays'
 $uiSrc = Join-Path $Here '..\..\game\ui'
 if (Test-Path -LiteralPath $uiSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.js) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
@@ -222,7 +239,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   # and the page sat in the repo with nothing carrying it.
   $page = Join-Path $uiSrc 'index.html'
   if (Test-Path -LiteralPath $page) {
-    Copy-Item -LiteralPath $page -Destination (Join-Path $ui 'index.html') -Force
+    Copy-ThornswoodShippedFile $page (Join-Path $ui 'index.html')
     $script:installed.Add((Join-Path $ui 'index.html'))
     Note 'index.html (ours, over the front''s)'
   } else {
@@ -232,13 +249,13 @@ if (Test-Path -LiteralPath $uiSrc) {
   # folder like them; whether it leaves the machine is Ship-Rules' call, and
   # a main pack never carries it.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.mp3) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
   # The two pictures of the scroll in front of the character choice.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.webp) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
@@ -249,7 +266,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   foreach ($pair in @(@('banner.webm', 'thornswood-menu.webm'), @('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
     $src = Join-Path $siteArt $pair[0]
     if (Test-Path -LiteralPath $src) {
-      Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force
+      Copy-ThornswoodShippedFile $src (Join-Path $ui $pair[1])
       $script:installed.Add((Join-Path $ui $pair[1]))
       Note ($pair[1] + ' (from the site''s ' + $pair[0] + ')')
     } else {
@@ -279,8 +296,7 @@ foreach ($pair in $menuPairs) {
   $dst = Join-Path $Game $pair[1]
   if (-not (Test-Path -LiteralPath $src)) { Gone ($pair[0] + ' is not in game\menu'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Copy-ThornswoodShippedFile $src $dst
   Note $pair[1]
 }
 
@@ -305,8 +321,7 @@ foreach ($rel in $oursMenuFiles) {
   $dst = Join-Path $Game $rel
   if (-not (Test-Path -LiteralPath $src)) { Gone ($rel + ' is not in game\ours'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Copy-ThornswoodShippedFile $src $dst
   Note $rel
 }
 
@@ -348,8 +363,7 @@ if (Test-Path -LiteralPath $reqSrc) {
     if ($f.Name -eq 'README.md') { continue }
     $dst = Join-Path $Game ('Data\' + $f.Name)
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-    Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+    Copy-ThornswoodShippedFile $f.FullName $dst
     Note ('Data\' + $f.Name)
   }
 } else {
@@ -362,7 +376,7 @@ $plSrc = Join-Path $Here '..\..\game\plugins'
 New-Item -ItemType Directory -Force -Path $plugins | Out-Null
 if (Test-Path -LiteralPath $plSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $plSrc -Filter *.js) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $plugins $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $plugins $f.Name)
     $script:installed.Add((Join-Path $plugins $f.Name))
     Note $f.Name
   }

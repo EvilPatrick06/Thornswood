@@ -7,7 +7,7 @@
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-Restore-Test
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root C:\Thornswood-Server-Dev -Which dev
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Expect 1234567
-      .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Work C:\ThornswoodTemps&Worktrees\temp\restore
+      .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <folder> -Work C:\Thornswood-Repo\temp\restore
       .\scripts\vps\Restore-Server.ps1 -Backup <file>.zip.enc -Root <throwaway folder> -Rehearse [-Port 7800 -VoicePort 7802]
 
   Restore-Backup.ps1 checks the signature and unpacks; this is the step after
