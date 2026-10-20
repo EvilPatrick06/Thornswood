@@ -90,6 +90,9 @@ $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+# Text from the repo goes in with CRLF line endings on every machine, as every
+# release has carried it (ShippedBytes.ps1, #2903).
+. (Join-Path $Here 'ShippedBytes.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
@@ -225,7 +228,7 @@ Head 'Overlays'
 $uiSrc = Join-Path $Here '..\..\game\ui'
 if (Test-Path -LiteralPath $uiSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.js) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
@@ -236,7 +239,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   # and the page sat in the repo with nothing carrying it.
   $page = Join-Path $uiSrc 'index.html'
   if (Test-Path -LiteralPath $page) {
-    Copy-Item -LiteralPath $page -Destination (Join-Path $ui 'index.html') -Force
+    Copy-ThornswoodShippedFile $page (Join-Path $ui 'index.html')
     $script:installed.Add((Join-Path $ui 'index.html'))
     Note 'index.html (ours, over the front''s)'
   } else {
@@ -246,13 +249,13 @@ if (Test-Path -LiteralPath $uiSrc) {
   # folder like them; whether it leaves the machine is Ship-Rules' call, and
   # a main pack never carries it.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.mp3) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
   # The two pictures of the scroll in front of the character choice.
   foreach ($f in Get-ChildItem -LiteralPath $uiSrc -Filter *.webp) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $ui $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
   }
@@ -263,7 +266,7 @@ if (Test-Path -LiteralPath $uiSrc) {
   foreach ($pair in @(@('banner.webm', 'thornswood-menu.webm'), @('banner.mp4', 'thornswood-menu.mp4'), @('banner.jpg', 'thornswood-menu.jpg'))) {
     $src = Join-Path $siteArt $pair[0]
     if (Test-Path -LiteralPath $src) {
-      Copy-Item -LiteralPath $src -Destination (Join-Path $ui $pair[1]) -Force
+      Copy-ThornswoodShippedFile $src (Join-Path $ui $pair[1])
       $script:installed.Add((Join-Path $ui $pair[1]))
       Note ($pair[1] + ' (from the site''s ' + $pair[0] + ')')
     } else {
@@ -293,8 +296,7 @@ foreach ($pair in $menuPairs) {
   $dst = Join-Path $Game $pair[1]
   if (-not (Test-Path -LiteralPath $src)) { Gone ($pair[0] + ' is not in game\menu'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Copy-ThornswoodShippedFile $src $dst
   Note $pair[1]
 }
 
@@ -319,8 +321,7 @@ foreach ($rel in $oursMenuFiles) {
   $dst = Join-Path $Game $rel
   if (-not (Test-Path -LiteralPath $src)) { Gone ($rel + ' is not in game\ours'); continue }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-  if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-  Copy-Item -LiteralPath $src -Destination $dst -Force
+  Copy-ThornswoodShippedFile $src $dst
   Note $rel
 }
 
@@ -362,8 +363,7 @@ if (Test-Path -LiteralPath $reqSrc) {
     if ($f.Name -eq 'README.md') { continue }
     $dst = Join-Path $Game ('Data\' + $f.Name)
     New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dst) | Out-Null
-    if (Test-Path -LiteralPath $dst) { Remove-Item -LiteralPath $dst -Force }
-    Copy-Item -LiteralPath $f.FullName -Destination $dst -Force
+    Copy-ThornswoodShippedFile $f.FullName $dst
     Note ('Data\' + $f.Name)
   }
 } else {
@@ -376,7 +376,7 @@ $plSrc = Join-Path $Here '..\..\game\plugins'
 New-Item -ItemType Directory -Force -Path $plugins | Out-Null
 if (Test-Path -LiteralPath $plSrc) {
   foreach ($f in Get-ChildItem -LiteralPath $plSrc -Filter *.js) {
-    Copy-Item -LiteralPath $f.FullName -Destination (Join-Path $plugins $f.Name) -Force
+    Copy-ThornswoodShippedFile $f.FullName (Join-Path $plugins $f.Name)
     $script:installed.Add((Join-Path $plugins $f.Name))
     Note $f.Name
   }

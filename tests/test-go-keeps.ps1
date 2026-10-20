@@ -62,7 +62,9 @@ $goText = [IO.File]::ReadAllText($go)
 $lines = $goText -split "`r?`n"
 $copies = 0; $followed = 0
 for ($i = 0; $i -lt $lines.Count; $i++) {
-    if ($lines[$i] -match 'Copy-Item .*-Destination \(Join-Path \$(ui|plugins) ') {
+    # Copy-ThornswoodShippedFile since #2903: a repo file goes out as One's
+    # checkout holds it (ShippedBytes.ps1).
+    if ($lines[$i] -match '(Copy-Item .*-Destination|Copy-ThornswoodShippedFile \S+) \(Join-Path \$(ui|plugins) ') {
         $copies++
         if ($i + 1 -lt $lines.Count -and $lines[$i + 1] -match '\$script:installed\.Add\(') { $followed++ }
     }

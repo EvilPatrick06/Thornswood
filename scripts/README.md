@@ -1,6 +1,6 @@
 # The PowerShell scripts
 
-Every `.ps1` under this folder, 213 of them, by area: `release` builds and
+Every `.ps1` under this folder, 216 of them, by area: `release` builds and
 ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs
 the world day to day, `mods` works on the collection and the plugins, `dev`
 is for whoever is changing this repository. `oneoff` holds finished one time
@@ -152,6 +152,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/New-ClientBuildRecord.ps1](release/New-ClientBuildRecord.ps1) | Records what the client runtime is and which fork commit it was built from, into records\client-build.json. |
+| [release/New-FeedRoot.ps1](release/New-FeedRoot.ps1) | Stages the folder a release from the feed is built from: every file the channel's last release left installed, from the site, by its sha256. |
 | [release/New-ServerBuildRecord.ps1](release/New-ServerBuildRecord.ps1) | Records every server file the fork builds and the one commit they were built from, into records\server-build.json. |
 | [release/New-SkyrimFilesRecord.ps1](release/New-SkyrimFilesRecord.ps1) | Records every file of the pinned Skyrim build, from the depot manifests the Downgrade asks Steam for, into records\skyrim-files.json. |
 | [release/Note-Rules.ps1](release/Note-Rules.ps1) | What release notes may say. Ship.ps1 dot-sources this and refuses notes that break it, before anything is built. tests\test-note-rules.ps1 drives the same function, so the rule and its test cannot disagree. |
@@ -178,7 +179,9 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Ship-Rules.ps1](release/Ship-Rules.ps1) | The one list of what never leaves a machine inside a Thornswood pack or installer. |
 | [release/Ship-Stack.ps1](release/Ship-Stack.ps1) | One Dev or Main command that runs gamemode deploy, the installer package, and the host feed remirror. |
 | [release/Ship.ps1](release/Ship.ps1) | Builds the launcher and publishes everything that changed, launcher and mods both, in a single release, to the main build or the dev build. |
+| [release/ShippedBytes.ps1](release/ShippedBytes.ps1) | The bytes a file of this checkout goes out as, the same from every machine (#2903). |
 | [release/Sign-Artifact.ps1](release/Sign-Artifact.ps1) | Signs a built binary, or says plainly that it is not signing and carries on. |
+| [release/Sign-OnGitHub.ps1](release/Sign-OnGitHub.ps1) | Signs the release manifest's catalog on GitHub's runner in the public engine fork, and checks it the way every installed launcher checks a launcher (#2903, Patrick's A of 20 Oct). |
 | [release/Sign-ReleaseCatalog.ps1](release/Sign-ReleaseCatalog.ps1) | Signs the release manifest's catalog with ThornswoodRelease and checks it the way every installed launcher checks a launcher (#2163, phase B). |
 | [release/Source-Notice.ps1](release/Source-Notice.ps1) | The note and licence texts that go inside every download on the update feed that carries SkyMP files. |
 | [release/Sync-Client.ps1](release/Sync-Client.ps1) | Puts the client runtime built from the fork into the game folder, and refuses any file that is not the recorded build. |

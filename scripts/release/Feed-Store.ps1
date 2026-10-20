@@ -93,6 +93,15 @@ function Get-FeedStoreDir([string]$Channel) {
     return (& (Join-Path $PSScriptRoot 'Where.ps1') $place)
 }
 
+# The folder a release from the feed is staged in and built from, one a
+# channel, in this machine's own data beside the working folders (#2754,
+# New-FeedRoot.ps1 and Ship -FromFeed).
+function Get-FeedRootDir([string]$Channel) {
+    $prefix = Get-FeedStorePrefix $Channel
+    $leaf = if ($prefix -eq 'feed-dev') { 'dev' } else { 'main' }
+    return (Join-Path (Join-Path (& (Join-Path $PSScriptRoot 'Where.ps1') MachineData) 'feed-root') $leaf)
+}
+
 function Get-FeedStoreSiteDir([string]$SiteDir) {
     if ($SiteDir) { return $SiteDir }
     if ($env:THORNSWOOD_TEST_SITE_DIR) { return [string]$env:THORNSWOOD_TEST_SITE_DIR }
