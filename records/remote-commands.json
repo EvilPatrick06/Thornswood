@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  56,
-    "callCount":  243,
+    "scriptCount":  59,
+    "callCount":  254,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -752,6 +752,60 @@
                       "does":  "builds and installs the bot service",
                       "class":  "admin",
                       "reason":  "service install"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$t = Get-ScheduledTask -TaskName \u0027$TaskName\u0027",
+                      "does":  "reads the bridge task, whether a token is there, the port and bridge.log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "Remove-Item -LiteralPath \u0027$Root\u0027 -Recurse -Force -EA SilentlyContinue",
+                      "does":  "stops the bridge, unregisters its task and deletes its folder",
+                      "class":  "admin",
+                      "reason":  "sends Unregister-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "New-Item -ItemType Directory -Force -Path \u0027$Root\\$stage\u0027 | Out-Null",
+                      "does":  "locks the bridge folder and makes its stage folder",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessRule"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $send[$k] \"${target}:$rootFar/$stage/$k\" }",
+                      "does":  "uploads bridge.js, ws.js and server-log.js to the stage folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the deploy owns"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Bridge.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027BRIDGE OK\u0027; exit 0",
+                      "does":  "checks the stage, swaps it in and registers and starts the bridge task, or puts the old one back",
+                      "class":  "admin",
+                      "reason":  "sends Register-ScheduledTask"
                   },
                   {
                       "script":  "scripts/deploy/Install-Runner.ps1",
@@ -1816,6 +1870,33 @@
                       "reason":  "hardening"
                   },
                   {
+                      "script":  "scripts/vps/New-CloudAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "\u0027REVOKED\u0027",
+                      "does":  "takes the cloud key line off the box and deletes the bridge token",
+                      "class":  "admin",
+                      "reason":  "sends authorized_keys"
+                  },
+                  {
+                      "script":  "scripts/vps/New-CloudAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodSecretRemote",
+                      "anchor":  "\u0027ACCESS ON\u0027",
+                      "does":  "writes the bridge token and replaces the cloud key line",
+                      "class":  "admin",
+                      "reason":  "secret; sends authorized_keys"
+                  },
+                  {
+                      "script":  "scripts/vps/New-CloudAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -F none -i $key -o IdentitiesOnly=yes",
+                      "does":  "logs in through the bridge with the new cloud key and echoes a word",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
                       "script":  "scripts/vps/Remote.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodSecretRemote",
@@ -2066,6 +2147,24 @@
                       "does":  "runs vps-ssh-scope.ps1, which sets the remote addresses of the port 22 rules",
                       "class":  "admin",
                       "reason":  "firewall change for port 22"
+                  },
+                  {
+                      "script":  "scripts/vps/Setup-CloudSsh.ps1",
+                      "scope":  "Works",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 $target \u0027echo THORNSWOOD_OK\u0027",
+                      "does":  "logs in through the bridge and echoes a word",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Setup-CloudSsh.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh-keyscan",
+                      "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
+                      "does":  "asks the box for its host keys through the bridge listener",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Setup-SshKey.ps1",
