@@ -98,10 +98,10 @@ cloud Claude threads (made with `-MakeKey`), and each person has their own.
 - `Permission denied (publickey)`: the bridge let you in but the box does not
   hold your key. Send Patrick the line `Setup-SshKey.ps1` prints again.
 - `box bridge: no WebSocket` or `the bridge did not open a WebSocket`: the
-  bridge or the site is down for everybody. Say so in #staff-general. If
+  bridge or the site is down for everybody. Say so in #staff-updates. If
   nobody can get in, the way back is the VNC console in the BisectHosting
   panel: `Start-ScheduledTask 'Thornswood Bridge'` and
   `Start-ScheduledTask 'Thornswood Web'` there (`Set-SshScope.ps1` has the
   rest).
 - `Host key verification failed`: `known_hosts` holds a key for the box that
-  is not the pinned one. Do not go on; ask in #staff-general.
+  is not the pinned one. Do not go on; ask in #staff-updates.

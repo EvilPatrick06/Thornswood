@@ -63,7 +63,7 @@ which service leads each of those, and when the busiest hour was.
 
 Leave it a week that includes a busy evening before reading anything into it.
 Whether the answer is the plan above or moving some services off this box is
-for the team in #staff-general, and whatever is done goes back on this page.
+for the team in #staff-updates, and whatever is done goes back on this page.
 
 ## Doing it
 
