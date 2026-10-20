@@ -222,7 +222,10 @@ async function main() {
 
   // ---- a release later: a new tag, and the settings before still answer
   const next = whole('feed', '1.2.6');
-  next.serverPort = '7779';
+  // A port of another length, so the new generation's size moves too: the
+  // tag is a generation's size and time, and a fast runner writes both of
+  // these inside one millisecond, which a real Ship never does.
+  next.serverPort = '17779';
   ship('feed', next);
   const v3 = await ask('/feed/version.json', { 'If-None-Match': v.h.etag });
   const top3 = JSON.parse(v3.body);
@@ -231,7 +234,7 @@ async function main() {
   const s2 = await ask('/feed/assets/' + top.settings.sha256);
   yes('the settings of the generation before still answer, for a launcher that read it just before', s2.code === 200 && sha(s2.body) === top.settings.sha256);
   const s3 = await ask('/feed/assets/' + top3.settings.sha256);
-  yes('and the new ones do', s3.code === 200 && JSON.parse(s3.body).serverPort === '7779');
+  yes('and the new ones do', s3.code === 200 && JSON.parse(s3.body).serverPort === '17779');
 
   // ---- channels apart, and a sha nobody named
   ship('feed-dev', whole('feed-dev', '1.2.5.6'));
