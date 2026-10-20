@@ -475,6 +475,32 @@ if (beat) {
   try { yes('and undefined when it throws, never letting it out', thrower() === undefined); }
   catch (e) { escaped = true; }
   yes('nothing a handler throws escapes guard', !escaped);
+
+  // #385, 20 Oct: the shared NPC runtime's own timers are counted too, under
+  // "npc <task>", through the timers the startup hands it.
+  const npcStep = vm.runInContext("counted('npc backgroundTick', function (a) { var t = Date.now(); while (Date.now() - t < 5) { } return a + 1; })", sandbox);
+  let gave = 0;
+  for (let i = 0; i < 4; i++) { gave = npcStep(i); }
+  const npcThrows = vm.runInContext("counted('npc throws', function () { throw new Error('y'); })", sandbox);
+  let handedOn = false;
+  try { npcThrows(); } catch (e) { handedOn = e && e.message === 'y'; }
+  let before2 = '';
+  try { before2 = fs.readFileSync(logFile, 'utf8'); } catch (e) { before2 = ''; }
+  beat.beat();
+  let after2 = '';
+  try { after2 = fs.readFileSync(logFile, 'utf8'); } catch (e) { after2 = ''; }
+  const line2 = after2.slice(before2.length).split('\n').filter(function (l) { return / server: /.test(l); })[0] || '';
+  console.log('  ' + line2.replace(/^\S+ \S+ /, ''));
+  const n = /npc backgroundTick (\d+)ms\/4 worst ([\d.]+)ms/.exec(line2);
+  yes('an NPC runtime step shows on the minute line: about 20 ms over 4 runs, worst about 5 (a 5 ms wait on a millisecond clock is 4 to 5)',
+      !!n && Number(n[1]) >= 16 && Number(n[1]) <= 40 && Number(n[2]) >= 4);
+  yes('and counts in the gamemode share, not the engine\'s', /gamemode (\d+\.\d)%/.test(line2) &&
+      Number(/gamemode (\d+\.\d)%/.exec(line2)[1]) > 0);
+  yes('a counted step still hands back what it returned', gave === 4);
+  yes('and hands on what it throws, as the runtime\'s own timer did', handedOn);
+  const startup = fs.readFileSync(SRC, 'utf8');
+  yes('the NPC startup hands the runtime counted timers',
+      /startSharedNpcServerRuntime\(\s*mp, \{setTimeout:\(fn,delay\)=>setTimeout\(counted\('npc '\+\(fn\.npcRuntimeTask\|\|'task'\),fn\),delay\), clearTimeout\}/.test(startup));
 }
 
 process.chdir(home);
