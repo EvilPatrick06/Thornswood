@@ -151,6 +151,10 @@ sys.exit(3)
         # As Send-Script.ps1 sends a long script: UTF-8 with a byte order mark.
         [IO.File]::WriteAllText($file, $text, (New-Object Text.UTF8Encoding($true)))
         $lines = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" })
+        # What the far side said, so a red check here names its cause in the log.
+        Write-Host '  the far side said:'
+        foreach ($l in $lines) { Write-Host ('    ' + $l) }
+        Write-Host ('  as ' + [Security.Principal.WindowsIdentity]::GetCurrent().Name + ', elevated: ' + ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator))
         $data = Join-Path $run 'data'
         Yes 'the data folder holds the server''s plugins, our own from the commit' (
             ($lines -match '^data\s+2 plugin\(s\)').Count -eq 1 -and
