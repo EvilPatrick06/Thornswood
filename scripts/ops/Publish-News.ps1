@@ -35,7 +35,7 @@ param(
   # announced launcher 1.0.196 to the world. Since #907 it is this machine's
   # working copy of the live feed, which the Ship that runs this has just
   # received from the VPS and sent back (Feed-Store.ps1).
-  [string]$ReleaseDir = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'),
+  [string]$ReleaseDir = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Releases),
   # Everything before this date is development history and stays off the site.
   # Read from scripts\ops\news-from.txt when not given, so it is one line to change.
   [string]$From,
