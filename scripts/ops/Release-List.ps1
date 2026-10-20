@@ -72,7 +72,7 @@ function Get-ThornswoodPrivDir([string]$Root) {
   $priv = 'private'
   if (Test-Path -LiteralPath $settings) {
     $cfg = $null
-    try { $cfg = [IO.File]::ReadAllText($settings) -replace '^﻿', '' | ConvertFrom-Json }
+    try { $cfg = [IO.File]::ReadAllText($settings) -replace '^\uFEFF', '' | ConvertFrom-Json }
     catch { return $null }
     if ($cfg -and $cfg.privDir) { $priv = [string]$cfg.privDir }
   }
@@ -98,7 +98,7 @@ function Read-ThornswoodReleaseList([string]$File) {
   if (-not $File) { return @{ ok = $false } }
   if (-not (Test-Path -LiteralPath $File)) { return @{ ok = $true; missing = $true; profiles = @(); actors = @() } }
   $v = $null
-  try { $v = [IO.File]::ReadAllText($File) -replace '^﻿', '' | ConvertFrom-Json } catch { $v = $null }
+  try { $v = [IO.File]::ReadAllText($File) -replace '^\uFEFF', '' | ConvertFrom-Json } catch { $v = $null }
   if (-not ($v -is [System.Management.Automation.PSCustomObject])) { return @{ ok = $false } }
   $acts = $v.actors
   if ($null -eq $acts) { $acts = @() }
@@ -115,7 +115,7 @@ function Get-ThornswoodCharacterIds($Files) {
   foreach ($f in @($Files)) {
     if (-not $f) { continue }
     $o = $null
-    try { $o = [IO.File]::ReadAllText([string]$f) -replace '^﻿', '' | ConvertFrom-Json }
+    try { $o = [IO.File]::ReadAllText([string]$f) -replace '^\uFEFF', '' | ConvertFrom-Json }
     catch { $notes += ('RELEASENOTE|' + $f + ' will not parse, so its character, if it is one, is not on the release list'); continue }
     if (-not ($o -is [System.Management.Automation.PSCustomObject])) { continue }
     $p = $o.profileId
