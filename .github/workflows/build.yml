@@ -550,6 +550,11 @@ jobs:
           # under pwsh and Windows PowerShell 5.1, and holds the key to the
           # stand-in's made-up one, never printed and never sent to storage.
           # About a minute.
+          # Issue #2912: tests\test-prove-secret.ps1 runs the secret proof
+          # against a fake ssh, and its watcher in Windows PowerShell 5.1 with
+          # standard input held open as on the box, where only the stop event
+          # ends it before its limit. It ran nowhere before, so the stop line
+          # that never reached the box went out unseen. Under a minute.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -842,7 +847,8 @@ jobs:
                  'test-storage-forecast.ps1',
                  'test-jump-sprint-no-timers.js',
                  'test-2183-availability.ps1',
-                 'test-2914-nexus-scripts.ps1'
+                 'test-2914-nexus-scripts.ps1',
+                 'test-prove-secret.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
