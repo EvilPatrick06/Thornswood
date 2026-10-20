@@ -538,6 +538,12 @@ jobs:
           # fork harness the shares never had. On the gate now. The kept NPC
           # harness says SKIP without the fork; the nightly runs it with it.
           # Under ten seconds together.
+          # Issue #2914: tests\test-2914-nexus-scripts.ps1 drives the Nexus Mods
+          # scripts (a new file version, a description line, a collection
+          # revision and its publish) against a stand-in Nexus on loopback,
+          # under pwsh and Windows PowerShell 5.1, and holds the key to the
+          # stand-in's made-up one, never printed and never sent to storage.
+          # About a minute.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -824,7 +830,8 @@ jobs:
                  'test-gate-list.ps1',
                  'test-storage-forecast.ps1',
                  'test-jump-sprint-no-timers.js',
-                 'test-2183-availability.ps1'
+                 'test-2183-availability.ps1',
+                 'test-2914-nexus-scripts.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
