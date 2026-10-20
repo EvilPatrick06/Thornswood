@@ -72,7 +72,9 @@ param(
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.
     [string]$KeyPath = '',
-    [string]$OutDir = 'C:\ThornswoodTemps&Worktrees\temp\box-access',
+    # Where a token waits to be handed over: the scratch folder
+    # Get-ScratchDir.ps1 names, so no script carries the path itself.
+    [string]$OutDir = '',
     [string]$BridgeRoot = 'C:\Thornswood-Bridge',
     # Where -MakeKey's proof connects, the same address connect.js uses.
     [string]$BoxUrl = 'wss://thornswood.net/box/',
@@ -88,6 +90,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 if (-not $KeyPath) { $KeyPath = Join-Path (Join-Path $HOME '.ssh') 'thornswood_ed25519' }
+if (-not $OutDir) { $OutDir = & (Join-Path (Join-Path (Split-Path -Parent $Here) 'release') 'Get-ScratchDir.ps1') 'box-access' }
 $ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

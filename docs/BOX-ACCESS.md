@@ -70,8 +70,9 @@ of a copied Discord message):
 
 It puts their key on the box, taken only through the bridge, makes their
 token, proves a new login from One still gets in, and writes the token to
-`C:\ThornswoodTemps&Worktrees\temp\box-access\djinn\box-token.txt`. Send what
-is in that file to them alone, then delete it and its folder. Running it again
+`box-access\djinn\box-token.txt` in the scratch folder, printing the whole
+path. Send what is in that file to them alone, then delete it and its
+folder. Running it again
 for the same name replaces both, so the old pair stops working.
 
 Take one person's access away. Nobody else's changes:
