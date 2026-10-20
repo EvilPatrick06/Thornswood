@@ -108,7 +108,7 @@ if ($UseLocal) {
         Start-Sleep -Seconds 2
     }
 
-    $tmp = Join-Path $env:TEMP 'thornswood-reset.ps1'
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-reset.ps1'
     Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
     & powershell -NoProfile -ExecutionPolicy Bypass -File $tmp -Root $Local
     Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
@@ -129,7 +129,7 @@ else {
     # Setup-SshKey.ps1 wrote into known_hosts, checked against vps.json.
     $ssh = @('-o', 'StrictHostKeyChecking=yes')
 
-    $tmp = Join-Path $env:TEMP 'thornswood-reset.ps1'
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-reset.ps1'
     Set-Content -LiteralPath $tmp -Value $body -Encoding UTF8
 
     Invoke-ThornswoodNative { & scp @ssh $tmp "${target}:C:/thornswood-reset.ps1" }

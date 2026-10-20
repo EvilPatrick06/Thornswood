@@ -908,7 +908,7 @@ if (Test-Path -LiteralPath $rp) {
   $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
   $settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
-  $settingsForVps = Join-Path $env:TEMP 'thornswood-server-settings-vps.json'
+  $settingsForVps = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-server-settings-vps.json'
   # WriteAllText with an explicit encoding: Set-Content -Encoding UTF8 writes a
   # byte order mark under Windows PowerShell 5.1, and a BOM is not JSON to node.
   [IO.File]::WriteAllText($settingsForVps, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding($false)))
