@@ -152,6 +152,19 @@ try {
         foreach ($p in 'Repo', 'Engine', 'Out', 'ServerDist', 'ClientDist', 'Package', 'ServerZip', 'Local', 'Backups', 'bot', 'voice') {
             Yes ('where.js ' + $p + ' matches Where.ps1') (Same (AskJs $p) (Ask $p))
         }
+        # With no LOCALAPPDATA at all, as off Windows (#2872): both name the
+        # platform's own folder for this machine's data, and agree. Before,
+        # Where.ps1 stopped on a null path and where.js answered a relative one.
+        $set = $env:LOCALAPPDATA
+        $env:LOCALAPPDATA = $null
+        try {
+            $platform = Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Thornswood'
+            Yes 'with no LOCALAPPDATA, ReleasesDev is in the platform''s folder for this machine''s data (#2872)' (Same (Ask 'ReleasesDev') (Join-Path $platform 'feed\dev'))
+            Yes 'and EngineBuilds beside it' (Same (Ask 'EngineBuilds') (Join-Path $platform 'engine-build.json'))
+            foreach ($p in 'Releases', 'ReleasesDev', 'EngineBuilds') {
+                Yes ('and where.js ' + $p + ' says the same') (Same (AskJs $p) (Ask $p))
+            }
+        } finally { $env:LOCALAPPDATA = $set }
     } else {
         Yes 'node is available to check where.js' $false
     }
