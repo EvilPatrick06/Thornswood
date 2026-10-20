@@ -171,6 +171,48 @@
   let spentAt = 0;
   const SPENT_EVERY = 30000;
 
+  /*
+    AND WHAT THE FRAME LOOKS LIKE, 20 October (#385). The line above said how
+    many frames and how much of them was this plugin, and on 17 October in
+    Whiterun it said 28 to 45 frames a second with this plugin at 1 to 5% of
+    a core, so the rest of the frame went somewhere this line could not see.
+    Three more numbers make the same spot with the NPCs on and off decide it:
+
+      longest   the longest gap between two frames, which is what a stutter
+                is, and how many gaps were over 50ms. A gap of a second or
+                more is a load screen, not a stutter, and is counted apart.
+      drawn     how many forms the SkyMP client is keeping in the world for
+                the server, and how many of those are actors. Every one is
+                updated by the client every frame, and the NPCs are most of
+                them, so this is the number the NPC switch moves.
+  */
+  const HITCH_MS = 50;
+  const PAUSE_MS = 1000;
+  let frameAt = 0;
+  let longestFrame = 0;
+  let hitches = 0;
+  let pauses = 0;
+
+  function drawnByClient() {
+    try {
+      const views = sp.storage.view && sp.storage.view.getFormViews();
+      if (!views) { return 'not known'; }
+      let forms = 0;
+      let actors = 0;
+      const n = views.getFormViewsArrayLength();
+      for (let i = 0; i < n; i++) {
+        const v = views.getNthFormView(i);
+        if (!v) { continue; }
+        forms++;
+        const id = v.getLocalRefrId();
+        if (id && sp.Actor.from(sp.Game.getFormEx(id))) { actors++; }
+      }
+      return forms + ' forms, ' + actors + ' of them actors';
+    } catch (e) {
+      return 'not known (' + e + ')';
+    }
+  }
+
   function guard(name, fn) {
     return function () {
       const began = Date.now();
@@ -195,6 +237,15 @@
   function frameWent() {
     frames++;
     const now = Date.now();
+    if (frameAt) {
+      const gap = now - frameAt;
+      if (gap >= PAUSE_MS) { pauses++; }
+      else {
+        if (gap > longestFrame) { longestFrame = gap; }
+        if (gap > HITCH_MS) { hitches++; }
+      }
+    }
+    frameAt = now;
     if (!spentAt) { spentAt = now; return; }
     if (now - spentAt < SPENT_EVERY) { return; }
     const seconds = (now - spentAt) / 1000;
@@ -214,7 +265,9 @@
         (total / Math.max(1, seconds) / 10).toFixed(1) + '% of one core), worst five: ' +
         rows.slice(0, 5).map(function (r) {
           return r.name + ' ' + r.ms + 'ms/' + r.runs + ' runs, worst ' + r.worst + 'ms';
-        }).join('; '));
+        }).join('; ') +
+        '; longest frame ' + longestFrame + 'ms, ' + hitches + ' over ' + HITCH_MS + 'ms, ' +
+        pauses + ' pause(s) of a second or more; the client draws ' + drawnByClient());
 
     for (const k in spent) {
       if (Object.prototype.hasOwnProperty.call(spent, k)) {
@@ -222,6 +275,9 @@
       }
     }
     frames = 0;
+    longestFrame = 0;
+    hitches = 0;
+    pauses = 0;
   }
 
   T.log = log;

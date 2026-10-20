@@ -651,6 +651,7 @@ jobs:
                  'test-1351-unmasked-frames.js',
                  'test-1349-relay-shapes.js',
                  'test-1033-pulse-cost.js',
+                 'test-385-frame-line.js',
                  'test-1157-session-ends.js',
                  'test-1994-load-refused.js',
                  'test-1894-door-sentence.js',
