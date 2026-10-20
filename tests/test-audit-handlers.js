@@ -69,10 +69,11 @@ function liftThrough(from, anchor, to) {
   return c < 0 ? null : src.slice(a, c + to.length);
 }
 
-// The eleven events with a fixed name, read out of
-// skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September.
+// The twelve events with a fixed name: eleven read out of
+// skymp5-server/cpp/server_guest_lib/gamemode_events on 24 September, and
+// onSpellCast, which skymp #86 added for Overcharge (#2848).
 const EVENTS = ['onActivate', 'onCraft', 'onDeath', 'onDropItem', 'onEatItem',
-                'onPutItem', 'onReadBook', 'onRespawn', 'onTakeItem',
+                'onPutItem', 'onReadBook', 'onRespawn', 'onSpellCast', 'onTakeItem',
                 'onUpdateAppearanceAttempt', 'onUpdateEquipmentAttempt'];
 // The Papyrus family: the engine calls mp['onPapyrusEvent:' + name] for each
 // of these. They are the server half of the fork's event list,
@@ -172,7 +173,7 @@ if (handlersSrc !== null) {
 // ---------------------------------------------------------------- the list --
 
 if (listSrc !== null) {
-  yes('the list names all eleven events with a fixed name',
+  yes('the list names all twelve events with a fixed name',
       EVENTS.every(function (e) { return listSrc.indexOf(e) !== -1; }));
   yes('the list names the Papyrus family by the name the engine looks up',
       listSrc.indexOf("mp['" + PAPYRUS_PREFIX + "<Name>']") !== -1);
@@ -304,7 +305,7 @@ if (getNames === null) {
     if (lit) { literal.push(lit[1]); } else { runtime.push(g); }
   });
   literal.sort();
-  yes('the eleven fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
+  yes('the twelve fixed names are exactly the ones the fork raises (' + literal.join(', ') + ')',
       JSON.stringify(literal) === JSON.stringify(EVENTS.slice().sort()));
 
   // The two families whose name is built when they fire, each checked by what

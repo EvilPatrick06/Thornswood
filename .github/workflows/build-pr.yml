@@ -508,6 +508,7 @@ jobs:
                  'test-1621-quest-state.js', 'test-merchant-expanded-scenes.js',
                  'test-merchant-commission-state.js', 'test-merchant-commission-settlement.js', 'test-merchant-commissions.js',
                  'test-merchant-commission-bundles.js', 'test-merchant-ranked-sources.js',
+                 'test-merchant-hold-coverage.js',
                  'test-unpin.js', 'test-coffers.js',
                  'test-512-trading-company.js',
                  'test-1383-injury.js',
