@@ -5,6 +5,11 @@ const fs = require('node:fs');
 const path = require('node:path');
 const root = path.join(__dirname, '../..');
 const modePath = path.join(root, 'game/gamemode.js');
+const old = fs.readFileSync(modePath, 'utf8').replace(/\r\n/g, '\n');
+const progression={};
+require('node:vm').runInNewContext(old.slice(old.indexOf('// ==== thornswood progression ===='),old.indexOf('// ==== end thornswood progression ====')),progression);
+const gates=require(path.join(root,'game/quest-eligibility.js')).createQuestEligibility({
+  table:progression.__thornswoodProgression.TABLE,spellIds:progression.__thornswoodProgression.SPELL_IDS});
 const moduleSource = fs.readFileSync(path.join(root, 'game/merchant-trading.js'), 'utf8').replace(/\r\n/g, '\n');
 const settlementSource = fs.readFileSync(path.join(root, 'game/merchant-settlement.js'), 'utf8').replace(/\r\n/g, '\n');
 const commissionStateSource = fs.readFileSync(path.join(root, 'game/merchant-commission-state.js'), 'utf8').replace(/\r\n/g, '\n');
@@ -20,6 +25,10 @@ const traders = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-t
 const roster = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-roster.json'), 'utf8'));
 const roles = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-role-tables.json'), 'utf8'));
 const quests = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-quests.json'), 'utf8'));
+const ranked=require(path.join(root,'scripts/dev/MerchantQuestSources.js')).validateRankedQuests(
+  JSON.parse(fs.readFileSync(path.join(root,'game/data/merchant-ranked-quests.json'),'utf8')),
+  {legacy:quests.quests,roster:roster.merchants,roles,gates,recipes:require(path.join(root,'game/data/recipes.json')).recipes,
+   harvests:require(path.join(root,'game/data/harvests.json')).harvests,ores:require(path.join(root,'game/data/ores.json')).ores});
 const activation = JSON.parse(fs.readFileSync(path.join(root, 'game/data/merchant-quest-activation.json'), 'utf8'));
 if(activation.version!==1 || !Array.isArray(activation.killScenes) || activation.killScenes.length>4 ||
     new Set(activation.killScenes.map(row=>row.id)).size!==activation.killScenes.length)
@@ -37,13 +46,14 @@ if(!Array.isArray(activation.commissions)||activation.commissions.length!==Objec
     new Set(activation.commissions.map(row=>row.id)).size!==activation.commissions.length)
   throw new Error('Invalid commission activation manifest');
 const commissionRows=activation.commissions.map(pin=>{
-  const matches=quests.quests.filter(row=>row.id===pin.id),row=matches[0];
+  const matches=quests.quests.concat(ranked.map(({itemTypes,...row})=>row)).filter(row=>row.id===pin.id),row=matches[0];
   if(matches.length!==1||row.kind!=='commission'||
     require('node:crypto').createHash('sha256').update(JSON.stringify(row)).digest('hex')!==pin.sha256)
     throw new Error('An activated commission changed. Preserve published definitions and use a new ID.');
   const type=roles.records[row.goods[0].item]&&roles.records[row.goods[0].item].type;
   if(!type)throw new Error('Commission item has no verified source record.');
-  return Object.assign({},row,{sourceHash:pin.sha256,itemType:type});
+  return Object.assign({},row,{sourceHash:pin.sha256,itemType:type,
+    ...(row.deliveryVersion===2?{itemTypes:ranked.find(source=>source.id===row.id).itemTypes}:{})});
 });
 const roleItems = new Set(Object.values(roles.tables).flatMap(table => Object.values(table).flat()));
 const stage = {version:1,history:roster.history,merchants:roster.merchants,tables:roles.tables,
@@ -73,7 +83,6 @@ const block = '// MERCHANT TRADING BUNDLE BEGIN\nconst MERCHANT_TRADING = (funct
   'module.exports.commissionRows = function () { return '+JSON.stringify(commissionRows)+'; };\n' +
   'module.exports.createQuestEligibility = QUEST_ELIGIBILITY.createQuestEligibility;\n' +
   'return module.exports;\n})();\n// MERCHANT TRADING BUNDLE END';
-const old = fs.readFileSync(modePath, 'utf8').replace(/\r\n/g, '\n');
 const existing = /\/\/ MERCHANT TRADING BUNDLE BEGIN[\s\S]*?\/\/ MERCHANT TRADING BUNDLE END/;
 const startup = '// NPC SERVER STARTUP BEGIN';
 const matched = existing.exec(old);
