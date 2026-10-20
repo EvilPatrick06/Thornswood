@@ -982,8 +982,10 @@ How to use it:
   option and can clear the Status on every card. Move the card on the board,
   or add the label `board: <Status>` to the issue (`board: In Progress`, `board: Done`):
   `.github\workflows\board-status.yml` sets the card's Status and takes the
-  label off again (#2863). A cloud Claude thread is refused GraphQL, which the
-  board needs, so the label is how it moves a card:
+  label off again (#2863). The label `order: <number>` (`order: 52.5`) sets
+  the card's Order the same way, and the label is deleted afterwards. A cloud
+  Claude thread is refused GraphQL, which the board needs, so these labels
+  are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,

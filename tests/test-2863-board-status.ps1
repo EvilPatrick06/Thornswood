@@ -1,7 +1,8 @@
 <#
   test-2863-board-status.ps1
 
-  A board: label sets the issue's Status on the board, then comes off.
+  A board: label sets the issue's Status on the board, an order: label its
+  Order, and the label comes off.
 
   WHY THIS EXISTS. Issue #2863. A cloud Claude thread is refused GraphQL, and
   the board's fields change only through GraphQL, so until this only "Releases
@@ -11,7 +12,7 @@
 
   What it checks:
     1. the workflow is there, runs when an issue gets a label and on nothing
-       else, only for a label that begins "board:", with a token that can only
+       else, only for a label that begins "board:" or "order:", with a token that can only
        edit issues, the board token from the "board" environment, one run per
        issue at a time with none cancelled while it runs (a queue on the job, so
        a run for another label never joins it), on the VPS runners
@@ -23,7 +24,9 @@
        would and writes down each call instead of making it: the Status named
        on the label is set on the issue's card, whatever its case, spaces or
        hyphens; every board: label on the issue comes off and no other label
-       is touched; a Status the board does not have, a missing token, an error
+       is touched; an order: label sets the Order number, and every order:
+       label on the issue is deleted from the repository; something that is
+       not a number, or a board with no Order field, fails the run; a Status the board does not have, a missing token, an error
        from the board and a refused label removal each fail the run, and the
        ones that fail before the Status is set touch no label.
 
@@ -61,8 +64,8 @@ $text = [IO.File]::ReadAllText($Workflow) -replace "`r`n", "`n"
 $on = [regex]::Match($text, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
 Yes 'it runs when an issue gets a label' ($on -match '(?m)^\s+issues:\s*$' -and $on -match 'types:\s*\[\s*labeled\s*\]')
 Yes '  and on nothing else' (@([regex]::Matches($on, '(?m)^  [a-z_]+:')).Count -eq 1)
-Yes '  and only for a label that begins "board:", so every other label takes no runner' (
-    $text -match [regex]::Escape("if: `${{ startsWith(github.event.label.name, 'board:') }}"))
+Yes '  and only for a label that begins "board:" or "order:", so every other label takes no runner' (
+    $text -match [regex]::Escape("if: `${{ startsWith(github.event.label.name, 'board:') || startsWith(github.event.label.name, 'order:') }}"))
 
 $perm = [regex]::Match($text, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value
 $grants = @([regex]::Matches($perm, '(?m)^\s+([a-z-]+):\s*(\S+)') | ForEach-Object { $_.Groups[1].Value + ': ' + $_.Groups[2].Value })
@@ -129,7 +132,8 @@ function Invoke-RestMethod {
         $q = ($Body | ConvertFrom-Json).query
         if ($q -match '^query') {
             $opts = @($env:TS_OPTIONS -split '\|' | ForEach-Object { [pscustomobject]@{ id = 'opt-' + ($_ -replace ' ', '_'); name = $_ } })
-            return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ id = 'PVT_board'; field = [pscustomobject]@{ id = 'PVTSSF_status'; options = $opts } } } } }
+            $order = if ($env:TS_NO_ORDER) { $null } else { [pscustomobject]@{ id = 'PVTF_order'; dataType = 'NUMBER' } }
+            return [pscustomobject]@{ data = [pscustomobject]@{ user = [pscustomobject]@{ projectV2 = [pscustomobject]@{ id = 'PVT_board'; status = [pscustomobject]@{ id = 'PVTSSF_status'; options = $opts }; order = $order } } } }
         }
         if ($q -match 'addProjectV2ItemById') { return [pscustomobject]@{ data = [pscustomobject]@{ addProjectV2ItemById = [pscustomobject]@{ item = [pscustomobject]@{ id = 'PVTI_card' } } } } }
         if ($q -match 'updateProjectV2ItemFieldValue') { return [pscustomobject]@{ data = [pscustomobject]@{ updateProjectV2ItemFieldValue = [pscustomobject]@{ projectV2Item = [pscustomobject]@{ id = 'PVTI_card' } } } } }
@@ -152,7 +156,7 @@ function Invoke-RestMethod {
 $runner = Join-Path $work 'status.ps1'
 [IO.File]::WriteAllText($runner, $standIn + $script)
 
-$names = 'BOARD_TOKEN', 'GH_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'ISSUE', 'ISSUE_NODE', 'LABEL', 'GITHUB_REPOSITORY', 'TS_CALLS', 'TS_OPTIONS', 'TS_LABELS', 'TS_BOARD_ERROR', 'TS_BROKEN', 'TS_GONE'
+$names = 'BOARD_TOKEN', 'GH_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'ISSUE', 'ISSUE_NODE', 'LABEL', 'GITHUB_REPOSITORY', 'TS_CALLS', 'TS_OPTIONS', 'TS_LABELS', 'TS_BOARD_ERROR', 'TS_BROKEN', 'TS_GONE', 'TS_NO_ORDER'
 function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @{}) {
     if (Test-Path -LiteralPath $calls) { Remove-Item -LiteralPath $calls -Force }
     $keep = @{}
@@ -172,6 +176,7 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:TS_BOARD_ERROR = ''
         $env:TS_BROKEN = ''
         $env:TS_GONE = ''
+        $env:TS_NO_ORDER = ''
         foreach ($k in $extra.Keys) { [Environment]::SetEnvironmentVariable($k, $extra[$k]) }
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner 2>&1 | Out-String; $code = $LASTEXITCODE }
@@ -182,8 +187,9 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
     $made = @()
     if (Test-Path -LiteralPath $calls) { $made = @(Get-Content -LiteralPath $calls | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     $set = @($made | Where-Object { $_.PSObject.Properties['body'] -and $_.body.query -match 'updateProjectV2ItemFieldValue' })
-    $dels = @($made | Where-Object { $_.method -eq 'Delete' } | ForEach-Object { [Uri]::UnescapeDataString(($_.uri -split '/labels/')[1]) })
-    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Set = $set; Deleted = $dels }
+    $dels = @($made | Where-Object { $_.method -eq 'Delete' -and $_.uri -like '*/issues/*' } | ForEach-Object { [Uri]::UnescapeDataString(($_.uri -split '/labels/')[1]) })
+    $gone = @($made | Where-Object { $_.method -eq 'Delete' -and $_.uri -notlike '*/issues/*' } | ForEach-Object { [Uri]::UnescapeDataString(($_.uri -split '/labels/')[1]) })
+    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Set = $set; Deleted = $dels; LabelGone = $gone }
 }
 $labelsUri = 'https://api.github.com/repos/EvilPatrick06/Thornswood/issues/2863/labels'
 
@@ -195,7 +201,7 @@ try {
     Yes '  it reads board 1 of EvilPatrick06' ($q[0].body.variables.o -eq 'EvilPatrick06' -and $q[0].body.variables.n -eq 1 -and $q[0].body.query -match 'field\(name:"Status"\)')
     Yes '  it finds the card by adding the issue it was given' ($q[1].body.query -match 'addProjectV2ItemById' -and $q[1].body.variables.p -eq 'PVT_board' -and $q[1].body.variables.c -eq 'I_issue2863')
     Yes '  and sets that card''s Status field to In Progress' (
-        $r.Set.Count -eq 1 -and $r.Set[0].body.variables.i -eq 'PVTI_card' -and $r.Set[0].body.variables.f -eq 'PVTSSF_status' -and $r.Set[0].body.variables.v -eq 'opt-In_Progress')
+        $r.Set.Count -eq 1 -and $r.Set[0].body.variables.i -eq 'PVTI_card' -and $r.Set[0].body.variables.f -eq 'PVTSSF_status' -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-In_Progress')
     Yes '  and says so' ($r.Out -match '#2863: Status set to In Progress')
     $rest = @($r.Calls | Where-Object { $_.uri -like "$labelsUri*" })
     Yes '  the label calls use the run''s own token' ($rest.Count -ge 1 -and @($rest | Where-Object { $_.auth -ne 'Bearer stand-in-run-token' }).Count -eq 0)
@@ -204,15 +210,15 @@ try {
 
     foreach ($spelling in 'board: in-progress', 'board:IN PROGRESS', 'Board: In  Progress ') {
         $r = Invoke-Status $spelling @($spelling)
-        Yes ("'{0}' is In Progress too (exit {1})" -f $spelling, $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v -eq 'opt-In_Progress')
+        Yes ("'{0}' is In Progress too (exit {1})" -f $spelling, $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-In_Progress')
     }
 
     $r = Invoke-Status 'board: Done' @('board: Done')
-    Yes ("board: Done sets Done (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set[0].body.variables.v -eq 'opt-Done')
+    Yes ("board: Done sets Done (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-Done')
 
     $r = Invoke-Status 'board: Done' @('board: In Progress', 'board: Done', 'wave: 2 This week')
     Yes ("an older board label waiting on the issue comes off with this one, and the card takes this one (exit {0})" -f $r.Code) (
-        $r.Code -eq 0 -and $r.Set[0].body.variables.v -eq 'opt-Done' -and $r.Deleted.Count -eq 2 -and ($r.Deleted -contains 'board: In Progress') -and ($r.Deleted -contains 'board: Done'))
+        $r.Code -eq 0 -and $r.Set[0].body.variables.v.singleSelectOptionId -eq 'opt-Done' -and $r.Deleted.Count -eq 2 -and ($r.Deleted -contains 'board: In Progress') -and ($r.Deleted -contains 'board: Done'))
 
     $r = Invoke-Status 'board: Done' @()
     Yes ("a run whose label an earlier run already took off still sets the Status and removes nothing (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Deleted.Count -eq 0)
@@ -236,6 +242,38 @@ try {
     $r = Invoke-Status 'board: In Progress' @('board: In Progress') @{ TS_BOARD_ERROR = 'Your token has not been granted the required scopes' }
     Yes ("an error from the board fails the run, says it, and touches no label (exit {0})" -f $r.Code) (
         $r.Code -ne 0 -and $r.Out -match 'the board answered: Your token has not been granted' -and $r.Deleted.Count -eq 0 -and $r.Set.Count -eq 0)
+
+    # ---- order: ------------------------------------------------------------
+    $r = Invoke-Status 'order: 52.5' @('order: 52.5', 'board: Done', 'area: Gamemode')
+    Yes ("order: 52.5: the run passes (exit {0})" -f $r.Code) ($r.Code -eq 0)
+    Yes '  and sets the card''s Order field to 52.5, a number' (
+        $r.Set.Count -eq 1 -and $r.Set[0].body.variables.f -eq 'PVTF_order' -and $r.Set[0].body.variables.v.number -eq 52.5 -and @($r.Set[0].body.variables.v.PSObject.Properties).Count -eq 1)
+    Yes '  and says so' ($r.Out -match '#2863: Order set to 52.5')
+    Yes ("  the order label is deleted from the repository, which takes it off the issue ({0})" -f ($r.LabelGone -join ', ')) ($r.LabelGone.Count -eq 1 -and $r.LabelGone[0] -eq 'order: 52.5')
+    Yes '  its name escaped into the address' (@($r.Calls | Where-Object { $_.method -eq 'Delete' -and $_.uri -eq 'https://api.github.com/repos/EvilPatrick06/Thornswood/labels/order%3A%2052.5' }).Count -eq 1)
+    Yes '  and the board label and every other label are left alone' ($r.Deleted.Count -eq 0)
+
+    $r = Invoke-Status 'Order:7' @('Order:7')
+    Yes ("'Order:7' sets 7 (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set[0].body.variables.v.number -eq 7)
+
+    $r = Invoke-Status 'order: 3' @('order: 9', 'order: 3')
+    Yes ("an older order label waiting on the issue is deleted with this one, and the card takes this one (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Set[0].body.variables.v.number -eq 3 -and $r.LabelGone.Count -eq 2 -and ($r.LabelGone -contains 'order: 9') -and ($r.LabelGone -contains 'order: 3'))
+
+    $r = Invoke-Status 'order: 12' @() @{ TS_GONE = 'order: 12' }
+    Yes ("a run whose label an earlier run already deleted still sets the Order, and GitHub's 404 for the label is said and passed over (exit {0})" -f $r.Code) (
+        $r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.LabelGone.Count -eq 1 -and $r.Out -match 'the label order: 12 was already deleted')
+
+    foreach ($bad in 'order: soon', 'order: 1,5', 'order: NaN', 'order: Infinity') {
+        $r = Invoke-Status $bad @($bad)
+        Yes ("'{0}' is not an Order: the run fails and touches nothing on the board or the labels (exit {1})" -f $bad, $r.Code) ($r.Code -ne 0 -and $r.Set.Count -eq 0 -and $r.LabelGone.Count -eq 0 -and $r.Deleted.Count -eq 0)
+    }
+
+    $r = Invoke-Status 'order: 4' @('order: 4') @{ TS_NO_ORDER = '1' }
+    Yes ("a board with no number field named Order fails the run and says so (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Out -match 'no number field named Order' -and $r.Set.Count -eq 0)
+
+    $r = Invoke-Status 'order: 4' @('order: 4') @{ TS_BROKEN = 'order: 4' }
+    Yes ("a refused label deletion fails the run (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Out -notmatch 'deleted the label order: 4')
 
     $r = Invoke-Status 'board: In Progress' @('board: In Progress') @{ TS_BROKEN = 'board: In Progress' }
     Yes ("a refused label removal fails the run (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Out -notmatch 'took board: In Progress off')
