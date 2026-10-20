@@ -167,7 +167,7 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:LABEL = $label
         $env:GITHUB_REPOSITORY = 'EvilPatrick06/Thornswood'
         $env:TS_CALLS = $calls
-        $env:TS_OPTIONS = 'Todo|In Progress|Completed|Done'
+        $env:TS_OPTIONS = 'Todo|In Progress|Done'
         $env:TS_LABELS = ConvertTo-Json -InputObject @($onIssue) -Compress
         $env:TS_BOARD_ERROR = ''
         $env:TS_BROKEN = ''
@@ -207,22 +207,24 @@ try {
         Yes ("'{0}' is In Progress too (exit {1})" -f $spelling, $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Set[0].body.variables.v -eq 'opt-In_Progress')
     }
 
-    $r = Invoke-Status 'board: Completed' @('board: Completed')
-    Yes ("board: Completed sets Completed (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set[0].body.variables.v -eq 'opt-Completed')
+    $r = Invoke-Status 'board: Done' @('board: Done')
+    Yes ("board: Done sets Done (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set[0].body.variables.v -eq 'opt-Done')
 
     $r = Invoke-Status 'board: Done' @('board: In Progress', 'board: Done', 'wave: 2 This week')
     Yes ("an older board label waiting on the issue comes off with this one, and the card takes this one (exit {0})" -f $r.Code) (
         $r.Code -eq 0 -and $r.Set[0].body.variables.v -eq 'opt-Done' -and $r.Deleted.Count -eq 2 -and ($r.Deleted -contains 'board: In Progress') -and ($r.Deleted -contains 'board: Done'))
 
-    $r = Invoke-Status 'board: Completed' @()
+    $r = Invoke-Status 'board: Done' @()
     Yes ("a run whose label an earlier run already took off still sets the Status and removes nothing (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Set.Count -eq 1 -and $r.Deleted.Count -eq 0)
 
-    $r = Invoke-Status 'board: Completed' @('board: Completed') @{ TS_GONE = 'board: Completed' }
-    Yes ("a label gone between the read and the removal (404) is said and passed over (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'board: Completed was already off #2863')
+    $r = Invoke-Status 'board: Done' @('board: Done') @{ TS_GONE = 'board: Done' }
+    Yes ("a label gone between the read and the removal (404) is said and passed over (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'board: Done was already off #2863')
 
-    $r = Invoke-Status 'board: Blocked' @('board: Blocked')
+    # The board has Todo, In Progress and Done. "Completed" was Patrick's word
+    # for Done (19 Oct), and a label naming it must not pass for anything.
+    $r = Invoke-Status 'board: Completed' @('board: Completed')
     Yes ("a Status the board does not have fails the run (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Set.Count -eq 0)
-    Yes '  says which ones it has' ($r.Out -match "no Status 'Blocked'; it has: Todo, In Progress, Completed, Done")
+    Yes '  says which ones it has' ($r.Out -match "no Status 'Completed'; it has: Todo, In Progress, Done")
     Yes '  and leaves the label on, so it shows it was not carried out' ($r.Deleted.Count -eq 0)
 
     $r = Invoke-Status 'board: ' @('board: ')

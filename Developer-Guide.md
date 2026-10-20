@@ -976,9 +976,11 @@ How to use it:
 - Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
   or what it waits on, and `anyone can start` marks what needs nobody in
   particular. Assign yourself when you start one.
-- Status: In Progress the moment work starts, Completed when it is merged and
-  only needs testing (Patrick, 19 Oct). Move the card on the board, or add the
-  label `board: <Status>` to the issue (`board: In Progress`, `board: Completed`):
+- Status: In Progress the moment work starts, Done when it is merged and only
+  needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
+  Progress and Done; never add one through the API, which rewrites every
+  option and can clear the Status on every card. Move the card on the board,
+  or add the label `board: <Status>` to the issue (`board: In Progress`, `board: Done`):
   `.github\workflows\board-status.yml` sets the card's Status and takes the
   label off again (#2863). A cloud Claude thread is refused GraphQL, which the
   board needs, so the label is how it moves a card:

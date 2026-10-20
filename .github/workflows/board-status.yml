@@ -1,10 +1,11 @@
 # A board: label sets the issue's Status on the board, then comes off (#2863).
 #
 # WHY. Patrick, 19 Oct 2026: an issue goes to In Progress on the board the
-# moment work starts on it, and to Completed when it is merged and only needs
-# testing; and "we need to make it so it works in the cloud". The board is a
-# user-owned Projects board, and its fields change only through GraphQL. A
-# cloud Claude thread is refused GraphQL and the user-scoped projectsV2
+# moment work starts on it, and to Done when it is merged and only needs
+# testing (the board's Status options are Todo, In Progress and Done); and
+# "we need to make it so it works in the cloud". The board is a user-owned
+# Projects board, and its fields change only through GraphQL. A cloud Claude
+# thread is refused GraphQL and the user-scoped projectsV2
 # routes (403, measured 19 Oct), but it can add a label to an issue over
 # REST. So a label is the instruction and this workflow carries it out:
 #
