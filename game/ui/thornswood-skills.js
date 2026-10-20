@@ -285,7 +285,7 @@
         { key: 'magicka', name: 'Magicka', subs: [
             { key: 'capacity', name: 'Capacity', desc: 'Most magicka', perk: 'Archmage’s Vessel: drop below a tenth of magicka and it returns to half, once a day.' },
             { key: 'clarity', name: 'Clarity', desc: 'Regeneration', perk: 'Leyline Attunement: magicka still returns while you cast, at half the usual rate.' },
-            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in five deals double. Holding twice as long is not in the game yet.' },
+            { key: 'potency', name: 'Potency', desc: 'Spell effect, in the schools you hold', perk: 'Overcharge: one spell in five deals double, or holds twice as long.' },
             { key: 'ward', name: 'Ward', desc: 'Magic resistance', perk: 'Spellbreaker: 20% of the magicka in a spell that hits you is added to yours.' },
             { key: 'efficiency', name: 'Efficiency', desc: 'Cost, in the schools you hold', perk: 'Font of Magic: once a day, 15 seconds where a spell costs nothing. Use starts it.' }] },
         { key: 'stamina', name: 'Stamina', subs: [

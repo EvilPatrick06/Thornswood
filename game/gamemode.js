@@ -51481,9 +51481,21 @@ return module.exports;
                        reads it) raised by the tree's Clarity, as the client
                        raises it.
     Overcharge         Every fifth spell of yours that takes health takes as
-                       much again. The other half, a spell that holds twice as
-                       long, is a magic effect on the machine that runs it and
-                       is NOT HERE.
+                       much again. And every fifth spell of yours that holds
+                       (one you cast and let go, with an effect that lasts a
+                       time and none that takes health: a ward of flesh, a
+                       light, a fear) holds twice as long. A spell's effects
+                       run on the machine that runs the actor they land on,
+                       so the engine fork counts those on your own machine
+                       (setCastDurationEvery, which the front plugin sets
+                       while Overcharge is held) and the cast says how long
+                       it holds. The server counts the same casts by the same
+                       rule (holdsLonger below) and answers onSpellCast with
+                       how long it holds on everybody else's machine, so a
+                       client's word alone holds nothing longer for anybody
+                       (THE CASTS THAT HOLD, below). Two counts: a spell that
+                       takes health never holds longer, and one that holds
+                       never deals double.
     Spellbreaker       A spell that hits you gives you a fifth of what it
                        costs, its SPIT cost as the record carries it. A
                        concentration spell's cost is a second of it, so it
@@ -51584,9 +51596,8 @@ return module.exports;
                          say: 'Drop below a tenth of magicka and it returns to half, once a day.' },
     leylineattunement: { name: 'Leyline Attunement', skill: 'clarity', rate: 0.5,
                          say: 'Magicka still returns while you cast, at half the usual rate.' },
-    overcharge:        { name: 'Overcharge', skill: 'potency', inEvery: 5, more: 1,
-                         say: 'One spell in five deals double, or holds twice as long.',
-                         not: 'Holding twice as long is not in the game yet: only the damage is doubled.' },
+    overcharge:        { name: 'Overcharge', skill: 'potency', inEvery: 5, more: 1, longer: 2,
+                         say: 'One spell in five deals double, or holds twice as long.' },
     spellbreaker:      { name: 'Spellbreaker', skill: 'ward', share: 0.2,
                          say: '20% of the magicka in a spell that hits you is added to yours.' },
     fontofmagic:       { name: 'Font of Magic', skill: 'efficiency', every: DAY, seconds: 15, costOff: 100,
@@ -51685,14 +51696,16 @@ return module.exports;
       troll  actor -> { at, said }         Troll's Blood's second, and its fight
       ley    actor -> when Leyline Attunement last gave
       spells actor -> how many spells of theirs have landed towards Overcharge
+      holding actor -> how many casts of theirs that hold, towards Overcharge
       sb     'target:caster:spell' -> when a concentration spell last gave
       blow   actor -> { by, at }           whose blow, when this block's write killed
   */
   var ST = g.__thornswoodPerkState;
   if (!ST || typeof ST !== 'object') {
     ST = g.__thornswoodPerkState = { held: {}, last: {}, fight: {}, font: {}, troll: {}, ley: {},
-                                     spells: {}, sb: {}, blow: {} };
+                                     spells: {}, holding: {}, sb: {}, blow: {} };
   }
+  if (!ST.holding || typeof ST.holding !== 'object') { ST.holding = {}; }
 
   function heldOf(id, t) {
     var c = ST.held[id];
@@ -51860,6 +51873,77 @@ return module.exports;
     if (!info.cost) { plog('the spell', hex(id), 'carries no cost, so Spellbreaker gives nothing for it'); }
     spellCosts[id] = info;
     return info;
+  }
+
+  /*
+    THE CASTS THAT HOLD (Overcharge's other half). A spell holds when it is a
+    spell (SPIT type 0, not a power, a shout or an ability), cast and let go
+    (cast type 1, not held like a ward or a stream of flame), with at least
+    one effect that lasts a time (EFIT's duration, at 8) and none that takes
+    health: an effect whose MGEF is hostile (DATA flags, bit 4) and works on
+    Health (its value, DATA at 0x44, is 24). The engine fork's
+    CastDurationsGame::Holds judges a cast on the caster's machine by the
+    same rule, so both count the same casts.
+  */
+  var HEALTH = 24;
+  var DETRIMENTAL = 4;
+  var holdsCache = {};
+  function holdsLonger(id) {
+    if (!id) { return false; }
+    if (has(holdsCache, id)) { return holdsCache[id]; }
+    var r = lookup(id);
+    var spit = typeOf(r) === 'SPEL' ? fieldOf(r, 'SPIT') : null;
+    var ok = !!spit && u32(spit, 8) === 0 && u32(spit, 16) === 1;
+    var lasts = false;
+    var fields = (ok && r.record.fields) || [];
+    for (var i = 0; i < fields.length && ok; i++) {
+      var f = fields[i];
+      if (!f) { continue; }
+      if (String(f.type) === 'EFID') {
+        var data = fieldOf(lookup(globalOf(r, u32(f.data, 0))), 'DATA');
+        if (((u32(data, 0) || 0) & DETRIMENTAL) && u32(data, 0x44) === HEALTH) { ok = false; }
+      } else if (String(f.type) === 'EFIT') {
+        if ((u32(f.data, 8) || 0) > 0) { lasts = true; }
+      }
+    }
+    holdsCache[id] = ok && lasts;
+    return holdsCache[id];
+  }
+
+  /*
+    A cast, from mp.onSpellCast, before the engine sends it to anybody near.
+    asked is how many times its usual time the caster's own machine gave its
+    effects; the answer is what everybody else's machine gives them. Every
+    cast that holds, by somebody who holds Overcharge, counts. The fifth
+    holds twice as long, and only when the caster's machine counted it the
+    fifth as well and asked for it; the one that asked is the one everybody
+    sees. A cast that asked without the count behind it holds its own time
+    for everybody else, and counts. A cast that did not ask at the fifth
+    (its machine counted one fewer) holds its own time and keeps the count,
+    so the next one is it.
+  */
+  function cast(casterId, spellId, asked) {
+    var by = Number(casterId) || 0;
+    var id = Number(spellId) || 0;
+    if (!by || !id || !personOf(by) || !heldOf(by, now()).overcharge || !holdsLonger(id)) { return 1; }
+    var longer = PERKS.overcharge.longer;
+    var n = (ST.holding[by] || 0) + 1;
+    if (n >= PERKS.overcharge.inEvery) {
+      if (Number(asked) === longer) {
+        ST.holding[by] = 0;
+        fired(by, 'overcharge', '(' + hex(id) + ' holds ' + longer + ' times as long)');
+        tell(by, 'Overcharge: that spell holds twice as long.');
+        return longer;
+      }
+      ST.holding[by] = n - 1;
+      return 1;
+    }
+    if (Number(asked) > 1) {
+      plog('Overcharge: the cast of', hex(id), 'by', hex(by), 'asked for', asked, 'times as long at',
+           n, 'of', PERKS.overcharge.inEvery + ', so it holds its own time for everybody else');
+    }
+    ST.holding[by] = n;
+    return 1;
   }
 
   /*
@@ -52309,11 +52393,25 @@ return module.exports;
     PERKS: PERKS, ORDER: ORDER, PROPERTY: PERK_PROPERTY, CRIT_LINE: CRIT_LINE, FIGHT_MS: FIGHT_MS,
     holds: holds, cheatDeath: cheatDeath, hit: hit, flush: flush, killerOf: killerOf, tick: tick,
     use: use, clocks: clocks, spendLine: spendLine, effects: effects, armourOf: armourOf,
-    lethalExtra: lethalExtra, readyAt: readyAt, fired: fired, state: ST
+    lethalExtra: lethalExtra, readyAt: readyAt, fired: fired, cast: cast, holdsLonger: holdsLonger, state: ST
   };
   console.log('[thornswood perks] ready: ' + ORDER.length + ' perks');
 })();
 // ==== end thornswood skill perks ====
+
+/*
+  Every cast, before the engine sends it to anybody near (skymp #86,
+  SpellCastEvent.h): how many times its usual time its effects hold on their
+  machines. 1, the game's own, unless the skill perks block above agrees to
+  more for Overcharge. Nothing here refuses a cast: a false refuses nothing,
+  the cast was made on the caster's own machine.
+*/
+mp.onSpellCast = guard('onSpellCast', function (casterId, spell, asked) {
+  var pk = globalThis.__thornswoodPerks;
+  var mult = 1;
+  try { mult = (pk && pk.cast) ? pk.cast(casterId, spell, asked) : 1; } catch (e) { log('perks: the cast threw:', e); }
+  if (mult !== 1) { mp.set(casterId, 'spellCastDurationMult', mult); }
+});
 
 // ==== thornswood warrior maneuvers ====
 /*
@@ -58988,13 +59086,13 @@ mp.onPutItem = guard('onPutItem', function () {
   undefined and true let it through, false refuses it (except in the Papyrus
   family, where it refuses nothing), and a throw is logged and lets it
   through. So a handler with no opinion returns nothing at all.
-  Eleven events have a fixed name, and they come first. Two families build
+  Twelve events have a fixed name, and they come first. Two families build
   their name when they fire: the Papyrus family, onPapyrusEvent:<Name>, which
   is the one that hears hits and spells and has its own heading below, and
   custom events, whose name is whatever the client sent (CUSTOM EVENTS AND
   PACKETS).
 
-  THE ELEVEN WITH A FIXED NAME.
+  THE TWELVE WITH A FIXED NAME.
 
     onActivate    Pressing E on anything. mp.onActivate refuses on named paths
                   only: a bench that is not theirs, a locked door whose client
@@ -59038,6 +59136,16 @@ mp.onPutItem = guard('onPutItem', function () {
                   in the injury and disease block hears it for a potion of
                   cure disease (#1383) and never refuses. The needs block
                   hears about eating from the client's /ate line instead.
+    onSpellCast   A cast the engine has checked (the sender's own actor or one
+                  it hosts, alive, with the spell equipped), before it goes
+                  out to anybody near, and not the message that interrupts a
+                  cast: (caster, spell, how many times its usual time the
+                  caster's machine gave its effects). mp.onSpellCast, after
+                  the skill perks block, answers through the caster's
+                  spellCastDurationMult how long its effects hold on
+                  everybody else's machine (Overcharge, #2848); it is 1, the
+                  game's own, until a handler sets it. A false refuses
+                  nothing: the cast was made on the caster's own machine.
     onReadBook    Reading a book. A spell tome teaches only under the Mage
                   rules (a spell point, the rank, a spell of the rank below),
                   and mp.onReadBook refuses it otherwise, keeping the tome
@@ -59064,7 +59172,7 @@ mp.onPutItem = guard('onPutItem', function () {
 
   THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
   engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
-  PapyrusEventEvent and fires it the way the eleven above are fired, under
+  PapyrusEventEvent and fires it the way the twelve above are fired, under
   the name "onPapyrusEvent:" followed by the Papyrus name. A handler is called
   with the id of the form the event is sent on, then the Papyrus arguments
   (PapyrusUtils::GetJsValueFromPapyrusValue): a form as { type: 'form', desc },
