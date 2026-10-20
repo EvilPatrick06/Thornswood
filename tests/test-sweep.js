@@ -77,7 +77,9 @@ function codeOf(src) {
     yes('and the body is 1000, a normal closure', code === 1000);
   }
   yes('the socket is still torn down afterwards',
-      /this\.socket\.write\(bye\);[\s\S]{0,80}this\.close\(\);/.test(c));
+      // The frame is written inline since #2817 took out the bye variable
+      // and the catch around it; what matters is that close follows it.
+      /this\.socket\.write\(Buffer\.from\(\[0x88, 2, 0x03, 0xe8\]\)\);[\s\S]{0,80}this\.close\(\);/.test(c));
 }
 
 // ----------------------------------------------------- an oversized body answers

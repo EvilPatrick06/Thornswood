@@ -85,7 +85,7 @@ function Join-FeedSettings($Doc, [string]$FeedUrl, [scriptblock]$Download) {
     $h = [Security.Cryptography.SHA256]::Create()
     try { $got = (($h.ComputeHash($bytes) | ForEach-Object { $_.ToString('x2') }) -join '') } finally { $h.Dispose() }
     if ($got -ne $sha) { throw "The settings the feed at $FeedUrl names did not hash to their name ($sha), so they were not read." }
-    $rest = ([Text.Encoding]::UTF8.GetString($bytes) -replace '^﻿', '') | ConvertFrom-Json
+    $rest = ([Text.Encoding]::UTF8.GetString($bytes) -replace '^\uFEFF', '') | ConvertFrom-Json
     $o = [ordered]@{}
     foreach ($p in $Doc.PSObject.Properties) { if ($p.Name -ne 'settings') { $o[$p.Name] = $p.Value } }
     foreach ($p in $rest.PSObject.Properties) { if (-not $o.Contains($p.Name)) { $o[$p.Name] = $p.Value } }

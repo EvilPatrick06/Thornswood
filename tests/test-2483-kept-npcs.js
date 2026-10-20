@@ -10,17 +10,31 @@
 //
 // This runs the fork's own harness, skymp5-client/test-kept-npc-adopt.js,
 // against the pinned engine/skymp. It needs the submodule checked out
-// (git submodule update --init engine/skymp). The pull request gate does not
-// check it out, so this is listed in tests/gate-excluded.txt.
+// (git submodule update --init engine/skymp). Without it this says SKIP,
+// which is the pull request gate and the nightly's harness shares; the
+// nightly's fork step fetches it and runs this with THORNSWOOD_FORK_REQUIRED.
 'use strict';
 
 const fs = require('fs');
 const path = require('path');
 const { spawnSync } = require('child_process');
 
-const harness = path.join(__dirname, '..', 'engine', 'skymp', 'skymp5-client', 'test-kept-npc-adopt.js');
+const client = path.join(__dirname, '..', 'engine', 'skymp', 'skymp5-client');
+const harness = path.join(client, 'test-kept-npc-adopt.js');
+if (!fs.existsSync(client)) {
+  // The gate and the nightly's harness shares have no fork. The nightly's
+  // fork step fetches it at the pin and sets THORNSWOOD_FORK_REQUIRED=1, as
+  // for test-papyrus-event-list.js: there a missing fork is a failure,
+  // because a check that did not happen is not a pass.
+  if (process.env.THORNSWOOD_FORK_REQUIRED === '1') {
+    console.log('FAIL  engine/skymp is not checked out (THORNSWOOD_FORK_REQUIRED is set, so not having it is a failure)');
+    process.exit(1);
+  }
+  console.log('SKIP  engine/skymp is not checked out here; the nightly fetches it at the pin and runs this');
+  process.exit(0);
+}
 if (!fs.existsSync(harness)) {
-  console.log('FAIL  engine/skymp is not checked out, or its pin is older than the #2483 fix: ' + harness);
+  console.log('FAIL  engine/skymp is checked out but its pin is older than the #2483 fix: ' + harness);
   process.exit(1);
 }
 const r = spawnSync(process.execPath, [harness], { stdio: 'inherit' });

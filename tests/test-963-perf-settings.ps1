@@ -44,8 +44,17 @@ function Read([string]$rel) { Get-Content -LiteralPath (Join-Path $root $rel) -R
 $stubs = @'
 using System;
 using System.Collections.Generic;
+using System.IO;
+using System.Runtime.InteropServices;
+using System.Text;
 namespace Thornswood963
 {
+    // Enforce.MakeItOurs splits a hard link with OwnGame.SwapCopyIn (#2599).
+    // The real code, lifted out of OwnGame.cs below, as test-2599-whole-swaps.ps1 does.
+    static class OwnGame
+    {
+__OWNGAME__
+    }
     static class Paths { public static string Game = ""; public static string LiveMyGames = ""; public static string LogFile = ""; }
     static class Swallow { public static int Count; public static void Note(string where, Exception e) { Count++; } }
     class Config { public bool AutoJoin = true; public string ServerPort = "7777"; public string ServerAddress = ""; }
@@ -94,6 +103,15 @@ namespace Thornswood963
     }
 }
 '@
+# The same two pieces of OwnGame.cs test-2599-whole-swaps.ps1 lifts: the
+# #2599 swaps, and ReplaceName with the MoveFileEx they rest on. Enforce.cs
+# calls SwapCopyIn since #2599, so it does not compile without them.
+$og = [IO.File]::ReadAllText((Join-Path $app 'OwnGame.cs')) -replace "`r`n", "`n"
+$region = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
+$block = [regex]::Match($og, '(?s)\n(        // ---- #2599: one name of the game folder replaced whole.*?        // ---- end #2599[^\n]*\n)')
+Yes 'OwnGame.SwapCopyIn and what it rests on are found in OwnGame.cs, to compile with Enforce.cs' ($region.Success -and $block.Success -and $block.Groups[1].Value -match 'internal static void SwapCopyIn\(')
+if (-not ($region.Success -and $block.Success)) { Write-Host ""; Write-Host "$($script:pass) passed, $($script:fail) failed"; exit 1 }
+$stubs = $stubs.Replace('__OWNGAME__', $region.Groups[1].Value.TrimEnd() + "`n" + $block.Groups[1].Value.TrimEnd())
 $sources = @($stubs)
 $usings = New-Object 'Collections.Generic.SortedSet[string]'
 foreach ($f in 'Enforce.cs', 'AutoJoin.cs', 'Hold.cs', 'Watched.cs', 'ChannelWait.cs') {

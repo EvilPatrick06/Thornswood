@@ -134,10 +134,13 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { [IO.
 
     . (Join-Path $Repo 'scripts\release\Feed-Store.ps1')
     $site = Join-Path $T 'site'
+    # The feed is its newest generation, feed\version\<8 digits>.json, since
+    # #2727: the site's version.json is never written any more.
+    $gen = Join-Path $site 'feed\version\00000001.json'
     foreach ($k in $bad.Keys) {
-        W (Join-Path $site 'feed\version.json') $bad[$k]
+        W $gen $bad[$k]
         $m = Says { Read-SiteFeed 'main' $site }
-        Yes ("Feed-Store Read-SiteFeed: a site version.json that is {0} is named" -f $k) ($m.StartsWith((Join-Path $site 'feed\version.json') + ' ' + $expect[$k]))
+        Yes ("Feed-Store Read-SiteFeed: a site feed that is {0} is named" -f $k) ($m.StartsWith($gen + ' ' + $expect[$k]))
     }
 
     . (Join-Path $Repo 'scripts\mods\LoadOrder.ps1')
