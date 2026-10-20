@@ -159,6 +159,7 @@ const fold = (s) => s.replace(/\s+/g, ' ').trim();
 /* Each file's calls, by kind. say: a key or a panel button. typed: the chat box. */
 const PANELS = {
   'thornswood-board.js': { say: 1 },
+  'thornswood-furniture.js': { say: 1 },
   'thornswood-box.js': { say: 1 },
   'thornswood-bridge.js': { typed: 2 },
   'thornswood-journal.js': { say: 1 },

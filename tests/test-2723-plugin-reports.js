@@ -84,6 +84,10 @@ const SITES = {
   "'/' + sig": { n: 2, kind: 'kept', lines: ['/lock ff001234', '/unlock ff001234', '/claim ff001234', '/key ff001234 master'] },
   "'/repair'": { n: 1, kind: 'kept', lines: ['/repair'] },
   "'/treat'": { n: 1, kind: 'kept', lines: ['/treat'] },
+  // furniture in a held building (#2679): the line asked for, the panel, a piece's keys
+  "'/furniture look'": { n: 1, kind: 'report', lines: ['/furniture look'] },
+  "'/furniture'": { n: 1, kind: 'kept', lines: ['/furniture'] },
+  "'/furniture ' + line": { n: 1, kind: 'kept', lines: ['/furniture down', '/furniture turn', '/furniture move ff00a1b2', '/furniture pick ff00a1b2'] },
   // the mod settings menu's values that changed
   "lines[i]": { n: 1, kind: 'report', lines: ['/modset chfshVAMenuHotkey=50', '/modset ATLAS_USKPDetected=1 DelayDragonMin=-2.5'] },
   "'/ride e ' + hex": { n: 1, kind: 'kept', lines: ['/ride e ff00beef'] },
