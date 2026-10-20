@@ -163,7 +163,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # them all again. With neither file there it shipped no applied.txt at all:
 # every one of the 227 packs pending on first launch, and 164 of them point at
 # the private repository. So it stops and says where it looked.
-if (-not $ReleaseDir) { $ReleaseDir = & (Join-Path $PSScriptRoot 'Where.ps1') Releases }
+if (-not $ReleaseDir) { $ReleaseDir = & (Join-Path $Here 'Where.ps1') Releases }
 $vLive = Join-Path $ReleaseDir 'version.json'
 if (-not (Test-Path -LiteralPath $vLive)) {
     Die ("No version.json in $ReleaseDir, so this installer cannot say which packs it already has, " +

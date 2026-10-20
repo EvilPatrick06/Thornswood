@@ -107,13 +107,24 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent (Split-Path -Parent $here)
 
-$layoutPath = Join-Path $repo 'layout.json'
-if (-not (Test-Path -LiteralPath $layoutPath)) {
-    throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
+# layout.json, read the first time a place or folder of the repository is
+# asked for. This machine's own places (MachineData and the files under it)
+# come from the platform and never from it, so asking for one of those does
+# not need it (#2903): Publish-Update, Publish-Discord and Package-Thornswood
+# ask Where.ps1 for them since then, and run in harnesses from a copy of the
+# scripts with no layout.json beside them.
+$script:layout = $null
+function Get-Layout {
+    if ($null -ne $script:layout) { return $script:layout }
+    $layoutPath = Join-Path $repo 'layout.json'
+    if (-not (Test-Path -LiteralPath $layoutPath)) {
+        throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
+    }
+    $layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
+    if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
+    try { $script:layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
+    return $script:layout
 }
-$layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
-if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
-try { $layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
 
 # This machine's own data (feed copies, ship-roots.json, engine-build.json):
 # %LOCALAPPDATA%\Thornswood, which tests point elsewhere by setting it. Off
@@ -219,9 +230,9 @@ function Get-Place([string]$name) {
         'EngineBuilds' { return Join-Path (Get-MachineData) 'engine-build.json' }
         'EngineBuild'  { return Get-EngineBuild }
     }
-    $place = Get-Named $layout.places $name
+    $place = Get-Named (Get-Layout).places $name
     if ($null -ne $place) { return Join-Under $repo ([string]$place) }
-    $der = Get-Named $layout.derived $name
+    $der = Get-Named (Get-Layout).derived $name
     if ($null -ne $der) {
         $base = Get-Place ([string]$der.from)
         return Join-Under $base ([string]$der.join)
@@ -232,15 +243,14 @@ function Get-Place([string]$name) {
 $placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
                 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
-$folderNames = @($layout.folders.PSObject.Properties.Name)
-
 if ($placeNames -contains $What) {
     Get-Place $What
 }
-elseif ($folderNames -contains $What) {
-    Join-Under $repo ([string](Get-Named $layout.folders $What))
+elseif (@((Get-Layout).folders.PSObject.Properties.Name) -contains $What) {
+    Join-Under $repo ([string](Get-Named (Get-Layout).folders $What))
 }
 else {
+    $folderNames = @((Get-Layout).folders.PSObject.Properties.Name)
     $known = ($placeNames + $folderNames) -join ', '
     throw "Where.ps1 does not know '$What'. Known: $known"
 }

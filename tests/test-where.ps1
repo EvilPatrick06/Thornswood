@@ -75,6 +75,17 @@ try {
     # 1. A fresh clone: nothing fetched, nothing built.
     Yes 'Repo is the folder above scripts\release' (Same (Ask 'Repo') $repo)
     Yes 'MachineData is this machine''s own data folder (#2903)' (Same (Ask 'MachineData') (Join-Path $env:LOCALAPPDATA 'Thornswood'))
+    # A copy of the scripts with no layout.json beside it (the release harnesses)
+    # still gets this machine's own places, which never come from layout.json,
+    # and still cannot get one of the repository's (#2903).
+    $bare = Join-Path $work 'bare\scripts\release'
+    New-Item -ItemType Directory -Force -Path $bare | Out-Null
+    Copy-Item -LiteralPath $where -Destination (Join-Path $bare 'Where.ps1')
+    $bareW = Join-Path $bare 'Where.ps1'
+    Yes 'with no layout.json, MachineData and Releases still answer' ((Same ([string](& $bareW 'MachineData')) (Join-Path $env:LOCALAPPDATA 'Thornswood')) -and (Same ([string](& $bareW 'Releases')) (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main')))
+    $bareWhy = ''
+    try { [void](& $bareW 'Out') } catch { $bareWhy = $_.Exception.Message }
+    Yes '  and a place of the repository says layout.json is missing' ($bareWhy -match 'layout\.json is not at')
     Yes 'Releases is this machine''s working copy of the main feed (#907)' (Same (Ask 'Releases') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'))
     Yes 'ReleasesDev is the dev one' (Same (Ask 'ReleasesDev') (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev'))
     Yes 'ShipRoots is beside them, in this machine''s own data (#1692; tests\test-1692-release-root.ps1 holds the rest)' (
