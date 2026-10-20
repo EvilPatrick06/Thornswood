@@ -118,7 +118,9 @@ function Remote($script) {
     return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 
-$log = Join-Path $Root 'bridge.log'
+# A path on the box, joined as text: Join-Path checks the drive exists here,
+# and there is no C: off Windows (#2872).
+$log = $Root.TrimEnd('\') + '\bridge.log'
 
 # ------------------------------------------------------------------ status --
 if ($Status) {
