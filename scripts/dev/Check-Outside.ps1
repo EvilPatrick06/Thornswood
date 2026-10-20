@@ -408,7 +408,21 @@ function Invoke-Outside {
       $v = $null
     } else {
       Ok ('version.json answers and reads: launcher ' + $v.launcherVersion + ', ' + @($v.packs).Count + ' packs.')
-      if ($v.updateRepo -and $Repo -and ([string]$v.updateRepo) -ne $Repo) {
+      # The rest of the feed, when version.json names it as settings of its
+      # own (#1050): what a launcher fetches next, checked the same way.
+      if ($v.PSObject.Properties['settings']) {
+        . (Join-Path $PSScriptRoot '..\release\Feed-Json.ps1')
+        $named = [string]$v.settings.sha256
+        try {
+          $v = Join-FeedSettings $v $FeedUrl
+          Ok ('the settings it names (' + $named + ') answer and hash to their name.')
+        }
+        catch {
+          Bad ('version.json names settings of its own, and a launcher cannot have them: ' + $_.Exception.Message + ' No launcher that reads them can check for updates.')
+          $v = $null
+        }
+      }
+      if ($v -and $v.updateRepo -and $Repo -and ([string]$v.updateRepo) -ne $Repo) {
         Bad ('the feed sends every launcher to ' + $v.updateRepo + ' for its next check, not ' + $Repo + '.')
       }
     }

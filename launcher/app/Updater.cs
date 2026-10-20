@@ -407,7 +407,7 @@ namespace Thornswood
                     LastNotModified = true;
                     return have.Doc;
                 }
-                VersionDoc doc = VersionDoc.Parse(body);
+                VersionDoc doc = ReadFeed(body, feedUrl, cfg);
                 // Kept only once the document parsed, so a tag is never held
                 // beside something the launcher could not read.
                 string tag = null, mod = null;
@@ -494,7 +494,9 @@ namespace Thornswood
                 if (at >= raw.Length) return null;
                 byte[] body = new byte[raw.Length - at];
                 Buffer.BlockCopy(raw, at, body, 0, body.Length);
-                VersionDoc doc = VersionDoc.Parse(body);
+                // The settings file it names only from memory or Profile: a
+                // copy without them costs one full check, never a download here.
+                VersionDoc doc = ReadFeed(body, lines[1], null);
                 if (doc == null) return null;
                 var c = new Cached();
                 c.Url = lines[1];

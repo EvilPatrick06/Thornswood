@@ -61,6 +61,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\release\Feed-Rules.ps1')
+. (Join-Path $Here '..\release\Feed-Json.ps1')   # Join-FeedSettings: the site's feed whole (#1050)
 $remirror = Join-Path $Here '..\deploy\Remirror-Site-Feed.ps1'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -119,7 +120,7 @@ foreach ($ch in $channels) {
 
     Head "The $ch feed, $feedUrl"
     $doc = $null
-    try { $doc = ((Get-Text $feedUrl) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json }
+    try { $doc = Join-FeedSettings (((Get-Text $feedUrl) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json) $feedUrl }
     catch {
         [void]$problems.Add("the $ch feed could not be read: $($_.Exception.Message)")
         Say "  could not read it: $($_.Exception.Message)" 'Red'
