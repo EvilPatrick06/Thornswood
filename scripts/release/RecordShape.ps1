@@ -211,6 +211,8 @@ function Get-ThornswoodRecordProblems {
             if ($null -ne $bod) {
                 $ss = Get-ThornswoodRecordProp $bod 'sets'
                 if ($null -eq $ss -or $ss -isnot [array] -or @($ss | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count) { $out += 'bodyslide.sets is missing or not a list of set names' }
+                $of = Get-ThornswoodRecordProp $bod 'outfits'
+                if ($null -ne $of -and ($of -isnot [array] -or @($of | Where-Object { -not ($_ -is [string]) -or -not $_.Trim() }).Count)) { $out += 'bodyslide.outfits is there and not a list of set names' }
                 $sl = Get-ThornswoodRecordProp $bod 'sliders'
                 if ($null -ne $sl -and ($sl -isnot [psobject] -or $sl -is [array] -or $sl -is [string])) { $out += 'bodyslide.sliders is there and not a map' }
             }

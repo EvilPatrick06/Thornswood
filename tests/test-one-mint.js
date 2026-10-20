@@ -342,8 +342,13 @@ const WRITERS = {
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
   'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
   'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
+  'furniture/takeOne': [1, 'takes one furniture item off a pack to set its piece down; it never adds (#2679)'],
+  'furniture/giveOne': [1, 'hands back one furniture item, a MISC out of game/data/furniture.json, for a piece picked up; never gold (#2679, test-2679-furniture.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
+  'hair dye/setPack': [1, 'writes back the pack it has just read: a hair dye\'s inputs taken and one entry named for the dye added to the list\'s item (a Bowl, never gold), or one dye taken away, or the pack it read put back when the hair would not take (#2675, test-2675-hair-dye-wiring.js)'],
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],
+  'trade ships/packTake': [1, 'the dock\'s load (#2700): a stack off the pack onto a trade ship\'s manifest, coin refused before the pack is read; it only takes away (test-2700-trade-ship-dock.js)'],
+  'trade ships/packGive': [1, 'the dock\'s hand out (#2700): only a piece the manifest begin() hands back, or the piece a refused load just took, each first debited off a pack, so never coin (trade-cargo refuses base 0xF aboard) and never more than was loaded (test-2700-trade-ship-dock.js)'],
   'property/boxTake': [1, 'hands back a thing out of the drop box record, which holds only what boxLeave took off a pack; gold comes out through payOut, never more than the row holds, and the row goes down by the same (#2298, test-2298-dropbox.js)']
 };
 
@@ -490,7 +495,8 @@ for (const at of Object.keys(WRITERS)) {
   const letterFee = /\bvar LETTER_FEE = (\d+);/.exec(code);
   const letterPay = /\bvar LETTER_PAY = (\d+);/.exec(code);
   /*
-    A HAUL (#1393). Posting a haul takes JOB_FEE and the pay, a whole number
+    A HAUL (#1393). Posting a haul takes the company's haul fee (its terms,
+    #512, #2695, apart from JOB_FEE) and the pay, a whole number
     above nothing, onto the ledger. It takes; it puts none in. A company
     sale is the trade block's saleById, section 4. A night in a bed was a
     caller too (#1392) until #1603: a night is paid in a trade now, and the
@@ -499,13 +505,13 @@ for (const at of Object.keys(WRITERS)) {
   // And gold put in the drop box (#2298): n, a whole number above nothing, or refused first.
   // A post's cost (#2554) is its fee, NOTICE_FEE or JOB_FEE, and a job's reward, a whole number above nothing.
   yes('its five callers pass a post\'s cost, NOTICE_FEE, or JOB_FEE and the reward, a letter\'s cost, LETTER_FEE and ' +
-      'LETTER_PAY, a haul\'s cost, JOB_FEE and the pay, a ride\'s fare, and gold put in the drop box',
+      'LETTER_PAY, a haul\'s cost, the company\'s haul fee and the pay, a ride\'s fare, and gold put in the drop box',
       callers.slice().sort().join(',') === 'cost,cost,cost,n,price' &&
       /var n = Math\.floor\(Number\(amount\)\);\s*\n\s*if \(!\(n > 0\)/.test(code) &&
       /\bvar fee = isJob \? JOB_FEE : NOTICE_FEE;\s*\n\s*var cost = fee \+ reward;/.test(code) &&
       /reward = \/\^\\d\+\$\/\.test\(first\) \? Number\(first\) : 0;\s*\n\s*if \(!\(reward > 0\)/.test(code) &&
       /\bvar cost = LETTER_FEE \+ LETTER_PAY;/.test(code) &&
-      /\bvar cost = JOB_FEE \+ pay;/.test(code));
+      /\bvar fee = co\.haulFee\(\);\s*\n\s*var cost = fee \+ pay;/.test(code));
   const fares = ['FARE_FERRY', 'FARE_CARRIAGE_IN_HOLD', 'FARE_CARRIAGE', 'FARE_CROSSING'].map(function (n) {
     const m = new RegExp('\\bvar ' + n + ' = (\\d+);').exec(code);
     return m ? Number(m[1]) : 0;

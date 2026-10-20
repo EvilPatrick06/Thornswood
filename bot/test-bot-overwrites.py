@@ -28,7 +28,7 @@ own overwrite last.
 Read only. Never connects to anything and never writes beside the code: the
 news webhook the builder saves is pointed at a temporary folder.
 """
-import _pyguard  # noqa: F401  (first: Python 3.10 or newer, #2276)
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import asyncio
 import contextlib
 import importlib.util
@@ -76,7 +76,8 @@ ATTACH_FILES = 1 << 15
 
 # Every mode that shuts @everyone out of one of the three. Only public does
 # not, and a public channel needs nothing for the bot.
-RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind', 'gm')
+RESTRICTED = ('read', 'open', 'membersread', 'hold', 'staff', 'pathfind', 'gm',
+              'gmrules')
 # The hold a hold mode is asked about, where one is needed.
 HOLD = 'Whiterun'
 

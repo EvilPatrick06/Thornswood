@@ -10,7 +10,8 @@
 
   The real property block runs over a pretend engine with the real door,
   building and jail tables, a Jarl of Whiterun, a Jarl of Riften, a guard of
-  Whiterun and a prisoner. The real spoils block, the real stuck block and
+  Whiterun and a prisoner, each office by its Discord role since #2551 (the
+  door hands the block the roles as __thornswoodOffices). The real spoils block, the real stuck block and
   the real respawn resolver run beside it. It checks:
     - the tables: each hold's jail building and the keys the game made for
       the cells, and game/data/jails.json saying the same;
@@ -138,10 +139,21 @@ const PEOPLE = [JARL_W, JARL_R, GUARD_W, PRISONER];
 const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rules-'));
 fs.writeFileSync(path.join(dir, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(dir, 'private'));
-// The two Jarls hold their holds' seats (#502, one Jarl a hold).
-fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ guards: { '503': 'whiterun' }, cells: {},
-  jarls: { whiterun: { pid: 501, actor: 0xff000501, name: 'Balgruuf' },
-           riften: { pid: 502, actor: 0xff000502, name: 'Laila' } } }));
+// An office is one character's (#2551, Patrick, 16 Oct): the law register
+// names the character that holds each office for its account. A profile the
+// door ties to no account is an account of its own, 'p:<profile>'.
+fs.writeFileSync(path.join(dir, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'jarl:whiterun': { 'p:501': { pid: 501, name: 'Balgruuf' } }, 'jarl:riften': { 'p:502': { pid: 502, name: 'Laila' } }, 'guard:whiterun': { 'p:503': { pid: 503, name: 'Hrongar' } } } }));
+// The offices are Discord roles (#2551): Balgruuf holds the Jarl of Whiterun
+// role, Laila the Jarl of Riften, Hrongar the Guard of Whiterun.
+const ROLES = {
+  501: { jarl: ['whiterun'], court: [], steward: [], guard: [] },
+  502: { jarl: ['riften'], court: [], steward: [], guard: [] },
+  503: { jarl: [], court: [], steward: [], guard: ['whiterun'] }
+};
+function officesOf(pid) {
+  const o = ROLES[pid];
+  return o ? JSON.parse(JSON.stringify(o)) : { jarl: [], court: [], steward: [], guard: [] };
+}
 function inDir(f) {
   const was = process.cwd();
   process.chdir(dir);
@@ -177,8 +189,6 @@ const mp = {
 };
 const kinds = {};
 const states = {};
-states[JARL_W.a] = { office: 'jarl', officeHold: 'whiterun' };
-states[JARL_R.a] = { office: 'jarl', officeHold: 'riften' };
 const said = [];
 const box = {
   console: { log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); } },
@@ -191,9 +201,10 @@ const box = {
   setInterval: function () { return 1; }, clearInterval: function () { },
   setTimeout: function () { return 0; },
   log: function () { logged.push(Array.prototype.join.call(arguments, ' ')); },
-  __thornswoodIsJarl: function (pid) { return pid === JARL_W.pid || pid === JARL_R.pid; },
+  __thornswoodOffices: officesOf,
+  __thornswoodOfficesOnRecord: officesOf,
   __thornswoodCharacter: {
-    stateOf: function (aid) { return states[aid] || { prof: 'cook', office: null }; },
+    stateOf: function (aid) { return states[aid] || { prof: 'cook' }; },
     writeState: function () { }
   }
 };
@@ -255,12 +266,13 @@ r = word(PRISONER, '/claim');
 yes('C10 a house is claimed by anybody, as before', !!claimOf(HOUSE) && claimOf(HOUSE).by === PRISONER.pid);
 
 // ------------------------------------- F. every office, read in one place
-const ow = W.officeOf(JARL_W.pid, JARL_W.a), og = W.officeOf(GUARD_W.pid, GUARD_W.a), op = W.officeOf(PRISONER.pid, PRISONER.a);
-yes('F1 officeOf says the Jarl of Whiterun is a Jarl of Whiterun and a steward, and no guard',
-    ow.jarl === true && ow.jarlOf === 'whiterun' && ow.steward === true && ow.guardOf === '');
+const ow = W.officeOf(JARL_W.pid), og = W.officeOf(GUARD_W.pid), op = W.officeOf(PRISONER.pid);
+yes('F1 officeOf says the Jarl of Whiterun is a Jarl of Whiterun and keeps it as its steward, and no guard',
+    ow.jarl === true && ow.jarlOf.join() === 'whiterun' && ow.steward === true && ow.stewardOf.join() === 'whiterun' &&
+    ow.guardOf.length === 0);
 yes('F2 a guard of Whiterun is that and nothing else; somebody with no office has none',
-    og.jarl === false && og.jarlOf === '' && og.steward === false && og.guardOf === 'whiterun' &&
-    !op.jarl && !op.jarlOf && !op.steward && !op.guardOf);
+    og.jarl === false && og.jarlOf.length === 0 && og.steward === false && og.guardOf.join() === 'whiterun' &&
+    !op.jarl && !op.jarlOf.length && !op.steward && !op.guardOf.length && !op.courtOf.length);
 const outside = gm.replace(propBlock, '');
 yes('F3 no block outside the property block reads the law register or the Jarl\'s hold itself',
     !/law\.guards|officeHold|law\.json/.test(outside));
@@ -394,8 +406,9 @@ if (arrivalSrc) {
   Patrick, 12 October evening: jail claims made before the jail rule end once
   if there are any, and then the rule holds. A fresh server folder holds
   property.json as an older server left it: a claim on Dragonsreach Dungeon by
-  somebody who is not Whiterun's seated Jarl, one on Riften Jail by Riften's
-  seated Jarl, and a house. The property block is started on it three times.
+  somebody who is not Whiterun's Jarl, one on Riften Jail by Riften's Jarl
+  (by the Jarl of Riften role, read on record: nobody has sent a pass at a
+  server start), and a house. The property block is started on it three times.
 */
 function startOn(folder) {
   const out = [];
@@ -414,8 +427,7 @@ function startOn(folder) {
 const old = fs.mkdtempSync(path.join(os.tmpdir(), 'ts-502-rule-once-'));
 fs.writeFileSync(path.join(old, 'server-settings.json'), JSON.stringify({ dataDir: 'data', privDir: 'private' }));
 fs.mkdirSync(path.join(old, 'private'));
-fs.writeFileSync(path.join(old, 'private', 'law.json'), JSON.stringify({ guards: {}, cells: {},
-  jarls: { riften: { pid: 502, actor: 0xff000502, name: 'Laila' } } }));
+fs.writeFileSync(path.join(old, 'private', 'law.json'), JSON.stringify({ cells: {}, held: { 'jarl:riften': { 'p:502': { pid: 502, name: 'Laila' } } } }));
 const RIFTEN_JAIL = byHold.riften;
 const before = { claims: {
   [JAIL]: { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: true },
@@ -425,15 +437,17 @@ const before = { claims: {
 fs.writeFileSync(path.join(old, 'private', 'property.json'), JSON.stringify(before));
 let run1 = startOn(old);
 const reg1 = JSON.parse(fs.readFileSync(path.join(old, 'private', 'property.json'), 'utf8'));
-yes('P1 at the first start, the claim on a jail by somebody who is not its hold\'s seated Jarl ends',
+yes('P1 at the first start, the claim on a jail by somebody who is not its hold\'s Jarl ends',
     !!run1.W && !run1.W.claims()[JAIL] && !reg1.claims[JAIL]);
-yes('P2 the seated Jarl\'s claim on their own jail, and a house, are kept',
+yes('P2 the Jarl\'s claim on their own jail, and a house, are kept',
     !!reg1.claims[RIFTEN_JAIL] && reg1.claims[RIFTEN_JAIL].by === 502 && !!reg1.claims[HOUSE]);
 yes('P3 the log names the holder, the profile and the jail, and counts what ended',
-    run1.logged.some(function (l) { return /law: the jail rule ends Erik's claim \(profile 909\) on Dragonsreach Dungeon, made before only the seated Jarl of whiterun could hold it/.test(l); }) &&
+    run1.logged.some(function (l) { return /law: the jail rule ends Erik's claim \(profile 909\) on Dragonsreach Dungeon, made before only the Jarl of whiterun could hold it/.test(l); }) &&
     run1.logged.some(function (l) { return /applied to the claims made before it once: 1 claim\(s\) ended/.test(l); }));
-yes('P4 the register records that it ran, and keeps every other part it holds',
-    Number(reg1.steps && reg1.steps.jailRule) > 0 && reg1.boxes && reg1.boxes.whiterun === 1234 &&
+// boxes is the steward-marked chest, retired by #2298: a register written
+// before then still has it, and it is simply not written again.
+yes('P4 the register records that it ran, and keeps every other part it holds, but not the retired boxes',
+    Number(reg1.steps && reg1.steps.jailRule) > 0 && reg1.boxes === undefined &&
     reg1.funds && reg1.funds.whiterun === 77);
 // A claim on a jail somehow in the register after that (written by hand, say) is not touched again.
 reg1.claims[JAIL] = { by: 909, name: 'Erik', at: clock.t, touched: clock.t, locked: false };

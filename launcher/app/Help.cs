@@ -65,10 +65,10 @@ namespace Thornswood
 
             // =================================================== character
             new HelpItem("Character", "The creation hall",
-                "A new character wakes in a shut room and the appearance menu opens on its own: make your face, give it its name, and close it. The character panel then opens. Choose the town you will wake up in and you are sent to its inn, in a plain shift. Your class and profession are on the same panel, and can be chosen there or later in the world."),
+                "A new character wakes in a shut room and the appearance menu opens on its own: make your face, give it its name, and close it. The character panel then opens. Choose the town you will start in and you are sent there, in a plain shift. Your class and profession are on the same panel, and can be chosen there or later in the world."),
 
-            new HelpItem("Character", "Where you wake up",
-                "Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or Winterhold, each at its inn. The town is the choice that ends creation, and it cannot be changed afterwards."),
+            new HelpItem("Character", "Where you start",
+                "Whiterun, Riften, Solitude, Windhelm, Markarth, Falkreath, Morthal, Dawnstar or Winterhold. You arrive at a quiet spot in or near the town, not in its inn: the stables at Whiterun, Solitude, Windhelm and Riften, and Understone Keep in Markarth. The town is the choice that ends creation, and it cannot be changed afterwards."),
 
             new HelpItem("Character", "What you start with",
                 "The shift you stand in, and 40 gold, once. Weapons, armour, tools and coin come from other people, who make them or pay them to you."),
@@ -191,13 +191,16 @@ namespace Thornswood
 
             // ===================================================== breakage
             // Scan and Fix are on the Diagnostics page since #607. Fix is
-            // Verify.Fix: the server's order, other servers' files and Creation
-            // Club plugins moved aside, missing plugins back from Vortex, the
-            // server's copy of Thornswood's own plugin when its bytes differ,
-            // and the mod to put right in Vortex when another author's differs
-            // (#1180: the server hands out only its own).
+            // Verify.Fix for the plugins: the server's order, other servers'
+            // files and Creation Club plugins moved aside, missing plugins
+            // back from Vortex, the server's copy of Thornswood's own plugins
+            // when their bytes differ or they are missing, and the mod to put
+            // right in Vortex when another author's differs (#1180: the server
+            // hands out only its own). Since #2627 Scan looks at the whole
+            // install (Upkeep.cs) and Fix puts right everything it can, then
+            // says what is left (ShellScanFix.cs).
             new HelpItem("If it breaks", "What Scan and Fix do",
-                "Both are on the Diagnostics page. Scan compares your plugins with the server's: the same names, in the same order, with the same bytes. Fix makes yours match. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs, and moves another server's files and stray Creation Club plugins aside, never deleting them. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
+                "Both are on the Diagnostics page. Scan looks for everything wrong with this install. It compares your plugins with the server's: the same names, in the same order, with the same bytes. It also looks for an update waiting, Thornswood's own game folder behind what Vortex has deployed or missing files, this build's own files changed, Windows' Skyrim folders left pointed at Thornswood after a crash, an out of date shortcut icon, the multiplayer client, Steam not running and the wrong Skyrim build. Fix puts right everything it can. It puts your plugin list in the server's order, puts back plugins Vortex has that the game folder lost, downloads the server's copy of Thornswood's own plugin when its bytes differ, names the mod to update or reinstall in Vortex when another author's plugin differs, and moves another server's files and stray Creation Club plugins aside, never deleting them. It brings the game folder up to date from Vortex first and takes a waiting update last. Then it scans again and says what is still wrong, why, and what will put it right. Close Skyrim first. Fix cannot install a mod Vortex never installed: if Scan says a plugin is not installed, the collection is not fully installed or the wrong Vortex profile is on."),
 
             new HelpItem("If it breaks", "\"LOAD ORDER ERROR\", or Play is refused",
                 "A plugin differs from the server's, and joining like that would desync everyone. Close the game, open Diagnostics, press Scan and then Fix, and press Play again. When the plugin that differs is another author's mod, Scan names the mod to update or reinstall in Vortex, because the server hands out only Thornswood's own."),
@@ -218,7 +221,7 @@ namespace Thornswood
                 "Usually one person's connection rather than the server. Restart the game before restarting anything else."),
 
             new HelpItem("If it breaks", "Your settings look wrong",
-                "Diagnostics, then Repair, with Skyrim closed. It puts this build's own settings and load order back to exactly what shipped. Your character is not touched, because it lives on the server."),
+                "Diagnostics, then Scan, then Fix, with Skyrim closed. Fix puts back this build's own files that are missing or changed, the settings files it shipped, and the load order the server expects. Your character is not touched, because it lives on the server."),
 
             new HelpItem("If it breaks", "Updates stopped arriving",
                 "Updates come from thornswood.net and need nothing on your machine. If the launcher says it could not check, see whether thornswood.net opens in your browser. If it does not, the site is down and it is not your end. If it does, send your logs."),

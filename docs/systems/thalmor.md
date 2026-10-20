@@ -92,8 +92,46 @@ not attack on sight, because most of them are still the game's own
 actors and the server does not run their AI. The server knows no item
 that is a Dominion flag, so a flag is not read yet.
 
-No patrol is spawned by the server yet. Every actor the server stands
-up goes through the shared NPC population and its runtime, and the
-patrols wait on that work. The known-issues page still says the cast
-that stays is traders and the carriage workers. This page adds the
-patrols to that cast. See [People who are not people](npcs.md).
+The patrols are staff settings in `game/data/thalmor-patrols.json`:
+whether any patrol is out at all, the most roads with one at once (and,
+if staff set one, a different most for a world stage, read at each start
+from the world stage the staff confirmed), and
+for each road its points (one member each, 2 to 4), the record each
+member is made from, how long a dead one takes to come back, and how far
+one strays. It ships off, with three candidate roads from the cut
+Immersive Patrols II Justiciar placements in the Pale, Haafingar and
+Hjaalmarch. A road off Tamriel's ground, with fewer than 2 or more than
+4 points, or with a point beside a walled town or village is refused.
+At each start the server stands up any member that is missing, at its
+own point, and takes down the members of a road staff turned off. If the
+world stage cannot be read at a start, nobody is stood up or taken down
+that start, and the members already out stay. A world stage in that list
+that the war has no stage for (a typo) is named in the server log at
+start and never used. A dead
+member comes back at its point after the return time; nothing stacks a
+second group. A member keeps to its stretch of road, inside its leash;
+there is no route between holds. A body cannot be opened, so it gives no
+coin. The known-issues page still says the cast that stays is traders
+and the carriage workers. This page adds the patrols to that cast. See
+[People who are not people](npcs.md).
+
+The war is what people make of it (Patrick, 17 October, #513). The server holds
+the tools and never plays it out by itself. It keeps one stage for the
+whole province, and a restart does not reset it. The stages are a list
+staff write, each with a name, its words, and who is behind it if they
+say so. Today the only stage is peace, so nothing in the world changes.
+A stage's id is 1 to 32 lower case letters, digits and dashes, the same
+rule the patrol file uses for the stage ids it gives a cap to, so every
+stage can have one. A stage whose id breaks it is left out of the list.
+No timer moves a stage. Every move is kept on record with when and who,
+so a change meant to last is never lost.
+
+The server can also put a notice on a hold's board in the name of an
+office, such as the Crown or a Jarl, never a person. It costs nothing,
+no gold moves, and the people standing at that board are told once.
+Staff move the world from a card on the Office page of K: one of them
+proposes a stage, and staff confirm it with a second press or drop it,
+and every press goes in the staff log. A stage can carry a notice that
+goes up on the boards when the move is confirmed.
+The patrols above are #1390's. A stage can set its own most for them
+(#2697), read at each start from the stage staff confirmed.

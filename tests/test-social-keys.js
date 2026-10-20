@@ -115,6 +115,8 @@ function rig(opts) {
     'function sleepPress() { return false; }\n' +
     // The same key in the inventory (#1384); no inventory is open here.
     'function repairPress() { return false; }\n' +
+    'function furniturePress() { return false; }\n' +
+    'function arrangePress() { return false; }\n' +
     // The board, ride and merchant presses (#1430, #1394) answer only the
     // game's Activate event, and the lock key (#1472) only X; none of the
     // presses here is either. Each has its own harness.
@@ -138,6 +140,9 @@ function rig(opts) {
     // K on a person a Master could take on (#1634), asked ahead of K; nobody
     // is looked at here. test-1634-apprentice-gui.js has what it does.
     'function apprenticePress() { return false; }\n' +
+    // K on a person while you carry a hair dye (#2675), asked after it; nobody
+    // is looked at here. test-2675-hair-dye-wiring.js has what it does.
+    'function hairDyePress() { return false; }\n' +
     'function commandKeyPressed() { }\n' +
     // The / and P watchers on the game's own menus are test-our-key-menus.js's.
     'const OFF_MENU = { openedBy: function () { return ""; }, shutFor: function () { }, keyDown: function () { } };\n' +

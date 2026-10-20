@@ -104,42 +104,108 @@ clone, in PowerShell 7.
    ```powershell
    .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id>'
    ```
-   It ends `DRY RUN: nothing was changed` and names the services a real run
-   stops for a moment.
-4. **The real run**, when nobody is on either game server (it refuses while
-   anybody is, unless `-Now` is added, which drops them):
+   It ends `DRY RUN: nothing was changed` and names the services that take
+   the rest out of their own files as each next starts. Its `release` lines
+   count what the game's registers say about their characters (a house, a
+   farm, an office, a post on a board, a place on a roll or in a book, a
+   dungeon chest's record): the game server lets go of those itself as it
+   starts (below). A `waiting` line names a service that still has a request
+   for them from an earlier real run.
+4. **A faction or business book they own** is disbanded when the game
+   server lets go of their character, with its members' place in it. If the
+   dry run counts one (`faction and business books they own`) and the group
+   wants to keep it, a staff member hands it to another member in the game
+   first (Hand it on, on the book's tab, which only staff see), then runs the dry run
+   again.
+5. **The real run**, at any time; it stops nothing and drops nobody (issue
+   #2758, Patrick, 18 October 2026: "it should not restart everytime we want
+   to delete a person it should just fully apply the rest upon a server
+   restart"):
    ```powershell
    .\scripts\vps\Remote.ps1 -File .\scripts\vps\Delete-Person.ps1 -Arguments '-DiscordId <their id> -Delete -By <your name>'
    ```
-   It stops the site, the game servers, voice and the bot only where their
-   files hold something of the person's, removes it, starts each one again,
-   and ends `DELETED, and written down in C:\Thornswood-Deletions\requests.jsonl`.
-   `NOT FINISHED` names a file it could not change; run it again.
-5. **What the run cannot find**, by hand: a gallery picture of theirs
+   It removes their records at once from every copy nothing runs from (the
+   folders a restore, a wipe, an install or a reset set aside), writes the
+   request into each service that holds something of theirs, and ends
+   `RECORDED, and written down in C:\Thornswood-Deletions\requests.jsonl`
+   with the services it asked. `NOT FINISHED` names a file it could not
+   change; run it again. Each service takes the request out of its own
+   files the next time it starts, before anything of theirs is open, and
+   says so in its own log with counts and never a name or a number:
+   - **the site** (`site.log`, `deletion requests:`) removes their link, rules
+     answer, sign-ins, sessions with their logs and alerts, roster rows,
+     tickets and gallery pictures;
+   - **each game server**: `server-log.js`, which its task starts it under,
+     deletes their characters' saves and takes them off the card, mod menu,
+     take count and last-left files before the engine starts (`server.log`,
+     `deletions:`); then the gamemode lets go of every entry the game's
+     registers hold through that register's own rule (issue #2351, Patrick's
+     option A of 16 October): their house and farm are free, an office their
+     character held ends, their posts come down with their words off, a job
+     they had taken goes back on the board, they leave every roll and book,
+     the bed nights end, and the drop box and the ledgers keep every coin and
+     every line with their name off it (`thornswood.log`, `release:`, ending
+     `every part is done, and the list is gone`). A save the server had not
+     finished when it last stopped, holding one of their characters, is
+     replayed by the engine first, so their saves go at the start after;
+   - **voice** (`voice.log`, `deletions:`) takes their chat lines out of every
+     day, except the ones inside a session staff kept;
+   - **the bot** (`bot.log`, `deletion requests:`) forgets their join number
+     and open ticket.
+
+   Nothing restarts on a schedule: a service starts again at a deploy or an
+   install of its own, after a crash and after a reboot. In October 2026 that
+   was about a day for the game servers and the site, and up to a week for
+   voice and the bot. Until then that service's copy still holds their
+   records. To see what still waits, run the dry run again: each `waiting`
+   line is a service that has not started since. When the person should not
+   wait, restart that service in a quiet hour (`Request-Restart` for a game
+   server, or its own deploy).
+6. **What the run cannot find**, by hand: a gallery picture of theirs
    approved before 16 October 2026, removed in the hub by name. Until then the
    site kept no account with a picture once it was approved, so nothing ties
    those to them; the run finds every one sent since.
-6. **Tell them** in the ticket that it is done, and what stays: staff's
+7. **Tell them** in the ticket once the dry run shows nothing `waiting`, that
+   it is done, and what stays: staff's
    records about them (bans, PKs, notes, the staff logs), reports they made or
-   that were made about them, a session staff marked kept, and what the game's
-   registers still say about a house or a bounty their character held (#2351
-   has the decision on those). Logs age out by their own rule, and the
-   encrypted backups expire on their schedule; the record below is why a
-   restore never brings the person back.
-7. **Then delete their ticket threads** in the Discord, which is the last
+   that were made about them, and a session staff marked kept. In the game,
+   what somebody else wrote naming their character (a letter addressed to
+   them, a thing left in a drop box for them) is that person's and stays,
+   and gold that was held for them on a hold's ledger stays with the hold.
+   Logs age out by their own rule, and the encrypted backups expire on their
+   schedule; the record below is why a restore never brings the person back.
+8. **Then delete their ticket threads** in the Discord, which is the last
    place on our side that holds what they wrote.
 
 **The record.** `C:\Thornswood-Deletions\requests.jsonl` on the box, one line
-for each completed request: the Discord id, the profile ids, when, who ran it
-and how many records each store lost. Nothing else about the person. The
-folder is SYSTEM's and Administrators' only. The nightly backup takes it as
+for each request, written when it is made: the Discord id, the profile ids,
+when, who ran it, how many records each store held and which services it
+asked. Nothing else about the person. The
+folder is SYSTEM's and Administrators' only, with read for the nightly
+backup's own task (#2833). The nightly backup takes it as
 `deletions\requests.jsonl`, so it leaves the box with every backup and comes
 back with any of them. A request made after the last backup is only on the
 box until the next nightly run.
 
 **After a restore**, before anything starts, `Delete-Person.ps1 -Reapply`
-removes everybody in the record again. `Restore-Box.ps1` does it as its last
-step; [RESTORING.md](RESTORING.md) has the commands for every other restore.
+removes everybody in the record again from every copy nothing runs from, and
+asks every service again, so each takes them out of its restored files as it
+starts. `Restore-Box.ps1` does it as its last step;
+[RESTORING.md](RESTORING.md) has the commands for every other restore,
+putting back a folder an install or a wipe set aside among them.
+
+**The guild traders' ledger** (`private\merchant-ledger.json`) keys a supply
+wait, a commission promise and a trade still waiting on a character by that
+character's form id and profile.
+The dry run counts those as `release`, and the game server lets
+go of them as its merchant purses are read (#2652): the waits and the
+promises go, so the gold a promise held back is the trader's to spend again,
+and a waiting trade is cleared, the trader keeping what it already held. The
+traders' purses and shelves name nobody and stay, like a hold's ledger.
+
+**What the game does not let go of yet.** A crop they sowed stays in the
+ground with their number as the one who sowed it, which nobody holds any
+more; whoever brings it in empties it, and a wipe takes it.
 
 ## Accessibility scope
 

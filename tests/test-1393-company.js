@@ -111,8 +111,11 @@ yes('the chargen town table reads', !!PASSAGES);
 
 function num(re) { const m = re.exec(prop); return m ? Number(m[1]) : NaN; }
 const JOB_FEE = num(/var JOB_FEE = (\d+);/);
-const HAUL_FROM = num(/var HAUL_TENTH_FROM = (\d+);/);
-const SALE_FROM = num(/var SALE_CUT_FROM = (\d+);/);
+// The haul cut and the sale cuts are the company's terms now (#512, #2695), read
+// by the company terms block, which every sandbox here is handed.
+const COMPANY = require('./fixtures/company-block').companyApi(gm);
+const HAUL_FROM = COMPANY.terms().haulCutFrom;
+const SALE_FROM = COMPANY.terms().saleCutFrom;
 yes('the job fee is 30, and the company\'s tenth and the sale\'s cuts both start at 10 gold',
     JOB_FEE === 30 && HAUL_FROM === 10 && SALE_FROM === 10);
 if (missing.length || !fees || !ledger || !seeding || !PASSAGES || HAUL_FROM !== 10 || SALE_FROM !== 10) { done(); }
@@ -194,6 +197,7 @@ function sandbox(w, roles) {
   };
   ctx.globalThis = ctx;
   vm.createContext(ctx);
+  ctx.__thornswoodCompany = require('./fixtures/company-block').companyApi(gm);
   vm.runInContext(SOCIAL, ctx, { filename: 'gamemode.js social' });
   vm.runInContext(TRADE, ctx, { filename: 'gamemode.js trade' });
   ctx.__thornswoodIsCompany = function (pid) { return (roles.company || []).indexOf(pid) !== -1; };
@@ -211,8 +215,6 @@ function boot(reg, w, opts) {
     'var funds = loadPart("funds", {});',
     'var notices = loadPart("notices", {});',
     'var GOLD_ID = ' + GOLD + ';',
-    'var HAUL_TENTH_FROM = ' + HAUL_FROM + ';',
-    'var SALE_CUT_FROM = ' + SALE_FROM + ';',
     'var haulShort = {};',
     'var boardReads = {};',
     HAUL_HOW,
@@ -223,9 +225,13 @@ function boot(reg, w, opts) {
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); reg.saves = (reg.saves || 0) + 1; }',
     'function refreshPanel() { }',
     // Nobody guards these boards; a guard's take down (#502) is
-    // tests/test-502-guard-board.js.
+    // tests/test-502-guard-board.js. Nobody is a Jarl here either, and the
+    // stewards given are stewards of every board here (#2551, a steward is
+    // of one hold: tests/test-2551-hold-offices.js).
     'function isGuard() { return false; }',
-    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
+    'function isJarlOf() { return false; }',
+    'function isStewardOf(pid) { return isSteward(pid); }',
+    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'officeCmd',
      'evict', 'boxCmd', 'rentCmd', 'bedCmd'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });

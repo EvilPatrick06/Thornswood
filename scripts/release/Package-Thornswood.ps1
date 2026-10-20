@@ -110,8 +110,12 @@ $stage      = Join-Path $OutDir 'stage'
 #>
 function Get-SkyrimPath {
     $roots = @()
+    # Either key may be missing (Steam writes one or the other), so each is
+    # tested for, and a key without SteamPath names nothing.
     foreach ($k in @('HKCU:\Software\Valve\Steam', 'HKLM:\SOFTWARE\Wow6432Node\Valve\Steam')) {
-        try { $sp = (Get-ItemProperty -Path $k -EA Stop).SteamPath; if ($sp) { $roots += ($sp -replace '/', '\') } } catch { }
+        if (-not (Test-Path -LiteralPath $k)) { continue }
+        $kp = Get-ItemProperty -LiteralPath $k
+        if ($kp.PSObject.Properties['SteamPath'] -and $kp.SteamPath) { $roots += ([string]$kp.SteamPath -replace '/', '\') }
     }
     foreach ($r in @($roots)) {
         $vdf = Join-Path $r 'config\libraryfolders.vdf'

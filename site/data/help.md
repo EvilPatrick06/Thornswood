@@ -143,6 +143,27 @@ closed.
 - **F1** turns the names over heads off and on, and **F2** hides and shows the
   overlay.
 
+## Dyeing your hair
+
+A Tailor (Haberdasher or Liverywright) steeps hair dye at a cooking spot.
+Anyone can use one: on yourself from the **K** panel, or on someone else once
+they accept.
+
+If you are a Tailor, carry a bottle of water and what the dye needs, press
+**E** on the cooking spot, and stay by the fire until the dye is done. Walk
+away before then and nothing is made or used. The dye goes into your pack,
+under its own name. Anyone who is not a Haberdasher or Liverywright and
+tries it is turned away and keeps everything they carry. They are told:
+"Steeping hair dye is work for a Haberdasher or Liverywright. Nothing was
+taken from your pack."
+
+To dye your own hair, open the Hair dye page of the **K** panel and press Dye
+my hair. To dye somebody else's, look at them and press **K**, then Offer to
+dye, or press Dye hair beside them under Near you on the **P** panel. With
+more than one dye in your pack, that button names the dye. They get Accept
+and Refuse, and nothing is used or changed until they press Accept. Hair,
+beard and brows take the one colour, and it stays until it is dyed again.
+
 ## Voice
 
 Voice runs in the launcher, not in the game. Leave the launcher open while you
@@ -198,6 +219,14 @@ plugins Vortex has that the game folder lost, downloads the server's copy of
 Thornswood's own plugin when its bytes differ, names the mod to update or
 reinstall in Vortex when another author's plugin differs, and moves another
 server's files and stray Creation Club plugins aside, never deleting them.
+
+Scan also looks at the rest of the install: an update waiting, Thornswood's
+game folder behind what Vortex has deployed or missing files, this build's own
+files changed, Windows' Skyrim folders left pointed at Thornswood after a
+crash, the shortcut icon, the multiplayer client, Steam and the Skyrim build.
+Fix puts right everything it can, bringing the game folder up to date from
+Vortex first and taking a waiting update last. Then it looks again and says
+only what is still wrong, why, and what will put it right.
 
 If Scan says a plugin is missing rather than different, the collection is not
 fully installed or the wrong Vortex profile is active. The launcher says which.

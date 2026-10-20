@@ -19,7 +19,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
 | Fork pull requests | Do not run workflows, get no write token and no secrets (`fork-pr-workflows-private-repos` all false) |
-| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; drop-claims: issues write) |
+| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use) |
 | Actions sharing | `access_level: none` (no other repository may use these workflows) |
 | Allowed actions | all, SHA pinning not required by the setting; the workflows pin every action to a full SHA by their own rule (release.yml) |
 
@@ -47,6 +47,10 @@ queued for Claude. The one decision only Patrick can make is in section 6.
    and signed on One today; decided (Patrick, 11 Oct 2026) to sign in
    release.yml on GitHub's runner through a federated Azure identity
    limited to `v*` tags (docs\SIGNED-RELEASES.md section 8).
+7. CI to the engine: engine.yml (#459) builds the fork at one commit and
+   records it, on GitHub's runner first and on these runners when that is
+   refused, started only by hand, with contents read. It sends nothing and
+   commits nothing; its records reach main through a pull request.
 
 ## 3. Findings
 
@@ -103,7 +107,12 @@ outbound limit as residual risk.
    The feeds read from the workflows today: `pypi.org` and
    `files.pythonhosted.org` (build.yml and nightly.yml install ruff and the
    bot's requirements with pip, hash pinned), and `registry.npmjs.org`
-   (build.yml and nightly.yml install eslint with npm).
+   (build.yml and nightly.yml install eslint with npm). engine.yml's
+   fallback (#459) reads more when it builds on the box: the fork and its
+   submodules from GitHub, the sources vcpkg builds each library from, from
+   wherever each port fetches them, and yarn's packages from `registry.yarnpkg.com`.
+   Its first run on the box is where that list is measured, before these
+   limits go on.
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
    because the account's Actions minutes or usage ran out. Patrick confirmed

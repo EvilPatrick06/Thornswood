@@ -9,6 +9,7 @@
     "agreed-not-written": "Patrick has said it may go out, but the terms with its maker are not written down anywhere. Ships today.",
     "no-licence-found": "Somebody else's, and nothing found gives Thornswood the right to hand it on. Ships today. Its issue carries the decision.",
     "withheld": "Never ships: packs and the installer leave it out and delete it from installs.",
+    "made-from-game": "Bethesda's own file, edited, or put together from Bethesda's: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own game archives (#2827), so nobody is handed the game's files. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
     "not-published": "In this private repository only; nobody outside the team receives it."
   },
   "assets": [
@@ -419,20 +420,6 @@
       "from": "game/menu/logo.nif"
     },
     {
-      "path": "game/ours/Data/Interface/startmenu.swf",
-      "sha256": "a1dd4595c1e931ecb8910334a3529238f2f50146997f3cd10191b87fa0190ecf",
-      "what": "The main menu's interface file with no Bethesda logo and no button list (Ship-Rules.ps1 $ShipOursFiles). 83,386 bytes.",
-      "published": "Every pack and the installer (Data\\Interface)",
-      "source": "Skyrim's own interface\\startmenu.swf (Skyrim - Interface.bsa, 83,404 bytes), edited: its logo shapes taken out. Measured 15 Oct: the same 871 SWF tags in the same order, only DefineShape tags differ, by a byte or two each, and no strings were added or removed",
-      "creator": "Bethesda Game Studios; edited for Thornswood, by whom is not recorded",
-      "licence": "not recorded: Bethesda's terms for mods that hand on a game file they edited were not read",
-      "attribution": "not recorded",
-      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited",
-      "evidence": "The comparison on #2177, 15 Oct 2026; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; scripts\\release\\Go.ps1.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on a game file they edited, which this file shares with the meshes built from Skyrim's own."
-    },
-    {
       "path": "game/ours/Data/Interface/loadwaitspinner.swf",
       "sha256": "ab7856f7aa3ddc63acea4633c24609c52dd2565c0f741f22d2335d1037e3470f",
       "what": "An empty loading spinner, 25 bytes, so no spinner draws.",
@@ -461,30 +448,28 @@
     {
       "path": "game/ours/Data/Interface/skyhud/skyhud.txt",
       "sha256": "1d735b7475cf258ae0b5bff08c769e3be2aa5f81f583da1c1de341a3ada176e1",
-      "what": "SkyHUD's settings file (its own header, BETA 0.90B) with the values Thornswood set on 16 Sep. Hash as git stores it, with LF line endings.",
+      "what": "Thornswood's preset for SkyHUD 0.90B: SkyHUD's own settings file (its own header, BETA 0.90B, and comments) with the values Thornswood set on 16 Sep. Hash as git stores it, with LF line endings.",
       "published": "Every pack and the installer (Data\\Interface\\skyhud)",
-      "source": "SkyHUD's own settings file, changed here",
-      "creator": "SkyHUD's author, with Thornswood's values",
-      "licence": "not recorded: SkyHUD's permissions were not read",
-      "attribution": "not recorded",
-      "approved": "In $ShipOursFiles since 16 Sep",
-      "evidence": "scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: read SkyHUD's Nexus permissions for its settings file, or ship only the lines Thornswood changed."
+      "source": "SkyHUD's settings file, Data\\Interface\\skyhud\\skyhud.txt, from SkyHUD 0.90B (Nexus Mods, Skyrim Special Edition mod 463, file 61422 'SkyHUD v090B v4', the file collection 7essxf revision 2 installs), with Thornswood's values",
+      "creator": "The SkyHUD Team (uploaded by Fhaarkas): the file's layout, header and comments; the values are Thornswood's, set on 16 Sep, by whom is not recorded",
+      "licence": "SkyHUD's own permission, in its Nexus description under PERMISSION: 'You're free to share your preset (skyhud.txt) anywhere. The rest of the mod must not be included and you must state clearly what version of the mod your preset is for.' Only skyhud.txt ships, and the version is stated",
+      "attribution": "The credits page names it as Thornswood's preset for SkyHUD 0.90B, by the SkyHUD Team (#2792)",
+      "approved": "In $ShipOursFiles since 16 Sep; its permission read 19 Oct 2026 (#2792)",
+      "evidence": "SkyHUD's description and the collection's revision 2 file list, read 19 Oct 2026 through the Nexus Mods API (api.nexusmods.com/v2/graphql: legacyMods gameId 1704 modId 463, and collection 7essxf); site\\data\\site\\credits.md; scripts\\release\\Ship-Rules.ps1 $ShipOursFiles.",
+      "status": "cleared"
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "e01025a8d605fef036ecfe82836e683677c7c26096027de5c2e0ea16473bf762",
-      "what": "Thornswood's own plugin, 132,906 bytes on 16 Oct (#2487: the forge list's Key recipe carries a never-true condition; before that 132,868 bytes, #2553). Every record in it but 57 placements is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record: the cells and worldspaces those placements stand in, and the house part and woodworking overrides. Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and what became of it.",
+      "sha256": "374937f57a1f08a78fe754209a278d996b690c1e32571d1e8a89199d9176a705",
+      "what": "Thornswood's own plugin, 114,290 bytes on 20 Oct (#2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
-      "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records, and the other server's other placements and its changes to Skyrim's own placements are gone. Left: 57 placements of Thornswood's kiln, salt quarry, hive and alchemy lab, at the spots the other server chose, until Thornswood stands its own (#2553).",
-      "creator": "Thornswood (scripts/mods/Add-ContentRecords.py), but the 57 placements, which are the other server's",
-      "licence": "Thornswood's own for every remade record; for the 57 placements, not recorded: no permission from that server's makers is recorded",
-      "attribution": "not recorded",
-      "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06); Patrick, 15 Oct, #2177 B: remade as Thornswood's own",
-      "evidence": "THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js.",
-      "status": "unconfirmed",
-      "ask": "Patrick (#2553): where Thornswood stands its own kilns, salt quarries, hives and alchemy labs. When those 57 placements are Thornswood's own, this entry is ours."
+      "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
+      "creator": "Thornswood (scripts/mods/Add-ContentRecords.py and scripts/dev/Build-StationSites.py)",
+      "licence": "Thornswood's own; the Bethesda records it overrides are the game's, as in any plugin with Skyrim's masters",
+      "attribution": "None asked",
+      "approved": "Patrick publishes it as Thornswood Content on Nexus Mods (EvilPatrick06); Patrick, 15 Oct, #2177 B: remade as Thornswood's own; Patrick, 16 Oct, #2553 A: its stations at Thornswood's own spots",
+      "evidence": "THIRD-PARTY.md, Thornswood Content; scripts/mods/content-salvaged.json; tests/test-2553-salvaged-gone.js; tests/test-2553-station-sites.js.",
+      "status": "ours"
     },
     {
       "path": "game/content/Thornswood-WoodworkerTrail.esp",
@@ -502,8 +487,8 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f",
-      "what": "The light plugin that loads last (#2468): 6,757 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped. 5,984,128 bytes on 16 Oct, rebuilt against the remade content plugin (#2553).",
+      "sha256": "66f5833bfe3b02a629feba127ef0adcc15736b2e9735ed42dd297e4af71f48b8",
+      "what": "The light plugin that loads last (#2468): 6,946 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551). 6,024,259 bytes on 19 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
@@ -513,34 +498,6 @@
       "evidence": "Commit f32f3364 (#2482) and pull request #2522; docs\\NPC-SERVER-ACTIVITY.md; tests\\test-2468-last-plugin.js; tests\\test-2486-last-ships.ps1.",
       "status": "unconfirmed",
       "ask": "Patrick (#2177): whether the authors of the collection plugins named under licence allow an override plugin that carries copies of their cell, worldspace and quest records, the way their Nexus permissions read, and where that is kept."
-    },
-    {
-      "path": "game/ours/Data/meshes/thornswood/noticeboard01.nif",
-      "sha256": "47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216",
-      "what": "Thornswood's notice board mesh, 155,907 bytes: Windhelm sign posts, stockade planks, a shack roof, the candle lantern, vanilla notes and a plank shelf, with its own collision.",
-      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
-      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
-      "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
-      "attribution": "not recorded",
-      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
-    },
-    {
-      "path": "game/ours/Data/meshes/thornswood/dropbox01.nif",
-      "sha256": "09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e",
-      "what": "The hold's drop box mesh, 29,665 bytes: the vanilla strongbox scaled up, with a coin slot and an iron lip.",
-      "published": "Every pack and the installer once released (Ship-Rules.ps1 $ShipOursFiles, Go.ps1)",
-      "source": "Built by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502)",
-      "creator": "Built here from Bethesda's Skyrim meshes",
-      "licence": "not recorded: the terms under which meshes made from Skyrim's own files may be handed on were not read",
-      "attribution": "not recorded",
-      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502)",
-      "evidence": "Commit b9923901 (#2502); tests\\test-2298-board-meshes.js.",
-      "status": "unconfirmed",
-      "ask": "Whoever next works #2177: record Bethesda's terms for mods that hand on meshes built from Skyrim's files, which the menu meshes and these two share."
     },
     {
       "path": "bot/thornswood-bot-1024.png",
@@ -852,17 +809,29 @@
       "issue": 2298
     },
     {
-      "path": "The 140 outfit meshes in scripts\\release\\built-until-1259.txt",
-      "what": "Outfits built in BodySlide on another machine from the collection's BodySlide projects, shipped as Thornswood's until Thornswood builds them itself.",
-      "published": "Packs and the installer, until #1259",
-      "source": "BodySlide output from mods in the collection",
-      "creator": "Those mods' authors, built by BodySlide",
-      "licence": "not recorded: those mods' permissions were not read",
-      "attribution": "not recorded",
-      "approved": "Shipped as ours for now (#1259)",
-      "evidence": "scripts\\release\\built-until-1259.txt; THIRD-PARTY.md, Shipped today with no licence this file can name.",
+      "path": "The 120 travel clothes meshes in scripts\\release\\built-until-1259.txt (Data\\meshes\\armor\\travel clothes\\)",
+      "what": "Common Clothes and Armors' women's outfits refitted to the 3BA body in BodySlide on another machine. Ship as Thornswood's until Build-Generated builds them from the collection's Common Clothes and Armors -3BA- Bodyslide project (#2454 part two).",
+      "published": "Packs and the installer, until #2454 part two replaces them with our own build",
+      "source": "Common Clothes and Armors -3BA- Bodyslide (Nexus SE 83980, by JamesDogg) over Common Clothes and Armors (Nexus SE 21305); some meshes from 3BA Vanilla Clothes and Armor (Nexus SE 51610)",
+      "creator": "Franklin Zunge and thetrader (Common Clothes and Armors), JamesDogg (3BA project), the authors 51610 credits; built by BodySlide",
+      "licence": "83980: \"Follow the permissions of the original mod\". 21305: asset use allowed without asking as long as the author is credited, not in anything sold, Donation Points allowed. 51610: not read (its Nexus page is shown only with adult content turned on).",
+      "attribution": "Common Clothes and Armors by Franklin Zunge and thetrader (Nexus SE 21305); 3BA BodySlide project by JamesDogg (Nexus SE 83980); 3BA Vanilla Clothes and Armor (Nexus SE 51610). Not yet on any credits page.",
+      "approved": "Shipped as ours for now (#1259); Patrick, 29 Sep: build them ourselves",
+      "evidence": "Nexus SE 83980 and 21305 permission sections, read on Nexus 17 Oct 2026 (#2454); scripts\\release\\built-until-1259.txt.",
       "status": "no-licence-found",
-      "issue": 1259
+      "issue": 2454
+    },
+    {
+      "path": "The 2 executioner meshes in scripts\\release\\built-until-1259.txt (Data\\meshes\\MCE\\clothes\\executioner\\f\\body_0.nif and body_1.nif)",
+      "what": "More Craftable Equipment's women's Executioner's Robes refitted in BodySlide on another machine. Ship as Thornswood's until Build-Generated builds them from More Craftable Equipment's CBBE BodySlide file (#2454 part two).",
+      "published": "Packs and the installer, until #2454 part two replaces them with our own build",
+      "source": "More Craftable Equipment - Unenchanted Clothing and Specialty Gear (Nexus SE 44666, by Parapets), its CBBE BodySlide file",
+      "creator": "Parapets (female and CBBE Executioner Robes, per the mod's file credits); built by BodySlide",
+      "licence": "Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International, named by the author on the mod page for the whole mod. A mesh we build from it is an adaptation: it goes out under the same licence, never in anything sold, with credit to every contributor of the assets used.",
+      "attribution": "Executioner Robes (female and CBBE) by Parapets, from More Craftable Equipment (Nexus SE 44666), CC BY-NC-SA 4.0. Not yet on any credits page.",
+      "approved": "Shipped as ours for now (#1259); Patrick, 29 Sep: build them ourselves",
+      "evidence": "Nexus SE 44666 Permissions and credits (Author's instructions and File credits), read on Nexus 17 Oct 2026 (#2454).",
+      "status": "cleared"
     },
     {
       "path": "Thornswood Content (Nexus mod 192001): SkyrimSoulsRE.ini, OpenAnimationReplacer.ini and four face files",
@@ -876,6 +845,41 @@
       "evidence": "THIRD-PARTY.md, Thornswood Content.",
       "status": "unconfirmed",
       "ask": "Whoever next works #2177: read the three mods' Nexus permissions for these files and record them here."
+    },
+    {
+      "path": "Data\\Interface\\startmenu.swf",
+      "what": "The main menu's interface file with no Bethesda logo and no button list, 83,386 bytes, sha256 a1dd4595c1e931ecb8910334a3529238f2f50146997f3cd10191b87fa0190ecf. Shipped in every pack and the installer until #2827, from game/ours.",
+      "published": "Never: the launcher makes it before every Play from the person's own Skyrim - Interface.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "Skyrim's own interface\\startmenu.swf (Skyrim - Interface.bsa, 83,404 bytes), edited: its logo shapes taken out. Measured 15 Oct: the same 871 SWF tags in the same order, only DefineShape tags differ, by a byte or two each, and no strings were added or removed. What the repository holds is the edit, as the bytes that change (launcher\\app\\FromGameMenu.cs, written by scripts\\mods\\Build-StartMenu.py), not the file",
+      "creator": "Bethesda Game Studios; edited for Thornswood, by whom is not recorded",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "The site's terms and credits pages say Thornswood ships no game files and makes these from the person's own game, and carry the notice line the terms ask for (#2792, #2827)",
+      "approved": "Patrick, 15 Oct 2026 (#2177, option B): recorded as Bethesda's file, edited; Patrick, 19 Oct 2026 (#2827, option 2): the launcher makes it from each person's own game and it stops shipping",
+      "evidence": "The comparison on #2177, 15 Oct 2026; launcher\\app\\FromGame.cs, FromGameMenu.cs and MadeFromGame.cs; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromGame; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, Bethesda's own files, made on each machine.",
+      "status": "made-from-game",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromGame",
+      "paths": [
+        "Data\\Interface\\startmenu.swf"
+      ],
+      "issue": 2827
+    },
+    {
+      "path": "Data\\meshes\\thornswood\\ (noticeboard01.nif and dropbox01.nif)",
+      "what": "Thornswood's notice board mesh, 155,907 bytes (sha256 47cfe0f22bdf8db0c66ad059cf77c546aeba972ad694d20e6ad7318630918216): Windhelm sign posts, stockade planks, a shack roof, the candle lantern, vanilla notes and a plank shelf, with its own collision; and the hold's drop box, 29,665 bytes (sha256 09d8ae9277b6006017ff82f21fa2081e63f6c2249ffe63300e1e8cffb299241e): the vanilla strongbox scaled up, with a coin slot and an iron lip. In game/ours until #2827.",
+      "published": "Never: the launcher puts them together before every Play from the person's own Skyrim - Meshes0.bsa and Meshes1.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "Put together by scripts\\mods\\Build-NoticeBoard.py from pieces of Skyrim's own meshes, read from the game's archives, with vanilla textures only (#2502). What the repository holds is the recipe (launcher\\app\\FromGameBoard.cs: which meshes, where each piece goes, and Thornswood's own collision hulls), not the meshes",
+      "creator": "Put together here from Bethesda's Skyrim meshes",
+      "licence": "Bethesda's terms for Skyrim Special Edition mods, the Creation Kit End User License Agreement (https://store.steampowered.com/eula/1946180_eula_0, Steam app 1946180), read 19 Oct 2026 (#2792): mods go out free and only to people who own the game (1.D.a), carry ZeniMax's notice line (2.B), and are represented as 'originally created by You' (3); 'Any rights not granted to You in this Agreement are reserved by ZeniMax', and no clause grants a right to hand on ZeniMax's own files, edited or not, or meshes put together from them",
+      "attribution": "The site's terms and credits pages say Thornswood ships no game files and makes these from the person's own game, and carry the notice line the terms ask for (#2792, #2827)",
+      "approved": "Patrick approved the board concept on 12 Oct (#2298, #2502); Patrick, 19 Oct 2026 (#2827, option 2): the launcher makes them from each person's own game and they stop shipping",
+      "evidence": "Commit b9923901 (#2502); launcher\\app\\FromGame.cs, FromGameBoard.cs and MadeFromGame.cs; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromGame; tests\\test-2298-board-meshes.js and tests\\test-2827-from-game.ps1.",
+      "status": "made-from-game",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromGame",
+      "paths": [
+        "Data\\meshes\\thornswood\\noticeboard01.nif",
+        "Data\\meshes\\thornswood\\dropbox01.nif"
+      ],
+      "issue": 2827
     }
   ],
   "dispositions": [

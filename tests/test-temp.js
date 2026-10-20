@@ -304,11 +304,13 @@ if (block) {
             /const CELL_TYPES = \[24, 34, 36, 42\];/.test(FRONT));
         yes('a fire somebody switched off is still skipped',
             /off = !!r\.isDisabled\(\)/.test(FRONT));
-        yes('and a non-empty walk is kept for the cell rather than redone every probe',
+        yes('and a walk is kept for the cell rather than redone every probe',
             /if \(cellId !== fireCell\)/.test(FRONT) &&
-            /if \(fireHere && fireHere\.length\)/.test(FRONT));
-        yes('an empty fire walk is retried, not cached forever',
-            /FIRE_EMPTY_RETRY/.test(FRONT) && /fireEmptyAt/.test(FRONT));
+            /if \(!fireHere && !fireWalk\)/.test(FRONT));
+        // #2590: walked again when the cell says it has loaded, never on a clock.
+        yes('the cell underfoot is walked again when it finishes loading, not on a timer',
+            /sp\.on\('cellFullyLoaded', guard\('fire cell loaded', fireCellLoaded\)\)/.test(FRONT) &&
+            !/const FIRE_EMPTY_RETRY =/.test(FRONT) && !/const FIRE_IDS_RETRY =/.test(FRONT));
         yes('using a forge furniture counts as standing in the heat',
             /getFurnitureReference/.test(FRONT) &&
             /function fireDistance/.test(FRONT));
@@ -800,11 +802,11 @@ if (block) {
           swimIn('nowhere:X.esm', 'shallow') > swimIn('nowhere:X.esm', 'water'));
       yes('the client has a word for wading',
           /wading = /.test(FRONT) && /kind = 'shallow'/.test(FRONT));
-      // #608: actor root Z can sit a few units above a real cell plane.
-      yes('and feet slack covers temple near-misses (#608)',
-          /FEET_SLACK/.test(FRONT) && /deep > -FEET_SLACK/.test(FRONT));
-      yes('and the heartbeat names when slack decided wading',
-          /wading via feet slack/.test(FRONT));
+      // #2302: no guessed slack under the feet; placed water is read instead.
+      yes('and the cell plane counts only above the feet (#2302)',
+          !/FEET_SLACK/.test(FRONT) && /deep > 0 && deep < WADE_DEEP/.test(FRONT));
+      yes('and the heartbeat names when placed water decided wading',
+          /wading in placed water/.test(FRONT));
       // And the water class only ever applies to somebody in the water.
       {
         const icy2 = Object.keys(WATERS.items).filter(function (d) { return WATERS.items[d] === 'ice'; })[0];

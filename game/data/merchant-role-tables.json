@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "f7f30a34079cc837ea9504c25acae903506f0f3aafc36179530c8251c7d70ea9",
+    "game/data/recipes.json": "014992b1667c6fe7e2d9cab98a71b6c7c79311ab36f2e7b9f3ac4ecd1c45fffa",
     "game/data/harvests.json": "da87513ba8c931267dd13d1b39fabcc0de9bfaa5bc064be474eea22783b1d77b",
     "game/data/hunts.json": "b3ad957575d1f2083e202e6253cc1e29edd23bb215bed89f1d3f77a6fce5aa4b",
     "game/data/items.json": "b91464db89a6a455f5f00bffc81329a5801f236519949bb1cb394e02d9354b4c",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "e01025a8d605fef036ecfe82836e683677c7c26096027de5c2e0ea16473bf762",
+      "sha256": "374937f57a1f08a78fe754209a278d996b690c1e32571d1e8a89199d9176a705",
       "repository": true
     },
     {
@@ -522,7 +522,7 @@
     },
     {
       "name": "Thornswood-Last.esp",
-      "sha256": "6354c54806a90e95ddc1c61ca622e18497e757abd7fc18bf029035a4765dae6f",
+      "sha256": "84191550d20554c14f803cead89f6aadaf342cae6e904f8f89a58739a4e89215",
       "repository": true
     }
   ],
@@ -1563,6 +1563,72 @@
       "flags": 0,
       "edid": "ClothesEmperor",
       "winner": "Update.esm"
+    },
+    "16000:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureStool",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16001:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureChair",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16002:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureBench",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16003:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureFineChair",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16004:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureFineBench",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16005:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureBedroll",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16006:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureBed",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16007:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureDoubleBed",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16008:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureFineDoubleBed",
+      "winner": "Thornswood-Content.esp"
+    },
+    "16009:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureChest",
+      "winner": "Thornswood-Content.esp"
+    },
+    "1600a:Thornswood-Content.esp": {
+      "type": "MISC",
+      "flags": 0,
+      "edid": "ThornswoodFurnitureLargeChest",
+      "winner": "Thornswood-Content.esp"
     },
     "16e26:Dragonborn.esm": {
       "type": "INGR",
@@ -5845,6 +5911,17 @@
         "1549a:Thornswood-Content.esp",
         "1549b:Thornswood-Content.esp",
         "154c1:Thornswood-Content.esp",
+        "16000:Thornswood-Content.esp",
+        "16001:Thornswood-Content.esp",
+        "16002:Thornswood-Content.esp",
+        "16003:Thornswood-Content.esp",
+        "16004:Thornswood-Content.esp",
+        "16005:Thornswood-Content.esp",
+        "16006:Thornswood-Content.esp",
+        "16007:Thornswood-Content.esp",
+        "16008:Thornswood-Content.esp",
+        "16009:Thornswood-Content.esp",
+        "1600a:Thornswood-Content.esp",
         "17720:Dragonborn.esm",
         "1b935:Dragonborn.esm",
         "1d9b:PlayFluteLuteDrum.esp",
@@ -5901,6 +5978,17 @@
         "1549a:Thornswood-Content.esp",
         "1549b:Thornswood-Content.esp",
         "154c1:Thornswood-Content.esp",
+        "16000:Thornswood-Content.esp",
+        "16001:Thornswood-Content.esp",
+        "16002:Thornswood-Content.esp",
+        "16003:Thornswood-Content.esp",
+        "16004:Thornswood-Content.esp",
+        "16005:Thornswood-Content.esp",
+        "16006:Thornswood-Content.esp",
+        "16007:Thornswood-Content.esp",
+        "16008:Thornswood-Content.esp",
+        "16009:Thornswood-Content.esp",
+        "1600a:Thornswood-Content.esp",
         "17720:Dragonborn.esm",
         "1b935:Dragonborn.esm",
         "1d9b:PlayFluteLuteDrum.esp",
@@ -8463,6 +8551,39 @@
       "Enchanter:wardweaver:public-wearable",
       "Tailor:recipe:967:MoreCraftableEquipment.esp:out"
     ],
+    "16000:Thornswood-Content.esp": [
+      "Woodworker:recipe:16080:Thornswood-Content.esp:out"
+    ],
+    "16001:Thornswood-Content.esp": [
+      "Woodworker:recipe:16081:Thornswood-Content.esp:out"
+    ],
+    "16002:Thornswood-Content.esp": [
+      "Woodworker:recipe:16082:Thornswood-Content.esp:out"
+    ],
+    "16003:Thornswood-Content.esp": [
+      "Woodworker:recipe:16083:Thornswood-Content.esp:out"
+    ],
+    "16004:Thornswood-Content.esp": [
+      "Woodworker:recipe:16084:Thornswood-Content.esp:out"
+    ],
+    "16005:Thornswood-Content.esp": [
+      "Woodworker:recipe:16085:Thornswood-Content.esp:out"
+    ],
+    "16006:Thornswood-Content.esp": [
+      "Woodworker:recipe:16086:Thornswood-Content.esp:out"
+    ],
+    "16007:Thornswood-Content.esp": [
+      "Woodworker:recipe:16087:Thornswood-Content.esp:out"
+    ],
+    "16008:Thornswood-Content.esp": [
+      "Woodworker:recipe:16088:Thornswood-Content.esp:out"
+    ],
+    "16009:Thornswood-Content.esp": [
+      "Woodworker:recipe:16089:Thornswood-Content.esp:out"
+    ],
+    "1600a:Thornswood-Content.esp": [
+      "Woodworker:recipe:1608a:Thornswood-Content.esp:out"
+    ],
     "16e26:Dragonborn.esm": [
       "Alchemist:harvests:harvests:16e24:Dragonborn.esm",
       "Alchemist:harvests:harvests:16e25:Dragonborn.esm",
@@ -9758,7 +9879,11 @@
       "Tailor:recipe:154c4:Thornswood-Content.esp:input:0",
       "Tailor:recipe:84a:MoreCraftableEquipment.esp:input:0",
       "Woodworker:recipe:1549c:Thornswood-Content.esp:input:2",
-      "Woodworker:recipe:1549d:Thornswood-Content.esp:input:3"
+      "Woodworker:recipe:1549d:Thornswood-Content.esp:input:3",
+      "Woodworker:recipe:16085:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16086:Thornswood-Content.esp:input:2",
+      "Woodworker:recipe:16087:Thornswood-Content.esp:input:2",
+      "Woodworker:recipe:16088:Thornswood-Content.esp:input:2"
     ],
     "4223b:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
@@ -10062,6 +10187,11 @@
       "Woodworker:recipe:108cf8:Skyrim.esm:input:0",
       "Woodworker:recipe:108cfc:Skyrim.esm:input:0",
       "Woodworker:recipe:1549f:Thornswood-Content.esp:input:2",
+      "Woodworker:recipe:16083:Thornswood-Content.esp:input:2",
+      "Woodworker:recipe:16084:Thornswood-Content.esp:input:2",
+      "Woodworker:recipe:16088:Thornswood-Content.esp:input:3",
+      "Woodworker:recipe:16089:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:1608a:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:8f7:MoreCraftableEquipment.esp:input:0",
       "Woodworker:recipe:b64f:Dawnguard.esm:input:1"
     ],
@@ -10913,6 +11043,16 @@
       "Woodworker:recipe:1549e:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:1549f:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:154c5:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16080:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16081:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16082:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16083:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16084:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16086:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16087:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16088:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16089:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:1608a:Thornswood-Content.esp:input:0",
       "Woodworker:recipe:19fb4:Playable Rieklings.esp:input:1",
       "Woodworker:recipe:19fb7:Playable Rieklings.esp:input:1",
       "Woodworker:recipe:19fb8:Playable Rieklings.esp:input:1",
@@ -11295,7 +11435,15 @@
       "Woodworker:recipe:1549d:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:1549e:Thornswood-Content.esp:input:1",
       "Woodworker:recipe:1549f:Thornswood-Content.esp:input:1",
-      "Woodworker:recipe:154c5:Thornswood-Content.esp:input:1"
+      "Woodworker:recipe:154c5:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16081:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16082:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16083:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16084:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16085:Thornswood-Content.esp:input:0",
+      "Woodworker:recipe:16086:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16087:Thornswood-Content.esp:input:1",
+      "Woodworker:recipe:16088:Thornswood-Content.esp:input:1"
     ],
     "801:Dawnguard.esm": [
       "Woodworker:recipe:f80e:Dawnguard.esm:out"
@@ -12257,8 +12405,8 @@
       "supply": 40
     },
     "Woodworker": {
-      "buy": 54,
-      "sell": 54,
+      "buy": 65,
+      "sell": 65,
       "supply": 16
     },
     "Tailor": {

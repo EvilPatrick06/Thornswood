@@ -63,17 +63,17 @@ assert.equal(freed.policy.configure(0xff000025,state),null,'A still-loaded dead 
 
 const place=source.match(/^function placeActors\([^\r\n]*\)[\s\S]*?^\}/m);
 assert.ok(place);
-function spawnFixture(allow) {
-  const events=[];
-  const ctx={Math,Number,globalThis:null,mp:{lookupEspmRecordById:()=>({record:{type:'NPC_'}}),
-    place:()=>0xff000010,set:(id,name)=>events.push(name),
+function spawnFixture(allow,commanded,keep) {
+  const events=[],markers=[];
+  const ctx={Math,Number,globalThis:null,serverRunId:()=>'run-now',mp:{lookupEspmRecordById:()=>({record:{type:'NPC_'}}),
+    place:()=>0xff000010,set:(id,name,value)=>{events.push(name);if(name==='thornswoodNpcCommanded') markers.push(value);},
     getNpcAIState:()=>state,destroyActor:()=>events.push('destroy')},
     __thornswoodNpcPopulation:{configure:()=>allow?{home:state.pos,cell:60,leash:100}:null,
       admit:()=>{events.push('admit');return allow;},release:()=>events.push('release')},
     __thornswoodNpcRuntime:{enroll:()=>events.push('enroll')}};
   ctx.globalThis=ctx;vm.createContext(ctx);vm.runInContext(place[0],ctx);
-  const result=ctx.placeActors(10,{desc:'3c:Skyrim.esm',pos:state.pos,rot:[0,0,0]},1,0);
-  return {result,events};
+  const result=ctx.placeActors(10,{desc:'3c:Skyrim.esm',pos:state.pos,rot:[0,0,0]},1,0,commanded,keep);
+  return {result,events,markers};
 }
 const refused=spawnFixture(false);
 assert.equal(refused.result.made,0,'A habitat/cap refusal cannot count as a successful birth or encounter');
@@ -98,23 +98,54 @@ assert.equal(failedBirth.policy.configure(0xff000033,state),null);
 console.log('Failed birth capacity recovery checks passed');
 
 const commanded=fixture(),commandedId=0xff000040;
-commanded.props.set(commandedId+':thornswoodNpcCommanded',true);
+// A temporary spawn made in this run of the server (#2623).
+const RUN={run:'run-now'};
+commanded.policy=context.createNpcPopulation(commanded.api,commanded.data,['Skyrim.esm'],null,RUN);
+commanded.props.set(commandedId+':thornswoodNpcCommanded',{run:'run-now'});
 const away={...state,pos:[9000,8000,30],cellOrWorld:99};
 const explicit=commanded.policy.configure(commandedId,away);
 assert.ok(explicit,'An explicit command is accepted outside authored habitats');
 assert.deepEqual(plain(explicit.home),away.pos);
 assert.equal(explicit.cell,99);
 assert.notEqual(commanded.props.get(commandedId+':isDisabled'),true);
-const reloaded=context.createNpcPopulation(commanded.api,commanded.data,['Skyrim.esm']);
+const reloaded=context.createNpcPopulation(commanded.api,commanded.data,['Skyrim.esm'],null,RUN);
 assert.ok(reloaded.configure(commandedId,{...away,pos:[9200,8000,30]}),
-  'The persisted command marker survives rediscovery and gamemode reload');
+  'The persisted command marker survives rediscovery and a gamemode reload in the same run');
 assert.deepEqual(plain(reloaded.configure(commandedId,away).home),away.pos,
   'Rediscovery retains the command location as its home');
 assert.ok(commanded.policy.configure(0xff000041,state));
 assert.ok(commanded.policy.configure(0xff000042,state));
 assert.equal(commanded.policy.configure(0xff000043,state),null,
   'Explicit commands do not consume or remove ordinary habitat caps');
-commanded.props.set(0xff000044+':thornswoodNpcCommanded',true);
+commanded.props.set(0xff000044+':thornswoodNpcCommanded',{run:'run-now'});
 assert.equal(commanded.policy.configure(0xff000044,{...away,isHuman:true}),null,
   'The command marker cannot enroll a human');
 console.log('Commanded spawn persistence and habitat isolation checks passed');
+
+// #2623: a spawn is temporary unless staff keep it.
+{
+  const t=fixture(),discarded=[];
+  const opts={run:'run-now',discard:id=>discarded.push(id)};
+  const pol=context.createNpcPopulation(t.api,t.data,['Skyrim.esm'],null,opts);
+  // Made this run and not kept: admitted, and marked temporary for death.
+  t.props.set(0xff000050+':thornswoodNpcCommanded',{run:'run-now'});
+  assert.ok(pol.configure(0xff000050,away));
+  assert.equal(pol.isTemporary(0xff000050),true,'A spawn staff did not keep is temporary');
+  // Kept: admitted in any run, and not temporary.
+  t.props.set(0xff000051+':thornswoodNpcCommanded',{keep:true});
+  assert.ok(pol.configure(0xff000051,away));
+  assert.equal(pol.isTemporary(0xff000051),false,'A kept spawn stays');
+  // Left from an earlier run: not admitted, handed to the gamemode to remove.
+  t.props.set(0xff000052+':thornswoodNpcCommanded',{run:'run-before'});
+  assert.equal(pol.configure(0xff000052,away),null,'A temporary spawn from an earlier run is not admitted');
+  // The plain true every spawn carried before #2623 was never a choice to keep.
+  t.props.set(0xff000053+':thornswoodNpcCommanded',true);
+  assert.equal(pol.configure(0xff000053,away),null,'An old spawn nobody chose to keep is not admitted');
+  assert.deepEqual(discarded,[0xff000052,0xff000053],'Both leftovers are handed over for removal, once each');
+  // An ordinary resident is never temporary.
+  assert.ok(pol.configure(1,state));assert.equal(pol.isTemporary(1),false);
+  // The marker placeActors writes.
+  assert.deepEqual(plain(spawnFixture(true,true,false).markers),[{run:'run-now'}],'An unkept spawn names this run');
+  assert.deepEqual(plain(spawnFixture(true,true,true).markers),[{keep:true}],'keep marks it kept');
+  console.log('Temporary and kept spawn checks passed');
+}

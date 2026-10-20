@@ -120,13 +120,13 @@ Closed, and the half must be one you can work at the rank named:
 | Alchemy lab | Blightbrewer or Physicker, from novice |
 | Arcane enchanter | Bladebinder or Wardweaver, from novice |
 | Staff enchanter | Bladebinder, from novice |
-| Sharpening wheel | Edgewright or Woodwright, from novice |
+| Sharpening wheel | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
 | Skyforge | Edgewright, Platewright, or Woodwright, at advanced |
 | Dawnguard bench | Woodwright, at advanced |
 | Forge | Open furniture. A forge recipe still has an owner and a rank |
 | Tanning rack | Open furniture. A hide into leather is the Platewright's |
 | Loom | Open furniture. The garment still has an owner and a rank |
-| Armour table | Open furniture. Tempering never reaches the server |
+| Armour table | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
 | Aetherium forge | Open furniture. The staff and the plate made there are master recipes |
 
 A forge or a skyforge burns one charcoal, cheapest grade in the pack

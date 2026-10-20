@@ -86,6 +86,12 @@ not invited to. Staff can rename, remove someone, disband, and hand
 ownership to a character who is already a member. Removing someone
 from the book does not take a Discord role off the account.
 
+When somebody's account is deleted at their request, the game lets go of
+their characters at its next start (#2351): they leave every book, the
+lines they wrote in a book's chat go, and a book one of them owns is
+disbanded. Staff who are told the group wants to keep it hand it to
+another member first.
+
 ## The price list
 
 Each line is a name they type, a buy price, and a sell price. A blank

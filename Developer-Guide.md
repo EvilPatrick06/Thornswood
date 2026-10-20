@@ -310,9 +310,10 @@ Needs: Windows 10 or 11, Skyrim Special Edition on Steam (any Steam library,
 any drive; the scripts find it through Steam) with the Thornswood collection
 deployed through Vortex, the Thornswood launcher installed on any drive and
 signed in, git, the GitHub CLI (`gh`) signed in to an account that is a
-collaborator on the source repo, PowerShell 7, node, Python 3 with `discord.py`
-and `Pillow` for the bot scripts, and an SSH key the VPS knows. There is no
-releases clone any more: the feed and its baseline are on the VPS (#907).
+collaborator on the source repo, PowerShell 7, node, Python 3.11 or newer (the
+bot runs on 3.12) with `discord.py` and `Pillow` for the bot scripts, and an
+SSH key the VPS knows. There is no releases clone any more: the feed and its
+baseline are on the VPS (#907).
 
 ```
 cd C:\Users\<you>\Downloads
@@ -344,7 +345,11 @@ at `<drive>:\Thornswood-DevBuild`, beside the main install. Then open it once an
 `<Root>-DevBuild\Game`: it offers at startup, and its own Settings, Maintenance
 has "Make it". Ship refuses `-Channel dev` without the dev build, and with the
 dev build but without that folder it builds the dev release out of the Steam
-copy instead. `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
+copy instead. That refusal is for `<drive>:\Thornswood-DevBuild` only, the folder
+Ship finds for itself: a folder you name with `-Root`, or record once with
+`.\scripts\release\Setup-ShipMachine.ps1 -Channel dev -Root <folder>`, is a release
+folder `Update-ShipRoot.ps1` makes with no `Launcher` folder, and the Ship's own
+launcher step makes one there (#2662). `.\scripts\release\Check-ShipReady.ps1 -Channel dev` says whether both are
 in place, without shipping anything.
 
 Then in `Thornswood-Repo`:
@@ -971,6 +976,17 @@ How to use it:
 - Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
   or what it waits on, and `anyone can start` marks what needs nobody in
   particular. Assign yourself when you start one.
+- Status: In Progress the moment work starts, Done when it is merged and only
+  needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
+  Progress and Done; never add one through the API, which rewrites every
+  option and can clear the Status on every card. Move the card on the board,
+  or add the label `board: <Status>` to the issue (`board: In Progress`, `board: Done`):
+  `.github\workflows\board-status.yml` sets the card's Status and takes the
+  label off again (#2863). The label `order: <number>` (`order: 52.5`) sets
+  the card's Order the same way, and the label is deleted afterwards. A cloud
+  Claude thread is refused GraphQL, which the board needs, so these labels
+  are how it moves a card:
+  `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-general,
   which issues moved.
@@ -1066,7 +1082,9 @@ from the board, none of these three puts an issue aside:
   until the folder exists (tests\test-own-folder-first.ps1).
   Decided by Patrick on 29 Sep (#1232): `Thornswood\Game` takes only
   Skyrim's own files (from the Steam copy when it is on the pinned build, or
-  the Downgrade's download), Vortex's deployed files by Vortex's own record,
+  the Downgrade's download; for a ship root, also from a folder that holds
+  that build's files byte for byte, checked file by file first, #2603),
+  Vortex's deployed files by Vortex's own record,
   and Thornswood's own files. Skyrim's own is the pinned build's file list,
   `records\skyrim-files.json`, read out of the depot manifests the Downgrade
   uses, never a guess by folder. A mod put into the Steam copy by hand stays
@@ -1124,7 +1142,11 @@ from the board, none of these three puts an issue aside:
   harnesses compile launcher files with the same compiler at the same
   version (`tests\Launcher-Csc.ps1`). C# inside PowerShell scripts
   (`Add-Type`, which Windows PowerShell 5.1 compiles with the Framework
-  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5.
+  compiler, as in `scripts\dev\Check-Secrets.ps1`) stays C# 5. So do the two
+  launcher files a script compiles that way: `launcher\app\Signature.cs`
+  (`Assert-PublishSigned.ps1`) and `launcher\app\VortexProfileState.cs`
+  (`scripts\mods\LoadOrder.ps1`); `tests\test-signer-check.ps1` and
+  `tests\test-vortex-profile-state.ps1` compile them at C# 5.
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
@@ -1281,6 +1303,12 @@ The short form of the rules. The same decisions, with the dates they were made, 
     the whole point of those".
   - Work goes into a pull request the day it is done, never left on a
     pushed branch without one. That is how the two above were lost track of.
+  - A pull request held back on purpose (a freeze, a decision it waits on)
+    carries the `held` label, with the reason in its body, and the label
+    comes off the day it is let go (Patrick, 18 Oct, #1273). The nightly lists
+    a held pull request and does not count it; any other pull request open
+    more than two days turns the night red. A word in the title is not the
+    mark: the nightly reads the label only.
   - At the start of a session, and before anything is shipped, look at what
     is open: `gh pr list --state open` and `git ls-remote --heads origin`.
     Everything there other than main, the current `hotfix/` branch and work
@@ -1316,9 +1344,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   paths, the architecture page and three launcher harnesses, issue #875, and
   the new-box runbook read against its scripts, issue #454),
   the launcher window, the count of
-  silent catches in the launcher, the launcher compiles with the .NET
-  Framework csc, and on GitHub's runner the launcher built with MSBuild
-  from its project files matches that build, issue #498). Red means the branch would stop Ship at the build step;
+  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher builds
+  with MSBuild from its project files, and that build is held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
   #staff-general. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
@@ -1963,6 +1991,26 @@ done. Main has its own root (`local\release-main` on One), so no Ship packs
 sources, `Build-Generated.ps1 -Channel <channel>` runs again, and Ship says so.
 `tests\test-2019-ship-roots.ps1` holds it.
 
+A new root takes the game's own files from the Steam copy only when that copy
+is on 1.6.1170, and an install's other way, the Downgrade, is a Steam
+download under the person's own account that a script cannot run. One's
+Steam copy is not on it since 16 Oct (another `bink2w64.dll` and
+`Dawnguard.esm`, and the Anniversary Edition's Creation Club files), so
+`-SkyrimFrom` on `Setup-ShipMachine.ps1` or `Update-ShipRoot.ps1` names a
+folder that holds them, such as the other root's `Game` (#2603):
+
+```
+.\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-main -SkyrimFrom C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild\Game
+```
+
+Every one of the game's own files the new folder takes is checked against
+`records\skyrim-files.json` by size and SHA-1, the archives too, before
+anything is placed, and the root is not made when one is missing or
+different; the sentence names it. They are copied, never linked, so the two
+roots share no file, and Make stops if one of them changed while it worked.
+`made.txt` names the folder on its `skyrim=` line. Only the ship root tool
+does this: an install's way to 1.6.1170's own files stays the Downgrade.
+
 **The Skyrim build.** Steam updates the Steam copy by itself. With Thornswood's
 own folder, the Downgrade button works on the Steam copy the folder is made
 from, never on the folder's copies, and the folder is then brought up to date
@@ -2282,7 +2330,7 @@ In the main launcher, on the Play page, open the Server dropdown and choose Dev.
 .\scripts\release\Check-ShipReady.ps1 -Channel dev
 ```
 
-That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build. The publish steps are [section 3](#3-how-to-release-to-dev).
+That says whether the dev build and its game folder are in place, and ships nothing. Ship refuses `-Channel dev` without the dev build, unless the folder was named with `-Root` or recorded with Setup-ShipMachine.ps1 (#2662). The publish steps are [section 3](#3-how-to-release-to-dev).
 
 #### The Play page
 
@@ -2508,7 +2556,7 @@ These are part of a normal week and do not each need a letter of their own. Pyth
 
 #### Python
 
-The bot scripts need Python 3 with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
+The bot scripts need Python 3.11 or newer (the bot runs on 3.12; Pillow 13 needs 3.11) with `discord.py` and `Pillow`. [Setting up a machine](#setting-up-a-machine) names that install. The bot deploy is [I. Bot](#i-bot).
 
 #### The .NET Framework
 

@@ -11,7 +11,7 @@
 //
 //   nothing -> appearance   beginAppearance: the hall, and the move into it
 //   appearance -> choosing  beginChoosing: the clothes, and what the pick does
-//   choosing -> done        arriveAt: the town and the inn
+//   choosing -> done        arriveAt: the town's start spot (#2622)
 //   nothing -> done         the returning stamp in chargenTick: welcome back
 //
 // AND ONCE. Patrick, 28 September, on these lines: "Yes I want it, the
@@ -203,7 +203,8 @@ const SETTLE_TICKS = Math.ceil(K.SETTLE_MS / TICK) + 4;
 const HALL_LINE = /Welcome to Thornswood\. (This is|You are going to) the creation hall/;
 const CLOTHES_LINE = /plain clothes/;
 const PANEL_LINE = /Press K/;
-const INN_LINE = /You start at the inn/;
+// The arrival line, Djinn's words since 17 October (test-arrival-line.js holds every town's).
+const INN_LINE = /^Welcome to [A-Z][A-Za-z ]+, Safe Travels\.$/;
 const BACK_LINE = /Welcome back to Thornswood/;
 const AGAIN_LINE = "Your character creation menu didn't open. Opening it again.";
 const RELOG_LINE = 'The character creation menu still did not open. Relog, and if it ' +
@@ -215,7 +216,7 @@ function clean(line) {
     line.text.indexOf(EM) < 0 && !/\n/.test(line.text);
 }
 
-// ------------------------------------------- a whole creation, start to inn
+// ------------------------------------------- a whole creation, start to the start spot
 {
   const ME = 0xff000058;
   const S = server();
@@ -240,7 +241,7 @@ function clean(line) {
       S.to(ME, CLOTHES_LINE).length === 1 && S.to(ME).length === 2);
   const l2 = S.to(ME, CLOTHES_LINE)[0];
   yes('it says what the town pick does, and not Press K, since the panel is on the screen',
-      !!l2 && /home town/.test(l2.text) && /\binn\b/.test(l2.text) && !PANEL_LINE.test(l2.text));
+      !!l2 && /home town/.test(l2.text) && /where you will start/.test(l2.text) && !/\binn\b/.test(l2.text) && !PANEL_LINE.test(l2.text));
   yes('the shift was really handed over (the log says so)',
       S.logs.some(function (l) { return /shift: 2 handed over/.test(l); }));
   yes('and the choosing log line is still written',
@@ -249,8 +250,8 @@ function clean(line) {
   yes('picking Riften sends them', S.mod.arriveAt(ME, 'riften') === true && S.stage(ME) === 'done');
   S.mod.arriveAt(ME, 'riften');
   S.run(200);
-  yes('done: a second pick and 200 ticks later, the inn line was said exactly once',
-      S.to(ME, INN_LINE).length === 1 && /Riften/.test(S.to(ME, INN_LINE)[0].text));
+  yes('done: a second pick and 200 ticks later, the arrival line was said exactly once, naming Riften\'s hold',
+      S.to(ME, INN_LINE).length === 1 && S.to(ME, INN_LINE)[0].text === 'Welcome to The Rift, Safe Travels.');
   yes('three steps, three lines, all to this person, none repeated',
       S.said.length === 3 && S.to(ME).length === 3 &&
       new Set(S.said.map(function (s) { return s.text; })).size === 3);

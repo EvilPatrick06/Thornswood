@@ -151,7 +151,7 @@ const pieces = {
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
   after: lineOf(/^const MASTER_CRAFT_AFTER_MS = .*$/m),
-  fns: ['function idOf(descriptor)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
+  fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)', 'function markWoven(actorId, outDesc, name, n)',

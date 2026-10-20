@@ -20,7 +20,12 @@
 //                and every page comes back
 //   signalling   once the room is in, every pair of voice pages trades what
 //                a WebRTC connection costs through the relay: an offer and
-//                an answer of about 3 KB, and six candidates each way
+//                an answer of about 3 KB, and six candidates each way,
+//                timed from the first offer sent to the last candidate
+//                arriving. This process sends all of it from its one
+//                thread, so past a hundred or so people that is what sets
+//                the time (#2390); load-signalling.js measures the
+//                service's own cost
 //   talk         each person says a plain line every --talk seconds
 //
 // People stand about twenty to a cell across as many cells as that takes,
@@ -104,15 +109,20 @@ async function service(site) {
   });
   delete env.THORNSWOOD_VOICE_MOST;
   const proc = spawn(process.execPath, ['-r', './probe.js', 'voice-server.js'], { cwd: dir, env: env });
-  const s = { dir, port, proc, log: '', probes: [] };
+  const s = { dir, port, proc, log: '', probes: [], badProbes: 0 };
   let line = '';
   proc.stdout.on('data', (d) => {
     line += d;
     let i;
     while ((i = line.indexOf('\n')) >= 0) {
       const l = line.slice(0, i); line = line.slice(i + 1);
-      if (l.startsWith('PROBE ')) { try { s.probes.push(Object.assign({ at: Date.now() }, JSON.parse(l.slice(6)))); } catch (e) { } }
-      else s.log += l + '\n';
+      if (!l.startsWith('PROBE ')) { s.log += l + '\n'; continue; }
+      // The probe writes each line whole, so one that will not parse is a
+      // fault in the probe or a line cut by something else writing: counted
+      // in the result, and kept in the log, rather than a second of numbers
+      // quietly missing.
+      try { s.probes.push(Object.assign({ at: Date.now() }, JSON.parse(l.slice(6)))); }
+      catch (e) { s.badProbes++; s.log += 'unreadable probe line: ' + l + '\n'; }
     }
   });
   proc.stderr.on('data', (d) => { s.log += d; });
@@ -163,12 +173,15 @@ function most(list, k) { return list.reduce((a, p) => Math.max(a, p[k]), 0); }
 const live = { s: null, socks: [], timers: [] };
 async function cleanUp() {
   for (const t of live.timers) clearInterval(t);
-  for (const x of live.socks) { try { x.ws.close(); } catch (e) { } }
+  for (const x of live.socks) x.ws.close();   // close() with no code does not throw
   const s = live.s;
   live.s = null; live.socks = []; live.timers = [];
   if (s) {
     await new Promise((r) => { s.proc.once('exit', r); try { s.proc.kill(); } catch (e) { r(); } });
-    try { fs.rmSync(s.dir, { recursive: true, force: true }); } catch (e) { }
+    // force already passes over a folder that is gone; anything else (a file
+    // still open) leaves a copy of the service in the temp folder, so say where.
+    try { fs.rmSync(s.dir, { recursive: true, force: true }); }
+    catch (e) { console.log('could not remove ' + s.dir + ' (' + (e.code || e.message) + '): delete it by hand'); }
   }
 }
 
@@ -179,9 +192,15 @@ async function run(n, site) {
   const feedBody = () => JSON.stringify({ who: crowd.map((p) => ({ profileId: p.profileId, pos: p.pos, angleZ: p.angleZ,
                                                                    cell: p.cell, name: p.name, party: p.party })) });
   let walking = false;
+  // A feed the service refuses or does not answer is what this measures
+  // going wrong, so each one is counted in the result, with the first reason.
+  const feed = { sent: 0, failed: 0, first: '' };
   const feeder = setInterval(() => {
     if (walking) for (const p of crowd) if (p.walks) { p.pos = [p.pos[0] + 14, p.pos[1] + 8, p.pos[2]]; p.angleZ = (p.angleZ + 3) % 360; }
-    post(s.port, '/positions', feedBody()).catch(() => { });
+    feed.sent++;
+    post(s.port, '/positions', feedBody()).then((r) => {
+      if (r.status !== 204) { feed.failed++; if (!feed.first) feed.first = 'answered ' + r.status; }
+    }, (e) => { feed.failed++; if (!feed.first) feed.first = String(e && e.code || e && e.message || e); });
   }, TICK_MS);
   live.timers.push(feeder);
 
@@ -191,7 +210,7 @@ async function run(n, site) {
     toks.push(...await Promise.all(crowd.slice(i, i + 50).map(async (p) => [p, await token(s.port, p.profileId), await token(s.port, p.profileId)])));
   }
 
-  const meter = { bytes: 0, msgs: 0 };
+  const meter = { bytes: 0, msgs: 0, signals: 0 };
   const socks = live.socks;
   const voicePages = [];
   const stormFrom = Date.now();
@@ -206,6 +225,7 @@ async function run(n, site) {
     ws.onmessage = (ev) => {
       const text = String(ev.data);
       meter.bytes += text.length; meter.msgs++;
+      if (text.startsWith('{"t":"sdp"') || text.startsWith('{"t":"ice"')) meter.signals++;
       if (!me.peer && text.startsWith('{"t":"welcome"')) { me.peer = JSON.parse(text).peer; if (voice) voicePages.push(me); }
       if (!me.pos && text.startsWith('{"t":"pos"')) me.pos = true;
       if (me.peer && me.pos && late) { clearTimeout(late); ok(); }
@@ -236,8 +256,17 @@ async function run(n, site) {
     }
     if (i % 20 === 19) await new Promise((r) => setImmediate(r));
   }
-  await new Promise((r) => setTimeout(r, 3000));
+  // Signalling is done when the last offer, answer and candidate has reached
+  // the page it was sent to, not when this process has finished sending: the
+  // service can still be working through them long after. A message that
+  // never comes (a socket closed at the ceiling) is counted, not waited for.
+  // Until #2390 this stopped three seconds after the last send, whatever had
+  // arrived by then, so its number was mostly how long this process took.
+  const sigSent = voicePages.length * (voicePages.length - 1) * 7;
+  const sigBy = Date.now() + 300000;
+  while (meter.signals < sigSent && Date.now() < sigBy) await new Promise((r) => setTimeout(r, 20));
   const sigMs = Date.now() - sigFrom;
+  await new Promise((r) => setTimeout(r, 1000));
   const sig = s.probes.slice(sigMark);
 
   // The evening: walking, talking, for SECONDS.
@@ -256,8 +285,15 @@ async function run(n, site) {
   clearInterval(talker);
   clearInterval(feeder);
   walking = false;
+  // An unread /health is said in the result, not printed as a row of blanks.
   let health = {};
-  try { health = JSON.parse((await new Promise((ok) => http.get('http://127.0.0.1:' + s.port + '/health', (res) => { let b = ''; res.on('data', (d) => { b += d; }); res.on('end', () => ok(b)); }))) ); } catch (e) { }
+  try {
+    health = JSON.parse(await new Promise((ok, bad) => {
+      http.get('http://127.0.0.1:' + s.port + '/health', (res) => {
+        let b = ''; res.on('data', (d) => { b += d; }); res.on('end', () => ok(b));
+      }).on('error', bad);
+    }));
+  } catch (e) { health = { unread: String(e && e.code || e && e.message || e) }; }
 
   const sockets = socks.length;
   await cleanUp();
@@ -265,12 +301,15 @@ async function run(n, site) {
   return {
     people: n, sockets: sockets, crowd: CROWD,
     storm: { ms: stormMs, cores: +most(storm, 'cores').toFixed(2), p99: +most(storm, 'p99').toFixed(1), max: +most(storm, 'max').toFixed(1) },
-    signalling: { pairs: voicePages.length * (voicePages.length - 1) / 2, ms: sigMs, cores: +most(sig, 'cores').toFixed(2), p99: +most(sig, 'p99').toFixed(1), max: +most(sig, 'max').toFixed(1) },
+    signalling: { pairs: voicePages.length * (voicePages.length - 1) / 2, ms: sigMs, undelivered: sigSent - meter.signals, cores: +most(sig, 'cores').toFixed(2), p99: +most(sig, 'p99').toFixed(1), max: +most(sig, 'max').toFixed(1) },
     evening: { cores: +avg(evening, 'cores').toFixed(3), coresPeak: +most(evening, 'cores').toFixed(2), p99: +most(evening, 'p99').toFixed(1),
                max: +most(evening, 'max').toFixed(1), rssMB: Math.round(most(evening, 'rss') / 1048576),
                kbPerSecond: Math.round(evBytes / 1024), msgsPerSecond: Math.round(evMsgs) },
-    health: { peers: health.peers, droppedPositions: health.droppedPositions, skippedRosters: health.skippedRosters,
-              closedBacklogged: health.closedBacklogged }
+    health: health.unread ? { unread: health.unread }
+      : { peers: health.peers, droppedPositions: health.droppedPositions, skippedRosters: health.skippedRosters,
+          closedBacklogged: health.closedBacklogged },
+    feed: feed,
+    unreadableProbeLines: s.badProbes
   };
 }
 

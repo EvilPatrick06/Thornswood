@@ -105,7 +105,8 @@ yes('the typed /jobs reader is gone: there is no function jobs( in the property 
 
 const fees = slice(prop, '  var NOTICE_FEE = ', 'var LETTER_REACH = 700;');
 const holds = slice(prop, '  var LEDGER_HOLDS = [', '];');
-const tenthFrom = slice(prop, '  var HAUL_TENTH_FROM = ', ';');
+// The company's cut of a haul is its terms now (#512, #2695), read by the company terms block.
+const COMPANY = require('./fixtures/company-block').companyApi(gm);
 const reads = slice(prop, '  var boardReads = ', ';');
 const seeding = (function () {
   const a = prop.indexOf('  var BOARD_REACH = 400;');
@@ -113,11 +114,11 @@ const seeding = (function () {
   return (a < 0 || b < 0) ? null : prop.slice(a, b);
 })();
 yes('the fees, the ten ledgers, the board seeding and what each character is reading are in the block',
-    !!fees && !!holds && !!tenthFrom && !!seeding && reads === '  var boardReads = {};');
+    !!fees && !!holds && !!COMPANY && !!seeding && reads === '  var boardReads = {};');
 const chargenLine = gm.split('\n').find(function (l) { return l.indexOf('const CHARGEN = ') === 0; });
 const PASSAGES = chargenLine ? JSON.parse(chargenLine.slice('const CHARGEN = '.length).replace(/;$/, '')).towns : null;
 yes('the chargen town table reads', !!PASSAGES);
-if (missing.length || !fees || !holds || !tenthFrom || !seeding || !reads || !PASSAGES) { done(); }
+if (missing.length || !fees || !holds || !COMPANY || !seeding || !reads || !PASSAGES) { done(); }
 
 const GOLD = 15;
 const TAMRIEL = '3c:Skyrim.esm';
@@ -167,25 +168,28 @@ function boot(reg, w) {
     'var GOLD_ID = ' + GOLD + ';',
     reads,
     holds,
-    tenthFrom,
     fees,
     seeding,
     'function save() { reg.funds = JSON.parse(JSON.stringify(funds)); ' +
     'reg.notices = JSON.parse(JSON.stringify(notices)); reg.boards = JSON.parse(JSON.stringify(boards)); }',
     'function refreshPanel(actorId) { pushed.push(actorId); }',
     // Nobody guards these boards; a guard's take down (#502) is
-    // tests/test-502-guard-board.js.
+    // tests/test-502-guard-board.js. Nobody is a Jarl here either, and the
+    // stewards given are stewards of every board here (#2551, a steward is
+    // of one hold: tests/test-2551-hold-offices.js).
     'function isGuard() { return false; }',
+    'function isJarlOf() { return false; }',
+    'function isStewardOf(pid) { return isSteward(pid); }',
     'function cancelHaul() { return true; }',
     'function haulCmd() { return true; }',
-    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'jarlCmd', 'stewardCmd',
+    ['deeds', 'setLock', 'mold', 'moldHere', 'cutKey', 'here', 'claim', 'officeCmd',
      'evict', 'boxCmd', 'rentCmd', 'sleepHere'].map(function (n) { return 'function ' + n + '() { return true; }'; }).join('\n')
   ];
   NAMES.forEach(function (n) { body.push(lifted[n]); });
   body.push('return { boards: boards, funds: function () { return funds; }, ' +
             'notices: function () { return notices; }, command: command, boardPanel: boardPanel, ' +
             'boardsView: boardsView, wallOf: wallOf, jobsOf: jobsOf };');
-  const g = { __thornswoodSocial: {}, __thornswoodTrade: { TRADE: { reach: 700 } } };
+  const g = { __thornswoodSocial: {}, __thornswoodTrade: { TRADE: { reach: 700 } }, __thornswoodCompany: COMPANY };
   const make = new Function('reg', 'mp', 'plog', 'loadPart', 'PASSAGES', 'g', 'isSteward', 'pushed', body.join('\n'));
   const api = make(reg, w.mp, function () { },
                    function (key, fallback) {

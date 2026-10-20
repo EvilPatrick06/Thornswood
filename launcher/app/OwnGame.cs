@@ -51,6 +51,20 @@ namespace Thornswood
     /// writes into the Steam copy. Skyrim's archives are the one thing still
     /// kept on the disk once, and only while their bytes are the same as the
     /// folder's own record; OwnGameShare.cs checks that before every Play.
+    ///
+    /// A THIRD WAY IN, FOR THE SHIP ROOT TOOL ONLY (#2603). On 16 Oct the
+    /// machine that ships could not make main's ship root: its Steam copy has
+    /// 1.6.1170's exe but another bink2w64.dll and Dawnguard.esm and the
+    /// Anniversary Edition's Creation Club files, and the Downgrade is a Steam
+    /// download under the person's own account, which a script cannot start.
+    /// Its dev ship root's Game held 1.6.1170's own files already. So Make
+    /// can take the game's own files from a folder that holds them byte for
+    /// byte as records\skyrim-files.json lists them (SkyrimFrom,
+    /// OwnGameKinds.cs): every one Make takes is checked before anything is
+    /// placed, then copied, never linked, so the new folder never shares a
+    /// file with the folder it came from. The launcher does not offer it: an
+    /// install's way to 1.6.1170's own files is the Downgrade, under the
+    /// person's own Steam account, and nobody's install needs another.
     /// </summary>
     static partial class OwnGame
     {
@@ -133,8 +147,14 @@ namespace Thornswood
         /// loop, killed 150 times, left files.txt missing 4 times through
         /// File.Replace and whole all 150 times through MoveFileEx
         /// (tests\test-2586-atomic-records.ps1 holds it to that).
+        ///
+        /// Internal, and the one way the launcher writes a record it keeps
+        /// in its Profile (#2591): Updater's release.txt and
+        /// release-files.txt (Sync.cs) and the news cache (FeedNews.cs) go
+        /// through it too. They deleted the old file and then moved the new
+        /// one in; killed 150 times, that left the record missing 30 times.
         /// </summary>
-        static void WriteRecord(string path, IEnumerable<string> lines)
+        internal static void WriteRecord(string path, IEnumerable<string> lines)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(path));
             string next = path + ".new";
@@ -147,15 +167,175 @@ namespace Thornswood
                     fs.Flush(true);
                 }
             }
+            SwapIn(next, path);
+        }
+
+        /// <summary>The same, for a record kept byte for byte (the news cache).</summary>
+        internal static void WriteRecord(string path, byte[] bytes)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path));
+            string next = path + ".new";
+            using (var fs = new FileStream(next, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                fs.Write(bytes, 0, bytes.Length);
+                fs.Flush(true);
+            }
+            SwapIn(next, path);
+        }
+
+        /// <summary>Renames next over path in one call, replacing it.</summary>
+        static void SwapIn(string next, string path)
+        {
             if (!MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough))
                 throw new IOException(path + " could not be replaced by " + next + ": " +
                                       new System.ComponentModel.Win32Exception(Marshal.GetLastWin32Error()).Message);
+        }
+
+        /// <summary>
+        /// Puts next in path's place in one rename (#2599), the same MoveFileEx
+        /// the records use: until the call path is the old file, after it the
+        /// new one, and a launcher stopped anywhere never leaves path missing.
+        /// A delete and then a move left a moment with no file: killed 150
+        /// times, that left it missing 30 times (#2591). Not SwapIn, which is
+        /// the records' plain rename; this one also waits out a lock and may
+        /// clear a read only mark.
+        ///
+        /// next is never opened for writing here. A fresh copy is flushed by
+        /// the one that made it (SwapCopyIn), so the name never points at bytes
+        /// still only in the cache. Any other next is a link to a file already
+        /// on the disk under another name (the share step links the Steam
+        /// copy's own file), with nothing to flush, and a write handle on it
+        /// would be one on Steam's file, which Steam reading it refuses.
+        ///
+        /// A lock (an antivirus scan, the indexer, Steam reading the file) is
+        /// waited out: the rename is tried again for about 600 ms while it is
+        /// refused with a sharing violation (32) or an access denied (5) that
+        /// is not a read only mark.
+        ///
+        /// Read only belongs to the file, not the name, and a rename over a
+        /// read only file is refused. clearReadOnly is DropName's rule, for a
+        /// name this folder is letting go of: the mark is cleared only when the
+        /// rename was refused because of it, and if the rename is refused even
+        /// then, the mark goes back on, on every name of the file, before the
+        /// refusal is thrown. Without clearReadOnly the refusal is thrown and
+        /// path is left as it was.
+        /// </summary>
+        internal static void ReplaceName(string next, string path, bool clearReadOnly)
+        {
+            int err = MoveOver(next, path);
+            if (err == 0) return;
+            if (clearReadOnly && err == 5 && File.Exists(path))
+            {
+                FileAttributes was = File.GetAttributes(path);
+                if ((was & FileAttributes.ReadOnly) != 0)
+                {
+                    File.SetAttributes(path, was & ~FileAttributes.ReadOnly);
+                    err = MoveOver(next, path);
+                    if (err == 0) return;
+                    File.SetAttributes(path, was);
+                }
+            }
+            throw new IOException(path + " could not be replaced by " + next + ": " +
+                                  new System.ComponentModel.Win32Exception(err).Message);
+        }
+
+        /// <summary>One MoveFileEx over path, tried again while a lock refuses it. 0, or the last Win32 error.</summary>
+        static int MoveOver(string next, string path)
+        {
+            for (int tries = 1; ; tries++)
+            {
+                if (MoveFileEx(next, path, MoveReplaceExisting | MoveWriteThrough)) return 0;
+                int err = Marshal.GetLastWin32Error();
+                if (err != 32 && err != 5) return err;
+                // A read only mark refuses with 5 as well, and waiting does not lift it.
+                if (err == 5 && File.Exists(path) && (File.GetAttributes(path) & FileAttributes.ReadOnly) != 0) return err;
+                if (tries >= MoveTries) return err;
+                System.Threading.Thread.Sleep(40 * tries);
+            }
+        }
+
+        const int MoveTries = 6;   // 40 + 80 + ... + 200 ms, 600 ms at most
+
+        /// <summary>
+        /// Flushes a file's bytes to the disk (FlushFileBuffers, through
+        /// FileStream.Flush(true)), for a fresh copy this file just made.
+        /// </summary>
+        static void FlushToDisk(string file)
+        {
+            using (var fs = new FileStream(file, FileMode.Open, FileAccess.Write, FileShare.ReadWrite | FileShare.Delete))
+                fs.Flush(true);
         }
 
         const int MoveReplaceExisting = 0x1;
         const int MoveWriteThrough = 0x8;
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool MoveFileEx(string existing, string replacement, int flags);
+
+        // ---- #2599: one name of the game folder replaced whole ------------------
+
+        /// <summary>
+        /// Takes one name off a file without touching the file's attributes
+        /// (#2599). A read only file's name cannot be deleted the ordinary way,
+        /// and clearing the mark to delete it clears it on every other name of
+        /// the file too: on a .thornswood-share link that is the Steam copy's
+        /// own file. So the name goes with FILE_DISPOSITION_IGNORE_READONLY_ATTRIBUTE
+        /// (Windows 10 1809 and later), which deletes the name and leaves the
+        /// mark. On an older Windows the mark is cleared and the name deleted,
+        /// which is what DropName does.
+        /// </summary>
+        internal static void DeleteName(string path)
+        {
+            if (!File.Exists(path)) return;
+            bool gone = false;
+            using (Microsoft.Win32.SafeHandles.SafeFileHandle h = OpenForDelete(path, 0x10000, 7, IntPtr.Zero, 3, 0x200000, IntPtr.Zero))
+            {
+                if (!h.IsInvalid)
+                {
+                    int flags = 0x1 | 0x2 | 0x10;   // DELETE, POSIX_SEMANTICS, IGNORE_READONLY_ATTRIBUTE
+                    gone = SetFileInformationByHandle(h, 21, ref flags, 4);   // FileDispositionInfoEx
+                }
+            }
+            if (gone) return;
+            File.SetAttributes(path, File.GetAttributes(path) & ~FileAttributes.ReadOnly);
+            File.Delete(path);
+        }
+
+        /// <summary>
+        /// A copy of path's own, put in path's place (Enforce.MakeItOurs and
+        /// Separate). A copy left by a stopped run goes first, read only or
+        /// not; File.Copy carries the source's read only mark, which would
+        /// refuse every copy over it after. The new copy is written, its mark
+        /// cleared so it can be flushed, and renamed over path in one call. If
+        /// that is refused (path read only, shared with Vortex's copy), path is
+        /// left as it was and the copy goes.
+        /// </summary>
+        internal static void SwapCopyIn(string path, string aside)
+        {
+            DeleteName(aside);
+            File.Copy(path, aside, false);
+            File.SetAttributes(aside, File.GetAttributes(aside) & ~FileAttributes.ReadOnly);
+            FlushToDisk(aside);
+            SwapNameIn(aside, path, false);
+        }
+
+        /// <summary>ReplaceName, and if it is refused, next goes, so nothing is left beside path.</summary>
+        internal static void SwapNameIn(string next, string path, bool clearReadOnly)
+        {
+            try { ReplaceName(next, path, clearReadOnly); }
+            catch
+            {
+                try { DeleteName(next); }
+                catch (Exception ex) { Swallow.Note("OwnGame.SwapNameIn, clean up " + next, ex); }
+                throw;
+            }
+        }
+
+        [DllImport("kernel32.dll", EntryPoint = "CreateFileW", CharSet = CharSet.Unicode, SetLastError = true)]
+        static extern Microsoft.Win32.SafeHandles.SafeFileHandle OpenForDelete(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+        [DllImport("kernel32.dll", SetLastError = true)]
+        static extern bool SetFileInformationByHandle(Microsoft.Win32.SafeHandles.SafeFileHandle file, int infoClass, ref int info, int size);
+
+        // ---- end #2599 -----------------------------------------------------------
 
         /// <summary>A folder made anew has its Steam copy looked at again (Make).</summary>
         static void ForgetCleaned()
@@ -389,7 +569,7 @@ namespace Thornswood
                    "so the two would share files and each would undo the other's. In Vortex, point Skyrim Special Edition at the Steam copy" +
                    (steam.Length > 0 ? " in " + steam : "") + " again and deploy" +
                    (chosen ? ", press Forget the chosen folder in Settings, under Maintenance," : ",") +
-                   " and then Bring it up to date from Vortex on Diagnostics.";
+                   " and then press Scan and Fix on Diagnostics.";
         }
 
         /// <summary>
@@ -483,6 +663,17 @@ namespace Thornswood
         /// </summary>
         public static string WhyNot(Config cfg, string src)
         {
+            return WhyNot(cfg, src, false);
+        }
+
+        /// <summary>
+        /// WhyNot, for a Make that is given the game's own files in a folder
+        /// of their own (<paramref name="skyrimGiven"/>, #2603): the Steam
+        /// copy's build is then not asked about, because none of the game's
+        /// own files comes from it. Everything else is asked as it always is.
+        /// </summary>
+        static string WhyNot(Config cfg, string src, bool skyrimGiven)
+        {
             // A folder that is made already holds the game itself, and a
             // refresh takes nothing but Vortex's files (#1218). So the Steam
             // copy's build, and whether there is a Steam copy at all, matter
@@ -506,7 +697,7 @@ namespace Thornswood
                 if (game.Length == 0)
                     return "Vortex deploys into " + src + ", but Thornswood takes the game itself only from Steam's own copy of Skyrim Special Edition, " +
                            "never from another folder, and this machine has none, so install Skyrim Special Edition in Steam and try again.";
-                string build = FirstBuild(cfg, game);
+                string build = skyrimGiven ? null : FirstBuild(cfg, game);
                 if (build != null) return build;
                 // Make takes Thornswood's own files from the Steam copy by
                 // Thornswood's records, the release's file list among them
@@ -1022,7 +1213,8 @@ namespace Thornswood
             public string From;
             public long Size, Ticks;
             // One of 1.6.1170's own files from the Downgrade's download, which
-            // is removed once the folder is made, so it is always copied.
+            // is removed once the folder is made, or from another folder that
+            // holds them (#2603), whose files stay its own: always copied.
             public bool Pinned;
             // Thornswood's own, from Profile\Payload (#1226): linked in and
             // then the Payload name removed, so it ends as the folder's own.
@@ -1042,13 +1234,32 @@ namespace Thornswood
         /// </summary>
         public static string Make(Config cfg, Action<string> say)
         {
-            lock (folderWork) return MakeNow(cfg, say);
+            return Make(cfg, say, null);
         }
 
-        static string MakeNow(Config cfg, Action<string> say)
+        /// <summary>
+        /// Make, with the game's own files taken from <paramref name="skyrimFrom"/>
+        /// instead of the Steam copy or the Downgrade's download, when it is
+        /// given (#2603): a folder that already holds 1.6.1170's own files,
+        /// each checked against the list before anything is placed and then
+        /// copied (SkyrimFrom). Only the ship root tool passes one; the
+        /// launcher's own Make is the one above.
+        /// </summary>
+        public static string Make(Config cfg, Action<string> say, string skyrimFrom)
+        {
+            string from = null;
+            if (!string.IsNullOrEmpty(skyrimFrom))
+            {
+                try { from = Path.GetFullPath(skyrimFrom.Trim().Trim('"')).TrimEnd('\\'); }
+                catch { throw new Exception(skyrimFrom + " is not a folder Thornswood can read, so the game's own files were not taken from it, and nothing was made."); }
+            }
+            lock (folderWork) return MakeNow(cfg, say, from);
+        }
+
+        static string MakeNow(Config cfg, Action<string> say, string skyrimFrom)
         {
             string src = DeploysInto(cfg);
-            string why = WhyNot(cfg, src);
+            string why = WhyNot(cfg, src, skyrimFrom != null);
             if (why != null) throw new Exception(why);
             if (Directory.Exists(Folder))
                 throw new Exception("There is already a Game folder at " + Folder + ", so nothing was made.");
@@ -1072,8 +1283,14 @@ namespace Thornswood
             var left = new List<string>();
             // The Steam copy is not the pinned build: the game comes from the
             // files the Downgrade downloaded (FirstBuild let it through only then).
+            // Or from a folder that holds them already, checked file by file
+            // before anything is placed (#2603); a refusal throws here, and
+            // nothing has been linked or copied.
             string game = GameFor(src);
-            List<string> pinned = FirstBuildWrong(cfg, game) ? Downgrade.Downloaded(cfg) : null;
+            Dictionary<string, Stamp> checkedAt = null;
+            List<Found> pinned = skyrimFrom != null
+                ? SkyrimFrom(skyrimFrom, deployed, say, out checkedAt)
+                : FirstBuildWrong(cfg, game) ? Downloads(Downgrade.Downloaded(cfg)) : null;
             int byHand = 0;
             List<Found> all = WithPayload(Gather(src, left, pinned, ours, ref byHand));
 
@@ -1128,6 +1345,15 @@ namespace Thornswood
                 if (say != null && pct >= shown + 10) { shown = pct - pct % 10; say("Making Thornswood's own Skyrim folder: " + shown + "%"); }
             }
             PlayProgress.Files(Phase, all.Count, all.Count);
+            // What was copied from skyrimFrom is the bytes that were checked
+            // only if nothing wrote to those files meanwhile (#2603). Before
+            // any record is written, so a refusal leaves no folder and no
+            // record of one; the next Make removes Game.new.
+            if (checkedAt != null)
+            {
+                string moved = SkyrimFromMoved(skyrimFrom, checkedAt);
+                if (moved != null) throw new Exception(moved);
+            }
 
             WriteRecord(FilesList, lines);
             WriteRecord(LeftOutFile, left);
@@ -1142,7 +1368,7 @@ namespace Thornswood
             // Vortex's record as the folder took it in, so the first refresh
             // after a Vortex deploy opens only what moved (VortexMoved).
             WriteVortexSeen(src, Staged(src), failed, null, null);
-            WriteMade(src, SumCopied(lines), 1);
+            WriteMade(src, SumCopied(lines), 1, skyrimFrom);
             SettleSettings(true);
             string payloadLeft = DropPayload();
 
@@ -1157,7 +1383,9 @@ namespace Thornswood
                 said += " " + fromPayload.ToString("n0") + " of Thornswood's own files came from " + Paths.Payload +
                         ", where the installer and the launcher kept them so that nothing was written into the Steam copy.";
             if (payloadLeft != null) said += " " + payloadLeft;
-            if (pinned != null)
+            if (skyrimFrom != null)
+                said += " The game itself is 1.6.1170's own files, copied from " + skyrimFrom + " after each was checked against that build's list; the Steam copy in " + game + " was not changed.";
+            else if (pinned != null)
             {
                 said += " The game itself is 1.6.1170's own files, downloaded from Steam; the Steam copy in " + game + " was not changed.";
                 Downgrade.ClearDownloads(cfg, say);
@@ -1197,7 +1425,18 @@ namespace Thornswood
                 && !KindsDue()
                 && DeploymentStamp(src) == Recorded("deployment")
                 && Recorded("deployment") != 0)
+            {
+                // The files are Vortex's, but its plugin list can change with
+                // nothing deployed: enabling a plugin, or a reinstall that
+                // Vortex re-enables. On 17 Oct a release folder kept a list
+                // from a minute when Thornswood-Content.esp was missing, the
+                // Ship built from it refused, and every later refresh came
+                // through here and never copied the list again. So the list
+                // is copied on this path too. It is two small files, and
+                // copying them writes nothing but Profile\OwnGame.
+                BakeVortexList();
                 return "Thornswood's own Skyrim folder already matches what Vortex has deployed.";
+            }
 
             string why = WhyNot(cfg, src);
             if (why != null) throw new Exception(why);
@@ -1799,10 +2038,22 @@ namespace Thornswood
             }
             catch (Exception ex) { Swallow.Note("OwnGame.SettleSettings, copy shipped ini", ex); }
 
-            // Vortex's Thornswood profile list, for Publish-Update on a machine
-            // that ships (#557). Windows' live plugins.txt follows whichever
-            // Vortex profile is active; the named Thornswood profile is the
-            // collection's order. Nothing here writes to Vortex.
+            BakeVortexList();
+
+            if (!first) return;
+            SettleFirstSettings();
+        }
+
+        /// <summary>
+        /// Vortex's Thornswood profile list, for Publish-Update on a machine
+        /// that ships (#557), copied into Profile\OwnGame. Windows' live
+        /// plugins.txt follows whichever Vortex profile is active; the named
+        /// Thornswood profile is the collection's order. Nothing here writes
+        /// to Vortex. Run on every refresh, the one that finds nothing to
+        /// bring in included, since the list changes without a deployment.
+        /// </summary>
+        static void BakeVortexList()
+        {
             try
             {
                 string tw = Checks.VortexProfileDir("Thornswood");
@@ -1830,9 +2081,11 @@ namespace Thornswood
                 }
             }
             catch (Exception ex) { try { File.AppendAllText(Paths.LogFile, DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss") + "  OwnGame: baking Thornswood profile list failed: " + ex.Message + Environment.NewLine); } catch { /* the log itself failed; nowhere left to say so */ } }
+        }
 
-            if (!first) return;
-
+        /// <summary>The settings a folder gets only when it is made (SettleSettings(true)).</summary>
+        static void SettleFirstSettings()
+        {
             // Skyrim's own ini files, so the first session is not on defaults.
             try
             {
@@ -1891,10 +2144,8 @@ namespace Thornswood
             try
             {
                 if (!File.Exists(path) || Links(path) <= 1) return;
-                string own = path + ".own";
-                File.Copy(path, own, true);
-                File.Delete(path);
-                File.Move(own, path);
+                // One rename over the shared name, never a delete first (#2599).
+                SwapCopyIn(path, path + ".own");
             }
             catch (Exception ex) { Swallow.Note("OwnGame.Separate, move", ex); }
         }
@@ -2793,7 +3044,7 @@ namespace Thornswood
         /// what Vortex deploying into the Steam copy does. The result is what
         /// somebody whose Vortex deploys into the Steam copy gets.
         /// </summary>
-        static List<Found> Gather(string src, List<string> left, List<string> pinned, HashSet<string> ours, ref int byHand)
+        static List<Found> Gather(string src, List<string> left, List<Found> pinned, HashSet<string> ours, ref int byHand)
         {
             string game = GameFor(src);
             if (SameFolder(game, src))
@@ -2859,13 +3110,6 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// 1.6.1170's own files, from the folders the Downgrade downloaded
-        /// them into, over the game's files in <paramref name="byRel"/>. Each
-        /// is copied (Found.Pinned), because the download is removed once the
-        /// folder is made. A path in <paramref name="keep"/> is the
-        /// collection's and is left to it.
-        /// </summary>
-        /// <summary>
         /// A listed file that is not the pinned build's does not come from
         /// the Steam copy. Pin puts the Downgrade's copy of it in its place,
         /// and a changed master never reaches the folder.
@@ -2880,18 +3124,36 @@ namespace Thornswood
             foreach (string rel in drop) byRel.Remove(rel);
         }
 
-        static void Pin(Dictionary<string, Found> byRel, List<string> pinned, HashSet<string> keep)
+        /// <summary>
+        /// 1.6.1170's own files, <paramref name="pinned"/> (the Downgrade's
+        /// download, or a folder that holds them, SkyrimFrom), over the game's
+        /// files in <paramref name="byRel"/>. Each is copied (Found.Pinned):
+        /// the download is removed once the folder is made, and another
+        /// folder's file must never be this one's too (#2603). A path in
+        /// <paramref name="keep"/> is the collection's and is left to it.
+        /// </summary>
+        static void Pin(Dictionary<string, Found> byRel, List<Found> pinned, HashSet<string> keep)
         {
-            foreach (string dir in pinned)
+            foreach (Found f in pinned)
             {
-                foreach (Found f in Walk(dir))
-                {
-                    if (f.Rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (keep != null && keep.Contains(f.Rel)) continue;
-                    f.Pinned = true;
-                    byRel[f.Rel] = f;
-                }
+                if (keep != null && keep.Contains(f.Rel)) continue;
+                f.Pinned = true;
+                byRel[f.Rel] = f;
             }
+        }
+
+        /// <summary>
+        /// Every file in the folders the Downgrade downloaded into, but its
+        /// own markers (.thornswood...), or null when there are none.
+        /// </summary>
+        static List<Found> Downloads(List<string> dirs)
+        {
+            if (dirs == null) return null;
+            var l = new List<Found>();
+            foreach (string dir in dirs)
+                foreach (Found f in Walk(dir))
+                    if (!f.Rel.StartsWith(".thornswood", StringComparison.OrdinalIgnoreCase)) l.Add(f);
+            return l;
         }
 
         /// <summary>
@@ -3220,15 +3482,41 @@ namespace Thornswood
         /// </summary>
         static void WriteMade(string src, long copied, int kinds)
         {
-            WriteRecord(MadeFile, new string[] {
+            WriteMade(src, copied, kinds, RecordedText("skyrim"));
+        }
+
+        /// <summary>
+        /// made.txt, with skyrim= naming the folder the game's own files were
+        /// copied from when Make was given one (#2603). A refresh keeps the
+        /// line as it is, because a refresh never takes the game's own files
+        /// again; Make writes it or leaves it out.
+        /// </summary>
+        static void WriteMade(string src, long copied, int kinds, string skyrimFrom)
+        {
+            var lines = new List<string> {
                 "source=" + src,
                 "game=" + GameFor(src),
-                "deployment=" + DeploymentStamp(src),
-                "rules=" + Rules,
-                "kinds=" + kinds,
-                "copied=" + copied,
-                "at=" + DateTime.Now.ToString("o")
-            });
+            };
+            if (!string.IsNullOrEmpty(skyrimFrom)) lines.Add("skyrim=" + skyrimFrom);
+            lines.Add("deployment=" + DeploymentStamp(src));
+            lines.Add("rules=" + Rules);
+            lines.Add("kinds=" + kinds);
+            lines.Add("copied=" + copied);
+            lines.Add("at=" + DateTime.Now.ToString("o"));
+            WriteRecord(MadeFile, lines);
+        }
+
+        /// <summary>A text value from made.txt, such as source, or "".</summary>
+        static string RecordedText(string key)
+        {
+            try
+            {
+                if (!File.Exists(MadeFile)) return "";
+                foreach (string line in File.ReadAllLines(MadeFile))
+                    if (line.StartsWith(key + "=", StringComparison.Ordinal)) return line.Substring(key.Length + 1).Trim();
+            }
+            catch (Exception ex) { Swallow.Note("OwnGame.RecordedText, reading made.txt", ex); }
+            return "";
         }
 
         static long Recorded(string key)
@@ -3325,6 +3613,9 @@ namespace Thornswood
             // or not: a refresh leaves it as built. Read without a catch: one
             // missed would be put back to Vortex's without a word.
             foreach (string rel in GeneratedFiles()) set.Add(rel);
+            // What the launcher makes from the game before every Play (#2827),
+            // which no pack names any more.
+            foreach (string rel in MadeInGame) set.Add(rel);
             return set;
         }
 

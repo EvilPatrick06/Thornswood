@@ -117,6 +117,11 @@ Yes 'the number becomes THORNSWOOD_VOICE_MOST, as a whole number' ($src.Contains
 
 $remote = [regex]::Match($src, '(?s)\$remote = @"\r?\n(.*?)\r?\n"@')
 Yes 'the install here-string is there' $remote.Success
+# The here-string calls Get-ThornswoodServiceAccountScript (#2578) to paste
+# ServiceAccount.ps1's functions in. Only the task line is read here, so it
+# stands in as nothing. Without it the expansion threw before any check after
+# it ran (found while checking the voice line for #2166).
+function Get-ThornswoodServiceAccountScript { return '' }
 function StartLine([string]$most) {
     $Root = 'C:\Thornswood-Voice'; $Port = 7778; $TaskName = 'Thornswood Voice'; $Site = 'https://thornswood.net'
     $Bind = '127.0.0.1'; $ChatRange = 'on'; $expectBuild = 'most-1'; $turnSet = ''
@@ -133,7 +138,7 @@ if ($remote.Success) {
     Yes 'before node starts, so the service is there to read it' ($at -ge 0 -and $node -gt $at)
     $without = StartLine ''
     Yes 'with none, nothing is added and the line is the one before this' (-not $without.Contains('THORNSWOOD_VOICE_MOST') -and
-        $without.Contains('set THORNSWOOD_CHAT_RANGE=on&& "'))
+        $without.Contains('set THORNSWOOD_CHAT_RANGE=on&&  start "" /b /wait /high "'))
     Yes 'no setting on that line is handed nothing' (-not ([regex]::IsMatch($with, 'set\s+[A-Z_]+=(?=&&|")')))
 }
 Yes 'the name the install sets is the name the service reads' ($svc.Contains('process.env.THORNSWOOD_VOICE_MOST'))

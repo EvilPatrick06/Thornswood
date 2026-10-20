@@ -53,6 +53,8 @@ try {
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'vps')) -Destination (Join-Path $scratch 'scripts\vps') -Recurse
     Copy-Item -LiteralPath $SetupDomain -Destination (Join-Path $deploy 'Setup-Domain.ps1')
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'Caddyfile')) -Destination (Join-Path $deploy 'Caddyfile')
+    # Setup-Domain.ps1 dot-sources the service account functions (#2578).
+    Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'ServiceAccount.ps1')) -Destination (Join-Path $deploy 'ServiceAccount.ps1')
 
     # The box, as far as the script can tell: ssh runs what it is given and
     # says it went well, scp takes the file. A script sent as a file is read
@@ -92,4 +94,12 @@ finally {
     Remove-Variable -Name TsDomainCalls -Scope Global -ErrorAction SilentlyContinue
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }
+
+# A full run compares where the name points with the box's address, so the
+# address is read from vps.json before that check. On 19 Oct it was read after,
+# and a full run without -Vps stopped on "resolves to <the box> and not .".
+$text = [IO.File]::ReadAllText($SetupDomain)
+$loads = $text.IndexOf('if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }')
+$dns = $text.IndexOf('Write-Host "Checking where $Domain points..."')
+Yes 'the box''s address is read from vps.json before the DNS check that compares with it' ($loads -ge 0 -and $dns -ge 0 -and $loads -lt $dns)
 Done

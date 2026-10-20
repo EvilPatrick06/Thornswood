@@ -93,7 +93,7 @@
                     'thornswood-skills.js', 'thornswood-party.js',
                     'thornswood-journal.js', 'thornswood-board.js', 'thornswood-trade.js', 'thornswood-merchant.js',
                     'thornswood-repair.js', 'thornswood-treat.js', 'thornswood-maneuvers.js', 'thornswood-ride.js',
-                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js'];
+                    'thornswood-help.js', 'thornswood-afk.js', 'thornswood-box.js', 'thornswood-ship.js', 'thornswood-furniture.js'];
   const LOG_FILE = 'Data/Platform/thornswood-front.log';
   const INI = 'Data/SKSE/Plugins/Thornswood.ini';
   const CLIENT_SETTINGS = 'Data/Platform/Plugins/skymp5-client-settings.txt';
@@ -381,6 +381,15 @@
   */
   const APPRENTICE_KEY = SKILLS_KEY;
   /*
+    "Dye their hair" on the look prompt (#2675). K again, for the same
+    reason: it opens the K panel, on its Hair dye page with the person under
+    the crosshair and an Offer to dye on each dye you carry. Only while the
+    server's near list says you carry one (hd). A Master's Take on wins the
+    key when both apply; Dye hair under Near you on P is there either way.
+    See hairDyePress.
+  */
+  const HAIR_DYE_KEY = SKILLS_KEY;
+  /*
     "Tend their wounds" on the look prompt (#1383). THE LOCK KEY, X, and not
     a new one: every letter is already Skyrim's or ours. The two never meet:
     the lock key answers only with a door, a crop or a forge under the
@@ -444,6 +453,7 @@
   const MOLD_NAME = keyName(MOLD_KEY);
   const SLEEP_NAME = keyName(SLEEP_KEY);
   const APPRENTICE_NAME = keyName(APPRENTICE_KEY);
+  const HAIR_DYE_NAME = keyName(HAIR_DYE_KEY);
   const LOCK_NAME = keyName(LOCK_KEY);
   const MANEUVER_NAME = keyName(MANEUVER_KEY);
   const HELP_NAME = keyName(HELP_KEY);
@@ -1191,7 +1201,7 @@
   */
   function lineHand(id) {
     const from = lineId;
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/line hand ' + id) + ',{quiet:true});}catch(e){}');
     log('menu: profile', from, 'hands its place in line to profile', id);
     lineStart(id, null);
   }
@@ -1256,15 +1266,15 @@
     if (passOk && (early || pass !== linePassSent || now - linePassAt >= LINE_PASS_EVERY_MS)) {
       linePassSent = pass;
       linePassAt = now;
-      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',true);}catch(e){}');
+      T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' + JSON.stringify('/joinpass ' + pass) + ',{quiet:true});}catch(e){}');
     }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line",{quiet:true});}catch(e){}');
   }
 
   /* Close the game from the page: give the place up now, before the connection closes. */
   function lineLeave() {
     if (!lineId) { return; }
-    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",true);}catch(e){}');
+    T.js('try{window.thornswoodNet&&window.thornswoodNet.say("/line leave",{quiet:true});}catch(e){}');
     log('menu: profile', lineId, 'gave up their place in line');
     lineId = 0;
   }
@@ -2098,7 +2108,7 @@
     board: 'thornswoodBoard', repair: 'thornswoodRepair', treat: 'thornswoodTreat',
     trade: 'thornswoodTrade', merchant: 'thornswoodMerchant', select: 'thornswoodSelect', wheel: 'thornswoodEmotes',
     afk: 'thornswoodAfk', maneuvers: 'thornswoodManeuvers', ride: 'thornswoodRide',
-    help: 'thornswoodHelp', box: 'thornswoodBox'
+    help: 'thornswoodHelp', box: 'thornswoodBox', ship: 'thornswoodShip'
   };
 
   T.claimFocus = function (who, on) {
@@ -2118,54 +2128,16 @@
   T.hasFocus = function (who) { return !!claims[who]; };
 
   /*
-    A PANEL THAT HOLDS THE KEYBOARD HAS A CURSOR. Issue 958.
-
-    Patrick on dev, 28 September: "Journal doesn't make your cursor appear so
-    I have to click F6 to make it appear to do anything". His log has the J
-    block's one repair firing, "the game's journal took the cursor with it,
-    raised it again for ours", and still no cursor after it: something in the
-    game's closing of its book took the cursor down again later, and one
-    try inside two seconds of the shut did not cover it. F6 did, because
-    skymp5-client's F6 lowers focus and applyFocus raises it again, and the
-    raise is what opens the Cursor Menu (BrowserApiTilted.cpp in the fork).
-
-    The cursor the page shows is drawn by the browser only while the game's
-    Cursor Menu is open (main.cpp in the fork parks it off screen otherwise),
-    so focus up for a claim with that menu down is a panel nobody can click.
-    This does what F6 did, whenever that is the state: lowered and raised
-    once, a quarter of a second apart at most, and no more than CURSOR_TRIES
-    times for one claim, so a game that keeps taking it cannot make this
-    flicker for ever. Not while one of the game's own menus is up, because
-    that menu is on its way out and its closing is what takes the cursor.
+    A PANEL THAT HOLDS THE KEYBOARD HAS A CURSOR (#958) is the fork's job,
+    not this file's (#2384). browser.setFocused only queues the Cursor
+    Menu's show, so a check on the next frame always found it down, and the
+    lower and raise that used to answer it fired on every claim and queued
+    a hide on top of the show still on its way. BrowserApiTilted.cpp now
+    keeps the show it asked for until the game opens the menu, and shows it
+    again from the Cursor Menu's own close event when something else (the
+    console closing, a game menu that used the cursor) takes it down while
+    focus is up. Nothing here lowers and raises focus to bring it back.
   */
-  const CURSOR_MENU = 'Cursor Menu';
-  const CURSOR_AGAIN_MS = 250;
-  const CURSOR_TRIES = 4;
-  let cursorTries = 0;
-  let cursorTriedAt = 0;
-
-  function keepCursor() {
-    if (!anyClaim()) { cursorTries = 0; return; }
-    let up = false, shown = true;
-    try {
-      up = !!sp.browser.isFocused();
-      shown = !!sp.Ui.isMenuOpen(CURSOR_MENU);
-    } catch (e) { return; }
-    if (!up || shown) { return; }
-    if (cursorTries >= CURSOR_TRIES) { return; }
-    const now = Date.now();
-    if (now - cursorTriedAt < CURSOR_AGAIN_MS) { return; }
-    if (busyMenuOpen()) { return; }
-    cursorTries++;
-    cursorTriedAt = now;
-    try {
-      sp.browser.setFocused(false);
-      sp.browser.setFocused(true);
-    } catch (e) { return; }
-    const who = Object.keys(claims).filter(function (k) { return claims[k]; }).join(', ');
-    say('the keyboard is with ' + who + ' and the cursor was down, raised it again (' +
-        cursorTries + ' of ' + CURSOR_TRIES + ')');
-  }
 
   // ---------------------------------------------------------------- typing --
   // Asked for, not taken.
@@ -2747,6 +2719,9 @@
 
     Containers and doors only. An unlocked display case is still Skyrim's.
   */
+  // When each property door last told the server it opened (#2680), so one
+  // pick is one line.
+  const pickSaid = {};
   sp.on('lockChanged', guard('lockchanged', (e) => {
     const ref = e ? e.lockedObject : null;
     if (!ref) { return; }
@@ -2770,6 +2745,24 @@
       say('lock opened on ' + id.toString(16) + ', handed it back to the server');
     } catch (err) {
       say('could not hand ' + id.toString(16) + ' back to the server: ' + err);
+    }
+
+    /*
+      A PROPERTY DOOR THAT OPENED HERE IS A PICK (#2680), and the server is
+      told, so its holder can be sent word. The lock script publishes the
+      doors the server shut to this person and takes a door off that list
+      before it opens one itself, so a door still on it that is open now was
+      opened by Skyrim's lockpicking. The server checks it all again.
+    */
+    if (type === 29 && id) {
+      let shutHere = null;
+      try { shutHere = globalThis.__thornswoodPropertyShut; } catch (err) { shutHere = null; }
+      const now = Date.now();
+      if (shutHere && shutHere[id] && !(pickSaid[id] && now - pickSaid[id] < 10000)) {
+        pickSaid[id] = now;
+        say('property door ' + id.toString(16) + ' opened on its lock, telling the server');
+        tellServer('/tspicked ' + id.toString(16));
+      }
     }
   }));
 
@@ -2797,11 +2790,11 @@
   const toServer = [];
 
   /*
-    The true after the line marks it as the plugin's own, so the chat page
-    queues it without saying "Not connected yet" over it. Patrick, 24
-    September, over a tester in the creation hall who had typed nothing: "it
-    says mulitple trimes he wasnt connected yet". A page from before the
-    marker ignores it and says what it always said.
+    say marks every line as pressed rather than typed (#2251, #2732), and
+    quiet asks the chat page to queue it without saying "Not connected yet"
+    over it. Patrick, 24 September, over a tester in the creation hall who
+    had typed nothing: "it says mulitple trimes he wasnt connected yet". The
+    two are separate answers in thornswood-chat.js (TWO ANSWERS, over send).
   */
   function tellServer(line) {
     if (line) { toServer.push(line); }
@@ -2809,7 +2802,7 @@
     if (!T.ready) { return; }
     while (toServer.length) {
       const sent = T.js('try{window.thornswoodNet&&window.thornswoodNet.say(' +
-                        JSON.stringify(toServer[0]) + ',true);}catch(e){}');
+                        JSON.stringify(toServer[0]) + ',{quiet:true});}catch(e){}');
       if (!sent) { return; }
       toServer.shift();
     }
@@ -2828,7 +2821,7 @@
   */
   let restSent = false;
   /* #843: chairs/benches leave controls off with no menu. The controls
-     watchdog, stuck rescue and ownTheCharacter all refuse to fight that
+     watchdog and the stuck rescue both refuse to fight that
      state when notOurs() says so. getFurnitureReference alone can flicker
      null while still seated, so furnitureEnter/Exit keep a seated flag too. */
   let seatedInFurniture = false;
@@ -4187,14 +4180,29 @@
   // is about 128 units tall, so this is roughly waist deep.
   const WADE_DEEP = 70;
   /*
-    #608 temple / shallow: getPositionZ is the actor root, not a true feet
-    probe. A real cell water plane can sit a few units under that root while
-    the person is clearly standing in the pool, so deep reads slightly
-    negative and wading never fires (heartbeat then says indoors). Slack
-    covers that near-miss only. A no-water cell still answers a huge
-    negative level, far below -FEET_SLACK, so it stays dry.
+    PLACED WATER, READ OUT OF THE RECORDS (#2302).
+
+    There used to be a feet slack of 24 here (#608): wading counted with the
+    cell's water plane up to 24 units BELOW the actor's position, on the
+    guess that getPositionZ is "the actor root, not a true feet probe". It
+    was never measured, and the records say it could not have worked. A
+    reference's position is its base, so an actor's is its feet. The Temple
+    of Kynareth (CELL 165a7 in Skyrim.esm) has XCLW 0, so getWaterLevel
+    answers 0 there, while its pool is a placed activator,
+    Water1024ClearAnkleStill (an ACTI with a WNAM), at z 48, and nothing in
+    that room stands lower than z 32. 0 minus 32 or more is never above -24.
+    The cell plane and the pool are different objects, and getWaterLevel only
+    knows the plane.
+
+    So the place tick reads both: the cell plane, which counts only when it
+    is above the feet, and every placed water in the cell, which the cell walk
+    keeps with the fires (activator 24 is one of its four types). Each row is
+    [plugin, local id, x1, y1, x2, y2]: an ACTI with a WNAM and its OBND
+    footprint. scripts\dev\Build-WaterTable.js writes the line below from the
+    load order; do not edit it by hand. The footprint is taken unrotated and
+    unscaled, which is exact for the square WaterNNN planes Bethesda places.
   */
-  const FEET_SLACK = 24;
+  const PLACED_WATERS = [["Skyrim.esm",1074089,-512,-512,512,512],["Skyrim.esm",1075745,-512,-512,512,512],["Skyrim.esm",1075749,-512,-512,512,512],["Skyrim.esm",1076822,-1024,-1024,1024,1024],["Skyrim.esm",1081285,-512,-512,512,512],["Skyrim.esm",1084157,-1024,-1024,1024,1024],["Skyrim.esm",1084161,-512,-1024,512,1024],["Skyrim.esm",1092911,-512,-512,512,512],["Skyrim.esm",1100481,-512,-512,512,512],["Skyrim.esm",1100484,-512,-512,512,512],["Skyrim.esm",1100487,-512,-512,512,512],["Skyrim.esm",1100489,-512,-512,512,512],["Skyrim.esm",1100491,-512,-512,512,512],["Skyrim.esm",1100493,-512,-512,512,512],["Skyrim.esm",1105428,-256,-764,238,582],["Skyrim.esm",1105429,-256,-764,238,582],["Skyrim.esm",1108346,-2524,-2009,781,1292],["Skyrim.esm",1108347,-2499,-2833,845,511],["Skyrim.esm",1108349,-730,-1068,737,399],["Dawnguard.esm",72882,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1199413,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220156,-512,-512,512,512],["Water for ENB (Shades of Skyrim).esp",1220159,-512,-512,512,512],["Dawnguard.esm",84869,-512,-512,512,512],["Skyrim.esm",87080,-512,-512,512,512],["Skyrim.esm",90254,-461,-1246,401,1163],["Skyrim.esm",95913,-461,-1246,401,1163],["Skyrim.esm",95915,-1057,-360,771,1348],["Skyrim.esm",95918,-1057,-360,771,1348],["Dragonborn.esm",104986,-512,-512,512,512],["Dawnguard.esm",105623,-512,-512,512,512],["Dawnguard.esm",106658,-512,-512,512,512],["Dawnguard.esm",7191,-512,-512,512,512],["Dragonborn.esm",121793,-512,-512,512,512],["Dragonborn.esm",126667,-512,-512,512,512],["Dragonborn.esm",155877,-2048,-2048,2048,2048],["SkyrimSewers.esp",161631,-512,-1024,512,1024],["Dawnguard.esm",10545,-512,-512,512,512],["Dragonborn.esm",175592,-455,-455,455,455],["Dragonborn.esm",175594,-394,-394,394,394],["Dragonborn.esm",179924,-512,-512,512,512],["Dragonborn.esm",210968,-512,-1024,512,1024],["Dragonborn.esm",226073,-512,-512,512,512],["Skyrim.esm",230449,-1116,-176,575,1471],["Dragonborn.esm",236396,-154,-152,148,199],["Skyrim.esm",240771,-512,-512,512,512],["Dragonborn.esm",250615,-197,-218,197,176],["Skyrim.esm",269133,-631,-1675,564,364],["Dawnguard.esm",17078,-121,-117,117,118],["Dawnguard.esm",17086,-120,-120,119,120],["Skyrim.esm",333178,-63,-24,63,23],["Dawnguard.esm",20882,-512,-512,512,512],["Skyrim.esm",337728,-896,-928,928,896],["Dawnguard.esm",24847,-512,-512,512,512],["Skyrim.esm",404064,-512,-512,512,512],["Dawnguard.esm",27540,-512,-1024,512,1024],["Skyrim.esm",463813,-512,-512,512,512],["Skyrim.esm",478953,-512,-512,512,512],["Skyrim.esm",501175,-3253,-1149,0,605],["Skyrim.esm",501208,-1787,-1149,1466,605],["Skyrim.esm",501237,-1116,-176,575,1471],["Skyrim.esm",517671,-512,-512,512,512],["Water for ENB.esm",2048,-1057,-360,771,1348],["Water for ENB.esm",2049,-1057,-360,771,1348],["Water for ENB.esm",2050,-1057,-360,771,1348],["Water for ENB.esm",2051,-1057,-360,771,1348],["Water for ENB.esm",2052,-1057,-360,771,1348],["Water for ENB.esm",2053,-512,-512,512,512],["Water for ENB.esm",2054,-886,-1845,810,2163],["Water for ENB.esm",2055,-344,-1177,335,116],["Water for ENB.esm",2056,-344,-1177,335,116],["Water for ENB.esm",2057,-107,-1054,134,1],["Water for ENB.esm",2058,-344,-1177,335,135],["Water for ENB.esm",2059,-344,-1177,335,116],["Water for ENB.esm",2061,-170,-225,188,230],["Water for ENB.esm",2062,-119,-179,134,168],["Water for ENB.esm",2063,-141,-189,141,199],["Water for ENB.esm",2064,-512,-512,512,512],["Water for ENB.esm",2066,-512,-512,512,512],["Water for ENB.esm",2096,-767,-26,1481,1247],["Water for ENB.esm",2098,-512,-512,512,512],["Skyrim.esm",543981,-2521,-2042,3041,808],["Skyrim.esm",548809,-1125,-1173,1173,1125],["Skyrim.esm",548812,-724,-724,724,724],["Skyrim.esm",548866,-76,-721,154,552],["Skyrim.esm",548870,-154,-721,87,560],["Skyrim.esm",593202,-450,-274,450,274],["Skyrim.esm",598311,-120,-120,119,120],["Skyrim.esm",619134,-154,-152,148,199],["Skyrim.esm",773926,-2048,-2048,2048,2048],["Skyrim.esm",793924,-512,-512,512,512],["Skyrim.esm",837555,-512,-512,512,512],["Skyrim.esm",837557,-1024,-1024,1024,1024],["Skyrim.esm",837558,-512,-1024,512,1024],["Skyrim.esm",837560,-512,-512,512,512],["Skyrim.esm",837561,-1024,-1024,1024,1024],["Skyrim.esm",837562,-512,-1024,512,1024],["Dawnguard.esm",52593,-512,-1024,512,1024],["Skyrim.esm",858612,-512,-512,512,512],["Skyrim.esm",934358,-512,-512,512,512],["Skyrim.esm",946557,-512,-512,512,512],["Skyrim.esm",1000818,-512,-512,512,512],["Skyrim.esm",1036492,-256,-256,255,256],["Skyrim.esm",1036493,-256,-256,255,256],["Skyrim.esm",1036503,-176,-166,171,215],["Skyrim.esm",1036508,-154,-152,148,199],["Skyrim.esm",1040529,-154,-152,148,199]];
   // FireFXShader, 0001b212 in Skyrim.esm, read out of the EFSH records. This
   // is the engine's own "this thing is burning", the one fire damage uses.
   const FIRE_SHADER = 0x1b212;
@@ -4251,6 +4259,14 @@
     out here, so the numbers go in the line.
   */
   let waterSaid = '';
+  /*
+    The placed waters of PLACED_WATERS, by runtime id: id -> [x1, y1, x2, y2].
+    Resolved once, the way the fire bases are, by the walk's own slice.
+    waterHere is the walk's list of them in this cell, [x, y, z, id] each.
+  */
+  let waterBox = null;
+  let waterHere = null;
+  let walkWant = null;      // fires and placed waters together, for the walk
   let fireCell = -1;      // the cell the list below was made for
   let fireHere = null;    // where the fires in it are
   let placeBeat = 0;      // when the heartbeat last wrote
@@ -4292,15 +4308,63 @@
   /*
     Resolved a slice at a time as well (#976): sixty odd lookups in one frame
     is its own hitch. fireIdAt is how far through FIRE_BASES the resolving
-    has got and fireIdOut what it has found so far. A pass that finds nothing
-    at all is the world not being up yet, and it is not tried again for
-    FIRE_IDS_RETRY, so a world that never answers costs a slice every few
-    seconds rather than one every frame.
+    has got and fireIdOut what it has found so far.
+
+    ONE PASS, AND ITS ANSWER STANDS (#2590, 16 Oct). Only the walk resolves,
+    and the walk starts only once somebody stands in a cell. Skyrim reads
+    every plugin's records before its main menu, so by then each base either
+    exists or never will this session: there is nothing for a second pass to
+    wait for. The pass that found nothing used to be asked again every
+    FIRE_IDS_RETRY (4 s), in case "the world" was "not up yet"; nothing was
+    ever measured behind that, and both sessions in the front logs on One
+    (5 and 15 Oct) resolved 67 of 67 on the first pass. A pass that finds
+    none now says so once, with the first error, and the probe stands down
+    for the session rather than asking again.
   */
   let fireIdAt = 0;
   let fireIdOut = [];
-  let fireIdFailedAt = 0;
-  const FIRE_IDS_RETRY = 4000;
+
+  /**
+   * Resolves PLACED_WATERS into waterBox, all at once: the table is a handful
+   * of rows, and a row that does not resolve is a plugin not in this load
+   * order, which is no water to find.
+   */
+  function resolveWaterIds() {
+    waterBox = {};
+    for (let i = 0; i < PLACED_WATERS.length; i++) {
+      const row = PLACED_WATERS[i];
+      try {
+        const raw = (row[0] === 'Skyrim.esm')
+          ? sp.Game.getFormEx(row[1])
+          : sp.Game.getFormFromFile(row[1], row[0]);
+        const base = sp.Form.from(raw);
+        const id = base ? base.getFormID() : 0;
+        if (id) { waterBox[id] = [row[2], row[3], row[4], row[5]]; }
+      } catch (e) { }
+    }
+    return waterBox;
+  }
+
+  /**
+   * The placed water somebody at (px, py, pz) is wading in, as
+   * { id, top, deep }, or null. Wading is inside the water's footprint with
+   * its surface above the feet and under WADE_DEEP over them.
+   */
+  function placedWaterAt(px, py, pz, waters, deepest) {
+    let best = null;
+    for (let i = 0; i < waters.length; i++) {
+      const w = waters[i];
+      const box = waterBox && waterBox[w[3]];
+      if (!box) { continue; }
+      if (px < w[0] + box[0] || px > w[0] + box[2] ||
+          py < w[1] + box[1] || py > w[1] + box[3]) { continue; }
+      const deep = w[2] - pz;
+      if (deep > 0 && deep < deepest && (!best || deep < best.deep)) {
+        best = { id: w[3], top: w[2], deep: deep };
+      }
+    }
+    return best;
+  }
 
   /** The runtime ids of FIRE_BASES, or [] until the walk has resolved them. */
   function fireIdList() {
@@ -4314,7 +4378,6 @@
    */
   function resolveFireIds(from) {
     if (fireIds) { return fireIds; }
-    if (fireIdAt === 0 && fireIdFailedAt && Date.now() - fireIdFailedAt < FIRE_IDS_RETRY) { return []; }
     let did = 0;
     while (fireIdAt < FIRE_BASES.length) {
       if (did > 0 && sliceNow() - from >= FIRE_SLICE_MS) { return []; }
@@ -4340,14 +4403,13 @@
     const out = fireIdOut;
     fireIdAt = 0;
     fireIdOut = [];
-    // Nothing at all means the world is not up yet, so it is worth asking
-    // again rather than remembering an empty answer for the session.
-    if (!out.length) { fireIdFailedAt = Date.now(); return []; }
     fireIds = out;
     fireWant = {};
     for (let i = 0; i < out.length; i++) { fireWant[out[i]] = true; }
     log('fires: ' + out.length + ' of ' + FIRE_BASES.length +
-        ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)');
+        ' bases resolved, across ' + FIRE_FILES.length + ' plugin(s)' +
+        (out.length ? '' : ', so no fire warms or burns anybody this session' +
+          (fireWhy ? '; the first one threw: ' + fireWhy : '')));
     return fireIds;
   }
 
@@ -4377,23 +4439,39 @@
     deal.
   */
   /*
-    HOW LONG AN EMPTY WALK IS BELIEVED.
+    WHEN A WALK IS BELIEVED: ONCE THE CELL HAS SAID IT IS IN (#2590).
 
-    fireHere = [] is truthy in JavaScript. The first version cached an empty
-    list the same way it cached a full one, so the first probe after a cell
-    change that found nothing (bases not resolved yet, cell not fully loaded,
-    or a forge room whose FX had not appeared) was the answer for the rest of
-    the stay. Patrick, #608: chilly standing in a burning forge, no warmth
-    next to one. A non-empty list is still kept for the cell; an empty one is
-    retried until something shows up or FIRE_EMPTY_RETRY has not yet run out
-    since the last empty walk with bases already resolved.
+    A cell is walked when somebody first stands in it. If it has not finished
+    loading by then, the walk can miss what is still coming in, so when the
+    engine says the cell underfoot is fully loaded (cellFullyLoaded, the event
+    behind Papyrus's OnCellLoad, "every object in this cell is loaded and
+    ready") it is walked again, and that walk's list is kept for the stay,
+    empty or not. A cell that had finished loading before anybody stood in it
+    (an exterior cell loads with the grid around you, ahead of you) sends
+    nothing more, and its first walk is the one kept.
+
+    This replaces a retry on a clock. #608 (27 Sep) kept a full list for the
+    cell and walked an empty one again every FIRE_EMPTY_RETRY (8 s) for as
+    long as it stayed empty, against "bases not resolved yet, cell not fully
+    loaded, or a forge room whose FX had not appeared", none of it measured.
+    What the front logs on One show (5 and 15 Oct): the first walk of the
+    race menu room looked at 49 things and the ones 11 s later at 58, so a
+    walk does run before a cell is in; and every walk of a cell already
+    walked found as many fires as the first one had (five walks of one room
+    found 0 each time, two of an exterior cell 0, and others 4 and 4, 11 and
+    11, 6 and 6). The retry only ever walked empty rooms again, and a full
+    list from a walk run too soon was never redone at all.
   */
-  const FIRE_EMPTY_RETRY = 8000;
-  let fireEmptyAt = 0;
   // The walk under way, { cell, t, i, n, walked, out }, or null. See
   // walkCellSlice. The 'fire walk' handler below the place tick carries it on
-  // a slice a frame; the place tick reads whatever list is finished.
+  // a slice a frame; the place tick reads whatever list is finished. While a
+  // cell is walked again, the list from its first walk stands until the new
+  // one is done.
   let fireWalk = null;
+
+  function newFireWalk(cellId) {
+    return { cell: cellId, t: 0, i: 0, n: -1, walked: 0, out: [] };
+  }
 
   function fireSpotsHere(pc) {
     let cellId = 0;
@@ -4402,23 +4480,14 @@
       cell = pc.getParentCell();
       cellId = cell ? cell.getFormID() : 0;
     } catch (e) { cellId = 0; }
-    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; fireEmptyAt = 0; fireWalk = null; }
-    // A non-empty list is good for the cell. An empty one is not final.
-    if (fireHere && fireHere.length) { return fireHere; }
-    if (fireHere && fireHere.length === 0) {
-      const ready = fireIdList().length > 0;
-      if (ready && (Date.now() - fireEmptyAt) < FIRE_EMPTY_RETRY) {
-        return fireHere;
-      }
-      fireHere = null;
-    }
+    if (cellId !== fireCell) { fireCell = cellId; fireHere = null; waterHere = null; fireWalk = null; }
     if (!cell) { return []; }
 
-    // Start a walk, or carry the one under way on by a slice, and answer
-    // with what is known now: nothing until the walk is done, which is a
-    // few frames in a busy cell.
-    if (!fireWalk) { fireWalk = { cell: cellId, t: 0, i: 0, n: -1, walked: 0, out: [] }; }
-    fireWalkStep(cell);
+    // Start the cell's walk, or carry the one under way on by a slice, and
+    // answer with what is known now: nothing until the first walk is done,
+    // which is a few frames in a busy cell.
+    if (!fireHere && !fireWalk) { fireWalk = newFireWalk(cellId); }
+    if (fireWalk) { fireWalkStep(cell); }
     return fireHere || [];
   }
 
@@ -4433,8 +4502,18 @@
       resolveFireIds(began);
       if (!fireIds) { return; }
     }
+    if (!waterBox) { resolveWaterIds(); }
     fireBases = fireIds.length;
-    const done = walkCellSlice(cell, w, fireWant, function (e) {
+    // No base resolved: there is nothing to look for in any cell.
+    if (!fireIds.length && !Object.keys(waterBox).length) {
+      fireWalk = null; fireHere = []; waterHere = []; fireHits = 0; return;
+    }
+    if (!walkWant) {
+      walkWant = {};
+      for (const k in fireWant) { walkWant[k] = true; }
+      for (const k in waterBox) { walkWant[k] = true; }
+    }
+    const done = walkCellSlice(cell, w, walkWant, function (e) {
       fireThrew++;
       if (!fireWhy) { fireWhy = String((e && e.message) || e); }
     }, began);
@@ -4442,14 +4521,15 @@
     if (!done) { return; }
 
     fireWalk = null;
-    fireHere = w.out;
-    fireHits = w.out.length;
-    if (!w.out.length) { fireEmptyAt = Date.now(); }
+    fireHere = w.out.filter(function (p) { return !!fireWant[p[3]]; });
+    waterHere = w.out.filter(function (p) { return !!waterBox[p[3]]; });
+    fireHits = fireHere.length;
     // fireWalked, not walked: naming the walk's own counter here threw on
     // every cell change from #184 on, 80 times in the dev log of 23
     // September, and the place report for that tick never went.
-    log('fires: ' + w.out.length + ' of ours in this cell, out of ' + fireWalked +
-        ' thing(s) looked at');
+    log('fires: ' + fireHere.length + ' of ours in this cell, out of ' + fireWalked +
+        ' thing(s) looked at' +
+        (waterHere.length ? ', and ' + waterHere.length + ' placed water(s)' : ''));
   }
 
   /**
@@ -4467,6 +4547,24 @@
       if (!cell || cell.getFormID() !== fireWalk.cell) { fireWalk = null; return; }
     } catch (e) { fireWalk = null; return; }
     fireWalkStep(cell);
+  }
+
+  /**
+   * The 'fire cell loaded' handler, on cellFullyLoaded. Only the cell
+   * somebody is standing in, and only once it has been walked or is being
+   * walked: a cell that finishes loading before anybody stands in it is
+   * walked whole when they do. The line says what the walk before it had
+   * seen, so the log shows what loading late cost.
+   */
+  function fireCellLoaded(event) {
+    let id = 0;
+    try { id = (event && event.cell) ? event.cell.getFormID() : 0; } catch (e) { id = 0; }
+    if (!id || id !== fireCell) { return; }
+    log('fires: cell ' + id.toString(16) + ' finished loading after it was walked (' +
+        (fireHere ? fireHere.length + ' of ours, out of ' + fireWalked + ' thing(s) looked at'
+                  : 'that walk was not done, at ' + fireWalked + ' thing(s)') +
+        '), so it is walked again');
+    fireWalk = newFireWalk(id);
   }
 
   // Runtime ids of the 'craft' rows: warmth only, never the catch (#2259).
@@ -4566,6 +4664,8 @@
 
   // The fire probe's cell walk, a slice a frame (#976). See walkCellSlice.
   sp.on('update', guard('fire walk', fireWalkTick));
+  // The cell underfoot finished loading after its walk: walk it again (#2590).
+  sp.on('cellFullyLoaded', guard('fire cell loaded', fireCellLoaded));
 
   sp.on('update', guard('place', () => {
     const now = Date.now();
@@ -4598,28 +4698,32 @@
           isSwimming only answers once somebody's feet have left the bottom.
           Standing knee deep in a river in the Pale reads as dry land to it,
           which is the wrong answer in the one situation people are actually
-          in most of the time. The cell's water level against where they are
-          standing is the rest of it: near or above their feet (see
-          FEET_SLACK) and below swimming is wading.
+          in most of the time. Water above their feet and below swimming is
+          wading, and there are two kinds of water (#2302): the cell's own
+          plane, and the placed waters the cell walk keeps (PLACED_WATERS).
+          pz is the actor's position, which is its feet.
 
           A cell with no water answers a level far below anywhere anybody
-          stands, so the subtraction comes out far more negative than
-          FEET_SLACK and this stays false without needing to ask whether
-          there is water at all.
+          stands, so the subtraction comes out negative and the plane stays
+          dry without needing to ask whether there is water at all.
         */
+        fireSpotsHere(pc);
+        const placed = placedWaterAt(px, py, pz, waterHere || [], WADE_DEEP);
         const level = cell.getWaterLevel();
+        let planeSaid = 'the cell has no readable water level';
         if (isFinite(level)) {
-          // pz is Actor.getPositionZ (root), not a true feet height (#608).
           const deep = level - pz;
-          wading = deep > -FEET_SLACK && deep < WADE_DEEP;
-          const slackBit = (wading && deep <= 0)
-            ? ', wading via feet slack'
-            : (wading ? ', wading' : ', dry');
-          waterSaid = 'water level ' + Math.round(level) + ', feet at ' +
-                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep' +
-                      slackBit;
+          wading = deep > 0 && deep < WADE_DEEP;
+          planeSaid = 'water level ' + Math.round(level) + ', feet at ' +
+                      Math.round(pz) + ', so ' + Math.round(deep) + ' deep';
+        }
+        if (placed) {
+          wading = true;
+          waterSaid = planeSaid + ', wading in placed water ' +
+                      placed.id.toString(16) + ', surface at ' +
+                      Math.round(placed.top) + ', ' + Math.round(placed.deep) + ' deep';
         } else {
-          waterSaid = 'the cell has no readable water level';
+          waterSaid = planeSaid + (wading ? ', wading' : (isFinite(level) ? ', dry' : ''));
         }
       }
     } catch (e) { }
@@ -4921,7 +5025,8 @@
   /** Draw or clear the little panel that names them and the three keys. */
   function drawPrompt(row) {
     const sig = row ? (row.n + '|' + row.f + '|' + row.m + '|' + row.y + '|' + (row.s || 0) + '|' + (row.c || '') +
-                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.t || 0)) : '';
+                       '|' + (row.d || 0) + '|' + (row.a ? JSON.stringify(row.a) : '') + '|' + (row.hd || 0) +
+                       '|' + (row.t || 0)) : '';
     if (sig === lookingSig) { return; }
     lookingSig = sig;
     if (!row) {
@@ -4966,6 +5071,9 @@
       // server's near list says so, with the halves (#1634). See
       // apprenticePress.
       (Array.isArray(row.a) && row.a.length ? keyRow(APPRENTICE_NAME, 'Take on as apprentice', false) : '') +
+      // Only while you carry a hair dye, and the key is not Take on's: the
+      // near list's hd (#2675). See hairDyePress.
+      (row.hd && !(Array.isArray(row.a) && row.a.length) ? keyRow(HAIR_DYE_NAME, 'Dye their hair', false) : '') +
       // Only while they have a wound somebody could tend: the near list's t
       // (#1383). See treatPress.
       (row.t ? keyRow(TREAT_NAME, 'Tend their wounds', false) : '');
@@ -5142,7 +5250,8 @@
     if (!lookingAt) { return false; }
     const line = '/' + cmd + ' ' + lookingAt;
     if (!T.ready) { note('The social connection is loading. Try again in a moment.'); return true; }
-    // These are deliberate actions; chat reports an offline queued request.
+    // These are deliberate actions: say marks the line as a key press, and
+    // with no quiet the chat says when it is queued offline (#2732).
     const sent = T.js('(function(){try{if(window.thornswoodNet&&window.thornswoodNet.say){' +
       'window.thornswoodNet.say(' + JSON.stringify(line) + ');return;}}catch(e){}' +
       'try{window.skyrimPlatform.sendMessage("thornswood-front","social:unavailable");}catch(e){}})();');
@@ -5208,6 +5317,28 @@
     T.js('try{if(window.thornswoodSkills&&window.thornswoodSkills.takeOn){' +
          'window.thornswoodSkills.takeOn(' + JSON.stringify(who) + ');}}catch(e){}');
     say('take on as apprentice: ' + lookingAt);
+    return true;
+  }
+
+  /*
+    Offer to dye the hair of the person under the crosshair (#2675). Only
+    while the prompt offers it: the server's near list saying you carry a
+    dye. Nothing is sent from here: the K panel opens on Hair dye with that
+    person, and its Offer to dye sends the line once the dye is chosen. The
+    server checks it all again. Answers whether it was used.
+  */
+  function hairDyePress() {
+    if (!lookingAt) { return false; }
+    if (claims.chat) { return false; }
+    if (T.hasFocus('skills')) { return false; }
+    if (busyMenuOpenNow()) { return false; }
+    const near = nearList();
+    const row = (near && Object.prototype.hasOwnProperty.call(near, lookingAt)) ? near[lookingAt] : null;
+    if (!row || !row.hd) { return false; }
+    const who = { id: lookingAt, name: String(row.n || '') };
+    T.js('try{if(window.thornswoodSkills&&window.thornswoodSkills.dyeFor){' +
+         'window.thornswoodSkills.dyeFor(' + JSON.stringify(who) + ');}}catch(e){}');
+    say('dye their hair: ' + lookingAt);
     return true;
   }
 
@@ -6026,6 +6157,221 @@
   }
 
   /*
+    ------------------------------------- furniture in a building you hold (#2679)
+
+    Setting a chair, a bed or a chest down, moving it and picking it up again,
+    with keys and a panel and nothing typed (Patrick, 4 October). The server
+    decides who may (the holder, or whoever carries the deed or the master
+    key) and writes what these lines need on thornswoodFurnitureLine: may,
+    the building's name, every piece of it you may touch as the server's id
+    in hex, and the piece in your hands with how long it stays there. This
+    file only draws the lines and sends what a key means; the furniture
+    block in game/gamemode.js checks everything again.
+
+    THREE LINES, never two at once:
+      in the inventory     the lock key, Arrange furniture: shuts the
+                           inventory and asks for the furniture panel
+                           (game/ui/thornswood-furniture.js), whose Place
+                           buttons set a piece down in front of you
+      a piece under the    the mold key, Move it; the lock key, Pick it up
+      crosshair
+      a piece in hand      the mold key, Set it down here; the lock key, Turn it
+
+    THE LOCK KEY IN THE INVENTORY, not the mold key: the repair line has U
+    there while a kit is carried, and X means nothing else in the inventory
+    (the treatment line is H). In the world a piece is no door, forge, crop
+    or person, so neither key means anything else on one; a piece in hand
+    takes both keys first, because that is what you are doing.
+
+    The server is asked for the line when you walk into another cell and
+    each time the inventory opens, so a building you just claimed shows the
+    line on the next open.
+  */
+  const FURNITURE_CSS = REPAIR_CSS.replace('bottom:12%', 'bottom:22%');
+  const PIECE_CSS = LOCK_CSS.replace('top:67%', 'top:72%');
+  const FURNITURE_ASK_MS = 1500;
+  let arrangeShown = false;
+  let pieceShown = '';
+  let furnitureCell = -1;
+  let furnitureAskedAt = 0;
+  let pieceAt = 0;
+  let pieceSentFor = '';
+  let pieceSentAt = 0;
+
+  function furnitureLine() {
+    let v = null;
+    try { v = globalThis.thornswoodFurnitureLine; } catch (e) { v = null; }
+    return (v && typeof v === 'object') ? v : null;
+  }
+
+  function askFurniture(force) {
+    const t = Date.now();
+    if (!force && t - furnitureAskedAt < FURNITURE_ASK_MS) { return; }
+    furnitureAskedAt = t;
+    tellServer('/furniture look');
+  }
+
+  /** The line up or down in the inventory. Only remembered once the page has taken it. */
+  function drawArrangeLine(on) {
+    if (on === arrangeShown) { return; }
+    if (!on) {
+      if (T.js('try{var d=document.getElementById("ts-furniture-line");if(d){d.style.display="none";}}catch(e){}')) {
+        arrangeShown = false;
+      }
+      return;
+    }
+    const v = furnitureLine();
+    const html = lockRow(LOCK_NAME, 'Arrange furniture' + (v && v.n ? ' in ' + v.n : ''));
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-furniture-line");' +
+             'if(!d){d=document.createElement("div");d.id="ts-furniture-line";' +
+             'd.style.cssText=' + JSON.stringify(FURNITURE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      arrangeShown = true;
+    }
+  }
+
+  function inventoryOpen() {
+    try { return !!sp.Ui.isMenuOpen(INVENTORY_MENU); } catch (e) { return false; }
+  }
+
+  sp.on('menuOpen', guard('furniture line up', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    askFurniture(true);
+    const v = furnitureLine();
+    drawArrangeLine(!!T.ready && !!(v && v.may));
+  }));
+  sp.on('menuClose', guard('furniture line down', (e) => {
+    if (!e || e.name !== INVENTORY_MENU) { return; }
+    drawArrangeLine(false);
+  }));
+
+  /* The lock key in the inventory, inside a building you may arrange. */
+  function arrangePress() {
+    if (!T.ready || claims.chat) { return false; }
+    if (!inventoryOpen()) { return false; }
+    const v = furnitureLine();
+    if (!v || !v.may) { drawArrangeLine(false); return false; }
+    drawArrangeLine(false);
+    try { sp.TESModPlatform.closeMenu(INVENTORY_MENU); }
+    catch (err) { say('furniture: closeMenu threw on the inventory: ' + err); }
+    tellServer('/furniture');
+    say('pressed ' + LOCK_NAME + ' in the inventory in ' + (v.n || 'a building') + ', asked for the furniture panel');
+    return true;
+  }
+
+  /** The piece in your hands, while it is still there, as its server id in hex. */
+  function pieceInHand() {
+    const v = furnitureLine();
+    if (!v || !v.may || !v.c) { return ''; }
+    return (Date.now() - (Number(v.seen) || 0) < (Number(v.left) || 0)) ? v.c : '';
+  }
+
+  /** The piece under the crosshair that you may touch, as its server id in hex, or ''. */
+  function pieceLookedAt() {
+    const v = furnitureLine();
+    if (!v || !v.may || !Array.isArray(v.p) || !v.p.length) { return ''; }
+    let ref = null;
+    try { ref = sp.Game.getCurrentCrosshairRef(); } catch (e) { ref = null; }
+    if (!ref) { return ''; }
+    let hex = '';
+    // Every piece is a reference the server placed, so its local id is not the server's (#1275).
+    try {
+      const convert = globalThis.thornswoodSocialServerId;
+      const serverId = typeof convert === 'function' ? convert(ref.getFormID() >>> 0) : 0;
+      if (serverId) { hex = (serverId >>> 0).toString(16); }
+    } catch (e) { hex = ''; }
+    return hex && v.p.indexOf(hex) !== -1 ? hex : '';
+  }
+
+  /** What the two keys do in the world right now: { hand, hex, rows }, or null. */
+  function pieceKeysNow() {
+    if (anyClaim() || busyMenuOpenNow()) { return null; }
+    const hand = pieceInHand();
+    if (hand) {
+      return { hand: hand, hex: hand, info: 'Carrying a piece',
+               rows: [lockRow(MOLD_NAME, 'Set it down here'), lockRow(LOCK_NAME, 'Turn it')] };
+    }
+    const hex = pieceLookedAt();
+    if (!hex) { return null; }
+    return { hand: '', hex: hex, info: '',
+             rows: [lockRow(MOLD_NAME, 'Move it'), lockRow(LOCK_NAME, 'Pick it up')] };
+  }
+
+  function drawPiece(now) {
+    const html = now ? (now.info ? '<div style="font-size:16px;color:#c9b99a;margin-bottom:3px">' +
+                                   plainWords(now.info) + '</div>' : '') + now.rows.join('') : '';
+    if (html === pieceShown) { return; }
+    if (!html) {
+      if (T.js('try{var d=document.getElementById("ts-furniture-piece");if(d){d.style.display="none";}}catch(e){}')) {
+        pieceShown = '';
+      }
+      return;
+    }
+    if (T.js('(function(){try{' +
+             'var d=document.getElementById("ts-furniture-piece");' +
+             'if(!d){d=document.createElement("div");d.id="ts-furniture-piece";' +
+             'd.style.cssText=' + JSON.stringify(PIECE_CSS) + ';' +
+             'document.body.appendChild(d);}' +
+             'd.innerHTML=' + JSON.stringify(html) + ';' +
+             'd.style.display="";' +
+             '}catch(e){}})();')) {
+      pieceShown = html;
+    }
+  }
+
+  /* The cell you stand in, so walking into another one asks for the line again. */
+  function cellNow() {
+    try {
+      const pc = sp.Game.getPlayer();
+      const cell = pc ? pc.getParentCell() : null;
+      return cell ? (cell.getFormID() >>> 0) : 0;
+    } catch (e) { return -1; }
+  }
+
+  sp.on('update', guard('furniture line', () => {
+    const now = Date.now();
+    if (now - pieceAt < LOCK_EVERY) { return; }
+    pieceAt = now;
+    if (!T.ready) { pieceShown = ''; arrangeShown = false; return; }
+    const cell = cellNow();
+    if (cell !== -1 && cell !== furnitureCell) { furnitureCell = cell; askFurniture(true); }
+    if (inventoryOpen()) {
+      const v = furnitureLine();
+      drawArrangeLine(!!(v && v.may));
+      drawPiece(null);
+      return;
+    }
+    drawPiece(pieceKeysNow());
+  }));
+
+  /*
+    The mold key or the lock key in the world, on a piece or with one in
+    hand. Asked again at the press. The same thing once in a third of a
+    second, so Turn can be pressed as fast as anybody likes and a double
+    press of Move is still one.
+  */
+  function furniturePress(code) {
+    if (!T.ready || claims.chat) { return false; }
+    const now = pieceKeysNow();
+    drawPiece(now);
+    if (!now) { return false; }
+    let line = '';
+    if (now.hand) { line = code === MOLD_KEY ? 'down' : 'turn'; }
+    else { line = (code === MOLD_KEY ? 'move ' : 'pick ') + now.hex; }
+    const t = Date.now();
+    if (line === pieceSentFor && t - pieceSentAt < 330) { return true; }
+    pieceSentFor = line;
+    pieceSentAt = t;
+    tellServer('/furniture ' + line);
+    say('pressed ' + (code === MOLD_KEY ? MOLD_NAME : LOCK_NAME) + ' for /furniture ' + line);
+    return true;
+  }
+
+  /*
     ------------------------------------- your party: the name, the map, the way
 
     Patrick, 22 September, asked the party menu to let people "see their name
@@ -6694,6 +7040,15 @@
    * stay because AI driven has no getter and nothing else keeps it off, but
    * they are not a fix for this and must not be reported as one.
    *
+   * #2387, 16 October: the corrections are gone. The real cause was the other
+   * launcher's build of MpClientPlugin.dll, replaced by the fork's own client
+   * on 20 September (1.1.61.1), after which jump and sprint work. Nothing in
+   * the fork writes IsNPC, bSprintOK or AI driven on the local character, and
+   * no log since has a line saying a correction had to act. The heartbeat that
+   * cleared IsNPC, the per-frame clear and the held sprint gate are removed
+   * rather than kept as insurance: a flag put back on a timer hides the next
+   * real cause. The probe below still names any gate that reads wrong.
+   *
    * The useful part is bSprintOK. It is the ONLY condition on the sprint
    * transition, in 0_master and mt_behavior both. A transition being evaluated
    * cannot refuse with its only condition satisfied, so that transition is not
@@ -6759,13 +7114,6 @@
   let probeHookOk = 0;
   let probeHookNo = 0;
   let probeTallyAt = 0;
-
-  let sprintHeldSince = 0;   // while the sprint key is down, and only then
-  let ownedAt = 0;           // last heartbeat that put the character back
-  let saidIsNpc = false;     // each of these is worth saying once, not every tick
-  let saidSprintGate = false;
-  let saidNpcStuck = false;  // the readback disagreeing with the write
-  let saidNpcThrew = false;
 
   function probeStart(kind, name) {
     return kind === 'jump' ? /^Jump(Standing|Directional)Start/i.test(name) : name === 'SprintStart';
@@ -6835,115 +7183,69 @@
     try { return String(pc.getAnimationVariableInt(name)); } catch (e) { return 'unknown'; }
   }
 
-  /**
-   * The character is the person's to drive.
-   *
-   * Both of these are switched on by somebody and switched back off by the
-   * same somebody, so anything that throws, disconnects or is never told it
-   * has finished leaves them on, and AI driven has no getter to ask. Setting
-   * them off when they were already off is not a state change and costs a
-   * native call, so this runs on a timer rather than trying to find out who
-   * did it.
-   */
-  function ownTheCharacter(pc) {
-    // The game switches controls off for its own menus, and race creation
-    // hands the character over on purpose.
-    if (busyMenuOpen()) { return; }
-    // Dead or sitting in something, which includes the cart.
-    if (notOurs()) { return; }
-    try { if (pc.isOnMount()) { return; } } catch (e) { }
+  // ==== broken limbs (#1383) ====
+  /*
+    A BROKEN LEG REFUSES SPRINT, the half of a break that is not an actor
+    value. docs/systems/injury.md: "A leg: ... sprint is refused." The server
+    keeps the break on the character and its screen script hands this file
+    globalThis.thornswoodBrokenLimbs, { leg }, the same way it hands
+    thornswoodHurtCare. The -8 speed and the -0.15 melee already ride on the
+    skills panel, and a broken arm's dearer block is charged by the server
+    when it charges the block (gamemode.js, BLOCK.brokenArm), so nothing of
+    the arm is done here.
 
-    try { sp.Game.setPlayerAIDriven(false); } catch (e) { }
+    bSprintOK is the only condition on the sprint transition (see
+    holdSprintGate below, measured on 20 September), so with a broken leg the
+    gate is held SHUT while the sprint key is down instead of open, and a
+    sprint already running is stopped. The game's own refusals work the same
+    way: over encumbered, out of stamina.
 
-    if (varBool(pc, 'IsNPC')) {
-      try {
-        pc.setAnimationVariableBool('IsNPC', false);
-        if (!saidIsNpc) {
-          saidIsNpc = true;
-          say('jump and sprint: the character was flagged IsNPC, which is what takes both out of the graph. Cleared.');
-        }
-      } catch (e) { }
+    Both callers run under guard(), so a call the game refuses reaches the
+    guard's log rather than being swallowed here. Self contained, with sp
+    handed in, so tests/test-1383-limbs-brews.js can run it over a fake sp.
+  */
+  const brokenLimbs = (function (sp) {
+    const TELL_EVERY_MS = 30000;
+    let toldLegAt = 0;
+
+    function leg() {
+      const l = globalThis.thornswoodBrokenLimbs;
+      return !!(l && l.leg);
     }
-  }
+
+    /* Shut the sprint gate on a broken leg. True when it did, so the caller
+       does not hold the gate open again on the same frame. */
+    function refuseSprint(pc) {
+      if (!pc || !leg()) { return false; }
+      if (pc.getAnimationVariableBool('bSprintOK')) { pc.setAnimationVariableBool('bSprintOK', false); }
+      if (pc.isSprinting()) { sp.Debug.sendAnimationEvent(pc, 'SprintStop'); }
+      const now = Date.now();
+      if (now - toldLegAt > TELL_EVERY_MS) {
+        toldLegAt = now;
+        sp.Debug.notification('Your broken leg will not take a sprint.');
+      }
+      return true;
+    }
+
+    return { refuseSprint: refuseSprint, leg: leg };
+  })(sp);
+  // ==== end broken limbs ====
 
   /**
-   * Hold the sprint gate open while the key is down.
-   *
-   * bSprintOK is the only condition on the sprint transition, in 0_master and
-   * in mt_behavior both, so with it shut SprintStart is refused however much
-   * stamina there is. Skyrim's own rule is repeated here rather than
-   * overridden: no sprinting while over encumbered, out of stamina, swimming
-   * or on a horse. Only while the key is actually down, so nothing is held
-   * open for somebody who is not asking for it.
+   * A broken leg holds the sprint gate shut while the sprint key is down
+   * (#1383). bSprintOK is the only condition on the sprint transition, in
+   * 0_master and in mt_behavior both, so with it shut SprintStart is refused
+   * however much stamina there is. Nothing here holds the gate open any more
+   * (#2387): that chased another launcher's client, which the fork replaced.
    */
-  function holdSprintGate(pc) {
-    if (!sprintHeldSince) { return; }
+  let sprintHeldSince = 0;   // while the sprint key is down, and only then
+  function holdSprintShut() {
+    if (!sprintHeldSince || !brokenLimbs.leg()) { return; }
     // A release this file never saw, because a menu or the wheel took the
     // keyboard mid press. Eight seconds is longer than anybody sprints in one
     // hold and short enough that it cannot stay stuck.
     if (Date.now() - sprintHeldSince > 8000) { sprintHeldSince = 0; return; }
-    if (anyClaim() || busyMenuOpen() || notOurs()) { return; }
-    try {
-      if (pc.isOverEncumbered()) { return; }
-      if (pc.isSwimming() || pc.isOnMount()) { return; }
-      if (pc.getActorValue('Stamina') <= 0) { return; }
-    } catch (e) { return; }
-    if (varBool(pc, 'bSprintOK')) { return; }
-    try {
-      pc.setAnimationVariableBool('bSprintOK', true);
-      if (!saidSprintGate) {
-        saidSprintGate = true;
-        say('jump and sprint: bSprintOK was shut with stamina left, which is what refuses SprintStart. Held open while the key is down.');
-      }
-    } catch (e) { }
-  }
-
-  /**
-   * Clear IsNPC on the frame the graph reads it, rather than every two seconds.
-   *
-   * ownTheCharacter() above already clears this on the heartbeat and that is
-   * not enough. On 20 September seven presses in a row were refused with
-   * IsNPC reading yes, in the same session whose log says the heartbeat had
-   * already found it set and cleared it. So it comes back, and a clear that
-   * runs up to two seconds before the press is a clear that is not there when
-   * it counts.
-   *
-   * This is the same reason bSprintOK is held every frame just above rather
-   * than polled: the graph reads the variable on the frame it handles the
-   * event. A variable the graph reads on the event frame has to be written on
-   * the event frame.
-   *
-   * The readback is the measurement the last session could not make, and it
-   * splits the two remaining answers without anybody having to be in the
-   * world twice. If it reads true immediately after being written false, the
-   * write is not taking and no amount of timing will help. If it reads false
-   * here and yes again at the press, something re-sets it in between and the
-   * question becomes what.
-   */
-  function holdNpcClear(pc) {
-    /* The same three ownTheCharacter refuses on, and for the same reasons. The
-       first one matters most here: race creation hands the character over on
-       purpose, and this runs on every heartbeat frame rather than only while
-       somebody is asking to jump, so without it this would be writing to the
-       graph all the way through a face being made. Nobody jumps while dead,
-       sitting or mounted either, so none of them costs a press. */
-    if (busyMenuOpen()) { return; }
-    if (notOurs()) { return; }
-    try { if (pc.isOnMount()) { return; } } catch (e) { }
-    if (!varBool(pc, 'IsNPC')) { return; }
-    try {
-      pc.setAnimationVariableBool('IsNPC', false);
-      if (!saidNpcStuck && varBool(pc, 'IsNPC')) {
-        saidNpcStuck = true;
-        say('jump and sprint: IsNPC was written false and read back true on the same frame. ' +
-            'The write is not taking, so this is not the heartbeat being too slow.');
-      }
-    } catch (e) {
-      if (!saidNpcThrew) {
-        saidNpcThrew = true;
-        say('jump and sprint: clearing IsNPC threw, which the heartbeat has been swallowing: ' + e);
-      }
-    }
+    brokenLimbs.refuseSprint(sp.Game.getPlayer());
   }
 
   function probeState() {
@@ -7011,24 +7313,23 @@
     if (e.userEventName === 'Sprint' || (!e.userEventName && e.code === probeKeys.sprint)) { kind = 'sprint'; }
     if (!kind) return;
 
-    // Sprint is a hold, not a press, and the gate is only worth holding open
-    // for as long as somebody is holding the key.
+    // Sprint is a hold, not a press: a broken leg holds the gate shut for as
+    // long as somebody is holding the key (#1383).
     if (kind === 'sprint') {
       if (e.isUp) { sprintHeldSince = 0; }
       else if (e.isDown && !sprintHeldSince) { sprintHeldSince = Date.now(); }
+      // A broken leg (#1383): shut on the press itself, the frame the graph
+      // reads the gate, not only on the next update.
+      if (e.isDown && !e.isUp && brokenLimbs.leg()) {
+        const legPc = sp.Game.getPlayer();
+        if (legPc) { brokenLimbs.refuseSprint(legPc); }
+      }
     }
 
     if (!e.isDown || e.isUp) return;
     // The chat or the wheel has the keyboard, or a menu does: not a jump.
     if (anyClaim() || busyMenuOpen()) return;
 
-    // The earliest point in the frame this file gets. buttonEvent runs from
-    // the input handler, before the graph updates, so a flag cleared here is
-    // clear when the graph reads it. The heartbeat two seconds ago was not.
-    try {
-      const pressPc = sp.Game.getPlayer();
-      if (pressPc) { holdNpcClear(pressPc); }
-    } catch (e2) { }
     const now = Date.now();
     if (now - probeLast[kind] < PROBE_GAP_MS) return;
     probeLast[kind] = now;
@@ -7050,26 +7351,12 @@
       }
     }
 
-    // The character is only fetched on a frame that has something to do with
-    // it. Three handlers in this file already ask for it every frame and that
-    // is three too many.
-    const heartbeat = now - ownedAt >= 2000;
+    holdSprintShut();
+
+    // The character is only fetched on a frame that has a press to resolve.
     let pc = null;
-    if (heartbeat || sprintHeldSince || probePresses.length) {
+    if (probePresses.length) {
       try { pc = sp.Game.getPlayer(); } catch (e) { pc = null; }
-    }
-    if (pc) {
-      // Two seconds, because this is a state that has to be wrong for a whole
-      // key press to matter and nothing here is worth a native call a frame.
-      if (heartbeat) { ownedAt = now; ownTheCharacter(pc); }
-      // Every frame, but only while the key is down: the graph reads the gate
-      // on the frame it handles the event, so a timer would miss it.
-      holdSprintGate(pc);
-      // Same reasoning, and this block only runs on a frame that already has
-      // the character in hand: a heartbeat, a held sprint key, or a press
-      // still being resolved. Sprint is a hold, so the frame the graph acts
-      // on is not always the frame the key arrived.
-      holdNpcClear(pc);
     }
 
     if (!probePresses.length) return;
@@ -7670,15 +7957,10 @@
     asked once more, because a book left open behind ours is the thing this
     block is for, and one still up after two seconds is said in the log.
 
-    The cursor. browser.setFocused(true) only raises the game's Cursor Menu
-    when it is not up already (BrowserApiTilted.cpp in the fork), and the
-    game's book raises one of its own. So when our panel takes the keyboard
-    while the book is still on screen, the cursor showing is the book's, and
-    it goes when the book does: our panel holding the keyboard with no
-    cursor. Which of the two lands first is a race between the page answering
-    and the game closing the book. Focus held with no Cursor Menu up is
-    lowered and raised once, which is the call that raises the cursor and
-    marks it as ours to lower when the panel closes.
+    The cursor is not this block's business any more (#2384). The book
+    taking the Cursor Menu down with it as it closes, under a panel of ours
+    that holds focus, is answered in the fork, from the Cursor Menu's close
+    event (BrowserApiTilted.cpp, CursorFocus.h).
   */
   sp.on('update', guard('journal after', () => {
     if (!journalShutAt) { return; }
@@ -7699,12 +7981,7 @@
         say('J: the game\'s journal opened ' + journalLag + 'ms after the press and was gone ' +
             since + 'ms after it was shut');
       }
-      if (since > JOURNAL_WATCH_MS) { journalShutAt = 0; return; }
-      if (!sp.browser.isFocused() || sp.Ui.isMenuOpen('Cursor Menu')) { return; }
       journalShutAt = 0;
-      sp.browser.setFocused(false);
-      sp.browser.setFocused(true);
-      say('J: the game\'s journal took the cursor with it, raised it again for ours');
     } catch (err) { journalShutAt = 0; }
   }));
 
@@ -8368,6 +8645,12 @@
     */
     // The mold key, and only while a door is under the crosshair and a Key
     // Mold is in the pack. Otherwise it is not used and goes on down the list.
+    // A piece of furniture in hand or under the crosshair, in a building you
+    // may arrange (#2679): the mold key moves or sets it down, the lock key
+    // picks it up or turns it. In the inventory the lock key is Arrange
+    // furniture. See furniturePress and arrangePress.
+    if ((e.code === MOLD_KEY || e.code === LOCK_KEY) && furniturePress(e.code)) { return; }
+    if (e.code === LOCK_KEY && arrangePress()) { return; }
     if (e.code === MOLD_KEY && moldPress()) { return; }
     // The same key on a person inside a building you hold. See SLEEP_KEY.
     if (e.code === SLEEP_KEY && sleepPress()) { return; }
@@ -8441,6 +8724,8 @@
 
     // K on a person a Master could take on opens K on them (#1634).
     if (e.code === APPRENTICE_KEY && apprenticePress()) { return; }
+    // K on a person while you carry a hair dye opens K's Hair dye on them (#2675).
+    if (e.code === HAIR_DYE_KEY && hairDyePress()) { return; }
     if (e.code === SKILLS_KEY) {
       if (claims.chat) { return; }
       const busyNow = busyMenuOpen();
@@ -8657,8 +8942,6 @@
       }
 
       applyFocus();
-      // And a claim holding the keyboard has its cursor (issue 958).
-      keepCursor();
     } catch (e) { }
 
     // Two watchdogs, because the worst outcome here is somebody standing in a
@@ -9314,6 +9597,10 @@
     if (what === 'box:opened') { T.claimFocus('box', true); return; }
     if (what === 'box:closed') { T.claimFocus('box', false); return; }
     if (what === 'box:ready') { log('the drop box panel is in'); return; }
+    // The trade ships' panel (#2700): a dock crate's E, or Ports and routes on K.
+    if (what === 'ship:opened') { T.claimFocus('ship', true); return; }
+    if (what === 'ship:closed') { T.claimFocus('ship', false); return; }
+    if (what === 'ship:ready') { log('the trade ships panel is in'); return; }
     if (what.indexOf('board:near ') === 0) {
       const bits = what.slice('board:near '.length).trim().split(/\s+/);
       if (bits[0] === 'none' || bits.length < 3) { boardNear = null; return; }
@@ -9340,6 +9627,9 @@
     if (what === 'repair:opened') { T.claimFocus('repair', true); return; }
     if (what === 'repair:closed') { T.claimFocus('repair', false); return; }
     if (what === 'repair:ready') { log('the repair panel is in'); return; }
+    if (what === 'furniture:opened') { T.claimFocus('furniture', true); return; }
+    if (what === 'furniture:closed') { T.claimFocus('furniture', false); return; }
+    if (what === 'furniture:ready') { log('the furniture panel is in'); return; }
     if (what === 'treat:opened') { T.claimFocus('treat', true); return; }
     if (what === 'treat:closed') { T.claimFocus('treat', false); return; }
     if (what === 'treat:ready') { log('the treatment panel is in'); return; }
@@ -9722,7 +10012,7 @@
     THE FILLED PERKS THAT HAPPEN ON THE PERSON'S OWN MACHINE (#1385).
 
     docs/systems/skill-tree.md is the table. The server fires every perk it
-    can reach (the skill perks block in game/gamemode.js). These three
+    can reach (the skill perks block in game/gamemode.js). These
     happen where it cannot: what a stagger, a sprint, a power attack and a
     fall do to you is worked out by the game on your own machine, and the
     health and stamina that leaves is what skymp5-client sends the server
@@ -9759,17 +10049,38 @@
     nothing however far the fall, for this character and nobody else.
 
     TIRELESS. Running costs nothing in this game and neither does a plain
-    swing. A sprint and a power attack do, and both are the game's own sums
-    from game settings (Skyrim.esm, overridden by nothing in the load order;
-    skymp5-server's attack costs are SweetPie's only, and this server does
-    not load SweetPie): fSprintStaminaDrainMult for a sprint, and
-    fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
-    weapon's weight for a power attack. Each is held at half while Tireless
-    is held. These have no second set for everybody else, so an NPC this
-    machine runs pays half as well; #1385 says so for Patrick.
+    swing. A sprint, a power attack and a shield bash do, and each is the
+    game's own sum from game settings (Skyrim.esm, overridden by nothing in
+    the load order; skymp5-server's attack costs are SweetPie's only, and
+    this server does not load SweetPie): fSprintStaminaDrainMult for a
+    sprint, fStaminaAttackWeaponBase plus fStaminaAttackWeaponMult times the
+    weapon's weight for a power attack, and fStaminaBashBase and
+    fStaminaPowerBashBase for a bash and a power bash. A bash counts as a
+    swing (Patrick, 12 Oct: one rule for every attack). Each is held at half
+    while Tireless is held. These have no second set for everybody else, so
+    an NPC this machine runs pays half as well, which Patrick kept (12 Oct).
 
-    PACK MULE IS NOT HERE. Being overloaded makes the game walk you, and no
-    game setting changes that; #1385 has it for Patrick.
+    PACK MULE, "being overloaded does not slow you". Being overloaded has
+    one effect here: the game makes you walk, on your own machine, and no
+    game setting changes that. The engine fork's client keeps a list of
+    characters the game does not hold to their carry weight (Patrick chose
+    the engine change on 12 Oct, #1385): for one on it, the game's own
+    Actor::IsOverEncumbered answers no, so it never makes you walk, and the
+    fork's movement sends your run to everybody else as it plays. While Pack
+    Mule is held, your own character is on that list. The inventory still
+    shows your real carry weight.
+
+    OVERCHARGE, "one spell in five ... holds twice as long". A spell's
+    effects run on the machine that runs the actor they land on, and the
+    game gives each one its duration there. The engine fork counts the casts
+    this machine makes for a character with a rule on it
+    (setCastDurationEvery): every fifth spell of yours that holds (one you
+    cast and let go, with an effect that lasts a time and none that takes
+    health) holds twice as long here, and the cast says so to the server.
+    The server counts the same casts by the same rule (holdsLonger in the
+    skill perks block) and tells everybody else's machine to hold it twice
+    as long too. While Overcharge is held, your own character has that rule;
+    the numbers are the gamemode's PERKS.overcharge, inEvery and longer.
 
     SET FROM THE GAME'S OWN VALUE, NOT FROM A NUMBER WRITTEN HERE. What a
     setting read before this file first touched it is kept in sp.storage,
@@ -9785,7 +10096,10 @@
   /* perk -> { game setting: the share of the game's own value it is held at }. */
   const PERK_SETTINGS = {
     windwalker: { fJumpFallHeightMult: 0 },
-    tireless: { fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5 }
+    tireless: {
+      fSprintStaminaDrainMult: 0.5, fStaminaAttackWeaponBase: 0.5, fStaminaAttackWeaponMult: 0.5,
+      fStaminaBashBase: 0.5, fStaminaPowerBashBase: 0.5
+    }
   };
 
   let perksHeld = {};               // perk -> true, the view's list
@@ -9796,6 +10110,11 @@
   let unshakeableOpen = 0;          // staggers that played with the block down, for the log
   let unshakeableSaid = 0;
   let unshakeableOpenSaid = 0;
+  let packMuleKept = null;          // what the client's list was last told, null until a view has said
+  let overchargeKept = null;        // what the client's cast count was last told, null until a view has said
+
+  /* Overcharge's other half: every fifth cast that holds, twice as long. */
+  const OVERCHARGE = { every: 5, longer: 2 };
 
   /* The whole panel view, as treeFromView takes it. Only its perks are read. */
   function perksFromView(json) {
@@ -9859,6 +10178,43 @@
     if (said.length) { log('perks: ' + said.join('; ')); }
   }
 
+  /* Your own character on the client's list while Pack Mule is held, and off
+     it while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the list whatever an earlier copy left in it. */
+  function packMuleNow() {
+    const on = !!perksHeld.packmule;
+    if (packMuleKept === on) { return; }
+    packMuleKept = on;
+    try {
+      sp.setOverEncumberedIgnored(0x14, on);
+      log('perks: Pack Mule ' + (on ? 'held, so carrying past your carry weight does not make you walk'
+                                    : 'not held, so carrying past your carry weight makes you walk, as the game does'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Pack Mule:', e);
+    }
+  }
+
+  /* Your own character's casts counted while Overcharge is held, and not
+     while not. Told only when it changes; null at load, so a reloaded
+     plugin sets the rule whatever an earlier copy left. */
+  function overchargeNow() {
+    const on = !!perksHeld.overcharge;
+    if (overchargeKept === on) { return; }
+    overchargeKept = on;
+    try {
+      sp.setCastDurationEvery(0x14, on ? OVERCHARGE.every : 0, on ? OVERCHARGE.longer : 1);
+      log('perks: Overcharge ' + (on ? 'held, so every ' + OVERCHARGE.every + 'th spell of yours that holds holds ' +
+                                       OVERCHARGE.longer + ' times as long'
+                                     : 'not held, so every spell of yours holds its own time'));
+    } catch (e) {
+      /* Said once and not retried: the next view that changes what is
+         held comes through here again. */
+      log('perks: could not set Overcharge:', e);
+    }
+  }
+
   try {
     sp.hooks.sendAnimationEvent.add({
       enter: function (ctx) {
@@ -9877,6 +10233,8 @@
     if (perksDirty) {
       perksDirty = false;
       perkSettingsNow();
+      packMuleNow();
+      overchargeNow();
     }
     if (perksHeld.unshakeable) {
       let pc = null;
