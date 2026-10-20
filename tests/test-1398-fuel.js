@@ -150,7 +150,6 @@ const pieces = {
   handle: lineOf(/^const HANDLE_DESC = .*$/m),
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
-  delay: lineOf(/^const KEY_NAME_DELAY = .*$/m),
   after: lineOf(/^const MASTER_CRAFT_AFTER_MS = .*$/m),
   fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
@@ -160,7 +159,7 @@ const pieces = {
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
-    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.delay && !!pieces.after &&
+    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.after &&
     pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft);
 
 /*
@@ -189,7 +188,7 @@ function craftRig(state) {
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
     __thornswoodManeuvers: { WOVEN: WOVEN }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.delay, pieces.after]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.after]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(

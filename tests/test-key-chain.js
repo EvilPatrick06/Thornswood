@@ -113,26 +113,14 @@ if (recipes) {
 {
   const b = body('mp.onCraft = guard(', 6000);
   yes('the craft of a key is answered', /desc === KEY_RECIPE/.test(b));
-  yes('and it reads which mold is in the pack', /prop\.moldInHand\(actorId\)/.test(b));
-  yes('no stamped mold refuses the craft, so no blank key is ever made',
-      /if \(!stampedAt\)/.test(b) && /return false;/.test(b));
-  // By the mold key at the door, never a typed /mold (#1637).
-  yes('and the refusal says how to get one, with nothing to type',
-      /press it into the lock there/.test(b) && !/say \/mold/.test(b));
-  yes('the key is named after the craft lands, not before',
-      /setTimeout\(function \(\)/.test(b) && /prop\.nameFreshKey\(actorId, named\)/.test(b));
-  yes('and nothing in that path spends the mold',
-      !/takeBlankMold/.test(b.slice(b.indexOf('desc === KEY_RECIPE'))));
+  // #2487: the menu's key is refused outright; the lock key at a forge cuts it named.
+  const k = b.slice(b.indexOf('desc === KEY_RECIPE'), b.indexOf('desc === KEY_RECIPE') + 900);
+  yes('the menu craft of a key is refused, so the ingot stays and no plain key is made',
+      /return false;/.test(k) && /lock key/.test(k));
+  yes('no timer names a key (#2487)', !/setTimeout/.test(k) && !/KEY_NAME_DELAY/.test(code));
+  yes('and nothing in that path spends the mold', !/takeBlankMold/.test(k));
 }
-{
-  const b = body('function nameFreshKey(actorId, building)', 1200);
-  yes('nameFreshKey is in the file', b.length > 0);
-  yes('it names the key for its building', /name: keyLabel\(building\)/.test(b) ||
-      /e\.name = keyLabel\(building\)/.test(b));
-  yes('and it leaves a key that already has a name alone', /if \(e\.name\) \{ continue; \}/.test(b));
-  yes('and it splits one off a stack rather than naming the stack',
-      /entries\.push\(\{ baseId: baseId, count: 1, name: keyLabel\(building\) \}\)/.test(b));
-}
+yes('nameFreshKey is gone: a key is named in the step that makes it (#2487)', !/nameFreshKey/.test(code));
 yes('the recipe the gate watches for is the one the plugin adds',
     /const KEY_RECIPE = '15497:Thornswood-Content\.esp'/.test(code));
 
