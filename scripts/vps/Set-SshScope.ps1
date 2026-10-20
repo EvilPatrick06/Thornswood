@@ -33,23 +33,37 @@
 
   -From Any opens port 22 to every address again, the same way.
 
-  Every address that needs ssh has to be in the list: this machine, every
-  other machine that deploys or ships (each developer's own), and
-  Watch-Outside.ps1's machine, which logs in every five minutes. A home
-  address that changes drops out of the list and that machine loses ssh
-  until the list is changed from a machine still in it, or from the console.
+  -From None shuts port 22 to every outside address (#2891): the rules take
+  127.0.0.1 alone, which is how the bridge reaches sshd, so the only way in
+  is the bridge, each machine with its own key and token
+  (Grant-BoxAccess.ps1). It only runs from a machine whose ssh already goes
+  through the bridge, and the new login that proves it goes the same way. A
+  home address that changes then stops nothing. The way back when the
+  bridge or Caddy is down is the console, below.
 
-  THE WAY BACK, BY HAND, if no machine can reach ssh. The VPS provider's panel
-  (BisectHosting, VirtFusion) has a console for the server that does not use
-  the network: open the server there, open its VNC console, sign in as
-  Administrator with the Windows password, and in PowerShell:
+  With a list of addresses instead, every address that needs ssh has to be
+  in it: this machine, every other machine that deploys or ships (each
+  developer's own), and Watch-Outside.ps1's machine, which logs in every five
+  minutes. A home address that changes drops out of the list and that
+  machine loses ssh until the list is changed from a machine still in it, or
+  from the console.
+
+  THE WAY BACK, BY HAND, if no machine can reach ssh (an address list that
+  lost its address, or with None the bridge or Caddy down). The VPS
+  provider's panel (BisectHosting, VirtFusion) has a console for the server
+  that does not use the network: open the server there, open its VNC
+  console, sign in as Administrator with the Windows password, and in
+  PowerShell. With None, start the bridge and Caddy first, which is all a
+  stopped one needs:
+      Start-ScheduledTask 'Thornswood Bridge'; Start-ScheduledTask 'Thornswood Web'
+  To put the rules back as they were before the last change instead:
       Get-ChildItem C:\ProgramData\ssh\ssh-scope-before-*.json
       $s = Get-Content -Raw <the newest of those> | ConvertFrom-Json
       foreach ($r in $s.rules) { Set-NetFirewallRule -Name $r.name -RemoteAddress @($r.remote) }
 
 .PARAMETER From
   The addresses that may reach port 22, comma separated: 203.0.113.7,
-  198.51.100.0/24, 2001:db8::/48, or Any.
+  198.51.100.0/24, 2001:db8::/48, or Any, or None (only the bridge).
 
 .PARAMETER Vps
   The box's address. vps.json's by default.
@@ -166,6 +180,10 @@ if ($hk.Status -ne 'trusted') {
     Die ("known_hosts does not hold the key scripts\vps\vps.json pins for $Vps (" + $hk.Status + '). Run .\scripts\vps\Setup-SshKey.ps1 first. Nothing was changed.')
 }
 Say '  known_hosts holds the pinned key' 'Green'
+
+if ($list -eq 'None' -and -not (Test-ThornswoodBridgeSsh $Vps)) {
+    Die "ssh to $Vps from here does not go through the bridge, so shutting port 22 would cut this machine off. Run .\scripts\vps\Grant-BoxAccess.ps1 -Name <this machine> -ThisMachine first. Nothing was changed."
+}
 
 Head '2. Key login, before anything else'
 if (-not (Test-KeyLogin)) { Die "Key login as $User is not proven. Run .\scripts\vps\Setup-SshKey.ps1 -Test until it works. Nothing was changed." }

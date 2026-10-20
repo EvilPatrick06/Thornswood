@@ -178,12 +178,14 @@ typed on a command line or written on this page.
    done: every script runs ssh with StrictHostKeyChecking=yes (issue #450), so
    a box whose key is not pinned there is refused. The changed files stay on
    this branch until step 27.
-4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1`. It
+4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1 -NewBox`. It
    writes the box into known_hosts only when it shows a key step 3 pinned,
-   then asks for the Administrator password once. Then
-   `.\scripts\vps\Setup-SshKey.ps1 -Test` says the key works. Another machine that deploys runs
-   `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly` and Patrick adds the line it
-   prints with `.\scripts\vps\Add-VpsKey.ps1`.
+   then asks for the Administrator password once and points ssh straight at
+   port 22, since the new box has no bridge yet. Once the site is up with
+   its Caddyfile, `.\scripts\deploy\Install-Bridge.ps1` and then
+   `.\scripts\vps\Grant-BoxAccess.ps1 -Name one -ThisMachine` move this
+   machine onto the bridge, and every other machine and person is given
+   their way in with `Grant-BoxAccess.ps1` (`docs\BOX-ACCESS.md`).
 5. **PowerShell 7, Node, Git and the Build Tools on the box**, and the
    firewall for the live game:
    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit -IncludeBuildTools'`.

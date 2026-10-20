@@ -296,13 +296,13 @@ The branch name is in the status bar at the bottom left. Open the terminal from 
 
 #### Reach the VPS
 
-You do not get the server password. Your PC creates a key. You send the public line. Somebody who already has a key on the server adds yours.
+You do not get the server password. Your PC creates a key and gets a token of its own, and reaches the server through the bridge, so your home address never matters. You send the public line. Patrick adds it and sends you the token.
 
 ```powershell
-.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
+.\scripts\vps\Setup-SshKey.ps1
 ```
 
-The script prints one line that starts with `ssh-ed25519`. Copy that whole line into Discord. Leave the private key file where the script put it. The reads, the test, and what the VPS is are in [E. VPS](#e-vps).
+The script prints one line that starts with `ssh-ed25519`. Copy that whole line into Discord, and press Enter when it asks for the token. Leave the private key file where the script put it. Once the token comes, run it again and paste it. The whole guide is `docs\BOX-ACCESS.md`; the reads, the test, and what the VPS is are in [E. VPS](#e-vps).
 
 ### Setting up a machine
 
@@ -355,13 +355,14 @@ in place, without shipping anything.
 Then in `Thornswood-Repo`:
 
 ```
-.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
+.\scripts\vps\Setup-SshKey.ps1
 ```
 
-which makes a key for the VPS, points ssh at it, and prints the public line.
-Send that line to Patrick; he runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`
-from his machine and the VPS knows you. `.\scripts\vps\Setup-SshKey.ps1 -Test`
-proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
+which makes a key for the VPS, points ssh at it through the bridge, and
+prints the public line. Send that line to Patrick; he runs
+`.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard` on One and
+sends you a token, which you paste when the same script asks
+(`docs\BOX-ACCESS.md`). `.\scripts\vps\Setup-SshKey.ps1 -Test` proves it. Until then the scripts that talk to the VPS (`Ship`, `Deploy-*`,
 `Request-Restart`, `Install-Bot`, `Publish-Installer`, `Publish-News`) cannot
 reach it, and Ship stops before it builds anything: the feed and its baseline
 are received from the VPS (#907).
@@ -447,7 +448,7 @@ by hand, and no secret is written into the repository.
 | The source | the shared clone | `git clone https://github.com/EvilPatrick06/Thornswood.git` and `gh auth login` as a collaborator |
 | The feed, its baseline, the launcher list and history | the VPS store, with a working copy in `%LOCALAPPDATA%\Thornswood\feed\<channel>` | Nothing to copy: every Ship receives them from the VPS first (`scripts\release\Feed-Store.ps1`, #907). The working copy is made on the first Ship |
 | The release webhooks, dev and #news | the VPS, `C:\Thornswood-Bot\webhooks`; One has no local copy | Nothing to copy: Ship reads them over ssh (`scripts\ops\Discord-Hook.ps1`) |
-| VPS access | One's own key, `.ssh\thornswood_ed25519` | Its own key: `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly`, and somebody the VPS already knows runs `.\scripts\vps\Add-VpsKey.ps1 -PublicKey '<the line>'`. With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
+| VPS access | One's own key, `.ssh\thornswood_ed25519`, and its own bridge token, `.ssh\thornswood-box-token` | Its own key and token: `.\scripts\vps\Setup-SshKey.ps1`, and somebody the VPS already knows runs `.\scripts\vps\Grant-BoxAccess.ps1 -Name <machine> -FromClipboard` with the line it prints (`docs\BOX-ACCESS.md`). With no such machine left, the BisectHosting panel is the way in (`docs\IT-IS-DOWN.md`) |
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
@@ -2247,27 +2248,27 @@ For the whole repository, `Ctrl+Shift+F` is the search to use.
 
 ### E. VPS
 
-The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key. The scripts connect with that key.
+The VPS is the remote Windows machine. The site, the bot, voice, and both game servers run there. You do not get the server password. Your PC has a key and a token of its own, and the scripts connect through the bridge at `wss://thornswood.net/box/` with them. The whole guide, with what to do when it stops working, is `docs\BOX-ACCESS.md`.
 
 #### Make a key and test it
 
 ```powershell
-.\scripts\vps\Setup-SshKey.ps1 -KeyOnly
+.\scripts\vps\Setup-SshKey.ps1
 ```
 
-Copy the whole `ssh-ed25519` line into Discord. On a machine that already has a key, somebody runs:
+Copy the whole `ssh-ed25519` line into Discord, and press Enter when it asks for the token. On One, Patrick runs:
 
 ```powershell
-.\scripts\vps\Add-VpsKey.ps1 -PublicKey 'ssh-ed25519 AAAA... comment'
+.\scripts\vps\Grant-BoxAccess.ps1 -Name <you> -FromClipboard
 ```
 
-Then, on your machine:
+and sends you the token. Then, on your machine, run `Setup-SshKey.ps1` again, paste the token, and check:
 
 ```powershell
 .\scripts\vps\Setup-SshKey.ps1 -Test
 ```
 
-A good answer is that the key already works. `Host key verification failed` means this machine has not recorded the server yet. Run the same script without `-Test` only when the first run did not finish.
+A good answer is that ssh to the box works. `Host key verification failed` means `known_hosts` holds a key for the server that is not the pinned one: stop and ask.
 
 #### Two reads
 
@@ -2669,7 +2670,7 @@ says **not enforced** where nothing checks it.
 | TURN relay key, not in use yet | `turn-key.txt` in `C:\Thornswood-Voice` on the VPS, put there by hand, and its own in `C:\Thornswood-Voice-Dev`, put there by hand too; `vps-dev-instance.ps1` never copies the live one (#1083). Neither is there yet: no relay has been stood up, so the service offers STUN only | Nothing yet. Once a relay is up, the voice service makes each browser a credential from it, and a credential lets whoever holds it send traffic through the relay until it expires. **Not enforced** as to who gets one: `/ice` answers anybody who asks. | Whoever runs the relay changes its shared secret there, puts the same value in `turn-key.txt`, and runs `Install-Voice.ps1 -Restart`. Credentials already handed out stop working at once. |
 | Backup passphrase | `C:\Thornswood-Backup\key.txt` on the VPS and `Documents\thornswood-backup-key.txt` on Patrick's machine, one copy in each on purpose | The nightly backups, which hold the site's `config.json`, `bot.env.json` and the live game server's `private` folder: every VPS secret above except the voice service's files. | `Install-Backup.ps1` sends the Documents copy up when the box has no `key.txt` (a new box, issue #454), makes one when neither has it, and copies it down when the Documents copy is missing. Keep the old one until the backups made with it have aged out. |
 | GitHub access | your own `gh auth login`, kept in Windows' credential store | Pushing branches and opening pull requests here, and a main Ship's download of the launcher CI built. Releases go to the VPS, not GitHub, since #897 and #907. | You: `gh auth logout`, then `gh auth login`, or revoke it on GitHub under Settings, Applications. Collaborator access to the source repo is Patrick's to give or take away. |
-| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, and its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. None of the scripts needs the Administrator password; `Add-VpsKey.ps1` exists so nobody else has to hold it. | You. First move the old key aside: rename both `.ssh\thornswood_ed25519` and `.ssh\thornswood_ed25519.pub`, say by adding `.old`. While the old key still opens the VPS, `Setup-SshKey.ps1` says it already works and stops, and while the `.pub` is there it uses that one again rather than making a new one. Passing `-KeyPath` a new file does not get round this, because that first check goes through your ssh config, which still names the old key. Then `Setup-SshKey.ps1 -KeyOnly` makes a new key at the same path and prints its public line. Patrick adds it with `Add-VpsKey.ps1 -PublicKey '<the new line>'` and takes the old one off with `Add-VpsKey.ps1 -PublicKey '<the line in the .old .pub>' -Remove`. For his own key, Patrick runs `Setup-SshKey.ps1` without `-KeyOnly`, which asks for the Administrator password once and puts the new key on itself, and then removes the old line the same way. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes and the old line is off. |
+| VPS access | your own key, `.ssh\thornswood_ed25519` in your profile, made by `Setup-SshKey.ps1`, with its public half in `C:\ProgramData\ssh\administrators_authorized_keys` on the VPS, taken only through the bridge; and your own bridge token, `.ssh\thornswood-box-token`, whose SHA-256 is in a file named for you in `C:\Thornswood-Bridge\tokens` on the VPS. Made on One, it waits in `C:\ThornswoodTemps&Worktrees\temp\box-access\<you>\box-token.txt` until it is sent to you, and that file is then deleted (`docs\BOX-ACCESS.md`) | Administrator on the VPS, and so every VPS row in this table: the site, the bot, both game servers, voice and the backups. Neither half alone gets a shell. None of the scripts needs the Administrator password. | Patrick, one name at a time, with `Grant-BoxAccess.ps1` on One: `-Name <you> -Remove` takes your key and token off and leaves everybody else's. For a new pair, move the old key aside (rename both `.ssh\thornswood_ed25519` and its `.pub`, say by adding `.old`) and delete `.ssh\thornswood-box-token`, then run `Setup-SshKey.ps1`, which makes a new key and prints its line. Patrick runs `Grant-BoxAccess.ps1 -Name <you> -FromClipboard` with it, which replaces your old key and token on the box, and sends you the new token to paste. Delete the `.old` pair once `Setup-SshKey.ps1 -Test` passes. |
 | VirusTotal API key | the environment variable `VT_API_KEY` on the machine that runs the optional manual upload, and nowhere in this repository: `Publish-VirusTotal.ps1` reads it from there only, so it has no file to be committed in and no parameter to be typed on a command line | Reading and uploading under our VirusTotal account when somebody runs the manual tool. Publish, Package, and Ship do not call it (#802). | Whoever owns the VirusTotal account, in the account's own API key page, then sets the variable on that machine. A machine without it skips a manual run; publish does not need the key. |
 | Nexus Mods API key | `%LOCALAPPDATA%\Thornswood\Nexus\api-key.txt` on One, written by `.\scripts\release\Set-NexusKey.ps1` at a prompt, and the environment variable `THORNSWOOD_NEXUS_API_KEY` in a cloud session's environment variables; nowhere in this repository. `scripts\release\Nexus.ps1` reads it from one of those two by those exact names (the variable when it is set) and sends it only in the `apikey` header to api.nexusmods.com, never to the upload addresses Nexus hands back (#2914) | Everything Patrick's Nexus account may do through the API: new file versions and description edits on Thornswood Content (192001) and the Thornswood Client Runtime (192762) (`Send-NexusFile.ps1`, `Set-NexusDescription.ps1`), and new and published revisions of the collection `7essxf` (`New-NexusRevision.ps1`). `Set-NexusKey.ps1 -Check` says where the key was found and whether its account owns both mods, without showing it. | Patrick, at https://www.nexusmods.com/settings/api-keys, then `Set-NexusKey.ps1` on One and the new value in the cloud environment's variables. |
 | Code signing | `records\signing\signing.json` on a machine that signs, written from `records\signing\signing.template.json` by `Setup-ShipMachine.ps1`. It names the setup and holds no key: the credential is the `az login` on that machine, as the person who ships from it, with an account of their own that holds the Certificate Profile Signer role on the Artifact Signing profile ([Your own signing sign in](#your-own-signing-sign-in)), or a certificate in that machine's own store | Whether Windows treats the launcher and the installer as ours rather than as an unknown download. | Patrick, in Azure: the signing account and the tenant are his. He makes each person's account, gives it the role, and takes the role away when they stop shipping. Without the file `Sign-Artifact.ps1` signs nothing and a local build carries on unsigned. Ship and Publish-Installer refuse that soft skip before anything reaches the site or the feed. |
