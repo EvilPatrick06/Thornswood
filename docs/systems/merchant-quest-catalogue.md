@@ -1,19 +1,19 @@
 # Merchant quest catalogue
 
-There are **35 authored definitions** in
+There are **104 authored definitions** in
 `game/data/merchant-quests.json` and `game/data/merchant-ranked-quests.json`, toward the required 240 or more distinct
 offers for the60 retained merchants. Four kill scenes are explicitly admitted
-by the pinned activation manifest, along with thirty-one delivery commissions.
+by the pinned activation manifest, along with one hundred delivery commissions.
 The aggregate authoring file stays `active:false` and
 `complete:false`, so adding a draft does not enable it. Runtime includes the23
-legacy definitions and ten bound routes plus these thirty-five offers. Source
+legacy definitions and ten bound routes plus these104 offers. Source
 activation is not proof of a completed Dev deployment.
 
 Four scenes give Novice and Advanced Warriors and Mages different work. Ten
 Novice commissions request goods for specific trades and holds. Eight more
 commissions add six Master offers, one Expert offer and one Novice Enchanter
 offer in Whiterun. Thirteen further parcels complete all24 Whiterun slots.
-Together these fill30 of the240 unique merchant/rank slots;
+A further69 parcels complete the Rift, Reach and Haafingar. These four holds have all96 slots, and the full source covers99 of240 unique merchant/rank slots;
 the five class Novice extras share already covered slots. These are deliveries,
 which can include goods obtained from other craftspeople; they do not assert
 that the person returning them crafted them. Neither kind grants ordinary
@@ -71,6 +71,8 @@ and transaction fences. A similarly named bandit or skeever elsewhere does
 not count. Existing camp difficulty and animal habitat remain unchanged.
 
 ## Finite-purse commissions
+
+The [regional delivery catalogue](merchant-regional-deliveries.md) lists the69 additions in the Rift, Reach and Haafingar, with their exact references, source records, counts, gates and personal rest periods. Whiterun's first complete set is below.
 
 ### Complete Whiterun rank coverage
 
@@ -311,7 +313,7 @@ the current protocol does not preserve. Reconnecting does not move an already
 committed cooldown. Pending saves, missing goods and native inventory/stock
 capacity refusals preserve the accepted job and its original payment.
 
-The thirty-one commissions add no actor, spawn, harvest, purse refill, new currency
+The hundred commissions add no actor, spawn, harvest, purse refill, new currency
 or character inventory grant. Native inventory, pending-record and private
 ledger byte limits remain in force. No alpha reset is required for this slice.
 
@@ -328,7 +330,7 @@ The four published scene IDs and their full authored hashes are pinned in
 `merchant-quest-activation.json`. Published definitions are immutable; new
 deeds or rewards need new IDs while the old definitions remain available
 for accepted work. These are the four scene IDs admitted to the hot-reload bundle;
-the thirty-one commissions have their separate permanent publication contract above.
+the hundred commissions have their separate permanent publication contract above.
 
 At acceptance, the server reserves the original reward in the same character
 property transaction as its objective and copied terms. At completion,
