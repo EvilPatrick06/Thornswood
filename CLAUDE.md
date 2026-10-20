@@ -73,6 +73,38 @@ Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
 
+### Staff notices: post them yourself, in #staff-updates
+
+Decided by Patrick on 20 Oct (#2934): the notices Developer-Guide.md asks
+for (a line before an edit to one of the six shared files, taking the dev
+feed, what was merged or published) go in #staff-updates, channel
+1549254991082946570, and "the agents should do this themselves using the
+bot". A Claude posts its own. It never hands one to Patrick, never puts one
+on his to-dos and never asks a person to post it.
+
+```
+pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Editing Shell.cs for the scan button, pull request to follow."
+```
+
+It hands the notice over ssh to `C:\Thornswood-Watch\say-staff.ps1` on the
+box, which puts it in the watchdog's outbox, and the bot says it in
+#staff-updates within a minute (the watchdog's webhook when the bot is down).
+No Discord token or webhook is needed or touched. It prints the notice's id;
+`pwsh scripts/ops/Say-Staff.ps1 -Check <id>` says whether it was said (exit
+0 said, 2 still waiting). Say it the way staff read it: what, why, when, and
+the pull request's link. 1800 characters at most, 30 an hour, no mentions.
+
+It needs ssh to the box: on One and a developer's PC it works as it is, and
+in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`. An agent
+environment with no other way in may instead hold a notices key
+(`THORNSWOOD_NOTICE_KEY_B64` and `THORNSWOOD_NOTICE_TOKEN`, made on One with
+`Grant-BoxAccess.ps1 -Name <name> -MakeKey -NoticesOnly`), which can do
+nothing on the box but this. When it stops, what it prints is a failure like
+any other: fix it at its cause, or put it on the board with what it printed,
+and post the notice once it works. Write the notice into the pull request
+body meanwhile so the record is there. This is for staff notices only; it
+is not a way to post anything else in Discord.
+
 ### No band-aids, ever
 
 Decided by Patrick on 4 Oct, after a Claude answered a band-aid with a second

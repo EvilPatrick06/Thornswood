@@ -186,7 +186,7 @@ The words this guide uses. The long alphabetical list, with file names, is [docs
 
 Do this once on a new Windows PC. Stay in order. On every PC is the steps. Setting up a machine and Shipping from another machine are for a PC that will publish a release. You can read those two after the clone works.
 
-Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-general that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
+Use your own GitHub account. Patrick adds that account as a collaborator on the private repository before a clone will work. Say so in Discord and wait for that. Before your first change, read `LICENSE` at the root of the repository and say in #staff-updates that you agree to its contributor terms. You agree once, and it covers anything you contributed before. Use your own clone. The shared folder `C:\Users\evilp\Downloads\Thornswood-Repo` on the shipping machine is for the lanes that build from it. Your clone can live at `C:\Dev\Thornswood`, or any empty folder you own.
 
 ### On every PC
 
@@ -785,7 +785,7 @@ git switch main
 git pull
 ```
 
-When `Launcher builds` says pass, and you are confident in the change, merge it yourself. Say what you merged in #staff-general. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
+When `Launcher builds` says pass, and you are confident in the change, merge it yourself. Say what you merged in #staff-updates. On the website the button is **Squash and merge**. GitHub deletes the branch after a squash merge. A green check is required. Merge a pull request you understand. Leave one you do not.
 
 What you run after the merge depends on what the pull request touched. A dev release is [section 3](#3-how-to-release-to-dev). A main release is [section 4](#4-how-to-release-to-main).
 
@@ -1000,7 +1000,7 @@ How to use it:
   are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
 - A pull request that finishes an issue says `Closes #N`, so merging closes
-  it and the board moves it to Done. Say in the pull request, or in #staff-general,
+  it and the board moves it to Done. Say in the pull request, or in #staff-updates,
   which issues moved.
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
@@ -1080,7 +1080,7 @@ from the board, none of these three puts an issue aside:
   taken from Vortex's own mods folder, and nothing else of that folder is
   read. Scan names the folder, Fix and Settings point the launcher at it,
   and with no Steam copy on the machine it refuses (OwnGame.DeploysInto,
-  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-general.
+  Gather, tests\test-vortex-folder.ps1). Djinn to agree it in #staff-updates.
   Decided by Patrick on 29 Sep (#1218, #1226): the Steam copy is the
   person's, to play vanilla at any build with their own mods, and Thornswood
   runs entirely from its own folder. With the own folder chosen in the setup
@@ -1162,8 +1162,8 @@ from the board, none of these three puts an issue aside:
 - Every change goes out as one complete release: launcher, game files and
   server together, never a half.
 
-Anything that changes one of these is a few lines in #staff-general first: the
-problem, the approach, what it touches. Agreed in #staff-general by
+Anything that changes one of these is a few lines in #staff-updates first: the
+problem, the approach, what it touches. Agreed in #staff-updates by
 the team before code; nobody settles it alone, and a Claude never does.
 
 #### How work moves
@@ -1205,7 +1205,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   Patrick, that day: "we don't need the required check/reviewer at all anymore for anyone as long as we give verbal agreement and the VPS check goes through". So the rule is ours, not a setting:
   anybody on the team merges their own pull request once `Launcher builds`
   (the build check, on the VPS) is green and they have said what it is in
-  #staff-general. Nobody waits for Patrick. Force pushes are refused.
+  #staff-updates. Nobody waits for Patrick. Force pushes are refused.
   Because nothing enforces it, it has to be kept by hand: on 25 Sep 35 pull
   requests were merged with their VPS build red and 18 with no build at all,
   and main went red with them. Wait for `Launcher builds` to say pass before
@@ -1250,7 +1250,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   says which.
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
-  Say in #staff-general when you take it, because there is one dev feed and the last
+  Say in #staff-updates when you take it, because there is one dev feed and the last
   dev Ship wins. A main Ship leaves the Dev feed and baseline unchanged, apart
   from which dev notes are marked DEV (see Mark the dev notes again).
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
@@ -1361,7 +1361,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   with MSBuild from its project files, and that build is held to its sources
   (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
   fix that, and merge once it is green, you are confident in the change, and you have said so in
-  #staff-general. Run the test harnesses your change touches yourself. All
+  #staff-updates. Run the test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly
@@ -1376,7 +1376,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
   every runner's folder again without stopping a job.
 - Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
-  Publish-Update.ps1 without a line in #staff-general first; every machine touches those.
+  Publish-Update.ps1 without a line in #staff-updates first; every machine touches those.
 
 #### How work moves, the long form
 
@@ -1401,7 +1401,7 @@ this is the long form.
   `Launcher builds` in `.github/workflows/build.yml`, runs on every pull
   request on the VPS runner, and the rule is ours rather than a setting:
   merge your own pull request once it is green, you are confident in the change, and you have said so in
-  #staff-general. Nothing merges by itself: auto-merge is off on the repository, so
+  #staff-updates. Nothing merges by itself: auto-merge is off on the repository, so
   somebody presses merge or runs `gh pr merge --squash`. Each of us merges
   our own. Somebody else on the team reading a pull request first is a habit,
   not a setting. `.github/CODEOWNERS` asks the rest of the team for a review when
@@ -1416,14 +1416,14 @@ this is the long form.
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
-  server. There is one dev feed and the last dev Ship wins, so say in #staff-general
+  server. There is one dev feed and the last dev Ship wins, so say in #staff-updates
   when you take it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, the launcher build (MSBuild from
-  the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-general, agreed by the
+  the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-updates, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
-  `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-general too; every
+  `Updater.cs` or `Publish-Update.ps1` gets a line in #staff-updates; every
   machine touches them.
 - **The publisher receives the feed and the baseline from the VPS** at the
   start and asks again before `version.json` is edited: a feed somebody changed
@@ -1457,7 +1457,7 @@ this is the long form.
 
 ## 3. How to release to dev
 
-Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins. Say what you are about to publish in #staff-general first.
+Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins. Say what you are about to publish in #staff-updates first.
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
 
@@ -1520,7 +1520,7 @@ Ship already posts the note. These commands send nothing. They show what a secon
 
 ### What any developer may do
 
-Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-general first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
+Decided for the whole team: any developer may do every one of these. Confidence in the change, and a green `Launcher builds` check on the exact commit, are the gates for a merge. A release, a deploy, and a news post are the same people. Say what you are about to publish in #staff-updates first. Dev and Main each have one shared feed and one shared server, and the last Ship on a channel wins.
 
 The machine that runs `Ship.ps1` still has to sign the build. `records\signing\signing.json` has to be present and enabled, and the launcher tip has to be signed by the certificate the launcher already trusts. `.\scripts\release\Setup-ShipMachine.ps1` is how a machine gets there. Shipping from another machine, in First Time Setup, says which Azure sign-in can sign.
 
@@ -1554,7 +1554,7 @@ To post the current feed again:
 
 ## 4. How to release to main
 
-A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign, then say so in #staff-general. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
+A main release is for a security fix, for something that leaves the game untestable, or for work the team has agreed goes live. Any developer who is confident may run it, from a machine that can sign, then say so in #staff-updates. A main release runs from `main` after `git pull`, with a clean tree that matches GitHub.
 
 ### Move the version first
 
@@ -1623,7 +1623,7 @@ dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
 and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
-never #news. There is one dev feed and the last dev Ship wins, so say in #staff-general
+never #news. There is one dev feed and the last dev Ship wins, so say in #staff-updates
 when you take it. Main and Dev have independent feeds and baselines. A Main
 Ship leaves Dev's release unchanged; advance Dev through its own Ship. What a
 Main Ship does change on the dev feed is which notes are marked DEV and its
@@ -2240,7 +2240,7 @@ Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that 
 
 `engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
 
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general. Those files sit in `launcher\app` and `scripts\release`.
+Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-updates. Those files sit in `launcher\app` and `scripts\release`.
 
 Search one file from PowerShell:
 
@@ -2542,7 +2542,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
 
-Six files are shared by every machine. A line in #staff-general comes before an edit:
+Six files are shared by every machine. A line in #staff-updates comes before an edit:
 
 | File | Where |
 | --- | --- |
@@ -2553,7 +2553,7 @@ Six files are shared by every machine. A line in #staff-general comes before an 
 | [launcher/app/Updater.cs](launcher/app/Updater.cs) | The feed, the version, and applying a pack |
 | [scripts/release/Publish-Update.ps1](scripts/release/Publish-Update.ps1) | Builds the pack a Ship publishes |
 
-Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-general.
+Do not edit Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 without a line in #staff-updates.
 
 #### Learn more about the repository
 
