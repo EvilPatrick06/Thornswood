@@ -47,8 +47,9 @@ param(
     [int]$Port        = 7790,
     [string]$TaskName = 'Thornswood Bridge',
     # The address the outside check asks. The bridge answers a plain request
-    # with "not here", which the site never says, so that answer through
-    # here is the bridge and Caddy carrying it.
+    # with "box bridge: not here", which the site never says (its own 404 is
+    # "not here"), so that answer through here is the bridge and Caddy
+    # carrying it (#2875).
     [string]$Site     = 'https://thornswood.net',
     [int]$Wait        = 20,
     [switch]$Status,
@@ -58,6 +59,8 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# The bridge's answer to a plain request, the same line as PLAIN in bridge.js.
+$Plain = 'box bridge: not here'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
@@ -97,7 +100,11 @@ if (`$t) { `$i = Get-ScheduledTaskInfo -TaskName '$TaskName'; 'task      ' + `$t
 # Whether a token is there, never what it is.
 if (Test-Path -LiteralPath '$Root\token.txt') { 'token     there, so New-CloudAccess.ps1 has run' } else { 'token     NOT THERE, so every WebSocket is refused' }
 try { Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:$Port/' -TimeoutSec 5 | Out-Null; 'port      $Port answered 200, which the bridge never says' }
-catch { if (`$_.Exception.Response -and [int]`$_.Exception.Response.StatusCode -eq 404) { 'port      $Port answers as the bridge' } else { 'port      $Port did not answer: ' + `$_.Exception.Message } }
+catch {
+    if ("`$(`$_.ErrorDetails.Message)".Trim() -eq '$Plain') { 'port      $Port answers as the bridge' }
+    elseif (`$_.Exception.Response) { 'port      $Port answered ' + [int]`$_.Exception.Response.StatusCode + ' but not as the bridge: ' + "`$(`$_.ErrorDetails.Message)".Trim() }
+    else { 'port      $Port did not answer: ' + `$_.Exception.Message }
+}
 if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Content -LiteralPath '$log' -Tail 15 }
 "@ | ForEach-Object { Say "  $_" }
     Write-Host ''
@@ -252,13 +259,15 @@ function Register([bool]`$system) {
     Register-ScheduledTask -TaskName '$TaskName' -Action `$action -Trigger (New-ScheduledTaskTrigger -AtStartup) -Settings `$settings -Principal (New-ThornswoodServicePrincipal -AsSystem:`$system) | Out-Null
 }
 
-function Answers {
+# Whether the port answers a plain request with one of these lines, the
+# bridge's 404. A status code alone would take any other server on the port
+# for the bridge (#2875).
+function Answers([string[]]`$Lines) {
     `$until = (Get-Date).AddSeconds($Wait)
     while ((Get-Date) -lt `$until) {
         try { Invoke-WebRequest -UseBasicParsing 'http://127.0.0.1:$Port/' -TimeoutSec 2 | Out-Null }
         catch {
-            `$r = `$_.Exception.Response
-            if (`$r -and [int]`$r.StatusCode -eq 404) { return `$true }
+            if (`$Lines -contains "`$(`$_.ErrorDetails.Message)".Trim()) { return `$true }
         }
         Start-Sleep -Milliseconds 700
     }
@@ -288,7 +297,7 @@ if (-not `$AsSystem) {
 }
 try { & `$node.Source `$writer --log '$log' --days 90 --roll } catch { 'could not roll bridge.log: ' + `$_.Exception.Message }
 Start-ScheduledTask -TaskName '$TaskName'
-if (Answers) {
+if (Answers @('$Plain')) {
     'the bridge answers on 127.0.0.1:$Port'
     if (-not (Test-Path -LiteralPath '$Root\token.txt')) { 'there is no token.txt yet, so it refuses everybody until New-CloudAccess.ps1 runs' }
     'BRIDGE OK'; exit 0
@@ -302,7 +311,10 @@ if (`$oldXml) {
     if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false }
     Register-ScheduledTask -TaskName '$TaskName' -Xml `$oldXml | Out-Null
     Start-ScheduledTask -TaskName '$TaskName'
-    if (Answers) { 'the old files and task are back, and it answers again' } else { 'THE OLD FILES AND TASK ARE BACK AND IT STILL DOES NOT ANSWER' }
+    # The old files may be from before #2875, when the bridge's 404 said only
+    # "not here". Nothing but the bridge listens on this port, and the site's
+    # own "not here" can only come through Caddy, never here.
+    if (Answers @('$Plain', 'not here')) { 'the old files and task are back, and it answers again' } else { 'THE OLD FILES AND TASK ARE BACK AND IT STILL DOES NOT ANSWER' }
 } else {
     Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
     'there was no bridge before this, so none is left registered'
@@ -314,8 +326,9 @@ $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target $target -SshAr
 
 # ---------------------------------------------------------------- outside ---
 Head 'Checking from here'
-# A plain request through Caddy: the bridge says "not here" with a 404, and
-# the site says something else, so this tells whether Caddy carries /box/.
+# A plain request through Caddy: the bridge says "box bridge: not here" with
+# a 404, and the site's own 404 says only "not here", so this whole line tells
+# whether Caddy carries /box/ (#2875).
 $via = $Site.TrimEnd('/') + '/box/'
 $said = ''
 try { $said = (Invoke-WebRequest -UseBasicParsing $via -TimeoutSec 15).Content }
@@ -326,7 +339,7 @@ catch {
         if (-not $said -and $_.ErrorDetails) { $said = [string]$_.ErrorDetails.Message }
     } else { $said = 'no answer: ' + $_.Exception.Message }
 }
-if ("$said".Trim() -eq 'not here') {
+if ("$said".Trim() -eq $Plain) {
     Say "  $via reaches the bridge." 'Green'
 } else {
     Say "  $via did not reach the bridge, so Caddy does not carry /box/ yet. Setup-Domain.ps1 -TaskOnly does not send the Caddyfile; Setup-Domain.ps1 does." 'Yellow'
