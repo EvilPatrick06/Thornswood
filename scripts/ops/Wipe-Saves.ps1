@@ -55,6 +55,10 @@
                              piece kept, and come back with it if the wipe is
                              undone. The staff list is in that copy too, for
                              staff to confirm again on the fresh world.
+    private\furniture.json   the furniture set down in held buildings (#2679).
+                             The pieces are references in the world, so the
+                             register goes aside with it, or a fresh world
+                             would stand last world's furniture again.
     data\property.json and data\farm-claims.json, where both were until
                              25 September (issue #541: data is served to
                              anybody), so a wipe on a server still running
@@ -158,7 +162,7 @@ function Remote($script) {
 
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 # What a wipe moves aside, in each server folder: the header says why each one.
-$Moves = @('world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
+$Moves = @('world', 'private\characters.json', 'private\property.json', 'private\furniture.json', 'private\farm-claims.json',
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
            'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',

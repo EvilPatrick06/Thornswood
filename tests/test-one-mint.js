@@ -343,6 +343,8 @@ const WRITERS = {
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
   'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
   'outer/markWoven': [1, 'names a garment a Master Weaver just made: units split off a plain stack of the same base, so no base is added and the count is the same after (#1398, test-1398-fuel.js)'],
+  'furniture/takeOne': [1, 'takes one furniture item off a pack to set its piece down; it never adds (#2679)'],
+  'furniture/giveOne': [1, 'hands back one furniture item, a MISC out of game/data/furniture.json, for a piece picked up; never gold (#2679, test-2679-furniture.js)'],
   'durability/writePack': [1, 'writes back a pack or chest it has just read: a stack renamed for its condition, or a kit or a broken piece taken away. No base is added and no count grows (test-1384-condition.js)'],
   'hair dye/setPack': [1, 'writes back the pack it has just read: a hair dye\'s inputs taken and one entry named for the dye added to the list\'s item (a Bowl, never gold), or one dye taken away, or the pack it read put back when the hair would not take (#2675, test-2675-hair-dye-wiring.js)'],
   'property/boxLeave': [1, 'takes a stack off the pack into the drop box record, and refuses gold, which goes in through takeGold (#2298); it never adds'],

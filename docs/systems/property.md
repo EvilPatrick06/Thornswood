@@ -231,6 +231,40 @@ An outhouse or a pot would be relief for the optional meter on
 server is fully live says to add it. Until then the server does not
 treat an outhouse or a pot as furniture.
 
+## Furniture
+
+A holder can furnish the place (#2679). Chairs, benches, a bar stool,
+beds, a bedroll and chests are items: a Woodwright makes them at the
+woodworking bench, and anybody can sell or buy one in an ordinary
+[Trade](trade.md). They are on
+[the Woodwright's list](lists/woodworker-woodwright.md).
+
+Inside a building you hold, or whose deed or master key you carry, the
+inventory shows Arrange furniture on the lock key, X unless you changed
+it. It opens the furniture panel, which lists the pieces you carry.
+Place sets one down in front of you, facing you. Look at a piece set
+down there and the line under it offers Move on the key mold's key, U
+unless you changed it, and Pick up on the lock key. Move puts it in
+your hands for a minute: U sets it down in front of you, X turns it.
+Pick up puts the item back in your pack; a chest has to be empty
+first. There is nothing to type. A plain key lets you in and does not
+let you move the furniture.
+
+Furniture belongs to the building, not to whoever set it down. It is
+still there after a restart. When a claim lapses, the holder is
+evicted or the deed changes hands, it stays for the next holder, the
+same as the chests that were already there, and the next holder can
+move it or pick it up. Deleting or resetting a character ends their
+claims and leaves the furniture where it stands. A wipe takes it with
+the world.
+
+How many pieces a building takes, how far in front of you a piece is
+set, how near you have to be to move one, how long it stays in your
+hands and how far one press turns it are staff numbers in
+`game/data/furniture.json`, with the catalog. Tables, shelves and other
+statics are in the catalog and switched off until a dev check shows
+the server keeps one that was set down.
+
 ## A shop
 
 A shop is a claimed building and a notice on the hold's board. No rank
@@ -284,8 +318,9 @@ transfer. All of these numbers are staff data.
 ## Where this is
 
 Claims, deeds, the 14 day lapse, locks, molds, keys, master keys,
-stewards, eviction, rent, and the hold's drop box are in the server. The register
-is `private/property.json`. Eviction and the rent are
+stewards, eviction, rent, the hold's drop box and furniture are in the server. The register
+is `private/property.json`, and the furniture's is `private/furniture.json`, which
+names no person (the furniture block in `game/gamemode.js`). Eviction and the rent are
 the Office page of the K panel, for a steward (the Steward or the Jarl
 of a hold, by the Discord role); see
 [Offices](offices.md). The rent owed is on that page for the steward at the

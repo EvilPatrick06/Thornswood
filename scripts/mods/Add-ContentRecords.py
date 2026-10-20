@@ -909,6 +909,58 @@ def thornswood_records(passage, clam):
              REMEDY, ALCHEMY_KEYWORD),
         misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
     ]
+    # Placeable furniture (#2679), one MISC and one woodworking recipe a row.
+    out += furniture_records()
+    return out
+
+
+# THE FURNITURE (#2679). game\data\furniture.json is staff data: each row is
+# a piece a holder sets down in a building they may arrange, the MISC that
+# carries it in a pack and the woodworking recipe that makes it. A row is
+# written only while its type is on in limits.types, so a static (STAT, off
+# until a dev check shows the server keeps a placed one) is never a thing
+# somebody can make and not set down. The form ids are the row's own, so
+# turning a type on or off renumbers nothing. The item is the charcoal stick in
+# a pack, as every crafted MISC of this plugin is: the piece is what stands.
+FURNITURE_CATALOG = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                                 'game', 'data', 'furniture.json'))
+FURNITURE_RANGE = (0x5016000, 0x5016FFF)
+
+
+def furniture_rows(path=FURNITURE_CATALOG):
+    """The catalog's rows whose type is on, each checked: its ids in the range
+    this plugin keeps for furniture, its inputs Skyrim.esm records."""
+    doc = json.load(open(path, encoding='utf-8'))
+    types = (doc.get('limits') or {}).get('types') or {}
+    rows, seen = [], set()
+    for row in doc.get('pieces') or []:
+        if not types.get(row.get('type')):
+            continue
+        item = 0x5000000 | int(row['item'], 16)
+        recipe = 0x5000000 | int(row['recipe'], 16)
+        for fid in (item, recipe):
+            if not FURNITURE_RANGE[0] <= fid <= FURNITURE_RANGE[1] or fid in seen:
+                raise SystemExit('STOP. furniture row %s: 0x%07X is outside 0x%07X-0x%07X or taken twice. '
+                                 'Nothing was written.' % (row.get('key'), fid, FURNITURE_RANGE[0],
+                                                           FURNITURE_RANGE[1]))
+            seen.add(fid)
+        inputs = []
+        for desc, count in row['inputs']:
+            local, _, master = desc.partition(':')
+            if master.lower() != 'skyrim.esm' or int(count) < 1:
+                raise SystemExit('STOP. furniture row %s takes %s x%s; an input is a Skyrim.esm record, '
+                                 'one or more. Nothing was written.' % (row.get('key'), desc, count))
+            inputs.append((int(local, 16), int(count)))
+        rows.append((item, recipe, row['edid'], row['name'], int(row['value']), float(row['weight']), inputs))
+    return rows
+
+
+def furniture_records():
+    out = []
+    for item, recipe, edid, name, value, weight, inputs in furniture_rows():
+        out.append(misc(item, edid, name, CHARCOAL_MODEL, CHARCOAL_BOUNDS, value, weight))
+        out.append(cobj(recipe, edid.replace('ThornswoodFurniture', 'ThornswoodRecipeFurniture'),
+                        inputs, item, WOODWORKING_KEYWORD))
     return out
 
 
