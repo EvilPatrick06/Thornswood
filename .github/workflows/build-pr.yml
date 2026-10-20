@@ -452,7 +452,7 @@ jobs:
           # the folder it unpacked, which a scanner can stop Windows renaming;
           # builds forty artifacts of new bytes and names forty new files, every
           # one at once, and prints how often the old folder rename was refused
-          # here. About fifteen seconds.
+          # here. About forty seconds.
           # Issue #2771: tests\test-2771-text-contrast.js holds every launcher
           # theme and the DIY starter to 4.5 to 1 for every text colour on
           # every surface, Muted above Faint, ui.xaml's placeholders to Forge,
