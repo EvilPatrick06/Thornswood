@@ -138,6 +138,14 @@ Yes 'the stage is checked by hash and node --check before the bridge is stopped'
     $installCode.IndexOf('--check') -lt $installCode.IndexOf('if (-not (StopIt))'))
 Yes 'a bridge that does not answer gets the old files and the old task back' ($installCode -match 'Register-ScheduledTask -TaskName .Thornswood Bridge. -Xml \$oldXml' -and $installCode -match "BRIDGE ROLLED BACK")
 Yes 'StopIt stops only what names bridge.log, and the child it started' ($stopIt -match [regex]::Escape("like ('*' + 'C:\Thornswood-Bridge\bridge.log' + '*')") -and $stopIt -match 'ParentProcessId -eq')
+# #2875: the site's own 404 says "not here" too, so every check that the
+# bridge answers looks for its whole line, never a status code or "not here".
+$bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')
+Yes 'Install-Bridge.ps1 looks for the line bridge.js answers a plain request with (#2875)' (
+    $bridgeJs -match "const PLAIN = 'box bridge: not here';" -and $install -match "(?m)^\`$Plain = 'box bridge: not here'\r?$")
+Yes '  through Caddy, at the outside check' ($install -match 'if \("\$said"\.Trim\(\) -eq \$Plain\)' -and $install -notmatch "-eq 'not here'")
+Yes '  and on the port, at install and in the status, never by status code alone' (
+    $install -match "if \(Answers @\('\`$Plain'\)\)" -and $install -match "-eq '\`$Plain'\) \{ 'port" -and $installCode -notmatch 'StatusCode -eq 404')
 Yes 'the status says whether a token is there, never what it is' ($install -match "token     there" -and $install -notmatch 'Get-Content[^\r\n]*token\.txt')
 
 # ---- 3. New-CloudAccess.ps1 ----------------------------------------------

@@ -76,9 +76,14 @@ function refuse(socket, status, why) {
 let open = 0;
 let seq = 0;
 
+// A plain request gets a 404 with a line nothing else on the box says. The
+// site's own 404 is "not here", so Install-Bridge.ps1's checks look for this
+// whole line, and an answer from the site is never taken for the bridge (#2875).
+const PLAIN = 'box bridge: not here';
+
 const server = http.createServer((req, res) => {
   res.writeHead(404, { 'Content-Type': 'text/plain' });
-  res.end('not here\n');
+  res.end(PLAIN + '\n');
 });
 
 server.on('upgrade', (req, socket, head) => {
