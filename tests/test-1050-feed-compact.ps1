@@ -153,7 +153,8 @@ $writers = @{}
 $bad = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse -File -Filter '*.ps1')) {
     $text = [IO.File]::ReadAllText($f.FullName)
-    $rel = $f.FullName.Substring($Repo.Length + 1)
+    # Named with \ whatever the machine, the way $known names them.
+    $rel = $f.FullName.Substring($Repo.Length + 1).Replace([IO.Path]::DirectorySeparatorChar, '\')
     $vars = @([regex]::Matches($text, '\$(\w+)\s*=\s*Join-Path\s+[^\r\n]*?[''"]version\.json[''"]') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
     foreach ($n in $vars) {
         $e = [regex]::Escape($n)

@@ -472,9 +472,10 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     # too for anything else that still reads it.
     $env:THORNSWOOD_SCRATCH_ROOT = Join-Path $T 'scratch'
     New-Item -ItemType Directory -Force -Path $env:THORNSWOOD_SCRATCH_ROOT | Out-Null
-    $env:TEMP = Join-Path $T 'temp'
-    $env:TMP = $env:TEMP
-    New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null
+    $dryTemp = Join-Path $T 'temp'
+    $env:TEMP = $dryTemp
+    $env:TMP = $dryTemp
+    New-Item -ItemType Directory -Force -Path $dryTemp | Out-Null
     $env:TS_DRY_CALLS = $log
     $env:TS_GH_DL = $ghDl
     # The tag a main Ship of launcher\app\Updater.cs's 1.1.93 looks for.
