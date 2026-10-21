@@ -33,7 +33,12 @@
     7. -Revision through the API: GraphQL's downloadLink, the v2
        download_link, and the CDN, which never gets the key;
     8. Compare-NexusLayout.ps1 (#2969): a record against a copy of itself,
-       and against a game folder as Vortex leaves it, each difference named.
+       and against a game folder as Vortex leaves it, each difference named:
+       the plugin order held to the collection's plugin rules, which
+       layout.json carries, with drift where no rule binds only listed; a
+       plugin differing only in its light flag named as that; a file the
+       machine writes for itself and a switched off line with no plugin file
+       listed, not counted; and a record with no rules refused.
 
   OFF WINDOWS (#2969) every run writes only the record (-Record), because a
   game folder is laid out on Windows, and the same layout is held through
@@ -437,6 +442,8 @@ function RunCmp([string[]]$arguments) {
     $pr.WaitForExit()
     return [pscustomobject]@{ Code = $pr.ExitCode; Out = $o + $e.Result }
 }
+$ljr = Get-Content -Raw -LiteralPath (P $recDir 'layout.json') | ConvertFrom-Json
+Yes 'layout.json carries the collection''s plugin rules as it gives them' (@($ljr.pluginRules).Count -eq 2 -and $ljr.pluginRules[0].name -eq 'gamma.esp' -and @($ljr.pluginRules[0].after) -join ',' -eq 'alpha.esp' -and $ljr.pluginRules[1].name -eq 'alpha.esp' -and @($ljr.pluginRules[1].after) -join ',' -eq 'zeta.esp')
 $copy = P $T 'record-copy'
 New-Item -ItemType Directory -Force -Path $copy | Out-Null
 foreach ($n in 'files.txt', 'plugins.txt', 'loadorder.txt', 'layout.json') { Copy-Item -LiteralPath (P $recDir $n) -Destination (P $copy $n) }
@@ -462,12 +469,42 @@ function Deployed([bool]$extra) {
 Deployed $false
 Put (P $T 'game-plugins.txt') "# This file is used by Skyrim to keep track of your downloaded content.`r`n*Alpha.esp`r`n*Gamma.esp`r`n*Beta.esp`r`n*Eps.esp`r`nZeta.esp`r`n"
 $r = RunCmp @('-Record', $recDir, '-Vortex', $vg2, '-Plugins', (P $T 'game-plugins.txt'))
-YesR 'a Vortex deployment of the same files and plugin order is the same' ($r.Code -eq 0 -and $r.Out -match '13 files are the same in both' -and $r.Out -match 'The same: every file and the plugin order') $r
+YesR 'a Vortex deployment of the same files and plugin order is the same' ($r.Code -eq 0 -and $r.Out -match '13 files are the same in both' -and $r.Out -match 'The same: every file, and the plugin order keeps the collection''s rules') $r
 Deployed $true
 Put (P $vg2 'Data\Beta.esp') 'beta plugin, edited'
 Put (P $T 'game-plugins.txt') "*Alpha.esp`r`n*Beta.esp`r`n*Gamma.esp`r`n*Eps.esp`r`n*Zeta.esp`r`n*ccBGSSSE001-Fish.esm`r`n"
 $r = RunCmp @('-Record', $recDir, '-Vortex', $vg2, '-Plugins', (P $T 'game-plugins.txt'))
-YesR 'a mod made on the machine, a changed file and a moved plugin are each named' ($r.Code -eq 1 -and $r.Out -match 'Generated Files: 1 files, Data\\meshes\\made\.nif' -and $r.Out -match 'different bytes: 1' -and $r.Out -match 'Data\\Beta\.esp  layout: Beta \(file 900002\), Vortex: Mod-1' -and $r.Out -match 'plugins only in the other: 1' -and $r.Out -match 'position 2 of the 4 plugins both enable: Gamma\.esp here, Beta\.esp there' -and $r.Out -match 'Zeta\.esp is disabled here and enabled there') $r
+YesR 'a mod made on the machine, a changed file, a broken rule and a moved plugin are each named' ($r.Code -eq 1 -and $r.Out -match 'Generated Files: 1 files, Data\\meshes\\made\.nif' -and $r.Out -match 'different bytes: 1' -and $r.Out -match 'Data\\Beta\.esp  layout: Beta \(file 900002\), Vortex: Mod-1' -and $r.Out -match 'plugins only in the other: 1' -and $r.Out -match 'plugin rules broken there: 1' -and $r.Out -match 'Alpha\.esp is to load after Zeta\.esp, and loads before it there' -and $r.Out -match 'Zeta\.esp is disabled here and enabled there') $r
+Yes 'where no rule binds, a plugin placed elsewhere than the curator''s list is listed and not counted' ($r.Out -match 'differs from the curator''s list: 1, not a difference' -and $r.Out -match 'position 2 of the 4 plugins both enable: Gamma\.esp here, Beta\.esp there' -and $r.Out -match '(?m)^5 differences\.')
+# What the first run on One printed as 15 plain differences (#2969): a
+# plugin edited in its light flag only, files the machine writes for itself,
+# and a switched off line for a plugin that is gone.
+function Tes4([uint32]$flags, [byte]$last) { $b = New-Object byte[] 24; [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0); [BitConverter]::GetBytes([uint32]0).CopyTo($b, 4); [BitConverter]::GetBytes($flags).CopyTo($b, 8); $b[23] = $last; return , $b }
+function PutBytes([string]$path, [byte[]]$b) { New-Item -ItemType Directory -Force -Path (Split-Path -Parent $path) | Out-Null; [IO.File]::WriteAllBytes($path, $b) }
+$rec9 = P $T 'record-kinds'; $vg9 = P $T 'vortex-kinds'
+PutBytes (P $T 'kinds-light.esp') (Tes4 0 1); PutBytes (P $T 'kinds-other.esp') (Tes4 0 2)
+Put (P $T 'kinds-snct.ini') ''; Put (P $T 'kinds-a.log') 'shipped'
+$kinds = [ordered]@{ 'Data\Light.esp' = 'kinds-light.esp'; 'Data\Other.esp' = 'kinds-other.esp'; 'Data\SKSE\Plugins\EngineFixes_SNCT.ini' = 'kinds-snct.ini'; 'Data\SKSE\Plugins\a.log' = 'kinds-a.log' }
+$fl = @('# Install-NexusRevision.ps1: collection 7essxf revision 9. sha256, size, Nexus file id, path in the game folder.')
+foreach ($k in $kinds.Keys) { $src = P $T $kinds[$k]; $fl += ((Sha $src) + "`t" + (Get-Item -LiteralPath $src).Length + "`t900009`t" + $k) }
+Put (P $rec9 'files.txt') (($fl -join "`r`n") + "`r`n")
+Put (P $rec9 'plugins.txt') "# Install-NexusRevision.ps1: collection 7essxf revision 9`r`n*Light.esp`r`n*Other.esp`r`n"
+Put (P $rec9 'layout.json') ([ordered]@{ schema = 1; mods = @([ordered]@{ name = 'Kinds'; fileId = 900009 }); plugins = @(); pluginRules = @([ordered]@{ name = 'other.esp'; after = @('light.esp') }) } | ConvertTo-Json -Depth 5)
+PutBytes (P $vg9 'Data\Light.esp') (Tes4 0x200 1)
+PutBytes (P $vg9 'Data\Other.esp') (Tes4 0x200 3)
+Put (P $vg9 'Data\SKSE\Plugins\EngineFixes_SNCT.ini') "[Volumes]`r`nMusic=0.4`r`n"
+Put (P $vg9 'Data\SKSE\Plugins\a.log') 'written in game'
+Put (P $vg9 'Data\vortex.deployment.json') ([ordered]@{ instance = 'x'; version = 1; deploymentMethod = 'hardlink'; files = @($kinds.Keys | ForEach-Object { [ordered]@{ relPath = $_.Substring(5); source = 'Kinds-9'; target = '' } }) } | ConvertTo-Json -Depth 5)
+Put (P $T 'kinds-plugins.txt') "*Light.esp`r`n*Other.esp`r`nGone.esp`r`n"
+$r = RunCmp @('-Record', $rec9, '-Vortex', $vg9, '-Plugins', (P $T 'kinds-plugins.txt'))
+YesR 'a plugin that is the record''s bytes but for the light flag is named as that, and counted' ($r.Code -eq 1 -and $r.Out -match 'but for the light flag in the plugin''s header: 1' -and $r.Out -match 'Data\\Light\.esp  set here, Kinds \(file 900009\)') $r
+Yes 'a plugin that differs in more than the flag is still different bytes' ($r.Out -match 'different bytes: 1' -and $r.Out -match 'Data\\Other\.esp  layout: Kinds')
+Yes 'the sound volumes Engine Fixes saves and a log are written on the machine, listed and not counted' ($r.Out -match 'written on this machine for itself \(a log, a setting saved there\): 2, not a difference' -and $r.Out -match 'EngineFixes_SNCT\.ini' -and $r.Out -match '(?m)^2 differences\.')
+Yes 'a switched off line with no plugin file in Data is listed and not counted' ($r.Out -match 'no file in Data, so the game loads nothing for them: 1, not a difference' -and $r.Out -match 'Gone\.esp' -and $r.Out -notmatch 'plugins only in the other' -and $r.Out -notmatch 'rules broken')
+$lj9 = Get-Content -Raw -LiteralPath (P $rec9 'layout.json') | ConvertFrom-Json
+Put (P $rec9 'layout.json') ([ordered]@{ schema = 1; mods = $lj9.mods; plugins = @() } | ConvertTo-Json -Depth 5)
+$r = RunCmp @('-Record', $rec9, '-Vortex', $vg9, '-Plugins', (P $T 'kinds-plugins.txt'))
+YesR 'a record written before layout.json carried the rules is refused, and says how to write it again' ($r.Code -eq 1 -and $r.Out -match 'has no pluginRules' -and $r.Out -match 'Install-NexusRevision\.ps1 -Record') $r
 
 # ---- the key, across every run ---------------------------------------------------
 Yes ('no run printed the key, in ' + $script:outs.Count + ' runs') (@($script:outs | Where-Object { $_.Contains($KEY) }).Count -eq 0)
