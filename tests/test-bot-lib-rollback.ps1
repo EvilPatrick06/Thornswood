@@ -162,7 +162,8 @@ if ($start -lt 0) { throw 'service swap block not found' }
 $start = $swap.IndexOf("`n", $start) + 1
 $end = $swap.IndexOf("`n'@", $start)
 if ($end -lt 0) { throw 'service swap block did not end' }
-$block = $swap.Substring($start, $end - $start)
+# With StopAndMove.ps1 in front, as Swap.ps1 puts it (#2928).
+$block = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\StopAndMove.ps1')) + "`r`n" + $swap.Substring($start, $end - $start)
 [IO.File]::WriteAllText($blockPath, $block)
 
 $child = Join-Path $work 'run-swap.ps1'

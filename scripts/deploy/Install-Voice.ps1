@@ -442,8 +442,11 @@ if ('$Bind' -eq '127.0.0.1') {
   A bare Unregister-ScheduledTask leaves the process it started running, so
   the old node kept the port, the new one died on the bind, and every check
   connected to the orphan and called it success: days of voice-server changes
-  went to disk and never ran. So: stop the task, then kill anything of ours
-  still running, then wait for the port to actually let go.
+  went to disk and never ran. So: find what is ours and open it, stop the
+  task, end whatever of ours is still running, and wait until each of them has
+  exited (StopAndMove.ps1, #2928), so the port is free and no file is still
+  open when the swap renames it. Until 20 Oct this waited for the port to let
+  go instead, fifteen seconds at most, and the renames were tried ten times.
 
   Ours, and only ours. This used to kill every node running voice-server.js,
   whatever folder it ran from, and there are two of these services, live and
@@ -456,7 +459,6 @@ if ('$Bind' -eq '127.0.0.1') {
   process there is, which is how this killed live twice on 18 September.
 #>
 function StopIt {
-    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
     `$mine = @()
     foreach (`$p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
         if (-not `$p.CommandLine) { continue }
@@ -468,37 +470,36 @@ function StopIt {
                   Where-Object { `$_.OwningProcess -eq `$p.ProcessId }
         if (`$onPort) { `$mine += `$p.ProcessId }
     }
-    `$killed = 0
+    # The parent shell of each too, so it cannot outlive the node it started.
+    `$shells = @()
     foreach (`$id in (`$mine | Select-Object -Unique)) {
-        # The parent shell first, so it cannot outlive the node it started.
         `$par = (Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$id) -EA SilentlyContinue).ParentProcessId
-        Stop-Process -Id `$id -Force -EA SilentlyContinue
         if (`$par) {
             `$pp = Get-CimInstance Win32_Process -Filter ("ProcessId=" + `$par) -EA SilentlyContinue
-            if (`$pp -and `$pp.Name -eq 'cmd.exe') { Stop-Process -Id `$par -Force -EA SilentlyContinue }
+            if (`$pp -and `$pp.Name -eq 'cmd.exe') { `$shells += [int]`$par }
         }
-        `$killed++
     }
+    `$held = @(Get-ThornswoodProcessHeld (@(`$mine) + @(`$shells)))
+    `$ThornswoodNotHeld
+    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
+    Stop-ThornswoodProcessHeld `$held
+    `$killed = @(`$mine | Select-Object -Unique).Count
     if (`$killed) { "stopped `$killed old voice process(es) for this root" }
     `$others = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue |
                 Where-Object { `$_.CommandLine -like '*voice-server.js*' })
     if (`$others.Count) { "left " + `$others.Count + " other voice process(es) alone" }
+    # Ours have exited, so anything on the port now is not ours, and is said.
     # A try that throws has not looked, so it is not taken for a free port.
-    `$free = `$false
+    `$busy = `$false
     `$why = ''
-    for (`$i = 0; `$i -lt 30; `$i++) {
-        `$busy = `$false
-        `$c = New-Object Net.Sockets.TcpClient
-        try {
-            `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
-            `$busy = `$c.Connected; `$why = ''
-        } catch { `$why = `$_.Exception.Message }
-        finally { `$c.Close() }
-        if (-not `$busy -and -not `$why) { `$free = `$true; break }
-        Start-Sleep -Milliseconds 500
-    }
-    if (-not `$free -and `$why) { 'could not tell whether port $Port up here is free: ' + `$why }
-    elseif (-not `$free) { 'something is still holding port $Port up here and would not let go' }
+    `$c = New-Object Net.Sockets.TcpClient
+    try {
+        `$null = `$c.BeginConnect('127.0.0.1', $Port, `$null, `$null).AsyncWaitHandle.WaitOne(300)
+        `$busy = `$c.Connected
+    } catch { `$why = `$_.Exception.Message }
+    finally { `$c.Close() }
+    if (`$why) { 'could not tell whether port $Port up here is free: ' + `$why }
+    elseif (`$busy) { 'something that is not ours is holding port $Port up here' }
 }
 
 # Any other task that starts voice-server.js from this root (#2008). The
@@ -624,7 +625,9 @@ function Why {
   install, after the same lines above, in place of the swap: what answers
   now is what must answer again, under the new task, and if it does not, the
   task it had goes back, exported above exactly as it was, and is started.
-  The last line is TASK OK or TASK ROLLED BACK.
+  The last line is TASK OK or TASK ROLLED BACK. StopIt ends what it stops
+  through StopAndMove.ps1 (Swap.ps1's $ThornswoodStopAndMoveText), which goes
+  in front, as it does in front of the swap.
 #>
 $taskOnlyBlock = @'
 $Rolling = $false
@@ -658,7 +661,7 @@ exit 1
 
 if ($TaskOnly) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
-    $taskOut = @(Remote ($vars + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
     Say 'registered again, and voice answers under the new task' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
