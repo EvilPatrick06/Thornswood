@@ -64,6 +64,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
 . (Join-Path $Here '..\mods\Generated.ps1')
+. (Join-Path $Here '..\deploy\Fresh-Checkout.ps1')
 $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
@@ -321,6 +322,24 @@ function Get-PackageLauncherRows([string]$Current, $Feed, [string]$Exe) {
     'downloads it from the feed, checks its sha256 and signature, and puts it there before -Package (#2661)') $null 'either' 'warn')
 }
 
+# WHAT SHIP ASKS OF THE CHECKOUT, from the same answer Ship gets (#2981).
+# Ship refuses, on both channels, unless Fresh-Checkout.ps1 says the checkout
+# is exactly origin/main (or the pushed branch a dev Ship may come from) with
+# nothing tracked changed. This map used to ask its own questions instead: on
+# dev it skipped behind altogether and called an uncommitted change a note,
+# saying a dev Ship builds from the working tree, which stopped being true
+# when #2118 put the freshness gate in front of every Ship. So on 20 Oct
+# it said READY on One's shared clone two minutes before Ship refused it for
+# engine\skymp sitting behind main's pin. $State is Get-FreshCheckoutState's
+# answer, asked with the -AnyBranch Ship would pass, so the row is a gap
+# exactly when Ship would refuse, with the line that closes it.
+function Get-CheckoutRows($State) {
+  $rows = @()
+  $rows += New-Row 'the checkout is current and clean, as Ship asks (Fresh-Checkout.ps1)' ([bool]$State.Ok) ([string]$State.Message) `
+    $(if ($State.Ok) { $null } else { [string]$State.Fix })
+  return $rows
+}
+
 # WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
 # mods only included, when records\signing\signing.json is missing, disabled or names a
 # profile that is not filled in (Get-SigningConfigRefusal, Assert-PublishSigned.ps1),
@@ -363,28 +382,15 @@ Ready 'this is a git clone' $isClone $RepoDir 'git clone https://github.com/Evil
 
 if ($isClone) {
   $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
-  $dirty  = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
-  & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
-  $behind = 0
-  try { $behind = [int]((& git -C $RepoDir rev-list --count "HEAD..origin/$branch" 2>$null | Out-String).Trim()) } catch { $behind = 0 }
-
   if ($Dev) {
-    Say ("  note  a dev release may ship from any branch. This is " + $branch + ".") 'DarkGray'
+    Say ("  note  a dev release may ship from any pushed branch. This is " + $branch + ".") 'DarkGray'
   } else {
     Ready 'on main' ($branch -eq 'main') ("on " + $branch) 'git checkout main' 'either'
-    Ready 'not behind origin/main' ($behind -eq 0) ("$behind behind") 'git pull' 'either'
   }
-  if ($dirty.Count) {
-    # A main Ship refuses a release with anything uncommitted and writes
-    # nothing (22 Sep, f917dd8). That is a gap: it would stop a Ship. A dev
-    # Ship builds from the working tree, so the same state is only a note.
-    if ($Dev) {
-      Say ("  note  " + $dirty.Count + " uncommitted change(s). A dev Ship builds from those changes as they are.") 'DarkGray'
-    } else {
-      Ready 'nothing uncommitted' $false ($dirty.Count.ToString() + ' uncommitted change(s). A main Ship refuses while anything is uncommitted.') `
-        'Commit them through a pull request, or put them back. A main Ship writes nothing to the repository.'
-    }
-  }
+  # Behind, ahead, diverged and uncommitted, each a gap on both channels,
+  # because Ship refuses each on both (Get-CheckoutRows above).
+  $fresh = Get-FreshCheckoutState -RepoDir $RepoDir -AnyBranch:(Test-FreshAnyBranch -RepoDir $RepoDir -Channel $Channel)
+  foreach ($r in @(Get-CheckoutRows $fresh)) { Show-Row $r }
 }
 
 # ------------------------------------------------------------ GitHub --
