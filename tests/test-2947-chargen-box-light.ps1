@@ -6,21 +6,29 @@
 
   Check-Chargen.ps1 -From dev and -From live read which plugins are light on
   the box, from the files the server loads, and whether its engine loads
-  them from the server's own server-build.json (#2947).
+  them from the server's own server-build.json (#2947). In the same call
+  they read the plugin records from the Thornswood-Content.esp its load
+  order names and the gamemode.js the server runs (#2950).
 
   WHY. Until #2947 both came from the machine running the check: the headers
   in -Data (C:\Thornswood\Game\Data) and this checkout's record. On a machine
   with no game folder, a cloud one, Get-ThornswoodLightTest threw on the
   first plugin it could not find, so the check stopped before it said
   anything; and a game folder holding another copy of a plugin answered for
-  a file the server does not load.
+  a file the server does not load. The plugin records and the gamemode were
+  read from -Data and -Dist the same way until #2950, so for a server they
+  described files it does not run, and failed with "not found" on a cloud
+  machine.
 
   HOW. The script the check sends is lifted out of Check-Chargen.ps1,
   expanded here with the values the check would give it (the server root and
   Test-ThornswoodPluginLight from ServerOrder.ps1), and run in Windows
   PowerShell, what sshd runs on the box, against a server folder made in a
-  temp folder: a server-settings.json, a server-build.json and plugin files
-  whose TES4 headers say light or not. Nothing connects to anything.
+  temp folder: a server-settings.json, a server-build.json, plugin files
+  whose TES4 headers say light or not, a Thornswood-Content.esp with BOOK and
+  MESG groups, and a gamemode.js. The two readers Check-Chargen.ps1 sends up
+  with it are lifted out of it by the parser, as is its list of what a
+  gamemode should mention. Nothing connects to anything.
 #>
 [CmdletBinding()]
 param()
@@ -59,6 +67,31 @@ Yes '  and the server''s own server-build.json' ($body.Contains('$root\server-bu
 # Only the build on this machine reads -Data and this checkout's record.
 $build = [regex]::IsMatch($text, "if \(\`$From -eq 'build'\) \{\s*\`$lightTest = Get-ThornswoodLightTest")
 Yes 'a server''s light plugins are not read from -Data' ($build -and ([regex]::Matches($text, 'Get-ThornswoodLightTest')).Count -eq 1)
+Yes 'it reads the plugin records and the gamemode there, sent up with it (#2950)' (
+    $body.Contains('$recordsDef') -and $body.Contains('Read-ThornswoodChargenRecords `$esp') -and
+    $body.Contains('$gmDef') -and $body.Contains('Find-ThornswoodGamemodeText `$gm @($needleList)'))
+# -Data and -Dist are read in the build's branch and nowhere else.
+$buildAt = $text.IndexOf("if (`$From -eq 'build') {")
+$elseAt = if ($buildAt -ge 0) { $text.IndexOf('} else {', $buildAt) } else { -1 }
+$espRead = "Join-Path `$Data 'Thornswood-Content.esp'"
+$gmRead = "Join-Path `$Dist 'gamemode.js'"
+Yes 'a server''s plugin records and gamemode are not read from -Data or -Dist' (
+    $buildAt -ge 0 -and $elseAt -gt $buildAt -and
+    ([regex]::Matches($text, [regex]::Escape($espRead))).Count -eq 1 -and ([regex]::Matches($text, [regex]::Escape($gmRead))).Count -eq 1 -and
+    $text.IndexOf($espRead) -gt $buildAt -and $text.IndexOf($espRead) -lt $elseAt -and
+    $text.IndexOf($gmRead) -gt $buildAt -and $text.IndexOf($gmRead) -lt $elseAt)
+
+# The readers and the list, lifted out of the check by the parser: the check
+# runs its own work at the top level, so it cannot be dot-sourced.
+$ast = [Management.Automation.Language.Parser]::ParseFile($check, [ref]$null, [ref]$null)
+foreach ($name in 'Read-ThornswoodChargenRecords', 'Find-ThornswoodGamemodeText') {
+    $fn = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true))
+    Yes "Check-Chargen.ps1 defines $name once" ($fn.Count -eq 1)
+    . ([scriptblock]::Create($fn[0].Extent.Text))
+}
+$needlesAt = @($ast.FindAll({ param($n) $n -is [Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$gmNeedles' }, $false))
+Yes 'Check-Chargen.ps1 sets $gmNeedles once' ($needlesAt.Count -eq 1)
+. ([scriptblock]::Create($needlesAt[0].Extent.Text))
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-chargen-light-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path (Join-Path $tmp 'plugins') -Force | Out-Null
@@ -72,16 +105,59 @@ function Write-Plugin([string]$name, [bool]$light) {
     [IO.File]::WriteAllBytes((Join-Path (Join-Path $tmp 'plugins') $name), $b)
 }
 
-# $engine is the server-build.json text, or $null for none.
-function Run-Remote([string[]]$order, $engine) {
+# A record or group: tag, size, then 16 bytes (flags, form id, ...) and data.
+# For a GRUP the size counts its own 24 bytes and the label is at 8.
+function Get-Record([string]$tag, [uint32]$formId, [string]$data) {
+    $d = [Text.Encoding]::ASCII.GetBytes($data)
+    $b = New-Object byte[] (24 + $d.Length)
+    [Text.Encoding]::ASCII.GetBytes($tag).CopyTo($b, 0)
+    [BitConverter]::GetBytes([uint32]$d.Length).CopyTo($b, 4)
+    [BitConverter]::GetBytes($formId).CopyTo($b, 12)
+    $d.CopyTo($b, 24)
+    return ,$b
+}
+function Get-Group([string]$label, [byte[][]]$records) {
+    $inner = New-Object Collections.Generic.List[byte]
+    foreach ($r in $records) { $inner.AddRange($r) }
+    $b = New-Object byte[] (24 + $inner.Count)
+    [Text.Encoding]::ASCII.GetBytes('GRUP').CopyTo($b, 0)
+    [BitConverter]::GetBytes([uint32](24 + $inner.Count)).CopyTo($b, 4)
+    [Text.Encoding]::ASCII.GetBytes($label).CopyTo($b, 8)
+    $inner.ToArray().CopyTo($b, 24)
+    return ,$b
+}
+# The content plugin, at $folder under the temp folder.
+function Write-Content([string]$folder) {
+    $all = New-Object Collections.Generic.List[byte]
+    $all.AddRange([byte[]](Get-Record 'TES4' 0 'HEDR'))
+    $all.AddRange([byte[]](Get-Group 'BOOK' @(
+        (Get-Record 'BOOK' 0x05E80030 'EDIDxFULLxMODLx'),
+        (Get-Record 'BOOK' 0x05E80031 'EDIDxFULLx'),
+        (Get-Record 'BOOK' 0x05E80000 'EDIDxMODLx'))))
+    $all.AddRange([byte[]](Get-Group 'MESG' @(,(Get-Record 'MESG' 0x05E80050 'ITXTaITXTbITXTc'))))
+    $dir = Join-Path $tmp $folder
+    New-Item -ItemType Directory -Path $dir -Force | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $dir 'Thornswood-Content.esp'), $all.ToArray())
+}
+
+# $engine is the server-build.json text, or $null for none. An entry of
+# $order is written as a full path under plugins, the way both servers name
+# theirs, unless it starts with ':', which is written as it stands after it.
+# $more is added to the settings.
+function Run-Remote([string[]]$order, $engine, [hashtable]$more = @{}) {
     $root = $tmp
     $settingsPath = Join-Path $tmp 'server-settings.json'
-    $settings = [ordered]@{ port = 7787; loadOrder = @($order | ForEach-Object { (Join-Path (Join-Path $tmp 'plugins') $_).Replace('\', '/') }) }
+    $settings = [ordered]@{ port = 7787; dataDir = 'data'; loadOrder = @($order | ForEach-Object {
+        if ($_.StartsWith(':')) { $_.Substring(1) } else { (Join-Path (Join-Path $tmp 'plugins') $_).Replace('\', '/') } }) }
+    foreach ($k in $more.Keys) { $settings[$k] = $more[$k] }
     [IO.File]::WriteAllText($settingsPath, ($settings | ConvertTo-Json -Depth 5), (New-Object Text.UTF8Encoding $false))
     $rp = Join-Path $tmp 'server-build.json'
     if ($null -eq $engine) { Remove-Item -LiteralPath $rp -Force -ErrorAction SilentlyContinue }
     else { [IO.File]::WriteAllText($rp, $engine, (New-Object Text.UTF8Encoding $false)) }
     $lightDef = 'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}"
+    $recordsDef = 'function Read-ThornswoodChargenRecords {' + "`n" + (Get-Command Read-ThornswoodChargenRecords).Definition + "`n}"
+    $gmDef = 'function Find-ThornswoodGamemodeText {' + "`n" + (Get-Command Find-ThornswoodGamemodeText).Definition + "`n}"
+    $needleList = (@($gmNeedles | ForEach-Object { "'" + $_.Text.Replace("'", "''") + "'" }) -join ', ')
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($body)
     $file = Join-Path $tmp 'remote.ps1'
     [IO.File]::WriteAllText($file, $expanded, (New-Object Text.UTF8Encoding $true))
@@ -112,6 +188,45 @@ try {
 
     $said = Run-Remote @('Skyrim.esm', 'Mystery.esp', 'Skyrim Unbound.esp') '{ "lightPlugins": true }'
     Yes 'a plugin the server does not have is named, not guessed' ($said -contains 'UNREAD Mystery.esp' -and -not @($said | Where-Object { $_ -like 'LIGHT * Mystery.esp' }).Count)
+
+    # #2950: the plugin records and the gamemode, from the server's files.
+    Yes 'no Thornswood-Content.esp in the order: PLUGIN NONE' ($said -contains 'PLUGIN NONE')
+    Yes 'no gamemode.js in the server folder: GAMEMODE MISSING, naming it' ($said -contains ('GAMEMODE MISSING ' + (Join-Path $tmp 'gamemode.js')))
+
+    $order2 = @('Skyrim.esm', 'Thornswood-Content.esp', 'Skyrim Unbound.esp')
+    $said = Run-Remote $order2 '{ "lightPlugins": true }'
+    $esp = (Join-Path (Join-Path $tmp 'plugins') 'Thornswood-Content.esp').Replace('\', '/')
+    Yes 'a plugin the order names that is not there: PLUGIN MISSING, naming it' ($said -contains ('PLUGIN MISSING ' + $esp))
+
+    Write-Content 'plugins'
+    $said = Run-Remote $order2 '{ "lightPlugins": true }'
+    Yes 'the plugin the order names is read: PLUGIN AT its path' ($said -contains ('PLUGIN AT ' + $esp))
+    Yes '  each BOOK with whether it has a name and a mesh' (
+        ($said -contains 'BOOK 05E80030 1 1') -and ($said -contains 'BOOK 05E80031 1 0') -and ($said -contains 'BOOK 05E80000 0 1'))
+    Yes '  and each MESG with its buttons' ($said -contains 'MESG 05E80050 3')
+    $local = @(Read-ThornswoodChargenRecords (Join-Path (Join-Path $tmp 'plugins') 'Thornswood-Content.esp'))
+    Yes '  and the box says what the build''s own read says' (
+        $local.Count -eq 4 -and @($local | Where-Object { $said -notcontains $_ }).Count -eq 0)
+
+    # A load order entry that is not a full path is under dataDir.
+    Write-Content 'data'
+    $said = Run-Remote @('Skyrim.esm', ':Thornswood-Content.esp', 'Skyrim Unbound.esp') '{ "lightPlugins": true }'
+    Yes 'an entry that is not a full path is read under dataDir' ($said -contains ('PLUGIN AT ' + (Join-Path (Join-Path $tmp 'data') 'Thornswood-Content.esp')))
+
+    $want = @($gmNeedles | ForEach-Object { $_.Text })
+    [IO.File]::WriteAllText((Join-Path $tmp 'gamemode.js'), ('const a = "' + $want[0] + '";' + "`n"), (New-Object Text.UTF8Encoding $false))
+    $said = Run-Remote $order2 '{ "lightPlugins": true }'
+    Yes 'the server folder''s gamemode.js is read: GAMEMODE AT its path' ($said -contains ('GAMEMODE AT ' + (Join-Path $tmp 'gamemode.js')))
+    Yes '  and it says which of the check''s texts it holds' (
+        ($said -contains ('HAS 1 ' + $want[0])) -and @($want | Select-Object -Skip 1 | Where-Object { $said -notcontains ('HAS 0 ' + $_) }).Count -eq 0)
+
+    # The engine's rule: a skymp5-gamemode folder wins over gamemode.js, and
+    # the settings' gamemodePath over both.
+    New-Item -ItemType Directory -Path (Join-Path $tmp 'skymp5-gamemode') -Force | Out-Null
+    $said = Run-Remote $order2 '{ "lightPlugins": true }'
+    Yes 'with a skymp5-gamemode folder, its gamemode.js is the one read' ($said -contains ('GAMEMODE MISSING ' + (Join-Path $tmp 'skymp5-gamemode\gamemode.js')))
+    $said = Run-Remote $order2 '{ "lightPlugins": true }' @{ gamemodePath = 'gm\main.js' }
+    Yes 'with a gamemodePath, that is the one read' ($said -contains ('GAMEMODE MISSING ' + (Join-Path $tmp 'gm\main.js')))
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
