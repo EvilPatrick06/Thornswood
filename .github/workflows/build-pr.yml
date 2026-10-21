@@ -555,7 +555,12 @@ jobs:
           # a zip entry), and Compare-NexusLayout.ps1 against a record and a
           # made-up Vortex deployment; off Windows it runs record-only. Under
           # a minute.
+          # Issue #2935: tests\test-check-serena.ps1 drives
+          # scripts\dev\Check-Serena.ps1 against a stand-in MCP server: a
+          # quick answer, a slow one, one that never answers, and no process
+          # left behind. About ten seconds.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-check-serena.ps1',
                  'test-2821-launcher-compiler.ps1', 'test-feed-notice.ps1', 'test-prior-acceptance.ps1', 'test-setup-own-folder.ps1',
                  'test-skyrim-pin.ps1', 'test-mustcopy-distribution.ps1', 'test-browser-args.ps1', 'test-installer-own-payload.ps1',
                  'test-load-order.ps1', 'test-log-upload.ps1', 'test-no-bethesda-files.ps1', 'test-payload-hash.ps1',

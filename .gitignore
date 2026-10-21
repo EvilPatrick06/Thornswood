@@ -113,3 +113,9 @@ bot/data/
 # C:\ThornswoodTemps&Worktrees on One.
 /temp/
 /worktrees/
+
+# Serena's project folder (#2935). Serena is started with --project-from-cwd,
+# so the first Claude Code session in a checkout writes .serena here: its
+# project.yml, its memories and its caches, all about that one machine's
+# sessions. scripts\dev\Check-Serena.ps1 starts it here too.
+/.serena/
