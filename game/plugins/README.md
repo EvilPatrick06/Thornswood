@@ -36,8 +36,10 @@ From the repo folder, with the game closed:
 .\scripts\release\Go.ps1 -SkipServer
 ```
 
-copies every `.js` here into `C:\Thornswood\Game\Data\Platform\Plugins`
-(`-Game` names another game folder, such as the dev build's), puts the page
+copies every `.js` here into `Game\Data\Platform\Plugins` under the launcher
+install, which `Where.ps1 Install` finds (`C:\Thornswood` on most machines,
+Thornswood on another drive when the launcher is there; `-Game` names
+another game folder, such as the dev build's), puts the page
 and the overlays from `game\ui` beside them, and removes anything in that
 folder that is not ours. It also puts the menu art and the recorded client in
 place. `-SkipServer` matters: without it Go.ps1 also copies
