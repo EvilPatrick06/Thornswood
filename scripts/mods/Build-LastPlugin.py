@@ -1370,12 +1370,15 @@ def build(data_dir):
     for kind, g, e, prev in swapped:
         what = '%s %s' % (kind.decode(), desc_of(g, canon))
         try:
-            same = copy_record(plugins[e.pi], e, rn, strings, what) == \
-                copy_record(plugins[prev.pi], prev, rn, strings, what)
-        except (ValueError, SystemExit):
-            same = False
-        if not same:
-            differs.append('%s: %s changes it from %s' % (what, plugins[e.pi].name, plugins[prev.pi].name))
+            mine = copy_record(plugins[e.pi], e, rn, strings, what)
+            theirs = copy_record(plugins[prev.pi], prev, rn, strings, what)
+            changed = sorted({t.decode() for t, b in mine if (t, b) not in theirs} |
+                             {t.decode() for t, b in theirs if (t, b) not in mine})
+        except (ValueError, SystemExit) as x:
+            changed = ['names a record no copy here names (%s)' % str(x).split('\n')[0][:80]]
+        if changed:
+            differs.append('%s: %s changes it from %s (%s)' % (what, plugins[e.pi].name, plugins[prev.pi].name,
+                                                                ', '.join(changed)))
     if held or differs:
         raise SystemExit('STOP. %d record(s) the plugin would copy are won by a plugin the policy never '
                          'copies from (notCopiedFrom):\n  %s\n%d record(s) are changed by one, so neither its '
