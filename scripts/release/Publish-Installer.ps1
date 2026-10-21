@@ -53,6 +53,7 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 # The installer is a live release, so the branch rule is Ship's for a main
 # release, Test-FreshAnyBranch -Channel main (#2436): main, or a clean
@@ -63,7 +64,6 @@ param(
 $freshRepo = Join-Path $PSScriptRoot '..\..'
 Assert-FreshCheckout -RepoDir $freshRepo -What 'Publish-Installer' -Target $Vps -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel main) -AllowStale:$AllowStaleCheckout
 
-$ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }

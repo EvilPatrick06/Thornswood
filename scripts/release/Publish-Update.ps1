@@ -85,6 +85,7 @@ param(
     # are the last release's, held to the server's order read off the box.
     [switch]$FromFeed
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 . (Join-Path $PSScriptRoot 'RecordShape.ps1')     # #2180: the Skyrim pin is held to its shape before it goes into the feed
 
@@ -102,7 +103,6 @@ function Get-LauncherExe([string]$dir) {
 }
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

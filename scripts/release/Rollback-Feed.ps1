@@ -94,10 +94,10 @@ param(
     # A folder standing in for C:\Thornswood-Docs. Tests only.
     [string]$SiteDir
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 
