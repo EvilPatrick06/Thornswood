@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 6024703,
-  "sha256": "a7d2e33235e55a20160798794c7099513ff815b719896aa84a96c81daf871ff6"
+  "size": 6042122,
+  "sha256": "87ec31ba04e3d650e5b77b4f2e3355217c8c546ead9e6030499e6b706fa07b90"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -638,6 +638,7 @@
   "The Great City of Solitude.esp",
   "Riften Expansion.esp",
   "Odin - Skyrim Magic Overhaul.esp",
+  "Hothtrooper44_ArmorCompilation.esp",
   "MoreCraftableEquipment.esp",
   "AnotherOakwood.esp",
   "aaaGraniteHill.esp",
@@ -655,7 +656,8 @@
   "Immersive Patrols II.esp",
   "YokuWeapons.esp",
   "Skyrim Unbound.esp",
-  "Water for ENB (Shades of Skyrim).esp"
+  "Water for ENB (Shades of Skyrim).esp",
+  "Playable Rieklings.esp"
  ],
  "counts": {
   "actorsOff": 6946,
@@ -666,7 +668,8 @@
   "questsKept": 48,
   "gatesUnlocked": 3,
   "placeLocations": 8,
-  "placeRooms": 3
+  "placeRooms": 3,
+  "recipesRecosted": 101
  },
  "refs": {
   "disabled": [
@@ -23783,6 +23786,1749 @@
    "vanilla": false,
    "why": [
     "a trigger names it"
+   ]
+  }
+ ],
+ "recost": [
+  {
+   "recipe": "19f8d:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "19f9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingHelmet2Alt",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "21475:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerHide",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "21f7f:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAROrcishMaskHelm",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ad99:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "2b067:Dragonborn.esm",
+   "editorId": "DLC2RecipeArmorNordicHeavyCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     8
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     6,
+     17
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "2b082:Dragonborn.esm",
+   "editorId": "DLC2RecipeWeaponNordicMace",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "2b085:Dragonborn.esm",
+   "editorId": "DLC2RecipeWeaponNordicWarhammer",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     5,
+     12
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     7
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "843:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorBanditBoots",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "848:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorBanditGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "849:YokuWeapons.esp",
+   "editorId": "0_RecipeCutlass",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "84a:YokuWeapons.esp",
+   "editorId": "0_RecipeNimcha",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "84b:YokuWeapons.esp",
+   "editorId": "0_RecipeSaber",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "84c:YokuWeapons.esp",
+   "editorId": "0_RecipeTakoba",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "851:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiArm",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     4,
+     12
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     9
+    ]
+   ]
+  },
+  {
+   "recipe": "855:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorCompanionsBoots",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "857:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorCompanionsGauntlets",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "860:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardBootsLight",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "861:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardCuirassHeavy1",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     4,
+     10
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     7
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "862:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardCuirassHeavy2",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     4,
+     10
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     7
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "868:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardHelmetHeavy",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     2
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "8d1:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorPenitusCuirass",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     7
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     11
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     7
+    ]
+   ]
+  },
+  {
+   "recipe": "8d4:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearBoots",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8d5:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearCuirass",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8d6:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearGauntlets",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8d8:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8d9:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     6,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8da:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8db:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakHelmetFull",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8dc:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     5,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8de:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8e0:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahBoots",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     5,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8e2:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahGauntlets",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8e9:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     5,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8eb:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8ee:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorTsunCuirass",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     4,
+     14
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "8f6:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeWeaponExecutionerAxe",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8ff:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeWeaponScimitar",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "923:YokuWeapons.esp",
+   "editorId": "0_RecipeMIRRORGaun",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "929:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleIronArma",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     4
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     15
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     7
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "92b:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleIronGaun",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "93b:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonArma",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     13
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "93d:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonGaun",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "93e:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonHelm",
+   "inputs": [
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "943:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadArma",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     12
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     25
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "944:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadArmaRED",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     25
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     12
+    ]
+   ]
+  },
+  {
+   "recipe": "945:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadHead",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     5
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "946:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadHeadRED",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     5
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "961:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC2ClothesSkaalHat",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     1,
+     5
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "9dd:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorGeneralTullius",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     4,
+     32
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     24
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     16
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe65:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     20
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe67:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     54
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe68:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     11
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe69:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     11
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6b:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditKilt",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6c:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditFurCloak",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6d:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditCuirass02",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6e:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassFalkreath",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe70:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassHjaalmarch",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe72:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassMarkarth",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe74:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassRiften",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe76:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassSolitude",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe78:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassThePale",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe7a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWhiterun",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe7c:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWinterhold",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     15
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe80:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorHideGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe84:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorImperialGauntlets",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe98:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirass",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirassB",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfea8:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorStormcloakCuirass",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeaa:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorStormcloakCuirassSleeves",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeb0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildGauntletsPlayer",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeb2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     59
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeb4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     20
+    ]
+   ]
+  },
+  {
+   "recipe": "bfebc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDA05SaviorsHide",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     2,
+     8
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     8
+    ]
+   ]
+  },
+  {
+   "recipe": "bfebe:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmor",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     44
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmet",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     22
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmetMaskLess",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     22
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorShortSleeve",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     59
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeca:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight1",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "bfecc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight2",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "bfece:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight3",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     6
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorHunterCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     25
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirass",
+   "inputs": [
+    [
+     "5ad9f:Skyrim.esm",
+     2,
+     7
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     7
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirassAlternate",
+   "inputs": [
+    [
+     "5ad9f:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bff05:Playable Rieklings.esp",
+   "editorId": "RecipeArmorExecutionHood",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bff06:Playable Rieklings.esp",
+   "editorId": "RecipeArmorExecutionHoodDB",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bff32:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "bff34:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass2",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     10
+    ]
+   ]
+  },
+  {
+   "recipe": "db28e:Skyrim.esm",
+   "editorId": "RecipeArmorHideGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "db5d3:Skyrim.esm",
+   "editorId": "RecipeArmorHideBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "db5d6:Skyrim.esm",
+   "editorId": "RecipeArmorHideShield",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     4,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "db89a:Skyrim.esm",
+   "editorId": "RecipeWeaponOrcishGreatsword",
+   "inputs": [
+    [
+     "5ad99:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "dc9fa:Skyrim.esm",
+   "editorId": "RecipeArmorElvenBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad9f:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "dc9fc:Skyrim.esm",
+   "editorId": "RecipeArmorElvenGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad9f:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "dc9fe:Skyrim.esm",
+   "editorId": "RecipeArmorElvenShield",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ad9f:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "dd97f:Skyrim.esm",
+   "editorId": "RecipeArmorSteelPlateCuirass",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     10
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     10
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "dd984:Skyrim.esm",
+   "editorId": "RecipeArmorOrcishCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     9
+    ],
+    [
+     "5ad99:Skyrim.esm",
+     4,
+     12
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "dd986:Skyrim.esm",
+   "editorId": "RecipeArmorOrcishHelmet",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "5ad99:Skyrim.esm",
+     2,
+     6
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "f19:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiArm2",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     9
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     4,
+     12
+    ]
+   ]
+  },
+  {
+   "recipe": "f46cd:Skyrim.esm",
+   "editorId": "RecipeArmorSkyforgeBoots",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     4,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "f46cf:Skyrim.esm",
+   "editorId": "RecipeArmorSkyforgeGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     2,
+     1
+    ]
    ]
   }
  ]
