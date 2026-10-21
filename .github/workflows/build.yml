@@ -944,6 +944,23 @@ jobs:
           & python tests/test-npc-population.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
+      - name: Check our plugins are clean
+        shell: pwsh
+        run: |
+          # Issue #2790. Our three plugins are written by scripts and change
+          # most weeks; this is the half of SSEEdit's error and cleaning check
+          # that needs no game: every record inside its group, sizes that add
+          # up, no form id twice or past the plugin's own index, nothing
+          # deleted. The identical-to-master half needs the masters, a game
+          # folder: python scripts/mods/Check-PluginClean.py where one is.
+          & python tests/test-2790-plugin-clean.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python scripts/mods/Check-PluginClean.py --no-masters
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=scripts/mods/Check-PluginClean.py::a plugin in game/content has a broken or deleted record; the lines above say which, and the cure is in the script that writes it'
+            exit 1
+          }
+
       - name: Check the launcher window
         shell: powershell
         run: |
