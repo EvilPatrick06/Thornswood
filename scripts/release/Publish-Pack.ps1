@@ -52,10 +52,10 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Pack' -AllowStale:$AllowStaleCheckout }
 
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)

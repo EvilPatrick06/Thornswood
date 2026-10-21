@@ -27,11 +27,12 @@ throw ('STOP. Fix-Voice.ps1 is retired and registers nothing (#2008). ' +
        'Install-Voice.ps1 does this job and takes that task off. The file is kept for the history.')
 
 Set-StrictMode -Off
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 $ProgressPreference    = 'SilentlyContinue'
 
 $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 . (Join-Path $Here '..\vps\Vps.ps1')
+$ErrorActionPreference = 'Continue'
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 

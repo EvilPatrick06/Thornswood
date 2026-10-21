@@ -174,9 +174,9 @@ param(
   [string]$EngineBuild = '',
   [string]$SkyrimFrom = ''
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)

@@ -63,6 +63,7 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 # The installer is a live release, so the branch rule is Ship's for a main
 # release, Test-FreshAnyBranch -Channel main (#2436): main, or a clean
@@ -79,7 +80,6 @@ function Get-LauncherExe([string]$dir) {
 }
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
