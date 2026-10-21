@@ -989,25 +989,29 @@ try {
         # names on C:\ land in the scratch folder, so the live root its door
         # seed reads private\door.json from is the scratch one, $root, with
         # the made-up door written above (#1905).
-        # The deploy store, the site's folder and the scripts Send-Script.ps1
-        # sends by file land there too (#459), so nothing here reaches the
+        # The deploy store and the site's folder land there too (#459), so
+        # nothing here reaches the
         # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
         # VPS are real.
         function MapFar([string]$s) {
             foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Server-Log.js', 'C:\Thornswood-Server\',
-                           'C:\Thornswood-Deploys', 'C:\Thornswood-Docs', 'C:\Windows\Temp\thornswood-remote-') {
+                           'C:\Thornswood-Deploys', 'C:\Thornswood-Docs') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
             }
             return $s
         }
         function global:ssh {
+            $in = @($input)
             $all = @($args | ForEach-Object { [string]$_ })
             $cmd = $all[-1]
             [void]$global:TsSshSeen.Add($cmd)
             $body = ''
             $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
             if ($m.Success) { $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) }
+            # A long script comes on standard input under Send-Script.ps1's
+            # reader (#3027), so it is read from there.
+            if ($m.Success -and $in.Count -and $body.StartsWith('. ([scriptblock]::Create(')) { $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$in[0] -replace '[^A-Za-z0-9+/=]', ''))) }
             else {
                 $m = [regex]::Match($cmd, '-File\s+(\S+)(.*)$')
                 if ($m.Success) {
@@ -1033,12 +1037,7 @@ try {
             if ($global:TsScpFail -and $m.Groups[1].Value -match $global:TsScpFail) { return }
             $to = MapFar $m.Groups[1].Value
             if ($to -eq $m.Groups[1].Value) { return }
-            # A script Send-Script.ps1 sends by file names the box's folders
-            # inside it, so it lands with them mapped, the same as one sent on
-            # the command line.
-            if ($to -like '*\Windows\Temp\thornswood-remote-*.ps1') {
-                [IO.File]::WriteAllText($to, (MapFar ([IO.File]::ReadAllText($src))), (New-Object Text.UTF8Encoding($true)))
-            } else { Copy-Item -LiteralPath $src -Destination $to -Force }
+            Copy-Item -LiteralPath $src -Destination $to -Force
             $global:LASTEXITCODE = 0
         }
         $global:TsSshSeen = New-Object Collections.Generic.List[string]

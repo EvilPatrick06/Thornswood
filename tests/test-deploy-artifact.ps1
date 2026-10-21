@@ -354,16 +354,17 @@ try {
         $global:LASTEXITCODE = 0
     }
     function global:ssh {
+        $in = @($input | ForEach-Object { [string]$_ })
         $global:tsSsh++
         $cmd = ([string]$args[-1]).Replace('C:/Windows/Temp/', $global:tsFarTemp)
-        # A script past Send-Script.ps1's limit (the store's lock from
-        # Lock-Folder.ps1 makes Send-ThornswoodArtifact's one) comes by scp and
-        # runs by -File, and is removed by -Command after.
-        if ($cmd -match ' -File (\S+)$') { & ([ScriptBlock]::Create([IO.File]::ReadAllText($Matches[1]))) }
-        elseif ($cmd -match ' -Command (.+)$') { & ([ScriptBlock]::Create($Matches[1])) }
+        if ($cmd -match ' -Command (.+)$') { & ([ScriptBlock]::Create($Matches[1])) }
         else {
             $b64 = ($cmd -split ' ')[-1]
             $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
+            # A script past Send-Script.ps1's limit (the store's lock from
+            # Lock-Folder.ps1 makes Send-ThornswoodArtifact's one) comes on
+            # standard input under the reader (#3027).
+            if ($text -eq (Get-ThornswoodStdinReader)) { $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
             & ([ScriptBlock]::Create($text))
         }
         $global:LASTEXITCODE = 0

@@ -80,8 +80,8 @@ $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 function Remote($script) {
   # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
-  # as a file of its own name, removed after, and the far side's exit code
-  # comes back. Lines come back as strings, so a later -contains still matches.
+  # on ssh's standard input (nothing of it is left on the box), and the far
+  # side's exit code comes back. Lines come back as strings, so a later -contains still matches.
   $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script | ForEach-Object { "$_" })
   return $out
 }

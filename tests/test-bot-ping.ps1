@@ -89,14 +89,6 @@ function Read-Host {
 function ssh {
     $a = @($args | ForEach-Object { [string]$_ })
     [void]$ScCalls.Add([pscustomobject]@{ Tool = 'ssh'; Args = $a; Sent = '' })
-    # The tidy up after a script sent by file: done here, since the scratch
-    # folder's path may hold an ampersand, which cmd.exe would split on.
-    $rm = [regex]::Match($a[-1], "Remove-Item -LiteralPath 'C:/Windows/Temp/([^']+)'")
-    if ($rm.Success) {
-        Remove-Item -LiteralPath (Join-Path $ScFar $rm.Groups[1].Value) -Force -ErrorAction SilentlyContinue
-        $global:LASTEXITCODE = 0
-        return
-    }
     # The box's C:/Windows/Temp is the scratch folder here, quoted for cmd.exe.
     $line = [regex]::Replace($a[-1], 'C:/Windows/Temp/(\S+)', { param($m) '"' + $ScFar + '\' + $m.Groups[1].Value + '"' })
     $in = @($input)
@@ -166,10 +158,10 @@ try {
     Yes 'set: the address is in nothing printed' (-not $r.Text.Contains($key) -and -not $r.Text.Contains($wire))
     $all = AllSent
     Yes 'set: the address is in nothing handed to ssh or scp, plain or base64' (-not $all.Contains($key) -and -not $all.Contains($wire))
-    Yes 'set: the script went up by scp and was run with -File' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 1 -and @($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and $_.Args[-1] -match '-File C:/Windows/Temp/thornswood-remote-' }).Count -eq 1)
+    Yes 'set: the script went on standard input under the reader, nothing copied up (#3027)' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 0 -and @($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and $_.Args[-1] -match '^powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand \S+$' }).Count -eq 1)
     Yes 'set: with host key checking on' (@($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and ($_.Args -join ' ') -match 'StrictHostKeyChecking=yes' }).Count -ge 1)
-    Yes 'set: nothing else is sent: no artifact, no bot files' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' -and $_.Args[-1] -notmatch 'thornswood-remote-' }).Count -eq 0)
-    Yes 'set: the script file is removed from the box afterwards' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
+    Yes 'set: nothing else is sent: no artifact, no bot files' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 0)
+    Yes 'set: nothing is written in the box''s temp folder' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
     Yes 'set: bot.env.json has no byte order mark' ([IO.File]::ReadAllBytes($envFile)[0] -eq 123)
 
     # ---- 2. the same again

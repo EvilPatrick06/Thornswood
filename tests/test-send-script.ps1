@@ -16,15 +16,19 @@
 
     - a short script goes on the command line, once, and its exit code comes
       back;
-    - a long one goes up as C:/Windows/Temp/thornswood-remote-<guid>.ps1, a
-      new name each run, is run from there by that name, bare, and removed,
-      and the local copy is removed too;
-    - the exit code is the far side's, not the tidy up's;
-    - the file is removed even when the run fails, and nothing is run or
-      removed when the copy up fails;
+    - a long one goes on ssh's standard input, in one ssh call, under a short
+      reader on the command line: nothing is copied up and nothing is written
+      in the far temp folder, so a run cut short has nothing to leave there
+      (issue #3027). Until 21 Oct 2026 it went up as a file and was removed by
+      a third call, and the old way, cut before that call, is shown to leave
+      its file, so the check is known to catch it;
+    - the exit code is the far side's: an exit inside the script, 1 for an
+      error that stops it or a script that does not parse, 0 otherwise, the
+      same as when it ran by file;
     - host key checking is always on, and a caller's weaker setting is
       refused before anything is sent;
-    - standard input reaches the far side both ways (Send-Secret.ps1 uses it);
+    - standard input reaches the far side both ways (Send-Secret.ps1 uses it),
+      for a long script as the line after the script's own;
     - two runs at once, in two processes, each run their own script, get
       their own exit code and leave nothing behind. The old fixed name,
       run the same way, is shown to collide, so the check is known to catch
@@ -93,6 +97,7 @@ function global:ssh {
     $temp = 'C:/Windows/Temp/'
     $m = [regex]::Match($cmd, '^powershell -NoProfile (-ExecutionPolicy Bypass )?-EncodedCommand ([A-Za-z0-9+/=]+)$')
     if ($m.Success) {
+        if ($global:TsSs.RunDelayMs) { Start-Sleep -Milliseconds $global:TsSs.RunDelayMs }
         if ($in.Count) { $in | & $global:TsSs.Shell -NoProfile -NonInteractive -EncodedCommand $m.Groups[2].Value 2>&1 }
         else { & $global:TsSs.Shell -NoProfile -NonInteractive -EncodedCommand $m.Groups[2].Value 2>&1 }
         return
@@ -109,6 +114,7 @@ function global:ssh {
     }
     $m = [regex]::Match($cmd, '^powershell -NoProfile -Command Remove-Item -LiteralPath ''(C:/Windows/Temp/[A-Za-z0-9._-]+)'' -Force$')
     if ($m.Success) {
+        if ($global:TsSs.TidyCut) { 'ssh: the connection was cut'; $global:LASTEXITCODE = 255; return }
         Remove-Item -LiteralPath (Join-Path $global:TsSs.Far $m.Groups[1].Value.Substring($temp.Length)) -Force -ErrorAction SilentlyContinue
         $global:LASTEXITCODE = 0
         return
@@ -128,7 +134,7 @@ function global:scp {
 }
 '@
 function New-FakeState([string]$farDir, [string]$shell) {
-    return @{ Far = $farDir; Shell = $shell; Calls = (New-Object System.Collections.ArrayList); RunDelayMs = 0; RunThrows = $false; ScpFails = $false }
+    return @{ Far = $farDir; Shell = $shell; Calls = (New-Object System.Collections.ArrayList); RunDelayMs = 0; RunThrows = $false; ScpFails = $false; TidyCut = $false }
 }
 $global:TsSs = New-FakeState $far $farShell
 . ([scriptblock]::Create($fakes))
@@ -149,9 +155,14 @@ function Long([string]$marker, [int]$code) {
 }
 # Callers wrap it in @(): one call comes back a lone PSCustomObject, which has no .Count on 5.1 (#2226).
 function Calls([string]$tool) { return @($global:TsSs.Calls | Where-Object { $_.Tool -eq $tool }) }
-function Reset { $global:TsSs.Calls.Clear(); $global:TsSs.RunThrows = $false; $global:TsSs.ScpFails = $false; $global:TsSs.RunDelayMs = 0 }
+function Reset { $global:TsSs.Calls.Clear(); $global:TsSs.RunThrows = $false; $global:TsSs.ScpFails = $false; $global:TsSs.RunDelayMs = 0; $global:TsSs.TidyCut = $false }
 function Left { return @(Get-ChildItem -LiteralPath $far -File).Count }
-$nameShape = '^C:/Windows/Temp/thornswood-remote-[0-9a-f]{32}\.ps1$'
+# The reader a long script runs under: short, on the command line, the same
+# every run, and the script itself never in it.
+$readerShape = '^powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand [A-Za-z0-9+/=]+$'
+function Script-Wire([string]$s) { return [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($s)) }
+# Whether any call wrote to or named the far temp folder.
+function Touched-Far { return @($global:TsSs.Calls | Where-Object { $_.Tool -eq 'scp' -or $_.Command -match '(?i)Windows/Temp' }).Count }
 
 # ---- 1. short: on the command line --------------------------------------------
 Reset
@@ -161,56 +172,82 @@ Yes 'short: one ssh call and no scp' (@(Calls 'ssh').Count -eq 1 -and @(Calls 's
 Yes 'short: what it printed comes back' ($out -contains 'short')
 Yes 'short: the far side''s exit code comes back (3)' ($rc -eq 3)
 
-# ---- 2. long: a file of its own name, run, removed ------------------------------
+# ---- 2. long: on standard input, nothing written on the box -------------------
 Reset
 $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'one' 7) | ForEach-Object { "$_" })
 $rc = $LASTEXITCODE
-$sc = @(Calls 'scp')
-$dest = ''
-if ($sc.Count) { $dest = $sc[0].Command.Substring($sc[0].Command.IndexOf(':') + 1) }
-Yes 'long: copied up once' ($sc.Count -eq 1)
-Yes ('long: to a name of its own, thornswood-remote-<guid>.ps1 (' + $dest + ')') ($dest -match $nameShape)
-Yes 'long: never to the old shared name' ($dest -ne 'C:/Windows/Temp/thornswood-remote.ps1')
-Yes 'long: the file holds the whole script, with a byte order mark' ($sc.Count -eq 1 -and $sc[0].Sent.Contains((Long 'one' 7)))
-$runs = @(Calls 'ssh' | Where-Object { $_.Command -like '*-File *' })
-Yes 'long: run once, by that same name, bare' ($runs.Count -eq 1 -and $runs[0].Command -eq ('powershell -NoProfile -ExecutionPolicy Bypass -File ' + $dest))
-$tidy = @(Calls 'ssh' | Where-Object { $_.Command -like '*Remove-Item*' })
-Yes 'long: removed afterwards, by that same name' ($tidy.Count -eq 1 -and $tidy[0].Command.Contains("'" + $dest + "'"))
-Yes 'long: nothing is left in the far temp folder' ((Left) -eq 0)
-Yes 'long: the local copy is gone too' ($sc.Count -eq 1 -and -not (Test-Path -LiteralPath $sc[0].Src))
+$runs = @(Calls 'ssh')
+Yes 'long: one ssh call and no scp' ($runs.Count -eq 1 -and @(Calls 'scp').Count -eq 0)
+Yes ('long: the command line is the short reader (' + $(if ($runs.Count) { $runs[0].Command.Length } else { 0 }) + ' characters)') ($runs.Count -eq 1 -and $runs[0].Command -match $readerShape -and $runs[0].Command.Length -lt 6000)
+Yes 'long: the script is not on the command line' ($runs.Count -eq 1 -and -not $runs[0].Command.Contains((Script-Wire (Long 'one' 7))))
+Yes 'long: nothing names or is written in the far temp folder' ((Touched-Far) -eq 0 -and (Left) -eq 0)
 Yes 'long: what it printed comes back' ($out -contains 'MARK one')
-Yes 'long: the far side''s exit code comes back (7), not the tidy up''s (0)' ($rc -eq 7)
-$first = $dest
+Yes 'long: the far side''s exit code comes back (7)' ($rc -eq 7)
+$first = ''
+if ($runs.Count) { $first = $runs[0].Command }
 
 Reset
 $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'two' 0) | ForEach-Object { "$_" })
 $rc = $LASTEXITCODE
-$sc = @(Calls 'scp')
-$second = ''
-if ($sc.Count) { $second = $sc[0].Command.Substring($sc[0].Command.IndexOf(':') + 1) }
-Yes 'long again: a different name from the run before' ($second -match $nameShape -and $second -ne $first)
+$runs = @(Calls 'ssh')
+Yes 'long again: the same reader, whatever the script' ($runs.Count -eq 1 -and $runs[0].Command -eq $first)
 Yes 'long again: a script that exits 0 hands back 0' ($rc -eq 0 -and ($out -contains 'MARK two'))
+
+Reset
+$noExit = (Long 'eight' 0) -replace 'exit 0$', "Write-Output 'END eight'"
+$out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script $noExit | ForEach-Object { "$_" })
+Yes 'long: a script with no exit runs to its end and hands back 0, as it did by file' ($LASTEXITCODE -eq 0 -and ($out -contains 'MARK eight') -and ($out -contains 'END eight'))
+Reset
+$withParam = "param([string]`$Who = 'nobody')`r`nWrite-Output ('WHO ' + `$Who)`r`n" + (Long 'nine' 0)
+$out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script $withParam | ForEach-Object { "$_" })
+Yes 'long: a script that opens with param() still runs' ($LASTEXITCODE -eq 0 -and ($out -contains 'WHO nobody') -and ($out -contains 'MARK nine'))
+Reset
+$utf = "Write-Output ('SAID ' + [string][char]0x00E9 + [string][char]0x2014)`r`n" + (Long 'ten' 0)
+$out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script $utf | ForEach-Object { "$_" })
+$said = @($out | Where-Object { $_ -like 'SAID *' }) | Select-Object -First 1
+Yes 'long: a script with letters past ASCII arrives as it was written' ("$said".Length -eq 7 -and [int]"$said"[5] -eq 0x00E9 -and [int]"$said"[6] -eq 0x2014)
 
 # ---- 3. when something fails -----------------------------------------------------
 Reset
-$global:TsSs.RunThrows = $true
-$threw = $null
-try { Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'three' 0) | Out-Null } catch { $threw = $_ }
+$out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script ((Long 'three' 0) -replace 'exit 0$', "throw 'the run broke on the way'") 2>&1 | ForEach-Object { "$_" })
 $rc = $LASTEXITCODE
-$sc = @(Calls 'scp')
-Yes 'a run that breaks: the error reaches the caller' ($null -ne $threw)
-Yes '  the file is still removed from the far side' (@(Calls 'ssh' | Where-Object { $_.Command -like '*Remove-Item*' }).Count -eq 1 -and (Left) -eq 0)
-Yes '  and the local copy' ($sc.Count -eq 1 -and -not (Test-Path -LiteralPath $sc[0].Src))
-Yes '  and the exit code says it failed' ($rc -ne 0)
-
+Yes 'a long script that throws: the error comes back' (($out -join ' ') -match 'the run broke on the way')
+Yes '  and the exit code says it failed (1)' ($rc -eq 1)
+Yes '  and nothing is left in the far temp folder' ((Touched-Far) -eq 0 -and (Left) -eq 0)
 Reset
-$global:TsSs.ScpFails = $true
-$threw = $null
-try { Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'four' 0) | Out-Null } catch { $threw = $_ }
+$out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script ((Long 'four' 0) + "`r`n'unclosed {") 2>&1 | ForEach-Object { "$_" })
 $rc = $LASTEXITCODE
-Yes 'a copy up that fails: it stops and says nothing was run' ($null -ne $threw -and "$threw" -match 'Nothing was run')
-Yes '  nothing is run and nothing removed' (@(Calls 'ssh').Count -eq 0)
-Yes '  and the exit code says it failed' ($rc -ne 0)
+Yes 'a long script that does not parse: nothing of it runs, and the exit code says so (1)' ($rc -eq 1 -and -not ($out -contains 'MARK four'))
+
+# A run cut short, the way #3027 was found: the old way sent the script up,
+# ran it, and removed it with a third call; cut before that call, its file
+# stays on the box. The helper makes no file to stay.
+$oldThree = @'
+function Invoke-OldThreeCalls([string]$Target, [string[]]$SshArgs, [string]$Script) {
+  $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
+  $tmp = [IO.Path]::GetTempFileName()
+  try {
+    [IO.File]::WriteAllText($tmp, $Script, (New-Object Text.UTF8Encoding($true)))
+    & scp @SshArgs $tmp "${Target}:$far" 2>&1 | Out-Null
+    & ssh @SshArgs $Target "powershell -NoProfile -ExecutionPolicy Bypass -File $far" 2>&1
+  }
+  finally {
+    & ssh @SshArgs $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" 2>&1 | Out-Null
+    Remove-Item -LiteralPath $tmp -Force -EA SilentlyContinue
+  }
+}
+'@
+. ([scriptblock]::Create($oldThree))
+Reset
+$global:TsSs.TidyCut = $true
+Invoke-OldThreeCalls -Target $target -SshArgs $sshArgs -Script (Long 'cut-old' 0) | Out-Null
+$oldLeft = Left
+Yes ('cut before its tidy up, the old three calls leave their file on the box (' + $oldLeft + '), so the check below can fail') ($oldLeft -eq 1)
+Get-ChildItem -LiteralPath $far -File | Remove-Item -Force
+Reset
+$global:TsSs.TidyCut = $true
+Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'cut-new' 0) | Out-Null
+Yes 'with the same cut, the helper leaves nothing on the box: it has no tidy up to cut' ((Left) -eq 0 -and (Touched-Far) -eq 0)
 
 # ---- 4. host key checking ---------------------------------------------------------
 Reset
@@ -225,8 +262,8 @@ Reset
 Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script (Long 'six' 0) | Out-Null
 Invoke-ThornswoodRemote -Target $target -Script "'y'" | Out-Null
 $weak = @($global:TsSs.Calls | Where-Object { ($_.Args -join ' ') -notmatch 'StrictHostKeyChecking=yes' })
-Yes ('every ssh and scp call carries StrictHostKeyChecking=yes, with or without the caller''s options (' + $global:TsSs.Calls.Count + ' calls)') ($global:TsSs.Calls.Count -ge 4 -and $weak.Count -eq 0)
-Yes 'the caller''s own options are passed on' (@($global:TsSs.Calls | Where-Object { ($_.Args -join ' ') -match 'ConnectTimeout=1' }).Count -ge 3)
+Yes ('every ssh call carries StrictHostKeyChecking=yes, long or short, with or without the caller''s options (' + $global:TsSs.Calls.Count + ' calls)') ($global:TsSs.Calls.Count -eq 2 -and $weak.Count -eq 0)
+Yes 'the caller''s own options are passed on' (@($global:TsSs.Calls | Where-Object { ($_.Args -join ' ') -match 'ConnectTimeout=1' }).Count -eq 1)
 
 # ---- 5. standard input and -Bypass -------------------------------------------------
 Reset
@@ -235,7 +272,7 @@ $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script $read
 Yes '-Stdin: a short script reads the line' ($out -contains 'GOT line-on-stdin')
 Reset
 $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script ($reader + "`r`n" + (Long 'seven' 0)) -Stdin 'line-on-stdin' | ForEach-Object { "$_" })
-Yes '-Stdin: a long one, run from its file, reads it too' ($out -contains 'GOT line-on-stdin' -and @(Calls 'scp').Count -eq 1)
+Yes '-Stdin: a long one reads it too, as the line after its own' ($out -contains 'GOT line-on-stdin' -and @(Calls 'scp').Count -eq 0 -and @(Calls 'ssh').Count -eq 1)
 Yes '-Stdin: the line is in no command line and no file sent' (-not (($global:TsSs.Calls | ForEach-Object { ($_.Args -join ' ') + [string]$_.Sent }) -join "`n").Contains('line-on-stdin'))
 Reset
 Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script "'z'" -Bypass | Out-Null
@@ -268,7 +305,7 @@ function Start-AtOnce([string]$how) {
     foreach ($pair in @(@('A', 5), @('B', 6))) {
         $jobs += Start-Job -ScriptBlock {
             param($fakes, $oldCopy, $sendScript, $farDir, $shell, $go, $how, $marker, $code, $target, $script)
-            $global:TsSs = @{ Far = $farDir; Shell = $shell; Calls = (New-Object System.Collections.ArrayList); RunDelayMs = 2000; RunThrows = $false; ScpFails = $false }
+            $global:TsSs = @{ Far = $farDir; Shell = $shell; Calls = (New-Object System.Collections.ArrayList); RunDelayMs = 2000; RunThrows = $false; ScpFails = $false; TidyCut = $false }
             . ([scriptblock]::Create($fakes))
             . $sendScript
             . ([scriptblock]::Create($oldCopy))
@@ -295,8 +332,7 @@ $a = @($new.Results | Where-Object { $_.Marker -eq 'A' }) | Select-Object -First
 $b = @($new.Results | Where-Object { $_.Marker -eq 'B' }) | Select-Object -First 1
 Yes 'at once: both runs finished' ($a -and $b)
 if ($a -and $b) {
-    Yes ('at once: each copied to a name of its own (' + ($a.Names -join ',') + ' and ' + ($b.Names -join ',') + ')') (
-        $a.Names.Count -eq 1 -and $b.Names.Count -eq 1 -and $a.Names[0] -match $nameShape -and $b.Names[0] -match $nameShape -and $a.Names[0] -ne $b.Names[0])
+    Yes 'at once: neither copied anything up' ($a.Names.Count -eq 0 -and $b.Names.Count -eq 0)
     Yes 'at once: each ran its own script and not the other''s' (($a.Out -contains 'MARK A') -and -not ($a.Out -contains 'MARK B') -and ($b.Out -contains 'MARK B') -and -not ($b.Out -contains 'MARK A'))
     Yes ('at once: each got its own exit code (' + $a.Code + ' and ' + $b.Code + ')') ($a.Code -eq 5 -and $b.Code -eq 6)
     Yes 'at once: nothing is left in the far temp folder' ($new.Left -eq 0)
@@ -399,14 +435,11 @@ try {
     if ($null -ne $oldSite) { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite }
 }
 $feedRc = $LASTEXITCODE
-$feedScp = @(Calls 'scp')
-$feedDest = ''
-if ($feedScp.Count) { $feedDest = $feedScp[0].Command.Substring($feedScp[0].Command.IndexOf(':') + 1) }
-Yes 'Feed-Store Invoke-FeedStoreOp sends a long script through Invoke-ThornswoodRemote (#1167)' ($feedDest -match $nameShape)
-Yes '  not under its old thornswood-feed-store name' ($feedDest -notmatch 'thornswood-feed-store')
+$feedSsh = @(Calls 'ssh')
+Yes 'Feed-Store Invoke-FeedStoreOp sends a long script through Invoke-ThornswoodRemote (#1167), on standard input' ($feedSsh.Count -eq 1 -and $feedSsh[0].Command -match $readerShape -and @(Calls 'scp').Count -eq 0)
 Yes '  the stand-in ran it and it said DONE' ($feedOut -contains 'DONE')
 Yes '  and NONE for a file the scratch store does not have' ($feedOut -contains 'NONE|version.json')
-Yes '  the file is removed afterwards' ((Left) -eq 0)
+Yes '  nothing of it was written in the far temp folder' ((Left) -eq 0 -and (Touched-Far) -eq 0)
 Yes '  and the far side''s exit code comes back, not a dropped one' ($feedRc -eq 0)
 $feedFn = ''
 $ft = $null; $fe = $null
