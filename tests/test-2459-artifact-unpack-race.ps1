@@ -19,6 +19,8 @@
     2. Another run's whole build landing in the moment before this run names
        its zip, its record or its folder leaves this run finished with that
        same artifact, every time: the other run is put there, not hoped for.
+       And a zip another run named, still held the way MoveFileExW holds
+       it while it names it, is read and unpacked all the same (#3067).
     3. A zip, a record or a folder already at the name that is not what this
        run built is refused and left as it was, never replaced or used.
     4. Eight runs in separate processes, half under PowerShell 7 and half
@@ -61,6 +63,7 @@ $helper = Join-Path $Repo 'scripts\deploy\Artifact.ps1'
 Yes 'scripts\deploy\Artifact.ps1 is there' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2459-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -98,6 +101,33 @@ function RecordSame($Want, [string]$Path) {
         if ([string]$a[$i].path -ne [string]$b[$i].path -or [string]$a[$i].sha256 -ne [string]$b[$i].sha256 -or [string]$a[$i].size -ne [string]$b[$i].size) { return $false }
     }
     return $true
+}
+# A handle on $Path the way MoveFileExW holds the file it names: delete
+# access, sharing everything. Off Windows there is no delete access to ask
+# for, and nothing there refuses a reader, so it is an ordinary handle.
+if ($OnWindows -and -not ('Harness2459Hold' -as [type])) {
+    Add-Type -Language CSharp -TypeDefinition @'
+using System;
+using System.ComponentModel;
+using System.Runtime.InteropServices;
+using Microsoft.Win32.SafeHandles;
+
+public static class Harness2459Hold {
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern SafeFileHandle CreateFileW(string name, uint access, uint share, IntPtr security, uint disposition, uint flags, IntPtr template);
+
+    public static SafeFileHandle Open(string path) {
+        // DELETE | SYNCHRONIZE, FILE_SHARE_READ | WRITE | DELETE, OPEN_EXISTING.
+        SafeFileHandle h = CreateFileW(path, 0x00010000 | 0x00100000, 7, IntPtr.Zero, 3, 0, IntPtr.Zero);
+        if (h.IsInvalid) throw new Win32Exception(Marshal.GetLastWin32Error());
+        return h;
+    }
+}
+'@
+}
+function Hold-AsRenaming([string]$Path) {
+    if ($OnWindows) { return [Harness2459Hold]::Open($Path) }
+    return [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
 }
 # What a run must not leave in its folder: a .building-* of its own, or an
 # unpacked folder that no .folder file there names.
@@ -172,7 +202,16 @@ try {
         $script:gapRan = $true
         $script:gapOther = Build $script:gapOut
     }
+    $script:holdZip = $false
+    $script:held = $null
     function Set-ThornswoodArtifactName([string]$From, [string]$To) {
+        if ($script:holdZip -and -not $script:held -and $To -like '*.zip') {
+            # 2b: the same zip named by the other run, which still holds it.
+            $theirs = Join-Path (Split-Path -Parent $To) ('.building-' + [Guid]::NewGuid().ToString('N') + '.zip')
+            [IO.File]::Copy($From, $theirs)
+            if (-not (& $script:realName $theirs $To)) { throw "the other run's zip could not be named $To" }
+            $script:held = Hold-AsRenaming $To
+        }
         Invoke-OtherRunInGap $To
         return (& $script:realName $From $To)
     }
@@ -206,6 +245,45 @@ try {
         Yes "  nothing of either run's own is left behind ($at)" ($left.Count -eq 0)
         if ($left.Count) { Write-Host ('  left: ' + ($left -join ', ')) }
     }
+
+    # ---- 2b. the zip at its name while the run that named it holds it ------
+    # MoveFileExW names a file through a handle it opened on that file with
+    # delete access, and closes it only once the name is given (and, under
+    # MOVEFILE_WRITE_THROUGH, written through). The run that lost the name
+    # finds the zip there in that moment, and reads it twice: its sha256,
+    # then its files into this run's folder. Until #3067 both reads opened
+    # with FileShare.Read, which Windows refuses beside a handle with delete
+    # access, and the run stopped with "being used by another process"
+    # (about one gate run in a dozen). Here the other run's zip takes the name
+    # first and a handle with delete access is held on it for all of this run.
+    $oHeld = Join-Path $tmp 'out-zip-held'
+    $script:holdZip = $true
+    $mine = $null
+    $err = $null
+    $refused = $null
+    try {
+        try { $mine = Build $oHeld } catch { $err = $_ }
+        if ($script:held -and $OnWindows) {
+            # The held handle is the one that refused the old reads: a
+            # FileShare.Read open of the zip beside it is refused.
+            try { [IO.File]::Open((Join-Path $oHeld $good.Name), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read).Dispose(); $refused = $false }
+            catch { $refused = $_.Exception.Message -like '*being used by another process*' }
+        }
+    } finally {
+        $script:holdZip = $false
+        if ($script:held) { $script:held.Dispose(); $script:held = $null }
+    }
+    Yes 'the other run named the zip first and held it the way MoveFileExW does' ($null -ne $refused -or -not $OnWindows)
+    if ($OnWindows) { Yes '  a FileShare.Read open beside that handle is refused, as Get-FileHash and ZipFile were' ($refused -eq $true) }
+    Yes '  this run still finishes, reading the zip while it is held' ($null -eq $err -and $null -ne $mine)
+    if ($err) { Write-Host ('  ' + $err.Exception.Message) }
+    Yes '  it names the same artifact with every file unpacked' (
+        $null -ne $mine -and $mine.Name -eq $good.Name -and $mine.Sha256 -eq $good.Sha256 -and
+        (FolderShort $mine.Folder $good.Record.files) -eq '' -and (RecordSame $good.Record $mine.RecordPath))
+    $left = Leftovers $oHeld
+    Yes "  nothing of either run's own is left behind (zip held)" ($left.Count -eq 0)
+    if ($left.Count) { Write-Host ('  left: ' + ($left -join ', ')) }
+
     Remove-Item Function:\Move-Item
     Remove-Item Function:\Set-ThornswoodArtifactName
     if ($script:realName) { Set-Item Function:\Set-ThornswoodArtifactName -Value $script:realName }

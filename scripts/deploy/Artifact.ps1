@@ -310,13 +310,44 @@ function Set-ThornswoodArtifactName([string]$From, [string]$To) {
   return [ThornswoodArtifactName]::Claim($From, $To)
 }
 
+<#
+  A zip at its name, opened to read and sharing every kind of access (#3067).
+  The run whose zip took the name is still inside MoveFileExW, holding the
+  file with delete access, when the run that lost the name finds it there;
+  Get-FileHash and ZipFile.ExtractToDirectory open with FileShare.Read, which
+  refuses to open beside that handle, and the loser stopped with "being used
+  by another process". A zip at its name is never written again (nothing at a
+  name is replaced), so a reader has nothing to deny anybody.
+#>
+function Open-ThornswoodArtifactZip([string]$Zip) {
+  return (New-Object IO.FileStream($Zip, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete)))
+}
+
+# The whole sha256 of a zip at its name, read the way Open-ThornswoodArtifactZip opens it.
+function Get-ThornswoodArtifactZipSha256([string]$Zip) {
+  $stream = Open-ThornswoodArtifactZip $Zip
+  try {
+    $h = [Security.Cryptography.SHA256]::Create()
+    try { return (-join ($h.ComputeHash($stream) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
+  } finally { $stream.Dispose() }
+}
+
+# Unpacks a zip at its name into $To, read the way Open-ThornswoodArtifactZip opens it.
+function Expand-ThornswoodArtifactZip([string]$Zip, [string]$To) {
+  $stream = Open-ThornswoodArtifactZip $Zip
+  try {
+    $archive = New-Object IO.Compression.ZipArchive($stream, [IO.Compression.ZipArchiveMode]::Read)
+    try { [IO.Compression.ZipFileExtensions]::ExtractToDirectory($archive, $To) } finally { $archive.Dispose() }
+  } finally { $stream.Dispose() }
+}
+
 # The zip this run built, under its name. When another run's is there first,
 # it has to be the same bytes by its whole sha256; then it is used and this
 # run's copy goes. A different file there is refused and left alone.
 function Save-ThornswoodArtifactZip([string]$Building, [string]$Zip, [string]$Sha256) {
   if (Set-ThornswoodArtifactName $Building $Zip) { return }
   Remove-Item -LiteralPath $Building -Force
-  $there = (Get-FileHash -LiteralPath $Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+  $there = Get-ThornswoodArtifactZipSha256 $Zip
   if ($there -ne $Sha256) {
     throw ("$Zip is already there and is not the zip this run built (its sha256 is $there, this build's is $Sha256). Nothing was replaced: remove that file and run again.")
   }
@@ -472,6 +503,7 @@ function New-ThornswoodArtifact {
     [string]$OutDir = ''
   )
   Initialize-ThornswoodArtifactType
+  Add-Type -AssemblyName System.IO.Compression
   Add-Type -AssemblyName System.IO.Compression.FileSystem
   $RepoDir = (Resolve-Path -LiteralPath $RepoDir).ProviderPath.TrimEnd('\')
   Assert-ThornswoodCommitted -RepoDir $RepoDir -Paths (@($Paths) + @($AlsoSends)) -What ('the ' + $Component + ' deploy')
@@ -550,7 +582,7 @@ function New-ThornswoodArtifact {
     $mine = Join-Path $OutDir ($base + '.' + [Guid]::NewGuid().ToString('N'))
     $named = $false
     try {
-      [IO.Compression.ZipFile]::ExtractToDirectory($zip, $mine)
+      Expand-ThornswoodArtifactZip $zip $mine
       $named = Save-ThornswoodArtifactFolderName $folderName ([IO.Path]::GetFileName($mine))
       if (-not $named) {
         Write-Host ('  ' + $base + ' was unpacked by another run at this commit first, so that folder is used') -ForegroundColor DarkGray
@@ -609,7 +641,7 @@ function Assert-ThornswoodSourceIntegrity {
   if (-not (Test-Path -LiteralPath $Artifact.Zip)) {
     throw "Refused: the $component artifact zip is missing, so nothing was sent and the box was not touched."
   }
-  $zipHash = (Get-FileHash -LiteralPath $Artifact.Zip -Algorithm SHA256).Hash.ToLowerInvariant()
+  $zipHash = Get-ThornswoodArtifactZipSha256 $Artifact.Zip
   if ($zipHash -ne ([string]$Artifact.Sha256).ToLowerInvariant()) {
     throw "Refused: the $component artifact zip is not the bytes built from $($commit.Substring(0, 12)), so nothing was sent and the box was not touched."
   }
