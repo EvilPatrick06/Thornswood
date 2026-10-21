@@ -163,6 +163,14 @@ two outside trades. A master takes someone on in the sister half or
 in an outside trade from the look prompt, and either of them ends it on
 the K panel. See [Masters and apprentices](apprenticeship.md).
 
+The crafting menu at a bench lists only what the craft gate would let
+you make there: your profession, your half and its rank, the sister
+half at novice, a taught half at novice, your race and your roll. The
+server hands your game the rest of the recipe table, and your game takes
+those recipes off every bench until the answer changes, so a rank, a
+Master taking you on or a roll changes the list straight away. A recipe
+nobody owns is listed for everybody.
+
 Not in the world yet: the parts of a warrior's maneuvers the game
 has to do itself (see [Warrior](professions/warrior.md)), the repair
 kits on [Durability](durability.md), the check of which effect a
