@@ -209,6 +209,29 @@ function listening(srv, port) {
     srv.on('close', gone);
   });
 }
+/*
+  Waits for a line the site says when it settles a request nobody is left to
+  answer: a body or an upload whose sender went (#3062). There is no answer
+  to read after, so the line itself is the event. The bound only turns a site
+  that never says it into a fail, not a hang. soFar is what the harness has
+  collected; its own listeners were added first, so it is up to date when
+  this looks.
+*/
+function heard(srv, soFar, re, ms) {
+  return new Promise((ok) => {
+    if (re.test(soFar())) { ok(true); return; }
+    const look = () => { if (re.test(soFar())) end(true); };
+    const late = setTimeout(() => end(false), ms);
+    function end(v) {
+      clearTimeout(late);
+      srv.stdout.removeListener('data', look);
+      srv.stderr.removeListener('data', look);
+      ok(v);
+    }
+    srv.stdout.on('data', look);
+    srv.stderr.on('data', look);
+  });
+}
 const hmac = (v) => crypto.createHmac('sha256', SECRET).update(String(v)).digest('hex').slice(0, 32);
 const cookieFor = (id) => {
   const at = String(Date.now());
@@ -250,7 +273,11 @@ function ask(method, where, body, opts) {
 }
 /*
   A raw request that sends its headers and only some of its body. Then it
-  waits for an answer (hold), or cuts the connection (drop).
+  waits for an answer (hold), or cuts the connection (drop). Host carries the
+  port, as every client sends it: the site's own origin is read from Host
+  (crossSite), and without the port an Origin naming this site was another
+  site's, so the cut upload below was refused before it was read and its
+  check passed with nothing tested (#3062).
 */
 function partial(where, total, sent, how, extraHeaders) {
   return new Promise((ok) => {
@@ -260,7 +287,7 @@ function partial(where, total, sent, how, extraHeaders) {
     let done = false;
     const finish = (v) => { if (done) return; done = true; ok(v); };
     s.on('connect', () => {
-      s.write('POST ' + where + ' HTTP/1.1\r\nHost: 127.0.0.1\r\nContent-Type: application/json\r\n' +
+      s.write('POST ' + where + ' HTTP/1.1\r\nHost: 127.0.0.1:' + port + '\r\nContent-Type: application/json\r\n' +
               'X-Forwarded-For: 10.8.1.' + (++lane) + '\r\n' + (extraHeaders || '') +
               'Content-Length: ' + total + '\r\n\r\n' + 'x'.repeat(sent));
       if (how === 'drop') setTimeout(() => { s.destroy(); finish({ ms: Date.now() - started }); }, 200);
@@ -468,9 +495,8 @@ function pageChecks() {
         b3.status === 413 && b3.ms < QUICK && /too big/.test(b3.j.error) && fair(b3.j.error));
     yes('a body that stops halfway: /api/play/pass answers 408 inside six seconds (' + b4.status + ', ' + b4.ms + ' ms)',
         b4.status === 408 && b4.ms < 6500 && b4.j.why === 'slow' && /too long/.test(b4.j.message) && fair(b4.j.message));
-    await sleep(500);
     yes('a body cut off halfway: the route settles and says so in the log',
-        /body closed on "\/api\/play\/join"/.test(log));
+        await heard(site, () => log, /body closed on "\/api\/play\/join"/, 10000));
 
     // An upload cut off halfway leaves no half file behind.
     MEMBERS['612'] = 'play';
@@ -479,7 +505,8 @@ function pageChecks() {
     const before = fs.existsSync(up) ? fs.readdirSync(up).length : 0;
     await partial('/api/gallery/submit?name=cut.png', 5000, 300, 'drop',
                   'Cookie: ' + cookieFor('612') + '\r\nOrigin: http://127.0.0.1:' + port + '\r\n');
-    await sleep(700);
+    yes('a picture cut off halfway: the site took it, and says the half file is removed',
+        await heard(site, () => log, /upload cut off after \d+ bytes on "\/api\/gallery\/submit", the half file is removed/, 10000));
     const after = fs.existsSync(up) ? fs.readdirSync(up).filter((n) => /cut\.png$/.test(n)).length : 0;
     yes('a picture cut off halfway: no half file is left in uploads (' + before + ' before, ' + after + ' left)', after === 0);
 

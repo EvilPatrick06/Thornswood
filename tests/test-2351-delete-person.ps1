@@ -257,10 +257,14 @@ try {
     Yes '-Delete without -By is refused' ($c -eq 1 -and (Said 'REFUSED: -Delete needs -By'))
     $c = Run (@('-DiscordId', $ME, '-Merge', 'x.jsonl') + $roots)
     Yes '-Merge without -Reapply is refused' ($c -eq 1 -and (Said 'REFUSED: -Merge goes with -Reapply'))
-    if (Test-Path -LiteralPath 'C:\Thornswood\Game\SkyrimSE.exe') {
+    # Off the box (a developer's workstation) it refuses without
+    # -AllowGamingPc, in the rule's words (scripts\vps\BoxGuard.ps1, #3041).
+    . (Join-Path $Repo 'scripts\vps\BoxGuard.ps1')
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) {
         $c = Run (@('-DiscordId', $ME) + ($roots | Where-Object { $_ -ne '-AllowGamingPc' }))
-        Yes 'on a gaming PC it refuses without -AllowGamingPc' ($c -eq 1 -and (Said 'this is a gaming PC'))
-    }
+        Yes 'off the box it refuses without -AllowGamingPc' ($c -eq 1 -and (Said ([regex]::Escape('REFUSED: ' + $notBox))))
+    } else { Write-Host 'SKIP  the refusal off the box: this is the box, a server (tests\test-3041-box-guard.ps1 runs it with a workstation stood in)' }
     $roster = Join-Path $Site 'data\roster.json'
     $keepRoster = Get $roster
     Put $roster '{"who":'

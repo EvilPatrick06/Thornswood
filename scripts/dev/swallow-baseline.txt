@@ -185,7 +185,6 @@ scripts\ops\Reset-Character.ps1 1
 scripts\ops\Set-Door.ps1 6
 scripts\ops\Set-Server.ps1 1
 scripts\ops\Wipe-Saves.ps1 1
-scripts\vps\Bootstrap-VPS.ps1 1
 scripts\vps\Check-Load.ps1 1
 scripts\vps\Check-ServerPriority.ps1 1
 scripts\vps\Check-Site.ps1 2
