@@ -22,7 +22,9 @@
 
   WHAT GOES UP. The commit, never the working tree: the tools, the plugins
   and the tables they read (scripts\mods, scripts\dev, game\content,
-  game\data, records, layout.json) as one artifact (Artifact.ps1, #459), so
+  game\data, records, layout.json, and every other file a Python builder of
+  scripts\mods\content-tables.json reads or writes, game\gamemode.js among
+  them) as one artifact (Artifact.ps1, #459), so
   an uncommitted change under those folders refuses the run before the box
   is asked anything. Commit it first; what ran is then a commit anyone can
   name.
@@ -92,6 +94,19 @@ foreach ($a in $Arguments) {
 
 $serverRoot = $(if ($Server -eq 'main') { 'C:\Thornswood-Server' } else { 'C:\Thornswood-Server-Dev' })
 $paths = @('scripts/mods', 'scripts/dev', 'game/content', 'game/data', 'records', 'layout.json')
+# And whatever else a Python builder of the content chain reads or writes
+# (scripts\mods\content-tables.json). Until #2962 the artifact held only the
+# folders above, so every builder that writes its table into game\gamemode.js
+# (the building holds, the woodworking benches, the doors and five more)
+# stopped on the box with "No such file" for gamemode.js, and the one that
+# reads docs\systems\cut-items.json would have too.
+$chainFiles = [IO.File]::ReadAllText((Join-Path $Here 'content-tables.json')) | ConvertFrom-Json
+foreach ($s in @($chainFiles.steps | Where-Object { $_.tool -like '*.py' })) {
+    foreach ($p in @(@($s.reads) + @($s.readsBack) + @($s.writes) | Where-Object { $_ })) {
+        $p = [string]$p
+        if (-not @($paths | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $paths += $p }
+    }
+}
 $artifact = New-ThornswoodArtifact -Component tools -RepoDir $repo -Paths $paths
 Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 

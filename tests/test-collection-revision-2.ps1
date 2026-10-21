@@ -292,7 +292,7 @@ if ($Offline) {
 $serverRecord = Join-Path $Repo 'records\server-build.json'
 function Get-FullPlugins([string[]]$loadOrder, [string]$record) {
     $isLight = Get-ThornswoodLightTest $loadOrder $record
-    return ,[string[]]@($loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } |
+    return ,[string[]]@($loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] } |
                         Where-Object { $_ -and -not (($null -ne $isLight) -and (& $isLight $_)) })
 }
 

@@ -56,6 +56,7 @@ try {
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
     Yes "  registers thornswood-pr-$comp with the label thornswood-pr" ($r.Text -match ("--name 'thornswood-pr-" + [regex]::Escape($comp) + "' --labels 'thornswood-pr'"))
     Yes '  never the VPS label' ($r.Text -notmatch "--labels 'thornswood-vps")
+    Yes '  nor the build label, which only VPS runners carry (#2994)' ($r.Text -notmatch 'thornswood-build')
     Yes '  in C:\Thornswood-RunnerPR, as the account thornswood-pr' ($r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-RunnerPR'") -and $r.Text -match [regex]::Escape("`$acct = 'thornswood-pr'"))
     Yes '  its own folder is still locked before config.cmd writes into it' ($r.Text -match '(?m)^Lock-RunnerRoot \$root \$acct')
     Yes '  the install shuts it out of every C:\Thornswood* folder, hyphen or not, Dumps included (#2488)' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood*' @() @()"))
@@ -84,9 +85,11 @@ try {
     # The VPS, unchanged: what an install on the box would send.
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
-    Yes '  the VPS runner keeps its label, name and folder' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
+    Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
     Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' @()") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
     Yes '  and Dumps left to Lock-VpsFolders.ps1, at install and in the lock after (#2127, #2488)' ($r.Text -match [regex]::Escape("'Thornswood-*' @() @('Thornswood-Dumps')") -and $r.Text -match [regex]::Escape("`$leave = @('Thornswood-Dumps')"))
+    $r = Dry @('-Number', '5')
+    Yes '  runner 5, which records\build-runners.json does not list, gets the VPS label alone and takes no builds (#2994)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-5' --labels 'thornswood-vps' --work")
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
 
     # ---- Close-RunnerAccount on scratch folders, the off-box filter ---------
