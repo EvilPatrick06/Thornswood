@@ -2261,7 +2261,7 @@
                       "scope":  "Open-ThornswoodOnBoxFolder",
                       "via":  "Start-ThornswoodRemote",
                       "anchor":  "$keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run -End $end)",
-                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its end event is set (#2999, #3063), for Run-OnBox.ps1 and Backup-Server.ps1 (#3035)",
+                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its end event is set or its caller is gone (#2999, #3063), for Run-OnBox.ps1 and Backup-Server.ps1 (#3035)",
                       "class":  "stage",
                       "reason":  "writes and removes stage folders the runs own"
                   },

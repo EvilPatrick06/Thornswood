@@ -196,10 +196,16 @@ foreach (`$c in `$changed) { 'CHANGED ' + `$c }
 #     one from before the lock (it has none). A folder whose lock is held
 #     is a run still going, and is left alone. No age and no time limit decide
 #     it: only whether the process that owns the folder is still there.
-#   - Not yet covered: a keeper whose caller went away without setting the
-#     event. A far process outlives its ssh session on the box (#3059), so
-#     that keeper holds its folder until something tells it its caller has
-#     gone, and what on the box can tell it is still being measured (#3063).
+#   - It also ends when its caller is gone without setting the event (the
+#     machine running it going away, a bridge reset). A far process outlives
+#     its ssh session on the box (#3059), so the session ending tells it
+#     nothing by itself; what does is a write to its standard output, which
+#     fails (Win32 error 232) from the moment its session is over (measured
+#     on the box 21 Oct 2026, #3063). So while it waits it writes a bare line
+#     end every five seconds with WriteFile itself, and when that write fails
+#     it removes the folder as if its event had been set. Not through .NET's
+#     console stream: that one swallows a broken pipe and reports the write
+#     as made. A bare line end is nothing to anybody reading what it says.
 #
 # Removing takes the lock alone (shared for deleting only, so it can delete
 # the lock while it holds it; Windows lets the file go when the handle
@@ -216,12 +222,14 @@ function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Ru
     if ($End -notmatch '^Global\\Thornswood-OnBoxEnd-[0-9a-f]{32}$') { throw ('not a keeper''s end event: ' + $End) }
     return @"
 `$ErrorActionPreference = 'Stop'
+`$ProgressPreference = 'SilentlyContinue'
 `$run = '$Run'
 `$top = Split-Path -Parent `$run
 function Say([string]`$l) { [Console]::Out.WriteLine(`$l); [Console]::Out.Flush() }
 `$made = `$false
 `$end = [Threading.EventWaitHandle]::new(`$false, [Threading.EventResetMode]::ManualReset, '$End', [ref]`$made)
 if (-not `$made) { Say ('TAKEN $End'); exit 2 }
+Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class ThornswoodKeeperOut{[DllImport("kernel32.dll")]static extern IntPtr GetStdHandle(int n);[DllImport("kernel32.dll",SetLastError=true)]static extern bool WriteFile(IntPtr h,byte[] b,int n,out int d,IntPtr o);public static int Beat(){byte[] b={10};int d;return WriteFile(GetStdHandle(-11),b,1,out d,IntPtr.Zero)?0:Marshal.GetLastWin32Error();}}'
 function Drop([string]`$d) {
   try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'Delete') }
   catch { Say ('HELD ' + `$d + ': ' + `$_.Exception.GetBaseException().Message); return }
@@ -242,7 +250,7 @@ foreach (`$f in @(Get-ChildItem -LiteralPath `$top -Filter 'thornswood-onbox-*' 
 `$own = New-Object IO.FileStream((`$run + '.lock'), 'CreateNew', 'ReadWrite', 'ReadWrite')
 New-Item -ItemType Directory -Path `$run | Out-Null
 Say ('MADE ' + `$run)
-[void]`$end.WaitOne()
+while (-not `$end.WaitOne(5000)) { if ([ThornswoodKeeperOut]::Beat()) { break } }
 `$own.Dispose()
 Drop `$run
 `$end.Dispose()
@@ -260,8 +268,8 @@ function Get-ThornswoodOnBoxEndScript([Parameter(Mandatory = $true)][string]$End
 # Close-ThornswoodOnBoxFolder ends it (above). Needs Send-Script.ps1 loaded.
 # Hands back Run (the folder, Windows form), Far (with forward slashes, for
 # scp), Made, Keeper (the ssh process), Said (what the keeper's sweep of
-# earlier folders said before MADE), and End, Target and SshArgs for the
-# close. Made false means there is no folder: the caller stops, and still
+# earlier folders said before MADE), Rest (the read of what it says after),
+# and End, Target and SshArgs for the close. Made false means there is no folder: the caller stops, and still
 # hands this to Close-ThornswoodOnBoxFolder.
 function Open-ThornswoodOnBoxFolder {
     param(
@@ -281,7 +289,10 @@ function Open-ThornswoodOnBoxFolder {
         if ($l -eq ('MADE ' + $run)) { $made = $true; break }
         if ($l) { $said += $l }
     }
-    return [pscustomobject]@{ Run = $run; Far = $run.Replace('\', '/'); Made = $made; Keeper = $keeper; Said = $said; End = $end; Target = $Target; SshArgs = $SshArgs }
+    # The rest is read as it comes, so the keeper's line ends while it waits
+    # never fill the pipe and stop it at a write.
+    $rest = $keeper.StandardOutput.ReadToEndAsync()
+    return [pscustomobject]@{ Run = $run; Far = $run.Replace('\', '/'); Made = $made; Keeper = $keeper; Said = $said; Rest = $rest; End = $end; Target = $Target; SshArgs = $SshArgs }
 }
 
 # Tells the keeper the run is over: a second ssh session sets its event, and
@@ -300,7 +311,7 @@ function Close-ThornswoodOnBoxFolder([Parameter(Mandatory = $true)]$Folder) {
         # can (PowerShell 7), the ssh alone where it cannot (5.1).
         if ($PSVersionTable.PSVersion.Major -ge 6) { $k.Kill($true) } else { $k.Kill() }
     }
-    $said = @($k.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $said = @($Folder.Rest.Result -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     $k.WaitForExit()
     return [pscustomobject]@{ Gone = ((-not $Folder.Made) -or ($said -contains ('GONE ' + $Folder.Run))); Told = (($told -contains 'END SET') -or ($told -contains 'END GONE')); Said = @($said + @($told | Where-Object { $_ -ne 'END SET' })) }
 }

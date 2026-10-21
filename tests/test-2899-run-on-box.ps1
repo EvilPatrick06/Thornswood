@@ -149,7 +149,9 @@ $errs = $null
 Yes 'the keeper''s text parses' (-not $errs -or $errs.Count -eq 0)
 $keepLine = 'powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($keep))
 Yes ('and fits on the command line, so nothing is sent ahead of it as a file (' + $keepLine.Length + ' of 6000)') ($keepLine.Length -le 6000)
-Yes 'and reads nothing from its standard input, which on the box never closes (#3063): it waits on its end event' ($keep -notmatch '\[Console\]::In' -and $keep.Contains('[void]$end.WaitOne()'))
+Yes 'and reads nothing from its standard input, which on the box never closes (#3063): it waits on its end event' ($keep -notmatch '\[Console\]::In' -and $keep.Contains('while (-not $end.WaitOne(5000))'))
+Yes 'and it learns its caller is gone from a write WriteFile itself makes, not .NET''s console stream, which swallows a broken pipe' (
+    $keep.Contains('WriteFile(GetStdHandle(-11)') -and $keep.Contains('if ([ThornswoodKeeperOut]::Beat()) { break }'))
 $endText = Get-ThornswoodOnBoxEndScript -End (New-End)
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($endText, [ref]$null, [ref]$errs)
@@ -168,6 +170,8 @@ Yes 'OnBox.ps1 starts the keeper for a run''s folder and sets its end event from
     $onBoxText -match 'Start-ThornswoodRemote -Target \$Target -SshArgs \$SshArgs -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run -End \$end\)' -and
     $onBoxText -match 'Invoke-ThornswoodRemote -Target \$Folder\.Target -SshArgs \$Folder\.SshArgs -Script \(Get-ThornswoodOnBoxEndScript -End \$Folder\.End\)' -and
     $onBoxText -notmatch 'StandardInput\.Close\(\)' -and $onBoxText -match "'GONE ' \+ \`$Folder\.Run")
+Yes 'and reads what the keeper says as it comes, so its line ends never fill the pipe' (
+    $onBoxText.Contains('$rest = $keeper.StandardOutput.ReadToEndAsync()') -and $onBoxText.Contains('$Folder.Rest.Result') -and $onBoxText -notmatch 'StandardOutput\.ReadToEnd\(\)')
 Yes 'Run-OnBox.ps1 opens its folder there, sends the run into it and no longer removes the folder by a call of its own' (
     $runText -match 'Open-ThornswoodOnBoxFolder -Target \$target -SshArgs \$ssh' -and $runText -match 'Close-ThornswoodOnBoxFolder \$box' -and
     $runText -match "\(\`$runFar \+ '/run\.ps1'\)" -and $runText -notmatch 'Start-ThornswoodRemote' -and
@@ -396,6 +400,16 @@ if (-not $OnWindows) {
         $m = @(Stop-Keeper $k)
         Yes 'its end event set from another process ends it, and it removes its folder' (($m -contains 'END SET') -and ($m -contains ('GONE ' + (Folder 'dddddddddddd'))) -and -not (Test-Path -LiteralPath (Folder 'dddddddddddd')) -and $k.P.HasExited)
         Yes 'an end sent after that finds no keeper' ((@(Set-End $k.End) -join '|') -eq 'END GONE')
+
+        # Its caller going away: the box ends the session and with it the
+        # read end of the keeper's output, and its next write fails (#3063).
+        $gone = Folder '777777777777'
+        $k = Start-Keeper $gone
+        $keepers += $k
+        $k.P.StandardOutput.Close()
+        Yes 'a keeper whose caller is gone removes its folder and its lock, and ends' (
+            $k.P.WaitForExit(30000) -and -not (Test-Path -LiteralPath $gone) -and -not (Test-Path -LiteralPath ($gone + '.lock')))
+        Yes 'and an end sent after that finds no keeper' ((@(Set-End $k.End) -join '|') -eq 'END GONE')
 
         # A keeper that is ended (the box restarting) can remove nothing.
         $cut = Folder 'eeeeeeeeeeee'
