@@ -2,7 +2,7 @@
   "version": 1,
   "quest": "crimson",
   "label": "Blackreach",
-  "loadOrderSha256": "351ce9773b98cd6abc2b6ec3280729002074ed0be797691dc6a91a048b60fd48",
+  "loadOrderSha256": "289c8f0dc29b98bb72f89e6bd5a3a95f6bdc5cb6949015adad1f24a2c4819581",
   "sources": [
     {
       "reference": "f3b51:Skyrim.esm",

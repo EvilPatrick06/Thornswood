@@ -16,6 +16,7 @@ import pathlib
 import re
 import struct
 from MerchantRoster import apply_roster, BOOK_HOLDS, ROLES
+import own_plugins
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('npc_cast', HERE / 'Build-CastTable.py')
@@ -481,7 +482,7 @@ def main():
             paths = json.load(source)['loadOrder']
     else:
         with open(args.out, encoding='utf-8') as source:
-            paths = [os.path.join(args.data, row['name']) for row in json.load(source)['loadOrder']]
+            paths = [own_plugins.plugin_path(args.data, row['name']) for row in json.load(source)['loadOrder']]
     payload = activate_guild(build(paths, args.strings_dir))
     with open(args.out, 'w', encoding='utf-8', newline='\n') as output:
         json.dump(payload, output, ensure_ascii=False, separators=(',', ':'))
