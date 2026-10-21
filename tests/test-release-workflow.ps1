@@ -144,7 +144,7 @@ $bpath = Join-Path (Split-Path -Parent $WorkflowPath) 'build.yml'
 if (Test-Path -LiteralPath $bpath) {
     $b = [IO.File]::ReadAllText($bpath).Replace("`r`n", "`n")
     Yes 'build.yml uses BUILD_RUNNER for its fallback, the switch release.yml takes at the switch-over' ($b.Contains("vars.BUILD_RUNNER != 'vps'"))
-    Yes 'build.yml''s fallback runs on the same label' ($b -match 'runs-on: \[self-hosted, Windows, (X64, )?thornswood-vps\]')
+    Yes 'build.yml''s fallback runs on the same label, on a build runner (#2994)' ($b -match 'runs-on: \[self-hosted, Windows, (X64, )?thornswood-vps, thornswood-build\]')
 }
 
 Write-Host ''

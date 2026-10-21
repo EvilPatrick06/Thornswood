@@ -52,6 +52,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -178,223 +179,227 @@ try {
     $x = Good; $x.PSObject.Properties.Remove('release')
     Yes '  caught: no release at all' ((@(Get-ReleaseDisagreements $x) -join ' ') -match 'names no release')
 
-    # ---- 3. the real Publish-Update.ps1 ------------------------------------------------
-    Write-Host ''; Write-Host 'the real Publish-Update.ps1'
-    $fake = Join-Path $Scratch 'repo'
-    New-Item -ItemType Directory -Force -Path $fake | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
-        $from = Join-Path $repo $f
-        if (Test-Path -LiteralPath $from) {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
-            Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
+    if ($OnWindows) {
+        # ---- 3. the real Publish-Update.ps1 ------------------------------------------------
+        Write-Host ''; Write-Host 'the real Publish-Update.ps1'
+        $fake = Join-Path $Scratch 'repo'
+        New-Item -ItemType Directory -Force -Path $fake | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
+        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
+            $from = Join-Path $repo $f
+            if (Test-Path -LiteralPath $from) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
+                Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
+            }
         }
-    }
-    $reqFrom = Join-Path $repo 'game\required-data'
-    if (Test-Path -LiteralPath $reqFrom) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
-        Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Recurse -Force
-    }
-    # The real Stop-Game closes any Skyrim on the machine; nothing here may.
-    Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
-    # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
-    Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
-    [void](RunGit $fake init -q)
-    [void](RunGit $fake @gitId add -A)
-    [void](RunGit $fake @gitId commit -q -m 'the build')
-    $head = (RunGit $fake rev-parse HEAD).Out
-    Yes "the stand-in checkout has a commit ($($head.Substring(0, [Math]::Min(12, $head.Length))))" ($head -match '^[0-9a-f]{40}$')
+        $reqFrom = Join-Path $repo 'game\required-data'
+        if (Test-Path -LiteralPath $reqFrom) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
+            Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Recurse -Force
+        }
+        # The real Stop-Game closes any Skyrim on the machine; nothing here may.
+        Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+        # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+        Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
+        [void](RunGit $fake init -q)
+        [void](RunGit $fake @gitId add -A)
+        [void](RunGit $fake @gitId commit -q -m 'the build')
+        $head = (RunGit $fake rev-parse HEAD).Out
+        Yes "the stand-in checkout has a commit ($($head.Substring(0, [Math]::Min(12, $head.Length))))" ($head -match '^[0-9a-f]{40}$')
 
-    $inst = Join-Path $Scratch 'install'
-    $site = Join-Path $Scratch 'site'
-    $rel = Join-Path $Scratch 'rel'
-    foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'appdata', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
-    New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), $rel | Out-Null
-    [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
-    # Every pack carries the reference plugin list in the game server's order,
-    # read from its manifest on the resources port. A stand-in server on this
-    # machine answers for it, and config.json points there.
-    Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
-    $pluginHeader = [byte[]]::new(24)
-    [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
-    foreach ($plugin in 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'ours.esp') {
-        [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
+        $inst = Join-Path $Scratch 'install'
+        $site = Join-Path $Scratch 'site'
+        $rel = Join-Path $Scratch 'rel'
+        foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'appdata', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
+        New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed'), (Join-Path $site 'feed-dev'), $rel | Out-Null
+        [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
+        # Every pack carries the reference plugin list in the game server's order,
+        # read from its manifest on the resources port. A stand-in server on this
+        # machine answers for it, and config.json points there.
+        Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
+        $pluginHeader = [byte[]]::new(24)
+        [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
+        foreach ($plugin in 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'ours.esp') {
+            [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
+        }
+        Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
+        # The covered bodies a publish needs since d2519bb, as a build leaves them.
+        . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
+        New-GeneratedBodies $inst $fake
+        . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+        Install-UiFrontFixture (Join-Path $inst 'Game')
+        $node = Get-Command node -ErrorAction SilentlyContinue
+        Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
+        if ($null -eq $node) { Done }
+        # The stand-in takes a port from the system, holds it, and says which on
+        # its first line; config.json names the game port one below it, the rule
+        # LoadOrder.ps1 reads the resources port by. It used to be given a random
+        # number nothing checked was free, and 800 ms to be up (#1728).
+        $serverJs = Join-Path $Scratch 'server.js'
+        Put $serverJs ("const srv = require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
+                       "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }); " +
+                       "srv.listen(0, '127.0.0.1', function () { console.log('listening on 127.0.0.1:' + srv.address().port); });")
+        $gpsi = New-Object Diagnostics.ProcessStartInfo
+        $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $serverJs + '"'
+        $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
+        $script:gameServer = [Diagnostics.Process]::Start($gpsi)
+        $gameErr = $script:gameServer.StandardError.ReadToEndAsync()
+        $first = $script:gameServer.StandardOutput.ReadLineAsync()
+        $heard = if ($first.Wait(15000)) { [string]$first.Result } else { '' }
+        $m = [regex]::Match($heard, '^listening on 127\.0\.0\.1:(\d+)$')
+        $port = if ($m.Success) { [int]$m.Groups[1].Value } else { 0 }
+        Yes "the stand-in game server says it is listening, on a port the system gave it ($port)" ($port -gt 0)
+        if (-not $port) {
+            if ($script:gameServer.HasExited -and $gameErr.Wait(2000)) { Write-Host $gameErr.Result -ForegroundColor DarkGray }
+            Done
+        }
+        $null = $script:gameServer.StandardOutput.ReadToEndAsync()
+        Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
+        # What the last release published, on the stand-in store: the plugin as it
+        # was, so this build has something to send. The feed names no baseline
+        # record yet, so the store's copy is what it is diffed against.
+        # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
+        # notice reads records\client-build.json (#1318), copied above. The feed
+        # already has that client runtime, as a real feed does, so this run does
+        # not stage the six runtime files the stand-in game folder never had.
+        $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
+        # The site's feed is the newest of its generations (Feed-Store.ps1, #2727).
+        function SiteFeed { return (Get-FeedVersionFile (Join-Path $site 'feed')) }
+        Put (Join-Path $site 'feed\version\00000001.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
+        Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
+        $Shell = (Get-Process -Id $PID).Path
+        function Publish([string[]]$extra) {
+            $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
+            $env:LOCALAPPDATA = Join-Path $inst 'appdata'
+            $ErrorActionPreference = 'Continue'
+            try {
+                $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
+                function Q([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
+                $argText = (@('-Root', (Q $inst), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $inst 'dist')), '-SiteDir', (Q $site),
+                              '-SiteUrl', 'http://127.0.0.1:9', '-NoPause') + @($extra)) -join ' '
+                # In this process's scope the way Ship runs it, so the id the
+                # publisher hands back can be read afterwards.
+                # try/finally: the publisher can stop on a Read-Host this child
+                # refuses, and what it handed back is still read.
+                $cmd = "`$global:ThornswoodPublishedRelease = ''; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
+                       "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']' }; exit `$rc"
+                $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String); $code = $LASTEXITCODE
+            } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
+            $said = [regex]::Match($out, 'PUBLISHED=\[([^\]]*)\]')
+            return [pscustomobject]@{ Code = $code; Out = $out; Published = $(if ($said.Success) { $said.Groups[1].Value } else { '?' }) }
+        }
+        function Said($r, [bool]$ok) { if (-not $ok) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray } }
+        function YesR([string]$what, [bool]$cond, $r) { Yes $what $cond; Said $r $cond }
+
+        # a. A release, sent for real into the stand-in site and store.
+        $r = Publish @('-Notes', "'Test release`n- one line'")
+        YesR ("a release goes out (exit {0}) and the publisher says which one ({1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
+        $id = $r.Published
+        $feed = Read-Json (SiteFeed)
+        $rec = Get-ReleaseRecord $feed
+        Yes 'the feed the site serves names that release' ($null -ne $rec -and [string]$rec.id -eq $id)
+        if ($null -ne $rec) {
+            $packIds = @($feed.packs | ForEach-Object { [string]$_.id })
+            Yes ("  its packs are the ones it added, named by the release ({0})" -f (@($rec.packs) -join ', ')) (
+                @($rec.packs).Count -ge 1 -and @($rec.packs | Where-Object { $packIds -notcontains $_ -or ($_ -ne $id -and $_ -notlike "$id-*") }).Count -eq 0)
+            Yes ("  its baseline is the release's own record, and the one the feed names ({0})" -f $rec.baseline) ($rec.baseline -eq $id -and $feed.baseline.id -eq $id)
+            # The list a rollback reads is the store's releases.json since #1050,
+            # beside the feed and not in it.
+            $storeList = Read-ReleaseListFile (Join-Path $site 'feed\releases.json')
+            $top = if ($null -ne $storeList -and @($storeList).Count) { @($storeList)[0] } else { $null }
+            Yes '  and it is the newest of the releases the channel can be put back to, ending on its last pack' (
+                $null -ne $top -and [string]$top.id -eq $id -and [string]$top.lastPack -eq [string]@($rec.packs)[-1])
+            Yes '  that list is in the store beside the feed, and the feed carries none' (-not $feed.PSObject.Properties['releases'])
+            Yes ("  it names the launcher the feed offers ({0})" -f $rec.launcherVersion) ($rec.launcherVersion -eq '1.1.102' -and $feed.launcherVersion -eq '1.1.102')
+            Yes '  the commit it was built from, and the checkout was clean' ($rec.commit -eq $head -and [int]$rec.uncommitted -eq 0)
+            Yes ("  and its tag, {0}" -f $rec.tag) ($rec.tag -eq "release/main/$id")
+            $bad = @(Get-ReleaseDisagreements $feed $storeList)
+            Yes ('  every name agrees' + $(if ($bad.Count) { ': ' + ($bad -join '; ') } else { '' })) ($bad.Count -eq 0)
+        }
+        $relTxt = Join-Path $site 'feed\releases.txt'
+        $line = @(if (Test-Path -LiteralPath $relTxt) { Get-Content -LiteralPath $relTxt | Where-Object { $_ -like "$id`t*" } })
+        Yes 'the store''s releases.txt has one line for it, its id first' ($line.Count -eq 1)
+        $listed = @(Get-FeedStoreReleases 'main' -SiteDir $site | Where-Object { $_.Id -eq $id })
+        Yes '  and Get-FeedStoreReleases reads back the same names' ($listed.Count -eq 1 -and $listed[0].Channel -eq 'main' -and
+            $listed[0].Commit -eq $head -and $listed[0].Tag -eq "release/main/$id" -and $listed[0].Baseline -eq $id -and
+            $listed[0].LauncherVersion -eq '1.1.102' -and @($listed[0].Packs).Count -eq @($rec.packs).Count)
+
+        # The rule paths still ride in a pack that carries a real change (#1012).
+        . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
+        $rule = @(Get-ShipDeleteAlways)
+        $zipA = @(Get-ChildItem -LiteralPath (Join-Path $inst 'dist') -Recurse -File -Filter "pack-$id*.zip" -ErrorAction SilentlyContinue)
+        $del = @()
+        if ($zipA.Count) {
+            Add-Type -AssemblyName System.IO.Compression.FileSystem
+            $za = [IO.Compression.ZipFile]::OpenRead($zipA[0].FullName)
+            try {
+                $de = $za.GetEntry('delete.txt')
+                if ($de) { $sr = New-Object IO.StreamReader($de.Open()); try { $del = @($sr.ReadToEnd() -split "`r?`n" | Where-Object { $_ }) } finally { $sr.Dispose() } }
+            } finally { $za.Dispose() }
+        }
+        # delete.txt names them with forward slashes.
+        $rule = @($rule | ForEach-Object { $_ -replace '\\', '/' })
+        Yes ("  its pack's delete.txt lists every rule path ({0} of {1})" -f @($rule | Where-Object { $del -contains $_ }).Count, $rule.Count) (
+            $rule.Count -gt 0 -and @($rule | Where-Object { $del -notcontains $_ }).Count -eq 0)
+
+        # e. The same build again, nothing of ours changed (#1012): the rule paths
+        #    alone are no reason for a release, so it stops with Nothing to do,
+        #    and says so with exit code 2, the code Ship reads as nothing
+        #    released. It was 0 without -Launcher until 6 Oct, which Ship read as
+        #    a release and announced.
+        $packsBefore = @((Read-Json (SiteFeed)).packs).Count
+        $r = Publish @('-Notes', "'Test release`n- the same again'")
+        YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
+        Yes '  and the feed gained no pack' (@((Read-Json (SiteFeed)).packs).Count -eq $packsBefore)
+
+        # d. A second real release straight after the first (#1057): its own id,
+        #    never the first's, so a launcher that took the first still takes it.
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a second release'
+        $r = Publish @('-Notes', "'Test release`n- a second one'")
+        YesR ("a second release goes out under an id of its own ({0} after {1}, exit {2})" -f $r.Published, $id, $r.Code) (
+            $r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$' -and $r.Published -ne $id) $r
+        $ids = @((Read-Json (SiteFeed)).packs | ForEach-Object { [string]$_.id })
+        Yes ("  the feed lists both, no id twice ({0})" -f ($ids -join ', ')) ($ids -contains $id -and $ids -contains $r.Published -and
+            @($ids | Select-Object -Unique).Count -eq $ids.Count)
+        $applied = @($id)
+        Yes '  and a launcher that applied the first has the second still to take' (@($ids | Where-Object { $applied -notcontains $_ }) -contains $r.Published)
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a release under a taken name'
+        $r2 = Publish @('-Notes', "'Test release`n- a clash'", '-Id', $r.Published)
+        YesR ("  an -Id the feed already has is refused (exit {0})" -f $r2.Code) ($r2.Code -ne 0 -and $r2.Out -match 'already has a release or pack named') $r2
+
+        # b. What Ship -DryRun passes: -NoUpload -NoPush. Nothing is sent, so
+        #    nothing may be named as sent.
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
+        $siteBefore = [IO.File]::ReadAllText((SiteFeed))
+        # A fixed id, so the checks below can name it.
+        $r = Publish @('-Notes', "'Test release`n- two lines'", '-Id', '20990101-0001', '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
+        YesR ("-NoUpload -NoPush: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '') $r
+        # #1056: a dry run of a real change is a dry run that worked, not exit 1
+        # with advice about the ssh key, and it asks nothing of the keyboard.
+        YesR ("  and finishes with exit 0, the packs' empty urls expected (exit {0})" -f $r.Code) (
+            $r.Code -eq 0 -and $r.Out -notmatch 'uploaded no asset' -and $r.Out -match 'nothing was uploaded') $r
+        Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
+        $local = Read-Json (Join-Path $rel 'version.json')
+        $lrec = Get-ReleaseRecord $local
+        Yes '  the feed it wrote here still names its release, with no baseline, as it sent none' ($null -ne $lrec -and $lrec.id -eq '20990101-0001' -and $lrec.baseline -eq '')
+
+        # c. A feed send that fails: the new feed cannot go up to the store.
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed a third time'
+        [void](Receive-FeedStore 'main' $rel -SiteDir $site)
+        New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed\version.json.part\in-the-way') | Out-Null
+        $siteBefore = [IO.File]::ReadAllText((SiteFeed))
+        $r = Publish @('-Notes', "'Test release`n- three lines'", '-Id', '20990101-0002')
+        YesR ("a feed send that fails: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '' -and $r.Out -match 'NOT SHIPPED') $r
+        # #1055: and says it with its exit code, which is all a Ship that keeps its
+        # launcher reads; anything but 0 or 2 stops Ship before it tells anybody.
+        Yes ("  with an exit code that is not 0 or 2 ({0})" -f $r.Code) ($r.Code -ne 0 -and $r.Code -ne 2)
+        Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
+        Remove-Item -LiteralPath (Join-Path $site 'feed\version.json.part') -Recurse -Force
+    } else {
+        Write-Host 'SKIP  the real Publish-Update.ps1: a release that signs here makes its catalog with New-FileCatalog, which only Windows has'
     }
-    Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-    # The covered bodies a publish needs since d2519bb, as a build leaves them.
-    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-    New-GeneratedBodies $inst $fake
-    . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
-    Install-UiFrontFixture (Join-Path $inst 'Game')
-    $node = Get-Command node -ErrorAction SilentlyContinue
-    Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
-    if ($null -eq $node) { Done }
-    # The stand-in takes a port from the system, holds it, and says which on
-    # its first line; config.json names the game port one below it, the rule
-    # LoadOrder.ps1 reads the resources port by. It used to be given a random
-    # number nothing checked was free, and 800 ms to be up (#1728).
-    $serverJs = Join-Path $Scratch 'server.js'
-    Put $serverJs ("const srv = require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-                   "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }); " +
-                   "srv.listen(0, '127.0.0.1', function () { console.log('listening on 127.0.0.1:' + srv.address().port); });")
-    $gpsi = New-Object Diagnostics.ProcessStartInfo
-    $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $serverJs + '"'
-    $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
-    $script:gameServer = [Diagnostics.Process]::Start($gpsi)
-    $gameErr = $script:gameServer.StandardError.ReadToEndAsync()
-    $first = $script:gameServer.StandardOutput.ReadLineAsync()
-    $heard = if ($first.Wait(15000)) { [string]$first.Result } else { '' }
-    $m = [regex]::Match($heard, '^listening on 127\.0\.0\.1:(\d+)$')
-    $port = if ($m.Success) { [int]$m.Groups[1].Value } else { 0 }
-    Yes "the stand-in game server says it is listening, on a port the system gave it ($port)" ($port -gt 0)
-    if (-not $port) {
-        if ($script:gameServer.HasExited -and $gameErr.Wait(2000)) { Write-Host $gameErr.Result -ForegroundColor DarkGray }
-        Done
-    }
-    $null = $script:gameServer.StandardOutput.ReadToEndAsync()
-    Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
-    # What the last release published, on the stand-in store: the plugin as it
-    # was, so this build has something to send. The feed names no baseline
-    # record yet, so the store's copy is what it is diffed against.
-    # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
-    # notice reads records\client-build.json (#1318), copied above. The feed
-    # already has that client runtime, as a real feed does, so this run does
-    # not stage the six runtime files the stand-in game folder never had.
-    $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    # The site's feed is the newest of its generations (Feed-Store.ps1, #2727).
-    function SiteFeed { return (Get-FeedVersionFile (Join-Path $site 'feed')) }
-    Put (Join-Path $site 'feed\version\00000001.json') ('{"launcherVersion":"1.1.102","packs":[],"news":[],"clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
-    Put (Join-Path $site 'feed\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
-    $Shell = (Get-Process -Id $PID).Path
-    function Publish([string[]]$extra) {
-        $oldA = $env:LOCALAPPDATA; $oldE = $ErrorActionPreference
-        $env:LOCALAPPDATA = Join-Path $inst 'appdata'
-        $ErrorActionPreference = 'Continue'
-        try {
-            $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
-            function Q([string]$s) { return "'" + $s.Replace("'", "''") + "'" }
-            $argText = (@('-Root', (Q $inst), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $inst 'dist')), '-SiteDir', (Q $site),
-                          '-SiteUrl', 'http://127.0.0.1:9', '-NoPause') + @($extra)) -join ' '
-            # In this process's scope the way Ship runs it, so the id the
-            # publisher hands back can be read afterwards.
-            # try/finally: the publisher can stop on a Read-Host this child
-            # refuses, and what it handed back is still read.
-            $cmd = "`$global:ThornswoodPublishedRelease = ''; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
-                   "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']' }; exit `$rc"
-            $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -Command $cmd 2>&1 | Out-String); $code = $LASTEXITCODE
-        } finally { $env:LOCALAPPDATA = $oldA; $ErrorActionPreference = $oldE }
-        $said = [regex]::Match($out, 'PUBLISHED=\[([^\]]*)\]')
-        return [pscustomobject]@{ Code = $code; Out = $out; Published = $(if ($said.Success) { $said.Groups[1].Value } else { '?' }) }
-    }
-    function Said($r, [bool]$ok) { if (-not $ok) { Write-Host (($r.Out -split "`r?`n" | Where-Object { $_.Trim() } | Select-Object -Last 14) -join "`n") -ForegroundColor DarkGray } }
-    function YesR([string]$what, [bool]$cond, $r) { Yes $what $cond; Said $r $cond }
-
-    # a. A release, sent for real into the stand-in site and store.
-    $r = Publish @('-Notes', "'Test release`n- one line'")
-    YesR ("a release goes out (exit {0}) and the publisher says which one ({1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
-    $id = $r.Published
-    $feed = Read-Json (SiteFeed)
-    $rec = Get-ReleaseRecord $feed
-    Yes 'the feed the site serves names that release' ($null -ne $rec -and [string]$rec.id -eq $id)
-    if ($null -ne $rec) {
-        $packIds = @($feed.packs | ForEach-Object { [string]$_.id })
-        Yes ("  its packs are the ones it added, named by the release ({0})" -f (@($rec.packs) -join ', ')) (
-            @($rec.packs).Count -ge 1 -and @($rec.packs | Where-Object { $packIds -notcontains $_ -or ($_ -ne $id -and $_ -notlike "$id-*") }).Count -eq 0)
-        Yes ("  its baseline is the release's own record, and the one the feed names ({0})" -f $rec.baseline) ($rec.baseline -eq $id -and $feed.baseline.id -eq $id)
-        # The list a rollback reads is the store's releases.json since #1050,
-        # beside the feed and not in it.
-        $storeList = Read-ReleaseListFile (Join-Path $site 'feed\releases.json')
-        $top = if ($null -ne $storeList -and @($storeList).Count) { @($storeList)[0] } else { $null }
-        Yes '  and it is the newest of the releases the channel can be put back to, ending on its last pack' (
-            $null -ne $top -and [string]$top.id -eq $id -and [string]$top.lastPack -eq [string]@($rec.packs)[-1])
-        Yes '  that list is in the store beside the feed, and the feed carries none' (-not $feed.PSObject.Properties['releases'])
-        Yes ("  it names the launcher the feed offers ({0})" -f $rec.launcherVersion) ($rec.launcherVersion -eq '1.1.102' -and $feed.launcherVersion -eq '1.1.102')
-        Yes '  the commit it was built from, and the checkout was clean' ($rec.commit -eq $head -and [int]$rec.uncommitted -eq 0)
-        Yes ("  and its tag, {0}" -f $rec.tag) ($rec.tag -eq "release/main/$id")
-        $bad = @(Get-ReleaseDisagreements $feed $storeList)
-        Yes ('  every name agrees' + $(if ($bad.Count) { ': ' + ($bad -join '; ') } else { '' })) ($bad.Count -eq 0)
-    }
-    $relTxt = Join-Path $site 'feed\releases.txt'
-    $line = @(if (Test-Path -LiteralPath $relTxt) { Get-Content -LiteralPath $relTxt | Where-Object { $_ -like "$id`t*" } })
-    Yes 'the store''s releases.txt has one line for it, its id first' ($line.Count -eq 1)
-    $listed = @(Get-FeedStoreReleases 'main' -SiteDir $site | Where-Object { $_.Id -eq $id })
-    Yes '  and Get-FeedStoreReleases reads back the same names' ($listed.Count -eq 1 -and $listed[0].Channel -eq 'main' -and
-        $listed[0].Commit -eq $head -and $listed[0].Tag -eq "release/main/$id" -and $listed[0].Baseline -eq $id -and
-        $listed[0].LauncherVersion -eq '1.1.102' -and @($listed[0].Packs).Count -eq @($rec.packs).Count)
-
-    # The rule paths still ride in a pack that carries a real change (#1012).
-    . (Join-Path $repo 'scripts\release\Ship-Rules.ps1')
-    $rule = @(Get-ShipDeleteAlways)
-    $zipA = @(Get-ChildItem -LiteralPath (Join-Path $inst 'dist') -Recurse -File -Filter "pack-$id*.zip" -ErrorAction SilentlyContinue)
-    $del = @()
-    if ($zipA.Count) {
-        Add-Type -AssemblyName System.IO.Compression.FileSystem
-        $za = [IO.Compression.ZipFile]::OpenRead($zipA[0].FullName)
-        try {
-            $de = $za.GetEntry('delete.txt')
-            if ($de) { $sr = New-Object IO.StreamReader($de.Open()); try { $del = @($sr.ReadToEnd() -split "`r?`n" | Where-Object { $_ }) } finally { $sr.Dispose() } }
-        } finally { $za.Dispose() }
-    }
-    # delete.txt names them with forward slashes.
-    $rule = @($rule | ForEach-Object { $_ -replace '\\', '/' })
-    Yes ("  its pack's delete.txt lists every rule path ({0} of {1})" -f @($rule | Where-Object { $del -contains $_ }).Count, $rule.Count) (
-        $rule.Count -gt 0 -and @($rule | Where-Object { $del -notcontains $_ }).Count -eq 0)
-
-    # e. The same build again, nothing of ours changed (#1012): the rule paths
-    #    alone are no reason for a release, so it stops with Nothing to do,
-    #    and says so with exit code 2, the code Ship reads as nothing
-    #    released. It was 0 without -Launcher until 6 Oct, which Ship read as
-    #    a release and announced.
-    $packsBefore = @((Read-Json (SiteFeed)).packs).Count
-    $r = Publish @('-Notes', "'Test release`n- the same again'")
-    YesR ("the same build again says Nothing to do (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
-    Yes '  and the feed gained no pack' (@((Read-Json (SiteFeed)).packs).Count -eq $packsBefore)
-
-    # d. A second real release straight after the first (#1057): its own id,
-    #    never the first's, so a launcher that took the first still takes it.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a second release'
-    $r = Publish @('-Notes', "'Test release`n- a second one'")
-    YesR ("a second release goes out under an id of its own ({0} after {1}, exit {2})" -f $r.Published, $id, $r.Code) (
-        $r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$' -and $r.Published -ne $id) $r
-    $ids = @((Read-Json (SiteFeed)).packs | ForEach-Object { [string]$_.id })
-    Yes ("  the feed lists both, no id twice ({0})" -f ($ids -join ', ')) ($ids -contains $id -and $ids -contains $r.Published -and
-        @($ids | Select-Object -Unique).Count -eq $ids.Count)
-    $applied = @($id)
-    Yes '  and a launcher that applied the first has the second still to take' (@($ids | Where-Object { $applied -notcontains $_ }) -contains $r.Published)
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed for a release under a taken name'
-    $r2 = Publish @('-Notes', "'Test release`n- a clash'", '-Id', $r.Published)
-    YesR ("  an -Id the feed already has is refused (exit {0})" -f $r2.Code) ($r2.Code -ne 0 -and $r2.Out -match 'already has a release or pack named') $r2
-
-    # b. What Ship -DryRun passes: -NoUpload -NoPush. Nothing is sent, so
-    #    nothing may be named as sent.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
-    $siteBefore = [IO.File]::ReadAllText((SiteFeed))
-    # A fixed id, so the checks below can name it.
-    $r = Publish @('-Notes', "'Test release`n- two lines'", '-Id', '20990101-0001', '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
-    YesR ("-NoUpload -NoPush: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '') $r
-    # #1056: a dry run of a real change is a dry run that worked, not exit 1
-    # with advice about the ssh key, and it asks nothing of the keyboard.
-    YesR ("  and finishes with exit 0, the packs' empty urls expected (exit {0})" -f $r.Code) (
-        $r.Code -eq 0 -and $r.Out -notmatch 'uploaded no asset' -and $r.Out -match 'nothing was uploaded') $r
-    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
-    $local = Read-Json (Join-Path $rel 'version.json')
-    $lrec = Get-ReleaseRecord $local
-    Yes '  the feed it wrote here still names its release, with no baseline, as it sent none' ($null -ne $lrec -and $lrec.id -eq '20990101-0001' -and $lrec.baseline -eq '')
-
-    # c. A feed send that fails: the new feed cannot go up to the store.
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed a third time'
-    [void](Receive-FeedStore 'main' $rel -SiteDir $site)
-    New-Item -ItemType Directory -Force -Path (Join-Path $site 'feed\version.json.part\in-the-way') | Out-Null
-    $siteBefore = [IO.File]::ReadAllText((SiteFeed))
-    $r = Publish @('-Notes', "'Test release`n- three lines'", '-Id', '20990101-0002')
-    YesR ("a feed send that fails: the publisher says no release was sent (exit {0})" -f $r.Code) ($r.Published -eq '' -and $r.Out -match 'NOT SHIPPED') $r
-    # #1055: and says it with its exit code, which is all a Ship that keeps its
-    # launcher reads; anything but 0 or 2 stops Ship before it tells anybody.
-    Yes ("  with an exit code that is not 0 or 2 ({0})" -f $r.Code) ($r.Code -ne 0 -and $r.Code -ne 2)
-    Yes '  and the site''s feed is what it was' ([IO.File]::ReadAllText((SiteFeed)) -eq $siteBefore)
-    Remove-Item -LiteralPath (Join-Path $site 'feed\version.json.part') -Recurse -Force
 
     # ---- 4. the tag --------------------------------------------------------------------
     Write-Host ''; Write-Host 'the tag'

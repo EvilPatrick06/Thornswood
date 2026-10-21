@@ -80,7 +80,7 @@ try { $s = ([IO.File]::ReadAllText($sp)) | ConvertFrom-Json } catch { $s = $null
 $lo = $null
 if ($null -ne $s -and $null -ne $s.PSObject.Properties['loadOrder']) { $lo = $s.PSObject.Properties['loadOrder'].Value }
 if ($null -eq $lo) { 'ORDER unreadable' }
-else { foreach ($o in @($lo)) { 'ORDER ' + [IO.Path]::GetFileName(([string]$o).Replace('/', '\')) } }
+else { foreach ($o in @($lo)) { 'ORDER ' + @(([string]$o) -split '[\\/]')[-1] } }
 foreach ($n in @($ours)) {
   $op = Join-Path $root ('plugins\' + $n)
   if (Test-Path -LiteralPath $op -PathType Leaf) {
