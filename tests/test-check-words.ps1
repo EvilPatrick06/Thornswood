@@ -230,13 +230,14 @@ try {
     # with no byte order mark as ANSI, which is where an em dash typed into the
     # check would have gone missing.
     $other = $null
-    if ($PSVersionTable.PSEdition -eq 'Core') { $c = Get-Command powershell.exe -ErrorAction SilentlyContinue; if ($c) { $other = $c.Source } }
-    else { $c = Get-Command pwsh -ErrorAction SilentlyContinue; if ($c) { $other = $c.Source } }
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if ($PSVersionTable.PSEdition -eq 'Desktop') { $c = Get-Command pwsh -ErrorAction SilentlyContinue; if ($c) { $other = $c.Source } }
+    elseif ($OnWindows) { $other = Get-WindowsPowerShell }
     if ($other) {
         $o = Invoke-Check $other $tmp
         Yes ('the other PowerShell (' + (Split-Path -Leaf $other) + ') reports exactly the same hits and exit code') (($o.Code -eq $s.Code) -and (($o.Hits -join ' ') -eq ($s.Hits -join ' ')))
     } else {
-        Write-Host 'SKIP  no second PowerShell on this machine to compare with'
+        Write-Host $(if ($PSVersionTable.PSEdition -eq 'Desktop') { 'SKIP  no pwsh on this machine to compare with' } else { 'SKIP  no Windows PowerShell 5.1 to compare with: this is not Windows' })
     }
 
     # Clean the seeded breaks away and the same tree passes, the one good

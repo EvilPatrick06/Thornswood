@@ -107,7 +107,7 @@ function Run {
 
 # A fork under a path cmd.exe splits (issue #1025). vcpkg bootstraps through
 # bootstrap-vcpkg.bat, and cmd ends a command at a bare &, so a fork under
-# C:\ThornswoodTemps&Worktrees, where every worktree goes, stopped at
+# C:\ThornswoodTemps&Worktrees, where every worktree went until #2900, stopped at
 # Configure with "'C:\ThornswoodTemps' is not recognized". So for configure
 # and build the fork's parent folder is reached through a drive letter of its
 # own (subst), and the letter is removed again when this ends. The parent and

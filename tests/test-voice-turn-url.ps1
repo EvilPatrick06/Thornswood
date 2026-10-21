@@ -46,6 +46,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoPath) { $RepoPath = $Here }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -197,7 +198,7 @@ function CommandFor([string]$url) {
 function RunCommand([string]$cmd) {
     Remove-Item -LiteralPath $seenPath -Force -ErrorAction SilentlyContinue
     $psi = New-Object System.Diagnostics.ProcessStartInfo
-    $psi.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $psi.FileName = Get-WindowsPath 'System32\cmd.exe'
     $psi.Arguments = $cmd
     $psi.WorkingDirectory = $root
     $psi.UseShellExecute = $false
@@ -222,23 +223,28 @@ $before = '/c "set THORNSWOOD_SITE=https://thornswood.net&& set THORNSWOOD_VOICE
 $none = CommandFor ''
 Yes 'with no relay the command line is the one every install sends, to the character' (
     $none -and $none.Cmd -ceq $before)
-$seen = if ($none) { RunCommand $none.Cmd } else { $null }
-Yes 'and the service it starts is handed no relay address' ($seen -and $null -eq $seen.url)
-Yes 'with site, port, bind and chat range as they always were, and auth on' (
-    $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
-    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
+if (-not $OnWindows) { Write-Host 'SKIP  what the service is handed: the task line is run through cmd.exe, as Task Scheduler runs it, and only Windows has cmd.exe' }
+else {
+    $seen = if ($none) { RunCommand $none.Cmd } else { $null }
+    Yes 'and the service it starts is handed no relay address' ($seen -and $null -eq $seen.url)
+    Yes 'with site, port, bind and chat range as they always were, and auth on' (
+        $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
+        $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
+}
 
 $relay = 'turn:relay.example.net:3478,turns:relay.example.net:5349?transport=tcp'
 $with = CommandFor $relay
 $want = $before.Replace('set THORNSWOOD_CHAT_RANGE=off&& ', 'set THORNSWOOD_CHAT_RANGE=off&& set THORNSWOOD_TURN_URL=' + $relay + '&& ')
 Yes 'with a relay, the one thing added is the relay address, before node starts' ($with -and $with.Cmd -ceq $want)
-$seen = if ($with) { RunCommand $with.Cmd } else { $null }
-Yes 'and the service gets exactly that address, with no space on the end' ($seen -and $seen.url -ceq $relay)
-Yes 'the rest is unchanged' (
-    $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
-    $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
-Yes 'and no relay key rides on the command line: the service is handed none there' (
-    $seen -and $null -eq $seen.secret -and $with.Remote -notmatch 'TURN_SECRET|TURN_PASS|TURN_USER')
+if ($OnWindows) {
+    $seen = if ($with) { RunCommand $with.Cmd } else { $null }
+    Yes 'and the service gets exactly that address, with no space on the end' ($seen -and $seen.url -ceq $relay)
+    Yes 'the rest is unchanged' (
+        $seen -and $seen.site -eq 'https://thornswood.net' -and $seen.port -eq '7778' -and
+        $seen.bind -eq '0.0.0.0' -and $seen.auth -eq 'on' -and $seen.chat -eq 'off')
+    Yes 'and no relay key rides on the command line: the service is handed none there' (
+        $seen -and $null -eq $seen.secret -and $with.Remote -notmatch 'TURN_SECRET|TURN_PASS|TURN_USER')
+}
 
 # ---- the probe --------------------------------------------------------------
 Write-Host ''
@@ -250,13 +256,20 @@ New-Item -ItemType Directory -Force -Path (Join-Path $stubDir 'deploy'), (Join-P
 # Remote.ps1's own parameters, running here instead of on the VPS. A canned
 # answer stands in for a service that is not there, or one saying something
 # no real one would.
-Set-Content -LiteralPath (Join-Path $stubDir 'vps\Remote.ps1') -Encoding ASCII -Value @'
+# The box runs what Remote.ps1 sends in Windows PowerShell 5.1; off Windows
+# the stand-in runs it in this shell.
+if ($OnWindows) { $farShell = Get-WindowsPowerShell }
+else {
+    $farShell = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
+Set-Content -LiteralPath (Join-Path $stubDir 'vps\Remote.ps1') -Encoding ASCII -Value (@'
 param([Parameter(Position = 0)][string]$Script, [string]$VpsHost, [string]$VpsUser)
 if ($env:TS_PROBE_ANSWER) { $env:TS_PROBE_ANSWER; return }
 $full = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $Script
 $b64 = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($full))
-& powershell.exe -NoProfile -NonInteractive -EncodedCommand $b64
-'@
+& '__FAR_SHELL__' -NoProfile -NonInteractive -EncodedCommand $b64
+'@).Replace('__FAR_SHELL__', $farShell.Replace("'", "''"))
 
 function StartVoice([int]$port, [hashtable]$vars, [string]$key) {
     $dir = Join-Path $script:temp ('voice-' + $port)

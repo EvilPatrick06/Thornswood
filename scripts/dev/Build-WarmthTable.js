@@ -45,6 +45,7 @@
 // the load order being unusual.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -56,9 +57,6 @@ const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'warmth.json'));
 const PRINT = args.indexOf('--print') !== -1;
-
-const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
-                  'HearthFires.esm', 'Dragonborn.esm'];
 
 /*
   THE MATERIAL CLASSES, AND WHY THERE ARE ONLY SIX.
@@ -155,21 +153,6 @@ const SKIN = {
 };
 
 function fail(msg) { console.error('FAIL  ' + msg); process.exitCode = 1; }
-
-function loadOrder() {
-  const out = BETHESDA.slice();
-  let raw = '';
-  try { raw = fs.readFileSync(PLUGINS_TXT, 'utf8'); } catch (e) { return out; }
-  raw.split(/\r?\n/).forEach(function (line) {
-    const t = line.trim();
-    if (!t || t[0] === '#') { return; }
-    // A leading * is "enabled" in the modern plugins.txt.
-    const name = t[0] === '*' ? t.slice(1).trim() : t;
-    if (!name) { return; }
-    if (out.indexOf(name) === -1) { out.push(name); }
-  });
-  return out;
-}
 
 function masters(b, headerSize) {
   const out = [];
@@ -321,7 +304,7 @@ function records(b, start, end, pass, mast, self, wantType) {
   }
 }
 
-const order = loadOrder();
+const order = loadedOrder(PLUGINS_TXT, DATA);
 let parsed = 0;
 
 /*
@@ -340,8 +323,7 @@ let parsed = 0;
   it, which the engine cannot handle either.
 */
 for (const pl of order) {
-  const p = path.join(DATA, pl);
-  if (!fs.existsSync(p)) { continue; }
+  const p = pluginPath(DATA, pl);
   let b;
   try { b = fs.readFileSync(p); } catch (e) { fail('could not read ' + pl); continue; }
   if (b.length < 24 || b.toString('ascii', 0, 4) !== 'TES4') { fail('not a plugin: ' + pl); continue; }

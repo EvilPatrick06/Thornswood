@@ -46,6 +46,50 @@ and exits 1 when anything failed. A harness that reads something only one
 machine has, such as the game folder, says SKIP for that part and checks the
 rest.
 
+## A harness that needs Windows
+
+Windows PowerShell 5.1, cmd.exe, a scheduled task, a folder's ACL and the
+.NET Framework are only on Windows, and the harnesses also run under pwsh on
+Linux. A `.ps1` harness that needs any of them dot-sources `tests\Windows.ps1`
+and asks `$OnWindows` before it names a Windows path:
+
+```
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs: they need Windows PowerShell 5.1, which only Windows has'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+$cmd = Get-WindowsPath 'System32\cmd.exe'
+```
+
+Off Windows it says SKIP for that part and checks the rest, or, when the
+whole harness is about Windows, prints one `NOT RUN` line saying why and
+exits 0. When what it runs on the box can run here as well, it may run it in
+this shell instead, and says so on a `NOTE` line. On Windows,
+`Get-WindowsPowerShell` fails the harness when powershell.exe is not where
+Windows keeps it, rather than letting it skip or run pwsh in its place. A
+harness that loads `tests\Launcher-Csc.ps1` has `$OnWindows` from it too.
+
+Before issue #2957 each harness found these itself, by joining onto
+`$env:SystemRoot` or asking `Get-Command` for powershell.exe, and copied the
+line from the harness before it; off Windows the join stopped harness after
+harness on its first lines. `test-2957-windows-one-way.ps1` fails on a
+harness that names `$env:SystemRoot` or `$env:WINDIR`, runs powershell or cmd
+by name, asks `$IsWindows` (which 5.1 does not have), or uses `$OnWindows`
+without loading `Windows.ps1`.
+
+## A harness that reads a child's error
+
+pwsh's default error view wraps a script error's message at the console's
+width, at a space, and starts the next line with `     | `. A check that looks
+for a phrase in that text then passes or fails by how long the temp folder's
+path is and how wide the console is: on 20 October two checks failed only on
+the runners whose profile folder names are 16 characters longer (#2933). A
+child whose error a check reads runs with `$global:ErrorView = 'NormalView'`,
+which prints the message as written: as the first line of the script it
+writes, or through a launcher like `Child` in `test-bad-json-records.ps1`.
+
 ## A harness that starts a service
 
 Several builds run at once on the VPS and share its 127.0.0.1, so a harness

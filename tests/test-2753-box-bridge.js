@@ -1,19 +1,24 @@
-// #2753: ssh from a cloud thread reaches the box inside a WebSocket.
+// #2753, #2891: ssh to the box goes inside a WebSocket.
 //
-// A cloud Claude thread's proxy carries HTTPS only, so ssh goes through
-// scripts/vps/bridge: connect.js (ssh's ProxyCommand in the cloud) opens a
-// WebSocket through the proxy to bridge.js (on the box behind Caddy), which
-// joins it to sshd. This runs both for real on loopback:
+// A cloud Claude thread's proxy carries HTTPS only, and port 22 takes no
+// outside address once everybody comes this way, so ssh goes through
+// scripts/vps/bridge: connect.js (ssh's ProxyCommand) opens a WebSocket,
+// through the proxy when there is one, to bridge.js (on the box behind
+// Caddy), which joins it to sshd. This runs both for real on loopback:
 //   1. ws.js frames: every length form, masked and not, fragments, pieces of
 //      one byte, and the frames a peer must never send;
-//   2. bridge.js, spawned with a token file and an echo server in sshd's
-//      place: a plain request is a 404, an upgrade with no token, a wrong one
-//      or none on the box is a 401, a ninth session is a 503, and with the
-//      token bytes go there and back intact, 3 MB included;
+//   2. bridge.js, spawned with a folder of two holders' token digests and an
+//      echo server in sshd's place: a plain request is a 404, an upgrade with
+//      no token, a wrong one, a token written raw instead of as its digest,
+//      or one whose holder was taken off is a 401 while the other holder
+//      still gets in, a ninth session is a 503, the log names the holder and
+//      never the token, and bytes go there and back intact, 3 MB included;
 //   3. connect.js, spawned the way ssh spawns it, through a stand-in for the
 //      cloud proxy that answers CONNECT: what goes in on standard input comes
-//      back on standard output, and a wrong token or a proxy that refuses the
-//      tunnel exits 1 saying which.
+//      back on standard output, with the token from the environment or from
+//      the file THORNSWOOD_BOX_TOKEN_FILE names, and a wrong token, a named
+//      file that is not there or a proxy that refuses the tunnel exits 1
+//      saying which.
 //
 // Read only. Nothing outside the temp folder is touched, and nothing leaves
 // loopback.
@@ -33,9 +38,23 @@ function yes(what, ok) { if (ok) { pass++; console.log('  ok   ' + what); } else
 
 const ws = require(path.join(DIR, 'ws.js'));
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), 'thornswood-bridge-'));
-const tokenFile = path.join(tmp, 'token.txt');
+// The box holds each token's SHA-256 in hex, in a file named for its holder,
+// as Grant-BoxAccess.ps1 writes it.
+const tokens = path.join(tmp, 'tokens');
+fs.mkdirSync(tokens);
+const digest = (t) => crypto.createHash('sha256').update(t).digest('hex');
 const TOKEN = crypto.randomBytes(32).toString('base64url');
-fs.writeFileSync(tokenFile, TOKEN + '\n');
+const OTHER = crypto.randomBytes(32).toString('base64url');
+const RAW = crypto.randomBytes(32).toString('base64url');
+fs.writeFileSync(path.join(tokens, 'cloud'), digest(TOKEN) + '\n');
+fs.writeFileSync(path.join(tokens, 'djinn'), digest(OTHER) + '\n');
+// A token written as it is, not as its digest, and a good digest under a
+// name the bridge does not take: neither lets anybody in.
+fs.writeFileSync(path.join(tokens, 'raw'), RAW + '\n');
+const STRAY = crypto.randomBytes(32).toString('base64url');
+fs.writeFileSync(path.join(tokens, 'Not A Name.txt'), digest(STRAY) + '\n');
+const tokenFile = path.join(tmp, 'thornswood-box-token');
+fs.writeFileSync(tokenFile, OTHER + '\r\n');
 
 // ---- 1. frames ---------------------------------------------------------------
 function roundTrip(len, mask) {
@@ -129,7 +148,7 @@ function runClient(env, input, waitMs) {
   const bridge = spawn(process.execPath, [path.join(DIR, 'bridge.js')], {
     env: Object.assign({}, process.env, {
       THORNSWOOD_BRIDGE_PORT: String(port),
-      THORNSWOOD_BRIDGE_TOKEN_FILE: tokenFile,
+      THORNSWOOD_BRIDGE_TOKENS: tokens,
       THORNSWOOD_BRIDGE_TARGET: '127.0.0.1:' + echoPort,
     }),
   });
@@ -172,7 +191,13 @@ function runClient(env, input, waitMs) {
     yes('the token as a bare header, without "Bearer", is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: ' + TOKEN]))));
     yes('an upgrade with the token but no WebSocket key is a 400', /^HTTP\/1\.1 400/.test(await upgrade(port, ['Upgrade: websocket', 'Connection: Upgrade', 'Sec-WebSocket-Version: 13', 'Authorization: Bearer ' + TOKEN])));
     yes('with the token it switches protocols', /^HTTP\/1\.1 101/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
-    yes('  and the log names no address and no token', log.indexOf(TOKEN) < 0 && !/127\.0\.0\.1:\d+\)/.test(log.split('\n').filter((l) => /session|refused/.test(l)).join('\n')));
+    yes('  and the log names whose token opened it', await waitFor(() => /session \d+ opened for cloud \(/.test(log), 3000));
+    yes('  and names no address and no token', log.indexOf(TOKEN) < 0 && log.indexOf(digest(TOKEN)) < 0 && !/127\.0\.0\.1:\d+\)/.test(log.split('\n').filter((l) => /session|refused/.test(l)).join('\n')));
+    yes('a second holder\'s token switches protocols too', /^HTTP\/1\.1 101/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + OTHER]))));
+    yes('  and is logged as theirs', await waitFor(() => /session \d+ opened for djinn \(/.test(log), 3000));
+    yes('a token the box holds raw, not as its digest, is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + RAW]))));
+    yes('a token whose digest is under a name the bridge does not take is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + STRAY]))));
+    yes('the digest itself sent as a token is a 401', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + digest(TOKEN)]))));
 
     // Nine at once: the ninth is refused while eight are open.
     const held = [];
@@ -182,10 +207,10 @@ function runClient(env, input, waitMs) {
       s.write(['GET / HTTP/1.1', 'Host: x'].concat(WS_HEADERS, ['Authorization: Bearer ' + TOKEN]).join('\r\n') + '\r\n\r\n');
       held.push(s);
     }
-    yes('eight sessions open at once', await waitFor(() => /session 9 opened \(8 open\)/.test(log), 3000));
+    yes('eight sessions open at once', await waitFor(() => /session 10 opened for cloud \(8 open\)/.test(log), 3000));
     yes('a ninth session while eight are open is a 503', /^HTTP\/1\.1 503/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
     held.forEach((s) => s.destroy());
-    yes('a session whose cloud end goes away is let go and logged with its bytes', await waitFor(() => (log.match(/session \d+ ended: the WebSocket closed, \d+ s, \d+ bytes in, \d+ bytes out/g) || []).length >= 9, 3000));
+    yes('a session whose far end goes away is let go and logged with its bytes', await waitFor(() => (log.match(/session \d+ ended: the WebSocket closed, \d+ s, \d+ bytes in, \d+ bytes out/g) || []).length >= 10, 3000));
 
     // ---- 3. connect.js through the stand-in proxy ----------------------------
     const url = 'ws://localhost:' + port + '/';
@@ -194,12 +219,48 @@ function runClient(env, input, waitMs) {
     yes('through the proxy, what goes in comes back out (exit ' + r.code + ')' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(small));
     yes('  and the proxy was asked to CONNECT to the bridge\'s host and port', connects.indexOf('CONNECT localhost:' + port + ' HTTP/1.1') >= 0);
 
+    // #2961: ssh closes standard input and sends SIGHUP 2 ms later. The
+    // close frame has to reach the bridge all the same, so it lets the slot
+    // go at once instead of when the connection drops, which through the
+    // cloud proxy and Caddy was 11 s. Windows has no SIGHUP to send.
+    if (process.platform !== 'win32') {
+      const closedBefore = (log.match(/ended: the far end closed it/g) || []).length;
+      const hupEnv = Object.assign({}, process.env, { THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN });
+      delete hupEnv.HTTPS_PROXY; delete hupEnv.https_proxy;
+      hupEnv.HTTPS_PROXY = proxyUrl;
+      const hup = spawn(process.execPath, [path.join(DIR, 'connect.js')], { env: hupEnv });
+      let back = Buffer.alloc(0);
+      hup.stdin.on('error', () => {});
+      hup.stdout.on('data', (d) => {
+        back = Buffer.concat([back, d]);
+        if (back.length >= small.length && !hup.stdin.writableEnded) { hup.stdin.end(); hup.kill('SIGHUP'); }
+      });
+      hup.stdin.write(small);
+      yes('ended the way ssh ends it, standard input closed then SIGHUP, it exits', await waitFor(() => hup.exitCode !== null || hup.signalCode !== null, 5000));
+      yes('  with 0, not killed by the signal (exit ' + hup.exitCode + ', signal ' + hup.signalCode + ')', hup.exitCode === 0);
+      yes('  and the bridge got its close frame, so the slot went at once', await waitFor(() => (log.match(/ended: the far end closed it/g) || []).length > closedBefore, 3000));
+      if (hup.exitCode === null && hup.signalCode === null) hup.kill();
+    }
+
     const big = crypto.randomBytes(3 * 1024 * 1024);
     r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN, HTTPS_PROXY: proxyUrl }, big, 30000);
     yes('3 MB there and back arrives byte for byte (exit ' + r.code + ', ' + r.out.length + ' bytes)', r.code === 0 && r.out.equals(big));
 
     r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: 'not-it', HTTPS_PROXY: proxyUrl }, Buffer.alloc(0));
-    yes('a wrong token exits 1 and says the bridge refused the token', r.code === 1 && /box bridge: the bridge refused the token \(401\)/.test(r.err));
+    yes('a wrong token exits 1 and says the bridge refused it', r.code === 1 && /box bridge: the bridge refused this token \(401\)/.test(r.err));
+
+    // A PC keeps its token in a file (Setup-SshKey.ps1), which connect.js
+    // reads when the environment holds none, line end and all.
+    r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: '', THORNSWOOD_BOX_TOKEN_FILE: tokenFile }, small);
+    yes('the token from the file THORNSWOOD_BOX_TOKEN_FILE names gets in (exit ' + r.code + ')' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(small));
+    r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: '', THORNSWOOD_BOX_TOKEN_FILE: path.join(tmp, 'not-there') }, Buffer.alloc(0));
+    yes('a token file that is named and not there exits 1 and says so', r.code === 1 && /box bridge: THORNSWOOD_BOX_TOKEN_FILE names .*not-there, which cannot be read/.test(r.err));
+    r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: '', THORNSWOOD_BOX_TOKEN_FILE: '', HOME: tmp, USERPROFILE: tmp }, Buffer.alloc(0));
+    yes('with no token anywhere it exits 1 and says none was sent', r.code === 1 && /box bridge: no token was sent/.test(r.err));
+    fs.mkdirSync(path.join(tmp, '.ssh'));
+    fs.copyFileSync(tokenFile, path.join(tmp, '.ssh', 'thornswood-box-token'));
+    r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: '', THORNSWOOD_BOX_TOKEN_FILE: '', HOME: tmp, USERPROFILE: tmp }, small);
+    yes('with none named, .ssh/thornswood-box-token in the home folder gets in (exit ' + r.code + ')' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(small));
 
     refuseTunnel = true;
     r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN, HTTPS_PROXY: proxyUrl }, Buffer.alloc(0));
@@ -243,8 +304,12 @@ function runClient(env, input, waitMs) {
       if (lis.exitCode === null) lis.kill();
     }
 
-    fs.unlinkSync(tokenFile);
-    yes('with the token file gone the bridge refuses even the right token', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
+    // Taking one holder off refuses them at once and leaves the other in.
+    fs.unlinkSync(path.join(tokens, 'djinn'));
+    yes('with one holder\'s file gone the bridge refuses their token', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + OTHER]))));
+    yes('  and still lets the other holder in', /^HTTP\/1\.1 101/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
+    fs.rmSync(tokens, { recursive: true, force: true });
+    yes('with the folder gone the bridge refuses everybody', /^HTTP\/1\.1 401/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
   } finally {
     bridge.kill();
     echo.close();

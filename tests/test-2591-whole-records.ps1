@@ -107,6 +107,8 @@ $work = Join-Path $Scratch ('thornswood-2591-' + [Guid]::NewGuid().ToString('N')
 $null = New-Item -ItemType Directory -Force -Path $work
 try {
     # ---- 2 and 3: the launcher's two, compiled ---------------------------------
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s two, compiled and killed mid-swap: they are .NET Framework code that renames through kernel32, which only Windows has'; Done }
     $og = Text (Join-Path $App 'OwnGame.cs')
     $m = [regex]::Match($og, '(?s)\n(        (?:internal )?static void WriteRecord\(string path, IEnumerable<string> lines\)\n        \{\n.*?\n        \}\n.*?static extern bool MoveFileEx\([^)]*\);\n)')
     Yes 'OwnGame.WriteRecord and its byte form are in OwnGame.cs' ($m.Success -and $m.Groups[1].Value -match 'internal static void WriteRecord\(string path, byte\[\] bytes\)')
@@ -200,9 +202,8 @@ __WRITERECORD__
     Yes ('killed 40 times while WriteRecord swaps the news cache in: whole every time ({0} of 40{1})' -f $r.Whole, $(if ($r.Bad) { '; ' + ($r.Bad -join ', ') })) ($r.Whole -eq 40)
 
     # ---- 4: the feed store, in Windows PowerShell 5.1 as the VPS runs it ---------
-    $ps51 = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    Yes 'Windows PowerShell 5.1, which the VPS runs the feed store with, is here' (Test-Path -LiteralPath $ps51)
-    if (-not (Test-Path -LiteralPath $ps51)) { Done }
+    if (-not $OnWindows) { Write-Host 'SKIP  the feed store in Windows PowerShell 5.1, which the VPS runs it with: this is not Windows'; Done }
+    $ps51 = Get-WindowsPowerShell
     $storePs1 = Join-Path $Repo 'scripts\release\Feed-Store.ps1'
 
     # The real swap op on a store of its own.

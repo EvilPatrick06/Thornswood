@@ -478,10 +478,13 @@ if (-not `$hasService -and -not `$NoServiceOk) {
 }
 function StopIt {
   if (`$hasService) {
-    try { Stop-Service -Name '$Service' -Force -ErrorAction Stop; 'stopped the service $Service' }
+    try { Stop-ThornswoodBotService '$Service' }
     catch { 'COULD NOT STOP the service $Service' + ': ' + `$_.Exception.Message }
   }
+  `$left = @(@(`$ThornswoodStillRunning) + @(`$ThornswoodNotHeld) | Where-Object { `$_ })
   Stop-ThornswoodBotStrays '$rootWin'
+  # The swap reads both after StopIt: what the service stop left counts too.
+  `$script:ThornswoodStillRunning = @(@(`$ThornswoodStillRunning) + `$left | Where-Object { `$_ })
 }
 # NOTHING HERE MAY NEED THE LOG TO BE THERE ALREADY, AND THE PATH PEOPLE ARE
 # TOLD TO LOOK AT IS LEFT ON THE BOX BY EVERY RUN, GREEN OR NOT.
@@ -647,7 +650,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
   # looks at nothing.
   $owns = ''
   if (-not $PutBack) { $owns = '$Owns = @(Get-ThornswoodBotOwned)' + "`r`n" }
-  $out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
+  $out = @(Remote ($vars + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $owns + $botHooks + $pick + $serviceSwapBlock) |
            ForEach-Object { Say "  $_"; "$_".Trim() })
   if (-not (Show-SwapResult $out "$rootWin\.prev-<stamp>")) { Die 'the bot was not swapped in. The lines above say what is running.' }
   return $out
@@ -733,7 +736,7 @@ function Confirm-BotFiles([string[]]$must) {
   $svcLib = Join-Path $Here '..\vps\Bot-Service.ps1'
   if (-not (Test-Path -LiteralPath $svcLib)) { Die "missing: $svcLib" }
   Head 'What the box has, at the folder the swap moved them to'
-  $out = @(Remote ((BotThereVars $Root $Service $must) + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botThereBlock) |
+  $out = @(Remote ((BotThereVars $Root $Service $must) + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + $botThereBlock) |
            ForEach-Object {
              $s = "$_".Trim()
              $c = 'Gray'
@@ -1045,7 +1048,7 @@ $null = Remote "New-Item -ItemType Directory -Force -Path '$rootWin\service' | O
 Invoke-ThornswoodNative { & scp @ssh $svcSrc "${User}@${Vps}:$Root/service/BotService.cs" } | Out-Null
 if ($LASTEXITCODE -ne 0) { Die "scp exited with $LASTEXITCODE for BotService.cs. The bot was not touched." }
 Say '  service\BotService.cs' 'Green'
-$running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
+$running = @(Remote ($ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 # Remember how long the log is, and read back only what is written past that.
 # Waiting for the words 'watching 1 server' to appear is no good on its own:

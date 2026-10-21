@@ -16,6 +16,8 @@ The rulebook says what each station is for and who works it, and names no town. 
 - **Salt quarry** ([miner.md](classes/miner.md)): salt comes from the sea. One on the shore of each hold capital on the Sea of Ghosts (Solitude, Windhelm, Dawnstar, Winterhold), beside the boat drawn up nearest the town, within 12,000 units. The quarry is an ore vein, so it is set into rock the way Skyrim's veins are (Patrick, 17 Oct, B on #2553): only the place the miner stands needs clear, dry, flat navmesh, no more than 240 units above the sea. The vein may run into rocks, cliffs and plants, but nothing else, and every part of it lies on ground no more than 16 units under it and above the water, or inside a rock or cliff, so it never hangs over a drop or the sea.
 - **Beehive** ([farmer.md](classes/farmer.md)): a placed hive is a farmer verb. One at each of Skyrim's own named farms (a location Skyrim marks as a farm) with at least 5 crop plots of the farmer's table within 2,400 units, the farm claim's circle, of the farm's point: its map marker, or the farmhouse's outside door where that marker is inside the house. It stands beside the crop plot nearest that point.
 - **Alchemy lab** ([physicker.md](professions/alchemist/physicker.md), [injury.md](injury.md)): the poultice and the remedy are made only at Thornswood's lab. One in the apothecary of each of the nine hold capitals, beside Skyrim's own lab there; Winterhold has no apothecary in town, so the College's Hall of Countenance; Windhelm's Palace of the Kings is tried after the White Phial.
+- **Well bucket** ([drink.md](drink.md)): water is drawn at a well by activating it (Patrick, 12 Oct, #1382), and every placed well in the load order is a static, which the game never lets anybody activate. So one bucket beside each of the 30 placed wells in `game/data/wells.json`, the nearest clear spot within 400 units of the well. Activating it fills an empty bottle with well water. A well in a cell that no master of the content plugin carries (the two in the sewers) is left out, since the plugin can only place into its masters' cells.
+- **Water bucket** ([drink.md](drink.md)): drawing spots at rivers and lakes (Patrick, 12 Oct, #1382). One for each of the nine towns with a forge, on the river nearest it, or for Riften on Lake Honrich: the nearest clear spot to the forge within 3,000 units whose cell's water `game/data/waters.json` classes as a river (for Riften, the deep water of the lake), at its edge: ground no lower than the water and no more than 120 units above it, with navmesh under the water within 160 units, so the water is there to reach. Lake water is worth what river water is (Patrick, 20 Oct), so one bucket serves both, and the water drawn there must be boiled.
 
 Each rule gives its anchors nearest first. The builder searches round each in turn, every step out to the kind's reach in eight turns, and takes the nearest clear spot; the first anchor with one wins.
 
@@ -76,6 +78,38 @@ The same measure as the benches, but where the rule above lets a kiln stand amon
 | The Hag's Cure, Markarth | 196 units |
 | The Mortar and Pestle, Dawnstar | 166 units |
 
+### Well buckets (18), 20 Oct 2026
+
+Each row is the well the bucket stands beside, by its base and cell, as the table names it.
+
+| Well | From the well |
+| --- | --- |
+| ImpWell01 in 9722:Skyrim.esm | 244 units |
+| ImpWell01 in BloatedMansRuins | 115 units |
+| FarmWell01 in DLC1RedwaterDen01 | 176 units |
+| FarmBWellEnt01 in DLC2HrodulfsHouse | 97 units |
+| RedoranWell01 in DLC2RavenRock02 | 272 units |
+| GenericWell01 in DushnikhYalExterior02 | 115 units |
+| FarmBWellEnt01 in FalkreathBarracksJail | 32 units |
+| FarmWell01 in FalkreathExterior02 | 181 units |
+| ImpWell01 in FellglowKeepExterior02 | 145 units |
+| ImpExtIceWell01 in FortDunstadExterior02 | 113 units |
+| ImpExtIceWell01 in FortNeugradExterior04 | 145 units |
+| ImpWell01 in FortSnowhawkExterior04 | 173 units |
+| ImpWell01 in FortSungardExterior01 | 144 units |
+| ImpExtIceWell01 in FrostflowLighthouseExterior01 | 112 units |
+| ImpWell01 in POIPineForest08 | 143 units |
+| FarmWell01 in POITundra08 | 226 units |
+| RTPlazaWell01 in RiftenOrigin | 284 units |
+| ImpWell01 in TrevasWatchExterior01 | 222 units |
+
+### Water buckets (2), 20 Oct 2026
+
+| Where | Cell | From the forge |
+| --- | --- | --- |
+| Lake Honrich at Riften | RiftenOrigin | 754 units |
+| the river at Riverwood | Riverwood02 | 2,338 units |
+
 ### Where the rule led to the other server's spot
 
 Elgrim's Elixirs' lab stands 114 units from where the other server's stood, Arcadia's Cauldron's 610 and Angeline's Aromatics' 569: the rule puts a lab beside Skyrim's own, and so did that server. Riverwood's kiln is 829 units from that server's Riverwood kiln and Chillfurrow's hive 950 from one of its two there; Rorikstead's two hives stand in the cell where it had one, 1,355 and 2,215 units from it. The four salt quarries are nowhere near its salt quarries. Every other spot is somewhere it never placed anything.
@@ -89,6 +123,27 @@ Nothing is placed where the measure refuses every spot. Measured over the same l
 - Charcoal kiln, Falkreath and Riften: none of the chopping blocks nearest the town has that ground beside it; refused mostly for off the navmesh, slopes, rocks and fences, and at Falkreath the bench's 1,000 units.
 - Beehive, Battle-Born Farm, Dragon Bridge Farm, Merryfair Farm and Sarethi Farm: none of the crop plots nearest the farm has clear, flat ground beside it; refused for thickets, fences, slopes and, at Battle-Born and Sarethi, cells that JK's Whiterun's Outskirts and Water for ENB change before the content plugin.
 - Alchemy lab, The White Phial, Windhelm: neither the White Phial nor the Palace of the Kings has a lab's floor clear beside Skyrim's own.
+- Well buckets, 12 of the 30 wells left without one of their own. A spot in a cell a mod changes before the content plugin is refused, so the copy of the cell never undoes the mod's edit; two wells side by side share one bucket:
+  - DLC2SkaalVilFarmWell01 in 142ec:Dragonborn.esm: no clear spot within 400 units beside it (5446 the ground runs # to #; 3135 its cell eda3:Dragonborn.esm: Embers XD.esp changes it before the content plugin; 2944 off the navmesh; 1901 touches FishRack01).
+  - FarmWell01 in 965b:Skyrim.esm: no clear spot within 400 units beside it (4380 its cell 965b:Skyrim.esm: ElysiumEstate.esp changes it before the content plugin; 2137 off the navmesh; 2066 touches DLC1TreeFloraMountainFlower01Yellow; 1219 touches TreeFloraHangingMoss02).
+  - FarmWell01 in 9ad9:Skyrim.esm: no clear spot within 400 units beside it (6766 its cell 9ad9:Skyrim.esm: aaaGraniteHill.esp changes it before the content plugin; 2468 off the navmesh; 1326 touches CommonBench01; 906 touches TreeClover01).
+  - FarmBWell01 in FalkreathBarracksJail: no clear spot within 400 units beside it (10361 off the navmesh; 3490 touches FXcobwebDangle01; 1580 touches FXcobwebDangle02; 257 touches PortGatePole01).
+  - ImpWell01 in FortGreenwall04: no clear spot within 400 units beside it (12503 off the navmesh; 3185 touches RiftenRWHallLadderDoor01, its way through).
+  - ImpWell01 in FortGreymoorExterior03: no clear spot within 400 units beside it (10633 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 237 touches Bucket01).
+  - ImpWell01 in FortSungardCourtyard: the well 352a9:Skyrim.esm is not placed, or is switched off or has an enable parent.
+  - FarmWell01 in POITundra08: it shares the bucket of well-23, 226 units away.
+  - GenericWell01 in SSewersSolitude02: the well 27172:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
+  - FarmBWell01 in SSewersWRBurrow: the well 3907d:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp.
+  - FarmBWell01 in WindhelmMarketplaceExterior: no clear spot within 400 units beside it (7841 off the navmesh; 3061 touches ImpExtBlocks01SnowLight; 1861 touches TreeFloraHangingMoss01; 1151 touches FishRack01Light_SNWH).
+  - RTPlazaWell01 in bcd0:Skyrim.esm: no clear spot within 400 units beside it (15688 off the navmesh).
+- Water buckets, 7 of the 9 left out: no river water, or for Riften lake water, within 3,000 units of the forge that has a clear spot at its edge. Whiterun's and Markarth's streams are placed water the records do not class as a river cell, and Windhelm's and Solitude's nearest water is the sea's:
+  - the river at Dawnstar: 98048 not by river or lake water.
+  - the river at Falkreath: 97936 not by river or lake water; 64 touches TreeThicket01; 47 off the navmesh; 1 not at the water's edge.
+  - the river at Markarth: 98048 not by river or lake water.
+  - the river at Morthal: 98048 not by river or lake water.
+  - the river at Solitude: 98048 not by river or lake water.
+  - the river at Whiterun: 98048 not by river or lake water.
+  - the river at Windhelm: 98048 not by river or lake water.
 - Lod's house in Falkreath, which Skyrim marks as a farm, has 3 crop plots near its door: a smith's yard, not a field, so no hive.
 
-To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, and rebuild what hashes the plugin (Build-LastPlugin.py, Build-NpcPopulation.py, Build-MerchantRoleTables.py, Build-WoodworkingBenches.py).
+To change one: edit the kind's rule or a site in `SITES` in `scripts/dev/Build-StationSites.py`, run it with `--data <the game's Data>`, then `python scripts/mods/Add-ContentRecords.py --masters <the game's Data>`, then `pwsh scripts/mods/Rebuild-ContentTables.ps1`, which rebuilds every table read out of the load order, in the order `scripts/mods/content-tables.json` gives, and the plugin's hash in `records/asset-provenance.json`.

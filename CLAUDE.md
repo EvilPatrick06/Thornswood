@@ -73,6 +73,38 @@ Measure before claiming a cause: read Profile\launcher.log, look at the file,
 check timestamps, say what you saw. When the doc and the machine disagree,
 say so and ask.
 
+### Staff notices: post them yourself, in #staff-updates
+
+Decided by Patrick on 20 Oct (#2934): the notices Developer-Guide.md asks
+for (a line before an edit to one of the six shared files, taking the dev
+feed, what was merged or published) go in #staff-updates, channel
+1549254991082946570, and "the agents should do this themselves using the
+bot". A Claude posts its own. It never hands one to Patrick, never puts one
+on his to-dos and never asks a person to post it.
+
+```
+pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Editing Shell.cs for the scan button, pull request to follow."
+```
+
+It hands the notice over ssh to `C:\Thornswood-Watch\say-staff.ps1` on the
+box, which puts it in the watchdog's outbox, and the bot says it in
+#staff-updates within a minute (the watchdog's webhook when the bot is down).
+No Discord token or webhook is needed or touched. It prints the notice's id;
+`pwsh scripts/ops/Say-Staff.ps1 -Check <id>` says whether it was said (exit
+0 said, 2 still waiting). Say it the way staff read it: what, why, when, and
+the pull request's link. 1800 characters at most, 30 an hour, no mentions.
+
+It needs ssh to the box: on One and a developer's PC it works as it is, and
+in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`. An agent
+environment with no other way in may instead hold a notices key
+(`THORNSWOOD_NOTICE_KEY_B64` and `THORNSWOOD_NOTICE_TOKEN`, made on One with
+`Grant-BoxAccess.ps1 -Name <name> -MakeKey -NoticesOnly`), which can do
+nothing on the box but this. When it stops, what it prints is a failure like
+any other: fix it at its cause, or put it on the board with what it printed,
+and post the notice once it works. Write the notice into the pull request
+body meanwhile so the record is there. This is for staff notices only; it
+is not a way to post anything else in Discord.
+
 ### No band-aids, ever
 
 Decided by Patrick on 4 Oct, after a Claude answered a band-aid with a second
@@ -153,10 +185,10 @@ this section exists for.
 Added by Patrick on 27 Sep, after a session found 624 local branches and 15
 worktrees in the shared clone and read a session-start snapshot as the truth.
 
-- `C:\Users\evilp\Downloads\Thornswood-Repo` is shared with Patrick's Grok Bot
-  lanes and sits detached at `origin/main`, because they build from it. Do
-  branch work in a worktree beside it (`git worktree add
-  ..\Thornswood-claude-<what> -b claude/<what> origin/main`), and afterwards
+- `C:\Thornswood-Repo` is shared with Patrick's Grok Bot lanes and sits
+  detached at `origin/main`, because they build from it. Do branch work in a
+  worktree in its ignored `worktrees` folder (`git worktree add
+  worktrees\claude-<what> -b claude/<what> origin/main`), and afterwards
   remove the worktree and delete the branch. Never leave that folder on a
   branch. Before deleting a worktree or branch you did not make, check no
   running process names its folder and its pull request merged over an hour
@@ -174,11 +206,12 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   what of yours is still there has its reason written on its issue, or it
   goes. Developer-Guide.md "No stray branches, worktrees or pull requests"
   is the rule for everybody.
-- Three folders, no copies (Patrick, 5 Oct). Work only in this repository,
-  the vault and `C:\ThornswoodTemps&Worktrees` (`worktrees\<name>`,
-  `temp\<task>`); never make another top-level folder or leave scratch in
-  Downloads, and never save a copy of a log, report, build or backup that
-  GitHub or the VPS already holds. Cite where it lives instead.
+- Two folders, no copies (Patrick, 5 Oct; on 20 Oct temp and worktrees moved
+  into the repository, #2900). Work only in this repository (its ignored
+  `worktrees\<name>` and `temp\<task>`) and the vault; never make another
+  top-level folder or leave scratch in Downloads, and never save a copy of a
+  log, report, build or backup that GitHub or the VPS already holds. Cite
+  where it lives instead.
 - The git status at the start of a session is a snapshot and can be hours
   old. Run `git status` and `git log -1 origin/main` before saying what state
   the clone is in.

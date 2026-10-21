@@ -48,7 +48,8 @@ function Yes([string]$what, [bool]$cond) {
 . (Join-Path $Repo 'scripts\deploy\ServerSettings.ps1')
 $utf8 = New-Object Text.UTF8Encoding($false)
 $pwsh = (Get-Process -Id $PID).Path
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$ps51 = if ($OnWindows) { Get-WindowsPowerShell } else { $null }
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-459-store-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = [IO.Directory]::CreateDirectory($T)
 
@@ -202,7 +203,7 @@ try {
     Yes 'a store with two builds for one record is refused, since one record makes one zip' ($r.Problem -match 'holds 2 server builds for one record')
 
     # ---- 2. the same, under Windows PowerShell 5.1, which runs it on the box -----
-    if (Test-Path -LiteralPath $ps51) {
+    if ($OnWindows) {
         $probe = Join-Path $T 'probe51.ps1'
         $probeText = @'
 param([string]$Lib, [string]$Json, [string]$Store, [string]$Rec, [string]$Into)
@@ -222,7 +223,7 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
         $i2 = Join-Path $T 'into51b'; $null = [IO.Directory]::CreateDirectory($i2)
         $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $probe, '-Lib', $lib, '-Json', $jsonLib, '-Store', $sw, '-Rec', $recA, '-Into', $i2))
         Yes '  and a swapped zip is refused there too, writing nothing' (@($o | Where-Object { $_ -match '^PROBLEM .*is not the zip its name' }).Count -eq 1 -and $o -contains 'FILES 0')
-    } else { Write-Host 'SKIP  no Windows PowerShell 5.1 on this machine' }
+    } else { Write-Host 'SKIP  the same under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs' }
 
     # ---- 3. which zip the store keeps, asked before anything is sent --------------
     $storeDir = $sA.Dir
@@ -256,45 +257,49 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
     try { $null = Test-ThornswoodServerBuildArtifact -Zip (Join-Path $sw $sA.A.Name) -Record $recA } catch { $why = $_.Exception.Message }
     Yes '  one whose bytes are not its name''s is refused' ($why -match 'is not the zip its name')
 
-    # ---- 5. Deploy-Server's store block on the box, against a scratch root --------
-    $root = Join-Path $T 'root'
-    $null = [IO.Directory]::CreateDirectory((Join-Path $root '.stage-x'))
-    Copy-Item -LiteralPath $recA -Destination (Join-Path $root '.stage-x\server-build.json')
-    $block = Join-Path $T 'store-block.ps1'
-    # What Deploy-Server puts in front of it: Read-JsonFile.ps1 and RecordShape.ps1 (Swap.ps1's $ThornswoodRecordShapeText).
-    $shapeText = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Read-JsonFile.ps1')) + "`r`n" + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\RecordShape.ps1')) + "`r`n"
-    [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
-        "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sA.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
-    $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
-    Yes 'Deploy-Server''s store block takes the build into the stage and ends STORED <name> (5.1)' (
-        $o -contains ('STORED ' + $sA.A.Name) -and (Test-Path -LiteralPath (Join-Path $root '.stage-x\scam_native.node')) -and
-        (Test-Path -LiteralPath (Join-Path $root '.stage-x\data\scripts\ActiveMagicEffect.pex')))
-    [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
-        "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sB.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
-    $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
-    Yes '  and with no build for the record it ends STORE REFUSED, the stage cleared' ($o -contains 'STORE REFUSED' -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-x')))
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  Deploy-Server''s store and settings blocks: they run on the box, under Windows PowerShell 5.1, which only Windows has'
+    } else {
+        # ---- 5. Deploy-Server's store block on the box, against a scratch root --------
+        $root = Join-Path $T 'root'
+        $null = [IO.Directory]::CreateDirectory((Join-Path $root '.stage-x'))
+        Copy-Item -LiteralPath $recA -Destination (Join-Path $root '.stage-x\server-build.json')
+        $block = Join-Path $T 'store-block.ps1'
+        # What Deploy-Server puts in front of it: Read-JsonFile.ps1 and RecordShape.ps1 (Swap.ps1's $ThornswoodRecordShapeText).
+        $shapeText = [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\Read-JsonFile.ps1')) + "`r`n" + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\release\RecordShape.ps1')) + "`r`n"
+        [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
+            "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sA.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
+        $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
+        Yes 'Deploy-Server''s store block takes the build into the stage and ends STORED <name> (5.1)' (
+            $o -contains ('STORED ' + $sA.A.Name) -and (Test-Path -LiteralPath (Join-Path $root '.stage-x\scam_native.node')) -and
+            (Test-Path -LiteralPath (Join-Path $root '.stage-x\data\scripts\ActiveMagicEffect.pex')))
+        [IO.File]::WriteAllText($block, ($shapeText + [IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerBuild.ps1')) + "`r`n" +
+            "`$Root = '" + $root + "'`r`n`$Stage = '.stage-x'`r`n`$Store = '" + $sB.Dir + "'`r`n" + $ThornswoodStoreExpandBlock), $utf8)
+        $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $block) | ForEach-Object { $_.Trim() })
+        Yes '  and with no build for the record it ends STORE REFUSED, the stage cleared' ($o -contains 'STORE REFUSED' -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-x')))
 
-    # ---- 6. Deploy-Server's settings block for -FromStore -------------------------
-    function StoreCarry([string]$was, [string]$settings) {
-        $null = [IO.Directory]::CreateDirectory((Join-Path $root '.stage-y'))
-        Put (Join-Path $root 'server-settings.json') $settings
-        Copy-Item -LiteralPath $recA -Destination (Join-Path $root 'server-build.json') -Force
-        $f = Join-Path $T 'carry-block.ps1'
-        [IO.File]::WriteAllText($f, ([IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
-            "`$Root = '" + $root + "'`r`n`$Stage = '.stage-y'`r`n`$WasRecord = '" + $was + "'`r`n" + $settingsStoreBlock), $utf8)
-        return @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $f) | ForEach-Object { $_.Trim() })
+        # ---- 6. Deploy-Server's settings block for -FromStore -------------------------
+        function StoreCarry([string]$was, [string]$settings) {
+            $null = [IO.Directory]::CreateDirectory((Join-Path $root '.stage-y'))
+            Put (Join-Path $root 'server-settings.json') $settings
+            Copy-Item -LiteralPath $recA -Destination (Join-Path $root 'server-build.json') -Force
+            $f = Join-Path $T 'carry-block.ps1'
+            [IO.File]::WriteAllText($f, ([IO.File]::ReadAllText((Join-Path $Repo 'scripts\deploy\ServerSettings.ps1')) + "`r`n" + $ThornswoodRecordSumText + "`r`n" +
+                "`$Root = '" + $root + "'`r`n`$Stage = '.stage-y'`r`n`$WasRecord = '" + $was + "'`r`n" + $settingsStoreBlock), $utf8)
+            return @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $f) | ForEach-Object { $_.Trim() })
+        }
+        $live = '{ "port": 7777, "thornswoodRequirePass": true, "loadOrder": [ "C:/Thornswood-Server/plugins/Skyrim.esm" ] }'
+        $o = StoreCarry (SumOf $recA) $live
+        $carried = @($o | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
+        Yes 'the -FromStore settings block copies the running settings into the stage unchanged' (
+            $carried.Count -eq 1 -and ([IO.File]::ReadAllText((Join-Path $root '.stage-y\server-settings.json'))) -eq $live -and
+            $carried[0].Substring(8) -eq (Get-FileHash -LiteralPath (Join-Path $root '.stage-y\server-settings.json') -Algorithm SHA256).Hash.ToLowerInvariant())
+        $o = StoreCarry (SumOf $recB) $live
+        Yes '  and when the box''s record changed since the run read it, CARRY REFUSED and the stage cleared' (
+            $o -contains 'CARRY REFUSED' -and (($o -join ' ') -match 'changed since this run read it') -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-y')))
+        $o = StoreCarry (SumOf $recA) '{ "port": 7777 }'
+        Yes '  and a server whose join pass switch is not true or false is refused (#1319)' ($o -contains 'CARRY REFUSED' -and (($o -join ' ') -match 'thornswoodRequirePass is missing'))
     }
-    $live = '{ "port": 7777, "thornswoodRequirePass": true, "loadOrder": [ "C:/Thornswood-Server/plugins/Skyrim.esm" ] }'
-    $o = StoreCarry (SumOf $recA) $live
-    $carried = @($o | Where-Object { $_ -match '^CARRIED [0-9a-f]{64}$' })
-    Yes 'the -FromStore settings block copies the running settings into the stage unchanged' (
-        $carried.Count -eq 1 -and ([IO.File]::ReadAllText((Join-Path $root '.stage-y\server-settings.json'))) -eq $live -and
-        $carried[0].Substring(8) -eq (Get-FileHash -LiteralPath (Join-Path $root '.stage-y\server-settings.json') -Algorithm SHA256).Hash.ToLowerInvariant())
-    $o = StoreCarry (SumOf $recB) $live
-    Yes '  and when the box''s record changed since the run read it, CARRY REFUSED and the stage cleared' (
-        $o -contains 'CARRY REFUSED' -and (($o -join ' ') -match 'changed since this run read it') -and -not (Test-Path -LiteralPath (Join-Path $root '.stage-y')))
-    $o = StoreCarry (SumOf $recA) '{ "port": 7777 }'
-    Yes '  and a server whose join pass switch is not true or false is refused (#1319)' ($o -contains 'CARRY REFUSED' -and (($o -join ' ') -match 'thornswoodRequirePass is missing'))
 
     # ---- 7. the refusals that come before anything is sent ------------------------
     $publish = Join-Path $Repo 'scripts\release\Publish-Server.ps1'
@@ -332,7 +337,9 @@ $r = Expand-ThornswoodStoredServerBuild -Store $Store -Record ([IO.File]::ReadAl
         $r = RunPs $deploy (@('-Vps', $nowhere, '-User', 'nobody', '-Now') + $c.A)
         Yes ('Deploy-Server ' + $c.Label + ' stops before anything is sent, saying why') ($r.Code -ne 0 -and $r.Out.Contains($c.Why) -and $r.Out -notmatch 'Staging in')
     }
-    if ((Test-Path -LiteralPath $ps51) -and (Get-Command node -ErrorAction SilentlyContinue)) {
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the installer''s refusal: the installer runs only on the box, under Windows PowerShell 5.1'
+    } elseif (Get-Command node -ErrorAction SilentlyContinue) {
         $inst = Join-Path $Repo 'scripts\deploy\Install-ThornswoodServer.ps1'
         $o = @(Out-Child $ps51 @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $inst, '-FromStore', '-PutBack', '-AllowGamingPc', '-Root', (Join-Path $T 'inst-root')) | ForEach-Object { $_.Trim() })
         Yes 'the installer refuses -FromStore with -PutBack, changing nothing' ($o -contains 'INSTALL REFUSED' -and (($o -join ' ') -match '-FromStore installs a server build out of the store'))

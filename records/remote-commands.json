@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  59,
-    "callCount":  254,
+    "scriptCount":  62,
+    "callCount":  267,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -694,7 +694,7 @@
                       "script":  "scripts/deploy/Install-Bot.ps1",
                       "scope":  "Invoke-BotSwap",
                       "via":  "Remote",
-                      "anchor":  "$out = @(Remote ($vars + (Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + $owns + $botHooks + $pick + $serviceSwapBlock) |",
+                      "anchor":  "$out = @(Remote ($vars + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + $owns + $botHooks + $pick + $serviceSwapBlock) |",
                       "does":  "bot swap through Bot-Service.ps1",
                       "class":  "admin",
                       "reason":  "Bot-Service uses sc.exe, Stop-Service, Stop-Process and Set-Acl"
@@ -703,7 +703,7 @@
                       "script":  "scripts/deploy/Install-Bot.ps1",
                       "scope":  "Confirm-BotFiles",
                       "via":  "Remote",
-                      "anchor":  "$out = @(Remote ((BotThereVars $Root $Service $must) + (Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + $botThereBlock) |",
+                      "anchor":  "$out = @(Remote ((BotThereVars $Root $Service $must) + $ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + $botThereBlock) |",
                       "does":  "checks the bot files and service are there",
                       "class":  "read-status",
                       "reason":  "read only"
@@ -748,7 +748,7 @@
                       "script":  "scripts/deploy/Install-Bot.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$running = @(Remote ((Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + @\"",
+                      "anchor":  "$running = @(Remote ($ThornswoodStopAndMoveText + (Get-Content -LiteralPath $svcLib -Raw) + \"`n\" + @\"",
                       "does":  "builds and installs the bot service",
                       "class":  "admin",
                       "reason":  "service install"
@@ -909,20 +909,20 @@
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -Command `\"Stop-ScheduledTask -TaskName \u0027$TaskName\u0027 -EA SilentlyContinue; Unregister-ScheduledTask -TaskName \u0027$TaskName\u0027 -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName \u0027Thornswood Voice\u0027 -EA SilentlyContinue; Remove-Item -LiteralPath \u0027$Root\u0027 -Recurse -Force -EA SilentlyContinue; \u0027removed\u0027`\"\" }",
-                      "does":  "removes the voice task and firewall rule",
+                      "via":  "Remote",
+                      "anchor":  "$removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "stops voice, waits for it to exit, and takes its task, firewall rule and folder away (-Remove)",
                       "class":  "admin",
                       "reason":  "task and firewall change"
                   },
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -Command `\"Stop-ScheduledTask -TaskName \u0027$TaskName\u0027 -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName \u0027$TaskName\u0027; \u0027restarted\u0027`\"\" }",
-                      "does":  "restarts the voice task",
-                      "class":  "task-start-stop",
-                      "reason":  "stop and start of a named task"
+                      "via":  "Remote",
+                      "anchor":  "$restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "stops voice, waits for it to exit, and starts it again under the task it has (-Restart)",
+                      "class":  "admin",
+                      "reason":  "opens and ends voice\u0027s processes and waits for them to exit, which task rights alone cannot (#2952)"
                   },
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
@@ -973,7 +973,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$taskOut = @(Remote ($vars + $remote + $taskOnlyBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "registers the voice task again and restarts voice under it (-TaskOnly)",
                       "class":  "admin",
                       "reason":  "task registration is install-time work outside the gate verbs"
@@ -982,7 +982,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$swapOut = @(Remote ($vars + $remote + $serviceSwapBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "installs voice: task, firewall, process stop",
                       "class":  "admin",
                       "reason":  "Register-ScheduledTask and NetFirewall"
@@ -1301,6 +1301,15 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends Stop-Process"
+                  },
+                  {
+                      "script":  "scripts/ops/Say-Staff.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh @sshArgs $target $remote",
+                      "does":  "runs C:\\Thornswood-Watch\\say-staff.ps1 with one staff notice, or a check of one, on its standard input; it appends one line to the watchdog\u0027s outbox, which the bot says in #staff-updates",
+                      "class":  "admin",
+                      "reason":  "work outside the gate verbs; a notices key (Grant-BoxAccess.ps1 -NoticesOnly) runs only this"
                   },
                   {
                       "script":  "scripts/ops/Set-Door.ps1",
@@ -1636,13 +1645,13 @@
                       "reason":  "reads files, settings, logs or status only"
                   },
                   {
-                      "script":  "scripts/vps/Add-VpsKey.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes \"$VpsUser@$VpsHost\" \"powershell -NoProfile -EncodedCommand $b64\" } 2\u003e\u00261",
-                      "does":  "install-time or outside-the-gate work",
-                      "class":  "admin",
-                      "reason":  "sends authorized_keys"
+                      "script":  "scripts/release/Sign-OnGitHub.ps1",
+                      "scope":  "Get-SignedCatalogRefusal",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs @(\u0027-o\u0027, \u0027BatchMode=yes\u0027, \u0027-o\u0027, \u0027StrictHostKeyChecking=yes\u0027) -Script $script)",
+                      "does":  "checks a catalog signed on GitHub against release.json and the signer, in a temp folder of its own that it removes",
+                      "class":  "read-status",
+                      "reason":  "changes nothing on the box; its scratch folder goes when the check ends"
                   },
                   {
                       "script":  "scripts/vps/Backup-Server.ps1",
@@ -1789,6 +1798,15 @@
                       "reason":  "backups carry every secret"
                   },
                   {
+                      "script":  "scripts/vps/Fetch-Backups.ps1",
+                      "scope":  "Send-OffBoxMark",
+                      "via":  "ssh",
+                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -EncodedCommand $enc\" }",
+                      "does":  "writes the newest checked copy\u0027s name into C:\\Thornswood-Watch\\offbox.txt, which the SYSTEM watchdog reads (#2755)",
+                      "class":  "admin",
+                      "reason":  "writes into the watchdog\u0027s locked folder, outside the gate verbs"
+                  },
+                  {
                       "script":  "scripts/vps/Forecast-Storage.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodRemote",
@@ -1868,33 +1886,6 @@
                       "does":  "cancels a pending hardening step",
                       "class":  "admin",
                       "reason":  "hardening"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "\u0027REVOKED\u0027",
-                      "does":  "takes the cloud key line off the box and deletes the bridge token",
-                      "class":  "admin",
-                      "reason":  "sends authorized_keys"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodSecretRemote",
-                      "anchor":  "\u0027ACCESS ON\u0027",
-                      "does":  "writes the bridge token and replaces the cloud key line",
-                      "class":  "admin",
-                      "reason":  "secret; sends authorized_keys"
-                  },
-                  {
-                      "script":  "scripts/vps/New-CloudAccess.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "\u0026 ssh -F none -i $key -o IdentitiesOnly=yes",
-                      "does":  "logs in through the bridge with the new cloud key and echoes a word",
-                      "class":  "read-status",
-                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Remote.ps1",
@@ -2158,20 +2149,11 @@
                       "reason":  "reads files, settings, logs or status only"
                   },
                   {
-                      "script":  "scripts/vps/Setup-CloudSsh.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh-keyscan",
-                      "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
-                      "does":  "asks the box for its host keys through the bridge listener",
-                      "class":  "read-status",
-                      "reason":  "reads files, settings, logs or status only"
-                  },
-                  {
                       "script":  "scripts/vps/Setup-SshKey.ps1",
                       "scope":  "Works",
                       "via":  "ssh",
-                      "anchor":  "$out = Invoke-ThornswoodNative { \u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=8 $target \u0027echo THORNSWOOD_OK\u0027 } 2\u003e$null",
-                      "does":  "reads files, settings, logs or status",
+                      "anchor":  "\u0026 ssh -o BatchMode=yes -o StrictHostKeyChecking=yes -o ConnectTimeout=20 $target \u0027echo THORNSWOOD_OK\u0027",
+                      "does":  "logs in through the bridge and echoes a word",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },
@@ -2201,6 +2183,24 @@
                       "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads the box host keys from port 22, no login"
+                  },
+                  {
+                      "script":  "scripts/vps/Vps.ps1",
+                      "scope":  "Add-ThornswoodKnownHostThroughBridge",
+                      "via":  "ssh-keyscan",
+                      "anchor":  "\u0026 ssh-keyscan -T 20 -p $port 127.0.0.1",
+                      "does":  "asks the box for its host keys through the bridge listener",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Vps.ps1",
+                      "scope":  "Test-ThornswoodBridgeSsh",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -o StrictHostKeyChecking=yes -G $Address",
+                      "does":  "prints what ssh makes of this machine\u0027s config; connects to nothing",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/vps/Watch-Load.ps1",
@@ -2298,6 +2298,123 @@
                       "via":  "Remote",
                       "anchor":  "`$all = @(Get-Content \u0027$Root\\watch.log\u0027 -EA SilentlyContinue)",
                       "does":  "reads files, settings, logs or status",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script \"New-Item -ItemType Directory -Force -Path \u0027$run\u0027 | Out-Null; \u0027MADE\u0027\"",
+                      "does":  "makes the run\u0027s own folder under C:\\Windows\\Temp",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile $artifact.Zip $target $ssh ($runFar + \u0027/tools.zip\u0027)",
+                      "does":  "uploads the tools artifact to the run\u0027s folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$lines = @(Invoke-ThornswoodArtifactRemote $target $ssh $farRun",
+                      "does":  "copies a game server\u0027s plugins into the run\u0027s folder, links Skyrim\u0027s archives, runs a repository Python tool there and zips what it wrote",
+                      "class":  "admin",
+                      "reason":  "runs a tool on the box, work outside the gate verbs"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "\u0026 scp @ssh ($target + \u0027:\u0027 + $runFar + \u0027/back.zip\u0027) $back",
+                      "does":  "downloads what the tool wrote",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$gone = @(Invoke-ThornswoodArtifactRemote $target $ssh $farClean",
+                      "does":  "removes the run\u0027s folder",
+                      "class":  "stage",
+                      "reason":  "removes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$answer = @(Invoke-ThornswoodArtifactRemote $target $ssh $ask)",
+                      "does":  "makes and locks C:\\Thornswood-GameData and hashes the archives it holds",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessRule"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile (Join-Path $Data $n) $target $ssh ($storeFar + \u0027/\u0027 + $incoming)",
+                      "does":  "uploads one Skyrim archive to C:\\Thornswood-GameData",
+                      "class":  "admin",
+                      "reason":  "writes into a folder only SYSTEM and Administrators reach"
+                  },
+                  {
+                      "script":  "scripts/mods/Send-GameArchives.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodArtifactRemote",
+                      "anchor":  "$out = @(Invoke-ThornswoodArtifactRemote $target $ssh $place)",
+                      "does":  "checks an arrived archive\u0027s sha1, gives it its name and makes it read only",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessControl"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxChangeScript $Name $digest $keyLine $blob $(if ($NoticesOnly) { $SayStaff } else { '' }))",
+                      "does":  "saves the key file and tokens, arms a put back task, then replaces or removes one name\u0027s key line and token digest",
+                      "class":  "admin",
+                      "reason":  "sends authorized_keys; task registration"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxKeepScript)",
+                      "does":  "cancels the put back task once a new login proves the change",
+                      "class":  "admin",
+                      "reason":  "task registration"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Script (Get-BoxListScript)",
+                      "does":  "lists the key lines and the names of the bridge tokens",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh -n -F none -i $newKey -o IdentitiesOnly=yes",
+                      "does":  "logs in through the bridge with the new cloud key and echoes a word, or for a notices key has say-staff.ps1 answer READY",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Grant-BoxAccess.ps1",
+                      "scope":  "Test-Login",
+                      "via":  "ssh",
+                      "anchor":  "\u0026 ssh @ssh -o ConnectTimeout=20 $target \u0027echo THORNSWOOD_OK\u0027",
+                      "does":  "logs in from this machine, the way every script does, and echoes a word",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   }

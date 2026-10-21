@@ -82,6 +82,7 @@ function repoFor(name, ps1Text, extra) {
   fs.mkdirSync(path.join(repo, "records"), { recursive: true });
   const ps1 = path.join(repo, "scripts", "dev", name);
   fs.writeFileSync(ps1, ps1Text);
+  fs.copyFileSync(path.join(REPO_DIR, "scripts", "dev", "OwnPlugins.ps1"), path.join(repo, "scripts", "dev", "OwnPlugins.ps1"));
   for (const f of extra || []) { fs.copyFileSync(path.join(REPO_DIR, f), path.join(repo, f)); }
   return { repo: repo, ps1: ps1, gm: path.join(repo, "game", "gamemode.js") };
 }

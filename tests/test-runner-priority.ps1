@@ -129,14 +129,14 @@ Yes 'there is no -TaskName any more, since there is no task' ($text -notmatch '\
 
 # ---- 2. Remove-RunnerWatchers, for real on scratch tasks ----------------------------
 Write-Host ''
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-if (-not $onWindows) { Write-Host 'SKIP  the task parts need Windows and its Task Scheduler'; Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the task parts need Windows and its Task Scheduler'; Done }
 Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }
 
 $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
-$cmdExe = [IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')
-$ps51 = [IO.Path]::Combine($env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
+$ps51 = Get-WindowsPowerShell
 $mine = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
 $prefix = 'Thornswood priority harness ' + [Guid]::NewGuid().ToString('N') + ' Runner'
 $goes = @(($prefix + ' Priority'), ($prefix + ' 3 Priority'))

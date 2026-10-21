@@ -18,7 +18,7 @@
   written out on the VPS as watch.ps1. This lifts it out through the AST and
   runs the real thing, top to bottom, once per five minute step on a fake
   clock, in a scratch folder. Only what touches the world is replaced: the
-  port, site, health, bot, backup, runner and disk probes, schtasks,
+  port, site, health, bot, backup, off-box copy, runner and disk probes, schtasks,
   Restart-Service (the bot's service, #465), the sleep, the clock and the
   webhook post. A fake bot plays the part of
   watch_services in bot.py between runs: it posts whatever is in the outbox
@@ -77,7 +77,7 @@ Yes 'the watch.ps1 it writes is plain ASCII' (-not ($text -match '[^\x00-\x7F]')
 
 $fns = @{}
 foreach ($f in $inner.FindAll({ param($a) $a -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true)) { $fns[$f.Name] = $f }
-foreach ($n in @('Observe', 'Tell', 'Deliver', 'PostWebhook', 'WebhookUrl', 'HealthProblem', 'BackupProblem', 'ServiceProblem', 'ReadOutages', 'SaveOutages', 'TrimAlerts')) {
+foreach ($n in @('Observe', 'Tell', 'Deliver', 'PostWebhook', 'WebhookUrl', 'HealthProblem', 'BackupProblem', 'OffBoxProblem', 'ServiceProblem', 'ReadOutages', 'SaveOutages', 'TrimAlerts')) {
     Yes "$n is in the watcher" ($fns.ContainsKey($n))
 }
 if ($script:fail) { Done }
@@ -99,7 +99,7 @@ Yes '-SetWebhook sends the address on standard input, never on the command line'
 
 # The watcher as it runs, without the probes that touch the world. The fakes
 # below stand in for those, and $root is a scratch folder.
-$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'PostWebhook', 'DiskNow')
+$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'PostWebhook', 'DiskNow')
 $body = @()
 foreach ($s in $inner.EndBlock.Statements) {
     if ($s -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $fake -contains $s.Name) { continue }
@@ -118,8 +118,8 @@ New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 # Built, never written whole: this file is scanned for webhook addresses.
 $script:goodHook = 'https://discord.com/api/' + 'webhooks/12345/' + 'harness-not-a-real-token'
-$ports = @{ 3001 = 'website'; 3000 = 'game'; 7778 = 'voice'; 7788 = 'dev game'; 7789 = 'dev voice' }
-$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice' }
+$ports = @{ 3001 = 'website'; 3000 = 'game'; 7778 = 'voice'; 7788 = 'dev game'; 7789 = 'dev voice'; 7790 = 'bridge' }
+$tasks = @{ 'Thornswood Web' = 'caddy'; 'Thornswood Docs' = 'website'; 'Thornswood Server' = 'game'; 'Thornswood Voice' = 'voice'; 'Thornswood Dev Server' = 'dev game'; 'Thornswood Dev Voice' = 'dev voice'; 'Thornswood Bridge' = 'bridge' }
 
 function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     $script:boxRoot = Join-Path $tmp $name
@@ -128,10 +128,11 @@ function Box([string]$name, [switch]$NoHook, [string]$Hook) {
     elseif (-not $NoHook) { Set-Content -LiteralPath (Join-Path $script:boxRoot 'alerts-webhook.txt') -Value $script:goodHook -Encoding ASCII }
     $script:clock = New-Object DateTime (2026, 9, 28, 12, 0, 0, [DateTimeKind]::Local)
     $script:world = @{}
-    foreach ($n in @('caddy', 'website', 'game', 'voice', 'bot', 'dev game', 'dev voice')) {
+    foreach ($n in @('caddy', 'website', 'game', 'voice', 'bot', 'dev game', 'dev voice', 'bridge')) {
         $script:world[$n] = @{ Up = $true; Restart = 'up'; Health = '' }
     }
     $script:backupWhy = ''
+    $script:offboxWhy = ''
     $script:runnerWhy = ''
     $script:diskPct = 50.0
     $script:hookAnswer = ''
@@ -177,6 +178,7 @@ function HealthProblem($url) {
 }
 function ServiceProblem($name) { return $script:runnerWhy }
 function BackupProblem($task, $folder, $hours) { return $script:backupWhy }
+function OffBoxProblem($file, $hours) { $script:offboxFile = $file; return $script:offboxWhy }
 function DiskNow() { return @{ Free = 80GB * $script:diskPct / 100.0; Size = 80GB } }
 function PostWebhook($url, $text) {
     $script:hookTries++
@@ -435,6 +437,33 @@ try {
     $script:backupWhy = ''
     Step 2
     Yes 'working again is said once' ((Said 'The nightly backup is working again') -eq 1 -and $script:said.Count -eq 2)
+    # The copy off the box (#2755): judged here from what Fetch-Backups.ps1
+    # on One writes, so a One that is off is told about.
+    Box 'offbox'
+    $script:offboxWhy = 'the newest copy One has checked is thornswood-20260926-031500.zip.enc, 56 hours old, and the line is 26'
+    Step 1
+    Yes 'an off-box copy out of date is told once, in words' ((Said '^\*\*The copy of the backups off the VPS is out of date\.\*\* The newest copy One has checked is thornswood-20260926-031500\.zip\.enc, 56 hours old') -eq 1)
+    Yes '  saying what to run on One, not that nothing restarts it' ("$($script:said[0].Text)" -match 'Run \.\\scripts\\vps\\Fetch-Backups\.ps1 there' -and "$($script:said[0].Text)" -notmatch 'Nothing restarts')
+    Yes '  asking about offbox.txt in the watchdog''s own folder' ($script:offboxFile -eq (Join-Path $script:boxRoot 'offbox.txt'))
+    Step 10
+    Yes '  and not again while it stays behind' ($script:said.Count -eq 1)
+    $script:offboxWhy = ''
+    Step 2
+    Yes '  up to date again is said once' ((Said 'The copy of the backups off the VPS is up to date again') -eq 1 -and $script:said.Count -eq 2)
+    # The real OffBoxProblem, against real files: the age comes from the
+    # stamp in the name, the box's own clock, not from the file's time.
+    $ob = [scriptblock]::Create('param($f, $n) $now = $n' + "`n" + $fns['OffBoxProblem'].Extent.Text + "`n" + 'OffBoxProblem $f 26')
+    $obFile = Join-Path $script:boxRoot 'offbox.txt'
+    $obNow = New-Object DateTime (2026, 9, 28, 12, 0, 0)
+    Yes 'OffBoxProblem: no offbox.txt says One has not said it holds a copy' ((& $ob $obFile $obNow) -match '^One has not said it holds a copy: there is no .*offbox\.txt')
+    Set-Content -LiteralPath $obFile -Value 'notes' -Encoding ASCII
+    Yes 'OffBoxProblem: a file that names no backup says so' ((& $ob $obFile $obNow) -match 'does not name a backup')
+    Set-Content -LiteralPath $obFile -Value 'thornswood-20260927-031500.zip.enc' -Encoding ASCII
+    Yes 'OffBoxProblem: a copy taken 32 hours ago is out of date, with its name and the line' ((& $ob $obFile $obNow) -eq 'the newest copy One has checked is thornswood-20260927-031500.zip.enc, 32 hours old, and the line is 26')
+    Set-Content -LiteralPath $obFile -Value 'thornswood-20260928-031500.zip.enc' -Encoding ASCII
+    Yes 'OffBoxProblem: one taken this morning is fine' ((& $ob $obFile $obNow) -eq '')
+    Set-Content -LiteralPath $obFile -Value 'thornswood-20260927-110000.zip' -Encoding ASCII
+    Yes 'OffBoxProblem: 25 hours is inside the line, and a plain .zip counts' ((& $ob $obFile $obNow) -eq '')
     Box 'runner'
     $script:runnerWhy = 'its Windows service is Stopped'
     Step 3

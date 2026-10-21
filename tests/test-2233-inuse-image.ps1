@@ -47,12 +47,21 @@ Yes 'an unreadable process is no longer counted on its name alone' (-not $users.
 Yes 'it counts only while one of the folder''s own programs is running' (
     $users.Contains('Get-RunningInstallImages $root') -and $users.Contains('if ($images.Count)'))
 
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail -gt 0) { exit 1 }
+    exit 0
+}
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the runs: a copy of Windows'' PING.EXE stands in for Skyrim, and this is not Windows'; Done }
+
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2233-' + [guid]::NewGuid().ToString('N'))
 $game = Join-Path $work 'Game'
 New-Item -ItemType Directory -Force -Path $game, (Join-Path $work 'Launcher') | Out-Null
 try {
     $sky = Join-Path $game 'SkyrimSE.exe'
-    Copy-Item -LiteralPath (Join-Path $env:SystemRoot 'System32\PING.EXE') -Destination $sky
+    Copy-Item -LiteralPath (Get-WindowsPath 'System32\PING.EXE') -Destination $sky
     $p = Start-Process -FilePath $sky -ArgumentList '-n', '30', '127.0.0.1' -PassThru -WindowStyle Hidden
     try {
         Start-Sleep -Milliseconds 500
@@ -70,8 +79,4 @@ try {
     (Get-Item -LiteralPath $ro).IsReadOnly = $false
 }
 finally { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
-
-Write-Host ''
-Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
-if ($script:fail -gt 0) { exit 1 }
-exit 0
+Done

@@ -23,6 +23,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $script = Join-Path $Here '..\scripts\oneoff\Reset-History.ps1'
+. (Join-Path $PSScriptRoot 'Windows.ps1')   # $OnWindows (#2957)
 
 $script:pass = 0
 $script:fail = 0
@@ -129,7 +130,7 @@ try {
     $w = New-World; $worlds += $w
     $hook = Join-Path (Join-Path $w.Origin 'hooks') 'pre-receive'
     Set-Content -LiteralPath $hook -Value "#!/bin/sh`necho refused by the test >&2`nexit 1" -NoNewline
-    if (-not $IsWindows) { & chmod +x $hook }
+    if (-not $OnWindows) { & chmod +x $hook }
     $before = Heads $w.Origin
     $r = Run $w @{ Yes = $true }
     Yes 'a push GitHub refuses stops it' ($r.Code -ne 0)

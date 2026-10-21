@@ -75,6 +75,7 @@ from collections import defaultdict
 HERE = os.path.dirname(os.path.abspath(__file__))
 if HERE not in sys.path:
     sys.path.insert(0, HERE)
+import own_plugins  # noqa: E402
 
 
 def _load(name, file):
@@ -129,18 +130,6 @@ FRAGMENT_PREFIXES = (('qf_', 'quest'), ('tif_', 'dialogue line'), ('sf_', 'scene
                      ('pf_', 'package'), ('prkf_', 'perk'))
 
 
-def active_order(plugins_txt):
-    order = list(dt.MASTERS)
-    for line in io.open(plugins_txt, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line.startswith('*'):
-            continue
-        line = line[1:]
-        if line not in order:
-            order.append(line)
-    return order
-
-
 def top_groups(pl, want):
     """Each record in the top groups named in want, as (tag, flags, fid, offset, size)."""
     buf = pl.buf
@@ -185,7 +174,7 @@ def read(data, order):
     factions, settings = {}, {}
     names = set(s[1] for s in SETTINGS)
     for name in order:
-        pl = dt.Plugin(os.path.join(data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(data, name), name)
         if not pl.ok:
             continue
         for tag, flags, fid, q, rs in top_groups(pl, (b'FACT', b'GMST')):
@@ -296,8 +285,8 @@ def main():
     if not os.path.isfile(args.plugins) or not os.path.isdir(args.data):
         print('STOP. no load order here: %s, %s' % (args.plugins, args.data))
         return 1
-    order = active_order(args.plugins)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    order = own_plugins.load_order(args.plugins)
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d active plugin(s) are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))

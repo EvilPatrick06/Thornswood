@@ -184,10 +184,11 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy
         foreach ($n in $names) { $prev[$n] = '1:1' }
         $prev['Data\Platform\Plugins\thornswood-gone.js'] = '1:1'
         Set-OneByteChanged $bundleFull 7
-        $prefix = $GameDir.TrimEnd('\') + '\'
+        $sep = [string][IO.Path]::DirectorySeparatorChar
+        $prefix = $GameDir.TrimEnd($sep) + $sep
         $now = @{}
         foreach ($f in (Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force)) {
-            $rel = $f.FullName.Substring($prefix.Length)
+            $rel = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
             if (Test-Machine $rel) { continue }
             $now[$rel] = '1:1'
         }

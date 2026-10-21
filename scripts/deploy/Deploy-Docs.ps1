@@ -836,24 +836,24 @@ if ($setup -notcontains 'SETUP DONE') {
 # ==== thornswood site hooks ====
 # What is particular to the site, for Swap.ps1's service swap: stopped by its
 # own folder on node's command line, and by its port, because older installs
-# ran it as plain 'server.js', which no command line filter can see. Started
-# by its task. Healthy when its front page answers, not merely when something
-# listens: a server.js that throws on its first request is not up.
+# ran it as plain 'server.js', which no command line filter can see. Found and
+# opened before the task is asked to stop, then waited for until each has
+# exited (StopAndMove.ps1, #2928); until 20 Oct this waited for the port to
+# close instead, up to ten seconds, and the renames were tried ten times over.
+# Started by its task. Healthy when its front page answers, not merely when
+# something listens: a server.js that throws on its first request is not up.
 $siteHooks = @'
 function StopIt {
-  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
   $ids = @()
   foreach ($p in @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)) {
     if ($p.CommandLine -and $p.CommandLine.IndexOf($Root + '\', [StringComparison]::OrdinalIgnoreCase) -ge 0) { $ids += $p.ProcessId }
   }
   $ids += @(Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue | Select-Object -ExpandProperty OwningProcess)
-  foreach ($id in @($ids | Where-Object { $_ -gt 0 -and $_ -ne $PID } | Sort-Object -Unique)) {
-    Stop-Process -Id $id -Force -EA SilentlyContinue
-    'stopped pid ' + $id
-  }
-  for ($i = 0; $i -lt 20 -and @(Get-NetTCPConnection -LocalPort $Port -State Listen -EA SilentlyContinue).Count; $i++) {
-    Start-Sleep -Milliseconds 500
-  }
+  $held = @(Get-ThornswoodProcessHeld $ids)
+  $ThornswoodNotHeld
+  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  foreach ($p in $held) { 'stopped pid ' + $p.Id }
+  Stop-ThornswoodProcessHeld $held
 }
 function StartIt { Start-ScheduledTask -TaskName $Task }
 function Healthy {

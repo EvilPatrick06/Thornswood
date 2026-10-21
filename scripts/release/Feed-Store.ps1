@@ -85,11 +85,21 @@ function Get-FeedStorePrefix([string]$Channel) {
 
 # This machine's working folder for a channel. Under LOCALAPPDATA beside the
 # pending-release notes, so every worktree on the machine shares one, and the
-# uninstaller cannot reach it.
+# uninstaller cannot reach it. Where.ps1 says where that is, off Windows too
+# (#2903): this used to join $env:LOCALAPPDATA itself, which is null on Linux.
 function Get-FeedStoreDir([string]$Channel) {
     $prefix = Get-FeedStorePrefix $Channel
-    $name = if ($prefix -eq 'feed-dev') { 'dev' } else { 'main' }
-    return (Join-Path (Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'feed') $name)
+    $place = if ($prefix -eq 'feed-dev') { 'ReleasesDev' } else { 'Releases' }
+    return (& (Join-Path $PSScriptRoot 'Where.ps1') $place)
+}
+
+# The folder a release from the feed is staged in and built from, one a
+# channel, in this machine's own data beside the working folders (#2754,
+# New-FeedRoot.ps1 and Ship -FromFeed).
+function Get-FeedRootDir([string]$Channel) {
+    $prefix = Get-FeedStorePrefix $Channel
+    $leaf = if ($prefix -eq 'feed-dev') { 'dev' } else { 'main' }
+    return (Join-Path (Join-Path (& (Join-Path $PSScriptRoot 'Where.ps1') MachineData) 'feed-root') $leaf)
 }
 
 function Get-FeedStoreSiteDir([string]$SiteDir) {
@@ -157,6 +167,14 @@ function Get-FeedStoreVps([hashtable]$To) {
 # neither can load the other's rename first in one session.
 $script:FeedStoreSwap = @'
 function Move-FeedStoreInto([string]$from, [string]$to) {
+  # Off Windows (a Ship from the feed in the cloud, #2903) there is no
+  # kernel32, and loading FeedSwap fails with "Value cannot be null (path1)".
+  # There File.Move with overwrite is rename(2), which already replaces the
+  # name in one step with the POSIX semantics asked of Windows below: a
+  # reader holding the old file keeps it, and a new reader gets the new one.
+  # Windows PowerShell 5.1 never reaches this line, so the overload it lacks
+  # is never asked of it.
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { [IO.File]::Move($from, $to, $true); return }
   if (-not ('Thornswood.FeedSwap' -as [type])) {
     Add-Type -TypeDefinition @"
 using System;

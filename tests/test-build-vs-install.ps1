@@ -33,6 +33,8 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 $RepoDir = $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the launcher is built with the Build Tools'' csc and installed over a Windows shortcut, so this runs only on Windows'; exit 0 }
 
 $script:pass = 0
 $script:fail = 0
@@ -63,8 +65,10 @@ function Get-DesktopState {
     $desk = [Environment]::GetFolderPath('Desktop')
     $o = @()
     foreach ($n in 'Thornswood.lnk', 'Thornswood Dev.lnk') {
-        $p = Join-Path $desk $n
-        if ($desk -and (Test-Path -LiteralPath $p)) { $o += ($n + '=' + (Get-Item -LiteralPath $p).LastWriteTimeUtc.Ticks) }
+        # Joined only when there is a desktop: an account with none has '' here,
+        # and Join-Path refuses '' before the test after it could (#2957).
+        $p = if ($desk) { Join-Path $desk $n } else { '' }
+        if ($p -and (Test-Path -LiteralPath $p)) { $o += ($n + '=' + (Get-Item -LiteralPath $p).LastWriteTimeUtc.Ticks) }
         else { $o += ($n + '=none') }
     }
     return ($o -join ';')
@@ -484,7 +488,7 @@ try {
     $elsewhere = Join-Path $work 'elsewhere'
     $itGame = Join-Path $itRoot 'Game'
     New-Item -ItemType Directory -Force -Path $elsewhere, $itGame | Out-Null
-    $ping = Join-Path $env:SystemRoot 'System32\PING.EXE'
+    $ping = Get-WindowsPath 'System32\PING.EXE'
     $realClose = Join-Path $itDev 'Close-Launcher.ps1'
     # The root's own Game\SkyrimSE.exe, told running by Close-Launcher.ps1 from
     # the folder's side; null when that script has no such test.
@@ -519,6 +523,13 @@ try {
     Yes 'U4 Test-GameRunning no longer counts a game it cannot read on its name alone' (
         $src -notmatch "if \(-not \`$path -or" -and $src -match "elseif \(Test-GameImageRunning \(Join-Path \`$Root \('Game\\' \+ \`$n \+ '\.exe'\)\)\)")
     Yes 'U5 and matches the root with its backslash, so C:\Thornswood is not C:\Thornswood-DevBuild' ($src.Contains("`$prefix = `$Root.TrimEnd('\') + '\'"))
+
+    # The dev install is asked by its whole name (#2900): a folder whose name
+    # merely ends in -devbuild, such as the dev release folder
+    # local\release-devbuild, is a scratch root and leaves the Desktop alone.
+    $inst = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Install-Launcher.ps1') -Raw
+    Yes 'V1 the dev install is C:\Thornswood-DevBuild by its whole name, not any folder ending in -DevBuild' (
+        $inst.Contains("`$isDevRoot = `$Root.TrimEnd('\') -ieq 'C:\Thornswood-DevBuild'") -and $inst -notmatch "isDevRoot\s*=[^\r\n]*-match")
 
     # ---- 8. who calls the install ------------------------------------------------
     # By code, not by comment: Build-Launcher.ps1's header names the install

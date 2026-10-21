@@ -61,8 +61,12 @@ $b = $src.IndexOf($close)
 Yes 'Deploy-Server.ps1 carries the live warning block between its markers' ($a -ge 0 -and $b -gt $a)
 if (-not ($a -ge 0 -and $b -gt $a)) { Done }
 
-$winPs = 'powershell'
-if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { $winPs = 'pwsh' }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 function RunHere($text) {
     $ErrorActionPreference = 'Continue'
     $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
@@ -214,6 +218,9 @@ try {
         $standIns = "function Stop-ScheduledTask { }`r`n" +
                     "function Stop-Process { 'stand-in asked to stop ' + (`$args -join ' ') }`r`n" +
                     "function Get-NetUDPEndpoint { }`r`n" +
+                    "function Get-ThornswoodProcessHeld { }`r`n" +
+                    "function Stop-ThornswoodProcessHeld { }`r`n" +
+                    "`$ThornswoodNotHeld = @()`r`n" +
                     "function Start-Sleep { }`r`n" +
                     "function Held { `$false }`r`n"
 

@@ -3,22 +3,32 @@
 /*
   connect.js
 
-  ssh's ProxyCommand in a cloud Claude thread (#2753). A cloud thread's only
-  way out is an HTTPS proxy, which never carries port 22, so ssh to the box
-  goes inside a WebSocket instead: this opens wss://thornswood.net/box/
-  through the proxy, and from then on whatever ssh writes on this process's
-  standard input goes to the box's sshd and whatever sshd answers comes out
-  on standard output. bridge.js is the other end, on the box behind Caddy.
+  ssh's ProxyCommand to the box, on every machine that reaches it: One, each
+  person's own PC and a cloud Claude thread. ssh to the box goes inside a
+  WebSocket on 443 (#2753, #2891): a cloud thread's only way out is an HTTPS
+  proxy, which never carries port 22, and port 22 itself is for no outside
+  address once everybody comes this way. This opens wss://thornswood.net/box/
+  (through the proxy when there is one), and from then on whatever ssh
+  writes on this process's standard input goes to the box's sshd and
+  whatever sshd answers comes out on standard output. bridge.js is the other
+  end, on the box behind Caddy.
 
-      ProxyCommand node /path/to/scripts/vps/bridge/connect.js
+      ProxyCommand node /path/to/connect.js
 
-  Setup-CloudSsh.ps1 writes that line into ~/.ssh/config; nobody runs this by
-  hand. What it reads, all from the environment:
+  Setup-SshKey.ps1 (a PC) and Setup-CloudSsh.ps1 (a cloud thread) write that
+  line into ~/.ssh/config; nobody runs this by hand. What it reads, all from
+  the environment:
 
-    THORNSWOOD_BOX_TOKEN  the bridge's token, sent as "Authorization: Bearer".
-                          Left unset when the cloud environment holds it as a
-                          network secret instead, which the proxy adds to the
-                          request itself.
+    THORNSWOOD_BOX_TOKEN  this one's own token, sent as "Authorization:
+                          Bearer". Left unset when the cloud environment holds
+                          it as a network secret instead, which the proxy adds
+                          to the request itself, and on a PC, which keeps it
+                          in a file:
+    THORNSWOOD_BOX_TOKEN_FILE  the file the token is in, read when
+                          THORNSWOOD_BOX_TOKEN is not set. When this is not
+                          set either, .ssh/thornswood-box-token in the home
+                          folder, if it is there. Setup-SshKey.ps1 writes it,
+                          readable by its owner only.
     THORNSWOOD_BOX_URL    where the bridge is. wss://thornswood.net/box/ when
                           unset. ws:// only for the harness on loopback.
     HTTPS_PROXY           the proxy, http://host:port. With none it connects
@@ -27,9 +37,9 @@
                           with its own authority, and the container sets this
                           to that authority's bundle.
 
-  The token only opens the WebSocket. Getting a shell still takes the cloud
-  key, which the box accepts only from 127.0.0.1, so only through the bridge
-  (Add-VpsKey.ps1 -OnlyFrom), and ssh still checks the box's host key against
+  The token only opens the WebSocket. Getting a shell still takes the same
+  person's key, which the box accepts only from 127.0.0.1, so only through
+  the bridge (Grant-BoxAccess.ps1), and ssh still checks the box's host key against
   scripts\vps\vps.json before it sends anything.
 
   Anything that goes wrong goes to standard error, starting "box bridge:",
@@ -38,6 +48,9 @@
 */
 const net = require('net');
 const tls = require('tls');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
 const crypto = require('crypto');
 const { OP, accept, encode, Reader } = require('./ws.js');
 
@@ -51,7 +64,17 @@ if (where.protocol !== 'wss:' && where.protocol !== 'ws:') die('THORNSWOOD_BOX_U
 const secure = where.protocol === 'wss:';
 const port = Number(where.port) || (secure ? 443 : 80);
 const proxyText = process.env.HTTPS_PROXY || process.env.https_proxy || '';
-const token = process.env.THORNSWOOD_BOX_TOKEN || '';
+const token = process.env.THORNSWOOD_BOX_TOKEN || tokenFromFile();
+function tokenFromFile() {
+  const named = process.env.THORNSWOOD_BOX_TOKEN_FILE || '';
+  const file = named || path.join(os.homedir(), '.ssh', 'thornswood-box-token');
+  try { return fs.readFileSync(file, 'utf8').trim(); } catch (e) {
+    // A file that was named and cannot be read is a mistake worth saying; the
+    // default one not being there means this machine sends no token itself.
+    if (named) die('THORNSWOOD_BOX_TOKEN_FILE names ' + named + ', which cannot be read (' + e.code + ')');
+    return '';
+  }
+}
 // How long the proxy, TLS and the upgrade together may take before this gives
 // up. ssh's own ConnectTimeout does not reach inside a ProxyCommand.
 const OPEN_MS = Number(process.env.THORNSWOOD_BOX_OPEN_MS) || 20000;
@@ -125,7 +148,7 @@ async function open() {
   if (token) lines.push('Authorization: Bearer ' + token);
   sock.write(lines.join('\r\n') + '\r\n\r\n');
   const h = await readHead(sock, 'the bridge');
-  if (h.status === 401) throw new Error('the bridge refused the token (401). THORNSWOOD_BOX_TOKEN, or the network secret, is not the one on the box');
+  if (h.status === 401) throw new Error(token ? 'the bridge refused this token (401): it is not one the box holds, or it was taken away' : 'no token was sent, and the bridge lets nobody in without one (401). Setup-SshKey.ps1 asks for it and keeps it in .ssh/thornswood-box-token');
   if (h.status !== 101) throw new Error('the bridge did not open a WebSocket (' + h.line + ')');
   if (h.headers['sec-websocket-accept'] !== accept(key)) throw new Error('the bridge answered the upgrade with the wrong Sec-WebSocket-Accept');
   return { sock, rest: h.rest };
@@ -175,4 +198,12 @@ open().then(({ sock, rest }) => {
     }
   });
   process.stdin.on('end', () => { sendClose(); sock.end(); });
+  // ssh ends its ProxyCommand with SIGHUP a moment after it closes standard
+  // input (measured 21 Oct 2026, #2961: 2 ms apart). Left to the default,
+  // that killed this before the close frame was out, so bridge.js held the
+  // session's slot until the proxy and Caddy let the connection go, about
+  // 11 s later, and one install's ssh calls a second apart filled all eight
+  // slots and were refused. The close goes out and this ends when the
+  // connection does, the same as when standard input ends.
+  process.on('SIGHUP', () => { sendClose(); sock.end(); });
 }).catch((e) => die(e.message));

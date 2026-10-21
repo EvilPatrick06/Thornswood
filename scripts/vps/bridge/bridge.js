@@ -3,31 +3,33 @@
 /*
   bridge.js
 
-  The box's end of ssh from a cloud Claude thread (#2753). Decided by Patrick
-  on 19 Oct 2026 (#2750, the logs decision, C): cloud threads get an ssh key
-  to the box, "because it needs the VPS for more than just this". A cloud
-  thread's proxy carries HTTPS only, so port 22 never opens from there, but a
-  WebSocket on 443 goes through (measured 19 Oct). So Caddy hands
-  wss://thornswood.net/box/ to this, on loopback, and this joins each
-  WebSocket it accepts to the box's own sshd on 127.0.0.1:22. connect.js is
-  the cloud end.
+  The box's only way in over ssh. Built for cloud Claude threads (#2753,
+  Patrick on 19 Oct 2026, #2750 C), whose proxy carries HTTPS only, so port
+  22 never opens from there, but a WebSocket on 443 goes through (measured 19
+  Oct). Since #2891 everybody comes this way, One and each person with box
+  access too, so port 22 can be shut to every outside address and a home
+  address that changes stops nothing. Caddy hands wss://thornswood.net/box/
+  to this, on loopback, and this joins each WebSocket it accepts to the box's
+  own sshd on 127.0.0.1:22. connect.js is the other end.
 
-  WHO GETS THROUGH. A WebSocket opens only with the bridge's token in
-  "Authorization: Bearer", compared in constant time; anything else is a 401
-  and closed, and a plain request is a 404. The token only reaches sshd's
-  login: a shell still needs the cloud key, which the box accepts only from
-  127.0.0.1 (Add-VpsKey.ps1 -OnlyFrom), so that key is no use anywhere but
-  through here, and port 22's address list (Set-SshScope.ps1) never needs a
-  cloud address. At most MAX_OPEN sessions at once.
+  WHO GETS THROUGH. Each one who may has a token of their own: tokens\<name>
+  beside this file holds the SHA-256 of it, in hex, and nothing else, so the
+  box never holds a token that works (Grant-BoxAccess.ps1 writes and removes
+  them, one name at a time). A WebSocket opens only when the SHA-256 of what
+  came in "Authorization: Bearer" is one of them, each compared in constant
+  time; anything else is a 401 and closed, and a plain request is a 404. A
+  token only reaches sshd's login: a shell still needs that person's key,
+  which the box accepts only from 127.0.0.1 (the from= on its line), so a key
+  is no use anywhere but through here. At most MAX_OPEN sessions at once.
 
-  It writes one line per session to its log: when it opened, how it ended
-  and how many bytes went each way. No address and no content: it never sees
-  inside the ssh session, which is encrypted end to end.
+  It writes one line per session to its log: whose token opened it, when,
+  how it ended and how many bytes went each way. No address and no content:
+  it never sees inside the ssh session, which is encrypted end to end.
 
       node bridge.js                 listens on 127.0.0.1:7790
       THORNSWOOD_BRIDGE_PORT         another port
-      THORNSWOOD_BRIDGE_TOKEN_FILE   where the token is; token.txt beside
-                                     this file when unset
+      THORNSWOOD_BRIDGE_TOKENS       the folder of token digests; tokens
+                                     beside this file when unset
       THORNSWOOD_BRIDGE_TARGET       host:port to join to; 127.0.0.1:22
                                      when unset (the harness points it at
                                      an echo server)
@@ -43,7 +45,7 @@ const crypto = require('crypto');
 const { OP, accept, encode, Reader } = require('./ws.js');
 
 const PORT = Number(process.env.THORNSWOOD_BRIDGE_PORT) || 7790;
-const TOKEN_FILE = process.env.THORNSWOOD_BRIDGE_TOKEN_FILE || path.join(__dirname, 'token.txt');
+const TOKENS = process.env.THORNSWOOD_BRIDGE_TOKENS || path.join(__dirname, 'tokens');
 const TARGET = process.env.THORNSWOOD_BRIDGE_TARGET || '127.0.0.1:22';
 const MAX_OPEN = 8;
 // A ping when nothing has gone either way for this long, and the session is
@@ -55,17 +57,27 @@ function log(line) {
   console.log(line);
 }
 
-// The token is read at every upgrade, so a new one written by
-// New-CloudAccess.ps1 counts at once and a removed file refuses everybody.
-// Compared as SHA-256 digests so the comparison takes the same time whatever
-// the length of what was sent.
-function tokenMatches(sent) {
-  let want;
-  try { want = fs.readFileSync(TOKEN_FILE, 'utf8').trim(); } catch (e) { return false; }
-  if (!want || !sent) return false;
-  const a = crypto.createHash('sha256').update(want).digest();
-  const b = crypto.createHash('sha256').update(sent).digest();
-  return crypto.timingSafeEqual(a, b);
+// The folder is read at every upgrade, so a token Grant-BoxAccess.ps1 adds
+// counts at once and one it removes refuses that person at once, everybody
+// else untouched. Each file is named for its holder and holds the SHA-256 of
+// the token in hex. The digest of what was sent is compared with every one,
+// each in constant time, so how long it takes says nothing about which came
+// close. Returns the holder's name, or '' when it is nobody's.
+const NAME = /^[a-z0-9][a-z0-9-]{0,31}$/;
+function tokenHolder(sent) {
+  if (!sent) return '';
+  const got = crypto.createHash('sha256').update(sent).digest();
+  let names;
+  try { names = fs.readdirSync(TOKENS); } catch (e) { return ''; }
+  let who = '';
+  for (const name of names.sort()) {
+    if (!NAME.test(name)) continue;
+    let hex;
+    try { hex = fs.readFileSync(path.join(TOKENS, name), 'utf8').trim().toLowerCase(); } catch (e) { continue; }
+    if (!/^[0-9a-f]{64}$/.test(hex)) continue;
+    if (crypto.timingSafeEqual(got, Buffer.from(hex, 'hex')) && !who) who = name;
+  }
+  return who;
 }
 
 function refuse(socket, status, why) {
@@ -92,7 +104,8 @@ server.on('upgrade', (req, socket, head) => {
   const sent = auth.startsWith('Bearer ') ? auth.slice(7).trim() : '';
   if (req.method !== 'GET' || String(req.headers['upgrade'] || '').toLowerCase() !== 'websocket') return refuse(socket, '400 Bad Request', 'not a WebSocket upgrade');
   if (req.headers['sec-websocket-version'] !== '13' || !req.headers['sec-websocket-key']) return refuse(socket, '400 Bad Request', 'no WebSocket key or version 13');
-  if (!tokenMatches(sent)) return refuse(socket, '401 Unauthorized', sent ? 'a token that is not the bridge\'s' : 'no token');
+  const who = tokenHolder(sent);
+  if (!who) return refuse(socket, '401 Unauthorized', sent ? 'a token that is nobody\'s' : 'no token');
   if (open >= MAX_OPEN) return refuse(socket, '503 Service Unavailable', MAX_OPEN + ' sessions already open');
 
   const [host, port] = TARGET.split(':');
@@ -123,7 +136,7 @@ server.on('upgrade', (req, socket, head) => {
       'Upgrade: websocket\r\n' +
       'Connection: Upgrade\r\n' +
       'Sec-WebSocket-Accept: ' + accept(req.headers['sec-websocket-key']) + '\r\n\r\n');
-    log('session ' + id + ' opened (' + open + ' open)');
+    log('session ' + id + ' opened for ' + who + ' (' + open + ' open)');
     if (head && head.length) take(head);
   });
   ssh.on('error', (e) => finish('sshd: ' + e.message));
@@ -152,25 +165,25 @@ server.on('upgrade', (req, socket, head) => {
       } else if (m.op === OP.PING) {
         socket.write(encode(OP.PONG, m.data, false));
       } else if (m.op === OP.CLOSE) {
-        return finish('the cloud end closed it');
+        return finish('the far end closed it');
       } else if (m.op === OP.TEXT) {
         return finish('a text frame, which ssh never sends');
       }
     }
   }
   socket.on('data', take);
-  // The HTTP server keeps its sockets half open, so a cloud end that goes
+  // The HTTP server keeps its sockets half open, so a far end that goes
   // away says so with 'end', and 'close' would wait for this end forever.
   socket.on('end', () => finish('the WebSocket closed'));
   socket.on('close', () => finish('the WebSocket closed'));
 
   const pinger = setInterval(() => {
     if (Date.now() - heard < PING_EVERY) return;
-    if (++unanswered > 3) return finish('the cloud end answered nothing for ' + Math.round((Date.now() - heard) / 1000) + ' s');
+    if (++unanswered > 3) return finish('the far end answered nothing for ' + Math.round((Date.now() - heard) / 1000) + ' s');
     socket.write(encode(OP.PING, Buffer.alloc(0), false));
   }, PING_EVERY);
 });
 
 server.listen(PORT, '127.0.0.1', () => {
-  log('box bridge listening on 127.0.0.1:' + PORT + ', joining to ' + TARGET + ', token from ' + TOKEN_FILE);
+  log('box bridge listening on 127.0.0.1:' + PORT + ', joining to ' + TARGET + ', tokens from ' + TOKENS);
 });
