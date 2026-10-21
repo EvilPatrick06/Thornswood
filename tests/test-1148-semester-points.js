@@ -119,7 +119,7 @@ yes("apprenticeship.md's gates and Where this is say the same",
 yes("mage.md says each spell takes a place and a semester's point", /each spell takes a place and a point from a semester at the College/.test(mageP));
 yes("no page or comment still says the question is open",
   !/places alone should (still )?be enough is asked/.test(magic + appr + flat(gm.split("\n").filter(function (l) { return l.length < 2000; }).join("\n"))));
-yes("the semester's own harness is in the build's list", /'test-1387-college\.js',/.test(read(".github/workflows/build.yml")));
+yes("the semester's own harness is on the build's gate (not in tests/gate-excluded.txt, #3009)", !/^test-1387-college\.js\s/m.test(read("tests/gate-excluded.txt")));
 
 console.log("\n" + pass + " passed, " + fail + " failed");
 process.exit(fail ? 1 : 0);

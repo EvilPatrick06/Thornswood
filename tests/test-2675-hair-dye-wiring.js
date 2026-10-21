@@ -503,7 +503,6 @@ const BOWL = idFor(DATA.item);
 
 // --------------------------------------------------------------- workflow
 {
-  const B = read('.github/workflows/build.yml');
-  yes('X1 build.yml runs this harness', B.indexOf("'test-2675-hair-dye-wiring.js'") >= 0);
+  yes('X1 build.yml runs this harness (it is not in tests/gate-excluded.txt, #3009)', !/^test-2675-hair-dye-wiring\.js\s/m.test(read('tests/gate-excluded.txt')));
 }
 done();
