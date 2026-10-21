@@ -186,6 +186,16 @@ class PluginClean(unittest.TestCase):
         self.assertEqual(self.section(text, 'Identical to master and kept, the parent of records'),
                          ["CELL 00000900, the parent of 1 of this plugin's records"], text)
 
+    def test_text_with_no_string_table_is_not_called_identical(self):
+        os.remove(os.path.join(self.dir, 'Strings', 'm_english.strings'))
+        p = plugin(['M.esm'], [grup(b'MISC', 0, misc(0x802, 'Bucket', z('Bucket')))])
+        code, text = self.run_check('P.esp', p)
+        self.assertEqual(code, 2, text)
+        self.assertEqual(self.section(text, 'Identical to master, to clean'), [], text)
+        self.assertEqual(self.section(text, 'Could not tell, the string tables are missing'),
+                         ["MISC 00000802 is M.esm's but for localised text whose string table is not "
+                          "in the Data folder"], text)
+
     def test_a_deleted_reference_is_found_without_the_masters(self):
         p = plugin(['M.esm'], [cells_group(cell(0x900, 'BucketRoom', refr(0x901, 0x802, flags=0x20)))])
         code, text = self.run_check('P.esp', p, '--no-masters')

@@ -94,12 +94,19 @@ WHERE IT RUNS
   deleted checks. Every pull request runs that (.github/workflows/build-pr.yml)
   over game/content, so a writer that leaves a broken or deleted record goes
   red before it merges. The masters are Bethesda's and the collection's mods'
-  plugins, which live in a game folder; the full check runs where one is:
+  plugins, which live in a game folder and, every one of them, in the dev
+  server's own plugins folder on the box (C:\\Thornswood-Server-Dev\\plugins,
+  103 plugins, and Python 3.12 is installed there, measured 21 October). The
+  server's folder has no archives or string tables, so a record that matches
+  its master but for localised text is listed as could not tell, and the run
+  says it was not checked whole; on 21 October, taking every such text as
+  the same turned no record of the three into one to clean. The full check:
 
     python scripts/mods/Check-PluginClean.py
     python scripts/mods/Check-PluginClean.py --data "C:\\Thornswood\\Game\\Data"
     python scripts/mods/Check-PluginClean.py --no-masters
     python scripts/mods/Check-PluginClean.py --data D:\\Data Thornswood-Last.esp
+    python scripts/mods/Check-PluginClean.py --data C:\\Thornswood-Server-Dev\\plugins
 
   With no plugin named it checks every plugin in game/content. Thornswood's
   own plugins are always read from game/content (scripts/dev/own_plugins.py),
@@ -346,6 +353,8 @@ class Strings(object):
         return self.archives
 
     def table(self, plugin, kind):
+        """{string id: text}, or None when the plugin has no such table in
+        the Data folder or its archives."""
         key = (plugin.lower(), kind)
         if key in self.tables:
             return self.tables[key]
@@ -357,8 +366,11 @@ class Strings(object):
                 data = fh.read()
         else:
             data = self._archive_files().get('strings/' + name)
+        if data is None:
+            self.tables[key] = None
+            return None
         out = {}
-        if data is not None and len(data) >= 8:
+        if len(data) >= 8:
             count = struct.unpack_from('<I', data, 0)[0]
             base = 8 + count * 8
             for i in range(count):
@@ -429,23 +441,27 @@ def same_values(mine, theirs, imap, mine_names, theirs_names):
 
 def same_text(mine, theirs, master, strings):
     """Whether a plain string in mine is the text a localised master's field
-    names by string id."""
+    names by string id: True, False, or None when it may be and none of the
+    master's string tables is there to say."""
     if not master.localised or len(theirs) != 4 or strings is None:
+        return False
+    if not (mine.endswith(b'\x00') and all(32 <= ch < 127 for ch in mine[:-1])):
         return False
     sid = struct.unpack('<I', theirs)[0]
     text = mine.rstrip(b'\x00')
     if sid == 0:
         return text == b''
-    for kind in STRING_KINDS:
-        got = strings.table(master.name, kind).get(sid)
-        if got is not None and got == text:
-            return True
-    return False
+    tables = [t for t in (strings.table(master.name, kind) for kind in STRING_KINDS) if t is not None]
+    if not tables:
+        return None
+    return any(t.get(sid) == text for t in tables)
 
 
 def identical(plugin, r, master, m, strings, names):
-    """Whether record r of plugin is the same as record m of master. names
-    holds every record of the plugin and its masters, as gids."""
+    """Whether record r of plugin is the same as record m of master: True,
+    False, or None when it is unless some localised text differs that the
+    master's string tables are not there to read. names holds every record
+    of the plugin and its masters, as gids."""
     if (r.flags & ~COMPRESSED) != (m.flags & ~COMPRESSED):
         return False
     a = subrecords(plugin.data(r))
@@ -461,6 +477,7 @@ def identical(plugin, r, master, m, strings, names):
     def theirs_names(fid):
         return master.gid(fid) in names
 
+    unknown = False
     for (ta, va), (tb, vb) in zip(a, b):
         if ta != tb:
             return False
@@ -472,10 +489,14 @@ def identical(plugin, r, master, m, strings, names):
             return False
         if same_values(va, vb, imap, mine_names, theirs_names):
             continue
-        if same_text(va, vb, master, strings):
+        said = same_text(va, vb, master, strings)
+        if said:
+            continue
+        if said is None:
+            unknown = True
             continue
         return False
-    return True
+    return None if unknown else True
 
 
 def references(plugin, r):
@@ -570,9 +591,10 @@ def check_masters(p, masters):
 
 
 def check_against_masters(p, masters, strings):
-    """(identical records to clean, identical parents kept, faults, and the
+    """(identical records to clean, identical parents kept, faults, the
     references that name a record no master has, as (record, field, form id)
-    for the load order to answer)."""
+    for the load order to answer, and the records that are identical unless
+    text the missing string tables hold differs)."""
     want = set()
     for r in p.records:
         if (r.fid >> 24) < len(p.masters):
@@ -595,7 +617,7 @@ def check_against_masters(p, masters, strings):
             exists.add(g)
             if g in want:
                 base[g] = (m, e)
-    itm, kept, faults = [], [], []
+    itm, kept, faults, untold = [], [], [], []
     for r in p.records:
         if (r.fid >> 24) >= len(p.masters):
             continue
@@ -613,10 +635,13 @@ def check_against_masters(p, masters, strings):
         except Fault as x:
             faults.append('%s: %s' % (what, x))
             continue
-        if not same:
+        if same is False:
             continue
         if r.tag in (b'CELL', b'WRLD') and r.children:
             kept.append('%s, the parent of %d of this plugin\'s records' % (what, r.children))
+        elif same is None:
+            untold.append('%s is %s\'s but for localised text whose string table is not in the Data '
+                          'folder' % (what, m.name))
         else:
             itm.append('%s is identical to %s\'s' % (what, m.name))
     unresolved = []
@@ -628,7 +653,7 @@ def check_against_masters(p, masters, strings):
             faults.append('%s %s names %08X, past this plugin\'s last file index' % (what, t.decode(), v))
         elif p.gid(v) not in exists:
             unresolved.append((r, t, v))
-    return itm, kept, faults, unresolved
+    return itm, kept, faults, unresolved, untold
 
 
 def injected_by(p, unresolved, data_dir, read, order):
@@ -729,14 +754,14 @@ def check_one(name, args, strings, read):
              ', light' if p.light else ''))
     faults, deleted = check_file(p)
     itm = None
-    notes = []
+    notes, untold = [], []
     if not args.no_masters:
         masters, missing = load_masters(p, args.data, read)
         if missing:
             report('COULD NOT CHECK against the masters', missing)
         else:
             faults += check_masters(p, masters)
-            itm, kept, more, unresolved = check_against_masters(p, masters, strings)
+            itm, kept, more, unresolved, untold = check_against_masters(p, masters, strings)
             faults += more
             if unresolved:
                 notes, more = injected_by(p, unresolved, args.data, read, release_order(args.catalogue))
@@ -747,12 +772,17 @@ def check_one(name, args, strings, read):
         report('Identical to master, to clean', itm)
         report('Identical to master and kept, the parent of records', kept)
         report('Named through a plugin that is not a master', notes)
+        if untold:
+            report('Could not tell, the string tables are missing', untold)
     found = len(faults) + len(deleted) + len(itm or [])
     if found:
         print('  NOT CLEAN, %d to fix in the writer that made it' % found)
         return 'not clean'
     if itm is None and not args.no_masters:
         print('  not checked against its masters')
+        return 'could not be checked whole'
+    if untold:
+        print('  not checked whole: give --data a Data folder with the masters\' string tables')
         return 'could not be checked whole'
     print('  clean%s' % (' (the file and deleted checks; no masters read)' if args.no_masters else ''))
     return 'clean'
