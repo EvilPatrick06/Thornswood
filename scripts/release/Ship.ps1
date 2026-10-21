@@ -1938,7 +1938,7 @@ if ($LASTEXITCODE -eq 2) {
 }
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
-    Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
+    Die 'Sync-Client.ps1 refused, and says why above. The client that matches the record is CI''s build of the pin: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci, then Ship again (engine\README.md, A Ship machine takes CI''s build).'
 }
 
 # ------------------------------------------------------------ covered bodies

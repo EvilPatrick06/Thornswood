@@ -35,13 +35,18 @@
        machine's sign in, what identity the profile carries, and checks it is
        the one the launcher pins (launcher\app\Signature.cs). A sign in that
        cannot reach the profile says so here instead of at the end of a Ship.
-    5. The client runtime records\client-build.json names. When neither the
-       game folder nor the build folder holds it, the zip of that exact
-       commit is fetched from the site's feed (the clientRuntime entry in
-       /feed-dev/version.json or /feed/version.json), checked against the
-       feed's sha256 and size, unpacked, and each of the six files checked
-       against the record's sha256 before anything is put in the build
-       folder. Not on either feed: -Rebuild builds the fork instead.
+    5. The client runtime records\client-build.json names. On a machine
+       that takes CI's engine build (below), Get-EngineArtifact.ps1 fetches
+       engine.yml's artifact of the pin and holds every file to the records.
+       Otherwise, when neither the game folder nor the build folder holds
+       it, the zip of that exact commit is fetched from the site's feed (the
+       clientRuntime entry in /feed-dev/version.json or /feed/version.json),
+       checked against the feed's sha256 and size, unpacked, and each of the
+       six files checked against the record's sha256 before anything is put
+       in the build folder. A build made here is never offered: a rebuild is
+       not the same bytes, so it cannot match a record CI made (#3047).
+       -Rebuild still builds the fork when asked, for a record made from a
+       build on this machine.
     6. Then Check-ShipReady.ps1 for the channel, which asks every other
        question Ship asks (the dev build, its game folder, the Vortex profile,
        the VPS and the feed store) and gives the verdict.
@@ -75,6 +80,15 @@
   from (engine\README.md "One engine": each engine change is built in a
   worktree of the fork). A folder with no build\dist in it is not recorded.
 
+  CI'S ENGINE BUILD (#3047). -EngineBuild ci records {"ci": true} instead:
+  the engine build is then CI's build of the pin, engine.yml's artifact,
+  which Get-EngineArtifact.ps1 puts in a folder named for the commit
+  (Where.ps1 EngineArtifact) after holding every file to the records. It is
+  the only build that matches a record CI made, and a pin move needs a fetch,
+  not a build, so it is what a Ship machine takes. A machine that records no
+  engine build and has none in its checkout is given it without asking: a
+  build of its own could not match the record either.
+
   WHAT IT NEVER DOES. It writes no secret anywhere, never turns signing off
   or writes "enabled": false, never edits an existing records\signing\signing.json,
   never ships, publishes or deploys, and does not sign anything. The only
@@ -100,8 +114,9 @@
   used, not recorded, and only asked whether it is current.
 
 .PARAMETER EngineBuild
-  The fork folder whose build\dist is this machine's engine build (see WHICH
-  ENGINE BUILD), recorded for Where.ps1. With -Check it is only shown.
+  ci for CI's build of the pin (see CI'S ENGINE BUILD), or the fork folder
+  whose build\dist is this machine's engine build (see WHICH ENGINE BUILD),
+  recorded for Where.ps1. With -Check it is only shown.
 
 .PARAMETER SkyrimFrom
   With -Root, for a root that has no game folder yet: the folder Skyrim
@@ -115,8 +130,9 @@
 
 .PARAMETER Rebuild
   When the recorded client is on neither feed, build the fork with
-  Build-Engine.ps1 (an hour or more the first time) instead of stopping with
-  the command.
+  Build-Engine.ps1 (an hour or more the first time) instead of stopping. It
+  matches only a record made from a build on this machine, never one CI
+  made (#3047); -EngineBuild ci is the way for those.
 
 .PARAMETER NoVps
   Passed to Check-ShipReady.ps1, which then skips the two questions that ask
@@ -148,10 +164,10 @@
   generated files record the game folder they were built for.
 
 .EXAMPLE
-  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -EngineBuild C:\Thornswood-Repo\worktrees\engine-596055b2
+  .\scripts\release\Setup-ShipMachine.ps1 -Channel main -Root C:\Thornswood-Repo\local\release-main -EngineBuild ci
   Gives main a release folder of its own, made by Update-ShipRoot.ps1 from
-  Vortex's deployment and the main feed's release, and records the fork
-  folder whose build is this machine's engine build (#2019). Then
+  Vortex's deployment and the main feed's release, and records CI's build of
+  the pin as this machine's engine build (#3047), fetched now. Then
   .\scripts\mods\Build-Generated.ps1 -Channel main builds its generated
   files.
 
@@ -421,16 +437,28 @@ function Save-ShipRoot([string]$File, [string]$Channel, [string]$Root) {
 }
 
 # Records $Fork as this machine's engine build, in $File (the one Where.ps1
-# EngineBuilds names, #2019). '' when it was written, else why not: a fork
-# folder with no build\dist in it is not an engine build, and recording it
-# would only move the stop to the next script that reads it.
+# EngineBuilds names, #2019): ci for CI's build of the pin (#3047), else a
+# fork folder. '' when it was written, else why not: a fork folder with no
+# build\dist in it is not an engine build, and recording it would only move
+# the stop to the next script that reads it.
 function Save-EngineBuild([string]$File, [string]$Fork) {
-  if (-not (Test-Path -LiteralPath (Join-Path $Fork 'build\dist'))) {
-    return ($Fork + ' has no build\dist in it, so it is not an engine build. Build it there first (engine\README.md, One engine).')
+  if ($Fork -eq 'ci') { $rec = [ordered]@{ ci = $true } }
+  elseif (-not (Test-Path -LiteralPath (Join-Path $Fork 'build\dist'))) {
+    return ($Fork + ' has no build\dist in it, so it is not an engine build. Record CI''s build of the pin instead, the one the records name: -EngineBuild ci (engine\README.md, A Ship machine takes CI''s build).')
   }
+  else { $rec = [ordered]@{ fork = $Fork } }
   New-Item -ItemType Directory -Force -Path (Split-Path -Parent $File) | Out-Null
-  [IO.File]::WriteAllText($File, (ConvertTo-Json -InputObject ([ordered]@{ fork = $Fork })), (New-Object Text.UTF8Encoding($false)))
+  [IO.File]::WriteAllText($File, (ConvertTo-Json -InputObject $rec), (New-Object Text.UTF8Encoding($false)))
   return ''
+}
+
+# Whether $File (Where.ps1 EngineBuilds) records CI's build of the pin (#3047).
+function Test-EngineBuildIsCi([string]$File) {
+  if (-not (Test-Path -LiteralPath $File)) { return $false }
+  $rec = $null
+  try { $rec = [IO.File]::ReadAllText($File) | ConvertFrom-Json } catch { return $false }
+  $p = $rec.PSObject.Properties['ci']
+  return ($null -ne $p -and $p.Value -eq $true)
 }
 
 # signtool the way Sign-Artifact.ps1 looks for it: newest x64 in the SDK.
@@ -473,10 +501,23 @@ $Work = Join-Path (& (Join-Path $Here 'Where.ps1') Out) 'ship-machine'
 # below read Where.ps1 ClientDist, which is under it.
 Head 'The engine build this machine uses'
 $engineFile = & (Join-Path $Here 'Where.ps1') EngineBuilds
-if ($EngineBuild) {
+# A machine that records none and has no build in its checkout takes CI's
+# (CI'S ENGINE BUILD above): one built here could not match the record.
+if (-not $EngineBuild -and -not (Test-Path -LiteralPath $engineFile) -and
+    -not (Test-Path -LiteralPath (Join-Path (& (Join-Path $Here 'Where.ps1') Engine) 'build\dist'))) {
+  Say '  this machine records no engine build and its checkout has none, so it takes CI''s build of the pin' 'DarkGray'
+  $EngineBuild = 'ci'
+}
+if ($EngineBuild -eq 'ci') {
+  if ($Check) { Plan ('record CI''s build of the pin as this machine''s engine build, in ' + $engineFile) }
+  else {
+    $why = Save-EngineBuild $engineFile 'ci'
+    if ($why) { Say ('  ' + $why) 'Red' } else { Say ('  recorded CI''s build of the pin in ' + $engineFile + '; Where.ps1 EngineBuild is ' + (& (Join-Path $Here 'Where.ps1') EngineArtifact)) 'Green' }
+  }
+} elseif ($EngineBuild) {
   $EngineBuild = [IO.Path]::GetFullPath($EngineBuild).TrimEnd('\')
   $hasBuild = Test-Path -LiteralPath (Join-Path $EngineBuild 'build\dist')
-  Row 'it has a build in it' $hasBuild $EngineBuild $(if (-not $hasBuild) { 'Give -EngineBuild the fork folder Build-Engine.ps1 -Fork built into (engine\README.md, One engine)' } else { '' })
+  Row 'it has a build in it' $hasBuild $EngineBuild $(if (-not $hasBuild) { 'Give -EngineBuild ci, CI''s build of the pin, which is the one the records name (engine\README.md, A Ship machine takes CI''s build)' } else { '' })
   if ($Check -and $hasBuild) { Plan ('record ' + $EngineBuild + ' as this machine''s engine build, in ' + $engineFile) }
   elseif ($hasBuild) {
     $why = Save-EngineBuild $engineFile $EngineBuild
@@ -609,6 +650,20 @@ $inDist = Get-ClientMatch $record $dist
 Say ('  record ' + $commit + '; the game folder ' + $game + ' holds ' + $inGame + ' of ' + $total + ', the build folder ' + $inDist + ' of ' + $total) 'DarkGray'
 if ($inGame -eq $total -or $inDist -eq $total) {
   Row 'the recorded client is here' $true $(if ($inGame -eq $total) { 'in the game folder' } else { 'in ' + $dist + ', and Ship copies it in' }) ''
+} elseif (($EngineBuild -eq 'ci') -or (Test-EngineBuildIsCi $engineFile)) {
+  # CI's build of the pin (#3047): engine.yml's artifact, held to the records.
+  $getArgs = @{ NoPause = $true }
+  if ($Check) { $getArgs['Check'] = $true }
+  $global:LASTEXITCODE = 0
+  & (Join-Path $Here 'Get-EngineArtifact.ps1') @getArgs
+  $gc = $LASTEXITCODE
+  if ($gc -eq 2) {
+    Plan ('fetch CI''s build of ' + $commit + ' and hold every file to the records')
+    Row 'the recorded client is here' $false 'not yet' '.\scripts\release\Setup-ShipMachine.ps1   (without -Check) fetches it, and so does the next Ship'
+  } else {
+    Row 'the recorded client is here' ($gc -eq 0) $(if ($gc -eq 0) { 'CI''s build of ' + $commit + ' in ' + (& (Join-Path $Here 'Where.ps1') EngineArtifact) + ', and Ship copies it in' } else { 'CI''s build of ' + $commit + ' could not be had' }) `
+      '.\scripts\release\Get-EngineArtifact.ps1 says why above (engine\README.md, A Ship machine takes CI''s build)'
+  }
 } else {
   $feeds = @()
   . (Join-Path $PSScriptRoot 'Feed-Json.ps1')   # Join-FeedSettings: the site's feed whole (#1050)
@@ -632,17 +687,17 @@ if ($inGame -eq $total -or $inDist -eq $total) {
     if (-not $why) { $why = Install-ClientRuntime $zip $cr.Sha256 $cr.Bytes $record $dist (Join-Path $Work ('client-runtime-' + $commit)) }
     Remove-Item -LiteralPath $zip -Force -EA SilentlyContinue
     Row 'the recorded client is here' (-not $why) $(if ($why) { $why } else { 'fetched from the ' + $cr.Feed + ' feed into ' + $dist + ', every file as recorded' }) `
-      'Run this again. If the feed''s copy is wrong, build it: .\scripts\release\Build-Engine.ps1'
+      'The lines above say why. CI''s build of the pin holds the same files: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci'
   } elseif ($Rebuild -and -not $Check) {
     Say ('  client-runtime-' + $commit + ' is on neither feed; building the fork (-Rebuild)') 'Yellow'
     $global:LASTEXITCODE = 0
     & (Join-Path $Here 'Build-Engine.ps1') -NoPause
     $inDist = Get-ClientMatch $record $dist
     Row 'the recorded client is here' ($inDist -eq $total) ('the build folder holds ' + $inDist + ' of ' + $total) `
-      'Build-Engine.ps1 says above what stopped it. A build that differs from the record is somebody''s engine change: ask before running New-ClientBuildRecord.ps1'
+      'A build made here is not the bytes a record CI made names: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci takes CI''s. Never write a new record for an engine nobody changed'
   } else {
-    Row 'the recorded client is here' $false ('client-runtime-' + $commit + ' is on neither feed, so it has to be built') `
-      '.\scripts\release\Setup-ShipMachine.ps1 -Rebuild   (or .\scripts\release\Build-Engine.ps1; Visual Studio 2022 Build Tools with C++, an hour or more)'
+    Row 'the recorded client is here' $false ('client-runtime-' + $commit + ' is on neither feed, and a build made here would not be the recorded bytes') `
+      '.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci   (CI''s build of the pin, the one the record names; engine\README.md, A Ship machine takes CI''s build)'
   }
 }
 if ((Test-Path -LiteralPath $game) -and ($inGame -ne $total)) {
