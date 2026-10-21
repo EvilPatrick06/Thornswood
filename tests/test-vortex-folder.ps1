@@ -126,18 +126,14 @@ namespace Thornswood
     {
         public const string OffSuffix = ".thornswood-off";
         public static string[] ForeignClients() { return new string[0]; }
-        // The light flag list: the hand list, and the overloads Verify calls
-        // with the list it works out from the manifest.
-        public static readonly string[] MustBeLight = { };
-        public static List<string> NotLight() { return new List<string>(); }
-        public static List<string> NotLight(IEnumerable<string> mustBeLight) { return new List<string>(); }
+        // The light flag of a plugin in Data, which Verify compares with the
+        // server's two lists. Null is a file that cannot be read.
+        public static bool? FlaggedLight(string name) { return null; }
         public static List<string> StrayCreations(ICollection<string> wanted) { return new List<string>(); }
         // Against a server's light order (#1715).
         public static List<string> StrayCreations(ICollection<string> wanted, ICollection<string> serverLight) { return new List<string>(); }
         public static bool TakesNoPlace(string name) { return false; }
         public static int IsolateForeign(Action<string> say) { return 0; }
-        public static int FlagLight(Action<string> say) { return 0; }
-        public static int FlagLight(IEnumerable<string> mustBeLight, Action<string> say) { return 0; }
         // The real one reads the Vortex state under this account's AppData.
         // No profile found is what OwnGame already handles: it leaves the
         // plugin list alone.

@@ -263,15 +263,22 @@ namespace Thornswood
                     "Fix moves it aside into Thornswood's Isolated folder and nothing is deleted, so that server still works.",
                     "Close that server's launcher and Skyrim, then press Fix again: a file another program has open cannot be moved.", true));
 
-            // A plugin the server counts as light but this machine's copy does
-            // not, which gives it a load order index the server does not have and
-            // shifts everything after it by one. The set is derived from the
-            // server's manifest against the collection reference, so a new one is
-            // caught without editing Checks. See Verify.MustBeLight.
-            foreach (string p in Checks.NotLight(MustBeLight(cfg)))
+            // A plugin whose light flag is not the one the server's copy has. A
+            // copy that is full where the server's is light takes a load order
+            // index the server does not have, and one that is light where the
+            // server's is full takes none, so from there on every plugin is one
+            // place off. Read from the server's own two lists, never worked
+            // out. The flag is part of the file, so the collection installs it
+            // and Vortex puts it right; the launcher no longer writes it
+            // (#3022). Ours are left to Bytes, whose Fix fetches the server's
+            // copy. Before the order, so one problem reads as one problem.
+            foreach (KeyValuePair<string, bool> f in FlagNotServers(cfg))
                 issues.Add(Issue.Of(IssueKind.Plugins,
-                    p + " is not flagged light, so from there on your load order counts " +
-                    "one place differently from the server's.", "Fix flags it; nothing else changes.", Retry, true));
+                    f.Key + (f.Value
+                        ? " is light on the server and not flagged light in your copy, so from there on your load order counts one place more than the server's."
+                        : " is flagged light in your copy and is a full plugin on the server, so from there on your load order counts one place less than the server's.") +
+                    " The game shows that as LOAD ORDER ERROR.",
+                    null, FromVortex(cfg, f.Key), true));
             // The order, position by position. Only when nothing above was
             // found, as before: a plugin turned off or not flagged light
             // already explains the shift from there on, and one problem
@@ -790,49 +797,30 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The plugins that have to carry the ESL flag on this machine, worked
-        /// out from the server rather than kept by hand.
-        ///
-        /// The server's manifest names every plugin it counts, in order; the
-        /// shipped reference list (Paths.Golden) enables the whole collection,
-        /// its light plugins and all. A plugin the reference enables that the
-        /// manifest leaves out is one the server treats as light: it drops light
-        /// plugins, and anything mastering to one, because Game.GetModCount gives
-        /// them no index. So this machine has to leave it out of the count too,
-        /// or from that plugin on its load order sits one place off the server's
-        /// and the game shows LOAD ORDER ERROR. That is Djinn's position 52 on
-        /// 2026-09-24 exactly: his Immersive Armors copy was not light, so it
-        /// took an index the server does not have.
-        ///
-        /// Derived, so the next plugin that ships light on the server but not on
-        /// a tester's disk is caught without a name being added to Checks. The
-        /// hand list in Checks.MustBeLight is always folded in: it is the answer
-        /// when the server cannot be asked (no manifest to derive from), and belt
-        /// and braces for the two names found by hand. Bethesda's masters and the
-        /// Creation Club files are left out the way Bytes leaves them out, and an
-        /// .esl takes no place in the order to begin with, so neither is flagged.
+        /// Each plugin in Data whose light flag is not the server's, with true
+        /// when the server's copy is light: in its light list (#1715) and not
+        /// flagged here, or in its full list and flagged here. Another author's
+        /// plugins only, and none when the server cannot be asked. An .esl is
+        /// light by its name, and a file that cannot be read is not reported.
         /// </summary>
-        public static List<string> MustBeLight(Config cfg)
+        static List<KeyValuePair<string, bool>> FlagNotServers(Config cfg)
         {
-            var names = new List<string>();
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-            foreach (string n in Checks.MustBeLight)
-                if (!string.IsNullOrEmpty(n) && seen.Add(n)) names.Add(n);
-
+            var l = new List<KeyValuePair<string, bool>>();
             ServerMod[] mods = null;
             try { mods = Manifest(cfg); }
-            catch (Exception ex) { Swallow.Note("Verify.MustBeLight, asking the server for its manifest", ex); }
-            if (mods != null)
+            catch (Exception ex) { Swallow.Note("Verify.FlagNotServers, asking the server for its manifest", ex); }
+            if (mods == null) return l;
+            foreach (bool light in new[] { false, true })
             {
-                var counted = new HashSet<string>(Names(mods), StringComparer.OrdinalIgnoreCase);
-                foreach (string p in Enabled(Path.Combine(Paths.Golden, "plugins.txt")))
+                foreach (ServerMod m in light ? (manifestLight ?? new ServerMod[0]) : mods)
                 {
-                    if (p.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) continue;
-                    if (counted.Contains(p) || Storefront.Contains(p)) continue;
-                    if (seen.Add(p)) names.Add(p);
+                    if (m == null || string.IsNullOrEmpty(m.filename) || m.Served || Storefront.Contains(m.filename)) continue;
+                    if (m.filename.EndsWith(".esl", StringComparison.OrdinalIgnoreCase)) continue;
+                    bool? here = Checks.FlaggedLight(m.filename);
+                    if (here != null && here.Value != light) l.Add(new KeyValuePair<string, bool>(m.filename, light));
                 }
             }
-            return names;
+            return l;
         }
 
         // ------------------------------------------------------------ order
@@ -1281,7 +1269,6 @@ namespace Thornswood
             // from that anything gets. It is moved aside, never deleted,
             // because somebody who plays here may also play there.
             n += Checks.IsolateForeign(say);
-            n += Checks.FlagLight(MustBeLight(cfg), say);
 
             // Creation Club plugins the game would load because Skyrim.ccc
             // names them. Moved aside the same way, and said, because these are

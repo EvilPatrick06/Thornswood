@@ -88,10 +88,10 @@ Yes 'SettleSettings copies Golden plugins.txt only when the Profile list is miss
     $og.Contains('Thornswood-Content'))
 
 $shellOwn = [IO.File]::ReadAllText((Join-Path $AppPath 'ShellOwnGame.cs'))
-Yes 'Bring it up to date applies PutInServerOrder after FlagLight' (
+# The collection installs the light flags (#2979); nothing here writes one (#3022).
+Yes 'Bring it up to date applies PutInServerOrder and writes no light flag' (
     $shellOwn.Contains('Verify.PutInServerOrder(c, say)') -and
-    $shellOwn.Contains('Checks.FlagLight(Verify.MustBeLight(c), say)') -and
-    $shellOwn.IndexOf('FlagLight(Verify.MustBeLight') -lt $shellOwn.IndexOf('PutInServerOrder(c, say)'))
+    -not $shellOwn.Contains('FlagLight'))
 Yes 'Bring it up to date skips Bytes CRC when Refresh already matched' (
     $shellOwn.Contains('Verify.Run(c, !already)') -and
     $shellOwn.Contains('already matches what Vortex has deployed'))

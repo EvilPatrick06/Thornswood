@@ -1,26 +1,26 @@
 // test-must-be-light.js
 //
-// The plugins the launcher flags light are the ones the server counts as light.
+// The launcher reads light flags and never writes one (#3022).
 //
 // SkyMP resolves a form by the plugin's position in the server's list, and the
 // client counts positions with Game.GetModCount, which skips light plugins. So
-// a plugin the server leaves out as light but a tester's copy does not carry
-// the flag for pushes every plugin after it one place along, and the game says
-// LOAD ORDER ERROR.
+// a copy whose ESL flag is not the server's pushes every plugin after it one
+// place along, and the game says LOAD ORDER ERROR.
 //
-// Djinn, 24 September, on the dev build: "Getting mod order Load Order Error,
-// same exact mod as last time. scan fix didn't work. Purge re-deploy didn't
-// work", with "position 52: you have Hothtrooper44_Armor_Ecksstra.esp there, the
-// server has SkyHUD.esp". The Nexus archive ships that file light, and the
-// server's order was built from a copy that is light.
+// Until #3022 the launcher wrote the flag into plugin files itself
+// (Checks.FlagLight), on a set it worked out by guessing: any plugin the
+// collection reference enables that the server's manifest leaves out was
+// called light (Verify.MustBeLight). That covered nine plugins whose archives
+// never carried the flag One's copies had, which #2979 traced to a hand edit
+// on Vortex's Plugins page on One and fixed in the collection itself with
+// Vortex patches (revision 4 of 7essxf). The guess was also wrong on its own
+// terms: on One, at 12:07 AM on 27 Sep and again on 1 Oct, the launcher said
+// "ElysiumEstate.esp is not flagged light ... Fix flags it", about a full
+// plugin of 956,423 bytes. Flagging it light would move every form in it.
 //
-// Issue #388's hardening: the set is no longer only a hand-maintained array.
-// Verify.MustBeLight DERIVES it from the server, so the next plugin that ships
-// light on the server but not on a tester's disk is caught without editing
-// Checks: any plugin the collection reference (Paths.Golden) enables that the
-// server leaves out of its manifest must be light here too. The hand list in
-// Checks.MustBeLight stays as the fallback for when the server cannot be asked.
-// This harness fails on the old hand-list-only behaviour and passes on the new.
+// So the collection installs the flag, and the launcher only compares it with
+// the server's own two lists (the full plugins and, since #1715, the light
+// ones) and sends the person to Vortex. This harness fails on the old code.
 //
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
@@ -34,61 +34,54 @@ function yes(what, cond) {
 }
 
 const appDir = path.join(REPO_DIR, 'launcher', 'app');
+const all = fs.readdirSync(appDir).filter(function (f) { return /\.cs$/.test(f); })
+  .map(function (f) { return { name: f, text: fs.readFileSync(path.join(appDir, f), 'utf8') }; });
 const checks = fs.readFileSync(path.join(appDir, 'Checks.cs'), 'utf8');
 const verify = fs.readFileSync(path.join(appDir, 'Verify.cs'), 'utf8');
 
-// The hand list is still there and still carries the two names found by hand,
-// because it is the fallback for when the server cannot be asked.
-const m = /public static readonly string\[\] MustBeLight = \{([\s\S]*?)\};/.exec(checks);
-yes('Checks.MustBeLight is still in the launcher, as the fallback', !!m);
-const list = m ? (m[1].match(/"([^"]+)"/g) || []).map(function (s) { return s.slice(1, -1); }) : [];
-yes('MCMHelper.esp is still on the fallback list', list.indexOf('MCMHelper.esp') >= 0);
-yes('and so is Hothtrooper44_Armor_Ecksstra.esp, the one behind Djinn\u2019s position 52',
-    list.indexOf('Hothtrooper44_Armor_Ecksstra.esp') >= 0);
+// Nothing writes a flag and nothing guesses a light set any more.
+['FlagLight', 'NotLight', 'MustBeLight'].forEach(function (n) {
+  const where = all.filter(function (f) { return new RegExp('\\b' + n + '\\b').test(f.text); })
+    .map(function (f) { return f.name; });
+  yes(n + ' is gone from the launcher' + (where.length ? ' (still in ' + where.join(', ') + ')' : ''), where.length === 0);
+});
 
-// The new behaviour: Verify.MustBeLight derives the set from the server. This
-// is what the old code did not have, so these checks fail on it.
-const mbl = /public static List<string> MustBeLight\(Config[^)]*\)\s*\{([\s\S]*?)\n        \}/.exec(verify);
-yes('Verify.MustBeLight derives the set from the server', !!mbl);
-const body = mbl ? mbl[1] : '';
-yes('it starts from the collection reference, Paths.Golden\\plugins.txt',
-    body.indexOf('Paths.Golden') >= 0);
+// The header is opened for reading only: the one place that reads the flag
+// never asks for write access.
+const hl = /static bool\? HeaderLight\(string path\)\s*\{([\s\S]*?)\n        \}/.exec(checks);
+yes('Checks.HeaderLight reads the flag', !!hl && hl[1].indexOf('LightFlag') >= 0);
+yes('and opens the plugin for reading only',
+    !!hl && hl[1].indexOf('FileAccess.Read,') >= 0 && hl[1].indexOf('ReadWrite,') < 0 && hl[1].indexOf('Write(') < 0);
+yes('a file that cannot be read answers null, so it is never reported either way',
+    !!hl && /return null;/.test(hl[1]) && /public static bool\? FlaggedLight\(string name\)/.test(checks));
+
+// The comparison: the server's own lists, never worked out.
+const fns = /static List<KeyValuePair<string, bool>> FlagNotServers\(Config cfg\)\s*\{([\s\S]*?)\n        \}/.exec(verify);
+yes('Verify.FlagNotServers compares the flag with the server', !!fns);
+const body = fns ? fns[1] : '';
 yes('it asks the server for its manifest', body.indexOf('Manifest(cfg)') >= 0);
-yes('it leaves out the plugins the manifest counts (the server is not light there)',
-    /counted\.Contains|Names\(mods\)/.test(body));
-yes('it still folds the hand list in as the fallback',
-    body.indexOf('Checks.MustBeLight') >= 0);
+yes('it walks the full list and the light list (#1715)',
+    body.indexOf('manifestLight') >= 0 && /:\s*mods\)/.test(body));
+yes('it does not start from the collection reference, which is what the guess did',
+    body.indexOf('Paths.Golden') < 0);
+yes('it leaves ours to Bytes, whose Fix fetches the server’s copy', body.indexOf('m.Served') >= 0);
+yes('it skips an .esl, which is light by its name', /EndsWith\("\.esl"/.test(body));
+yes('it reads the flag through Checks.FlaggedLight and skips an unreadable file',
+    body.indexOf('Checks.FlaggedLight(m.filename)') >= 0 && body.indexOf('here != null') >= 0);
 
-// Run and Fix must drive the flag off the derived set, not the bare hand list.
-// The old code called Checks.NotLight() and Checks.FlagLight(null).
-yes('Verify.Run flags off the derived set (Checks.NotLight(MustBeLight(cfg)))',
-    verify.indexOf('Checks.NotLight(MustBeLight(cfg))') >= 0);
-yes('Verify.Fix flags off the derived set (Checks.FlagLight(MustBeLight(cfg), ...))',
-    /Checks\.FlagLight\(MustBeLight\(cfg\)/.test(verify));
-
-// The flag is set on a separated copy, never through the link. The server
-// derives WHICH plugins; how they are written must not change.
-const fl = /public static int FlagLight\(IEnumerable[\s\S]*?\n        \}/.exec(checks);
-yes('FlagLight separates the file from Vortex\u2019s copy before it writes',
-    !!fl && fl[0].indexOf('OwnGame.Separate(p);') >= 0 &&
-    fl[0].indexOf('OwnGame.Separate(p);') < fl[0].indexOf('fs.Write('));
-
-// Every plugin the hand list names must be one the server leaves out, or
-// flagging it would move the client the wrong way. When the server's order is
-// in this checkout, check it; otherwise say so rather than pass silently.
-let order = [];
-try {
-  order = JSON.parse(fs.readFileSync(path.join(REPO_DIR, 'version.json'), 'utf8')).loadOrder || [];
-} catch (e) { order = []; }
-if (!order.length) {
-  console.log('SKIP  no server load order in this checkout to compare the list against');
-} else {
-  const names = order.map(function (p) { return String(p).split(/[\\/]/).pop().toLowerCase(); });
-  list.forEach(function (n) {
-    yes(n + ' is not in the server\u2019s load order, which is what makes it light there',
-        names.indexOf(n.toLowerCase()) < 0);
-  });
-}
+// What Run says: Vortex puts it right, Fix does not claim to.
+const run = /public static List<Issue> Run\(Config cfg, bool checkBytes\)[\s\S]*?\n        \}\n/.exec(verify);
+const runText = run ? run[0] : '';
+const at = runText.indexOf('FlagNotServers(cfg)');
+yes('Verify.Run reports it', at >= 0);
+const issue = at >= 0 ? runText.slice(at, runText.indexOf('true));', at)) : '';
+yes('with no Fix line, because Fix does not write the flag', /null,\s*FromVortex\(cfg, f\.Key\)/.test(issue));
+yes('and sends the person to Vortex for that mod', issue.indexOf('FromVortex(cfg, f.Key)') >= 0);
+yes('both directions are said: light on the server, and full on the server',
+    issue.indexOf('is light on the server and not flagged light in your copy') >= 0 &&
+    issue.indexOf('is flagged light in your copy and is a full plugin on the server') >= 0);
+yes('before the order walk, so one problem reads as one problem',
+    at >= 0 && at < runText.indexOf('LoadOrder.FirstMismatch(game, manifest)'));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
