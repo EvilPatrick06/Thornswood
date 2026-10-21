@@ -723,7 +723,7 @@ foreach ($f in 'Setup-Thornswood.ps1', 'Install.bat', 'Setup.bat', 'READ ME FIRS
 # "All of it is built from" the fork, which was false for build.js, so the
 # note now lists whichever of them the payload holds as their own group, with
 # the gap said and upstream named, rather than claiming a commit for them.
-function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir) {
+function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]$PayloadDir, [string]$FrontRecord) {
     # A file the record gains that is not here stops the package, because a
     # person has to look at where it comes from before a notice names it.
     $from = @{
@@ -759,6 +759,24 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
         if (-not $from.ContainsKey($leaf)) { throw "client-build.json lists $leaf, which has no known source folder" }
         $table += ('  {0,-34}{1,-18}{2}' -f $leaf, $from[$leaf][0], $from[$leaf][1])
     }
+    # build.js is built from the fork's skymp5-front at the pin by every Ship
+    # since #2931, and front-build.json beside the client record holds it. With
+    # that record there and build.js in the payload, it is one of the files
+    # Thornswood built, at the client's commit; a record of another commit
+    # stops the package, since this note names one commit for all of them.
+    if (-not $FrontRecord) { $FrontRecord = Join-Path (Split-Path -Parent $ClientRecord) 'front-build.json' }
+    $frontBuilt = $false
+    if ($PayloadDir -and (Test-Path -LiteralPath (Join-Path $PayloadDir 'Data\Platform\UI\build.js')) -and (Test-Path -LiteralPath $FrontRecord)) {
+        $fRaw = "$(Get-Content -LiteralPath $FrontRecord -Raw)"
+        if (-not $fRaw.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw ($FrontRecord + ' is empty') }
+        $fc = ([string]($fRaw.TrimStart([char]0xFEFF) | ConvertFrom-Json).forkCommit).ToLowerInvariant()
+        $cc = ([string]$c.forkCommit).ToLowerInvariant()
+        if (-not $fc -or -not ($fc.StartsWith($cc) -or $cc.StartsWith($fc))) {
+            throw ($FrontRecord + ' is the build of ' + $fc + ' and client-build.json of ' + $cc + '. The note names one commit for what Thornswood built.')
+        }
+        $table += ('  {0,-34}{1,-18}{2}' -f 'build.js', 'skymp5-front', 'GNU GPL version 3')
+        $frontBuilt = $true
+    }
     $bin = [string]$s.binary
     if (-not $from.ContainsKey($bin)) { throw "server-build.json names $bin, which has no known source folder" }
     $table += ('  {0,-34}{1,-18}{2}' -f ($bin + ' (the server)'), $from[$bin][0], $from[$bin][1])
@@ -783,6 +801,7 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
     if ($PayloadDir) {
         foreach ($nb in $notBuilt) {
             if ($recorded -contains $nb.Path) { continue }
+            if ($frontBuilt -and $nb.Path -eq 'Data\Platform\UI\build.js') { continue }
             if (-not (Test-Path -LiteralPath (Join-Path $PayloadDir $nb.Path))) { continue }
             $leaf = $nb.Path.Substring($nb.Path.LastIndexOf('\') + 1)
             $extra += ('  {0,-34}{1,-18}{2}' -f $leaf, $nb.Folder, $nb.Licence)
@@ -834,7 +853,7 @@ function Get-SourceNotice([string]$ClientRecord, [string]$ServerRecord, [string]
     $lines += @(
         '',
         'The full licence texts sit beside this note in the install folder:',
-        '  GPL-3.0.txt             GNU GPL version 3 (skymp5-client, skyrim-platform)',
+        '  GPL-3.0.txt             GNU GPL version 3 (skymp5-client, skyrim-platform, skymp5-front)',
         '  AGPL-3.0.txt            GNU AGPL version 3 (MpClientPlugin.dll, the server)',
         '  WebView2-LICENSE.txt    Microsoft WebView2 SDK (inside the launcher)',
         '',
