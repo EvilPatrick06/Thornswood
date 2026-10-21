@@ -81,29 +81,47 @@ Yes 'a baseline record with no sha256 is refused' $threw
 
 # ---- 2. the files and the refusals ----------------------------------------------
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163-' + [guid]::NewGuid().ToString('N'))
+# The catalog is New-FileCatalog's and Test-FileCatalog's, which only Windows
+# has. Off Windows the manifest is written without it, as a release from the
+# feed writes it (-NoCatalog, Sign-OnGitHub.ps1), and its listing is checked
+# the way that release checks it (-CatalogChecked).
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$offWin = -not $OnWindows
 try {
-    $sm = New-ReleaseManifestFiles $doc '20991231-0000-dev' 'dev' $scratch
-    Yes 'it writes files\release.json and release.cat' ((Test-Path -LiteralPath $sm.Json -PathType Leaf) -and (Test-Path -LiteralPath $sm.Catalog -PathType Leaf))
+    if ($OnWindows) {
+        $sm = New-ReleaseManifestFiles $doc '20991231-0000-dev' 'dev' $scratch
+        Yes 'it writes files\release.json and release.cat' ((Test-Path -LiteralPath $sm.Json -PathType Leaf) -and (Test-Path -LiteralPath $sm.Catalog -PathType Leaf))
+    } else {
+        $said = ''
+        try { [void](New-ReleaseManifestFiles $doc '20991231-0000-dev' 'dev' $scratch) } catch { $said = $_.Exception.Message }
+        Yes 'off Windows a catalog made here is refused in words: New-FileCatalog is only on Windows' ($said -match 'only on Windows' -and $said -notmatch 'not recognized')
+        $sm = New-ReleaseManifestFiles $doc '20991231-0000-dev' 'dev' $scratch -NoCatalog
+        Yes 'with -NoCatalog it writes files\release.json alone' ((Test-Path -LiteralPath $sm.Json -PathType Leaf) -and -not (Test-Path -LiteralPath $sm.Catalog))
+    }
     $bytes = [IO.File]::ReadAllBytes($sm.Json)
     Yes '  release.json has no byte order mark and is one line' ($bytes[0] -ne 0xEF -and -not ([IO.File]::ReadAllText($sm.Json).Contains("`n")))
     $m = [IO.File]::ReadAllText($sm.Json) | ConvertFrom-Json
     Yes '  it names the release, the channel, the commit and the fork commit' ($m.release -eq '20991231-0000-dev' -and $m.channel -eq 'dev' -and $m.commit -eq ('1' * 40) -and $m.forkCommit -eq 'f00d' -and $m.schema -eq 1)
     Yes '  and lists the five assets' (@($m.assets).Count -eq 5)
     Yes '  the catalog holds only release.json' (@(Get-ChildItem -LiteralPath $sm.Files -File).Count -eq 1)
-    Yes 'the manifest as written passes' ((Get-ReleaseManifestRefusal $sm $doc) -eq '')
+    Yes 'the manifest as written passes' ((Get-ReleaseManifestRefusal $sm $doc -CatalogChecked:$offWin) -eq '')
     $more = New-Doc
     $more.packs += [pscustomobject]@{ id = 'p2'; url = 'https://thornswood.net/feed-dev/assets/' + (Sha '9'); sha256 = (Sha '9') }
-    $why = Get-ReleaseManifestRefusal $sm $more
+    $why = Get-ReleaseManifestRefusal $sm $more -CatalogChecked:$offWin
     Yes 'a feed asset the manifest does not list is refused, by name' ($why -match 'pack p2')
 
-    # 3. the gate refuses the unsigned catalog
-    $expected = Get-ExpectedSignerFragment -RepoRoot $Repo
-    $gate = Get-PublishSignRefusal -Path $sm.Catalog -ExpectedSigner $expected
-    Yes 'the publish gate refuses the catalog while it is unsigned' ($gate -match 'not Authenticode Valid')
+    if ($OnWindows) {
+        # 3. the gate refuses the unsigned catalog
+        $expected = Get-ExpectedSignerFragment -RepoRoot $Repo
+        $gate = Get-PublishSignRefusal -Path $sm.Catalog -ExpectedSigner $expected
+        Yes 'the publish gate refuses the catalog while it is unsigned' ($gate -match 'not Authenticode Valid')
 
-    [IO.File]::WriteAllText($sm.Json, ([IO.File]::ReadAllText($sm.Json)).Replace((Sha 'c'), (Sha '8')), (New-Object Text.UTF8Encoding($false)))
-    $why = Get-ReleaseManifestRefusal $sm $doc
-    Yes 'a release.json changed after the catalog was made is refused' ($why -match 'Test-FileCatalog')
+        [IO.File]::WriteAllText($sm.Json, ([IO.File]::ReadAllText($sm.Json)).Replace((Sha 'c'), (Sha '8')), (New-Object Text.UTF8Encoding($false)))
+        $why = Get-ReleaseManifestRefusal $sm $doc
+        Yes 'a release.json changed after the catalog was made is refused' ($why -match 'Test-FileCatalog')
+    } else {
+        Write-Host 'SKIP  the catalog: the gate on it unsigned, and a release.json changed after it was made; New-FileCatalog, Test-FileCatalog and Authenticode are only on Windows'
+    }
 } finally {
     if (Test-Path -LiteralPath $scratch) { Remove-Item -LiteralPath $scratch -Recurse -Force }
 }

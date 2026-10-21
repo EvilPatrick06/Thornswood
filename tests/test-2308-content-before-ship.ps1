@@ -46,6 +46,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -270,25 +271,29 @@ try {
     $zips = @(Get-ChildItem -LiteralPath (Join-Path $inst 'dist') -Recurse -File -Filter 'pack-*.zip' -ErrorAction SilentlyContinue)
     Yes '  and no pack was even made' ($zips.Count -eq 0)
 
-    # b. The server holds version two: the release goes out.
-    Put $liveEsp $contentV2
-    $r = Publish @('-Notes', "'Test release`n- one line'")
-    YesR ("the same release, once the server holds the same plugin, goes out (exit {0}, release {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
-    Yes '  and says the server already holds it' ($r.Out -match 'already holds this release''s Thornswood-Content.esp')
-    $feed = Read-Json (SiteFeed $site)
-    Yes '  the feed the site serves has the release''s pack' (@($feed.packs).Count -ge 1)
-    Yes ("  and its assets reached the site, so the count in a. could see one ({0})" -f (Assets)) ((Assets) -gt $assetsBefore)
-    $base = Read-Json (Join-Path $site 'feed\published.json')
-    $v2Entry = ('{0}:{1}' -f [Text.Encoding]::UTF8.GetByteCount($contentV2), (ShaOf $contentV2))
-    $baseEntry = $base.PSObject.Properties['Data\Thornswood-Content.esp']
-    Yes '  and the baseline records version two' ($null -ne $baseEntry -and [string]$baseEntry.Value -eq $v2Entry)
+    if ($OnWindows) {
+        # b. The server holds version two: the release goes out.
+        Put $liveEsp $contentV2
+        $r = Publish @('-Notes', "'Test release`n- one line'")
+        YesR ("the same release, once the server holds the same plugin, goes out (exit {0}, release {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
+        Yes '  and says the server already holds it' ($r.Out -match 'already holds this release''s Thornswood-Content.esp')
+        $feed = Read-Json (SiteFeed $site)
+        Yes '  the feed the site serves has the release''s pack' (@($feed.packs).Count -ge 1)
+        Yes ("  and its assets reached the site, so the count in a. could see one ({0})" -f (Assets)) ((Assets) -gt $assetsBefore)
+        $base = Read-Json (Join-Path $site 'feed\published.json')
+        $v2Entry = ('{0}:{1}' -f [Text.Encoding]::UTF8.GetByteCount($contentV2), (ShaOf $contentV2))
+        $baseEntry = $base.PSObject.Properties['Data\Thornswood-Content.esp']
+        Yes '  and the baseline records version two' ($null -ne $baseEntry -and [string]$baseEntry.Value -eq $v2Entry)
 
-    # c. The content plugin did not change: the server is not asked.
-    Put $liveEsp 'whatever the server has now'
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
-    $r = Publish @('-Notes', "'Second test release`n- another line'")
-    YesR ("a release that does not change the content plugin goes out whatever the server holds (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
-    Yes '  and does not ask it' ($r.Out -notmatch 'The content plugin on the server')
+        # c. The content plugin did not change: the server is not asked.
+        Put $liveEsp 'whatever the server has now'
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed again'
+        $r = Publish @('-Notes', "'Second test release`n- another line'")
+        YesR ("a release that does not change the content plugin goes out whatever the server holds (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Published -match '^\d{8}-\d{6}$') $r
+        Yes '  and does not ask it' ($r.Out -notmatch 'The content plugin on the server')
+    } else {
+        Write-Host 'SKIP  b. and c., a release that goes out: a release that signs here makes its catalog with New-FileCatalog, which only Windows has'
+    }
 
     # ---- 4. where it sits ---------------------------------------------------------------
     Write-Host ''; Write-Host 'where the check sits'

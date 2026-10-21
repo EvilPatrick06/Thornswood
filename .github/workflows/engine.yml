@@ -139,7 +139,9 @@ jobs:
     name: Engine build (VPS fallback)
     needs: engine
     if: ${{ !cancelled() && needs.engine.result != 'success' && needs.engine.result != 'cancelled' }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    # A build like the build check's, so it takes one of the box's build
+    # slots too (thornswood-build, records/build-runners.json, #2994).
+    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     timeout-minutes: 360
     steps: &engine
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7

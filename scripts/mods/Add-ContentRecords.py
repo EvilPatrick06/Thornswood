@@ -378,6 +378,7 @@ if anything it was asked to add is already there.
 """
 
 import argparse
+import copy
 import json
 import math
 import os
@@ -1184,25 +1185,38 @@ def local_fid(desc, plugin_masters, plugin_name):
     return (names.index(owner.lower()) << 24) | int(obj, 16)
 
 
-def drop_bare_parents(kids):
-    """kids without a CELL or WRLD record whose children group is gone, and
-    without a group left empty by that. A cell record with no placements of
+def drop_bare_parents(kids, dropped):
+    """kids without a group that holds nothing, and without a CELL or WRLD
+    record whose children group is gone. A cell record with no placements of
     this plugin's under it is an override of Bethesda's cell that changes
-    nothing Thornswood needs."""
-    out = []
-    for i, k in enumerate(kids):
+    nothing Thornswood needs. The form id of each record dropped is added to
+    dropped.
+
+    THE GROUPS GO FIRST, AND AN EMPTY ONE GOES HOWEVER IT GOT EMPTY (#2790).
+    A placement the station table moves is taken out of its old cell with a
+    plain remove from its list, which leaves that cell's temporary group with
+    nothing in it. Until 21 October this judged the cell before its groups
+    and kept any group that arrived empty, so the empty group held the cell
+    record up: CELL 0x8ED5, DawnstarWesternMineExterior, copied for the
+    Dawnstar kiln and salt quarry in #2629 and left when the station table
+    put them in Dawnstar03Exterior, sat in the plugin identical to
+    HearthFires.esm's, holding an empty group (Check-PluginClean.py, run
+    against the dev server's masters)."""
+    pruned = []
+    for k in kids:
         if isinstance(k, Grup):
-            had = len(k.kids)
-            k.kids = drop_bare_parents(k.kids)
-            if had and not k.kids:
+            k.kids = drop_bare_parents(k.kids, dropped)
+            if not k.kids:
                 continue
-            out.append(k)
-            continue
-        if k.tag in (b'CELL', b'WRLD'):
-            nxt = kids[i + 1] if i + 1 < len(kids) else None
+        pruned.append(k)
+    out = []
+    for i, k in enumerate(pruned):
+        if not isinstance(k, Grup) and k.tag in (b'CELL', b'WRLD'):
+            nxt = pruned[i + 1] if i + 1 < len(pruned) else None
             want = 6 if k.tag == b'CELL' else 1
             if not (isinstance(nxt, Grup) and struct.unpack_from('<I', nxt.label, 0)[0] == k.fid
-                    and struct.unpack_from('<i', nxt.label, 4)[0] == want and nxt.kids):
+                    and struct.unpack_from('<i', nxt.label, 4)[0] == want):
+                dropped.add(k.fid)
                 continue
         out.append(k)
     return out
@@ -2227,6 +2241,14 @@ def main():
     print('  %d already where the table puts them, %d moved to another cell, %d placed now, %d cell and '
           'worldspace record(s) copied from the masters for them'
           % (len(stays), len(moved), len(to_place) - len(moved), len(copies)))
+    # A cell or world the plugin carries with none of its records under it,
+    # as the file stands; one a move empties is found when the move is made.
+    going_bare = set()
+    drop_bare_parents(copy.deepcopy(tree), going_bare)
+    going_bare &= set(before)
+    if going_bare:
+        print('  %d cell or world record(s) hold none of this plugin\'s records and go: %s'
+              % (len(going_bare), ', '.join('0x%07X' % f for f in sorted(going_bare))))
 
     new_head, head_changed = described(head)
     print('')
@@ -2254,7 +2276,7 @@ def main():
     for r in wood_have:
         if set_bnam(r, WOODWORKING_KEYWORD):
             edited.add(r.fid)
-    if not built and not edited and not removing and not head_changed and not to_place:
+    if not built and not edited and not removing and not head_changed and not to_place and not going_bare:
         print('')
         print('  Everything this writes is already in the plugin as it writes it. Nothing was written.')
         return 0
@@ -2281,7 +2303,8 @@ def main():
         put_placement(tree, r, want_cell[r.fid], stamp)
     built_world += to_place
     tree = take_out(tree, removing)
-    tree = drop_bare_parents(tree)
+    bare = set()
+    tree = drop_bare_parents(tree, bare)
     # A record this adds goes where it belongs in the order this tool writes
     # its records in, not at the end of its group: a house part copied back in
     # from HearthFires.esm lands before the woodworking overrides, where it
@@ -2299,7 +2322,10 @@ def main():
     added = set(r.fid for r in built)
     kept_ids = set(r.fid for r in every_record(tree)) - added
     # A placement the table moved to another cell is in the file again, added.
-    gone_unasked = sorted(f for f in before if f not in kept_ids and f not in removing and f not in moved)
+    # A cell or world left holding none of this plugin's records goes with
+    # its last placement (drop_bare_parents).
+    gone_unasked = sorted(f for f in before
+                          if f not in kept_ids and f not in removing and f not in moved and f not in bare)
     if gone_unasked:
         print('')
         print('STOP. 0x%07X went with nothing left under it, and the register does not say it goes. '
@@ -2422,6 +2448,9 @@ def main():
           % (len(records), len(after_records)))
     print('  ok    %d added, %d edited, %d taken out, every other byte untouched'
           % (len(built), len(edited), len(removing)))
+    if bare & set(before):
+        print('  ok    %d cell or world record(s) left holding none of this plugin\'s records went: %s'
+              % (len(bare & set(before)), ', '.join('0x%07X' % f for f in sorted(bare & set(before)))))
     print('  ok    every record this tool writes is what it writes')
     print("  ok    the %d placements are the station table's, each in its cell" % len(want))
     print('  ok    no salvaged record is left')

@@ -59,6 +59,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -319,160 +320,164 @@ try {
         Move-Item -LiteralPath ($mainGens + '.away') -Destination $mainGens
     }
 
-    # ---- 3. the real Publish-Update.ps1, dev, nothing new --------------------------
-    Write-Host ''; Write-Host 'the real Publish-Update.ps1 on the dev channel'
-    $fake = Join-Path $Scratch 'repo'
-    New-Item -ItemType Directory -Force -Path $fake | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-    foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
-        $from = Join-Path $repo $f
-        if (Test-Path -LiteralPath $from) {
-            New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
-            Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
+    if ($OnWindows) {
+        # ---- 3. the real Publish-Update.ps1, dev, nothing new --------------------------
+        Write-Host ''; Write-Host 'the real Publish-Update.ps1 on the dev channel'
+        $fake = Join-Path $Scratch 'repo'
+        New-Item -ItemType Directory -Force -Path $fake | Out-Null
+        Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
+        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
+            $from = Join-Path $repo $f
+            if (Test-Path -LiteralPath $from) {
+                New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
+                Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
+            }
         }
-    }
-    $reqFrom = Join-Path $repo 'game\required-data'
-    if (Test-Path -LiteralPath $reqFrom) {
-        New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
-        Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Recurse -Force
-    }
-    # The real Stop-Game closes any Skyrim on the machine; nothing here may.
-    Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
-    # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
-    Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
-    [void](RunGit $fake init -q)
-    [void](RunGit $fake @gitId add -A)
-    [void](RunGit $fake @gitId commit -q -m 'the build')
-    $head = (RunGit $fake rev-parse HEAD).Out
-    [void](RunGit $fake checkout -q -b side)
-    Put (Join-Path $fake 'side.txt') 'work main never took'
-    [void](RunGit $fake @gitId add side.txt)
-    [void](RunGit $fake @gitId commit -q -m 'side work')
-    $sideCommit = (RunGit $fake rev-parse HEAD).Out
-    [void](RunGit $fake checkout -q --detach $head)
-    # The release the note from before sourceCommit below came with, built
-    # from what main has shipped.
-    Tag-DevRelease $fake $head '20261001-215555-dev' '2026-10-01T21:56:40-06:00'
-    Yes ("the stand-in checkout is clean at the build ({0})" -f $head.Substring(0, 12)) ((RunGit $fake status --porcelain).Out -eq '' -and $sideCommit -ne $head)
+        $reqFrom = Join-Path $repo 'game\required-data'
+        if (Test-Path -LiteralPath $reqFrom) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $fake 'game\required-data') | Out-Null
+            Copy-Item -Path (Join-Path $reqFrom '*') -Destination (Join-Path $fake 'game\required-data') -Recurse -Force
+        }
+        # The real Stop-Game closes any Skyrim on the machine; nothing here may.
+        Put (Join-Path $fake 'scripts\dev\Close-Launcher.ps1') "function Stop-Game { param([string]`$Root) return `$false }`r`nfunction Get-GameProcesses { param([string]`$Root) return @() }`r`n"
+        # No signing setup here: the catalog Publish-Update signs (#2163, phase B) is left unsigned, and the stub answers that it passed.
+        Put (Join-Path $fake 'scripts\release\Sign-ReleaseCatalog.ps1') "function Invoke-ReleaseCatalogSign { param([string]`$Catalog, [string]`$RepoDir) return '' }`r`n"
+        [void](RunGit $fake init -q)
+        [void](RunGit $fake @gitId add -A)
+        [void](RunGit $fake @gitId commit -q -m 'the build')
+        $head = (RunGit $fake rev-parse HEAD).Out
+        [void](RunGit $fake checkout -q -b side)
+        Put (Join-Path $fake 'side.txt') 'work main never took'
+        [void](RunGit $fake @gitId add side.txt)
+        [void](RunGit $fake @gitId commit -q -m 'side work')
+        $sideCommit = (RunGit $fake rev-parse HEAD).Out
+        [void](RunGit $fake checkout -q --detach $head)
+        # The release the note from before sourceCommit below came with, built
+        # from what main has shipped.
+        Tag-DevRelease $fake $head '20261001-215555-dev' '2026-10-01T21:56:40-06:00'
+        Yes ("the stand-in checkout is clean at the build ({0})" -f $head.Substring(0, 12)) ((RunGit $fake status --porcelain).Out -eq '' -and $sideCommit -ne $head)
 
-    $inst = Join-Path $Scratch 'install-dev'
-    $pSite = Join-Path $Scratch 'site-pub'
-    $rel = Join-Path $Scratch 'rel-dev'
-    foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'Launcher', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
-    New-Item -ItemType Directory -Force -Path (Join-Path $pSite 'feed'), (Join-Path $pSite 'feed-dev'), $rel | Out-Null
-    [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
-    Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
-    $pluginHeader = [byte[]]::new(24)
-    [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
-    foreach ($plugin in 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'ours.esp') {
-        [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
-    }
-    Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
-    . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
-    New-GeneratedBodies $inst $fake
-    . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
-    Install-UiFrontFixture (Join-Path $inst 'Game')
-    $node = Get-Command node -ErrorAction SilentlyContinue
-    Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
-    if ($null -eq $node) { Done }
-    $serverJs = Join-Path $Scratch 'server.js'
-    Put $serverJs ("const srv = require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
-                   "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }); " +
-                   "srv.listen(0, '127.0.0.1', function () { console.log('listening on 127.0.0.1:' + srv.address().port); });")
-    $gpsi = New-Object Diagnostics.ProcessStartInfo
-    $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $serverJs + '"'
-    $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
-    $script:gameServer = [Diagnostics.Process]::Start($gpsi)
-    $null = $script:gameServer.StandardError.ReadToEndAsync()
-    $first = $script:gameServer.StandardOutput.ReadLineAsync()
-    $heard = if ($first.Wait(15000)) { [string]$first.Result } else { '' }
-    $pm = [regex]::Match($heard, '^listening on 127\.0\.0\.1:(\d+)$')
-    $port = if ($pm.Success) { [int]$pm.Groups[1].Value } else { 0 }
-    Yes "the stand-in game server is listening ($port)" ($port -gt 0)
-    if (-not $port) { Done }
-    $null = $script:gameServer.StandardOutput.ReadToEndAsync()
-    Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
-    Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
-    # Main has shipped the build; the dev feed has one release on it, the
-    # plugin as it was, and its notes go stale below.
-    $pMain = [pscustomobject][ordered]@{ launcherVersion = '1.2.0'; packs = @(); news = @()
-                                         release = [pscustomobject][ordered]@{ id = '20261005-235125'; channel = 'main'; commit = $head; uncommitted = 0 } }
-    Put (Join-Path $pSite 'feed\version\00000001.json') ($pMain | ConvertTo-Json -Depth 6)
-    # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
-    # notice reads records\client-build.json (#1318), copied above. The dev feed
-    # already has that client runtime, as a real dev feed does, so this run does
-    # not stage the six runtime files the stand-in game folder never had.
-    $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-    Put (Join-Path $pSite 'feed-dev\version\00000001.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
-    Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
-    function Publish([string[]]$extra) {
+        $inst = Join-Path $Scratch 'install-dev'
+        $pSite = Join-Path $Scratch 'site-pub'
+        $rel = Join-Path $Scratch 'rel-dev'
+        foreach ($dd in 'Game\Data', 'Profile\OwnGame', 'Launcher', 'dist') { New-Item -ItemType Directory -Force -Path (Join-Path $inst $dd) | Out-Null }
+        New-Item -ItemType Directory -Force -Path (Join-Path $pSite 'feed'), (Join-Path $pSite 'feed-dev'), $rel | Out-Null
+        [IO.File]::WriteAllLines((Join-Path $inst 'Profile\OwnGame\files.txt'), @('F|V|1024|638000000000000000|Data\collection.esp'))
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.esp') 'the plugin, changed'
+        Put (Join-Path $inst 'Profile\OwnGame\plugins.txt') "*ours.esp`r`n"
+        $pluginHeader = [byte[]]::new(24)
+        [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($pluginHeader, 0)
+        foreach ($plugin in 'Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm', 'ours.esp') {
+            [IO.File]::WriteAllBytes((Join-Path $inst "Game\Data\$plugin"), $pluginHeader)
+        }
+        Put (Join-Path $inst 'Profile\OwnGame\loadorder.txt') "ours.esp`r`n"
+        . (Join-Path $repo 'tests\fixtures\generated-bodies.ps1')
+        New-GeneratedBodies $inst $fake
+        . (Join-Path $repo 'tests\fixtures\ui-front.ps1')
+        Install-UiFrontFixture (Join-Path $inst 'Game')
+        $node = Get-Command node -ErrorAction SilentlyContinue
+        Yes 'node is on PATH, for the stand-in game server' ($null -ne $node)
+        if ($null -eq $node) { Done }
+        $serverJs = Join-Path $Scratch 'server.js'
+        Put $serverJs ("const srv = require('http').createServer(function (q, s) { s.setHeader('Content-Type', 'application/json'); " +
+                       "s.end(JSON.stringify({ mods: ['Skyrim.esm','Update.esm','Dawnguard.esm','HearthFires.esm','Dragonborn.esm','ours.esp'].map(filename => ({ filename, size: 24, crc32: 1 })) })); }); " +
+                       "srv.listen(0, '127.0.0.1', function () { console.log('listening on 127.0.0.1:' + srv.address().port); });")
+        $gpsi = New-Object Diagnostics.ProcessStartInfo
+        $gpsi.FileName = $node.Source; $gpsi.Arguments = '"' + $serverJs + '"'
+        $gpsi.UseShellExecute = $false; $gpsi.CreateNoWindow = $true; $gpsi.RedirectStandardOutput = $true; $gpsi.RedirectStandardError = $true
+        $script:gameServer = [Diagnostics.Process]::Start($gpsi)
+        $null = $script:gameServer.StandardError.ReadToEndAsync()
+        $first = $script:gameServer.StandardOutput.ReadLineAsync()
+        $heard = if ($first.Wait(15000)) { [string]$first.Result } else { '' }
+        $pm = [regex]::Match($heard, '^listening on 127\.0\.0\.1:(\d+)$')
+        $port = if ($pm.Success) { [int]$pm.Groups[1].Value } else { 0 }
+        Yes "the stand-in game server is listening ($port)" ($port -gt 0)
+        if (-not $port) { Done }
+        $null = $script:gameServer.StandardOutput.ReadToEndAsync()
+        Put (Join-Path $inst 'config.json') ('{"ServerAddress":"127.0.0.1","ServerPort":' + ($port - 1) + '}')
+        Put (Join-Path $inst 'Game\Data\Platform\UI\thornswood-ours.bsa') ('x' * 4096)
+        # Main has shipped the build; the dev feed has one release on it, the
+        # plugin as it was, and its notes go stale below.
+        $pMain = [pscustomobject][ordered]@{ launcherVersion = '1.2.0'; packs = @(); news = @()
+                                             release = [pscustomobject][ordered]@{ id = '20261005-235125'; channel = 'main'; commit = $head; uncommitted = 0 } }
+        Put (Join-Path $pSite 'feed\version\00000001.json') ($pMain | ConvertTo-Json -Depth 6)
+        # The stand-in UI front carries a SkyMP file (build.js), so the pack's source
+        # notice reads records\client-build.json (#1318), copied above. The dev feed
+        # already has that client runtime, as a real dev feed does, so this run does
+        # not stage the six runtime files the stand-in game folder never had.
+        $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
+        Put (Join-Path $pSite 'feed-dev\version\00000001.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
+        Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
+        function Publish([string[]]$extra) {
+            $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
+            $argText = (@('-Channel', 'dev', '-Root', (Q $inst), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $inst 'dist')), '-SiteDir', (Q $pSite),
+                          '-SiteUrl', 'http://127.0.0.1:9', '-NoPause') + @($extra)) -join ' '
+            $cmd = "`$global:ThornswoodPublishedRelease = ''; `$global:ThornswoodDevMarks = `$null; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
+                   "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']'; 'MARKS=[' + `$(if (`$global:ThornswoodDevMarks) { [string]`$global:ThornswoodDevMarks.Done } else { '' }) + ']' }; exit `$rc"
+            $c = Child $cmd
+            $p = [regex]::Match($c.Out, 'PUBLISHED=\[([^\]]*)\]'); $mk = [regex]::Match($c.Out, 'MARKS=\[([^\]]*)\]')
+            return [pscustomobject]@{ Code = $c.Code; Out = $c.Out; Published = $(if ($p.Success) { $p.Groups[1].Value } else { '?' }); Marks = $(if ($mk.Success) { $mk.Groups[1].Value } else { '?' }) }
+        }
+        $pDevDir = Join-Path $pSite 'feed-dev'
+        $r = Publish @('-Notes', "'Dev test release`n- one line'")
+        YesR ("a dev release goes out first (exit {0}, {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '-dev$') $r
+        $afterRelease = Read-Json (SiteFeed $pDevDir)
+        Yes '  and on the way it marks its notes against main, as it always did' ($afterRelease.mainVersion -eq '1.2.0' -and @($afterRelease.news).Count -eq 1 -and $afterRelease.news[0].channel -eq '')
+
+        # Stale marks, the shape of 6 Oct: what main has marked DEV, mainVersion behind.
+        function Make-Stale {
+            $d = Read-Json (SiteFeed $pDevDir)
+            $notes = @($d.news) + @(
+                [pscustomobject]@{ date = '10-5-2026 3:25 PM'; title = 'Work main never took'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $sideCommit },
+                [pscustomobject]@{ date = '10-5-2026 1:08 PM'; title = 'Work main has'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $head },
+                [pscustomobject]@{ date = '10-1-2026 9:56 PM'; title = 'Note from before sourceCommit'; body = ''; details = @('x'); channel = 'dev' })
+            foreach ($n in $notes) { $n.channel = 'dev' }
+            $d.news = $notes; $d.mainVersion = '1.1.106'
+            Put-SiteFeed $pDevDir ($d | ConvertTo-Json -Depth 6)
+        }
+        Make-Stale
+        $before = Read-Json (SiteFeed $pDevDir)
+        $packsBefore = @($before.packs).Count
+        $relLines = { @(if (Test-Path -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt')) { Get-Content -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt') | Where-Object { $_ } }).Count }
+        $relBefore = & $relLines
+        $pubBefore = Sha (Join-Path $pSite 'feed-dev\published.json')
+        $r = Publish @('-Notes', "'Dev and main match again`n- the notes main has lose the mark'")
+        YesR ("the same build again is Nothing to do, exit 2, and no release is named (exit {0}, [{1}])" -f $r.Code, $r.Published) (
+            $r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
+        Yes '  it says nothing was released and nothing was added to the news' ($r.Out -match 'Nothing was released, so nothing was added to the news')
+        $after = Read-Json (SiteFeed $pDevDir)
+        Yes ("  the store's dev feed marks DEV only the work main never took ({0} marked)" -f @($after.news | Where-Object { $_.channel -eq 'dev' }).Count) (
+            @($after.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and @($after.news | Where-Object { $_.channel -eq 'dev' })[0].title -eq 'Work main never took')
+        Yes '  and says main is on 1.2.0' ($after.mainVersion -eq '1.2.0')
+        Yes '  no news entry was added and no pack, release or baseline moved' (
+            @($after.news).Count -eq @($before.news).Count -and @($after.packs).Count -eq $packsBefore -and
+            (& $relLines) -eq $relBefore -and [string]$after.release.id -eq [string]$before.release.id -and
+            (Sha (Join-Path $pSite 'feed-dev\published.json')) -eq $pubBefore)
+        Yes ("  and the publisher tells Ship the marks were refreshed ({0})" -f $r.Marks) ($r.Marks -eq 'True')
+
+        Make-Stale
+        $staleSha = Sha (SiteFeed $pDevDir)
+        # -NoPush reads the copy last received rather than the VPS, so receive the
+        # stale one the way the run before a dry run would have.
+        [void](Receive-FeedStore 'dev' $rel -SiteDir $pSite)
+        $r = Publish @('-Notes', "'Dev and main match again`n- a dry run'", '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
+        YesR ("with -NoPush (what Ship -DryRun passes) it exits 2 and sends nothing (exit {0})" -f $r.Code) ($r.Code -eq 2 -and (Sha (SiteFeed $pDevDir)) -eq $staleSha -and
+            $r.Out -match 'this run sends nothing') $r
+
+        # Main sees exit 2 as well when its build matches, and touches no dev feed.
+        Put (Join-Path $pSite 'feed\published.json') ([IO.File]::ReadAllText((Join-Path $pSite 'feed-dev\published.json')))
+        $pMain2 = Read-Json (SiteFeed (Join-Path $pSite 'feed'))
+        $pMain2 | Add-Member -NotePropertyName baseline -NotePropertyValue $afterRelease.baseline -Force
+        Put-SiteFeed (Join-Path $pSite 'feed') ($pMain2 | ConvertTo-Json -Depth 6)
+        $relMain = Join-Path $Scratch 'rel-main'
         $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
-        $argText = (@('-Channel', 'dev', '-Root', (Q $inst), '-ReleaseDir', (Q $rel), '-DistRoot', (Q (Join-Path $inst 'dist')), '-SiteDir', (Q $pSite),
-                      '-SiteUrl', 'http://127.0.0.1:9', '-NoPause') + @($extra)) -join ' '
-        $cmd = "`$global:ThornswoodPublishedRelease = ''; `$global:ThornswoodDevMarks = `$null; `$rc = 1; try { & $(Q $pu) $argText; `$rc = `$LASTEXITCODE } " +
-               "finally { 'PUBLISHED=[' + `$global:ThornswoodPublishedRelease + ']'; 'MARKS=[' + `$(if (`$global:ThornswoodDevMarks) { [string]`$global:ThornswoodDevMarks.Done } else { '' }) + ']' }; exit `$rc"
-        $c = Child $cmd
-        $p = [regex]::Match($c.Out, 'PUBLISHED=\[([^\]]*)\]'); $mk = [regex]::Match($c.Out, 'MARKS=\[([^\]]*)\]')
-        return [pscustomobject]@{ Code = $c.Code; Out = $c.Out; Published = $(if ($p.Success) { $p.Groups[1].Value } else { '?' }); Marks = $(if ($mk.Success) { $mk.Groups[1].Value } else { '?' }) }
+        $c = Child ("`$global:ThornswoodDevMarks = `$null; & " + (Q $pu) + " -Root " + (Q $inst) + " -ReleaseDir " + (Q $relMain) + " -DistRoot " + (Q (Join-Path $inst 'dist')) +
+                    " -SiteDir " + (Q $pSite) + " -SiteUrl 'http://127.0.0.1:9' -NoPause -Notes 'Main again`n- nothing new'; `$rc = `$LASTEXITCODE; 'MARKS=[' + [string](`$null -ne `$global:ThornswoodDevMarks) + ']'; exit `$rc")
+        YesR ("a main publish with nothing new exits 2 too, and leaves the dev feed alone (exit {0})" -f $c.Code) ($c.Code -eq 2 -and $c.Out -match 'MARKS=\[False\]' -and
+            (Sha (SiteFeed $pDevDir)) -eq $staleSha) $c
+    } else {
+        Write-Host 'SKIP  the real Publish-Update.ps1 on the dev channel: a release that signs here makes its catalog with New-FileCatalog, which only Windows has'
     }
-    $pDevDir = Join-Path $pSite 'feed-dev'
-    $r = Publish @('-Notes', "'Dev test release`n- one line'")
-    YesR ("a dev release goes out first (exit {0}, {1})" -f $r.Code, $r.Published) ($r.Code -eq 0 -and $r.Published -match '-dev$') $r
-    $afterRelease = Read-Json (SiteFeed $pDevDir)
-    Yes '  and on the way it marks its notes against main, as it always did' ($afterRelease.mainVersion -eq '1.2.0' -and @($afterRelease.news).Count -eq 1 -and $afterRelease.news[0].channel -eq '')
-
-    # Stale marks, the shape of 6 Oct: what main has marked DEV, mainVersion behind.
-    function Make-Stale {
-        $d = Read-Json (SiteFeed $pDevDir)
-        $notes = @($d.news) + @(
-            [pscustomobject]@{ date = '10-5-2026 3:25 PM'; title = 'Work main never took'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $sideCommit },
-            [pscustomobject]@{ date = '10-5-2026 1:08 PM'; title = 'Work main has'; body = ''; details = @('x'); channel = 'dev'; sourceCommit = $head },
-            [pscustomobject]@{ date = '10-1-2026 9:56 PM'; title = 'Note from before sourceCommit'; body = ''; details = @('x'); channel = 'dev' })
-        foreach ($n in $notes) { $n.channel = 'dev' }
-        $d.news = $notes; $d.mainVersion = '1.1.106'
-        Put-SiteFeed $pDevDir ($d | ConvertTo-Json -Depth 6)
-    }
-    Make-Stale
-    $before = Read-Json (SiteFeed $pDevDir)
-    $packsBefore = @($before.packs).Count
-    $relLines = { @(if (Test-Path -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt')) { Get-Content -LiteralPath (Join-Path $pSite 'feed-dev\releases.txt') | Where-Object { $_ } }).Count }
-    $relBefore = & $relLines
-    $pubBefore = Sha (Join-Path $pSite 'feed-dev\published.json')
-    $r = Publish @('-Notes', "'Dev and main match again`n- the notes main has lose the mark'")
-    YesR ("the same build again is Nothing to do, exit 2, and no release is named (exit {0}, [{1}])" -f $r.Code, $r.Published) (
-        $r.Code -eq 2 -and $r.Out -match 'Nothing to do' -and $r.Published -eq '') $r
-    Yes '  it says nothing was released and nothing was added to the news' ($r.Out -match 'Nothing was released, so nothing was added to the news')
-    $after = Read-Json (SiteFeed $pDevDir)
-    Yes ("  the store's dev feed marks DEV only the work main never took ({0} marked)" -f @($after.news | Where-Object { $_.channel -eq 'dev' }).Count) (
-        @($after.news | Where-Object { $_.channel -eq 'dev' }).Count -eq 1 -and @($after.news | Where-Object { $_.channel -eq 'dev' })[0].title -eq 'Work main never took')
-    Yes '  and says main is on 1.2.0' ($after.mainVersion -eq '1.2.0')
-    Yes '  no news entry was added and no pack, release or baseline moved' (
-        @($after.news).Count -eq @($before.news).Count -and @($after.packs).Count -eq $packsBefore -and
-        (& $relLines) -eq $relBefore -and [string]$after.release.id -eq [string]$before.release.id -and
-        (Sha (Join-Path $pSite 'feed-dev\published.json')) -eq $pubBefore)
-    Yes ("  and the publisher tells Ship the marks were refreshed ({0})" -f $r.Marks) ($r.Marks -eq 'True')
-
-    Make-Stale
-    $staleSha = Sha (SiteFeed $pDevDir)
-    # -NoPush reads the copy last received rather than the VPS, so receive the
-    # stale one the way the run before a dry run would have.
-    [void](Receive-FeedStore 'dev' $rel -SiteDir $pSite)
-    $r = Publish @('-Notes', "'Dev and main match again`n- a dry run'", '-NoUpload', '-NoPush', '-NoClose', '-KeepPacks', '0')
-    YesR ("with -NoPush (what Ship -DryRun passes) it exits 2 and sends nothing (exit {0})" -f $r.Code) ($r.Code -eq 2 -and (Sha (SiteFeed $pDevDir)) -eq $staleSha -and
-        $r.Out -match 'this run sends nothing') $r
-
-    # Main sees exit 2 as well when its build matches, and touches no dev feed.
-    Put (Join-Path $pSite 'feed\published.json') ([IO.File]::ReadAllText((Join-Path $pSite 'feed-dev\published.json')))
-    $pMain2 = Read-Json (SiteFeed (Join-Path $pSite 'feed'))
-    $pMain2 | Add-Member -NotePropertyName baseline -NotePropertyValue $afterRelease.baseline -Force
-    Put-SiteFeed (Join-Path $pSite 'feed') ($pMain2 | ConvertTo-Json -Depth 6)
-    $relMain = Join-Path $Scratch 'rel-main'
-    $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
-    $c = Child ("`$global:ThornswoodDevMarks = `$null; & " + (Q $pu) + " -Root " + (Q $inst) + " -ReleaseDir " + (Q $relMain) + " -DistRoot " + (Q (Join-Path $inst 'dist')) +
-                " -SiteDir " + (Q $pSite) + " -SiteUrl 'http://127.0.0.1:9' -NoPause -Notes 'Main again`n- nothing new'; `$rc = `$LASTEXITCODE; 'MARKS=[' + [string](`$null -ne `$global:ThornswoodDevMarks) + ']'; exit `$rc")
-    YesR ("a main publish with nothing new exits 2 too, and leaves the dev feed alone (exit {0})" -f $c.Code) ($c.Code -eq 2 -and $c.Out -match 'MARKS=\[False\]' -and
-        (Sha (SiteFeed $pDevDir)) -eq $staleSha) $c
 
     # ---- 4. Ship.ps1 from the publisher on -----------------------------------------
     Write-Host ''; Write-Host 'Ship.ps1 after the publisher'
@@ -503,7 +508,9 @@ function Add-ReleaseTag { Add-Content -LiteralPath $env:TS_CALLS -Value 'tag'; [
 $Here = Join-Path $env:TS_STAND 'release'
 $Dev = ($Channel -eq 'dev')
 $NoPause = $true; $NoAnnounce = $false; $AnnounceMinutes = 5; $Package = $false; $ciStub = ''
-$Root = 'C:\nowhere'; $DistRoot = 'C:\nowhere'; $RepoDir = 'C:\nowhere'; $ReleaseDir = $env:TS_REL
+# A folder that is not there, on this machine's own drive: off Windows there
+# is no C:, and Join-Path stops on a drive that is not there.
+$Root = Join-Path $env:TS_REL 'nowhere'; $DistRoot = $Root; $RepoDir = $Root; $ReleaseDir = $env:TS_REL
 $Notes = "A note`n- a line"; $current = '1.2.0'; $target = '1.2.0'; $dryKeep = @()
 $script:InstallerFailed = 0; $script:PostShipFailed = @()
 $global:ThornswoodDiscordResult = ''

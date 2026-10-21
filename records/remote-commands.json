@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  62,
-    "callCount":  267,
+    "scriptCount":  63,
+    "callCount":  270,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2138,6 +2138,33 @@
                       "does":  "runs vps-ssh-scope.ps1, which sets the remote addresses of the port 22 rules",
                       "class":  "admin",
                       "reason":  "firewall change for port 22"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-TimeWait.ps1",
+                      "scope":  "Invoke-Encoded",
+                      "via":  "ssh",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" \"powershell -NoProfile -EncodedCommand $enc\" } 2\u003e\u00261)",
+                      "does":  "reads when the box last started, or the startup tasks, the bot and the ports after the restart",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-TimeWait.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $BoxScript \"${User}@${Vps}:$far\" } 2\u003e\u00261 | Out-Null",
+                      "does":  "uploads vps-time-wait.ps1",
+                      "class":  "admin",
+                      "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
+                  },
+                  {
+                      "script":  "scripts/vps/Set-TimeWait.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "ssh",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" $cmd } 2\u003e\u00261)",
+                      "does":  "runs vps-time-wait.ps1, which sets TcpTimedWaitDelay and, with -Restart, restarts the box",
+                      "class":  "admin",
+                      "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
                   },
                   {
                       "script":  "scripts/vps/Setup-CloudSsh.ps1",

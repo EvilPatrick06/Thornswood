@@ -80,7 +80,7 @@ Yes 'the hosted job is GitHub''s windows-2022, the image with the generator the 
 Yes 'the hosted job is skipped when BUILD_RUNNER is vps or the run asked for the box' ($hosted -match "if: \$\{\{ vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}")
 Yes 'the fallback waits on the hosted job' ($vps -match '(?m)^    needs: engine$')
 Yes 'the fallback runs when the hosted job did not succeed and was not cancelled' ($vps -match "!cancelled\(\) && needs\.engine\.result != 'success' && needs\.engine\.result != 'cancelled'")
-Yes 'the fallback is the VPS runners'' label' ($vps -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps\]$')
+Yes 'the fallback is the VPS runners'' label, on a build runner (#2994)' ($vps -match '(?m)^    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]$')
 Yes 'the VPS label is in the fallback alone' (([regex]::Matches($code, 'thornswood-vps')).Count -eq 1)
 Yes 'the two jobs run one list of steps (the anchor)' ($vps -match '(?m)^    steps: &engine$' -and $hosted -match '(?m)^    steps: \*engine$')
 $tv = [regex]::Match($vps, 'timeout-minutes: (\d+)'); $th = [regex]::Match($hosted, 'timeout-minutes: (\d+)')
