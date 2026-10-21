@@ -76,7 +76,7 @@ try {
 
     $p = Track (Get-CollectionJsonPath $f)
     Yes 'Get-CollectionJsonPath reads the best archive when there is no loose file' ($p -and ([IO.File]::ReadAllText($p) -eq '{"rev":"re-exported, longer"}'))
-    Yes '  and names the archive it came out of' ([string]$script:CollectionJsonFrom -like '*\export\collection-new.zip')
+    Yes '  and names the archive it came out of' ([string]$script:CollectionJsonFrom -like ('*' + [IO.Path]::DirectorySeparatorChar + [IO.Path]::Combine('export', 'collection-new.zip')))
     [IO.File]::WriteAllText((Join-Path $f 'collection.json'), '{"rev":"loose"}')
     $p = Get-CollectionJsonPath $f
     Yes 'a loose collection.json wins over any archive' ($p -eq (Join-Path $f 'collection.json') -and $script:CollectionJsonFrom -eq '')

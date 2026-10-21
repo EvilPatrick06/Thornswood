@@ -168,8 +168,10 @@ Yes 'scripts\README.md lists it as RETIRED' ($row.Count -eq 1 -and $row[0] -matc
 # Through Check-CoveredBodies.ps1, which reads the mesh's shape names. The
 # byte search this used to do was wrong both ways: "Bra" is in malebody_1.nif
 # by chance, and bone names carry the anatomy words on covered bodies too.
-$live = Join-Path $GameRoot 'Game\Data\meshes\actors\character\character assets\femalebody_1.nif'
-if (Test-Path -LiteralPath $live) {
+# Join-Path stops on a drive this machine does not have (C: off Windows),
+# so whether the folder is here at all is asked first.
+$live = $(if (Test-Path -LiteralPath $GameRoot) { Join-Path $GameRoot 'Game\Data\meshes\actors\character\character assets\femalebody_1.nif' } else { '' })
+if ($live -and (Test-Path -LiteralPath $live)) {
     $check = Join-Path $Repo 'scripts\mods\Check-CoveredBodies.ps1'
     $out = & (Get-Process -Id $PID).Path -NoProfile -ExecutionPolicy Bypass -File $check `
                -Game (Join-Path $GameRoot 'Game') 2>&1 | Out-String

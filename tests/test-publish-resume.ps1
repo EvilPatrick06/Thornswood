@@ -14,6 +14,7 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $here = Split-Path -Parent $here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $src = Get-Content -LiteralPath (Join-Path $here 'scripts\release\Publish-Update.ps1') -Raw
 $a = $src.IndexOf('# ==== thornswood publish resume ====')
@@ -112,10 +113,16 @@ try {
     # finish a release no note named, and a note never removed was left to
     # name a release already out. Each now hands back what it could not do.
     Check 'a note written answers nothing to say' (Write-Pending $state '20260928-0102' 'gh exited with 1') ''
-    $held = [IO.File]::Open($script:PendingFile, 'Open', 'Read', 'None')
-    try { $why = Clear-Pending $state } finally { $held.Dispose() }
-    Check 'a note that cannot be removed is said, naming it' ([bool]($why -match 'could not be removed' -and $why.Contains($script:PendingFile))) 'True'
-    Check '  and it is still there' (Test-Path -LiteralPath $script:PendingFile) 'True'
+    if ($OnWindows) {
+        $held = [IO.File]::Open($script:PendingFile, 'Open', 'Read', 'None')
+        try { $why = Clear-Pending $state } finally { $held.Dispose() }
+        Check 'a note that cannot be removed is said, naming it' ([bool]($why -match 'could not be removed' -and $why.Contains($script:PendingFile))) 'True'
+        Check '  and it is still there' (Test-Path -LiteralPath $script:PendingFile) 'True'
+    } else {
+        # A file held open without share-delete is a Windows share mode; Linux
+        # removes a file whoever holds it open.
+        Write-Host 'SKIP  a note that cannot be removed: holding it open stops a remove only on Windows'
+    }
     Check 'a note removed answers nothing to say' (Clear-Pending $state) ''
     $blocker = Join-Path $work 'a-file-not-a-folder'
     [IO.File]::WriteAllText($blocker, 'x')

@@ -504,6 +504,18 @@ jobs:
           # to writing nothing there. It ran only in the nightly, and its
           # fixture wrote Windows paths, so off Windows it failed 22 checks
           # and nothing said so. Under a second.
+          # Issue #2970: tests\test-nightly-harnesses.ps1 runs
+          # Nightly-Harnesses.ps1 against stand-in harnesses (the shares, each
+          # kind of failure, the budget, and -Only, which harnesses.yml uses to
+          # run named harnesses on demand from a cloud session) and reads
+          # nightly.yml and harnesses.yml. It ran only in the nightly, so a
+          # change to the runner the nightly itself depends on went out with no
+          # run. About twenty seconds.
+          # Issue #2970: tests\test-capture-443.ps1 holds the #2946 packet
+          # capture (scripts\vps\vps-capture-443.ps1, sent to the box by
+          # Remote.ps1 in place of lines typed there) to parsing under 5.1,
+          # one action at a time, SYN and RST on 443 only, and ending on a
+          # task of its own so no ssh session waits it out. A few seconds.
           # Issue #2961: tests\test-2961-voice-port-once.ps1 holds
           # Install-Voice.ps1's outside check to one try that says what it
           # answered, and to "not known" rather than "correctly shut" from
@@ -516,17 +528,37 @@ jobs:
           # harness on its first lines off Windows, and asking Get-Command for
           # powershell.exe let a Windows machine without it skip or run pwsh
           # instead. A few seconds.
+          # Issue #2821: eighteen harnesses compiled launcher and setup code
+          # with Add-Type or a CSharpCodeProvider, C# 5 under Windows
+          # PowerShell and .NET 8's libraries under pwsh, never what the build
+          # compiles; they call Add-LauncherType (tests\Launcher-Csc.ps1) now
+          # and run here, so the build's compiler proves them on every pull
+          # request. tests\test-2821-launcher-compiler.ps1 fails on a harness
+          # that compiles launcher code any other way. Seconds each.
           # Issue #2946: tests\test-time-wait.ps1 runs vps-time-wait.ps1 on
           # stand-ins for the registry, the UDP ports and the restart, with
           # real server folders, and Set-TimeWait.ps1 against a fake ssh. The
           # box restarts only while nobody is on either server, and never
           # while a count cannot be read. A few seconds.
+          # Issue #2754: tests\test-2754-revision-layout.ps1 drives
+          # Install-NexusRevision.ps1, the collection layout without Vortex,
+          # against the same stand-in with a made-up collection: the Steam and
+          # Vortex folder refusals, a kind it does not do, the md5 refusal, the
+          # cache, and with 7-Zip the layout and its record. Since #2969 it
+          # also holds what Windows does with names (letter case, a \ inside
+          # a zip entry), and Compare-NexusLayout.ps1 against a record and a
+          # made-up Vortex deployment; off Windows it runs record-only. Under
+          # a minute.
           # Issue #2935: tests\test-check-serena.ps1 drives
           # scripts\dev\Check-Serena.ps1 against a stand-in MCP server: a
           # quick answer, a slow one, one that never answers, and no process
           # left behind. About ten seconds.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-check-serena.ps1',
+                 'test-2821-launcher-compiler.ps1', 'test-feed-notice.ps1', 'test-prior-acceptance.ps1', 'test-setup-own-folder.ps1',
+                 'test-skyrim-pin.ps1', 'test-mustcopy-distribution.ps1', 'test-browser-args.ps1', 'test-installer-own-payload.ps1',
+                 'test-load-order.ps1', 'test-log-upload.ps1', 'test-no-bethesda-files.ps1', 'test-payload-hash.ps1',
+                 'test-setup-in-window.ps1', 'test-voice-ticket.ps1', 'test-swallow.ps1', 'test-setup-agreements.ps1', 'test-downgrade-asks.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
@@ -821,9 +853,11 @@ jobs:
                  'test-watch-outside.ps1',
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
+                 'test-nightly-harnesses.ps1', 'test-capture-443.ps1',
                  'test-prove-secret.ps1',
                  'test-time-wait.ps1',
-                 'test-mod-menus.js'
+                 'test-mod-menus.js',
+                 'test-2754-revision-layout.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

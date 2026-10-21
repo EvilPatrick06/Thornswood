@@ -75,14 +75,17 @@ $s   = $raw | ConvertFrom-Json
 $lo  = @($s.loadOrder)
 
 $already = $false
-foreach ($p in $lo) { if ([IO.Path]::GetFileName($p) -ieq 'MCMHelper.esp') { $already = $true } }
+# A load order entry is a box path; its file name is taken on either separator,
+# since GetFileName off Windows does not split on \ (#2989).
+function Leaf($p) { @(([string]$p) -split '[\\/]')[-1] }
+foreach ($p in $lo) { if ((Leaf $p) -ieq 'MCMHelper.esp') { $already = $true } }
 
 if ($already) {
   Note 'MCMHelper.esp is already in the server list'
 } else {
   $at = -1
   for ($i = 0; $i -lt $lo.Count; $i++) {
-    if ([IO.Path]::GetFileName($lo[$i]) -ieq $After) { $at = $i; break }
+    if ((Leaf $lo[$i]) -ieq $After) { $at = $i; break }
   }
   # Stopping here is the point. Putting MCMHelper.esp at a guessed position
   # shifts every entry after it, and the client's check calls that "Expect

@@ -17,7 +17,9 @@
 
   This lifts FetchToken and JsonEscape out of the shipped Voice.cs by name and
   brace match, the same way test-dev-version.ps1 lifts the version block out
-  of Ship.ps1, compiles them against a stub Discord and Config, and points
+  of Ship.ps1, compiles them against a stub Discord and Config with the
+  compiler the build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821;
+  off Windows it says SKIP, that compiler is only there), and points
   them at a socket on loopback that records every byte it is sent. So the
   question "did the ticket cross the wire" is answered by the wire.
 
@@ -34,6 +36,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $VoicePath) { $VoicePath = Join-Path $Here 'launcher\app\Voice.cs' }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -207,12 +210,14 @@ namespace NS
 '@
 $cs = $cs.Replace('namespace NS', 'namespace ' + $ns).Replace('FETCH', $fetch).Replace('ESCAPE', $escape)
 
-# Quiet about warnings: newer .NET calls WebRequest obsolete, and the
-# launcher builds against the .NET Framework, where it is not.
+if (-not $OnWindows) {
+    Write-Host 'SKIP  FetchToken, compiled and pointed at the wire: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Done
+}
 $compiled = $true
-try { Add-Type -TypeDefinition $cs -Language CSharp -IgnoreWarnings -WarningAction SilentlyContinue }
+try { $null = Add-LauncherType -Source $cs }
 catch { $compiled = $false; Write-Host $_.Exception.Message }
-Yes 'FetchToken compiles against the stubs' $compiled
+Yes 'FetchToken compiles against the stubs, with the compiler the build runs' $compiled
 if (-not $compiled) { Done }
 
 $VoiceT = [type]($ns + '.Voice')

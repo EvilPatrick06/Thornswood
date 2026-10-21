@@ -21,6 +21,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $script = Join-Path $Repo 'scripts\deploy\Install-Runner.ps1'
 $ps = (Get-Process -Id $PID).Path
 
@@ -50,7 +51,7 @@ try {
         return @{ Code = $rc; Said = ($said -join "`n"); Text = $text }
     }
 
-    $comp = $env:COMPUTERNAME.ToLower()
+    $comp = [Environment]::MachineName.ToLower()
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
@@ -97,24 +98,28 @@ try {
     $lib = [regex]::Match($src, "(?s)\`$lockLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the lock library is where it was' ($lib -match 'function Close-RunnerAccount')
     . ([scriptblock]::Create($lib))
-    $parent = Join-Path $work 'c'
-    $names = 'Thornswood-Server', 'ThornswoodTemps&Worktrees', 'Thornswood Vault', 'Thornswood-RunnerPR', 'Other'
-    foreach ($n in $names) { New-Item -ItemType Directory -Path (Join-Path $parent $n) | Out-Null }
-    $extra = Join-Path $work 'elsewhere'; New-Item -ItemType Directory -Path $extra | Out-Null
-    $own = Join-Path $parent 'Thornswood-RunnerPR'
-    $said = @(Close-RunnerAccount '*S-1-5-7' $own $parent 'Thornswood*' @($extra, (Join-Path $work 'not-there')))
-    function Denied([string]$p) { return [bool]@((Get-Acl -LiteralPath $p).Access | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-7' }).Count }
-    Yes 'off the box it shuts the account out of Thornswood-Server' (Denied (Join-Path $parent 'Thornswood-Server'))
-    Yes '  and out of ThornswoodTemps&Worktrees, which has no hyphen' (Denied (Join-Path $parent 'ThornswoodTemps&Worktrees'))
-    Yes '  and out of Thornswood Vault' (Denied (Join-Path $parent 'Thornswood Vault'))
-    Yes '  and out of an -AlsoDeny folder' (Denied $extra)
-    Yes '  but not its own folder' (-not (Denied $own))
-    Yes '  and not a folder that is not Thornswood''s' (-not (Denied (Join-Path $parent 'Other')))
-    Yes '  an -AlsoDeny folder that is not there is passed over' (-not ($said -join ' ' -match 'not-there'))
-    $parent2 = Join-Path $work 'c2'
-    foreach ($n in 'Thornswood-Server', 'ThornswoodTemps') { New-Item -ItemType Directory -Path (Join-Path $parent2 $n) | Out-Null }
-    $null = Close-RunnerAccount '*S-1-5-7' (Join-Path $parent2 'none') $parent2
-    Yes 'the VPS default filter is unchanged: Thornswood-* only' ((Denied (Join-Path $parent2 'Thornswood-Server')) -and -not (Denied (Join-Path $parent2 'ThornswoodTemps')))
+    if ($OnWindows) {
+        $parent = Join-Path $work 'c'
+        $names = 'Thornswood-Server', 'ThornswoodTemps&Worktrees', 'Thornswood Vault', 'Thornswood-RunnerPR', 'Other'
+        foreach ($n in $names) { New-Item -ItemType Directory -Path (Join-Path $parent $n) | Out-Null }
+        $extra = Join-Path $work 'elsewhere'; New-Item -ItemType Directory -Path $extra | Out-Null
+        $own = Join-Path $parent 'Thornswood-RunnerPR'
+        $said = @(Close-RunnerAccount '*S-1-5-7' $own $parent 'Thornswood*' @($extra, (Join-Path $work 'not-there')))
+        function Denied([string]$p) { return [bool]@((Get-Acl -LiteralPath $p).Access | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-7' }).Count }
+        Yes 'off the box it shuts the account out of Thornswood-Server' (Denied (Join-Path $parent 'Thornswood-Server'))
+        Yes '  and out of ThornswoodTemps&Worktrees, which has no hyphen' (Denied (Join-Path $parent 'ThornswoodTemps&Worktrees'))
+        Yes '  and out of Thornswood Vault' (Denied (Join-Path $parent 'Thornswood Vault'))
+        Yes '  and out of an -AlsoDeny folder' (Denied $extra)
+        Yes '  but not its own folder' (-not (Denied $own))
+        Yes '  and not a folder that is not Thornswood''s' (-not (Denied (Join-Path $parent 'Other')))
+        Yes '  an -AlsoDeny folder that is not there is passed over' (-not ($said -join ' ' -match 'not-there'))
+        $parent2 = Join-Path $work 'c2'
+        foreach ($n in 'Thornswood-Server', 'ThornswoodTemps') { New-Item -ItemType Directory -Path (Join-Path $parent2 $n) | Out-Null }
+        $null = Close-RunnerAccount '*S-1-5-7' (Join-Path $parent2 'none') $parent2
+        Yes 'the VPS default filter is unchanged: Thornswood-* only' ((Denied (Join-Path $parent2 'Thornswood-Server')) -and -not (Denied (Join-Path $parent2 'ThornswoodTemps')))
+    } else {
+        Write-Host 'SKIP  Close-RunnerAccount on scratch folders: it denies with icacls and reads the deny back with Get-Acl, which only Windows has'
+    }
 
     # ---- the guards in the dry run (WHAT A PULL REQUEST JOB MAY REACH) -----
     $r = Dry @('-OffBox')
@@ -211,13 +216,17 @@ try {
     $want = @($dv, (Join-Path $u 'alice'), (Join-Path $u 'Public'), (Join-Path $pd 'ssh'), (Join-Path $pd 'Docker'))
     Yes 'the read list: other drives, other profiles and Public, ProgramData ssh and Docker' ((@($deny | Sort-Object) -join '|') -eq (@($want | Sort-Object) -join '|'))
     Yes '  not its own profile, not Default, not the rest of ProgramData' (-not ($deny -match 'thornswood-pr|Default|chocolatey'))
-    $said = @(Close-RunnerReads '*S-1-5-7' $deny)
-    Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))
-    Yes '  and nothing else' (-not (Denied (Join-Path $u 'thornswood-pr')) -and -not (Denied (Join-Path $pd 'chocolatey')))
-    $kid = Join-Path $u 'alice\Documents'; New-Item -ItemType Directory -Path $kid | Out-Null
-    Yes '  the deny reaches what is inside' (Denied $kid)
-    $null = Open-RunnerReads '*S-1-5-7' $deny
-    Yes 'Open-RunnerReads takes every one off again' (@($deny | Where-Object { Denied $_ }).Count -eq 0 -and -not (Denied $kid))
+    if ($OnWindows) {
+        $said = @(Close-RunnerReads '*S-1-5-7' $deny)
+        Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))
+        Yes '  and nothing else' (-not (Denied (Join-Path $u 'thornswood-pr')) -and -not (Denied (Join-Path $pd 'chocolatey')))
+        $kid = Join-Path $u 'alice\Documents'; New-Item -ItemType Directory -Path $kid | Out-Null
+        Yes '  the deny reaches what is inside' (Denied $kid)
+        $null = Open-RunnerReads '*S-1-5-7' $deny
+        Yes 'Open-RunnerReads takes every one off again' (@($deny | Where-Object { Denied $_ }).Count -eq 0 -and -not (Denied $kid))
+    } else {
+        Write-Host 'SKIP  Close-RunnerReads and Open-RunnerReads on scratch folders: they deny with icacls and are read back with Get-Acl, which only Windows has'
+    }
 } finally {
     $env:PATH = $oldPath
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
