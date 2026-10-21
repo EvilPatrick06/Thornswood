@@ -55,6 +55,10 @@ $Box = P 'scripts', 'vps', 'vps-web-firewall.ps1'
 $Driver = P 'scripts', 'vps', 'Set-WebFirewall.ps1'
 $Outside = P 'scripts', 'vps', 'Watch-Outside.ps1'
 
+. (Join-Path $Here 'Windows.ps1')
+. (P 'scripts', 'vps', 'Vps.ps1')
+# The box's own address, from vps.json through Vps.ps1, never written here.
+$VpsAddr = Get-ThornswoodVpsAddress
 $script:pass = 0
 $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -75,7 +79,7 @@ Yes ('cloudflare-ranges.txt reads whole: ' + $ranges.Count + ' ranges') ($ranges
 Yes '  IPv4 and IPv6 both' (@($ranges | Where-Object { $_ -like '*:*' }).Count -gt 0 -and @($ranges | Where-Object { $_ -notlike '*:*' }).Count -gt 0)
 Yes '  and none twice' (@($ranges | Sort-Object -Unique).Count -eq $ranges.Count)
 $cf = [IO.File]::ReadAllText($Caddyfile)
-$tp = [regex]::Match($cf, '(?m)^\s*trusted_proxies static ([^\r\n]+)$')
+$tp = [regex]::Match($cf, '(?m)^[ \t]*trusted_proxies static ([^\r\n]+)')
 $trusted = @($tp.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
 Yes 'the Caddyfile trusts a static list' ($tp.Success)
 Yes '  and it is cloudflare-ranges.txt, range for range, in its order' (($trusted -join ' ') -eq ($ranges -join ' '))
@@ -114,7 +118,7 @@ try {
     $cases = [ordered]@{
         '173.245.48.1' = $true; '173.245.63.255' = $true; '173.245.64.0' = $false
         '104.21.5.10' = $true; '104.27.255.255' = $true; '104.28.0.1' = $false
-        '172.67.130.5' = $true; '192.135.112.23' = $false; '203.0.113.5' = $false
+        '172.67.130.5' = $true; $VpsAddr = $false; '203.0.113.5' = $false
         '2606:4700::1' = $true; '2a06:98c7:ffff::1' = $true; '2a06:98c8::1' = $false; '2001:db8::1' = $false
         '::ffff:104.16.0.1' = $true; 'not an address' = $false
     }
@@ -123,7 +127,7 @@ try {
         $got = @((Test-ThornswoodInRanges $a $ranges), (& $wo $a $ranges), (& $bx $a $ranges))
         Yes ("{0}: {1} by all three" -f $a, $(if ($want) { 'inside' } else { 'outside' })) (@($got | Where-Object { $_ -ne $want }).Count -eq 0)
     }
-    Yes 'the VPS itself is outside, so a record pointing straight at it never passes for Cloudflare' (-not (Test-ThornswoodInRanges '192.135.112.23' $ranges))
+    Yes 'the VPS itself is outside, so a record pointing straight at it never passes for Cloudflare' (-not (Test-ThornswoodInRanges $VpsAddr $ranges))
 
     # ---- 4. the box half ---------------------------------------------------------
     Write-Host ''
@@ -139,8 +143,8 @@ try {
         $null = [System.Management.Automation.Language.Parser]::ParseInput($t, [ref]$null, [ref]$e)
         Yes ((Split-Path -Leaf $f) + ' parses and is plain ASCII') ((-not $e -or $e.Count -eq 0) -and -not ($t.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
     }
-    if ($IsWindows -or $env:OS -eq 'Windows_NT') {
-        $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    if ($OnWindows) {
+        $ps51 = Get-WindowsPowerShell
         $chk = "`$e = `$null; `$null = [System.Management.Automation.Language.Parser]::ParseFile('" + $Box.Replace("'", "''") + "', [ref]`$null, [ref]`$e); if (`$e) { 'ERR ' + `$e[0].Message } else { 'OK' }"
         $said = (& $ps51 -NoProfile -NonInteractive -Command $chk) -join ' '
         Yes ('  and Windows PowerShell 5.1, which runs it on the box, parses it: ' + $said) ($said -eq 'OK')
@@ -229,9 +233,9 @@ function Resolve-Name([string]$Name, [string]$Server) {
     Yes '  and no ALSO: the Store apps'' package rules, the game''s UDP port and 3000 let nothing in on 443 for Caddy' (-not (Has $r.Lines '^ALSO '))
 
     New-Fake
-    $global:Fake.dns['www.thornswood.net'] = @('192.135.112.23')
+    $global:Fake.dns['www.thornswood.net'] = @($VpsAddr)
     $r = Invoke-BoxHere ("-Apply -Ranges '" + $list + "'")
-    Yes '-Apply while www points straight at the box: STOP, exit 1, nothing changed' ($r.Code -eq 1 -and (Has $r.Lines '^NAME www\.thornswood\.net from 8\.8\.8\.8 is 192\.135\.112\.23, OUTSIDE the ranges$') -and
+    Yes '-Apply while www points straight at the box: STOP, exit 1, nothing changed' ($r.Code -eq 1 -and (Has $r.Lines ('^NAME www\.thornswood\.net from 8\.8\.8\.8 is ' + [regex]::Escape($VpsAddr) + ', OUTSIDE the ranges$')) -and
         (Has $r.Lines "^STOP thornswood\.net does not point only into the ranges for everybody .*Turn on Cloudflare's proxy for both names, wait five minutes") -and $global:Fake.log.Count -eq 0)
 
     New-Fake
@@ -409,7 +413,7 @@ function Resolve-Name([string]$Name, [string]$Server) {
     Yes 'a plain run: exit 0, both rules take only the list' ($r.Code -eq 0 -and $global:H.Given -eq ('-Apply ' + $wantList) -and (Remote 'Thornswood Web 443') -eq $sorted -and (Remote 'Thornswood Web 80') -eq $sorted)
 
     Fresh
-    $global:Fake.dns['thornswood.net'] = @('192.135.112.23')
+    $global:Fake.dns['thornswood.net'] = @($VpsAddr)
     $r = Invoke-Driver @{}
     Yes 'a plain run while the name points straight at the box: exit 1, nothing changed' ($r.Code -eq 1 -and $r.Text -match 'The box stopped' -and $global:Fake.log.Count -eq 0)
 
