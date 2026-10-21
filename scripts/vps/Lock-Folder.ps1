@@ -4,9 +4,11 @@
   The one place the creators of the VPS service folders get their lock from
   (follow-up to issues #1183 and #1691): Watch-Services.ps1 and Watch-Load.ps1
   for C:\Thornswood-Watch, Setup-Domain.ps1 for C:\Thornswood-Caddy, and
-  Artifact.ps1 and Swap.ps1 for C:\Thornswood-Deploys. Dot-sourced on this
-  machine; the far side gets the function as text inside the script that is
-  sent, since those scripts run ON the VPS through Send-Script.ps1.
+  Artifact.ps1 and Swap.ps1 for C:\Thornswood-Deploys, and Grant-BoxAccess.ps1
+  for the copies it keeps in C:\ProgramData\ssh\box-access-before (#3034).
+  Dot-sourced on this machine; the far side gets the function as text inside
+  the script that is sent, since those scripts run ON the VPS through
+  Send-Script.ps1.
 
   The rules are the ones Lock-VpsFolders.ps1 applies, so a folder made from now
   on starts the way Lock-VpsFolders leaves an old one:

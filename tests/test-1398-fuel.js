@@ -4,7 +4,7 @@
 // the smelter the grade of its metal, and the skyforge one grade poorer. A
 // drum, a flute and a lute are not asked for a tool handle; a war axe, a
 // battleaxe, a warhammer and a mace still are. Grand Chef's batch comes out
-// twice, a Master Weaver's garment ignores 4 degrees of exposure, and a
+// twice (named before the engine gives it, #2906), a Master Weaver's garment ignores 4 degrees of exposure, and a
 // Master Carver's fire is 48 at your feet. Temper rows stay unscored and
 // Mastercraft is not a temper bonus.
 //
@@ -155,7 +155,8 @@ const pieces = {
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
         'function holdsPerk(actorId, key)', 'function wovenMark(actorId)', 'function markWoven(actorId, outDesc, name, n)',
-        'function masterCraft(actorId, row, count)', 'function unfitToMake(actorId, workbenchId)'].map(cut),
+        'function masterCraft(actorId, row, count)', 'function cookedOutput(actorId, row)',
+        'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
@@ -165,7 +166,9 @@ yes('the craft pieces are all in the gamemode',
 /*
   The rig: one pack per person, every descriptor its own number, a recipe id
   that is the descriptor's number, and the timers caught so a test can run
-  them once the craft has landed.
+  them once the craft has landed. craftOutput is the engine's property inside
+  onCraft (fork #92, #2906): what the craft gives, which the handler may name,
+  and what lands is what it names.
 */
 function craftRig(state) {
   const ids = {}, descs = {};
@@ -175,11 +178,19 @@ function craftRig(state) {
   const timers = [];
   const said = [];
   const credited = [];
+  let output = null;
   const mp = {
     getIdFromDesc: function (d) { return id(d); },
     getDescFromId: function (n) { return descs[n] || ''; },
-    get: function (a, key) { if (key === 'inventory') { return { entries: (packs[a] || []).map(function (e) { return Object.assign({}, e); }) }; } return undefined; },
-    set: function (a, key, v) { if (key === 'inventory') { packs[a] = v.entries.map(function (e) { return Object.assign({}, e); }); } },
+    get: function (a, key) {
+      if (key === 'inventory') { return { entries: (packs[a] || []).map(function (e) { return Object.assign({}, e); }) }; }
+      if (key === 'craftOutput') { return output ? Object.assign({}, output) : undefined; }
+      return undefined;
+    },
+    set: function (a, key, v) {
+      if (key === 'inventory') { packs[a] = v.entries.map(function (e) { return Object.assign({}, e); }); }
+      if (key === 'craftOutput' && output) { output = Object.assign({}, output, v); }
+    },
     onCraft: null
   };
   const g = {
@@ -205,18 +216,24 @@ function craftRig(state) {
       return (packs[A] || []).filter(function (e) { return e.baseId === id(desc); }).reduce(function (t, e) { return t + e.count; }, 0);
     },
     entries: function (desc) { return (packs[A] || []).filter(function (e) { return e.baseId === id(desc); }); },
-    // What the engine does after an allowed craft: the output lands, plain.
+    // What the engine does after an allowed craft: the output lands, what
+    // craftOutput names, the recipe's own unless the handler named another.
     craft: function (recipe, made) {
       const row = RECIPES[recipe] || KEPT[recipe];
+      output = { baseId: id(row.out), count: made || 1 };
       const r = onCraft(A, id(row.out), made || 1, id(recipe), 0);
-      if (r !== false) { (packs[A] = packs[A] || []).push({ baseId: id(row.out), count: made || 1 }); }
+      if (r !== false) { (packs[A] = packs[A] || []).push({ baseId: output.baseId, count: output.count }); }
+      output = null;
       return r;
     },
     // The gamemode said yes and then the engine's RemoveItems threw, because
     // the server did not hold what the client said went in: nothing lands.
     craftThatFails: function (recipe, made) {
       const row = RECIPES[recipe] || KEPT[recipe];
-      return onCraft(A, id(row.out), made || 1, id(recipe), 0);
+      output = { baseId: id(row.out), count: made || 1 };
+      const r = onCraft(A, id(row.out), made || 1, id(recipe), 0);
+      output = null;
+      return r;
     },
     later: function () { while (timers.length) { timers.shift()(); } }
   };
@@ -309,13 +326,12 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     const chef = person('cook', row.half.toLowerCase(), 'master');
     const r = craftRig(chef);
     r.craft(cookRow, 1);
-    yes('a Grand Chef\'s batch is in the pack once before the timer', r.count(row.out) === 1);
+    yes('a Grand Chef\'s batch lands as two, named before the engine gives it (' + row.name + ')', r.count(row.out) === 2);
     r.later();
-    yes('and twice after it: two instead of one (' + row.name + ')', r.count(row.out) === 2);
+    yes('and nothing is added after it', r.count(row.out) === 2);
     yes('and it is still one piece of work', r.credited.length === 1);
     const two = craftRig(chef);
     two.craft(cookRow, 2);
-    two.later();
     yes('a batch of two comes out as four', two.count(row.out) === 4);
     const novice = craftRig(person('cook', row.half.toLowerCase(), 'expert'));
     novice.craft(cookRow, 1);
@@ -335,7 +351,7 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     behind.craftThatFails(cookRow, 1);
     behind.later();
     yes('and the food already in the pack is not doubled either', behind.count(row.out) === 3);
-    yes('the timer that hands it over waits for nothing but the end of the engine\'s call (0)',
+    yes('the timer that is left (the weaver\'s mark) waits for nothing but the end of the engine\'s call (0)',
         /^const MASTER_CRAFT_AFTER_MS = 0;$/.test(pieces.after));
   });
 

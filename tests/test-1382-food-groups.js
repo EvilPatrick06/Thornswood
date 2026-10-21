@@ -37,8 +37,16 @@ try { file = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'food-gr
 
 yes('the group table is in the gamemode', !!GROUPS && !!GROUPS.items);
 yes('and it is game/data/food-groups.json exactly', !!GROUPS && !!file && JSON.stringify(GROUPS) === JSON.stringify(file));
+// The approved list is the records the game came with; a fine dish (#2906) is
+// counted on its own, in its plain dish's group.
+const FINE = (GROUPS && GROUPS.quality && GROUPS.quality.fine) || {};
+const FINE_IDS = new Set(Object.values(FINE));
 const count = {};
-if (GROUPS) { for (const d in GROUPS.items) { count[GROUPS.items[d]] = (count[GROUPS.items[d]] || 0) + 1; } }
+if (GROUPS) { for (const d in GROUPS.items) { if (!FINE_IDS.has(d)) { count[GROUPS.items[d]] = (count[GROUPS.items[d]] || 0) + 1; } } }
+yes('every fine dish is in its plain dish\'s group (#2906)', FINE_IDS.size === 63 &&
+  Object.keys(FINE).every(function (plain) { return !!GROUPS.items[plain] && GROUPS.items[FINE[plain]] === GROUPS.items[plain]; }));
+yes('and the burnt meal is in no group: burnt is a quality, not a group', !!GROUPS.quality && !!GROUPS.quality.burnt &&
+  !GROUPS.items[GROUPS.quality.burnt]);
 yes('the approved counts: raw 19, cooked 43, soup 30, ingredient 14, prepared 13, drugs 6',
   count.raw === 19 && count.cooked === 43 && count.soup === 30 && count.ingredient === 14 && count.prepared === 13 && count.drugs === 6);
 yes('six drinks are ale, two are drink, one is a potion', count.ale === 6 && count.drink === 2 && count.potion === 1);

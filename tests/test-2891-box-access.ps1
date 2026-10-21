@@ -18,8 +18,12 @@
        back before it changes anything; a grant replaces that name's line and
        any line holding the same key under another comment, and writes the
        digest; a removal takes that name's alone; every other key and token
-       stays; the put back puts both back as they were; an armed put back
-       from an earlier run, or no bridge, stops it with nothing changed.
+       stays; the put back puts both back as they were and removes its
+       copy; an armed put back from an earlier run, or no bridge, stops it
+       with nothing changed. The copy's folder is locked to SYSTEM and
+       Administrators while it is empty, before anything goes in it (#3034):
+       on Windows the real lock runs and its rules are read back, elsewhere
+       a stand-in says when it was called.
     3. A key line is found in a pasted Discord message, a code block and a
        line a narrow window wrapped, and nothing is found in what is not one.
     4. The digest is the SHA-256 bridge.js computes, in hex, and a token is
@@ -62,6 +66,8 @@ $setupPath = P 'scripts', 'vps', 'Setup-SshKey.ps1'
 $grant = Text $grantPath
 $setup = Text $setupPath
 . (P 'scripts', 'vps', 'Vps.ps1')
+. (P 'scripts', 'vps', 'Lock-Folder.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 # ---- 1. they parse ----------------------------------------------------------
 $e = $null
@@ -114,11 +120,20 @@ function Register-ScheduledTask { param($TaskName, $Action, $Trigger, $Principal
 function Unregister-ScheduledTask { param($TaskName, $Confirm, $EA, $ErrorAction) $global:Armed = $false }
 function icacls { }
 '@
+# Off Windows there is no ACL to set: the lock the box script carries is
+# renamed out of the way and this one says when it was called.
+if (-not $OnWindows) {
+    $stubs += @'
+
+function Lock-ThornswoodFolder { param([string]$Path, [switch]$Only) $global:Locked = @{ Path = $Path; Only = [bool]$Only; Empty = (@(Get-ChildItem -LiteralPath $Path -Force).Count -eq 0) } }
+'@
+}
 function OnScratch([string]$script) {
     $s = $script.Replace('C:\ProgramData\ssh\administrators_authorized_keys', $keys).Replace('C:\ProgramData\ssh\box-access-before', $save)
     # On the box a STOP ends powershell.exe; here, run in this one, it ends
     # the script block, so the harness goes on.
     $s = $s.Replace('; exit 1 }', '; return }')
+    if (-not $OnWindows) { $s = $s.Replace('function Lock-ThornswoodFolder {', 'function Lock-ThornswoodFolder-OnTheBox {') }
     return ($stubs + "`n" + $s)
 }
 function RunBox([string]$script) {
@@ -148,6 +163,15 @@ try {
     $after = Lines
     Yes 'a grant: ARMED, then CHANGED, then DONE' (($out -join '|') -match '^ARMED .*\|CHANGED djinn: 1 key line\(s\) taken off.*\|CHANGED now 4 key line\(s\), and tokens for: cloud, djinn\|DONE$')
     Yes '  the put back is armed before anything changed' ($global:Armed -and (Test-Path -LiteralPath (Join-Path $save 'keys')))
+    if ($OnWindows) {
+        $sacl = Get-Acl -LiteralPath $save
+        $open = @($sacl.Access | Where-Object { @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0') -contains $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value })
+        $kacl = Get-Acl -LiteralPath (Join-Path $save 'keys')
+        $kopen = @($kacl.Access | Where-Object { @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-3-0') -contains $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value })
+        Yes '  the copy''s folder takes nothing from above and gives no broad group a rule, nor does the key file copied into it (#3034)' ($sacl.AreAccessRulesProtected -and -not $open.Count -and -not $kopen.Count)
+    } else {
+        Yes '  the copy''s folder is locked, -Only, while it is still empty (#3034)' ($global:Locked -and $global:Locked.Path -eq $save -and $global:Locked.Only -and $global:Locked.Empty)
+    }
     Yes '  the old djinn line goes and the new one, only through the bridge, comes' ($after -contains ('from="127.0.0.1" ' + $pubB + ' thornswood-djinn') -and -not ($after -match 'AAAAolddjinn'))
     Yes '  every other key line stays as it was' ($after[0] -eq ($pubA + ' thornswood') -and $after[1] -match 'thornswood-cloud$' -and $after[2] -eq 'ssh-rsa AAAAsomebody someone-else' -and $after.Count -eq 4)
     Yes '  the digest is written under the name, and the cloud token stays' ((Text (Join-Path $tokens 'djinn')) -eq $digest -and (Text (Join-Path $tokens 'cloud')) -eq ('c' * 64))
@@ -159,6 +183,7 @@ try {
     $back = Lines
     Yes 'the put back puts the key file back as it was' ($back.Count -eq 4 -and ($back -match 'AAAAolddjinn').Count -eq 1 -and -not ($back -match 'NewDjinn'))
     Yes '  and the tokens, and disarms itself' ((@(Names) -join ',') -eq 'cloud' -and -not $global:Armed)
+    Yes '  and removes its copy, which nothing reads after it' (-not (Test-Path -LiteralPath $save))
 
     # A machine's own key under an older comment is replaced, not doubled.
     Fresh
@@ -260,7 +285,7 @@ try {
     Yes 'Setup-SshKey.ps1 never turns host key checking down' ($setup -notmatch '(?i)StrictHostKeyChecking\s*[= ]\s*"?(no|off|accept-new|ask)\b')
 }
 finally {
-    foreach ($n in 'Armed', 'PutBackArg') { Remove-Variable -Name $n -Scope Global -ErrorAction SilentlyContinue }
+    foreach ($n in 'Armed', 'PutBackArg', 'Locked') { Remove-Variable -Name $n -Scope Global -ErrorAction SilentlyContinue }
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
 
