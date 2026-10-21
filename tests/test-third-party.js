@@ -472,6 +472,10 @@ const ANTIGO_USERS = [
   'skymp5-server/cpp/server_guest_lib/WorldState.cpp'
 ];
 const ANTIGO_LINKS = ['vcpkg.json', 'skymp5-server/cpp/CMakeLists.txt'];
+// The fork's own tests (misc/tests) go into no file anybody receives. Since
+// fork #77, test_save_completion_addon.cpp there writes stand-ins for antigo's
+// names so the addon compiles without it; THIRD-PARTY.md says so.
+const ANTIGO_TESTS = 'misc/tests/';
 if (!haveFork) {
   skip('no fork here, so the antigo and frida-gum ports and antigo\'s users were not read');
 } else {
@@ -491,6 +495,12 @@ if (!haveFork) {
       .map(function (l) { return l.slice(commit.length + 1).trim(); })
       .filter(function (p) { return p && p.indexOf('overlay_ports/') !== 0 && ANTIGO_LINKS.indexOf(p) < 0; });
   } catch (e) { users = []; }
+  const testUsers = users.filter(function (p) { return p.indexOf(ANTIGO_TESTS) === 0; });
+  testUsers.forEach(function (p) {
+    yes('THIRD-PARTY.md names ' + p.split('/').pop() + ', a fork test that names antigo, as going into no shipped file',
+        N.indexOf(p.split('/').pop()) >= 0 && /Nothing under `misc\\tests` goes into a file anybody receives/.test(flat(N)));
+  });
+  users = users.filter(function (p) { return p.indexOf(ANTIGO_TESTS) !== 0; });
   const newUsers = users.filter(function (p) { return ANTIGO_USERS.indexOf(p) < 0; });
   newUsers.forEach(function (p) { console.log('      uses antigo, and may put it into a client file: ' + p); });
   yes('the only fork files that use antigo are the three server ones THIRD-PARTY.md names (' + users.length + ')',
@@ -538,12 +548,50 @@ if (!spi) {
       spi.indexOf(Buffer.from('GumInterceptor', 'latin1')) >= 0);
 }
 
+// ---------------------------------------------------------------- the front
+//
+// Since #2931 every Ship builds build.js and the files beside it from the
+// fork's skymp5-front at the pin and holds them to records\front-build.json.
+// THIRD-PARTY.md said for a month that nobody recorded its commit. Its section
+// on that build names the record's commit and count, and every font the
+// record holds is named with what its own file says.
+let front = null;
+try { front = JSON.parse(read(path.join(REPO, 'records', 'front-build.json'))); } catch (e) { front = null; }
+yes('records\\front-build.json reads', !!(front && front.forkCommit && front.files));
+const frontSec = (function () {
+  const at = N.indexOf('\n## SkyMP\'s interface, built from the fork');
+  if (at < 0) { return ''; }
+  const next = N.indexOf('\n## ', at + 4);
+  return next < 0 ? N.slice(at) : N.slice(at, next);
+})();
+yes('THIRD-PARTY.md has a section on the interface built from the fork', frontSec.length > 0);
+if (front && front.files) {
+  const fNames = Object.keys(front.files);
+  let fBytes = 0;
+  fNames.forEach(function (n) { fBytes += front.files[n].bytes; });
+  const fFlat = flat(frontSec);
+  yes('that section names the record\'s commit, ' + String(front.forkCommit).slice(0, 8), frontSec.indexOf('`' + String(front.forkCommit).slice(0, 8) + '`') >= 0);
+  yes('that section names the client record\'s commit as the same one', String(front.forkCommit).indexOf(commit) === 0);
+  yes('that section gives the record\'s ' + fNames.length + ' files and ' + fBytes + ' bytes',
+      fFlat.indexOf(fNames.length + ' files, ' + fBytes.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',') + ' bytes') >= 0);
+  fNames.filter(function (n) { return /\.(ttf|otf|woff2?)$/i.test(n); }).forEach(function (n) {
+    yes('that section names the font ' + n + ' the record holds', frontSec.indexOf('`' + n + '`') >= 0);
+  });
+  if (front.files['build.js']) {
+    yes('that section gives build.js by the record\'s sha256', frontSec.indexOf(front.files['build.js'].sha256) >= 0);
+  }
+}
+yes('"What is still missing" no longer says build.js has no recorded commit as if every release did',
+    !/^- build\.js has no recorded source commit\.$/m.test(section('What is still missing')));
+
 // ---------------------------------------------------------------- Nexus Mods
 //
 // Two of the collection's mods are Thornswood's own uploads. One of them, the
 // Thornswood Client Runtime (Nexus 192762), is the largest thing somebody else
-// wrote that Thornswood hands out: 68 files of CEF, Chromium, ANGLE, ICU, Node,
-// Microsoft's shader compiler and one Skyrim Platform script, about 349 MB.
+// wrote that Thornswood hands out: since 1.0.1, 67 files of CEF, Chromium,
+// ANGLE, ICU, Node and Microsoft's shader compiler, about 349 MB. 1.0.0 also
+// had one Skyrim Platform script, and Nexus still serves it to revisions 1
+// and 2 of the collection, so its source stays offered.
 // THIRD-PARTY.md once filed all of it under "Not shipped by Thornswood", and
 // nothing here noticed, because this harness looked no further than the
 // launcher, launcher\lib, the site and the six client files. So the section on
@@ -577,8 +625,8 @@ yes('THIRD-PARTY.md has a "Not shipped by Thornswood" section', notShipped.lengt
 });
 yes('"What is still missing" does not say nothing hands a person the GPL text',
     missingSec.length > 0 && !/nothing hands a person the GPL/i.test(flat(missingSec)));
-yes('"What is still missing" says the installer hands AGPL-3.0.txt',
-    /installer also hands[\s\S]{0,200}AGPL-3\.0\.txt/.test(missingSec));
+yes('"Where the source is" says the installer hands AGPL-3.0.txt',
+    /installer hands[\s\S]{0,200}AGPL-3\.0\.txt/.test(sourceSec));
 yes('installer/licences/AGPL-3.0.txt exists', (function () {
   try { return fs.statSync(path.join(ROOT, 'installer', 'licences', 'AGPL-3.0.txt')).isFile(); } catch (e) { return false; }
 })());
@@ -588,11 +636,19 @@ yes('installer/licences/GPL-3.0.txt exists', (function () {
 yes('installer/licences/WebView2-LICENSE.txt exists', (function () {
   try { return fs.statSync(path.join(ROOT, 'installer', 'licences', 'WebView2-LICENSE.txt')).isFile(); } catch (e) { return false; }
 })());
+// 1.0.1 has no GPL file in it; 1.0.0, which revisions 1 and 2 still install,
+// has ___systemPolyfill.js and skyrim-platform's licence beside it.
 const polyRows = runtimeSec.split('\n').filter(function (l) {
-  return l.charAt(0) === '|' && l.indexOf('`___systemPolyfill.js`') >= 0;
+  return l.charAt(0) === '|' && l.indexOf('___systemPolyfill.js') >= 0;
 });
-yes('the Client Runtime section gives ___systemPolyfill.js as GPL-3.0',
-    polyRows.some(function (l) { return /(^|[^A])GPL-3\.0/.test(l) && l.indexOf('AGPL') < 0; }));
+yes('no table in the Client Runtime section lists ___systemPolyfill.js, which 1.0.1 does not carry', polyRows.length === 0);
+const oldRuntime = (function () {
+  const at = runtimeSec.indexOf('\n### Version 1.0.0');
+  return at < 0 ? '' : flat(runtimeSec.slice(at));
+})();
+yes('the Client Runtime section says what 1.0.0, still installed by revisions 1 and 2, carries',
+    oldRuntime.indexOf('`___systemPolyfill.js`') >= 0 && oldRuntime.indexOf('SkyrimPlatform-LICENSE.txt') >= 0 &&
+    oldRuntime.indexOf('GNU General Public License version 3') >= 0);
 const polySrc = new RegExp(reEscape(forkUrl) + '/tree/([0-9a-f]{40})/skyrim-platform/tools/system_polyfill').exec(sourceSec);
 yes('"Where the source is" gives a commit of the fork that still has ___systemPolyfill.js', !!(forkUrl && polySrc));
 yes('the credits page names the Thornswood Client Runtime and links its Nexus page',
@@ -682,7 +738,7 @@ if (!runtimeDir) {
     yes(r + ' is in the section by its sha256, ' + sha.slice(0, 16), hashRows[r] === sha);
   });
   Object.keys(hashRows).forEach(function (r) {
-    yes(r + ', hashed in the section, is in the mod', fs.existsSync(path.join(dist, r)));
+    yes(r + ', hashed in the section, is in the mod', fs.existsSync(path.join.apply(path, [dist].concat(r.split('\\')))));
   });
 
   // The licence texts it installs, each named, and the versions its README
@@ -692,6 +748,13 @@ if (!runtimeDir) {
   try { licences = fs.readdirSync(path.join(docs, 'licences')); } catch (e) { licences = []; }
   yes('the mod carries licence texts (' + licences.length + ')', licences.length > 0);
   licences.forEach(function (n) { yes(n + ', in the mod, is named in the section', runtimeSec.indexOf('`' + n + '`') >= 0); });
+  const icuText = (function () {
+    try { return fs.readFileSync(path.join(docs, 'licences', 'ICU-LICENSE.txt')); } catch (e) { return null; }
+  })();
+  if (icuText !== null) {
+    const icuSha = crypto.createHash('sha256').update(icuText).digest('hex');
+    yes('the section gives the sha256 of the mod\'s ICU-LICENSE.txt, ' + icuSha.slice(0, 16), runtimeFlat.indexOf(icuSha) >= 0);
+  }
   const readme = read(path.join(docs, 'README.txt')) || '';
   const what = readme.split(/\nNot included/)[0];
   const vers = (what.match(/\b\d+\.\d+\.\d+(?:\.\d+)?(?:\+g[0-9a-f]+)?/g) || []).filter(function (v, i, a) { return a.indexOf(v) === i; });
