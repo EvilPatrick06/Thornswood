@@ -909,20 +909,20 @@
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -Command `\"Stop-ScheduledTask -TaskName \u0027$TaskName\u0027 -EA SilentlyContinue; Unregister-ScheduledTask -TaskName \u0027$TaskName\u0027 -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName \u0027Thornswood Voice\u0027 -EA SilentlyContinue; Remove-Item -LiteralPath \u0027$Root\u0027 -Recurse -Force -EA SilentlyContinue; \u0027removed\u0027`\"\" }",
-                      "does":  "removes the voice task and firewall rule",
+                      "via":  "Remote",
+                      "anchor":  "$removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "stops voice, waits for it to exit, and takes its task, firewall rule and folder away (-Remove)",
                       "class":  "admin",
                       "reason":  "task and firewall change"
                   },
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -Command `\"Stop-ScheduledTask -TaskName \u0027$TaskName\u0027 -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName \u0027$TaskName\u0027; \u0027restarted\u0027`\"\" }",
-                      "does":  "restarts the voice task",
-                      "class":  "task-start-stop",
-                      "reason":  "stop and start of a named task"
+                      "via":  "Remote",
+                      "anchor":  "$restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "does":  "stops voice, waits for it to exit, and starts it again under the task it has (-Restart)",
+                      "class":  "admin",
+                      "reason":  "opens and ends voice\u0027s processes and waits for them to exit, which task rights alone cannot (#2952)"
                   },
                   {
                       "script":  "scripts/deploy/Install-Voice.ps1",
@@ -973,7 +973,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $remote + $taskOnlyBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "registers the voice task again and restarts voice under it (-TaskOnly)",
                       "class":  "admin",
                       "reason":  "task registration is install-time work outside the gate verbs"
@@ -982,7 +982,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$swapOut = @(Remote ($vars + $remote + $serviceSwapBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "installs voice: task, firewall, process stop",
                       "class":  "admin",
                       "reason":  "Register-ScheduledTask and NetFirewall"

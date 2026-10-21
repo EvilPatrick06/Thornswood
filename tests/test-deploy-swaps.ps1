@@ -813,6 +813,36 @@ try {
     Yes '  and no file was staged, sent or swapped' (((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging' -and @(Kept $voiceRoot '.stage-*').Count -eq 0)
     if ($script:fail -gt $failed) { Show }
 
+    # Issue #2952: -Restart was Stop-ScheduledTask, a second's sleep and
+    # Start-ScheduledTask. The stand-in Stop-ScheduledTask ends the task's
+    # cmd.exe and leaves its node running, the way the real one returns
+    # before voice has exited (63 ms, every process still up, measured on dev
+    # voice on 21 Oct), so a start that does not wait for the old node finds
+    # it on the port and the old process goes on answering.
+    $live = Live $voiceRoot
+    $pidBefore = Listener $voicePort
+    $taskBefore = TaskArg ($TaskPrefix + ' Voice')
+    $a = $voice.Clone(); $a['Restart'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -Restart is RESTART OK, the same build answering as a new process' (
+        $r.Ok -and $r.Said -match 'RESTART OK' -and (WaitFor { ((Build) -eq 'voice-v1') -and ((Listener $voicePort) -notin 0, $pidBefore) }))
+    Yes '  and the old process has exited, not been left beside the new one' (-not (Get-Process -Id $pidBefore -EA SilentlyContinue))
+    Yes '  and the task and the files are as they were, nothing staged or sent' (
+        ((TaskArg ($TaskPrefix + ' Voice')) -eq $taskBefore) -and ((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging')
+    if ($script:fail -gt $failed) { Show }
+
+    # And -Remove took the folder away in the same instant, with every error
+    # silenced, and the firewall rule it took was always live's.
+    $pidBefore = Listener $voicePort
+    $a = $voice.Clone(); $a['Remove'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -Remove is REMOVED, with voice exited and its task and folder gone' (
+        $r.Ok -and $r.Said -match '(?m)^\s*REMOVED$' -and -not (Get-Process -Id $pidBefore -EA SilentlyContinue) -and
+        (Listener $voicePort) -eq 0 -and -not (TaskArg ($TaskPrefix + ' Voice')) -and -not (Test-Path -LiteralPath $voiceRoot))
+    if ($script:fail -gt $failed) { Show }
+
     # ================================================================ the bot
     $botRoot = Join-Path $box 'Thornswood-Bot'
     # What a full install leaves, and the code only one needs: the files, the

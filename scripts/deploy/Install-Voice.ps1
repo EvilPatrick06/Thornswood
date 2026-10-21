@@ -16,7 +16,9 @@
   voice around by editing a file on their machine.
 
       .\Install-Voice.ps1              install and start it
-      .\Install-Voice.ps1 -Restart     just restart it
+      .\Install-Voice.ps1 -Restart     stop it, wait until it has exited, start
+                                       it again under the task it has, sending
+                                       no file, and check it answers
       .\Install-Voice.ps1 -TaskOnly    register its task again with this
                                        install's settings and restart it under
                                        it, sending no file (#2491); the task
@@ -108,12 +110,8 @@ if ($TaskOnly -and ($Remove -or $Restart -or $PutBack)) {
     Die '-TaskOnly registers the task again and restarts voice under it, so it does not go with -Remove, -Restart or -PutBack. Nothing was sent.'
 }
 
-if ($Remove) {
-    Head 'Removing'
-    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue; Remove-NetFirewallRule -DisplayName 'Thornswood Voice' -EA SilentlyContinue; Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue; 'removed'`"" }
-    Say 'Gone. The game server is untouched.' 'Green'
-    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-    exit 0
+if ($Restart -and ($Remove -or $PutBack)) {
+    Die '-Restart starts voice again as it is, so it does not go with -Remove or -PutBack. Nothing was sent.'
 }
 
 # What goes up is the voice artifact (issue #459, Artifact.ps1): the service
@@ -129,13 +127,6 @@ if (-not $PutBack -and -not $Remove -and -not $Restart -and -not $TaskOnly) {
     $artifact = New-ThornswoodArtifact -Component voice -RepoDir (Join-Path $Here '..\..') -Paths 'voice/voice-server.js', 'voice/headlines.js' `
         -AlsoSends 'scripts/vps/Server-Log.js'
     Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
-}
-
-if ($Restart) {
-    Head 'Restarting'
-    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue; Start-Sleep -Seconds 1; Start-ScheduledTask -TaskName '$TaskName'; 'restarted'`"" }
-    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-    exit 0
 }
 
 <#
@@ -157,7 +148,7 @@ $turnExplicit = $PSBoundParameters.ContainsKey('TurnUrl')
 # would start a second command.
 $turnShape = '^turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?(,turns?:[A-Za-z0-9.-]+(:\d{1,5})?(\?transport=(udp|tcp))?)*$'
 if ($TurnUrl -and $TurnUrl -notmatch $turnShape) { Die "-TurnUrl takes turn:host:port, or several joined by commas, and nothing else." }
-if (-not $bindExplicit -or -not $chatExplicit -or -not $turnExplicit) {
+if (-not $Restart -and -not $Remove -and (-not $bindExplicit -or -not $chatExplicit -or -not $turnExplicit)) {
     # The relay is read off /ice, the list every page is handed, because that
     # is what is actually being served; a relay with no key serves nothing and
     # so is not kept, and /health's turn field is read too so that is said
@@ -239,7 +230,7 @@ if (-not $PutBack -and -not $Remove -and -not $Restart) {
 # this here, before anything is sent (#2711).
 $expectBuild = ''
 $src = Join-Path $Here '..\..\voice'
-if (-not $PutBack -and -not $TaskOnly) {
+if (-not $PutBack -and -not $TaskOnly -and -not $Restart -and -not $Remove) {
 Assert-ThornswoodSourceIntegrity -Artifact $artifact -RepoDir (Join-Path $Here '..\..')
 $vsPath = Join-Path $artifact.Folder 'voice\voice-server.js'
 $vsText = ''
@@ -291,7 +282,7 @@ $hashes    = [ordered]@{}
 # is worse than sending nothing, so nothing here sends one. The service's own
 # join tokens are signed with a key it makes for itself in token-key.txt.
 
-if (-not $PutBack -and -not $TaskOnly) {
+if (-not $PutBack -and -not $TaskOnly -and -not $Restart -and -not $Remove) {
     Head 'Staging'
     $send = [ordered]@{}
     $send['voice-server.js'] = Join-Path $src 'voice-server.js'
@@ -321,20 +312,13 @@ New-Item -ItemType Directory -Force -Path '$Root\$stageName' | Out-Null
 }
 
 # ---------------------------------------------------------------- install ---
-Head 'Installing'
+Head $(if ($Restart) { 'Restarting' } elseif ($Remove) { 'Removing' } else { 'Installing' })
 # The relay, when there is one. With none this is empty and the service's
 # command line below is exactly the one every install sent before it existed.
 $turnSet = ''
 if ($TurnUrl) { $turnSet = "set THORNSWOOD_TURN_URL=$TurnUrl&& " }
 $remote = @"
 `$ErrorActionPreference = 'Stop'
-# Progress records come back as a wall of CLIXML when stdout is not a console.
-`$ProgressPreference = 'SilentlyContinue'
-`$node = (Get-Command node -EA SilentlyContinue)
-if (-not `$node) {
-    `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
-    `$node = Get-Command node -EA SilentlyContinue
-}
 if (-not `$node) { 'node is not installed on this machine'; 'SWAP REFUSED'; exit 1 }
 
 # The account voice runs as (#2578, ServiceAccount.ps1). The fail-safe comes
@@ -365,7 +349,6 @@ if ('$Bind' -eq '127.0.0.1') {
     New-NetFirewallRule -DisplayName '$TaskName' -Direction Inbound -Protocol TCP -LocalPort $Port -Action Allow | Out-Null
 }
 
-`$log = Join-Path '$Root' 'voice.log'
 # THORNSWOOD_SITE is what lets /choose check that a character creation choice
 # actually came from the person who owns that profile. That endpoint has to be
 # reachable from every person's machine, so it cannot be locked to the loopback,
@@ -406,7 +389,6 @@ if ('$Bind' -eq '127.0.0.1') {
 # -PutBack puts the files the last install replaced back under this same
 # task, and a copy from before #1303 reads it and lets unproven joins in
 # without it.
-`$writer = Join-Path '$Root' 'server-log.js'
 `$cmd = ('/c "set THORNSWOOD_SITE=$Site&& set THORNSWOOD_VOICE_PORT=$Port&& set THORNSWOOD_VOICE_BIND=$Bind&& set THORNSWOOD_VOICE_AUTH=on&& set THORNSWOOD_CHAT_RANGE=$ChatRange&& $mostSet$turnSet start "" /b /wait /high "{0}" "{2}" --log "{1}" --days 90 --stamp voice-server.js & call exit %^errorlevel%"' -f `$node.Source, `$log, `$writer)
 
 # The task as it is now, for the way back: a new install that does not answer
@@ -435,6 +417,24 @@ if ('$Bind' -eq '127.0.0.1') {
 `$ErrorActionPreference = 'Continue'
 # Not `$want: names ignore case here, and `$Want is the swap's list of files.
 `$wantBuild = '$expectBuild'
+"@
+
+<#
+  What every run on the box that stops or starts voice shares, sent in front
+  of what that run does: an install, -TaskOnly, -Restart and -Remove. Each
+  stops voice through StopIt, and so through StopAndMove.ps1, which goes in
+  front of this.
+#>
+$voiceTools = @"
+# Progress records come back as a wall of CLIXML when stdout is not a console.
+`$ProgressPreference = 'SilentlyContinue'
+`$node = (Get-Command node -EA SilentlyContinue)
+if (-not `$node) {
+    `$env:Path = [Environment]::GetEnvironmentVariable('Path','Machine') + ';' + [Environment]::GetEnvironmentVariable('Path','User')
+    `$node = Get-Command node -EA SilentlyContinue
+}
+`$log = Join-Path '$Root' 'voice.log'
+`$writer = Join-Path '$Root' 'server-log.js'
 
 <#
   Stop the old service, and mean it.
@@ -500,6 +500,15 @@ function StopIt {
     finally { `$c.Close() }
     if (`$why) { 'could not tell whether port $Port up here is free: ' + `$why }
     elseif (`$busy) { 'something that is not ours is holding port $Port up here' }
+}
+
+# Whether everything StopIt ended has exited, and nothing else: StopIt has
+# already said each one that has not. One that has not still holds the port,
+# so a new voice started now dies on the bind while the old one goes on
+# answering; the runs that start voice again without a swap ask this first,
+# as the swap does (Swap.ps1).
+function StoppedAll {
+    return (-not @(@(`$ThornswoodStillRunning) + @(`$ThornswoodNotHeld) | Where-Object { `$_ }).Count)
 }
 
 # Any other task that starts voice-server.js from this root (#2008). The
@@ -633,6 +642,7 @@ $taskOnlyBlock = @'
 $Rolling = $false
 $wantBuild = Build
 StopIt
+if (-not (StoppedAll)) { 'what the stop ended has not all exited, so voice was not started again'; 'TASK NOT STARTED'; exit 1 }
 StartIt
 if (Healthy) {
   'PASS: ' + (Answer)
@@ -659,9 +669,92 @@ else { 'THE TASK IT HAD IS BACK AND IT STILL IS NOT ANSWERING'; Why }
 exit 1
 '@
 
+<#
+  -Restart: voice stopped and started again under the task it has, nothing
+  sent and nothing registered. Until 21 Oct 2026 (#2952) this was one line,
+  Stop-ScheduledTask, a second's sleep, Start-ScheduledTask, and "restarted"
+  whatever happened. Measured on the box that day, on dev voice:
+  Stop-ScheduledTask returned in 63 ms with the task already Ready and all
+  four of its processes (cmd, conhost, server-log.js and voice-server.js)
+  still running, node still on the port; all four were gone 673 ms in. So the
+  second was a guess that node had let go of the port, and when it guessed
+  wrong the new node died on the bind and nothing said so.
+
+  Now it is StopIt, which waits until each process has exited
+  (StopAndMove.ps1), then StartIt with the task kept, then Healthy, held to
+  the build voice-server.js on the box names, since that is what the start
+  runs. The last line is RESTART OK or RESTART FAILED.
+#>
+$restartBlock = @"
+`$ErrorActionPreference = 'Continue'
+`$Rolling = `$false
+if (-not `$node) { 'node is not installed on this machine, so voice was not stopped'; 'RESTART FAILED'; exit 1 }
+if (-not (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue)) { 'there is no task $TaskName up here, so voice was not stopped. Install it first.'; 'RESTART FAILED'; exit 1 }
+`$wantBuild = ''
+`$vs = Join-Path '$Root' 'voice-server.js'
+try { `$m = [regex]::Match([IO.File]::ReadAllText(`$vs), "const\s+BUILD\s*=\s*'([^']+)'"); if (`$m.Success) { `$wantBuild = `$m.Groups[1].Value } }
+catch { 'could not read ' + `$vs + ': ' + `$_.Exception.Message }
+if (-not `$wantBuild) { `$vs + ' names no build, so only that port $Port answers is checked' }
+StopIt
+if (-not (StoppedAll)) { 'what the stop ended has not all exited, so voice was not started again'; 'RESTART FAILED'; exit 1 }
+StartIt
+if (Healthy) { 'PASS: ' + (Answer); 'RESTART OK'; exit 0 }
+'FAIL: it did not answer within ' + `$Wait + ' seconds of being started'
+Why
+'RESTART FAILED'
+exit 1
+"@
+
+<#
+  -Remove: voice stopped the same way, and only once every process of it
+  has exited are its task, its firewall rule and its folder taken away, each
+  saying why when it cannot be. Until 21 Oct 2026 (#2952) the folder went in
+  the same instant as Stop-ScheduledTask, which returns before voice has
+  exited, with every error silenced, so "removed" could leave the folder
+  half there; and the rule it took away was always live's, 'Thornswood
+  Voice', whichever service was being removed, where an install makes it
+  under the task's own name.
+#>
+$removeBlock = @"
+`$ErrorActionPreference = 'Continue'
+StopIt
+if (-not (StoppedAll)) { 'what the stop ended has not all exited, so nothing was taken away'; 'NOT REMOVED'; exit 1 }
+if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) {
+    try { Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA Stop; 'took off the task $TaskName' }
+    catch { 'could not take off the task ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
+}
+if (Get-NetFirewallRule -DisplayName '$TaskName' -EA SilentlyContinue) {
+    try { Remove-NetFirewallRule -DisplayName '$TaskName' -EA Stop; 'took away the firewall rule $TaskName' }
+    catch { 'could not take away the firewall rule ${TaskName}: ' + `$_.Exception.Message; 'NOT REMOVED'; exit 1 }
+}
+if (Test-Path -LiteralPath '$Root') {
+    try { Remove-Item -LiteralPath '$Root' -Recurse -Force -EA Stop; 'took away $Root' }
+    catch { 'could not take away ${Root}: ' + `$_.Exception.Message + '; open under it then: ' + (Get-ThornswoodPathHolders '$Root'); 'NOT REMOVED'; exit 1 }
+}
+'REMOVED'
+"@
+
+if ($Restart) {
+    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
+    $restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($restartOut -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
+    Say 'restarted, and voice answers again' 'Green'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
+if ($Remove) {
+    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
+    $removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($removeOut -notcontains 'REMOVED') { Die 'voice was not taken off. The lines above say what is left.' }
+    Say 'Gone. The game server is untouched.' 'Green'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
 if ($TaskOnly) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
-    $taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
     Say 'registered again, and voice answers under the new task' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -672,7 +765,7 @@ $keepTask = '$KeepTask = $false'
 $pick = ''
 if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
-$swapOut = @(Remote ($vars + $remote + $serviceSwapBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
 if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 
 # ---------------------------------------------------------------- verify ----
