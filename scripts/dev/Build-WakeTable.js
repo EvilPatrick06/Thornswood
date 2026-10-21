@@ -68,7 +68,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { pluginPath } = require('./OwnPlugins.js');
+const { pluginPath, loadOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 const Worlds = require('./Build-WorldspaceTable.js');
 
@@ -263,7 +263,7 @@ function buildTable(t, worlds, destinations, cellToHold) {
 }
 
 function readLoadOrder(dataDir, pluginsTxt) {
-  const order = Worlds.loadOrder(pluginsTxt);
+  const order = loadOrder(pluginsTxt);
   const t = { keywords: {}, locations: {}, cells: {}, doors: {} };
   const problems = [];
   for (const pl of order) {

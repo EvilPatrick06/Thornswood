@@ -490,21 +490,8 @@ class Cast(object):
             'open ground in %s' % (self.t[b'WRLD'].get(a.get('world'), {}).get('edid') or 'a worldspace'))
 
 
-def load_order(data, plugins_txt):
-    order = list(MASTERS)
-    for line in io.open(plugins_txt, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if line.startswith('*'):
-            line = line[1:]
-        if line.lower() not in [o.lower() for o in order]:
-            order.append(line)
-    return order
-
-
 def build(data, plugins_txt, say):
-    order = load_order(data, plugins_txt)
+    order = own_plugins.load_order(plugins_txt)
     missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(data, n))]
     if missing:
         say('STOP. %d plugin(s) are not in %s: %s' % (len(missing), data, ', '.join(missing[:6])))

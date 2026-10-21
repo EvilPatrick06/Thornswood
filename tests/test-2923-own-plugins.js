@@ -21,6 +21,10 @@
      load order is in it or left out with a reason, no step reads a table a
      later step writes, and the script lists every step.
   N  the harnesses that hold a table to the plugin's bytes name the script.
+  L  #2976. The load order is read in one place: the three helpers say the
+     same of a plugins.txt holding switched off lines (the masters, then each
+     '*' line, once), and no builder reads plugins.txt's lines itself.
+     tests/test-1712-builders-skip-off.js runs the builders on such a list.
 
   Nothing outside a temporary folder is written.
 */
@@ -119,6 +123,7 @@ fs.mkdirSync(GAME, { recursive: true });
 for (const f of ['Build-FoodTable.js', 'OwnPlugins.js']) { fs.copyFileSync(path.join(DEV, f), path.join(REPO, 'scripts', 'dev', f)); }
 fs.writeFileSync(path.join(REPO, 'game', 'gamemode.js'), 'const FOODS = {"items":{}};\n');
 fs.writeFileSync(path.join(GAME, 'Skyrim.esm'), plugin([], [alch(0x00064b3d, 'FoodSweetroll', 'Sweet Roll')]));
+for (const m of ['Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) { fs.writeFileSync(path.join(GAME, m), plugin(['Skyrim.esm'], [])); }
 // The game folder's copy is an older release; the repository's has the tea.
 fs.writeFileSync(path.join(GAME, 'Thornswood-Content.esp'), plugin(['Skyrim.esm'], [alch(0x01018004, 'ThornswoodOldStew', 'Old Stew')]));
 fs.writeFileSync(path.join(REPO, 'game', 'content', 'Thornswood-Content.esp'), plugin(['Skyrim.esm'], [alch(0x01018001, 'ThornswoodTeaLavender', 'Lavender Tea')]));
@@ -226,6 +231,58 @@ const naming = ['tests/test-2468-last-plugin.js', 'tests/test-2551-building-hold
 const silent = naming.filter((f) => read(f).indexOf('Rebuild-ContentTables.ps1') < 0);
 yes('N1 the harnesses that hold a table to the plugin\'s bytes, and the docs, name the script' + (silent.length ? ' (not: ' + silent.join(', ') + ')' : ''),
     silent.length === 0);
+
+// ---------------------------------------------------------------- L
+// The shape of One's Default\plugins.txt on 20 Oct, cut down: ElysiumEstateSSE.esp
+// switched off with its file gone, the live ElysiumEstate.esp switched on, and
+// a byte order mark, a comment, a master written into the list, a name twice in
+// two cases and a switched off line for a plugin that is also switched on.
+const LIST = path.join(TMP, 'plugins-2976.txt');
+fs.writeFileSync(LIST, '\ufeff# This file is used by Skyrim to keep track of your downloaded content.\r\n' +
+  '*Skyrim.esm\r\n*Unofficial Skyrim Special Edition Patch.esp\r\nCBBE.esp\r\n*ElysiumEstate.esp\r\n' +
+  '\r\nElysiumEstateSSE.esp\r\n*elysiumestate.esp\r\n  *Thornswood-Content.esp  \r\nThornswood-Content.esp\r\nCBBE.esp\r\n');
+const WANT_ON = js.MASTERS.concat(['Unofficial Skyrim Special Edition Patch.esp', 'ElysiumEstate.esp', 'Thornswood-Content.esp']);
+const WANT_OFF = ['CBBE.esp', 'ElysiumEstateSSE.esp'];
+yes('L1 OwnPlugins.js reads the five masters and then each switched on line, once',
+    JSON.stringify(js.loadOrder(LIST)) === JSON.stringify(WANT_ON));
+yes('L2 and names the switched off lines, none of them loaded', JSON.stringify(js.switchedOff(LIST)) === JSON.stringify(WANT_OFF));
+const pyL = run(['python', 'py', 'python3'], ['-c',
+  'import json, sys; sys.path.insert(0, sys.argv[1]); import own_plugins\n' +
+  'on, off = own_plugins.read_plugins_txt(sys.argv[2])\n' +
+  'print(json.dumps([own_plugins.MASTERS, own_plugins.load_order(sys.argv[2]), on, off, own_plugins.switched_off(sys.argv[2])]))', DEV, LIST]);
+if (!pyL) {
+  console.log('SKIP  L3: no python here');
+} else {
+  let got = null;
+  try { got = JSON.parse(pyL.stdout); } catch (e) { got = null; }
+  yes('L3 own_plugins.py says the same', !!got && JSON.stringify(got) ===
+      JSON.stringify([js.MASTERS, WANT_ON, WANT_ON, WANT_OFF, WANT_OFF]));
+  if (!got) { console.log(pyL.stdout + pyL.stderr); }
+}
+const asksL = path.join(TMP, 'asks-2976.ps1');
+fs.writeFileSync(asksL, 'param([string]$Dev, [string]$List)\n' +
+  '. (Join-Path $Dev \'OwnPlugins.ps1\')\n' +
+  'ConvertTo-Json -Compress -InputObject @(@(Get-LoadOrder $List), @(Get-SwitchedOff $List))\n');
+const psL = run(['pwsh', 'powershell'], ['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', asksL, '-Dev', DEV, '-List', LIST]);
+if (!psL) {
+  console.log('SKIP  L4: no PowerShell here');
+} else {
+  let got = null;
+  try { got = JSON.parse(psL.stdout); } catch (e) { got = null; }
+  yes('L4 OwnPlugins.ps1 says the same', !!got && JSON.stringify(got) === JSON.stringify([WANT_ON, WANT_OFF]));
+  if (!got || JSON.stringify(got[0]) !== JSON.stringify(WANT_ON)) { console.log(psL.stdout + psL.stderr); }
+}
+// A builder that parses plugins.txt itself tests a line for its leading '*'.
+const STAR = [/startswith\(\s*['"]\*['"]\s*\)/i, /\[0\]\s*[!=]==?\s*['"]\*['"]/, /charAt\(0\)\s*[!=]==?\s*['"]\*['"]/];
+const parsers = [];
+for (const dir of ['scripts/dev', 'scripts/mods']) {
+  for (const n of fs.readdirSync(path.join(ROOT, dir))) {
+    if (!/^(Build|Write|Audit|Measure)-.*\.(js|ps1|py)$/.test(n)) { continue; }
+    read(dir + '/' + n).split('\n').forEach((l, i) => { if (STAR.some((r) => r.test(l))) { parsers.push(dir + '/' + n + ':' + (i + 1)); } });
+  }
+}
+yes('L5 no builder reads plugins.txt\'s lines itself; each takes its load order from the helper' +
+    (parsers.length ? ' (' + parsers.slice(0, 6).join(', ') + ')' : ''), parsers.length === 0);
 
 fs.rmSync(TMP, { recursive: true, force: true });
 console.log('');

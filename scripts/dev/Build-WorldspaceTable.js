@@ -48,27 +48,12 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const { pluginPath } = require('./OwnPlugins.js');
+const { pluginPath, loadOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const ROOT = path.join(__dirname, '..', '..');
-const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
-                  'HearthFires.esm', 'Dragonborn.esm'];
 // Tamriel. If it is not found, the WRLD group is not being read.
 const CANARY = '3c:Skyrim.esm';
-
-// Skyrim's five masters, then every plugin switched on in plugins.txt.
-function loadOrder(pluginsTxt) {
-  const out = BETHESDA.slice();
-  const raw = fs.readFileSync(pluginsTxt, 'utf8');
-  raw.split(/\r?\n/).forEach(function (line) {
-    const t = line.trim();
-    if (!t || t[0] !== '*') { return; }
-    const name = t.slice(1).trim();
-    if (name && out.indexOf(name) === -1) { out.push(name); }
-  });
-  return out;
-}
 
 function mastersOf(b, headerSize) {
   const out = [];
@@ -238,7 +223,7 @@ function main(args) {
   return 0;
 }
 
-module.exports = { loadOrder: loadOrder, worldsOf: worldsOf, readWorldspaces: readWorldspaces,
+module.exports = { worldsOf: worldsOf, readWorldspaces: readWorldspaces,
                    replaceList: replaceList, install: install, main: main };
 
 if (require.main === module) { process.exit(main(process.argv.slice(2))); }
