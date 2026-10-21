@@ -25,7 +25,8 @@
                   anywhere whatever the list says, so it stops and names it.
                   So does finding no rule for 22 at all.
     the change    the rules' remote addresses are saved to
-                  C:\ProgramData\ssh\ssh-scope-before-<time>.json, a task puts
+                  C:\ProgramData\ssh\ssh-scope-before-<time>.json, which only
+                  SYSTEM and Administrators may read (#3034), a task puts
                   them back in ten minutes ("Thornswood ssh scope rollback"),
                   and then each rule's remote address becomes the list.
                   Set-SshScope.ps1 cancels the task once a new key login from
@@ -45,8 +46,8 @@
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the firewall,
-  scheduled tasks, SSH_CLIENT, the save folder). Only tests\test-ssh-scope.ps1
-  passes it, to run this against stand-ins.
+  scheduled tasks, SSH_CLIENT, the save folder, the save's rules). Only
+  tests\test-ssh-scope.ps1 passes it, to run this against stand-ins.
 
 .PARAMETER KeepSelf
   Do not delete this file at the end. The test harness passes it.
@@ -101,6 +102,23 @@ function Get-AllowRules {
     }
 }
 function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+
+# Makes $Path an empty file only SYSTEM and Administrators may open, taking
+# nothing from its folder (#3034). C:\ProgramData\ssh gives every signed in
+# account read, as Windows OpenSSH installs it, and a file made there takes
+# that rule, so a save written there plainly is open to every account on the
+# box. The rules are set while the file is empty, so its content is never
+# open, and they are the ones administrators_authorized_keys has.
+function New-PrivateFile([string]$Path) {
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $acl = New-Object Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($s in 'S-1-5-18', 'S-1-5-32-544') {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+}
 
 # Whether a rule's filters match sshd's own traffic: any program or sshd.exe,
 # no app container, and any service or sshd. A rule bound to an app container
@@ -232,6 +250,7 @@ function Invoke-Scope {
     $saved = Join-Path (Get-SaveFolder) ('ssh-scope-before-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.json')
     if (-not $DryRun) {
         $doc = [ordered]@{ taken = (Get-Date).ToString('o'); rules = @($todo | ForEach-Object { [ordered]@{ name = $_.Name; remote = @($_.Remote) } }) }
+        New-PrivateFile $saved
         [IO.File]::WriteAllText($saved, ($doc | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
         Register-Rollback $saved
     }
