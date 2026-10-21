@@ -64,7 +64,7 @@
     website   answers on 3001, which is what Caddy puts on 443
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
-    bot       a python process is alive with the bot script in its command line.
+    bot       the python the ThornswoodBot service started is alive (#3189).
               And its heartbeat, C:\Thornswood-Bot\data\heartbeat.json, says it is on
               Discord: a bot hung or off Discord for ten minutes while its
               process runs is down too (issue #449). That file is written once
@@ -202,16 +202,23 @@ function SiteAnswers($url) {
   }
 }
 
+# The bot is the python the ThornswoodBot service started, nothing else
+# (#3189). Any python with Thornswood-Bot in its command line used to count,
+# so a harness on a runner that runs a stand-in bot from a folder of that name
+# (test-bot-service.ps1 and others) was the bot too, for as long as it ran.
+function BotPythons() {
+  $svc = Get-CimInstance Win32_Service -Filter "Name = 'ThornswoodBot'" -EA SilentlyContinue
+  if (-not $svc -or -not $svc.ProcessId) { return @() }
+  return @(Get-CimInstance Win32_Process -Filter ("Name = 'python.exe' AND ParentProcessId = " + [int]$svc.ProcessId) -EA SilentlyContinue)
+}
+
 function BotAlive() {
-  foreach ($p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
-    if ("$($p.CommandLine)" -match 'Thornswood-Bot') { return $true }
-  }
-  return $false
+  return (@(BotPythons).Count -gt 0)
 }
 
 # ------------------------------------------------ the bot's heartbeat ---
 #
-# A python process with the bot in its command line is not a bot that is
+# A live python under the bot's service is not a bot that is
 # working (issue #449). It can be stuck logging in, hung, or cut off from
 # Discord and never getting back, and in every one of those it is still
 # running. So the bot writes heartbeat.json in its data folder every minute
@@ -238,8 +245,7 @@ $beatStale = 600
 # Every running bot process: its pid and when it started, in unix seconds.
 function BotProcs() {
   $list = @()
-  foreach ($p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
-    if ("$($p.CommandLine)" -notmatch 'Thornswood-Bot') { continue }
+  foreach ($p in @(BotPythons)) {
     $at = 0
     try { $at = ([DateTimeOffset]$p.CreationDate).ToUnixTimeSeconds() } catch { }
     $list += @{ Id = [int64]$p.ProcessId; Started = [int64]$at }
@@ -1006,9 +1012,11 @@ function SiteAnswers(`$url) {
     return `$false
   }
 }
+# The python the ThornswoodBot service started, as BotPythons does (#3189).
 `$bot = `$false
-foreach (`$p in (Get-CimInstance Win32_Process -Filter "Name = 'python.exe'" -EA SilentlyContinue)) {
-  if ("`$(`$p.CommandLine)" -match 'Thornswood-Bot') { `$bot = `$true }
+`$botSvc = Get-CimInstance Win32_Service -Filter "Name = 'ThornswoodBot'" -EA SilentlyContinue
+if (`$botSvc -and `$botSvc.ProcessId) {
+  `$bot = @(Get-CimInstance Win32_Process -Filter ("Name = 'python.exe' AND ParentProcessId = " + [int]`$botSvc.ProcessId) -EA SilentlyContinue).Count -gt 0
 }
 'caddy     ' + `$(if (SiteAnswers 'https://thornswood.net/') { 'up' } else { 'DOWN' })
 'website   ' + `$(if (Answers 3001) { 'up' } else { 'DOWN' })
