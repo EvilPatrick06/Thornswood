@@ -36458,11 +36458,16 @@ log('gamemode loaded:',
              profileOf(actorId)!==mine || !rankOk(rankStep(actorId,'farmer'),baseDesc))return false;
           var now=groundOf(refrId);
           if(!now || JSON.stringify(now)!==JSON.stringify(ground))return false;
-          var held=claimCovering(now,true);return !held || held.by===mine;
+          var held=claimCovering(now,true);return (!held || held.by===mine) && grant.current();
         }catch(error){return false;}
       }
-      if(!store.sowWithSeed(ref,original,next,eligible,function(fence){return grant.seed(crop.produce,fence);}))
+      if(!store.sowWithSeed(ref,original,next,eligible,function(fence){return grant.seed(crop.produce,fence);})) {
+        if(store.available() && eligible() && grant.sourceCurrent() && !carriesSeed(actorId,baseDesc) && grant.current()) {
+          var handout=offerSeed(actorId,mine);
+          if(handout)return handout;
+        }
         return 'Sowing did not complete. Check your pack and this plot.';
+      }
       if(grant.current())touchClaim(ground,mine);
       return 'You sow the '+crop.name+'. It will be ready in '+minutes(Math.ceil(ms/60000))+'.';
     }
@@ -37099,12 +37104,13 @@ log('gamemode loaded:',
     so the line says so now rather than at the next ask. Only when the line
     they have is for this plot; nobody else's line moves.
   */
-  function press(actorId, refrId, baseDesc) {
-    var said = activate(actorId, refrId, baseDesc);
+  function press(actorId, refrId, baseDesc, grant) {
+    var said = activate(actorId, refrId, baseDesc,grant);
+    if(grant && !grant.current())return said;
     var v = null;
     try { v = mp.get(actorId, PLOT_LINE_PROPERTY); } catch (e) { v = null; }
     var hex = (refrId >>> 0).toString(16);
-    if (v && typeof v === 'object' && v.hex === hex) {
+    if (v && typeof v === 'object' && v.hex === hex && (!grant || grant.current())) {
       plotLine(actorId, profileOf(actorId), ['/plot', hex]);
     }
     return said;
@@ -37156,7 +37162,7 @@ log('gamemode loaded:',
 
   g.__thornswoodFarming = {
     PROPERTY: PLOT_PROPERTY, release: release,
-    activate: press, harvestQuest:activate, sowQuest:sowAt, command: command, giveSeeds: giveSeeds,
+    activate: press, harvestQuest:press, sowQuest:sowAt, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
     farmOf: farmOf,
     // For the property block's /claim (#2250): is this id a crop plot, and is
@@ -77431,6 +77437,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         return wrote ? true : typeof deps.available==='function' && !deps.available() ? null : false;
       }
       award.current=currentOwner;
+      award.sourceCurrent=function(){return currentOwner() && deps.orchardSources.verify(actor,ref);};
       award.seed=function(item,fence) {
         if(item!=='64b2e:Skyrim.esm')return false;
         var done=keep(actor,held,[{item:item,count:-1}],function(){

@@ -37,4 +37,16 @@ for(const refusal of [false,null,'throw']) {
  assert.deepEqual(p.read('0'),ripe);
  p.shutdown();assert.equal(p.write('0',ripe),false);assert.throws(()=>p.read('0'));
 }
+{
+ const f=fixture(),p=f.open();let seeds=2;
+ assert.equal(p.sowWithSeed('0',null,ripe,()=>true,fence=>{
+  assert.equal(p.sowWithSeed('0',null,ripe,()=>true,()=>{seeds--;return true;}),false);
+  assert.equal(p.compareWrite('1',null,{by:0,crop:'',at:0,ms:0,step:0}),false);
+  assert.equal(fence(),true);seeds--;return true;
+ }),true);
+ assert.equal(seeds,1);assert.deepEqual(p.read('0'),ripe);
+ assert.equal(p.sowWithSeed('0',ripe,ripe,()=>true,()=>{seeds--;return true;}),false);
+ assert.equal(p.sow('0',ripe),false,'a stale sow cannot overwrite a ripe plot');
+ assert.equal(p.compareWrite('0',null,{by:0,crop:'',at:0,ms:0,step:0}),false,'stale ordinary harvest cannot clear a replacement plot');
+}
 console.log('PASS durable plot-before-goods ordering, restart, reentrant sowing/harvest refusal, definite rollback and unknown retention');

@@ -106,6 +106,24 @@ for(const defect of ['none','reentry','identity']) {
  }
 }
 {
+ const s=setup();s.take();s.draw();
+ s.w.ctx.__afterCommit=()=>{s.realm.__thornswoodProperty.coversGround=()=>{s.w.ctx.__identityToken='post-seed replacement';return null;};};
+ assert.equal(s.draw().ok,false);
+ assert.equal(s.store.read(data.sources[0].reference).crop,'','post-seed callback cannot publish a plot for a replacement actor');
+}
+{
+ const s=setup();s.take();s.store.write(data.sources[0].reference,{by:0,crop:'',at:0,ms:0,step:0});
+ assert.match(s.draw().text,/here is seed/,'definite empty-pack shortage retains Farmer seed recovery');
+ assert.equal(h.form(500).props.thornswoodQuests.open.orchard.drawn,0);
+}
+{
+ const s=setup();s.take();let refreshed=0;
+ const get=s.realm.mp.get,set=s.realm.mp.set;
+ s.realm.mp.get=(id,key)=>key==='thornswoodPlotLine'?{hex:(8000).toString(16)}:get(id,key);
+ s.realm.mp.set=(id,key,value)=>{if(key==='thornswoodPlotLine')refreshed++;else set(id,key,value);};
+ assert.equal(s.draw().ok,true);assert.equal(refreshed,1,'harvest refreshes the displayed plot line immediately');
+}
+{
  const s=setup({unknown:true});s.take();assert.equal(s.draw().ok,false);
  assert.equal(h.have(500,'64b2e:Skyrim.esm'),1);assert.equal(s.store.available(),false);
  const restored=plots.createOrchardPlots({durable:true,load:s.saved,save:()=>true},data.sources.map(r=>r.reference));
