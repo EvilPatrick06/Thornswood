@@ -149,7 +149,7 @@ try {
             Yes "$p carries its address and a sha256 that is empty or 64 hex" (
                 $e.url -eq "https://thornswood.net/$p" -and ([string]$e.sha256 -eq '' -or [string]$e.sha256 -match '^[0-9a-f]{64}$'))
         }
-        Yes 'and nothing about the person or the machine' (-not ($raw -match [regex]::Escape($env:USERNAME)) -and -not ($raw -match [regex]::Escape($env:COMPUTERNAME)))
+        Yes 'and nothing about the person or the machine' (-not ($raw -match [regex]::Escape([Environment]::UserName)) -and -not ($raw -match [regex]::Escape([Environment]::MachineName)))
     }
 
     # ---- from the setup window ---------------------------------------------------

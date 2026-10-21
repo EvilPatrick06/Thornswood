@@ -292,6 +292,12 @@ try {
 }
 
 # ---- 6. this machine ------------------------------------------------------------------
+# Join-Path stops on a drive this machine does not have (C: off Windows),
+# so whether the folder is here at all is asked first.
+if (-not (Test-Path -LiteralPath $Root)) {
+    Skip "no $Root on this machine"
+    Done
+}
 $game = Join-Path $Root 'Game'
 $profileDir = Join-Path $Root 'Profile'
 $collection = Get-ShipOwnGameCollection $profileDir

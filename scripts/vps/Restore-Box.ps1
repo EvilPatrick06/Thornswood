@@ -55,7 +55,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Backup,
   [string]$VpsHost = '',
   [string]$VpsUser = '',
-  [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
+  [string]$KeyFile = (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Documents\thornswood-backup-key.txt'),
   # A live profile id that must come back, the number the launcher and the
   # site show. Passed to the live restore only.
   [string]$Expect,

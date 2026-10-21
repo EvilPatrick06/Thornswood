@@ -212,9 +212,12 @@ function Find-SigningDlib([string]$Repo) {
   $top = Join-Path $Repo 'records\signing\client'
   if (-not (Test-Path -LiteralPath $top)) { return '' }
   $hit = @(Get-ChildItem -LiteralPath $top -Recurse -File -Filter 'Azure.CodeSigning.Dlib.dll' -EA SilentlyContinue |
-           Where-Object { $_.FullName -match '\\x64\\' } | Sort-Object FullName) | Select-Object -First 1
+           Where-Object { $_.FullName -match '[\\/]x64[\\/]' } | Sort-Object FullName) | Select-Object -First 1
   if (-not $hit) { return '' }
-  return $hit.FullName.Substring($Repo.TrimEnd('\').Length).TrimStart('\')
+  # Named relative to the repository with \, as signing.json names it, on any
+  # machine: off Windows the found path is written with / (#2989).
+  $sep = [string][IO.Path]::DirectorySeparatorChar
+  return $hit.FullName.Substring($Repo.TrimEnd($sep).Length).TrimStart($sep).Replace($sep, '\')
 }
 
 # Fetches the pinned signing client and unpacks it into

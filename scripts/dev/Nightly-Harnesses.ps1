@@ -101,7 +101,32 @@ Set-Content -Path $nothing -Value $null -NoNewline
 # What a harness left running after it ended: the processes it started, and
 # theirs, found by parent id and killed. Only ones started after the harness,
 # so a pid Windows has since handed to something else is left alone.
-function Kill-Left($id, $since) {
+#
+# Off Windows (a cloud session running the harnesses, #2989) there is no CIM,
+# and a process whose parent ends is handed to init, so by the time a harness
+# has ended the tree is gone. There each harness is started with a mark of its
+# own in its environment, which every process it starts inherits and no
+# re-parenting takes away, and /proc says which processes hold it.
+$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+function Get-Marked($mark) {
+    $want = 'THORNSWOOD_NIGHTLY_RUN=' + $mark
+    foreach ($d in [IO.Directory]::GetDirectories('/proc')) {
+        $n = [IO.Path]::GetFileName($d)
+        if ($n -notmatch '^\d+$' -or [int]$n -eq $PID) { continue }
+        try { $env = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($d + '/environ')) }
+        catch { continue <# it ended while being listed, or is not ours to read: neither is a harness's #> }
+        if ($env.Split([char]0) -notcontains $want) { continue }
+        $comm = ''
+        try { $comm = [IO.File]::ReadAllText($d + '/comm').Trim() } catch { $comm = '(ended)' }
+        [pscustomobject]@{ Id = [int]$n; Name = $comm }
+    }
+}
+function Kill-Left($id, $since, $mark) {
+    if (-not $onWindows) {
+        $left = @(Get-Marked $mark | Where-Object { $_.Id -ne $id })
+        foreach ($q in $left) { Stop-Process -Id $q.Id -Force -ErrorAction SilentlyContinue }
+        return @($left | ForEach-Object { $_.Name })
+    }
     $procs = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name, CreationDate)
     $mine = @{ $id = $true }; $left = @()
     do {
@@ -119,15 +144,23 @@ function Run-One($exe, $argList, $name, $path, $clock) {
     $file = $name -replace '[\\/]', '_'
     $o = Join-Path $OutDir ($file + '.out'); $e = Join-Path $OutDir ($file + '.err')
     $since = (Get-Date).AddSeconds(-1)
+    $mark = [Guid]::NewGuid().ToString('N')
+    if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
-           -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
+    try {
+        $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
+               -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
+    } finally { Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue }
     $null = $p.Handle
     $timedOut = -not $p.WaitForExit($clock * 1000)
-    if ($timedOut) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null; $null = $p.WaitForExit(10000) }
+    if ($timedOut) {
+        if ($onWindows) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null }
+        else { foreach ($q in @(Get-Marked $mark)) { Stop-Process -Id $q.Id -Force -ErrorAction SilentlyContinue } }
+        $null = $p.WaitForExit(10000)
+    }
     $code = if ($timedOut) { -1 } else { $p.ExitCode }
     $secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
-    $left = @(Kill-Left $p.Id $since)
+    $left = @(Kill-Left $p.Id $since $mark)
     Write-Host ("--- {0}  ({1}s{2})" -f $name, $secs, $(if ($clock -ne $PER_HARNESS) { ', on a ' + $clock + ' s clock it names' } else { '' }))
     foreach ($f in $o, $e) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $clock) }

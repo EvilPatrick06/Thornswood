@@ -639,12 +639,22 @@ if (-not $FromFeed) {
 # and lower cased. Absent plugins never loaded, so removing their references
 # cannot break a save. A new key avoids comparing with older keys that counted
 # absent files. The first release establishes that installed-only baseline.
+#
+# Installed is asked the way the game asks it, without regard to case: the
+# names are the Data folder's own, lower cased once. Until #2989 each name was
+# lower cased first and then asked of the folder, which on a machine whose
+# folders care about case (a Ship from the cloud) found none of them, so every
+# release's key was the key of an empty list. On Windows the key is unchanged.
 function Get-ActiveOrderKey([string]$path, [string]$data = '') {
+    $installed = @{}
+    if ($data -and [IO.Directory]::Exists($data)) {
+        foreach ($f in [IO.Directory]::EnumerateFiles($data)) { $installed[[IO.Path]::GetFileName($f).ToLowerInvariant()] = $true }
+    }
     $on = @(Get-Content -LiteralPath $path -ErrorAction Stop |
             ForEach-Object { $_.Trim() } |
             Where-Object { $_.StartsWith('*') } |
             ForEach-Object { $_.Substring(1).Trim().ToLowerInvariant() } |
-            Where-Object { $_ -and (-not $data -or [IO.File]::Exists((Join-Path $data $_))) })
+            Where-Object { $_ -and (-not $data -or $installed.ContainsKey($_)) })
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($on -join "`n")) | ForEach-Object { $_.ToString('x2') }) }
     finally { $sha.Dispose() }

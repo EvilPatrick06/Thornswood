@@ -16,10 +16,13 @@
       fail-safe finds a folder Users may read and passes a locked one;
     - the server's installer carries an exact copy of the functions, and
       the Caddyfile keeps Caddy's certificates beside it.
-  Windows only (ScheduledTasks and NTFS rules). A few seconds.
+  The principal and the scratch folders need Windows (ScheduledTasks and NTFS
+  rules) and say SKIP off it; the rest reads text and runs anywhere. A few
+  seconds.
 #>
 $ErrorActionPreference = 'Stop'
 $Repo   = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Deploy = Join-Path $Repo 'scripts\deploy'
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$ok) {
@@ -97,14 +100,18 @@ $fixVoice = Text (Join-Path $Repo 'scripts\oneoff\Fix-Voice.ps1')
 Yes 'Fix-Voice.ps1 (retired) names no SYSTEM principal or Highest run level' (-not [regex]::IsMatch($fixVoice, $sysRe))
 
 # ---- the principal --------------------------------------------------------------
-$p = New-ThornswoodServicePrincipal
-Yes 'the principal is NT AUTHORITY\LOCAL SERVICE' ($p.UserId -match '(?i)LOCAL SERVICE$')
-Yes 'the principal is Limited' ([string]$p.RunLevel -eq 'Limited')
-Yes 'the principal asks for SeChangeNotifyPrivilege and nothing else' (
-    @($p.RequiredPrivilege).Count -eq 1 -and @($p.RequiredPrivilege)[0] -eq 'SeChangeNotifyPrivilege')
-Yes 'the principal has a SID of its own (Unrestricted)' ([string]$p.ProcessTokenSidType -eq 'Unrestricted')
-$s = New-ThornswoodServicePrincipal -AsSystem
-Yes '-AsSystem is SYSTEM, Highest, as it was' ($s.UserId -match '(?i)SYSTEM$' -and [string]$s.RunLevel -eq 'Highest')
+if ($OnWindows) {
+    $p = New-ThornswoodServicePrincipal
+    Yes 'the principal is NT AUTHORITY\LOCAL SERVICE' ($p.UserId -match '(?i)LOCAL SERVICE$')
+    Yes 'the principal is Limited' ([string]$p.RunLevel -eq 'Limited')
+    Yes 'the principal asks for SeChangeNotifyPrivilege and nothing else' (
+        @($p.RequiredPrivilege).Count -eq 1 -and @($p.RequiredPrivilege)[0] -eq 'SeChangeNotifyPrivilege')
+    Yes 'the principal has a SID of its own (Unrestricted)' ([string]$p.ProcessTokenSidType -eq 'Unrestricted')
+    $s = New-ThornswoodServicePrincipal -AsSystem
+    Yes '-AsSystem is SYSTEM, Highest, as it was' ($s.UserId -match '(?i)SYSTEM$' -and [string]$s.RunLevel -eq 'Highest')
+} else {
+    Write-Host 'SKIP  the principal: New-ScheduledTaskPrincipal is in ScheduledTasks, which only Windows has'
+}
 
 # ---- the text sent to the box ----------------------------------------------------
 $sent = Get-ThornswoodServiceAccountScript
@@ -114,22 +121,26 @@ Yes 'the functions sent to the box parse' $ok
 Yes 'and carry all six' (([regex]::Matches($sent, '(?m)^function ')).Count -eq 6)
 
 # ---- never reach ---------------------------------------------------------------
-$nr = @(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Server')
-Yes 'never reach: the backups, the deploys, the watch and maint folders' (
-    $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch' -and $nr -contains 'C:\Thornswood-Maint')
-Yes "never reach: another server's private folder, and voice keys, but not its own" (
-    $nr -contains 'C:\Thornswood-Server-Dev\private' -and $nr -notcontains 'C:\Thornswood-Server\private' -and
-    $nr -contains 'C:\Thornswood-Voice\token-key.txt')
-# A deploy into a scratch box is checked against that box (#1273): with the
-# list fixed on C:, a harness on a VPS runner looked at the real servers'
-# private folders, which the runner may not, and the install ended there.
-$sb = @(Get-ThornswoodServiceNeverReach -Own 'D:\scratch\box\Thornswood-Server' -Box 'D:\scratch\box')
-Yes 'never reach follows -Box: the scratch box is checked, and nothing on C:' (
-    $sb -contains 'D:\scratch\box\Thornswood-Backup' -and $sb -contains 'D:\scratch\box\Thornswood-Server-Dev\private' -and
-    $sb -notcontains 'D:\scratch\box\Thornswood-Server\private' -and -not @($sb | Where-Object { $_ -like 'C:\*' }).Count)
-Yes '  and with no -Box it is the box, C:' (@(Get-ThornswoodServiceNeverReach) -contains 'C:\Thornswood-Server\private')
-Yes '  and C: written without its backslash is the same' (
-    (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs' -Box 'C:') -join '|') -eq (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs') -join '|'))
+if ($OnWindows) {
+    $nr = @(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Server')
+    Yes 'never reach: the backups, the deploys, the watch and maint folders' (
+        $nr -contains 'C:\Thornswood-Backup' -and $nr -contains 'C:\Thornswood-Deploys' -and $nr -contains 'C:\Thornswood-Watch' -and $nr -contains 'C:\Thornswood-Maint')
+    Yes "never reach: another server's private folder, and voice keys, but not its own" (
+        $nr -contains 'C:\Thornswood-Server-Dev\private' -and $nr -notcontains 'C:\Thornswood-Server\private' -and
+        $nr -contains 'C:\Thornswood-Voice\token-key.txt')
+    # A deploy into a scratch box is checked against that box (#1273): with the
+    # list fixed on C:, a harness on a VPS runner looked at the real servers'
+    # private folders, which the runner may not, and the install ended there.
+    $sb = @(Get-ThornswoodServiceNeverReach -Own 'D:\scratch\box\Thornswood-Server' -Box 'D:\scratch\box')
+    Yes 'never reach follows -Box: the scratch box is checked, and nothing on C:' (
+        $sb -contains 'D:\scratch\box\Thornswood-Backup' -and $sb -contains 'D:\scratch\box\Thornswood-Server-Dev\private' -and
+        $sb -notcontains 'D:\scratch\box\Thornswood-Server\private' -and -not @($sb | Where-Object { $_ -like 'C:\*' }).Count)
+    Yes '  and with no -Box it is the box, C:' (@(Get-ThornswoodServiceNeverReach) -contains 'C:\Thornswood-Server\private')
+    Yes '  and C: written without its backslash is the same' (
+        (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs' -Box 'C:') -join '|') -eq (@(Get-ThornswoodServiceNeverReach -Own 'C:\Thornswood-Docs') -join '|'))
+} else {
+    Write-Host 'SKIP  the never-reach list: it is the box''s folders joined onto its drive (C:\ or a scratch D:\), and Join-Path needs that drive to be on this machine'
+}
 Yes 'each caller passes the folder its own root is in as -Box' (
     $server.Contains('Get-ThornswoodServiceNeverReach -Own $Root -Box (Split-Path -Parent $Root)') -and
     $voice.Contains("Get-ThornswoodServiceNeverReach -Own '`$Root' -Box (Split-Path -Parent '`$Root')") -and
@@ -140,97 +151,101 @@ Yes "and Deploy-Docs does, and names the site's grants from it, not from C:" (
     $docs.Contains("@('`$boxWin\Thornswood-Server', '(OI)(NP)R')") -and -not $docs.Contains("@('C:\Thornswood-"))
 
 # ---- scratch folders -------------------------------------------------------------
-$scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts2578-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
-$null = New-Item -ItemType Directory -Path $scratch
-try {
-    $me  = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-    $sid = 'S-1-5-87-1111111111-2222222222-3333333333-444444444-555555555'
-    $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
-    function Locked([string]$d) {
-        $null = New-Item -ItemType Directory -Path $d -Force
-        $a = Get-Acl -LiteralPath $d
-        $a.SetAccessRuleProtection($true, $false)
-        foreach ($r in @($a.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) { [void]$a.RemoveAccessRuleSpecific($r) }
-        foreach ($x in 'S-1-5-18', 'S-1-5-32-544', $me) {
-            $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($x)), 'FullControl', $tree, 'None', 'Allow')))
-        }
-        Set-ThornswoodServiceAcl $d $a
-    }
-
-    $open = Join-Path $scratch 'open'
-    $null = New-Item -ItemType Directory -Path $open
-    $a = Get-Acl -LiteralPath $open
-    $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')), 'ReadAndExecute', $tree, 'None', 'Allow')))
-    Set-ThornswoodServiceAcl $open $a
-    $shut = Join-Path $scratch 'shut'; Locked $shut
-    $ls = Join-Path $scratch 'ls'; Locked $ls
-    $a = Get-Acl -LiteralPath $ls
-    $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-19')), 'Read', $tree, 'None', 'Allow')))
-    Set-ThornswoodServiceAcl $ls $a
-
-    Yes 'the fail-safe finds a folder Users may read' (@(Test-ThornswoodServiceCannotReach @($open)).Count -gt 0)
-    Yes 'the fail-safe finds a folder LOCAL SERVICE may read' (@(Test-ThornswoodServiceCannotReach @($ls)).Count -gt 0)
-    Yes 'the fail-safe passes a locked folder and one that is not there' (
-        @(Test-ThornswoodServiceCannotReach @($shut, (Join-Path $scratch 'nothing'))).Count -eq 0)
-    Yes "the fail-safe finds a folder the task's own SID may read" (
-        @(Test-ThornswoodServiceCannotReach @($open) @($sid)).Count -gt 0)
-
-    # A folder this account may not even look into, the way a VPS runner sees
-    # the servers' private folders (#1273): Test-Path on what is inside is an
-    # error, and without -ErrorAction Stop it said False and the path was
-    # passed over as not there. Only SYSTEM is let in; the owner, this
-    # account, may still put its rules back for the clean-up.
-    $hidden = Join-Path $scratch 'hidden'
-    $null = New-Item -ItemType Directory -Path (Join-Path $hidden 'private') -Force
-    $null = & icacls $hidden /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'
-    $null = & icacls $hidden /remove:g ('*' + $me)
+if ($OnWindows) {
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts2578-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+    $null = New-Item -ItemType Directory -Path $scratch
     try {
-        $why = @(Test-ThornswoodServiceCannotReach @((Join-Path $hidden 'private')))
-        Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + ')') (
-            $why.Count -eq 1 -and $why[0] -match 'could not be checked')
-    } finally { $null = & icacls $hidden /grant ('*' + $me + ':(OI)(CI)F') }
+        $me  = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+        $sid = 'S-1-5-87-1111111111-2222222222-3333333333-444444444-555555555'
+        $tree = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+        function Locked([string]$d) {
+            $null = New-Item -ItemType Directory -Path $d -Force
+            $a = Get-Acl -LiteralPath $d
+            $a.SetAccessRuleProtection($true, $false)
+            foreach ($r in @($a.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]))) { [void]$a.RemoveAccessRuleSpecific($r) }
+            foreach ($x in 'S-1-5-18', 'S-1-5-32-544', $me) {
+                $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($x)), 'FullControl', $tree, 'None', 'Allow')))
+            }
+            Set-ThornswoodServiceAcl $d $a
+        }
 
-    $root = Join-Path $scratch 'root'; Locked $root
-    foreach ($d in 'world', 'data', 'private') { Locked (Join-Path $root $d) }
-    Set-Content -LiteralPath (Join-Path $root 'gamemode.js') -Value '// code'
-    Set-Content -LiteralPath (Join-Path $root 'server.log') -Value 'a line'
-    $said = @(Grant-ThornswoodServiceFolder -Root $root -Sid $sid -Writable 'world', 'data', 'private', 'for-bot' -Files '*.log', '*.log.*')
-    Yes 'the grant says what it gave' ($said.Count -ge 4)
+        $open = Join-Path $scratch 'open'
+        $null = New-Item -ItemType Directory -Path $open
+        $a = Get-Acl -LiteralPath $open
+        $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')), 'ReadAndExecute', $tree, 'None', 'Allow')))
+        Set-ThornswoodServiceAcl $open $a
+        $shut = Join-Path $scratch 'shut'; Locked $shut
+        $ls = Join-Path $scratch 'ls'; Locked $ls
+        $a = Get-Acl -LiteralPath $ls
+        $a.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier('S-1-5-19')), 'Read', $tree, 'None', 'Allow')))
+        Set-ThornswoodServiceAcl $ls $a
 
-    function RulesFor([string]$p, [string]$who) {
-        return @((Get-Acl -LiteralPath $p).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
-                 Where-Object { $_.IdentityReference.Value -eq $who -and [string]$_.AccessControlType -eq 'Allow' })
+        Yes 'the fail-safe finds a folder Users may read' (@(Test-ThornswoodServiceCannotReach @($open)).Count -gt 0)
+        Yes 'the fail-safe finds a folder LOCAL SERVICE may read' (@(Test-ThornswoodServiceCannotReach @($ls)).Count -gt 0)
+        Yes 'the fail-safe passes a locked folder and one that is not there' (
+            @(Test-ThornswoodServiceCannotReach @($shut, (Join-Path $scratch 'nothing'))).Count -eq 0)
+        Yes "the fail-safe finds a folder the task's own SID may read" (
+            @(Test-ThornswoodServiceCannotReach @($open) @($sid)).Count -gt 0)
+
+        # A folder this account may not even look into, the way a VPS runner sees
+        # the servers' private folders (#1273): Test-Path on what is inside is an
+        # error, and without -ErrorAction Stop it said False and the path was
+        # passed over as not there. Only SYSTEM is let in; the owner, this
+        # account, may still put its rules back for the clean-up.
+        $hidden = Join-Path $scratch 'hidden'
+        $null = New-Item -ItemType Directory -Path (Join-Path $hidden 'private') -Force
+        $null = & icacls $hidden /inheritance:r /grant:r '*S-1-5-18:(OI)(CI)F'
+        $null = & icacls $hidden /remove:g ('*' + $me)
+        try {
+            $why = @(Test-ThornswoodServiceCannotReach @((Join-Path $hidden 'private')))
+            Yes ('the fail-safe refuses a path it may not look for, rather than passing it over (' + ($why -join ' | ') + ')') (
+                $why.Count -eq 1 -and $why[0] -match 'could not be checked')
+        } finally { $null = & icacls $hidden /grant ('*' + $me + ':(OI)(CI)F') }
+
+        $root = Join-Path $scratch 'root'; Locked $root
+        foreach ($d in 'world', 'data', 'private') { Locked (Join-Path $root $d) }
+        Set-Content -LiteralPath (Join-Path $root 'gamemode.js') -Value '// code'
+        Set-Content -LiteralPath (Join-Path $root 'server.log') -Value 'a line'
+        $said = @(Grant-ThornswoodServiceFolder -Root $root -Sid $sid -Writable 'world', 'data', 'private', 'for-bot' -Files '*.log', '*.log.*')
+        Yes 'the grant says what it gave' ($said.Count -ge 4)
+
+        function RulesFor([string]$p, [string]$who) {
+            return @((Get-Acl -LiteralPath $p).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
+                     Where-Object { $_.IdentityReference.Value -eq $who -and [string]$_.AccessControlType -eq 'Allow' })
+        }
+        $fsr = [Security.AccessControl.FileSystemRights]
+        $write = [long]($fsr::WriteData -bor $fsr::AppendData -bor $fsr::Delete)
+        function Can([string]$p, [string]$who, [long]$bits) {
+            $have = 0L; foreach ($r in (RulesFor $p $who)) { $have = $have -bor [long][int]$r.FileSystemRights }
+            return (($have -band $bits) -eq $bits)
+        }
+        function CanAny([string]$p, [string]$who, [long]$bits) {
+            $have = 0L; foreach ($r in (RulesFor $p $who)) { $have = $have -bor [long][int]$r.FileSystemRights }
+            return (($have -band $bits) -ne 0)
+        }
+        $gm = Join-Path $root 'gamemode.js'
+        Yes 'the task may read and run gamemode.js' (Can $gm $sid ([long]$fsr::ReadAndExecute))
+        Yes 'and may not change or delete it' (-not (CanAny $gm $sid ([long]($fsr::WriteData -bor $fsr::AppendData -bor $fsr::Delete))))
+        Yes 'LOCAL SERVICE itself is given nothing on it' (@(RulesFor $gm 'S-1-5-19').Count -eq 0)
+        Yes 'the task may make files and folders in the root' (Can $root $sid ([long]($fsr::CreateFiles -bor $fsr::CreateDirectories)))
+        Yes 'and may not delete what is in it' (-not (CanAny $root $sid ([long]$fsr::DeleteSubdirectoriesAndFiles)))
+        $co = @((Get-Acl -LiteralPath $root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) |
+                Where-Object { $_.IdentityReference.Value -eq 'S-1-3-0' })
+        Yes 'what it makes there is its own to change (CREATOR OWNER Modify, inherit only)' (
+            $co.Count -eq 1 -and ($co[0].FileSystemRights -band $fsr::Modify) -eq $fsr::Modify -and [string]$co[0].PropagationFlags -eq 'InheritOnly')
+        Yes 'the log a SYSTEM task left behind it may keep writing' (Can (Join-Path $root 'server.log') $sid $write)
+        foreach ($d in 'world', 'data', 'private') {
+            Yes "it may change what is in $d" (Can (Join-Path $root $d) $sid ([long]$fsr::Modify))
+        }
+        Yes 'a writable folder that is not there is passed over' (-not (Test-Path -LiteralPath (Join-Path $root 'for-bot')))
+        $threw = $false
+        try { $null = Grant-ThornswoodServiceFolder -Root (Join-Path $scratch 'gone') -Sid $sid } catch { $threw = $true }
+        Yes 'a root that is not there throws, so the installer puts the task back on SYSTEM' $threw
+    } finally {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
     }
-    $fsr = [Security.AccessControl.FileSystemRights]
-    $write = [long]($fsr::WriteData -bor $fsr::AppendData -bor $fsr::Delete)
-    function Can([string]$p, [string]$who, [long]$bits) {
-        $have = 0L; foreach ($r in (RulesFor $p $who)) { $have = $have -bor [long][int]$r.FileSystemRights }
-        return (($have -band $bits) -eq $bits)
-    }
-    function CanAny([string]$p, [string]$who, [long]$bits) {
-        $have = 0L; foreach ($r in (RulesFor $p $who)) { $have = $have -bor [long][int]$r.FileSystemRights }
-        return (($have -band $bits) -ne 0)
-    }
-    $gm = Join-Path $root 'gamemode.js'
-    Yes 'the task may read and run gamemode.js' (Can $gm $sid ([long]$fsr::ReadAndExecute))
-    Yes 'and may not change or delete it' (-not (CanAny $gm $sid ([long]($fsr::WriteData -bor $fsr::AppendData -bor $fsr::Delete))))
-    Yes 'LOCAL SERVICE itself is given nothing on it' (@(RulesFor $gm 'S-1-5-19').Count -eq 0)
-    Yes 'the task may make files and folders in the root' (Can $root $sid ([long]($fsr::CreateFiles -bor $fsr::CreateDirectories)))
-    Yes 'and may not delete what is in it' (-not (CanAny $root $sid ([long]$fsr::DeleteSubdirectoriesAndFiles)))
-    $co = @((Get-Acl -LiteralPath $root).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) |
-            Where-Object { $_.IdentityReference.Value -eq 'S-1-3-0' })
-    Yes 'what it makes there is its own to change (CREATOR OWNER Modify, inherit only)' (
-        $co.Count -eq 1 -and ($co[0].FileSystemRights -band $fsr::Modify) -eq $fsr::Modify -and [string]$co[0].PropagationFlags -eq 'InheritOnly')
-    Yes 'the log a SYSTEM task left behind it may keep writing' (Can (Join-Path $root 'server.log') $sid $write)
-    foreach ($d in 'world', 'data', 'private') {
-        Yes "it may change what is in $d" (Can (Join-Path $root $d) $sid ([long]$fsr::Modify))
-    }
-    Yes 'a writable folder that is not there is passed over' (-not (Test-Path -LiteralPath (Join-Path $root 'for-bot')))
-    $threw = $false
-    try { $null = Grant-ThornswoodServiceFolder -Root (Join-Path $scratch 'gone') -Sid $sid } catch { $threw = $true }
-    Yes 'a root that is not there throws, so the installer puts the task back on SYSTEM' $threw
-} finally {
-    Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+} else {
+    Write-Host 'SKIP  the grants and the fail-safe on scratch folders: they are NTFS rules, read and written with Get-Acl and icacls, which only Windows has'
 }
 
 Write-Host ''

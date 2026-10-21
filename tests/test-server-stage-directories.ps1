@@ -31,3 +31,10 @@ foreach ($relative in '../outside.txt', 'data/../../outside.txt', 'C:\outside.tx
     if (-not $refused) { throw "Unsafe stage destination accepted: $relative" }
     Write-Host "PASS rejects $relative"
 }
+# The box's own folders come out the same from any machine, a cloud session's
+# included: Windows paths, resolved by Windows' rules (#2989).
+$boxStage = 'C:\Thornswood-Server\.stage-box'
+$got = @(Get-StageDirectories $boxStage @('gamemode.js', 'data/a.json', 'data\b.json', 'plugins/./x.esp', 'data/sub/../c.json'))
+$want = @($boxStage, ($boxStage + '\data'), ($boxStage + '\plugins'))
+if (($got -join '|') -ne ($want -join '|')) { throw "The box's stage folders came out as $($got -join ', ')" }
+Write-Host "PASS the box's stage folders are its own Windows paths on any machine"

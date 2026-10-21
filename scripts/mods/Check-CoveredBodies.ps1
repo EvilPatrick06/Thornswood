@@ -211,13 +211,15 @@ foreach ($body in $bodies) {
 }
 
 # Anything else under meshes\actors\character that carries anatomy. FaceGenData
-# is thousands of heads and never a body, so it is left out.
+# is thousands of heads and never a body, so it is left out. Off Windows the
+# folders are joined with /, so either separator is read, and a file is named
+# with \ on any machine (#2989).
 $root = Join-Path $data 'meshes\actors\character'
 $named = @($bodies | ForEach-Object { $_.Name.ToLowerInvariant() })
 if (Test-Path -LiteralPath $root) {
     $others = @(Get-ChildItem -LiteralPath $root -Recurse -File -Filter *.nif -ErrorAction SilentlyContinue |
         Where-Object {
-            $_.FullName -notmatch '(?i)\\facegendata\\' -and
+            $_.FullName -notmatch '(?i)[\\/]facegendata[\\/]' -and
             $_.Name -notmatch '(?i)^1stperson' -and
             -not ($_.DirectoryName -eq $assets -and $named -contains $_.Name.ToLowerInvariant())
         })
@@ -227,7 +229,7 @@ if (Test-Path -LiteralPath $root) {
         if ($v.Anatomy.Count -eq 0) { continue }
         $sex = ''
         if ($f.Name -match '(?i)female') { $sex = 'female'; $v = Get-BodyVerdict $shapes 'female' }
-        $rel = $f.FullName.Substring($data.Length + 1)
+        $rel = $f.FullName.Substring($data.Length + 1).Replace([IO.Path]::DirectorySeparatorChar, '\')
         if ($v.Covered) {
             if (-not $Quiet) { Say ("  covered  {0} shapes: {1}" -f $rel, ($shapes -join ', ')) 'Green' }
         } else {

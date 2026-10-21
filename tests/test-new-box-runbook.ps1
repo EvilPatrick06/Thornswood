@@ -447,11 +447,15 @@ Yes '  the webhook, which Watch-Services -SetWebhook asks for, from Discord' (
     @($moving | Where-Object { $_.Leaf -eq 'Watch-Services.ps1' -and (Has $_ 'SetWebhook') }).Count -eq 1)
 $phrase = Row '*passphrase*'
 $keyPath = 'Documents\thornswood-backup-key.txt'
-$rbDefault = [regex]::Match([IO.File]::ReadAllText((Join-Path $scriptsDir 'vps\Restore-Box.ps1')), '\$KeyFile\s*=\s*"([^"]+)"').Groups[1].Value
-$ibDefault = [regex]::Match([IO.File]::ReadAllText((Join-Path $scriptsDir 'deploy\Install-Backup.ps1')), '\$KeyOut\s*=\s*"([^"]+)"').Groups[1].Value
+# Each default's whole line: a "$env:USERPROFILE\..." string, or since #2989
+# a Join-Path onto the profile folder that runs off Windows too. Either way the
+# file it names is the last string on the line.
+$rbDefault = [regex]::Match([IO.File]::ReadAllText((Join-Path $scriptsDir 'vps\Restore-Box.ps1')), '\$KeyFile\s*=\s*([^\r\n]+)').Groups[1].Value
+$ibDefault = [regex]::Match([IO.File]::ReadAllText((Join-Path $scriptsDir 'deploy\Install-Backup.ps1')), '\$KeyOut\s*=\s*([^\r\n]+)').Groups[1].Value
+$endsKey = [regex]::Escape($keyPath) + '[''"]\)?,?\s*$'
 Yes '  the passphrase from the file Restore-Box.ps1 and Install-Backup.ps1 both default to' (
     $phrase.Count -eq 1 -and $phrase[0][1] -match [regex]::Escape($keyPath) -and
-    $rbDefault.EndsWith($keyPath) -and $ibDefault.EndsWith($keyPath))
+    $rbDefault -match $endsKey -and $ibDefault -match $endsKey)
 $tok = Row '*bot token*'
 Yes '  the bot token and the site keys from inside the backup, so Install-Bot asks for none' ($tok.Count -eq 1 -and $tok[0][1] -match 'backup' -and $tok[0][2] -match '-NoToken')
 
