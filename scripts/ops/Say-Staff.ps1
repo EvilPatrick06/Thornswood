@@ -52,7 +52,9 @@
     posted    0 (-Check), by the bot or the webhook
     waiting   2 (-Check), in the outbox, not said yet; the bot reads every
               minute and the webhook takes over after two and a half
-    waiting   2, through GitHub: the run had not ended in -WaitMinutes
+    waiting   2, through GitHub: the run had not ended in -WaitMinutes, or
+              GitHub started it and a read of its answer failed; the notice
+              was sent either way, and -Run <its id> reads the answer
     refused, not found, expired, no watchdog, or the box not reached: 1,
               with why. Nothing was posted.
   In a GitHub Actions job it also writes the box's answer, or why it
@@ -146,33 +148,66 @@ if ($PSCmdlet.ParameterSetName -eq 'Check') {
 if (-not $From) { $From = 'agent' }
 
 # ----------------------------------------------------------- through GitHub --
+# The run the dispatch started, once GitHub has named it. From then on the
+# notice is GitHub's to run, so a read that fails here is said as that, with
+# the line that reads the answer later, and never as nothing having been sent.
+$sentRun = 0
+
 # One GET, its answer as an object; a refusal stops the script with why.
-function Get-GitHub([string]$path) {
+# -NotYet: GitHub's Not Found means not served yet, and comes back as $null.
+function Get-GitHub([string]$path, [switch]$NotYet) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
     $o = @(& gh api $path 2>&1 | ForEach-Object { "$_" })
     $c = $LASTEXITCODE
     $ErrorActionPreference = $old
-    if ($c -ne 0) { Die ("GitHub answered GET $path with: " + (($o | Select-Object -Last 2) -join ' ')) }
+    if ($c -ne 0) {
+        if ($NotYet -and ($o -join ' ') -match '\(HTTP 404\)') { return $null }
+        $why = "GitHub answered GET $path with: " + (($o | Select-Object -Last 2) -join ' ')
+        if ($sentRun) { Unread $why }
+        Die $why
+    }
     return (($o -join "`n") | ConvertFrom-Json)
+}
+
+# Sent, and the answer not read: exit 2, as for a run that has not ended.
+function Unread([string]$why) {
+    Note 'warning' ("sent as run $sentRun; its answer was not read: $why")
+    Say ("the notice was sent: GitHub started run $sentRun with it, and the run posts it. Its answer was not read here: $why") 'Yellow'
+    Say ('  its answer: pwsh scripts/ops/Say-Staff.ps1 -Run ' + $sentRun) 'DarkGray'
+    exit 2
 }
 
 # Waits for the run to end, then reads what the runner said: the Say-Staff
 # annotation on its job. Returns the box's answer line.
-function Read-RunAnswer([long]$id) {
+#
+# -Started: the dispatch has just named this run. GitHub writes the run, then
+# answers the dispatch with its id, and serves reads from copies that catch
+# up a moment later, so the first read of a run that new can be Not Found
+# (#3081: run 39647569632 was 404 within the second it was made, during
+# GitHub's Actions incident of 21 Oct, and served a few seconds after). Until
+# a read first serves it, that run is one more state of the wait below, which
+# reads every 5 seconds until the run has ended or -WaitMinutes is up, the
+# same as queued. A run given by -Run, or one already read, that is Not Found
+# stops at once: GitHub never said it exists, or it no longer does.
+function Read-RunAnswer([long]$id, [switch]$Started) {
     $runPath = "repos/$GitHubRepo/actions/runs/$id"
     $deadline = [DateTime]::UtcNow.AddMinutes($WaitMinutes)
-    $run = Get-GitHub $runPath
-    $told = $false
-    while ($run.status -ne 'completed') {
+    $run = Get-GitHub $runPath -NotYet:$Started
+    $told = ''
+    while (-not $run -or $run.status -ne 'completed') {
+        $state = if ($run) { $run.status } else { 'not served by GitHub yet' }
         if ([DateTime]::UtcNow -gt $deadline) {
-            Say ("the run has not ended after $WaitMinutes minutes (it was " + $run.status + '), so every runner is busy. It still posts when one takes it.') 'Yellow'
+            Say ("the run has not ended after $WaitMinutes minutes (it was " + $state + '), so every runner is busy. It still posts when one takes it.') 'Yellow'
             Say ('  its answer then: pwsh scripts/ops/Say-Staff.ps1 -Run ' + $id) 'DarkGray'
-            Say ('  ' + $run.html_url) 'DarkGray'
+            if ($run) { Say ('  ' + $run.html_url) 'DarkGray' }
             exit 2
         }
-        if (-not $told -and $run.status -ne 'in_progress') { Say ('  waiting for a runner (' + $run.status + ')') 'DarkGray'; $told = $true }
+        if ($told -ne $state -and $state -ne 'in_progress') {
+            if ($run) { Say ('  waiting for a runner (' + $state + ')') 'DarkGray' } else { Say '  started; GitHub does not serve the new run yet' 'DarkGray' }
+            $told = $state
+        }
         Start-Sleep -Seconds 5
-        $run = Get-GitHub $runPath
+        $run = Get-GitHub $runPath -NotYet:($Started -and -not $run)
     }
     if ($run.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a staff-notice run (it is " + $run.path + ').') }
     $notes = @()
@@ -199,9 +234,13 @@ if ($route -eq 'github') {
         $ErrorActionPreference = $old
         if ($c -ne 0) { Die ('GitHub did not start the staff-notice workflow: ' + (($o | Select-Object -Last 2) -join ' ') + '. Nothing was posted.') }
         $started = ($o -join "`n") | ConvertFrom-Json
-        if (-not $started.workflow_run_id) { Die ('GitHub started the workflow but named no run: ' + ($o -join ' ')) }
+        if (-not $started.workflow_run_id) {
+            Say ('the notice was sent: GitHub started the staff-notice workflow with it, but named no run, so its answer cannot be read here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow) 'Yellow'
+            exit 2
+        }
         Say ('sent to the staff-notice workflow: ' + $started.html_url) 'DarkGray'
-        $answer = Read-RunAnswer ([long]$started.workflow_run_id)
+        $sentRun = [long]$started.workflow_run_id
+        $answer = Read-RunAnswer $sentRun -Started
     }
     $out = @($answer)
     $code = 1
