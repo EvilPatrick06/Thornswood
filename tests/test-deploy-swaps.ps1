@@ -371,11 +371,18 @@ function MapTemp([string]$s) {
               Replace('C:/Thornswood-Deploys', $store.Replace('\', '/')).Replace('C:\Thornswood-Deploys', $store)
 }
 function global:ssh {
+    $in = @($input)
     $all = @($args | ForEach-Object { [string]$_ })
     $cmd = $all[-1]
     $body = ''
     $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
-    if ($m.Success) { $body = MapTemp ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
+    if ($m.Success) {
+        $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+        # A long script comes on standard input under Send-Script.ps1's
+        # reader (#3027), so it is read from there.
+        if ($in.Count -and $body.StartsWith('. ([scriptblock]::Create(')) { $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$in[0] -replace '[^A-Za-z0-9+/=]', ''))) }
+        $body = MapTemp $body
+    }
     else {
         $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
         # The file's own text, with the box's fixed places mapped too.

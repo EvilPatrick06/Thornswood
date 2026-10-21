@@ -754,10 +754,17 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
                   Replace('C:/Thornswood-Deploys', $global:TsGm.Store.Replace('\', '/')).Replace('C:\Thornswood-Deploys', $global:TsGm.Store)
     }
     function global:ssh {
+        $in = @($input)
         $cmd = [string]@($args)[-1]
         $body = ''
         $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
-        if ($m.Success) { $body = TsGmMap ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
+        if ($m.Success) {
+            $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+            # A long script comes on standard input under Send-Script.ps1's
+            # reader (#3027), so it is read from there.
+            if ($in.Count -and $body.StartsWith('. ([scriptblock]::Create(')) { $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$in[0] -replace '[^A-Za-z0-9+/=]', ''))) }
+            $body = TsGmMap $body
+        }
         else {
             $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
             if ($m.Success) { $body = TsGmMap ([IO.File]::ReadAllText((TsGmMap $m.Groups[1].Value))) }
@@ -812,11 +819,11 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $script:lastFar = @($lines) + @($threw)
         return [pscustomobject]@{ Ok = ((-not $threw) -and $global:LASTEXITCODE -eq 0); Said = ($script:lastFar -join "`n"); Threw = $threw
                                   Ssh = ($global:TsGm.Ssh.Count - $script:gmSshBefore); Scp = ($global:TsGm.Scp.Count - $script:gmScpBefore)
-                                  # What scp put anywhere but Send-Script.ps1's own script files: a read
-                                  # whose command line is past its limit goes up as a file, and that sends
-                                  # nothing to the server or the store (16 Oct: the -GamemodeOnly read is
-                                  # 7,020 characters encoded, past the 6,000 limit).
-                                  Sent = @($global:TsGm.Scp | Select-Object -Skip $script:gmScpBefore | Where-Object { $_ -notlike '*thornswood-remote-*' }).Count }
+                                  # What scp put anywhere. A read whose command line is past
+                                  # Send-Script.ps1's limit goes on standard input and copies
+                                  # nothing up (16 Oct: the -GamemodeOnly read is 7,020
+                                  # characters encoded, past the 6,000 limit; #3027).
+                                  Sent = @($global:TsGm.Scp | Select-Object -Skip $script:gmScpBefore).Count }
     }
     function Text([string]$path) { if (Test-Path -LiteralPath $path) { return [IO.File]::ReadAllText($path) }; return $null }
     function Prevs { return @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } | Sort-Object Name | ForEach-Object { $_.FullName }) }

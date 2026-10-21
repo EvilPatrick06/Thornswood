@@ -136,9 +136,7 @@ try {
         if ($l) { Say ('box  ' + $l) 'DarkGray' }
     }
     if (-not $made) { throw ('could not make ' + $run + ' on the box. What ssh said is above.') }
-    # The run's own script goes into its folder, so it goes with the folder:
-    # sent the usual way, as a file of its own in the temp folder, a cut
-    # session would leave that file behind instead.
+    # The run's own script goes into its folder, so it goes with the folder.
     $farFile = Join-Path $local 'run.ps1'
     [IO.File]::WriteAllText($farFile, $farRun, (New-Object Text.UTF8Encoding($true)))
     Send-ThornswoodArtifactFile $artifact.Zip $target $ssh ($runFar + '/tools.zip')

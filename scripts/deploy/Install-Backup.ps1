@@ -67,8 +67,8 @@ foreach ($t in 'ssh', 'scp') {
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
-  # as a file of its own name, removed after, and the far side's exit code
-  # comes back.
+  # on ssh's standard input (nothing of it is left on the box), and the far
+  # side's exit code comes back.
   return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 
