@@ -176,6 +176,14 @@ class Guild(object):
         # Set by hand to #welcome-travelers on the live server, which the
         # builder now leaves where it is.
         self.system_channel = object()
+        # Discord's own notices, both on #staff-updates by the id in
+        # staff-channel.txt, as the live server was measured on 21 Oct
+        # (#2955), so the builder leaves them alone.
+        with open(os.path.join(HERE, 'staff-channel.txt'), encoding='utf-8') as f:
+            self.staff_updates = types.SimpleNamespace(
+                id=int(f.read().strip()), name='staff-updates')
+        self.public_updates_channel = self.staff_updates
+        self.safety_alerts_channel = self.staff_updates
 
     async def _made(self, what, name, **kw):
         self.calls.append((what, name, kw))
@@ -196,6 +204,9 @@ class Guild(object):
 
     async def create_forum(self, name, **kw):
         return await self._made('create_forum', name, **kw)
+
+    def get_channel(self, cid):
+        return self.staff_updates if cid == self.staff_updates.id else None
 
     async def edit(self, **kw):
         self.calls.append(('guild.edit', self, kw))
