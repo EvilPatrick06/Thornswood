@@ -26,6 +26,6 @@ what you saw in game. "Not run" is an answer; leave nothing blank. -->
 
 - [ ] It changes one thing. A branch that changes eight things is eight reviews.
 - [ ] It fixes the cause, and says what the cause was. No band-aids: nothing that notices the damage and undoes it, no retry that hopes a race comes out right, no layer over an earlier band-aid (Developer-Guide.md, "Fix the cause, no band-aids").
-- [ ] If it edits Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1, there is a line in #staff-general about it.
-- [ ] If it changes anything in Developer-Guide.md's settled design, the team agreed it in #staff-general first.
+- [ ] If it edits Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1, there is a line in #staff-updates about it (`scripts/ops/Say-Staff.ps1` posts one through the bot).
+- [ ] If it changes anything in Developer-Guide.md's settled design, the team agreed it in #staff-updates first.
 - [ ] Anything it found or left unfinished is on the board (GitHub Issues).

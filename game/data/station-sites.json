@@ -585,6 +585,31 @@
     8.0
    ]
   },
+  "river": {
+   "amongPlants": false,
+   "base": "18031:Thornswood-Content.esp",
+   "bounds": [
+    -18,
+    -18,
+    0,
+    18,
+    18,
+    46
+   ],
+   "count": 2,
+   "edid": "ThornswoodActivatorWaterBucket",
+   "flat": 8.0,
+   "name": "water bucket",
+   "reach": 3000,
+   "rule": "One on the river nearest each of the nine towns with a forge (#1382), the nearest clear spot to the forge within 3,000 units whose cell's water is river water by game/data/waters.json, and one on Lake Honrich at Riften, whose water the records call deep. At the edge: ground no lower than that water and no more than 120 units above it, and navmesh under the water within 160 units, so the water is there to reach. Patrick, 12 October 2026, approved drawing spots at rivers and lakes on #1382, and 20 October 2026: lake water is worth what river water is, so one bucket serves both, and both must be boiled.",
+   "setIntoRock": false,
+   "user": [
+    -30.0,
+    -80.0,
+    30.0,
+    -18.0
+   ]
+  },
   "salt": {
    "amongPlants": false,
    "base": "dde4ef:Thornswood-Content.esp",
@@ -608,6 +633,31 @@
     -300.0,
     35.0,
     -236.0
+   ]
+  },
+  "well": {
+   "amongPlants": false,
+   "base": "18030:Thornswood-Content.esp",
+   "bounds": [
+    -18,
+    -18,
+    0,
+    18,
+    18,
+    46
+   ],
+   "count": 18,
+   "edid": "ThornswoodActivatorWellBucket",
+   "flat": 8.0,
+   "name": "well bucket",
+   "reach": 400,
+   "rule": "One beside each of the placed wells in game/data/wells.json (#1382): the wells are statics and raise no activation, so the bucket is what somebody activates to draw water there (Patrick, 12 October 2026, approved on #1382). A well in a cell no master of the content plugin carries is left out, because the plugin can only place into its masters' cells.",
+   "setIntoRock": false,
+   "user": [
+    -30.0,
+    -80.0,
+    30.0,
+    -18.0
    ]
   }
  },
@@ -1907,6 +1957,102 @@
    "turn": 135,
    "where": "The College's Hall of Countenance, Winterhold"
   },
+  "river-riften": {
+   "anchor": "53481:Skyrim.esm",
+   "anchorAngle": 2.34,
+   "anchorAt": [
+    172414.7,
+    -97164.6,
+    11128.0
+   ],
+   "anchorEdid": "CraftingBlackSmithForge",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 2.34,
+   "base": "18031:Thornswood-Content.esp",
+   "cell": "42247:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RiftenOrigin",
+   "fromAnchor": 754,
+   "groundUnder": [
+    10687.7,
+    10690.1
+   ],
+   "interior": false,
+   "kind": "river",
+   "nearest": {
+    "edid": "XJKboatoar",
+    "ref": "16bf:JKs Skyrim.esp",
+    "units": 55
+   },
+   "offset": [
+    120,
+    -744
+   ],
+   "passedOver": [],
+   "point": "53481:Skyrim.esm",
+   "pos": [
+    172504.3,
+    -97912.9,
+    10687.7
+   ],
+   "ref": "18144:Thornswood-Content.esp",
+   "space": "16bb4:Skyrim.esm",
+   "spaceEdid": "RiftenWorld",
+   "turn": 0,
+   "where": "Lake Honrich at Riften",
+   "worldCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins"
+  },
+  "river-riverwood": {
+   "anchor": "d6987:Skyrim.esm",
+   "anchorAngle": 152.8,
+   "anchorAt": [
+    20459.2,
+    -45225.1,
+    -83.4
+   ],
+   "anchorEdid": "CraftingBlackSmithForge",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 242.8,
+   "base": "18031:Thornswood-Content.esp",
+   "cell": "9712:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "Riverwood02",
+   "fromAnchor": 2338,
+   "groundUnder": [
+    -138.4,
+    -133.5
+   ],
+   "interior": false,
+   "kind": "river",
+   "nearest": {
+    "edid": "TreeSwordFernCluster02",
+    "ref": "a5b:Update.esm",
+    "units": 252
+   },
+   "offset": [
+    -2232,
+    -696
+   ],
+   "passedOver": [],
+   "point": "d6987:Skyrim.esm",
+   "pos": [
+    22126.2,
+    -43585.7,
+    -138.4
+   ],
+   "ref": "18145:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 90,
+   "where": "the river at Riverwood",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
   "salt-dawnstar": {
    "anchor": "1b3f:JKs Skyrim.esp",
    "anchorAngle": 84.27,
@@ -2108,6 +2254,850 @@
    "turn": 315,
    "where": "Winterhold",
    "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-03": {
+   "anchor": "10aaa6:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    83449.8,
+    -46340.1,
+    7831.1
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9722:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Immersive Patrols II.esp, so the copy never wins",
+   "cellEdid": "",
+   "fromAnchor": 244,
+   "groundUnder": [
+    7818.2,
+    7826.0
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "ImpStoneBlock04",
+    "ref": "10aaa8:Skyrim.esm",
+    "units": 32
+   },
+   "offset": [
+    224,
+    96
+   ],
+   "passedOver": [],
+   "pos": [
+    83673.8,
+    -46244.1,
+    7818.2
+   ],
+   "ref": "18102:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in 9722:Skyrim.esm",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-05": {
+   "anchor": "95342:Skyrim.esm",
+   "anchorAngle": 359.99,
+   "anchorAt": [
+    -2772.4,
+    3861.0,
+    1546.0
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 89.99,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "20a3e:Skyrim.esm",
+   "cellCopy": "won by Skyrim.esm, Bethesda's own",
+   "cellEdid": "BloatedMansRuins",
+   "fromAnchor": 115,
+   "groundUnder": [
+    1547.3,
+    1552.0
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "RockS02",
+    "ref": "95365:Skyrim.esm",
+    "units": 41
+   },
+   "offset": [
+    -64,
+    96
+   ],
+   "passedOver": [],
+   "pos": [
+    -2836.5,
+    3957.0,
+    1547.3
+   ],
+   "ref": "18104:Thornswood-Content.esp",
+   "space": "1fae2:Skyrim.esm",
+   "spaceEdid": "BloatedMansGrottoWorld",
+   "turn": 90,
+   "where": "ImpWell01 in BloatedMansRuins",
+   "worldCopy": "won by Update.esm, Bethesda's own"
+  },
+  "well-06": {
+   "anchor": "8c34:Dawnguard.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    1228.7,
+    549.7,
+    6524.5
+   ],
+   "anchorEdid": "FarmWell01",
+   "anchorRecordFrom": "Dawnguard.esm",
+   "anchorTouchedBy": [
+    "Dawnguard.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "5eab:Dawnguard.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "DLC1RedwaterDen01",
+   "fromAnchor": 176,
+   "groundUnder": [
+    6532.4,
+    6534.0
+   ],
+   "interior": true,
+   "kind": "well",
+   "nearest": {
+    "edid": "CandleHornChandelier01",
+    "ref": "140a2:Dawnguard.esm",
+    "units": 79
+   },
+   "offset": [
+    0,
+    176
+   ],
+   "passedOver": [],
+   "pos": [
+    1228.7,
+    725.7,
+    6532.4
+   ],
+   "ref": "18105:Thornswood-Content.esp",
+   "space": "5eab:Dawnguard.esm",
+   "spaceEdid": "DLC1RedwaterDen01",
+   "turn": 0,
+   "where": "FarmWell01 in DLC1RedwaterDen01"
+  },
+  "well-07": {
+   "anchor": "21093:Dragonborn.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    537.4,
+    -315.3,
+    537.3
+   ],
+   "anchorEdid": "FarmBWellEnt01",
+   "anchorRecordFrom": "Dragonborn.esm",
+   "anchorTouchedBy": [
+    "Dragonborn.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "21074:Dragonborn.esm",
+   "cellCopy": "won by Dragonborn.esm, Bethesda's own",
+   "cellEdid": "DLC2HrodulfsHouse",
+   "fromAnchor": 97,
+   "groundUnder": [
+    541.8,
+    543.3
+   ],
+   "interior": true,
+   "kind": "well",
+   "nearest": {
+    "edid": "DLC2HrodulfsBookshelf",
+    "ref": "38f48:Dragonborn.esm",
+    "units": 33
+   },
+   "offset": [
+    96,
+    16
+   ],
+   "passedOver": [],
+   "pos": [
+    633.4,
+    -299.3,
+    541.8
+   ],
+   "ref": "18106:Thornswood-Content.esp",
+   "space": "21074:Dragonborn.esm",
+   "spaceEdid": "DLC2HrodulfsHouse",
+   "turn": 0,
+   "where": "FarmBWellEnt01 in DLC2HrodulfsHouse"
+  },
+  "well-08": {
+   "anchor": "1caff:Dragonborn.esm",
+   "anchorAngle": 30.0,
+   "anchorAt": [
+    29445.4,
+    36890.0,
+    420.0
+   ],
+   "anchorEdid": "RedoranWell01",
+   "anchorRecordFrom": "Dragonborn.esm",
+   "anchorTouchedBy": [
+    "Dragonborn.esm"
+   ],
+   "angle": 30.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "eed6:Dragonborn.esm",
+   "cellCopy": "won by Dragonborn.esm, Bethesda's own",
+   "cellEdid": "DLC2RavenRock04",
+   "fromAnchor": 272,
+   "groundUnder": [
+    424.0,
+    429.7
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "CrateSmall02",
+    "ref": "1df2d:Dragonborn.esm",
+    "units": 66
+   },
+   "offset": [
+    -208,
+    -176
+   ],
+   "passedOver": [],
+   "pos": [
+    29177.3,
+    36841.6,
+    424.0
+   ],
+   "ref": "18107:Thornswood-Content.esp",
+   "space": "800:Dragonborn.esm",
+   "spaceEdid": "DLC2SolstheimWorld",
+   "turn": 0,
+   "where": "RedoranWell01 in DLC2RavenRock02",
+   "worldCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins"
+  },
+  "well-09": {
+   "anchor": "5a646:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    -145433.1,
+    -22394.3,
+    -1034.1
+   ],
+   "anchorEdid": "GenericWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 270.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "7660:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "DushnikhYalExterior02",
+   "fromAnchor": 115,
+   "groundUnder": [
+    -1043.3,
+    -1035.7
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "CombatDummy02",
+    "ref": "6a8df:Skyrim.esm",
+    "units": 107
+   },
+   "offset": [
+    64,
+    -96
+   ],
+   "passedOver": [],
+   "pos": [
+    -145369.1,
+    -22490.3,
+    -1043.3
+   ],
+   "ref": "18108:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 270,
+   "where": "GenericWell01 in DushnikhYalExterior02",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-10": {
+   "anchor": "ef416:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    800.0,
+    -224.0,
+    0.0
+   ],
+   "anchorEdid": "FarmBWellEnt01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "ef324:Skyrim.esm",
+   "cellCopy": "won by Skyrim.esm, Bethesda's own",
+   "cellEdid": "FalkreathBarracksJail",
+   "fromAnchor": 32,
+   "groundUnder": [
+    0.0,
+    0.4
+   ],
+   "interior": true,
+   "kind": "well",
+   "nearest": {
+    "edid": "FXcobwebDangle02",
+    "ref": "ef3f4:Skyrim.esm",
+    "units": 82
+   },
+   "offset": [
+    0,
+    32
+   ],
+   "passedOver": [],
+   "pos": [
+    800.0,
+    -192.0,
+    0.0
+   ],
+   "ref": "18109:Thornswood-Content.esp",
+   "space": "ef324:Skyrim.esm",
+   "spaceEdid": "FalkreathBarracksJail",
+   "turn": 0,
+   "where": "FarmBWellEnt01 in FalkreathBarracksJail"
+  },
+  "well-12": {
+   "anchor": "ef327:Skyrim.esm",
+   "anchorAngle": 117.46,
+   "anchorAt": [
+    -26955.9,
+    -87201.9,
+    -2970.6
+   ],
+   "anchorEdid": "FarmWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 117.46,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9c7f:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "FalkreathExterior02",
+   "fromAnchor": 181,
+   "groundUnder": [
+    -2961.2,
+    -2955.0
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "HandCart01Wheel",
+    "ref": "69e33:Skyrim.esm",
+    "units": 36
+   },
+   "offset": [
+    128,
+    128
+   ],
+   "passedOver": [],
+   "pos": [
+    -26901.4,
+    -87374.5,
+    -2961.2
+   ],
+   "ref": "1810b:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "FarmWell01 in FalkreathExterior02",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-13": {
+   "anchor": "71a9a:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    64816.2,
+    10258.1,
+    -654.1
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9176:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "FellglowKeepExterior02",
+   "fromAnchor": 145,
+   "groundUnder": [
+    -662.4,
+    -654.9
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "ChickenNest",
+    "ref": "1066b3:Skyrim.esm",
+    "units": 73
+   },
+   "offset": [
+    144,
+    16
+   ],
+   "passedOver": [],
+   "pos": [
+    64960.2,
+    10274.1,
+    -662.4
+   ],
+   "ref": "1810c:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in FellglowKeepExterior02",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-14": {
+   "anchor": "2088b:Skyrim.esm",
+   "anchorAngle": 34.38,
+   "anchorAt": [
+    27754.4,
+    63081.5,
+    -9468.2
+   ],
+   "anchorEdid": "ImpExtIceWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 259.38,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "8fec:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "FortDunstadExterior02",
+   "fromAnchor": 113,
+   "groundUnder": [
+    -9468.8,
+    -9460.9
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "Bucket02b",
+    "ref": "c9187:Skyrim.esm",
+    "units": 53
+   },
+   "offset": [
+    80,
+    80
+   ],
+   "passedOver": [],
+   "pos": [
+    27865.6,
+    63102.4,
+    -9468.8
+   ],
+   "ref": "1810d:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 225,
+   "where": "ImpExtIceWell01 in FortDunstadExterior02",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-17": {
+   "anchor": "33ed9:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    34644.1,
+    -92660.2,
+    13210.8
+   ],
+   "anchorEdid": "ImpExtIceWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9883:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "FortNeugradExterior04",
+   "fromAnchor": 145,
+   "groundUnder": [
+    13214.4,
+    13222.1
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "Bucket01",
+    "ref": "33edb:Skyrim.esm",
+    "units": 208
+   },
+   "offset": [
+    144,
+    16
+   ],
+   "passedOver": [],
+   "pos": [
+    34788.1,
+    -92644.2,
+    13214.4
+   ],
+   "ref": "18110:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpExtIceWell01 in FortNeugradExterior04",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-18": {
+   "anchor": "6f3de:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    -55328.0,
+    70480.0,
+    -12928.0
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9380:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "FortSnowhawkExterior04",
+   "fromAnchor": 173,
+   "groundUnder": [
+    -12931.5,
+    -12924.6
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "Bucket01",
+    "ref": "6f580:Skyrim.esm",
+    "units": 119
+   },
+   "offset": [
+    144,
+    96
+   ],
+   "passedOver": [],
+   "pos": [
+    -55184.0,
+    70576.0,
+    -12931.5
+   ],
+   "ref": "18111:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in FortSnowhawkExterior04",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-20": {
+   "anchor": "798a0:Skyrim.esm",
+   "anchorAngle": 314.16,
+   "anchorAt": [
+    -70916.0,
+    -27502.8,
+    667.0
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 314.16,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9a9b:Skyrim.esm",
+   "cellCopy": "won by Skyrim.esm, Bethesda's own",
+   "cellEdid": "FortSungardExterior01",
+   "fromAnchor": 144,
+   "groundUnder": [
+    674.6,
+    674.6
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "ImpExtBldgSecondCorner01",
+    "ref": "2bd9e:Skyrim.esm",
+    "units": 84
+   },
+   "offset": [
+    0,
+    -144
+   ],
+   "passedOver": [],
+   "pos": [
+    -70812.7,
+    -27603.1,
+    674.6
+   ],
+   "ref": "18113:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in FortSungardExterior01",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-21": {
+   "anchor": "cd4cc:Skyrim.esm",
+   "anchorAngle": 53.0,
+   "anchorAt": [
+    63429.1,
+    89840.9,
+    -5090.0
+   ],
+   "anchorEdid": "ImpExtIceWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 53.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "8f29:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "FrostflowLighthouseExterior01",
+   "fromAnchor": 112,
+   "groundUnder": [
+    -5107.4,
+    -5101.2
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "RockM02Snow",
+    "ref": "61cf7:Skyrim.esm",
+    "units": 254
+   },
+   "offset": [
+    0,
+    -112
+   ],
+   "passedOver": [],
+   "pos": [
+    63339.7,
+    89773.5,
+    -5107.4
+   ],
+   "ref": "18114:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpExtIceWell01 in FrostflowLighthouseExterior01",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-22": {
+   "anchor": "2107b:North Keep.esp",
+   "anchorAngle": 51.57,
+   "anchorAt": [
+    -57308.7,
+    -76508.2,
+    142.8
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "North Keep.esp",
+   "anchorTouchedBy": [
+    "North Keep.esp"
+   ],
+   "angle": 51.57,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9c24:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by North Keep.esp, so the copy never wins",
+   "cellEdid": "NorthkeepExterior01",
+   "fromAnchor": 143,
+   "groundUnder": [
+    143.3,
+    143.6
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "ImpExtSupport01",
+    "ref": "212a2:North Keep.esp",
+    "units": 333
+   },
+   "offset": [
+    -64,
+    -128
+   ],
+   "passedOver": [],
+   "pos": [
+    -57448.8,
+    -76537.6,
+    143.3
+   ],
+   "ref": "18115:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in POIPineForest08",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-23": {
+   "anchor": "5448:OarsRest.esp",
+   "anchorAngle": 356.56,
+   "anchorAt": [
+    -47733.9,
+    -46215.2,
+    1128.5
+   ],
+   "anchorEdid": "FarmWell01",
+   "anchorRecordFrom": "OarsRest.esp",
+   "anchorTouchedBy": [
+    "OarsRest.esp"
+   ],
+   "angle": 356.56,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9b3a:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins",
+   "cellEdid": "POITundra08",
+   "fromAnchor": 226,
+   "groundUnder": [
+    1093.2,
+    1100.7
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "TreeFloraThistle01",
+    "ref": "31ca:OarsRest.esp",
+    "units": 30
+   },
+   "offset": [
+    -160,
+    -160
+   ],
+   "passedOver": [],
+   "pos": [
+    -47884.0,
+    -46384.5,
+    1093.2
+   ],
+   "ref": "18116:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "FarmWell01 in POITundra08",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
+  },
+  "well-25": {
+   "anchor": "f0ebc:Skyrim.esm",
+   "anchorAngle": 90.0,
+   "anchorAt": [
+    173440.0,
+    -97024.0,
+    11134.6
+   ],
+   "anchorEdid": "RTPlazaWell01",
+   "anchorRecordFrom": "JKs Skyrim.esp",
+   "anchorTouchedBy": [
+    "Skyrim.esm",
+    "JKs Skyrim.esp"
+   ],
+   "angle": 90.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "42247:Skyrim.esm",
+   "cellCopy": "carried after the content plugin by Populated Cities Towns Villages Legendary.esp, so the copy never wins",
+   "cellEdid": "RiftenOrigin",
+   "fromAnchor": 284,
+   "groundUnder": [
+    11104.9,
+    11112.0
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "TreeReachFern02",
+    "ref": "1039:JKs Skyrim.esp",
+    "units": 67
+   },
+   "offset": [
+    272,
+    80
+   ],
+   "passedOver": [],
+   "pos": [
+    173520.0,
+    -97296.0,
+    11104.9
+   ],
+   "ref": "18118:Thornswood-Content.esp",
+   "space": "16bb4:Skyrim.esm",
+   "spaceEdid": "RiftenWorld",
+   "turn": 0,
+   "where": "RTPlazaWell01 in RiftenOrigin",
+   "worldCopy": "carried after the content plugin by Water for ENB (Shades of Skyrim).esp, so the copy never wins"
+  },
+  "well-28": {
+   "anchor": "69f82:Skyrim.esm",
+   "anchorAngle": 0.0,
+   "anchorAt": [
+    112008.1,
+    -82168.8,
+    11168.3
+   ],
+   "anchorEdid": "ImpWell01",
+   "anchorRecordFrom": "Skyrim.esm",
+   "anchorTouchedBy": [
+    "Skyrim.esm"
+   ],
+   "angle": 0.0,
+   "base": "18030:Thornswood-Content.esp",
+   "cell": "9832:Skyrim.esm",
+   "cellCopy": "won by Update.esm, Bethesda's own",
+   "cellEdid": "TrevasWatchExterior01",
+   "fromAnchor": 222,
+   "groundUnder": [
+    11142.0,
+    11149.6
+   ],
+   "interior": false,
+   "kind": "well",
+   "nearest": {
+    "edid": "ShackFrameLMid01",
+    "ref": "c6295:Skyrim.esm",
+    "units": 443
+   },
+   "offset": [
+    192,
+    -112
+   ],
+   "passedOver": [],
+   "pos": [
+    112200.1,
+    -82280.8,
+    11142.0
+   ],
+   "ref": "1811b:Thornswood-Content.esp",
+   "space": "3c:Skyrim.esm",
+   "spaceEdid": "Tamriel",
+   "turn": 0,
+   "where": "ImpWell01 in TrevasWatchExterior01",
+   "worldCopy": "carried after the content plugin by Water for ENB - Patch - Generic Landscape Patch.esp, so the copy never wins"
   }
  },
  "skipped": {
@@ -2288,6 +3278,180 @@
     }
    ],
    "where": "The White Phial, Windhelm"
+  },
+  "river-dawnstar": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "cadf6:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Dawnstar"
+  },
+  "river-falkreath": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "99b8a:Skyrim.esm",
+     "why": "no clear spot within 3000 units (97936 not by river or lake water; 64 touches TreeThicket01; 47 off the navmesh; 1 not at the water's edge)"
+    }
+   ],
+   "where": "the river at Falkreath"
+  },
+  "river-markarth": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "514d8:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Markarth"
+  },
+  "river-morthal": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "24588:JKs Skyrim.esp",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Morthal"
+  },
+  "river-solitude": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "4e3e9:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Solitude"
+  },
+  "river-whiterun": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "c430a:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Whiterun"
+  },
+  "river-windhelm": {
+   "kind": "river",
+   "triedAnchors": [
+    {
+     "anchor": "f7798:Skyrim.esm",
+     "why": "no clear spot within 3000 units (98048 not by river or lake water)"
+    }
+   ],
+   "where": "the river at Windhelm"
+  },
+  "well-01": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "2b245:Dragonborn.esm",
+     "why": "no clear spot within 400 units (5446 the ground runs # to #; 3135 its cell eda3:Dragonborn.esm: Embers XD.esp changes it before the content plugin; 2944 off the navmesh; 1901 touches FishRack01)"
+    }
+   ],
+   "where": "DLC2SkaalVilFarmWell01 in 142ec:Dragonborn.esm"
+  },
+  "well-02": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "1f99b:ElysiumEstate.esp",
+     "why": "no clear spot within 400 units (4380 its cell 965b:Skyrim.esm: ElysiumEstate.esp changes it before the content plugin; 2137 off the navmesh; 2066 touches DLC1TreeFloraMountainFlower01Yellow; 1219 touches TreeFloraHangingMoss02)"
+    }
+   ],
+   "where": "FarmWell01 in 965b:Skyrim.esm"
+  },
+  "well-04": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "2b2c:aaaGraniteHill.esp",
+     "why": "no clear spot within 400 units (6766 its cell 9ad9:Skyrim.esm: aaaGraniteHill.esp changes it before the content plugin; 2468 off the navmesh; 1326 touches CommonBench01; 906 touches TreeClover01)"
+    }
+   ],
+   "where": "FarmWell01 in 9ad9:Skyrim.esm"
+  },
+  "well-11": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "ef43d:Skyrim.esm",
+     "why": "no clear spot within 400 units (10361 off the navmesh; 3490 touches FXcobwebDangle01; 1580 touches FXcobwebDangle02; 257 touches PortGatePole01)"
+    }
+   ],
+   "where": "FarmBWell01 in FalkreathBarracksJail"
+  },
+  "well-15": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "5c535:Skyrim.esm",
+     "why": "no clear spot within 400 units (12503 off the navmesh; 3185 touches RiftenRWHallLadderDoor01, its way through)"
+    }
+   ],
+   "where": "ImpWell01 in FortGreenwall04"
+  },
+  "well-16": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "51762:Skyrim.esm",
+     "why": "no clear spot within 400 units (10633 its cell 99e8:Skyrim.esm: Embers XD.esp changes it before the content plugin; 3868 off the navmesh; 767 touches ImpDoorDoubleLoad01, its way through; 237 touches Bucket01)"
+    }
+   ],
+   "where": "ImpWell01 in FortGreymoorExterior03"
+  },
+  "well-19": {
+   "kind": "well",
+   "triedAnchors": [],
+   "where": "ImpWell01 in FortSungardCourtyard",
+   "why": "the well 352a9:Skyrim.esm is not placed, or is switched off or has an enable parent"
+  },
+  "well-24": {
+   "kind": "well",
+   "triedAnchors": [],
+   "where": "FarmWell01 in POITundra08",
+   "why": "it shares the bucket of well-23, 226 units away"
+  },
+  "well-26": {
+   "kind": "well",
+   "triedAnchors": [],
+   "where": "GenericWell01 in SSewersSolitude02",
+   "why": "the well 27172:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp"
+  },
+  "well-27": {
+   "kind": "well",
+   "triedAnchors": [],
+   "where": "FarmBWell01 in SSewersWRBurrow",
+   "why": "the well 3907d:SkyrimSewers.esp stands in a cell of skyrimsewers.esp, which is not a master of Thornswood-Content.esp"
+  },
+  "well-29": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "9283:JKs Skyrim.esp",
+     "why": "no clear spot within 400 units (7841 off the navmesh; 3061 touches ImpExtBlocks01SnowLight; 1861 touches TreeFloraHangingMoss01; 1151 touches FishRack01Light_SNWH)"
+    }
+   ],
+   "where": "FarmBWell01 in WindhelmMarketplaceExterior"
+  },
+  "well-30": {
+   "kind": "well",
+   "triedAnchors": [
+    {
+     "anchor": "10060d:Skyrim.esm",
+     "why": "no clear spot within 400 units (15688 off the navmesh)"
+    }
+   ],
+   "where": "RTPlazaWell01 in bcd0:Skyrim.esm"
   }
  }
 }

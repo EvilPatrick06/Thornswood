@@ -162,7 +162,9 @@ async function openPage(port, pid) {
       if (m.t === 'welcome') me.peer = m.peer;
     };
     ws.onclose = () => { me.closed = true; };
-    ws.onerror = () => { };
+    // Before open, error is a refused handshake, which Node 22's WebSocket
+    // never follows with close (#2818); after open the promise is settled.
+    ws.onerror = () => { clearTimeout(late); bad(new Error('socket for ' + pid + ' was refused')); };
   });
 }
 const rosters = (me) => me.got.filter((m) => m.t === 'peers');

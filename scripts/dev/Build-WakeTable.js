@@ -68,6 +68,7 @@
 'use strict';
 const fs = require('fs');
 const path = require('path');
+const { pluginPath, loadOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 const Worlds = require('./Build-WorldspaceTable.js');
 
@@ -262,11 +263,11 @@ function buildTable(t, worlds, destinations, cellToHold) {
 }
 
 function readLoadOrder(dataDir, pluginsTxt) {
-  const order = Worlds.loadOrder(pluginsTxt);
+  const order = loadOrder(pluginsTxt);
   const t = { keywords: {}, locations: {}, cells: {}, doors: {} };
   const problems = [];
   for (const pl of order) {
-    const p = path.join(dataDir, pl);
+    const p = pluginPath(dataDir, pl);
     if (!fs.existsSync(p)) { problems.push(pl + ' is switched on and is not in ' + dataDir); continue; }
     try { readPlugin(fs.readFileSync(p), pl, t); }
     catch (e) { problems.push(pl + ' will not parse: ' + e.message); }

@@ -58,8 +58,10 @@ function Yes([string]$what, [bool]$cond) {
 }
 
 $roller = Join-Path $RepoPath 'scripts\vps\Roll-Log.ps1'
-$winps  = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-$cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  Roll-Log.ps1 runs on the box under Windows PowerShell 5.1, from tasks that start it through cmd.exe, and only Windows has either'; exit 0 }
+$winps  = Get-WindowsPowerShell
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
 $node   = $null
 $nc = Get-Command node -ErrorAction SilentlyContinue
 if ($nc) { $node = $nc.Source }

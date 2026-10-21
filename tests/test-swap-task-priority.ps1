@@ -68,8 +68,8 @@ Yes ('every start of the task comes straight after TaskShape (' + $starts.Count 
     $starts.Count -ge 2 -and @($starts | Where-Object { $_ -gt 0 -and $lines[$_ - 1] -eq 'TaskShape' }).Count -eq $starts.Count)
 if ($fn.Count -ne 1) { Done }
 
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-if (-not $onWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
 Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }
 
@@ -78,7 +78,7 @@ $Root = 'C:\Thornswood-Server-Dev'
 $me = [Security.Principal.WindowsIdentity]::GetCurrent().Name
 $run = [scriptblock]::Create($fn[0].Extent.Text + "`nTaskShape")
 try {
-    $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument '/c exit 0' -WorkingDirectory $env:TEMP
+    $a = New-ScheduledTaskAction -Execute (Get-WindowsPath 'System32\cmd.exe') -Argument '/c exit 0' -WorkingDirectory $env:TEMP
     $p = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive
     Register-ScheduledTask -TaskName $Task -Action $a -Principal $p -Settings (New-ScheduledTaskSettingsSet -RestartCount 999 -RestartInterval (New-TimeSpan -Minutes 1)) | Out-Null
     $before = Get-ScheduledTask -TaskName $Task
@@ -95,7 +95,7 @@ try {
 
     # The installer's shape: priority 1 and node through start /high.
     Unregister-ScheduledTask -TaskName $Task -Confirm:$false
-    $a = New-ScheduledTaskAction -Execute "$env:SystemRoot\System32\cmd.exe" -Argument '/c "start "" /b /wait /high "node.exe" dist_back/skymp5-server.js >> "server.log" 2>&1 & call exit %^errorlevel%"' -WorkingDirectory $env:TEMP
+    $a = New-ScheduledTaskAction -Execute (Get-WindowsPath 'System32\cmd.exe') -Argument '/c "start "" /b /wait /high "node.exe" dist_back/skymp5-server.js >> "server.log" 2>&1 & call exit %^errorlevel%"' -WorkingDirectory $env:TEMP
     # Priority 1 is above what an account that is not elevated may give a
     # task: a VPS runner is refused here (#1273), the way
     # test-server-task-priority.ps1 is refused its scratch task, and says so.

@@ -12,7 +12,7 @@
   resource", after a week that includes a busy evening, before anybody decides
   between a bigger box and splitting the services apart. This is that note.
   It does not decide anything. Which way to go is Patrick and Djinn's call in
-  #staff-general; this is so it is made on numbers rather than on a guess.
+  #staff-updates; this is so it is made on numbers rather than on a guess.
 
   HOW IT COUNTS. The record holds running totals, so everything here is the
   difference between two lines next to each other, divided by the seconds

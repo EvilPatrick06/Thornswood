@@ -183,6 +183,20 @@ def body_hash(data):
     return hashlib.sha256(rest).hexdigest()
 
 
+def localise(d, names):
+    """<hex>:<plugin> as the form id the plugin writes, its master's index on top."""
+    obj, owner = d.split(':', 1)
+    return ([n.lower() for n in names].index(owner.lower()) << 24) | int(obj, 16)
+
+
+def content_tool():
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('add_content_records', os.path.join(HERE, 'Add-ContentRecords.py'))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
 def desc(fid, names):
     idx = fid >> 24
     owner = names[idx] if idx < len(names) else PLUGIN
@@ -351,6 +365,22 @@ def build(masters_dir):
             row['usedBy'] = users(f, names)
         row['dataSha256'] = hashes[f]
         rows.append(row)
+
+    # A cell or worldspace kept as Bethesda's is written by Add-ContentRecords.py
+    # from the winning master's own record. Where the salvaged copy was those
+    # very bytes (RiftenWorld, since a well bucket stands in it, #1382), the
+    # plugin's record is Bethesda's and not the other server's, so the master's
+    # own hash is kept beside it: the tool and the harness hold the record to
+    # it with no game to read.
+    kept = [(r, (r['type'].encode('ascii'), localise(r['formId'], names))) for r in rows
+            if r['disposition'] == "Bethesda's"]
+    if kept:
+        own = content_tool().bethesdas_world_records(masters_dir, names, [k for _, k in kept])
+        if own is None:
+            raise SystemExit('STOP. the masters are not in %s, and the cells and worldspaces kept as '
+                             "Bethesda's are hashed from them. Give --masters the game's Data folder." % masters_dir)
+        for r, k in kept:
+            r['bethesdaSha256'] = body_hash(own[k][1])
 
     counts = {}
     for r in rows:

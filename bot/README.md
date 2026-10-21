@@ -565,19 +565,24 @@ monitor never holds up anything the bot does on Discord.
 
 ## Community setup, field by field
 
-These three are on the Enable Community screen and none of them can be set by
-a bot.
+These three are on the Enable Community screen, which only a person can go
+through. Take what it offers for the last two: the next `Setup-Discord.ps1`
+run moves them.
 
-| Field | Now | After the build |
+| Field | On the Enable Community screen | After the build |
 |---|---|---|
 | Rules or guidelines channel | `#rules` | leave it |
-| Community Updates Channel | `#general-chat`, because nothing else exists yet | `#staff-general` |
-| Safety Notifications Channel | `#general-chat` | `#staff-general` |
+| Community Updates Channel | `#general-chat`, because nothing else exists yet | `#staff-updates`, set by the build |
+| Safety Notifications Channel | `#general-chat` | `#staff-updates`, set by the build |
 
-Both of the last two carry moderation and safety notices about your own server,
-some of it about specific people, so they do not belong in a channel everybody
-reads. Come back and move them the moment `Setup-Discord.ps1` has made the
-Staff category.
+Both of the last two carry Discord's notices about your own server, moderation
+and safety among them and some of it about specific people, so they do not
+belong in a channel everybody reads, and they are notices, so they go where
+staff notices go: `#staff-updates`, never `#staff-general`, which is for talk.
+`Build-Discord.py` finds `#staff-updates` by the id in `bot\staff-channel.txt`,
+the same one the bot speaks in, and says under "did not manage" when it could
+not move them. `-Check` says `would change` when either one points anywhere
+else.
 
 **Server description.** This is what shows in the embed whenever somebody
 pastes your invite link anywhere, so it is worth more than it looks:

@@ -105,3 +105,11 @@ voice/chat/
 # and a copy of the backup passphrase. The setup stub is build output, in out\.
 /local/
 bot/data/
+
+# Scratch and worktrees, inside the repository since #2900 (Patrick, 20 Oct:
+# "temp files and folders and work trees should move into the repo folder and
+# just be gitignored"). temp is where Get-ScratchDir.ps1 puts a task's scratch;
+# worktrees is where a branch gets its own checkout. Before that both lived in
+# C:\ThornswoodTemps&Worktrees on One.
+/temp/
+/worktrees/

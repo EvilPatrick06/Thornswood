@@ -4,7 +4,9 @@
   Runs the Thornswood bot as a Windows service under its own account, and
   stops and starts it by name (issue #465). Functions only, run ON the VPS as
   Administrator: Install-Bot.ps1 sends this in front of its own script, the
-  way it sends Write-BotToken.ps1.
+  way it sends Write-BotToken.ps1, with scripts\deploy\StopAndMove.ps1 in
+  front of it, because every stop here waits for what it stopped to have
+  exited (#2928).
 
       Install-ThornswoodBotService   build the service program, put the
                                      service in place of the old loop, grant
@@ -112,14 +114,49 @@ function Build-ThornswoodBotHost([string]$Source, [string]$Out) {
 # left with the bot's folder on its command line is not the service's. This
 # is the one place anything here looks at a command line: stopping and
 # starting the bot is by the service's name.
+#
+# Each is opened, ended, and waited for until it has exited (StopAndMove.ps1),
+# so what it held is closed before the swap moves the bot's folder.
 function Stop-ThornswoodBotStrays([string]$Root) {
   $mark = $Root.TrimEnd('\') + '\'
+  $strays = @()
   foreach ($p in @(Get-CimInstance Win32_Process -EA SilentlyContinue |
                    Where-Object { $_.Name -match '^(python|pythonw|powershell|cmd)' -and $_.CommandLine -and $_.ProcessId -ne $PID })) {
     if ($p.CommandLine.IndexOf($mark, [StringComparison]::OrdinalIgnoreCase) -lt 0) { continue }
-    Stop-Process -Id $p.ProcessId -Force -EA SilentlyContinue
-    'stopped a copy of the bot no service started, pid ' + $p.ProcessId + ' (' + $p.Name + ')'
+    $strays += $p
   }
+  $held = @(Get-ThornswoodProcessHeld @($strays | ForEach-Object { [int]$_.ProcessId }))
+  $ThornswoodNotHeld
+  foreach ($p in $strays) { 'stopped a copy of the bot no service started, pid ' + $p.ProcessId + ' (' + $p.Name + ')' }
+  Stop-ThornswoodProcessHeld $held
+}
+
+# The service stopped by name, and returned from once its program and the
+# python it ran have exited. Stop-Service returns once the service manager
+# says Stopped, which is before its process has exited and let go of its
+# files: the service program that is replaced next, and the bot's folder the
+# swap moves (#2928, measured on the box: a folder refused 15 times in 15 at
+# once after a stop, 0 in 15 once its process had exited). Until 20 Oct the
+# program was tried ten times a second apart instead. Both opened before the
+# stop, so the wait is on them; throws what Stop-Service throws.
+function Stop-ThornswoodBotService([string]$Name) {
+  $ids = @()
+  $w = Get-CimInstance Win32_Service -Filter ("Name = '" + $Name + "'") -EA SilentlyContinue
+  if ($w -and $w.ProcessId) {
+    $ids += [int]$w.ProcessId
+    $ids += @(Get-CimInstance Win32_Process -Filter ("ParentProcessId=" + [int]$w.ProcessId) -EA SilentlyContinue | ForEach-Object { [int]$_.ProcessId })
+  }
+  $held = @(Get-ThornswoodProcessHeld $ids)
+  $ThornswoodNotHeld
+  Stop-Service -Name $Name -Force -ErrorAction Stop
+  'stopped the service ' + $Name
+  Stop-ThornswoodProcessHeld $held
+}
+
+# Whether a stop above left a process it ended still running, or one it could
+# not open: what it held may still be open, so nothing it held is replaced.
+function Test-ThornswoodBotStopLeft {
+  return (@(@($ThornswoodStillRunning) + @($ThornswoodNotHeld) | Where-Object { $_ }).Count -gt 0)
 }
 
 # The old loop's two files, beside the code. Remove-ThornswoodBotLoop takes
@@ -508,23 +545,20 @@ function Install-ThornswoodBotService {
   }
   $out += 'built the service program from ' + (Split-Path -Leaf $Source)
 
-  # Stopped by name, then the old loop, then any copy started by hand.
+  # Stopped by name, then the old loop, then any copy started by hand, each
+  # waited for until it has exited.
   $svc = Get-Service -Name $Name -EA SilentlyContinue
   if ($svc -and "$($svc.Status)" -ne 'Stopped') {
-    try { Stop-Service -Name $Name -Force -ErrorAction Stop; $out += 'stopped the service ' + $Name }
+    try { $out += @(Stop-ThornswoodBotService $Name) }
     catch { return @{ Ok = $false; Lines = $out + @('COULD NOT STOP the service ' + $Name + ': ' + $_.Exception.Message) } }
+    if (Test-ThornswoodBotStopLeft) { return @{ Ok = $false; Lines = $out + @('THE SERVICE PROGRAM HAS NOT EXITED, so it was not replaced. The bot is stopped; the line above names the process.') } }
   }
   $out += @(Remove-ThornswoodBotLoop -Root $Root -Task $Task)
   $out += @(Stop-ThornswoodBotStrays $Root)
 
-  # The new program over the old. Windows can hold a stopped service's file
-  # for a moment, so it is tried for ten seconds.
-  $moved = $false
-  foreach ($i in 1..10) {
-    try { Move-Item -LiteralPath $new -Destination $exe -Force -ErrorAction Stop; $moved = $true; break }
-    catch { Start-Sleep -Seconds 1 }
-  }
-  if (-not $moved) { return @{ Ok = $false; Lines = $out + @('COULD NOT REPLACE ' + $exe + '. The bot is stopped. Run this again.') } }
+  # The new program over the old, once: everything that ran it has exited.
+  try { Move-Item -LiteralPath $new -Destination $exe -Force -ErrorAction Stop }
+  catch { return @{ Ok = $false; Lines = $out + @('COULD NOT REPLACE ' + $exe + ' (' + $_.Exception.Message + '; open in it then: ' + (Get-ThornswoodPathHolders $exe) + '). The bot is stopped.') } }
   Write-ThornswoodBotHostJson (Join-Path $dir 'host.json') $Root $Python
 
   # The service. Its program path has no spaces in it, and every setting on
@@ -572,7 +606,7 @@ function Install-ThornswoodBotService {
 function Restart-ThornswoodBotService([string]$Name = 'ThornswoodBot', [string]$Root = 'C:\Thornswood-Bot') {
   if (-not (Get-Service -Name $Name -EA SilentlyContinue)) { return $null }
   $out = @()
-  try { Stop-Service -Name $Name -Force -ErrorAction Stop; $out += 'stopped the service ' + $Name }
+  try { $out += @(Stop-ThornswoodBotService $Name) }
   catch { $out += 'COULD NOT STOP the service ' + $Name + ': ' + $_.Exception.Message }
   $out += @(Stop-ThornswoodBotStrays $Root)
   try { Start-Service -Name $Name -ErrorAction Stop; $out += 'started the service ' + $Name }

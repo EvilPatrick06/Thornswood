@@ -37,6 +37,13 @@ function Yes([string]$what, [bool]$cond) {
 }
 function Say($m, $c = 'Gray') { }
 function Die($m) { throw ('DIE ' + $m) }
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $names = @(
     'Data\SKSE\Plugins\MpClientPlugin.dll',
@@ -133,8 +140,9 @@ try {
     Write-Utf8 $launcherRecordPath $launcherJson
     Write-Utf8 $checkoutPath $checkoutJson
 
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
+    if (-not $OnWindows) { Write-Host 'SKIP  the record read out of a packed launcher: the stand-in launcher is built with the .NET Framework csc, which only Windows has'; Done }
+    $csc = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    if (-not (Test-Path -LiteralPath $csc)) { $csc = Get-WindowsPath 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
     Yes 'the .NET Framework csc is here' (Test-Path -LiteralPath $csc)
     $cs = Join-Path $scratch 'Program.cs'
     Write-Utf8 $cs "class Program { static void Main() {} }`r`n"
@@ -291,7 +299,4 @@ finally {
     Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
 }
 
-Write-Host ''
-Write-Host ("{0} passed, {1} failed" -f $pass, $fail)
-if ($fail) { exit 1 }
-exit 0
+Done

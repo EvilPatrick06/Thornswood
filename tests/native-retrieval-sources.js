@@ -4,7 +4,9 @@
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),crypto=require('node:crypto');
 const root=path.resolve(__dirname,'..'),doc=require('../game/data/merchant-retrievals.json');
 const addon=require(path.resolve(process.argv[2])),data=path.resolve(process.argv[3]),scratch=path.resolve(process.argv[4]);
-assert(scratch.startsWith('C:\\ThornswoodTemps&Worktrees\\temp\\'),'fixture stays in the approved scratch area');
+const tempRoot=path.resolve(root,'../../temp');
+const relativeScratch=path.relative(tempRoot,scratch);
+assert(relativeScratch&&!relativeScratch.startsWith('..')&&!path.isAbsolute(relativeScratch),'fixture stays in the approved scratch area');
 const loadOrder=require('../game/data/npc-population.json').loadOrder.map(row=>{
  const owned=path.join(root,'game/content',row.name),file=fs.existsSync(owned)?owned:path.join(data,row.name);
  const sha=crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex');

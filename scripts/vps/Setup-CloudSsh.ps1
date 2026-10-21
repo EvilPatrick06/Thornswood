@@ -12,39 +12,42 @@
       pwsh scripts/vps/Setup-CloudSsh.ps1 -Test    only check, change nothing
 
   WHY A BRIDGE. A cloud thread's only way out is an HTTPS proxy, which never
-  carries port 22, and port 22 on the box answers One's address only
-  (Set-SshScope.ps1). So ssh goes inside a WebSocket on 443 instead:
+  carries port 22, and port 22 on the box takes no outside address anyway
+  (#2891). So ssh goes inside a WebSocket on 443 instead:
   connect.js, as ssh's ProxyCommand, opens wss://thornswood.net/box/, Caddy
   hands it to bridge.js on the box, and bridge.js joins it to the box's own
   sshd on 127.0.0.1. Decided by Patrick on 19 Oct 2026 (#2750, C): cloud
   threads get an ssh key to the box.
 
-  WHAT IT READS, from the cloud environment's settings (New-CloudAccess.ps1
-  on One makes both and says where they go):
+  WHAT IT READS, from the cloud environment's settings
+  (Grant-BoxAccess.ps1 -Name cloud -MakeKey on One makes both and says where
+  they go):
     THORNSWOOD_BOX_KEY_B64  the cloud key's private half, base64. The box
                             takes it only from 127.0.0.1, so only through the
                             bridge (the from= on its line).
-    THORNSWOOD_BOX_TOKEN    the bridge's token. Left out when the environment
+    THORNSWOOD_BOX_TOKEN    the cloud's own token. Left out when the environment
                             holds it as a network secret for thornswood.net,
                             which the proxy adds to the request itself.
   Neither is printed, by this or by connect.js.
 
   WHAT IT WRITES, in this container only:
     ~/.ssh/thornswood_cloud_ed25519   the key, readable by this user only
+    ~/.ssh/thornswood-bridge          the bridge client
     ~/.ssh/config                     a Host block for the box's address with
                                       the key, the ProxyCommand and
                                       StrictHostKeyChecking yes, between two
                                       marker lines so a second run replaces it
+                                      (Set-ThornswoodBridgeSsh, Vps.ps1)
     ~/.ssh/known_hosts                the box's host key, and only one that
                                       scripts/vps/vps.json pins
-                                      (Add-ThornswoodKnownHost)
+                                      (Add-ThornswoodKnownHostThroughBridge)
 
   THE BOX'S OWN KEY. ssh-keyscan cannot run a ProxyCommand, so it asks
   through bridge/listen.js, a port on this container's loopback that carries
   each connection to the box the same way, and what it is shown goes through
-  the same pin as Setup-SshKey.ps1's (Add-ThornswoodKnownHost -Scanned).
-  Nothing that is not pinned reaches known_hosts, and ssh itself never adds
-  a key: it runs with StrictHostKeyChecking yes from the first connection.
+  the same pin as every other key. Nothing that is not pinned reaches
+  known_hosts, and ssh itself never adds a key: it runs with
+  StrictHostKeyChecking yes from the first connection.
 
   openssh-client is installed with apt-get when ssh is not there.
 #>
@@ -72,7 +75,6 @@ if (-not $KeyPath) { $KeyPath = Join-Path $sshDir 'thornswood_cloud_ed25519' }
 $cfg = Join-Path $sshDir 'config'
 $connect = Join-Path (Join-Path $Here 'bridge') 'connect.js'
 $begin = '# >>> thornswood cloud (Setup-CloudSsh.ps1)'
-$end = '# <<< thornswood cloud'
 
 if ($IsWindows) { Die 'this is for a cloud thread. On a Windows machine, Setup-SshKey.ps1 sets ssh up.' }
 if (-not (Test-Path -LiteralPath $connect)) { Die "not found: $connect" }
@@ -94,14 +96,14 @@ Head 'What the environment holds'
 $keyB64 = [string]$env:THORNSWOOD_BOX_KEY_B64
 if (-not $keyB64) {
     Die ('THORNSWOOD_BOX_KEY_B64 is not set in this environment, so there is no key to log in with. ' +
-         'It goes in the cloud environment''s variables; New-CloudAccess.ps1 on One makes it. A new session picks it up.')
+         'It goes in the cloud environment''s variables; Grant-BoxAccess.ps1 -Name cloud -MakeKey on One makes it. A new session picks it up.')
 }
 $keyText = ''
 try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($keyB64 -replace '\s', ''))) }
-catch { Die 'THORNSWOOD_BOX_KEY_B64 is not base64. Make it again with New-CloudAccess.ps1 on One.' }
+catch { Die 'THORNSWOOD_BOX_KEY_B64 is not base64. Make it again with Grant-BoxAccess.ps1 -Name cloud -MakeKey on One.' }
 # Whether it is a key at all is ssh-keygen's to say, below, once it is written.
 if (-not $keyText.Trim()) {
-    Die 'THORNSWOOD_BOX_KEY_B64 decodes to nothing. Make it again with New-CloudAccess.ps1 on One.'
+    Die 'THORNSWOOD_BOX_KEY_B64 decodes to nothing. Make it again with Grant-BoxAccess.ps1 -Name cloud -MakeKey on One.'
 }
 Say '  THORNSWOOD_BOX_KEY_B64 is set' 'Green'
 if ($env:THORNSWOOD_BOX_TOKEN) { Say '  THORNSWOOD_BOX_TOKEN is set' 'Green' }
@@ -151,7 +153,7 @@ $pub = @(Invoke-ThornswoodNative { & ssh-keygen -y -P '' -f $KeyPath } 2>$null)
 $ErrorActionPreference = $old
 if ($LASTEXITCODE -ne 0 -or -not ($pub -join '').StartsWith('ssh-')) {
     Remove-Item -LiteralPath $KeyPath -Force -ErrorAction SilentlyContinue
-    Die 'the key in THORNSWOOD_BOX_KEY_B64 does not open without a passphrase, or is not whole. Make it again with New-CloudAccess.ps1 on One.'
+    Die 'the key in THORNSWOOD_BOX_KEY_B64 does not open without a passphrase, or is not whole. Make it again with Grant-BoxAccess.ps1 -Name cloud -MakeKey on One.'
 }
 Say "  $KeyPath" 'Green'
 
@@ -159,70 +161,18 @@ Say "  $KeyPath" 'Green'
 Head 'Pointing ssh at the bridge'
 # ssh runs the ProxyCommand through the shell with this environment, so the
 # proxy, its authority bundle and the token reach connect.js as they are.
-$block = @(
-    $begin,
-    "Host $VpsHost",
-    "    User $VpsUser",
-    "    IdentityFile $KeyPath",
-    '    IdentitiesOnly yes',
-    '    StrictHostKeyChecking yes',
-    "    ProxyCommand `"$($node.Source)`" `"$connect`"",
-    $end
-) -join "`n"
-$text = ''
-if (Test-Path -LiteralPath $cfg) { $text = [IO.File]::ReadAllText($cfg) }
-$text = [regex]::Replace($text, '(?s)' + [regex]::Escape($begin) + '.*?' + [regex]::Escape($end) + '\n?', '')
-if ($text -match ('(?m)^[ \t]*Host[ \t]+([^\r\n]*[ \t])?' + [regex]::Escape($VpsHost) + '([ \t]|\r?$)')) {
-    Die "$cfg already has a Host entry for $VpsHost that this did not write, and ssh would use that one first. Take it out, then run this again."
-}
-# First in the file, since ssh takes the first value it finds for each option.
-$text = $block + "`n" + $(if ($text.Trim()) { "`n" + $text.TrimStart() } else { '' })
-[IO.File]::WriteAllText($cfg, $text, (New-Object Text.UTF8Encoding($false)))
-& chmod 600 $cfg
+try {
+    $client = Install-ThornswoodBridgeClient (Join-Path $Here 'bridge')
+    $null = Set-ThornswoodBridgeSsh -Address $VpsHost -User $VpsUser -KeyPath $KeyPath -Node $node.Source -Connect (Join-Path $client 'connect.js') -Begin $begin -End '# <<< thornswood cloud'
+} catch { Die $_.Exception.Message }
 Say "  $cfg" 'Green'
 
 # ----------------------------------------------------------- host key ------
 Head "The box's own key"
-$hk = Test-ThornswoodKnownHost -Address $VpsHost
-if ($hk.Status -eq 'wrong') {
-    Die ("known_hosts here holds a key for $VpsHost that scripts/vps/vps.json does not pin (" + ($hk.Wrong -join ', ') + "). ssh-keygen -R $VpsHost, then run this again.")
-}
-if ($hk.Status -eq 'trusted') {
-    Say ('  known_hosts holds the pinned key (' + ($hk.Pinned -join ', ') + ')') 'Green'
-} else {
-    # listen.js prints the port it took, then carries each connection to
-    # the box until its standard input closes.
-    $psi = New-Object Diagnostics.ProcessStartInfo
-    $psi.FileName = $node.Source
-    $psi.ArgumentList.Add((Join-Path (Join-Path $Here 'bridge') 'listen.js'))
-    $psi.UseShellExecute = $false
-    $psi.RedirectStandardInput = $true
-    $psi.RedirectStandardOutput = $true
-    $listener = [Diagnostics.Process]::Start($psi)
-    try {
-        $port = [string]$listener.StandardOutput.ReadLine()
-        if ($port -notmatch '^\d+$') { Die 'the bridge listener did not start, so the box''s key could not be asked for. Nothing was written.' }
-        $old = $ErrorActionPreference
-        $ErrorActionPreference = 'Continue'
-        $scan = @(Invoke-ThornswoodNative { & ssh-keyscan -T 20 -p $port 127.0.0.1 } 2>&1 | ForEach-Object { "$_" })
-        $ErrorActionPreference = $old
-        # Each line names [127.0.0.1]:port, the listener; the key is the box's,
-        # so it is written under the box's address, after the pin has seen it.
-        $lines = @($scan | Where-Object { $_ -match '^\[127\.0\.0\.1\]:\d+ ' } | ForEach-Object { $VpsHost + ' ' + ($_ -replace '^\S+\s+', '') })
-        if (-not $lines.Count) {
-            Die ('the box showed no host key through the bridge, so nothing was written. ssh-keyscan said: ' + (($scan | Select-Object -Last 3) -join ' '))
-        }
-        try { $n = Add-ThornswoodKnownHost -Address $VpsHost -Scanned $lines }
-        catch { Die $_.Exception.Message }
-        Say "  added $n pinned key line(s) to known_hosts" 'Green'
-    }
-    finally {
-        # Closing its input is how listen.js is told to stop. Either step can
-        # find it already gone, which is the end wanted, so neither says more.
-        try { $listener.StandardInput.Close() } catch { <# already ended, its input closed with it #> }
-        if (-not $listener.WaitForExit(3000)) { try { $listener.Kill() } catch { <# ended between the wait and the kill #> } }
-    }
-}
+try { $n = Add-ThornswoodKnownHostThroughBridge -Address $VpsHost -Node $node.Source -Listen (Join-Path $client 'listen.js') }
+catch { Die $_.Exception.Message }
+if ($n) { Say "  added $n pinned key line(s) to known_hosts" 'Green' }
+else { Say '  known_hosts holds the pinned key' 'Green' }
 
 # ---------------------------------------------------------------- proof ----
 Head 'Logging in'

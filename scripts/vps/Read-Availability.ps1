@@ -14,8 +14,8 @@
   site and has no baseline, because nothing turned the outbox into a figure.
   The data was already there: Watch-Services.ps1 writes one JSON line each
   time a thing goes down and one when it is back (id, at, service, kind,
-  text, with at in Unix seconds), and Watch-Outside.ps1 appends lines of the
-  same shape for what it sees from outside, as "outside <name>". This pairs
+  text, with at in Unix seconds), and Watch-Outside.ps1 wrote lines of the
+  same shape for what it saw from outside, as "outside <name>". This pairs
   them.
 
   HOW IT COUNTS. Only lines whose kind is down or back are read; everything
@@ -29,9 +29,11 @@
     - an outage still open at the end is counted to the window's end
   Every outage is cut to the window. A service with no down or back line in
   the window is not listed: no line is no recorded outage, which is not the
-  same as proof it was up. Outside lines reach the box's file only when One
-  could reach the box over ssh; when it could not, they went into One's own
-  copy of alerts.jsonl instead.
+  same as proof it was up. Outside lines reached the box's file only while
+  Watch-Outside.ps1 ran on One and could reach the box over ssh. Since #2755
+  it runs on GitHub's runners, which cannot, so its lines stay in its own
+  outbox there and the box's file has only the box's own: for the site,
+  caddy, which asks over the public name.
 
   LIMITATIONS. Both are said in every report this prints, and on the page.
     1. The times are the watchdog run that decided, not the moment a thing

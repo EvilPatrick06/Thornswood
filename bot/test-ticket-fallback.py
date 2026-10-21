@@ -532,15 +532,20 @@ class Client(object):
         self.user = Perm(id=4242)
 
     def get_channel(self, cid):
+        for g in self.guilds:
+            for c in g.text_channels:
+                if c.id == cid:
+                    return c
         return None
 
 
 def startup():
     g, panel, mod = server(threads=False)
     g.channel('tickets', overwrites=staff_only(g, mod))
-    staff = g.channel('staff-general', overwrites=staff_only(g, mod))
+    # Found by its id, the one in staff-channel.txt, never by its name (#2940).
+    staff = g.channel('staff-updates', overwrites=staff_only(g, mod))
     was_client, was_id = bot.client, bot.TROUBLE_ID
-    bot.client, bot.TROUBLE_ID = Client([g]), 0
+    bot.client, bot.TROUBLE_ID = Client([g]), staff.id
     SAID[:] = []
     try:
         asyncio.run(bot.ensure_panel(g))

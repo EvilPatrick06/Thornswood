@@ -4,6 +4,13 @@
 # scripts\vps\Get-RunnerFacts.ps1 against stand-in rules. Nothing reaches the
 # VPS or GitHub.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $repo = Split-Path -Parent $PSScriptRoot
 $check = Join-Path $repo 'scripts\vps\Check-RunnerIsolation.ps1'
 $collector = Join-Path $repo 'scripts\vps\Get-RunnerFacts.ps1'
@@ -62,7 +69,7 @@ function Run($facts, [string]$wf) {
     $facts | ConvertTo-Json -Depth 8 | Set-Content $fp -Encoding utf8
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $check, '-Facts', $fp, '-Report', $rp, '-Strict')
     if ($wf) { $a += @('-Workflows', $wf) }
-    $o = & powershell @a 2>&1 | Out-String
+    $o = & $winPs @a 2>&1 | Out-String
     @{ Code = $LASTEXITCODE; Out = $o; Report = $(if (Test-Path $rp) { Get-Content $rp -Raw } else { '' }) }
 }
 try {
@@ -122,7 +129,7 @@ try {
     $rp2 = Join-Path $scratch 'rec.json'; $r2 | ConvertTo-Json -Depth 6 | Set-Content $rp2 -Encoding utf8
     $c = Facts; $c.runner.runners[0].firewallRules = 0
     $fp = Join-Path $scratch 'f2.json'; $c | ConvertTo-Json -Depth 8 | Set-Content $fp -Encoding utf8
-    $o = & powershell -NoProfile -ExecutionPolicy Bypass -File $check -Facts $fp -Record $rp2 -Workflows $wfOk -Strict 2>&1 | Out-String
+    $o = & $winPs -NoProfile -ExecutionPolicy Bypass -File $check -Facts $fp -Record $rp2 -Workflows $wfOk -Strict 2>&1 | Out-String
     T ($LASTEXITCODE -eq 0 -and $o -match 'intentional: stand-in reason') 'a risk listed as intentional is classed so, with its reason'
 
     $d = Facts; $d.runner.runners[0].account = 'password=hunter2PLANTED'

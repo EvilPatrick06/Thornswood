@@ -120,7 +120,7 @@ $channel = ''
 try { $channel = (Get-Help $Ship -Parameter Channel -ErrorAction Stop | Out-String) } catch { $channel = '' }
 Yes 'Get-Help -Parameter Channel names both channels' ($channel -match '\bmain\b' -and $channel -match '\bdev\b')
 Yes 'and says the last dev Ship wins' ($channel -match '(?i)last dev ship wins')
-Yes 'and says to say so in #staff-general' ($channel -match '#staff-general')
+Yes 'and says to say so in #staff-updates' ($channel -match '#staff-updates')
 $examples = (@($h.examples.example) | ForEach-Object { $_.code }) -join "`n"
 Yes 'there is an example of a dev release' ($examples -match '-Channel dev')
 
@@ -299,9 +299,15 @@ try {
 
     # Patrick may run it from Windows PowerShell and the build check runs it in
     # PowerShell 7. Both have to write the same bytes or the check is red for
-    # a reason nobody can see.
-    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if ($env:SystemRoot -and (Test-Path -LiteralPath $ps51)) {
+    # a reason nobody can see. Windows PowerShell 5.1 exists only on Windows,
+    # so off Windows the comparison does not apply and says so (#2944). On
+    # Windows it always runs, and a powershell.exe that is not where Windows
+    # keeps it is a failure, never a skip (tests\Windows.ps1, #2957).
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  Windows PowerShell 5.1 comparison: this is not Windows, which is the only place 5.1 runs'
+    } else {
+        $ps51 = Get-WindowsPowerShell
         $o51 = Join-Path $work 'README-51.md'
         $o7 = Join-Path $work 'README-7.md'
         & $Gen -Scripts $ToolsPath -Out $o7 6>$null
@@ -309,8 +315,6 @@ try {
         $same = (Test-Path -LiteralPath $o51) -and (Test-Path -LiteralPath $o7) -and
                 ([IO.File]::ReadAllText($o51, $Utf8) -eq [IO.File]::ReadAllText($o7, $Utf8))
         Yes 'Windows PowerShell 5.1 writes the same index as this PowerShell' $same
-    } else {
-        Write-Host 'SKIP  no Windows PowerShell here to compare against'
     }
 } catch {
     # Anything that stops the run part way is a failure, said as one, and the

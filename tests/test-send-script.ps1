@@ -70,9 +70,12 @@ $errs = $null
 Yes 'Send-Script.ps1 parses' (@($errs).Count -eq 0)
 . $sendScript
 
-$farShell = (Get-Command powershell.exe -ErrorAction SilentlyContinue)
-if (-not $farShell) { $farShell = Get-Command pwsh }
-$farShell = $farShell.Source
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $farShell = Get-WindowsPowerShell }
+else {
+    $farShell = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 
 $script:work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-send-script-' + [Guid]::NewGuid().ToString('N'))
 $far = Join-Path $script:work 'far'

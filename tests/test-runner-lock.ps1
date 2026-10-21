@@ -139,7 +139,8 @@ if ($lib) {
 
 # ---- for real, on scratch folders -----------------------------------------------------
 $icacls = $null
-if ($IsWindows -or $PSVersionTable.PSEdition -eq 'Desktop') { $icacls = Get-Command icacls.exe -ErrorAction SilentlyContinue }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $icacls = Get-Command icacls.exe -ErrorAction SilentlyContinue }
 if (-not $icacls -or -not $lib) {
     Write-Host 'SKIP  the locks on scratch folders: they need Windows and icacls'
 } else {
@@ -201,7 +202,7 @@ if (-not $icacls -or -not $lib) {
         $own2 = Join-Path $box 'Thornswood-Runner9'
         foreach ($d in $dumps, $server, $own2) { New-Item -ItemType Directory -Path $d -Force | Out-Null }
         Set-Content -LiteralPath (Join-Path $dumps 'node.exe.1234.dmp') -Value 'stand-in'
-        $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $ps51 = Get-WindowsPowerShell
         function LockBox {
             $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
             try { $o = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $lvfPath -Parent $box -SiteSid none -BotSid none -AllowGamingPc -DumpWriterSids 'S-1-5-7' 2>&1 | ForEach-Object { "$_" }) }

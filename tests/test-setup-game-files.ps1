@@ -43,6 +43,8 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+
 # ---- lift the functions out of the real script -----------------------------
 $tokens = $null; $errors = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($SetupPath, [ref]$tokens, [ref]$errors)
@@ -130,35 +132,39 @@ try {
     Yes 'a patched SkyrimSE.exe is named, which is what sends setup to the depot repair' ($off -contains 'SkyrimSE.exe')
 
     # ---- 4. Remove-SharedNames ------------------------------------------------
-    $steamCopy = Join-Path $root 'SteamCopy'
-    $made      = Join-Path $root 'Made'
-    $payload   = Join-Path $root 'Payload'
-    Put (Join-Path $steamCopy 'Data\Skyrim.esm') 'STEAM MASTER'
-    Put (Join-Path $steamCopy 'Data\Shared [x].bsa') 'STEAM BRACKET'
-    $null = New-Item -ItemType Directory -Force -Path (Join-Path $made 'Data')
-    $null = New-Item -ItemType HardLink -Path (Join-Path $made 'Data\Skyrim.esm') -Target (Join-Path $steamCopy 'Data\Skyrim.esm')
-    $lb = Join-Path $made 'Data\Shared [x].bsa'
-    cmd /c mklink /H "$lb" "$(Join-Path $steamCopy 'Data\Shared [x].bsa')" | Out-Null
-    Put (Join-Path $made 'Data\Plain.esp') 'OLD PLAIN'
-    Put (Join-Path $made 'Data\Locked.esp') 'OLD LOCKED'
-    [IO.File]::SetAttributes((Join-Path $made 'Data\Locked.esp'), [IO.FileAttributes]::ReadOnly)
-    Put (Join-Path $made 'Data\Keep.esp') 'NOT IN PAYLOAD'
-    foreach ($n in 'Skyrim.esm', 'Shared [x].bsa', 'Plain.esp', 'Locked.esp', 'New.esp') { Put (Join-Path $payload "Data\$n") "PAYLOAD $n" }
-    Yes 'stand-in: the made folder''s master is a hard link to the Steam copy' ((Get-Item -LiteralPath (Join-Path $made 'Data\Skyrim.esm')).LinkType -eq 'HardLink')
-    $script:said = @()
-    Remove-SharedNames $payload $made
-    Yes 'the linked master is gone from the made folder' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Skyrim.esm')))
-    Yes 'and the Steam copy keeps its own bytes' ((ReadOf (Join-Path $steamCopy 'Data\Skyrim.esm')) -eq 'STEAM MASTER')
-    Yes 'a linked name with [ ] in it is gone too' (-not (Test-Path -LiteralPath $lb))
-    Yes 'and its Steam name keeps its bytes' ((ReadOf (Join-Path $steamCopy 'Data\Shared [x].bsa')) -eq 'STEAM BRACKET')
-    Yes 'a plain file the payload replaces is gone' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Plain.esp')))
-    Yes 'a read-only file the payload replaces is gone' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Locked.esp')))
-    Yes 'a file the payload does not carry is left alone' ((ReadOf (Join-Path $made 'Data\Keep.esp')) -eq 'NOT IN PAYLOAD')
-    Yes 'the payload itself is untouched' (@(Get-ChildItem -LiteralPath (Join-Path $payload 'Data') -File).Count -eq 5)
-    Yes 'it says two linked files were separated' (@($script:said | Where-Object { $_ -match '\b2 linked file' }).Count -eq 1)
-    $script:said = @()
-    Remove-SharedNames $payload (Join-Path $root 'EmptyDest')
-    Yes 'into a folder with none of the names, nothing is said and nothing fails' ($script:said.Count -eq 0)
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  4. Remove-SharedNames: its linked names are NTFS hard links made with cmd.exe''s mklink, which only Windows has'
+    } else {
+        $steamCopy = Join-Path $root 'SteamCopy'
+        $made      = Join-Path $root 'Made'
+        $payload   = Join-Path $root 'Payload'
+        Put (Join-Path $steamCopy 'Data\Skyrim.esm') 'STEAM MASTER'
+        Put (Join-Path $steamCopy 'Data\Shared [x].bsa') 'STEAM BRACKET'
+        $null = New-Item -ItemType Directory -Force -Path (Join-Path $made 'Data')
+        $null = New-Item -ItemType HardLink -Path (Join-Path $made 'Data\Skyrim.esm') -Target (Join-Path $steamCopy 'Data\Skyrim.esm')
+        $lb = Join-Path $made 'Data\Shared [x].bsa'
+        & (Get-WindowsPath 'System32\cmd.exe') /c mklink /H "$lb" "$(Join-Path $steamCopy 'Data\Shared [x].bsa')" | Out-Null
+        Put (Join-Path $made 'Data\Plain.esp') 'OLD PLAIN'
+        Put (Join-Path $made 'Data\Locked.esp') 'OLD LOCKED'
+        [IO.File]::SetAttributes((Join-Path $made 'Data\Locked.esp'), [IO.FileAttributes]::ReadOnly)
+        Put (Join-Path $made 'Data\Keep.esp') 'NOT IN PAYLOAD'
+        foreach ($n in 'Skyrim.esm', 'Shared [x].bsa', 'Plain.esp', 'Locked.esp', 'New.esp') { Put (Join-Path $payload "Data\$n") "PAYLOAD $n" }
+        Yes 'stand-in: the made folder''s master is a hard link to the Steam copy' ((Get-Item -LiteralPath (Join-Path $made 'Data\Skyrim.esm')).LinkType -eq 'HardLink')
+        $script:said = @()
+        Remove-SharedNames $payload $made
+        Yes 'the linked master is gone from the made folder' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Skyrim.esm')))
+        Yes 'and the Steam copy keeps its own bytes' ((ReadOf (Join-Path $steamCopy 'Data\Skyrim.esm')) -eq 'STEAM MASTER')
+        Yes 'a linked name with [ ] in it is gone too' (-not (Test-Path -LiteralPath $lb))
+        Yes 'and its Steam name keeps its bytes' ((ReadOf (Join-Path $steamCopy 'Data\Shared [x].bsa')) -eq 'STEAM BRACKET')
+        Yes 'a plain file the payload replaces is gone' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Plain.esp')))
+        Yes 'a read-only file the payload replaces is gone' (-not (Test-Path -LiteralPath (Join-Path $made 'Data\Locked.esp')))
+        Yes 'a file the payload does not carry is left alone' ((ReadOf (Join-Path $made 'Data\Keep.esp')) -eq 'NOT IN PAYLOAD')
+        Yes 'the payload itself is untouched' (@(Get-ChildItem -LiteralPath (Join-Path $payload 'Data') -File).Count -eq 5)
+        Yes 'it says two linked files were separated' (@($script:said | Where-Object { $_ -match '\b2 linked file' }).Count -eq 1)
+        $script:said = @()
+        Remove-SharedNames $payload (Join-Path $root 'EmptyDest')
+        Yes 'into a folder with none of the names, nothing is said and nothing fails' ($script:said.Count -eq 0)
+    }
 }
 finally {
     Get-ChildItem -LiteralPath $root -Recurse -File -Force -EA SilentlyContinue | ForEach-Object { try { $_.Attributes = 'Normal' } catch { } }

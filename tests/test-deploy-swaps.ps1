@@ -105,10 +105,14 @@ foreach ($n in 'Deploy-DevGamemode.ps1', 'Deploy-Docs.ps1', 'Install-Voice.ps1',
 
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
 $python = Get-Command python -CommandType Application -EA SilentlyContinue | Select-Object -First 1
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $node -or -not $python -or -not (Test-Path -LiteralPath $ps51) -or
-    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-    Write-Host 'SKIP  the runs need node, python, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+if (-not $node -or -not $python -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node, python and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
 }
 
@@ -215,7 +219,7 @@ $script:ownTasks = @('Docs', 'Voice', 'Dev Server', 'Live Server') | ForEach-Obj
 function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
-    $folder = Join-Path $env:SystemRoot 'System32\Tasks'
+    $folder = Get-WindowsPath 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
     if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + '*')))) { return $true }
@@ -811,6 +815,36 @@ try {
     Yes '  and the task starts node through start /high, on server-log.js running voice (#2166)' ((TaskArg ($TaskPrefix + ' Voice')) -like '*start "" /b /wait /high "*" "*\server-log.js" --log "*\voice.log" --days 90 --stamp voice-server.js & call exit*')
     Yes '  and reads node back at High' ($r.Said -match 'node, pid \d+, runs at High priority')
     Yes '  and no file was staged, sent or swapped' (((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging' -and @(Kept $voiceRoot '.stage-*').Count -eq 0)
+    if ($script:fail -gt $failed) { Show }
+
+    # Issue #2952: -Restart was Stop-ScheduledTask, a second's sleep and
+    # Start-ScheduledTask. The stand-in Stop-ScheduledTask ends the task's
+    # cmd.exe and leaves its node running, the way the real one returns
+    # before voice has exited (63 ms, every process still up, measured on dev
+    # voice on 21 Oct), so a start that does not wait for the old node finds
+    # it on the port and the old process goes on answering.
+    $live = Live $voiceRoot
+    $pidBefore = Listener $voicePort
+    $taskBefore = TaskArg ($TaskPrefix + ' Voice')
+    $a = $voice.Clone(); $a['Restart'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -Restart is RESTART OK, the same build answering as a new process' (
+        $r.Ok -and $r.Said -match 'RESTART OK' -and (WaitFor { ((Build) -eq 'voice-v1') -and ((Listener $voicePort) -notin 0, $pidBefore) }))
+    Yes '  and the old process has exited, not been left beside the new one' (-not (Get-Process -Id $pidBefore -EA SilentlyContinue))
+    Yes '  and the task and the files are as they were, nothing staged or sent' (
+        ((TaskArg ($TaskPrefix + ' Voice')) -eq $taskBefore) -and ((Live $voiceRoot) -eq $live) -and $r.Said -notmatch 'Staging')
+    if ($script:fail -gt $failed) { Show }
+
+    # And -Remove took the folder away in the same instant, with every error
+    # silenced, and the firewall rule it took was always live's.
+    $pidBefore = Listener $voicePort
+    $a = $voice.Clone(); $a['Remove'] = $true
+    $r = Deploy 'Install-Voice.ps1' $a
+    $failed = $script:fail
+    Yes 'Install-Voice -Remove is REMOVED, with voice exited and its task and folder gone' (
+        $r.Ok -and $r.Said -match '(?m)^\s*REMOVED$' -and -not (Get-Process -Id $pidBefore -EA SilentlyContinue) -and
+        (Listener $voicePort) -eq 0 -and -not (TaskArg ($TaskPrefix + ' Voice')) -and -not (Test-Path -LiteralPath $voiceRoot))
     if ($script:fail -gt $failed) { Show }
 
     # ================================================================ the bot

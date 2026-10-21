@@ -344,8 +344,9 @@ WATCH_ID = _int_env('WATCH_CHANNEL_ID', _staff_channel_id())
 # "speaking in #news": right kind of place, wrong place, and it would have put
 # every crash report in with the release announcements.
 #
-# 0 when there is no file, so _trouble_channel falls through to looking
-# staff-general up by name. TROUBLE_CHANNEL_ID in bot.env.json overrides it.
+# 0 when there is no file, and then _trouble_channel says so in the bot log
+# and nothing is said in Discord. It used to look staff-general up by name
+# instead (#2940). TROUBLE_CHANNEL_ID in bot.env.json overrides it.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
 
 # The bot's own records, joins.json, open-tickets.json, heartbeat.json
@@ -4581,39 +4582,27 @@ async def watch_trouble():
 
 def _trouble_channel():
     """
-    The channel a session that went wrong is announced in.
+    The channel a session that went wrong is announced in: #staff-updates, by
+    the id from staff-channel.txt or TROUBLE_CHANNEL_ID, and nothing else.
 
-    An id wins, from staff-channel.txt or TROUBLE_CHANNEL_ID, because an id
-    cannot be ambiguous. With no id it falls back to the name staff-general,
-    AND ONLY WHEN EXACTLY ONE CHANNEL HAS THAT NAME.
-
-    That last part is the whole rule. This server has two channels called news,
-    one staff and one public, and discord.py's by-name lookup hands back
-    whichever is listed first, so a watcher matching on a name would eventually
-    announce staff business in public. One match is safe; two is not, and two
-    is silence plus a line in the log saying so rather than a guess.
+    No id, or an id that is not a channel this bot can see, is a line in the
+    bot log and silence in Discord, the way watch_say has always been. Until
+    #2940 it fell back to a channel named staff-general, so the same alert went
+    to #staff-updates on a box set up right and to the team's everyday channel
+    on one that was not, and nothing in Discord said which. A guess by name
+    also hid the missing or wrong id, which is the thing to fix: Install-Bot
+    sends staff-channel.txt with the code. And a name can match the wrong
+    channel; this server has two called news, one staff and one public.
     """
-    if TROUBLE_ID:
-        ch = client.get_channel(TROUBLE_ID)
-        if ch is not None:
-            return ch
-        log('trouble: channel id %d is not one this bot can see.' % TROUBLE_ID)
-
-    found = []
-    for g in client.guilds:
-        for ch in getattr(g, 'text_channels', []):
-            if ch.name == 'staff-general':
-                found.append(ch)
-    if len(found) == 1:
-        return found[0]
-    if len(found) > 1:
-        log('trouble: %d channels are called staff-general, so nothing was '
-            'said. Put the right id in staff-channel.txt or set '
-            'TROUBLE_CHANNEL_ID.' % len(found))
+    if not TROUBLE_ID:
+        log('trouble: no channel id, so nothing is said. staff-channel.txt is '
+            'missing or unreadable; Install-Bot.ps1 sends it with the code.')
         return None
-
-    log('trouble: no channel called staff-general and no id given.')
-    return None
+    ch = client.get_channel(TROUBLE_ID)
+    if ch is None:
+        log('trouble: channel %d is not one this bot can see, so nothing is '
+            'said.' % TROUBLE_ID)
+    return ch
 
 
 async def trouble_say(text):
@@ -4622,7 +4611,11 @@ async def trouble_say(text):
     if ch is None:
         return
     try:
-        await ch.send(text[:1900])
+        # The line carries a name and a line from a log, both from somewhere
+        # else. Mentions stay off, as in watch_say and report_say, so an
+        # @everyone in it is text and not a ping.
+        await ch.send(text[:1900],
+                      allowed_mentions=discord.AllowedMentions.none())
     except Exception:
         log('trouble: could not post in #%s:\n' % getattr(ch, 'name', '?')
             + traceback.format_exc())

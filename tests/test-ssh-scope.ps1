@@ -191,6 +191,22 @@ try {
     $r = Invoke-BoxHere ' '
     Yes 'an empty list: STOP, nothing changed' ($r.Code -eq 1 -and (Has $r.Lines '^STOP the list of addresses is empty') -and (Untouched))
 
+    # None (#2891): 127.0.0.1 alone, the bridge, and only from a session that
+    # came through it.
+    New-Fake
+    $r = Invoke-BoxHere 'None'
+    Yes 'None from a session that did not come through the bridge: STOP naming it, nothing changed' ($r.Code -eq 1 -and (Has $r.Lines '^STOP this session comes from 203\.0\.113\.7, not through the bridge') -and (Untouched))
+    New-Fake
+    $global:Fake.caller = '127.0.0.1'
+    $r = Invoke-BoxHere 'None'
+    Yes 'None through the bridge: both rules take 127.0.0.1 alone, with the save and put back' ($r.Code -eq 0 -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq '127.0.0.1' -and (RemoteOf 'sshd-22-extra') -eq '127.0.0.1' -and
+        $global:Fake.log[0] -eq 'Register-Rollback' -and (Has $r.Lines '^KEPT this session comes from 127\.0\.0\.1'))
+    Yes '  and the other ports are not touched' ((RemoteOf 'Thornswood-Site') -eq 'Any' -and (RemoteOf 'Thornswood-Game') -eq 'Any')
+    New-Fake
+    $global:Fake.caller = '127.0.0.1'
+    $r = Invoke-BoxHere '127.0.0.1,None'
+    Yes 'None inside a list: STOP, nothing changed' ($r.Code -eq 1 -and (Has $r.Lines '^STOP None goes alone') -and (Untouched))
+
     New-Fake
     $global:Fake.rules += @{ Name = 'all-tcp'; DisplayName = 'every TCP port'; Action = 'Allow'; Protocol = 'TCP'; Ports = @('Any'); Program = 'Any'; Remote = @('Any'); Enabled = $true }
     $r = Invoke-BoxHere '203.0.113.7'
@@ -273,6 +289,8 @@ try {
     function global:ssh {
         $WhatIfPreference = $false
         $a = @($args | ForEach-Object { [string]$_ })
+        # ssh -G, what ssh makes of its config: whether it goes through the bridge.
+        if ($a -contains '-G') { 'hostname 127.0.0.1'; if ($global:H.Bridge) { 'proxycommand "node" "C:\Users\x\.ssh\thornswood-bridge\connect.js"' }; $global:LASTEXITCODE = 0; return }
         $global:H.Calls.Add('ssh ' + ($a -join ' '))
         $last = $a[-1]
         if ($last -eq 'echo THORNSWOOD_KEY_OK') {
@@ -305,7 +323,7 @@ try {
         $out = @(& $Driver @a 6>&1 2>&1 | ForEach-Object { [string]$_ })
         return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out; Text = ($out -join "`n") }
     }
-    function Fresh { New-Fake; $global:H.Calls.Clear(); $global:H.Cancelled = $false; $global:H.Sent = ''; $global:H.Changed = $false; $global:H.KeyWorks = $true; $global:H.KeyAfter = $true; $global:H.HostFp = $pin }
+    function Fresh { New-Fake; $global:H.Calls.Clear(); $global:H.Cancelled = $false; $global:H.Sent = ''; $global:H.Changed = $false; $global:H.KeyWorks = $true; $global:H.KeyAfter = $true; $global:H.HostFp = $pin; $global:H.Bridge = $false }
 
     Fresh
     $global:H.HostFp = 'SHA256:' + ('A' * 43)
@@ -336,6 +354,17 @@ try {
     $global:H.KeyAfter = $false
     $r = Invoke-Driver @{}
     Yes 'a new login that fails: exit 1, the put back left armed, and it says the box reopens itself' ($r.Code -eq 1 -and -not $global:H.Cancelled -and $global:Fake.rollback -and $r.Text -match 'puts the old rules back by itself within ten minutes')
+
+    Fresh
+    $r = Invoke-Driver @{ From = @('None') }
+    Yes '-From None from a machine whose ssh does not go through the bridge: refused, exit 1, before any login' ($r.Code -eq 1 -and $r.Text -match 'does not go through the bridge' -and $global:H.Calls.Count -eq 0 -and (Untouched))
+
+    Fresh
+    $global:H.Bridge = $true
+    $global:Fake.caller = '127.0.0.1'
+    $r = Invoke-Driver @{ From = @('None'); WhatIf = $true }
+    Yes '-From None -WhatIf through the bridge: exit 0, the box asked read only with None, nothing changed' ($r.Code -eq 0 -and
+        @($global:H.Calls | Where-Object { $_ -match '-From "None" -DryRun$' }).Count -eq 1 -and (Untouched))
 
     Fresh
     $r = Invoke-Driver @{ From = @('198.51.100.0/24') }

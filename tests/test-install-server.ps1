@@ -157,14 +157,23 @@ if ($gpAst) {
         Yes 'settings that do not read stop it, naming the file, where they gave 7777' ($why -match 'server-settings\.json does not read, so the port this server answers on is not known')
     } finally { Remove-Item -LiteralPath $gpDir -Recurse -Force -ErrorAction SilentlyContinue }
 }
-Yes 'the waits for the ports list them whole and filter, with no -LocalPort left to throw for nothing there' ($src -notmatch 'Get-NetUDPEndpoint -LocalPort' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$ids -contains' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$_\.LocalPort -eq \$port \}')
+Yes 'the waits for the ports list them whole and filter, with no -LocalPort left to throw for nothing there' ($src -notmatch 'Get-NetUDPEndpoint -LocalPort' -and $src -match 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$_\.LocalPort -eq \$port \}')
+# #2928: the stop waits for the server's processes to have exited, which is
+# when their files and ports are closed, rather than for the ports to let go.
+Yes 'the stop waits for each of the server''s processes to exit, not for its ports' (
+    $src -match '\$held = @\(Get-ThornswoodProcessHeld \$ids\)' -and $src -match 'Stop-ThornswoodProcessHeld \$held' -and
+    $src -notmatch 'Get-NetUDPEndpoint -ErrorAction Stop \| Where-Object \{ \$ids -contains')
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $node -or -not (Test-Path -LiteralPath $ps51) -or
-    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-    Write-Host 'SKIP  the runs need node, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+if (-not $node -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
 }
 
@@ -217,7 +226,7 @@ $script:ownTasks = @('Server', 'Dev', 'Live', 'Scene') | ForEach-Object { $TaskP
 function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
-    $folder = Join-Path $env:SystemRoot 'System32\Tasks'
+    $folder = Get-WindowsPath 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
     if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + ' *')))) { return $true }
@@ -942,7 +951,9 @@ try {
     try { $out = Install (Payload) @() } finally { $held.Close() }
     $failed = $script:fail
     Yes 'a root that cannot be moved aside is INSTALL REFUSED' (($out -contains 'INSTALL REFUSED') -and $script:lastCode -ne 0)
-    Yes '  and names the file that is held' (($out -join "`n") -match 'still open: .*w\.txt')
+    # Tried once, saying the Windows error and what holds it (#2928): this
+    # harness, which has the file open.
+    Yes '  and says why, naming what holds it' (($out -join "`n") -match ('could not move .* \(0x8007[0-9A-F]{4}\); open under it then: .*pid ' + $PID + '\b'))
     Yes '  and the root is as it was, with no stage left' (((Tree $root) -eq $before) -and @(Beside '.stage-*').Count -eq 0)
     Yes '  and the old server was started again' ((WaitUp $P) -and ((Owner $P) -ne $running))
     if ($script:fail -gt $failed) { Show }

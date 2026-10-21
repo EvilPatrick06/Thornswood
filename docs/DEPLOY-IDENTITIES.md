@@ -12,7 +12,8 @@ section 7.
 How the scripts get in. Every script that reaches the box goes through
 `scripts\vps\Remote.ps1` (`Invoke-ThornswoodRemote`) or plain `ssh`/`scp`,
 34 scripts under `scripts\` in all, as `Administrator` with a key
-(`docs\OWNERSHIP.md`, "VPS access"; `Setup-SshKey.ps1`; `Add-VpsKey.ps1`).
+(`docs\OWNERSHIP.md`, "VPS access"; `Setup-SshKey.ps1`; `Add-VpsKey.ps1`,
+replaced since by `Grant-BoxAccess.ps1`, #2891).
 Runbooks do the same by hand (`docs\IT-IS-DOWN.md`, `docs\RESTORING.md`,
 `docs\MOVING-THE-SERVER.md`).
 
@@ -47,7 +48,7 @@ folder locks from `Lock-VpsFolders.ps1`).
 | Register or change a task that runs as SYSTEM | Install-*, Install-Backup, Install-Runner | Yes |
 | Install a service, change a virtual account, set folder ACLs | Install-Bot, Install-Runner, Lock-VpsFolders | Yes |
 | Firewall, sshd, Windows Update, hardening | Harden-VPS, Maint Update | Yes |
-| Add or remove an ssh key | Add-VpsKey, Setup-SshKey | Yes |
+| Add or remove an ssh key | Grant-BoxAccess, Setup-SshKey | Yes |
 
 Most day to day traffic (every Ship, deploy and feed write) is in the first
 three rows. The admin rows are install-time and rare. This table was first
@@ -78,7 +79,7 @@ Where the evidence differs from section 2:
 | Artifact store writes need Modify only | `Send-ThornswoodArtifact` and the put back record restore (`Restore-SwapRecord`, `Restore-ThornswoodServerRecord`) run `Get-ThornswoodLockedFolderScript`, which sets the store's ACL, on every call | Admin today. The ACL belongs at install time (Lock-VpsFolders), not in every deploy |
 | Deploy-Docs is a file deploy | Every run also opens or removes the site firewall rule, sets the task's account, and can write the site password into `config.json` | Admin for those three calls. The file stage, check and swap rows are deploy verbs |
 | Install-Bot files need no admin | The bot swap goes through `Bot-Service.ps1`: `sc.exe`, `Stop-Service`, `Stop-Process` and `Set-Acl`. The rest installs Python, pip packages and the service | Admin. Only the stage upload and its hash check are deploy verbs |
-| Install-Voice files need no admin | The main run registers the task and the firewall rule and stops the process | Admin, apart from the stage, its check and the task restart |
+| Install-Voice files need no admin | The main run registers the task and the firewall rule and stops the process. Since #2952 `-Restart` and `-Remove` open voice's processes, end what the task stop left and wait for each to exit | Admin, apart from the stage and its check. The restart too since #2952: task rights alone cannot open a LOCAL SERVICE process to wait for it |
 | Publish-Server is a file deploy | It copies the zip and four libraries to `C:\` and runs `Install-ThornswoodServer.ps1`, which registers the SYSTEM task | Admin (first install). Day to day server deploys are Deploy-Server |
 | Watch is a read | Watch-Services and Watch-Load write their scripts into locked folders and register or delete their tasks | Admin for those calls; their status reads stay read-status |
 | Feed writes are Feed-Store, Publish-Update and Publish-Discord | Feed writes also come from Remirror-Site-Feed, Publish-News (`news.json`) and Publish-Installer (site `files`) | All feed-send; the feed verb must cover those folders too |
@@ -117,7 +118,7 @@ verb is refused rather than retrying as admin.
 
 - One key per person per machine, comment `<person>-<machine>-<date>`, so a
   line can be traced and removed without touching anyone else's.
-- Added with `Add-VpsKey.ps1` (it gains `-Role deploy|admin`).
+- Added with `Grant-BoxAccess.ps1` (it gains `-Role deploy|admin`).
 - Reviewed quarterly against `docs\OWNERSHIP.md`; a key with no login in 90
   days (OpenSSH log) is proposed for removal.
 - Removal on leaving or loss: delete the line, nothing else changes. No
@@ -168,8 +169,10 @@ section.
   (section 1).
 - What uses the key from One: every Ship and deploy; `Fetch-Backups.ps1`
   every night, which pulls backups that hold every secret (an admin row in
-  the map); and `Watch-Outside.ps1` every five minutes, which logs in only
-  when it has an alert to hand to the watchdog's outbox.
+  the map), and which since #2755 also writes the name of the newest copy
+  it checked into the watchdog's `offbox.txt`. `Watch-Outside.ps1` logged in
+  every five minutes until #2755 moved it to GitHub's runners, which have no
+  key and post to Discord themselves.
 
 ### 6.2 What a stolen key can do, now and after each change
 
@@ -202,8 +205,8 @@ Patrick's console login check, not on work).
   note), and `Set-SshScope.ps1 -From Any`. A port 22 change whose new login
   fails is put back by the box itself within ten minutes.
 - Risk of the change: a machine whose address changes loses ssh until the
-  list is changed. If that is One, every Ship, deploy, backup fetch and
-  Watch-Outside login fails until someone in the list, or Patrick at the
+  list is changed. If that is One, every Ship, deploy and backup fetch
+  fails until someone in the list, or Patrick at the
   console, runs `Set-SshScope.ps1` again.
 
 **7.4, the deploy identity** (undecided).
@@ -215,7 +218,7 @@ Patrick's console login check, not on work).
   time; the process stop in the swap blocks moves into a gate verb that runs
   elevated; and the three admin calls on every `Deploy-Docs.ps1` run (the
   firewall rule, the task's account, the site password) leave the deploy
-  path. Then `Remote.ps1 -As`, the gate itself, `Add-VpsKey.ps1 -Role`, the
+  path. Then `Remote.ps1 -As`, the gate itself, `Grant-BoxAccess.ps1 -Role`, the
   account, the folder rights and task rights on the box, and a week on dev
   (section 5). Nobody has put days on it; the issue says large.
 - What it buys, measured: while the game servers run as SYSTEM, very little
@@ -264,9 +267,9 @@ since 16 Oct).
   OpenSSH log on the box (agents are refused box reads).
 - Days of work for the deploy identity and for own accounts: whoever takes
   own accounts first.
-- `Watch-Outside.ps1` reaches the box with ssh through a variable (`& $ssh`)
-  in two places, and `records\remote-commands.json` has no row for either:
-  the map test finds only commands named `ssh` or `scp`. Recorded on #2182.
+- `Watch-Outside.ps1` reached the box with ssh through a variable (`& $ssh`)
+  in two places that `records\remote-commands.json` had no row for (#2182).
+  Since #2755 it runs on GitHub's runners and has no ssh at all.
 
 ## 7. Decisions (Patrick, 11 Oct 2026)
 

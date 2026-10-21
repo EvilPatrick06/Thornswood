@@ -242,14 +242,14 @@ put('Embedded.esp', plugin([], [group('QUST', [quest(0x800, 'EmbeddedMenuQuest',
 put('Off.esp', plugin([], [group('QUST', [quest(0x800, 'OffMenuQuest', 2, [{ name: 'OffMenu', props: [] }])])]));
 put('Broken.esp', Buffer.from('this is not a plugin at all'));
 
-put('Scripts\\SKI_ConfigBase.pex', pex('SKI_ConfigBase', 'SKI_QuestBase'));
-put('Scripts\\MCM_ConfigBase.pex', pex('MCM_ConfigBase', 'SKI_ConfigBase'));
-put('Scripts\\ClassicMenu.pex', pex('ClassicMenu', 'SKI_ConfigBase', ['JsonUtil', 'SetIntValue']));
-put('Scripts\\HelperMenu.pex', pex('HelperMenu', 'MCM_ConfigBase'));
-put('Scripts\\PlainQuest.pex', pex('PlainQuest', 'Quest'));
-put('Scripts\\OtherScript.pex', pex('OtherScript', 'Quest'));
-put('Scripts\\OffMenu.pex', pex('OffMenu', 'SKI_ConfigBase'));
-put('Scripts\\Shadowed.pex', pex('Shadowed', 'Quest'));
+put(path.join('Scripts', 'SKI_ConfigBase.pex'), pex('SKI_ConfigBase', 'SKI_QuestBase'));
+put(path.join('Scripts', 'MCM_ConfigBase.pex'), pex('MCM_ConfigBase', 'SKI_ConfigBase'));
+put(path.join('Scripts', 'ClassicMenu.pex'), pex('ClassicMenu', 'SKI_ConfigBase', ['JsonUtil', 'SetIntValue']));
+put(path.join('Scripts', 'HelperMenu.pex'), pex('HelperMenu', 'MCM_ConfigBase'));
+put(path.join('Scripts', 'PlainQuest.pex'), pex('PlainQuest', 'Quest'));
+put(path.join('Scripts', 'OtherScript.pex'), pex('OtherScript', 'Quest'));
+put(path.join('Scripts', 'OffMenu.pex'), pex('OffMenu', 'SKI_ConfigBase'));
+put(path.join('Scripts', 'Shadowed.pex'), pex('Shadowed', 'Quest'));
 
 // Compressed by default, so PackedMenu is LZ4 and PackedRaw, whose bit flips
 // that, is stored. A textures folder comes first so the names have to line up.
@@ -263,7 +263,7 @@ put('Embedded.bsa', bsa(0x103, [
   { folder: 'scripts', name: 'embeddedmenu.pex', data: pex('EmbeddedMenu', 'MCM_ConfigBase') }
 ]));
 
-put('MCM\\Config\\Helper\\config.json', JSON.stringify({
+put(path.join('MCM', 'Config', 'Helper', 'config.json'), JSON.stringify({
   modName: 'Helper',
   content: [
     { type: 'header', text: 'Top' },
@@ -278,9 +278,9 @@ put('MCM\\Config\\Helper\\config.json', JSON.stringify({
     { type: 'empty' }
   ] }]
 }, null, 2));
-put('MCM\\Config\\Gone\\config.json', '{"modName":"Gone","content":[]}');
-put('MCM\\Settings\\Helper.ini', '; Another server wrote this\r\n[General]\r\nbTop=1\r\n');
-put('MCM\\Settings\\Stray.ini', '[General]\r\nx=1\r\n');
+put(path.join('MCM', 'Config', 'Gone', 'config.json'), '{"modName":"Gone","content":[]}');
+put(path.join('MCM', 'Settings', 'Helper.ini'), '; Another server wrote this\r\n[General]\r\nbTop=1\r\n');
+put(path.join('MCM', 'Settings', 'Stray.ini'), '[General]\r\nx=1\r\n');
 
 function snapshot() {
   const out = [];
@@ -342,7 +342,7 @@ try {
   yes('with the archive\'s compression, flipped for the one file that says so',
       packed.packedmenu && packed.packedmenu.compressed && packed.packedraw && !packed.packedraw.compressed);
 
-  const order = A.readLoadOrder(PLUGINS);
+  const order = require(path.join(REPO_DIR, 'scripts', 'dev', 'OwnPlugins.js')).loadOrder(PLUGINS);
   const find = A.scriptFinder(DATA, order);
   const pm = find('PackedMenu') || {};
   yes('an LZ4 script out of an archive reads, and extends SKI_ConfigBase', pm.parent === 'SKI_ConfigBase' && pm.from === 'Packed.bsa');

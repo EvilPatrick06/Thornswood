@@ -52,12 +52,12 @@ $tokens = $null; $errors = $null
 [void][System.Management.Automation.Language.Parser]::ParseFile($Fetch, [ref]$tokens, [ref]$errors)
 Yes 'Fetch-Backups.ps1 parses' ($errors.Count -eq 0)
 
-$ps51 = $null
-if ($env:SystemRoot) { $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
-if (-not $ps51 -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which the scheduled task uses'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which the scheduled task uses; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2199w-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $cwd = Join-Path $root 'ran-here'

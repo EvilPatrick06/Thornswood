@@ -3,7 +3,7 @@
   "active": false,
   "builtBy": "scripts/dev/Build-MerchantRoleTables.py",
   "sources": {
-    "game/data/recipes.json": "014992b1667c6fe7e2d9cab98a71b6c7c79311ab36f2e7b9f3ac4ecd1c45fffa",
+    "game/data/recipes.json": "7e609ab4b5fa1ae6773c43e5e6dde4b870db27338031e4c5e2ecae3ef5ff7cfd",
     "game/data/harvests.json": "da87513ba8c931267dd13d1b39fabcc0de9bfaa5bc064be474eea22783b1d77b",
     "game/data/hunts.json": "b3ad957575d1f2083e202e6253cc1e29edd23bb215bed89f1d3f77a6fce5aa4b",
     "game/data/items.json": "b91464db89a6a455f5f00bffc81329a5801f236519949bb1cb394e02d9354b4c",
@@ -267,7 +267,7 @@
     },
     {
       "name": "Thornswood-Content.esp",
-      "sha256": "bb160f188bf4159e24ae4acaf66e7686a50dce4e515e25f3015e275738035caf",
+      "sha256": "0090269cb6955e2cc9a8e717fd992f31b506de7f558f10adb99c6cee6b38f29a",
       "repository": true
     },
     {
@@ -1683,6 +1683,27 @@
       "flags": 0,
       "edid": "DLC2Scathecraw01",
       "winner": "Dragonborn.esm"
+    },
+    "18001:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodTeaLavender",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "18002:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodTeaJuniper",
+      "winner": "Thornswood-Content.esp",
+      "food": true
+    },
+    "18003:Thornswood-Content.esp": {
+      "type": "ALCH",
+      "flags": 0,
+      "edid": "ThornswoodFoodTeaSnowberry",
+      "winner": "Thornswood-Content.esp",
+      "food": true
     },
     "18388:Skyrim.esm": {
       "type": "ARMO",
@@ -7453,6 +7474,9 @@
         "117ff:HearthFires.esm",
         "11801:HearthFires.esm",
         "14dc4:Dawnguard.esm",
+        "18001:Thornswood-Content.esp",
+        "18002:Thornswood-Content.esp",
+        "18003:Thornswood-Content.esp",
         "1b3bd:Skyrim.esm",
         "1cd72:Dragonborn.esm",
         "206e7:Dragonborn.esm",
@@ -7571,6 +7595,9 @@
         "117ff:HearthFires.esm",
         "11801:HearthFires.esm",
         "14dc4:Dawnguard.esm",
+        "18001:Thornswood-Content.esp",
+        "18002:Thornswood-Content.esp",
+        "18003:Thornswood-Content.esp",
         "1b3bd:Skyrim.esm",
         "1cd72:Dragonborn.esm",
         "206e7:Dragonborn.esm",
@@ -8625,6 +8652,15 @@
       "Alchemist:harvests:harvests:17e94:Dragonborn.esm",
       "Smith:recipe:19f9d:Playable Rieklings.esp:input:2"
     ],
+    "18001:Thornswood-Content.esp": [
+      "Cook:recipe:18011:Thornswood-Content.esp:out"
+    ],
+    "18002:Thornswood-Content.esp": [
+      "Cook:recipe:18012:Thornswood-Content.esp:out"
+    ],
+    "18003:Thornswood-Content.esp": [
+      "Cook:recipe:18013:Thornswood-Content.esp:out"
+    ],
     "18388:Skyrim.esm": [
       "Enchanter:wardweaver:public-wearable",
       "Smith:recipe:f46cc:Skyrim.esm:out"
@@ -8706,7 +8742,8 @@
       "Alchemist:harvests:harvests:bcf34:Skyrim.esm",
       "Alchemist:harvests:harvests:df015:Skyrim.esm",
       "Cook:recipe:117fd:HearthFires.esm:input:0",
-      "Cook:recipe:11802:HearthFires.esm:input:0"
+      "Cook:recipe:11802:HearthFires.esm:input:0",
+      "Cook:recipe:18013:Thornswood-Content.esp:input:0"
     ],
     "1b935:Dragonborn.esm": [
       "Woodworker:recipe:19fb7:Playable Rieklings.esp:out"
@@ -9902,6 +9939,7 @@
     ],
     "45c28:Skyrim.esm": [
       "Alchemist:harvests:harvests:1bb3d:Skyrim.esm",
+      "Cook:recipe:18011:Thornswood-Content.esp:input:0",
       "Cook:recipe:811:Gourmet.esp:input:2",
       "Cook:recipe:812:Gourmet.esp:input:2",
       "Cook:recipe:813:Gourmet.esp:input:2"
@@ -10007,6 +10045,7 @@
     "5076e:Skyrim.esm": [
       "Alchemist:harvests:harvests:bb948:Skyrim.esm",
       "Cook:recipe:117fc:HearthFires.esm:input:1",
+      "Cook:recipe:18012:Thornswood-Content.esp:input:0",
       "Cook:recipe:80f:Gourmet.esp:input:0"
     ],
     "50d0:Dawnguard.esm": [
@@ -12420,8 +12459,8 @@
       "supply": 16
     },
     "Cook": {
-      "buy": 116,
-      "sell": 116,
+      "buy": 119,
+      "sell": 119,
       "supply": 53
     },
     "Alchemist": {
