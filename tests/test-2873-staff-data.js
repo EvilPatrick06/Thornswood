@@ -121,9 +121,8 @@ const tp = fs.readFileSync(path.join(__dirname, 'test-1390-thalmor-patrols.js'),
 yes('R3 the patrol keeper is run with no data folder in test-1390-thalmor-patrols.js', /K2b with no data folder/.test(tp));
 
 // ------------------------------------------------------------ on the gate
-const wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build.yml'), 'utf8');
-const wp = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build-pr.yml'), 'utf8');
-yes('G1 this harness is on build.yml and build-pr.yml', wf.indexOf("'test-2873-staff-data.js'") >= 0 && wp.indexOf("'test-2873-staff-data.js'") >= 0);
+const gx = fs.readFileSync(path.join(ROOT, 'tests', 'gate-excluded.txt'), 'utf8');
+yes('G1 this harness is on the gate of build.yml and build-pr.yml (not in tests/gate-excluded.txt, #3009)', !/^test-2873-staff-data\.js\s/m.test(gx));
 
 console.log('\n' + passed + ' passed, ' + failed + ' failed');
 process.exit(failed ? 1 : 0);
