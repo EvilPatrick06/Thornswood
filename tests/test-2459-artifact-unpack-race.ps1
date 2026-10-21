@@ -63,6 +63,7 @@ $helper = Join-Path $Repo 'scripts\deploy\Artifact.ps1'
 Yes 'scripts\deploy\Artifact.ps1 is there' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
+. (Join-Path $Here 'Windows.ps1')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2459-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -104,8 +105,7 @@ function RecordSame($Want, [string]$Path) {
 # A handle on $Path the way MoveFileExW holds the file it names: delete
 # access, sharing everything. Off Windows there is no delete access to ask
 # for, and nothing there refuses a reader, so it is an ordinary handle.
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-if ($onWindows -and -not ('Harness2459Hold' -as [type])) {
+if ($OnWindows -and -not ('Harness2459Hold' -as [type])) {
     Add-Type -Language CSharp -TypeDefinition @'
 using System;
 using System.ComponentModel;
@@ -126,7 +126,7 @@ public static class Harness2459Hold {
 '@
 }
 function Hold-AsRenaming([string]$Path) {
-    if ($onWindows) { return [Harness2459Hold]::Open($Path) }
+    if ($OnWindows) { return [Harness2459Hold]::Open($Path) }
     return [IO.File]::Open($Path, [IO.FileMode]::Open, [IO.FileAccess]::ReadWrite, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
 }
 # What a run must not leave in its folder: a .building-* of its own, or an
@@ -263,7 +263,7 @@ try {
     $refused = $null
     try {
         try { $mine = Build $oHeld } catch { $err = $_ }
-        if ($script:held -and $onWindows) {
+        if ($script:held -and $OnWindows) {
             # The held handle is the one that refused the old reads: a
             # FileShare.Read open of the zip beside it is refused.
             try { [IO.File]::Open((Join-Path $oHeld $good.Name), [IO.FileMode]::Open, [IO.FileAccess]::Read, [IO.FileShare]::Read).Dispose(); $refused = $false }
@@ -273,8 +273,8 @@ try {
         $script:holdZip = $false
         if ($script:held) { $script:held.Dispose(); $script:held = $null }
     }
-    Yes 'the other run named the zip first and held it the way MoveFileExW does' ($null -ne $refused -or -not $onWindows)
-    if ($onWindows) { Yes '  a FileShare.Read open beside that handle is refused, as Get-FileHash and ZipFile were' ($refused -eq $true) }
+    Yes 'the other run named the zip first and held it the way MoveFileExW does' ($null -ne $refused -or -not $OnWindows)
+    if ($OnWindows) { Yes '  a FileShare.Read open beside that handle is refused, as Get-FileHash and ZipFile were' ($refused -eq $true) }
     Yes '  this run still finishes, reading the zip while it is held' ($null -eq $err -and $null -ne $mine)
     if ($err) { Write-Host ('  ' + $err.Exception.Message) }
     Yes '  it names the same artifact with every file unpacked' (
