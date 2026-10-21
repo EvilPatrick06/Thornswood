@@ -23,7 +23,11 @@
   than to the last release (#2983): a file the release carried at another
   build is taken from the site by the sha256 the record names, from this
   channel's assets or else the other channel's, so main can carry the client
-  a dev Ship already put on the site without an engine build here.
+  a dev Ship already put on the site without an engine build here. A client no
+  Ship has carried yet is on neither feed: it is taken from CI's engine build
+  of the pin instead (engine.yml's artifact, which Get-EngineArtifact.ps1
+  fetches and holds to the records, #3047), so the dev Ship that first carries
+  a new engine pin runs without an engine build here too.
 
   It also writes <Root>\config.json from the feed's own server, voice and site
   fields, so the publish writes them back as they are: only a Ship from One
@@ -33,13 +37,16 @@
     - a feed that names no record, or a record whose files are not all on the
       site (no :record:files): a collection Ship from One sends them first;
     - any file that does not hash to the name the record gives it;
-    - a recorded client file that is on neither feed's assets.
+    - a recorded client file that is on neither feed's assets nor in CI's
+      engine build of the pin with the bytes the record names.
   A file already in the folder with the right bytes is not fetched again, and
   anything in Game the record does not name is removed first, so the folder
   is the record and nothing older.
 
-  Talks to the site only (https), never to the VPS over ssh. Writes nothing
-  outside -Root.
+  Talks to the site (https), and to GitHub through Get-EngineArtifact.ps1 only
+  when the recorded client is on neither feed; never to the VPS over ssh.
+  Writes nothing outside -Root but the engine build Get-EngineArtifact.ps1
+  keeps in this machine's own data.
 
 .EXAMPLE
   .\scripts\release\New-FeedRoot.ps1 -Channel dev
@@ -54,7 +61,10 @@ param(
     # A folder standing in for the site's root on the VPS. Tests only.
     [string]$SiteDir,
     # The client record to stage. records\client-build.json unless given.
-    [string]$ClientRecord
+    [string]$ClientRecord,
+    # A client folder standing in for CI's engine build of the pin
+    # (Where.ps1 EngineArtifact's build\dist\client). Tests only.
+    [string]$EngineDist
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -90,8 +100,10 @@ Say ("{0} release {1}: {2} files" -f $Channel, [string]$ptr.id, $files.Count) 'C
 # first carried that client put each file on the site by its sha256. So these
 # six are held to the client record, not the release's: each is taken from
 # this channel's assets, else the other channel's, by the sha256 the record
-# names. A client on neither feed is refused: Build-Engine on One or the box
-# makes it, and the dev Ship from there puts it on the site.
+# names. A client no Ship has carried yet is on neither feed: on 21 Oct the pin
+# moved to 445ded38 (#3088) and four of its six files were on no feed. CI's
+# engine build of the pin holds exactly those bytes (#3047), so a file on
+# neither feed is taken from there, and refused only when that cannot give it.
 $clientFile = if ($ClientRecord) { $ClientRecord } else { Join-Path $PSScriptRoot '..\..\records\client-build.json' }
 $client = @{}
 $clientCommit = ''
@@ -135,7 +147,33 @@ foreach ($k in $files) {
 }
 Say ("  {0} fetched ({1:N1} MB), {2} already here with the same bytes" -f $fetched, ($bytes / 1MB), $kept) 'Green'
 
-# ---- the recorded client, from the site
+# ---- the recorded client, from the site, else from CI's engine build
+# CI's engine build of the pin, asked for once and only when a recorded client
+# file is on neither feed: -EngineDist in a harness, otherwise Where.ps1
+# EngineArtifact's client folder, fetched by Get-EngineArtifact.ps1 when it is
+# not here yet, which holds every file in it to the records first.
+$script:ciClient = $null
+function Get-CiClientDist {
+    if ($null -ne $script:ciClient) { return $script:ciClient }
+    $script:ciClient = [pscustomobject]@{ Dir = ''; Why = '' }
+    if ($EngineDist) {
+        if (Test-Path -LiteralPath $EngineDist -PathType Container) { $script:ciClient.Dir = $EngineDist }
+        else { $script:ciClient.Why = "There is no engine build at $EngineDist." }
+        return $script:ciClient
+    }
+    $art = ''
+    try { $art = [string](& (Join-Path $PSScriptRoot 'Where.ps1') EngineArtifact) } catch { $script:ciClient.Why = "Where.ps1 could not name CI's engine build of the pin: " + $_.Exception.Message; return $script:ciClient }
+    $dir = Join-Path $art 'build\dist\client'
+    if (-not (Test-Path -LiteralPath $dir -PathType Container)) {
+        Say "  the recorded client is on neither feed; fetching CI's engine build of the pin" 'Cyan'
+        $global:LASTEXITCODE = 0
+        & (Join-Path $PSScriptRoot 'Get-EngineArtifact.ps1') -NoPause
+        if ($LASTEXITCODE -ne 0) { $script:ciClient.Why = "Get-EngineArtifact.ps1 could not fetch CI's engine build of the pin (exit $LASTEXITCODE); its lines above say why."; return $script:ciClient }
+    }
+    if (Test-Path -LiteralPath $dir -PathType Container) { $script:ciClient.Dir = $dir }
+    else { $script:ciClient.Why = "Get-EngineArtifact.ps1 ran, and there is still no client at $dir." }
+    return $script:ciClient
+}
 if ($client.Count) {
     $prefixes = @((Get-FeedStorePrefix $Channel), (Get-FeedStorePrefix $(if ($Channel -eq 'dev') { 'main' } else { 'dev' })))
     $inPlace = 0; $taken = @()
@@ -153,11 +191,25 @@ if ($client.Count) {
             } catch { $why += $_.Exception.Message }
         }
         if ($null -ne $why) {
-            throw ("The client this checkout records ($clientCommit) has $k on neither feed, so it cannot be staged: " + ($why -join ' ') + ' Build it with Build-Engine.ps1 on One or the box, and Ship dev from there.')
+            $from = Get-CiClientDist
+            if ($from.Dir) {
+                $src = Join-Path $from.Dir $k
+                if (-not (Test-Path -LiteralPath $src -PathType Leaf)) { $why += "CI's engine build of the pin at $($from.Dir) has no $k." }
+                elseif ((Get-BaselineEntry $src) -ne ('{0}:{1}' -f $c.Bytes, $c.Sha)) { $why += "CI's engine build of the pin at $($from.Dir) holds another $k than the record names." }
+                else {
+                    $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $dest)
+                    Copy-Item -LiteralPath $src -Destination $dest -Force
+                    $taken += "$k from CI's engine build of the pin"
+                    $why = $null
+                }
+            } else { $why += $from.Why }
+        }
+        if ($null -ne $why) {
+            throw ("The client this checkout records ($clientCommit) has $k on neither feed, and CI's engine build of the pin could not give it, so it cannot be staged: " + ($why -join ' '))
         }
     }
     if ($taken.Count) {
-        Say ("  client {0}: {1} already the recorded build, {2} taken from the site" -f $clientCommit, $inPlace, $taken.Count) 'Green'
+        Say ("  client {0}: {1} already the recorded build, {2} taken, each from where it says" -f $clientCommit, $inPlace, $taken.Count) 'Green'
         foreach ($t in $taken) { Say "    $t" 'DarkGray' }
     } else {
         Say ("  client {0}: all {1} files are the recorded build" -f $clientCommit, $inPlace) 'DarkGray'

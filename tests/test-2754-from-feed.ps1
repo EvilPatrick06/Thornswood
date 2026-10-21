@@ -25,8 +25,9 @@
        name, keeps what is already right, writes config.json from the feed,
        and refuses a record without :record:files and an asset whose bytes
        are not its name. The client is held to the checkout's record, taken
-       from this channel's assets or else the other's, and refused when
-       neither feed has it (#2983).
+       from this channel's assets or else the other's, else from CI's engine
+       build of the pin (a stand-in folder, -EngineDist), and refused when
+       none of them holds the recorded bytes (#2983).
     5. Sign-OnGitHub.ps1 with a stand-in gh and box: it sends release.json and
        Thornswood's own pin, account and signer to the fork's workflow, waits
        for that run, takes its catalog, and returns '' only when the box
@@ -173,11 +174,16 @@ try {
         Put $clientRec (([pscustomobject]@{ forkCommit = 'bf2b3b40'; files = [pscustomobject]$f }) | ConvertTo-Json -Depth 5)
     }
     Set-ClientRecord @{ 'Data\Platform\Plugins\chat.js' = $one }
+    # CI's engine build of the pin, standing in: absent until a case puts the
+    # client in it, so no stage reaches GitHub.
+    $engineDist = Join-Path $Scratch 'engine-ci\build\dist\client'
     function Stage([string]$Channel = 'dev') {
         $oldE = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec 2>&1 | Out-String); $code = $LASTEXITCODE }
+        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec -EngineDist $engineDist 2>&1 | Out-String); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $oldE }
-        return [pscustomobject]@{ Code = $code; Out = $out }
+        # Squashed: the refusal is an error record, which PowerShell wraps at the
+        # console's width (a word can break across two lines) on a runner.
+        return [pscustomobject]@{ Code = $code; Out = $out; Squashed = ($out -replace '[\s|]', '') }
     }
     Set-Feed (New-Record $true)
     Put (Join-Path $root 'Game\Data\stray.txt') 'left from something older'
@@ -222,7 +228,19 @@ try {
     Put (Join-Path $site 'feed\version\00000001.json') (([pscustomobject]$mfeed) | ConvertTo-Json -Depth 5)
     Set-ClientRecord @{ 'Data\Platform\Plugins\skymp5-client.js' = $newClient }
     $r = Stage 'main'
-    Yes 'a recorded client the last release lacks is refused when neither feed has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js')
+    Yes 'a recorded client the last release lacks is refused when neither feed nor CI''s engine build has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js' -and $r.Squashed -match 'noenginebuildat')
+    # A client no Ship has carried yet (#3088's 445ded38): on neither feed, but
+    # in CI's engine build of the pin.
+    $ciFile = Join-Path $engineDist 'Data\Platform\Plugins\skymp5-client.js'
+    Put $ciFile 'not the recorded client'
+    $r = Stage 'main'
+    Yes '  and refused when CI''s engine build holds another file than the record names' ($r.Code -ne 0 -and $r.Squashed -match 'holdsanotherData.Platform.Plugins.skymp5-client\.jsthantherecordnames' -and -not (Test-Path -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')))
+    Put $ciFile ([byte[]]$newClient)
+    $r = Stage 'main'
+    Yes ("  and taken from CI's engine build of the pin when neither feed has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match "skymp5-client\.js from CI's engine build of the pin")
+    if ($r.Code -ne 0) { Write-Host $r.Out -ForegroundColor DarkGray }
+    Remove-Item -LiteralPath (Join-Path $Scratch 'engine-ci') -Recurse -Force
+    Remove-Item -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js') -Force
     [void](Asset $newClient)
     $r = Stage 'main'
     Yes ("  and taken from dev's assets when only dev has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match 'skymp5-client\.js from /feed-dev')
