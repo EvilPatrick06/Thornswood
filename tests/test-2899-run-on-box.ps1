@@ -70,13 +70,13 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-# NormalView: pwsh's default error view wraps a refusal at the console's
-# width and cuts the source line short; the longer refusal since #3100 came
-# back split on the runners (#2933, #3106). Whitespace is folded as
-# test-bad-json-records.ps1 does.
+# The refusal's own message, written out as text. Formatted as an error it
+# is wrapped at the console's width with a gutter put in the middle of it,
+# which on the runners split the longer refusal since #3100 (#2933, #3106;
+# a 60-column console here does the same).
 function Refused([string[]]$words) {
-    $out = (& pwsh -NoProfile -Command { param($s, $w) $global:ErrorView = 'NormalView'; & $s @w -VpsHost 127.0.0.1 -VpsUser nobody } -args $runOnBox, $words 2>&1 | Out-String)
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Text = ($out -replace '\s+', ' ') }
+    $out = (& pwsh -NoProfile -Command { param($s, $w) try { & $s @w -VpsHost 127.0.0.1 -VpsUser nobody } catch { 'REFUSED: ' + $_.Exception.Message; exit 1 } } -args $runOnBox, $words 2>&1 | Out-String)
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Text = $out }
 }
 
 # ---- 1. refused before anything is built or sent -------------------------
