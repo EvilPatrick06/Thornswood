@@ -41,7 +41,11 @@ THE RULE, every number of it a knob below
   materials it asks for, every input counted but gold coins (Gold001): 21
   forge recipes of Immersive Weapons and the Hothtrooper compilation ask up
   to 50 coins as well as their materials, and coins are money, not a
-  material. Their coin counts are left as the mods have them (#3115). A
+  material. Patrick, 21 October, q-3115-forge-coins, B: a forge recipe that
+  charges coins costs only its materials, so every forge recipe that asks
+  coins, whoever's work it is (bows and an eyepatch are at the forge too),
+  has them taken out: its row in the table takes them to 0, and
+  Build-LastPlugin.py leaves that input out of the record. A
   recipe that takes a finished piece (an Old Captain Helmet into an Old
   Helmet, a Nord Hero blade into another) is a conversion, not a piece made
   from materials, and is left alone: 18 rows. A group of fewer than PEERS rows
@@ -125,6 +129,19 @@ def cost(inputs):
     return sum(i['count'] for i in inputs if i['item'] != COIN)
 
 
+def entry_for(desc, row, inputs, to):
+    return {
+        'recipe': desc,
+        'editorId': row.get('editorId', ''),
+        'name': row.get('name', ''),
+        'plugin': row.get('plugin', desc.split(':', 1)[1]),
+        'kind': row.get('family', ''), 'rank': row.get('rank', ''),
+        'costWas': cost(inputs),
+        'inputs': [dict(i, to=t) for i, t in zip(inputs, to)],
+        'costNow': sum(t for i, t in zip(inputs, to) if i['item'] != COIN),
+    }
+
+
 def build(recipes, previous):
     metal = metals(recipes)
     kept = {r['recipe']: r for r in (previous or {}).get('recipes', [])}
@@ -134,7 +151,7 @@ def build(recipes, previous):
     for desc, row, inputs, group in rows:
         groups[group].append(cost(inputs))
     usual = {g: statistics.median(c) for g, c in groups.items() if len(c) >= PEERS}
-    recost, unreachable = [], []
+    recost, unreachable, done = [], [], set()
     for desc, row, inputs, group in rows:
         if group not in usual:
             continue
@@ -142,43 +159,55 @@ def build(recipes, previous):
         if LOW * median <= was <= HIGH * median:
             continue
         factor = median / was
-        to = [i['count'] if i['item'] == COIN else max(1, int(round(i['count'] * factor))) for i in inputs]
-        entry = {
-            'recipe': desc,
-            'editorId': row.get('editorId', ''),
-            'name': row.get('name', ''),
-            'plugin': row.get('plugin', desc.split(':', 1)[1]),
-            'kind': group[0], 'rank': group[1], 'metal': group[2],
-            'peers': len(groups[group]), 'usual': median,
-            'costWas': was,
-            'inputs': [dict(i, to=t) for i, t in zip(inputs, to)],
-            'costNow': sum(t for i, t in zip(inputs, to) if i['item'] != COIN),
-        }
-        if to == [i['count'] for i in inputs]:
+        to = [0 if i['item'] == COIN else max(1, int(round(i['count'] * factor))) for i in inputs]
+        entry = entry_for(desc, row, inputs, to)
+        entry.update({'metal': group[2], 'peers': len(groups[group]), 'usual': median})
+        entry['why'] = ['peers'] + (['coins'] if COIN in [i['item'] for i in inputs] else [])
+        if [t for i, t in zip(inputs, to) if i['item'] != COIN] == [i['count'] for i in inputs if i['item'] != COIN] \
+                and 'coins' not in entry['why']:
             entry['why'] = ('every input is already at one, the least a recipe can ask, so no count '
                             'brings it nearer what its peers ask')
             unreachable.append(entry)
         else:
             recost.append(entry)
+        done.add(desc)
+    # Every other forge recipe that charges coins, whoever's work it is
+    # (Patrick, q-3115 B): the coins come out and the materials stay.
+    for desc in sorted(recipes['recipes']):
+        row = recipes['recipes'][desc]
+        if desc in done or row.get('benchName') not in BENCHES:
+            continue
+        source = kept[desc]['inputs'] if desc in kept else row.get('inputItems', [])
+        inputs = [{'item': i['item'], 'name': i['name'], 'count': i['count']} for i in source]
+        if COIN not in [i['item'] for i in inputs]:
+            continue
+        entry = entry_for(desc, row, inputs, [0 if i['item'] == COIN else i['count'] for i in inputs])
+        entry['why'] = ['coins']
+        recost.append(entry)
+    recost.sort(key=lambda r: r['recipe'])
+    coins = sum(1 for r in recost if 'coins' in r['why'])
     return {
         'version': 2,
         'builtBy': 'scripts/dev/Build-Recost.py',
         'issue': 613,
         'decision': 'Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against '
                     'the same kind of piece at the same rank and metal; a steel cuirass should cost about what '
-                    'other steel cuirasses cost. No gold worth.',
+                    'other steel cuirasses cost. No gold worth. And q-3115-forge-coins, B: a forge recipe that '
+                    'charges gold coins costs only its materials.',
         'readFrom': 'game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked '
                     'about, their family and rank, and the inputs of the tempering recipe for the same item',
         'rule': {
             'owner': OWNER, 'benches': list(BENCHES), 'temper': list(TEMPER),
             'peers': PEERS, 'low': LOW, 'high': HIGH, 'notMaterial': [COIN],
             'how': 'peers are the rows of the same family, rank and tempering material; cost is how many materials '
-                   'a row asks, every input counted but gold coins, whose counts stay as they are. A row under low or over high times its peers\' median cost has '
+                   'a row asks, every input counted but gold coins. A row under low or over high times its peers\' median cost has '
                    'every material count multiplied by the one factor that brings it to the median, rounded, never '
-                   'under one. A row already listed keeps the original inputs it was first measured with.',
+                   'under one. Every forge recipe that charges gold coins has them taken out (to 0). A row already '
+                   'listed keeps the original inputs it was first measured with.',
         },
         'counts': {'measured': len(rows), 'inGroups': sum(len(groups[g]) for g in usual),
-                   'groups': len(usual), 'recosted': len(recost), 'unreachable': len(unreachable)},
+                   'groups': len(usual), 'recosted': len(recost), 'coinsTakenOut': coins,
+                   'unreachable': len(unreachable)},
         'recipes': recost,
         'unreachable': unreachable,
     }
@@ -197,8 +226,9 @@ def main():
     data = build(recipes, previous)
     text = dump(data)
     c = data['counts']
-    print('%d smith recipes measured, %d in %d groups of %d or more peers; %d re-costed, %d no count can fix'
-          % (c['measured'], c['inGroups'], c['groups'], PEERS, c['recosted'], c['unreachable']))
+    print('%d smith recipes measured, %d in %d groups of %d or more peers; %d re-costed (%d with gold coins taken out), '
+          '%d no count can fix' % (c['measured'], c['inGroups'], c['groups'], PEERS, c['recosted'], c['coinsTakenOut'],
+                                   c['unreachable']))
     if args.check:
         have = io.open(OUT, encoding='utf-8').read() if os.path.isfile(OUT) else ''
         if have != text:

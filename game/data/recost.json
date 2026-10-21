@@ -2,7 +2,7 @@
  "version": 2,
  "builtBy": "scripts/dev/Build-Recost.py",
  "issue": 613,
- "decision": "Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against the same kind of piece at the same rank and metal; a steel cuirass should cost about what other steel cuirasses cost. No gold worth.",
+ "decision": "Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against the same kind of piece at the same rank and metal; a steel cuirass should cost about what other steel cuirasses cost. No gold worth. And q-3115-forge-coins, B: a forge recipe that charges gold coins costs only its materials.",
  "readFrom": "game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked about, their family and rank, and the inputs of the tempering recipe for the same item",
  "rule": {
   "owner": "Smith",
@@ -20,16 +20,95 @@
   "notMaterial": [
    "f:Skyrim.esm"
   ],
-  "how": "peers are the rows of the same family, rank and tempering material; cost is how many materials a row asks, every input counted but gold coins, whose counts stay as they are. A row under low or over high times its peers' median cost has every material count multiplied by the one factor that brings it to the median, rounded, never under one. A row already listed keeps the original inputs it was first measured with."
+  "how": "peers are the rows of the same family, rank and tempering material; cost is how many materials a row asks, every input counted but gold coins. A row under low or over high times its peers' median cost has every material count multiplied by the one factor that brings it to the median, rounded, never under one. Every forge recipe that charges gold coins has them taken out (to 0). A row already listed keeps the original inputs it was first measured with."
  },
  "counts": {
   "measured": 1112,
   "inGroups": 882,
   "groups": 105,
-  "recosted": 39,
+  "recosted": 60,
+  "coinsTakenOut": 21,
   "unreachable": 0
  },
  "recipes": [
+  {
+   "recipe": "1246:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyScimitar",
+   "name": "Ebony Scimitar",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Swords",
+   "rank": "master",
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 4,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "12c6:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponCaptainsCutlass",
+   "name": "Captain's Cutlass",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Swords",
+   "rank": "advanced",
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    }
+   ],
+   "costNow": 4,
+   "why": [
+    "coins"
+   ]
+  },
   {
    "recipe": "19f9a:Playable Rieklings.esp",
    "editorId": "RecipeArmorRieklingHelmet2Alt",
@@ -37,9 +116,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Helmets",
    "rank": "novice",
-   "metal": "Bone Meal",
-   "peers": 4,
-   "usual": 4.5,
    "costWas": 2,
    "inputs": [
     {
@@ -49,7 +125,13 @@
      "to": 4
     }
    ],
-   "costNow": 4
+   "costNow": 4,
+   "metal": "Bone Meal",
+   "peers": 4,
+   "usual": 4.5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "21474:Hothtrooper44_ArmorCompilation.esp",
@@ -58,9 +140,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Shields",
    "rank": "expert",
-   "metal": "Refined Malachite",
-   "peers": 3,
-   "usual": 7,
    "costWas": 2,
    "inputs": [
     {
@@ -76,7 +155,13 @@
      "to": 4
     }
    ],
-   "costNow": 8
+   "costNow": 8,
+   "metal": "Refined Malachite",
+   "peers": 3,
+   "usual": 7,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "21478:Hothtrooper44_ArmorCompilation.esp",
@@ -85,9 +170,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Shields",
    "rank": "advanced",
-   "metal": "Orichalcum Ingot",
-   "peers": 6,
-   "usual": 5.0,
    "costWas": 2,
    "inputs": [
     {
@@ -103,7 +185,13 @@
      "to": 2
     }
    ],
-   "costNow": 4
+   "costNow": 4,
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "2147a:Hothtrooper44_ArmorCompilation.esp",
@@ -112,9 +200,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Shields",
    "rank": "advanced",
-   "metal": "Steel Ingot",
-   "peers": 19,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -130,7 +215,13 @@
      "to": 2
     }
    ],
-   "costNow": 4
+   "costNow": 4,
+   "metal": "Steel Ingot",
+   "peers": 19,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "2147b:Hothtrooper44_ArmorCompilation.esp",
@@ -139,9 +230,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Shields",
    "rank": "master",
-   "metal": "Ebony Ingot",
-   "peers": 10,
-   "usual": 5.0,
    "costWas": 2,
    "inputs": [
     {
@@ -157,7 +245,13 @@
      "to": 2
     }
    ],
-   "costNow": 4
+   "costNow": 4,
+   "metal": "Ebony Ingot",
+   "peers": 10,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "2147c:Hothtrooper44_ArmorCompilation.esp",
@@ -166,9 +260,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Shields",
    "rank": "advanced",
-   "metal": "Orichalcum Ingot",
-   "peers": 6,
-   "usual": 5.0,
    "costWas": 2,
    "inputs": [
     {
@@ -184,7 +275,175 @@
      "to": 2
     }
    ],
-   "costNow": 4
+   "costNow": 4,
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "216ea:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponOrnateMaulWarhammer",
+   "name": "Ornate Maul",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Warhammers",
+   "rank": "master",
+   "costWas": 8,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 4,
+     "to": 4
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 3
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    }
+   ],
+   "costNow": 8,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "22f7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinBoots",
+   "name": "Paladin Boots",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Armoured boots",
+   "rank": "master",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "22f9:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinGauntlets",
+   "name": "Paladin Gauntlets",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Gauntlets",
+   "rank": "master",
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 4,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "22fa:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinHelmet",
+   "name": "Paladin Barbut",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "master",
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "e7ed0:Skyrim.esm",
+     "name": "Hawk Feathers",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 7,
+   "why": [
+    "coins"
+   ]
   },
   {
    "recipe": "238ff:Hothtrooper44_ArmorCompilation.esp",
@@ -193,9 +452,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Helmets",
    "rank": "expert",
-   "metal": "Refined Moonstone",
-   "peers": 3,
-   "usual": 5,
    "costWas": 12,
    "inputs": [
     {
@@ -241,7 +497,13 @@
      "to": 1
     }
    ],
-   "costNow": 7
+   "costNow": 7,
+   "metal": "Refined Moonstone",
+   "peers": 3,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "2390a:Hothtrooper44_ArmorCompilation.esp",
@@ -250,9 +512,6 @@
    "plugin": "Hothtrooper44_ArmorCompilation.esp",
    "kind": "Helmets",
    "rank": "expert",
-   "metal": "Corundum Ingot",
-   "peers": 4,
-   "usual": 5.0,
    "costWas": 12,
    "inputs": [
     {
@@ -304,7 +563,364 @@
      "to": 1
     }
    ],
-   "costNow": 8
+   "costNow": 8,
+   "metal": "Corundum Ingot",
+   "peers": 4,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "2414:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyDadao",
+   "name": "Ebony Dadao",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Greatswords",
+   "rank": "master",
+   "costWas": 9,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 5,
+     "to": 5
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 3
+    }
+   ],
+   "costNow": 9,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "25d24:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponDragonguardKatana",
+   "name": "Dragonguard Katana",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Swords",
+   "rank": "expert",
+   "costWas": 8,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 3
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 8,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "286a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARSeadogEyepatch",
+   "name": "Eyepatch",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Hats and hoods",
+   "rank": "advanced",
+   "costWas": 1,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 1,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 1,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "2ad2:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponValenwoodWarBow",
+   "name": "Valenwood War Bow",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Bows",
+   "rank": "expert",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "6f993:Skyrim.esm",
+     "name": "Firewood",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 2,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "3dee:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinGreatHelm",
+   "name": "Paladin Great Helm",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "master",
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "e7ed0:Skyrim.esm",
+     "name": "Hawk Feathers",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 7,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "4341:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponBlackMammothRecurveBow",
+   "name": "Black Mammoth Recurve Bow",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Bows",
+   "rank": "master",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "3ad6c:Skyrim.esm",
+     "name": "Mammoth Tusk",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 3,
+     "to": 3
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "d4be7:Skyrim.esm",
+     "name": "Snow Fox Pelt",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "4e8b:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponWhiteMammothRecurveBow",
+   "name": "White Mammoth Recurve Bow",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Bows",
+   "rank": "master",
+   "costWas": 6,
+   "inputs": [
+    {
+     "item": "3ad6c:Skyrim.esm",
+     "name": "Mammoth Tusk",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ada1:Skyrim.esm",
+     "name": "Refined Malachite",
+     "count": 3,
+     "to": 3
+    },
+    {
+     "item": "d4be7:Skyrim.esm",
+     "name": "Snow Fox Pelt",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 6,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "58d0:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponColovianDarkCompositeBow",
+   "name": "Colovian Dark Composite Bow",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Bows",
+   "rank": "advanced",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "6f993:Skyrim.esm",
+     "name": "Firewood",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "58d4:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponColovianCompositeBow",
+   "name": "Colovian Composite Bow",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Bows",
+   "rank": "advanced",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "6f993:Skyrim.esm",
+     "name": "Firewood",
+     "count": 3,
+     "to": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
   },
   {
    "recipe": "89a:YokuWeapons.esp",
@@ -313,9 +929,6 @@
    "plugin": "YokuWeapons.esp",
    "kind": "Gauntlets",
    "rank": "advanced",
-   "metal": "Quicksilver Ingot",
-   "peers": 5,
-   "usual": 7,
    "costWas": 3,
    "inputs": [
     {
@@ -337,7 +950,13 @@
      "to": 2
     }
    ],
-   "costNow": 6
+   "costNow": 6,
+   "metal": "Quicksilver Ingot",
+   "peers": 5,
+   "usual": 7,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "89b:YokuWeapons.esp",
@@ -346,9 +965,6 @@
    "plugin": "YokuWeapons.esp",
    "kind": "Armoured boots",
    "rank": "advanced",
-   "metal": "Quicksilver Ingot",
-   "peers": 5,
-   "usual": 7,
    "costWas": 3,
    "inputs": [
     {
@@ -370,7 +986,13 @@
      "to": 2
     }
    ],
-   "costNow": 6
+   "costNow": 6,
+   "metal": "Quicksilver Ingot",
+   "peers": 5,
+   "usual": 7,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "8de:MoreCraftableEquipment.esp",
@@ -379,9 +1001,6 @@
    "plugin": "MoreCraftableEquipment.esp",
    "kind": "Gauntlets",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
    "costWas": 7,
    "inputs": [
     {
@@ -397,7 +1016,13 @@
      "to": 1
     }
    ],
-   "costNow": 3
+   "costNow": 3,
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "8e2:MoreCraftableEquipment.esp",
@@ -406,9 +1031,6 @@
    "plugin": "MoreCraftableEquipment.esp",
    "kind": "Gauntlets",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
    "costWas": 7,
    "inputs": [
     {
@@ -424,7 +1046,13 @@
      "to": 2
     }
    ],
-   "costNow": 3
+   "costNow": 3,
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "8eb:MoreCraftableEquipment.esp",
@@ -433,9 +1061,6 @@
    "plugin": "MoreCraftableEquipment.esp",
    "kind": "Gauntlets",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 22,
-   "usual": 3.0,
    "costWas": 7,
    "inputs": [
     {
@@ -451,7 +1076,13 @@
      "to": 1
     }
    ],
-   "costNow": 3
+   "costNow": 3,
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "906:Immersive Weapons.esp",
@@ -460,9 +1091,6 @@
    "plugin": "Immersive Weapons.esp",
    "kind": "Daggers",
    "rank": "expert",
-   "metal": "Dragon Bone",
-   "peers": 4,
-   "usual": 2.0,
    "costWas": 5,
    "inputs": [
     {
@@ -484,7 +1112,13 @@
      "to": 1
     }
    ],
-   "costNow": 3
+   "costNow": 3,
+   "metal": "Dragon Bone",
+   "peers": 4,
+   "usual": 2.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe6b:Playable Rieklings.esp",
@@ -493,9 +1127,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -505,7 +1136,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe6d:Playable Rieklings.esp",
@@ -514,9 +1151,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -526,7 +1160,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe6e:Playable Rieklings.esp",
@@ -535,9 +1175,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -547,7 +1184,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe70:Playable Rieklings.esp",
@@ -556,9 +1199,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -568,7 +1208,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe72:Playable Rieklings.esp",
@@ -577,9 +1223,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -589,7 +1232,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe74:Playable Rieklings.esp",
@@ -598,9 +1247,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -610,7 +1256,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe76:Playable Rieklings.esp",
@@ -619,9 +1271,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -631,7 +1280,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe78:Playable Rieklings.esp",
@@ -640,9 +1295,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -652,7 +1304,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe7a:Playable Rieklings.esp",
@@ -661,9 +1319,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -673,7 +1328,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe7c:Playable Rieklings.esp",
@@ -682,9 +1343,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -694,7 +1352,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe98:Playable Rieklings.esp",
@@ -703,9 +1367,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "advanced",
-   "metal": "Corundum Ingot",
-   "peers": 14,
-   "usual": 10.5,
    "costWas": 4,
    "inputs": [
     {
@@ -721,7 +1382,13 @@
      "to": 5
     }
    ],
-   "costNow": 10
+   "costNow": 10,
+   "metal": "Corundum Ingot",
+   "peers": 14,
+   "usual": 10.5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfe9a:Playable Rieklings.esp",
@@ -730,9 +1397,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "advanced",
-   "metal": "Corundum Ingot",
-   "peers": 14,
-   "usual": 10.5,
    "costWas": 4,
    "inputs": [
     {
@@ -748,7 +1412,13 @@
      "to": 5
     }
    ],
-   "costNow": 10
+   "costNow": 10,
+   "metal": "Corundum Ingot",
+   "peers": 14,
+   "usual": 10.5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfeae:Playable Rieklings.esp",
@@ -757,9 +1427,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -769,7 +1436,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfeb2:Playable Rieklings.esp",
@@ -778,9 +1451,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -790,7 +1460,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfeb6:Playable Rieklings.esp",
@@ -799,9 +1475,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -811,7 +1484,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfeba:Playable Rieklings.esp",
@@ -820,9 +1499,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Iron Ingot",
-   "peers": 10,
-   "usual": 8.0,
    "costWas": 2,
    "inputs": [
     {
@@ -832,7 +1508,13 @@
      "to": 8
     }
    ],
-   "costNow": 8
+   "costNow": 8,
+   "metal": "Iron Ingot",
+   "peers": 10,
+   "usual": 8.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfebc:Playable Rieklings.esp",
@@ -841,9 +1523,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "master",
-   "metal": "Ebony Ingot",
-   "peers": 26,
-   "usual": 10.0,
    "costWas": 4,
    "inputs": [
     {
@@ -859,7 +1538,13 @@
      "to": 5
     }
    ],
-   "costNow": 10
+   "costNow": 10,
+   "metal": "Ebony Ingot",
+   "peers": 26,
+   "usual": 10.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfebe:Playable Rieklings.esp",
@@ -868,9 +1553,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -880,7 +1562,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfec0:Playable Rieklings.esp",
@@ -889,9 +1577,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Helmets",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 16,
-   "usual": 5.0,
    "costWas": 2,
    "inputs": [
     {
@@ -901,7 +1586,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 16,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfec2:Playable Rieklings.esp",
@@ -910,9 +1601,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Helmets",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 16,
-   "usual": 5.0,
    "costWas": 2,
    "inputs": [
     {
@@ -922,7 +1610,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 16,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfed0:Playable Rieklings.esp",
@@ -931,9 +1625,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Steel Ingot",
-   "peers": 6,
-   "usual": 7.0,
    "costWas": 3,
    "inputs": [
     {
@@ -943,7 +1634,13 @@
      "to": 7
     }
    ],
-   "costNow": 7
+   "costNow": 7,
+   "metal": "Steel Ingot",
+   "peers": 6,
+   "usual": 7.0,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfed2:Playable Rieklings.esp",
@@ -952,9 +1649,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "expert",
-   "metal": "Refined Moonstone",
-   "peers": 5,
-   "usual": 9,
    "costWas": 4,
    "inputs": [
     {
@@ -970,7 +1664,13 @@
      "to": 4
     }
    ],
-   "costNow": 8
+   "costNow": 8,
+   "metal": "Refined Moonstone",
+   "peers": 5,
+   "usual": 9,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bfed4:Playable Rieklings.esp",
@@ -979,9 +1679,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "expert",
-   "metal": "Refined Moonstone",
-   "peers": 5,
-   "usual": 9,
    "costWas": 4,
    "inputs": [
     {
@@ -997,7 +1694,13 @@
      "to": 4
     }
    ],
-   "costNow": 8
+   "costNow": 8,
+   "metal": "Refined Moonstone",
+   "peers": 5,
+   "usual": 9,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bff32:Playable Rieklings.esp",
@@ -1006,9 +1709,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -1018,7 +1718,13 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
   },
   {
    "recipe": "bff34:Playable Rieklings.esp",
@@ -1027,9 +1733,6 @@
    "plugin": "Playable Rieklings.esp",
    "kind": "Body armour",
    "rank": "novice",
-   "metal": "Leather",
-   "peers": 47,
-   "usual": 5,
    "costWas": 2,
    "inputs": [
     {
@@ -1039,7 +1742,259 @@
      "to": 5
     }
    ],
-   "costNow": 5
+   "costNow": 5,
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "why": [
+    "peers"
+   ]
+  },
+  {
+   "recipe": "c7472c:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyCutlass",
+   "name": "Ebony Cutlass",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Swords",
+   "rank": "master",
+   "costWas": 3,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 3,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "d9a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFalkreathBoots",
+   "name": "Falkreath Boots",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Armoured boots",
+   "rank": "advanced",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "d9e:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFalkreathGauntlets",
+   "name": "Falkreath Gauntlets",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Gauntlets",
+   "rank": "advanced",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "d9f:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARFalkreathHelmet",
+   "name": "Falkreath Helmet",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "expert",
+   "costWas": 6,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 6,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "da1:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARHedgeKnightBoots",
+   "name": "Hedge Knight Boots",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Armoured boots",
+   "rank": "advanced",
+   "costWas": 6,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 6,
+   "why": [
+    "coins"
+   ]
+  },
+  {
+   "recipe": "da3:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARHedgeKnightGauntlets",
+   "name": "Hedge Knight Gauntlets",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Gauntlets",
+   "rank": "advanced",
+   "costWas": 6,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 25,
+     "to": 0
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 6,
+   "why": [
+    "coins"
+   ]
   }
  ],
  "unreachable": []

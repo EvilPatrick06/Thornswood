@@ -79,10 +79,11 @@ WHAT IT PUTS IN THE PLUGIN
      the hold's own when none covers it. Everything else on each record is
      the winner's own.
 
-  5. The smith recipes game/data/recost.json re-costs (Patrick, 21 October
-     2026, A on #613): each is the winning record with only its input counts
-     changed to the ones the table gives, so the same inputs, output, bench
-     and conditions. scripts/dev/Build-Recost.py writes the table from
+  5. The forge recipes game/data/recost.json re-costs (Patrick, 21 October
+     2026, A on #613, and B on #3115): each is the winning record with only
+     its input counts changed to the ones the table gives, and an input the
+     table takes to 0 (gold coins) taken out, so the same output, bench and
+     conditions. scripts/dev/Build-Recost.py writes the table from
      game/data/recipes.json; a winning record whose inputs are not the ones
      the table measured stops the build, because the counts were worked out
      for those inputs and no others.
@@ -1244,17 +1245,32 @@ def recost_entries(table, plugins, win):
 
 
 def recount(pairs, row):
-    """The recipe with each input's count set to the table's, in order."""
+    """The recipe with each input's count set to the table's, in order. An
+    input the table takes to 0 is taken out, and COCT says how many are left
+    (Patrick, 21 Oct, q-3115 B: a forge recipe charges no gold coins)."""
     to = [i['to'] for i in row['inputs']]
-    out, n = [], 0
+    if not any(to):
+        raise SystemExit('STOP. recost.json takes every input out of %s. Nothing was written.' % row['recipe'])
+    out, n, coct = [], 0, None
     for t, b in pairs:
         if t == b'CNTO':
-            b = b[:4] + struct.pack('<i', to[n]) + b[8:]
+            if n >= len(to):
+                n += 1
+                continue
+            keep = to[n]
             n += 1
+            if keep == 0:
+                continue
+            b = b[:4] + struct.pack('<i', keep) + b[8:]
+        if t == b'COCT':
+            coct = len(out)
         out.append((t, b))
     if n != len(to):
         raise SystemExit('STOP. %s has %d inputs and recost.json %d. Nothing was written.'
                          % (row['recipe'], n, len(to)))
+    if coct is None:
+        raise SystemExit('STOP. %s has no COCT. Nothing was written.' % row['recipe'])
+    out[coct] = (b'COCT', struct.pack('<I', sum(1 for c in to if c)))
     return out
 
 
@@ -1412,7 +1428,7 @@ def verify(data_dir, plugin_bytes, manifest):
         pairs = subrecords(plugins[e.pi].data(e)) if e else []
         have = [(plugins[e.pi].gid(struct.unpack_from('<I', b, 0)[0]), struct.unpack_from('<i', b, 4)[0])
                 for t, b in pairs if t == b'CNTO'] if e else []
-        if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs']]:
+        if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs'] if i[2]]:
             fails.append('recipe %s %s does not ask the re-costed counts' % (row['recipe'], row['editorId']))
     for desc in manifest.get('gatesUnlocked', []):
         e = win.get((b'REFR', ref_key(desc)))

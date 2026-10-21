@@ -65,9 +65,10 @@ yes('T3 its counts are its rows (' + table.counts.recosted + ' re-costed, ' + ta
     table.recipes.length === table.counts.recosted && table.unreachable.length === table.counts.unreachable &&
     table.counts.recosted > 0 && table.counts.inGroups > table.counts.recosted);
 const bad = [];
-for (const r of table.recipes) {
+for (const r of table.recipes.filter((x) => x.why.indexOf('peers') >= 0)) {
   const row = recipes[r.recipe];
-  const was = r.inputs.reduce((n, i) => n + i.count, 0), now = r.inputs.reduce((n, i) => n + i.to, 0);
+  const mat = r.inputs.filter((i) => i.item !== 'f:Skyrim.esm');
+  const was = mat.reduce((n, i) => n + i.count, 0), now = mat.reduce((n, i) => n + i.to, 0);
   const outside = was < rule.low * r.usual || was > rule.high * r.usual;
   const inside = now >= rule.low * r.usual && now <= rule.high * r.usual;
   const atLeastOne = r.inputs.every((i) => Number.isInteger(i.to) && i.to >= 1);
@@ -92,9 +93,15 @@ yes('T6 no gold worth is read: the item has no gold price here (docs/systems/pro
     !/worth|price/.test(JSON.stringify(rule)) && !/\['worth'\]|get\('worth'\)/.test(generator) &&
     table.recipes.every((r) => !('worth' in r) && r.inputs.every((i) => !('price' in i))));
 
-yes('T7 gold coins are not a material: no coin count is changed, and they count in no cost (#3115)',
-    (rule.notMaterial || []).join() === 'f:Skyrim.esm' &&
-    table.recipes.every((r) => r.inputs.every((i) => i.item !== 'f:Skyrim.esm' || i.to === i.count)));
+const coinRows = Object.keys(recipes).filter((k) => rule.benches.indexOf(recipes[k].benchName) >= 0 &&
+  recipes[k].inputItems.some((i) => i.item === 'f:Skyrim.esm'));
+const coinTable = table.recipes.filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
+yes('T7 every forge recipe that charges gold coins has them taken out, and nothing else of it changes unless ' +
+    'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ')',
+    (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinRows.length > 0 &&
+    coinRows.length === coinTable.length && table.counts.coinsTakenOut === coinTable.length &&
+    coinTable.every((r) => r.why.indexOf('coins') >= 0 && r.inputs.every((i) => i.item === 'f:Skyrim.esm' ? i.to === 0
+      : (r.why.indexOf('peers') >= 0 || i.to === i.count))));
 yes('T8 a recipe that takes a finished piece is a conversion and is not re-costed',
     table.recipes.every((r) => recipes[r.recipe].inputItems.every((i) => i.type !== 'ARMO' && i.type !== 'WEAP')));
 
@@ -154,6 +161,14 @@ try:
     L.recost_entries({'recipes': [dict(row, recipe='801:Mod.esp')]}, plugins, win); out['missing'] = ''
 except SystemExit as x:
     out['missing'] = str(x)
+row3 = dict(row, inputs=[dict(row['inputs'][0], to=0), row['inputs'][1]])
+dropped = L.recount(L.subrecords(plugins[1].data(e)), row3)
+out['dropped'] = {'cnto': [list(struct.unpack('<Ii', b)) for t, b in dropped if t == b'CNTO'],
+                  'coct': [struct.unpack('<I', b)[0] for t, b in dropped if t == b'COCT']}
+try:
+    L.recount(L.subrecords(plugins[1].data(e)), dict(row, inputs=[dict(i, to=0) for i in row['inputs']])); out['empty'] = ''
+except SystemExit as x:
+    out['empty'] = str(x)
 print(json.dumps(out))
 `;
 const run = python(['-', LAST], RIG);
@@ -174,6 +189,11 @@ yes('L5 so does a recipe no plugin has', /no plugin has it/.test(r.missing));
 
 // ------------------------------------------------------------------ wiring
 const tool = fs.readFileSync(LAST, 'utf8');
+yes('L6 an input the table takes to 0 (gold coins, q-3115 B) is left out, and COCT counts what is left (' +
+    JSON.stringify(r && r.dropped) + ')',
+    !!r && JSON.stringify(r.dropped) === JSON.stringify({ cnto: [[0x01000900, 7]], coct: [1] }));
+yes('L7 a recipe the table would leave with no input stops the build',
+    !!r && /takes every input out/.test(r.empty));
 yes('W1 the builder reads game/data/recost.json, puts COBJ first among its groups, and checks the re-costed counts win',
     /RECOST = os\.path\.join\(ROOT, 'game', 'data', 'recost\.json'\)/.test(tool) &&
     /GROUP_ORDER = \[b'COBJ', b'CELL'/.test(tool) && /does not ask the re-costed counts/.test(tool));
