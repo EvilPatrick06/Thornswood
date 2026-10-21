@@ -328,12 +328,12 @@ Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
 pull request, is red when the pin and the two records do not name one commit,
 or name another branch or fork than `.gitmodules`, or when the server record
 leaves out a server file or says one was built from another commit. `tests\test-engine-at-fork-head.js`,
-in the nightly checks, asks GitHub whether the pin is the head of the branch
+in the nightly checks, asks the fork over git whether the pin is the head of the branch
 (or the head is only merge commits over it with the same files), and is red
 when a fork change has been merged and not pinned here.
 
 One more, a level up (issue #1791). `tests\test-fork-upstream.js`, in the
-nightly checks, asks GitHub for the commits on upstream
+nightly checks, asks git for the commits on upstream
 skyrim-multiplayer/skymp `main` that `thornswood/engine-changes` does not
 have, and is red naming each one. Patrick, 5 Oct: the nightly goes red when
 upstream has fixes the fork does not. It goes green when each is merged into

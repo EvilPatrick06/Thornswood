@@ -10,8 +10,8 @@
 // using the new one ... What's the point in the changes if we aren't using
 // them."
 //
-// It asks GitHub's compare API, signed out (the fork is public), for the pin
-// against the branch:
+// It asks the fork itself, over git (tests\fork-git.js, #3052), for the pin
+// against the branch, and judges the answer:
 //   identical                       the pin is the head: pass
 //   ahead, no file differs          the head is only merge commits over the
 //                                   pin (a fork pull request merged with a
@@ -19,16 +19,20 @@
 //   ahead, with files               fork changes nobody here runs yet: fail,
 //                                   naming the commits
 //   behind or diverged              the pin is not on the branch: fail
-// No answer from GitHub is a fail, not a skip: a check that did not happen is
-// the failure this exists to stop. It needs the network, so it runs in the
+// It asked GitHub's REST compare API signed out until 21 Oct, which allows 60
+// requests an hour per address and failed on every shared one (a cloud
+// thread); git's own fetch is not under that limit and needs no token.
+// No answer from the fork is a fail, not a skip: a check that did not happen
+// is the failure this exists to stop. It needs the network, so it runs in the
 // nightly checks and not in the build check on every pull request.
 //
-// THORNSWOOD_FORK_COMPARE_JSON, a path to a saved compare answer, stands in for
-// the network so the verdict can be checked by hand. Read only.
+// THORNSWOOD_FORK_COMPARE_JSON, a path to a saved comparison in the same
+// shape (status, ahead_by, behind_by, commits, files), stands in for the
+// network so the verdict can be checked by hand. Read only.
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
+const forkGit = require('./fork-git');
 const { execFileSync } = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
@@ -44,7 +48,7 @@ function git(args) {
 
 // What a compare answer says about the pin, as { ok, why }.
 function verdict(cmp) {
-  if (!cmp || typeof cmp.status !== 'string') { return { ok: false, why: 'GitHub gave no comparison' }; }
+  if (!cmp || typeof cmp.status !== 'string') { return { ok: false, why: 'no comparison was made' }; }
   const commits = Array.isArray(cmp.commits) ? cmp.commits : [];
   const files = Array.isArray(cmp.files) ? cmp.files : [];
   if (cmp.status === 'identical') { return { ok: true, why: 'the pin is the head of the branch' }; }
@@ -55,7 +59,7 @@ function verdict(cmp) {
     const names = commits.map(function (c) { return String(c.sha || '').slice(0, 8) + ' ' + String((c.commit && c.commit.message) || '').split('\n')[0]; });
     return { ok: false, why: cmp.ahead_by + ' fork commit(s) changing ' + files.length + ' file(s) are on the branch and not in the pin: ' + names.join('; ') };
   }
-  return { ok: false, why: 'the pin is not on the branch (GitHub says ' + cmp.status + ', ' + cmp.behind_by + ' commit(s) of the pin are not on it)' };
+  return { ok: false, why: 'the pin is not on the branch (' + cmp.status + ', ' + cmp.behind_by + ' commit(s) of the pin are not on it)' };
 }
 
 // The verdict itself, on made up answers.
@@ -66,21 +70,22 @@ yes('a pin off the branch fails', !verdict({ status: 'diverged', ahead_by: 1, be
 yes('a pin ahead of the branch fails', !verdict({ status: 'behind', ahead_by: 0, behind_by: 1, commits: [], files: [] }).ok);
 yes('no answer fails', !verdict(null).ok);
 
-function getJson(url) {
-  return new Promise(function (resolve, reject) {
-    const headers = { 'User-Agent': 'thornswood-test-engine-at-fork-head', Accept: 'application/vnd.github+json' };
-    const req = https.get(url, { headers: headers, timeout: 30000 }, function (res) {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', function (d) { body += d; });
-      res.on('end', function () {
-        if (res.statusCode !== 200) { reject(new Error('GitHub answered ' + res.statusCode + ' for ' + url)); return; }
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
-      });
-    });
-    req.on('timeout', function () { req.destroy(new Error('no answer from GitHub in 30 seconds')); });
-    req.on('error', reject);
-  });
+// The pin against the head of the branch in the fork, as git sees it. The
+// files are named only when the head is ahead, the one case the verdict reads
+// them; the head's tree being the pin's is the same as no file differing.
+function askFork(url, branch, pin) {
+  const repo = forkGit.open('fork-head');
+  try {
+    repo.fetch('fork', url, ['+refs/heads/' + branch + ':refs/compare/head']);
+    try { repo.git(['fetch', '-q', '--no-tags', '--filter=tree:0', 'fork', pin]); }
+    catch (e) { throw new Error('the fork does not have the pinned commit ' + pin + ' (' + e.message + ')'); }
+    const cmp = repo.compare(pin, 'refs/compare/head');
+    cmp.files = [];
+    if (cmp.status === 'ahead' && repo.git(['log', '-1', '--format=%T', pin]) !== repo.git(['log', '-1', '--format=%T', 'refs/compare/head'])) {
+      cmp.files = repo.git(['diff', '--name-only', pin, 'refs/compare/head']).split(/\r?\n/).filter(Boolean).map(function (f) { return { filename: f }; });
+    }
+    return cmp;
+  } finally { repo.close(); }
 }
 
 async function main() {
@@ -100,7 +105,7 @@ async function main() {
   const saved = process.env.THORNSWOOD_FORK_COMPARE_JSON;
   try {
     cmp = saved ? JSON.parse(fs.readFileSync(saved, 'utf8'))
-      : await getJson('https://api.github.com/repos/' + gh[1] + '/' + gh[2] + '/compare/' + pin + '...' + encodeURIComponent(branch).replace(/%2F/g, '/'));
+      : askFork(url, branch, pin);
   } catch (e) {
     console.log('      ' + (e && e.message || e));
     cmp = null;
