@@ -185,6 +185,22 @@ function Expand-Archive7([string]$archive, [string]$to, [string]$what) {
   $r = Invoke-Tool $script:SevenZip @('x', '-y', '-ssc-', ('-o' + $to), $archive)
   if ($r.Code -ne 0) { throw ('7-Zip (' + $script:SevenZip + ') could not unpack ' + $what + ' (' + $archive + '), exit ' + $r.Code + ': ' + ($r.Err.Trim() -replace '\s+', ' ')) }
 }
+# Every path in an archive, in the order 7-Zip lists and unpacks them. Off
+# Windows the walk names a folder the archive spells two ways as the first
+# entry spells it, as 7-Zip does on Windows (FileList, #2969).
+function Get-ArchiveOrder([string]$archive) {
+  if ($IsWindows) { return $null }
+  Use-SevenZip
+  $r = Invoke-Tool $script:SevenZip @('l', '-slt', $archive)
+  if ($r.Code -ne 0) { throw ('7-Zip (' + $script:SevenZip + ') could not list ' + $archive + ', exit ' + $r.Code + ': ' + ($r.Err.Trim() -replace '\s+', ' ')) }
+  $after = $false
+  $paths = New-Object System.Collections.Generic.List[string]
+  foreach ($line in ($r.Out -split "`r?`n")) {
+    if ($line -eq '----------') { $after = $true; continue }
+    if ($after -and $line.StartsWith('Path = ')) { $paths.Add($line.Substring(7)) }
+  }
+  return ,$paths.ToArray()
+}
 function Test-Under([string]$path, [string]$folder) {
   if (-not $folder) { return $false }
   $sep = [IO.Path]::DirectorySeparatorChar
@@ -393,7 +409,7 @@ foreach ($e in $col.Entries) {
   $u = Join-Path (Join-Path $script:Work 'mods') ([string]$e.Index)
   Step { Expand-Archive7 $archives[$e.Index] $u $e.Say() }
   $files = $null
-  try { [void][Thornswood.Layout.NexusLayout]::SplitBackslashNames($u); $files = [Thornswood.Layout.NexusLayout]::FileList($u) }
+  try { [void][Thornswood.Layout.NexusLayout]::SplitBackslashNames($u); $files = [Thornswood.Layout.NexusLayout]::FileList($u, (Get-ArchiveOrder $archives[$e.Index])) }
   catch { $ex = $_.Exception; while ($ex.InnerException) { $ex = $ex.InnerException }; $stops.Add($e.Say() + ': ' + $ex.Message); continue }
   $plan = Step { [Thornswood.Layout.NexusLayout]::PlanMod($e, $u, $files, $world) }
   if ($plan.Stop) { $stops.Add($e.Say() + ': ' + $plan.Stop); $plans.Add($plan); if ($Record) { Remove-Unpacked $e $u }; continue }
