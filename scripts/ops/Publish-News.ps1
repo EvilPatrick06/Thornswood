@@ -45,9 +45,8 @@ param(
   [string]$OutFile,
   [switch]$Quiet
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
-
-$ErrorActionPreference = 'Stop'
 
 # ConvertFrom-Json gives back an object with only the properties the file
 # actually had. Reaching for one that is not there throws under strict mode,

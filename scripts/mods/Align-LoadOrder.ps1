@@ -29,9 +29,9 @@ param(
     # outside its scratch folder is written.
     [string[]]$AlsoFix = @('C:\Thornswood\Profile\LocalAppData\Plugins.txt')
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-$ErrorActionPreference = 'Stop'
 foreach ($p in @($Data, $Plugins, $Settings)) {
     if (-not (Test-Path -LiteralPath $p)) { throw "not found: $p" }
 }

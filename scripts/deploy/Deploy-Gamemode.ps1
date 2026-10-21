@@ -138,6 +138,7 @@ param(
     # nobody reads.
     [switch]$IgnoreRevision
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Data,

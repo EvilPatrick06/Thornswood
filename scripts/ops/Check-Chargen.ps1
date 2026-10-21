@@ -45,6 +45,7 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerOrder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
