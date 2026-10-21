@@ -81,16 +81,18 @@ try {
     # each way, in order, with no limit on how much is in flight.
     $lag = Join-Path $tmp 'lag.js'
     [IO.File]::WriteAllText($lag, @'
-const net=require('net');const [to,ms]=[Number(process.argv[2]),Number(process.argv[3])];
-const srv=net.createServer((a)=>{const b=net.connect(to,'127.0.0.1');a.setNoDelay(true);b.setNoDelay(true);
+const net=require('net');const [to,ms,port]=[Number(process.argv[2]),Number(process.argv[3]),Number(process.argv[4])];
+net.createServer((a)=>{const b=net.connect(to,'127.0.0.1');a.setNoDelay(true);b.setNoDelay(true);
 for(const [x,y] of [[a,b],[b,a]]){x.on('data',(d)=>setTimeout(()=>y.write(d),ms));x.on('end',()=>setTimeout(()=>y.end(),ms));x.on('error',()=>y.destroy());}
-}).listen(0,'127.0.0.1',()=>console.log(srv.address().port));
+}).listen(port,'127.0.0.1');
 '@)
     function Start-Lag([int]$to, [int]$ms) {
-        $out = Join-Path $tmp ("lag-$to.out")
-        $script:procs += Start-Process -FilePath $node -ArgumentList @("`"$lag`"", "$to", "$ms") -PassThru -RedirectStandardOutput $out
-        for ($i = 0; $i -lt 50; $i++) { $t = (Get-Content -LiteralPath $out -ErrorAction SilentlyContinue | Select-Object -First 1); if ($t) { return [int]$t }; Start-Sleep -Milliseconds 100 }
-        throw 'lag.js did not start'
+        $l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0); $l.Start(); $p = $l.LocalEndpoint.Port; $l.Stop()
+        $script:procs += Start-Process -FilePath $node -ArgumentList @("`"$lag`"", "$to", "$ms", "$p") -PassThru -RedirectStandardError (Join-Path $tmp "lag-$to.err")
+        for ($i = 0; $i -lt 100; $i++) {
+            try { $c = [Net.Sockets.TcpClient]::new('127.0.0.1', $p); $c.Close(); return $p } catch { Start-Sleep -Milliseconds 100 }
+        }
+        throw ('lag.js did not listen on ' + $p + ': ' + (Get-Content -LiteralPath (Join-Path $tmp "lag-$to.err") -Raw -ErrorAction SilentlyContinue))
     }
     $LAG = 20
     $lagSshd = Start-Lag $port $LAG
