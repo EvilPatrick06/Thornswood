@@ -252,11 +252,13 @@ try {
         $in = @($input | ForEach-Object { [string]$_ })
         $last = $a[-1]
         # The script as the box would run it: inline, or Send-Script.ps1's
-        # reader on the line with the script on standard input.
+        # runner on the line, which takes the copy scp put in the far folder
+        # off it and runs that (#3059).
         $s = ''
         if ($last -match 'EncodedCommand (\S+)') {
             $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
-            if ($s -eq $global:H.Reader -and $in.Count) { $s = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
+            $rp = & $global:H.RunnerPath $s
+            if ($rp) { $rf = Join-Path $global:H.Far ($rp -split '\\')[-1]; $s = [IO.File]::ReadAllText($rf); Remove-Item -LiteralPath $rf -Force }
         }
         # vps-time-wait.ps1 whole, as a block with its switches after it: the
         # file under test runs here with them, against the stand-in layer.
@@ -308,7 +310,7 @@ try {
         New-Fake
         $global:H = @{ KeyWorks = $true; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string]); Far = $far; Layer = $Layer; Sent = '';
                        Restarts = 0; Polls = 0; NeverBack = $false; ForgetsValue = $false; Health = $false
-                       Box = $Box; BoxText = [IO.File]::ReadAllText($Box); Reader = (Get-ThornswoodStdinReader) }
+                       Box = $Box; BoxText = [IO.File]::ReadAllText($Box); RunnerPath = ${function:Get-ThornswoodRemoteRunnerPath} }
     }
     function BoxRuns { return @($global:H.Calls | Where-Object { $_ -match ' BOX( |$)' }) }
 
@@ -326,8 +328,9 @@ try {
     $r = Invoke-Driver @{ Check = $true }
     Yes '-Check: exit 0, the box ran with -Check only, nothing changed' ($r.Code -eq 0 -and $r.Text -match 'NOW TcpTimedWaitDelay is not set' -and
         @(BoxRuns | Where-Object { $_ -match ' BOX -Check$' }).Count -eq 1 -and $global:Fake.log.Count -eq 0)
-    Yes '  vps-time-wait.ps1 went whole on ssh''s standard input, and nothing was copied to the box (#3035)' (
-        -not $global:H.Sent -and @($global:H.Calls | Where-Object { $_ -like 'scp *' -or $_ -match '-File |UNREAD' }).Count -eq 0)
+    Yes '  vps-time-wait.ps1 went whole by scp to a copy its run took off the box, so nothing of it is left there (#3035, #3059)' (
+        $global:H.Sent -match 'thornswood-remote-[0-9a-f]{32}\.ps1$' -and @(Get-ChildItem -LiteralPath $global:H.Far -File).Count -eq 0 -and
+        @($global:H.Calls | Where-Object { $_ -like 'scp *' }).Count -ge 1 -and @($global:H.Calls | Where-Object { $_ -match '-File |UNREAD' }).Count -eq 0)
 
     Fresh
     $r = Invoke-Driver @{ Check = $true; Restart = $true }
@@ -347,7 +350,7 @@ try {
     Yes '-Restart: exit 0, the box restarted once' ($r.Code -eq 0 -and $global:H.Restarts -eq 1)
     Yes '  it waited through the box being down for a later start time' ($global:H.Polls -eq 3 -and $r.Text -match 'the box started again at 2026-10-21T05:10:00Z')
     Yes '  and then read 30 back, and what started with it' ($r.Text -match '(?s)started again.*NOW TcpTimedWaitDelay is 30 seconds' -and $global:H.Health -and $r.Text -match 'task      Thornswood Server: Running')
-    Yes '  every ssh checked the host key, and nothing went by scp' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' -or $_ -like 'scp *' }).Count -eq 0)
+    Yes '  every ssh and scp checked the host key' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' }).Count -eq 0)
 
     Fresh
     Set-Online 0 '{"now":4}'

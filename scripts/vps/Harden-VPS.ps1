@@ -17,10 +17,11 @@
        would leave no way in over ssh at all.
     3. From outside, before: which login methods the box offers, and whether
        Remote Desktop's port answers from here.
-    4. On the box: scripts\vps\vps-harden.ps1 is run there, sent on ssh's
-       standard input, so nothing of it is written on the box (#3035; until
-       21 Oct 2026 it was copied into C:\Windows\Temp, and a run cut short
-       left the copy there). Remote Desktop refused, its
+    4. On the box: scripts\vps\vps-harden.ps1 is run there, sent through
+       Send-Script.ps1, whose run deletes a long script's copy before it
+       runs (#3035, #3059; until 21 Oct 2026 it was copied into
+       C:\Windows\Temp and removed after, and a run cut short left the copy
+       there). Remote Desktop refused, its
        firewall rules turned off, its service stopped and set to Disabled;
        ssh's own rules on port 22 are never touched. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with

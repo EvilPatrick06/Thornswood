@@ -9,8 +9,8 @@
   The keeper's folder is the one way a script here lands files on the box or
   makes them there to bring back (#3035): Open-ThornswoodOnBoxFolder and
   Close-ThornswoodOnBoxFolder, below, for Run-OnBox.ps1 and Backup-Server.ps1
-  alike. A script that only needs its text run there sends it on ssh's
-  standard input instead (Send-Script.ps1), and writes nothing.
+  alike. A script that only needs its text run there sends it through
+  Send-Script.ps1 instead, whose run deletes a long one's copy before it runs.
 
   The far side runs under Windows PowerShell 5.1: ASCII, and .NET for the
   hashes, not Get-FileHash (ServerContent.ps1 says why).
