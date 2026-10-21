@@ -20,6 +20,8 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+# $OnWindows, for the one Windows-only step: how a leftover process is found.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Repo = Split-Path -Parent $PSScriptRoot
 $Check = Join-Path $Repo 'scripts' 'dev' 'Check-Serena.ps1'
 $script:pass = 0; $script:fail = 0
@@ -84,7 +86,7 @@ try {
     $t.Stop()
     Yes 'a start that never answers fails' ($r.Code -eq 1 -and $r.Out -match 'never answered initialize')
     Yes 'and the check stops waiting at -Limit' ($t.Elapsed.TotalSeconds -lt 30)
-    $left = if ($IsWindows) { @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*$fake*" }) } else { @(& pgrep -f $fake) }
+    $left = if ($OnWindows) { @(Get-CimInstance Win32_Process | Where-Object { $_.CommandLine -like "*$fake*" }) } else { @(& pgrep -f $fake) }
     Yes 'no stand-in is left running' ($left.Count -eq 0)
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force
