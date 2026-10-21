@@ -63,7 +63,7 @@ $helper = Join-Path $Repo 'scripts\deploy\Artifact.ps1'
 Yes 'scripts\deploy\Artifact.ps1 is there' (Test-Path -LiteralPath $helper)
 if (-not (Test-Path -LiteralPath $helper)) { Done }
 . $helper
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2459-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
