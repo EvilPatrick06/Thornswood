@@ -12,10 +12,21 @@ and every other plugin from the game's Data folder. The same rule is
 OwnPlugins.js and OwnPlugins.ps1; tests/test-2923-own-plugins.js holds the
 three to it.
 
+Which plugins are in the load order is read here too (#2976). The game loads
+Skyrim's five masters, then every line of plugins.txt that starts with '*'. A
+line without one is a plugin Vortex or the launcher knows about and has
+switched off: the game does not load it, and its file may be gone. Eight
+builders parsed plugins.txt on their own and four of those took the switched
+off lines as loaded, so on 20 Oct Build-DoorTable.py stopped on
+ElysiumEstateSSE.esp, a switched off line whose file the launcher had removed
+on 1 Oct. Every builder takes its load order from load_order.
+
     import own_plugins
+    order = own_plugins.load_order(args.plugins)
     path = own_plugins.plugin_path(data, 'Thornswood-Content.esp')
 """
 
+import io
 import os
 
 OWN_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', 'game', 'content'))
@@ -27,3 +38,44 @@ def is_own(name):
 
 def plugin_path(data, name):
     return os.path.join(OWN_DIR, name) if is_own(name) else os.path.join(str(data), name)
+
+
+# The five masters load before the game reads plugins.txt, and are never
+# written to it.
+MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
+
+
+def read_plugins_txt(plugins_txt):
+    """plugins.txt as the game reads it, as (on, off): on is the load order (the
+    masters, then each '*' line, once, names matched without case the way
+    Windows matches files), off is each line the game skips because it has no
+    '*'."""
+    on, off = list(MASTERS), []
+    seen = set(n.lower() for n in on)
+    with io.open(str(plugins_txt), encoding='utf-8-sig', errors='replace') as fh:
+        lines = fh.read().splitlines()
+    for line in lines:
+        line = line.strip()
+        if not line or line.startswith('#'):
+            continue
+        if not line.startswith('*'):
+            off.append(line)
+            continue
+        name = line[1:].strip()
+        if name and name.lower() not in seen:
+            seen.add(name.lower())
+            on.append(name)
+    skipped = []
+    for name in off:
+        if name.lower() not in seen:
+            seen.add(name.lower())
+            skipped.append(name)
+    return on, skipped
+
+
+def load_order(plugins_txt):
+    return read_plugins_txt(plugins_txt)[0]
+
+
+def switched_off(plugins_txt):
+    return read_plugins_txt(plugins_txt)[1]
