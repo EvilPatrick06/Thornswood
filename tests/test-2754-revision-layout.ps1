@@ -40,8 +40,9 @@
   files.txt: part 1 holds the refusals of -Game and -Record there instead,
   and part 6's runs over a placed layout say SKIP. On both, part 5 also holds
   what Windows does with names: a FOMOD naming OPT\LAMBDA.TXT finds
-  opt\Lambda.txt, Textures and textures in one archive are one folder, and
-  a zip entry named Data\SKSE\Plugins\x.dll lands in those folders.
+  opt\Lambda.txt, textures and Textures in one archive are one folder named as
+  its first entry names it, and a zip entry named Data\SKSE\Plugins\x.dll
+  lands in those folders.
   Off Windows, two files in one archive differing only in case stop the run.
 
   Needs node. Part 5 onward needs 7-Zip and says SKIP without it. Everything
@@ -200,7 +201,7 @@ $arc = [ordered]@{
     gamma = Zip 'Gamma' @{ 'fomod\ModuleConfig.xml' = $fomodXml; 'opt1\Gamma.esp' = 'gamma one'; 'opt2\Gamma.esp' = 'gamma two'; 'common\textures\shared.dds' = 'gamma texture' }
     delta = Zip 'Delta' @{ 'delta_1\skse64_loader.exe' = 'loader'; 'delta_1\Data\Scripts\delta.pex' = 'script' }
     eps   = Zip 'Epsilon' @{ 'Eps.esp' = 'AAAA' }
-    kappa = ZipExact 'Kappa' @('Data/Textures/k1.dds', 'kappa one', 'Data/textures/k2.dds', 'kappa two', 'Data\SKSE\Plugins\kappa.dll', 'kappa dll')
+    kappa = ZipExact 'Kappa' @('Data/textures/k2.dds', 'kappa two', 'Data/Textures/k1.dds', 'kappa one', 'Data\SKSE\Plugins\kappa.dll', 'kappa dll')
     lambda = ZipExact 'Lambda' @('fomod/ModuleConfig.xml', $lambdaXml, 'opt/Lambda.txt', 'lambda text')
     mu    = ZipExact 'Mu' @('Data/mu.txt', 'lower', 'Data/MU.txt', 'upper')
 }
@@ -360,7 +361,10 @@ Yes 'the FOMOD runs with the collection''s choice (Two) and its required folder'
 Yes 'the file Alpha and Gamma share is Gamma''s, the mod the rule deploys after' ((Has 'Data\textures\shared.dds' 'gamma texture') -and $F['data\textures\shared.dds'][2] -eq '900003')
 Yes 'the script extender goes to the game folder, from its own folder down' ((Has 'skse64_loader.exe' 'loader') -and (Has 'Data\Scripts\delta.pex' 'script') -and (Lacks 'Data\skse64_loader.exe'))
 Yes 'the patch makes Eps.esp AAAB' (Has 'Data\Eps.esp' 'AAAB')
-Yes 'Textures and textures in one archive are one folder, as on Windows' ((Has 'Data\Textures\k1.dds' 'kappa one') -and (Has 'Data\Textures\k2.dds' 'kappa two') -and @($lines | Where-Object { $_.EndsWith("`tData\Textures\k1.dds") -or $_.EndsWith("`tData\Textures\k2.dds") }).Count -eq 2)
+# textures comes first in the zip, so 7-Zip on Windows makes the folder
+# textures and puts Textures/k1.dds in it (#2969: One's revision 2 has
+# Immersive Armours' meshes this way).
+Yes 'textures and Textures in one archive are one folder, named as its first entry names it, as on Windows' ((Has 'Data\textures\k1.dds' 'kappa one') -and (Has 'Data\textures\k2.dds' 'kappa two') -and @($lines | Where-Object { $_.EndsWith("`tData\textures\k1.dds") -or $_.EndsWith("`tData\textures\k2.dds") }).Count -eq 2)
 Yes 'a FOMOD naming OPT\LAMBDA.TXT finds opt\Lambda.txt' (Has 'Data\lambda.txt' 'lambda text')
 Yes 'a zip entry named with \ between its folders lands in those folders, as on Windows' (Has 'Data\SKSE\Plugins\kappa.dll' 'kappa dll')
 $pl = @([IO.File]::ReadAllLines((P $recDir 'plugins.txt')) | Where-Object { $_ -and -not $_.StartsWith('#') })
@@ -447,7 +451,7 @@ YesR 'a changed file and a missing one are named, and it exits 1' ($r.Code -eq 1
 # A game folder as Vortex leaves it: its deployment records, the files, one
 # file of a mod made on the machine, and the game's plugins.txt.
 $vg2 = P $T 'vortex-deployed'
-$want = [ordered]@{ 'Data\Alpha.esp' = 'alpha plugin'; 'Data\readme.txt' = 'read me'; 'Data\Zeta.esp' = 'zeta plugin'; 'Data\Beta.esp' = 'beta plugin'; 'Data\Gamma.esp' = 'gamma two'; 'Data\textures\shared.dds' = 'gamma texture'; 'Data\Scripts\delta.pex' = 'script'; 'Data\Eps.esp' = 'AAAB'; 'Data\Textures\k1.dds' = 'kappa one'; 'Data\Textures\k2.dds' = 'kappa two'; 'Data\SKSE\Plugins\kappa.dll' = 'kappa dll'; 'Data\lambda.txt' = 'lambda text'; 'skse64_loader.exe' = 'loader' }
+$want = [ordered]@{ 'Data\Alpha.esp' = 'alpha plugin'; 'Data\readme.txt' = 'read me'; 'Data\Zeta.esp' = 'zeta plugin'; 'Data\Beta.esp' = 'beta plugin'; 'Data\Gamma.esp' = 'gamma two'; 'Data\textures\shared.dds' = 'gamma texture'; 'Data\Scripts\delta.pex' = 'script'; 'Data\Eps.esp' = 'AAAB'; 'Data\textures\k1.dds' = 'kappa one'; 'Data\textures\k2.dds' = 'kappa two'; 'Data\SKSE\Plugins\kappa.dll' = 'kappa dll'; 'Data\lambda.txt' = 'lambda text'; 'skse64_loader.exe' = 'loader' }
 foreach ($k in $want.Keys) { Put (P $vg2 $k) $want[$k] }
 function Deployed([bool]$extra) {
     $data = @($want.Keys | Where-Object { $_.StartsWith('Data\') } | ForEach-Object { [ordered]@{ relPath = $_.Substring(5); source = 'Mod-1'; target = '' } })
