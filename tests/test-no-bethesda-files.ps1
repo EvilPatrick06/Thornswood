@@ -59,7 +59,9 @@ $PackagePath = Join-Path $Repo 'scripts\release\Package-Thornswood.ps1'
 $SecretsPath = Join-Path $Repo 'scripts\dev\Check-Secrets.ps1'
 $OwnGamePath = Join-Path $Repo 'launcher\app\OwnGame.cs'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
-if (-not $Record) { $Record = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json' }
+# The dev baseline where Publish-Update keeps it on this machine: Where.ps1's
+# ReleasesDev, which LOCALAPPDATA (set only on Windows) no longer has to name.
+if (-not $Record) { $Record = Join-Path (& (Join-Path $Repo 'scripts\release\Where.ps1') ReleasesDev) 'published.json' }
 
 $script:pass = 0
 $script:fail = 0

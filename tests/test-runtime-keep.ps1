@@ -4,6 +4,7 @@
 param([string]$Repo = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+if (-not $OnWindows) { Write-Host 'NOT RUN  this compiles Keep.cs and ClientRuntime.cs with the build''s compiler (the Build Tools'' csc) and runs them on .NET Framework, which only Windows has'; exit 0 }
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-runtime-keep-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($work)
 try {

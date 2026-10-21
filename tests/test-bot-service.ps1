@@ -70,6 +70,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $svcLib = Join-Path $repo 'scripts\vps\Bot-Service.ps1'
 $svcSrc = Join-Path $repo 'scripts\vps\BotService.cs'
 
@@ -251,11 +252,18 @@ $build = Join-Path $tmp 'build'
 $null = New-Item -ItemType Directory -Force -Path $build
 $exe = Join-Path $build 'ThornswoodBotService.exe'
 $r = Build-ThornswoodBotHost $svcSrc $exe
-Yes ('BotService.cs builds with the .NET Framework compiler, C# 5' + $(if (-not $r.Ok) { ': ' + ($r.Lines -join ' | ') } else { '' })) ($r.Ok)
-$bad = Join-Path $build 'broken.cs'
-[IO.File]::WriteAllText($bad, 'class Broken { void X() { int y = ; } }')
-$r2 = Build-ThornswoodBotHost $bad (Join-Path $build 'broken.exe')
-Yes 'a source that does not build says so, with the compiler''s words' (-not $r2.Ok -and ($r2.Lines -join ' ') -match 'error CS')
+if ($OnWindows) {
+    Yes ('BotService.cs builds with the .NET Framework compiler, C# 5' + $(if (-not $r.Ok) { ': ' + ($r.Lines -join ' | ') } else { '' })) ($r.Ok)
+    $bad = Join-Path $build 'broken.cs'
+    [IO.File]::WriteAllText($bad, 'class Broken { void X() { int y = ; } }')
+    $r2 = Build-ThornswoodBotHost $bad (Join-Path $build 'broken.exe')
+    Yes 'a source that does not build says so, with the compiler''s words' (-not $r2.Ok -and ($r2.Lines -join ' ') -match 'error CS')
+} else {
+    # The program is a Windows service built with the .NET Framework's own
+    # compiler, which is a part of Windows.
+    Yes 'off Windows the build says plainly that the compiler is a part of Windows' (-not $r.Ok -and ($r.Lines -join ' ') -match 'comes with Windows')
+    Write-Host 'SKIP  BotService.cs built, and a broken source refused, with the .NET Framework compiler: it is only on Windows'
+}
 
 # A python for the stand-in bot: py -3.9 where there is one, which is what
 # the bot's own tests use, else python.
@@ -519,335 +527,342 @@ if (-not $r.Ok) {
     Yes 'no host.json: it stops, and says in the bot''s folder which file it wants' ($h.P.WaitForExit(15000) -and $h.P.ExitCode -eq 1 -and (Log $root) -match 'host\.json.*Install-Bot\.ps1 writes that file')
 }
 
-# ============================================================ the grants ===
-function Protect([string]$path, [string[]]$sids) {
-    $acl = Get-Acl -LiteralPath $path
-    $acl.SetAccessRuleProtection($true, $false)
-    foreach ($x in @($acl.Access)) { [void]$acl.RemoveAccessRule($x) }
-    $isDir = Test-Path -LiteralPath $path -PathType Container
-    foreach ($s in $sids) {
-        $who = New-Object Security.Principal.SecurityIdentifier($s)
-        if ($isDir) { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow'))) }
-        else { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, 'FullControl', 'Allow'))) }
+# The grants are folder ACLs, read and written by SID, and the install builds
+# the program with the .NET Framework compiler and registers a Windows service:
+# all of it Windows.
+if ($OnWindows) {
+    # ============================================================ the grants ===
+    function Protect([string]$path, [string[]]$sids) {
+        $acl = Get-Acl -LiteralPath $path
+        $acl.SetAccessRuleProtection($true, $false)
+        foreach ($x in @($acl.Access)) { [void]$acl.RemoveAccessRule($x) }
+        $isDir = Test-Path -LiteralPath $path -PathType Container
+        foreach ($s in $sids) {
+            $who = New-Object Security.Principal.SecurityIdentifier($s)
+            if ($isDir) { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, 'FullControl', 'ContainerInherit, ObjectInherit', 'None', 'Allow'))) }
+            else { $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($who, 'FullControl', 'Allow'))) }
+        }
+        Set-Acl -LiteralPath $path -AclObject $acl
     }
-    Set-Acl -LiteralPath $path -AclObject $acl
-}
-# The bot's account's rules on a path, read by SID (#1880). Get-Acl's .Access
-# names every account Windows knows, and on the VPS, where the ThornswoodBot
-# service is real, the bot's rule reads NT SERVICE\ThornswoodBot rather than
-# its SID. A match on the SID found no rule there: the sixteen checks that
-# want one failed on the build runner, and the ones that want none passed
-# whatever the folder held.
-function Rules([string]$path) {
-    return @((Get-Acl -LiteralPath $path).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $sid })
-}
-$me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
-$g = Join-Path $tmp 'grants'
-$gRoot = Join-Path $g 'Thornswood-Bot'
-$gWatch = Join-Path $g 'Thornswood-Watch'
-$gData = Join-Path $g 'Thornswood-Docs\data'
-$gForBot = Join-Path $gData 'for-bot'
-# A game server with private\moderation.log from before #2321, which had the
-# bot's read on that one file, and no for-bot yet.
-$gServer = Join-Path $g 'Thornswood-Server'
-$gMod = Join-Path $gServer 'private\moderation.log'
-foreach ($d in @($gRoot, (Join-Path $gRoot 'service'), (Join-Path $gRoot 'webhooks'), $gWatch, (Join-Path $gData 'session-logs'), $gForBot, (Split-Path -Parent $gMod))) { $null = New-Item -ItemType Directory -Force -Path $d }
-foreach ($f in @((Join-Path $gRoot 'bot.py'), (Join-Path $gRoot 'bot.env.json'), (Join-Path $gRoot 'service\host.json'), (Join-Path $gRoot 'webhooks\news.txt'), (Join-Path $gWatch 'alerts.jsonl'),
-                 (Join-Path $gWatch 'alerts-webhook.txt'), (Join-Path $gData 'sessions.json'), (Join-Path $gForBot 'trouble.json'), (Join-Path $gData 'session-logs\one.log'), $gMod,
-                 (Join-Path (Split-Path -Parent $gMod) 'door.json'))) { [IO.File]::WriteAllText($f, 'x') }
-# What the box has from before #1102 and #1104: the bot's account with Modify
-# on its whole folder, read on every file in the site's data, and the Users
-# rule every folder under C:\ inherits (given here, since a scratch folder
-# under the temp folder does not have it).
-$users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
-$acl = Get-Acl -LiteralPath $gRoot
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Modify', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($users, 'ReadAndExecute, CreateFiles', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
-Set-Acl -LiteralPath $gRoot -AclObject $acl
-$acl = Get-Acl -LiteralPath $gData
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Read', 'ObjectInherit', 'NoPropagateInherit', 'Allow')))
-Set-Acl -LiteralPath $gData -AclObject $acl
-# A module the bot's account could have dropped beside bot.py, and the cache
-# it wrote, owned by it.
-$null = New-Item -ItemType Directory -Force -Path (Join-Path $gRoot '__pycache__')
-[IO.File]::WriteAllText((Join-Path $gRoot '__pycache__\bot.cpython-312.pyc'), 'x')
-Protect (Join-Path $gRoot 'bot.env.json') @('S-1-5-18', 'S-1-5-32-544', $me)
-Protect (Join-Path $gWatch 'alerts-webhook.txt') @('S-1-5-18', 'S-1-5-32-544', $me)
-$acl = Get-Acl -LiteralPath $gMod
-$acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Read', 'Allow')))
-Set-Acl -LiteralPath $gMod -AclObject $acl
-# A server folder that is not on this box.
-$missing = Join-Path $g 'Thornswood-Server-Dev'
-$moved = @(Move-ThornswoodBotRecords $gRoot)
-Yes 'the cache the bot''s account wrote beside its code is removed' (-not (Test-Path -LiteralPath (Join-Path $gRoot '__pycache__')) -and ($moved -join ' ') -match '__pycache__')
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer, $missing))
-Yes 'every grant went on' (@($said | Where-Object { $_ -match '^COULD NOT' }).Count -eq 0)
-# Which one did not, and why, so a red on the build runner says it in the log.
-foreach ($l in @($said | Where-Object { $_ -match '^COULD NOT' })) { Write-Host ('      ' + $l) }
-$rootAcl = Get-Acl -LiteralPath $gRoot
-Yes 'the bot''s folder takes nothing from above it' ($rootAcl.AreAccessRulesProtected -and @($rootAcl.Access | Where-Object { $_.IsInherited }).Count -eq 0)
-Yes 'and no Users, Everyone or Authenticated Users rule reaches it or bot.py' (
-    @(@($rootAcl.Access) + @((Get-Acl -LiteralPath (Join-Path $gRoot 'bot.py')).Access) | Where-Object { @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11') -contains $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }).Count -eq 0)
-$x = Rules $gRoot
-Yes 'the bot''s folder: read and run for the bot''s account, to everything under it, and no more' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'ReadAndExecute' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
-$x = @(Rules (Join-Path $gRoot 'bot.py'))
-Yes 'so the bot''s account cannot write bot.py' ($x.Count -ge 1 -and @($x | Where-Object { "$($_.FileSystemRights)" -match 'Modify|Write|FullControl|CreateFiles|AppendData' }).Count -eq 0)
-$owner = @($rootAcl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-3-4' })
-Yes 'and OWNER RIGHTS is read and run, so a file the account owns cannot be opened up by it' ($owner.Count -eq 1 -and "$($owner[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl|ChangePermissions')
-$x = Rules (Join-Path $gRoot 'data')
-Yes 'the data folder: Modify for the bot''s account, the one place it writes' (@($x | Where-Object { -not $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
-$hookAcl = Get-Acl -LiteralPath (Join-Path $gRoot 'webhooks')
-Yes 'the webhooks folder takes nothing from the bot''s folder, and the bot''s account has nothing there' ($hookAcl.AreAccessRulesProtected -and (Rules (Join-Path $gRoot 'webhooks')).Count -eq 0 -and (Rules (Join-Path $gRoot 'webhooks\news.txt')).Count -eq 0)
-$svcAcl = Get-Acl -LiteralPath (Join-Path $gRoot 'service')
-$x = Rules (Join-Path $gRoot 'service')
-Yes 'the program''s folder takes nothing from the bot''s folder' ($svcAcl.AreAccessRulesProtected -and @($svcAcl.Access | Where-Object { $_.IsInherited }).Count -eq 0)
-Yes 'and the bot''s account may read it and run the program, not change it' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'ReadAndExecute' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl')
-Yes 'nor host.json in it' (@(Rules (Join-Path $gRoot 'service\host.json') | Where-Object { "$($_.FileSystemRights)" -match 'Modify|Write|FullControl' }).Count -eq 0 -and (Rules (Join-Path $gRoot 'service\host.json')).Count -eq 1)
-$x = Rules (Join-Path $gRoot 'bot.env.json')
-Yes 'bot.env.json: stays protected, and the bot''s account may read it and nothing more' ((Get-Acl -LiteralPath (Join-Path $gRoot 'bot.env.json')).AreAccessRulesProtected -and $x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read, Synchronize$')
-$x = Rules $gWatch
-Yes 'the watchdog''s folder: read on the files directly in it' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].PropagationFlags)" -match 'NoPropagateInherit')
-Yes 'which alerts.jsonl gets' ((Rules (Join-Path $gWatch 'alerts.jsonl')).Count -eq 1)
-Yes 'and the protected webhook file does not' ((Rules (Join-Path $gWatch 'alerts-webhook.txt')).Count -eq 0)
-$sent = Join-Path $gWatch 'alerts-sent-bot.txt'
-Yes 'alerts-sent-bot.txt is made when it is not there, and the bot''s account may write it' ((Test-Path -LiteralPath $sent) -and @(Rules $sent | Where-Object { -not $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
-Yes 'the site''s for-bot folder: read on what the site writes for the bot' ((Rules (Join-Path $gForBot 'trouble.json')).Count -eq 1 -and "$((Rules (Join-Path $gForBot 'trouble.json'))[0].FileSystemRights)" -notmatch 'Modify|Write')
-Yes 'and the bot''s account cannot read sessions.json, or anything else of the site''s' ((Rules (Join-Path $gData 'sessions.json')).Count -eq 0 -and (Rules $gData).Count -eq 0)
-Yes 'nor anything below the site''s data' ((Rules (Join-Path $gData 'session-logs\one.log')).Count -eq 0 -and (Rules (Join-Path $gData 'session-logs')).Count -eq 0)
-# The game servers' staff log (#2321): read on the for-bot folder beside
-# private, made here when the server has none, so a log the gamemode makes
-# after the grant takes the rule; private and door.json never get one.
-$gFb = Join-Path $gServer 'for-bot'
-$x = @(Rules $gFb)
-Yes 'a game server''s for-bot is made when it has none, and said' ((Test-Path -LiteralPath $gFb) -and ($said -join "`n") -match [regex]::Escape('made ' + $gFb))
-Yes 'and the bot''s account may read it and everything in it, and no more' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
-# What the gamemode does at the first staff action, after the install: make
-# the file. It takes the folder's rule, which a rule on one file never could.
-$later = Join-Path $gFb 'moderation.log'
-[IO.File]::AppendAllText($later, '{"did":"warn"}' + "`n")
-$x = @(Rules $later)
-Yes 'a staff log the gamemode makes after the grant takes the bot''s read by itself' ($x.Count -eq 1 -and $x[0].IsInherited -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl')
-Yes 'and private, door.json and the old moderation.log there give the bot''s account nothing' ((Rules (Split-Path -Parent $gMod)).Count -eq 0 -and (Rules (Join-Path (Split-Path -Parent $gMod) 'door.json')).Count -eq 0 -and (Rules $gMod).Count -eq 0)
-Yes 'the bot''s old rule on private\moderation.log is taken off, and said' (($said -join "`n") -match [regex]::Escape('took the bot''s account off ' + $gMod))
-Yes 'a server folder that is not on the box is said, and nothing is made' (($said -join "`n") -match [regex]::Escape('no game server at ' + $missing) -and -not (Test-Path -LiteralPath $missing))
-$null = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer))
-function Own([string]$path) { return @(Rules $path | Where-Object { -not $_.IsInherited }).Count }
-Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gFb) -eq 1)
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-site\data') -ServerRoots @())
-$null = New-Item -ItemType Directory -Force -Path (Join-Path $g 'no-forbot\data')
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-forbot\data') -ServerRoots @())
-Yes 'a site with no for-bot yet: said, with what to run, and nothing made' (($said -join ' ') -match 'for-bot\. Run Deploy-Docs\.ps1' -and -not (Test-Path -LiteralPath (Join-Path $g 'no-forbot\data\for-bot')))
+    # The bot's account's rules on a path, read by SID (#1880). Get-Acl's .Access
+    # names every account Windows knows, and on the VPS, where the ThornswoodBot
+    # service is real, the bot's rule reads NT SERVICE\ThornswoodBot rather than
+    # its SID. A match on the SID found no rule there: the sixteen checks that
+    # want one failed on the build runner, and the ones that want none passed
+    # whatever the folder held.
+    function Rules([string]$path) {
+        return @((Get-Acl -LiteralPath $path).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $sid })
+    }
+    $me = [Security.Principal.WindowsIdentity]::GetCurrent().User.Value
+    $g = Join-Path $tmp 'grants'
+    $gRoot = Join-Path $g 'Thornswood-Bot'
+    $gWatch = Join-Path $g 'Thornswood-Watch'
+    $gData = Join-Path $g 'Thornswood-Docs\data'
+    $gForBot = Join-Path $gData 'for-bot'
+    # A game server with private\moderation.log from before #2321, which had the
+    # bot's read on that one file, and no for-bot yet.
+    $gServer = Join-Path $g 'Thornswood-Server'
+    $gMod = Join-Path $gServer 'private\moderation.log'
+    foreach ($d in @($gRoot, (Join-Path $gRoot 'service'), (Join-Path $gRoot 'webhooks'), $gWatch, (Join-Path $gData 'session-logs'), $gForBot, (Split-Path -Parent $gMod))) { $null = New-Item -ItemType Directory -Force -Path $d }
+    foreach ($f in @((Join-Path $gRoot 'bot.py'), (Join-Path $gRoot 'bot.env.json'), (Join-Path $gRoot 'service\host.json'), (Join-Path $gRoot 'webhooks\news.txt'), (Join-Path $gWatch 'alerts.jsonl'),
+                     (Join-Path $gWatch 'alerts-webhook.txt'), (Join-Path $gData 'sessions.json'), (Join-Path $gForBot 'trouble.json'), (Join-Path $gData 'session-logs\one.log'), $gMod,
+                     (Join-Path (Split-Path -Parent $gMod) 'door.json'))) { [IO.File]::WriteAllText($f, 'x') }
+    # What the box has from before #1102 and #1104: the bot's account with Modify
+    # on its whole folder, read on every file in the site's data, and the Users
+    # rule every folder under C:\ inherits (given here, since a scratch folder
+    # under the temp folder does not have it).
+    $users = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    $acl = Get-Acl -LiteralPath $gRoot
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Modify', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($users, 'ReadAndExecute, CreateFiles', 'ContainerInherit, ObjectInherit', 'None', 'Allow')))
+    Set-Acl -LiteralPath $gRoot -AclObject $acl
+    $acl = Get-Acl -LiteralPath $gData
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Read', 'ObjectInherit', 'NoPropagateInherit', 'Allow')))
+    Set-Acl -LiteralPath $gData -AclObject $acl
+    # A module the bot's account could have dropped beside bot.py, and the cache
+    # it wrote, owned by it.
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $gRoot '__pycache__')
+    [IO.File]::WriteAllText((Join-Path $gRoot '__pycache__\bot.cpython-312.pyc'), 'x')
+    Protect (Join-Path $gRoot 'bot.env.json') @('S-1-5-18', 'S-1-5-32-544', $me)
+    Protect (Join-Path $gWatch 'alerts-webhook.txt') @('S-1-5-18', 'S-1-5-32-544', $me)
+    $acl = Get-Acl -LiteralPath $gMod
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($sid)), 'Read', 'Allow')))
+    Set-Acl -LiteralPath $gMod -AclObject $acl
+    # A server folder that is not on this box.
+    $missing = Join-Path $g 'Thornswood-Server-Dev'
+    $moved = @(Move-ThornswoodBotRecords $gRoot)
+    Yes 'the cache the bot''s account wrote beside its code is removed' (-not (Test-Path -LiteralPath (Join-Path $gRoot '__pycache__')) -and ($moved -join ' ') -match '__pycache__')
+    $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer, $missing))
+    Yes 'every grant went on' (@($said | Where-Object { $_ -match '^COULD NOT' }).Count -eq 0)
+    # Which one did not, and why, so a red on the build runner says it in the log.
+    foreach ($l in @($said | Where-Object { $_ -match '^COULD NOT' })) { Write-Host ('      ' + $l) }
+    $rootAcl = Get-Acl -LiteralPath $gRoot
+    Yes 'the bot''s folder takes nothing from above it' ($rootAcl.AreAccessRulesProtected -and @($rootAcl.Access | Where-Object { $_.IsInherited }).Count -eq 0)
+    Yes 'and no Users, Everyone or Authenticated Users rule reaches it or bot.py' (
+        @(@($rootAcl.Access) + @((Get-Acl -LiteralPath (Join-Path $gRoot 'bot.py')).Access) | Where-Object { @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11') -contains $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value }).Count -eq 0)
+    $x = Rules $gRoot
+    Yes 'the bot''s folder: read and run for the bot''s account, to everything under it, and no more' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'ReadAndExecute' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
+    $x = @(Rules (Join-Path $gRoot 'bot.py'))
+    Yes 'so the bot''s account cannot write bot.py' ($x.Count -ge 1 -and @($x | Where-Object { "$($_.FileSystemRights)" -match 'Modify|Write|FullControl|CreateFiles|AppendData' }).Count -eq 0)
+    $owner = @($rootAcl.Access | Where-Object { $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-3-4' })
+    Yes 'and OWNER RIGHTS is read and run, so a file the account owns cannot be opened up by it' ($owner.Count -eq 1 -and "$($owner[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl|ChangePermissions')
+    $x = Rules (Join-Path $gRoot 'data')
+    Yes 'the data folder: Modify for the bot''s account, the one place it writes' (@($x | Where-Object { -not $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+    $hookAcl = Get-Acl -LiteralPath (Join-Path $gRoot 'webhooks')
+    Yes 'the webhooks folder takes nothing from the bot''s folder, and the bot''s account has nothing there' ($hookAcl.AreAccessRulesProtected -and (Rules (Join-Path $gRoot 'webhooks')).Count -eq 0 -and (Rules (Join-Path $gRoot 'webhooks\news.txt')).Count -eq 0)
+    $svcAcl = Get-Acl -LiteralPath (Join-Path $gRoot 'service')
+    $x = Rules (Join-Path $gRoot 'service')
+    Yes 'the program''s folder takes nothing from the bot''s folder' ($svcAcl.AreAccessRulesProtected -and @($svcAcl.Access | Where-Object { $_.IsInherited }).Count -eq 0)
+    Yes 'and the bot''s account may read it and run the program, not change it' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match 'ReadAndExecute' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl')
+    Yes 'nor host.json in it' (@(Rules (Join-Path $gRoot 'service\host.json') | Where-Object { "$($_.FileSystemRights)" -match 'Modify|Write|FullControl' }).Count -eq 0 -and (Rules (Join-Path $gRoot 'service\host.json')).Count -eq 1)
+    $x = Rules (Join-Path $gRoot 'bot.env.json')
+    Yes 'bot.env.json: stays protected, and the bot''s account may read it and nothing more' ((Get-Acl -LiteralPath (Join-Path $gRoot 'bot.env.json')).AreAccessRulesProtected -and $x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read, Synchronize$')
+    $x = Rules $gWatch
+    Yes 'the watchdog''s folder: read on the files directly in it' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].PropagationFlags)" -match 'NoPropagateInherit')
+    Yes 'which alerts.jsonl gets' ((Rules (Join-Path $gWatch 'alerts.jsonl')).Count -eq 1)
+    Yes 'and the protected webhook file does not' ((Rules (Join-Path $gWatch 'alerts-webhook.txt')).Count -eq 0)
+    $sent = Join-Path $gWatch 'alerts-sent-bot.txt'
+    Yes 'alerts-sent-bot.txt is made when it is not there, and the bot''s account may write it' ((Test-Path -LiteralPath $sent) -and @(Rules $sent | Where-Object { -not $_.IsInherited -and "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+    Yes 'the site''s for-bot folder: read on what the site writes for the bot' ((Rules (Join-Path $gForBot 'trouble.json')).Count -eq 1 -and "$((Rules (Join-Path $gForBot 'trouble.json'))[0].FileSystemRights)" -notmatch 'Modify|Write')
+    Yes 'and the bot''s account cannot read sessions.json, or anything else of the site''s' ((Rules (Join-Path $gData 'sessions.json')).Count -eq 0 -and (Rules $gData).Count -eq 0)
+    Yes 'nor anything below the site''s data' ((Rules (Join-Path $gData 'session-logs\one.log')).Count -eq 0 -and (Rules (Join-Path $gData 'session-logs')).Count -eq 0)
+    # The game servers' staff log (#2321): read on the for-bot folder beside
+    # private, made here when the server has none, so a log the gamemode makes
+    # after the grant takes the rule; private and door.json never get one.
+    $gFb = Join-Path $gServer 'for-bot'
+    $x = @(Rules $gFb)
+    Yes 'a game server''s for-bot is made when it has none, and said' ((Test-Path -LiteralPath $gFb) -and ($said -join "`n") -match [regex]::Escape('made ' + $gFb))
+    Yes 'and the bot''s account may read it and everything in it, and no more' ($x.Count -eq 1 -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl' -and "$($x[0].InheritanceFlags)" -match 'ContainerInherit' -and "$($x[0].InheritanceFlags)" -match 'ObjectInherit')
+    # What the gamemode does at the first staff action, after the install: make
+    # the file. It takes the folder's rule, which a rule on one file never could.
+    $later = Join-Path $gFb 'moderation.log'
+    [IO.File]::AppendAllText($later, '{"did":"warn"}' + "`n")
+    $x = @(Rules $later)
+    Yes 'a staff log the gamemode makes after the grant takes the bot''s read by itself' ($x.Count -eq 1 -and $x[0].IsInherited -and "$($x[0].FileSystemRights)" -match '^Read' -and "$($x[0].FileSystemRights)" -notmatch 'Modify|Write|FullControl')
+    Yes 'and private, door.json and the old moderation.log there give the bot''s account nothing' ((Rules (Split-Path -Parent $gMod)).Count -eq 0 -and (Rules (Join-Path (Split-Path -Parent $gMod) 'door.json')).Count -eq 0 -and (Rules $gMod).Count -eq 0)
+    Yes 'the bot''s old rule on private\moderation.log is taken off, and said' (($said -join "`n") -match [regex]::Escape('took the bot''s account off ' + $gMod))
+    Yes 'a server folder that is not on the box is said, and nothing is made' (($said -join "`n") -match [regex]::Escape('no game server at ' + $missing) -and -not (Test-Path -LiteralPath $missing))
+    $null = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot $gWatch -DocsData $gData -ServerRoots @($gServer))
+    function Own([string]$path) { return @(Rules $path | Where-Object { -not $_.IsInherited }).Count }
+    Yes 'given again, nothing is doubled' ((Own $gRoot) -eq 1 -and (Own (Join-Path $gRoot 'data')) -eq 1 -and (Own $gForBot) -eq 1 -and (Own (Join-Path $gRoot 'bot.env.json')) -eq 1 -and (Own $gWatch) -eq 1 -and (Own $sent) -eq 1 -and (Own $gFb) -eq 1)
+    $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-site\data') -ServerRoots @())
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $g 'no-forbot\data')
+    $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot '' -DocsData (Join-Path $g 'no-forbot\data') -ServerRoots @())
+    Yes 'a site with no for-bot yet: said, with what to run, and nothing made' (($said -join ' ') -match 'for-bot\. Run Deploy-Docs\.ps1' -and -not (Test-Path -LiteralPath (Join-Path $g 'no-forbot\data\for-bot')))
 
-# -- the records move out of the code folder --------------------------------------
-$mv = Join-Path $g 'move-records'
-$null = New-Item -ItemType Directory -Force -Path (Join-Path $mv 'data')
-foreach ($n in 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json', 'bot.log', 'bot.log.1', 'bot.log.20260916-1535.old', 'bot.py') { [IO.File]::WriteAllText((Join-Path $mv $n), ('old ' + $n)) }
-[IO.File]::WriteAllText((Join-Path $mv 'data\heartbeat.json'), 'newer')
-$said = @(Move-ThornswoodBotRecords $mv)
-Yes 'joins.json, open tickets, the command stamp and the logs move into data' (
-    ((Get-Content -LiteralPath (Join-Path $mv 'data\joins.json') -Raw) -eq 'old joins.json') -and (Test-Path -LiteralPath (Join-Path $mv 'data\open-tickets.json')) -and
-    (Test-Path -LiteralPath (Join-Path $mv 'data\commands-synced.json')) -and (Test-Path -LiteralPath (Join-Path $mv 'data\bot.log')) -and (Test-Path -LiteralPath (Join-Path $mv 'data\bot.log.1')) -and
-    -not (Test-Path -LiteralPath (Join-Path $mv 'joins.json')) -and -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log')))
-Yes 'one already in data is kept, and the old one beside the code goes' (((Get-Content -LiteralPath (Join-Path $mv 'data\heartbeat.json') -Raw) -eq 'newer') -and -not (Test-Path -LiteralPath (Join-Path $mv 'heartbeat.json')))
-Yes 'the code is not touched' (Test-Path -LiteralPath (Join-Path $mv 'bot.py'))
-# A log somebody renamed by hand to keep it is a log too (#1184): the swap
-# leaves it beside the code as the bot's own, so the full run moves it into
-# data rather than leaving it there for ever. A log is never removed.
-Yes 'a log renamed by hand moves into data with the rest' (
-    ((Get-Content -LiteralPath (Join-Path $mv 'data\bot.log.20260916-1535.old') -Raw) -eq 'old bot.log.20260916-1535.old') -and
-    -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log.20260916-1535.old')))
-# What the swap leaves in the bot's folder besides the code it sends (#1184).
-# The things the full run moves or takes off later are in it by the same
-# lists those use, so the two cannot drift apart.
-$owned = @(Get-ThornswoodBotOwned)
-Yes 'what the bot owns besides its code: its settings, its record, data, service, webhooks, py-libs' (
-    -not @('bot.env.json', 'thornswood-deploy.json', 'data', 'service', 'webhooks', 'py-libs' | Where-Object { $owned -notcontains $_ }).Count)
-Yes '  and the old loop''s files and the records and logs from before #1104, by the lists the full run uses' (
-    -not @(@(Get-ThornswoodBotLoopFiles) + @(Get-ThornswoodBotRecordNames) | Where-Object { $owned -notcontains $_ }).Count -and
-    @(Get-ThornswoodBotLoopFiles).Count -eq 2 -and @('bot.log', 'bot.log.1', 'bot.log.20260916-1535.old' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count -eq 3)
-Yes '  and no code: bot.py, card.py, assets and a stray sample.py are none of its own' (
-    -not @('bot.py', 'card.py', 'assets', 'sample.py', 'backfill.py' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count)
-Yes 'the log is read from data from then on' ((Get-ThornswoodBotLog $mv) -eq (Join-Path $mv 'data\bot.log'))
-$old = Join-Path $g 'old-layout'
-$null = New-Item -ItemType Directory -Force -Path $old
-[IO.File]::WriteAllText((Join-Path $old 'bot.log'), 'x')
-Yes 'and from beside the code on a box whose install is older' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
-# With both there, the one written last, because -CodeOnly leaves an empty
-# data\bot.log on every run so the path the docs name is always a file: a rule
-# that went by which files exist would put every reader on that empty one
-# while the bot wrote the other.
-$null = New-Item -ItemType Directory -Force -Path (Join-Path $old 'data')
-[IO.File]::WriteAllText((Join-Path $old 'data\bot.log'), '')
-(Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-5)
-Yes 'with both there, the one the bot is writing: the older place when that is the one written last' (
-    (Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
-(Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(5)
-Yes 'and data once the program writing it is the newer one' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'data\bot.log'))
+    # -- the records move out of the code folder --------------------------------------
+    $mv = Join-Path $g 'move-records'
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $mv 'data')
+    foreach ($n in 'joins.json', 'open-tickets.json', 'commands-synced.json', 'heartbeat.json', 'bot.log', 'bot.log.1', 'bot.log.20260916-1535.old', 'bot.py') { [IO.File]::WriteAllText((Join-Path $mv $n), ('old ' + $n)) }
+    [IO.File]::WriteAllText((Join-Path $mv 'data\heartbeat.json'), 'newer')
+    $said = @(Move-ThornswoodBotRecords $mv)
+    Yes 'joins.json, open tickets, the command stamp and the logs move into data' (
+        ((Get-Content -LiteralPath (Join-Path $mv 'data\joins.json') -Raw) -eq 'old joins.json') -and (Test-Path -LiteralPath (Join-Path $mv 'data\open-tickets.json')) -and
+        (Test-Path -LiteralPath (Join-Path $mv 'data\commands-synced.json')) -and (Test-Path -LiteralPath (Join-Path $mv 'data\bot.log')) -and (Test-Path -LiteralPath (Join-Path $mv 'data\bot.log.1')) -and
+        -not (Test-Path -LiteralPath (Join-Path $mv 'joins.json')) -and -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log')))
+    Yes 'one already in data is kept, and the old one beside the code goes' (((Get-Content -LiteralPath (Join-Path $mv 'data\heartbeat.json') -Raw) -eq 'newer') -and -not (Test-Path -LiteralPath (Join-Path $mv 'heartbeat.json')))
+    Yes 'the code is not touched' (Test-Path -LiteralPath (Join-Path $mv 'bot.py'))
+    # A log somebody renamed by hand to keep it is a log too (#1184): the swap
+    # leaves it beside the code as the bot's own, so the full run moves it into
+    # data rather than leaving it there for ever. A log is never removed.
+    Yes 'a log renamed by hand moves into data with the rest' (
+        ((Get-Content -LiteralPath (Join-Path $mv 'data\bot.log.20260916-1535.old') -Raw) -eq 'old bot.log.20260916-1535.old') -and
+        -not (Test-Path -LiteralPath (Join-Path $mv 'bot.log.20260916-1535.old')))
+    # What the swap leaves in the bot's folder besides the code it sends (#1184).
+    # The things the full run moves or takes off later are in it by the same
+    # lists those use, so the two cannot drift apart.
+    $owned = @(Get-ThornswoodBotOwned)
+    Yes 'what the bot owns besides its code: its settings, its record, data, service, webhooks, py-libs' (
+        -not @('bot.env.json', 'thornswood-deploy.json', 'data', 'service', 'webhooks', 'py-libs' | Where-Object { $owned -notcontains $_ }).Count)
+    Yes '  and the old loop''s files and the records and logs from before #1104, by the lists the full run uses' (
+        -not @(@(Get-ThornswoodBotLoopFiles) + @(Get-ThornswoodBotRecordNames) | Where-Object { $owned -notcontains $_ }).Count -and
+        @(Get-ThornswoodBotLoopFiles).Count -eq 2 -and @('bot.log', 'bot.log.1', 'bot.log.20260916-1535.old' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count -eq 3)
+    Yes '  and no code: bot.py, card.py, assets and a stray sample.py are none of its own' (
+        -not @('bot.py', 'card.py', 'assets', 'sample.py', 'backfill.py' | Where-Object { $n = $_; @($owned | Where-Object { $n -like $_ }).Count }).Count)
+    Yes 'the log is read from data from then on' ((Get-ThornswoodBotLog $mv) -eq (Join-Path $mv 'data\bot.log'))
+    $old = Join-Path $g 'old-layout'
+    $null = New-Item -ItemType Directory -Force -Path $old
+    [IO.File]::WriteAllText((Join-Path $old 'bot.log'), 'x')
+    Yes 'and from beside the code on a box whose install is older' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
+    # With both there, the one written last, because -CodeOnly leaves an empty
+    # data\bot.log on every run so the path the docs name is always a file: a rule
+    # that went by which files exist would put every reader on that empty one
+    # while the bot wrote the other.
+    $null = New-Item -ItemType Directory -Force -Path (Join-Path $old 'data')
+    [IO.File]::WriteAllText((Join-Path $old 'data\bot.log'), '')
+    (Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(-5)
+    Yes 'with both there, the one the bot is writing: the older place when that is the one written last' (
+        (Get-ThornswoodBotLog $old) -eq (Join-Path $old 'bot.log'))
+    (Get-Item -LiteralPath (Join-Path $old 'data\bot.log')).LastWriteTimeUtc = [DateTime]::UtcNow.AddMinutes(5)
+    Yes 'and data once the program writing it is the newer one' ((Get-ThornswoodBotLog $old) -eq (Join-Path $old 'data\bot.log'))
 
-# -- the data folder put right for a restart, where it has gone ------------------
-# The service opens its log before it starts python, so no data folder is no
-# service: -CodeOnly's restart makes it and grants the account Modify, as a
-# full run would, rather than stopping the bot and waiting out -Wait on a log
-# nothing could write.
-$gone = Join-Path $g 'no-data'
-$null = New-Item -ItemType Directory -Force -Path $gone
-$said = @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot')
-$x = @(Rules (Join-Path $gone 'data'))
-Yes 'a bot folder with no data folder: it is made, and the bot''s account may write it' (
-    (Test-Path -LiteralPath (Join-Path $gone 'data')) -and ($said -join ' ') -match 'made .*data' -and
-    @($x | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
-Yes 'and a file made in it is writable by the account too, which is what bot.log is' (
-    @(& { [IO.File]::WriteAllText((Join-Path $gone 'data\bot.log'), ''); Rules (Join-Path $gone 'data\bot.log') } |
-      Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
-Yes 'and with the folder there it says nothing and leaves its rules alone, since they are the full run''s' (
-    @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot').Count -eq 0 -and (Own (Join-Path $gone 'data')) -eq 1)
-$said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot (Join-Path $g 'no-watch-yet') -DocsData '' -ServerRoots @())
-Yes 'no watchdog folder yet: said, with what to run' (($said -join ' ') -match 'no-watch-yet\. Run Install-Bot\.ps1 again after Watch-Services\.ps1 -Install')
+    # -- the data folder put right for a restart, where it has gone ------------------
+    # The service opens its log before it starts python, so no data folder is no
+    # service: -CodeOnly's restart makes it and grants the account Modify, as a
+    # full run would, rather than stopping the bot and waiting out -Wait on a log
+    # nothing could write.
+    $gone = Join-Path $g 'no-data'
+    $null = New-Item -ItemType Directory -Force -Path $gone
+    $said = @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot')
+    $x = @(Rules (Join-Path $gone 'data'))
+    Yes 'a bot folder with no data folder: it is made, and the bot''s account may write it' (
+        (Test-Path -LiteralPath (Join-Path $gone 'data')) -and ($said -join ' ') -match 'made .*data' -and
+        @($x | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+    Yes 'and a file made in it is writable by the account too, which is what bot.log is' (
+        @(& { [IO.File]::WriteAllText((Join-Path $gone 'data\bot.log'), ''); Rules (Join-Path $gone 'data\bot.log') } |
+          Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1)
+    Yes 'and with the folder there it says nothing and leaves its rules alone, since they are the full run''s' (
+        @(Repair-ThornswoodBotData -Root $gone -Name 'ThornswoodBot').Count -eq 0 -and (Own (Join-Path $gone 'data')) -eq 1)
+    $said = @(Grant-ThornswoodBotAccess -Sid $sid -Root $gRoot -WatchRoot (Join-Path $g 'no-watch-yet') -DocsData '' -ServerRoots @())
+    Yes 'no watchdog folder yet: said, with what to run' (($said -join ' ') -match 'no-watch-yet\. Run Install-Bot\.ps1 again after Watch-Services\.ps1 -Install')
 
-# ========================================================== the install ===
-# Stand-ins for everything that touches the service manager, the task
-# scheduler and the process list. The compiler, the files and the ACLs are
-# real. $script:calls is the order things happened in.
-$script:calls = @()
-$script:svc = $null
-$script:task = $true
-$script:startFails = $false
-$script:procs = @()
-function Get-Service { [CmdletBinding()] param([string]$Name) $script:calls += 'Get-Service'; return $script:svc }
-function Stop-Service { [CmdletBinding()] param([string]$Name, [switch]$Force) $script:calls += ('Stop-Service ' + $Name); if ($script:svc) { $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Stopped' } } }
-function Start-Service { [CmdletBinding()] param([string]$Name) $script:calls += ('Start-Service ' + $Name); if ($script:startFails) { throw 'The service did not respond to the start request' }; $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Running' } }
-function New-Service { [CmdletBinding()] param([string]$Name, [string]$BinaryPathName, [string]$DisplayName, [string]$StartupType, [string]$Description, $Credential)
-    $script:calls += ('New-Service ' + $Name + '|' + $BinaryPathName + '|' + $DisplayName + '|' + $StartupType + '|' + [bool]$Credential)
-    $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Stopped' } }
-function sc.exe { $script:calls += ('sc ' + ($args -join ' ')); $global:LASTEXITCODE = 0; 'SUCCESS' }
-function Get-ScheduledTask { [CmdletBinding()] param([string]$TaskName) if ($script:task) { return [pscustomobject]@{ TaskName = $TaskName } } }
-function Stop-ScheduledTask { [CmdletBinding()] param([string]$TaskName) $script:calls += ('Stop-ScheduledTask ' + $TaskName) }
-function Unregister-ScheduledTask { [CmdletBinding()] param([string]$TaskName, [switch]$Confirm) $script:calls += ('Unregister-ScheduledTask ' + $TaskName); $script:task = $false }
-function Get-CimInstance { [CmdletBinding()] param([Parameter(Position = 0)][string]$ClassName, [string]$Filter)
-    if ($ClassName -eq 'Win32_Service') { return [pscustomobject]@{ State = 'Running'; StartName = 'NT SERVICE\ThornswoodBot' } }
-    return $script:procs }
-function Stop-Process { [CmdletBinding()] param([int]$Id, [switch]$Force) $script:calls += ('Stop-Process ' + $Id) }
-# The stop and wait (StopAndMove.ps1, which Install-Bot sends in front of
-# Bot-Service.ps1, #2928): opening is taking the id, and ending and waiting
-# is the stop, called in the same order Stop-Process was.
-$ThornswoodNotHeld = @()
-$ThornswoodStillRunning = @()
-function Get-ThornswoodProcessHeld([int[]]$Ids) { @($Ids | Where-Object { $_ -gt 0 -and $_ -ne $PID }) }
-function Stop-ThornswoodProcessHeld($Held) { foreach ($id in @($Held)) { $script:calls += ('Stop-Process ' + $id) } }
-function Get-ThornswoodPathHolders([string]$Path) { 'nothing' }
-function Test-ThornswoodEventSource([string]$Name) { return $false }
-function New-EventLog { [CmdletBinding()] param([string]$LogName, [string]$Source) $script:calls += ('New-EventLog ' + $LogName + ' ' + $Source) }
-function Start-Sleep { }
-
-# A python that says where its libraries are, as the real check asks it to.
-# Not under C:\Users: the check refuses any python there, rightly, because the
-# service's account cannot read another account's profile, and the temp
-# folder of whoever runs this (a person, or the runner's account on the VPS)
-# is in their profile. So the stand-ins go in a folder of their own under
-# ProgramData, removed at the end, when the scratch folder is in a profile.
-$pyRoot = Join-Path $tmp 'pyfake'
-if ($tmp -match '^[A-Za-z]:\\Users\\') {
-    $pyRoot = Join-Path $env:ProgramData ('ts-bot-service-pyfake-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-    $script:pyOutside = $pyRoot
-}
-$goodPy = Join-Path $pyRoot 'good\python.cmd'
-$userPy = Join-Path $pyRoot 'user\python.cmd'
-$failPy = Join-Path $pyRoot 'fail\python.cmd'
-foreach ($p in @($goodPy, $userPy, $failPy)) { $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) }
-[IO.File]::WriteAllText($goodPy, "@echo off`r`necho C:\Program Files\Python312\Lib\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
-[IO.File]::WriteAllText($userPy, "@echo off`r`necho C:\Users\Administrator\AppData\Roaming\Python\Python312\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
-[IO.File]::WriteAllText($failPy, "@echo off`r`necho ModuleNotFoundError: No module named 'discord'`r`nexit /b 1`r`n")
-
-Yes 'a python whose libraries are for everybody passes the check' (@(Test-ThornswoodBotPython $goodPy).Count -eq 0)
-$b = @(Test-ThornswoodBotPython $userPy)
-Yes 'a library installed for one person is refused, saying where' ($b.Count -eq 1 -and $b[0] -match 'installed for one person, at C:\\Users\\Administrator')
-$b = @(Test-ThornswoodBotPython $failPy)
-Yes 'a python that cannot import the bot''s libraries is refused' ($b.Count -eq 1 -and $b[0] -match 'cannot import discord, PIL and certifi')
-Yes 'no python at all is refused' ((@(Test-ThornswoodBotPython (Join-Path $tmp 'none\python.exe')) -join '') -match 'not found')
-if ($py -match '^[A-Za-z]:\\Users\\') {
-    Yes 'the per-person python on this machine is refused too' ((@(Test-ThornswoodBotPython $py) -join ' ') -match 'python is installed for one person')
-}
-
-function InstallBox([string]$name) {
-    $root = Join-Path $tmp $name
-    $null = New-Item -ItemType Directory -Force -Path $root
-    foreach ($f in 'run.ps1', 'roll-log.ps1', 'bot.py') { [IO.File]::WriteAllText((Join-Path $root $f), 'x') }
-    [IO.File]::WriteAllText((Join-Path $root 'bot.env.json'), '{}')
+    # ========================================================== the install ===
+    # Stand-ins for everything that touches the service manager, the task
+    # scheduler and the process list. The compiler, the files and the ACLs are
+    # real. $script:calls is the order things happened in.
     $script:calls = @()
-    $script:procs = @(
-        [pscustomobject]@{ Name = 'python.exe'; ProcessId = 101; CommandLine = 'python "' + $root + '\bot.py"' },
-        [pscustomobject]@{ Name = 'powershell.exe'; ProcessId = 102; CommandLine = 'powershell.exe -NoProfile -File "' + $root + '\run.ps1"' },
-        [pscustomobject]@{ Name = 'cmd.exe'; ProcessId = 103; CommandLine = 'cmd /c "python ""' + $root + '\bot.py"" >> ""' + $root + '\bot.log"" 2>&1"' },
-        [pscustomobject]@{ Name = 'python.exe'; ProcessId = 104; CommandLine = 'python C:\somewhere-else\tool.py' },
-        [pscustomobject]@{ Name = 'node.exe'; ProcessId = 105; CommandLine = 'node ' + $root + '\not-the-bot.js' },
-        [pscustomobject]@{ Name = 'powershell.exe'; ProcessId = $PID; CommandLine = 'powershell -File ' + $root + '\this-install.ps1' })
-    return $root
+    $script:svc = $null
+    $script:task = $true
+    $script:startFails = $false
+    $script:procs = @()
+    function Get-Service { [CmdletBinding()] param([string]$Name) $script:calls += 'Get-Service'; return $script:svc }
+    function Stop-Service { [CmdletBinding()] param([string]$Name, [switch]$Force) $script:calls += ('Stop-Service ' + $Name); if ($script:svc) { $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Stopped' } } }
+    function Start-Service { [CmdletBinding()] param([string]$Name) $script:calls += ('Start-Service ' + $Name); if ($script:startFails) { throw 'The service did not respond to the start request' }; $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Running' } }
+    function New-Service { [CmdletBinding()] param([string]$Name, [string]$BinaryPathName, [string]$DisplayName, [string]$StartupType, [string]$Description, $Credential)
+        $script:calls += ('New-Service ' + $Name + '|' + $BinaryPathName + '|' + $DisplayName + '|' + $StartupType + '|' + [bool]$Credential)
+        $script:svc = [pscustomobject]@{ Name = $Name; Status = 'Stopped' } }
+    function sc.exe { $script:calls += ('sc ' + ($args -join ' ')); $global:LASTEXITCODE = 0; 'SUCCESS' }
+    function Get-ScheduledTask { [CmdletBinding()] param([string]$TaskName) if ($script:task) { return [pscustomobject]@{ TaskName = $TaskName } } }
+    function Stop-ScheduledTask { [CmdletBinding()] param([string]$TaskName) $script:calls += ('Stop-ScheduledTask ' + $TaskName) }
+    function Unregister-ScheduledTask { [CmdletBinding()] param([string]$TaskName, [switch]$Confirm) $script:calls += ('Unregister-ScheduledTask ' + $TaskName); $script:task = $false }
+    function Get-CimInstance { [CmdletBinding()] param([Parameter(Position = 0)][string]$ClassName, [string]$Filter)
+        if ($ClassName -eq 'Win32_Service') { return [pscustomobject]@{ State = 'Running'; StartName = 'NT SERVICE\ThornswoodBot' } }
+        return $script:procs }
+    function Stop-Process { [CmdletBinding()] param([int]$Id, [switch]$Force) $script:calls += ('Stop-Process ' + $Id) }
+    # The stop and wait (StopAndMove.ps1, which Install-Bot sends in front of
+    # Bot-Service.ps1, #2928): opening is taking the id, and ending and waiting
+    # is the stop, called in the same order Stop-Process was.
+    $ThornswoodNotHeld = @()
+    $ThornswoodStillRunning = @()
+    function Get-ThornswoodProcessHeld([int[]]$Ids) { @($Ids | Where-Object { $_ -gt 0 -and $_ -ne $PID }) }
+    function Stop-ThornswoodProcessHeld($Held) { foreach ($id in @($Held)) { $script:calls += ('Stop-Process ' + $id) } }
+    function Get-ThornswoodPathHolders([string]$Path) { 'nothing' }
+    function Test-ThornswoodEventSource([string]$Name) { return $false }
+    function New-EventLog { [CmdletBinding()] param([string]$LogName, [string]$Source) $script:calls += ('New-EventLog ' + $LogName + ' ' + $Source) }
+    function Start-Sleep { }
+
+    # A python that says where its libraries are, as the real check asks it to.
+    # Not under C:\Users: the check refuses any python there, rightly, because the
+    # service's account cannot read another account's profile, and the temp
+    # folder of whoever runs this (a person, or the runner's account on the VPS)
+    # is in their profile. So the stand-ins go in a folder of their own under
+    # ProgramData, removed at the end, when the scratch folder is in a profile.
+    $pyRoot = Join-Path $tmp 'pyfake'
+    if ($tmp -match '^[A-Za-z]:\\Users\\') {
+        $pyRoot = Join-Path $env:ProgramData ('ts-bot-service-pyfake-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+        $script:pyOutside = $pyRoot
+    }
+    $goodPy = Join-Path $pyRoot 'good\python.cmd'
+    $userPy = Join-Path $pyRoot 'user\python.cmd'
+    $failPy = Join-Path $pyRoot 'fail\python.cmd'
+    foreach ($p in @($goodPy, $userPy, $failPy)) { $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $p) }
+    [IO.File]::WriteAllText($goodPy, "@echo off`r`necho C:\Program Files\Python312\Lib\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
+    [IO.File]::WriteAllText($userPy, "@echo off`r`necho C:\Users\Administrator\AppData\Roaming\Python\Python312\site-packages\discord\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\PIL\__init__.py`r`necho C:\Program Files\Python312\Lib\site-packages\certifi\cacert.pem`r`nexit /b 0`r`n")
+    [IO.File]::WriteAllText($failPy, "@echo off`r`necho ModuleNotFoundError: No module named 'discord'`r`nexit /b 1`r`n")
+
+    Yes 'a python whose libraries are for everybody passes the check' (@(Test-ThornswoodBotPython $goodPy).Count -eq 0)
+    $b = @(Test-ThornswoodBotPython $userPy)
+    Yes 'a library installed for one person is refused, saying where' ($b.Count -eq 1 -and $b[0] -match 'installed for one person, at C:\\Users\\Administrator')
+    $b = @(Test-ThornswoodBotPython $failPy)
+    Yes 'a python that cannot import the bot''s libraries is refused' ($b.Count -eq 1 -and $b[0] -match 'cannot import discord, PIL and certifi')
+    Yes 'no python at all is refused' ((@(Test-ThornswoodBotPython (Join-Path $tmp 'none\python.exe')) -join '') -match 'not found')
+    if ($py -match '^[A-Za-z]:\\Users\\') {
+        Yes 'the per-person python on this machine is refused too' ((@(Test-ThornswoodBotPython $py) -join ' ') -match 'python is installed for one person')
+    }
+
+    function InstallBox([string]$name) {
+        $root = Join-Path $tmp $name
+        $null = New-Item -ItemType Directory -Force -Path $root
+        foreach ($f in 'run.ps1', 'roll-log.ps1', 'bot.py') { [IO.File]::WriteAllText((Join-Path $root $f), 'x') }
+        [IO.File]::WriteAllText((Join-Path $root 'bot.env.json'), '{}')
+        $script:calls = @()
+        $script:procs = @(
+            [pscustomobject]@{ Name = 'python.exe'; ProcessId = 101; CommandLine = 'python "' + $root + '\bot.py"' },
+            [pscustomobject]@{ Name = 'powershell.exe'; ProcessId = 102; CommandLine = 'powershell.exe -NoProfile -File "' + $root + '\run.ps1"' },
+            [pscustomobject]@{ Name = 'cmd.exe'; ProcessId = 103; CommandLine = 'cmd /c "python ""' + $root + '\bot.py"" >> ""' + $root + '\bot.log"" 2>&1"' },
+            [pscustomobject]@{ Name = 'python.exe'; ProcessId = 104; CommandLine = 'python C:\somewhere-else\tool.py' },
+            [pscustomobject]@{ Name = 'node.exe'; ProcessId = 105; CommandLine = 'node ' + $root + '\not-the-bot.js' },
+            [pscustomobject]@{ Name = 'powershell.exe'; ProcessId = $PID; CommandLine = 'powershell -File ' + $root + '\this-install.ps1' })
+        return $root
+    }
+    function At([string]$rx) { for ($i = 0; $i -lt $script:calls.Count; $i++) { if ($script:calls[$i] -match $rx) { return $i } }; return -1 }
+
+    # -- the first time: the old loop on the box, no service ------------------------
+    $script:svc = $null; $script:task = $true; $script:startFails = $false
+    $root = InstallBox 'install-first'
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    $lines = ($res.Lines -join "`n")
+    Yes ('the first install says it worked' + $(if (-not $res.Ok) { ': ' + $lines } else { '' })) ($res.Ok)
+    Yes 'the program is built and in place, and no half-built copy is left' ((Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.exe')) -and -not (Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.new.exe')))
+    $hj = Get-Content -LiteralPath (Join-Path $root 'service\host.json') -Raw | ConvertFrom-Json
+    Yes 'host.json names the bot''s folder, its data folder and the python it checked' ($hj.root -eq $root -and $hj.data -eq (Join-Path $root 'data') -and $hj.python -eq $goodPy -and $hj.script -eq 'bot.py')
+    Yes 'the old scheduled task is stopped and removed' ((At '^Unregister-ScheduledTask Thornswood Bot$') -ge 0 -and $lines -match 'removed the old scheduled task Thornswood Bot')
+    Yes 'run.ps1 and roll-log.ps1 are gone from the bot''s folder' (-not (Test-Path -LiteralPath (Join-Path $root 'run.ps1')) -and -not (Test-Path -LiteralPath (Join-Path $root 'roll-log.ps1')) -and (Test-Path -LiteralPath (Join-Path $root 'bot.py')))
+    Yes 'the old loop''s python, powershell and cmd are stopped' ((At '^Stop-Process 101$') -ge 0 -and (At '^Stop-Process 102$') -ge 0 -and (At '^Stop-Process 103$') -ge 0)
+    Yes 'and nothing else: not another python, not node, not this install itself' ((At '^Stop-Process 104$') -lt 0 -and (At '^Stop-Process 105$') -lt 0 -and (At ('^Stop-Process ' + $PID + '$')) -lt 0)
+    $ns = @($script:calls | Where-Object { $_ -match '^New-Service ' })
+    Yes 'the service is made once, by name, starting with Windows' ($ns.Count -eq 1 -and $ns[0] -eq ('New-Service ThornswoodBot|' + (Join-Path $root 'service\ThornswoodBotService.exe') + '|Thornswood Bot|Automatic|False'))
+    Yes 'as NT SERVICE\ThornswoodBot' ((At ('^sc config ThornswoodBot binPath= ' + [regex]::Escape((Join-Path $root 'service\ThornswoodBotService.exe')) + ' start= auto obj= NT SERVICE\\ThornswoodBot$')) -ge 0)
+    Yes 'with no password anywhere, because the account has none' (@($script:calls | Where-Object { $_ -match '(?i)password' }).Count -eq 0)
+    Yes 'its own SID on its token, and one privilege, for walking folders' ((At '^sc sidtype ThornswoodBot unrestricted$') -ge 0 -and (At '^sc privs ThornswoodBot SeChangeNotifyPrivilege$') -ge 0)
+    Yes 'restarted after a minute if the program itself crashes' ((At '^sc failure ThornswoodBot reset= 3600 actions= restart/60000/restart/300000$') -ge 0)
+    Yes 'its exits go to the Application event log' ((At '^New-EventLog Application ThornswoodBot$') -ge 0)
+    Yes 'the bot''s account is granted its data folder before it starts, and only read on its code' (@(Rules (Join-Path $root 'data') | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1 -and @(Rules $root | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 0)
+    $first = At '^Stop-|^Unregister-'
+    Yes 'started by name, last' ((At '^Start-Service ThornswoodBot$') -eq ($script:calls.Count - 1))
+    Yes 'nothing on the box was stopped before the program had built' ($lines.IndexOf('built the service program') -ge 0 -and $lines.IndexOf('built the service program') -lt $lines.IndexOf('removed the old scheduled task'))
+    Yes 'and the read-back says what it runs as' ($lines -match 'service ThornswoodBot: Running, as NT SERVICE\\ThornswoodBot')
+
+    # -- again, with the service there and running ----------------------------------
+    $root2 = $root
+    $script:calls = @()
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root2 -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    Yes 'a second install works too' ($res.Ok)
+    Yes 'it stops the running service by name first, then replaces the program' ((At '^Stop-Service ThornswoodBot$') -ge 0 -and (At '^Stop-Service ThornswoodBot$') -lt (At '^sc config'))
+    Yes 'and does not make the service twice' (@($script:calls | Where-Object { $_ -match '^New-Service ' }).Count -eq 0)
+    Yes 'with no old task left, nothing is unregistered' ((At '^Unregister-ScheduledTask') -lt 0)
+
+    # -- what stops it before anything is touched ------------------------------------
+    $script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }; $script:task = $true
+    $root = InstallBox 'install-badpython'
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $userPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    Yes 'a python the account cannot read stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'CANNOT SWITCH: .*installed for one person' -and ($res.Lines -join ' ') -match 'Nothing was stopped or changed' -and
+        (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
+    $root = InstallBox 'install-badsource'
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $bad -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    Yes 'a program that does not build stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'DID NOT BUILD\. Nothing was stopped or changed' -and ($res.Lines -join ' ') -match 'error CS' -and
+        (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root (Join-Path $tmp 'has space') -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    Yes 'a bot folder with a space in its path is refused, since the program is registered bare' (-not $res.Ok -and ($res.Lines -join ' ') -match 'space in its path')
+    $script:startFails = $true
+    $root = InstallBox 'install-nostart'
+    $res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
+    Yes 'a service that will not start is said, not passed over' (-not $res.Ok -and ($res.Lines -join ' ') -match 'THE SERVICE DID NOT START: The service did not respond')
+    $script:startFails = $false
+
+    # -- -CodeOnly's restart ------------------------------------------------------------
+    $script:svc = $null
+    $script:calls = @()
+    Yes 'with no service, the restart says so by returning nothing, and touches nothing' ($null -eq (Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root) -and (At '^Stop-|^Start-') -lt 0)
+    $script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }
+    $root = InstallBox 'restart'
+    $out = @(Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root)
+    $s1 = At '^Stop-Service ThornswoodBot$'; $s2 = At '^Stop-Process 101$'; $s3 = At '^Start-Service ThornswoodBot$'
+    Yes 'the restart is: stop by name, sweep for a copy started by hand, start by name' ($s1 -ge 0 -and $s2 -gt $s1 -and $s3 -gt $s2)
+    Yes 'and says each' (($out -join ' ') -match 'stopped the service ThornswoodBot' -and ($out -join ' ') -match 'stopped a copy of the bot no service started, pid 101' -and ($out -join ' ') -match 'started the service ThornswoodBot')
+} else {
+    Write-Host 'SKIP  the grants (folder ACLs by SID) and the install (a Windows service built with the .NET Framework compiler): only Windows has them'
 }
-function At([string]$rx) { for ($i = 0; $i -lt $script:calls.Count; $i++) { if ($script:calls[$i] -match $rx) { return $i } }; return -1 }
-
-# -- the first time: the old loop on the box, no service ------------------------
-$script:svc = $null; $script:task = $true; $script:startFails = $false
-$root = InstallBox 'install-first'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-$lines = ($res.Lines -join "`n")
-Yes ('the first install says it worked' + $(if (-not $res.Ok) { ': ' + $lines } else { '' })) ($res.Ok)
-Yes 'the program is built and in place, and no half-built copy is left' ((Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.exe')) -and -not (Test-Path -LiteralPath (Join-Path $root 'service\ThornswoodBotService.new.exe')))
-$hj = Get-Content -LiteralPath (Join-Path $root 'service\host.json') -Raw | ConvertFrom-Json
-Yes 'host.json names the bot''s folder, its data folder and the python it checked' ($hj.root -eq $root -and $hj.data -eq (Join-Path $root 'data') -and $hj.python -eq $goodPy -and $hj.script -eq 'bot.py')
-Yes 'the old scheduled task is stopped and removed' ((At '^Unregister-ScheduledTask Thornswood Bot$') -ge 0 -and $lines -match 'removed the old scheduled task Thornswood Bot')
-Yes 'run.ps1 and roll-log.ps1 are gone from the bot''s folder' (-not (Test-Path -LiteralPath (Join-Path $root 'run.ps1')) -and -not (Test-Path -LiteralPath (Join-Path $root 'roll-log.ps1')) -and (Test-Path -LiteralPath (Join-Path $root 'bot.py')))
-Yes 'the old loop''s python, powershell and cmd are stopped' ((At '^Stop-Process 101$') -ge 0 -and (At '^Stop-Process 102$') -ge 0 -and (At '^Stop-Process 103$') -ge 0)
-Yes 'and nothing else: not another python, not node, not this install itself' ((At '^Stop-Process 104$') -lt 0 -and (At '^Stop-Process 105$') -lt 0 -and (At ('^Stop-Process ' + $PID + '$')) -lt 0)
-$ns = @($script:calls | Where-Object { $_ -match '^New-Service ' })
-Yes 'the service is made once, by name, starting with Windows' ($ns.Count -eq 1 -and $ns[0] -eq ('New-Service ThornswoodBot|' + (Join-Path $root 'service\ThornswoodBotService.exe') + '|Thornswood Bot|Automatic|False'))
-Yes 'as NT SERVICE\ThornswoodBot' ((At ('^sc config ThornswoodBot binPath= ' + [regex]::Escape((Join-Path $root 'service\ThornswoodBotService.exe')) + ' start= auto obj= NT SERVICE\\ThornswoodBot$')) -ge 0)
-Yes 'with no password anywhere, because the account has none' (@($script:calls | Where-Object { $_ -match '(?i)password' }).Count -eq 0)
-Yes 'its own SID on its token, and one privilege, for walking folders' ((At '^sc sidtype ThornswoodBot unrestricted$') -ge 0 -and (At '^sc privs ThornswoodBot SeChangeNotifyPrivilege$') -ge 0)
-Yes 'restarted after a minute if the program itself crashes' ((At '^sc failure ThornswoodBot reset= 3600 actions= restart/60000/restart/300000$') -ge 0)
-Yes 'its exits go to the Application event log' ((At '^New-EventLog Application ThornswoodBot$') -ge 0)
-Yes 'the bot''s account is granted its data folder before it starts, and only read on its code' (@(Rules (Join-Path $root 'data') | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 1 -and @(Rules $root | Where-Object { "$($_.FileSystemRights)" -match 'Modify' }).Count -eq 0)
-$first = At '^Stop-|^Unregister-'
-Yes 'started by name, last' ((At '^Start-Service ThornswoodBot$') -eq ($script:calls.Count - 1))
-Yes 'nothing on the box was stopped before the program had built' ($lines.IndexOf('built the service program') -ge 0 -and $lines.IndexOf('built the service program') -lt $lines.IndexOf('removed the old scheduled task'))
-Yes 'and the read-back says what it runs as' ($lines -match 'service ThornswoodBot: Running, as NT SERVICE\\ThornswoodBot')
-
-# -- again, with the service there and running ----------------------------------
-$root2 = $root
-$script:calls = @()
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root2 -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-Yes 'a second install works too' ($res.Ok)
-Yes 'it stops the running service by name first, then replaces the program' ((At '^Stop-Service ThornswoodBot$') -ge 0 -and (At '^Stop-Service ThornswoodBot$') -lt (At '^sc config'))
-Yes 'and does not make the service twice' (@($script:calls | Where-Object { $_ -match '^New-Service ' }).Count -eq 0)
-Yes 'with no old task left, nothing is unregistered' ((At '^Unregister-ScheduledTask') -lt 0)
-
-# -- what stops it before anything is touched ------------------------------------
-$script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }; $script:task = $true
-$root = InstallBox 'install-badpython'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $userPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-Yes 'a python the account cannot read stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'CANNOT SWITCH: .*installed for one person' -and ($res.Lines -join ' ') -match 'Nothing was stopped or changed' -and
-    (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
-$root = InstallBox 'install-badsource'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $bad -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-Yes 'a program that does not build stops it, with nothing stopped or changed' (-not $res.Ok -and ($res.Lines -join ' ') -match 'DID NOT BUILD\. Nothing was stopped or changed' -and ($res.Lines -join ' ') -match 'error CS' -and
-    (At '^Stop-|^Unregister-|^New-Service|^sc |^Start-Service') -lt 0 -and (Test-Path -LiteralPath (Join-Path $root 'run.ps1')))
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root (Join-Path $tmp 'has space') -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-Yes 'a bot folder with a space in its path is refused, since the program is registered bare' (-not $res.Ok -and ($res.Lines -join ' ') -match 'space in its path')
-$script:startFails = $true
-$root = InstallBox 'install-nostart'
-$res = Install-ThornswoodBotService -Name 'ThornswoodBot' -Root $root -Python $goodPy -Source $svcSrc -Task 'Thornswood Bot' -WatchRoot '' -DocsData '' -ServerRoots @()
-Yes 'a service that will not start is said, not passed over' (-not $res.Ok -and ($res.Lines -join ' ') -match 'THE SERVICE DID NOT START: The service did not respond')
-$script:startFails = $false
-
-# -- -CodeOnly's restart ------------------------------------------------------------
-$script:svc = $null
-$script:calls = @()
-Yes 'with no service, the restart says so by returning nothing, and touches nothing' ($null -eq (Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root) -and (At '^Stop-|^Start-') -lt 0)
-$script:svc = [pscustomobject]@{ Name = 'ThornswoodBot'; Status = 'Running' }
-$root = InstallBox 'restart'
-$out = @(Restart-ThornswoodBotService -Name 'ThornswoodBot' -Root $root)
-$s1 = At '^Stop-Service ThornswoodBot$'; $s2 = At '^Stop-Process 101$'; $s3 = At '^Start-Service ThornswoodBot$'
-Yes 'the restart is: stop by name, sweep for a copy started by hand, start by name' ($s1 -ge 0 -and $s2 -gt $s1 -and $s3 -gt $s2)
-Yes 'and says each' (($out -join ' ') -match 'stopped the service ThornswoodBot' -and ($out -join ' ') -match 'stopped a copy of the bot no service started, pid 101' -and ($out -join ' ') -match 'started the service ThornswoodBot')
 }
 catch {
     Yes ('the harness ran to the end: ' + $_.Exception.Message + ' at ' + $_.InvocationInfo.PositionMessage) $false
