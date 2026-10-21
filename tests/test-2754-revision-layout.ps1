@@ -58,7 +58,8 @@ $repo = Split-Path -Parent $Here
 # A path written the Windows way, under a folder on this machine.
 function P([string]$root, [string]$rel) { return (Join-Path $root ($rel.Replace('\', [IO.Path]::DirectorySeparatorChar))) }
 $script_ = P $repo 'scripts\release\Install-NexusRevision.ps1'
-$win = -not ($PSVersionTable.PSVersion.Major -ge 6 -and -not $IsWindows)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$win = $OnWindows
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
