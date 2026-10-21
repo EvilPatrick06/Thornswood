@@ -29,9 +29,10 @@
 
 [CmdletBinding()]
 param(
-  # C:\Thornswood\Game on most machines; Find-Root below retargets when the
-  # launcher is on another drive. -Game and -Vortex still win.
-  [string] $Game   = 'C:\Thornswood\Game',
+  # Under the launcher install, which Where.ps1 Install finds (C:\Thornswood
+  # on most machines, another drive's when the launcher is there, #3003).
+  # -Game and -Vortex still win.
+  [string] $Game   = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game'),
   [string] $Vps    = '',
   [string] $User   = '',
   [switch] $SkipServer,
@@ -41,21 +42,6 @@ param(
   [switch] $Vortex
 )
 
-# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Game and
-# -Vortex still win; this only fills the default when neither was passed, so a
-# machine whose launcher lives on another drive is not stuck on C:\Thornswood.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
-if (-not $Vortex -and -not $PSBoundParameters.ContainsKey('Game')) {
-  $Game = Join-Path (Find-Root) 'Game'
-}
 if ($Vortex) {
   $roots = @()
   # Either key may be missing (Steam writes one or the other), so each is

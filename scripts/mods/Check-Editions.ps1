@@ -49,16 +49,11 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 
-# Where the game and the list are, unless told otherwise. The same Find-Root
-# shape the other scripts use, so a second developer on another drive is found.
+# Where the game and the list are, unless told otherwise: under the launcher
+# install, which Where.ps1 Install finds (#3003), so a second developer on
+# another drive is found.
 if (-not $Data -or -not $Plugins) {
-  $root = 'C:\Thornswood'
-  if (-not (Test-Path -LiteralPath (Join-Path $root 'Launcher\Thornswood.exe'))) {
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-      $cand = Join-Path $d.Root 'Thornswood'
-      if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { $root = $cand; break }
-    }
-  }
+  $root = [string](& (Join-Path $Here '..\release\Where.ps1') Install)
   if (-not $Data)    { $Data    = Join-Path $root 'Game\Data' }
   if (-not $Plugins) { $Plugins = Join-Path $root 'Profile\LocalAppData\plugins.txt' }
 }
