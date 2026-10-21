@@ -59,7 +59,6 @@ function yes(what, cond) {
 }
 const EMDASH = String.fromCharCode(0x2014);
 const fair = (s) => typeof s === 'string' && s.length > 0 && s.indexOf(EMDASH) < 0 && !/\bplayers?\b/i.test(s);
-const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 // ------------------------------------------------------------- 1. the source --
 console.log('the source:');
@@ -266,7 +265,7 @@ const refused = (r) => r.status === 403 && r.j.why === 'cross-site' && fair(r.j.
     r = await request(port, 'POST', '/api/staff/pk', { cookie: admin, 'content-type': 'text/plain', origin: 'https://evil.example' }, formBody);
     yes('a text/plain form from another site that would parse as JSON is refused', refused(r));
     yes('  and the character is not PK\'d', !read(A.dir, 'data/pk.json', {})['2002']);
-    await sleep(300);
+    // The site writes site.log before it answers the 403 (#3060).
     const log = text(A.dir, 'site.log') || '';
     yes('site.log says what was refused and where it came from',
         /refused a POST to \/api\/staff\/pk from another site \(origin: https:\/\/evil\.example\)/.test(log) &&
@@ -343,9 +342,12 @@ const refused = (r) => r.status === 403 && r.j.why === 'cross-site' && fair(r.j.
   } catch (e) {
     yes('the harness ran to the end: ' + (e && e.stack || e), false);
   } finally {
-    if (a) a.srv.kill();
-    if (b) b.srv.kill();
-    await sleep(200);
+    // Each site has let go of its folder when it has closed, not after a guess.
+    await Promise.all([a, b].filter(Boolean).map((s) => new Promise((ok) => {
+      if (s.srv.exitCode !== null || s.srv.signalCode !== null) { ok(); return; }
+      s.srv.once('close', ok);
+      s.srv.kill();
+    })));
     for (const d of [A.dir, B.dir]) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) { } }
   }
   console.log('\n' + pass + ' passed, ' + fail + ' failed');
