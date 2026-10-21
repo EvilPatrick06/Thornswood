@@ -204,16 +204,31 @@ function Remote($text) {
 }
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
+# The read asks the box what is on the game port with Get-NetUDPEndpoint, a
+# Windows cmdlet. Off Windows the far side gets one of the same name that
+# lists the same thing, the UDP listeners, from .NET, so what it answers is
+# still this machine's own ports.
+$udpStandIn = ''
 if ($OnWindows) { $winPs = Get-WindowsPowerShell }
 else {
     $winPs = (Get-Process -Id $PID).Path
     Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+    Write-Host 'NOTE  and Get-NetUDPEndpoint, which only Windows has, is a stand-in there that lists the UDP listeners through .NET'
+    $udpStandIn = @'
+function Get-NetUDPEndpoint {
+  foreach ($e in [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveUdpListeners()) {
+    [pscustomobject]@{ LocalAddress = [string]$e.Address; LocalPort = $e.Port }
+  }
+}
+
+'@
 }
 function RunHere($text) {
     # The same hop the real Remote makes, base64 of UTF-16 into -EncodedCommand,
     # without the ssh in front of it. Continue, so an error the far end prints
     # comes back as a line, the way ssh hands it back, rather than stopping here.
     $ErrorActionPreference = 'Continue'
+    $text = $udpStandIn + $text
     $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
     return @(& $winPs -NoProfile -NonInteractive -EncodedCommand $e 2>&1 | ForEach-Object { [string]$_ })
 }

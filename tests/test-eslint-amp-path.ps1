@@ -19,11 +19,11 @@
   working folder both under a '&' folder, then again under a plain folder.
   Each run must report the finding and must not crash. Offline: npm is
   replaced by a function that copies an already-installed eslint 9.39.5 from
-  -EslintCache (default %TEMP%\herald-lint). Without that cache it says SKIP
+  -EslintCache (default herald-lint in the temp folder, %TEMP% on Windows). Without that cache it says SKIP
   and exits 2.
 #>
 [CmdletBinding()]
-param([string]$EslintCache = (Join-Path $env:TEMP 'herald-lint'))
+param([string]$EslintCache = (Join-Path ([IO.Path]::GetTempPath()) 'herald-lint'))
 
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -72,7 +72,7 @@ function RunFrom([string]$base, [string]$label) {
     if ($out -notmatch 'no-unreachable') { Write-Host (($out.Trim() -split "`n" | Select-Object -First 6) -join "`n") }
 }
 
-$work = Join-Path $env:TEMP ('eslint-amp-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$work = Join-Path ([IO.Path]::GetTempPath()) ('eslint-amp-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 try {
     RunFrom (Join-Path $work 'Temps&Worktrees') "'&' path"
     RunFrom (Join-Path $work 'plain') 'plain path'
