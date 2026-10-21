@@ -172,7 +172,7 @@ try {
   const stop = python([TOOL, '--data', dir, '--masters', noGame]);
   yes('4 a copy with a kind of record no row names: the tool stops',
       !!stop && stop.status === 1 && /STOP\. 1 record\(s\) the plugin would hold are named by no row of CONTENTS/.test(stop.stdout));
-  yes('4 and says which record', !!stop && /\n  ACTI ThornswoodActivatorSkillManual\n/.test(stop.stdout));
+  yes('4 and says which record', !!stop && /^  ACTI ThornswoodActivatorSkillManual\r?$/m.test(stop.stdout));
   if (stop && stop.status !== 1) { console.log(stop.stdout + stop.stderr); }
   yes('4 and writes nothing', fs.readFileSync(copy).equals(planted));
 } finally {
