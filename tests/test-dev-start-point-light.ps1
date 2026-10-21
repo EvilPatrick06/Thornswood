@@ -18,12 +18,17 @@
   and run in Windows PowerShell, what sshd runs on the box, against a
   server-settings.json in a temp folder. Nothing connects to anything.
 
-  The last case is the measured one, and runs where this machine has the build
-  the dev server runs (THORNSWOOD_DEV_SETTINGS names its server-settings.json;
-  the fork build it named by default, claude-1005-skymp, no longer exists)
-  and the game folder whose headers say which plugins are light
-  (C:\Thornswood\Game\Data);
-  elsewhere it says SKIP.
+  The last case is the measured one: the dev server's own order and which of
+  its plugins are light, read off the box on 20 Oct (#2924) into
+  tests\fixtures\dev-load-order-2924.json, 103 plugins, 55 of them light,
+  Skyrim Unbound.esp 94th in the list and 45th among the full plugins, the
+  same places as on 5 Oct. It runs on every machine. Until #2924 it read a
+  server-settings.json in a fork worktree (claude-1005-skymp) and the headers
+  in C:\Thornswood\Game\Data, and once that worktree was removed it said
+  SKIP everywhere: the order is the box's and the plugins it loads are on the
+  box, so neither belongs to a checkout or a game folder. The record is what
+  was measured and is not kept in step with the box; whether the dev server's
+  start point is right now is Check-Chargen.ps1 -From dev's question.
 #>
 [CmdletBinding()]
 param()
@@ -118,20 +123,18 @@ try {
     Yes 'a plugin this machine cannot read leaves the start point alone' ($r.start -eq '0x0919BAD4')
     Yes '  and says which' ($r.said -match 'cannot tell whether mystery\.esp is light, so the start point is left alone')
 
-    # The measured case: the order the dev server runs, its headers from the game folder.
-    $devSettings = [string]$env:THORNSWOOD_DEV_SETTINGS
-    $data = 'C:\Thornswood\Game\Data'
-    if ($devSettings -and (Test-Path -LiteralPath $devSettings) -and (Test-Path -LiteralPath $data)) {
-        $names = @((Get-Content -LiteralPath $devSettings -Raw | ConvertFrom-Json).loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
-        $real = @{}
-        foreach ($n in $names) { $f = Join-Path $data $n; if (Test-Path -LiteralPath $f) { $real[$n] = Test-ThornswoodPluginLight $f } }
-        $listAt = [Array]::IndexOf([string[]]$names, 'Skyrim Unbound.esp')
-        Write-Host ("      the dev order: {0} plugins, {1} light, Unbound {2} in the list" -f $names.Count, @($real.Values | Where-Object { $_ }).Count, $listAt)
-        $r = Run-Block (Settings $names '0x5E19BAD4') $real $true
-        Yes ('the dev server''s own order: 0x5E19BAD4, as the 10:01 PM deploy wrote it, moves to 0x2D19BAD4 (' + $r.start + ')') ($r.start -eq '0x2D19BAD4')
-    } else {
-        Write-Host 'SKIP  the dev server''s own order: no build or game folder here'
-    }
+    # The measured case: the order the dev server runs and its light plugins,
+    # as read off the box (the header says where and when).
+    $measured = Get-Content -LiteralPath (Join-Path $here 'fixtures\dev-load-order-2924.json') -Raw | ConvertFrom-Json
+    $names = [string[]]@($measured.plugins | ForEach-Object { [string]$_.name })
+    $real = @{}
+    foreach ($m in @($measured.plugins)) { $real[[string]$m.name] = [bool]$m.light }
+    $listAt = [Array]::IndexOf($names, 'Skyrim Unbound.esp')
+    Yes ('the record holds the dev order: {0} plugins, {1} light, Skyrim Unbound.esp {2} in the list' -f $names.Count, @($real.Values | Where-Object { $_ }).Count, $listAt) (
+        $names.Count -eq 103 -and @($real.Values | Where-Object { $_ }).Count -eq 55 -and $listAt -eq 94 -and $real.Count -eq $names.Count)
+    $r = Run-Block (Settings $names ('0x{0:X2}19BAD4' -f $listAt)) $real $true
+    Yes ('the dev server''s own order: 0x5E19BAD4, as the 10:01 PM deploy wrote it, moves to 0x2D19BAD4, the start point the box had (' + $r.start + ')') (
+        $r.start -eq '0x2D19BAD4' -and $r.start -eq [string]$measured.startPoint)
 } finally {
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
