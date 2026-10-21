@@ -1216,32 +1216,26 @@ $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -
 # reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
 $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 
-# And from here, the shape Publish-Server.ps1 uses. The box answering itself
-# on 127.0.0.1 is not the same as it answering the rest of the world; this is
-# the one a firewall rule shows up in.
+# And from here, the shape Publish-Server.ps1 uses: ONE try (#2975). The box
+# answering itself on 127.0.0.1 is the same socket the rest of the world
+# reaches, behind standing firewall rules, so nothing is left to wait for
+# (Vps.ps1 "from outside" has the measurements); this is the try a firewall
+# rule shows up in. Until 21 Oct 2026 it tried up to 10 times two seconds
+# apart. The witness is the other server's resources port, so a machine that
+# reaches no raw port on the box is told apart from a port that is shut.
 $port = if ($noBuild) { $livePort } else { [int]$settings.port }
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
-# A connect that throws (a name that does not resolve, say) is said in the
-# FAIL line, so that line names its cause and not only the port.
-$seen = $false
-$connectWhy = ''
-for ($i = 0; $i -lt 10; $i++) {
-  $c = New-Object Net.Sockets.TcpClient
-  try {
-    $null = $c.BeginConnect($Vps, $resPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
-    $seen = $c.Connected
-  } catch { $connectWhy = $_.Exception.Message }
-  finally { $c.Close() }
-  if ($seen) { break }
-  Start-Sleep -Seconds 2
-}
+$witness = if ($resPort -eq 3000) { 7788 } else { 3000 }
+$outside = Test-ThornswoodFromOutside $Vps $resPort $witness
 Write-Host ''
-if ($seen) {
+if ($outside.Answered) {
   Write-Host ("  PASS. The server is up at {0}:{1}, resources on {2}, from here as well." -f $Vps, $port, $resPort) -ForegroundColor Green
+} elseif ($outside.NotKnown) {
+  Write-Host ("  PASS on the box. Whether {0}:{1} answers from outside is not known: {2}." -f $Vps, $resPort, $outside.NotKnown) -ForegroundColor Yellow
 } else {
-  Write-Host ("  FAIL. The box says the server is up, and {0}:{1} does not answer from here." -f $Vps, $resPort) -ForegroundColor Red
-  if ($connectWhy) { Write-Host ("  The last try to connect said: {0}" -f $connectWhy) -ForegroundColor Red }
-  Write-Host '  The new files stay in place: this is the network or the firewall, and' -ForegroundColor Red
-  Write-Host '  putting the old files back would not change it.' -ForegroundColor Red
+  Write-Host ("  FAIL. The box says the server is up, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $Vps, $resPort, $outside.Said, $witness) -ForegroundColor Red
+  Write-Host '  The new files stay in place: this is the box''s inbound rule for the port, or' -ForegroundColor Red
+  Write-Host '  something between, and putting the old files back would not change it:' -ForegroundColor Red
+  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
   exit 1
 }

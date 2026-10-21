@@ -794,7 +794,8 @@ Head 'Checking from here'
   the active store when it returned, and connections from outside to 7789
   came in 0.3 s after it, with no rule before that dropped. The try gets 5 s
   so TCP's own resends of a lost SYN (at 1 s and 3 s) are inside it; a
-  connection from outside took 0.1 s.
+  connection from outside took 0.1 s. The try and the witness below are
+  Vps.ps1's "from outside" (#2975), shared with the server scripts.
 
   A port that is silent is only shut if this machine reaches the box's raw
   ports at all. A cloud thread's container reaches nothing but HTTPS, through
@@ -804,33 +805,13 @@ Head 'Checking from here'
   everybody, so it is asked the same way, and when it is silent too the
   voice port was not measured from here, and this says so.
 #>
-function TryPort([int]$p) {
-    $c = New-Object Net.Sockets.TcpClient
-    try {
-        $ar = $c.BeginConnect($VpsHost, $p, $null, $null)
-        if (-not $ar.AsyncWaitHandle.WaitOne(5000)) { return 'silent for 5 s' }
-        $c.EndConnect($ar)
-        return 'answered'
-    } catch {
-        # A try that throws (a name that does not resolve) has not looked,
-        # so it is said, and not taken for a port that is shut. A refusal is
-        # an answer from the box: nothing takes connections there.
-        $e = $_.Exception
-        while ($e.InnerException) { $e = $e.InnerException }
-        if ($e -is [Net.Sockets.SocketException] -and $e.SocketErrorCode -eq 'ConnectionRefused') { return 'refused' }
-        return 'not tried: ' + $e.Message
-    } finally { $c.Close() }
-}
-
-$voiceTry = TryPort $Port
-$reachable = $voiceTry -eq 'answered'
-$reachWhy = ''
-if ($voiceTry -like 'not tried:*') { $reachWhy = $voiceTry.Substring(11) }
-elseif (-not $reachable) {
-    $resPort = $(if ($voiceChannel -eq 'dev') { 7788 } else { 3000 })
-    $resTry = TryPort $resPort
-    if ($resTry -ne 'answered') { $reachWhy = "this machine reaches no raw port on the box: the game server's $resPort, which answers everybody, was $resTry as well" }
-}
+# Vps.ps1 "from outside" (#2975) is the one try, shared with Publish-Server
+# and Deploy-Server.
+$resPort = $(if ($voiceChannel -eq 'dev') { 7788 } else { 3000 })
+$outside = Test-ThornswoodFromOutside $VpsHost $Port $resPort
+$voiceTry = $outside.Said
+$reachable = $outside.Answered
+$reachWhy = $outside.NotKnown
 
 Write-Host ''
 if ($Bind -eq '127.0.0.1') {
