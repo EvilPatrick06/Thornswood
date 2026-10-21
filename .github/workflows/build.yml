@@ -606,6 +606,15 @@ jobs:
           # real server folders, and Set-TimeWait.ps1 against a fake ssh. The
           # box restarts only while nobody is on either server, and never
           # while a count cannot be read. A few seconds.
+          # Issue #2754: tests\test-2754-revision-layout.ps1 drives
+          # Install-NexusRevision.ps1, the collection layout without Vortex,
+          # against the same stand-in with a made-up collection: the Steam and
+          # Vortex folder refusals, a kind it does not do, the md5 refusal, the
+          # cache, and with 7-Zip the layout and its record. Since #2969 it
+          # also holds what Windows does with names (letter case, a \ inside
+          # a zip entry), and Compare-NexusLayout.ps1 against a record and a
+          # made-up Vortex deployment; off Windows it runs record-only. Under
+          # a minute.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -901,11 +910,11 @@ jobs:
                  'test-watch-outside.ps1',
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
+                 'test-nightly-harnesses.ps1', 'test-capture-443.ps1',
                  'test-prove-secret.ps1',
                  'test-time-wait.ps1',
                  'test-mod-menus.js',
-                 'test-nightly-harnesses.ps1',
-                 'test-capture-443.ps1'
+                 'test-2754-revision-layout.ps1'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
