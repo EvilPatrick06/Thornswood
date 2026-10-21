@@ -391,7 +391,8 @@ whether the live server runs the file in this repository, by hash.
 
 ## Tests that read it
 
-CI runs every `tests\test-*` harness (`.github/workflows/build.yml:110-119`).
+The build check runs every `tests\test-*.js` and `tests\test-*.ps1` harness
+that `tests\gate-excluded.txt` does not name (`scripts\dev\Gate-Harnesses.ps1`).
 These read `gamemode.js`, most by running one block against a stubbed `mp`.
 
 | Area | Tests |

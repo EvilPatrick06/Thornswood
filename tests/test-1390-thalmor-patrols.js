@@ -460,9 +460,8 @@ yes('N3 the keeper reads the world stage register through worldStage() and stage
 
 yes('N1 the keeper sets no timer and adds no command', !/setTimeout|setInterval|onChat|registerCommand|'\/[a-z]+/.test(KEEPER));
 yes('N2 the keeper does not use the commanded marker', !/thornswoodNpcCommanded/.test(KEEPER));
-const wf = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build.yml'), 'utf8');
-const wp = fs.readFileSync(path.join(ROOT, '.github', 'workflows', 'build-pr.yml'), 'utf8');
-yes('W1 this harness runs in build.yml and build-pr.yml', wf.includes("'test-1390-thalmor-patrols.js'") && wp.includes("'test-1390-thalmor-patrols.js'"));
+const gx = fs.readFileSync(path.join(ROOT, 'tests', 'gate-excluded.txt'), 'utf8');
+yes('W1 this harness is on the build gate (not in tests/gate-excluded.txt, #3009)', !/^test-1390-thalmor-patrols\.js\s/m.test(gx));
 const served = fs.readFileSync(path.join(ROOT, 'tests', 'test-2582-nothing-personal-served.js'), 'utf8');
 yes('W2 thalmor-patrols.json is on the list of shipped data that names nobody', served.includes("'thalmor-patrols.json'"));
 const page = fs.readFileSync(path.join(ROOT, 'docs', 'systems', 'thalmor.md'), 'utf8').replace(/\s+/g, ' ');
