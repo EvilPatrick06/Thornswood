@@ -8,8 +8,15 @@
 // compiles launcher code with the compiler and the C# version the build uses,
 // not the in-box .NET Framework csc, which stops at C# 5.
 //
-//   const { csc, langVersion } = require('./launcher-csc');
-//   csc is null on a machine without the Build Tools.
+//   const { onWindows, csc, langVersion } = require('./launcher-csc');
+//   csc is null on a machine without the Build Tools, and off Windows.
+//
+// The Build Tools, and so the compiler, are only on Windows, the way
+// tests\Launcher-Csc.ps1 has it since #2982. A harness asks onWindows first:
+// off Windows it says SKIP for the compile and checks the rest; on Windows a
+// missing csc is a failure, as before. Without that, a harness on Linux
+// looked for vswhere, found none, and failed "the Build Tools csc is on this
+// machine" over something no Linux machine can have (#3005).
 
 const fs = require('fs');
 const path = require('path');
@@ -34,4 +41,6 @@ const proj = fs.readFileSync(path.join(__dirname, '..', 'launcher', 'app', 'Thor
 const m = /<LangVersion>([^<]+)<\/LangVersion>/.exec(proj);
 if (!m) throw new Error('launcher\\app\\Thornswood.csproj names no LangVersion, so the harnesses cannot compile at the version the build does.');
 
-module.exports = { csc: findCsc(), langVersion: m[1].trim() };
+const onWindows = process.platform === 'win32';
+
+module.exports = { onWindows: onWindows, csc: onWindows ? findCsc() : null, langVersion: m[1].trim() };
