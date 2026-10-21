@@ -340,8 +340,8 @@ yes('W4 no long dash in the list', words.every((w) => w.indexOf('\u2014') < 0 &&
 const banned = ['pl', 'ayer'].join('');
 yes('W5 no word the house style keeps out', words.every((w) => !new RegExp('\\b' + banned + 's?\\b', 'i').test(w)) &&
   !new RegExp('\\b' + banned + 's?\\b', 'i').test(src));
-const flow = read(path.join(REPO_DIR, '.github', 'workflows', 'build.yml'));
-yes('W6 build.yml runs this harness', flow.indexOf("'test-2675-hair-dye.js'") >= 0);
+const gx = read(path.join(REPO_DIR, 'tests', 'gate-excluded.txt'));
+yes('W6 build.yml runs this harness (it is not in tests/gate-excluded.txt, #3009)', !/^test-2675-hair-dye\.js\s/m.test(gx));
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed, ' + skip + ' skipped');

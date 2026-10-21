@@ -11,14 +11,17 @@ servers' manifests over plain HTTP unless given `-Offline`). The nightly checks 
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
-A few of them run on every pull request as well, in the build check
-(`.github/workflows/build.yml`), because each one's failure once sat on main
-unseen: `test-ownership.js` (issue #752, a secret file reached main with no
-row on `docs\OWNERSHIP.md`), and the list in its step "Run the harnesses that
-went red unseen" (issues #875, #454 and #1088, the last three being the VPS
-address kept in one place and deploys that are the same bytes for the same
-commit). Each is under a minute. The rest are minutes together, which is why
-they are nightly.
+Most of them run on every pull request as well, in the build check
+(`.github/workflows/build.yml`, the step "Run the gate harnesses"): every
+`test-*.js` and `test-*.ps1` here that `gate-excluded.txt` does not name, as
+`scripts\dev\Gate-Harnesses.ps1` lists them when the build runs (issue
+#3009). A new harness is on that gate the moment it is in this folder, and
+touches no shared line; say in its header why it exists. To keep one off the
+gate, add a line to `gate-excluded.txt`, `name  reason`, in name order. A
+harness build.yml runs in a step of its own (`test-ownership.js`, issue #752)
+has a line there too, "own step in build.yml", so the gate does not run it
+twice. The "not sorted yet" lines are minutes together, which is why they
+come onto the gate a few at a time.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.

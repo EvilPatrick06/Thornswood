@@ -354,8 +354,7 @@ const B1 = 'b1:Skyrim.esm';
   const pm = read('docs/systems/property.md');
   yes('property.md has the furniture section', pm.indexOf('## Furniture') >= 0 && pm.indexOf('game/data/furniture.json') >= 0);
   yes('commands.md has the /furniture row', read('docs/systems/commands.md').indexOf('| `/furniture`') >= 0);
-  const pr = read('.github/workflows/build-pr.yml'), bd = read('.github/workflows/build.yml');
-  yes('this harness runs in both workflows', pr.indexOf('test-2679-furniture.js') >= 0 && bd.indexOf('test-2679-furniture.js') >= 0);
+  yes('this harness runs in both workflows (it is not in tests/gate-excluded.txt, #3009)', !/^test-2679-furniture\.js\s/m.test(read('tests/gate-excluded.txt')));
 }
 
 // ------------------------------------ on a machine with the game: the bases
