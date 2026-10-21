@@ -123,10 +123,10 @@ function Invoke-ThornswoodRemote {
 # its standard input and output redirected; what ssh itself says on standard
 # error goes to this console as it would for any ssh.
 #
-# Only the command line form. The file form sends the script up first and
-# removes it with a call of its own afterwards, and a session cut between the
-# two leaves the file behind, which is what this is for avoiding. A script
-# over the limit is refused, before anything is sent.
+# Only the command line form: standard input is how the far side is told to
+# finish, so a long script cannot come that way as Invoke-ThornswoodRemote
+# sends one (#3027). A script over the limit is refused, before anything is
+# sent.
 function Start-ThornswoodRemote {
     param(
         [Parameter(Mandatory = $true)][string]$Target,
