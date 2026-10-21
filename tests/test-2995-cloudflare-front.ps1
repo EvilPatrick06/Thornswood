@@ -55,7 +55,7 @@ $Box = P 'scripts', 'vps', 'vps-web-firewall.ps1'
 $Driver = P 'scripts', 'vps', 'Set-WebFirewall.ps1'
 $Outside = P 'scripts', 'vps', 'Watch-Outside.ps1'
 
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 . (P 'scripts', 'vps', 'Vps.ps1')
 # The box's own address, from vps.json through Vps.ps1, never written here.
 $VpsAddr = Get-ThornswoodVpsAddress
