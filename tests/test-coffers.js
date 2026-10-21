@@ -221,9 +221,14 @@ if (postBlock !== null && wordsBlock !== null) {
     .replace(/\/\/[^\n]*/g, ' ');
   yes('the put hook is registered with the engine, under guard() for the join pass',
       /mp\.onPutItem = guard\('onPutItem'/.test(code));
-  yes('and it asks the property block nothing: no container has a rule of its own (#2298)',
-      !/prop\.putIn|__thornswoodProperty[\s\S]{0,40}putIn/.test(code) &&
-      /mp\.onPutItem = guard\('onPutItem', function \(\) \{\s*return;\s*\}\);/.test(code));
+  const put = src.match(/^mp\.onPutItem = guard\('onPutItem',[\s\S]*?^\}\);/m);
+  const context = { mp: {}, guard: (name, fn) => fn,
+    globalThis: { __thornswoodProperty: new Proxy({}, { get() { throw Error('container property consulted'); } }) } };
+  require('node:vm').createContext(context);
+  require('node:vm').runInContext(require('./fixtures/ordinary-quest-items') + put[0], context);
+  yes('ordinary goods pass every container without consulting its property rules (#2298)',
+      context.mp.onPutItem(111, 222, 15, 3) === undefined &&
+      context.mp.onPutItem(333, 222, 12, 1) === undefined);
   yes('the board words are in the one list, and /box is not',
       /'\/evict', '\/rent',/.test(code) && /'\/notice', '\/job', '\/board',/.test(code) && !/'\/box'/.test(code));
   yes('and the dispatcher routes them, and never /box',

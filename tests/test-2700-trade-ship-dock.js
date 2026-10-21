@@ -203,7 +203,7 @@ try {
     vm.createContext(box);
     const back = process.cwd();
     process.chdir(dir);
-    try { vm.runInContext(blockSrc, box, { filename: 'gamemode.js (trade ships)' }); } finally { process.chdir(back); }
+    try { vm.runInContext(require('./fixtures/ordinary-quest-items') + blockSrc, box, { filename: 'gamemode.js (trade ships)' }); } finally { process.chdir(back); }
     const ts = box.__thornswoodTradeShips;
     return {
       box: box, ts: ts, store: store, timers: timers, clock: clock, logged: logged,

@@ -1,6 +1,6 @@
 'use strict';
 const apply=Reflect.apply;
-const vector=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
+const vector=v=>Array.isArray(v)&&v.length===3&&[0,1,2].every(i=>Number.isFinite(v[i]));
 const distance=(a,b)=>a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);
 const staticId=id=>Number.isInteger(id)&&id>0&&id<0xff000000;
 function createQuestSources(mp,input,contract) {
@@ -31,24 +31,54 @@ function createQuestSources(mp,input,contract) {
    if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==1||fields[0].data[0]!==value)fail();
   }
  }
+ function produce(lookup,row) {
+  const fields=(lookup.record.fields||[]).filter(f=>f&&f.type==='PFIG');
+  if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==4)fail();
+  const data=fields[0].data,raw=Buffer.from(data.buffer,data.byteOffset,4).readUInt32LE();
+  if(mapped(lookup,raw)!==row.itemId)fail();
+ }
+ function token(lookup) {
+  const fields=(lookup.record.fields||[]).filter(f=>f&&f.type==='DATA');
+  if(fields.length!==1||!(fields[0].data instanceof Uint8Array)||fields[0].data.byteLength!==8)fail();
+  const bytes=fields[0].data,data=Buffer.from(bytes.buffer,bytes.byteOffset,8);
+  if(data.readUInt32LE()!==0||data.readFloatLE(4)!==0)fail();
+ }
  const byId=new Map(),byDesc=new Set();
  if(!Array.isArray(input)||input.length!==contract.count)fail();
  for(const original of input) {
   const row=JSON.parse(JSON.stringify(original));
   if(!vector(original.position)||row.itemType!==contract.itemType||row.rank!==contract.rank||row.returnMinutes!==contract.returnMinutes||byDesc.has(row.reference))fail();
+  if(contract.retrieval&&(!['CONT','ACTI'].includes(row.baseType)||!['WRLD','CELL'].includes(row.spaceType)||
+    !row.provenance||!Number.isInteger(row.provenance.fileIndex)||row.provenance.fileIndex<0||
+    !/^[a-f0-9]{64}$/.test(row.provenance.recordSha256)))fail();
   const id=resolve(row.reference),base=resolve(row.base),item=resolve(row.item),world=resolve(row.world);
   if(item===15||byId.has(id)||contract.vanillaIds&&id!==parseInt(row.reference.split(':')[0],16))fail();
-  winner(base,contract.baseType);const itemRecord=winner(item,contract.itemType);winner(world,'WRLD');
+  winner(base,contract.retrieval?row.baseType:contract.baseType);const itemRecord=winner(item,contract.itemType);
+  winner(world,contract.retrieval?row.spaceType:'WRLD');
   if(contract.emptyPetty)emptyPetty(itemRecord);
+  if(contract.retrieval)token(itemRecord);
   byId.set(id,{...row,id,baseId:base,itemId:item,worldId:world});byDesc.add(row.reference);
  }
  function source(row) {
-  winner(row.baseId,contract.baseType);winner(row.worldId,'WRLD');
+  const baseRecord=winner(row.baseId,contract.retrieval?row.baseType:contract.baseType);
+  winner(row.worldId,contract.retrieval?row.spaceType:'WRLD');
+  if(contract.produce)produce(baseRecord,row);
   const itemRecord=winner(row.itemId,contract.itemType);
   if(contract.emptyPetty)emptyPetty(itemRecord);
+  if(contract.retrieval)token(itemRecord);
   if(call('getDescFromId',row.id)!==row.reference||call('get',row.id,'isDisabled')!==false||
     call('get',row.id,'baseDesc')!==row.base)return false;
   const placement=winner(row.id,'REFR'),names=(placement.record.fields||[]).filter(f=>f&&f.type==='NAME');
+  if(contract.retrieval) {
+   const record=placement.record;
+   if(placement.fileIndex!==row.provenance.fileIndex||record.id!==row.provenance.rawId)return false;
+   const nativeFields=(record.fields||[]).map(f=>{
+    if(!f||typeof f.type!=='string'||!(f.data instanceof Uint8Array))fail();
+    return [f.type,Buffer.from(f.data.buffer,f.data.byteOffset,f.data.byteLength).toString('hex')];
+   });
+   const hash=require('node:crypto').createHash('sha256').update(JSON.stringify([record.type,record.id,record.flags,nativeFields])).digest('hex');
+   if(hash!==row.provenance.recordSha256)return false;
+  }
   if(names.length!==1||!(names[0].data instanceof Uint8Array)||names[0].data.byteLength!==4)return false;
   const bytes=names[0].data,raw=Buffer.from(bytes.buffer,bytes.byteOffset,bytes.byteLength).readUInt32LE();
   if(mapped(placement,raw)!==row.baseId)return false;
@@ -82,4 +112,13 @@ function createQuestHarvestSources(mp,input) {
 function createQuestGeodeSources(mp,input) {
  return createQuestSources(mp,input,{label:'geode',count:6,baseType:'ACTI',itemType:'SLGM',rank:'novice',returnMinutes:30,vanillaIds:true,emptyPetty:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources};
+function createQuestLongfinSources(mp,input) {
+ return createQuestSources(mp,input,{label:'longfin',count:8,baseType:'FLOR',itemType:'INGR',rank:'master',returnMinutes:240,produce:true});
+}
+function createQuestRetrievalSources(mp,input) {
+ return createQuestSources(mp,input,{label:'retrieval',count:7,itemType:'MISC',retrieval:true});
+}
+function createQuestOrchardSources(mp,input) {
+ return createQuestSources(mp,input,{label:'orchard',count:10,baseType:'FLOR',itemType:'ALCH',rank:'expert',returnMinutes:0,produce:true});
+}
+module.exports={createQuestOrchardSources,createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};

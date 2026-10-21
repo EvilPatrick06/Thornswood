@@ -31,8 +31,7 @@ Each role has an explicit item table, checked by the server for purchases,
 sales and supply work. Hold price books remain the price authority; a role
 table is permission to trade an item, not permission to invent a price.
 Different roles have different tables. Stock stays finite and consists of
-goods bought; purses remain finite. Retiring a trader must preserve saved
-balances, stock and unresolved settlements, without another starting grant.
+goods bought; purses remain finite. The alpha economy is disposable under Patrick's current instruction. Retirement does not require a migration or a second starting grant. Existing recovery checks remain in place.
 
 The controller accepts server-compiled native item IDs for each role's buy,
 sell and supply permissions. A declared role without verified tables refuses
@@ -295,8 +294,7 @@ extra traders at the record. Claude must deliver matching client/server
 content together with strict client admission; a gamemode-only change and
 server exclusions cannot suppress native client copies deterministically.
 Implement quests in complete, source-bound slices with coverage checks for
-all trades, holds, tiers, classes, professions, halves and schools. Legacy
-open quests must remain recoverable during catalogue changes.
+all trades, holds, tiers, classes, professions, halves and schools. No accepted alpha work needs migration; existing recovery paths remain available without becoming a rollout prerequisite.
 
 A full saved trade must fit the remaining pack together with its incoming
 goods, using the same native size and count limits as a new trade. Checking
