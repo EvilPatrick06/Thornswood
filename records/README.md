@@ -7,6 +7,11 @@ read it (issue #440, phase 8):
   hash, and the fork commit they came from. `scripts\release\New-ClientBuildRecord.ps1`
   writes it; Build-Launcher puts it inside the launcher, and Sync-Client and
   Ship refuse a client that is not this build.
+- `front-build.json`: the front, skymp5-front built by webpack from the same
+  fork commit, every file by hash (#2754). `scripts\release\Build-Front.ps1
+  -Record` writes it when the pin moves; Build-Front puts the build in
+  `local\thornswood-front.zip` only when it is this one, and Go.ps1 refuses a
+  zip that is not.
 - `server-build.json`: every server file the fork builds the same way (the
   binary, the JavaScript half the server runs, its map and the rest
   `scripts\deploy\ServerBuild.ps1` names), and the one fork commit.
@@ -42,6 +47,14 @@ read it (issue #440, phase 8):
   on this list, so a mod put into the Steam copy by hand never gets in. Run
   the script again in the same pull request as a pin move;
   `tests\test-skyrim-pin.ps1` fails while the two disagree.
+- `game-strings.json`: the loose string tables of the localized masters the
+  content tools read whose names are in no Skyrim archive, by size and
+  sha256 (#2899): RaceCompatibility.esm's three, measured 20 Oct 2026.
+  `scripts\mods\Send-GameArchives.ps1` sends them to the box beside Skyrim's
+  archives, and `Run-OnBox.ps1` links them into a run, so Build-LastPlugin
+  runs there. No script writes this one: it is changed by hand, in a pull
+  request, when such a master joins `game\data\last-plugin.json`'s masters;
+  Build-LastPlugin says "no strings for <plugin>" until it is.
 - `update-creation-club.json`: the Creation Club records Bethesda keeps in
   Update.esm (354 on build 1.6.1170, editor ids starting cc). Every Special
   Edition has them, but their art comes with the Creation Club files

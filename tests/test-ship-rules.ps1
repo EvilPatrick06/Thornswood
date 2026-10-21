@@ -474,7 +474,7 @@ $fakeGame = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-ship-rules-' + [Gu
 try {
     foreach ($rel in $clientFiles) {
         $recorded = $ShipClientHashes[$rel]
-        $full = [IO.Path]::Combine($fakeGame, $rel)
+        $full = [IO.Path]::Combine($fakeGame, $rel.Replace('\', [IO.Path]::DirectorySeparatorChar))
         $null = New-Item -ItemType Directory -Force -Path (Split-Path $full -Parent)
         [IO.File]::WriteAllText($full, 'the recorded build of ' + $rel)
         $sha = [Security.Cryptography.SHA256]::Create()
@@ -770,7 +770,9 @@ try {
     $me = (Get-Process -Id $PID).Path
     function Load-Rules([string]$then) {
         $driver = Join-Path $scratch 'load.ps1'
-        [IO.File]::WriteAllText($driver, ("`$ErrorActionPreference = 'Stop'`r`n. '" + (Join-Path $relDir 'Ship-Rules.ps1').Replace("'", "''") + "'`r`n'LOADED'`r`n" + $then), (New-Object Text.UTF8Encoding($true)))
+        # NormalView: pwsh's default error view wraps a message at the console's
+        # width, and the scratch path in it is longer on some runners (#2933).
+        [IO.File]::WriteAllText($driver, ("`$global:ErrorView = 'NormalView'`r`n`$ErrorActionPreference = 'Stop'`r`n. '" + (Join-Path $relDir 'Ship-Rules.ps1').Replace("'", "''") + "'`r`n'LOADED'`r`n" + $then), (New-Object Text.UTF8Encoding($true)))
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $o = @(& $me -NoProfile -ExecutionPolicy Bypass -File $driver 2>&1 | ForEach-Object { "$_" }); $c = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }

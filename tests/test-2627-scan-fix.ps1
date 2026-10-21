@@ -38,6 +38,12 @@
        how many things it did, and the Fix button is on exactly when there is
        something it can fix. Diagnostics keeps the icon refresh and has no
        Repair, Restore or Bring it up to date button any more.
+    6. #2856. A Skyrim whose path cannot be read, which is every process of
+       another Windows account, counts as ours only while this build's own
+       file of that name is running, told from the folder's side. The build
+       runners on the box are eight accounts, and another runner's stand-in
+       SkyrimSE.exe made case 4 see a running game. The stand-in here has a
+       name of its own, so no other build can see it as a game.
 
   HOW. Every file in launcher\app is compiled with a driver into one program,
   with the compiler and C# version the build uses (Launcher-Csc.ps1). The
@@ -85,9 +91,11 @@ $null = New-Item -ItemType Directory -Force -Path $T
 $driver = @'
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Threading;
@@ -297,6 +305,7 @@ namespace Thornswood
             NotOurs(port);
             NoFolderYet(port);
             TheRest(port);
+            OtherAccount();
 
             Console.WriteLine("driver: " + pass + " passed, " + fail + " failed");
             try { listener.Stop(); } catch { /* the program ends here either way */ }
@@ -542,6 +551,14 @@ namespace Thornswood
 
             Yes("Keep.Changed reads and writes nothing", Text(Path.Combine(data, "Platform\\UI\\index.html")) == "ANOTHER SERVER'S PAGE");
 
+            // Fix is handed what Scan found. When Scan missed one, handing it
+            // a null only ended the driver in a NullReferenceException that
+            // hid which check went wrong (#2856), so stop here and say so.
+            if (build == null || folders == null || lost == null)
+            {
+                Yes("Fix not run: Scan did not find what this case set up, the FAIL lines above say which", false);
+                return;
+            }
             var said = new List<string>();
             var mine = new List<Issue> { build, folders, lost };
             Upkeep.FixOnDisk(cfg, mine, feed, Into(said));
@@ -562,6 +579,40 @@ namespace Thornswood
                 Find(again, IssueKind.Skyrim, null) != null && Find(again, IssueKind.Update, null) != null);
             Yes("Forget takes one kind off what the card shows", CountKind(Upkeep.LastIssues, IssueKind.Update) == 1 &&
                 ForgetThenCount(IssueKind.Update) == 0);
+        }
+
+        /// <summary>
+        /// #2856. Checks.GameProcesses counts a game whose path it cannot read
+        /// only while OwnImageRunning says this build's own file of that name
+        /// runs. Never named SkyrimSE here: every other build on the box would
+        /// see that process.
+        /// </summary>
+        static void OtherAccount()
+        {
+            MethodInfo own = typeof(Checks).GetMethod("OwnImageRunning", BindingFlags.NonPublic | BindingFlags.Static);
+            Yes("Checks tells this build's own game file running from the folder's side (OwnImageRunning)", own != null);
+            if (own == null) return;
+            Func<bool> running = delegate { return (bool)own.Invoke(null, new object[] { "ts2856-standin" }); };
+            string was = Paths.Game;
+            Paths.Game = Path.Combine(T, "other-account");
+            string exe = Path.Combine(Paths.Game, "ts2856-standin.exe");
+            try
+            {
+                Yes("a game file that is not there is not running", !running());
+                Directory.CreateDirectory(Paths.Game);
+                File.Copy(Path.Combine(Environment.SystemDirectory, "PING.EXE"), exe);
+                Yes("one that is there and that nothing runs is not running", !running());
+                var si = new ProcessStartInfo(exe, "-n 60 127.0.0.1");
+                si.UseShellExecute = false;
+                si.CreateNoWindow = true;
+                using (Process p = Process.Start(si))
+                {
+                    Yes("while it runs, it is running", running());
+                    p.Kill();
+                    Yes("once it has exited, it is not running", p.WaitForExit(30000) && !running());
+                }
+            }
+            finally { Paths.Game = was; }
         }
 
         /// <summary>What a scan found, under the lines that judge it, so a failure can be read.</summary>
@@ -634,6 +685,7 @@ $own = Src (Join-Path $App 'ShellOwnGame.cs')
 $upd = Src (Join-Path $App 'ShellUpdate.cs')
 $xaml = Src (Join-Path $Repo 'launcher\ui.xaml')
 $upkeep = Src (Join-Path $App 'Upkeep.cs')
+$checks = Src (Join-Path $App 'Checks.cs')
 
 Yes 'the Scan button asks everything, and the Fix button is RunFix' (
     $shell.Contains('btnScan.Click += delegate { RunScan(true); };') -and $shell.Contains('btnFix.Click += delegate { RunFix(); };'))
@@ -664,6 +716,8 @@ Yes 'a log line that blocks Play keeps the words the site reads' ($sf.Contains('
 Yes 'the bring-up-to-date tells Fix when it fails, so Fix carries on' ($own -match 'else if \(fail != null && failed != null\) failed\(\);')
 Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (([regex]::Matches($upd, 'if \(after != null\) after\(\);')).Count -eq 2)
 Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say\).*?\}, delegate')
+Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
+    $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')
 Yes 'Diagnostics keeps the icon refresh, which Scan cannot see' ($xaml -match 'x:Name="BtnIcons"')
 Yes 'and has no Repair, Restore or Bring it up to date button, which Fix does now' (
     $xaml -notmatch 'x:Name="BtnRepair"' -and $xaml -notmatch 'x:Name="BtnRestore"' -and $xaml -notmatch 'x:Name="BtnOwnGameRefresh"')

@@ -6,7 +6,7 @@
       .\scripts\release\Check-ShipReady.ps1              the main channel
       .\scripts\release\Check-ShipReady.ps1 -Channel dev the dev channel
       .\scripts\release\Check-ShipReady.ps1 -NoVps       skip the two checks that ask the VPS
-      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Users\evilp\Downloads\Thornswood-Repo\local\release-devbuild
+      .\scripts\release\Check-ShipReady.ps1 -Channel dev -Root C:\Thornswood-Repo\local\release-devbuild
                                                     a folder this machine has not recorded
 
   WHICH FOLDER (#1692). The one this machine builds the channel's release
@@ -626,7 +626,7 @@ if ($NoVps) {
     $sshOk = ($out -match 'THORNSWOOD_OK')
   } catch { $sshOk = $false }
   Ready 'ssh to the VPS works without a password' $sshOk $script:VpsAddress `
-    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Add-VpsKey.ps1 to put the public half on the box' 'either'
+    '.\scripts\vps\Setup-SshKey.ps1        then Patrick runs .\scripts\vps\Grant-BoxAccess.ps1 with the line it prints (docs\BOX-ACCESS.md)' 'either'
   Say '  note  a Ship needs ssh: the feed, its baseline and every download go to the VPS (#897, #907).' 'DarkGray'
   # The feed store beside the feed the site serves (Feed-Store.ps1, #907).
   # Read only: asks what is there, sends nothing.
@@ -652,7 +652,7 @@ if ($verdict.Ready) {
   Write-Host ''
   if ($Dev) {
     Say '      .\scripts\release\Ship.ps1 -Channel dev "what changed"' 'White'
-    Say '  Say in #staff-general when you take the dev feed: there is one, and the last dev Ship wins.' 'DarkGray'
+    Say '  Say in #staff-updates when you take the dev feed: there is one, and the last dev Ship wins.' 'DarkGray'
   } else {
     Say '      .\scripts\release\Ship.ps1 "what changed"' 'White'
     Say '  That publishes to everybody. Only run it from main, with the pull done.' 'DarkGray'

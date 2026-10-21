@@ -160,7 +160,7 @@ so an install on another drive is one the launcher refuses to play from
 under the buttons says what a different drive costs, and pressing Install on a
 different drive asks once more before anything is written. It asks and does not
 refuse: whether the launcher may fall back to copies instead, at about 26 to 41
-GB, is the team's call in #staff-general (issue #473).
+GB, is the team's call in #staff-updates (issue #473).
 `tests\test-setup-skyrim-drive.ps1` holds all of that to what is here.
 
 ## Thornswood's own Skyrim folder

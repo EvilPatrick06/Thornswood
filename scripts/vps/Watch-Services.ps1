@@ -48,9 +48,10 @@
 
   Anything else on this box that needs to tell staff something (the bot's own
   wrapper, issue #449) appends a line of the same shape to alerts.jsonl and
-  this delivers it the same way. So does Watch-Outside.ps1 on One, over ssh,
-  for what it sees from outside (issue #448); when the box cannot be reached
-  it posts through its own copy of the same webhook. tests\test-watch-alerts.ps1 drives the real
+  this delivers it the same way. Watch-Outside.ps1, which asks from outside
+  (issue #448), runs on GitHub's runners since #2755 and posts through the
+  same webhook itself, because a runner cannot reach this box over ssh.
+  tests\test-watch-alerts.ps1 drives the real
   code below against fakes: down, back, flapping, the bot down, a webhook
   that fails. bot\test-watch-services.py reads what that harness writes.
 
@@ -72,6 +73,10 @@
               restarted by that name, under the same three an hour
     dev game  answers on 7788, the dev server's resources port
     dev voice answers on 7789
+    bridge    answers on 7790, the ssh bridge (#2753), which is the only way
+              into the box over ssh once port 22 takes no outside address
+              (#2891). Down, it locks everybody out but the VNC console, so
+              it is restarted like the rest
     disk      free space on C:, which every one of the above shares. Under
               twenty percent it writes DISK LOW, under ten DISK CRITICAL,
               once when the line is crossed and once when it comes back. It
@@ -84,6 +89,11 @@
               cannot tell hung from idle. That was the 18 September case.
     backup    the Thornswood Backup task's last result, and a backup file in
               C:\Thornswood-Backup less than 26 hours old
+    offbox    the copy of the backups off this box is less than 26 hours
+              old: the newest copy Fetch-Backups.ps1 on One has checked, by
+              the name it writes into offbox.txt in this folder after each
+              run (#2755). Judged here, not on One, so a One that is off is
+              told about, since that is when the copy falls behind
     runner    every build runner's Windows service is running: the first,
               thornswood-vps, and the numbered ones Install-Runner.ps1
               -Number puts beside it (4 October)
@@ -373,6 +383,22 @@ function BackupProblem($task, $folder, $hours) {
   return ''
 }
 
+# '' when the newest copy off this box is younger than $hours, else why not
+# (#2755). Fetch-Backups.ps1 on One writes the name of the newest copy it has
+# checked into offbox.txt after each run, so this box knows how far behind the
+# copy off it is even while One is off, which is when it falls behind. The
+# age is read from the name, stamped by this box's clock when it took the
+# backup, so the two machines' clocks never meet.
+function OffBoxProblem($file, $hours) {
+  if (-not (Test-Path -LiteralPath $file)) { return ('One has not said it holds a copy: there is no ' + $file + ', which Fetch-Backups.ps1 writes after each copy it checks') }
+  $name = ('' + (Get-Content -LiteralPath $file -TotalCount 1 -EA SilentlyContinue)).Trim()
+  if ($name -notmatch '^thornswood-(\d{8}-\d{6})\.zip(\.enc)?$') { return ($file + ' does not name a backup') }
+  $taken = [datetime]::ParseExact($Matches[1], 'yyyyMMdd-HHmmss', [Globalization.CultureInfo]::InvariantCulture)
+  $age = ($now - $taken).TotalHours
+  if ($age -gt $hours) { return ('the newest copy One has checked is ' + $name + ', ' + [math]::Floor($age) + ' hours old, and the line is ' + $hours) }
+  return ''
+}
+
 # What is down, one line per thing: name|down or up|bad runs|good runs|first
 # bad|first good. Only this script writes it.
 function ReadOutages() {
@@ -422,7 +448,10 @@ function HowWords($c, $how) {
     }
     'gaveup'  { return 'The watchdog has restarted it three times this hour and has stopped trying. It needs a person.' }
     'soft'    { return 'It is still running, so the watchdog does not restart it for this. It may be hung. It needs a person.' }
-    default   { return 'Nothing restarts this by itself. It needs a person.' }
+    default   {
+      if ($c.ContainsKey('Fix')) { return $c.Fix }
+      return 'Nothing restarts this by itself. It needs a person.'
+    }
   }
 }
 
@@ -606,7 +635,10 @@ $checks = @(
   # cannot be connected to, so its resources port stands in, exactly as
   # 3000 does for the live one.
   @{ Name = 'dev game';  Task = 'Thornswood Dev Server'; Port = 7788; Say = 'The dev game server'; Health = 'http://127.0.0.1:7788/api/servers/thornswood/manifest.json' },
-  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789; Say = 'Dev voice'; Health = 'http://127.0.0.1:7789/health' }
+  @{ Name = 'dev voice'; Task = 'Thornswood Dev Voice';  Port = 7789; Say = 'Dev voice'; Health = 'http://127.0.0.1:7789/health' },
+  # The way in over ssh (#2891). A plain request answers 404 on purpose, so
+  # the port answering is the whole check.
+  @{ Name = 'bridge';    Task = 'Thornswood Bridge';     Port = 7790; Say = 'The ssh bridge, the way into the box' }
 )
 
 # Told about and never restarted. The runner's service name is the one
@@ -614,6 +646,8 @@ $checks = @(
 # and the name ends in -<n> for every runner after the first.
 $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
+  @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS'; Fails = 'is out of date'; Recovers = 'is up to date again'; OffBox = (Join-Path $root 'offbox.txt'); Hours = 26
+     Fix = 'Fetch-Backups.ps1 on One brings the nightly backup down at 04:15 while One is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 there, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
   @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' }
 )
 
@@ -694,6 +728,7 @@ if ($fresh.Count -gt 0) { Add-Content -LiteralPath $hist -Value $fresh }
 foreach ($c in $tellOnly) {
   $why = ''
   if ($c.ContainsKey('Backup')) { $why = BackupProblem $c.Backup $c.Folder $c.Hours }
+  elseif ($c.ContainsKey('OffBox')) { $why = OffBoxProblem $c.OffBox $c.Hours }
   else { $why = ServiceProblem $c.Service }
   if ($why) { Observe $told $c $true $false ($why.Substring(0, 1).ToUpper() + $why.Substring(1)) 'nobody' }
   else { Observe $told $c $false $false '' '' }
@@ -896,12 +931,18 @@ if ($Install) {
   Head 'Putting it on the server'
 
   $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($watcher))
+  # The box's half of scripts\ops\Say-Staff.ps1, beside watch.ps1 so it takes
+  # this folder's lock: how an agent puts a staff notice in this outbox (#2934).
+  # A notices key (Grant-BoxAccess.ps1 -NoticesOnly) can run this and nothing else.
+  $sayB64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Here 'vps-say-staff.ps1')))
 
   $out = Remote @"
 `$ErrorActionPreference = 'Continue'
 $(Get-ThornswoodLockedFolderScript $Root)
 [IO.File]::WriteAllBytes('$Root\watch.ps1', [Convert]::FromBase64String('$b64'))
 'wrote     $Root\watch.ps1  ' + (Get-Item '$Root\watch.ps1').Length + ' bytes'
+[IO.File]::WriteAllBytes('$Root\say-staff.ps1', [Convert]::FromBase64String('$sayB64'))
+'wrote     $Root\say-staff.ps1  ' + (Get-Item '$Root\say-staff.ps1').Length + ' bytes, for staff notices from agents'
 
 # Every five minutes, as SYSTEM, so it keeps going when nobody is logged in.
 # The path has no spaces in it, so the command needs no quotes inside the
@@ -989,6 +1030,7 @@ if (Test-Path `$hb) {
 } else { 'heartbeat none. The bot writes C:\Thornswood-Bot\data\heartbeat.json once Install-Bot.ps1 -NoToken has run' }
 'dev game  ' + `$(if (Answers 7788) { 'up' } else { 'DOWN' })
 'dev voice ' + `$(if (Answers 7789) { 'up' } else { 'DOWN' })
+'bridge    ' + `$(if (Answers 7790) { 'up' } else { 'DOWN' })
 # Free space right now, and LOW or CRITICAL when the watcher's last run found
 # it under a line. The twenty and the ten are kept in the watcher only, so
 # this reads its verdict from disk.txt rather than holding a second copy.
@@ -999,6 +1041,7 @@ if (`$d -and ([double]`$d.Used + `$d.Free) -gt 0) { 'disk      ' + [math]::Round
 else { 'disk      could not be read' }
 `$t = & schtasks /query /tn '$Task' /fo list 2>`$null
 if (`$LASTEXITCODE -eq 0) { 'watcher   installed' } else { 'watcher   NOT installed. Run this with -Install' }
+if (Test-Path '$Root\say-staff.ps1') { 'notices   say-staff.ps1 is there, so agents can post in #staff-updates (Say-Staff.ps1)' } else { 'notices   NO say-staff.ps1, so Say-Staff.ps1 cannot post. Run this with -Install' }
 # Where the webhook posts, asked of Discord on the box (WebhookChannel's
 # question, there): only the channel id comes back, never the address.
 if (Test-Path '$Root\alerts-webhook.txt') {
@@ -1029,7 +1072,7 @@ if (`$down.Count) { 'told      DOWN: ' + (`$down -join ', ') } else { 'told     
 "@
 foreach ($l in $out) {
   $c = 'Gray'
-  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY') { $c = 'Red' }
+  if ("$l" -match 'DOWN|NOT installed|LOW$|CRITICAL$|OFF DISCORD|Stopped$|NOT #staff-updates|WOULD NOT SAY|NO say-staff') { $c = 'Red' }
   if ("$l" -match '\bup$|installed$|Running$') { $c = 'Green' }
   Say "  $l" $c
 }

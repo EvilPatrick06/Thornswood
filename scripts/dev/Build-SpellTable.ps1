@@ -48,6 +48,10 @@ param(
     [switch]   $NoInstall
 )
 
+# Thornswood's own plugins are read from game\content, every other plugin
+# from -Data (#2923, OwnPlugins.ps1).
+. (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+
 # ---------------------------------------------------------------- knobs ----
 # classes.md is the rulebook and it does not settle either of these. They are
 # the two judgement calls this script makes, and they are here so they are in
@@ -311,7 +315,7 @@ foreach ($pl in $Plugins) {
     # a plugin that keeps its names inside its own records needs no table; one
     # that is flagged localised and has none can only fall back to editor ids,
     # and then a name in the book will not match anything
-    $p = Join-Path $Data $pl
+    $p = Get-PluginPath $Data $pl
     $localised = $false
     if (Test-Path -LiteralPath $p) {
         $head = New-Object byte[] 12
@@ -333,7 +337,7 @@ $taught  = @{}
 $fromEdid = 0
 
 foreach ($pl in $Plugins) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { Bad "not found: $path"; continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }

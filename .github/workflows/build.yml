@@ -70,7 +70,7 @@
 # Then: "we don't need the required check/reviewer at all anymore for
 # anyone as long as we give verbal agreement and the VPS check goes
 # through". So nothing is required in GitHub's settings; the team merges
-# once this is green and it has been said in #staff-general.
+# once this is green and it has been said in #staff-updates.
 name: Build check
 on:
   push:
@@ -469,6 +469,11 @@ jobs:
           # Read-Availability.ps1, the reader of the watchdog's down and back
           # lines, to its counting on made-up lines, under pwsh and Windows
           # PowerShell 5.1, and to reading only. About ten seconds.
+          # Issue #2755: tests\test-watch-outside.ps1 drives the outside
+          # watcher, which runs from a public repository on GitHub's runners,
+          # against fake answers: could not check is never "down" (#2857),
+          # what -Export writes there, and a public run log that names
+          # nothing private. A few seconds.
           # Issue #2319: tests\test-crash-snapshot.ps1 compiles CrashDump.cs and
           # holds crash snapshots to the person's setting, kept until staff mark
           # the crash looked at, two at most; tests\test-2319-crash-looked-at.js
@@ -522,6 +527,19 @@ jobs:
           # each name to being refused and left alone, and releases eight runs
           # at once under pwsh and PowerShell 5.1, three times over. About
           # twenty seconds.
+          # Issue #2888: tests\test-2888-artifact-folder-name.ps1 holds that an
+          # artifact names only files (its zip, record and .folder file), never
+          # the folder it unpacked, which a scanner can stop Windows renaming;
+          # builds forty artifacts of new bytes and names forty new files, every
+          # one at once, and prints how often the old folder rename was refused
+          # here. About forty seconds.
+          # Issue #2928: tests\test-2928-stop-and-move.ps1 holds every swap on the
+          # box to scripts\deploy\StopAndMove.ps1: a process it stops is waited
+          # for until it has exited, and each rename is tried once and says why
+          # it was refused, with no sleep or retry left in Swap.ps1, the server
+          # installer, the bot, voice, the site or the bridge; then ends a node
+          # holding a file ten times and renames its folder at once each time.
+          # About fifteen seconds.
           # Issue #2771: tests\test-2771-text-contrast.js holds every launcher
           # theme and the DIY starter to 4.5 to 1 for every text colour on
           # every surface, Muted above Faint, ui.xaml's placeholders to Forge,
@@ -540,7 +558,36 @@ jobs:
           # fork harness the shares never had. On the gate now. The kept NPC
           # harness says SKIP without the fork; the nightly runs it with it.
           # Under ten seconds together.
-          $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+          # Issue #2914: tests\test-2914-nexus-scripts.ps1 drives the Nexus Mods
+          # scripts (a new file version, a description line, a collection
+          # revision and its publish) against a stand-in Nexus on loopback,
+          # under pwsh and Windows PowerShell 5.1, and holds the key to the
+          # stand-in's made-up one, never printed and never sent to storage.
+          # About a minute.
+          # Issue #2912: tests\test-prove-secret.ps1 runs the secret proof
+          # against a fake ssh, and its watcher in Windows PowerShell 5.1 with
+          # standard input held open as on the box, where only the stop event
+          # ends it before its limit. It ran nowhere before, so the stop line
+          # that never reached the box went out unseen. Under a minute.
+          # Issue #2938: tests\test-mod-menus.js builds a game folder byte by
+          # byte (plugins, compiled scripts, archives, MCM Helper files) and
+          # holds Audit-ModMenus.js to where each menu keeps its values, and
+          # to writing nothing there. It ran only in the nightly, and its
+          # fixture wrote Windows paths, so off Windows it failed 22 checks
+          # and nothing said so. Under a second.
+          # Issue #2961: tests\test-2961-voice-port-once.ps1 holds
+          # Install-Voice.ps1's outside check to one try that says what it
+          # answered, and to "not known" rather than "correctly shut" from
+          # a machine that reaches no raw port on the box, as a cloud
+          # thread's does. Under ten seconds, on loopback only.
+          # Issue #2957: tests\test-2957-windows-one-way.ps1 holds every harness
+          # to finding Windows, Windows PowerShell 5.1 and cmd.exe through
+          # tests\Windows.ps1: $OnWindows first, then Get-WindowsPowerShell or
+          # Get-WindowsPath. Joining onto $env:SystemRoot stopped harness after
+          # harness on its first lines off Windows, and asking Get-Command for
+          # powershell.exe let a Windows machine without it skip or run pwsh
+          # instead. A few seconds.
+          $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
@@ -555,8 +602,8 @@ jobs:
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1',
-                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-2459-artifact-unpack-race.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-2863-board-status.ps1', 'test-2753-cloud-ssh.ps1', 'test-2753-box-bridge.js', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-2459-artifact-unpack-race.ps1', 'test-2888-artifact-folder-name.ps1', 'test-2928-stop-and-move.ps1', 'test-2899-run-on-box.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-2863-board-status.ps1', 'test-2753-cloud-ssh.ps1', 'test-2753-box-bridge.js', 'test-2961-voice-port-once.ps1', 'test-2891-box-access.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -631,6 +678,7 @@ jobs:
                  'test-513-world-staff.js',
                  'test-513-world-stage.js',
                  'test-1390-thalmor-patrols.js',
+                 'test-2873-staff-data.js',
                  'test-1603-beds.js',
                  'test-1606-logout-fill.js',
                  'test-1382-potion-window.js',
@@ -746,11 +794,15 @@ jobs:
                  'test-1382-meal-time-cold.js',
                  'test-1382-wet-fade.js',
                  'test-1382-ale-help-hangover.js',
+                 'test-1382-tea.js',
+                 'test-1382-drunk.js',
+                 'test-1382-well-buckets.js',
+                 'test-2923-own-plugins.js',
                  'test-table-install.js',
                  'test-secrets-fail-closed.js',
                  'test-our-key-menus.js', 'test-slash-key.js', 'test-social-keys.js', 'test-server-pick-order.ps1',
                  'test-2384-cursor-focus.js',
-                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1', 'test-2727-feed-swap-readers.ps1', 'test-2180-feed-sends.ps1', 'test-feed-store.ps1', 'test-2740-whole-writes.js', 'test-2740-shared-reads.ps1',
+                 'test-2037-journal-new.js', 'test-2135-journal-press.js', 'test-social.js', 'test-2157-reconfigure.ps1', 'test-2210-links-attributes.ps1', 'test-2210-refresh-scope.ps1', 'test-2019-ship-roots.ps1', 'test-2586-atomic-records.ps1', 'test-2591-whole-records.ps1', 'test-2727-feed-swap-readers.ps1', 'test-2180-feed-sends.ps1', 'test-feed-store.ps1', 'test-2754-front.ps1', 'test-2754-from-feed.ps1', 'test-temp-folder.ps1', 'test-2740-whole-writes.js', 'test-2740-shared-reads.ps1',
                  'test-2599-whole-swaps.ps1',
                  'test-site-auth.js',
                  'test-site-route-gaps.js', 'test-2215-play-pressed-by.ps1',
@@ -775,10 +827,10 @@ jobs:
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1', 'test-2661-keep-feed-launcher.ps1', 'test-2662-dev-root-launcher.ps1',
                  'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
-                 'test-dev-settings-keys.ps1',
+                 'test-dev-settings-keys.ps1', 'test-dev-start-point-light.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
-                 'test-2308-content-before-ship.ps1',
+                 'test-2308-content-before-ship.ps1', 'test-2947-chargen-box-light.ps1',
                  'test-1050-news-out.ps1',
                  'test-1050-feed-compact.ps1',
                  'test-1050-feed-split.ps1', 'test-1050-feed-split.js',
@@ -826,7 +878,12 @@ jobs:
                  'test-gate-list.ps1',
                  'test-storage-forecast.ps1',
                  'test-jump-sprint-no-timers.js',
-                 'test-2183-availability.ps1'
+                 'test-2183-availability.ps1',
+                 'test-watch-outside.ps1',
+                 'test-2914-nexus-scripts.ps1',
+                 'test-say-staff.ps1',
+                 'test-prove-secret.ps1',
+                 'test-mod-menus.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n

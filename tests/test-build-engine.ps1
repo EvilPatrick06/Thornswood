@@ -26,6 +26,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $root = Split-Path -Parent $Here
 $script = Join-Path $root 'scripts\release\Build-Engine.ps1'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -59,9 +60,12 @@ if ($runAst) {
     # Run notes out of memory errors with EngineJobs.ps1, which the script
     # dot-sources (#1203; tests\test-1203-engine-jobs.ps1 holds that half).
     $withJobs = ". '" + (Join-Path $root 'scripts\release\EngineJobs.ps1') + "'; " + $runAst.Extent.Text
-    $runOk = & ([scriptblock]::Create($withJobs + '; Run cmd /c "echo printed & echo also 1>&2"')) 6>$null
+    # The tool is this PowerShell, started as a program, so the check runs
+    # wherever the harness does (#2957; it was cmd.exe, which only Windows has).
+    $tool = "'" + (Get-Process -Id $PID).Path.Replace("'", "''") + "'"
+    $runOk = & ([scriptblock]::Create($withJobs + '; Run ' + $tool + ' -NoProfile -NonInteractive -Command "[Console]::Out.WriteLine(''printed''); [Console]::Error.WriteLine(''also'')"')) 6>$null
     Yes 'Run returns 0, and only 0, for a tool that prints and succeeds' ((@($runOk).Count -eq 1) -and ($runOk -eq 0))
-    $runBad = & ([scriptblock]::Create($withJobs + '; Run cmd /c "echo printed & exit 3"')) 6>$null
+    $runBad = & ([scriptblock]::Create($withJobs + '; Run ' + $tool + ' -NoProfile -NonInteractive -Command "[Console]::Out.WriteLine(''printed''); exit 3"')) 6>$null
     Yes 'Run returns 3, and only 3, for a tool that prints and fails with 3' ((@($runBad).Count -eq 1) -and ($runBad -eq 3))
 }
 # A bare -- in a call to Run is eaten by PowerShell, so cmake got /m as its
@@ -129,11 +133,12 @@ Yes 'configure and build run inside a try whose finally removes the letter' ($te
 # "$_" makes 5.1's error records plain text.
 function Read-CmdBat([string]$Bat) {
     $ErrorActionPreference = 'Continue'
-    $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe'
+    $cmdExe = Get-WindowsPath 'System32\cmd.exe'
     return (& $cmdExe /d /c ($Bat + ' 2>&1') 2>&1 | ForEach-Object { "$_" } | Out-String)
 }
 
-if ($lift.Count -eq $liftNames.Count) {
+if (-not $OnWindows) { Write-Host 'SKIP  a fork under a path with an &: its drive letter is a subst and its bootstrap a cmd.exe run, which only Windows has' }
+elseif ($lift.Count -eq $liftNames.Count) {
     . ([scriptblock]::Create($lift -join "`n"))
     $amp = Join-Path ([IO.Path]::GetTempPath()) ('ts-engine-' + [Guid]::NewGuid().ToString('N').Substring(0, 8) + '\wt&x')
     $forkA = Join-Path $amp 'fork'

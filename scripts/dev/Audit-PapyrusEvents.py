@@ -110,8 +110,9 @@ import zlib
 from collections import defaultdict
 
 import bsa
+import own_plugins
 
-MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
+MASTERS = own_plugins.MASTERS
 
 # The fork's event list, both halves, is records\papyrus-events.json, which
 # scripts\dev\PapyrusEventList.js reads out of the fork and
@@ -525,19 +526,10 @@ def records(buf, start, masters, own, stats):
 def load_order(data_dir, plugins_txt):
     """The masters, then plugins.txt, with master flagged plugins first the way
     the engine sorts them. Returns (order, missing)."""
-    listed = list(MASTERS)
-    with io.open(plugins_txt, encoding='utf-8-sig', errors='replace') as fh:
-        lines = fh.read().splitlines()
-    for line in lines:
-        line = line.strip()
-        if not line or line.startswith('#') or not line.startswith('*'):
-            continue
-        name = line[1:].strip()
-        if name.lower() not in [n.lower() for n in listed]:
-            listed.append(name)
+    listed = own_plugins.load_order(plugins_txt)
     first, rest, missing = [], [], []
     for name in listed:
-        path = os.path.join(data_dir, name)
+        path = own_plugins.plugin_path(data_dir, name)
         if not os.path.isfile(path):
             missing.append(name)
             continue
@@ -720,7 +712,7 @@ def audit(data_dir, plugins_txt, rule):
     chains, kinds, subkeys = {}, {}, defaultdict(set)
     bad_vmad = defaultdict(int)
     for idx, plugin in enumerate(order):
-        with open(os.path.join(data_dir, plugin), 'rb') as fh:
+        with open(own_plugins.plugin_path(data_dir, plugin), 'rb') as fh:
             buf = fh.read()
         try:
             _flags, masters, start = plugin_header(buf)

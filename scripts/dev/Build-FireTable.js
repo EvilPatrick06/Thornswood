@@ -61,6 +61,7 @@
 // check passed.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -98,28 +99,9 @@ const PRINT = args.indexOf('--print') !== -1;
   it, because that is the file the engine resolves it from and the override is
   what it hands back.
 */
-const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
-                  'HearthFires.esm', 'Dragonborn.esm'];
-
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
 
-function loadOrder() {
-  const out = BETHESDA.slice();
-  let raw = '';
-  try { raw = fs.readFileSync(PLUGINS_TXT, 'utf8'); }
-  catch (e) { return out; }
-  raw.split(/\r?\n/).forEach(function (line) {
-    const t = line.trim();
-    if (!t || t[0] === '#') { return; }
-    // A leading * is "enabled" in the modern plugins.txt.
-    const name = t[0] === '*' ? t.slice(1).trim() : t;
-    if (!name) { return; }
-    if (out.indexOf(name) === -1) { out.push(name); }
-  });
-  return out;
-}
-
-const PLUGINS = loadOrder();
+const PLUGINS = loadedOrder(PLUGINS_TXT, DATA);
 
 // The form types a fire can be. STAT is in the scan so the unlit versions are
 // seen and counted as dropped rather than silently missing.
@@ -224,7 +206,6 @@ function subrecords(rec) {
 const rows = [];
 const dropped = [];
 const seen = {};
-const missing = [];
 // Which plugin the walk is inside, and what it declares as its masters.
 const here = { file: '', masters: [] };
 let scanned = 0;
@@ -297,10 +278,7 @@ function walk(b, start, end) {
 }
 
 for (const pl of PLUGINS) {
-  const p = path.join(DATA, pl);
-  // A name in plugins.txt with no file behind it is somebody's list being
-  // ahead of their mods, which is not this script's problem to fail over.
-  if (!fs.existsSync(p)) { missing.push(pl); continue; }
+  const p = pluginPath(DATA, pl);
   const b = fs.readFileSync(p);
   if (b.toString('ascii', 0, 4) !== 'TES4') { fail('not a plugin: ' + p); continue; }
   here.file = pl;
@@ -319,7 +297,7 @@ if (!rows.length) { fail('the table came out empty'); }
 
 rows.sort(function (a, b) { return a.edid.toLowerCase() < b.edid.toLowerCase() ? -1 : 1; });
 
-console.log(PLUGINS.length + ' plugins in the order, ' + missing.length + ' not installed');
+console.log(PLUGINS.length + ' plugins in the order');
 console.log(scanned + ' records read, ' + rows.length + ' are lit fires, ' +
             dropped.length + ' dropped for being out');
 {
@@ -339,7 +317,6 @@ if (process.exitCode === 1) {
 } else {
   const doc = {
     builtFrom: PLUGINS,
-    notInstalled: missing,
     builtAt: new Date().toISOString(),
     reach: REACH,
     inside: INSIDE,

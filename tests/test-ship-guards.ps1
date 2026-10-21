@@ -98,6 +98,9 @@ Yes 'Ship.ps1 has Unbump' ($unbump -ne '')
 Yes 'and the Write-UpdaterCs it writes with' ($writeUpdater -ne '')
 Yes 'the plugin check is in Ship.ps1' ($script:guard -ne '')
 if (-not ($script:dryBefore -and $script:dryAfter -and $unbump -and $writeUpdater -and $script:guard)) { Done }
+# The check hashes the plugins as they ship, and Go.ps1 puts them in the game
+# folder that way (ShippedBytes.ps1, #2903), so the copies here are made the same way.
+. (Join-Path $RepoHere 'scripts\release\ShippedBytes.ps1')
 
 # What the blocks call. Say and Head only print; Die stops, as it does in Ship.
 function Say($m, $c = 'Gray') { }
@@ -206,7 +209,7 @@ try {
     New-Item -ItemType Directory -Path $plugins, $live -Force | Out-Null
     foreach ($n in 'thornswood-chat.js', 'thornswood-voice.js') {
         [IO.File]::WriteAllText((Join-Path $plugins $n), "// $n as it is in the repo today`n")
-        Copy-Item -LiteralPath (Join-Path $plugins $n) -Destination $live -Force
+        Copy-ThornswoodShippedFile (Join-Path $plugins $n) (Join-Path $live $n)
     }
 
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.68`";`r`n")
@@ -218,7 +221,7 @@ try {
     $said = Invoke-Guard $repoTools $game
     Yes 'a day old plugin in the game folder stops the release' ($said -match 'not the ones in this repo')
     Yes '  and puts the version back' ((Read-Version $updaterCs) -eq $current)
-    Copy-Item -LiteralPath (Join-Path $plugins 'thornswood-chat.js') -Destination $live -Force
+    Copy-ThornswoodShippedFile (Join-Path $plugins 'thornswood-chat.js') (Join-Path $live 'thornswood-chat.js')
 
     [IO.File]::WriteAllText($updaterCs, "        public const string Version = `"1.1.68`";`r`n")
     Remove-Item -LiteralPath (Join-Path $live 'thornswood-voice.js') -Force

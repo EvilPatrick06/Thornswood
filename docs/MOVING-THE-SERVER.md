@@ -63,7 +63,7 @@ which service leads each of those, and when the busiest hour was.
 
 Leave it a week that includes a busy evening before reading anything into it.
 Whether the answer is the plan above or moving some services off this box is
-for the team in #staff-general, and whatever is done goes back on this page.
+for the team in #staff-updates, and whatever is done goes back on this page.
 
 ## Doing it
 
@@ -126,9 +126,9 @@ files in it. Steps 1 to 9 leave the old box serving, so they can take as many
 days as they need.
 
 ```powershell
-git -C C:\Users\evilp\Downloads\Thornswood-Repo fetch origin
-git -C C:\Users\evilp\Downloads\Thornswood-Repo worktree add "C:\ThornswoodTemps&Worktrees\worktrees\move" -b patrick/move-to-new-box origin/main
-Set-Location "C:\ThornswoodTemps&Worktrees\worktrees\move"
+git -C C:\Thornswood-Repo fetch origin
+git -C C:\Thornswood-Repo worktree add "C:\Thornswood-Repo\worktrees\move" -b patrick/move-to-new-box origin/main
+Set-Location "C:\Thornswood-Repo\worktrees\move"
 ```
 
 The secrets a move needs, and where each one comes from. None of them is ever
@@ -178,12 +178,14 @@ typed on a command line or written on this page.
    done: every script runs ssh with StrictHostKeyChecking=yes (issue #450), so
    a box whose key is not pinned there is refused. The changed files stay on
    this branch until step 27.
-4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1`. It
+4. **This machine's key on the box:** `.\scripts\vps\Setup-SshKey.ps1 -NewBox`. It
    writes the box into known_hosts only when it shows a key step 3 pinned,
-   then asks for the Administrator password once. Then
-   `.\scripts\vps\Setup-SshKey.ps1 -Test` says the key works. Another machine that deploys runs
-   `.\scripts\vps\Setup-SshKey.ps1 -KeyOnly` and Patrick adds the line it
-   prints with `.\scripts\vps\Add-VpsKey.ps1`.
+   then asks for the Administrator password once and points ssh straight at
+   port 22, since the new box has no bridge yet. Once the site is up with
+   its Caddyfile, `.\scripts\deploy\Install-Bridge.ps1` and then
+   `.\scripts\vps\Grant-BoxAccess.ps1 -Name one -ThisMachine` move this
+   machine onto the bridge, and every other machine and person is given
+   their way in with `Grant-BoxAccess.ps1` (`docs\BOX-ACCESS.md`).
 5. **PowerShell 7, Node, Git and the Build Tools on the box**, and the
    firewall for the live game:
    `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeGit -IncludeBuildTools'`.
@@ -297,9 +299,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     lacks and whether this machine has the bytes; the same two without `-Check`
     send them. For any this machine does not have, bring the old box's copy
     down first with
-    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`
+    `scp -r Administrator@<old address>:C:/Thornswood-Docs/feed/assets "C:\Thornswood-Repo\temp\move\feed-assets"`
     (and `feed-dev/assets` for the dev feed) and add
-    `-AssetDir "C:\ThornswoodTemps&Worktrees\temp\move\feed-assets"`. Then
+    `-AssetDir "C:\Thornswood-Repo\temp\move\feed-assets"`. Then
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
 18. **The name:** in Patrick's Cloudflare login, point the A records for
@@ -369,8 +371,11 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
 30. **The watchers on this machine**, last, from a checkout of main that has
     step 27 in it, because each keeps its own copy of the address:
     `.\scripts\vps\Fetch-Backups.ps1 -Schedule` brings the new box's backups
-    here every day, and `.\scripts\vps\Watch-Outside.ps1 -Install` watches the
-    site, the feeds, the certificate, the name and the runner from outside it.
+    here every day. The outside watcher runs on GitHub's runners from its own
+    public repository and asks for the address it was exported with, so
+    `.\scripts\vps\Watch-Outside.ps1 -Export "C:\Thornswood-Repo\temp\watch-outside"`
+    into a clone of that repository, then commit and push it there, and its
+    dns check expects the new box.
 
 ## Then leave the old box alone for a week
 
@@ -407,9 +412,9 @@ The steps, in order:
    per-machine override (issue #1090, `scripts\vps\Vps.ps1`): a file holding
    only `{"address": "<its address>", "hostKeys": ["SHA256:..."]}`, with the
    fingerprints step 2 of "If it is a new machine" reads in its console.
-   Save it as `C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json` and, in
+   Save it as `C:\Thornswood-Repo\temp\rehearsal\vps.json` and, in
    the one PowerShell window the rehearsal runs in, set
-   `$env:THORNSWOOD_VPS_LOCAL = "C:\ThornswoodTemps&Worktrees\temp\rehearsal\vps.json"`.
+   `$env:THORNSWOOD_VPS_LOCAL = "C:\Thornswood-Repo\temp\rehearsal\vps.json"`.
    Every script run from that window talks to the throwaway box, and every
    other window and every lane on the machine still talks to the real one.
    (`%LOCALAPPDATA%\Thornswood\vps.json` also works, but it points the whole

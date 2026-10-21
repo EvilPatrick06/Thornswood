@@ -12,8 +12,9 @@
   confirmed. In this order, each step saying what it found and what it did:
 
     the list      every entry an IPv4 or IPv6 address or a range written
-                  address/bits, or the single word Any (back to anywhere).
-                  Anything else stops it.
+                  address/bits, or the single word Any (back to anywhere),
+                  or the single word None (no outside address: 127.0.0.1
+                  alone, which is the bridge, #2891). Anything else stops it.
     the caller    the address this ssh session comes from, read from
                   SSH_CLIENT, must be inside the list. A list that leaves it
                   out would cut this machine off, so it stops.
@@ -37,7 +38,7 @@
 
 .PARAMETER From
   The addresses that may reach port 22, comma separated: 203.0.113.7,
-  198.51.100.0/24, 2001:db8::/48, or Any.
+  198.51.100.0/24, 2001:db8::/48, or Any, or None.
 
 .PARAMETER DryRun
   Read everything, change nothing, and say WOULD for each change.
@@ -172,10 +173,15 @@ function Invoke-Scope {
     $entries = @($From -split '[,\s]+' | Where-Object { $_ })
     if (-not $entries.Count) { $script:stopped = $true; Say 'STOP' 'the list of addresses is empty. Nothing was changed.'; return }
     $any = ($entries.Count -eq 1 -and $entries[0] -eq 'Any')
+    # None is the box's own loopback alone, the only way the bridge reaches
+    # sshd (#2891): no outside address reaches port 22 at all, and the
+    # firewall never filters loopback anyway.
+    $none = ($entries.Count -eq 1 -and $entries[0] -eq 'None')
+    if ($none) { $entries = @('127.0.0.1') }
     $ranges = @()
     if (-not $any) {
         foreach ($e in $entries) {
-            if ($e -eq 'Any') { $script:stopped = $true; Say 'STOP' 'Any goes alone, not in a list. Nothing was changed.'; return }
+            if ($e -eq 'Any' -or $e -eq 'None') { $script:stopped = $true; Say 'STOP' ($e + ' goes alone, not in a list. Nothing was changed.'); return }
             $r = ConvertTo-Range $e
             if (-not $r) { $script:stopped = $true; Say 'STOP' ("'" + $e + "' is not an address or address/bits. Nothing was changed."); return }
             $ranges += $r
@@ -189,6 +195,7 @@ function Invoke-Scope {
         $c = if ($caller) { ConvertTo-Range $caller } else { $null }
         if (-not $c) { $script:stopped = $true; Say 'STOP' 'could not read the address this session comes from (SSH_CLIENT), so the list cannot be checked against it. Nothing was changed.'; return }
         $inside = @($ranges | Where-Object { Test-InRange $c $_ })
+        if (-not $inside.Count -and $none) { $script:stopped = $true; Say 'STOP' ('this session comes from ' + $caller + ', not through the bridge, so shutting port 22 would cut this machine off. Point its ssh through the bridge first (Grant-BoxAccess.ps1 -ThisMachine, or Setup-SshKey.ps1), then run this again. Nothing was changed.'); return }
         if (-not $inside.Count) { $script:stopped = $true; Say 'STOP' ('this session comes from ' + $caller + ', which is not in the list, so the change would cut this machine off. Add it, or run this from a machine in the list. Nothing was changed.'); return }
         Say 'KEPT' ('this session comes from ' + $caller + ', inside ' + $inside[0].Text)
     }

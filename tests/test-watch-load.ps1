@@ -96,9 +96,12 @@ foreach ($slow in @('Get-NetTCPConnection', 'Get-NetAdapterStatistics', 'Get-Net
     Yes "the collector does not call $slow" ($ctext -notmatch ('(?m)^[^#]*\b' + $slow + '\b'))
 }
 
-$ps = $null
-$cmd = Get-Command powershell.exe -ErrorAction SilentlyContinue
-if ($cmd) { $ps = $cmd.Source } else { $ps = (Get-Command pwsh).Source }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $ps = Get-WindowsPowerShell }
+else {
+    $ps = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 Write-Host ("      running it under {0}" -f $ps) -ForegroundColor DarkGray
 
 $watch   = Join-Path $scratch 'watch'

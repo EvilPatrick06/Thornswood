@@ -239,7 +239,7 @@ yes('B2 every plugin but ours is the collection\'s own bytes, revision ' + recor
     (other.length ? ' (not: ' + other.slice(0, 4).map((r) => r.name).join(', ') + '; rebuild the plugin for this revision)' : ''),
     other.length === 0);
 const contentRow = built.find((r) => r.name === 'Thornswood-Content.esp');
-yes('B3 and the content plugin is the repository\'s (rebuild the plugin after a content change)',
+yes('B3 and the content plugin is the repository\'s (after a content change, run scripts/mods/Rebuild-ContentTables.ps1)',
     !!contentRow && contentRow.sha256 === crypto.createHash('sha256').update(fs.readFileSync(CONTENT)).digest('hex'));
 
 // ---------------------------------------------------------------- rebuild

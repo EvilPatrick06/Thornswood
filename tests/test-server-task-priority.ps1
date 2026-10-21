@@ -137,8 +137,8 @@ Yes 'it starts node through start "" /b /wait /high, on server-log.js running th
 Yes '  and hands the server''s exit code back as the task''s' ($format -and $format.Contains('& call exit %^errorlevel%"'))
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-if (-not $onWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
 Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }
 
@@ -227,7 +227,7 @@ $writerAt = Join-Path $scratch 'server-log.js'
 Copy-Item -LiteralPath $writerSrc -Destination $writerAt
 [IO.File]::WriteAllText((Join-Path $scratch 'dist_back\skymp5-server.js'), "setTimeout(function () { }, 90000);`n")
 $line = $format -f $nodeCmd.Source, $writerAt, (Join-Path $scratch 'server.log')
-$action = New-ScheduledTaskAction -Execute ([IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')) -Argument $line -WorkingDirectory $scratch
+$action = New-ScheduledTaskAction -Execute (Get-WindowsPath 'System32\cmd.exe') -Argument $line -WorkingDirectory $scratch
 $child = $null
 $server = $null
 $parent = $null

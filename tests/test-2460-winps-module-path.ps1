@@ -29,11 +29,14 @@ Yes 'the Developer Guide says to start a harness with pwsh -NoProfile -File' ($g
 Yes 'and names the Git Bash failure (#2460)' ($guide.Contains('#2460') -and $guide.Contains('Get-FileHash'))
 Yes 'and how to clear the path for 5.1 from Git Bash' ($guide.Contains('env -u PSModulePath powershell.exe'))
 
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $pwsh = Get-Command pwsh -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not (Test-Path -LiteralPath $ps51) -or -not $pwsh) {
-    Write-Host 'SKIP  the module path runs need Windows PowerShell 5.1 and pwsh, and this machine lacks one'
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the module path runs: they are between pwsh and Windows PowerShell 5.1, and this is not Windows, which is the only place 5.1 runs'
+} elseif (-not $pwsh) {
+    Write-Host 'SKIP  the module path runs need pwsh as well as Windows PowerShell 5.1, and this machine has no pwsh'
 } else {
+    $ps51 = Get-WindowsPowerShell
     $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2460-' + [Guid]::NewGuid().ToString('N'))
     $null = [IO.Directory]::CreateDirectory($tmp)
     $utf8 = New-Object Text.UTF8Encoding($false)
@@ -47,7 +50,7 @@ if (-not (Test-Path -LiteralPath $ps51) -or -not $pwsh) {
         $outer = Join-Path $tmp 'outer.ps1'
         [IO.File]::WriteAllText($outer, (@(
             'param([string]$Probe)',
-            '& (Join-Path $env:SystemRoot "System32\WindowsPowerShell\v1.0\powershell.exe") -NoProfile -File $Probe'
+            ('& ''' + $ps51.Replace("'", "''") + ''' -NoProfile -File $Probe')
         ) -join "`r`n"), $utf8)
 
         # A PowerShell 7 module path, the shape Git Bash passes on from a pwsh terminal.
@@ -57,7 +60,7 @@ if (-not (Test-Path -LiteralPath $ps51) -or -not $pwsh) {
             (Join-Path $env:ProgramFiles 'PowerShell\Modules'),
             (Join-Path $home7 'Modules'),
             (Join-Path $env:ProgramFiles 'WindowsPowerShell\Modules'),
-            (Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules')
+            (Get-WindowsPath 'System32\WindowsPowerShell\v1.0\Modules')
         ) -join ';'
 
         function Read-Probe([string]$exe, [string]$argLine) {
@@ -81,7 +84,7 @@ if (-not (Test-Path -LiteralPath $ps51) -or -not $pwsh) {
             return $r
         }
 
-        $sys = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Utility'
+        $sys = Get-WindowsPath 'System32\WindowsPowerShell\v1.0\Modules\Microsoft.PowerShell.Utility'
         $via = Read-Probe $pwsh.Source ('-NoProfile -File "' + $outer + '" -Probe "' + $probe + '"')
         Yes 'the guide route (pwsh started with that path, then 5.1) keeps Get-FileHash' ($via.Hash -eq 'yes')
         Yes 'and that 5.1 loads Windows PowerShell''s own Utility module' ($via.First.StartsWith($sys, [StringComparison]::OrdinalIgnoreCase))

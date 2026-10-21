@@ -22,7 +22,7 @@ talk reaches it through the launcher, which hears it from the game plugin over
 a local socket and a small file in `Data\Platform`.
 
 Five files in `launcher\app` are touched from every machine and need a line in
-#staff-general before they change: Shell.cs, Checks.cs, Keep.cs, Hold.cs and
+#staff-updates before they change: Shell.cs, Checks.cs, Keep.cs, Hold.cs and
 Updater.cs.
 
 ## On your machine

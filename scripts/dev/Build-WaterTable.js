@@ -55,6 +55,7 @@
 // not where this thinks it is.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -66,9 +67,6 @@ const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.txt');
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'waters.json'));
 const PRINT = args.indexOf('--print') !== -1;
-
-const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
-                  'HearthFires.esm', 'Dragonborn.esm'];
 
 // Tamriel. If this worldspace comes out with no water, NAM2 is not being read
 // and every exterior in the game would silently fall back to nothing.
@@ -99,19 +97,6 @@ function classOf(edid) {
 }
 
 function fail(msg) { console.error('FAIL  ' + msg); process.exitCode = 1; }
-
-function loadOrder() {
-  const out = BETHESDA.slice();
-  let raw = '';
-  try { raw = fs.readFileSync(PLUGINS_TXT, 'utf8'); } catch (e) { return out; }
-  raw.split(/\r?\n/).forEach(function (line) {
-    const t = line.trim();
-    if (!t || t[0] === '#') { return; }
-    const name = t[0] === '*' ? t.slice(1).trim() : t;
-    if (name && out.indexOf(name) === -1) { out.push(name); }
-  });
-  return out;
-}
 
 function masters(b, headerSize) {
   const out = [];
@@ -221,11 +206,10 @@ function walk(b, start, end, mast, self) {
   }
 }
 
-const order = loadOrder();
+const order = loadedOrder(PLUGINS_TXT, DATA);
 let parsed = 0;
 for (const pl of order) {
-  const p = path.join(DATA, pl);
-  if (!fs.existsSync(p)) { continue; }
+  const p = pluginPath(DATA, pl);
   let b;
   try { b = fs.readFileSync(p); } catch (e) { fail('could not read ' + pl); continue; }
   if (b.length < 24 || b.toString('ascii', 0, 4) !== 'TES4') { fail('not a plugin: ' + pl); continue; }

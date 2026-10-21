@@ -48,6 +48,7 @@ const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const M = require('./Audit-ModMenus.js');
+const { loadOrder } = require('../dev/OwnPlugins.js');
 
 // ------------------------------------------------------------------ archives
 
@@ -202,7 +203,7 @@ function readMenu(bytes) {
 }
 
 function check(opts) {
-  const order = M.readLoadOrder(opts.plugins);
+  const order = loadOrder(opts.plugins);
   const gone = {};
   (opts.gone || []).forEach(function (g) { if (g) { gone[g.toLowerCase().replace(/\//g, '\\')] = true; } });
   const find = fileFinder(opts.data, order, gone);

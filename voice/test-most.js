@@ -135,17 +135,21 @@ function joinToken(s, pid) {
 
 const opened = [];
 /*
-  One page's socket. Resolves once it is welcomed or closed, whichever comes
-  first, with what it was sent: { welcomed, closed, code, reason, chat, rosters, ws }.
+  One page's socket. Resolves once it is welcomed, closed or refused at the
+  handshake, whichever comes first, with what it was sent:
+  { welcomed, closed, refused, code, reason, chat, rosters, ws }. A refused
+  handshake is told by error before open, since Node 22's WebSocket never
+  follows it with close (#2818).
 */
 async function page(s, pid) {
   const token = await joinToken(s, pid);
   return new Promise((ok) => {
     const ws = new WebSocket('ws://127.0.0.1:' + s.port + '/', ['thornswood', token]);
     opened.push(ws);
-    const me = { pid: pid, ws: ws, token: token, welcomed: false, closed: false, code: 0, reason: '', chat: [], roster: null };
+    const me = { pid: pid, ws: ws, token: token, open: false, welcomed: false, closed: false, refused: false,
+                 code: 0, reason: '', chat: [], roster: null };
     const late = setTimeout(() => ok(me), BOUND_MS);
-    ws.onopen = () => { ws.send(JSON.stringify({ t: 'join', profileId: pid, name: 'Person ' + pid })); };
+    ws.onopen = () => { me.open = true; ws.send(JSON.stringify({ t: 'join', profileId: pid, name: 'Person ' + pid })); };
     ws.onmessage = (ev) => {
       let m = null;
       try { m = JSON.parse(String(ev.data)); } catch (e) { return; }
@@ -154,13 +158,13 @@ async function page(s, pid) {
       if (m.t === 'peers') { me.roster = m.peers || []; }
     };
     ws.onclose = (ev) => { me.closed = true; me.code = ev.code; me.reason = ev.reason; clearTimeout(late); ok(me); };
-    ws.onerror = () => { };
+    ws.onerror = () => { if (!me.open) { me.refused = true; clearTimeout(late); ok(me); } };
   });
 }
 
 function closed(me) {
   return new Promise((ok) => {
-    if (me.closed) { ok(); return; }
+    if (me.closed || me.refused) { ok(); return; }
     const prev = me.ws.onclose;
     me.ws.onclose = (ev) => { if (prev) prev(ev); ok(); };
     me.ws.close();
@@ -228,13 +232,17 @@ function finish() {
       [a, b, c, b2].every((p) => !(p.roster || []).some((r) => Number(r.profileId) === 104)));
 
   // The token the fourth came with was spent on that handshake, as any is.
+  // The service answers it 403, and a refused handshake fires error: Node
+  // 24's WebSocket follows that with close 1006, Node 22's (undici 6) never
+  // does and leaves the socket connecting (#2818). So the answer is settled
+  // on whichever of the two comes first.
   const again = await new Promise((ok) => {
     const ws = new WebSocket('ws://127.0.0.1:' + s.port + '/', ['thornswood', d.token]);
     opened.push(ws);
     let opened2 = false;
     ws.onopen = () => { opened2 = true; };
     ws.onclose = () => ok(opened2);
-    ws.onerror = () => { };
+    ws.onerror = () => ok(opened2);
   });
   yes('the token the turned away socket carried does not open a second one', again === false);
 

@@ -161,6 +161,8 @@ try {
     New-Item -ItemType Directory -Force -Path (Join-Path $tree 'launcher\app') | Out-Null
     [IO.File]::WriteAllText((Join-Path $tree 'launcher\app\OwnGame.cs'), 'class OwnGame { }')
     Invoke-Expression $fns['Get-LauncherInputHash']
+    # The fingerprint reads each file as it ships (#2903).
+    . (Join-Path $repo 'scripts\release\ShippedBytes.ps1')
     $before = Get-LauncherInputHash $tree
     [IO.File]::WriteAllText((Join-Path $tree 'launcher\app\OwnGame.cs'), 'class OwnGame { void Faster() { } }')
     Yes 'a launcher change since main''s release moves the fingerprint Ship compares' ((Get-LauncherInputHash $tree) -ne $before)
@@ -209,6 +211,12 @@ try {
     Yes ("4 once main ships that 1.2.4, dev keeps it with no rebuild: " + (Said $r)) (Chose $r '1.2.4' $false)
     $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $E; Main = "1.2.3|$M"; DevFeed = "1.2.4|$G"; Ever = @('1.2.3.2', '1.2.4') }
     Yes ("4 a launcher change after dev took 1.2.4 takes 1.2.4.1: " + (Said $r)) (Chose $r '1.2.4.1' $true)
+    # 20 Oct: dev on 1.2.6.1 from these sources, main still on 1.2.5, and the
+    # next dev Ship from clean main 1.2.6 stopped on a downgrade to 1.2.6.
+    $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $E; Main = "1.2.3|$M"; DevFeed = "1.2.4.1|$E"; Ever = @('1.2.4', '1.2.4.1') }
+    Yes ("4 the next Ship from those sources keeps dev's launcher, no rebuild and no downgrade: " + (Said $r)) (Chose $r '1.2.4' $false)
+    $r = Run @{ Aligned = $true; Current = '1.2.4'; Inputs = $G; Main = "1.2.3|$M"; DevFeed = "1.2.4.1|$E"; Ever = @('1.2.4', '1.2.4.1') }
+    Yes ("4 and another launcher change takes 1.2.4.2: " + (Said $r)) (Chose $r '1.2.4.2' $true)
 
     # ---- 5. main has published past this source (a hotfix) -----------------
     $r = Run @{ Aligned = $true; Current = '1.2.3'; Inputs = $E; Main = "1.2.4|$G"; DevFeed = "1.2.3.2|$D"; Ever = @('1.2.3.2') }

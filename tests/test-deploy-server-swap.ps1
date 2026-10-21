@@ -101,6 +101,10 @@ Yes 'Swap.ps1 puts Read-JsonFile.ps1 and RecordShape.ps1 in front of the stage c
     $lib.Substring($b).Contains('$checkBlock = $ThornswoodRecordShapeText + $checkBlock'))
 $checkBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\Read-JsonFile.ps1')) + "`r`n" +
               [IO.File]::ReadAllText((Join-Path $Here 'scripts\release\RecordShape.ps1')) + "`r`n" + $checkBlock
+# And the stop and the renames (#2928), the way Swap.ps1 puts them in front.
+Yes 'Swap.ps1 puts StopAndMove.ps1 in front of the swap' (
+    $lib.Substring($b).Contains('$swapBlock = $ThornswoodStopAndMoveText + $swapBlock'))
+$swapBlock = [IO.File]::ReadAllText((Join-Path $Here 'scripts\deploy\StopAndMove.ps1')) + "`r`n" + $swapBlock
 Yes 'Deploy-Server.ps1 loads Swap.ps1' ($src -match "\. \(Join-Path \`$Here 'Swap\.ps1'\)")
 # Which settings Deploy-Server takes from the build and which stay the live
 # server's (#1222), and the carry it runs on the box: ServerSettings.ps1.
@@ -188,10 +192,14 @@ Yes 'and what it makes parses with the swap behind it' ($errors.Count -eq 0)
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -EA SilentlyContinue
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $node -or -not (Test-Path -LiteralPath $ps51) -or
-    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-    Write-Host 'SKIP  the runs need node, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+if (-not $node -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
 }
 

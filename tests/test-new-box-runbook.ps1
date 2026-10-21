@@ -303,7 +303,7 @@ $steps = @(
     @{ Say = 'Harden-VPS, once key login works (issue #450)';        Leaf = 'Harden-VPS.ps1' },
     @{ Say = 'Set-Server moves everybody';                           Leaf = 'Set-Server.ps1' },
     @{ Say = 'the main Ship';                                        Leaf = 'Ship.ps1' },
-    @{ Say = 'the outside watch installed';                          Leaf = 'Watch-Outside.ps1'; Also = { param($r) Has $r 'Install' } }
+    @{ Say = 'the outside watch exported with the new address';      Leaf = 'Watch-Outside.ps1'; Also = { param($r) Has $r 'Export' } }
 )
 $prev = -1; $prevSay = 'the start'; $inOrder = $true
 foreach ($s in $steps) {
@@ -314,7 +314,7 @@ foreach ($s in $steps) {
 }
 Yes ("the new machine steps run in the order the scripts need ({0} steps)" -f $steps.Count) $inOrder
 $lastPs1 = $moving[$moving.Count - 1]
-Yes ("and end with the watchers (the last is {0})" -f $lastPs1.Leaf) (@('Watch-Outside.ps1', 'Fetch-Backups.ps1') -contains $lastPs1.Leaf -and ((Has $lastPs1 'Install') -or (Has $lastPs1 'Schedule')))
+Yes ("and end with the watchers (the last is {0})" -f $lastPs1.Leaf) (@('Watch-Outside.ps1', 'Fetch-Backups.ps1') -contains $lastPs1.Leaf -and ((Has $lastPs1 'Export') -or (Has $lastPs1 'Schedule')))
 $mt = $pages['MOVING-THE-SERVER.md, new machine']
 $pinAt = $mt.IndexOf('hostKeys')
 Yes 'the new box''s host key is pinned in vps.json before Setup-SshKey reaches for it (issue #450)' (
@@ -516,11 +516,12 @@ try {
     }
 
     # ---- the box-side half, under Windows PowerShell 5.1 --------------------
-    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-        Write-Host 'SKIP  the box-side runs need Windows PowerShell 5.1, which runs them on the VPS'
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the box-side runs need Windows PowerShell 5.1, which runs them on the VPS; this is not Windows'
         throw 'skip'
     }
+    $ps51 = Get-WindowsPowerShell
     $old = Join-Path $work 'old'
     $site = Join-Path $old 'site'; $bot = Join-Path $old 'bot'; $caddy = Join-Path $old 'caddy'; $voice = Join-Path $old 'voice'
     Put (Join-Path $site 'data\board.json') '{"cards":[]}'
