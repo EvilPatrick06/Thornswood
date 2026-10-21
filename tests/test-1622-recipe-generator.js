@@ -70,10 +70,14 @@ function oneString(name) {
 }
 
 // ---- the load order is the plugins that are switched on -----------------
-const loadOrder = slice(ps, "foreach ($p in $MASTERS_FIRST) { $order.Add($p) }", "Ok (\"{0} plugins: the five masters, then {1}\"");
-yes("the plugins.txt loop is in the build", loadOrder !== null);
-yes("a line Vortex switched off (no '*') is left out of the load order",
-  !!loadOrder && loadOrder.indexOf("if (-not $t.StartsWith('*')) { $offCount++; continue }") >= 0);
+// The build reads plugins.txt through scripts/dev/OwnPlugins.ps1 (#2976), which
+// leaves a switched off line out; tests/test-2923-own-plugins.js holds the
+// helper to that and tests/test-1712-builders-skip-off.js runs builders on it.
+const loadOrder = slice(ps, "if (-not (Test-Path -LiteralPath $PluginsTxt))", "Ok (\"{0} plugins: the five masters, then {1}\"");
+yes("the build takes its load order from plugins.txt", loadOrder !== null);
+yes("through the helper, which leaves a line Vortex switched off (no '*') out of it",
+  !!loadOrder && loadOrder.indexOf("foreach ($p in (Get-LoadOrder $PluginsTxt)) { $order.Add($p) }") >= 0 &&
+  loadOrder.indexOf("$offCount = (Get-SwitchedOff $PluginsTxt).Count") >= 0);
 yes("and the run says how many were left out", ps.indexOf("line(s) in that list are switched off and were left out") >= 0);
 
 // ---- the line ending the files already have (#1622) ---------------------

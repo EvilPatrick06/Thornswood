@@ -168,7 +168,7 @@ $env:THORNSWOOD_NEXUS_STANDIN = $null; $env:LOCALAPPDATA = (Join-Path $T 'appdat
 $n0 = Count
 $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.1')
 $env:THORNSWOOD_NEXUS_STANDIN = $base; $env:LOCALAPPDATA = $realAppData
-YesR 'with no key on the machine a file upload stops, naming the variable and the file' ($r.Code -eq 1 -and $r.Out -match 'THORNSWOOD_NEXUS_API_KEY' -and $r.Out -match 'Thornswood\\Nexus\\api-key\.txt' -and $r.Out -match 'Nothing was changed on Nexus') $r
+YesR 'with no key on the machine a file upload stops, naming the variable and the file' ($r.Code -eq 1 -and $r.Out -match 'THORNSWOOD_NEXUS_API_KEY' -and $r.Out.Contains([IO.Path]::Combine('Thornswood', 'Nexus', 'api-key.txt')) -and $r.Out -match 'Nothing was changed on Nexus') $r
 Yes 'and asks nothing first' ((Count) -eq $n0)
 
 $r = Run 'Set-NexusKey.ps1' @('-Check')

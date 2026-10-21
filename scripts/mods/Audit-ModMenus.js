@@ -62,24 +62,10 @@
 // its own, which only its source says. Those need the game or the source.
 const fs = require('fs');
 const path = require('path');
-const { pluginPath } = require('../dev/OwnPlugins.js');
+const { pluginPath, loadOrder } = require('../dev/OwnPlugins.js');
 const zlib = require('zlib');
 
-const BASE_MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'];
 const COMPRESSED_RECORD = 0x00040000;
-
-// ------------------------------------------------------------------ plugins
-
-/* The enabled plugins, in order, the same way the table builders read them. */
-function readLoadOrder(file) {
-  const names = fs.readFileSync(file, 'utf8').split(/\r?\n/)
-    .map(function (l) { return l.trim(); })
-    .filter(function (l) { return l.charAt(0) === '*'; })
-    .map(function (l) { return l.slice(1).trim(); })
-    .filter(Boolean);
-  const lower = names.map(function (n) { return n.toLowerCase(); });
-  return BASE_MASTERS.filter(function (n) { return lower.indexOf(n.toLowerCase()) === -1; }).concat(names);
-}
 
 /*
   A form id inside a plugin names its file by position: the top byte is an
@@ -550,7 +536,7 @@ function stamp(file) {
 function audit(opts) {
   const data = opts.data;
   const pluginsTxt = opts.plugins;
-  const order = readLoadOrder(pluginsTxt);
+  const order = loadOrder(pluginsTxt);
   const problems = [];
   function problem(s) { if (problems.indexOf(s) === -1) { problems.push(s); } }
   const missing = [];
@@ -765,7 +751,7 @@ function report(r, verbose) {
 }
 
 module.exports = {
-  readLoadOrder: readLoadOrder, formKey: formKey, readPlugin: readPlugin, readVmad: readVmad,
+  formKey: formKey, readPlugin: readPlugin, readVmad: readVmad,
   readPex: readPex, lz4Block: lz4Block, lz4Frame: lz4Frame, archiveScripts: archiveScripts,
   archiveFile: archiveFile, scriptFinder: scriptFinder, chainOf: chainOf,
   readMcmConfig: readMcmConfig, sourceFormKey: sourceFormKey, audit: audit, report: report

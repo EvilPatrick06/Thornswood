@@ -544,7 +544,7 @@ $prior = @()
 if (-not $NewOrder -and -not $FullLoadOrder -and -not $MinimalLoadOrder -and (Test-Path -LiteralPath $priorPath)) {
     try {
         $prior = @((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $priorPath -Raw) $priorPath).loadOrder |
-                   ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) } |
+                   ForEach-Object { @(([string]$_) -split '[\\/]')[-1] } |
                    Where-Object { $_ })
     } catch { $prior = @() }
 }

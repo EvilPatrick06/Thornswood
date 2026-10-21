@@ -482,6 +482,65 @@ try {
   Yes 'the run log holds no webhook and no token' ($public -notmatch 'SECRETHOOKTOKEN|api/webhooks|FAKETOKEN')
   Yes 'the public lines are there: the site and a feed say what they saw' ($public -match 'site\s+ok\s+answered 200' -and $public -match 'feed\s+ok\s+answered, release')
 
+  # ---- -Remove on One (#2990) -------------------------------------------------------------
+  # One's old task lets only an administrator delete it. A plain shell is
+  # stopped before it tries, and told how to run it; a refusal is printed
+  # with Windows' own words. Until #2990 the refusal was swallowed and the
+  # run said only that the task was still registered.
+  Yes 'Remove-OldWatch is there' ([bool](Get-Command Remove-OldWatch -EA SilentlyContinue))
+  if (Get-Command Remove-OldWatch -EA SilentlyContinue) {
+    $script:tasks = New-Object System.Collections.Generic.List[string]
+    $script:elevated = $false; $script:unregCalls = 0; $script:unregRefuse = ''; $script:listRefuse = ''
+    function Test-Elevated { return $script:elevated }
+    function Get-ScheduledTask { if ($script:listRefuse) { throw $script:listRefuse }; return @($script:tasks | ForEach-Object { [pscustomobject]@{ TaskName = $_ } }) }
+    function Unregister-ScheduledTask([string]$TaskName, [switch]$Confirm) {
+      $script:unregCalls++
+      if ($script:unregRefuse) { throw $script:unregRefuse }
+      [void]$script:tasks.Remove($TaskName)
+    }
+    $script:said = New-Object System.Collections.Generic.List[string]
+    $sayInto = { param($m, $c) $script:said.Add($m) }
+    $oldDir = Join-Path $dir 'old-watch'
+    function Reset-Remove {
+      $script:tasks.Clear(); $script:tasks.Add('Thornswood Watch Outside'); $script:tasks.Add('Something Else')
+      $script:elevated = $false; $script:unregCalls = 0; $script:unregRefuse = ''; $script:listRefuse = ''; $script:said.Clear()
+      $null = New-Item -ItemType Directory -Path $oldDir -Force; Set-Content -LiteralPath (Join-Path $oldDir 'alerts.jsonl') -Value 'x'
+    }
+    $runLine = "& 'C:\Thornswood-Repo\scripts\vps\Watch-Outside.ps1' -Remove -TaskName 'Thornswood Watch Outside'"
+
+    Reset-Remove
+    $code = Remove-OldWatch 'Thornswood Watch Outside' $oldDir $runLine $sayInto
+    $text = $script:said -join "`n"
+    Yes '-Remove in a plain shell stops before it tries, and fails' ($code -eq 1 -and $script:unregCalls -eq 0)
+    Yes '  saying only an administrator can delete it, and the line to run there' ($text -match 'only an administrator' -and $text -match 'Run as administrator' -and $text.Contains($runLine))
+    Yes '  and leaves the task and its folder as they were' ($script:tasks.Contains('Thornswood Watch Outside') -and (Test-Path -LiteralPath $oldDir))
+
+    Reset-Remove; $script:elevated = $true
+    $script:unregRefuse = 'Access is denied. (HRESULT 0x80070005)'
+    $code = Remove-OldWatch 'Thornswood Watch Outside' $oldDir $runLine $sayInto
+    $text = $script:said -join "`n"
+    Yes '-Remove that Windows refuses fails, with Windows'' own words' ($code -eq 1 -and $text -match 'refused to remove Thornswood Watch Outside: Access is denied\. \(HRESULT 0x80070005\)')
+    Yes '  and keeps the folder, since the task is still there' (Test-Path -LiteralPath $oldDir)
+
+    Reset-Remove; $script:elevated = $true
+    $code = Remove-OldWatch 'Thornswood Watch Outside' $oldDir $runLine $sayInto
+    $text = $script:said -join "`n"
+    Yes '-Remove as administrator takes the task off, and only that task' ($code -eq 0 -and -not $script:tasks.Contains('Thornswood Watch Outside') -and $script:tasks.Contains('Something Else') -and $text -match 'removed Thornswood Watch Outside')
+    Yes '  and its folder with the webhook copy' (-not (Test-Path -LiteralPath $oldDir) -and $text -match 'with its copy of the webhook')
+
+    Reset-Remove; $script:tasks.Remove('Thornswood Watch Outside') | Out-Null
+    $code = Remove-OldWatch 'Thornswood Watch Outside' $oldDir $runLine $sayInto
+    $text = $script:said -join "`n"
+    Yes '-Remove with no task, in a plain shell, says it is not registered and still clears the folder' ($code -eq 0 -and $script:unregCalls -eq 0 -and $text -match 'is not registered' -and -not (Test-Path -LiteralPath $oldDir))
+
+    Reset-Remove; $script:listRefuse = 'The task service could not be reached'
+    $code = Remove-OldWatch 'Thornswood Watch Outside' $oldDir $runLine $sayInto
+    $text = $script:said -join "`n"
+    Yes '-Remove that cannot list the tasks says why, and is not told as no task' ($code -eq 1 -and $text -match 'would not list the scheduled tasks: The task service could not be reached' -and $text -notmatch 'is not registered')
+    Remove-Item -LiteralPath $oldDir -Recurse -Force -EA SilentlyContinue
+  }
+  Yes '-Remove no longer drops what Windows says' ((Get-Content -LiteralPath $ScriptPath -Raw) -notmatch 'Unregister-ScheduledTask\s+-TaskName[^\r\n]*SilentlyContinue')
+
   # ---- words and secrets ----------------------------------------------------------------
   $all = (Get-Content -LiteralPath $P.Alerts -Raw) + (Get-Content -LiteralPath $P.Log -Raw)
   Yes 'the webhook address is in neither the outbox nor watch.log' ($all -notmatch 'SECRETHOOKTOKEN' -and $all -notmatch 'api/webhooks')

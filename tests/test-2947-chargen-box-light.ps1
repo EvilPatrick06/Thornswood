@@ -25,8 +25,8 @@
   Test-ThornswoodPluginLight from ServerOrder.ps1), and run in Windows
   PowerShell, what sshd runs on the box, against a server folder made in a
   temp folder: a server-settings.json, a server-build.json, plugin files
-  whose TES4 headers say light or not, a Thornswood-Content.esp with BOOK and
-  MESG groups, and a gamemode.js. The two readers Check-Chargen.ps1 sends up
+  whose TES4 headers say light or not, a Thornswood-Content.esp with a BOOK
+  group and a MESG group, and a gamemode.js. The two readers Check-Chargen.ps1 sends up
   with it are lifted out of it by the parser, as is its list of what a
   gamemode should mention. Nothing connects to anything.
 #>
@@ -203,10 +203,11 @@ try {
     Yes 'the plugin the order names is read: PLUGIN AT its path' ($said -contains ('PLUGIN AT ' + $esp))
     Yes '  each BOOK with whether it has a name and a mesh' (
         ($said -contains 'BOOK 05E80030 1 1') -and ($said -contains 'BOOK 05E80031 1 0') -and ($said -contains 'BOOK 05E80000 0 1'))
-    Yes '  and each MESG with its buttons' ($said -contains 'MESG 05E80050 3')
+    Yes '  and no MESG: the creation menus are out of the plugin and the check (#2962)' (
+        @($said | Where-Object { $_ -like 'MESG *' }).Count -eq 0)
     $local = @(Read-ThornswoodChargenRecords (Join-Path (Join-Path $tmp 'plugins') 'Thornswood-Content.esp'))
     Yes '  and the box says what the build''s own read says' (
-        $local.Count -eq 4 -and @($local | Where-Object { $said -notcontains $_ }).Count -eq 0)
+        $local.Count -eq 3 -and @($local | Where-Object { $said -notcontains $_ }).Count -eq 0)
 
     # A load order entry that is not a full path is under dataDir.
     Write-Content 'data'
