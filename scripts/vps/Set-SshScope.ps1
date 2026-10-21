@@ -15,8 +15,10 @@
     1. The box's own key. known_hosts here must hold the host key
        scripts\vps\vps.json pins.
     2. Key login, before anything else.
-    3. On the box: scripts\vps\vps-ssh-scope.ps1 is copied to C:\Windows\Temp
-       and run there (it deletes itself). It refuses a list that does not
+    3. On the box: scripts\vps\vps-ssh-scope.ps1 runs there, sent on ssh's
+       standard input, so nothing of it is written on the box (#3035; until
+       21 Oct 2026 it was copied into C:\Windows\Temp, and a run cut short
+       left the copy there). It refuses a list that does not
        hold the address this session comes from, a rule for every port that
        would let 22 in anyway, and a rule for 22 shared with other ports.
        Then it saves the rules' remote addresses as they are, arms a task
@@ -100,7 +102,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
-. (Join-Path $Here 'Vps.ps1')
+. (Join-Path $Here 'Send-Script.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
@@ -137,20 +139,17 @@ function Invoke-Encoded([string]$script) {
     return $out
 }
 
+# vps-ssh-scope.ps1 runs on the box from ssh's standard input, as
+# Harden-VPS.ps1 sends its own (Send-Script.ps1), so a run cut short at any
+# point leaves nothing of it there (#3035).
 function Invoke-Box([bool]$dry) {
     if (-not (Test-Path -LiteralPath $BoxScript)) { Die "There is no $BoxScript. Nothing was sent." }
-    $far = 'C:/Windows/Temp/thornswood-ssh-scope-' + [Guid]::NewGuid().ToString('N') + '.ps1'
+    $a = "-From '" + $list.Replace("'", "''") + "'"
+    if ($dry) { $a += ' -DryRun' }
+    $script = Get-ThornswoodFileScript -Path $BoxScript -Arguments $a
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    Invoke-ThornswoodNative { & scp @ssh $BoxScript "${User}@${Vps}:$far" } 2>&1 | Out-Null
-    $sent = ($LASTEXITCODE -eq 0)
-    $ErrorActionPreference = $old
-    if (-not $sent) { Die "Could not copy vps-ssh-scope.ps1 to the box. Nothing was changed." }
-    # The path goes bare, as Harden-VPS.ps1 sends its own (Remote.ps1 says why).
-    $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File $far -From `"$list`""
-    if ($dry) { $cmd += ' -DryRun' }
-    $ErrorActionPreference = 'Continue'
-    $out = Clean @(Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1)
+    $out = Clean @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ("`$ProgressPreference = 'SilentlyContinue'`r`n" + $script))
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     foreach ($l in $out) {
@@ -168,9 +167,7 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  who may reach ssh' -ForegroundColor White
 Say "  $User@$Vps, port 22 from $list" 'DarkGray'
 
-foreach ($t in 'ssh', 'scp') {
-    if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
-}
+if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) { Die 'ssh is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client.' }
 if (-not $list) { Die 'No addresses given. Pass -From with the list, or -From Any.' }
 
 Head "1. The box's own key"

@@ -19,8 +19,10 @@
     1. The box's own key. known_hosts here must hold the host key
        scripts\vps\vps.json pins.
     2. Key login, and when the box last started.
-    3. On the box: scripts\vps\vps-time-wait.ps1 is copied to C:\Windows\Temp
-       and run there (it deletes itself). It sets the value and reads it
+    3. On the box: scripts\vps\vps-time-wait.ps1 runs there, sent on ssh's
+       standard input, so nothing of it is written on the box (#3035; until
+       21 Oct 2026 it was copied into C:\Windows\Temp, and a run cut short
+       left the copy there). It sets the value and reads it
        back. With -Restart it then reads who is on the live and the dev
        server, refuses while anybody is or while a count cannot be read, and
        restarts the box.
@@ -91,7 +93,7 @@ param(
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
-. (Join-Path $Here 'Vps.ps1')
+. (Join-Path $Here 'Send-Script.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
@@ -126,20 +128,15 @@ function Get-BootTime {
     return ''
 }
 
+# vps-time-wait.ps1 runs on the box from ssh's standard input, as
+# Harden-VPS.ps1 sends its own (Send-Script.ps1), so a run cut short at any
+# point, the restart included, leaves nothing of it there (#3035).
 function Invoke-Box([string]$mode) {
     if (-not (Test-Path -LiteralPath $BoxScript)) { Die "There is no $BoxScript. Nothing was sent." }
-    $far = 'C:/Windows/Temp/thornswood-time-wait-' + [Guid]::NewGuid().ToString('N') + '.ps1'
+    $script = Get-ThornswoodFileScript -Path $BoxScript -Arguments $mode
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    Invoke-ThornswoodNative { & scp @ssh $BoxScript "${User}@${Vps}:$far" } 2>&1 | Out-Null
-    $sent = ($LASTEXITCODE -eq 0)
-    $ErrorActionPreference = $old
-    if (-not $sent) { Die "Could not copy vps-time-wait.ps1 to the box. Nothing was changed." }
-    # The path goes bare, as Harden-VPS.ps1 sends its own (Remote.ps1 says why).
-    $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
-    if ($mode) { $cmd += ' ' + $mode }
-    $ErrorActionPreference = 'Continue'
-    $out = Clean @(Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1)
+    $out = Clean @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ("`$ProgressPreference = 'SilentlyContinue'`r`n" + $script))
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     foreach ($l in $out) {
@@ -158,9 +155,7 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  how long the box holds a closed connection' -ForegroundColor White
 Say "  $User@$Vps" 'DarkGray'
 
-foreach ($t in 'ssh', 'scp') {
-    if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
-}
+if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) { Die 'ssh is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client.' }
 if ($Check -and $Restart) { Die '-Check only reads, so it does not go with -Restart.' }
 
 Head "1. The box's own key"

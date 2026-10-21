@@ -65,7 +65,7 @@ function Run-Block([string]$value, $settings, [string]$npcValue = '') {
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
     # The values the deploy would have put in; these names are what the block reads.
     $rootWin = $tmp
-    $farOrder = ''
+    $orderWire = ''
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
     $lightDef = ''
@@ -119,7 +119,7 @@ try {
     foreach ($bad in @('{ "port": 77', '')) {
         Get-ChildItem $tmp -Filter 'server-settings.json.before-*' | Remove-Item -Force
         [IO.File]::WriteAllText($p, $bad)
-        $rootWin = $tmp; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $fullIndexDef = $script:fullIndexDef
+        $rootWin = $tmp; $orderWire = ''; $remotePlugins = 'C:/nowhere'; $fullIndexDef = $script:fullIndexDef
         $lightDef = ''; $devRecordLight = $false; $VoicePort = 7789; $maxOnline = 0; $seats = 0
         $LoadOrderRefuse = 'on'; $RequirePass = ''; $Npcs = ''
         $file = Join-Path $tmp 'block.ps1'

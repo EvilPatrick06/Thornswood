@@ -25,8 +25,9 @@
   the box restarts.
 
   Every line it prints starts with a word: NOW, ALREADY, CHANGED, WOULD,
-  ROOM, NOTE, RESTARTING or STOP. It deletes itself before it ends, and
-  before the restart when there is one.
+  ROOM, NOTE, RESTARTING or STOP. Set-TimeWait.ps1 sends its text on ssh's
+  standard input and Windows PowerShell 5.1 runs it from there, so nothing
+  of it is ever written on the box, restart or no restart (#3035).
 
 .PARAMETER Check
   Only say what the value is now. Nothing is changed.
@@ -163,7 +164,6 @@ $script:code = 1
 try { Invoke-TimeWait }
 catch { $script:RestartNow = $false; $script:code = 1; Say 'STOP' ('it failed partway, at: ' + $_.Exception.Message + '. Nothing restarted.') }
 $code = $script:code
-if ($PSCommandPath) { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue }
 if ($code -eq 0 -and $script:RestartNow) {
     Say 'RESTARTING' 'the box, so Windows reads the new value; every Thornswood service starts again with it'
     Invoke-BoxRestart
