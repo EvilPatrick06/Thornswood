@@ -228,10 +228,13 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 }
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
-  # Which server this is, as its own settings say (-Server).
-  `$name = ''
-  try { `$name = [string]((Get-Content (Join-Path `$r 'server-settings.json') -Raw | ConvertFrom-Json).thornswoodServer) } catch { }
-  'NAME|' + `$r + '|' + `$name
+  # Which server this is, as its own settings say (-Server). Settings that
+  # cannot be read are said, with why, so -Server never guesses past them.
+  try {
+    'NAME|' + `$r + '|' + [string]((Get-Content (Join-Path `$r 'server-settings.json') -Raw | ConvertFrom-Json).thornswoodServer)
+  } catch {
+    'NAMEERR|' + `$r + '|' + ("`$(`$_.Exception.Message)" -replace '[|\r\n]', ' ')
+  }
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
   foreach (`$n in @($movesLit)) {
     `$p = Join-Path `$r `$n
@@ -266,6 +269,12 @@ $nameOf = @{}
 foreach ($l in $lines) {
   $bits = "$l" -split '\|'
   if ($bits[0] -eq 'NAME') { $nameOf[$bits[1]] = $bits[2] }
+  if ($bits[0] -eq 'NAMEERR') {
+    # Unreadable settings could be the server asked for, so -Server stops
+    # rather than leave it; with no -Server every folder goes anyway.
+    if ($Server) { Die "The server settings at $($bits[1]) could not be read ($($bits[2])), so it is not known whether that folder is $Server. Nothing was wiped." }
+    Say "  the server settings at $($bits[1]) could not be read ($($bits[2]))" 'Yellow'
+  }
 }
 $keep = $true
 foreach ($l in $lines) {

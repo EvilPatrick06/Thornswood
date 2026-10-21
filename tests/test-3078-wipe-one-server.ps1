@@ -14,7 +14,8 @@
   dev only the dev folder, its task and its files are taken; with -Server main
   only main's; with none, both, as before; and a name no folder carries stops
   with nothing taken. The box half that writes the NAME line is checked in the
-  survey's text.
+  survey's text, and so is the line that says a folder's settings could not
+  be read, which stops -Server rather than guess.
 
   Read only.
 #>
@@ -86,6 +87,17 @@ Yes 'A1 with no -Server both go, as before' (@($all.roots).Count -eq 2 -and @($a
 
 $none = Read-Survey 'staging'
 Yes 'N1 a name no folder carries stops with nothing taken' ($none.ContainsKey('died') -and $none.died -like 'DIE No server*')
+
+# Settings the box could not read are said with why, never passed over: with
+# -Server that folder might be the one asked for, so nothing is taken.
+Yes 'U1 the survey says settings it could not read on a NAMEERR line, with why' (
+    $text.Contains("'NAMEERR|' + ``" + '$r') -and $text.Contains('Exception.Message'))
+$survey = @($survey | ForEach-Object { if ($_ -eq 'NAME|C:\Thornswood-Server|main') { 'NAMEERR|C:\Thornswood-Server|Invalid JSON primitive' } else { $_ } })
+$bad = Read-Survey 'dev'
+Yes 'U2 with -Server an unreadable folder stops the run with nothing taken, naming it' (
+    $bad.ContainsKey('died') -and $bad.died -like '*C:\Thornswood-Server *could not be read*Invalid JSON primitive*')
+$badAll = Read-Survey ''
+Yes 'U3 with no -Server every folder still goes, as before' (-not $badAll.ContainsKey('died') -and @($badAll.roots).Count -eq 2)
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
