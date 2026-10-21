@@ -58,7 +58,13 @@ WHAT IT CHECKS
                 a recipe's result, bench and items, a cell's location, owner,
                 water, climate, music and lighting, a location's parent, link
                 and enable parents) name a record that exists in the plugin
-                or one of its masters.
+                or one of its masters. A record one of the release's other
+                plugins adds in a master's numbering (MoreCraftableEquipment
+                adds its loom keyword as Update.esm's 0x6CE000) exists in the
+                release's load order, as SSEEdit loaded with that order sees
+                it; that is a note naming the plugin, not a fault. The load
+                order is the NPC catalogue's (game/data/npc-population.json),
+                read only when a reference needs it.
 
 WHAT IT DOES NOT
 
@@ -110,6 +116,7 @@ CLEANING
 """
 
 import argparse
+import json
 import os
 import re
 import struct
@@ -123,6 +130,9 @@ import bsa  # noqa: E402  (the repository's archive reader)
 import own_plugins  # noqa: E402  (where each plugin is read from, #2923)
 
 DATA_DIR = 'C:\\Thornswood\\Game\\Data'
+# The release's load order: the NPC catalogue's, which every builder of the
+# last plugin and the tables reads, held there to each plugin's bytes.
+CATALOGUE = os.path.join(ROOT, 'game', 'data', 'npc-population.json')
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -560,7 +570,9 @@ def check_masters(p, masters):
 
 
 def check_against_masters(p, masters, strings):
-    """(identical records to clean, identical parents kept, faults)."""
+    """(identical records to clean, identical parents kept, faults, and the
+    references that name a record no master has, as (record, field, form id)
+    for the load order to answer)."""
     want = set()
     for r in p.records:
         if (r.fid >> 24) < len(p.masters):
@@ -607,6 +619,7 @@ def check_against_masters(p, masters, strings):
             kept.append('%s, the parent of %d of this plugin\'s records' % (what, r.children))
         else:
             itm.append('%s is identical to %s\'s' % (what, m.name))
+    unresolved = []
     for r, t, v in refs:
         what = '%s %08X' % (r.tag.decode('latin1'), r.fid)
         if t is None:
@@ -614,9 +627,55 @@ def check_against_masters(p, masters, strings):
         elif (v >> 24) > len(p.masters):
             faults.append('%s %s names %08X, past this plugin\'s last file index' % (what, t.decode(), v))
         elif p.gid(v) not in exists:
-            faults.append('%s %s names %08X, which is in neither %s nor its masters'
-                          % (what, t.decode(), v, p.name))
-    return itm, kept, faults
+            unresolved.append((r, t, v))
+    return itm, kept, faults, unresolved
+
+
+def injected_by(p, unresolved, data_dir, read, order):
+    """(notes, faults) for references no master holds. A plugin may add a
+    record in another file's numbering (MoreCraftableEquipment.esp adds its
+    loom keyword as Update.esm's 0x6CE000): in the release's load order that
+    record exists, and SSEEdit, loaded with that order, resolves it. So the
+    rest of the load order is read, and a reference one of its plugins
+    injects is a note that names the plugin; one nothing holds is a fault."""
+    want = set(p.gid(v) for _, _, v in unresolved)
+    found = {}
+    for n in order:
+        if n.lower() == p.name.lower() or n in p.masters:
+            continue
+        if n.lower() not in read:
+            path = own_plugins.plugin_path(data_dir, n)
+            if not os.path.isfile(path):
+                continue
+            try:
+                read[n.lower()] = Plugin(path, n)
+            except (Fault, OSError, struct.error):
+                continue
+        q = read[n.lower()]
+        for e in q.records:
+            g = q.gid(e.fid)
+            if g in want and g[0] != q.name.lower():
+                found.setdefault(g, q.name)
+    notes, faults = [], []
+    for r, t, v in unresolved:
+        what = '%s %08X %s names %08X' % (r.tag.decode('latin1'), r.fid, t.decode(), v)
+        g = p.gid(v)
+        if g in found:
+            notes.append('%s, which no master has; %s adds it as %s\'s' % (what, found[g], p.owner(v)))
+        else:
+            faults.append('%s, which is in neither %s, its masters nor the load order'
+                          % (what, p.name))
+    return notes, faults
+
+
+def release_order(catalogue):
+    """The plugin names of the release's load order, or [] when the
+    catalogue cannot be read."""
+    try:
+        with open(catalogue, encoding='utf-8') as fh:
+            return [row['name'] for row in json.load(fh)['loadOrder']]
+    except (OSError, ValueError, KeyError, TypeError):
+        return []
 
 
 def report(title, lines, empty='none'):
@@ -631,6 +690,8 @@ def main(argv=None):
     ap = argparse.ArgumentParser(description='Whether Thornswood\'s own plugins are clean.')
     ap.add_argument('plugins', nargs='*', help='plugin file names; every plugin in game/content when none')
     ap.add_argument('--data', default=DATA_DIR, help="the game's Data folder, where the masters are read from")
+    ap.add_argument('--catalogue', default=CATALOGUE,
+                    help='the JSON whose loadOrder is the release load order (the NPC catalogue)')
     ap.add_argument('--no-masters', action='store_true',
                     help='read only the plugins: the file and deleted checks')
     args = ap.parse_args(argv)
@@ -668,19 +729,24 @@ def check_one(name, args, strings, read):
              ', light' if p.light else ''))
     faults, deleted = check_file(p)
     itm = None
+    notes = []
     if not args.no_masters:
         masters, missing = load_masters(p, args.data, read)
         if missing:
             report('COULD NOT CHECK against the masters', missing)
         else:
             faults += check_masters(p, masters)
-            itm, kept, more = check_against_masters(p, masters, strings)
+            itm, kept, more, unresolved = check_against_masters(p, masters, strings)
             faults += more
+            if unresolved:
+                notes, more = injected_by(p, unresolved, args.data, read, release_order(args.catalogue))
+                faults += more
     report('Errors', faults)
     report('Deleted records', deleted)
     if itm is not None:
         report('Identical to master, to clean', itm)
         report('Identical to master and kept, the parent of records', kept)
+        report('Named through a plugin that is not a master', notes)
     found = len(faults) + len(deleted) + len(itm or [])
     if found:
         print('  NOT CLEAN, %d to fix in the writer that made it' % found)

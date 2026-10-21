@@ -9,6 +9,7 @@ runs, --no-masters over game/content, and needs it clean.
 import contextlib
 import importlib.util
 import io
+import json
 import os
 import pathlib
 import shutil
@@ -20,6 +21,9 @@ ROOT = pathlib.Path(__file__).resolve().parents[1]
 SPEC = importlib.util.spec_from_file_location('check_plugin_clean', ROOT / 'scripts' / 'mods' / 'Check-PluginClean.py')
 CHECK = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(CHECK)
+WSPEC = importlib.util.spec_from_file_location('add_content_records', ROOT / 'scripts' / 'mods' / 'Add-ContentRecords.py')
+WRITER = importlib.util.module_from_spec(WSPEC)
+WSPEC.loader.exec_module(WRITER)
 
 
 def sub(tag, data):
@@ -112,6 +116,8 @@ class PluginClean(unittest.TestCase):
         self.addCleanup(shutil.rmtree, self.dir)
         for name, data in masters().items():
             self.put(name, data)
+        order = ['M.esm', 'O.esp', 'N.esp', 'I.esp', 'P.esp']
+        self.put('order.json', json.dumps({'loadOrder': [{'name': n} for n in order]}).encode())
 
     def put(self, name, data):
         path = os.path.join(self.dir, name)
@@ -123,7 +129,8 @@ class PluginClean(unittest.TestCase):
         self.put(name, data)
         out = io.StringIO()
         with contextlib.redirect_stdout(out):
-            code = CHECK.main(['--data', self.dir] + list(extra) + [name])
+            code = CHECK.main(['--data', self.dir, '--catalogue', os.path.join(self.dir, 'order.json')] +
+                              list(extra) + [name])
         return code, out.getvalue()
 
     def section(self, text, title):
@@ -190,8 +197,19 @@ class PluginClean(unittest.TestCase):
                    next_object=0x801)
         code, text = self.run_check('P.esp', p)
         self.assertEqual(code, 1, text)
-        self.assertIn('REFR 01000800 NAME names 00000FFF, which is in neither P.esp nor its masters',
+        self.assertIn('REFR 01000800 NAME names 00000FFF, which is in neither P.esp, its masters nor the load order',
                       self.section(text, 'Errors'), text)
+
+    def test_a_record_another_plugin_injects_is_a_note(self):
+        # I.esp, not a master of P, adds a keyword in M.esm's numbering, the
+        # way MoreCraftableEquipment.esp adds its loom keyword to Update.esm.
+        self.put('I.esp', plugin(['M.esm'], [grup(b'KYWD', 0, rec(b'KYWD', 0xABC, [sub(b'EDID', z('Loom'))]))]))
+        p = plugin(['M.esm'], [grup(b'COBJ', 0, cobj(0x01000800, 'RecipeAtLoom', 0x802, 0xABC))],
+                   next_object=0x801)
+        code, text = self.run_check('P.esp', p)
+        self.assertEqual(code, 0, text)
+        self.assertEqual(self.section(text, 'Named through a plugin that is not a master'),
+                         ["COBJ 01000800 BNAM names 00000ABC, which no master has; I.esp adds it as M.esm's"], text)
 
     def test_faults_in_the_file_itself(self):
         light = plugin(['M.esm'], [
@@ -236,6 +254,25 @@ class PluginClean(unittest.TestCase):
         code, text = self.run_check('P.esp', p)
         self.assertEqual(code, 0, text)
         self.assertIn('1 clean, 0 not clean', text)
+
+    def test_the_content_writer_drops_a_cell_a_move_left_empty(self):
+        # A station moved out of its cell leaves the cell's temporary group
+        # empty (a plain remove from its list). The cell record went with it
+        # only from #2790 on; before, the empty group held it up, identical
+        # to Bethesda's.
+        stamp = b'\x00' * 4
+        def cell_rec(fid):
+            return WRITER.Rec(b'CELL', 0, fid, b'\x00' * 8, b'')
+        def ref(fid):
+            return WRITER.Rec(b'REFR', 0, fid, b'\x00' * 8, b'')
+        left = WRITER.new_group(struct.pack('<I', 0x8ED5), 6, stamp,
+                                [WRITER.new_group(struct.pack('<I', 0x8ED5), 9, stamp, [])])
+        held = WRITER.new_group(struct.pack('<I', 0x8EB5), 6, stamp,
+                                [WRITER.new_group(struct.pack('<I', 0x8EB5), 9, stamp, [ref(0x05015506)])])
+        dropped = set()
+        out = WRITER.drop_bare_parents([cell_rec(0x8ED5), left, cell_rec(0x8EB5), held], dropped)
+        self.assertEqual(dropped, {0x8ED5})
+        self.assertEqual([getattr(k, 'fid', None) for k in out], [0x8EB5, None])
 
     def test_the_plugins_in_game_content_pass_the_build_check(self):
         out = io.StringIO()
