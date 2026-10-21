@@ -343,6 +343,30 @@ collection revision. Until that ships, the server refusal stays the gate for tho
 Placements of the furniture in the world are Claude's: at least one beside a forge
 in every major hold and some minor towns. This script only adds the base records.
 
+THE CREATION MENUS, TAKEN OUT (#2962)
+
+Four message boxes were the questions of the first creation flow:
+ThornswoodTradeMenu1 and 2 (MESG 0x05E80050, 0x05E80051, "What do you do for a
+living?", sixteen trades over two pages) and ThornswoodTownMenu1 and 2 (MESG
+0x05E80052, 0x05E80053, "Where do you begin?", ten towns over two pages). Since
+20 September the choices are made in the game on K, in the panel the character
+block of gamemode.js owns, and since 21 September there is no trade to choose:
+rank comes from work. The server could never have shown these boxes anyway:
+Message.Show from the gamemode has no actor to show it to (the comment above
+CHARGEN in gamemode.js says why).
+
+Measured 21 October: no record in this plugin, Thornswood-Last.esp or
+Thornswood-WoodworkerTrail.esp names any of the four, compressed records
+included, and Thornswood ships no Papyrus script of its own. Nothing in the
+repository named them but Check-Chargen.ps1, which asked for them and their
+button counts as if creation needed them.
+
+They stayed because this tool keeps every record it does not write, and
+nothing took them out when the flow moved. So RETIRED names them, and a run
+takes out any of them the plugin still carries, after checking each is the
+MESG of that editor id. Nothing keeps a change form for a message box, so no
+save or server state names their form ids.
+
 
 Usage (both default to game\\content\\Thornswood-Content.esp in this repo):
     python scripts/mods/Add-ContentRecords.py --check
@@ -384,6 +408,16 @@ DESCRIPTION = (b"Thornswood's crafting and gathering content: stations, salt, or
                b"charcoal kilns, skill manuals, tools, keys, fishing, repair kits, "
                b"treatments, the notice board and drop box, house parts, and their "
                b"recipes.")
+
+# Thornswood's own records that nothing shows or names any more, by object id
+# in this plugin's own numbering, type and editor id (THE CREATION MENUS, TAKEN
+# OUT, above). A run takes out any of them the plugin carries.
+RETIRED = (
+    (0xE80050, b'MESG', 'ThornswoodTradeMenu1'),
+    (0xE80051, b'MESG', 'ThornswoodTradeMenu2'),
+    (0xE80052, b'MESG', 'ThornswoodTownMenu1'),
+    (0xE80053, b'MESG', 'ThornswoodTownMenu2'),
+)
 
 # Form ids for the three new records. The plugin's own records all sit in the
 # 0x05______ space; 0x501548E is the highest of the 0x0501____ family in use, so
@@ -1927,6 +1961,21 @@ def main():
     going = set(f for f in dropping if f in by_fid)
     removing |= going
 
+    # WHAT IS RETIRED GOES (#2962): the creation menus nothing shows.
+    retiring = set()
+    for obj, tag, edid in RETIRED:
+        fid = (len(plugin_masters) << 24) | obj
+        r = by_fid.get(fid)
+        if r is None:
+            continue
+        if r.tag != tag or r.editor_id() != edid:
+            print('')
+            print('STOP. 0x%07X is %s %s, not the retired %s %s. Nothing was written.'
+                  % (fid, r.tag.decode(), r.editor_id(), tag.decode(), edid))
+            return 1
+        retiring.add(fid)
+    removing |= retiring
+
     # The cell and world records that stay hold the stations' placements.
     # Each is written from the winning master's own record, Bethesda's, never
     # the salvaged copy. That needs the masters; without them a record that is
@@ -2065,6 +2114,9 @@ def main():
             kinds[by_fid[f].tag.decode()] = kinds.get(by_fid[f].tag.decode(), 0) + 1
         print('  salvaged, nothing of Thornswood\'s asks for them (#2553): %s'
               % ', '.join('%d %s' % (n, t) for t, n in sorted(kinds.items())))
+    for f in sorted(retiring):
+        print('  retired, nothing shows or names it (#2962): %s 0x%07X %s'
+              % (by_fid[f].tag.decode(), f, by_fid[f].editor_id()))
     print('')
     print('Where the stations stand (#2553, game\\data\\station-sites.json)')
     kinds = {}

@@ -5,9 +5,9 @@
 
   Reset-Appearance.ps1 keeps the character and reopens the race menu, which is
   right when you care about the character. While the creation flow itself is
-  what is being tested, you do not: you want the face menu, the trade menu and
-  the town menu every single launch, and you want nothing carried over from the
-  last attempt.
+  what is being tested, you do not: you want the face menu and the choices on
+  K every single launch, and you want nothing carried over from the last
+  attempt.
 
   So this deletes the characters' change forms outright. The server then has no actor
   for your profile, takes its create path, and the whole flow runs from the top.
