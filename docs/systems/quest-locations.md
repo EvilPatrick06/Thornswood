@@ -69,7 +69,7 @@ organization, not a playable quest area.
 For stationary exterior sources, use a sphere of radius 128 game units
 around each winning source-record position, plus the exact reference and
 worldspace. This applies to the pearl, crimson, orchard and geode sources,
-the satchel sack, and the eventual longfin markers. These are per-source
+the satchel sack, and the dedicated longfin markers. These are per-source
 bounds, not a radius around the whole route. Keep the normal interaction
 reach check between the character and that source as well. Longfin, orchard
 and satchel use Tamriel `3c:Skyrim.esm`; pearls use Solstheim

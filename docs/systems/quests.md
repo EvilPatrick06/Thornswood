@@ -161,7 +161,7 @@ save does not discard a later kill. Rewards still wait for the inventory
 save acknowledgement and are paid once with the completed quest.
 These bindings await the matching native engine and gamemode release;
 implementation does not establish availability on either server.
-The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. The [seven retrievals](merchant-retrieval-work.md) connect exact specialists, source items and fixed rewards. The [mammoth ground](merchant-mammoth-work.md) now uses its three existing bodies, normal Master hunting goods and exact one-body return. The orchard still needs its interaction through existing Farmer rules. Source implementation is not a deployment record.
+The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. The [seven retrievals](merchant-retrieval-work.md) connect exact specialists, source items and fixed rewards. The [mammoth ground](merchant-mammoth-work.md) now uses its three existing bodies, normal Master hunting goods and exact one-body return. The [orchard](merchant-orchard-work.md) connects its ten trees through existing Farmer claims, sowing, seasonal growth and complete harvest yields. Source implementation is not a deployment record.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
@@ -177,8 +177,7 @@ over them and their quest steps are refused until it is put right.
 The remaining scarce places and scene objects have been selected in
 [Custom quest places](quest-locations.md), with exact source references,
 counts, cooldowns and the distinction between existing sources and the
-dedicated markers now authored in Content. The existing Farmer orchard interaction is not
-bound yet, so their offers stay shut. A dragon is not a bounty. Papyrus
+dedicated markers now authored in Content. The existing Farmer orchard interaction is bound in source; availability still requires Claude to deliver the merged sections. A dragon is not a bounty. Papyrus
 quests do not run.
 
 The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.

@@ -29,11 +29,16 @@ for(const row of doc.sources) {
  assert.equal(mp.getDescFromId(lookup.toGlobalRecordId(Buffer.from(names[0].data).readUInt32LE())),row.base);
 }
 console.log('PASS all seven actual native winning file indices, raw identities and complete ordered record hashes');
-if(process.argv[5]==='mammoth') {
+if(['mammoth','orchard'].includes(process.argv[5])) {
  const population={keep:require('../game/data/npc-population.json').npcs.filter(r=>r.keep).map(r=>
   [r.ref,r.base,r.world||r.cell,r.pos,r.leash,r.returnMinutes,r.role,r.habitat,r.tier,r.cap,r.populationBucket,0,r.species])};
  const sources=require('../game/quest-mammoth-sources').createQuestMammothSources(mp,population);
  assert.equal(sources.contains('33fa6:Skyrim.esm'),true);
  console.log('PASS all three actual native mammoth ACHR/base records and fixed original placements');
+}
+if(process.argv[5]==='orchard') {
+ const rows=require('../game/data/merchant-orchard.json').sources;
+ require('../game/quest-resource-sources').createQuestOrchardSources(mp,rows);
+ console.log('PASS all ten actual native orchard references, apple base/produce and original positions');
 }
 process.exit(0);

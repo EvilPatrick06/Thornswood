@@ -1,6 +1,6 @@
 'use strict';
 const apply=Reflect.apply;
-const vector=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
+const vector=v=>Array.isArray(v)&&v.length===3&&[0,1,2].every(i=>Number.isFinite(v[i]));
 const distance=(a,b)=>a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);
 const staticId=id=>Number.isInteger(id)&&id>0&&id<0xff000000;
 function createQuestSources(mp,input,contract) {
@@ -118,4 +118,7 @@ function createQuestLongfinSources(mp,input) {
 function createQuestRetrievalSources(mp,input) {
  return createQuestSources(mp,input,{label:'retrieval',count:7,itemType:'MISC',retrieval:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};
+function createQuestOrchardSources(mp,input) {
+ return createQuestSources(mp,input,{label:'orchard',count:10,baseType:'FLOR',itemType:'ALCH',rank:'expert',returnMinutes:0,produce:true});
+}
+module.exports={createQuestOrchardSources,createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};

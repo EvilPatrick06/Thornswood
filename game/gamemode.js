@@ -8730,6 +8730,14 @@ function loot(actorId, refrId, baseDesc) {
  * and says so in the log.
  */
 function farmActivate(actorId, refrId, baseDesc) {
+  const refs=globalThis.__thornswoodQuestOrchardRefs;
+  if(baseDesc==="141081:JK's Whiterun's Outskirts.esp" && !refs)return 'The orchard is unavailable for now.';
+  if(refs && refs[refrId]) {
+    const quests=globalThis.__thornswoodQuests;
+    if(!quests || typeof quests.harvestOrchard!=='function')return 'The orchard is unavailable for now.';
+    const result=quests.harvestOrchard(actorId,refrId,baseDesc);
+    if(result!==null)return result.text;
+  }
   const f = globalThis.__thornswoodFarming;
   if (!f || !f.activate) {
     log('the farming block is not loaded, so the crop at', refrId.toString(16),
@@ -35758,9 +35766,27 @@ log('gamemode loaded:',
     string of '__proto__' finding something on Object.prototype is the same hole
     the progression block's own() was written for.
   */
-  function readPlot(refrId) {
+  function orchardRef(refrId) {
+    if(!g.__thornswoodQuestOrchardRefs && mp.get(refrId,'baseDesc')==="141081:JK's Whiterun's Outskirts.esp")throw Error('Orchard references are unavailable');
+    return g.__thornswoodQuestOrchardRefs && g.__thornswoodQuestOrchardRefs[refrId];
+  }
+  function plotValue(refrId) {
+    var ref=orchardRef(refrId);
+    if(ref) {
+      if(!g.__thornswoodOrchardPlots)throw Error('Orchard plots are unavailable');
+      return g.__thornswoodOrchardPlots.read(ref);
+    }
+    return mp.get(refrId,PLOT_PROPERTY);
+  }
+  function setPlotValue(refrId,value) {
+    var ref=orchardRef(refrId);
+    if(ref) {
+      if(!g.__thornswoodOrchardPlots || !(value.crop ? g.__thornswoodOrchardPlots.sow(ref,value) : g.__thornswoodOrchardPlots.write(ref,value)))throw Error('Orchard plot was not written');
+    } else mp.set(refrId,PLOT_PROPERTY,value);
+  }
+  function readPlot(refrId,raw) {
     var v = null;
-    try { v = mp.get(refrId, PLOT_PROPERTY); } catch (e) { return null; }
+    try { v = arguments.length>1 ? raw : plotValue(refrId); } catch (e) { return null; }
     if (!v || typeof v !== 'object') { return null; }
     if (typeof v.crop !== 'string' || !P.has(CROPS, v.crop)) { return null; }
     var at = Number(v.at) || 0;
@@ -35803,13 +35829,13 @@ log('gamemode loaded:',
   */
   function neverWorked(refrId) {
     var v = null;
-    try { v = mp.get(refrId, PLOT_PROPERTY); } catch (e) { return true; }
+    try { v = plotValue(refrId); } catch (e) { return true; }
     return !v || typeof v !== 'object';
   }
 
   function writePlot(refrId, by, crop, ms, step) {
     try {
-      mp.set(refrId, PLOT_PROPERTY,
+      setPlotValue(refrId,
              { by: by, crop: crop, at: Date.now(), ms: ms, step: step });
       return true;
     } catch (e) {
@@ -35831,9 +35857,11 @@ log('gamemode loaded:',
     The caller checks the answer and refuses to hand anything over when it is
     false, so a plot that could not be cleared is a plot nobody was paid for.
   */
-  function clearPlot(refrId) {
+  function clearPlot(refrId,expected) {
     try {
-      mp.set(refrId, PLOT_PROPERTY, { by: 0, crop: '', at: 0, ms: 0, step: 0 });
+      var ref=orchardRef(refrId);
+      if(ref)return !!g.__thornswoodOrchardPlots && g.__thornswoodOrchardPlots.compareWrite(ref,expected,{by:0,crop:'',at:0,ms:0,step:0});
+      setPlotValue(refrId, { by: 0, crop: '', at: 0, ms: 0, step: 0 });
       return true;
     } catch (e) {
       flog('could not clear', refrId.toString(16) + ':', e);
@@ -35896,12 +35924,12 @@ log('gamemode loaded:',
     season count is spring. If the season block is not loaded, this is
     wall-clock time, which is what the older harness measures.
   */
-  function grownSoFar(plot) {
+  function grownSoFar(plot,strict) {
     var S = g.__thornswoodSeason;
     var rank = (CROPS[plot.crop] && CROPS[plot.crop].rank) || 'novice';
-    if (!S || !S.grownMs) { return Date.now() - plot.at; }
-    try { return S.grownMs(plot.at, Date.now(), rank); }
-    catch (e) { return Date.now() - plot.at; }
+    if (!S || !S.grownMs) { if(strict)throw Error('Season is unavailable');return Date.now() - plot.at; }
+    try { var elapsed=S.grownMs(plot.at, Date.now(), rank);if(strict && (!Number.isFinite(elapsed)||elapsed<0))throw Error('Season growth cannot be verified');return elapsed; }
+    catch (e) { if(strict)throw e;return Date.now() - plot.at; }
   }
 
   /*
@@ -35912,8 +35940,8 @@ log('gamemode loaded:',
     adds nothing for an expert crop. The plot is not cleared: it stays
     sown, and the minutes left are the wait minus the time the clock ran.
   */
-  function minutesLeft(plot) {
-    var left = plot.ms - grownSoFar(plot);
+  function minutesLeft(plot,strict) {
+    var left = plot.ms - grownSoFar(plot,strict);
     return left > 0 ? Math.ceil(left / 60000) : 0;
   }
 
@@ -36185,7 +36213,7 @@ log('gamemode loaded:',
     what makes a claim a circle around a plot instead of a square with lines
     through the farm.
   */
-  function claimCovering(ground) {
+  function claimCovering(ground,strict) {
     if (!ground) { return null; }
     /*
       A HOME AND ITS FARM ARE ONE CLAIM, and the home is asked first.
@@ -36204,11 +36232,13 @@ log('gamemode loaded:',
       below reads it without knowing which half of the system answered.
     */
     var W = g.__thornswoodProperty;
+    if(strict && (!W || typeof W.coversGround!=='function'))throw Error('Property claims are unavailable');
     if (W && W.coversGround) {
       try {
         var house = W.coversGround(ground);
         if (house) { return house; }
       } catch (e) {
+        if(strict)throw e;
         flog('the property block threw about ground, so only farm claims count:', e);
       }
     }
@@ -36316,7 +36346,24 @@ log('gamemode loaded:',
     what is standing is how a new Farmer earns the rank that opens the next
     rung, and it is the only work available to somebody who owns no seed at all.
   */
-  function standing(actorId, refrId, baseDesc, crop) {
+  function awardQuestCrop(actorId,refrId,baseDesc,crop,n,original,plot,grant) {
+    var mine=profileOf(actorId),ground=groundOf(refrId),store=g.__thornswoodOrchardPlots;
+    var ref=orchardRef(refrId);
+    function eligible() {
+      try {
+        if(!mine || !ground || !grant.current() || classGate(actorId,'farm') || toolGate(actorId,'farmer') ||
+           profileOf(actorId)!==mine || !rankOk(rankStep(actorId,'farmer'),baseDesc))return false;
+        if(plot && (plot.crop!==baseDesc || minutesLeft(plot,true)>0))return false;
+        var nowGround=groundOf(refrId);
+        if(!nowGround || JSON.stringify(nowGround)!==JSON.stringify(ground))return false;
+        var held=claimCovering(nowGround,true);
+        return !(held && held.by!==mine && (!plot || plot.by!==mine));
+      } catch(error){return false;}
+    }
+    return !!store && !!ref && store.harvest(ref,original,eligible,function(fence){return grant(crop.produce,n,fence);});
+  }
+
+  function standing(actorId, refrId, baseDesc, crop, grant, original) {
     var step = rankStep(actorId, 'farmer');
 
     var mine = profileOf(actorId);
@@ -36343,7 +36390,7 @@ log('gamemode loaded:',
       return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
              'order to put in your hands. Say so in the dev channel.';
     }
-    if (!clearPlot(refrId)) {
+    if (grant ? !awardQuestCrop(actorId,refrId,baseDesc,crop,1,original,null,grant) : !clearPlot(refrId,original)) {
       return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
     }
 
@@ -36352,8 +36399,10 @@ log('gamemode loaded:',
       plot they sowed themselves; a row somebody else planted and walked away
       from pays what is on it and no more.
     */
-    addItem(actorId, crop.produce, 1);
+    if(!grant)addItem(actorId, crop.produce, 1);
+    if(grant && !grant.current())return "The orchard work has changed.";
     touchClaim(ground, mine);
+    if(grant && !grant.current())return 'The orchard work has changed.';
     var rank = creditWork(actorId, 'farm');
     flog(actorId.toString(16), 'brought in the standing', crop.name, 'at',
          refrId.toString(16) + ', a plot nobody had worked');
@@ -36368,7 +36417,11 @@ log('gamemode loaded:',
     and the press cannot drift into saying different things or enforcing
     different rules. /plant finds a plot and calls this; a press already has one.
   */
-  function sowAt(actorId, refrId, baseDesc) {
+  function sowAt(actorId, refrId, baseDesc, grant) {
+    if(orchardRef(refrId) && !grant) {
+      var quests=g.__thornswoodQuests;
+      return quests && quests.sowOrchard ? quests.sowOrchard(actorId,refrId,baseDesc).text : 'The orchard is unavailable for now.';
+    }
     var crop = CROPS[baseDesc];
     if (!crop) { return null; }
 
@@ -36395,6 +36448,24 @@ log('gamemode loaded:',
              'claim ground nobody holds.';
     }
 
+    if(orchardRef(refrId)) {
+      var store=g.__thornswoodOrchardPlots,ref=orchardRef(refrId),original;
+      try {original=store.read(ref);}catch(error){return 'The orchard is unavailable for now.';}
+      var ms=growMs(baseDesc,step),next={by:mine,crop:baseDesc,at:Date.now(),ms:ms,step:step};
+      function eligible() {
+        try {
+          if(!grant || !grant.current() || classGate(actorId,'farm') || toolGate(actorId,'farmer') ||
+             profileOf(actorId)!==mine || !rankOk(rankStep(actorId,'farmer'),baseDesc))return false;
+          var now=groundOf(refrId);
+          if(!now || JSON.stringify(now)!==JSON.stringify(ground))return false;
+          var held=claimCovering(now,true);return !held || held.by===mine;
+        }catch(error){return false;}
+      }
+      if(!store.sowWithSeed(ref,original,next,eligible,function(fence){return grant.seed(crop.produce,fence);}))
+        return 'Sowing did not complete. Check your pack and this plot.';
+      if(grant.current())touchClaim(ground,mine);
+      return 'You sow the '+crop.name+'. It will be ready in '+minutes(Math.ceil(ms/60000))+'.';
+    }
     if (!takeItem(actorId, crop.produce, 1)) {
       var handout = offerSeed(actorId, mine);
       if (handout) { return handout; }
@@ -36415,7 +36486,7 @@ log('gamemode loaded:',
     return 'You sow the ' + crop.name + '. It will be ready in ' + minutes(mins) + '.';
   }
 
-  function activate(actorId, refrId, baseDesc) {
+  function activate(actorId, refrId, baseDesc, grant) {
     if (!P.has(CROPS, baseDesc)) { return null; }
     var here = CROPS[baseDesc];
 
@@ -36431,7 +36502,10 @@ log('gamemode loaded:',
     var noTool = toolGate(actorId, 'farmer');
     if (noTool) { return noTool; }
 
-    var plot = readPlot(refrId);
+    var original;
+    var captured=!!grant || !!orchardRef(refrId);
+    if(captured) {try {original=plotValue(refrId);}catch(error){return 'The orchard is unavailable for now.';}}
+    var plot = captured ? readPlot(refrId,original) : readPlot(refrId);
     if (!plot) {
       /*
         NOTHING THE SERVER SOWED. Which of the two it is decides everything.
@@ -36441,7 +36515,7 @@ log('gamemode loaded:',
         first bring-in is the whole seed supply of this server. See neverWorked
         above for why, and for why it cannot run away.
       */
-      if (!neverWorked(refrId)) {
+      if (captured ? original && typeof original==='object' : !neverWorked(refrId)) {
         /*
           PRESSING EMPTY GROUND SOWS IT.
 
@@ -36460,9 +36534,9 @@ log('gamemode loaded:',
           A press already knows exactly which patch of ground was pressed, so
           there is nothing to guess.
         */
-        return sowAt(actorId, refrId, baseDesc);
+        return sowAt(actorId, refrId, baseDesc,grant);
       }
-      return standing(actorId, refrId, baseDesc, here);
+      return standing(actorId, refrId, baseDesc, here,grant,original);
     }
 
     var crop = CROPS[plot.crop];
@@ -36523,7 +36597,8 @@ log('gamemode loaded:',
       return 'The ' + crop.name + ' comes up and there is nothing in this load ' +
              'order to put in your hands. Say so in the dev channel.';
     }
-    if (!clearPlot(refrId)) {
+    var n = yieldAt(plot.step);
+    if (grant ? !awardQuestCrop(actorId,refrId,baseDesc,crop,n,original,plot,grant) : !clearPlot(refrId,original)) {
       return 'The ' + crop.name + ' will not come out of the ground. Try it again in a moment.';
     }
 
@@ -36533,9 +36608,10 @@ log('gamemode loaded:',
       keeping the plot's state off whoever is looking at it: a Master walking a
       Novice's row brings in a Novice's crop.
     */
-    var n = yieldAt(plot.step);
-    addItem(actorId, crop.produce, n);
+    if(!grant)addItem(actorId, crop.produce, n);
+    if(grant && !grant.current())return 'The orchard work has changed.';
     touchClaim(ground, mine);
+    if(grant && !grant.current())return 'The orchard work has changed.';
     var rank = creditWork(actorId, 'farm');
     /*
       The shovel wears here and NOT in plant(), even though turning the ground
@@ -36548,6 +36624,7 @@ log('gamemode loaded:',
       reason anybody could name. Wear sits next to creditWork for that reason:
       the two count the same thing.
     */
+    if(grant && !grant.current())return 'The orchard work has changed.';
     var worn = wearTool(actorId, 'farmer');
     flog(actorId.toString(16), 'brought in', n, crop.name, 'at', refrId.toString(16));
     return 'You bring in ' + n + ' ' + crop.name + '.' + (rank ? ' ' + rank : '') +
@@ -36588,6 +36665,9 @@ log('gamemode loaded:',
       toProfile(profileId, 'No plot within reach. Stand next to the ground you ' +
                            'mean to sow.');
       return;
+    }
+    if(orchardRef(found.refrId)) {
+      toProfile(profileId,sowAt(actorId,found.refrId,found.base));return;
     }
     var crop = CROPS[found.base];
     var step = rankStep(actorId, 'farmer');
@@ -37076,7 +37156,7 @@ log('gamemode loaded:',
 
   g.__thornswoodFarming = {
     PROPERTY: PLOT_PROPERTY, release: release,
-    activate: press, command: command, giveSeeds: giveSeeds,
+    activate: press, harvestQuest:activate, sowQuest:sowAt, command: command, giveSeeds: giveSeeds,
     readPlot: readPlot, claimCovering: claimCovering, groundOf: groundOf,
     farmOf: farmOf,
     // For the property block's /claim (#2250): is this id a crop plot, and is
@@ -75407,7 +75487,7 @@ return module.exports;})();
 const QUEST_FISHING_SOURCES = (function () { const module = {exports:{}};
 'use strict';
 const apply=Reflect.apply;
-const vector=v=>Array.isArray(v)&&v.length===3&&v.every(Number.isFinite);
+const vector=v=>Array.isArray(v)&&v.length===3&&[0,1,2].every(i=>Number.isFinite(v[i]));
 const distance=(a,b)=>a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);
 const staticId=id=>Number.isInteger(id)&&id>0&&id<0xff000000;
 function createQuestSources(mp,input,contract) {
@@ -75525,7 +75605,10 @@ function createQuestLongfinSources(mp,input) {
 function createQuestRetrievalSources(mp,input) {
  return createQuestSources(mp,input,{label:'retrieval',count:7,itemType:'MISC',retrieval:true});
 }
-module.exports={createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};
+function createQuestOrchardSources(mp,input) {
+ return createQuestSources(mp,input,{label:'orchard',count:10,baseType:'FLOR',itemType:'ALCH',rank:'expert',returnMinutes:0,produce:true});
+}
+module.exports={createQuestOrchardSources,createQuestFishingSources,createQuestHarvestSources,createQuestGeodeSources,createQuestLongfinSources,createQuestRetrievalSources};
 return module.exports;})();
 const QUEST_ITEMS = (function () { const module = {exports:{}};
 'use strict';
@@ -75652,6 +75735,118 @@ function mammothAbandon(entry) {
  return value?{ok:true,changes:changes(value.bundles)}:{ok:false};
 }
 module.exports={readMammothDraw,appendMammothDraw,mammothReturn,mammothAbandon};
+return module.exports;})();
+const ORCHARD_PLOTS = (function () { const module = {exports:{}};
+'use strict';
+const clone=value=>JSON.parse(JSON.stringify(value));
+const same=(a,b)=>JSON.stringify(a)===JSON.stringify(b);
+function createOrchardPlots(storage,references) {
+ if(!storage||storage.durable!==true||!Array.isArray(references)||references.length!==10||new Set(references).size!==10)
+  throw Error('Orchard plot storage is unavailable');
+ let active=true,busy=false,doc=storage.load();
+ function validPlot(value) {
+  if(value===null)return true;
+  if(!value||Array.isArray(value)||typeof value!=='object'||
+   !Number.isSafeInteger(value.by)||value.by<0||typeof value.crop!=='string'||
+   !Number.isSafeInteger(value.at)||value.at<0||!Number.isSafeInteger(value.ms)||value.ms<0||
+   !Number.isInteger(value.step)||value.step<0||value.step>3)return false;
+  return value.crop==='' ? value.by===0&&value.at===0&&value.ms===0&&value.step===0 :
+   value.crop==="141081:JK's Whiterun's Outskirts.esp"&&value.by>0&&value.at>0&&value.ms>0;
+ }
+ if(!doc||doc.version!==1||!doc.entries||Array.isArray(doc.entries)||
+  Object.keys(doc.entries).length!==10||!references.every(ref=>Object.hasOwn(doc.entries,ref)&&validPlot(doc.entries[ref])))
+  throw Error('Orchard plots cannot be verified');
+ doc=clone(doc);
+ function usable() {return active&&(!storage.current||storage.current());}
+ function read(ref) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref))throw Error('Orchard plots are unavailable');
+  return clone(doc.entries[ref]);
+ }
+ function save(next) {
+  try {
+   if(!usable()||storage.save(clone(next))!==true||!usable())throw Error('Orchard save acknowledgement is unavailable');
+   doc=clone(next);return true;
+  }catch(error){active=false;return false;}
+ }
+ function write(ref,value) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref)||!validPlot(value))return false;
+  busy=true;
+  try {const next=clone(doc);next.entries[ref]=clone(value);return save(next);}
+  finally {busy=false;}
+ }
+ function compareWrite(ref,expected,value) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref)||!same(doc.entries[ref],expected))return false;
+  return write(ref,value);
+ }
+ function sow(ref,value) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref)||doc.entries[ref]&&doc.entries[ref].crop!=='')return false;
+  return write(ref,value);
+ }
+ function sowWithSeed(ref,expected,value,eligible,seed) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref)||!validPlot(value)||!value.crop||
+   !same(doc.entries[ref],expected)||expected&&expected.crop!=='')return false;
+  busy=true;
+  try {
+   if(!eligible()||!usable())return false;
+   let paid;
+   try {paid=seed(()=>usable()&&eligible()&&usable()&&same(doc.entries[ref],expected));}
+   catch(error){active=false;return false;}
+   if(paid!==true){if(paid!==false)active=false;return false;}
+   if(!usable()||!eligible()||!same(doc.entries[ref],expected))return false;
+   const next=clone(doc);next.entries[ref]=clone(value);return save(next);
+  }finally{busy=false;}
+ }
+ function harvest(ref,expected,eligible,award) {
+  if(!usable()||busy||!Object.hasOwn(doc.entries,ref)||!same(doc.entries[ref],expected))return false;
+  busy=true;
+  try {
+   if(!eligible()||!usable()||!same(doc.entries[ref],expected))return false;
+   const next=clone(doc),reserved={by:0,crop:'',at:0,ms:0,step:0};
+   next.entries[ref]=reserved;
+   if(!save(next))return false;
+   let paid;
+   try {paid=award(()=>usable()&&eligible()&&usable()&&same(doc.entries[ref],reserved));}
+   catch(error){active=false;return false;}
+   if(paid===true)return usable();
+   if(paid!==false){active=false;return false;}
+   if(!usable()||!same(doc.entries[ref],reserved))return false;
+   const restored=clone(doc);restored.entries[ref]=clone(expected);save(restored);
+   return false;
+  }finally {busy=false;}
+ }
+ return Object.freeze({read,write,compareWrite,sow,sowWithSeed,harvest,available:usable,shutdown(){active=false;}});
+}
+function createOrchardStorage(fs,path,settings,writeWhole,references) {
+ if(typeof writeWhole!=='function')throw Error('Durable orchard writes are unavailable');
+ const dir=path.resolve(settings.privDir||'private'),served=path.resolve(settings.dataDir||'data');
+ const file=path.join(dir,'orchard-plots.json'),marker=file+'.initialized';
+ function real(input) {
+  let found=input;const tail=[];
+  while(!fs.existsSync(found)){const parent=path.dirname(found);if(parent===found)throw Error('Orchard path unavailable');tail.unshift(path.basename(found));found=parent;}
+  return path.resolve(fs.realpathSync(found),...tail);
+ }
+ function privacy() {
+  const relative=path.relative(real(served),real(dir));
+  if(!relative||relative!=='..'&&!relative.startsWith('..'+path.sep)&&!path.isAbsolute(relative))throw Error('Orchard state must be private');
+ }
+ const checksum=doc=>require('node:crypto').createHash('sha256').update(JSON.stringify([doc.version,doc.entries])).digest('hex');
+ function save(doc) {
+  privacy();writeWhole(file,JSON.stringify({version:doc.version,entries:doc.entries,sha256:checksum(doc)}));return true;
+ }
+ function load() {
+  privacy();
+  if(!fs.existsSync(file)) {
+   if(fs.existsSync(marker))throw Error('Saved orchard plots are missing');
+   save({version:1,entries:Object.fromEntries(references.map(ref=>[ref,null]))});
+  }
+  const doc=JSON.parse(fs.readFileSync(file,'utf8'));
+  if(!doc||doc.sha256!==checksum(doc))throw Error('Saved orchard plots are damaged');
+  if(!fs.existsSync(marker))writeWhole(marker,'1');
+  return {version:doc.version,entries:doc.entries};
+ }
+ return {load,save,durable:true};
+}
+module.exports={createOrchardPlots,createOrchardStorage};
 return module.exports;})();
 const SCENE_BUDGET = (function () { const module = {exports:{}};
 'use strict';
@@ -76674,6 +76869,9 @@ module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLong
 module.exports.createQuestRetrievalSources = QUEST_FISHING_SOURCES.createQuestRetrievalSources;
 module.exports.createQuestItemPolicy = QUEST_ITEMS.createQuestItemPolicy;
 module.exports.createQuestMammothSources = QUEST_MAMMOTH_SOURCES.createQuestMammothSources;
+module.exports.orchardPlots = ORCHARD_PLOTS;
+module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
+module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
 module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"0090269cb6955e2cc9a8e717fd992f31b506de7f558f10adb99c6cee6b38f29a","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"0090269cb6955e2cc9a8e717fd992f31b506de7f558f10adb99c6cee6b38f29a","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
@@ -76908,13 +77106,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   var byId = {};
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
   var LEGACY_TRADE = {longfin:'Alchemist',pearl:'Enchanter',ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
-    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist',geode:'Enchanter',mammoth:'Cook'};
+    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist',geode:'Enchanter',mammoth:'Cook',orchard:'Cook'};
   // New legacy work has one appointed specialist. Already accepted work
   // keeps its former compatible trade and destination rules after the cut.
   var LEGACY_OFFER_REF = {longfin:'198d2:Skyrim.esm',pearl:'177da:Dragonborn.esm',ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
     stalhrim:'1828f:Dragonborn.esm',heartstone:'1828f:Dragonborn.esm',
     wolf:'1a684:Skyrim.esm',sabre:'1b124:Skyrim.esm',camp:'1a67c:Skyrim.esm',
-    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm',geode:'1e7d6:Skyrim.esm',mammoth:'1a66e:Skyrim.esm'};
+    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm',geode:'1e7d6:Skyrim.esm',mammoth:'1a66e:Skyrim.esm',orchard:'1a66e:Skyrim.esm'};
 
   function createCustomQuests(deps) {
     deps = deps || {};
@@ -76937,7 +77135,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     var budget=typeof MERCHANT_TRADING!=='undefined' ? MERCHANT_TRADING.sceneBudget : null;
     if(expandedRows.length && !budget)throw new Error('Expanded scene reward authority is unavailable.');
     function traderFor(row,ref,recovery) {
-      if(row.id==='mammoth')return active && typeof deps.traderRole==='function' && deps.traderRole(ref)==='Cook' && descOf(ref)===LEGACY_OFFER_REF.mammoth;
+      if(row.id==='mammoth'||row.id==='orchard')return active && typeof deps.traderRole==='function' && deps.traderRole(ref)==='Cook' && descOf(ref)===LEGACY_OFFER_REF[row.id];
       var retrieval=retrievalByQuest[row.id];
       if(retrieval) {
         if(!active || typeof deps.traderRole!=='function' || deps.traderRole(ref)!==retrieval.role)return false;
@@ -77214,6 +77412,35 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       if(!wrote)return taken.waitMs>0?{ok:false,text:messages.wait}:unavailable;
       return {ok:true,count:1};
     }
+    function harvestOrchard(actor,ref,base,sowing) {
+      var row=byId.orchard,held=questsOf(actor),open=held && held.open.orchard;
+      var unavailable={ok:false,text:'The orchard work is unavailable for now.'};
+      if(!held || !deps.orchardSources || !deps.orchardPlots || !deps.orchardPlots.available() || !deps.orchardSources.verify(actor,ref))return unavailable;
+      if(!open && !qualify(actor,row,held).ok)return {ok:false,text:"This orchard needs Expert Farmer standing."};
+      var farm=deps.orchardFarming && deps.orchardFarming();
+      if(!farm || typeof farm.harvestQuest!=='function' || sowing && typeof farm.sowQuest!=='function')return unavailable;
+      var owner=held.owner,wrote=false;
+      var currentOwner=function(){return active && current(actor,owner);};
+      function award(item,n,fence) {
+        if(item!=='64b2e:Skyrim.esm' || !Number.isSafeInteger(n) || n<=0 || open && !Number.isSafeInteger(open.drawn) ||
+          open && (open.drawn+n>row.holds || open.drawn>0 && open.itemDesc!==item))return false;
+        if(open){open.drawn+=n;open.itemDesc=item;}
+        wrote=keep(actor,held,[{item:item,count:n}],function(){
+          return currentOwner() && fence() && deps.orchardSources.verify(actor,ref) && qualify(actor,row,held,true).ok;
+        });
+        return wrote ? true : typeof deps.available==='function' && !deps.available() ? null : false;
+      }
+      award.current=currentOwner;
+      award.seed=function(item,fence) {
+        if(item!=='64b2e:Skyrim.esm')return false;
+        var done=keep(actor,held,[{item:item,count:-1}],function(){
+          return currentOwner() && fence() && deps.orchardSources.verify(actor,ref) && qualify(actor,row,held,true).ok;
+        });
+        return done ? true : typeof deps.available==='function' && !deps.available() ? null : false;
+      };
+      var text=sowing ? farm.sowQuest(actor,ref,base,award) : farm.harvestQuest(actor,ref,base,award);
+      return {ok:wrote,text:text || unavailable.text};
+    }
     function harvestScarce(actor,ref) {
       return drawScarce(actor,ref,byId.crimson,deps.harvestData,deps.harvestSources,deps.harvestRules,deps.harvestStock,{
         unavailable:'This crimson plant is unavailable for now.',closed:'Take the crimson work from the Winterhold Alchemist first.',
@@ -77448,7 +77675,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       }
       delete b.open[id];
       b.cool[id] = deps.now() + (row.expanded ? open.terms.hours : row.hours) * HOUR;
-      var eligible=retrieval ? function(){return traderFor(row,traderRef,true) && descOf(traderRef)===retrieval.destination && qualify(actor,row,b,true).ok;} : id==='mammoth' ? function(){return traderFor(row,traderRef,true) && qualify(actor,row,b,true).ok;} : undefined;
+      var eligible=retrieval ? function(){return traderFor(row,traderRef,true) && descOf(traderRef)===retrieval.destination && qualify(actor,row,b,true).ok;} : (id==='mammoth'||id==='orchard') ? function(){return traderFor(row,traderRef,true) && qualify(actor,row,b,true).ok;} : undefined;
       if (!keep(actor, b, changes,eligible)) return { ok: false, why: 'unwritten' };
       return { ok: true, gold: row.scarce ? 0 : row.gold };
     }
@@ -77501,10 +77728,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     }
     var mineNames = {
       ebony: 'Raven Rock Mine', stalhrim: 'Kolbjorn Barrow', heartstone: 'Coldcinder Cave',
-      pearl: 'Raven Rock coast', mammoth:'Bleakwind Basin and its western tundra',
+      pearl: 'Raven Rock coast', orchard:'Chillfurrow Farm orchard outside Whiterun', mammoth:'Bleakwind Basin and its western tundra',
       gem: {Ruby: 'White Ridge Sanctum', Sapphire: 'Highpoint Tower', Emerald: 'Kolbjorn Barrow', Amethyst: 'Highpoint Tower'}
     };
     function bound(row) {
+      if(row.id==='orchard')return !!deps.orchardSources && !!deps.orchardPlots;
       if(row.id==='mammoth')return !!deps.mammothSources && !!huntBundles;
       if(row.kind==='retrieval' && typeof deps.traderRole==='function')return !!retrievalByQuest[row.id] && !!deps.retrievalSources;
       if(row.id==='longfin')return !!deps.longfinSources && !!deps.longfinData;
@@ -77527,11 +77755,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         if(row.id==='mammoth' && validDraw && open && open.drawn>0)huntCheck+=' Return '+open.bundles[0].goods[0]+' Mammoth Tusk and '+open.bundles[0].goods[1]+' Mammoth Snout.';
         var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
         var location = mineNames[row.id] || '';
-        return {id:row.id,name:row.name,who:row.who,ask:row.ask,holds:row.holds,hours:row.hours,check:huntCheck,
+        return {id:row.id,name:row.name,who:row.who,ask:row.ask,holds:row.holds,hours:row.hours,check:row.id==='orchard' ? 'Expert Farmers use the existing orchard plots, claims, shovel and seasonal growth. Return four apples, draw at most ten, and keep extras. A complete ripe harvest must fit the remaining allowance.' : huntCheck,
           state:state,drawn:open ? open.drawn : 0,gem:open && open.gem || '',
           gems:row.gems ? row.gems.slice() : [],locations:location,
           waitMinutes:until ? Math.max(0,Math.ceil((until-deps.now())/60000)) : 0,
-          canTake:ready && validDraw && state==='available',canReturn:ready && validDraw && !!open && open.drawn>=row.ask && (row.id!=='mammoth' || gate.ok),
+          canTake:ready && validDraw && state==='available',canReturn:ready && validDraw && !!open && open.drawn>=row.ask && (!['mammoth','orchard'].includes(row.id) || gate.ok),
           canAbandon:ready && validDraw && !!open};
       });
       var hold=deps.traderHold && deps.traderHold(traderRef);
@@ -77612,7 +77840,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
       mineRare: mineRare, dressMammoth:dressMammoth, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
-      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, longfinScarce:longfinScarce, harvestScarce:harvestScarce, geodeScarce:geodeScarce,
+      onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, longfinScarce:longfinScarce, sowOrchard:function(actor,ref,base){return harvestOrchard(actor,ref,base,true);},harvestOrchard:harvestOrchard,harvestScarce:harvestScarce, geodeScarce:geodeScarce,
       shutdown: function () { active = false; }
     };
   }
@@ -77690,12 +77918,35 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         catch(error){log('The crimson work stays unavailable: '+String(error));}
       }
       var geodeData=typeof MERCHANT_TRADING.scarceGeodes==='function'?MERCHANT_TRADING.scarceGeodes():null;
+      var orchardData=typeof MERCHANT_TRADING.orchardSources==='function' ? MERCHANT_TRADING.orchardSources() : null,orchardSources=null,orchardPlots=null;
+      var orchardRefs=Object.create(null);globalThis.__thornswoodQuestOrchardRefs=null;
+      try {
+      if(!orchardData || !Array.isArray(orchardData.sources) || orchardData.sources.length!==10)throw Error('Orchard source evidence unavailable');
+      orchardData.sources.forEach(function(source){
+        var id=mp.getIdFromDesc(source.reference);
+        if(!Number.isInteger(id)||id<=0||id>=0xff000000||mp.getDescFromId(id)!==source.reference||orchardRefs[id])throw Error('Invalid orchard references');
+        orchardRefs[id]=source.reference;
+      });
+      Object.freeze(orchardRefs);globalThis.__thornswoodQuestOrchardRefs=orchardRefs;
+      }catch(error){log("The orchard reference register is unavailable: "+String(error));}
+      if(globalThis.__thornswoodOrchardPlots)globalThis.__thornswoodOrchardPlots.shutdown();
+      globalThis.__thornswoodOrchardPlots=null;
+      var orchardOwner={};globalThis.__thornswoodOrchardPlotOwner=orchardOwner;
+      try {
+        orchardSources=MERCHANT_TRADING.createQuestOrchardSources(mp,orchardData.sources);
+        var refs=orchardData.sources.map(function(r){return r.reference;});
+        var storage=MERCHANT_TRADING.orchardPlots.createOrchardStorage(require('fs'),require('path'),mp.getServerSettings(),mp.writeFileWhole.bind(mp),refs);
+        storage.current=function(){return globalThis.__thornswoodOrchardPlotOwner===orchardOwner;};
+        orchardPlots=MERCHANT_TRADING.orchardPlots.createOrchardPlots(storage,refs);
+        globalThis.__thornswoodOrchardPlots=orchardPlots;
+      }catch(error){log('The orchard work stays unavailable: '+String(error));}
       var geodeSources=null;
       if(geodeData) {
         try {geodeSources=MERCHANT_TRADING.createQuestGeodeSources(mp,geodeData.sources);}
         catch(error){log('The geode work stays unavailable: '+String(error));}
       }
       globalThis.__thornswoodQuests = createCustomQuests({
+        orchardSources:orchardSources,orchardPlots:orchardPlots,orchardFarming:function(){return globalThis.__thornswoodFarming;},
         mammothSources:mammothSources,mammothStock:function(){return globalThis.__thornswoodResourceStock;},
         mammothGoods:function(actor,base){
           var row=HUNTS_BY_BASE[base],pair=row && row.yield && row.yield[3];
