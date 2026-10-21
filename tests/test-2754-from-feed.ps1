@@ -24,7 +24,9 @@
        file of the last record by its sha256, removes what the record does not
        name, keeps what is already right, writes config.json from the feed,
        and refuses a record without :record:files and an asset whose bytes
-       are not its name.
+       are not its name. The client is held to the checkout's record, taken
+       from this channel's assets or else the other's, and refused when
+       neither feed has it (#2983).
     5. Sign-OnGitHub.ps1 with a stand-in gh and box: it sends release.json and
        Thornswood's own pin, account and signer to the fork's workflow, waits
        for that run, takes its catalog, and returns '' only when the box
@@ -162,9 +164,18 @@ try {
     }
     $Shell = (Get-Process -Id $PID).Path
     $root = Join-Path $Scratch 'feed-root'
-    function Stage {
+    # The client record a stage holds the folder to: by default one naming the
+    # chat plugin, which the record carries already.
+    $clientRec = Join-Path $Scratch 'client-build.json'
+    function Set-ClientRecord([hashtable]$files) {
+        $f = [ordered]@{}
+        foreach ($k in $files.Keys) { $f[$k] = [ordered]@{ sha256 = (ShaBytes $files[$k]); bytes = $files[$k].Length } }
+        Put $clientRec (([pscustomobject]@{ forkCommit = 'b9e16e8b'; files = [pscustomobject]$f }) | ConvertTo-Json -Depth 5)
+    }
+    Set-ClientRecord @{ 'Data\Platform\Plugins\chat.js' = $one }
+    function Stage([string]$Channel = 'dev') {
         $oldE = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel dev -Root $root -SiteDir $site 2>&1 | Out-String); $code = $LASTEXITCODE }
+        try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec 2>&1 | Out-String); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $oldE }
         return [pscustomobject]@{ Code = $code; Out = $out }
     }
@@ -179,7 +190,7 @@ try {
     Yes '  and config.json names the feed''s own server' ($cfg.ServerAddress -eq '192.0.2.7' -and [string]$cfg.ServerPort -eq '7788')
     Yes '  and keeps the record it staged from' (Test-Path -LiteralPath (Join-Path $root 'record\record.json'))
     $r = Stage
-    Yes 'a second run fetches nothing that is already right' ($r.Code -eq 0 -and $r.Out -match '0 fetched' -and $r.Out -match '2 already here')
+    Yes 'a second run fetches nothing that is already right' ($r.Code -eq 0 -and $r.Out -match '0 fetched' -and $r.Out -match '1 already here' -and $r.Out -match 'all 1 files are the recorded build')
     Put (Join-Path $root 'Game\Data\Meshes\body.nif') 'damaged'
     $r = Stage
     Yes '  and fetches again a file whose bytes are wrong' ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Meshes\body.nif')) -eq $sTwo)
@@ -191,6 +202,42 @@ try {
     Remove-Item -LiteralPath (Join-Path $root 'Game\Data\Meshes\body.nif') -Force
     $r = Stage
     Yes 'an asset whose bytes are not its name is refused' ($r.Code -ne 0 -and $r.Out -match 'body\.nif could not be staged')
+    Put (Join-Path $assets $sTwo) $two
+
+    # The client the checkout records, when the last release carried another
+    # build (#2983): main's release has the old client, and the recorded one
+    # is on the site only under dev's assets.
+    $newClient = Utf8 "the client at b9e16e8b`r`n"
+    $sNew = ShaBytes $newClient
+    $mainAssets = Join-Path $site 'feed\assets'
+    function MainAsset([byte[]]$b) { $s = ShaBytes $b; Put (Join-Path $mainAssets $s) $b; return $s }
+    $oldClient = Utf8 "the client at 3bdf3d3c`r`n"
+    $sOld = MainAsset $oldClient; [void](MainAsset $two)
+    $mrec = [ordered]@{ ':record:files' = '1'; 'Data\Platform\Plugins\skymp5-client.js' = ('{0}:{1}' -f $oldClient.Length, $sOld); 'Data\Meshes\body.nif' = ('{0}:{1}' -f $two.Length, $sTwo) }
+    $mrecSha = MainAsset (Utf8 (([pscustomobject]$mrec) | ConvertTo-Json))
+    $mfeed = [ordered]@{
+        launcherVersion = '1.2.6'; packs = @(); serverAddress = '192.0.2.7'; serverPort = 7777; siteUrl = 'https://thornswood.net'
+        baseline = [ordered]@{ id = '20261017-205912'; sha256 = $mrecSha; url = "https://thornswood.net/feed/assets/$mrecSha"; entries = 2 }
+    }
+    Put (Join-Path $site 'feed\version\00000001.json') (([pscustomobject]$mfeed) | ConvertTo-Json -Depth 5)
+    Set-ClientRecord @{ 'Data\Platform\Plugins\skymp5-client.js' = $newClient }
+    $r = Stage 'main'
+    Yes 'a recorded client the last release lacks is refused when neither feed has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js')
+    [void](Asset $newClient)
+    $r = Stage 'main'
+    Yes ("  and taken from dev's assets when only dev has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match 'skymp5-client\.js from /feed-dev')
+    if ($r.Code -ne 0) { Write-Host $r.Out -ForegroundColor DarkGray }
+    Yes '  and the rest of the release is still staged as recorded' ((ShaFile (Join-Path $root 'Game\Data\Meshes\body.nif')) -eq $sTwo)
+    [void](MainAsset $newClient)
+    Remove-Item -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js') -Force
+    $r = Stage 'main'
+    Yes "  and from the channel's own assets first when it has it" ($r.Code -eq 0 -and $r.Out -match 'skymp5-client\.js from /feed[^-]')
+    $r = Stage 'main'
+    Yes '  and nothing is taken when the folder already holds the recorded client' ($r.Code -eq 0 -and $r.Out -match 'all 1 files are the recorded build')
+    Put (Join-Path $mainAssets $sNew) 'not the client'
+    Remove-Item -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js') -Force
+    $r = Stage 'main'
+    Yes '  and a copy whose bytes are not the record is passed over for one that is' ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match 'from /feed-dev')
 
     # ---- 5. signing on GitHub, with a stand-in gh and box ---------------------------
     Write-Host ''; Write-Host 'signing on GitHub'

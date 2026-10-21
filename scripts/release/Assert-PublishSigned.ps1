@@ -122,6 +122,13 @@ function Get-PublishSignRefusal {
         return ("missing file to check for a publish signature: $Path")
     }
 
+    # Get-AuthenticodeSignature is Windows' alone: pwsh elsewhere has no such
+    # command, so off Windows no file can be shown signed, and the refusal says
+    # that rather than that the command was not found.
+    if (-not (Get-Command Get-AuthenticodeSignature -ErrorAction SilentlyContinue)) {
+        return ((Split-Path -Leaf $Path) + ' cannot be checked for a signature on this machine: ' +
+                'Get-AuthenticodeSignature, which reads one, is only on Windows. Check it on Windows. Nothing was published.')
+    }
     $sig = $null
     try {
         $sig = Get-AuthenticodeSignature -LiteralPath $Path

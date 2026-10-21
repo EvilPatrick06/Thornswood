@@ -62,6 +62,31 @@ Yes 'a path that climbs out of scripts/mods is refused' ($r.Code -ne 0 -and $r.T
 $r = Refused @('scripts/mods/Add-ContentRecords.py', '--note', 'say "hi"')
 Yes 'an argument with a double quote in it is refused' ($r.Code -ne 0 -and $r.Text -match 'double quote' -and $r.Text -notmatch 'artifact ')
 
+# ---- 1b. the artifact carries what the chain's Python builders touch ----
+# Until #2962 it held scripts, game\content, game\data, records and
+# layout.json only, so a builder that writes into game\gamemode.js stopped on
+# the box. The lines that make $paths are lifted out of Run-OnBox.ps1 by the
+# parser and run here with its $Here.
+$ast = [Management.Automation.Language.Parser]::ParseFile($runOnBox, [ref]$null, [ref]$null)
+$top = @($ast.EndBlock.Statements)
+$from = @($top | Where-Object { $_.Extent.Text -like '$paths = @(*' })
+$upTo = @($top | Where-Object { $_.Extent.Text -like 'foreach ($s in @($chainFiles.steps*' })
+Yes 'Run-OnBox.ps1 makes $paths once and adds the chain''s files to it once' ($from.Count -eq 1 -and $upTo.Count -eq 1)
+$Here = Join-Path $Repo 'scripts\mods'
+$paths = $null
+foreach ($st in $top) {
+    if ($st.Extent.StartOffset -lt $from[0].Extent.StartOffset -or $st.Extent.StartOffset -gt $upTo[0].Extent.StartOffset) { continue }
+    . ([scriptblock]::Create($st.Extent.Text))
+}
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$chain = Get-Content -LiteralPath (Join-Path $Repo 'scripts\mods\content-tables.json') -Raw | ConvertFrom-Json
+$need = @($chain.steps | Where-Object { $_.tool -like '*.py' } | ForEach-Object { @($_.reads) + @($_.readsBack) + @($_.writes) } | Where-Object { $_ } | Sort-Object -Unique)
+$left = @($need | Where-Object { $n = [string]$_; -not @($paths | Where-Object { $n -eq $_ -or $n.StartsWith($_ + '/') }).Count })
+Yes ('every file a Python builder of the chain reads or writes goes up (' + $need.Count + ')' + $(if ($left.Count) { ': not ' + ($left -join ', ') } else { '' })) (
+    $need.Count -gt 0 -and $left.Count -eq 0)
+Yes '  game\gamemode.js among them' ($paths -contains 'game/gamemode.js')
+
 # ---- 4. Send-GameArchives refuses what is not the pinned build -----------
 $send = Join-Path $Repo 'scripts\mods\Send-GameArchives.ps1'
 $empty = Join-Path ([IO.Path]::GetTempPath()) ('ts-2899-empty-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
