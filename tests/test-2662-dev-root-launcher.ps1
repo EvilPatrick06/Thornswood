@@ -193,15 +193,21 @@ exit 0
     Write-Host ''
     Write-Host 'Publish-Update.ps1 dev gate'
     $gate = LiftIf $pubPath 'No dev build at'
-    $dev = LiftIf $pubPath '^if \(\$Dev -and -not \$PSBoundParameters\.ContainsKey\(''Root''\)\) \{ \$Root = \$Root \+ ''-DevBuild'' \}$'
-    Yes 'Publish-Update.ps1 has one dev gate, after the -DevBuild rule' ($null -ne $gate -and $null -ne $dev -and $gate.Extent.StartOffset -gt $dev.Extent.StartOffset)
+    # The folder a publish with no -Root reads, which Where.ps1 InstallDev
+    # answers on the dev channel (#3003). The runner below gives it a Where.ps1
+    # of its own that answers from TS_INSTALL.
+    $dev = LiftIf $pubPath "^if \(-not \`$PSBoundParameters\.ContainsKey\('Root'\)\) \{\s+\`$Root = \[string\]\(& \(Join-Path \`$Here 'Where\.ps1'\) \`$\(if \(\`$Dev\) \{ 'InstallDev' \} else \{ 'Install' \}\)\)\s+\}$"
+    Yes 'Publish-Update.ps1 has one dev gate, after it asks Where.ps1 for the install' ($null -ne $gate -and $null -ne $dev -and $gate.Extent.StartOffset -gt $dev.Extent.StartOffset)
     Yes '  and it asks only when no -Root was given' ($gate -and $gate.Clauses[0].Item1.Extent.Text -match '-not \$PSBoundParameters\.ContainsKey\(''Root''\)')
     if ($gate -and $dev) {
+        $installWhere = Join-Path $T 'install-where'
+        New-Item -ItemType Directory -Force -Path $installWhere | Out-Null
+        [IO.File]::WriteAllText((Join-Path $installWhere 'Where.ps1'), "param([string]`$What)`nif (`$What -eq 'InstallDev') { `$env:TS_INSTALL + '-DevBuild' } elseif (`$What -eq 'Install') { `$env:TS_INSTALL } else { throw `$What }`n", $utf8)
         $runner = @"
 param([string]`$Channel = 'main', [string]`$Root = '')
 function Die(`$m) { Write-Output "STOP. `$m"; exit 1 }
 `$Dev = (`$Channel -eq 'dev')
-if (-not `$PSBoundParameters.ContainsKey('Root')) { `$Root = `$env:TS_INSTALL }
+`$Here = '$installWhere'
 $($dev.Extent.Text)
 $($gate.Extent.Text)
 Write-Output "WENT ON `$Root"

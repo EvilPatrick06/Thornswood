@@ -76,6 +76,11 @@ function Set-RuleRemote([string]$Name, [string[]]$Remote) {
     $global:Fake.log.Add('Set-RuleRemote ' + $Name)
 }
 function Register-Rollback([string]$Saved) { $global:Fake.rollback = $Saved; $global:Fake.log.Add('Register-Rollback') }
+function New-PrivateFile([string]$Path) {
+    $global:Fake.private.Add([pscustomobject]@{ Path = $Path; Existed = (Test-Path -LiteralPath $Path) })
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $global:Fake.log.Add('New-PrivateFile')
+}
 '@
 $Layer = Join-Path $tmp 'layer.ps1'
 [IO.File]::WriteAllText($Layer, $layerText, $utf8)
@@ -97,6 +102,7 @@ function New-Fake {
         )
         rollback = ''
         log = New-Object System.Collections.Generic.List[string]
+        private = New-Object System.Collections.Generic.List[object]
     }
 }
 function Rule([string]$name) { return @($global:Fake.rules | Where-Object { $_.Name -eq $name })[0] }
@@ -122,7 +128,7 @@ try {
     $driverText = [IO.File]::ReadAllText($Driver)
     Yes 'Set-SshScope.ps1 is plain ASCII too' (-not ($driverText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Test-IsServer', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback')
+    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Test-IsServer', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -139,6 +145,12 @@ try {
         if (-not $p -or $layerNames -notcontains $p.Name) { $loose += ('{0} at line {1}' -f $name, $c.Extent.StartLineNumber) }
     }
     Yes ('every command in it that touches Windows is inside a layer function' + $(if ($loose.Count) { ': ' + ($loose -join ', ') } else { '' })) ($loose.Count -eq 0)
+    # A copy written plainly into C:\ProgramData\ssh takes the folder's rule
+    # for every signed in account (#3034), so rules are set in one place.
+    $setAcl = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and [string]$n.Member -eq 'SetAccessControl' }, $true) | Where-Object {
+        $p = $_.Parent; while ($p -and -not ($p -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $p = $p.Parent }; -not $p -or $p.Name -ne 'New-PrivateFile' })
+    $copies = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Copy-Item', 'Set-Acl', 'icacls', 'icacls.exe') -contains $n.GetCommandName() }, $true))
+    Yes '  a file''s rules are set only in New-PrivateFile, and no Copy-Item, Set-Acl or icacls makes or changes one' (-not $setAcl.Count -and -not $copies.Count)
     Yes 'SSH_CLIENT is read only inside the layer' (@([regex]::Matches($boxText, 'SSH_CLIENT') | Where-Object { $_ }).Count -ge 1 -and $boxText -match "function Get-CallerAddress \{ return \(\[string\]\`$env:SSH_CLIENT")
 
     # ---- a dry run changes nothing ------------------------------------------------
@@ -162,11 +174,13 @@ try {
     $doc = if ($saved.Count) { Get-Content -Raw -LiteralPath $saved[0].FullName | ConvertFrom-Json } else { $null }
     Yes '  the rules as they were are saved, and only the two it changed' ($saved.Count -eq 1 -and @($doc.rules).Count -eq 2 -and
         @($doc.rules | Where-Object { @($_.remote) -join ',' -ne 'Any' }).Count -eq 0 -and (@($doc.rules.name) -join ',') -eq 'OpenSSH-Server-In-TCP,sshd-22-extra')
-    Yes '  the put back is armed with that file before any rule is set' ($global:Fake.rollback -eq $saved[0].FullName -and $global:Fake.log[0] -eq 'Register-Rollback' -and $global:Fake.log.Count -eq 3)
+    Yes '  made by New-PrivateFile while it did not exist yet, so its rules are set before the rules go in (#3034)' ($global:Fake.private.Count -eq 1 -and
+        $global:Fake.private[0].Path -eq $saved[0].FullName -and -not $global:Fake.private[0].Existed -and $global:Fake.log[0] -eq 'New-PrivateFile')
+    Yes '  the put back is armed with that file before any rule is set' ($global:Fake.rollback -eq $saved[0].FullName -and $global:Fake.log[1] -eq 'Register-Rollback' -and $global:Fake.log.Count -eq 4)
     Yes '  every change printed as CHANGED, and the count in the last line' (@($r.Lines | Where-Object { $_ -match '^CHANGED ' }).Count -eq 4 -and $r.Lines[-1] -eq 'DONE 4 change(s) made.')
 
     $r2 = Invoke-BoxHere '198.51.100.0/24 203.0.113.7'
-    Yes 'second run with the same list in another order: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and (Has $r2.Lines "^ALREADY rule 'OpenSSH SSH Server") -and $global:Fake.log.Count -eq 3)
+    Yes 'second run with the same list in another order: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and (Has $r2.Lines "^ALREADY rule 'OpenSSH SSH Server") -and $global:Fake.log.Count -eq 4)
 
     $r3 = Invoke-BoxHere 'Any'
     Yes 'Any opens both rules again, with its own save and put back' ($r3.Code -eq 0 -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq 'Any' -and (RemoteOf 'sshd-22-extra') -eq 'Any' -and
@@ -204,7 +218,7 @@ try {
     $global:Fake.caller = '127.0.0.1'
     $r = Invoke-BoxHere 'None'
     Yes 'None through the bridge: both rules take 127.0.0.1 alone, with the save and put back' ($r.Code -eq 0 -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq '127.0.0.1' -and (RemoteOf 'sshd-22-extra') -eq '127.0.0.1' -and
-        $global:Fake.log[0] -eq 'Register-Rollback' -and (Has $r.Lines '^KEPT this session comes from 127\.0\.0\.1'))
+        $global:Fake.log[0] -eq 'New-PrivateFile' -and $global:Fake.log[1] -eq 'Register-Rollback' -and (Has $r.Lines '^KEPT this session comes from 127\.0\.0\.1'))
     Yes '  and the other ports are not touched' ((RemoteOf 'Thornswood-Site') -eq 'Any' -and (RemoteOf 'Thornswood-Game') -eq 'Any')
     New-Fake
     $global:Fake.caller = '127.0.0.1'

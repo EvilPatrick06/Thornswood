@@ -86,20 +86,9 @@ function Stop-Check([string]$m) {
   exit 1
 }
 
-# The same place Check-ShipReady looks: C:\Thornswood, or the first drive with
-# a Thornswood launcher on it. The first is asked as a plain string, as
-# Where.ps1's Find-InstallRoot does: Join-Path stops on a drive this machine
-# does not have (C: off Windows) rather than answering that it is not there.
-function Find-Root {
-  $first = 'C:\Thornswood'
-  if (Test-Path -LiteralPath ($first + '\Launcher\Thornswood.exe')) { return $first }
-  foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-    $cand = Join-Path $d.Root 'Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-  }
-  return $first
-}
-if (-not $Root) { $Root = Find-Root }
+# The launcher install, which Where.ps1 Install finds (#3003): C:\Thornswood,
+# or the first drive with a Thornswood launcher on it.
+if (-not $Root) { $Root = [string](& (Join-Path $Here '..\release\Where.ps1') Install) }
 if (-not $List) { $List = Join-Path $Root 'Profile\Default\plugins.txt' }
 if (-not $Data) { $Data = Join-Path $Root 'Game\Data' }
 

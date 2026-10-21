@@ -41,11 +41,11 @@
 [CmdletBinding()]
 param(
   [string]$Dist = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
-  # C:\Thornswood\Game on most machines. When C: has no launcher, every fixed
-  # drive is tried the way Publish-Update.ps1's Find-Root does it, so a second
-  # developer whose install is on another drive is not stuck on Patrick's path.
+  # Under the launcher install, which Where.ps1 Install finds (C:\Thornswood
+  # on most machines, another drive's when the launcher is there, #3003), so
+  # Sync-Client copies into the install this machine's launcher actually uses.
   # -Game still wins.
-  [string]$Game = 'C:\Thornswood\Game',
+  [string]$Game = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game'),
   [string]$Record,
   [switch]$Check,
   [switch]$NoPause
@@ -54,21 +54,6 @@ $ErrorActionPreference = 'Stop'
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\client-build.json' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
-
-# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1, kept
-# identical so Sync-Client copies into the install this machine's launcher
-# actually uses. No shared helper yet: that would pull Find-Root out of
-# Publish-Update.ps1, which needs a line in #staff-updates first.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
-if (-not $PSBoundParameters.ContainsKey('Game')) { $Game = Join-Path (Find-Root) 'Game' }
 
 function Stop-Here($m) {
   Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red

@@ -107,6 +107,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
+. (Join-Path $Here 'Lock-Folder.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 if (-not $KeyPath) { $KeyPath = Join-Path (Join-Path $HOME '.ssh') 'thornswood_ed25519' }
@@ -187,6 +188,7 @@ function Find-PublicKeyLine([string]$Text) {
 # $Need, when given, is a file the key's forced command runs: without it on
 # the box the key would open nothing, so nothing is changed.
 function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob, [string]$Need = '') {
+    $lock = 'function Lock-ThornswoodFolder {' + ${function:Lock-ThornswoodFolder}.ToString() + '}'
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
@@ -199,9 +201,15 @@ if (-not (Test-Path -LiteralPath '$BridgeRoot\bridge.js')) { 'STOP there is no b
 if (`$need -and -not (Test-Path -LiteralPath `$need)) { 'STOP there is no ' + `$need + ' on the box, and a notices key runs only that. Run scripts\vps\Watch-Services.ps1 -Install first. Nothing was changed.'; exit 1 }
 if (Get-ScheduledTask -TaskName `$task -EA SilentlyContinue) { 'STOP the put back from an earlier run is still armed, so that run is not finished: it puts its key file and tokens back within ten minutes of when it started. Run this again after that. Nothing was changed.'; exit 1 }
 
-# What is there now, for the put back. The folder is under ProgramData\ssh,
-# which only Administrators and SYSTEM can read.
+# What is there now, for the put back, in a folder only SYSTEM and
+# Administrators may open (#3034). ProgramData\ssh itself gives every signed
+# in account read, as Windows OpenSSH installs it, and a folder made there
+# takes that rule, so the copies of the key file and the token digests would
+# be open to every account on the box. It is locked while it is empty.
+$lock
 if (Test-Path -LiteralPath `$save) { Remove-Item -LiteralPath `$save -Recurse -Force }
+New-Item -ItemType Directory -Path `$save -Force | Out-Null
+Lock-ThornswoodFolder -Path `$save -Only
 New-Item -ItemType Directory -Path (Join-Path `$save 'tokens') -Force | Out-Null
 if (Test-Path -LiteralPath `$keys) { Copy-Item -LiteralPath `$keys -Destination (Join-Path `$save 'keys') }
 if (Test-Path -LiteralPath `$tokens) { Get-ChildItem -LiteralPath `$tokens -File | Copy-Item -Destination (Join-Path `$save 'tokens') }
@@ -219,6 +227,7 @@ if (Test-Path -LiteralPath `$keys) { icacls `$keys /inheritance:r /grant 'Admini
 if (-not (Test-Path -LiteralPath `$tokens)) { New-Item -ItemType Directory -Path `$tokens -Force | Out-Null }
 Get-ChildItem -LiteralPath `$tokens -File | Remove-Item -Force
 Get-ChildItem -LiteralPath (Join-Path `$save 'tokens') -File | Copy-Item -Destination `$tokens
+Remove-Item -LiteralPath `$save -Recurse -Force
 Unregister-ScheduledTask -TaskName '$PutBack' -Confirm:`$false
 '@
 `$cmd = (@(`$back -split '\r?\n' | Where-Object { `$_.Trim() }) -join '; ')

@@ -277,9 +277,12 @@ SIX.forEach(function (d) {
   const go = read('scripts/release/Go.ps1') || '';
   const keep = read('launcher/app/Keep.cs') || '';
   const rules = read('scripts/release/Ship-Rules.ps1') || '';
-  const game = (/\[string\]\s*\$Game\s*=\s*'([^']+)'/.exec(go) || [])[1];
-  yes('plugins: the README names the game folder Go.ps1 installs into by default, ' + game,
-      !!game && t.indexOf(game) >= 0);
+  // Go.ps1's default -Game is the Game folder of the install Where.ps1 finds
+  // (#3003), and the README says so rather than naming one machine's path.
+  const asksInstall = go.indexOf("[string] $Game   = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '" + BS + "Game')") >= 0;
+  yes('plugins: Go.ps1 installs into the Game folder of the install Where.ps1 finds, as the README says',
+      asksInstall && t.indexOf('`Where.ps1 Install`') >= 0 &&
+      t.indexOf('`Game' + BS + 'Data' + BS + 'Platform' + BS + 'Plugins`') >= 0);
   const serverPart = go.indexOf('if (-not $SkipServer)');
   yes('plugins: Go.ps1 still copies the voice service to the VPS unless it is given -SkipServer, ' +
       'which is why the README says to pass it',

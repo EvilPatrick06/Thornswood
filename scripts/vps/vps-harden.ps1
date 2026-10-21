@@ -20,7 +20,8 @@
                      one it reads) and above the Match block, where a global
                      setting has to be. The new file is checked with
                      sshd -t before it replaces the old one, and the old one
-                     is kept beside it as sshd_config.before-harden-<time>.
+                     is kept beside it as sshd_config.before-harden-<time>,
+                     which only SYSTEM and Administrators may read (#3034).
     restart          sshd is restarted by a one time scheduled task a few
                      seconds after this returns, so the answer gets back
                      before the connection goes. A second task puts the old
@@ -44,7 +45,7 @@
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the registry,
-  the firewall, services, scheduled tasks, sshd -t). Only
+  the firewall, services, scheduled tasks, sshd -t, the copy's rules). Only
   tests\test-harden-vps.ps1 passes it, to run this against stand-ins.
 #>
 [CmdletBinding()]
@@ -118,6 +119,28 @@ function Register-Rollback([string]$Backup) {
     $t = New-ScheduledTaskTrigger -Once -At ((Get-Date).AddMinutes(10))
     $p = New-ScheduledTaskPrincipal -UserId 'SYSTEM' -LogonType ServiceAccount -RunLevel Highest
     Register-ScheduledTask -TaskName $RollbackTask -Action $a -Trigger $t -Principal $p -Force | Out-Null
+}
+
+# Makes $Path an empty file only SYSTEM and Administrators may open, taking
+# nothing from its folder (#3034). C:\ProgramData\ssh gives every signed in
+# account read, as Windows OpenSSH installs it, and a file made there takes
+# that rule, so a copy made there plainly is open to every account on the
+# box. The rules are set while the file is empty, so its content is never
+# open, and they are the ones administrators_authorized_keys has.
+function New-PrivateFile([string]$Path) {
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $acl = New-Object Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($s in 'S-1-5-18', 'S-1-5-32-544') {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+    # Read back, not taken from the call: a FileSecurity already written once
+    # writes nothing the second time and says nothing (#3034, on the box).
+    $got = Get-Acl -LiteralPath $Path
+    $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+    if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
 }
 
 if ($Layer) { . $Layer }
@@ -233,7 +256,10 @@ function Invoke-Harden {
             Change 'sshd_config: PasswordAuthentication no, KbdInteractiveAuthentication no (sshd -t accepts the new file), then sshd restarted'
         } else {
             $backup = $SshdConfig + '.before-harden-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
-            Copy-Item -LiteralPath $SshdConfig -Destination $backup -Force
+            # Byte for byte, into a file only SYSTEM and Administrators may
+            # open, not Copy-Item's, which takes the folder's rules.
+            New-PrivateFile $backup
+            [IO.File]::WriteAllBytes($backup, [IO.File]::ReadAllBytes($SshdConfig))
             # Written in place, so the file keeps the permissions sshd insists on.
             [IO.File]::WriteAllText($SshdConfig, $newText, (New-Object Text.UTF8Encoding($false)))
             Change ('sshd_config: PasswordAuthentication no, KbdInteractiveAuthentication no (old file kept as ' + $backup + ')')
