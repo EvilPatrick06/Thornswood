@@ -41,11 +41,11 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
-$ErrorActionPreference = 'Stop'
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -63,8 +63,8 @@ function Die($m) {
 
 # Progress stays quiet, or a bar from the far side comes back as lines mixed
 # in with the state this prints. The send itself is Send-Script.ps1 (issue
-# #1166, the same way as #1070): a long script goes as a file of its own
-# name, removed after, and the far side's exit code comes back.
+# #1166, the same way as #1070): a long script goes by scp and its run takes
+# it off the box before it runs, and the far side's exit code comes back.
 function Remote($script) {
   $script = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script

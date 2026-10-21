@@ -230,10 +230,10 @@
 #>
 param(
     # The build's Data folder. Read only.
-    [string] $Data       = 'C:\Thornswood\Game\Data',
+    [string] $Data       = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # The load order. The five Bethesda masters are always first and are never
     # in this file, so they are put in front of it.
-    [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
+    [string] $PluginList = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\OwnGame\plugins.txt'),
     [string] $Out        = '',
     [string] $JsOut      = '',
     # Archives may be stored separately from a verified server plugin snapshot.
@@ -244,6 +244,7 @@ param(
     [switch] $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -401,8 +402,6 @@ $RANK_BANDS = @(
 $YIELD_FLOOR    = 1
 $YIELD_PER_RANK = 1     # the ceiling is $YIELD_FLOOR + tier * $YIELD_PER_RANK
 $RANK_ORDER     = @('novice', 'advanced', 'expert', 'master')
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\hunts.json' }
 
@@ -566,17 +565,12 @@ function JsonStr($s) {
     return '"' + $t + '"'
 }
 
-# The line ending a file already uses: CRLF when it holds one, LF otherwise.
-# The table and the gamemode block are written with it, so a run never mixes
-# the two in one file. Until 5 October both were joined with CRLF whatever the
-# file held, and a checkout that keeps LF (the agents' VM, the VPS runner's
-# clones) got a whole-file diff of hunts.json and CRLF lines inside an LF
-# gamemode. Build-RecipeTable.ps1 (#1622), Build-OreTable.ps1 (#1787),
-# Build-HarvestTable.ps1 and Build-SpellTable.ps1 (#1828) do the same.
-function EolOf([string]$text) {
-    if ($text.Contains("`r`n")) { return "`r`n" }
-    return "`n"
-}
+# Every table and gamemode block this writes is joined with LF, the ending
+# .gitattributes gives these files on every checkout (#3029). Until then each
+# run took the ending of the file it found, because a checkout with autocrlf
+# held them CRLF and the agents' VM and the runners' clones LF (#1622, #1787,
+# #1828), so a run on One rewrote every table it touched.
+$Eol = "`n"
 
 # Everything sitting directly in the game folder, with its size and its last
 # write. Taken before the work and again after it, so 'read only' is something
@@ -1723,9 +1717,8 @@ Write-Host 'writing' -ForegroundColor Cyan
 # no timestamp in it, so that the same game files give byte for byte the same
 # file: ConvertTo-Json lays out Windows PowerShell 5.1 and PowerShell 7
 # differently, and a rebuild that changed nothing would be a whole-file diff.
-# The line ending is the one the table already has, CRLF for a new one.
-$jsonEol = "`r`n"
-if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
+# It is joined with LF, as everything this writes is.
+$jsonEol = $Eol
 function Gives-Json($gives) {
     $parts = New-Object 'System.Collections.Generic.List[string]'
     foreach ($g in $gives) {
@@ -1909,7 +1902,7 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add($indent + '};')
             $body.Add('')
-            $eol = EolOf $text
+            $eol = $Eol
             $new = $text.Substring(0, $m.Index) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} animals into the HUNTS_BY_BASE block of {1}" -f $table.Count, $gm)

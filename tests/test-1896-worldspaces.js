@@ -271,8 +271,9 @@ yes('the install writes the list into data.json at its own layout, and nothing e
 yes('and into the DATA line on one line, 1.0 still written 1.0',
   inst.gm === '// head\nconst DATA = {"a":1.0,"worldspaces":["3c:Skyrim.esm","d7a:Arena.esp"],"solstheim":2000800};\nconst WORLDSPACES = new Set(DATA.worldspaces);\n');
 const crlf = Build.install(['3c:Skyrim.esm', 'd7a:Arena.esp'], small.split('\n').join(CR + '\n'), smallGm.split('\n').join(CR + '\n'));
-yes('a checkout with Windows line ends installs the same, and keeps them',
-  !crlf.error && crlf.json === inst.json.split('\n').join(CR + '\n') && crlf.gm === inst.gm.split('\n').join(CR + '\n'));
+yes('a checkout from before .gitattributes, CRLF, gets the same list, written LF (#3029)',
+  !crlf.error && crlf.json.indexOf('"worldspaces": [\n  "3c:Skyrim.esm",\n  "d7a:Arena.esp"\n ]') >= 0 &&
+  crlf.gm.indexOf('const DATA = {"a":1.0,"worldspaces":["3c:Skyrim.esm","d7a:Arena.esp"],"solstheim":2000800};') >= 0);
 yes('it refuses a data.json with two lists rather than guess which',
   !!Build.install(['3c:Skyrim.esm'], '{"worldspaces":[],"b":{"worldspaces":[]}}', smallGm).error);
 yes('the install of the list this load order has today changes neither file',

@@ -14,7 +14,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root    = 'C:\Thornswood',
+    [string]$Root,
     # Where releases are staged and zipped. Deliberately NOT under $Root: that
     # is the folder people play from, and staging there put 10.9 GB of old
     # packs on the game drive. The dev tree is where build output belongs.
@@ -85,6 +85,7 @@ param(
     # are the last release's, held to the server's order read off the box.
     [switch]$FromFeed
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 . (Join-Path $PSScriptRoot 'RecordShape.ps1')     # #2180: the Skyrim pin is held to its shape before it goes into the feed
 
@@ -102,7 +103,6 @@ function Get-LauncherExe([string]$dir) {
 }
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -115,24 +115,15 @@ $Dev = ($Channel -eq 'dev')
 
 # ---- where the launcher is installed ----------------------------------------
 #
-# C:\Thornswood on most machines. A second developer may have put it on
-# another drive, so when C: has no launcher every fixed drive is tried for
-# <drive>:\Thornswood\Launcher\Thornswood.exe. The dev build is always the
-# main root plus -DevBuild, on the same drive; that is where the main
-# launcher's Settings page installs it (DevBuild.cs). -Root still wins.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
+# The install Where.ps1 finds (#3003): C:\Thornswood on most machines, or
+# Thornswood on another drive when the launcher is there. The dev launcher
+# lives beside the main one, the install plus -DevBuild, where the main
+# launcher's Settings page installs it (DevBuild.cs), and Where.ps1 InstallDev
+# answers that. Its config.json carries the dev ports and its Launcher folder
+# holds the exe that gets uploaded. -Root still wins.
+if (-not $PSBoundParameters.ContainsKey('Root')) {
+    $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' }))
 }
-if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
-# The dev launcher lives beside the main one. Its config.json carries the dev
-# ports and its Launcher folder holds the exe that gets uploaded.
-if ($Dev -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $Root + '-DevBuild' }
 # Only the folder worked out here is asked for a Launcher folder (#2662): no
 # Launcher folder in <install>-DevBuild means the dev build was never
 # installed. A folder named by -Root is not: Ship always passes one, the ship
@@ -639,12 +630,22 @@ if (-not $FromFeed) {
 # and lower cased. Absent plugins never loaded, so removing their references
 # cannot break a save. A new key avoids comparing with older keys that counted
 # absent files. The first release establishes that installed-only baseline.
+#
+# Installed is asked the way the game asks it, without regard to case: the
+# names are the Data folder's own, lower cased once. Until #2989 each name was
+# lower cased first and then asked of the folder, which on a machine whose
+# folders care about case (a Ship from the cloud) found none of them, so every
+# release's key was the key of an empty list. On Windows the key is unchanged.
 function Get-ActiveOrderKey([string]$path, [string]$data = '') {
+    $installed = @{}
+    if ($data -and [IO.Directory]::Exists($data)) {
+        foreach ($f in [IO.Directory]::EnumerateFiles($data)) { $installed[[IO.Path]::GetFileName($f).ToLowerInvariant()] = $true }
+    }
     $on = @(Get-Content -LiteralPath $path -ErrorAction Stop |
             ForEach-Object { $_.Trim() } |
             Where-Object { $_.StartsWith('*') } |
             ForEach-Object { $_.Substring(1).Trim().ToLowerInvariant() } |
-            Where-Object { $_ -and (-not $data -or [IO.File]::Exists((Join-Path $data $_))) })
+            Where-Object { $_ -and (-not $data -or $installed.ContainsKey($_)) })
     $sha = [Security.Cryptography.SHA256]::Create()
     try { return -join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($on -join "`n")) | ForEach-Object { $_.ToString('x2') }) }
     finally { $sha.Dispose() }

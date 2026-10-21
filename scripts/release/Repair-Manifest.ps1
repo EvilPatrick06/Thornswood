@@ -64,9 +64,9 @@ param(
     # live one is never touched to test anything.
     ,[string]$AppliedFile
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Feed-Store.ps1')
@@ -79,25 +79,15 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 
 # ---- where the launcher is installed ----------------------------------------
 #
-# The same rule as Find-Root in Publish-Update.ps1, kept identical so the
-# applied.txt settled below is the one the launcher on this machine reads.
-# C:\Thornswood on most machines; when C: has no launcher, every fixed drive is
-# tried for <drive>:\Thornswood\Launcher\Thornswood.exe, because a second
-# developer may have installed on another drive. Until this it was always C:,
-# so on that machine the repair wrote nothing, the dead pack ids were never
-# marked as seen, and the launcher kept the update card up until the repaired
-# feed came back down. The dev build is the main root plus -DevBuild, on the
-# same drive; that is where the main launcher's Settings page installs it
-# (DevBuild.cs). -AppliedFile still wins.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
+# The install Where.ps1 finds (#3003), the one Publish-Update.ps1 asks for, so
+# the applied.txt settled below is the one the launcher on this machine reads.
+# C:\Thornswood on most machines, or Thornswood on another drive when the
+# launcher is there. Until it looked there it was always C:, so on that
+# machine the repair wrote nothing, the dead pack ids were never marked as
+# seen, and the launcher kept the update card up until the repaired feed came
+# back down. The dev build is the install plus -DevBuild, where the main
+# launcher's Settings page installs it (DevBuild.cs), which Where.ps1
+# InstallDev answers. -AppliedFile still wins.
 
 . (Join-Path $Here 'Feed-Rules.ps1')
 
@@ -183,8 +173,7 @@ foreach ($why in @($split.Drop | ForEach-Object { $_.Why } | Sort-Object -Unique
 # would keep the update card up until the repaired file comes back down.
 $applied = $AppliedFile
 if (-not $applied) {
-    $root = Find-Root
-    if ($Channel -eq 'dev') { $root = $root + '-DevBuild' }
+    $root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Channel -eq 'dev') { 'InstallDev' } else { 'Install' }))
     $applied = Join-Path $root 'Profile\applied.txt'
 }
 if ($DryRun) {

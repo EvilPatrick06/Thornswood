@@ -1,7 +1,7 @@
 {
-  "builtBy": "tools\\Build-WarmthTable.js",
-  "builtAt": "2026-09-23T07:07:33.073Z",
-  "source": "the ARMO records of 99 plugins in load order, and the KYWD records their keywords point at",
+  "builtBy": "scripts\\dev\\Build-WarmthTable.js",
+  "builtAt": "2026-10-21T09:37:25.567Z",
+  "source": "the ARMO records of 101 plugins in load order, and the KYWD records their keywords point at",
   "readFrom": "BOD2 for what it covers, KWDA for the material, DATA for the weight",
   "note": "what a material is WORTH is balance and lives in NEEDS.wear in gamemode.js",
   "count": 4061,
@@ -21391,300 +21391,6 @@
       "w": 0,
       "e": "EE_ChickenAnimalSkin01"
     },
-    "32528:SkyrimSewers.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "SSewersClothesVampiress"
-    },
-    "299f:Solitude Arena.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 6,
-      "e": "LSDarmurebleu"
-    },
-    "29a1:Solitude Arena.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 6,
-      "e": "LSDarmurejaune"
-    },
-    "5a86:Solitude Arena.esp": {
-      "m": "cloth",
-      "c": "hands",
-      "w": 1,
-      "e": "LSDGANTDELAMORT"
-    },
-    "603d:Solitude Arena.esp": {
-      "m": "cloth",
-      "c": "hands",
-      "w": 1,
-      "e": "LSDGANTDELAMORT2"
-    },
-    "aea2:Solitude Arena.esp": {
-      "m": "light",
-      "c": "head,hair,circlet,ears",
-      "w": 5,
-      "e": "LSDcasquechamp"
-    },
-    "b443:Solitude Arena.esp": {
-      "m": "light",
-      "c": "head,hair,circlet,ears",
-      "w": 5,
-      "e": "LSDcasquechamp2"
-    },
-    "2701b8:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "body",
-      "w": 6,
-      "e": "ZSH_V7_Template"
-    },
-    "37650:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskSnow"
-    },
-    "3764f:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskBrown"
-    },
-    "3764b:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskBlack"
-    },
-    "335a2:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_ClavicusVileMaskLight"
-    },
-    "37652:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskBlackLight"
-    },
-    "48a5:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "body",
-      "w": 28,
-      "e": "ZEM_ArmorLight"
-    },
-    "37653:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskBrownLight"
-    },
-    "37654:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_Pelt_MaskSnowLight"
-    },
-    "169211:ZIA_Complete Pack.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "ZWJ_Polymorph68_GiantMudcrab_Skin"
-    },
-    "24ca68:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "head,hair,circlet,ears",
-      "w": 7,
-      "e": "ZCV_V7_Template"
-    },
-    "24ca67:ZIA_Complete Pack.esp": {
-      "m": "heavy",
-      "c": "body",
-      "w": 28,
-      "e": "ZEM_V7_Template"
-    },
-    "24ca71:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "hair,circlet,ears",
-      "w": 9,
-      "e": "ZMS_V7_TemplateMaskH"
-    },
-    "24ca72:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "hair,circlet",
-      "w": 9,
-      "e": "ZMS_V7_TemplateMaskL"
-    },
-    "24ca73:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "body",
-      "w": 3,
-      "e": "ZMS_V7_TemplateRobes"
-    },
-    "24ca74:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "hands",
-      "w": 2,
-      "e": "ZMS_V7_TemplateGloves"
-    },
-    "24ca75:ZIA_Complete Pack.esp": {
-      "m": "light",
-      "c": "feet",
-      "w": 2,
-      "e": "ZMS_V7_TemplateBoots"
-    },
-    "1505af:Arena - Markarth Side.esp": {
-      "m": "cloth",
-      "c": "circlet",
-      "w": 2,
-      "e": "MarkarthSideQuestCrown"
-    },
-    "1304:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hands",
-      "w": 7,
-      "e": "DIS_General_Gauntlets"
-    },
-    "1305:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hair,circlet",
-      "w": 10,
-      "e": "DIS_General_Helmet"
-    },
-    "1302:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "feet",
-      "w": 7,
-      "e": "DIS_General_Boots"
-    },
-    "1303:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "body",
-      "w": 38,
-      "e": "DIS_General_Cuirass"
-    },
-    "1873:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "feet",
-      "w": 8,
-      "e": "DIS_Officer_BootsA"
-    },
-    "1874:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 34,
-      "e": "DIS_Officer_CuirassA"
-    },
-    "1875:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "hands",
-      "w": 4,
-      "e": "DIS_Officer_Gauntlets"
-    },
-    "1876:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "hair",
-      "w": 5,
-      "e": "DIS_Officer_Helmet"
-    },
-    "187c:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "chest",
-      "w": 2,
-      "e": "DIS_Imperial_Cloack"
-    },
-    "187d:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "chest",
-      "w": 2,
-      "e": "DIS_Officer_Cloack"
-    },
-    "187e:DIS_Heavy_Legion.esp": {
-      "m": "cloth",
-      "c": "chest",
-      "w": 2,
-      "e": "DIS_Penitus_Cloack"
-    },
-    "5937:DIS_Heavy_Legion.esp": {
-      "m": "light",
-      "c": "hands",
-      "w": 3,
-      "e": "ArmorImperialGauntletsMedium"
-    },
-    "593f:DIS_Heavy_Legion.esp": {
-      "m": "light",
-      "c": "hair,circlet",
-      "w": 4,
-      "e": "ArmorImperialHelmetMedium"
-    },
-    "5943:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "feet",
-      "w": 6,
-      "e": "DIS_Rust_Boots"
-    },
-    "5945:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "body",
-      "w": 22,
-      "e": "DIS_Rust_Cuirass"
-    },
-    "5947:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hands",
-      "w": 5,
-      "e": "DIS_Rust_Gauntlets"
-    },
-    "594c:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hair,circlet",
-      "w": 4,
-      "e": "DIS_Rust_Helmet"
-    },
-    "5934:DIS_Heavy_Legion.esp": {
-      "m": "light",
-      "c": "body",
-      "w": 27,
-      "e": "DIS_Legate_CuirassA"
-    },
-    "5eb4:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "body",
-      "w": 25,
-      "e": "DIS_Old_Cuirass"
-    },
-    "5eb6:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hands",
-      "w": 5,
-      "e": "DIS_Old_Gauntlets"
-    },
-    "5ebb:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hair,circlet",
-      "w": 4,
-      "e": "DIS_Old_Helmet"
-    },
-    "5ec2:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "hair,circlet",
-      "w": 5,
-      "e": "DIS_Old_Captain_Helmet"
-    },
-    "5eb2:DIS_Heavy_Legion.esp": {
-      "m": "heavy",
-      "c": "feet",
-      "w": 6,
-      "e": "DIS_Old_Boots"
-    },
-    "4d086:OarsRest.esp": {
-      "m": "cloth",
-      "c": "body",
-      "w": 0,
-      "e": "OR_SkinChicken"
-    },
     "2cb369:Triumvirate - Mage Archetypes.esp": {
       "m": "cloth",
       "c": "head",
@@ -22939,6 +22645,306 @@
       "w": 0,
       "e": "vol_Cape_DarkBrotherhood"
     },
+    "1dcbf:FishingInSkyrim.esp": {
+      "m": "cloth",
+      "c": "hair,circlet",
+      "w": 0.5,
+      "e": "FishingLuckyHat"
+    },
+    "32528:SkyrimSewers.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "SSewersClothesVampiress"
+    },
+    "299f:Solitude Arena.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "LSDarmurebleu"
+    },
+    "29a1:Solitude Arena.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 6,
+      "e": "LSDarmurejaune"
+    },
+    "5a86:Solitude Arena.esp": {
+      "m": "cloth",
+      "c": "hands",
+      "w": 1,
+      "e": "LSDGANTDELAMORT"
+    },
+    "603d:Solitude Arena.esp": {
+      "m": "cloth",
+      "c": "hands",
+      "w": 1,
+      "e": "LSDGANTDELAMORT2"
+    },
+    "aea2:Solitude Arena.esp": {
+      "m": "light",
+      "c": "head,hair,circlet,ears",
+      "w": 5,
+      "e": "LSDcasquechamp"
+    },
+    "b443:Solitude Arena.esp": {
+      "m": "light",
+      "c": "head,hair,circlet,ears",
+      "w": 5,
+      "e": "LSDcasquechamp2"
+    },
+    "2701b8:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "body",
+      "w": 6,
+      "e": "ZSH_V7_Template"
+    },
+    "37650:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskSnow"
+    },
+    "3764f:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskBrown"
+    },
+    "3764b:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskBlack"
+    },
+    "335a2:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_ClavicusVileMaskLight"
+    },
+    "37652:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskBlackLight"
+    },
+    "48a5:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "body",
+      "w": 28,
+      "e": "ZEM_ArmorLight"
+    },
+    "37653:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskBrownLight"
+    },
+    "37654:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_Pelt_MaskSnowLight"
+    },
+    "169211:ZIA_Complete Pack.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "ZWJ_Polymorph68_GiantMudcrab_Skin"
+    },
+    "24ca68:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "head,hair,circlet,ears",
+      "w": 7,
+      "e": "ZCV_V7_Template"
+    },
+    "24ca67:ZIA_Complete Pack.esp": {
+      "m": "heavy",
+      "c": "body",
+      "w": 28,
+      "e": "ZEM_V7_Template"
+    },
+    "24ca71:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "hair,circlet,ears",
+      "w": 9,
+      "e": "ZMS_V7_TemplateMaskH"
+    },
+    "24ca72:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "hair,circlet",
+      "w": 9,
+      "e": "ZMS_V7_TemplateMaskL"
+    },
+    "24ca73:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "body",
+      "w": 3,
+      "e": "ZMS_V7_TemplateRobes"
+    },
+    "24ca74:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "hands",
+      "w": 2,
+      "e": "ZMS_V7_TemplateGloves"
+    },
+    "24ca75:ZIA_Complete Pack.esp": {
+      "m": "light",
+      "c": "feet",
+      "w": 2,
+      "e": "ZMS_V7_TemplateBoots"
+    },
+    "1505af:Arena - Markarth Side.esp": {
+      "m": "cloth",
+      "c": "circlet",
+      "w": 2,
+      "e": "MarkarthSideQuestCrown"
+    },
+    "1304:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 7,
+      "e": "DIS_General_Gauntlets"
+    },
+    "1305:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 10,
+      "e": "DIS_General_Helmet"
+    },
+    "1302:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 7,
+      "e": "DIS_General_Boots"
+    },
+    "1303:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "body",
+      "w": 38,
+      "e": "DIS_General_Cuirass"
+    },
+    "1873:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "feet",
+      "w": 8,
+      "e": "DIS_Officer_BootsA"
+    },
+    "1874:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 34,
+      "e": "DIS_Officer_CuirassA"
+    },
+    "1875:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "hands",
+      "w": 4,
+      "e": "DIS_Officer_Gauntlets"
+    },
+    "1876:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "hair",
+      "w": 5,
+      "e": "DIS_Officer_Helmet"
+    },
+    "187c:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "chest",
+      "w": 2,
+      "e": "DIS_Imperial_Cloack"
+    },
+    "187d:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "chest",
+      "w": 2,
+      "e": "DIS_Officer_Cloack"
+    },
+    "187e:DIS_Heavy_Legion.esp": {
+      "m": "cloth",
+      "c": "chest",
+      "w": 2,
+      "e": "DIS_Penitus_Cloack"
+    },
+    "5937:DIS_Heavy_Legion.esp": {
+      "m": "light",
+      "c": "hands",
+      "w": 3,
+      "e": "ArmorImperialGauntletsMedium"
+    },
+    "593f:DIS_Heavy_Legion.esp": {
+      "m": "light",
+      "c": "hair,circlet",
+      "w": 4,
+      "e": "ArmorImperialHelmetMedium"
+    },
+    "5943:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 6,
+      "e": "DIS_Rust_Boots"
+    },
+    "5945:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "body",
+      "w": 22,
+      "e": "DIS_Rust_Cuirass"
+    },
+    "5947:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 5,
+      "e": "DIS_Rust_Gauntlets"
+    },
+    "594c:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 4,
+      "e": "DIS_Rust_Helmet"
+    },
+    "5934:DIS_Heavy_Legion.esp": {
+      "m": "light",
+      "c": "body",
+      "w": 27,
+      "e": "DIS_Legate_CuirassA"
+    },
+    "5eb4:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "body",
+      "w": 25,
+      "e": "DIS_Old_Cuirass"
+    },
+    "5eb6:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hands",
+      "w": 5,
+      "e": "DIS_Old_Gauntlets"
+    },
+    "5ebb:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 4,
+      "e": "DIS_Old_Helmet"
+    },
+    "5ec2:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "hair,circlet",
+      "w": 5,
+      "e": "DIS_Old_Captain_Helmet"
+    },
+    "5eb2:DIS_Heavy_Legion.esp": {
+      "m": "heavy",
+      "c": "feet",
+      "w": 6,
+      "e": "DIS_Old_Boots"
+    },
+    "4d086:OarsRest.esp": {
+      "m": "cloth",
+      "c": "body",
+      "w": 0,
+      "e": "OR_SkinChicken"
+    },
     "870:YokuWeapons.esp": {
       "m": "heavy",
       "c": "feet",
@@ -23328,12 +23334,6 @@
       "c": "feet",
       "w": 3,
       "e": "0_MirrorBoots"
-    },
-    "1dcbf:FishingInSkyrim.esp": {
-      "m": "cloth",
-      "c": "hair,circlet",
-      "w": 0.5,
-      "e": "FishingLuckyHat"
     },
     "801:IA CBBE Patch.esp": {
       "m": "cloth",

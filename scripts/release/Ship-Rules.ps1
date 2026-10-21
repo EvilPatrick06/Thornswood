@@ -1038,6 +1038,8 @@ function Test-ShipBethesda([string]$rel) {
 #     repository nor the shipping machine's game today. A setting Thornswood
 #     wants everybody to have is Thornswood's own file (the Thornswood Content
 #     mod, or a launcher Enforce rule), never one machine's saved menu file.
+#   - What a mod saves from the game itself: Engine Fixes' EngineFixes_SNCT.ini,
+#     the sound volumes, which its archive ships empty.
 #   - Saves and profiles: a Saves folder, *.ess and *.skse, and a Profile or
 #     My Games folder at the top of the game folder.
 #   - ShaderCache, anywhere: rebuilt by the game on first launch for that GPU.
@@ -1062,7 +1064,11 @@ function Test-ShipBethesda([string]$rel) {
 # on theirs: their key binds, their Vortex, their face.
 $ShipOneMachineFiles = @(
     'Data\SKSE\Plugins\CommunityShaders\SettingsUser.json',
-    'Data\SKSE\Plugins\CommunityShaders\SettingsTest.json'
+    'Data\SKSE\Plugins\CommunityShaders\SettingsTest.json',
+    # Engine Fixes ships this empty and saves the game's sound volumes into it
+    # ("saved SNCT volumes to ini", in its dll). One's held 434 bytes from
+    # 5 October against the archive's 0 (#2969).
+    'Data\SKSE\Plugins\EngineFixes_SNCT.ini'
 )
 
 function Test-ShipOneMachine([string]$rel) {
@@ -1679,7 +1685,12 @@ function Get-ShipLoadOrderDir([string]$Root, [string]$ProfileDir) {
         if ($tw -and (Test-Path -LiteralPath (Join-Path $tw 'plugins.txt'))) { return $tw }
     }
     if (-not (Test-Path -LiteralPath (Join-Path $Root 'Game'))) {
-        return (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition')
+        # Off Windows there is no LOCALAPPDATA, and Join-Path stopped on the
+        # null before the Ship could say there was no list (#2989); the
+        # platform's own folder answers instead, as in Where.ps1 (#2872).
+        $local = $env:LOCALAPPDATA
+        if (-not $local) { $local = [Environment]::GetFolderPath('LocalApplicationData') }
+        return (Join-Path $local 'Skyrim Special Edition')
     }
     return (Join-Path $ProfileDir 'Default')
 }

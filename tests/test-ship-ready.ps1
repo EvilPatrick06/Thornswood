@@ -22,8 +22,9 @@
   real Sync-Client.ps1 answering:
     1. A fresh worktree: no engine\skymp at all, the recorded client in the
        game folder. READY.
-    2. No matching client anywhere. NOT READY, and the fix names the build
-       folder, Sync-Client -Check -Dist and Build-Engine.
+    2. No matching client anywhere. NOT READY, and the fix names CI's build
+       (Setup-ShipMachine -EngineBuild ci) and Sync-Client -Check -Dist, and
+       never a rebuild, which cannot match a record (#3047).
     3. A matching build and a game folder that differs: READY, Ship copies it.
     4. A build that is not the recorded one: READY when the game folder holds
        the recorded client, NOT READY when it does not.
@@ -34,9 +35,9 @@
        required-data in the game folder are notes (Ship's Go.ps1 step copies
        them in before it checks), and the main-only rows are asked only when
        the channel is main.
-    7. Uncommitted changes (issue #1254): on main the line says a main Ship
-       refuses while anything is uncommitted, and that row is a gap. On dev
-       the line says a dev Ship builds from those changes as they are.
+    7. The checkout (issues #1254, #2981): asked what Ship asks, through
+       Fresh-Checkout.ps1 with Ship's branch rule, on both channels, so an
+       uncommitted change or a clone behind main is a gap on dev too.
     8. The release folder is a ship root, not an install (issue #2603).
        Get-LauncherRows: on main a folder with no launcher passes, saying
        the Ship puts the one CI built there itself, and no fix says to
@@ -163,8 +164,8 @@ try {
     Yes '2. the client row fails' (-not $r.Ok)
     Yes '2. and it is a need, not a warn' ($r.Level -eq 'need')
     Yes '2. it says the build was not found and the game folder is not right' ($r.Detail -match 'client build not found' -and $r.Detail -match '1 of 2 in place')
-    Yes '2. the fix names the build folder' ($r.Fix.Contains($dist))
-    Yes '2. the fix says how to check a candidate and how to build one' ($r.Fix -match 'Sync-Client\.ps1 -Check -Dist' -and $r.Fix -match 'Build-Engine\.ps1')
+    Yes '2. the fix says how to check a candidate, and to take CI''s build of the pin, not a rebuild (#3047)' (
+        $r.Fix -match 'Sync-Client\.ps1 -Check -Dist' -and $r.Fix -match 'Setup-ShipMachine\.ps1 -EngineBuild ci' -and $r.Fix -notmatch 'Build-Engine')
     Yes '2. the verdict is NOT READY' (-not (Get-ShipVerdict (Client-Rows)).Ready)
 
     Set-Game 'empty'; Set-Dist 'none'
@@ -239,7 +240,7 @@ try {
     Put $srv 'scam_native.node' 'an edited server'
     Put $payload 'scam_native.node' 'another edited server'
     $b = @(Main-Rows 'main' | Where-Object { $_.What -like '*server build*' })[0]
-    Yes '5. no matching server build anywhere fails, pointing at Build-Engine' (-not $b.Ok -and $b.Fix -match 'Build-Engine')
+    Yes '5. no matching server build anywhere fails, pointing at CI''s build, not a rebuild (#3047)' (-not $b.Ok -and $b.Fix -match '-EngineBuild ci' -and $b.Fix -notmatch 'Build-Engine')
 
     # A record that does not read (#2711): it was read in a try with an empty
     # catch, and then every build "did not match" and the fix named a build.
@@ -261,12 +262,19 @@ try {
     Yes '6. the main-only rows are asked only when the channel is not dev' ($text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows')
     Yes '6. the verdict is Get-ShipVerdict''s, and exit 1 follows it' ($text -match '\$verdict = Get-ShipVerdict \$script:rows' -and $text -match 'if \(-not \$verdict\.Ready\) \{ exit 1 \}')
 
-    # A main Ship has refused uncommitted work since 22 Sep (f917dd8). The
-    # map used to say the opposite, and a note would not have counted.
-    Yes '7. on main, uncommitted work is a gap and the line says a main Ship refuses while anything is uncommitted' (
-        $text -match "Ready 'nothing uncommitted'" -and $text -match 'A main Ship refuses while anything is uncommitted')
-    Yes '7. on dev, the line says a dev Ship builds from those changes as they are' (
-        $text -match 'A dev Ship builds from those changes as they are')
+    # A main Ship has refused uncommitted work since 22 Sep (f917dd8), and
+    # every Ship, dev too, since #2118 put Fresh-Checkout.ps1 in front of it.
+    # On 20 Oct this map still called it a note on dev and said READY two
+    # minutes before a dev Ship refused (#2981). So the checkout is asked
+    # what Ship asks, with the -AnyBranch Ship passes, on both channels.
+    # tests\test-2981-update-checkout.ps1 runs it against a scratch clone.
+    Yes '7. the checkout is asked Fresh-Checkout''s question, with the branch rule Ship uses' (
+        $text -match '\$fresh = Get-FreshCheckoutState -RepoDir \$RepoDir -AnyBranch:\(Test-FreshAnyBranch -RepoDir \$RepoDir -Channel \$Channel\)' -and
+        $text -match 'foreach \(\$r in @\(Get-CheckoutRows \$fresh\)\) \{ Show-Row \$r \}')
+    Yes '7. and not only on main: it is outside the channel test' (
+        $text -notmatch '(?s)if \(\$Dev\) \{[^}]*Get-FreshCheckoutState' -and $text -notmatch '(?s)\} else \{[^}]*Get-FreshCheckoutState')
+    Yes '7. it no longer says a dev Ship builds from uncommitted changes' (
+        $text -notmatch 'A dev Ship builds from those changes as they are')
     Yes '7. it no longer says a main Ship commits uncommitted changes' (
         $text -notmatch 'commits them when it is out')
 

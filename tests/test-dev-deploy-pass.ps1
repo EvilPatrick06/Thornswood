@@ -73,7 +73,7 @@ function Run-Block([string]$value, $settings) {
     $p = Join-Path $tmp 'server-settings.json'
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
     $rootWin = $tmp
-    $farOrder = ''
+    $orderWire = ''
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
     $lightDef = ''

@@ -22,7 +22,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root   = 'C:\Thornswood',
+    [string]$Root   = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [string]$Server = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
     [string]$Client = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ClientDist),
     [string]$ServerIp = '',
@@ -44,11 +44,13 @@ param(
 # turning it on here makes them fail on lines that have always been fine. The
 # same goes for ErrorActionPreference: each of them sets its own.
 Set-StrictMode -Off
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
+. (Join-Path $Here 'Close-Launcher.ps1')   # Test-GameRunning, asked below
+$ErrorActionPreference = 'Continue'
 if (-not $ServerIp) { $ServerIp = Get-ThornswoodVpsAddress }
 $Data = Join-Path $Root 'Game\Data'
 
@@ -74,7 +76,6 @@ if (-not (Test-Path -LiteralPath $Root)) {
 # Skyrim". Only a game run from $Root\Game counts: until 12 Oct any SkyrimSE on
 # the machine did, so another Windows account's game, or another build
 # runner's stand-in, stopped this run (#2410). Close-Launcher.ps1 says how.
-. (Join-Path $Here 'Close-Launcher.ps1')
 if (Test-GameRunning -Root $Root) {
     Write-Host ''
     Say "STOP. Skyrim is running from $(Join-Path $Root 'Game'). Close the game first, or these files cannot be written." 'Red'
@@ -218,7 +219,7 @@ foreach ($s in $steps) {
     if ($help.Parameters.ContainsKey('ServerIp'))   { $splat['ServerIp'] = $ServerIp }
     if ($help.Parameters.ContainsKey('ServerPort')) { $splat['ServerPort'] = $ServerPort }
 
-    # These scripts each default to C:\Thornswood on their own, which is
+    # These scripts each default to the install Where.ps1 finds, which is
     # right until somebody passes -Root. Handing them the folder this run is
     # actually working on is what makes -Root mean anything.
     if ($help.Parameters.ContainsKey('Data')) { $splat['Data'] = $Data }

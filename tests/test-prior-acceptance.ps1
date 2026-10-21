@@ -10,13 +10,14 @@
   three questions when the record is missing or a page's hash has changed,
   and writes that same file. Declining writes nothing.
 
-  This compiles the launcher's own class with the .NET Framework C# compiler
-  and runs it against a scratch folder that stands in for an install made
-  before the lock: a config.json, a Profile folder, and no accepted.json.
+  This compiles the launcher's own class with the compiler the build runs, at
+  the C# version the project names (Add-LauncherType, tests\Launcher-Csc.ps1,
+  #2821), and runs it against a scratch folder that stands in for an install
+  made before the lock: a config.json, a Profile folder, and no accepted.json.
   No Skyrim, no C:\Thornswood, no window. The site is not asked.
 
-  Under pwsh this starts itself again under Windows PowerShell, because that
-  is the compiler Build-Launcher.ps1 uses.
+  Under pwsh this starts itself again under Windows PowerShell, because the
+  class is WPF's and the launcher runs it on the .NET Framework, not .NET.
 #>
 [CmdletBinding()]
 param()
@@ -33,6 +34,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     & $wp -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
     exit $LASTEXITCODE
 }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -69,38 +71,13 @@ $m = [regex]::Match($boot, 'static readonly string\[\] Pages = \{([^}]*)\};')
 $windowPages = @([regex]::Matches($m.Groups[1].Value, '"(\w+)"') | ForEach-Object { $_.Groups[1].Value })
 Yes 'the setup window still has three pages' ($windowPages.Count -eq 3)
 
-$provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-$cp = New-Object System.CodeDom.Compiler.CompilerParameters
-$cp.GenerateInMemory = $true
-$cp.GenerateExecutable = $false
-function Find-Ref([string]$name) {
-    $roots = @(
-        (Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319'),
-        (Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319\WPF'),
-        (Get-WindowsPath 'Microsoft.NET\Framework\v4.0.30319'),
-        (Get-WindowsPath 'Microsoft.NET\Framework\v4.0.30319\WPF'),
-        "${env:ProgramFiles(x86)}\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.6.1"
-    )
-    foreach ($d in $roots) {
-        $cand = Join-Path $d $name
-        if (Test-Path -LiteralPath $cand) { return $cand }
-    }
-    $hit = Get-ChildItem (Get-WindowsPath 'Microsoft.NET\assembly') -Filter $name -Recurse -File -ErrorAction SilentlyContinue |
-        Select-Object -First 1 -ExpandProperty FullName
-    if ($hit) { return $hit }
-    return $name
-}
-foreach ($r in @(
-    'System.dll', 'System.Core.dll',
-    'PresentationFramework.dll', 'PresentationCore.dll', 'WindowsBase.dll', 'System.Xaml.dll'
-)) { [void]$cp.ReferencedAssemblies.Add((Find-Ref $r)) }
-$built = $provider.CompileAssemblyFromSource($cp, $acc)
-$errors = @($built.Errors | Where-Object { -not $_.IsWarning })
-foreach ($e in $errors) { Write-Host ('      ' + $e.Line + '  ' + $e.ErrorNumber + '  ' + $e.ErrorText) }
-Yes 'Acceptance.cs compiles with the .NET Framework C# compiler' ($errors.Count -eq 0)
-if ($errors.Count) { Done }
+$asm = $null
+try { $asm = Add-LauncherType -Source $acc }
+catch { Write-Host ('      ' + $_.Exception.Message) }
+Yes 'Acceptance.cs compiles with the compiler the build runs' ($null -ne $asm)
+if ($null -eq $asm) { Done }
 
-$T = $built.CompiledAssembly.GetType('Thornswood.Acceptance')
+$T = $asm.GetType('Thornswood.Acceptance')
 Yes 'the class is Thornswood.Acceptance' ($null -ne $T)
 
 $pages = @($T::Pages)

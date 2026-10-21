@@ -305,7 +305,6 @@ def main():
     print('  wrote %s' % args.out)
 
     text = io.open(args.gamemode, encoding='utf-8', newline='').read()
-    nl = '\r\n' if '\r\n' in text else '\n'
     mark = 'JAIL_CELLS'
     a = text.find('// ==== %s, generated ====' % mark)
     b = text.find('// ==== end %s ====' % mark)
@@ -324,7 +323,7 @@ def main():
              '  var JAIL_SHUT = ' + json.dumps(shut, sort_keys=True, separators=(',', ':')) + ';',
              '  var JAIL_BUILDING = ' + json.dumps(buildings, sort_keys=True, separators=(',', ':')) + ';',
              '  var JAIL_KEY = ' + json.dumps(keys, sort_keys=True, separators=(',', ':')) + ';']
-    text = text[:a] + nl.join(lines) + nl + '  ' + text[b:]
+    text = text[:a] + '\n'.join(lines) + '\n' + '  ' + text[b:]
     io.open(args.gamemode, 'w', encoding='utf-8', newline='').write(text)
     print('  wrote %s into the gamemode' % mark)
     return 0

@@ -2,8 +2,10 @@
   Vps.ps1
 
   The one place every script gets the VPS address, user, and ports from.
-  Dot-source it:
+  Dot-source it under Stop, so a copy without it ends on the load instead of
+  going on with no address (#3006, tests\test-3006-loads-under-stop.ps1):
 
+      $ErrorActionPreference = 'Stop'
       . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
 
   Then, after the param block:
@@ -32,14 +34,7 @@
 #>
 
 function Get-ThornswoodVps {
-    $here = $PSScriptRoot
-    if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-    $path = Join-Path $here 'vps.json'
-    if (-not (Test-Path -LiteralPath $path)) {
-        throw "VPS defaults not found: $path"
-    }
-    $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8
-    $j = $raw | ConvertFrom-Json
+    $j = Get-ThornswoodVpsCommitted
     $local = Get-ThornswoodVpsLocalPath
     if ($local -and (Test-Path -LiteralPath $local)) {
         $mine = $null
@@ -51,6 +46,20 @@ function Get-ThornswoodVps {
     if ($env:THORNSWOOD_VPS_USER) { $j | Add-Member -NotePropertyName user -NotePropertyValue ([string]$env:THORNSWOOD_VPS_USER) -Force }
     if (-not $j.address) { throw "vps.json has no address: $path" }
     return $j
+}
+
+# vps.json as the checkout holds it, with no machine's own file and no
+# environment over it. Say-Staff.ps1 -OnTheBox takes the pins and the user
+# from this alone: on a runner, a machine's own file is whatever an earlier
+# job on the same account left (#3045).
+function Get-ThornswoodVpsCommitted {
+    $here = $PSScriptRoot
+    if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $path = Join-Path $here 'vps.json'
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "VPS defaults not found: $path"
+    }
+    return (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json)
 }
 
 # This machine's own VPS file, which nothing in git carries. It need not exist.
@@ -105,6 +114,58 @@ function Invoke-ThornswoodNative($ThornswoodNativeCall) {
     $ErrorActionPreference = 'Continue'
     if ($MyInvocation.ExpectingInput) { $input | & $ThornswoodNativeCall }
     else { & $ThornswoodNativeCall }
+}
+
+# ------------------------------------------------------- from outside ----
+# Whether a port on the box answers from this machine: ONE try (#2975, the
+# shape #2961 gave Install-Voice). Publish-Server and Deploy-Server ask the
+# resources port this way once the box has said the new server answers on
+# both its ports from 127.0.0.1. Until 21 Oct 2026 each tried up to 30 (or
+# 10) times two seconds apart, which waited for nothing: the server listens
+# on every address with one socket (skymp5-server ui.ts listens on the port
+# with no host), so the socket the box found is the one outside reaches, and
+# the inbound rules for 3000 and 7788 are standing rules made when the box was
+# set up, not by an install. Measured on the box that day: 3000 and 7788 each
+# listened on :: (one node process each), and their allow rules were there
+# with remote Any. Nothing changes between the box's answer and this try, so
+# a second try can only say what the first said.
+#
+# The try gets 5 s so TCP's own resends of a lost SYN (at 1 s and 3 s) are
+# inside it. It says what it got: answered, refused (an answer from the box:
+# nothing takes connections there), silent, or why it could not try (a name
+# that does not resolve has not looked, so that is not called shut).
+function Get-ThornswoodPortTry([string]$Address, [int]$Port) {
+    $c = New-Object Net.Sockets.TcpClient
+    try {
+        $ar = $c.BeginConnect($Address, $Port, $null, $null)
+        if (-not $ar.AsyncWaitHandle.WaitOne(5000)) { return 'silent for 5 s' }
+        $c.EndConnect($ar)
+        return 'answered'
+    } catch {
+        $e = $_.Exception
+        while ($e.InnerException) { $e = $e.InnerException }
+        if ($e -is [Net.Sockets.SocketException] -and $e.SocketErrorCode -eq 'ConnectionRefused') { return 'refused' }
+        return 'not tried: ' + $e.Message
+    } finally { $c.Close() }
+}
+
+# A port that did not answer is only a fault if this machine reaches the
+# box's raw ports at all. A cloud thread's container reaches nothing but
+# HTTPS, through its proxy (3000, 7788 and 7789 were all silent for 5 s from
+# one, 21 Oct 2026), so from there every raw port is silent whatever the box
+# does. -Witness is another port on the box that answers everybody (the other
+# server's resources port): when it is silent too, this port was not measured
+# from here, and NotKnown says why. Answered, Said (what the try got) and
+# NotKnown (empty when the try was a measurement) come back.
+function Test-ThornswoodFromOutside([string]$Address, [int]$Port, [int]$Witness) {
+    $said = Get-ThornswoodPortTry $Address $Port
+    $notKnown = ''
+    if ($said -like 'not tried: *') { $notKnown = 'it could not be tried: ' + $said.Substring(11) }
+    elseif ($said -ne 'answered') {
+        $w = Get-ThornswoodPortTry $Address $Witness
+        if ($w -ne 'answered') { $notKnown = "this machine reaches no raw port on the box: $Witness, which answers everybody, was $w as well" }
+    }
+    [pscustomobject]@{ Answered = ($said -eq 'answered'); Said = $said; NotKnown = $notKnown }
 }
 
 # ------------------------------------------------------------ host key ----

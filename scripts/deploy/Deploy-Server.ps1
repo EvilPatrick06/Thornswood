@@ -208,10 +208,10 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Server' -Target $Vps -AllowStale:$AllowStaleCheckout
 
-$ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -237,24 +237,36 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 . (Join-Path $Here '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
+# The box's folders, worked out on this machine. .NET resolves a path by this
+# machine's rules, and off Windows (a deploy from a cloud session) it took the
+# box's \ as part of a name, so every file was refused as escaping the stage
+# (#2989). The segments are resolved here by Windows' rules instead: either
+# separator, . dropped, .. taking one back and never above the stage.
 function Get-StageDirectories([string]$stageRoot, [string[]]$relativePaths) {
-  $stagePath = [IO.Path]::GetFullPath($stageRoot).TrimEnd('\')
-  $prefix = $stagePath + '\'
+  $stagePath = $stageRoot.TrimEnd('\', '/')
   $parents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
   foreach ($relative in $relativePaths) {
-    if (-not $relative -or [IO.Path]::IsPathRooted($relative) -or $relative.Contains(':')) {
+    if (-not $relative -or $relative.Contains(':') -or $relative -match '^[\\/]') {
       throw "Invalid stage destination: $relative"
     }
-    $target = [IO.Path]::GetFullPath([IO.Path]::Combine($stagePath, $relative.Replace('/', '\')))
-    if (-not $target.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-      throw "Stage destination escapes its directory: $relative"
+    $parts = [Collections.Generic.List[string]]::new()
+    foreach ($seg in ($relative -split '[\\/]')) {
+      if ($seg -eq '' -or $seg -eq '.') { continue }
+      if ($seg -eq '..') {
+        if ($parts.Count -eq 0) { throw "Stage destination escapes its directory: $relative" }
+        $parts.RemoveAt($parts.Count - 1)
+        continue
+      }
+      $parts.Add($seg)
     }
-    $null = $parents.Add([IO.Path]::GetDirectoryName($target))
+    if ($parts.Count -eq 0) { throw "Stage destination escapes its directory: $relative" }
+    $parts.RemoveAt($parts.Count - 1)
+    $null = $parents.Add((@($stagePath) + @($parts)) -join '\')
   }
   return @($parents | Sort-Object)
 }
@@ -905,7 +917,8 @@ if (Test-Path -LiteralPath $rp) {
   $settingsSrc = Join-Path $Dist 'server-settings.json'
   $settings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
-  $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  # Split on either separator: GetFileName off Windows takes \ as part of the name (#2989).
+  $pluginNames = @($settings.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
   $settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
   $settingsForVps = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-server-settings-vps.json'
@@ -1203,32 +1216,26 @@ $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -
 # reads it for the credits page (DeployedBuild.ps1). Never fails the deploy.
 $null = Save-ThornswoodDeployedBuild "$User@$Vps" $ssh $Root
 
-# And from here, the shape Publish-Server.ps1 uses. The box answering itself
-# on 127.0.0.1 is not the same as it answering the rest of the world; this is
-# the one a firewall rule shows up in.
+# And from here, the shape Publish-Server.ps1 uses: ONE try (#2975). The box
+# answering itself on 127.0.0.1 is the same socket the rest of the world
+# reaches, behind standing firewall rules, so nothing is left to wait for
+# (Vps.ps1 "from outside" has the measurements); this is the try a firewall
+# rule shows up in. Until 21 Oct 2026 it tried up to 10 times two seconds
+# apart. The witness is the other server's resources port, so a machine that
+# reaches no raw port on the box is told apart from a port that is shut.
 $port = if ($noBuild) { $livePort } else { [int]$settings.port }
 $resPort = if ($port -eq 7777) { 3000 } else { $port + 1 }
-# A connect that throws (a name that does not resolve, say) is said in the
-# FAIL line, so that line names its cause and not only the port.
-$seen = $false
-$connectWhy = ''
-for ($i = 0; $i -lt 10; $i++) {
-  $c = New-Object Net.Sockets.TcpClient
-  try {
-    $null = $c.BeginConnect($Vps, $resPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
-    $seen = $c.Connected
-  } catch { $connectWhy = $_.Exception.Message }
-  finally { $c.Close() }
-  if ($seen) { break }
-  Start-Sleep -Seconds 2
-}
+$witness = if ($resPort -eq 3000) { 7788 } else { 3000 }
+$outside = Test-ThornswoodFromOutside $Vps $resPort $witness
 Write-Host ''
-if ($seen) {
+if ($outside.Answered) {
   Write-Host ("  PASS. The server is up at {0}:{1}, resources on {2}, from here as well." -f $Vps, $port, $resPort) -ForegroundColor Green
+} elseif ($outside.NotKnown) {
+  Write-Host ("  PASS on the box. Whether {0}:{1} answers from outside is not known: {2}." -f $Vps, $resPort, $outside.NotKnown) -ForegroundColor Yellow
 } else {
-  Write-Host ("  FAIL. The box says the server is up, and {0}:{1} does not answer from here." -f $Vps, $resPort) -ForegroundColor Red
-  if ($connectWhy) { Write-Host ("  The last try to connect said: {0}" -f $connectWhy) -ForegroundColor Red }
-  Write-Host '  The new files stay in place: this is the network or the firewall, and' -ForegroundColor Red
-  Write-Host '  putting the old files back would not change it.' -ForegroundColor Red
+  Write-Host ("  FAIL. The box says the server is up, and {0}:{1} was {2} from here, though {3} on the box answers from here." -f $Vps, $resPort, $outside.Said, $witness) -ForegroundColor Red
+  Write-Host '  The new files stay in place: this is the box''s inbound rule for the port, or' -ForegroundColor Red
+  Write-Host '  something between, and putting the old files back would not change it:' -ForegroundColor Red
+  Write-Host ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $resPort) -ForegroundColor DarkGray
   exit 1
 }

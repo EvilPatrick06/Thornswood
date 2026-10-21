@@ -38,7 +38,9 @@
   NOT READY means something that would stop a Ship, and nothing else. A Ship
   never builds the engine, so the fork in engine\skymp is a note, not a check:
   what it needs is the game folder holding the recorded client, or a build
-  that matches records\client-build.json for it to copy in (issue #946). What
+  that matches records\client-build.json for it to copy in (issue #946),
+  which is CI's build of the pin, fetched by the Ship itself on a machine
+  that takes it (Setup-ShipMachine.ps1 -EngineBuild ci, issue #3047). What
   only a main release asks for, the setup stub -Package attaches to and the
   server build the live deploys send (issue #932), prints as WARN on main and
   leaves the verdict alone.
@@ -58,12 +60,19 @@ param(
   [switch]$NoPause
 )
 
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
 . (Join-Path $Here '..\mods\Generated.ps1')
+. (Join-Path $Here '..\deploy\Fresh-Checkout.ps1')
+. (Join-Path $Here '..\mods\LoadOrder.ps1')
+. (Join-Path $Here 'Find-MSBuild.ps1') -Load
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+. (Join-Path $Here 'Feed-Store.ps1')
+# Each check below is a row, not a stop: what fails is said, and the rest are still asked.
+$ErrorActionPreference = 'Continue'
 $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
@@ -119,7 +128,14 @@ function Get-ShipVerdict($rows) {
 # for Go.ps1 to copy in (exit 2). Until 28 Sep this asked whether
 # engine\skymp was a clone of the fork, and said NOT READY on two fresh Ship
 # worktrees whose Ships then ran to the end and published.
-function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [string]$ClientDist) {
+#
+# CI'S BUILD (#3047). The build that matches a record is the one it was made
+# from, and since #459 that is CI's: a build made here never is, so the fix
+# names CI's and never a rebuild. On a machine that takes it, ClientDist is
+# CI's build of the pin, and when that folder is not here yet Sync-Client
+# fetches it as a Ship starts. $Ci is then what Get-EngineArtifact.ps1 -Check
+# said (Code 2: GitHub keeps it, so the Ship gets it; else why not).
+function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [string]$ClientDist, $Ci = $null) {
   $rows = @()
   $hasRec = Test-Path -LiteralPath $Record
   $rows += New-Row 'the client build record is in the repo' $hasRec 'records\client-build.json' 'It is tracked in git, so git pull brings it'
@@ -149,10 +165,21 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
     2       { 'a build that matches is at ' + $ClientDist + ', and Ship copies it in' }
     default { $(if ($stop.Success) { $stop.Groups[1].Value.Trim() } else { "Sync-Client -Check exit $code" }) }
   }
-  $fix = 'Copy a client build that matches records\client-build.json to ' + $ClientDist +
-         ' (another checkout''s engine\skymp\build\dist\client will do; .\scripts\release\Sync-Client.ps1 -Check -Dist <that folder> says whether it matches),' +
-         ' or build the fork with .\scripts\release\Build-Engine.ps1'
-  $rows += New-Row 'the recorded client is in the game folder, or here to copy in' (($code -eq 0) -or ($code -eq 2)) $detail $fix
+  $ok = ($code -eq 0) -or ($code -eq 2)
+  if ($null -ne $Ci -and -not $ok -and -not (Test-Path -LiteralPath $ClientDist)) {
+    if ($Ci.Code -eq 2) {
+      $ok = $true
+      $detail = 'CI''s build of the pin is not at ' + $ClientDist + ' yet; GitHub keeps it, and the Ship fetches it first'
+    } else {
+      $detail = 'CI''s build of the pin is not at ' + $ClientDist + ', and cannot be fetched: ' + $Ci.Said
+    }
+    $fix = '.\scripts\release\Get-EngineArtifact.ps1 says why, and what makes it again (engine\README.md, A Ship machine takes CI''s build)'
+  } else {
+    $fix = 'Take CI''s build of the pin, the one records\client-build.json names: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci' +
+           ' (engine\README.md, A Ship machine takes CI''s build). A build made on this machine matches only a record made from it;' +
+           ' .\scripts\release\Sync-Client.ps1 -Check -Dist <a folder> says whether another build matches'
+  }
+  $rows += New-Row 'the recorded client is in the game folder, or here to copy in' $ok $detail $fix
   return $rows
 }
 
@@ -214,7 +241,7 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
       ('Copy ' + $match + ' to a scratch folder and pass it as -Dist to Deploy-Gamemode.ps1 and Deploy-Server.ps1 (Deploy-Gamemode writes into the folder it is given)') 'either' 'warn'
   } else {
     $rows += New-Row $what $false ('none in ' + ($ServerDists -join ' or ')) `
-      'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose files all match' 'either' 'warn'
+      '.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci puts CI''s server build of the pin under ServerDist (a build made here never matches); or deploy from the store with Deploy-Server.ps1 -FromStore' 'either' 'warn'
   }
   return $rows
 }
@@ -321,6 +348,24 @@ function Get-PackageLauncherRows([string]$Current, $Feed, [string]$Exe) {
     'downloads it from the feed, checks its sha256 and signature, and puts it there before -Package (#2661)') $null 'either' 'warn')
 }
 
+# WHAT SHIP ASKS OF THE CHECKOUT, from the same answer Ship gets (#2981).
+# Ship refuses, on both channels, unless Fresh-Checkout.ps1 says the checkout
+# is exactly origin/main (or the pushed branch a dev Ship may come from) with
+# nothing tracked changed. This map used to ask its own questions instead: on
+# dev it skipped behind altogether and called an uncommitted change a note,
+# saying a dev Ship builds from the working tree, which stopped being true
+# when #2118 put the freshness gate in front of every Ship. So on 20 Oct
+# it said READY on One's shared clone two minutes before Ship refused it for
+# engine\skymp sitting behind main's pin. $State is Get-FreshCheckoutState's
+# answer, asked with the -AnyBranch Ship would pass, so the row is a gap
+# exactly when Ship would refuse, with the line that closes it.
+function Get-CheckoutRows($State) {
+  $rows = @()
+  $rows += New-Row 'the checkout is current and clean, as Ship asks (Fresh-Checkout.ps1)' ([bool]$State.Ok) ([string]$State.Message) `
+    $(if ($State.Ok) { $null } else { [string]$State.Fix })
+  return $rows
+}
+
 # WHETHER THIS MACHINE SIGNS (issue #458). Ship refuses every release, dev and
 # mods only included, when records\signing\signing.json is missing, disabled or names a
 # profile that is not filled in (Get-SigningConfigRefusal, Assert-PublishSigned.ps1),
@@ -363,28 +408,15 @@ Ready 'this is a git clone' $isClone $RepoDir 'git clone https://github.com/Evil
 
 if ($isClone) {
   $branch = (& git -C $RepoDir rev-parse --abbrev-ref HEAD 2>$null | Out-String).Trim()
-  $dirty  = @(& git -C $RepoDir status --porcelain --untracked-files=no 2>$null | Where-Object { $_ })
-  & git -C $RepoDir fetch --quiet origin 2>$null | Out-Null
-  $behind = 0
-  try { $behind = [int]((& git -C $RepoDir rev-list --count "HEAD..origin/$branch" 2>$null | Out-String).Trim()) } catch { $behind = 0 }
-
   if ($Dev) {
-    Say ("  note  a dev release may ship from any branch. This is " + $branch + ".") 'DarkGray'
+    Say ("  note  a dev release may ship from any pushed branch. This is " + $branch + ".") 'DarkGray'
   } else {
     Ready 'on main' ($branch -eq 'main') ("on " + $branch) 'git checkout main' 'either'
-    Ready 'not behind origin/main' ($behind -eq 0) ("$behind behind") 'git pull' 'either'
   }
-  if ($dirty.Count) {
-    # A main Ship refuses a release with anything uncommitted and writes
-    # nothing (22 Sep, f917dd8). That is a gap: it would stop a Ship. A dev
-    # Ship builds from the working tree, so the same state is only a note.
-    if ($Dev) {
-      Say ("  note  " + $dirty.Count + " uncommitted change(s). A dev Ship builds from those changes as they are.") 'DarkGray'
-    } else {
-      Ready 'nothing uncommitted' $false ($dirty.Count.ToString() + ' uncommitted change(s). A main Ship refuses while anything is uncommitted.') `
-        'Commit them through a pull request, or put them back. A main Ship writes nothing to the repository.'
-    }
-  }
+  # Behind, ahead, diverged and uncommitted, each a gap on both channels,
+  # because Ship refuses each on both (Get-CheckoutRows above).
+  $fresh = Get-FreshCheckoutState -RepoDir $RepoDir -AnyBranch:(Test-FreshAnyBranch -RepoDir $RepoDir -Channel $Channel)
+  foreach ($r in @(Get-CheckoutRows $fresh)) { Show-Row $r }
 }
 
 # ------------------------------------------------------------ GitHub --
@@ -438,7 +470,6 @@ $hasGame = [bool]($GameDir -and (Test-Path $GameDir))
 # what Vortex has deployed here, and nothing checked whether that deployment
 # was current. Vortex knew all along and wrote it in its own state.
 try {
-    . (Join-Path $Here '..\mods\LoadOrder.ps1')
     # No config.json is the launcher's own collection (Get-CollectionSlug's
     # default). One that is there and does not read could name another, so
     # the revision is not asked of the default in its place.
@@ -484,7 +515,6 @@ if ($hasGame) {
 # ------------------------------------------------------------- the compiler --
 Head 'The build'
 # The launcher builds only with MSBuild from its project files (#498).
-. (Join-Path $PSScriptRoot 'Find-MSBuild.ps1') -Load
 $msb = Find-ThornswoodMSBuild
 Ready 'MSBuild and the .NET Framework 4.8.1 reference assemblies are here' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
   'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
@@ -497,7 +527,6 @@ Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2
 
 # ------------------------------------------------------------- the signing --
 Head 'Signing'
-. (Join-Path $Here 'Assert-PublishSigned.ps1')
 $signCfg = Join-Path $RepoDir 'records\signing\signing.json'
 $signRefuse = ''
 if (Test-Path -LiteralPath $signCfg) { $signRefuse = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
@@ -571,8 +600,21 @@ if ($hasGame -and $reqFiles.Count -gt 0) {
 Head 'The client runtime'
 $where = Join-Path $Here 'Where.ps1'
 $clientDist = (& $where ClientDist)
+# CI's build of the pin, when it is the one this machine reads and is not
+# here yet: whether GitHub keeps it for the Ship to fetch (#3047). Read only.
+$ci = $null
+$ciDist = ''
+try { $ciDist = Join-Path ([string](& $where EngineArtifact)) 'build\dist\client' } catch { $ciDist = '' }
+if ($hasGame -and $ciDist -and ([IO.Path]::GetFullPath($clientDist).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($ciDist).TrimEnd('\', '/')) -and -not (Test-Path -LiteralPath $clientDist)) {
+  $global:LASTEXITCODE = 0
+  $chunks = & (Join-Path $Here 'Get-EngineArtifact.ps1') -Check -NoPause 6>&1 2>&1
+  $ciCode = $global:LASTEXITCODE
+  $ciText = @(foreach ($o in @($chunks)) { if ($o -is [System.Management.Automation.InformationRecord]) { [string]$o.MessageData } else { [string]$o } }) -join [Environment]::NewLine
+  $ciStop = [regex]::Match($ciText, '(?m)^STOP\. (.+)$')
+  $ci = [pscustomobject]@{ Code = $ciCode; Said = $(if ($ciStop.Success) { $ciStop.Groups[1].Value.Trim() } else { 'Get-EngineArtifact -Check exit ' + $ciCode }) }
+}
 foreach ($r in @(Get-ClientRows (Join-Path $Here 'Sync-Client.ps1') (Join-Path $Here '..\..\records\client-build.json') `
-                   $(if ($hasGame) { $GameDir } else { '' }) $clientDist)) { Show-Row $r }
+                   $(if ($hasGame) { $GameDir } else { '' }) $clientDist $ci)) { Show-Row $r }
 if (-not $hasGame) {
   Say '  skip  no own game folder, so the client in it was not checked' 'DarkGray'
 }
@@ -584,7 +626,7 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
   Say ('  note  the skymp fork is at ' + $fork + ', on ' + $forkBranch + '. A Ship does not build it.') 'DarkGray'
 } else {
   Say '  note  no clone of the skymp fork here. A Ship does not build the engine, so it is not needed;' 'DarkGray'
-  Say '        only rebuilding the client or the server is (.\scripts\release\Build-Engine.ps1).' 'DarkGray'
+  Say '        only an engine change is, and its build is CI''s (engine\README.md, The engine built in CI).' 'DarkGray'
 }
 
 # ------------------------------------------------ the generated files --
@@ -603,7 +645,6 @@ if (-not $Dev) {
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
   # Main's feed as the site serves it, as Ship reads it (Get-PublishedLauncher),
   # and the number this checkout's launcher carries, as Publish-Update reads it.
-  . (Join-Path $Here 'Feed-Store.ps1')
   $mainFeed = $null
   try { $mainFeed = Read-SiteFeed 'main' } catch { $mainFeed = $null }
   $current = ''
@@ -633,7 +674,6 @@ if ($NoVps) {
   if ($sshOk) {
     $storeOk = $false; $storeSaid = ''
     try {
-      . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
       $there = Get-FeedStoreThere $Channel
       $storeOk = [bool]$there['version.json'] -and [bool]$there['published.json']
       $storeSaid = $(if ($storeOk) { 'version.json and published.json' } else { 'missing ' + ((@('version.json', 'published.json') | Where-Object { -not $there[$_] }) -join ' and ') })

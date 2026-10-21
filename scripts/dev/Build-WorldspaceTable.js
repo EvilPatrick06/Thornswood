@@ -145,7 +145,7 @@ function replaceList(text, list) {
   const found = text.match(LIST_RE) || [];
   if (found.length !== 1) { return null; }
   return text.replace(LIST_RE, function (all, s1, s2, inner) {
-    const nl = inner.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+    const nl = '\n';
     const item = /\n([ \t]*)"/.exec(inner);
     const close = /\n([ \t]*)$/.exec(inner);
     const body = item
@@ -155,8 +155,7 @@ function replaceList(text, list) {
   });
 }
 
-// A checkout with Windows line ends has a \r before the \n.
-const DATA_RE = /^const DATA = (.*);\r?$/m;
+const DATA_RE = /^const DATA = (.*);$/m;
 
 // The two texts with list written in, or { error }.
 function install(list, jsonText, gmText) {

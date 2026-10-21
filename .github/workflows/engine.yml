@@ -18,6 +18,10 @@
 #     on a machine with no engine build;
 #   client\, the six client files at the paths the record names, which
 #     Sync-Client.ps1 -Dist puts in a game folder;
+#   and the whole of it is a Ship machine's engine build:
+#     Get-EngineArtifact.ps1 fetches it for the pin and holds every file to
+#     the records (#3047, engine\README.md "A Ship machine takes CI's build"),
+#     so keep its layout in step with scripts\release\EngineArtifact.ps1;
 #   fork-build.json, when the fork built it (below): the fork's run, and
 #     each file it kept with its sha256 and time;
 #   SHA256SUMS over all of it.
@@ -147,6 +151,20 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
         with:
           submodules: false
+
+      # A runner keeps its folder from one job to the next, and a checkout
+      # there rewrites only the files that differ from the last job's commit,
+      # so every other file keeps the line endings the last job's
+      # .gitattributes gave it (#3029). Every tracked file is written again,
+      # the way this commit checks it out.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
 
       # The hosted image's node is whatever it has this month; the box has its
       # own (Bootstrap-VPS.ps1), as in build.yml.

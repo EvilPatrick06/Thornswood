@@ -151,8 +151,10 @@ let n = 0;
 function game(files, order) {
   const root = path.join(TMP, 'g' + (n++));
   const data = path.join(root, 'Data');
+  // rel names folders with \ the way the game does; split, so Linux makes
+  // the folders too rather than one file with \ in its name (#3005).
   Object.keys(files).forEach(function (rel) {
-    const f = path.join(data, rel);
+    const f = path.join.apply(path, [data].concat(rel.split('\\')));
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, files[rel]);
   });
@@ -193,6 +195,10 @@ try {
   yes('  and what to do: take the loose scripts out', /Take the loose SkyUI scripts out of Data\\Scripts/.test(r.out));
   yes('  it never says player', !/player/i.test(r.out));
   yes('  and wrote nothing in the game folder', stamp(g1.data) === before);
+  const g1b = game({ 'SkyUI_SE.bsa': skyuiArchive(), 'SkyUI_SE.esp': Buffer.alloc(8), 'scripts\\SKI_Main.PEX': oldScript() });
+  r = run(g1b);
+  yes('  a loose script is found whatever the case of its folder and name, as Windows finds it (got ' + r.code + ')',
+    r.code === 2 && /loose in Data\\Scripts/.test(r.out));
 
   // 2. The same folder once a release has deleted the loose script.
   r = run(g1, ['Data\\Scripts\\ski_main.pex']);
@@ -279,8 +285,27 @@ yes('  and OwnGame.Rules moved to 8 for it, so every folder refreshes once', !!r
 
 const ship = read('scripts/release/Ship.ps1');
 const at = ship.indexOf("Head 'SkyUI menus'");
-const step = at >= 0 ? ship.slice(at, at + 1800) : '';
+// The step is the statement after its Head line, read by PowerShell's own
+// parser so it ends where the step ends however long it grows. A window of
+// so many characters after the Head line lost the node line once a comment
+// pushed it past the window (#3020).
+function shipStep(head) {
+  const find = "$e = $null; $t = $null; $ast = [System.Management.Automation.Language.Parser]::ParseFile($env:TS_SHIP, [ref]$t, [ref]$e); " +
+    "if ($e -and $e.Count) { 'PARSE ' + $e[0].Message; exit 1 }; " +
+    "$h = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.PipelineAst] -and $n.Extent.Text -ceq $env:TS_HEAD }, $true)); " +
+    "if ($h.Count -ne 1) { 'HEADS ' + $h.Count; exit 1 }; " +
+    "$list = @($h[0].Parent.Statements); $i = [array]::IndexOf($list, $h[0]); " +
+    "if ($i -lt 0 -or $i + 1 -ge $list.Count) { 'NO STATEMENT AFTER IT'; exit 1 }; " +
+    "[Console]::Out.Write($list[$i + 1].Extent.Text); exit 0";
+  const r = spawnSync('pwsh', ['-NoProfile', '-NonInteractive', '-Command', find], {
+    encoding: 'utf8', env: Object.assign({}, process.env, { TS_SHIP: path.join(REPO, 'scripts', 'release', 'Ship.ps1'), TS_HEAD: head })
+  });
+  if (r.status !== 0) { console.log('      reading ' + head + ' in Ship.ps1: ' + (r.error ? r.error.message : (r.stdout + r.stderr).trim())); return ''; }
+  return r.stdout;
+}
+const step = at >= 0 ? shipStep("Head 'SkyUI menus'") : '';
 yes('Ship.ps1 has a SkyUI menus step', at > 0);
+yes('  read whole as the statement after its Head line, by PowerShell\'s parser', /^if \(\$FromFeed\) \{/.test(step) && /\}\s*$/.test(step));
 yes('  it runs Check-SkyUIMenus.js on the game folder with the order Ship ships',
   /Check-SkyUIMenus\.js'\) --data \(Join-Path \$GameDir 'Data'\) --plugins \$skyuiPlugins/.test(step) && /Get-ShipLoadOrderDir/.test(step));
 yes('  it reads the paths every pack deletes as gone', /--gone \(@\(Get-ShipDeleteAlways\) -join ';'\)/.test(step));

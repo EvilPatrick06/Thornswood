@@ -88,13 +88,40 @@
   and never falls back to another folder. where.js answers EngineBuild the
   same way, so both read one engine build.
 
+  CI'S ENGINE BUILD, issue #3047. A rebuild is never the same bytes, so a
+  record CI made (engine.yml, #459) matches only CI's build, and a fork
+  folder built on this machine never does: on 21 Oct One's record still
+  named a b9e16e8b worktree after the pin moved to 57fd87d8, and the dev Ship
+  stopped. A machine that ships records {"ci": true} instead
+  (Setup-ShipMachine.ps1 -EngineBuild ci), and EngineBuild is then
+  EngineArtifact: engine-ci\<the fork commit this checkout's
+  records\server-build.json names, 12> in this machine's own data, where
+  Get-EngineArtifact.ps1 puts engine.yml's artifact of that commit after
+  holding every file to the records. It is named for the pin, so a pin move
+  is a new folder and never a stale one, and each checkout reads the build
+  of its own pin. Like any place it is answered whether or not it is there
+  yet; Sync-Client.ps1 fetches it when it needs the client from it.
+
+  THE LAUNCHER INSTALL, issue #3003. Install is the folder this machine's
+  launcher is installed in: C:\Thornswood, or Thornswood on the first other
+  fixed drive with Launcher\Thornswood.exe in it, else C:\Thornswood.
+  InstallDev is the same with -DevBuild on the end, where the main launcher's
+  Settings page installs the dev build (DevBuild.cs). Until 21 October six
+  scripts (Publish-Update, Repair-Manifest, Sync-Client, Go, Deploy-Gamemode
+  and Check-CollectionRules) each carried a pasted Find-Root with this rule,
+  and Check-Editions a seventh copy inline, so a change to it had to be made
+  seven times, and the copies that asked Join-Path for C: stopped on a machine
+  with none. They ask here now, and tests\test-3003-one-install-rule.ps1
+  fails on a new copy. Like ShipRoots these are this machine's, and only the
+  PowerShell scripts ask, so where.js does not answer them.
+
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
-  Which place: Repo, Engine, EngineBuild, EngineBuilds, ServerDist,
+  Which place: Repo, Engine, EngineBuild, EngineBuilds, EngineArtifact, ServerDist,
   ClientDist, ServerSettings, ChangeForms, Out, Dist, Package, Payload,
-  ServerZip, Local, Backups, Releases, ReleasesDev, ShipRoot, ShipRootDev,
-  ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
+  ServerZip, Local, Backups, Releases, ReleasesDev, Install, InstallDev,
+  ShipRoot, ShipRootDev, ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
   from layout.json (docs, bot, voice, site, tests, game, launcher,
   installer, records, scripts).
 #>
@@ -158,10 +185,12 @@ function Get-Named($obj, [string]$name) {
     return $prop.Value
 }
 
-# The launcher install: C:\Thornswood, or Thornswood on the first other fixed
-# drive that has Launcher\Thornswood.exe in it, else C:\Thornswood. The first
-# is asked as a plain string, so a machine with no C: drive (a harness off
-# Windows) gets an answer rather than an error from Join-Path.
+# The launcher install (#3003, see the header): C:\Thornswood, or Thornswood
+# on the first other fixed drive that has Launcher\Thornswood.exe in it, else
+# C:\Thornswood. The only copy of the rule: every script asks Where.ps1
+# Install or InstallDev for it. The first is asked as a plain string, so a
+# machine with no C: drive (a harness off Windows) gets an answer rather than
+# an error from Join-Path.
 function Find-InstallRoot {
     $first = 'C:\Thornswood'
     if (Test-Path -LiteralPath ($first + '\Launcher\Thornswood.exe')) { return $first }
@@ -189,26 +218,38 @@ function Get-NamedShipRoot([string]$channel) {
 function Get-ShipRoot([string]$channel) {
     $named = Get-NamedShipRoot $channel
     if ($named) { return $named }
-    $root = Find-InstallRoot
-    if ($channel -eq 'dev') { return ($root + '-DevBuild') }
-    return $root
+    if ($channel -eq 'dev') { return Get-Place 'InstallDev' }
+    return Get-Place 'Install'
 }
 
-# The fork folder whose build\dist is this machine's engine build (#2019, see
-# the header): what EngineBuilds records, or the checkout's own engine.
+# The folder whose build\dist is this machine's engine build (#2019, see the
+# header): CI's build of the pin when EngineBuilds records ci (#3047), the
+# fork folder it records, or the checkout's own engine.
 function Get-EngineBuild {
     $file = Get-Place 'EngineBuilds'
     if (-not (Test-Path -LiteralPath $file)) { return (Get-Place 'Engine') }
     $rec = $null
     try { $rec = [IO.File]::ReadAllText($file) | ConvertFrom-Json }
-    catch { throw "$file does not read as JSON, so which engine build this machine uses is not known. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>." }
+    catch { throw "$file does not read as JSON, so which engine build this machine uses is not known. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci." }
+    if ((Get-Named $rec 'ci') -eq $true) { return (Get-Place 'EngineArtifact') }
     $fork = [string](Get-Named $rec 'fork')
-    if (-not $fork) { throw "$file names no fork folder. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>." }
+    if (-not $fork) { throw "$file names no engine build. Write it again with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci." }
     if (-not (Test-Path -LiteralPath (Join-Path $fork 'build\dist'))) {
         throw ("$file names $fork as this machine's engine build, and there is no build\dist in it, so there is no engine build to read. " +
-               "Build it there (engine\README.md, One engine), or record the fork folder that has it: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>.")
+               "Take CI's build of the pin instead, which is the one the records name: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci (engine\README.md, A Ship machine takes CI's build).")
     }
     return $fork
+}
+
+# Where CI's engine build of this checkout's pin goes (#3047, see the
+# header): engine-ci\<fork commit 12> in this machine's own data, the commit
+# records\server-build.json names.
+function Get-EngineArtifact {
+    $record = Join-Path $repo 'records\server-build.json'
+    $commit = ''
+    try { $commit = ([string](Get-Named (Get-Named ([IO.File]::ReadAllText($record) | ConvertFrom-Json) 'source') 'commit')).ToLowerInvariant() } catch { $commit = '' }
+    if ($commit -notmatch '^[0-9a-f]{40}$') { throw "$record names no fork commit (source.commit), so which CI engine build this checkout takes is not known." }
+    return (Join-Path (Join-Path (Get-MachineData) 'engine-ci') $commit.Substring(0, 12))
 }
 
 function Get-Place([string]$name) {
@@ -221,6 +262,9 @@ function Get-Place([string]$name) {
         'Releases'    { return Join-Path (Get-MachineData) 'feed\main' }
         'ReleasesDev' { return Join-Path (Get-MachineData) 'feed\dev' }
         # The folder a release is built from here, and the file that names it (#1692).
+        # The launcher install, and the dev build beside it (#3003).
+        'Install'     { return Find-InstallRoot }
+        'InstallDev'  { return ((Find-InstallRoot) + '-DevBuild') }
         'ShipRoots'   { return Join-Path (Get-MachineData) 'ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }
@@ -230,6 +274,8 @@ function Get-Place([string]$name) {
         # This machine's engine build, and the file that names it (#2019).
         'EngineBuilds' { return Join-Path (Get-MachineData) 'engine-build.json' }
         'EngineBuild'  { return Get-EngineBuild }
+        # CI's engine build of this checkout's pin (#3047).
+        'EngineArtifact' { return Get-EngineArtifact }
     }
     $place = Get-Named (Get-Layout).places $name
     if ($null -ne $place) { return Join-Under $repo ([string]$place) }
@@ -241,9 +287,9 @@ function Get-Place([string]$name) {
     return $null
 }
 
-$placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+$placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'EngineArtifact', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
-                'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
+                'Install', 'InstallDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
 if ($placeNames -contains $What) {
     Get-Place $What
 }

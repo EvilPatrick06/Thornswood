@@ -4,6 +4,7 @@
 param([string]$Repo = (Split-Path -Parent $PSScriptRoot))
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+if (-not $OnWindows) { Write-Host 'NOT RUN  this compiles Keep.cs and ClientRuntime.cs with the build''s compiler (the Build Tools'' csc) and runs them on .NET Framework, which only Windows has'; exit 0 }
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-runtime-keep-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($work)
 try {
@@ -21,7 +22,9 @@ try {
     if ($LASTEXITCODE) { throw 'Runtime/Keep regression failed' }
 } finally {
     $target = [IO.Path]::GetFullPath($work)
-    $parent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    # This machine's separator: off Windows the temp folder ends in / (#2989).
+    $sep = [IO.Path]::DirectorySeparatorChar
+    $parent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd($sep) + $sep
     if (-not $target.StartsWith($parent, [StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($target) -notlike 'thornswood-runtime-keep-*') { throw 'Unsafe fixture cleanup target' }
     Remove-Item -LiteralPath $target -Recurse -Force
 }

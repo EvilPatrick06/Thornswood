@@ -168,8 +168,8 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -688,7 +688,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
 # in front of it for Repair-ThornswoodBotData.
 $botThereBlock = @'
 $ErrorActionPreference = 'Continue'
-'asked of ' + $env:COMPUTERNAME + ', where the bot runs from ' + $Root
+'asked of ' + [Environment]::MachineName + ', where the bot runs from ' + $Root
 # The folder the service writes, then the log in it. Repair makes the folder
 # and grants the account what it needs when it had to make it; it says
 # nothing when there was nothing to do.

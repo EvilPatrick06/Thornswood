@@ -400,10 +400,10 @@
 #>
 param(
     # The build's Data folder. Read only.
-    [string]   $Data       = 'C:\Thornswood\Game\Data',
+    [string]   $Data       = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # The load order. The five Bethesda masters are always first and are never
     # in this file, so they are put in front of it.
-    [string]   $PluginsTxt = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [string]   $PluginsTxt = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt'),
     # Overrides the load order entirely when it is given.
     [string[]] $Plugins    = @(),
     [string]   $Out        = '',
@@ -412,6 +412,7 @@ param(
     [switch]   $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -2045,8 +2046,6 @@ $BENCH_OWNER = [ordered]@{
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
 }
 
-$ErrorActionPreference = 'Stop'
-
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\recipes.json' }
 
 $fail = 0
@@ -2668,15 +2667,12 @@ function InputsJson($r) {
     return '[' + ($bits -join ', ') + ']'
 }
 
-# The line ending a file already uses: CRLF when it holds one, LF otherwise. The
-# table and the gamemode blocks are written with it, so a run never mixes the
-# two in one file. Build-FuelTable.js and Build-ItemNameTable.js follow the
-# gamemode's ending the same way, and they turned the whole of it to CRLF when
-# this wrote CRLF blocks into an LF checkout (issue #1622).
-function EolOf([string]$text) {
-    if ($text.Contains("`r`n")) { return "`r`n" }
-    return "`n"
-}
+# Every table and gamemode block this writes is joined with LF, the ending
+# .gitattributes gives these files on every checkout (#3029). Until then each
+# run took the ending of the file it found, because a checkout with autocrlf
+# held them CRLF and the agents' VM and the runners' clones LF (#1622, #1787,
+# #1828), so a run on One rewrote every table it touched.
+$Eol = "`n"
 
 # A listing of the game folder: name, size and last write, for the files this
 # reads and the folder they sit in. Taken before and after so the promise that
@@ -5510,12 +5506,8 @@ foreach ($desc in $unowned.Keys) {
 }
 $doc.Add('  }')
 $doc.Add('}')
-# The line ending the table already has, CRLF for a new one. A Windows checkout
-# holds CRLF and git stores LF; a checkout that holds LF (this VM, issue #1622)
-# got CRLF from this line until 5 October and committed every line of it as a
-# change.
-$jsonEol = "`r`n"
-if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
+# Joined with LF, as everything this writes is.
+$jsonEol = $Eol
 $json = ($doc -join $jsonEol) + $jsonEol
 
 # A run that failed leaves the table it could not rebuild exactly as it was.
@@ -5807,7 +5799,7 @@ if (-not $NoInstall -and $fail -eq 0) {
             $body.Add($open)
             foreach ($l in $lines) { $body.Add($l) }
             $body.Add('')
-            $eol = EolOf $text
+            $eol = $Eol
             $new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} recipes and the comment over them into the RECIPES_BY_ID block of {1}" -f $blockRows.Count, $gm)
@@ -5824,7 +5816,7 @@ if (-not $NoInstall -and $fail -eq 0) {
             $body = New-Object 'System.Collections.Generic.List[string]'
             $body.Add($sOpen)
             foreach ($l in $staffLines) { $body.Add($l) }
-            $eol = EolOf $text
+            $eol = $Eol
             $new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} staff spells into the STAFF_SPELLS block of {1}" -f $staffSpells.Count, $gm)

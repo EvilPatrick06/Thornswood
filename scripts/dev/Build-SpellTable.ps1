@@ -39,7 +39,7 @@
   same record, or if a name had to be resolved by a rule other than the first.
 #>
 param(
-    [string]   $Data     = 'C:\Thornswood\Game\Data',
+    [string]   $Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     [string]   $Book     = '',
     [string]   $Out      = '',
     [string]   $JsOut    = '',
@@ -48,6 +48,7 @@ param(
     [switch]   $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -77,8 +78,6 @@ $LANGUAGE = 'english'
 # A name that needs 2 or 3 is printed and makes the run fail, so it gets read
 # by a person before it ships.
 $PICK_ORDER = @('tome', 'edid', 'only')
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Book) { $Book = Join-Path $PSScriptRoot '..\..\game\ui\thornswood-skills.js' }
 if (-not $Out)  { $Out  = Join-Path $PSScriptRoot '..\..\game\data\spells.json' }
@@ -228,17 +227,12 @@ function JsonStr($s) {
     return '"' + $t + '"'
 }
 
-# The line ending a file already uses: CRLF when it holds one, LF otherwise.
-# The table and the gamemode block are written with it, so a run never mixes
-# the two in one file. Until 5 October both were joined with CRLF whatever the
-# file held, and a checkout that keeps LF (the agents' VM, the VPS runner's
-# clones) got a whole-file diff of spells.json and CRLF lines inside an LF
-# gamemode (issue #1828). Build-RecipeTable.ps1 (#1622) and Build-OreTable.ps1
-# (#1787) do the same.
-function EolOf([string]$text) {
-    if ($text.Contains("`r`n")) { return "`r`n" }
-    return "`n"
-}
+# Every table and gamemode block this writes is joined with LF, the ending
+# .gitattributes gives these files on every checkout (#3029). Until then each
+# run took the ending of the file it found, because a checkout with autocrlf
+# held them CRLF and the agents' VM and the runners' clones LF (#1622, #1787,
+# #1828), so a run on One rewrote every table it touched.
+$Eol = "`n"
 
 function KindName($list, $i) {
     if ($i -ge 0 -and $i -lt $list.Count -and $list[$i]) { return $list[$i] }
@@ -564,9 +558,8 @@ Write-Host 'writing' -ForegroundColor Cyan
 # no timestamp in it, so that the same game files give byte for byte the same
 # file: ConvertTo-Json lays out Windows PowerShell 5.1 and PowerShell 7
 # differently, and a rebuild that changed nothing would be a whole-file diff.
-# The line ending is the one the table already has, CRLF for a new one.
-$jsonEol = "`r`n"
-if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }
+# It is joined with LF, as everything this writes is.
+$jsonEol = $Eol
 $docLines = New-Object 'System.Collections.Generic.List[string]'
 $docLines.Add('{')
 $docLines.Add('  "builtBy": ' + (JsonStr 'scripts\dev\Build-SpellTable.ps1') + ',')
@@ -661,7 +654,7 @@ if (-not $NoInstall -and $fail -eq 0) {
             }
             $body.Add('  };')
             $body.Add('')
-            $eol = EolOf $text
+            $eol = $Eol
             $new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)
             [System.IO.File]::WriteAllText($gm, $new, (New-Object System.Text.UTF8Encoding($false)))
             Ok ("wrote {0} spells into the SPELL_IDS block of {1}" -f $table.Count, $gm)

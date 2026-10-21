@@ -21,6 +21,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $script = Join-Path $Repo 'scripts\deploy\Install-Runner.ps1'
 $ps = (Get-Process -Id $PID).Path
 
@@ -50,7 +51,7 @@ try {
         return @{ Code = $rc; Said = ($said -join "`n"); Text = $text }
     }
 
-    $comp = $env:COMPUTERNAME.ToLower()
+    $comp = [Environment]::MachineName.ToLower()
     $r = Dry @('-OffBox')
     Yes "-OffBox dry run ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  it ran nothing: every step says DRY RUN' ($r.Said -match 'DRY RUN, nothing ran' -and $r.Said -match 'on this machine')
@@ -86,8 +87,13 @@ try {
     $r = Dry @()
     Yes "without -OffBox the dry run still ends 0 (got $($r.Code))" ($r.Code -eq 0)
     Yes '  the VPS runner keeps its label, name and folder, and runner 1 takes builds (#2994)' ($r.Text -match "--name 'thornswood-vps' --labels 'thornswood-vps,thornswood-build'" -and $r.Text -match [regex]::Escape("`$root = 'C:\Thornswood-Runner'"))
-    Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' @()") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
-    Yes '  and Dumps left to Lock-VpsFolders.ps1, at install and in the lock after (#2127, #2488)' ($r.Text -match [regex]::Escape("'Thornswood-*' @() @('Thornswood-Dumps')") -and $r.Text -match [regex]::Escape("`$leave = @('Thornswood-Dumps')"))
+    # #2161, 21 Oct: the record's no-reach folders outside C:\Thornswood-* are denied on the box too.
+    $vpsAlso = "@('C:\ProgramData\ssh', 'C:\Users\Administrator')"
+    Yes '  and its C:\Thornswood-* filter and Defender skip' ($r.Text -match [regex]::Escape("Close-RunnerAccount `$acct `$root 'C:\' 'Thornswood-*' $vpsAlso") -and $r.Text -match '(?m)^if \(\$true\) \{\s*$')
+    Yes '  and Dumps left to Lock-VpsFolders.ps1, at install and in the lock after (#2127, #2488)' ($r.Text -match [regex]::Escape("'Thornswood-*' $vpsAlso @('Thornswood-Dumps')") -and $r.Text -match [regex]::Escape("`$leave = @('Thornswood-Dumps')"))
+    Yes '  and sshd''s folder and the administrator''s profile, from records\runner-isolation.json, at install' ($r.Text -match [regex]::Escape($vpsAlso))
+    $r = Dry @('-Lock')
+    Yes "  and in -Lock, for every runner on the box (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape("`$alsoDeny = $vpsAlso"))
     $r = Dry @('-Number', '5')
     Yes '  runner 5, which records\build-runners.json does not list, gets the VPS label alone and takes no builds (#2994)' ($r.Code -eq 0 -and $r.Text -match "--name 'thornswood-vps-5' --labels 'thornswood-vps' --work")
     Yes '  GitHub still never asked' (-not (Test-Path -LiteralPath $ghCalled))
@@ -97,24 +103,28 @@ try {
     $lib = [regex]::Match($src, "(?s)\`$lockLib = @'\r?\n(.*?)\r?\n'@").Groups[1].Value
     Yes 'the lock library is where it was' ($lib -match 'function Close-RunnerAccount')
     . ([scriptblock]::Create($lib))
-    $parent = Join-Path $work 'c'
-    $names = 'Thornswood-Server', 'ThornswoodTemps&Worktrees', 'Thornswood Vault', 'Thornswood-RunnerPR', 'Other'
-    foreach ($n in $names) { New-Item -ItemType Directory -Path (Join-Path $parent $n) | Out-Null }
-    $extra = Join-Path $work 'elsewhere'; New-Item -ItemType Directory -Path $extra | Out-Null
-    $own = Join-Path $parent 'Thornswood-RunnerPR'
-    $said = @(Close-RunnerAccount '*S-1-5-7' $own $parent 'Thornswood*' @($extra, (Join-Path $work 'not-there')))
-    function Denied([string]$p) { return [bool]@((Get-Acl -LiteralPath $p).Access | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-7' }).Count }
-    Yes 'off the box it shuts the account out of Thornswood-Server' (Denied (Join-Path $parent 'Thornswood-Server'))
-    Yes '  and out of ThornswoodTemps&Worktrees, which has no hyphen' (Denied (Join-Path $parent 'ThornswoodTemps&Worktrees'))
-    Yes '  and out of Thornswood Vault' (Denied (Join-Path $parent 'Thornswood Vault'))
-    Yes '  and out of an -AlsoDeny folder' (Denied $extra)
-    Yes '  but not its own folder' (-not (Denied $own))
-    Yes '  and not a folder that is not Thornswood''s' (-not (Denied (Join-Path $parent 'Other')))
-    Yes '  an -AlsoDeny folder that is not there is passed over' (-not ($said -join ' ' -match 'not-there'))
-    $parent2 = Join-Path $work 'c2'
-    foreach ($n in 'Thornswood-Server', 'ThornswoodTemps') { New-Item -ItemType Directory -Path (Join-Path $parent2 $n) | Out-Null }
-    $null = Close-RunnerAccount '*S-1-5-7' (Join-Path $parent2 'none') $parent2
-    Yes 'the VPS default filter is unchanged: Thornswood-* only' ((Denied (Join-Path $parent2 'Thornswood-Server')) -and -not (Denied (Join-Path $parent2 'ThornswoodTemps')))
+    if ($OnWindows) {
+        $parent = Join-Path $work 'c'
+        $names = 'Thornswood-Server', 'ThornswoodTemps&Worktrees', 'Thornswood Vault', 'Thornswood-RunnerPR', 'Other'
+        foreach ($n in $names) { New-Item -ItemType Directory -Path (Join-Path $parent $n) | Out-Null }
+        $extra = Join-Path $work 'elsewhere'; New-Item -ItemType Directory -Path $extra | Out-Null
+        $own = Join-Path $parent 'Thornswood-RunnerPR'
+        $said = @(Close-RunnerAccount '*S-1-5-7' $own $parent 'Thornswood*' @($extra, (Join-Path $work 'not-there')))
+        function Denied([string]$p) { return [bool]@((Get-Acl -LiteralPath $p).Access | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value -eq 'S-1-5-7' }).Count }
+        Yes 'off the box it shuts the account out of Thornswood-Server' (Denied (Join-Path $parent 'Thornswood-Server'))
+        Yes '  and out of ThornswoodTemps&Worktrees, which has no hyphen' (Denied (Join-Path $parent 'ThornswoodTemps&Worktrees'))
+        Yes '  and out of Thornswood Vault' (Denied (Join-Path $parent 'Thornswood Vault'))
+        Yes '  and out of an -AlsoDeny folder' (Denied $extra)
+        Yes '  but not its own folder' (-not (Denied $own))
+        Yes '  and not a folder that is not Thornswood''s' (-not (Denied (Join-Path $parent 'Other')))
+        Yes '  an -AlsoDeny folder that is not there is passed over' (-not ($said -join ' ' -match 'not-there'))
+        $parent2 = Join-Path $work 'c2'
+        foreach ($n in 'Thornswood-Server', 'ThornswoodTemps') { New-Item -ItemType Directory -Path (Join-Path $parent2 $n) | Out-Null }
+        $null = Close-RunnerAccount '*S-1-5-7' (Join-Path $parent2 'none') $parent2
+        Yes 'the VPS default filter is unchanged: Thornswood-* only' ((Denied (Join-Path $parent2 'Thornswood-Server')) -and -not (Denied (Join-Path $parent2 'ThornswoodTemps')))
+    } else {
+        Write-Host 'SKIP  Close-RunnerAccount on scratch folders: it denies with icacls and reads the deny back with Get-Acl, which only Windows has'
+    }
 
     # ---- the guards in the dry run (WHAT A PULL REQUEST JOB MAY REACH) -----
     $r = Dry @('-OffBox')
@@ -128,8 +138,17 @@ try {
     $iG = $t.IndexOf('Set-RunnerFirewall $grdAcct'); $iC = $t.IndexOf('.\config.cmd --unattended')
     Yes '  both before config.cmd can start the runner' ($iG -gt 0 -and $iC -gt $iG)
     Yes '  GitHub''s lists came from a stand-in: gh never called' (-not (Test-Path -LiteralPath $ghCalled))
-    $r = Dry @('-OffBox', '-AllowHost', 'pypi.org')
+    # localhost, so the harness needs no network to resolve it.
+    $r = Dry @('-OffBox', '-AllowHost', 'localhost')
     Yes '-AllowHost lets its address through (stand-in 203.0.113.7)' ($r.Text -match [regex]::Escape("-203.0.113.6'") -and $r.Text -match [regex]::Escape("'203.0.113.8-"))
+    # #2161, 21 Oct: through pwsh -File (this Dry) a,b reached the script as one
+    # name, the real run failed to resolve it and the dry run never asked.
+    $r = Dry @('-OffBox', '-AllowHost', 'localhost,localhost')
+    Yes "  a comma list given through -File is split into its names (exit $($r.Code))" ($r.Code -eq 0 -and ([regex]::Matches($r.Said, '-AllowHost localhost:')).Count -eq 2 -and $r.Said -notmatch 'localhost,localhost')
+    $r = Dry @('-OffBox', '-AllowHost', 'no-such-host.invalid')
+    Yes "  the dry run resolves each name and stops on one that does not resolve, writing nothing (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'no-such-host\.invalid does not resolve|no-such-host\.invalid resolves to nothing' -and $r.Text -notmatch 'Set-RunnerFirewall \$grdAcct')
+    $r = Dry @('-OffBox', '-AlsoDeny', 'D:\One,D:\Two')
+    Yes '  -AlsoDeny given as a comma list through -File is two folders' ($r.Text -match [regex]::Escape("`$alsoDeny = @('D:\One', 'D:\Two')"))
     $r = Dry @('-OffBox', '-Lock')
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
@@ -150,7 +169,7 @@ try {
     # A step run, not a function the guard library defines: a line that starts with it.
     $noLock = '(?m)^\s*(&\s*icacls|Close-RunnerReads|Open-RunnerReads|Lock-RunnerRoot|Close-RunnerAccount|New-LocalUser|Remove-LocalUser|Remove-RunnerWatchers)\b|config\.cmd|ExclusionPath'
     Yes 'the lock-step pattern does catch a full -OffBox install (a control)' ((Dry @('-OffBox')).Text -match $noLock)
-    $r = Dry @('-NetworkOnly', '-Number', '4', '-AllowHost', 'pypi.org')
+    $r = Dry @('-NetworkOnly', '-Number', '4', '-AllowHost', 'localhost')
     $t = $r.Text
     Yes "-NetworkOnly -Number 4 dry run ends 0 and goes to the VPS names (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$grdAcct = 'thornswood-runner4'"))
     Yes '  it writes the outbound block rules for that account alone' ($t -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $t -match '-Direction Outbound -Action Block' -and $t -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner4'"))
@@ -211,13 +230,17 @@ try {
     $want = @($dv, (Join-Path $u 'alice'), (Join-Path $u 'Public'), (Join-Path $pd 'ssh'), (Join-Path $pd 'Docker'))
     Yes 'the read list: other drives, other profiles and Public, ProgramData ssh and Docker' ((@($deny | Sort-Object) -join '|') -eq (@($want | Sort-Object) -join '|'))
     Yes '  not its own profile, not Default, not the rest of ProgramData' (-not ($deny -match 'thornswood-pr|Default|chocolatey'))
-    $said = @(Close-RunnerReads '*S-1-5-7' $deny)
-    Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))
-    Yes '  and nothing else' (-not (Denied (Join-Path $u 'thornswood-pr')) -and -not (Denied (Join-Path $pd 'chocolatey')))
-    $kid = Join-Path $u 'alice\Documents'; New-Item -ItemType Directory -Path $kid | Out-Null
-    Yes '  the deny reaches what is inside' (Denied $kid)
-    $null = Open-RunnerReads '*S-1-5-7' $deny
-    Yes 'Open-RunnerReads takes every one off again' (@($deny | Where-Object { Denied $_ }).Count -eq 0 -and -not (Denied $kid))
+    if ($OnWindows) {
+        $said = @(Close-RunnerReads '*S-1-5-7' $deny)
+        Yes 'Close-RunnerReads denies the account each one' (@($deny | Where-Object { Denied $_ }).Count -eq $deny.Count -and -not ($said -match 'COULD NOT'))
+        Yes '  and nothing else' (-not (Denied (Join-Path $u 'thornswood-pr')) -and -not (Denied (Join-Path $pd 'chocolatey')))
+        $kid = Join-Path $u 'alice\Documents'; New-Item -ItemType Directory -Path $kid | Out-Null
+        Yes '  the deny reaches what is inside' (Denied $kid)
+        $null = Open-RunnerReads '*S-1-5-7' $deny
+        Yes 'Open-RunnerReads takes every one off again' (@($deny | Where-Object { Denied $_ }).Count -eq 0 -and -not (Denied $kid))
+    } else {
+        Write-Host 'SKIP  Close-RunnerReads and Open-RunnerReads on scratch folders: they deny with icacls and are read back with Get-Acl, which only Windows has'
+    }
 } finally {
     $env:PATH = $oldPath
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue

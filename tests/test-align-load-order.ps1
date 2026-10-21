@@ -105,9 +105,10 @@ try {
     $r = Align (Join-Path $T 'nope.txt') $settings
     Yes 'a plugin list that is not there stops it, naming the path' ($r.Out -match 'not found: .*nope\.txt')
 
-    # 8. The default -AlsoFix is still the launcher's LocalAppData copy.
+    # 8. The default -AlsoFix is still the launcher's LocalAppData copy, in
+    # the install Where.ps1 finds (#3031).
     $src = [IO.File]::ReadAllText($Script)
-    Yes "the default -AlsoFix is the launcher's LocalAppData Plugins.txt" ($src -match "\[string\[\]\]\`$AlsoFix = @\('C:\\Thornswood\\Profile\\LocalAppData\\Plugins\.txt'\)")
+    Yes "the default -AlsoFix is the launcher's LocalAppData Plugins.txt" ($src -match "\[string\[\]\]\`$AlsoFix = @\(\(\(& \(Join-Path \`$PSScriptRoot '\.\.\\release\\Where\.ps1'\) Install\) \+ '\\Profile\\LocalAppData\\Plugins\.txt'\)\)")
 }
 finally {
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue

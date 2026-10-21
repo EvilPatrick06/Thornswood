@@ -91,7 +91,7 @@ Yes 'ten quiet minutes is the line' ($staleAst -and $staleAst.Right.Extent.Text 
 
 # ---- the rule, on its own ---------------------------------------------------
 $beatStale = 600
-. ([scriptblock]::Create($fns['Mins'].Extent.Text + "`n" + $fns['BeatProblem'].Extent.Text))
+. ([scriptblock]::Create($fns['Mins'].Extent.Text + "`n" + $fns['BeatProblem'].Extent.Text + "`n" + $fns['ReadBeat'].Extent.Text))
 
 $at = 2000000000
 function B([int64]$written, [bool]$on, [int64]$connectedAt, [int64]$started = ($at - 7200), [int64]$procId = 4242, [int64]$lastEvent = 0) {
@@ -131,7 +131,7 @@ $bad = @($words | Where-Object { -not $_ -or $_ -match '[^\x00-\x7F]' -or $_ -ma
 Yes 'every reason is plain ASCII, never says player, and leaves the full stop to the message' ($bad.Count -eq 0)
 
 # ---- the whole watcher, on a fake clock ---------------------------------------
-$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'PostWebhook', 'DiskNow')
+$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'PostWebhook', 'DiskNow')
 $body = @()
 foreach ($s in $inner.EndBlock.Statements) {
     if ($s -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $fake -contains $s.Name) { continue }
@@ -185,6 +185,8 @@ function BotProcs() { if ($script:alive) { return @(@{ Id = 4242; Started = $scr
 function HealthProblem($url) { return '' }
 function ServiceProblem($name) { return '' }
 function BackupProblem($task, $folder, $hours) { return '' }
+# The off-box copy (#2936), which test-watch-alerts.ps1 holds; here it is fine.
+function OffBoxProblem($file, $hours) { return '' }
 function DiskNow() { return @{ Free = 40GB; Size = 80GB } }
 function PostWebhook($url, $text) {
     if ($url -ne $script:goodHook) { return 'HTTP 404' }
@@ -347,7 +349,6 @@ try {
         Yes 'the real bot.py writes a heartbeat' ($rc -eq 0 -and (Test-Path -LiteralPath $real))
         $got = $null
         if (Test-Path -LiteralPath $real) {
-            . ([scriptblock]::Create($fns['ReadBeat'].Extent.Text))
             $got = ReadBeat $real
         }
         Yes 'the watcher''s ReadBeat reads it' ($null -ne $got -and [int64]$got.pid -gt 0)

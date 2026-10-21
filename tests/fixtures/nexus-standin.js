@@ -18,6 +18,20 @@
 // file whose CRC-64/NVME is not the one its complete address carries, and a
 // version made from an upload that is not available. Everything it was asked
 // is kept for GET /_requests; POST /_control changes how it answers.
+//
+// For Install-NexusRevision.ps1 (#2754, tests\test-2754-revision-layout.ps1)
+// it also answers a mod file version's download-link, a collection revision's
+// download_link and its downloadLink in GraphQL, and serves the files behind
+// them at /cdn/..., refusing a CDN request that carries the key. What it
+// serves is set through /_control: serve maps a file id to a local file and
+// the name its Content-Disposition gives, corrupt names file ids whose bytes
+// it changes on the way out, premium false answers download-link with the
+// 403 Nexus gives a free account, and addRevision adds a revision with the
+// local collection archive its download serves.
+//
+// For New-NexusRevision.ps1 -Add (#2969) it also knows a mod of somebody
+// else's, 1932, with an optional file 8662, and answers legacyModsByDomain
+// with each mod's author and category.
 
 'use strict';
 const http = require('http');
@@ -35,6 +49,9 @@ const control = {
   storeOdd: false,        // PATCH /mods/<id> keeps the text without the stored line breaks
   partSize: 65536,        // multipart part size
   unboundComplete: false, // the complete address leaves out the CRC it was started with
+  serve: {},              // file id -> { path, name }: what /cdn/file/<id> sends
+  corrupt: [],            // file ids whose bytes are changed on the way out
+  premium: true,          // false: download-link answers 403 as for a free account
 };
 
 const requests = [];
@@ -43,10 +60,12 @@ const violations = [];
 function storedOf(text) { return text.replace(/\\/g, '&#92;').replace(/\n/g, '\n<br />'); }
 
 const mods = {
-  '192762': { uid: 'mod-192762', name: 'Thornswood Client Runtime', files: ['file-runtime'],
+  '192762': { uid: 'mod-192762', name: 'Thornswood Client Runtime', files: ['file-runtime'], author: 'EvilPatrick06', category: 'Utilities',
     description: storedOf('[size=4][b]Thornswood Client Runtime[/b][/size]\n\nThe runtime, in Data\\Platform\\Distribution.\n\n[b]What is in it[/b]\nThe server\'s files.') },
-  '192001': { uid: 'mod-192001', name: 'Thornswood Content', files: ['file-content'],
+  '192001': { uid: 'mod-192001', name: 'Thornswood Content', files: ['file-content'], author: 'EvilPatrick06', category: 'Miscellaneous',
     description: storedOf('[size=4][b]Description[/b][/size]\nThornswood Content is the plugin for Thornswood.\n\n[size=4][b]Installation[/b][/size]\nThe collection installs it.') },
+  // Not Thornswood's: a mod a revision adds, which the team's list leaves out.
+  '1932': { uid: 'mod-1932', name: 'KS Hairdos Lite SE', files: ['file-hair'], author: 'Brataccas', category: 'Body, Face, and Hair', notTeam: true, description: '' },
 };
 const files = {
   'file-runtime': { id: 'file-runtime', name: 'Thornswood Client Runtime', mod: '192762', versions: [
@@ -54,6 +73,8 @@ const files = {
   'file-content': { id: 'file-content', name: 'Thornswood Content', mod: '192001', versions: [
     { id: 'ver-809365', game_scoped_id: '809365', name: 'Thornswood Content', version: '1.1', category: 'old_version', uploaded_at: '2026-09-22T22:11:00Z', is_primary: false, position: '1' },
     { id: 'ver-811029', game_scoped_id: '811029', name: 'Thornswood Content', version: '1.2', category: 'main', uploaded_at: '2026-09-26T22:15:00Z', is_primary: true, position: '2' }] },
+  'file-hair': { id: 'file-hair', name: 'KS Hairdos Lite SE NoNPCs', mod: '1932', versions: [
+    { id: 'ver-8662', game_scoped_id: '8662', name: 'KS Hairdos Lite SE NoNPCs', version: '1.3', category: 'optional', uploaded_at: '2016-11-17T08:37:45Z', is_primary: false, position: '1' }] },
 };
 let nextFileId = 812345;
 const collection = { id: 515846, slug: '7essxf', name: 'Thornswood', latest: 2, draft: null,
@@ -113,12 +134,28 @@ function api(req, res, url, body, json) {
     const hit = findVersion(v => v.id === m[1]); if (!hit) return problem(res, 404, 'No version');
     return send(res, 200, { data: versionView(hit.v, hit.f) });
   }
+  if (req.method === 'GET' && (m = p.match(/^\/v3\/games\/skyrimspecialedition\/mod-file-versions\/(\d+)\/download-link$/))) {
+    if (!control.premium) return problem(res, 403, 'Download links require Premium, or a valid key and expires.');
+    if (!control.serve[m[1]]) return problem(res, 404, 'No mod file version ' + m[1]);
+    const base = 'http://127.0.0.1:' + server.address().port;
+    return send(res, 200, { data: { links: [
+      { name: 'Nexus Global Content Delivery Network', short_name: 'Nexus CDN', url: base + '/cdn/file/' + m[1] + '?md5=x&expires=4102444800' },
+      { name: 'Amsterdam (Premium)', short_name: 'Amsterdam', url: base + '/cdn/file/' + m[1] + '?md5=y&expires=4102444800' }],
+      expires_at: '2100-01-01T00:00:00Z' } });
+  }
+  if (req.method === 'GET' && (m = p.match(/^\/v2\/collections\/(\d+)\/revisions\/(\d+)\/download_link$/))) {
+    if (Number(m[1]) !== collection.id) return problem(res, 404, 'No collection');
+    const n = Object.keys(collection.revisions).find(k => collection.revisions[k].id === m[2]);
+    if (!n || !collection.revisions[n].archive) return problem(res, 404, 'No revision ' + m[2]);
+    const base = 'http://127.0.0.1:' + server.address().port;
+    return send(res, 200, { download_links: [{ name: 'Nexus CDN', short_name: 'Nexus CDN', URI: base + '/cdn/collection/' + m[2] + '?md5=z&expires=4102444800' }] });
+  }
   if (req.method === 'GET' && (m = p.match(/^\/v3\/games\/skyrimspecialedition\/mod-file-versions\/(\d+)$/))) {
     const hit = findVersion(v => v.game_scoped_id === m[1]); if (!hit) return problem(res, 404, 'No version');
     return send(res, 200, { data: versionView(hit.v, hit.f) });
   }
   if (req.method === 'GET' && p === '/v3/team-mods') {
-    return send(res, 200, { data: { mods: Object.keys(mods).map(k => ({ mod: { id: mods[k].uid, game_scoped_id: k, name: mods[k].name, game: { id: '1704', name: 'Skyrim Special Edition', domain_name: 'skyrimspecialedition' } }, affiliation: 'owner', bug_tracker: 'open', open_bug_count: 0 })) }, meta: { page: 1, page_size: 100, total_count: 2 } });
+    return send(res, 200, { data: { mods: Object.keys(mods).filter(k => !mods[k].notTeam).map(k => ({ mod: { id: mods[k].uid, game_scoped_id: k, name: mods[k].name, game: { id: '1704', name: 'Skyrim Special Edition', domain_name: 'skyrimspecialedition' } }, affiliation: 'owner', bug_tracker: 'open', open_bug_count: 0 })) }, meta: { page: 1, page_size: 100, total_count: 2 } });
   }
   if (req.method === 'POST' && (p === '/v3/uploads' || p === '/v3/uploads/multipart')) {
     if (!json || typeof json.size_bytes !== 'number' || typeof json.filename !== 'string') return problem(res, 422, 'size_bytes and filename');
@@ -209,7 +246,7 @@ function graph(req, res, json) {
   }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
-    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
+    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, author: mod.author, modCategory: { name: mod.category }, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
   }
   if ((m = q.match(/(?:^|[{\s])mod\(modId: (\d+), gameId: (\d+)\)/))) {
     const mod = m[2] === '1704' ? mods[m[1]] : undefined;
@@ -219,7 +256,7 @@ function graph(req, res, json) {
   if ((m = q.match(/collectionRevision\(slug: "7essxf", revision: (\d+)/))) {
     const r = collection.revisions[m[1]];
     if (!r) return send(res, 200, { errors: [{ message: 'Revision not found' }] });
-    return send(res, 200, { data: { collectionRevision: { id: r.id, revisionNumber: Number(m[1]), status: r.status } } });
+    return send(res, 200, { data: { collectionRevision: { id: r.id, revisionNumber: Number(m[1]), status: r.status, downloadLink: '/v2/collections/' + collection.id + '/revisions/' + r.id + '/download_link' } } });
   }
   if (/collection\(slug: "7essxf", domainName: "skyrimspecialedition"\)/.test(q)) {
     return send(res, 200, { data: { collection: { id: collection.id, name: collection.name, latestPublishedRevision: { id: Number(collection.revisions[collection.latest].id), revisionNumber: collection.latest }, draftRevisionNumber: collection.draft } } });
@@ -275,6 +312,23 @@ function storage(req, res, url, body) {
   return problem(res, 404, 'No storage address ' + p);
 }
 
+// The CDN behind the download links: signed already, so it takes no key.
+function cdn(req, res, url) {
+  const p = url.pathname;
+  let m, item = null;
+  if (req.headers.apikey !== undefined) { violations.push('the key went to the CDN: ' + req.method + ' ' + p); return problem(res, 400, 'apikey sent to the CDN'); }
+  if (req.method === 'GET' && (m = p.match(/^\/cdn\/file\/(\d+)$/))) item = control.serve[m[1]] ? Object.assign({ id: m[1] }, control.serve[m[1]]) : null;
+  else if (req.method === 'GET' && (m = p.match(/^\/cdn\/collection\/(\d+)$/))) {
+    const n = Object.keys(collection.revisions).find(k => collection.revisions[k].id === m[1]);
+    if (n && collection.revisions[n].archive) item = { path: collection.revisions[n].archive, name: path.basename(collection.revisions[n].archive) };
+  }
+  if (!item) return problem(res, 404, 'Nothing at ' + p);
+  let bytes = fs.readFileSync(item.path);
+  if (item.id && control.corrupt.indexOf(item.id) >= 0) { bytes = Buffer.from(bytes); bytes[0] = bytes[0] ^ 0xFF; }
+  res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Content-Length': bytes.length, 'Content-Disposition': 'attachment; filename="' + item.name + '"' });
+  return res.end(bytes);
+}
+
 const server = http.createServer((req, res) => {
   const chunks = [];
   req.on('data', c => chunks.push(c));
@@ -289,10 +343,12 @@ const server = http.createServer((req, res) => {
       const c = Object.assign({}, json || {});
       // A description put straight into the stored form, to give the scripts one they cannot read back.
       if (c.setStored) { mods[c.setStored.mod].description = c.setStored.stored; mods[c.setStored.mod].cached = undefined; delete c.setStored; }
+      // A revision whose download is a local collection archive.
+      if (c.addRevision) { collection.revisions[c.addRevision.n] = { id: String(c.addRevision.id), status: c.addRevision.status || 'published', upload: null, archive: c.addRevision.archive }; delete c.addRevision; }
       Object.assign(control, c);
       return send(res, 200, control);
     }
-    const isApi = url.pathname.startsWith('/v3/') || url.pathname === '/v2/graphql';
+    const isApi = url.pathname.startsWith('/v3/') || url.pathname === '/v2/graphql' || url.pathname.startsWith('/v2/collections/');
     requests.push({ method: req.method, path: url.pathname, query: url.search, api: isApi,
       key: req.headers.apikey === undefined ? 'none' : (req.headers.apikey === KEY ? 'right' : 'wrong'),
       appName: req.headers['application-name'] || '', appVersion: req.headers['application-version'] || '',
@@ -305,6 +361,7 @@ const server = http.createServer((req, res) => {
       return api(req, res, url, body, json);
     }
     if (url.pathname.startsWith('/s3/')) return storage(req, res, url, body);
+    if (url.pathname.startsWith('/cdn/')) return cdn(req, res, url);
     return problem(res, 404, 'nothing here');
   });
 });

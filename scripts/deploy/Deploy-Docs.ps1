@@ -128,10 +128,10 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Deploy-Docs' -Target $Vps -AllowStale:$AllowStaleCheckout
 
-$ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -234,8 +234,8 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 # contain a method named 'Trim'" after the files had already gone up. The two
 # places that build a list from this take only the strings.
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -249,7 +249,11 @@ $rootWin   = $Root.Replace('/','\')
 # no backslash at the end. The fail-safe and the site's grants name the other
 # folders from it, so a deploy into a scratch box never reaches the real ones
 # (#1273).
-$boxWin    = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
+# It is taken as text by Windows rules: Split-Path here is this machine's,
+# and off Windows it made C:\Thornswood-Docs's parent C:/ and every grant
+# C:/\Thornswood-Server (#2989).
+$boxWin    = $rootWin.TrimEnd('\')
+$boxWin    = if ($boxWin.LastIndexOf('\') -ge 0) { $boxWin.Substring(0, $boxWin.LastIndexOf('\')) } else { '' }
 $stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp

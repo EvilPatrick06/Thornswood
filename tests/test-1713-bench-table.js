@@ -10,7 +10,9 @@
 //   a run shut the cookpot, which docs/systems/professions.md calls open
 //   furniture. The page's open furniture is now a knob, OPEN_FURNITURE.
 // - It wrote both blocks with CRLF whatever the gamemode held, so on a
-//   checkout that keeps LF a run left two CRLF blocks in an LF file.
+//   checkout that keeps LF a run left two CRLF blocks in an LF file. It then
+//   took the gamemode's own ending; since #3029 .gitattributes checks the
+//   gamemode out with LF everywhere, and both blocks are written LF.
 //
 // #1384 took the armour table out of the open furniture: tempering is cut, so
 // it and the sharpening wheel are shut for everybody (SHUT_BENCHES, held by
@@ -196,12 +198,15 @@ try {
     const r2 = build(lf);
     yes("a second run changes nothing", r2.code === 0 && fs.readFileSync(lf, "utf8") === after);
 
-    // A CRLF gamemode stays CRLF.
+    // A gamemode from before .gitattributes, CRLF: both blocks go in LF.
     const crlf = path.join(tmp, "gamemode-crlf.js");
     fs.writeFileSync(crlf, ["// head", BOPEN, "old", BCLOSE, "", OPEN, "old", CLOSE, "// tail", ""].join("\r\n"));
     const r3 = build(crlf);
     const t3 = fs.readFileSync(crlf, "utf8");
-    yes("a CRLF gamemode stays CRLF", r3.code === 0 && t3.split("\n").length - 1 === t3.split("\r\n").length - 1);
+    function between(t, a, b) { const i = t.indexOf(a), j = t.indexOf(b); return i < 0 || j < i ? null : t.slice(i, j); }
+    const w1 = between(t3, BOPEN, BCLOSE), w2 = between(t3, OPEN, CLOSE);
+    yes("both blocks written into a CRLF gamemode are LF", r3.code === 0 && w1 !== null && w2 !== null &&
+      t3.indexOf("\r\nold\r\n") < 0 && (w1 + w2).indexOf("\r") < 0);
   }
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

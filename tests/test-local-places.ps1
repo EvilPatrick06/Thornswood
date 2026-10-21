@@ -98,7 +98,7 @@ Yes ('no script under scripts names Downloads\Thornswood-Backups or C:\Thornswoo
 
 $asks = [regex]"Where\.ps1'\)\s+Backups\b"
 foreach ($rel in 'scripts\vps\Backup-Server.ps1', 'scripts\vps\Fetch-Backups.ps1', 'scripts\mods\Clean-Everything.ps1', 'scripts\deploy\Rotate-BotToken.ps1') {
-    $text = [IO.File]::ReadAllText([IO.Path]::Combine($realRepo, $rel))
+    $text = [IO.File]::ReadAllText((Join-Path $realRepo $rel))
     $byVar = $text -match '\$where\s*=\s*Join-Path \$Here ''\.\.\\release\\Where\.ps1''' -and $text -match '& \$where Backups'
     Yes ((Split-Path -Leaf $rel) + ' asks Where.ps1 Backups') ($asks.IsMatch($text) -or $byVar)
 }
@@ -127,13 +127,13 @@ try {
         'scripts\release\Where.ps1',
         'scripts\vps\Backup-Server.ps1', 'scripts\vps\Fetch-Backups.ps1', 'scripts\vps\Restore-Backup.ps1',
         'scripts\vps\Vps.ps1', 'scripts\vps\Send-Script.ps1', 'scripts\vps\vps.json',
-        'scripts\mods\Clean-Everything.ps1'
+        'scripts\mods\Clean-Everything.ps1', 'scripts\mods\OnBox.ps1'
     )
     function New-Scratch([string]$dir, [bool]$worktree) {
         foreach ($rel in $copy) {
             $to = Join-Path $dir $rel
             New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to) | Out-Null
-            Copy-Item -LiteralPath ([IO.Path]::Combine($realRepo, $rel)) -Destination $to
+            Copy-Item -LiteralPath (Join-Path $realRepo $rel) -Destination $to
         }
         if ($worktree) { [IO.File]::WriteAllText((Join-Path $dir '.git'), 'gitdir: C:/nowhere/.git/worktrees/scratch') }
         else { New-Item -ItemType Directory -Force -Path (Join-Path $dir '.git') | Out-Null }

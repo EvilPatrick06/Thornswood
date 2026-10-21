@@ -219,17 +219,20 @@ try {
     # the artifact there, and the box answers for it with the hash of what
     # arrived, the way Send-ThornswoodArtifact asks after a send.
     $fake = @'
+$in = @($input | ForEach-Object { [string]$_ })
 [IO.File]::AppendAllText($env:TS_PUB_CALLS, ('NAME ' + ($args -join ' ') + [Environment]::NewLine))
 $all = $args -join ' '
 $text = $all
 if ($all -match '-EncodedCommand (\S+)') { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1])) }
-# A script over the command line's limit goes up as a file and is run from
-# there (Send-Script.ps1), so the stand-in keeps it to read when it is run.
-elseif ($all -match '-File \S*(thornswood-remote-[0-9a-f]+\.ps1)') {
-    $kept = Join-Path $env:TS_PUB_STORE $Matches[1]
-    if (Test-Path -LiteralPath $kept) { $text = [IO.File]::ReadAllText($kept) }
+# A script over the command line's limit goes by scp to a copy of its own,
+# which a short runner on the command line takes off the box and runs
+# (Send-Script.ps1, #3059), so the stand-in keeps the copy and reads it there.
+if ($text -match "^\`$ThornswoodRunFile = 'C:\\Windows\\Temp\\(thornswood-remote-[0-9a-f]{32}\.ps1)'") {
+    $copy = Join-Path $env:TS_PUB_STORE $Matches[1]
+    $text = [IO.File]::ReadAllText($copy)
+    Remove-Item -LiteralPath $copy -Force
 }
-if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/|Windows/Temp/)((?:server-|thornswood-remote-).+)$') {
+if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/|C:/Windows/Temp/)((server-|thornswood-remote-).+)$') {
     Copy-Item -LiteralPath ([string]$args[-2]) -Destination (Join-Path $env:TS_PUB_STORE $Matches[1]) -Force
 }
 'INSTALL OK'
@@ -244,7 +247,7 @@ exit 0
     foreach ($n in 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')), $fake.Replace('NAME', $n))
     }
-    $env:PATH = $bin + ';' + $oldPath
+    $env:PATH = $bin + [IO.Path]::PathSeparator + $oldPath
     $env:TS_PUB_CALLS = $log
     $env:TS_PUB_STORE = Join-Path $T 'store-server'
     New-Item -ItemType Directory -Force -Path $env:TS_PUB_STORE | Out-Null

@@ -44,6 +44,17 @@
   the summary is always printed. The cure for that line is another share in
   nightly.yml, not a longer budget.
 
+  NAMED HARNESSES ON DEMAND (#2970). .github/workflows/harnesses.yml runs
+  the harnesses somebody names, on the same Windows runners and the same
+  way, so a harness that needs Windows PowerShell is run from a cloud
+  session by dispatching that workflow, with no login on the box:
+
+      .\scripts\dev\Nightly-Harnesses.ps1 -Only 'test-deploy-swaps.ps1 voice/test-most.js'
+
+  -Only takes the names as the nightly prints them, split by spaces or
+  commas, and runs those in place of a share. A name that is no harness here
+  is refused before anything runs (exit 2), so a typo is never a green run.
+
   tests\test-nightly-harnesses.ps1 runs this against stand-in harnesses.
 
 .PARAMETER Shard
@@ -56,6 +67,11 @@
   How long this may take in all. A harness starts only when the time used so
   far plus its clock is no more than this. nightly.yml gives 2400 seconds of a
   45 minute job.
+
+.PARAMETER Only
+  Harness names to run in place of a share, split by spaces or commas
+  (test-x.ps1, test-y.js, voice/test-z.js). Every one must be a harness
+  here, or nothing runs and the exit is 2.
 
 .PARAMETER Root
   The repository whose harnesses run. The one this script is in, unless a
@@ -70,6 +86,7 @@ param(
     [int]$Shard = 1,
     [int]$Of = 1,
     [int]$BudgetSeconds = 2400,
+    [string]$Only = '',
     [string]$Root = '',
     [string]$OutDir = ''
 )
@@ -101,7 +118,32 @@ Set-Content -Path $nothing -Value $null -NoNewline
 # What a harness left running after it ended: the processes it started, and
 # theirs, found by parent id and killed. Only ones started after the harness,
 # so a pid Windows has since handed to something else is left alone.
-function Kill-Left($id, $since) {
+#
+# Off Windows (a cloud session running the harnesses, #2989) there is no CIM,
+# and a process whose parent ends is handed to init, so by the time a harness
+# has ended the tree is gone. There each harness is started with a mark of its
+# own in its environment, which every process it starts inherits and no
+# re-parenting takes away, and /proc says which processes hold it.
+$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+function Get-Marked($mark) {
+    $want = 'THORNSWOOD_NIGHTLY_RUN=' + $mark
+    foreach ($d in [IO.Directory]::GetDirectories('/proc')) {
+        $n = [IO.Path]::GetFileName($d)
+        if ($n -notmatch '^\d+$' -or [int]$n -eq $PID) { continue }
+        try { $env = [Text.Encoding]::Latin1.GetString([IO.File]::ReadAllBytes($d + '/environ')) }
+        catch { continue <# it ended while being listed, or is not ours to read: neither is a harness's #> }
+        if ($env.Split([char]0) -notcontains $want) { continue }
+        $comm = ''
+        try { $comm = [IO.File]::ReadAllText($d + '/comm').Trim() } catch { $comm = '(ended)' }
+        [pscustomobject]@{ Id = [int]$n; Name = $comm }
+    }
+}
+function Kill-Left($id, $since, $mark) {
+    if (-not $onWindows) {
+        $left = @(Get-Marked $mark | Where-Object { $_.Id -ne $id })
+        foreach ($q in $left) { Stop-Process -Id $q.Id -Force -ErrorAction SilentlyContinue }
+        return @($left | ForEach-Object { $_.Name })
+    }
     $procs = @(Get-CimInstance Win32_Process -Property ProcessId, ParentProcessId, Name, CreationDate)
     $mine = @{ $id = $true }; $left = @()
     do {
@@ -119,15 +161,23 @@ function Run-One($exe, $argList, $name, $path, $clock) {
     $file = $name -replace '[\\/]', '_'
     $o = Join-Path $OutDir ($file + '.out'); $e = Join-Path $OutDir ($file + '.err')
     $since = (Get-Date).AddSeconds(-1)
+    $mark = [Guid]::NewGuid().ToString('N')
+    if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
     $sw = [Diagnostics.Stopwatch]::StartNew()
-    $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
-           -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
+    try {
+        $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
+               -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
+    } finally { Remove-Item Env:\THORNSWOOD_NIGHTLY_RUN -ErrorAction SilentlyContinue }
     $null = $p.Handle
     $timedOut = -not $p.WaitForExit($clock * 1000)
-    if ($timedOut) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null; $null = $p.WaitForExit(10000) }
+    if ($timedOut) {
+        if ($onWindows) { & taskkill.exe /T /F /PID $p.Id 2>&1 | Out-Null }
+        else { foreach ($q in @(Get-Marked $mark)) { Stop-Process -Id $q.Id -Force -ErrorAction SilentlyContinue } }
+        $null = $p.WaitForExit(10000)
+    }
     $code = if ($timedOut) { -1 } else { $p.ExitCode }
     $secs = [Math]::Round($sw.Elapsed.TotalSeconds, 1)
-    $left = @(Kill-Left $p.Id $since)
+    $left = @(Kill-Left $p.Id $since $mark)
     Write-Host ("--- {0}  ({1}s{2})" -f $name, $secs, $(if ($clock -ne $PER_HARNESS) { ', on a ' + $clock + ' s clock it names' } else { '' }))
     foreach ($f in $o, $e) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $clock) }
@@ -148,8 +198,16 @@ if (Test-Path -LiteralPath $voice) {
     $every += @(Get-ChildItem -LiteralPath $voice -Filter 'test-*.js' -File | Sort-Object Name |
                 ForEach-Object { [pscustomobject]@{ Name = 'voice/' + $_.Name; File = $_ } })
 }
-$mine = @(for ($i = 0; $i -lt $every.Count; $i++) { if (($i % $Of) -eq ($Shard - 1)) { $every[$i] } })
-Write-Host ("share {0} of {1}: {2} of the {3} harnesses, {4} s to run them in" -f $Shard, $Of, $mine.Count, $every.Count, $BudgetSeconds)
+if ($Only.Trim()) {
+    $asked = @($Only -split '[\s,]+' | Where-Object { $_ } | Select-Object -Unique)
+    $unknown = @($asked | Where-Object { $n = $_; -not @($every | Where-Object { $_.Name -eq $n }).Count })
+    if ($unknown.Count) { Write-Host ("::error::no such harness here, so nothing was run: " + ($unknown -join ', ')); exit 2 }
+    $mine = @($every | Where-Object { $asked -contains $_.Name })
+    Write-Host ("the {0} harness(es) asked for, of the {1}, {2} s to run them in: {3}" -f $mine.Count, $every.Count, $BudgetSeconds, (@($mine | ForEach-Object { $_.Name }) -join ', '))
+} else {
+    $mine = @(for ($i = 0; $i -lt $every.Count; $i++) { if (($i % $Of) -eq ($Shard - 1)) { $every[$i] } })
+    Write-Host ("share {0} of {1}: {2} of the {3} harnesses, {4} s to run them in" -f $Shard, $Of, $mine.Count, $every.Count, $BudgetSeconds)
+}
 
 $clockAll = [Diagnostics.Stopwatch]::StartNew()
 $results = @()
@@ -171,7 +229,8 @@ Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-O
 Write-Host ('all of them, added up: {0}s, in {1}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum), [Math]::Round($clockAll.Elapsed.TotalSeconds))
 if ($notRun.Count) {
     Write-Host ''
-    Write-Host ("{0} harness(es) not run, out of this share's {1} s; nightly.yml needs another share: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', '))
+    if ($Only.Trim()) { Write-Host ("{0} harness(es) not run, out of the {1} s; name fewer in one run: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', ')) }
+    else { Write-Host ("{0} harness(es) not run, out of this share's {1} s; nightly.yml needs another share: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', ')) }
 }
 if ($failed.Count) {
     Write-Host ''

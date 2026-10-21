@@ -36,6 +36,7 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
@@ -43,9 +44,8 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The dev server is a second install beside the live one, and the dev build is
 # a second launcher beside the main one. Asking about one against the other is
 # what made this worth a switch rather than two paths typed by hand.
-if (-not $Client) { $Client = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' } }
+if (-not $Client) { $Client = [string](& (Join-Path $Here '..\release\Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' })) }
 
-$ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 # The one rule for what the game loads and in what order, shared with the
@@ -64,8 +64,8 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 

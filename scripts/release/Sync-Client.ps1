@@ -21,6 +21,15 @@
   and the build is not read, so a checkout with no engine\skymp build still
   answers 0 for a game folder that is right (issue #946).
 
+  CI'S BUILD, issue #3047. A rebuild is never the same bytes, so only the
+  build a record was made from matches it, and since #459 that is CI's. On a
+  machine that takes CI's build (Setup-ShipMachine.ps1 -EngineBuild ci) the
+  default -Dist is Where.ps1 EngineArtifact's client folder, named for the
+  pin. When the game folder needs the client and that folder is not there
+  yet, Get-EngineArtifact.ps1 fetches engine.yml's artifact into it first,
+  held to the records, so a Ship or Go after a pin move needs no engine build.
+  -Check fetches nothing.
+
   Nothing here talks to the VPS, starts anything, or touches the Steam copy.
 
 .PARAMETER Check
@@ -41,11 +50,11 @@
 [CmdletBinding()]
 param(
   [string]$Dist = (& (Join-Path $PSScriptRoot 'Where.ps1') ClientDist),
-  # C:\Thornswood\Game on most machines. When C: has no launcher, every fixed
-  # drive is tried the way Publish-Update.ps1's Find-Root does it, so a second
-  # developer whose install is on another drive is not stuck on Patrick's path.
+  # Under the launcher install, which Where.ps1 Install finds (C:\Thornswood
+  # on most machines, another drive's when the launcher is there, #3003), so
+  # Sync-Client copies into the install this machine's launcher actually uses.
   # -Game still wins.
-  [string]$Game = 'C:\Thornswood\Game',
+  [string]$Game = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game'),
   [string]$Record,
   [switch]$Check,
   [switch]$NoPause
@@ -54,21 +63,6 @@ $ErrorActionPreference = 'Stop'
 if (-not $Record) { $Record = Join-Path $PSScriptRoot '..\..\records\client-build.json' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
-
-# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1, kept
-# identical so Sync-Client copies into the install this machine's launcher
-# actually uses. No shared helper yet: that would pull Find-Root out of
-# Publish-Update.ps1, which needs a line in #staff-updates first.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
-if (-not $PSBoundParameters.ContainsKey('Game')) { $Game = Join-Path (Find-Root) 'Game' }
 
 function Stop-Here($m) {
   Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red
@@ -111,9 +105,22 @@ if ($already -eq $files.Count) {
   Say 'every recorded file is already in the game folder' 'Green'
   exit 0
 }
+# CI's build of the pin, fetched when it is the build asked for and is not
+# here yet (CI'S BUILD above). Only that folder: any other -Dist is somebody's
+# own and is never filled from here.
+$ciDist = ''
+try { $ciDist = Join-Path ([string](& (Join-Path $PSScriptRoot 'Where.ps1') EngineArtifact)) 'build\dist\client' } catch { $ciDist = '' }
+$isCi = $ciDist -and ([IO.Path]::GetFullPath($Dist).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($ciDist).TrimEnd('\', '/'))
+if ($isCi -and -not $Check -and -not (Test-Path -LiteralPath $Dist)) {
+  Say "  CI's engine build of the pin is not here yet; fetching it" 'Cyan'
+  $global:LASTEXITCODE = 0
+  & (Join-Path $PSScriptRoot 'Get-EngineArtifact.ps1') -NoPause
+  if ($LASTEXITCODE -ne 0) { Stop-Here "CI's engine build of the pin could not be fetched, and the game folder does not hold the recorded client. Get-EngineArtifact.ps1 says why above." }
+}
 if (-not (Test-Path -LiteralPath $Dist)) {
   Stop-Here (("client build not found: $Dist, and the game folder does not hold the recorded client ({0} of {1} in place). " -f $already, $files.Count) +
-             'Put a build that matches records\client-build.json there, or pass -Dist with one.')
+             $(if ($isCi) { 'It is CI''s build of the pin, which .\scripts\release\Get-EngineArtifact.ps1 fetches (and Sync-Client without -Check runs it).' }
+               else { 'Put a build that matches records\client-build.json there, or pass -Dist with one. CI''s build of the pin is the one the record names: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci makes it this machine''s (engine\README.md, A Ship machine takes CI''s build).' }))
 }
 
 # First pass: every file in the build must be the recorded one. Nothing is
@@ -129,7 +136,12 @@ foreach ($rel in $files) {
     Say "  $rel" 'Yellow'
     Say "    build    $have" 'Yellow'
     Say "    recorded $want" 'Yellow'
-    Stop-Here 'the build is not the recorded one. Rebuild, then run .\scripts\release\New-ClientBuildRecord.ps1, then this again.'
+    # Not "rebuild": a rebuild is never the same bytes, so it can match only a
+    # record made from it, and a new record for an engine nobody changed is
+    # the mix engine\README.md forbids (#3047).
+    Stop-Here ("the build is not the recorded one ($Dist). Only the build the record was made from matches it, and that is CI's: " +
+               '.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci makes it this machine''s engine build (engine\README.md, A Ship machine takes CI''s build). ' +
+               'A new record is only for an engine change, in its pin pull request.')
   }
   $dst = Join-Path $Game $rel
   $state = if (-not (Test-Path -LiteralPath $dst)) { 'absent' }

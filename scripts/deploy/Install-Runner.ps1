@@ -244,6 +244,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# A list typed as a,b,c reaches [string[]] as three items in this PowerShell
+# (& .\Install-Runner.ps1) but as ONE string through pwsh -File, which then
+# failed to resolve "pypi.org,files.pythonhosted.org,..." on the box (#2161,
+# 21 Oct) or, for -AlsoDeny, named one folder that is not there and was passed
+# over. Both are split on commas here, however the script was started. No
+# host name has a comma, and no folder these deny does.
+$AllowHost = @($AllowHost | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$AlsoDeny = @($AlsoDeny | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
@@ -270,7 +278,7 @@ if ($OffBox) {
   $n = $(if ($Number -gt 1) { '' + $Number } else { '' })
   if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-RunnerPR' + $n }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
-  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + $env:COMPUTERNAME.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
+  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
   if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
@@ -282,6 +290,19 @@ $registerLabels = $Label
 if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
   $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
+}
+# On the box, the folders records\runner-isolation.json says no runner may
+# reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
+# administrator's profile) are denied with the Thornswood ones, at every
+# install and every -Lock. Until 21 Oct only C:\Thornswood-* and a hand-given
+# -AlsoDeny were, and Check-RunnerIsolation.ps1 -Collect read on 21 Oct that
+# every runner account's rights on C:\ProgramData\ssh included read (#2161).
+# A noReach entry that is a file, or under C:\Thornswood-*, is passed over
+# here: the box script skips anything that is not a folder, and the
+# Thornswood folders are denied by $liveFilter already.
+if (-not $OffBox) {
+  $isolation = Get-Content -LiteralPath (Join-Path $Here '..\..\records\runner-isolation.json') -Raw | ConvertFrom-Json
+  $AlsoDeny = @(@($AlsoDeny) + @($isolation.noReach | Where-Object { $_ -and $_ -notlike 'C:\Thornswood-*' }) | Select-Object -Unique)
 }
 # The lists the scripts below are given, as PowerShell source. $leaveList is
 # the folders under C:\ that Lock-VpsFolders.ps1 gives the runner accounts
@@ -341,8 +362,8 @@ function Invoke-Here([string]$script, $secret = $null) {
 }
 function Remote($script) {
   if ($OffBox -or $DryRunTo) { return Invoke-Here $script }
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 function Send-WithSecret($secret, [string]$script) {
@@ -609,10 +630,18 @@ function Get-GuardBlocks {
     if (-not $got.Count) { throw ('api.github.com/meta has no ' + $k + ' list, so no firewall rule was made') }
     $allow += $got
   }
+  # The dry run resolves each name too, so a name the real run cannot resolve
+  # stops the dry run the same way; it writes the stand-in 203.0.113.7 rather
+  # than the addresses, as it writes stand-in GitHub lists.
   foreach ($h in @($AllowHost | Where-Object { $_ })) {
-    if ($DryRunTo) { $allow += '203.0.113.7/32'; continue }
-    $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString })
+    $ips = @()
+    try { $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString }) } catch { throw ('-AllowHost ' + $h + ' does not resolve: ' + $_.Exception.Message) }
     if (-not $ips.Count) { throw ('-AllowHost ' + $h + ' resolves to nothing') }
+    if ($DryRunTo) {
+      $allow += '203.0.113.7/32'
+      Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now; the dry run writes 203.0.113.7)') 'Yellow'
+      continue
+    }
     $allow += $ips
     Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now)') 'Yellow'
   }

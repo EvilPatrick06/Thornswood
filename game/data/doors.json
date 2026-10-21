@@ -3307,7 +3307,7 @@
    "eaa20:JK's Whiterun's Outskirts.esp"
   ]
  },
- "builtBy": "tools/Build-DoorTable.py",
+ "builtBy": "scripts/dev/Build-DoorTable.py",
  "cells": {
   "103e1d:Arena - Markarth Side.esp": {
    "edid": "aaaMarkarthSideInnInterior",
@@ -4822,7 +4822,7 @@
   "16a11:Skyrim.esm": {
    "edid": "SolitudeAngelinesAromatics",
    "interior": true,
-   "name": "The Lucky Cauldron"
+   "name": "Angeline's Aromatics"
   },
   "16a55:HearthFires.esm": {
    "edid": "BYOHHouse3PaleBasement",
@@ -6779,10 +6779,6 @@
    "interior": true,
    "name": "Driftshade Cellar"
   },
-  "3e13:TavernGames.esp": {
-   "edid": "_SAG_BoardGameInterface_Cell",
-   "interior": true
-  },
   "3e908:Skyrim.esm": {
    "edid": "ChillwindDepths01",
    "interior": true,
@@ -8231,7 +8227,7 @@
   "97299:Skyrim.esm": {
    "edid": "WindhelmPalaceUpstairs01",
    "interior": true,
-   "name": "Palace of the Kings Upstairs"
+   "name": "Palace of the Kings, Upstairs"
   },
   "9731:Skyrim.esm": {
    "edid": "Riverwood04",
@@ -8622,18 +8618,10 @@
    "edid": "",
    "interior": false
   },
-  "c542:TavernGames.esp": {
-   "edid": "_SAG_CardGameInterface_Cell",
-   "interior": true
-  },
   "c5aa0:Skyrim.esm": {
    "edid": "HonningbrewMeadery03",
    "interior": true,
    "name": "Honningbrew Boilery"
-  },
-  "c5ed:TavernGames.esp": {
-   "edid": "_SAG_DiceGameInterface_Cell",
-   "interior": true
   },
   "c7348:Skyrim.esm": {
    "edid": "HallOfTheVigilant01",
@@ -8900,7 +8888,7 @@
   "lead": 2794,
   "locked": 385,
   "owned": 330,
-  "placed": 5655,
+  "placed": 5652,
   "unpaired": 0
  },
  "doors": {
@@ -23517,10 +23505,6 @@
    "cell": "3dd34:Skyrim.esm",
    "to": "3d6ab:Skyrim.esm"
   },
-  "3e40:TavernGames.esp": {
-   "base": "2c155:Skyrim.esm",
-   "cell": "3e13:TavernGames.esp"
-  },
   "3e40a:Skyrim.esm": {
    "base": "6597b:Skyrim.esm",
    "cell": "361f9:Skyrim.esm",
@@ -33590,7 +33574,11 @@
   },
   "a8204:Skyrim.esm": {
    "base": "31895:Skyrim.esm",
-   "cell": "2a03a:Skyrim.esm"
+   "cell": "2a03a:Skyrim.esm",
+   "lock": {
+    "key": null,
+    "level": 255
+   }
   },
   "a82dd:Skyrim.esm": {
    "base": "c5893:Skyrim.esm",
@@ -35576,14 +35564,6 @@
    "cell": "7bc27:Skyrim.esm",
    "to": "7bc2f:Skyrim.esm"
   },
-  "c54b:TavernGames.esp": {
-   "base": "2c155:Skyrim.esm",
-   "cell": "c542:TavernGames.esp",
-   "lock": {
-    "key": null,
-    "level": 255
-   }
-  },
   "c55c0:Skyrim.esm": {
    "base": "42035:Skyrim.esm",
    "cell": "7bc27:Skyrim.esm"
@@ -35672,10 +35652,6 @@
   "c5fdf:Skyrim.esm": {
    "base": "64091:Skyrim.esm",
    "cell": "16e00:Skyrim.esm"
-  },
-  "c611:TavernGames.esp": {
-   "base": "2c155:Skyrim.esm",
-   "cell": "c5ed:TavernGames.esp"
   },
   "c62a0:Skyrim.esm": {
    "base": "e74f6:Skyrim.esm",

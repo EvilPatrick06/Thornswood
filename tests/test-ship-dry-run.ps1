@@ -28,7 +28,10 @@
     D  -DryRun -Package on main
     V  -DryRun -Package on dev
     R  a real Ship -Package on main, which builds the installer in the one
-       file shape the site carries (-OneFile, #1213)
+       file shape the site carries (-OneFile, #1213), past the real freshness
+       guard (Fresh-Checkout.ps1, #2118) as the harness stand-in it is
+    Q  the same real Ship with Fresh-Checkout.ps1 gone: refused on the load,
+       before anything is built or called (#3006)
     E  -DryRun on dev, numbered from what the store says dev has published
     G  -DryRun on dev with no -Root, on a machine that recorded its dev
        release folder (Where.ps1 ShipRootDev, #1692): that folder is built,
@@ -87,6 +90,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
@@ -214,6 +218,8 @@ function Stub([string]$name, [string]$params, [string]$body) {
 }
 
 $oldPath = $env:PATH
+# PATH's separator: ; on Windows, : elsewhere.
+$pathSep = [string][IO.Path]::PathSeparator
 $oldAppData = $env:LOCALAPPDATA
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
@@ -222,6 +228,7 @@ $oldGhDl = $env:TS_GH_DL
 $oldGhTag = $env:TS_GH_TAG
 $oldSite = $env:THORNSWOOD_TEST_SITE_DIR
 $oldScratch = $env:THORNSWOOD_SCRATCH_ROOT
+$oldVps = $env:THORNSWOOD_VPS
 $ps = (Get-Process -Id $PID).Path
 
 function Invoke-Ship([string[]]$shipArgs) {
@@ -287,6 +294,13 @@ try {
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\records\ui-gone.json') -Destination (Join-Path $repo 'records\ui-gone.json') -Force
     New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\mods') | Out-Null
     Copy-Item -LiteralPath (Join-Path $realRel '..\mods\LoadOrder.ps1') -Destination (Join-Path $repo 'scripts\mods\LoadOrder.ps1') -Force
+    # The freshness guard a real Ship loads (#2118), the real one: R runs it,
+    # and it lets R by only as the harness stand-in, THORNSWOOD_HARNESS with
+    # the box harness.invalid. Until #3006 it was not here, Ship walked past
+    # the missing file under Continue, and R passed with no guard at all.
+    New-Item -ItemType Directory -Force -Path (Join-Path $repo 'scripts\deploy') | Out-Null
+    $freshCopy = Join-Path $repo 'scripts\deploy\Fresh-Checkout.ps1'
+    Copy-Item -LiteralPath (Join-Path $realRel '..\deploy\Fresh-Checkout.ps1') -Destination $freshCopy -Force
     # What Ship.ps1 dot-sources, which a stand-in cannot write down because it
     # is not called, only read. The two rule files are the real ones: they
     # only define functions, and the notes below are held to Note-Rules the
@@ -464,7 +478,7 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     [IO.File]::WriteAllText((Join-Path $bin 'gh.ps1'), $standIn.Replace('NAME', 'gh') + "`r`n" +
         "if (`$args.Count -ge 2 -and `$args[0] -eq 'api') { & `$env:TS_GH_DL @args }`r`nexit 0`r`n")
 
-    $env:PATH = $bin + ';' + $oldPath
+    $env:PATH = $bin + $pathSep + $oldPath
     $env:LOCALAPPDATA = $appdata
     # Ship stages the launcher under Get-ScratchDir (issue #1272), not %TEMP%.
     # Point the scratch root at this run's own folder so the gh stand-in writes
@@ -481,6 +495,9 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     # The tag a main Ship of launcher\app\Updater.cs's 1.1.93 looks for.
     $env:TS_GH_TAG = 'v1.1.93'
     $env:THORNSWOOD_TEST_SITE_DIR = $site
+    # The box a Ship's freshness guard asks about: one that can never be a
+    # real server, so the guard knows the stand-in (Fresh-Checkout.ps1).
+    $env:THORNSWOOD_VPS = 'harness.invalid'
 
     $feed = Join-Path $rel 'version.json'
     $devFeed = Join-Path $relDev 'version.json'
@@ -538,6 +555,9 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     $devBaselineBeforeMain = Hash $siteDevBase
     $r = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
     Yes ("R a real main Ship -Package runs to the end (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'Everyone in the world has')
+    Yes 'R its freshness guard ran, and let the harness stand-in by (#2118)' ($r.Out -match 'freshness: the harness stand-in box, not checked')
+    $unknown = @($r.Out -split "`r?`n" | Where-Object { $_ -match 'is not recognized' })
+    Yes ('R and nothing it loads or calls is missing (#3006)' + $(if ($unknown.Count) { ': ' + $unknown[0].Trim() } else { '' })) ($unknown.Count -eq 0)
     # When it stops, what it said and what it called, so the FAIL says why.
     if ($r.Code -ne 0) { $r.Out -split "`r?`n" | Select-Object -Last 25 | ForEach-Object { Write-Host ("      " + $_) }; $r.Calls | ForEach-Object { Write-Host ("      call: " + $_) } }
     $pub = Called $r 'Publish-Update'
@@ -601,6 +621,17 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     $devNow = [IO.File]::ReadAllText((Get-FeedVersionFile $siteDevDir)) | ConvertFrom-Json
     Yes 'R a main ship preserves the independently published dev feed' ((Hash-SiteFeed $siteDevDir) -eq $devBeforeMain)
     Yes '  and the independently published dev baseline' ((Hash $siteDevBase) -eq $devBaselineBeforeMain)
+
+    # ---- Q: the freshness guard is not there (#3006) -----------------------------------
+    # Ship loads Fresh-Checkout.ps1 under Stop, so a guard that cannot load
+    # ends the Ship on that line, before anything is built, called or sent.
+    Remove-Item -LiteralPath $freshCopy -Force
+    try {
+        $q = Invoke-Ship @("The map marker points at the right door`n- The marker over a house now sits on the door you walk through", '-Package', '-Root', $root, '-DistRoot', $dist, '-NoPause')
+    } finally { Copy-Item -LiteralPath (Join-Path $realRel '..\deploy\Fresh-Checkout.ps1') -Destination $freshCopy -Force }
+    Yes ("Q a real Ship with no Fresh-Checkout.ps1 is refused (exit {0})" -f $q.Code) ($q.Code -ne 0 -and $q.Out -match 'Fresh-Checkout\.ps1')
+    Yes ('Q before anything is called or sent' + $(if ($q.Calls.Count) { ' (' + ($q.Calls -join '; ') + ')' } else { '' })) ($q.Calls.Count -eq 0)
+    Yes '  and it does not go on past the guard' ($q.Out -notmatch 'Test-FreshAnyBranch|Assert-FreshCheckout' -and $q.Out -notmatch 'Everyone in the world has')
 
     # ---- E: a dev dry run numbers itself from the site store, not from git ------------
     # launchers.txt on the dev store says 1.1.93.2 went out, main's feed on the
@@ -745,9 +776,11 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
     $nodeStandIn = Join-Path $bin 'node.ps1'
     $nodeLine = '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@(''node'') + @($args | ForEach-Object { [string]$_ })) -join '' '') + "`r`n")'
     # PATH without any folder that holds a real node, for J.
-    $noNodePath = (@($bin) + @($oldPath -split ';' | Where-Object {
-        $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.exe')) -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.cmd'))
-    })) -join ';'
+    # A real node is node.exe or node.cmd on Windows, and node elsewhere.
+    $nodeNames = if ($OnWindows) { @('node.exe', 'node.cmd') } else { @('node') }
+    $noNodePath = (@($bin) + @($oldPath -split [regex]::Escape($pathSep) | Where-Object {
+        $d = $_; $d -and -not @($nodeNames | Where-Object { Test-Path -LiteralPath (Join-Path $d $_) }).Count
+    })) -join $pathSep
     $skyNote = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
     $skyArgs = @($skyNote, '-Channel', 'dev', '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
     $oldNodeExit = $env:TS_NODE_EXIT
@@ -756,7 +789,7 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         # J: no node at all.
         $env:PATH = $noNodePath
         $j = Invoke-Ship $skyArgs
-        $env:PATH = $bin + ';' + $oldPath
+        $env:PATH = $bin + $pathSep + $oldPath
         Yes ("J a Ship with a game folder and no node is refused (exit {0})" -f $j.Code) ($j.Code -eq 1 -and $j.Out -match 'STOP\. node is not on this machine')
         Yes '  and says why: SkyUI''s menus are read with it, and how to install it' (
             $j.Out -match 'Check-SkyUIMenus\.js' -and $j.Out -match 'SkyUI error box' -and $j.Out -match 'winget install --id OpenJS\.NodeJS\.LTS')
@@ -817,7 +850,7 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         Yes ("M a nude body on dev still warns and runs to the end (exit {0})" -f $n.Code) (
             $n.Code -eq 0 -and $n.Out -match 'a body in the game folder is nude \(issue #405\); shipping anyway' -and $n.Out -match 'Dry run finished')
     } finally {
-        $env:PATH = $bin + ';' + $oldPath
+        $env:PATH = $bin + $pathSep + $oldPath
         $env:TS_NODE_EXIT = $oldNodeExit
         $env:TS_BODIES_EXIT = $oldBodiesExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue
@@ -833,6 +866,7 @@ finally {
     $env:TS_GH_TAG = $oldGhTag
     $env:THORNSWOOD_TEST_SITE_DIR = $oldSite
     if ($null -eq $oldScratch) { Remove-Item Env:THORNSWOOD_SCRATCH_ROOT -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_SCRATCH_ROOT = $oldScratch }
+    if ($null -eq $oldVps) { Remove-Item Env:THORNSWOOD_VPS -ErrorAction SilentlyContinue } else { $env:THORNSWOOD_VPS = $oldVps }
     Remove-Item -LiteralPath $T -Recurse -Force -ErrorAction SilentlyContinue
 }
 

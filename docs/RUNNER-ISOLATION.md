@@ -13,13 +13,14 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | What | Read |
 | --- | --- |
 | Runners | Four, `thornswood-vps`, `-2`, `-3`, `-4`, all online, labels `self-hosted, Windows, X64, thornswood-vps` |
+| Runners, 21 Oct 2026 | Eight, `thornswood-vps` and `-2` to `-8`, from the `runner_name` on their jobs. 1 to 4 also carry `thornswood-build` and take the heavy jobs (records\build-runners.json, #2994); 5 to 8 are temporary while hosted minutes are out (#2929) and take only the light ones (board cards, dropped claims, the nightly's board job, the release jobs, harnesses.yml) |
 | Where | The same Windows VPS that runs both game servers, both voice services, the site, Caddy, the bot, the watchdog and the nightly backup (docs\SYSTEM.md) |
 | Accounts | `thornswood-runner`, `-runner2`, `-runner3`, `-runner4`: local users in Users and their GitHub runner groups, not in Administrators. Each runs its `actions.runner.*` service |
 | Runner folders | Locked by `scripts\deploy\Install-Runner.ps1` to SYSTEM, Administrators and the runner's account, with nothing inherited from C:\ |
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
 | Fork pull requests | Do not run workflows, get no write token and no secrets (`fork-pr-workflows-private-repos` all false) |
-| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use) |
+| Default workflow token | read; each workflow also sets its own `permissions` (build: contents read; nightly: contents read, issues write, pull-requests read; release: contents write, on a `v*` tag or by hand; engine: contents read, by hand only; drop-claims: issues write; board-status: issues write, with the board token from the `board` environment, which only main may use; staff-notice: contents read, started by hand, with the notices key named claude from the `notices` environment, which only main may use, and which sshd takes only from 127.0.0.1 and runs only say-staff.ps1 for, #3045) |
 | Actions sharing | `access_level: none` (no other repository may use these workflows) |
 | Allowed actions | all, SHA pinning not required by the setting; the workflows pin every action to a full SHA by their own rule (release.yml) |
 
@@ -28,6 +29,11 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 1. People who can push (three collaborators) to people who cannot: GitHub.
    Only pushers, and pull requests from branches in this repository, run
    code on the runners. Forks do not.
+   A pull request runs the workflow files on its own branch, so its code
+   can ask for any label, `thornswood-build` or not. The label split
+   decides where jobs go, not what a pusher's branch can reach, which is
+   why every runner account gets the outbound limits, the light ones (5
+   to 8) as well as the build ones.
 2. A job to its runner: none. A job runs as the runner's account and can read
    the runner's own `.credentials` (GitHub's design, Install-Runner.ps1 says
    so). A job can affect the next job on the same runner through anything it
@@ -58,10 +64,11 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | --- | --- | --- | --- |
 | F1 | Pull request code from any branch in this repository runs on the production box | build.yml: `on: pull_request` and `runs-on: [self-hosted, Windows, thornswood-vps]`. The check reports it as a risk row | Risk while pull request code can run on the VPS; hosted runners become the default (section 6) |
 | F2 | Install-Runner.ps1's header says build.yml sends pull requests to the label `thornswood-pr`, which no VPS runner carries. build.yml has never used that label (git log -S finds none) | Install-Runner.ps1 "OFF THE BOX"; build.yml | Resolved by the decision in section 6 |
-| F3 | VPS runner accounts have no outbound limit | Install-Runner.ps1 puts firewall rules on with -OffBox, and since #2161 on one VPS runner account at a time with -NetworkOnly; the check counts rules naming each runner SID | Risk until the outbound limits in section 6 are on, measured by the check |
+| F3 | VPS runner accounts have no outbound limit | Install-Runner.ps1 puts firewall rules on with -OffBox, and since #2161 on one VPS runner account at a time with -NetworkOnly; the check counts rules naming each runner SID. On 20 Oct none of 1 to 4 had them (-NetworkOnly -Status). Runner 4 has had them since that evening and ran its builds green after (pip, npm, ruff and eslint all ran) | Risk until the outbound limits in section 6 are on every runner account, measured by the check |
 | F4 | A job can read its runner's `.credentials` and leave files for the next job | GitHub's runner design; `_work\_temp` leftovers are counted by the check | Residual, inherent to persistent self-hosted runners |
 | F5 | Fork pull requests cannot run here | repository settings above | OK |
 | F6 | Runners are not administrators | account groups above | OK, rechecked by every run |
+| F7 | Every runner account could read `C:\ProgramData\ssh`, sshd's folder, which the record lists as no-reach | `Check-RunnerIsolation.ps1 -Collect`, 21 Oct 2026 10:37 AM UTC: `read=True write=False` for all eight accounts. Installs and `-Lock` on the box denied only `C:\Thornswood-*` and a hand-given `-AlsoDeny` | Fixed: every install and `-Lock` on the box now also denies the record's no-reach folders outside `C:\Thornswood-*` (`C:\ProgramData\ssh`, `C:\Users\Administrator`); proven by the check's reach rows after `-Lock` |
 
 ## 4. Cleanup, success and failure
 
@@ -112,7 +119,25 @@ outbound limit as residual risk.
    submodules from GitHub, the sources vcpkg builds each library from, from
    wherever each port fetches them, and yarn's packages from `registry.yarnpkg.com`.
    Its first run on the box is where that list is measured, before these
-   limits go on.
+   limits go on. Measured on 20 Oct 2026 (run 39364911234, thornswood-vps-3,
+   the one compile on the box, from an empty cache): besides GitHub,
+   mirror.msys2.org, cef-builds.spotifycdn.com, sqlite.org, www.nasm.us,
+   download.qt.io, sourceware.org, www.python.org and
+   node-embedder-api-prebuilt-vcpkg-port-v2.b-cdn.net. Two of those pass
+   each download on to a mirror they pick and two are CDNs, so no address
+   list taken in advance holds them, and the limits block a compile on the
+   box. engine.yml compiles there only when the fork has no build of the
+   commit; its usual path takes the fork's own build, from GitHub alone.
+   #3014 takes the compile off third-party hosts; the limits stay as they
+   are.
+
+   The rollout, one runner account at a time, because a block that misses a
+   host turns every build on that runner red: runner 4 first (20 Oct), then
+   3, 2 and 1, each proven by a build it then runs green, then 5 to 8, each
+   proven by any job it then runs green. `scripts\vps\Get-RunnerJobs.ps1`
+   reads that off GitHub (every runner carries the same labels, so a build
+   cannot be sent to one of them); `-NetworkOnly -Remove` for that one
+   account is the way back.
 2. GitHub-hosted runners are the default for builds. The VPS runners are a
    backup only: used by hand, or automatically when a hosted run fails
    because the account's Actions minutes or usage ran out. Patrick confirmed

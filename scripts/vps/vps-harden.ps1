@@ -5,8 +5,8 @@
 .DESCRIPTION
   Do not run this by hand. Harden-VPS.ps1 proves key login works first, from
   your machine, and refuses to send this otherwise; run that instead. It
-  copies this file to C:\Windows\Temp, runs it with Windows PowerShell 5.1,
-  and this file deletes itself when it is done.
+  sends this file's text on ssh's standard input and Windows PowerShell 5.1
+  runs it from there, so nothing of it is ever written on the box (#3035).
 
   In this order, each step saying what it found and what it did:
 
@@ -20,7 +20,8 @@
                      one it reads) and above the Match block, where a global
                      setting has to be. The new file is checked with
                      sshd -t before it replaces the old one, and the old one
-                     is kept beside it as sshd_config.before-harden-<time>.
+                     is kept beside it as sshd_config.before-harden-<time>,
+                     which only SYSTEM and Administrators may read (#3034).
     restart          sshd is restarted by a one time scheduled task a few
                      seconds after this returns, so the answer gets back
                      before the connection goes. A second task puts the old
@@ -44,19 +45,15 @@
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the registry,
-  the firewall, services, scheduled tasks, sshd -t). Only
+  the firewall, services, scheduled tasks, sshd -t, the copy's rules). Only
   tests\test-harden-vps.ps1 passes it, to run this against stand-ins.
-
-.PARAMETER KeepSelf
-  Do not delete this file at the end. The test harness passes it.
 #>
 [CmdletBinding()]
 param(
     [switch]$DryRun,
     [string]$SshdConfig = (Join-Path $env:ProgramData 'ssh\sshd_config'),
     [string]$Sshd = (Join-Path $env:WINDIR 'System32\OpenSSH\sshd.exe'),
-    [string]$Layer = '',
-    [switch]$KeepSelf
+    [string]$Layer = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -124,7 +121,41 @@ function Register-Rollback([string]$Backup) {
     Register-ScheduledTask -TaskName $RollbackTask -Action $a -Trigger $t -Principal $p -Force | Out-Null
 }
 
+# Makes $Path an empty file only SYSTEM and Administrators may open, taking
+# nothing from its folder (#3034). C:\ProgramData\ssh gives every signed in
+# account read, as Windows OpenSSH installs it, and a file made there takes
+# that rule, so a copy made there plainly is open to every account on the
+# box. The rules are set while the file is empty, so its content is never
+# open, and they are the ones administrators_authorized_keys has.
+function New-PrivateFile([string]$Path) {
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $acl = New-Object Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($s in 'S-1-5-18', 'S-1-5-32-544') {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+    # Read back, not taken from the call: a FileSecurity already written once
+    # writes nothing the second time and says nothing (#3034, on the box).
+    $got = Get-Acl -LiteralPath $Path
+    $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+    if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
+}
+
 if ($Layer) { . $Layer }
+
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
+}
+# ---- end BoxGuard.ps1 ----
 
 # ---------------------------------------------------------------- the file ---
 # Sets Key to Value everywhere sshd would read it, and above the first Match
@@ -163,12 +194,10 @@ function Change([string]$what) {
 }
 
 function Invoke-Harden {
-    # Only ever on the box. Windows calls a workstation ProductType 1 and a
-    # server 3, the same test Bootstrap-VPS.ps1 makes.
+    # Only ever on the box (BoxGuard.ps1, carried below its layer).
     if (-not $Layer) {
-        $pt = 0
-        try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
-        if ($pt -eq 1) { $script:stopped = $true; Say 'STOP' 'this is a workstation, not the VPS. Run Harden-VPS.ps1 on your machine; it sends this to the box.'; return }
+        $notBox = Get-ThornswoodBoxRefusal
+        if ($notBox) { $script:stopped = $true; Say 'STOP' ($notBox + '. Run Harden-VPS.ps1 on your machine; it sends this to the box.'); return }
     }
 
     # ---------------------------------------------------------- ssh stays ---
@@ -237,7 +266,10 @@ function Invoke-Harden {
             Change 'sshd_config: PasswordAuthentication no, KbdInteractiveAuthentication no (sshd -t accepts the new file), then sshd restarted'
         } else {
             $backup = $SshdConfig + '.before-harden-' + (Get-Date -Format 'yyyyMMdd-HHmmss')
-            Copy-Item -LiteralPath $SshdConfig -Destination $backup -Force
+            # Byte for byte, into a file only SYSTEM and Administrators may
+            # open, not Copy-Item's, which takes the folder's rules.
+            New-PrivateFile $backup
+            [IO.File]::WriteAllBytes($backup, [IO.File]::ReadAllBytes($SshdConfig))
             # Written in place, so the file keeps the permissions sshd insists on.
             [IO.File]::WriteAllText($SshdConfig, $newText, (New-Object Text.UTF8Encoding($false)))
             Change ('sshd_config: PasswordAuthentication no, KbdInteractiveAuthentication no (old file kept as ' + $backup + ')')
@@ -258,7 +290,6 @@ finally {
     if ($DryRun) { Say 'DONE' ([string]$changes + ' change(s) would be made. Nothing was changed.') }
     elseif ($stopped) { Say 'DONE' ([string]$changes + ' change(s) made before it stopped.') }
     else { Say 'DONE' ([string]$changes + ' change(s) made.') }
-    if (-not $KeepSelf -and $PSCommandPath) { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue }
 }
 if ($stopped) { exit 1 }
 exit 0

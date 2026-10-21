@@ -72,10 +72,11 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here 'Vps.ps1')
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
+# Send-Secret.ps1 loads Send-Script.ps1, which loads Vps.ps1.
+. (Join-Path $Here 'Send-Secret.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
-$ErrorActionPreference = 'Stop'
 
 if ($PSCmdlet.ParameterSetName -eq 'File') {
     if (-not (Test-Path -LiteralPath $File)) { throw "There is no script at $File" }
@@ -90,12 +91,15 @@ if ($PSCmdlet.ParameterSetName -eq 'File') {
         }
         throw "$File does not parse. Nothing was sent."
     }
-    # The file becomes a script block called with its arguments, so its own
+    # The file becomes a script block run with its arguments, so its own
     # param block takes them as it would on the VPS's command line. Always,
     # not only with arguments: the line that quiets progress goes in front of
     # what is sent, and a param block that is not first does not parse, so a
-    # file with one never ran through here before 25 September.
-    $body = "& {`r`n" + $body + "`r`n} " + $Arguments.Trim()
+    # file with one never ran through here before 25 September. Send-Script.ps1
+    # makes the block (Get-ThornswoodFileScript), the same way the scripts
+    # that send a box script of their own do (#3035), and says why it is
+    # dot-sourced rather than called with &, as it was here until then.
+    $body = Get-ThornswoodFileScript -Path $File -Arguments $Arguments
 } else {
     $body = $Script
 }
@@ -109,15 +113,13 @@ if ($Show) {
 }
 
 # The sending is Send-Script.ps1's (issue #1070), the one helper every script
-# here uses: the command line when the script fits, otherwise a file of its
-# own name in C:/Windows/Temp, run, removed whether it worked or not, and the
-# far side's exit code handed back rather than the tidy up's. Why a long
-# script goes as a file, and why the path goes bare, is in its header;
-# tests\test-remote-big-script.ps1 sends a 10 KB script through it.
+# here uses: the command line when the script fits, otherwise scp to a copy
+# its run deletes before it runs (#3027, #3059), and the far side's exit
+# code handed back. Why a long script cannot go on the command line is in its
+# header; tests\test-remote-big-script.ps1 sends a 10 KB script through it.
 #
 # With a secret, Send-Secret.ps1 sends it: the value on standard input, the
 # script the same way as without one.
-. (Join-Path $Here 'Send-Secret.ps1')
 $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 if ($PSBoundParameters.ContainsKey('Secret')) {
     $value = ConvertFrom-ThornswoodSecureString $Secret

@@ -54,9 +54,9 @@ param(
     # did (#1114). Left off, the build's own is packed, when there is one.
     [string]$Stamp = ''
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-$ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath $Dist)) { throw "server dist not found: $Dist" }
 . (Join-Path $PSScriptRoot '..\deploy\ServerSettings.ps1')
 . (Join-Path $PSScriptRoot '..\deploy\ServerBuild.ps1')

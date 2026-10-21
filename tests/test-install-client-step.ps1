@@ -91,6 +91,10 @@ try {
     $tree = Join-Path $tmp 'repo'
     foreach ($d in 'scripts\dev', 'scripts\release', 'scripts\vps', 'records') { New-Item -ItemType Directory -Force -Path (Join-Path $tree $d) | Out-Null }
     Copy-Item -LiteralPath $install -Destination (Join-Path $tree 'scripts\dev')
+    # Close-Launcher.ps1, which Install-Thornswood loads for its game check:
+    # under Stop since #3006, a tree without it stops on the load, where
+    # before the check was "not recognized" and the run went on.
+    Copy-Item -LiteralPath (Join-Path $Repo 'scripts\dev\Close-Launcher.ps1') -Destination (Join-Path $tree 'scripts\dev')
     Copy-Item -LiteralPath $sync -Destination (Join-Path $tree 'scripts\release')
     # Sync-Client holds the record to RecordShape.ps1 (#2180, since #2271),
     # which reads it through Read-JsonFile.ps1, so both go in beside it.

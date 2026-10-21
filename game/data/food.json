@@ -1,13 +1,13 @@
 {
  "builtBy": "scriptsdevBuild-FoodTable.js",
- "builtAt": "2026-10-20T17:06:52.685Z",
+ "builtAt": "2026-10-21T09:37:20.171Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",
- "count": 461,
+ "count": 525,
  "byKind": {
-  "food": 97,
-  "drink": 41,
+  "food": 140,
+  "drink": 62,
   "ale": 35,
   "potion": 208,
   "poison": 80
@@ -4160,6 +4160,582 @@
    "edid": "ThornswoodFoodTeaSnowberry",
    "name": "Snowberry Tea",
    "kind": "drink",
+   "gold": 5
+  },
+  "19000:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19000",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodBurntMeal",
+   "name": "Burnt Meal",
+   "kind": "food",
+   "gold": 5
+  },
+  "19010:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19010",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineAshYamSoup",
+   "name": "Fine Ash Yam Soup",
+   "kind": "drink",
+   "gold": 9
+  },
+  "19011:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19011",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCookedBoarMeat",
+   "name": "Fine Cooked Boar Meat",
+   "kind": "food",
+   "gold": 15
+  },
+  "19012:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19012",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineJuniperBerryDumpling",
+   "name": "Fine Juniper Berry Dumpling",
+   "kind": "food",
+   "gold": 6
+  },
+  "19013:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19013",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineMammothCheeseFondue",
+   "name": "Fine Mammoth Cheese Fondue",
+   "kind": "food",
+   "gold": 14
+  },
+  "19014:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19014",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineEidarCheeseFondue",
+   "name": "Fine Eidar Cheese Fondue",
+   "kind": "food",
+   "gold": 14
+  },
+  "19015:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19015",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineAshHopperStew",
+   "name": "Fine Ash Hopper Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19016:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19016",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBoarStew",
+   "name": "Fine Boar Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19017:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19017",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineMammothStew",
+   "name": "Fine Mammoth Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19018:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19018",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGoatStew",
+   "name": "Fine Goat Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19019:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19019",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCookedDog",
+   "name": "Fine Cooked Dog",
+   "kind": "food",
+   "gold": 8
+  },
+  "1901a:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901a",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGourdSoup",
+   "name": "Fine Gourd Soup",
+   "kind": "drink",
+   "gold": 6
+  },
+  "1901b:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901b",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCarrotSoup",
+   "name": "Fine Carrot Soup",
+   "kind": "drink",
+   "gold": 6
+  },
+  "1901c:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901c",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRoastedCarrots",
+   "name": "Fine Roasted Carrots",
+   "kind": "food",
+   "gold": 6
+  },
+  "1901d:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901d",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRoastedYams",
+   "name": "Fine Roasted Yams",
+   "kind": "food",
+   "gold": 6
+  },
+  "1901e:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901e",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRabbitStew",
+   "name": "Fine Rabbit Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "1901f:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1901f",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFinePheasantStew",
+   "name": "Fine Pheasant Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19020:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19020",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineMushroomStew",
+   "name": "Fine Mushroom Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19021:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19021",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineWildMushroomStew",
+   "name": "Fine Wild Mushroom Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19022:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19022",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGlowingMushroomStew",
+   "name": "Fine Glowing Mushroom Stew",
+   "kind": "drink",
+   "gold": 16
+  },
+  "19023:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19023",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRoastedMushrooms",
+   "name": "Fine Roasted Mushrooms",
+   "kind": "food",
+   "gold": 6
+  },
+  "19024:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19024",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRoastedWildMushrooms",
+   "name": "Fine Roasted Wild Mushrooms",
+   "kind": "food",
+   "gold": 6
+  },
+  "19025:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19025",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRoastedGlowingMushroom",
+   "name": "Fine Roasted Glowing Mushroom",
+   "kind": "food",
+   "gold": 6
+  },
+  "19026:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19026",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineJellyDumpling",
+   "name": "Fine Jelly Dumpling",
+   "kind": "food",
+   "gold": 6
+  },
+  "19027:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19027",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBraidedBread",
+   "name": "Fine Braided Bread",
+   "kind": "food",
+   "gold": 2
+  },
+  "19028:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19028",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGarlicBread",
+   "name": "Fine Garlic Bread",
+   "kind": "food",
+   "gold": 2
+  },
+  "19029:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19029",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineAppleDumpling",
+   "name": "Fine Apple Dumpling",
+   "kind": "food",
+   "gold": 3
+  },
+  "1902a:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902a",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFinePotatoBread",
+   "name": "Fine Potato Bread",
+   "kind": "food",
+   "gold": 2
+  },
+  "1902b:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902b",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineJuniperBerryCrostata",
+   "name": "Fine Juniper Berry Crostata",
+   "kind": "food",
+   "gold": 5
+  },
+  "1902c:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902c",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineJazbayCrostata",
+   "name": "Fine Jazbay Crostata",
+   "kind": "food",
+   "gold": 5
+  },
+  "1902d:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902d",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSnowberryCrostata",
+   "name": "Fine Snowberry Crostata",
+   "kind": "food",
+   "gold": 5
+  },
+  "1902e:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902e",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFinePotatoSoup",
+   "name": "Fine Potato Soup",
+   "kind": "drink",
+   "gold": 5
+  },
+  "1902f:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1902f",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineClamChowder",
+   "name": "Fine Clam Chowder",
+   "kind": "food",
+   "gold": 5
+  },
+  "19030:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19030",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSteamedMudcrabLegs",
+   "name": "Fine Steamed Mudcrab Legs",
+   "kind": "food",
+   "gold": 4
+  },
+  "19031:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19031",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineJazbayDumpling",
+   "name": "Fine Jazbay Dumpling",
+   "kind": "food",
+   "gold": 3
+  },
+  "19032:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19032",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSnowberryDumpling",
+   "name": "Fine Snowberry Dumpling",
+   "kind": "food",
+   "gold": 3
+  },
+  "19033:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19033",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBoiledCremeTreat",
+   "name": "Fine Boiled Creme Treat",
+   "kind": "food",
+   "gold": 4
+  },
+  "19034:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19034",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineHoneyNutTreat",
+   "name": "Fine Honey Nut Treat",
+   "kind": "food",
+   "gold": 2
+  },
+  "19035:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19035",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBakedPotatoes",
+   "name": "Fine Baked Potatoes",
+   "kind": "food",
+   "gold": 2
+  },
+  "19036:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19036",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSalmonSteak",
+   "name": "Fine Salmon Steak",
+   "kind": "food",
+   "gold": 4
+  },
+  "19037:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19037",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSlaughterfishSteak",
+   "name": "Fine Slaughterfish Steak",
+   "kind": "food",
+   "gold": 5
+  },
+  "19038:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19038",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineSweetRoll",
+   "name": "Fine Sweet Roll",
+   "kind": "food",
+   "gold": 2
+  },
+  "19039:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19039",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGrilledLeeks",
+   "name": "Fine Grilled Leeks",
+   "kind": "food",
+   "gold": 2
+  },
+  "1903a:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903a",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineApplePie",
+   "name": "Fine Apple Pie",
+   "kind": "food",
+   "gold": 5
+  },
+  "1903b:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903b",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBreadLoaf",
+   "name": "Fine Bread Loaf",
+   "kind": "food",
+   "gold": 2
+  },
+  "1903c:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903c",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCookedBeef",
+   "name": "Fine Cooked Beef",
+   "kind": "food",
+   "gold": 5
+  },
+  "1903d:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903d",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGoatRoast",
+   "name": "Fine Goat Roast",
+   "kind": "food",
+   "gold": 4
+  },
+  "1903e:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903e",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineHorkerLoaf",
+   "name": "Fine Horker Loaf",
+   "kind": "food",
+   "gold": 4
+  },
+  "1903f:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1903f",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineHorseHaunch",
+   "name": "Fine Horse Haunch",
+   "kind": "food",
+   "gold": 4
+  },
+  "19040:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19040",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineMammothSteak",
+   "name": "Fine Mammoth Steak",
+   "kind": "food",
+   "gold": 8
+  },
+  "19041:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19041",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineVenisonChop",
+   "name": "Fine Venison Chop",
+   "kind": "food",
+   "gold": 5
+  },
+  "19042:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19042",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineRabbitHaunch",
+   "name": "Fine Rabbit Haunch",
+   "kind": "food",
+   "gold": 3
+  },
+  "19043:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19043",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFinePheasantRoast",
+   "name": "Fine Pheasant Roast",
+   "kind": "food",
+   "gold": 4
+  },
+  "19044:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19044",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCookedSkeever",
+   "name": "Fine Cooked Skeever",
+   "kind": "food",
+   "gold": 4
+  },
+  "19045:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19045",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGrilledChickenBreast",
+   "name": "Fine Grilled Chicken Breast",
+   "kind": "food",
+   "gold": 4
+  },
+  "19046:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19046",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCabbageAndTomatoSoup",
+   "name": "Fine Cabbage and Tomato Soup",
+   "kind": "drink",
+   "gold": 8
+  },
+  "19047:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19047",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCabbageSoup",
+   "name": "Fine Cabbage Soup",
+   "kind": "drink",
+   "gold": 5
+  },
+  "19048:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19048",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineBeefStew",
+   "name": "Fine Beef Stew",
+   "kind": "drink",
+   "gold": 8
+  },
+  "19049:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x19049",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineHorkerStew",
+   "name": "Fine Horker Stew",
+   "kind": "drink",
+   "gold": 8
+  },
+  "1904a:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1904a",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineCabbagePotatoSoup",
+   "name": "Fine Cabbage Potato Soup",
+   "kind": "drink",
+   "gold": 5
+  },
+  "1904b:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1904b",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineTomatoSoup",
+   "name": "Fine Tomato Soup",
+   "kind": "drink",
+   "gold": 5
+  },
+  "1904c:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1904c",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineVenisonStew",
+   "name": "Fine Venison Stew",
+   "kind": "drink",
+   "gold": 8
+  },
+  "1904d:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1904d",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineVegetableSoup",
+   "name": "Fine Vegetable Soup",
+   "kind": "drink",
+   "gold": 5
+  },
+  "1904e:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x1904e",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodFineGoatCheeseFondue",
+   "name": "Fine Goat Cheese Fondue",
+   "kind": "food",
    "gold": 5
   }
  }

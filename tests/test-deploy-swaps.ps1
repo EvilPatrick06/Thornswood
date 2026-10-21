@@ -361,9 +361,10 @@ function RunWrapped([string]$body) {
     return $out
 }
 
-# ssh: the three shapes the Remote helpers send. A script inline as
-# -EncodedCommand, a script sent as a file to C:/Windows/Temp and run with
-# -File, and the Remove-Item that tidies that file away.
+# ssh: the shapes the Remote helpers send. A script inline as
+# -EncodedCommand, a long one by scp to a copy in C:/Windows/Temp that
+# Send-Script.ps1's runner takes off and runs (#3059), and a file run with
+# -File.
 # And the deploy store Artifact.ps1 keeps on the box (issue #459).
 function MapTemp([string]$s) {
     $store = Join-Path $global:TsBox.Box 'Thornswood-Deploys'
@@ -371,11 +372,20 @@ function MapTemp([string]$s) {
               Replace('C:/Thornswood-Deploys', $store.Replace('\', '/')).Replace('C:\Thornswood-Deploys', $store)
 }
 function global:ssh {
+    $in = @($input)
     $all = @($args | ForEach-Object { [string]$_ })
     $cmd = $all[-1]
     $body = ''
     $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
-    if ($m.Success) { $body = MapTemp ([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))) }
+    if ($m.Success) {
+        $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+        # A long script goes by scp to a copy of its own, which
+        # Send-Script.ps1's runner takes off the box and runs, so it is read
+        # from there and taken off the same way.
+        $r = [regex]::Match($body, "^\`$ThornswoodRunFile = '(C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1)'")
+        if ($r.Success) { $copy = MapTemp $r.Groups[1].Value; $body = [IO.File]::ReadAllText($copy); Remove-Item -LiteralPath $copy -Force }
+        $body = MapTemp $body
+    }
     else {
         $m = [regex]::Match($cmd, '-File\s+(\S+)\s*$')
         # The file's own text, with the box's fixed places mapped too.
@@ -391,11 +401,13 @@ function global:ssh {
     $global:LASTEXITCODE = $global:TsLastCode
 }
 # scp: into the scratch box, failing like the real one when the folder is not
-# there, and failing or arriving different when a test asks it to.
+# there, and failing or arriving different when a test asks it to. Counted
+# are the files sent, not a long script's own copy, which its runner takes
+# off before it runs (Send-Script.ps1, #3059).
 function global:scp {
-    $global:TsScpCount++
     $all = @($args | ForEach-Object { [string]$_ })
     $src = $all[-2]; $dst = $all[-1]
+    if ($dst -notmatch ':C:/Windows/Temp/thornswood-remote-[0-9a-f]{32}\.ps1$') { $global:TsScpCount++ }
     $m = [regex]::Match($dst, '^[^@\s]+@[^:\s]+:(.+)$')
     $global:LASTEXITCODE = 1
     if (-not $m.Success) { return }

@@ -30,9 +30,9 @@
     3. Exit 255 (ssh could not connect) comes back as 255, still no throw,
        so the caller's exit code check is what decides.
     4. Standard input piped in reaches ssh (the secret channel's path).
-    5. Remote.ps1 end to end, short script and long (scp then ssh -File),
-       and called with 2>$null the way Install-Voice.ps1 calls it: exit 0
-       with the far end's output; 255 when ssh fails.
+    5. Remote.ps1 end to end, short script and long (by scp and a runner,
+       #3059), and called with 2>$null the way Install-Voice.ps1
+       calls it: exit 0 with the far end's output; 255 when ssh fails.
     6. Send-Secret.ps1's Invoke-ThornswoodSecretRemote with the warning:
        the value arrives on standard input and the output comes back.
   Then, once, by reading the scripts with PowerShell's parser: no ssh, scp,
@@ -50,6 +50,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -62,7 +63,7 @@ $warning = '** WARNING: connection is not using a post-quantum key exchange algo
 
 if ($Child) {
     # ------------------------------------------------------ one PowerShell -----
-    $env:PATH = $Child + ';' + $env:PATH
+    $env:PATH = $Child + [IO.Path]::PathSeparator + $env:PATH
     $v = $PSVersionTable.PSVersion.Major
     $tag = "[PS $v]"
     . (Join-Path $repo 'scripts\vps\Vps.ps1')
@@ -118,14 +119,14 @@ if ($Child) {
     $long = "'" + ('y' * 4000) + "'"
     $threw = $false
     try { $text = (& $remote $long -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true; $text = [string]$_ }
-    Yes "$tag Remote.ps1 long script (scp, then ssh -File): no throw, exit 0" ((-not $threw) -and $LASTEXITCODE -eq 0 -and $text -match 'far-end-said-hi')
+    Yes "$tag Remote.ps1 long script (by scp and its runner): no throw, exit 0" ((-not $threw) -and $LASTEXITCODE -eq 0 -and $text -match 'far-end-said-hi')
     $env:TS_FAKE_RC = '255'
     $threw = $false
     try { $null = (& $remote "'x'" -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true }
     Yes "$tag Remote.ps1 when ssh fails: exit 255, not 0" ((-not $threw) -and $LASTEXITCODE -eq 255)
     $threw = $false
     try { $null = (& $remote $long -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true }
-    Yes "$tag Remote.ps1 long script when scp fails: stops, nothing run" $threw
+    Yes "$tag Remote.ps1 long script when scp fails: exit 255, not 0" ((-not $threw) -and $LASTEXITCODE -eq 255)
     $env:TS_FAKE_RC = '0'
 
     # 6. The secret channel.
@@ -159,11 +160,30 @@ try {
         'if "%TS_FAKE_STDIN%"=="1" for /f "usebackq delims=" %%L in (`findstr /r "^"`) do echo stdin:%%L',
         'exit /b %TS_FAKE_RC%'
     ) -join "`r`n"
-    [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
-    [IO.File]::WriteAllText((Join-Path $bin 'scp.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+    if ($OnWindows) {
+        [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+        [IO.File]::WriteAllText((Join-Path $bin 'scp.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+    } else {
+        # Off Windows nothing runs a .cmd, so the same stand-in as a shell script.
+        $sh = @(
+            '#!/bin/sh',
+            ("printf '%s\n' '" + $warning + "' 1>&2"),
+            'if [ "$TS_FAKE_RC" = "255" ]; then exit 255; fi',
+            'echo far-end-said-hi',
+            'if [ "$TS_FAKE_STDIN" = "1" ]; then while IFS= read -r l || [ -n "$l" ]; do printf ''stdin:%s\n'' "$l"; done; fi',
+            'exit "${TS_FAKE_RC:-0}"'
+        ) -join "`n"
+        foreach ($n in 'ssh', 'scp') {
+            $f = Join-Path $bin $n
+            [IO.File]::WriteAllText($f, $sh + "`n", (New-Object Text.ASCIIEncoding))
+            & chmod 755 $f
+        }
+    }
 
+    # Each PowerShell by the name its platform gives it: off Windows there is
+    # only pwsh.
     $shells = @()
-    foreach ($s in 'powershell.exe', 'pwsh.exe') {
+    foreach ($s in $(if ($OnWindows) { 'powershell.exe', 'pwsh.exe' } else { 'pwsh' })) {
         $c = Get-Command $s -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($c) { $shells += $c.Source }
     }
@@ -195,7 +215,7 @@ $bare = @()
 $users = @()
 $wrapped = 0
 foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Filter *.ps1 -File -Recurse)) {
-    $rel = $f.FullName.Substring($repo.Length + 1)
+    $rel = $f.FullName.Substring($repo.Length + 1).Replace([string][IO.Path]::DirectorySeparatorChar, '\')
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
     $uses = $false
     foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
@@ -211,7 +231,7 @@ foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Filter *
     }
     if ($uses -and $rel -ne 'scripts\vps\Vps.ps1') {
         $t = [IO.File]::ReadAllText($f.FullName)
-        if ($t -notmatch '(?i)(Vps|Send-Secret|Artifact|Feed-Store)\.ps1''\)') { $users += $rel }
+        if ($t -notmatch '(?i)(Vps|Send-Script|Send-Secret|Artifact|Feed-Store)\.ps1''\)') { $users += $rel }
     }
 }
 Yes ('no ssh, scp, sftp, ssh-keygen or ssh-keyscan under scripts\ runs outside Invoke-ThornswoodNative' + $(if ($bare.Count) { ': ' + ($bare -join ', ') } else { '' })) ($bare.Count -eq 0)

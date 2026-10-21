@@ -29,7 +29,8 @@
        the settings engine\README.md gives (read off the shipping machine's
        CMakeCache, 24 Sep; the option names checked against the fork's
        CMakeLists.txt on 25 Sep). SKYRIM_DIR is the game folder with
-       SkyrimSE.exe in it: C:\Thornswood\Game unless -SkyrimDir says another.
+       SkyrimSE.exe in it: Game in the install Where.ps1 Install finds
+       (C:\Thornswood\Game on most machines) unless -SkyrimDir says another.
        The first configure builds every vcpkg library and takes a long time.
        A fork whose path has an & in it is reached through a drive letter of
        its own (subst) for configure and build, removed again at the end by
@@ -64,7 +65,7 @@
 [CmdletBinding()]
 param(
     [switch]$Check,
-    [string]$SkyrimDir = 'C:\Thornswood\Game',
+    [string]$SkyrimDir = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game'),
     [string]$Fork = (& (Join-Path $PSScriptRoot 'Where.ps1') Engine),
     # Projects compiled at once, two compilers each. 0, the default, works
     # it out from the memory free when the build starts (EngineJobs.ps1).
@@ -75,9 +76,9 @@ param(
     [switch]$NoSkyrim,
     [switch]$NoPause
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-$ErrorActionPreference = 'Stop'
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Ok($m) { Write-Host ('  ok       ' + $m) -ForegroundColor Green }

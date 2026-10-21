@@ -55,6 +55,8 @@
       Send-NexusUpload facts              the whole upload: create, send,
                                           finalise, wait until it is available
       Wait-NexusUpload id seconds         only the wait, for -UploadId
+      Receive-NexusPresigned url folder   one download from a signed address
+                                          Nexus handed back, into a folder
 #>
 
 $script:NexusAppName = 'Thornswood'
@@ -337,6 +339,79 @@ function Send-NexusPresigned([string]$Method, [string]$Url, $Content, [string]$W
   $r = Send-NexusRequest (Get-NexusClient -Upload) $req $What
   $req.Dispose()
   return $r
+}
+
+# One download from a signed address Nexus handed back (a mod file's
+# download-link, a collection revision's download_link): its CDN, which gets
+# no key and none of the Nexus headers, like the upload addresses above. The
+# file goes into $Folder under the name the CDN's Content-Disposition gives,
+# written as <name>.part and renamed once every byte is in, so a stop part way
+# never leaves a whole-looking file. Returns Path, Name, Size and Md5Hex (the
+# md5 worked out while it was written). A redirect, an answer other than 200,
+# or fewer bytes than Content-Length stop it with a sentence; nothing is tried
+# again, and the .part is deleted.
+$script:NexusDownloadClient = $null
+function Receive-NexusPresigned([string]$Url, [string]$Folder, [string]$What, [string]$FallbackName = 'download') {
+  $u = $null
+  if (-not [Uri]::TryCreate($Url, [UriKind]::Absolute, [ref]$u) -or -not ($u.Scheme -eq 'https' -or ((Test-NexusStandIn) -and $u.Scheme -eq 'http' -and $u.Host -eq '127.0.0.1'))) {
+    throw ($What + ': Nexus handed back a download address that is not https, so nothing was asked of it.')
+  }
+  if (-not $script:NexusDownloadClient) {
+    $h = New-Object System.Net.Http.HttpClientHandler
+    $h.AllowAutoRedirect = $false
+    $c = New-Object System.Net.Http.HttpClient($h)
+    # The biggest mod in the collection is about a gigabyte; two hours is a
+    # slow line, not a hope that a stuck one comes back.
+    $c.Timeout = [TimeSpan]::FromHours(2)
+    $script:NexusDownloadClient = $c
+  }
+  $req = New-Object System.Net.Http.HttpRequestMessage([System.Net.Http.HttpMethod]::Get, $Url)
+  $resp = $null
+  try { $resp = $script:NexusDownloadClient.SendAsync($req, [System.Net.Http.HttpCompletionOption]::ResponseHeadersRead).GetAwaiter().GetResult() }
+  catch {
+    $e = $_.Exception
+    while ($e.InnerException) { $e = $e.InnerException }
+    throw ($What + ' got no answer from ' + $u.Host + ': ' + $e.Message)
+  }
+  try {
+    $code = [int]$resp.StatusCode
+    if ($code -ne 200) { throw ($What + ': ' + $u.Host + ' answered HTTP ' + $code + ' ' + $resp.ReasonPhrase + ', so nothing was downloaded.') }
+    $name = ''
+    $cd = $resp.Content.Headers.ContentDisposition
+    if ($cd) { $name = [string]$cd.FileNameStar; if (-not $name) { $name = ([string]$cd.FileName).Trim('"') } }
+    $name = [IO.Path]::GetFileName($name)
+    if (-not $name -or $name.IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) { $name = $FallbackName }
+    $want = $resp.Content.Headers.ContentLength
+    New-Item -ItemType Directory -Force -Path $Folder | Out-Null
+    $path = Join-Path $Folder $name
+    $part = $path + '.part'
+    $md5 = [Security.Cryptography.IncrementalHash]::CreateHash([Security.Cryptography.HashAlgorithmName]::MD5)
+    $got = [long]0
+    $ok = $false
+    try {
+      $in = $resp.Content.ReadAsStreamAsync().GetAwaiter().GetResult()
+      $out = [IO.File]::Open($part, [IO.FileMode]::Create, [IO.FileAccess]::Write, [IO.FileShare]::None)
+      try {
+        $buf = New-Object byte[] (1 -shl 20)
+        try {
+          while (($n = $in.Read($buf, 0, $buf.Length)) -gt 0) { $out.Write($buf, 0, $n); $md5.AppendData($buf, 0, $n); $got += $n }
+        }
+        catch [System.IO.IOException] {
+          $e = $_.Exception
+          while ($e.InnerException) { $e = $e.InnerException }
+          throw ($What + ': the connection to ' + $u.Host + ' broke after ' + $got + ' of ' + $(if ($null -ne $want) { [string]$want } else { 'the' }) + ' bytes (' + $e.Message.TrimEnd('.') + '), so the download is not whole and was deleted.')
+        }
+      }
+      finally { $out.Dispose(); $in.Dispose() }
+      if ($null -ne $want -and $got -ne [long]$want) { throw ($What + ': ' + $u.Host + ' sent ' + $got + ' of the ' + $want + ' bytes it said, so the download is not whole.') }
+      $ok = $true
+    }
+    finally { if (-not $ok -and (Test-Path -LiteralPath $part)) { [IO.File]::Delete($part) } }
+    if (Test-Path -LiteralPath $path) { [IO.File]::Delete($path) }
+    [IO.File]::Move($part, $path)
+    return [pscustomobject]@{ Path = $path; Name = $name; Size = $got; Md5Hex = (($md5.GetHashAndReset() | ForEach-Object { $_.ToString('x2') }) -join '') }
+  }
+  finally { $resp.Dispose(); $req.Dispose() }
 }
 
 # The wait for Nexus to process a finalised upload. get upload says the state

@@ -17,8 +17,11 @@
        would leave no way in over ssh at all.
     3. From outside, before: which login methods the box offers, and whether
        Remote Desktop's port answers from here.
-    4. On the box: scripts\vps\vps-harden.ps1 is copied to C:\Windows\Temp
-       and run there (it deletes itself). Remote Desktop refused, its
+    4. On the box: scripts\vps\vps-harden.ps1 is run there, sent through
+       Send-Script.ps1, whose run deletes a long script's copy before it
+       runs (#3035, #3059; until 21 Oct 2026 it was copied into
+       C:\Windows\Temp and removed after, and a run cut short left the copy
+       there). Remote Desktop refused, its
        firewall rules turned off, its service stopped and set to Disabled;
        ssh's own rules on port 22 are never touched. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
@@ -29,8 +32,7 @@
        Remote Desktop's port does not answer.
 
   -WhatIf does steps 1 to 3 and runs step 4 read only: it prints what WOULD
-  change and changes nothing. It still copies vps-harden.ps1 to
-  C:\Windows\Temp to run it there, and that copy deletes itself.
+  change and changes nothing.
 
   THE SAFETY NET. When sshd_config changes, the box also registers a task,
   "Thornswood harden rollback", that puts the old sshd_config back and
@@ -112,11 +114,11 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here 'Vps.ps1')
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
+. (Join-Path $Here 'Send-Script.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $KnownHosts) { $KnownHosts = Get-ThornswoodKnownHostsPath }
-$ErrorActionPreference = 'Stop'
 
 $BoxScript = Join-Path $Here 'vps-harden.ps1'
 $Rollback = 'Thornswood harden rollback'
@@ -175,21 +177,14 @@ function Show-Outside([string]$when) {
     return [pscustomobject]@{ Methods = $m; RdpOpen = $open }
 }
 
+# vps-harden.ps1 runs on the box from ssh's standard input (Send-Script.ps1),
+# so a run cut short at any point leaves nothing of it there (#3035).
 function Invoke-Box([bool]$dry) {
     if (-not (Test-Path -LiteralPath $BoxScript)) { Die "There is no $BoxScript. Nothing was sent." }
-    $far = 'C:/Windows/Temp/thornswood-harden-' + [Guid]::NewGuid().ToString('N') + '.ps1'
+    $script = Get-ThornswoodFileScript -Path $BoxScript -Arguments $(if ($dry) { '-DryRun' } else { '' })
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    Invoke-ThornswoodNative { & scp @ssh $BoxScript "${User}@${Vps}:$far" } 2>&1 | Out-Null
-    $sent = ($LASTEXITCODE -eq 0)
-    $ErrorActionPreference = $old
-    if (-not $sent) { Die "Could not copy vps-harden.ps1 to the box. Nothing was changed." }
-    # The path goes bare: ours, no spaces, and the form that runs whichever
-    # shell sshd hands the line to (Remote.ps1 says why).
-    $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
-    if ($dry) { $cmd += ' -DryRun' }
-    $ErrorActionPreference = 'Continue'
-    $out = Clean @(Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1)
+    $out = Clean @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ("`$ProgressPreference = 'SilentlyContinue'`r`n" + $script))
     $rc = $LASTEXITCODE
     $ErrorActionPreference = $old
     foreach ($l in $out) {
@@ -207,7 +202,7 @@ Write-Host ''
 Write-Host '  THORNSWOOD  -  key login only, Remote Desktop off' -ForegroundColor White
 Say "  $User@$Vps" 'DarkGray'
 
-foreach ($t in 'ssh', 'scp', 'ssh-keygen') {
+foreach ($t in 'ssh', 'ssh-keygen') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
 }
 

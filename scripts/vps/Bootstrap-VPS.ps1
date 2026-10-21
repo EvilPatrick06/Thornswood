@@ -100,31 +100,24 @@ $ErrorActionPreference = 'Stop'
 
 # --- refuse to run anywhere that is not the VPS -----------------------------
 #
-# THE GUARD USED TO TEST A FOLDER THAT NO LONGER EXISTS. It looked for
-# SkyrimSE.exe in the old build folder, which was the install path before the
-# rename, so on either machine as they are today the guard cannot fire and this
-# script goes on to install Node and Python as though it were the VPS.
-#
-# A safety check has to test the thing it protects against, and it has to keep
-# testing it when that thing moves. So this asks Windows what it IS rather than
-# looking for one file: ProductType 1 is a workstation, 2 is a domain
-# controller and 3 is a server. The VPS is a server; both of the machines this
-# is meant to refuse are workstations.
-#
-# The Skyrim check stays underneath it as a second net, pointed at the paths
-# that exist now. Either one firing is enough.
-$productType = 1
-try { $productType = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { }
-if ($productType -eq 1) {
-    throw "This is a workstation, not a server, so it is not the VPS. Nothing was changed."
+# Windows is asked what this machine is: the box is Windows Server, a gaming
+# PC is a workstation. Until #3041 a second net under it looked for the game
+# in C:\Thornswood and C:\Thornswood-DevBuild, which a launcher on another
+# drive is not in; scripts\vps\BoxGuard.ps1 says why the game is not looked
+# for at all, and why not being able to tell is a refusal too.
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
 }
-
-foreach ($sign in @('C:\Thornswood\Game\SkyrimSE.exe',
-                    'C:\Thornswood-DevBuild\Game\SkyrimSE.exe')) {
-    if (Test-Path -LiteralPath $sign) {
-        throw "$sign is present, so this looks like a gaming PC, not the VPS. Nothing was changed."
-    }
-}
+# ---- end BoxGuard.ps1 ----
+$notBox = Get-ThornswoodBoxRefusal
+if ($notBox) { throw ($notBox + '. Nothing was changed.') }
 Write-Host "host: $env:COMPUTERNAME   user: $env:USERNAME" -ForegroundColor Cyan
 Write-Host "PowerShell currently: $($PSVersionTable.PSVersion)" -ForegroundColor Cyan
 Write-Host ''

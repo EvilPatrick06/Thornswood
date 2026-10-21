@@ -94,10 +94,14 @@ No Discord token or webhook is needed or touched. It prints the notice's id;
 0 said, 2 still waiting). Say it the way staff read it: what, why, when, and
 the pull request's link. 1800 characters at most, 30 an hour, no mentions.
 
-It needs ssh to the box: on One and a developer's PC it works as it is, and
-in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`. An agent
-environment with no other way in may instead hold a notices key
-(`THORNSWOOD_NOTICE_KEY_B64` and `THORNSWOOD_NOTICE_TOKEN`, made on One with
+On One and a developer's PC it goes over ssh to the box as it is. In a
+cloud thread, which has no ssh, the same line starts
+`.github/workflows/staff-notice.yml` on main, waits for the run on a VPS
+runner and prints its answer (#3045): the notice says `[claude]`, no secret is
+in the container, and a run no runner took in time prints the
+`Say-Staff.ps1 -Run <id>` line that reads it later. An agent environment with
+no other way in may instead hold a notices key (`THORNSWOOD_NOTICE_KEY_B64`
+and `THORNSWOOD_NOTICE_TOKEN`, made on One with
 `Grant-BoxAccess.ps1 -Name <name> -MakeKey -NoticesOnly`), which can do
 nothing on the box but this. When it stops, what it prints is a failure like
 any other: fix it at its cause, or put it on the board with what it printed,
@@ -186,7 +190,11 @@ Added by Patrick on 27 Sep, after a session found 624 local branches and 15
 worktrees in the shared clone and read a session-start snapshot as the truth.
 
 - `C:\Thornswood-Repo` is shared with Patrick's Grok Bot lanes and sits
-  detached at `origin/main`, because they build from it. Do branch work in a
+  detached at `origin/main`, because they build from it. Move it there with
+  `.\scripts\release\Update-Checkout.ps1`, which takes `engine\skymp` to
+  main's pin with it and refuses when anything would be left behind; a bare
+  `git checkout --detach origin/main` left the submodule three pins behind
+  and stopped a dev Ship (#2981). Do branch work in a
   worktree in its ignored `worktrees` folder (`git worktree add
   worktrees\claude-<what> -b claude/<what> origin/main`), and afterwards
   remove the worktree and delete the branch. Never leave that folder on a

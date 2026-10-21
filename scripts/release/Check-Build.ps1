@@ -27,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Data = 'C:\Thornswood\Game\Data',
+  [string]$Data = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game\Data'),
   # A manifest on disk. Without one it asks the game server, which is the copy
   # that is actually deciding whether people get in.
   [string]$Manifest,
@@ -47,6 +47,7 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # ---------------------------------------------------------------- -Vortex ---
@@ -94,8 +95,6 @@ if ($Vortex) {
     if (-not $sk) { throw "Could not find Skyrim Special Edition through Steam, so -Vortex has nothing to read." }
     $Data = Join-Path $sk 'Data'
 }
-
-$ErrorActionPreference = 'Stop'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }

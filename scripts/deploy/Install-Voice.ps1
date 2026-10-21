@@ -264,8 +264,8 @@ foreach ($f in 'voice-server.js', 'headlines.js') {
   the newest .prev folder back and leaves the task as it is.
 #>
 function Remote($script) {
-    # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-    # name, removed after, and the far side's exit code comes back.
+    # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+    # it off the box before it runs, and the far side's exit code comes back.
     return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 
@@ -734,9 +734,13 @@ if (Test-Path -LiteralPath '$Root') {
 'REMOVED'
 "@
 
+# Each part of a run's far script is a here-string, and a here-string's last
+# line has no line break after it, so the parts are joined on line breaks: put
+# end to end, $remote's last line and -TaskOnly's first were one line the box
+# could not parse (#2952, 20 Oct).
 if ($Restart) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
-    $restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $restartOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $restartBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($restartOut -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
     Say 'restarted, and voice answers again' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -745,7 +749,7 @@ if ($Restart) {
 
 if ($Remove) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
-    $removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $removeOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $removeBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($removeOut -notcontains 'REMOVED') { Die 'voice was not taken off. The lines above say what is left.' }
     Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -754,7 +758,7 @@ if ($Remove) {
 
 if ($TaskOnly) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
-    $taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $taskOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $remote, $taskOnlyBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
     Say 'registered again, and voice answers under the new task' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -765,7 +769,7 @@ $keepTask = '$KeepTask = $false'
 $pick = ''
 if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
-$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+$swapOut = @(Remote (@($vars, $voiceTools, $remote, $serviceSwapBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
 if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 
 # ---------------------------------------------------------------- verify ----
@@ -790,7 +794,8 @@ Head 'Checking from here'
   the active store when it returned, and connections from outside to 7789
   came in 0.3 s after it, with no rule before that dropped. The try gets 5 s
   so TCP's own resends of a lost SYN (at 1 s and 3 s) are inside it; a
-  connection from outside took 0.1 s.
+  connection from outside took 0.1 s. The try and the witness below are
+  Vps.ps1's "from outside" (#2975), shared with the server scripts.
 
   A port that is silent is only shut if this machine reaches the box's raw
   ports at all. A cloud thread's container reaches nothing but HTTPS, through
@@ -800,33 +805,13 @@ Head 'Checking from here'
   everybody, so it is asked the same way, and when it is silent too the
   voice port was not measured from here, and this says so.
 #>
-function TryPort([int]$p) {
-    $c = New-Object Net.Sockets.TcpClient
-    try {
-        $ar = $c.BeginConnect($VpsHost, $p, $null, $null)
-        if (-not $ar.AsyncWaitHandle.WaitOne(5000)) { return 'silent for 5 s' }
-        $c.EndConnect($ar)
-        return 'answered'
-    } catch {
-        # A try that throws (a name that does not resolve) has not looked,
-        # so it is said, and not taken for a port that is shut. A refusal is
-        # an answer from the box: nothing takes connections there.
-        $e = $_.Exception
-        while ($e.InnerException) { $e = $e.InnerException }
-        if ($e -is [Net.Sockets.SocketException] -and $e.SocketErrorCode -eq 'ConnectionRefused') { return 'refused' }
-        return 'not tried: ' + $e.Message
-    } finally { $c.Close() }
-}
-
-$voiceTry = TryPort $Port
-$reachable = $voiceTry -eq 'answered'
-$reachWhy = ''
-if ($voiceTry -like 'not tried:*') { $reachWhy = $voiceTry.Substring(11) }
-elseif (-not $reachable) {
-    $resPort = $(if ($voiceChannel -eq 'dev') { 7788 } else { 3000 })
-    $resTry = TryPort $resPort
-    if ($resTry -ne 'answered') { $reachWhy = "this machine reaches no raw port on the box: the game server's $resPort, which answers everybody, was $resTry as well" }
-}
+# Vps.ps1 "from outside" (#2975) is the one try, shared with Publish-Server
+# and Deploy-Server.
+$resPort = $(if ($voiceChannel -eq 'dev') { 7788 } else { 3000 })
+$outside = Test-ThornswoodFromOutside $VpsHost $Port $resPort
+$voiceTry = $outside.Said
+$reachable = $outside.Answered
+$reachWhy = $outside.NotKnown
 
 Write-Host ''
 if ($Bind -eq '127.0.0.1') {

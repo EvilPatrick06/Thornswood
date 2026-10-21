@@ -7,18 +7,25 @@ launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
 --live` is one that does; `test-collection-revision-2.ps1` reads both
-servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+servers' manifests over plain HTTP unless given `-Offline`). One that asks a
+GitHub repository which commits a branch has asks git, through
+`tests\fork-git.js`, and not GitHub's REST API: signed out, that allows 60
+requests an hour per address, and a cloud thread's address is shared (#3052).
+The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
-A few of them run on every pull request as well, in the build check
-(`.github/workflows/build.yml`), because each one's failure once sat on main
-unseen: `test-ownership.js` (issue #752, a secret file reached main with no
-row on `docs\OWNERSHIP.md`), and the list in its step "Run the harnesses that
-went red unseen" (issues #875, #454 and #1088, the last three being the VPS
-address kept in one place and deploys that are the same bytes for the same
-commit). Each is under a minute. The rest are minutes together, which is why
-they are nightly.
+Most of them run on every pull request as well, in the build check
+(`.github/workflows/build.yml`, the step "Run the gate harnesses"): every
+`test-*.js` and `test-*.ps1` here that `gate-excluded.txt` does not name, as
+`scripts\dev\Gate-Harnesses.ps1` lists them when the build runs (issue
+#3009). A new harness is on that gate the moment it is in this folder, and
+touches no shared line; say in its header why it exists. To keep one off the
+gate, add a line to `gate-excluded.txt`, `name  reason`, in name order. A
+harness build.yml runs in a step of its own (`test-ownership.js`, issue #752)
+has a line there too, "own step in build.yml", so the gate does not run it
+twice. The "not sorted yet" lines are minutes together, which is why they
+come onto the gate a few at a time.
 
 The voice service's own harnesses stay beside it in `voice\`, and the bot's in
 `bot\`, because they are run from there.
@@ -88,6 +95,43 @@ A path a harness compares with what a script prints is built with
 `Join-Path` or `[IO.Path]::Combine`, and a key written with `\`, like the
 swallow baseline's, is made from a path by replacing
 `[IO.Path]::DirectorySeparatorChar`. Off Windows `\` is part of a file name.
+
+A `.js` harness does the same with `process.platform === 'win32'`: off
+Windows it says SKIP for the part that needs Windows, with why, and checks
+the rest. A path it builds from a name written with `\` splits the name
+first (`path.join.apply(path, [dir].concat(rel.split('\\')))`), and a script
+that reads the game folder matches each folder and file in any case, as
+Windows does (`Check-SkyUIMenus.js` `looseFile`). The C# compiler is
+`tests\launcher-csc.js`, whose `onWindows` is asked before its `csc`; the
+bot's Python is `tests\bot-python.js` (#3005).
+
+## A harness that compiles launcher code
+
+A `.ps1` harness that compiles C# out of `launcher\app` or `installer\setup`
+dot-sources `tests\Launcher-Csc.ps1` and hands the source to
+`Add-LauncherType`, which compiles it the way the build does: the Roslyn csc
+beside MSBuild, the project's `LangVersion`, the .NET Framework 4.8.1
+reference assemblies. It returns the loaded assembly and throws with the
+compiler's words when the code does not compile. Off Windows that compiler is
+not there, so the harness says SKIP for the compiled part:
+
+```
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  Updater.IsNewer, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Done
+}
+$asm = Add-LauncherType -Source $configSrc, $stub
+$T = $asm.GetType('Thornswood.Updater')
+```
+
+Before issue #2821 eighteen harnesses compiled launcher code with `Add-Type`
+or a `CSharpCodeProvider`, copied from one to the next: C# 5 under Windows
+PowerShell and .NET 8's libraries under pwsh, never the build's compiler.
+`test-2821-launcher-compiler.ps1` fails on a harness that names launcher or
+setup code and gives `Add-Type` anything but C# written out in full in the
+harness itself (a stand-in server or a probe of a Windows call is that), or
+makes a `CSharpCodeProvider`.
 
 ## A harness that reads a child's error
 

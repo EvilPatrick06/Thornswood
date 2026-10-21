@@ -6,13 +6,16 @@
 // the fault #1787 fixed in Build-OreTable.ps1 and #1622 in
 // Build-RecipeTable.ps1. A Windows checkout hid it; a checkout that keeps LF
 // (the agents' VM, the VPS runner's clones) got a whole-file diff of the table
-// and CRLF lines inside an LF gamemode.
+// and CRLF lines inside an LF gamemode. They then took the ending of the file
+// they found; since #3029 .gitattributes checks both files out with LF on every
+// machine, so they write LF and take nothing from the file.
 //
 // This runs each builder against a small Data folder made here, from a copy of
 // the builder beside a copy of the real gamemode, so the install step writes
 // into the copy. An LF table and gamemode stay LF, nothing outside the blocks
-// changes, a second run changes nothing, a CRLF pair stays CRLF, and a new
-// table is CRLF. Nothing outside a temporary folder is written.
+// changes, a second run changes nothing, a CRLF table comes out LF, the blocks
+// written into a CRLF gamemode are LF, and a new table is LF. Nothing outside a
+// temporary folder is written.
 const REPO_DIR = require("path").join(__dirname, "..");
 const fs = require("fs");
 const os = require("os");
@@ -31,16 +34,14 @@ const harvestPs1 = fs.readFileSync(path.join(REPO_DIR, "scripts", "dev", "Build-
 const spellPs1 = fs.readFileSync(path.join(REPO_DIR, "scripts", "dev", "Build-SpellTable.ps1"), "utf8");
 
 // ---- the scripts, read ----------------------------------------------------
-const EOLOF = /function EolOf\(\[string\]\$text\) \{\s*if \(\$text\.Contains\("`r`n"\)\) \{ return "`r`n" \}\s*return "`n"\s*\}/;
 for (const [name, s, installs] of [["Build-HarvestTable.ps1", harvestPs1, 4], ["Build-SpellTable.ps1", spellPs1, 1]]) {
-  yes(name + " has EolOf, the same as Build-RecipeTable.ps1 and Build-OreTable.ps1", EOLOF.test(s));
-  yes(name + ": the table takes the ending of the table already there",
-    s.indexOf("if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }") >= 0 &&
-    s.indexOf("$json = ($docLines -join $jsonEol) + $jsonEol") >= 0);
-  yes(name + ": every gamemode block takes the gamemode's own ending (" + installs + ")",
-    (s.match(/\$eol = EolOf \$text\s+\$new = \$text\.Substring\(0, \$(m\.Index|a)\) \+ \(\(\$body -join \$eol\)\) \+ \$eol \+ \$text\.Substring\(\$b\)/g) || []).length === installs);
-  yes(name + ": no other CRLF is written: the two left are EolOf's answer and a new table's",
-    s.split('"`r`n"').length - 1 === 3);
+  yes(name + " writes with LF, the same as Build-RecipeTable.ps1 and Build-OreTable.ps1",
+    s.indexOf('$Eol = "`n"') >= 0 && s.indexOf("EolOf") < 0);
+  yes(name + ": the table is joined with it",
+    s.indexOf("$jsonEol = $Eol") >= 0 && s.indexOf("$json = ($docLines -join $jsonEol) + $jsonEol") >= 0);
+  yes(name + ": every gamemode block is joined with it (" + installs + ")",
+    (s.match(/\$eol = \$Eol\s+\$new = \$text\.Substring\(0, \$(m\.Index|a)\) \+ \(\(\$body -join \$eol\)\) \+ \$eol \+ \$text\.Substring\(\$b\)/g) || []).length === installs);
+  yes(name + ": no CRLF is written anywhere", s.split('"`r`n"').length - 1 === 0);
 }
 
 // ---- plugin records ---------------------------------------------------------
@@ -68,7 +69,8 @@ function header() {
 const MASTERS = ["Skyrim.esm", "Update.esm", "Dawnguard.esm", "HearthFires.esm", "Dragonborn.esm"];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tw-1828-"));
-function allCrlf(t) { return t.split("\n").length - 1 === t.split("\r\n").length - 1 && t.indexOf("\n") >= 0; }
+// The text from a block's declaration to its end marker: what a run writes.
+function written(t, open, close) { const a = t.indexOf(open), b = t.indexOf(close); return a < 0 || b < a ? null : t.slice(a, b); }
 function pwshRun(ps1, args) {
   const r = cp.spawnSync("pwsh", ["-NoProfile", "-File", ps1].concat(args), { encoding: "utf8", timeout: 170000 });
   return { code: r.status, out: String(r.stdout || "") + String(r.stderr || "") };
@@ -179,22 +181,23 @@ try {
     yes("a second harvest run changes neither file", h2.code === 0 &&
       fs.readFileSync(hOut, "utf8") === ht1 && fs.readFileSync(H.gm, "utf8") === hg1);
 
-    // a Windows checkout: both CRLF
+    // a checkout from before .gitattributes: both CRLF
     const smallGm = ["// head"];
     for (const n of HB) { smallGm.push("var " + n + " = {", "  \"old\": 1", "};", "", "// ==== end " + n + " ===="); }
     smallGm.push("// tail", "");
     fs.writeFileSync(H.gm, smallGm.join("\r\n"));
     fs.writeFileSync(hOut, "{\r\n  \"old\": true\r\n}\r\n");
     const h3 = harvest();
-    yes("a CRLF harvests.json stays CRLF", h3.code === 0 && allCrlf(fs.readFileSync(hOut, "utf8")));
+    yes("a CRLF harvests.json comes out LF", h3.code === 0 && fs.readFileSync(hOut, "utf8") === ht1);
     const hg3 = fs.readFileSync(H.gm, "utf8");
-    yes("a CRLF gamemode stays CRLF through the four blocks", h3.code === 0 && allCrlf(hg3) &&
-      hg3.indexOf('"1000:Skyrim.esm"') >= 0 && hg3.indexOf('"old"') < 0);
+    yes("the four blocks written into a CRLF gamemode are LF", h3.code === 0 &&
+      hg3.indexOf('"1000:Skyrim.esm"') >= 0 && hg3.indexOf('"old"') < 0 &&
+      HB.every(function (n) { const w = written(hg3, "var " + n + " = {", "// ==== end " + n + " ===="); return w !== null && w.indexOf(CR) < 0; }));
 
-    // no table yet: CRLF, as before
+    // no table yet: LF as well
     fs.unlinkSync(hOut);
     const h4 = harvest();
-    yes("a new harvests.json is written with CRLF", h4.code === 0 && allCrlf(fs.readFileSync(hOut, "utf8")));
+    yes("a new harvests.json is written with LF", h4.code === 0 && fs.readFileSync(hOut, "utf8") === ht1);
 
     // ======================= Build-SpellTable.ps1 =============================
     // Two spells in a book of its own, each taught by a tome, in one master.
@@ -244,13 +247,15 @@ try {
     fs.writeFileSync(S.gm, ["// head", "  var SPELL_IDS = {", "    \"old\": 1", "  };", "", "  // ==== end SPELL_IDS ====", "// tail", ""].join("\r\n"));
     fs.writeFileSync(sOut, "{\r\n  \"old\": true\r\n}\r\n");
     const s3 = spells();
-    yes("a CRLF spells.json stays CRLF", s3.code === 0 && allCrlf(fs.readFileSync(sOut, "utf8")));
-    yes("a CRLF gamemode stays CRLF through SPELL_IDS", s3.code === 0 && allCrlf(fs.readFileSync(S.gm, "utf8")) &&
-      fs.readFileSync(S.gm, "utf8").indexOf('"Flames": "12fcd:Skyrim.esm"') >= 0);
+    yes("a CRLF spells.json comes out LF", s3.code === 0 && fs.readFileSync(sOut, "utf8") === st1);
+    const sg3 = fs.readFileSync(S.gm, "utf8");
+    const sw3 = written(sg3, "  var SPELL_IDS = {", "  // ==== end SPELL_IDS ====");
+    yes("the SPELL_IDS block written into a CRLF gamemode is LF", s3.code === 0 &&
+      sg3.indexOf('"Flames": "12fcd:Skyrim.esm"') >= 0 && sw3 !== null && sw3.indexOf(CR) < 0);
 
     fs.unlinkSync(sOut);
     const s4 = spells();
-    yes("a new spells.json is written with CRLF", s4.code === 0 && allCrlf(fs.readFileSync(sOut, "utf8")));
+    yes("a new spells.json is written with LF", s4.code === 0 && fs.readFileSync(sOut, "utf8") === st1);
   }
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });

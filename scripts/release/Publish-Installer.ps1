@@ -53,6 +53,7 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 # The installer is a live release, so the branch rule is Ship's for a main
 # release, Test-FreshAnyBranch -Channel main (#2436): main, or a clean
@@ -63,7 +64,6 @@ param(
 $freshRepo = Join-Path $PSScriptRoot '..\..'
 Assert-FreshCheckout -RepoDir $freshRepo -What 'Publish-Installer' -Target $Vps -AnyBranch:(Test-FreshAnyBranch -RepoDir $freshRepo -Channel main) -AllowStale:$AllowStaleCheckout
 
-$ErrorActionPreference = 'Stop'
 $ssh  = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -74,8 +74,8 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $rootWin = $Root.Replace('/','\')
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -90,6 +90,16 @@ $exeItem = Get-Item -LiteralPath $exe
 # no longer part of publish: code signing covers trust, and a manual send is
 # scripts\release\Publish-VirusTotal.ps1 when somebody wants a report.
 $exeSha = (Get-FileHash -LiteralPath $exeItem.FullName -Algorithm SHA256).Hash
+
+# Which release this installer carries, from the note Package-Thornswood.ps1
+# left beside the exe it built, checked against the exe's own sha256 (#3043).
+# It goes into the exe's entry in files.json, and Ship's installer gate counts
+# the releases after it there. Read before anything is sent: an installer whose
+# release is not known would leave every main Ship unable to tell how far
+# behind it is, so it is not published.
+. (Join-Path $Here 'Release-Name.ps1')
+$installerRelease = Read-InstallerReleaseNote $OutDir $exeSha
+Write-Host ("  carries release {0}" -f $installerRelease)
 
 # Publish sign gate: the tip on the site must be Authenticode Valid under
 # ExpectedSigner. Package -NoPublish may leave an unsigned Setup for local use;
@@ -179,6 +189,7 @@ if ($single) {
       label   = 'Thornswood installer'
       version = $Version
       sha256  = $exeSha
+      release = $installerRelease
       note    = 'One file. Download it and run it.'
     }
   }
@@ -192,6 +203,7 @@ if ($single) {
       label   = 'Thornswood installer'
       version = $Version
       sha256  = $exeSha
+      release = $installerRelease
       note    = 'One file. Download it and run it. It gets the mods itself, about 700 MB.'
     }
     $zipOut = @{

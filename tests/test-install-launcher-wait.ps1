@@ -18,8 +18,11 @@
   it writes is under its own temp folder.
 #>
 Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
-$ErrorActionPreference = 'Stop'
+# An exe that another process holds cannot be written only under Windows'
+# share modes, and the launcher it closes is a Windows program.
+if (-not $OnWindows) { Write-Host 'NOT RUN  an exe held open by another process, and a launcher closed and replaced, are Windows'' share modes and a Windows program'; exit 0 }
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }

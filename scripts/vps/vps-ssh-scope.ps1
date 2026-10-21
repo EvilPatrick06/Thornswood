@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   Do not run this by hand. Set-SshScope.ps1 proves key login works first, from
-  your machine, sends this to C:\Windows\Temp, runs it with Windows
-  PowerShell 5.1, and this file deletes itself when it is done.
+  your machine, then sends this file's text on ssh's standard input and
+  Windows PowerShell 5.1 runs it from there, so nothing of it is ever
+  written on the box (#3035).
 
   Issue #2182, decision 2 (Patrick, 11 Oct 2026): restrict the inbound rules on
   port 22 to known addresses, only after the hosting console login is
@@ -25,7 +26,8 @@
                   anywhere whatever the list says, so it stops and names it.
                   So does finding no rule for 22 at all.
     the change    the rules' remote addresses are saved to
-                  C:\ProgramData\ssh\ssh-scope-before-<time>.json, a task puts
+                  C:\ProgramData\ssh\ssh-scope-before-<time>.json, which only
+                  SYSTEM and Administrators may read (#3034), a task puts
                   them back in ten minutes ("Thornswood ssh scope rollback"),
                   and then each rule's remote address becomes the list.
                   Set-SshScope.ps1 cancels the task once a new key login from
@@ -45,18 +47,14 @@
 
 .PARAMETER Layer
   A file that replaces the functions below that touch Windows (the firewall,
-  scheduled tasks, SSH_CLIENT, the save folder). Only tests\test-ssh-scope.ps1
-  passes it, to run this against stand-ins.
-
-.PARAMETER KeepSelf
-  Do not delete this file at the end. The test harness passes it.
+  scheduled tasks, SSH_CLIENT, the save folder, the save's rules). Only
+  tests\test-ssh-scope.ps1 passes it, to run this against stand-ins.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$From,
     [switch]$DryRun,
-    [string]$Layer = '',
-    [switch]$KeepSelf
+    [string]$Layer = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -73,11 +71,18 @@ function Say([string]$word, [string]$what) { Write-Output ($word + ' ' + $what) 
 
 function Get-CallerAddress { return ([string]$env:SSH_CLIENT -split '\s+')[0] }
 function Get-SaveFolder { return (Join-Path $env:ProgramData 'ssh') }
-function Test-IsServer {
-    $pt = 0
-    try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
-    return ($pt -ne 1)
+# Is this the box? scripts\vps\BoxGuard.ps1 (#3041).
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
 }
+# ---- end BoxGuard.ps1 ----
 
 # Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program,
 # Package (the app container the rule is for, '' when none), Service ('Any'
@@ -101,6 +106,28 @@ function Get-AllowRules {
     }
 }
 function Set-RuleRemote([string]$Name, [string[]]$Remote) { Set-NetFirewallRule -Name $Name -RemoteAddress $Remote }
+
+# Makes $Path an empty file only SYSTEM and Administrators may open, taking
+# nothing from its folder (#3034). C:\ProgramData\ssh gives every signed in
+# account read, as Windows OpenSSH installs it, and a file made there takes
+# that rule, so a save written there plainly is open to every account on the
+# box. The rules are set while the file is empty, so its content is never
+# open, and they are the ones administrators_authorized_keys has.
+function New-PrivateFile([string]$Path) {
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $acl = New-Object Security.AccessControl.FileSecurity
+    $acl.SetAccessRuleProtection($true, $false)
+    foreach ($s in 'S-1-5-18', 'S-1-5-32-544') {
+        $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl', 'Allow')))
+    }
+    $item = Get-Item -LiteralPath $Path -Force
+    if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+    # Read back, not taken from the call: a FileSecurity already written once
+    # writes nothing the second time and says nothing (#3034, on the box).
+    $got = Get-Acl -LiteralPath $Path
+    $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+    if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
+}
 
 # Whether a rule's filters match sshd's own traffic: any program or sshd.exe,
 # no app container, and any service or sshd. A rule bound to an app container
@@ -167,7 +194,10 @@ function Change([string]$what) {
 }
 
 function Invoke-Scope {
-    if (-not $Layer -and -not (Test-IsServer)) { $script:stopped = $true; Say 'STOP' 'this is a workstation, not the VPS. Run Set-SshScope.ps1 on your machine; it sends this to the box.'; return }
+    if (-not $Layer) {
+        $notBox = Get-ThornswoodBoxRefusal
+        if ($notBox) { $script:stopped = $true; Say 'STOP' ($notBox + '. Run Set-SshScope.ps1 on your machine; it sends this to the box.'); return }
+    }
 
     # ---------------------------------------------------------- the list ---
     $entries = @($From -split '[,\s]+' | Where-Object { $_ })
@@ -232,6 +262,7 @@ function Invoke-Scope {
     $saved = Join-Path (Get-SaveFolder) ('ssh-scope-before-' + (Get-Date).ToString('yyyyMMdd-HHmmss') + '.json')
     if (-not $DryRun) {
         $doc = [ordered]@{ taken = (Get-Date).ToString('o'); rules = @($todo | ForEach-Object { [ordered]@{ name = $_.Name; remote = @($_.Remote) } }) }
+        New-PrivateFile $saved
         [IO.File]::WriteAllText($saved, ($doc | ConvertTo-Json -Depth 4), (New-Object Text.UTF8Encoding($false)))
         Register-Rollback $saved
     }
@@ -252,7 +283,6 @@ finally {
     if ($DryRun) { Say 'DONE' ([string]$script:changes + ' change(s) would be made. Nothing was changed.') }
     elseif ($script:stopped) { Say 'DONE' ([string]$script:changes + ' change(s) made before it stopped.') }
     else { Say 'DONE' ([string]$script:changes + ' change(s) made.') }
-    if (-not $KeepSelf -and $PSCommandPath) { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue }
 }
 if ($script:stopped) { exit 1 }
 exit 0

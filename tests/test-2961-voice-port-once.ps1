@@ -16,11 +16,12 @@
   install there printed "correctly shut" whatever the firewall did.
 
   HOW. Install-Voice.ps1 reaches the VPS the moment it runs, so it is parsed
-  and never run. TryPort is lifted out of its syntax tree and run against a
-  listener and a closed port on this machine's loopback. The lines that
-  decide what to say are lifted as text and run with TryPort stood in, once
-  for each answer the voice port and the game server's port can give, and
-  what they print is held to what each case means.
+  and never run. The try is Vps.ps1's Get-ThornswoodPortTry (#2975), run
+  here against a listener and a closed port on this machine's loopback. The
+  lines that decide what to say are lifted as text and run with that try
+  stood in under Test-ThornswoodFromOutside, once for each answer the voice
+  port and the game server's port can give, and what they print is held to
+  what each case means.
 
   Never connects to anything off this machine.
 #>
@@ -61,35 +62,32 @@ Yes 'the check is there, before the record is written' ($from -gt 0 -and $to -gt
 $verify = $text.Substring($from, $to - $from)
 $code = ($verify -split "`n" | Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
 $code = [regex]::Replace($code, '(?s)<#.*?#>', '')
-# TryPort's own while only unwraps an exception to its innermost one.
-$code = [regex]::Replace($code, '(?s)function TryPort.*?\n\}', '')
 Yes 'the check has no loop' ($code -notmatch '\b(for|foreach|while|do)\s*[\({]')
 Yes '  and sleeps for nothing' ($code -notmatch 'Start-Sleep')
 
-$fn = $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'TryPort' }, $true)
-Yes 'TryPort is defined once' ($fn.Count -eq 1)
-. ([scriptblock]::Create($fn[0].Extent.Text))
+Yes '  and has no try of its own' ($code -notmatch 'TcpClient')
+. (Join-Path $RepoPath 'scripts\vps\Vps.ps1')
 
-# ---- TryPort, on loopback --------------------------------------------------
+# ---- the try, on loopback --------------------------------------------------
 $VpsHost = '127.0.0.1'
 $l = New-Object Net.Sockets.TcpListener([Net.IPAddress]::Loopback, 0)
 $l.Start()
 $open = $l.LocalEndpoint.Port
 $watch = [Diagnostics.Stopwatch]::StartNew()
-$r = TryPort $open
+$r = Get-ThornswoodPortTry $VpsHost $open
 Yes "a port something listens on answered ($r, $($watch.ElapsedMilliseconds) ms)" ($r -eq 'answered')
 $l.Stop()
 $watch.Restart()
-$r = TryPort $open
+$r = Get-ThornswoodPortTry $VpsHost $open
 Yes "  and with nothing on it, it is refused ($r)" ($r -eq 'refused' -or $r -like 'silent*')
 Yes '  at once, not after the 5 s a silent port gets' ($watch.ElapsedMilliseconds -lt 4000)
 $VpsHost = 'no-such-box.invalid'
-$r = TryPort $open
+$r = Get-ThornswoodPortTry $VpsHost $open
 Yes "a name that does not resolve was not tried, and says why ($r)" ($r -like 'not tried: *' -and $r.Length -gt 11)
 
 # ---- what it says, for each answer -----------------------------------------
-$start = $verify.IndexOf('$voiceTry = TryPort $Port')
-Yes 'the one try is TryPort $Port' ($start -gt 0 -and ([regex]::Matches($verify, 'TryPort \$Port')).Count -eq 1)
+$start = $verify.IndexOf('$resPort = ')
+Yes 'the one try is Test-ThornswoodFromOutside $VpsHost $Port $resPort' ($start -gt 0 -and ([regex]::Matches($code, 'Test-ThornswoodFromOutside')).Count -eq 1 -and $verify.Contains('Test-ThornswoodFromOutside $VpsHost $Port $resPort'))
 $decide = [scriptblock]::Create($verify.Substring($start))
 
 function Case([string]$bind, [string]$channel, [string]$voice, [string]$res) {
@@ -102,7 +100,7 @@ function Case([string]$bind, [string]$channel, [string]$voice, [string]$res) {
         $Bind = $bind; $voiceChannel = $channel
         $Port = $(if ($channel -eq 'dev') { 7789 } else { 7778 })
         $VpsHost = '192.0.2.1'; $Site = 'https://example.invalid'; $Root = 'C:\Voice'; $target = 'a@b'; $TaskName = 'Thornswood Dev Voice'
-        function TryPort([int]$p) {
+        function Get-ThornswoodPortTry([string]$a, [int]$p) {
             $script:asked += $p
             if ($p -eq $Port) { return $answers.voice }
             return $answers.res
@@ -145,6 +143,6 @@ $c = Case '0.0.0.0' 'dev' 'silent for 5 s' 'silent for 5 s'
 Yes 'every interface, from a machine that reaches no raw port: not known, in yellow, not a failure' ($c.Said -match 'Yellow: Voice answers on the box, and whether 192\.0\.2\.1:7789 answers from outside is not known' -and $c.Said -notmatch 'Red:')
 
 $c = Case '0.0.0.0' 'dev' 'not tried: No such host is known' 'answered'
-Yes 'a try that threw: not known, saying why, and the game port is not asked' ($c.Said -match 'Yellow: .*not known: No such host is known' -and $c.Asked -join ',' -eq '7789')
+Yes 'a try that threw: not known, saying why, and the game port is not asked' ($c.Said -match 'Yellow: .*not known: it could not be tried: No such host is known' -and $c.Asked -join ',' -eq '7789')
 
 Done

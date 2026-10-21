@@ -55,7 +55,7 @@ param(
   [Parameter(Mandatory = $true)][string]$Backup,
   [string]$VpsHost = '',
   [string]$VpsUser = '',
-  [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
+  [string]$KeyFile = (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Documents\thornswood-backup-key.txt'),
   # A live profile id that must come back, the number the launcher and the
   # site show. Passed to the live restore only.
   [string]$Expect,
@@ -80,8 +80,8 @@ $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
 function Remote($script) {
   # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
-  # as a file of its own name, removed after, and the far side's exit code
-  # comes back. Lines come back as strings, so a later -contains still matches.
+  # by scp and its run takes it off the box before it runs, and the far
+  # side's exit code comes back. Lines come back as strings, so a later -contains still matches.
   $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script | ForEach-Object { "$_" })
   return $out
 }

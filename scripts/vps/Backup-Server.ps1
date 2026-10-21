@@ -43,26 +43,38 @@
   in it, because a backup without them is not a backup. Keep it where you keep
   the rest of that, which is not a shared drive and not the repo.
 
-  Reads only, on the server side. The one thing it writes there is the zip, in
-  the temp folder, and it deletes that afterwards unless you pass -KeepOnVps.
+  Reads only, on the server side. The one thing it writes there is the copy
+  it zips and the zip, in a folder of the run's own under C:\Windows\Temp
+  that lives as long as one ssh session (scripts\mods\OnBox.ps1, the same
+  folder Run-OnBox.ps1 uses): the session's keeper makes it, and removes it
+  when this says the run is over or the session drops. A keeper killed with
+  its session cannot remove anything, but the folder is then held by nobody,
+  and the next run of either script removes it before it makes its own.
+
+  Until 21 Oct 2026 (#3035) the copy and the zip were made by one ssh call,
+  brought down by scp, and removed by a third call, which a run cut short
+  never reached, and a zip scp could not bring down was left on the box on
+  purpose. That left a copy of everybody's characters and the bot's data
+  outside the places the privacy page names, for as long as nobody noticed.
+  A run that cannot bring the zip down now says so, and the zip goes with
+  the folder: run it again.
 #>
 [CmdletBinding()]
 param(
   [string]$Vps  = '',
   [string]$User = '',
   [string]$Out,
-  [switch]$KeepOnVps,
   [switch]$NoPause
 )
 
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here 'Vps.ps1')
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Send-Script.ps1')
+. (Join-Path $Here '..\mods\OnBox.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
-$ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -75,8 +87,8 @@ function Die($m) {
 }
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -84,7 +96,7 @@ function Remote($script) {
 # Downloads\Thornswood-Backups: Patrick's rule that Thornswood work on One
 # lives only in the repository and the vault.
 # A worktree's local folder goes when the worktree is removed, and this zip is
-# the only copy (the one on the VPS is deleted unless -KeepOnVps), so a
+# the only copy (the one on the VPS goes with its run's folder), so a
 # worktree is refused rather than written into.
 if (-not $Out) {
   $where = Join-Path $Here '..\release\Where.ps1'
@@ -98,7 +110,6 @@ if (-not (Test-Path -LiteralPath $Out)) { [void](New-Item -ItemType Directory -P
 
 $stamp = (Get-Date).ToString('yyyyMMdd-HHmm')
 $name  = "thornswood-backup-$stamp.zip"
-$remoteZip = "C:/Windows/Temp/$name"
 $localZip  = Join-Path $Out $name
 
 Write-Host ''
@@ -111,8 +122,7 @@ Head 'Gathering'
 
 $gather = @"
 `$ErrorActionPreference = 'Continue'
-`$stage = 'C:\Windows\Temp\thornswood-backup-$stamp'
-if (Test-Path `$stage) { Remove-Item `$stage -Recurse -Force -EA SilentlyContinue }
+`$stage = Join-Path `$run 'stage'
 `$null = New-Item -ItemType Directory -Path `$stage -Force
 
 function Grab(`$from, `$asName) {
@@ -270,41 +280,47 @@ foreach (`$w in `$webNotes) { `$notes += '  ' + `$w }
 [IO.File]::WriteAllText((Join-Path `$stage 'notes.txt'), (`$notes -join [Environment]::NewLine))
 'took      notes.txt'
 
-`$zip = '$remoteZip'.Replace('/','\')
-if (Test-Path `$zip) { Remove-Item `$zip -Force -EA SilentlyContinue }
+`$zip = Join-Path `$run '$name'
 Add-Type -AssemblyName System.IO.Compression.FileSystem
 [IO.Compression.ZipFile]::CreateFromDirectory(`$stage, `$zip)
-Remove-Item `$stage -Recurse -Force -EA SilentlyContinue
 'zip       ' + [math]::Round((Get-Item `$zip).Length / 1MB, 1) + ' MB'
 "@
 
-$lines = Remote $gather
-foreach ($l in $lines) {
-  $c = 'Gray'
-  if ("$l" -match '^missing') { $c = 'Yellow' }
-  if ("$l" -match '^zip') { $c = 'Green' }
-  Say "  $l" $c
+# The run's folder on the box, held by its keeper until the run is over, or
+# until its session drops (OnBox.ps1). The gather above makes its files
+# inside it, and holds it as well while it runs, so they go with it.
+$box = Open-ThornswoodOnBoxFolder -Target "$User@$Vps" -SshArgs $ssh
+function Shut {
+  $shut = Close-ThornswoodOnBoxFolder $box
+  if ($shut.Gone) { Say '  nothing of it is left on the server' 'DarkGray' }
+  else { Say ('  ' + $box.Run + ' is still on the server (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'its keeper''s session ended without a word' }) + '). The next run of this or Run-OnBox.ps1 removes it.') 'Yellow' }
 }
+try {
+  foreach ($l in $box.Said) { Say "  box  $l" 'DarkGray' }
+  if (-not $box.Made) { Die ('The server could not make ' + $box.Run + ' for the run. What ssh said is above. Nothing has been brought down.') }
+  $remoteZip = $box.Far + '/' + $name
 
-if (-not ($lines | Where-Object { "$_" -match '^zip' })) {
-  Die 'The server did not finish making the zip. Nothing has been brought down.'
+  $lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + "`r`n" + $gather)
+  foreach ($l in $lines) {
+    $c = 'Gray'
+    if ("$l" -match '^missing') { $c = 'Yellow' }
+    if ("$l" -match '^zip') { $c = 'Green' }
+    if ("$l" -match '^STOP') { $c = 'Red' }
+    Say "  $l" $c
+  }
+  if (-not ($lines | Where-Object { "$_" -match '^zip' })) {
+    Die 'The server did not finish making the zip. Nothing has been brought down.'
+  }
+
+  # ---------------------------------------------------------- bring it down ---
+  Head 'Bringing it down'
+  Invoke-ThornswoodNative { & scp @ssh "${User}@${Vps}:$remoteZip" "$localZip" } 2>&1 | Out-Host
 }
-
-# ------------------------------------------------------------ bring it down ---
-Head 'Bringing it down'
-Invoke-ThornswoodNative { & scp @ssh "${User}@${Vps}:$remoteZip" "$localZip" } 2>&1 | Out-Host
-if (-not (Test-Path -LiteralPath $localZip)) { Die "scp did not leave a file at $localZip. The zip is still on the server at $remoteZip." }
+finally { Shut }
+if (-not (Test-Path -LiteralPath $localZip)) { Die "scp did not leave a file at $localZip, and the zip on the server went with its run's folder. Run this again." }
 
 $mb = [math]::Round((Get-Item -LiteralPath $localZip).Length / 1MB, 1)
 Say "  $localZip   $mb MB" 'Green'
-
-if ($KeepOnVps) {
-  Say "  left a copy on the server at $remoteZip" 'DarkGray'
-}
-else {
-  [void](Remote "Remove-Item '$($remoteZip.Replace('/','\'))' -Force -EA SilentlyContinue")
-  Say '  tidied the copy off the server' 'DarkGray'
-}
 
 Head 'Keep this somewhere sensible'
 Say '  The zip has the bot token, the Discord client secret and the server' 'DarkGray'

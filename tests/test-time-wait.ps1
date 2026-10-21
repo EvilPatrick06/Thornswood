@@ -26,12 +26,17 @@
   when both rooms are empty, and refuses when somebody is on, when a count
   cannot be read, when the settings do not read and when the ports cannot be
   listed; a server that is not running counts as nobody on, whatever its
-  online.json says; it deletes itself, before the restart. And that every
-  command in it that changes or reads Windows sits inside a layer function.
+  online.json says; it has nothing of its own to remove, since it is never
+  written on the box (#3035). And that every command in it that changes or
+  reads Windows sits inside a layer function.
 
   The machine half runs Set-TimeWait.ps1 with ssh, scp and ssh-keygen as
-  stand-ins. It checks: no pinned key, or no key login, means a refusal
-  before anything is sent; -Check and -WhatIf run the box read only; a real
+  stand-ins. ssh, given the script Send-Script.ps1 sends on its standard
+  input, checks it carries the whole of vps-time-wait.ps1 and runs that file
+  against the stand-in layer with the switches the script gave it. It
+  checks: no pinned key, or no key login, means a refusal before anything is
+  sent; nothing is ever copied to the box (#3035); -Check and -WhatIf run the
+  box read only; a real
   -Restart waits for a later start time and then reads 30 back; a box that
   never comes back, or comes back without 30, exits 1; a box that refuses
   exits 1 without waiting.
@@ -58,7 +63,7 @@ New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $utf8 = New-Object Text.UTF8Encoding($false)
 
 $layerText = @'
-function Test-IsServer { return $true }
+function Get-ThornswoodBoxRefusal { return '' }
 function Get-TimeWaitValue { return $global:Fake.value }
 function Set-TimeWaitValue([int]$Value) {
     $global:Fake.log.Add('Set-TimeWaitValue ' + $Value)
@@ -68,10 +73,7 @@ function Test-PortOpen([int]$Port) {
     if ($global:Fake.portsFail) { throw 'the CIM provider is not answering' }
     return [bool]$global:Fake.open[[string]$Port]
 }
-function Invoke-BoxRestart {
-    $global:Fake.log.Add('Invoke-BoxRestart')
-    $global:Fake.selfThere = (Test-Path -LiteralPath $global:Fake.self)
-}
+function Invoke-BoxRestart { $global:Fake.log.Add('Invoke-BoxRestart') }
 $ServerRoots = @($global:Fake.roots)
 '@
 $Layer = Join-Path $tmp 'layer.ps1'
@@ -92,21 +94,16 @@ function New-Fake {
         portsFail = $false
         roots = @((New-Room 'live' 7777 '{"now":0,"max":12}'), (New-Room 'dev' 7787 '{"now":0}'))
         log = New-Object System.Collections.Generic.List[string]
-        self = ''
-        selfThere = $null
     }
 }
 function Set-Online([int]$i, [string]$json) { [IO.File]::WriteAllText((Join-Path (Join-Path $global:Fake.roots[$i] 'data') 'online.json'), $json, $utf8) }
 
 function Invoke-BoxHere([hashtable]$a) {
-    $copy = Join-Path $tmp ('box-' + [Guid]::NewGuid().ToString('N') + '.ps1')
-    Copy-Item -LiteralPath $Box -Destination $copy
-    $global:Fake.self = $copy
     $b = @{ Layer = $Layer }
     foreach ($k in $a.Keys) { $b[$k] = $a[$k] }
     $global:LASTEXITCODE = 0
-    $out = @(& $copy @b 2>&1 | ForEach-Object { [string]$_ })
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out; Copy = $copy }
+    $out = @(& $Box @b 2>&1 | ForEach-Object { [string]$_ })
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out }
 }
 function Has($lines, [string]$rx) { return (@($lines | Where-Object { $_ -match $rx }).Count -gt 0) }
 function Restarted { return ($global:Fake.log -contains 'Invoke-BoxRestart') }
@@ -122,7 +119,7 @@ try {
     Yes 'Set-TimeWait.ps1 is plain ASCII too' (-not ($driverText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
     Yes '  and sets 30 seconds, the lowest Windows takes' ($boxText -match '\$Seconds = 30\r?\n')
 
-    $layerNames = @('Test-IsServer', 'Get-TimeWaitValue', 'Set-TimeWaitValue', 'Test-PortOpen', 'Invoke-BoxRestart')
+    $layerNames = @('Get-ThornswoodBoxRefusal', 'Get-TimeWaitValue', 'Set-TimeWaitValue', 'Test-PortOpen', 'Invoke-BoxRestart')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -143,7 +140,7 @@ try {
     New-Fake
     $r = Invoke-BoxHere @{ Check = $true }
     Yes '-Check with no value: exit 0, says the default of 120 applies, changes nothing' ($r.Code -eq 0 -and (Has $r.Lines '^NOW TcpTimedWaitDelay is not set, so Windows holds TIME_WAIT for its default of 120 seconds$') -and $global:Fake.log.Count -eq 0 -and $r.Lines.Count -eq 1)
-    Yes '  and deletes itself' (-not (Test-Path -LiteralPath $r.Copy))
+    Yes '  and has nothing of its own to delete, since it is never written on the box (#3035)' ($boxText -notmatch 'PSCommandPath|KeepSelf')
 
     New-Fake
     $r = Invoke-BoxHere @{ DryRun = $true }
@@ -175,7 +172,6 @@ try {
     New-Fake
     $r = Invoke-BoxHere @{ Restart = $true }
     Yes '-Restart with nobody on: sets 30, then restarts, and says RESTARTING last' ($r.Code -eq 0 -and ($global:Fake.log -join ',') -eq 'Set-TimeWaitValue 30,Invoke-BoxRestart' -and $r.Lines[-1] -match '^RESTARTING the box')
-    Yes '  it had deleted itself before the restart' ($global:Fake.selfThere -eq $false)
 
     New-Fake
     $global:Fake.value = 30
@@ -234,6 +230,7 @@ try {
     $far = Join-Path $tmp 'far'
     New-Item -ItemType Directory -Path $far -Force | Out-Null
 
+    . (Join-Path $repo 'scripts\vps\Send-Script.ps1')
     $global:H = @{}
     function global:ssh-keygen {
         $a = @($args | ForEach-Object { [string]$_ })
@@ -252,21 +249,37 @@ try {
     function global:ssh {
         $WhatIfPreference = $false
         $a = @($args | ForEach-Object { [string]$_ })
-        $global:H.Calls.Add('ssh ' + ($a -join ' '))
+        $in = @($input | ForEach-Object { [string]$_ })
         $last = $a[-1]
-        if ($last -match '-File (\S+)((?: -\w+)*)$') {
-            $local = Join-Path $global:H.Far (($Matches[1] -split '/')[-1])
+        # The script as the box would run it: inline, or Send-Script.ps1's
+        # runner on the line, which takes the copy scp put in the far folder
+        # off it and runs that (#3059).
+        $s = ''
+        if ($last -match 'EncodedCommand (\S+)') {
+            $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
+            $rp = & $global:H.RunnerPath $s
+            if ($rp) { $rf = Join-Path $global:H.Far ($rp -split '\\')[-1]; $s = [IO.File]::ReadAllText($rf); Remove-Item -LiteralPath $rf -Force }
+        }
+        # vps-time-wait.ps1 whole, as a block with its switches after it: the
+        # file under test runs here with them, against the stand-in layer.
+        $at = $s.IndexOf($global:H.BoxText)
+        if ($at -ge 0) {
+            $given = $s.Substring($at + $global:H.BoxText.Length).Trim().TrimStart('}').Trim()
+            $global:H.Calls.Add(('ssh ' + (($a | Select-Object -SkipLast 1) -join ' ') + ' BOX ' + $given).TrimEnd())
             $sw = @{ Layer = $global:H.Layer }
-            foreach ($w in @($Matches[2] -split ' ' | Where-Object { $_ })) { $sw[$w.TrimStart('-')] = $true }
-            $out = @(& $local @sw 2>&1 | ForEach-Object { [string]$_ })
+            foreach ($w in @($given -split ' ' | Where-Object { $_ })) {
+                if ($w -notmatch '^-(Check|Restart|DryRun)$') { $global:H.Calls.Add('ssh UNREAD ' + $given); $global:LASTEXITCODE = 1; return }
+                $sw[$w.TrimStart('-')] = $true
+            }
+            $out = @(& $global:H.Box @sw 2>&1 | ForEach-Object { [string]$_ })
             $code = $LASTEXITCODE
             $out
             # A restart cuts the session: ssh says so and exits 255.
             if (Restarted) { $global:H.Polls = 0; $global:H.Restarts++; 'Connection to 127.0.0.1 closed by remote host.'; $code = 255 }
             $global:LASTEXITCODE = $code; return
         }
-        if ($last -match 'EncodedCommand (\S+)') {
-            $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
+        $global:H.Calls.Add('ssh ' + ($a -join ' '))
+        if ($s) {
             if ($s -match 'LastBootUpTime') {
                 if (-not $global:H.KeyWorks) { 'Administrator@127.0.0.1: Permission denied (publickey).'; $global:LASTEXITCODE = 255; return }
                 if ($global:H.Restarts -gt 0) {
@@ -296,9 +309,10 @@ try {
     function Fresh {
         New-Fake
         $global:H = @{ KeyWorks = $true; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string]); Far = $far; Layer = $Layer; Sent = '';
-                       Restarts = 0; Polls = 0; NeverBack = $false; ForgetsValue = $false; Health = $false }
+                       Restarts = 0; Polls = 0; NeverBack = $false; ForgetsValue = $false; Health = $false
+                       Box = $Box; BoxText = [IO.File]::ReadAllText($Box); RunnerPath = ${function:Get-ThornswoodRemoteRunnerPath} }
     }
-    function BoxRuns { return @($global:H.Calls | Where-Object { $_ -match '-File ' }) }
+    function BoxRuns { return @($global:H.Calls | Where-Object { $_ -match ' BOX( |$)' }) }
 
     Fresh
     $global:H.HostFp = 'SHA256:' + ('A' * 43)
@@ -313,8 +327,10 @@ try {
     Fresh
     $r = Invoke-Driver @{ Check = $true }
     Yes '-Check: exit 0, the box ran with -Check only, nothing changed' ($r.Code -eq 0 -and $r.Text -match 'NOW TcpTimedWaitDelay is not set' -and
-        @(BoxRuns | Where-Object { $_ -match '-File \S+ -Check$' }).Count -eq 1 -and $global:Fake.log.Count -eq 0)
-    Yes '  the copy sent up deleted itself' ($global:H.Sent -and -not (Test-Path -LiteralPath $global:H.Sent))
+        @(BoxRuns | Where-Object { $_ -match ' BOX -Check$' }).Count -eq 1 -and $global:Fake.log.Count -eq 0)
+    Yes '  vps-time-wait.ps1 went whole by scp to a copy its run took off the box, so nothing of it is left there (#3035, #3059)' (
+        $global:H.Sent -match 'thornswood-remote-[0-9a-f]{32}\.ps1$' -and @(Get-ChildItem -LiteralPath $global:H.Far -File).Count -eq 0 -and
+        @($global:H.Calls | Where-Object { $_ -like 'scp *' }).Count -ge 1 -and @($global:H.Calls | Where-Object { $_ -match '-File |UNREAD' }).Count -eq 0)
 
     Fresh
     $r = Invoke-Driver @{ Check = $true; Restart = $true }
@@ -323,7 +339,7 @@ try {
     Fresh
     $r = Invoke-Driver @{ Restart = $true; WhatIf = $true }
     Yes '-Restart -WhatIf: exit 0, the box asked with -Restart -DryRun, nothing changed, no restart' ($r.Code -eq 0 -and
-        @(BoxRuns | Where-Object { $_ -match '-File \S+ -Restart -DryRun$' }).Count -eq 1 -and $global:Fake.log.Count -eq 0 -and $r.Text -match 'WOULD restart the box' -and $r.Text -match 'Nothing was changed')
+        @(BoxRuns | Where-Object { $_ -match ' BOX -Restart -DryRun$' }).Count -eq 1 -and $global:Fake.log.Count -eq 0 -and $r.Text -match 'WOULD restart the box' -and $r.Text -match 'Nothing was changed')
 
     Fresh
     $r = Invoke-Driver @{}

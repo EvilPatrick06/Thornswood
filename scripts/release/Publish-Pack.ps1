@@ -39,7 +39,7 @@
 param(
     [string]$Only,
     [switch]$DryRun,
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot 'Where.ps1') Install),
     # A folder holding the version.json to add the packs to. Left out, the
     # live feed is received from the VPS store into this machine's working
     # folder for main, and sent back (#907).
@@ -52,10 +52,10 @@ param(
     [switch]$AllowStaleCheckout
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
 if (-not $DryRun) { . (Join-Path $PSScriptRoot '..\deploy\Fresh-Checkout.ps1'); Assert-FreshCheckout -RepoDir (Join-Path $PSScriptRoot '..\..') -What 'Publish-Pack' -AllowStale:$AllowStaleCheckout }
 
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
@@ -140,10 +140,11 @@ foreach ($id in $order) {
         $files = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force)
         # The long path, which is what FullName starts with. $GameDir
         # itself is the short 8.3 form when the build sits under a short
-        # TEMP (issue #1156).
-        $prefix = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd('\') + '\'
+        # TEMP (issue #1156). Named with \ on any machine (#2989).
+        $sep = [string][IO.Path]::DirectorySeparatorChar
+        $prefix = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd($sep) + $sep
         foreach ($f in $files) {
-            $r = $f.FullName.Substring($prefix.Length)
+            $r = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
             $ext = $f.Extension.ToLowerInvariant()
             if ($ext -in '.esp', '.esm', '.esl', '.bsa') { $plugins += $r; continue }
             $dest = Join-Path (Join-Path $stage 'game') $r

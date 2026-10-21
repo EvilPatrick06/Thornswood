@@ -76,8 +76,62 @@ function Done {
 }
 
 $App = Join-Path $Repo 'launcher\app'
+
+# ---- 5: the wiring, by text, first, since it needs no compiler ---------------------------------------------------
+# Line ends as git checked them out: CRLF on a runner, LF in some worktrees.
+# The patterns below are written with LF.
+function Src([string]$path) { [IO.File]::ReadAllText($path) -replace "`r`n", "`n" }
+$shell = Src (Join-Path $App 'Shell.cs')
+$sf = Src (Join-Path $App 'ShellScanFix.cs')
+$own = Src (Join-Path $App 'ShellOwnGame.cs')
+$upd = Src (Join-Path $App 'ShellUpdate.cs')
+$xaml = Src (Join-Path $Repo 'launcher\ui.xaml')
+$upkeep = Src (Join-Path $App 'Upkeep.cs')
+$checks = Src (Join-Path $App 'Checks.cs')
+
+Yes 'the Scan button asks everything, and the Fix button is RunFix' (
+    $shell.Contains('btnScan.Click += delegate { RunScan(true); };') -and $shell.Contains('btnFix.Click += delegate { RunFix(); };'))
+$runFix = [regex]::Match($sf, '(?s)static void RunFix\(\)(.*?)\n        \}\n').Groups[1].Value
+Yes 'Fix refuses while the own folder is being prepared, so it never writes into a folder that is being made (#2403)' (
+    $runFix -match 'if \(ownGameBusy\) \{ Log\(' -and $runFix.IndexOf('if (ownGameBusy)') -lt $runFix.IndexOf('fixing = true;'))
+Yes 'and while the Downgrade or an update is going in' ($runFix -match 'if \(Downgrade\.Busy\)' -and $runFix -match 'if \(playBar\.Active\)')
+Yes 'Fix scans first, then brings the folder up to date from Vortex before anything else, carrying on either way' (
+    $runFix -match 'Upkeep\.Look\(cfg, true, null, out feed\)' -and
+    $runFix -match 'Has\(rest, IssueKind\.Behind\) &&\s*StartOwnGame\(false, true, delegate \{ FixRest\(known\); \}, delegate \{ FixRest\(known\); \}\)')
+$fixRest = [regex]::Match($sf, '(?s)static void FixRest\(VersionDoc feed\)(.*?)\n        \}\n').Groups[1].Value
+$disk = $fixRest.IndexOf('Upkeep.FixOnDisk(')
+$rescan = $fixRest.IndexOf('List<Issue> plugins = Rescan(feed);')
+$report = $fixRest.IndexOf('Report(plugins);')
+$update = $fixRest.IndexOf('RunUpdate(delegate')
+$down = $fixRest.LastIndexOf('RunDowngrade();')
+Yes 'then the steps that write files, then a scan, then the report, then the update, then the Downgrade' (
+    $disk -gt 0 -and $rescan -gt $disk -and $report -gt $rescan -and $update -gt $report -and $down -gt $update)
+Yes 'the own folder, made after asking, comes before the update' ($fixRest.IndexOf('if (Verify.OwnFolderNext) { AskOwnGame(false); return; }') -gt $report -and $fixRest.IndexOf('if (Verify.OwnFolderNext)') -lt $update)
+# Comments quote the old line on purpose; only the code is read here.
+$sfCode = ($sf -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
+$shellCode = ($shell -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
+Yes 'Fix never says how many things it put right' (-not ($sfCode -match 'Fix put \d|put " \+ n \+') -and -not ($shellCode -match '"Fix put " \+'))
+Yes 'and says only what is still wrong, with what will put it right, after it' (
+    $sf -match 'Fix is done\. Still wrong, and what will put it right:' -and $sf -match 'Fix could not put this right\. " \+ i\.WhatWill')
+Yes 'the Fix button is on exactly when there is something Fix can do' ($sf.Contains('btnFix.IsEnabled = canFix > 0 && !fixing;'))
+Yes 'a log line that blocks Play keeps the words the site reads' ($sf.Contains('(i.Blocking ? "blocks Play: " : "worth knowing: ")'))
+Yes 'the bring-up-to-date tells Fix when it fails, so Fix carries on' ($own -match 'else if \(fail != null && failed != null\) failed\(\);')
+Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (([regex]::Matches($upd, 'if \(after != null\) after\(\);')).Count -eq 2)
+Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say\).*?\}, delegate')
+Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
+    $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')
+Yes 'Diagnostics keeps the icon refresh, which Scan cannot see' ($xaml -match 'x:Name="BtnIcons"')
+Yes 'and has no Repair, Restore or Bring it up to date button, which Fix does now' (
+    $xaml -notmatch 'x:Name="BtnRepair"' -and $xaml -notmatch 'x:Name="BtnRestore"' -and $xaml -notmatch 'x:Name="BtnOwnGameRefresh"')
+
+# 1 to 4 compile the launcher's files and a driver with the build's compiler and
+# run them; that compiler is the Build Tools' csc, which only Windows has.
+if (-not $OnWindows) {
+    Write-Host 'SKIP  1 to 4, the scan and fix compiled and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows'
+    Done
+}
 Yes 'the compiler the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
-if ($script:fail) { Done }
+if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
 $refs = @(); $missing = @()
 foreach ($n in @($LauncherNeeded)) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
@@ -674,53 +728,6 @@ foreach ($l in $out) {
     else { Write-Host $l }
 }
 Yes 'the driver ran to the end and reported' (@($out | Where-Object { $_ -match '^driver: ' }).Count -eq 1)
-
-# ---- 5: the wiring, by text ---------------------------------------------------
-# Line ends as git checked them out: CRLF on a runner, LF in some worktrees.
-# The patterns below are written with LF.
-function Src([string]$path) { [IO.File]::ReadAllText($path) -replace "`r`n", "`n" }
-$shell = Src (Join-Path $App 'Shell.cs')
-$sf = Src (Join-Path $App 'ShellScanFix.cs')
-$own = Src (Join-Path $App 'ShellOwnGame.cs')
-$upd = Src (Join-Path $App 'ShellUpdate.cs')
-$xaml = Src (Join-Path $Repo 'launcher\ui.xaml')
-$upkeep = Src (Join-Path $App 'Upkeep.cs')
-$checks = Src (Join-Path $App 'Checks.cs')
-
-Yes 'the Scan button asks everything, and the Fix button is RunFix' (
-    $shell.Contains('btnScan.Click += delegate { RunScan(true); };') -and $shell.Contains('btnFix.Click += delegate { RunFix(); };'))
-$runFix = [regex]::Match($sf, '(?s)static void RunFix\(\)(.*?)\n        \}\n').Groups[1].Value
-Yes 'Fix refuses while the own folder is being prepared, so it never writes into a folder that is being made (#2403)' (
-    $runFix -match 'if \(ownGameBusy\) \{ Log\(' -and $runFix.IndexOf('if (ownGameBusy)') -lt $runFix.IndexOf('fixing = true;'))
-Yes 'and while the Downgrade or an update is going in' ($runFix -match 'if \(Downgrade\.Busy\)' -and $runFix -match 'if \(playBar\.Active\)')
-Yes 'Fix scans first, then brings the folder up to date from Vortex before anything else, carrying on either way' (
-    $runFix -match 'Upkeep\.Look\(cfg, true, null, out feed\)' -and
-    $runFix -match 'Has\(rest, IssueKind\.Behind\) &&\s*StartOwnGame\(false, true, delegate \{ FixRest\(known\); \}, delegate \{ FixRest\(known\); \}\)')
-$fixRest = [regex]::Match($sf, '(?s)static void FixRest\(VersionDoc feed\)(.*?)\n        \}\n').Groups[1].Value
-$disk = $fixRest.IndexOf('Upkeep.FixOnDisk(')
-$rescan = $fixRest.IndexOf('List<Issue> plugins = Rescan(feed);')
-$report = $fixRest.IndexOf('Report(plugins);')
-$update = $fixRest.IndexOf('RunUpdate(delegate')
-$down = $fixRest.LastIndexOf('RunDowngrade();')
-Yes 'then the steps that write files, then a scan, then the report, then the update, then the Downgrade' (
-    $disk -gt 0 -and $rescan -gt $disk -and $report -gt $rescan -and $update -gt $report -and $down -gt $update)
-Yes 'the own folder, made after asking, comes before the update' ($fixRest.IndexOf('if (Verify.OwnFolderNext) { AskOwnGame(false); return; }') -gt $report -and $fixRest.IndexOf('if (Verify.OwnFolderNext)') -lt $update)
-# Comments quote the old line on purpose; only the code is read here.
-$sfCode = ($sf -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
-$shellCode = ($shell -split "`n" | Where-Object { $_ -notmatch '^\s*//' }) -join "`n"
-Yes 'Fix never says how many things it put right' (-not ($sfCode -match 'Fix put \d|put " \+ n \+') -and -not ($shellCode -match '"Fix put " \+'))
-Yes 'and says only what is still wrong, with what will put it right, after it' (
-    $sf -match 'Fix is done\. Still wrong, and what will put it right:' -and $sf -match 'Fix could not put this right\. " \+ i\.WhatWill')
-Yes 'the Fix button is on exactly when there is something Fix can do' ($sf.Contains('btnFix.IsEnabled = canFix > 0 && !fixing;'))
-Yes 'a log line that blocks Play keeps the words the site reads' ($sf.Contains('(i.Blocking ? "blocks Play: " : "worth knowing: ")'))
-Yes 'the bring-up-to-date tells Fix when it fails, so Fix carries on' ($own -match 'else if \(fail != null && failed != null\) failed\(\);')
-Yes 'and the update tells Fix when it is done, or failed, so Fix scans again' (([regex]::Matches($upd, 'if \(after != null\) after\(\);')).Count -eq 2)
-Yes 'Fix writes into the game folder with the folder to itself (OwnGame.Alone)' ($upkeep -match '(?s)OwnGame\.Alone\(delegate\s*\{.*?Verify\.Fix\(cfg, say\).*?\}, delegate')
-Yes 'a game whose path cannot be read counts as ours only while our own file of that name runs (#2856)' (
-    $checks -match '\(at == null && !OwnImageRunning\(n\)\)\) skip = true;')
-Yes 'Diagnostics keeps the icon refresh, which Scan cannot see' ($xaml -match 'x:Name="BtnIcons"')
-Yes 'and has no Repair, Restore or Bring it up to date button, which Fix does now' (
-    $xaml -notmatch 'x:Name="BtnRepair"' -and $xaml -notmatch 'x:Name="BtnRestore"' -and $xaml -notmatch 'x:Name="BtnOwnGameRefresh"')
 
 try { Remove-Item -LiteralPath $T -Recurse -Force } catch { Write-Host "      (scratch left at $T)" }
 Done

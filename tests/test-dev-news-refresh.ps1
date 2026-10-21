@@ -503,7 +503,7 @@ function Say($m, $c = 'Gray') { Write-Host $m }
 function Head($m) { Write-Host ''; Write-Host $m }
 function Die($m) { Write-Host "STOP. $m"; exit 1 }
 function Unbump([string]$why) { Write-Host "UNBUMP $why" }
-function Measure-Installer { [pscustomobject]@{ DistDir = 'x'; HaveZip = $true; Behind = 0; ZipTime = (Get-Date) } }
+function Measure-Installer { [pscustomobject]@{ DistDir = 'x'; Known = $true; Why = ''; Release = '20260101-000000'; Behind = 0 } }
 function Add-ReleaseTag { Add-Content -LiteralPath $env:TS_CALLS -Value 'tag'; [pscustomobject]@{ Why = ''; Tag = 'release/x'; Commit = ('a' * 40); PutRight = '' } }
 $Here = Join-Path $env:TS_STAND 'release'
 $Dev = ($Channel -eq 'dev')

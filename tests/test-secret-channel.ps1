@@ -79,10 +79,22 @@ $ScCalls = New-Object System.Collections.ArrayList
 
 function ssh {
     $a = @($args | ForEach-Object { [string]$_ })
-    [void]$ScCalls.Add([pscustomobject]@{ Tool = 'ssh'; Args = $a; Sent = '' })
+    $in = @($input)
+    [void]$ScCalls.Add([pscustomobject]@{ Tool = 'ssh'; Args = $a; Sent = ''; Stdin = @($in | ForEach-Object { [string]$_ }) })
     # The box's C:/Windows/Temp is the scratch folder here.
     $line = $a[-1].Replace('C:/Windows/Temp/', ($ScFar.Replace('\', '/') + '/'))
-    $in = @($input)
+    $m = [regex]::Match($line, '-EncodedCommand (\S+)$')
+    if ($m.Success) {
+        # A long script's runner (Send-Script.ps1, #3059) takes its copy
+        # from the scratch folder too, and sweeps that folder, not the
+        # machine's own C:\Windows\Temp.
+        $said = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+        $copy = Get-ThornswoodRemoteRunnerPath $said
+        if ($copy) {
+            $said = $said.Replace($copy, (Join-Path $ScFar ($copy -split '\\')[-1])).Replace("'C:\Windows\Temp'", ("'" + $ScFar + "'"))
+            $line = $line.Substring(0, $m.Groups[1].Index) + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($said))
+        }
+    }
     if ($in.Count) { $in | & $cmdExe /d /c $line }
     else { & $cmdExe /d /c $line }
 }
@@ -172,22 +184,28 @@ try {
     Yes 'short: the value is in nothing handed to ssh, plain or base64, nor in the script' (-not $all.Contains($secret) -and -not $all.Contains($wire))
     Yes 'short: the output does not carry the value' (-not ((@($out) -join "`n").Contains($secret)))
 
-    # ---- 2. a long script: by file, the value still on standard input
+    # ---- 2. a long script: by scp, the value on standard input (#3059)
     $ScCalls.Clear()
     $out = Invoke-ThornswoodSecretRemote -Target 'tester@box.invalid' -Script ($probe + "`r`nexit 7") -Secret $secret -Limit 200
     $rc = $LASTEXITCODE
-    $sc = @($ScCalls | Where-Object { $_.Tool -eq 'scp' })
-    Yes 'long: the script went up by scp, once' ($sc.Count -eq 1)
-    Yes 'long: to a file of its own name in C:/Windows/Temp' ($sc.Count -and $sc[0].Args[-1] -match '^tester@box\.invalid:C:/Windows/Temp/thornswood-remote-[0-9a-f]{32}\.ps1$')
-    Yes 'long: the file sent holds the script' ($sc.Count -and $sc[0].Sent.Contains('SEEN '))
-    Yes 'long: the file sent does not hold the value, plain or base64' ($sc.Count -and -not $sc[0].Sent.Contains($secret) -and -not $sc[0].Sent.Contains($wire))
-    Yes 'long: run with -File' (@($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and $_.Args[-1] -match '-ExecutionPolicy Bypass -File C:/Windows/Temp/thornswood-remote-' }).Count -eq 1)
+    $calls = @($ScCalls | Where-Object { $_.Tool -eq 'ssh' })
+    $copies = @($ScCalls | Where-Object { $_.Tool -eq 'scp' })
+    $scriptText = ''
+    if ($copies.Count) { $scriptText = [string]$copies[0].Sent }
+    $runner = ''
+    if ($calls.Count -and $calls[0].Args[-1] -match '-EncodedCommand (\S+)$') { $runner = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1])) }
+    $copy = Get-ThornswoodRemoteRunnerPath $runner
+    Yes 'long: one scp and one ssh call' ($calls.Count -eq 1 -and $copies.Count -eq 1)
+    Yes 'long: the command line is Send-Script.ps1''s runner, naming the copy scp made' ($copy -and $runner -eq (Get-ThornswoodRemoteRunner -Path $copy) -and $copies[0].Args[-1].EndsWith(':' + $copy.Replace('\', '/')))
+    Yes 'long: the script went whole by scp' ($scriptText.Contains('SEEN ') -and $scriptText.TrimEnd().EndsWith('exit 7'))
+    Yes 'long: the value is on standard input, the one line there' (@($calls[0].Stdin).Count -eq 1 -and @($calls[0].Stdin)[0] -eq $wire)
+    Yes 'long: the script''s copy does not hold the value, plain or base64' ($scriptText -and -not $scriptText.Contains($secret) -and -not $scriptText.Contains($wire))
     Yes 'long: the far side got the value whole' ((Said $out 'HASH') -eq (Hash $secret))
     Yes 'long: no process command line held the value while it ran' ((Said $out 'SEEN') -eq '0')
-    Yes 'long: the far end''s exit code comes back, not the tidy up''s' ($rc -eq 7)
-    Yes 'long: the file is removed from the box afterwards' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
+    Yes 'long: the far end''s exit code comes back' ($rc -eq 7)
+    Yes 'long: its run took its copy off the box''s temp folder' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
     $all = AllSent
-    Yes 'long: the value is in nothing handed to ssh or scp' (-not $all.Contains($secret) -and -not $all.Contains($wire))
+    Yes 'long: the value is in nothing handed to ssh as an argument, nor in the script' (-not $all.Contains($secret) -and -not $all.Contains($wire))
 
     # ---- 3. -Bypass is passed on
     $ScCalls.Clear()

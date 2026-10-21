@@ -35,7 +35,7 @@
 #>
 param(
     [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
-    [string]$Data = 'C:\Thornswood\Game\Data',
+    [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # Whose settings to read: the build on this machine, or a server's own.
     [ValidateSet('build', 'live', 'dev')][string]$From = 'build',
     [string]$Vps  = '',
@@ -45,6 +45,7 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerOrder.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }

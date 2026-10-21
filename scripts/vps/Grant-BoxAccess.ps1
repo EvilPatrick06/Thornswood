@@ -21,6 +21,9 @@
       .\scripts\vps\Grant-BoxAccess.ps1 -Name codex -MakeKey -NoticesOnly
                        an agent that only posts staff notices: a key that can
                        do nothing on the box but put one in #staff-updates
+      .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices
+                       the same, for .github\workflows\staff-notice.yml: the
+                       key goes into that GitHub environment, not a file
       .\scripts\vps\Grant-BoxAccess.ps1 -Name djinn -Remove
                        take that one name's key and token off the box
       .\scripts\vps\Grant-BoxAccess.ps1 -List
@@ -42,6 +45,18 @@
   puts it there). Its file is <OutDir>\notice-access.txt, with
   THORNSWOOD_NOTICE_KEY_B64=... and THORNSWOOD_NOTICE_TOKEN=..., for that
   agent's environment; scripts\ops\Say-Staff.ps1 uses them.
+
+  -ToEnvironment <name> (with -MakeKey -NoticesOnly; #3045) puts the key
+  instead into the secret NOTICE_KEY_B64 of that environment on GitHub,
+  where .github\workflows\staff-notice.yml reads it: the way a cloud thread
+  posts. Before anything on the box changes, it makes the environment usable
+  by main alone (a branch policy for main and nothing else), and stops,
+  changing nothing, when the environment already lets another branch in or
+  gh cannot reach it. After the proof the key goes to gh secret set on its
+  standard input, so no file holds it and nothing prints it. The workflow runs
+  on the box and reaches sshd on 127.0.0.1 itself, so it needs no bridge
+  token: the token this makes is proved like every notices key's and then
+  held by nobody.
 
   THE TWO HALVES, and why neither is any use alone:
     the key     the public half goes on the box as
@@ -87,6 +102,9 @@ param(
     [switch]$MakeKey,
     # With -MakeKey: a key that can only post a staff notice (see above).
     [switch]$NoticesOnly,
+    # With -MakeKey -NoticesOnly: the GitHub environment the key goes into.
+    [string]$ToEnvironment = '',
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
     [switch]$Remove,
     [switch]$List,
     # -ThisMachine: this machine's key, the one Setup-SshKey.ps1 makes.
@@ -104,13 +122,14 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Vps.ps1')
 . (Join-Path $Here 'Send-Script.ps1')
+. (Join-Path $Here 'Lock-Folder.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 if (-not $KeyPath) { $KeyPath = Join-Path (Join-Path $HOME '.ssh') 'thornswood_ed25519' }
 if (-not $OutDir) { $OutDir = & (Join-Path (Join-Path (Split-Path -Parent $Here) 'release') 'Get-ScratchDir.ps1') 'box-access' }
-$ErrorActionPreference = 'Stop'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit $code }
@@ -187,6 +206,7 @@ function Find-PublicKeyLine([string]$Text) {
 # $Need, when given, is a file the key's forced command runs: without it on
 # the box the key would open nothing, so nothing is changed.
 function Get-BoxChangeScript([string]$Who, [string]$Digest, [string]$KeyLine, [string]$Blob, [string]$Need = '') {
+    $lock = 'function Lock-ThornswoodFolder {' + ${function:Lock-ThornswoodFolder}.ToString() + '}'
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
@@ -199,9 +219,15 @@ if (-not (Test-Path -LiteralPath '$BridgeRoot\bridge.js')) { 'STOP there is no b
 if (`$need -and -not (Test-Path -LiteralPath `$need)) { 'STOP there is no ' + `$need + ' on the box, and a notices key runs only that. Run scripts\vps\Watch-Services.ps1 -Install first. Nothing was changed.'; exit 1 }
 if (Get-ScheduledTask -TaskName `$task -EA SilentlyContinue) { 'STOP the put back from an earlier run is still armed, so that run is not finished: it puts its key file and tokens back within ten minutes of when it started. Run this again after that. Nothing was changed.'; exit 1 }
 
-# What is there now, for the put back. The folder is under ProgramData\ssh,
-# which only Administrators and SYSTEM can read.
+# What is there now, for the put back, in a folder only SYSTEM and
+# Administrators may open (#3034). ProgramData\ssh itself gives every signed
+# in account read, as Windows OpenSSH installs it, and a folder made there
+# takes that rule, so the copies of the key file and the token digests would
+# be open to every account on the box. It is locked while it is empty.
+$lock
 if (Test-Path -LiteralPath `$save) { Remove-Item -LiteralPath `$save -Recurse -Force }
+New-Item -ItemType Directory -Path `$save -Force | Out-Null
+Lock-ThornswoodFolder -Path `$save -Only
 New-Item -ItemType Directory -Path (Join-Path `$save 'tokens') -Force | Out-Null
 if (Test-Path -LiteralPath `$keys) { Copy-Item -LiteralPath `$keys -Destination (Join-Path `$save 'keys') }
 if (Test-Path -LiteralPath `$tokens) { Get-ChildItem -LiteralPath `$tokens -File | Copy-Item -Destination (Join-Path `$save 'tokens') }
@@ -219,6 +245,7 @@ if (Test-Path -LiteralPath `$keys) { icacls `$keys /inheritance:r /grant 'Admini
 if (-not (Test-Path -LiteralPath `$tokens)) { New-Item -ItemType Directory -Path `$tokens -Force | Out-Null }
 Get-ChildItem -LiteralPath `$tokens -File | Remove-Item -Force
 Get-ChildItem -LiteralPath (Join-Path `$save 'tokens') -File | Copy-Item -Destination `$tokens
+Remove-Item -LiteralPath `$save -Recurse -Force
 Unregister-ScheduledTask -TaskName '$PutBack' -Confirm:`$false
 '@
 `$cmd = (@(`$back -split '\r?\n' | Where-Object { `$_.Trim() }) -join '; ')
@@ -287,6 +314,47 @@ function Test-Login {
     return [pscustomobject]@{ Ok = (($out -join '') -match 'THORNSWOOD_OK'); Out = $out }
 }
 
+# gh api, with a JSON body on its standard input when there is one.
+function Invoke-GitHub([string]$Method, [string]$Path, [string]$Body = '') {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    if ($Body) { $o = @($Body | & gh api -X $Method $Path --input - 2>&1 | ForEach-Object { "$_" }) }
+    else { $o = @(& gh api -X $Method $Path 2>&1 | ForEach-Object { "$_" }) }
+    $c = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    return [pscustomobject]@{ Ok = ($c -eq 0); Text = ($o -join "`n") }
+}
+
+# The GitHub environment a workflow's notices key goes into, usable by main
+# and no other branch, so a workflow on a pull request branch cannot read the
+# key. Stops, changing nothing, when it already lets another branch in.
+function Set-MainOnlyEnvironment([string]$EnvName) {
+    $base = "repos/$GitHubRepo/environments/$EnvName"
+    $now = Invoke-GitHub GET $base
+    $policy = $null
+    $haveMain = $false
+    if ($now.Ok) {
+        $policy = ($now.Text | ConvertFrom-Json).deployment_branch_policy
+        if ($policy -and $policy.custom_branch_policies) {
+            $list = Invoke-GitHub GET "$base/deployment-branch-policies?per_page=100"
+            if (-not $list.Ok) { Die ("GitHub did not list the branches the environment $EnvName lets in: " + $list.Text + ' Nothing was changed.') }
+            $all = @(($list.Text | ConvertFrom-Json).branch_policies)
+            $others = @($all | Where-Object { -not ($_.name -eq 'main' -and $_.type -eq 'branch') } | ForEach-Object { $_.type + ' ' + $_.name })
+            if ($others.Count) { Die ("the environment $EnvName on GitHub also lets in " + ($others -join ', ') + ', so a workflow there could read the key. Take those off it (the repository''s Settings, Environments) first. Nothing was changed.') }
+            $haveMain = ($all.Count -eq 1)
+        }
+    } elseif ($now.Text -notmatch 'HTTP 404') {
+        Die ("GitHub did not answer for the environment $EnvName on $GitHubRepo with gh here: " + $now.Text + ' Nothing was changed.')
+    }
+    if ($haveMain -and $policy -and -not $policy.protected_branches) { Say "  the GitHub environment $EnvName is there, for main only" 'Green'; return }
+    $put = Invoke-GitHub PUT $base '{"deployment_branch_policy":{"protected_branches":false,"custom_branch_policies":true}}'
+    if (-not $put.Ok) { Die ("GitHub refused to make the environment $EnvName for chosen branches: " + $put.Text + ' Nothing was changed on the box.') }
+    if (-not $haveMain) {
+        $add = Invoke-GitHub POST "$base/deployment-branch-policies" '{"name":"main","type":"branch"}'
+        if (-not $add.Ok) { Die ("the environment $EnvName on GitHub lets no branch in now, and GitHub refused to let main in: " + $add.Text + ' Nothing was changed on the box.') }
+    }
+    Say "  the GitHub environment $EnvName is there, for main only" 'Green'
+}
+
 foreach ($t in 'ssh', 'ssh-keygen') {
     if (-not (Get-Command $t -ErrorAction SilentlyContinue)) { Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client." }
 }
@@ -295,6 +363,9 @@ if ($ways -ne 1) { Die 'Pass one of: -PublicKey (or -FromClipboard), -ThisMachin
 # A notices key is made here, so its private half is never asked of anybody
 # and its file names what it is for.
 if ($NoticesOnly -and -not $MakeKey) { Die '-NoticesOnly goes with -MakeKey. Nothing was changed.' }
+if ($ToEnvironment -and -not $NoticesOnly) { Die '-ToEnvironment goes with -MakeKey -NoticesOnly. Nothing was changed.' }
+if ($ToEnvironment -and $ToEnvironment -notmatch '^[a-z0-9][a-z0-9-]{0,31}$') { Die '-ToEnvironment is one lower case word, the way the workflow names it: notices. Nothing was changed.' }
+if ($ToEnvironment -and -not (Get-Command gh -ErrorAction SilentlyContinue)) { Die '-ToEnvironment puts the key on GitHub with gh, and gh is not on PATH. Nothing was changed.' }
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  who may reach the box' -ForegroundColor White
@@ -328,6 +399,11 @@ if ($MakeKey -and -not $NoticesOnly -and $Name -ne 'cloud') { Say "  -MakeKey ma
 
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (($ThisMachine -or $MakeKey) -and -not $node) { Die 'node is not on PATH, and the bridge client is node. Nothing was changed.' }
+
+if ($ToEnvironment) {
+    Head "Where the key goes: the GitHub environment $ToEnvironment"
+    Set-MainOnlyEnvironment $ToEnvironment
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-access-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null
@@ -454,7 +530,18 @@ try {
             $proof | Select-Object -Last 5 | ForEach-Object { Say "  $_" 'DarkGray' }
             Die "it did not get in, so no file was written. Its key and token are on the box; run this again once the lines above are dealt with, or -Name $Name -Remove to take them off."
         }
-        if ($NoticesOnly) {
+        if ($ToEnvironment) {
+            Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
+            Head "The key into the GitHub environment $ToEnvironment"
+            # On gh's standard input: no file holds it and no command line shows it.
+            $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+            $set = @([Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) | & gh secret set NOTICE_KEY_B64 --env $ToEnvironment --repo $GitHubRepo 2>&1 | ForEach-Object { "$_" })
+            $setCode = $LASTEXITCODE
+            $ErrorActionPreference = $old
+            if ($setCode -ne 0) { Die ("GitHub refused the secret: " + ($set -join ' ') + " The key is on the box and holds nowhere else; run this again, which replaces it, or -Name $Name -Remove.") }
+            Say "  NOTICE_KEY_B64 in $ToEnvironment, which only main may use. Nothing here holds it." 'Green'
+            Say "  A session with no ssh now posts with scripts/ops/Say-Staff.ps1 -Text `"...`", as $Name, through .github/workflows/staff-notice.yml." 'White'
+        } elseif ($NoticesOnly) {
             Say '  ssh through the bridge with the new key got in, and it ran say-staff.ps1 and nothing else' 'Green'
             $out = Join-Path $OutDir 'notice-access.txt'
             Write-ThornswoodPrivateFile -Path $out -Text ("THORNSWOOD_NOTICE_KEY_B64=" + [Convert]::ToBase64String([IO.File]::ReadAllBytes($newKey)) + "`nTHORNSWOOD_NOTICE_TOKEN=$token`n")

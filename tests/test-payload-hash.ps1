@@ -21,8 +21,10 @@
   other.
 
   The site half runs under node, which the build check already has. The
-  installer half is compiled with Add-Type from the methods lifted out of
-  Bootstrap.cs; Build-Launcher.ps1 is what holds that file to C# 5.
+  installer half is compiled from the methods lifted out of Bootstrap.cs with
+  the compiler the build runs, at the C# version the project names
+  (Add-LauncherType, tests\Launcher-Csc.ps1, #2821); off Windows that half
+  says SKIP, the build's compiler is only there.
 
   Read only apart from files under its own temp folder.
 #>
@@ -43,6 +45,7 @@ $Here = Split-Path -Parent $Here
 if (-not $InstallerPath) { $InstallerPath = Join-Path $Here 'scripts\release\Publish-Installer.ps1' }
 if (-not $ServerPath)    { $ServerPath    = Join-Path $Here 'site\server.js' }
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'installer\setup\Bootstrap.cs' }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -178,7 +181,6 @@ try {
     Yes '  and a refusal from either stops the script (the first before anything is sent)' (
         $pub -match '(?s)\$listCode = \$LASTEXITCODE.{0,600}throw \("files\.json on the site.{0,200}Nothing was sent' -and
         $pub -match '(?s)\$listWriteCode = \$LASTEXITCODE.{0,200}if \(\$listWriteCode -ne 0\) \{\s*throw')
-    . (Join-Path $PSScriptRoot 'Windows.ps1')
     function Run-Remote([string]$body) {
         $rootWin = $docs
         $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
@@ -392,7 +394,10 @@ process.stdout.write(sent === null ? 'NOTHING SENT' : sent);
     Yes 'before it fetches a byte' ($fetch -gt $noSha -and $noSha -gt $urlAt)
 
     $compiled = $false
-    if ($between -and $matches_ -and $check -and $url) {
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the lifted methods, compiled and run: their compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    }
+    elseif ($between -and $matches_ -and $check -and $url) {
         $members = @($between, $matches_, $check, $url) | ForEach-Object {
             $m = [string]$_
             'public ' + $m
@@ -407,10 +412,10 @@ public static class ThornswoodPayloadCheck
 $($members -join "`n`n")
 }
 "@
-        try { Add-Type -TypeDefinition $cs -Language CSharp; $compiled = $true }
+        try { $null = Add-LauncherType -Source $cs; $compiled = $true }
         catch { Write-Host ("      " + $_.Exception.Message) }
     }
-    Yes 'the lifted methods compile' $compiled
+    if ($OnWindows) { Yes 'the lifted methods compile, with the compiler the build runs' $compiled }
 
     if ($compiled) {
         $T = [ThornswoodPayloadCheck]

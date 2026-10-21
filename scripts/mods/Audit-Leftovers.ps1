@@ -20,7 +20,9 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Report = 'C:\Thornswood\_dist\audit-report.txt',
+    # In the repository's local folder, ignored by git, rather than inside the
+    # install this audit walks (#3031).
+    [string]$Report = (Join-Path (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Local) 'audit-report.txt'),
     [int]$MinMB = 1,
     [switch]$NoPause
 )
@@ -37,7 +39,7 @@ function MB($b) { '{0,8:n1} MB' -f ($b / 1MB) }
 # measured and named, never to be touched: it is where the vanilla files come
 # from and the installer fingerprints three of them.
 $roots = @(
-    @{ Path = 'C:\Thornswood';                                                       Note = 'the live build' }
+    @{ Path = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install);                                            Note = 'the live build' }
     @{ Path = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine);                                             Note = 'the SkyMP source and build tree' }
     @{ Path = 'C:\SkyrimRP';                                                         Note = 'older attempt?' }
     @{ Path = (Join-Path $env:USERPROFILE 'Downloads');                                            Note = 'downloads and the repo' }

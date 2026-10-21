@@ -43,7 +43,8 @@
 [CmdletBinding()]
 param(
     [string]$Src,
-    [string]$Root = 'C:\Thornswood-DevBuild',
+    # The dev install, Where.ps1 InstallDev, unless told otherwise (#3031).
+    [string]$Root,
     # Where Thornswood.exe goes. Ship builds into a folder of its own and lets
     # Install-Launcher put the exe in place, so the build never meets a
     # launcher that is still running from the install.
@@ -67,6 +68,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Src)  { $Src  = Join-Path $Here '..\..\launcher\app' }
+if (-not $Root) { $Root = [string](& (Join-Path $Here 'Where.ps1') InstallDev) }
 if (-not $OutDir) { $OutDir = Join-Path $Root 'Launcher' }
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -75,7 +77,7 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 
 Head 'Thornswood - launcher build'
 Say ("  building into $OutDir") 'DarkGray'
-if ($Root.TrimEnd('\\') -ieq 'C:\Thornswood') {
+if ($Root.TrimEnd('\\') -ieq [string](& (Join-Path $Here 'Where.ps1') Install)) {
     Say '  this is the install you play on, not the dev one' 'Yellow'
 }
 

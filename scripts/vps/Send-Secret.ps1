@@ -30,8 +30,11 @@
   change it) and written to ssh's standard input. ssh carries its standard
   input to the remote command's, cmd.exe hands it on to powershell, and the
   first line of the remote script reads one line of it. Only the script goes
-  on the command line, and when it is too long for that, only the script goes
-  by file: the value is never in either. Watch-Services.ps1 -Webhook has sent
+  on the command line, and when it is too long for that, it goes by scp and
+  its run deletes the copy before it runs (Send-Script.ps1, #3059), while the
+  value still goes on standard input: never on a command line and never in a
+  file. Standard input reaches the box whole only up to about 8 KB, measured
+  21 Oct 2026, so a value over 8,000 bytes is refused before anything is sent. Watch-Services.ps1 -Webhook has sent
   the alerts webhook this way since 28 September.
 
   Measured on this machine on 29 September, in Windows PowerShell 5.1 and in
@@ -86,9 +89,9 @@ function Invoke-ThornswoodSecretRemote {
     $wire = ConvertTo-ThornswoodSecretWire $Secret
     $Secret = $null
     # Send-Script.ps1 does the sending (issue #1070): on the command line when
-    # it fits, otherwise as a file of its own name, run, removed, and the far
+    # it fits, otherwise by scp to a copy its run deletes first, and the far
     # side's exit code kept. The value goes on standard input either way,
-    # never on a command line and never in the file.
+    # never on a command line and never in a file.
     try { Invoke-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script $full -Bypass:$Bypass -Limit $Limit -Stdin $wire }
     finally { $wire = $null }
 }

@@ -4395,7 +4395,7 @@
   "16a11:Skyrim.esm": {
    "hold": "solitude",
    "how": "doors",
-   "name": "The Lucky Cauldron",
+   "name": "Angeline's Aromatics",
    "opensOnto": [
     {
      "hold": "solitude",
@@ -11379,7 +11379,7 @@
   "97299:Skyrim.esm": {
    "hold": "windhelm",
    "how": "doors",
-   "name": "Palace of the Kings Upstairs",
+   "name": "Palace of the Kings, Upstairs",
    "opensOnto": [
     {
      "hold": "windhelm",
@@ -12833,8 +12833,8 @@
   },
   {
    "name": "Thornswood-Content.esp",
-   "sha256": "677c4753f63de84c91574184a1438796c1ca72d55793bcbd14d373d534080581",
-   "size": 254400
+   "sha256": "2f3f1435fa0d0587d21be00fe405b0f3898b302f73a66f82eb7cf4ca03792f88",
+   "size": 272098
   },
   {
    "name": "Populated Cities Towns Villages Legendary.esp",

@@ -86,18 +86,9 @@ function Stop-Check([string]$m) {
   exit 1
 }
 
-# The same place Check-ShipReady looks: C:\Thornswood, or the first drive with
-# a Thornswood launcher on it.
-function Find-Root {
-  $first = 'C:\Thornswood'
-  if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-  foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-    $cand = Join-Path $d.Root 'Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-  }
-  return $first
-}
-if (-not $Root) { $Root = Find-Root }
+# The launcher install, which Where.ps1 Install finds (#3003): C:\Thornswood,
+# or the first drive with a Thornswood launcher on it.
+if (-not $Root) { $Root = [string](& (Join-Path $Here '..\release\Where.ps1') Install) }
 if (-not $List) { $List = Join-Path $Root 'Profile\Default\plugins.txt' }
 if (-not $Data) { $Data = Join-Path $Root 'Game\Data' }
 
@@ -334,11 +325,18 @@ if ($edges.Count -eq 0) {
   }
   Verdict ("every pair of full plugins next to each other is held in that order ({0} pairs)" -f $pairs) $out.ToArray()
 
-  # Four: a full plugin a rule names that the list does not enable.
+  # Four: a full plugin a rule names that the list does not enable. A rule
+  # names it in lower case, as Vortex writes them; Windows finds the file in
+  # any case, and a file system that keeps case (Linux) does not, so the file
+  # is looked for by name there (#2989).
   $out = New-Object Collections.Generic.List[string]
   foreach ($n in @($named | Sort-Object)) {
     if ($present.Contains($n)) { continue }
-    if (Test-LoadOrderLight (Join-Path $Data $n)) { continue }
+    $path = Join-Path $Data $n
+    if (-not [IO.File]::Exists($path)) {
+      $path = @(@([IO.Directory]::EnumerateFiles($Data)) | Where-Object { [IO.Path]::GetFileName($_) -ieq $n }) + @($path) | Select-Object -First 1
+    }
+    if (Test-LoadOrderLight $path) { continue }
     [void]$out.Add($n + ': a rule names it and the list does not enable it.')
   }
   Verdict 'every full plugin a rule names is enabled in the list' $out.ToArray()

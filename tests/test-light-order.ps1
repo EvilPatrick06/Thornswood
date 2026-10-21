@@ -250,10 +250,22 @@ try {
     # A scratch tree laid out like the repository: the deploy script and what
     # it dot-sources, a LoadOrder.ps1 whose collection is current, a game
     # folder with Skyrim.ccc and plugins, a plugin list and a build folder.
+    # A whole server-build record, as RecordShape.ps1 holds Deploy-Gamemode's
+    # to (#2180), with lightPlugins as given, or none for $null. Until #3006
+    # the tree had no RecordShape.ps1, the check was "not recognized", and a
+    # record of two keys went through.
+    function ServerRecord($light) {
+        $h = 'ab' * 32
+        $r = [ordered]@{ binary = 'scam_native.node'; sha256 = $h; bytes = 1; source = [ordered]@{ commit = ('cd' * 20) }
+                         files = [ordered]@{ 'scam_native.node' = [ordered]@{ sha256 = $h; bytes = 1 } } }
+        if ($null -ne $light) { $r.lightPlugins = [bool]$light }
+        return ($r | ConvertTo-Json -Depth 5)
+    }
     function New-Tree([string]$name, [string]$record) {
         $t = Join-Path $T $name
         foreach ($rel in 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\deploy\MaxOnline.ps1', 'scripts\deploy\ServerOrder.ps1',
-                         'scripts\release\BuildStamp.ps1', 'scripts\release\Read-JsonFile.ps1', 'records\most-online.json') {
+                         'scripts\release\BuildStamp.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1',
+                         'records\most-online.json') {
             $from = Join-Path $Repo $rel
             if (-not (Test-Path -LiteralPath $from)) { continue }
             $to = Join-Path $t $rel
@@ -305,10 +317,13 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
         return [pscustomobject]@{ Code = $code; Text = ($out -join "`n") }
     }
     function Settings([string]$t) { return ([IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json')) | ConvertFrom-Json) }
-    function Leaves($s) { return [string[]]@($s.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) }) }
+    # A load order entry names the plugin by a path written for the box; its
+    # file name is the part after the last separator of either kind, since
+    # GetFileName off Windows does not split on \ (#2989).
+    function Leaves($s) { return [string[]]@($s.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] }) }
 
     # An engine that loads no light plugin: what the live server is today.
-    $t = New-Tree 'no-light' '{"binary":"scam_native.node"}'
+    $t = New-Tree 'no-light' (ServerRecord $null)
     $r = Invoke-Copy $t
     Yes 'an engine that loads no light plugin: the deploy runs' ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Text }
@@ -317,7 +332,7 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
     Same '  the start point is Skyrim Unbound.esp at its place in the list, 7' ([string]$s.startPoints[0].worldOrCell) '0x0719BAD4'
 
     # An engine that loads them.
-    $t = New-Tree 'light' '{"binary":"scam_native.node","lightPlugins":true}'
+    $t = New-Tree 'light' (ServerRecord $true)
     $r = Invoke-Copy $t
     Yes 'an engine that loads light plugins: the deploy runs' ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Text }

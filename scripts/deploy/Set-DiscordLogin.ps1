@@ -86,20 +86,20 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
-$ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $rootWin = $Root.Replace('/','\')
 $botWin  = $BotRoot.Replace('/','\')
 $writer  = Join-Path $Here '..\vps\Write-BotToken.ps1'
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -298,7 +298,7 @@ try { `$patch = `$ThornswoodSecret | ConvertFrom-Json }
 catch { `$ThornswoodSecret = `$null; 'NOT WRITTEN: what arrived on standard input is not the JSON Set-DiscordLogin.ps1 sends. Nothing written.'; return }
 `$ThornswoodSecret = `$null
 if (-not `$patch) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
-`$f = '$rootWin\config.json'
+`$f = Join-Path '$rootWin' 'config.json'
 # A config.json that is there and does not read is not empty: written over,
 # it would lose the bot token, botKey, the cookie secret and the rest (#2317).
 `$cfg = @{}

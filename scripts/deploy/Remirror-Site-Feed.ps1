@@ -302,8 +302,8 @@ function Send-FeedJson([string]$dir) {
 # sshd on Windows hands the command to cmd.exe and cmd.exe stops at 8,191
 # characters.
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-  # name, removed after, and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -566,7 +566,7 @@ foreach ($b in $badUpThere) { Say "  BAD BYTES up there, this sends them again: 
 # hashed. Those are what Publish-Update leaves behind for the release that just
 # went out (pack-<id>.zip, client-runtime-<commit>.zip) and what Build-Launcher
 # leaves in the install folder (Thornswood.exe).
-$gameRoot = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' }
+$gameRoot = [string](& (Join-Path $Here '..\release\Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' }))
 $folders = @()
 foreach ($d in @($AssetDir)) { if ($d) { $folders += $d } }
 $folders += (Join-Path $FeedDir 'assets')

@@ -26,6 +26,11 @@
 # Invoke-ThornswoodArtifactRemote, and a test can run the same text locally.
 $ThornswoodDeployedBuildText = @'
 function Write-ThornswoodDeployedBuild([string]$RecordPath, [string]$OutPath, [string]$Channel, [string]$At) {
+  # As this machine's file system names them, since they are read with .NET:
+  # the same on the box, and a run of this text off Windows (a test) gets /
+  # where the near side joined with \ (#2989).
+  $RecordPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($RecordPath)
+  $OutPath = $ExecutionContext.SessionState.Path.GetUnresolvedProviderPathFromPSPath($OutPath)
   if ($Channel -ne 'live' -and $Channel -ne 'dev') { 'DEPLOYED BUILD NOT WRITTEN: no channel ' + $Channel; return }
   if (-not (Test-Path -LiteralPath $RecordPath)) { 'DEPLOYED BUILD NOT WRITTEN: there is no ' + $RecordPath; return }
   try { $rec = [IO.File]::ReadAllText($RecordPath) -replace '^\uFEFF', '' | ConvertFrom-Json }
