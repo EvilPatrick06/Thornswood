@@ -782,23 +782,50 @@ Head 'Checking from here'
 
   So: on 0.0.0.0 the port must answer. On 127.0.0.1 it must NOT, and the
   service is reached through whatever is proxying instead.
+
+  One try (#2961). Until 21 Oct 2026 this tried up to 15 times a second
+  apart, which waited for nothing: the firewall rule is made before the old
+  voice is stopped, and the box has already had the new build answer on this
+  port. Measured that day on the box: New-NetFirewallRule had the rule in
+  the active store when it returned, and connections from outside to 7789
+  came in 0.3 s after it, with no rule before that dropped. The try gets 5 s
+  so TCP's own resends of a lost SYN (at 1 s and 3 s) are inside it; a
+  connection from outside took 0.1 s.
+
+  A port that is silent is only shut if this machine reaches the box's raw
+  ports at all. A cloud thread's container reaches nothing but HTTPS, through
+  its proxy, so from there every raw port is silent, and this printed
+  "correctly shut" whatever the firewall did. The game server's resources
+  port (3000 live, 7788 dev, the one every launcher reads) answers
+  everybody, so it is asked the same way, and when it is silent too the
+  voice port was not measured from here, and this says so.
 #>
-# A try that throws (a name that does not resolve) has not looked, so it is
-# said, and not taken for a port that is shut.
-$reachable = $false
-$reachWhy = ''
-for ($i = 0; $i -lt 15; $i++) {
+function TryPort([int]$p) {
     $c = New-Object Net.Sockets.TcpClient
     try {
-        $null = $c.BeginConnect($VpsHost, $Port, $null, $null).AsyncWaitHandle.WaitOne(1000)
-        $reachable = $c.Connected; $reachWhy = ''
-    } catch { $reachWhy = $_.Exception.Message }
-    finally { $c.Close() }
-    if ($reachable) { break }
-    # On loopback we are waiting to be sure it stays shut, not for it to open,
-    # so there is nothing to keep retrying for.
-    if ($Bind -eq '127.0.0.1') { break }
-    Start-Sleep -Seconds 1
+        $ar = $c.BeginConnect($VpsHost, $p, $null, $null)
+        if (-not $ar.AsyncWaitHandle.WaitOne(5000)) { return 'silent for 5 s' }
+        $c.EndConnect($ar)
+        return 'answered'
+    } catch {
+        # A try that throws (a name that does not resolve) has not looked,
+        # so it is said, and not taken for a port that is shut. A refusal is
+        # an answer from the box: nothing takes connections there.
+        $e = $_.Exception
+        while ($e.InnerException) { $e = $e.InnerException }
+        if ($e -is [Net.Sockets.SocketException] -and $e.SocketErrorCode -eq 'ConnectionRefused') { return 'refused' }
+        return 'not tried: ' + $e.Message
+    } finally { $c.Close() }
+}
+
+$voiceTry = TryPort $Port
+$reachable = $voiceTry -eq 'answered'
+$reachWhy = ''
+if ($voiceTry -like 'not tried:*') { $reachWhy = $voiceTry.Substring(11) }
+elseif (-not $reachable) {
+    $resPort = $(if ($voiceChannel -eq 'dev') { 7788 } else { 3000 })
+    $resTry = TryPort $resPort
+    if ($resTry -ne 'answered') { $reachWhy = "this machine reaches no raw port on the box: the game server's $resPort, which answers everybody, was $resTry as well" }
 }
 
 Write-Host ''
@@ -808,11 +835,14 @@ if ($Bind -eq '127.0.0.1') {
         Say '  The bind did not take, or the firewall rule is still open.' 'Red'
         Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
     } elseif ($reachWhy) {
-        Say "Loopback only, and ${VpsHost}:$Port could not be tried from out here ($reachWhy), so whether it is shut is not known." 'Yellow'
+        Say "Loopback only, and whether ${VpsHost}:$Port is shut from outside is not known: $reachWhy." 'Yellow'
     } else {
-        Say "Loopback only, and ${VpsHost}:$Port is correctly shut from out here." 'Green'
-        # The service is only useful if something is carrying it, so say whether
-        # anything actually is rather than leaving that to be assumed.
+        Say "Loopback only, and ${VpsHost}:$Port is correctly shut from out here ($voiceTry)." 'Green'
+    }
+    # The service is only useful if something is carrying it, so say whether
+    # anything actually is rather than leaving that to be assumed. This goes
+    # over HTTPS, so it is asked from anywhere, a cloud thread included.
+    if (-not $reachable) {
         $via = ''
         if ($Site) { $via = $Site.TrimEnd('/') + $(if ($Port -eq 7778) { '/voice' } else { '/voice-dev' }) }
         if ($via) {
@@ -829,10 +859,12 @@ if ($Bind -eq '127.0.0.1') {
     Say "Voice is up at http://${VpsHost}:$Port" 'Green'
     Write-Host ''
     Say 'The position feed is part of game\gamemode.js, so nothing else needs running for it.' 'Gray'
+} elseif ($reachWhy) {
+    Say "Voice answers on the box, and whether ${VpsHost}:$Port answers from outside is not known: $reachWhy." 'Yellow'
 } else {
-    Say "Installed, but nothing is answering on ${VpsHost}:$Port." 'Red'
-    if ($reachWhy) { Say "  The last try to connect said: $reachWhy" 'Red' }
-    Say "  ssh $target `"powershell -NoProfile -Command Get-Content '$Root\voice.log' -Tail 20`"" 'DarkGray'
+    Say "Installed, but ${VpsHost}:$Port was $voiceTry from out here, though voice answers on the box and the game server answers from here." 'Red'
+    Say "  The firewall rule '$TaskName' up there, or something between, is not letting it in." 'Red'
+    Say "  .\scripts\vps\Remote.ps1 `"Get-NetFirewallRule -DisplayName '$TaskName' | Get-NetFirewallPortFilter`"" 'DarkGray'
 }
 # The service's files are in place: the box records that it runs this
 # artifact, and /health says so from then on (Artifact.ps1).
