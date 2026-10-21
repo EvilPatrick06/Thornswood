@@ -1978,7 +1978,8 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
     if (over || cut || broke || timedOut || invalid) {
       // The half file goes. It was made above with wx, so it is there; one
       // that will not go is said, by its name and the code (#2736).
-      try { fs.unlinkSync(dest); }
+      let removed = false;
+      try { fs.unlinkSync(dest); removed = true; }
       catch (e) { console.error('[thornswood-docs] could not remove the half upload ' + name + ' (' + (e.code || e.message) + ')'); }
       if (timedOut) return send(res, 408, JSON.stringify({error:'That upload took too long. Try again with a smaller file.'}), null, {Connection:'close'});
       if (quotaExceeded) return send(res, 429, JSON.stringify({error:'This connection has uploaded 500 MB in the last hour. Try again later.'}),
@@ -1986,8 +1987,15 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
       if (invalid) return sendJson(res, 415, {error:'The file contents do not match its image or recording type.'});
       if (over) return send(res, 413, JSON.stringify({ error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' }),
                             null, { Connection: 'close' });
-      // destroy() does not throw, so no try (#2736).
-      if (cut) { res.destroy(); return; }
+      // destroy() does not throw, so no try (#2736). A sender that went has
+      // nobody left to answer, so the log is the only record it leaves
+      // (#3062), said once the half file is gone.
+      if (cut) {
+        if (removed) console.log('[thornswood-docs] upload cut off after ' + got + ' bytes on ' +
+                                 JSON.stringify(String(req.url || '').split('?')[0].slice(0, 200)) + ', the half file is removed');
+        res.destroy();
+        return;
+      }
       console.error('[thornswood-docs] could not write the upload ' + name + ' (' + broke + ')');
       return sendJson(res, 500, { error: 'the site could not save that file. Try again in a minute.' });
     }
