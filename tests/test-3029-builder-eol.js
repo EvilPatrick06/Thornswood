@@ -24,6 +24,12 @@
   E  no step takes its line ending from a file, joins with CRLF, or writes
      with the platform's ending.
   F  merchant-role-tables.json pins the bytes every checkout now has.
+  G  a VPS runner keeps its folder between jobs, and a checkout there leaves
+     every file the two commits share as the last job wrote it, so the
+     attributes above never reached a runner that already had the repository
+     (measured 21 Oct: the job log says "Cleaning the repository", and a
+     checkout made that way kept all 5,182 CRLF lines of hunts.json). Every
+     self-hosted job writes every tracked file again right after its checkout.
 
   Nothing is written.
 */
@@ -130,6 +136,32 @@ const stale = Object.keys(roles.sources || {}).filter(function (f) {
 });
 yes('F  merchant-role-tables.json pins the bytes of its ' + Object.keys(roles.sources || {}).length + ' inputs as they are checked out' + some(stale),
   Object.keys(roles.sources || {}).length > 0 && stale.length === 0);
+
+// ---- G ------------------------------------------------------------------------
+const WF = path.join(ROOT, '.github', 'workflows');
+const AGAIN = /\n\s*- name: Check every tracked file out again\n\s*if: runner\.environment == 'self-hosted'\n\s*shell: pwsh\n\s*run: \|\n\s*git rm -r -q --cached \.\n\s*if \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}\n\s*git reset -q --hard HEAD\n\s*if \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}(\n|$)/;
+const missing = [];
+let checkouts = 0;
+for (const f of fs.readdirSync(WF).filter(function (n) { return /\.ya?ml$/.test(n); }).sort()) {
+  const t = fs.readFileSync(path.join(WF, f), 'utf8').split('\r\n').join('\n');
+  const starts = [];
+  const re = /^  ([A-Za-z0-9_-]+):\s*$/gm;
+  let m;
+  while ((m = re.exec(t))) { starts.push({ name: m[1], at: m.index }); }
+  starts.forEach(function (s, k) {
+    const job = t.slice(s.at, k + 1 < starts.length ? starts[k + 1].at : t.length);
+    const runs = /^\s*runs-on:(.*)$/m.exec(job);
+    if (!runs || runs[1].indexOf('self-hosted') < 0) { return; }
+    const parts = job.split(/(?=\n\s*- (?:uses|name): )/);
+    parts.forEach(function (p, i) {
+      if (p.indexOf('uses: actions/checkout@') < 0) { return; }
+      checkouts++;
+      if (!AGAIN.test(parts[i + 1] || '')) { missing.push(f + ' ' + s.name); }
+    });
+  });
+}
+yes('G  each of the ' + checkouts + ' checkouts on a self-hosted runner is followed by writing every file again' + some(missing),
+  checkouts > 0 && missing.length === 0);
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
