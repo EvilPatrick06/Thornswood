@@ -163,7 +163,8 @@
   -Reapply never adds a line of its own.
 
   WHAT IT REFUSES, with nothing changed:
-    - anywhere with C:\Thornswood\Game\SkyrimSE.exe, which is a gaming PC
+    - anywhere that is not the box: a Windows workstation, which a gaming PC
+      is, or a machine Windows will not say is a server (BoxGuard.ps1)
     - a Discord id that is not 17 to 20 digits
     - -Delete without -By, the person running it
     - a JSON file, or a line of the record, that is there and will not parse
@@ -200,7 +201,8 @@
   own SID is given read on the record's folder. Nothing is given when no
   task of that name is registered; Install-Backup.ps1 gives it read then.
 .PARAMETER AllowGamingPc
-  Run on a machine with the game on it. Only the tests pass it.
+  Run on a machine that is not the box, a developer's workstation. Only the
+  tests pass it.
 #>
 [CmdletBinding()]
 param(
@@ -224,8 +226,20 @@ $ProgressPreference = 'SilentlyContinue'
 function Say([string]$m) { Write-Output $m }
 function Refuse([string]$m) { Write-Output ('REFUSED: ' + $m); exit 1 }
 
-if (-not $AllowGamingPc -and (Test-Path -LiteralPath 'C:\Thornswood\Game\SkyrimSE.exe')) {
-    Refuse 'C:\Thornswood\Game\SkyrimSE.exe is here, so this is a gaming PC, not the VPS. Nothing was changed.'
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
+}
+# ---- end BoxGuard.ps1 ----
+if (-not $AllowGamingPc) {
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) { Refuse ($notBox + '. Nothing was changed.') }
 }
 # powershell -File hands a list over as one word with commas in it.
 $Merge = @($Merge | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })

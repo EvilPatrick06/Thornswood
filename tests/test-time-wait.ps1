@@ -63,7 +63,7 @@ New-Item -ItemType Directory -Path $tmp -Force | Out-Null
 $utf8 = New-Object Text.UTF8Encoding($false)
 
 $layerText = @'
-function Test-IsServer { return $true }
+function Get-ThornswoodBoxRefusal { return '' }
 function Get-TimeWaitValue { return $global:Fake.value }
 function Set-TimeWaitValue([int]$Value) {
     $global:Fake.log.Add('Set-TimeWaitValue ' + $Value)
@@ -119,7 +119,7 @@ try {
     Yes 'Set-TimeWait.ps1 is plain ASCII too' (-not ($driverText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
     Yes '  and sets 30 seconds, the lowest Windows takes' ($boxText -match '\$Seconds = 30\r?\n')
 
-    $layerNames = @('Test-IsServer', 'Get-TimeWaitValue', 'Set-TimeWaitValue', 'Test-PortOpen', 'Invoke-BoxRestart')
+    $layerNames = @('Get-ThornswoodBoxRefusal', 'Get-TimeWaitValue', 'Set-TimeWaitValue', 'Test-PortOpen', 'Invoke-BoxRestart')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
