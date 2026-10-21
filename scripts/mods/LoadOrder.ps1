@@ -38,8 +38,19 @@ function Get-VortexStateText([string]$Path) {
     return [Text.Encoding]::GetEncoding(28591).GetString($raw)
 }
 
+# Vortex's own folder, under %APPDATA% as Vortex keeps it. Off Windows (a
+# cloud session) APPDATA is not set, and Join-Path stopped on the null before
+# anything was asked; the platform's own folder for it takes its place, which
+# holds no Vortex, so every lookup below finds none, as on a Windows machine
+# without Vortex. The same rule as Where.ps1's machine data (#2872).
+function Get-VortexDir {
+    $a = $env:APPDATA
+    if (-not $a) { $a = [Environment]::GetFolderPath('ApplicationData') }
+    return (Join-Path $a 'Vortex')
+}
+
 function Get-VortexStateDir {
-    return (Join-Path $env:APPDATA 'Vortex\state.v2')
+    return (Join-Path (Get-VortexDir) 'state.v2')
 }
 
 
@@ -122,7 +133,7 @@ function Import-VortexStateReader {
 #>
 function Get-CollectionRevisionFromFolder([string]$Slug) {
     if (-not $Slug) { return 0 }
-    $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
+    $dir = Join-Path (Get-VortexDir) 'skyrimse\mods'
     if (-not (Test-Path -LiteralPath $dir)) { return 0 }
     $best = 0
     foreach ($d in (Get-ChildItem -LiteralPath $dir -Directory -Filter ("collection_" + $Slug + "_*") -EA SilentlyContinue)) {
@@ -170,7 +181,7 @@ function Get-CollectionModIds([string]$Slug) {
 #>
 function Get-CollectionInstalledFolder([string]$Slug) {
     if (-not $Slug) { return $null }
-    $dir = Join-Path $env:APPDATA 'Vortex\skyrimse\mods'
+    $dir = Join-Path (Get-VortexDir) 'skyrimse\mods'
     if (-not (Test-Path -LiteralPath $dir)) { return $null }
 
     # New naming: folder is the mod id from state. Prefer a folder the JSON can
@@ -411,7 +422,7 @@ function Get-CollectionState([string]$Url) {
 #>
 function Get-VortexProfileDir([string]$Name = 'Thornswood') {
     if (-not $Name) { return $null }
-    $profilesRoot = Join-Path $env:APPDATA 'Vortex\skyrimse\profiles'
+    $profilesRoot = Join-Path (Get-VortexDir) 'skyrimse\profiles'
     if (-not (Test-Path -LiteralPath $profilesRoot)) { return $null }
     $st = Get-VortexStateDir
     if (Test-Path -LiteralPath (Join-Path $st 'CURRENT')) {
