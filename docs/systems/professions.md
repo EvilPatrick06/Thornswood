@@ -106,15 +106,19 @@ in a life, and it never climbs.
 
 ## Benches, in one picture
 
-Some furniture turns you away before a recipe is even read. Some
-furniture is open, and the recipe is what refuses you.
+A bench opens only for somebody with at least one recipe there that
+they may make, so the crafting menu never opens on nothing. A bench
+that holds something nobody owns opens for anybody, because anybody may
+make that. What else it holds that is somebody's work is then refused
+at the recipe.
 
-Closed, and the half must be one you can work at the rank named:
+Who each bench opens for. A half is one you can work at the rank named:
+your own half, or your sister half or a taught half at novice.
 
 | Bench | Who |
 | --- | --- |
 | Oven | Hearthcook or Confectioner, from novice |
-| Cookpot | Open furniture. The recipe is still Hearthcook's |
+| Cookpot | Hearthcook, from novice |
 | Grain mill | Hearthcook, from novice |
 | Charcoal kiln | Charburner, from novice |
 | Alchemy lab | Blightbrewer or Physicker, from novice |
@@ -123,11 +127,11 @@ Closed, and the half must be one you can work at the rank named:
 | Sharpening wheel | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
 | Skyforge | Edgewright, Platewright, or Woodwright, at advanced |
 | Dawnguard bench | Woodwright, at advanced |
-| Forge | Open furniture. A forge recipe still has an owner and a rank |
-| Tanning rack | Open furniture. A hide into leather is the Platewright's |
-| Loom | Open furniture. The garment still has an owner and a rank |
+| Forge | Anybody. Rings, necklaces and circlets are nobody's work. Every other forge recipe has an owner and a rank |
+| Tanning rack | Anybody. Fur plate and fishing nets are nobody's work. A hide into leather is the Platewright's |
+| Loom | Anybody. The Falkreath Guard Cloak is nobody's work. Every other garment has an owner and a rank |
 | Armour table | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
-| Aetherium forge | Open furniture. The staff and the plate made there are master recipes |
+| Aetherium forge | Anybody. The Aetherial Crown is nobody's work. The staff and the plate made there are master recipes |
 
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a

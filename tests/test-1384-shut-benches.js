@@ -56,12 +56,10 @@ const knob = (/SHUT_BENCHES = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
 yes("SHUT_BENCHES names the sharpening wheel", /'CraftingSmithingSharpeningWheel': SHUT_SAYS,/.test(knob));
 yes("SHUT_BENCHES names the armour table", /'CraftingSmithingArmorTable': SHUT_SAYS,/.test(knob));
 yes("and nothing else", (knob.match(/^\s+'[^']+': /gm) || []).length === 2);
-const open = (/OPEN_FURNITURE = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
-yes("OPEN_FURNITURE no longer calls the armour table open", open.length > 0 && open.indexOf("CraftingSmithingArmorTable") < 0);
-yes("the stale premise is gone from the builder's knob", open.indexOf("Tempering never reaches the server") < 0);
+yes("no list of open furniture is left to call the armour table open (#3080)", py.indexOf("OPEN_FURNITURE") < 0);
 const iShut = py.indexOf("for bname in sorted(SHUT_BENCHES):");
-yes("the shut benches are written after the rows nobody owns and after OPEN_FURNITURE, so neither opens one again",
-  iShut > py.indexOf("for row in unowned.values():") && iShut > py.indexOf("for bname in sorted(OPEN_FURNITURE):"));
+yes("the shut benches are written after the rows nobody owns, so none opens one again",
+  iShut > py.indexOf("for row in unowned.values():"));
 yes("a shut bench is written with anyone false, no halves, and its sentence",
   /access\[bench\] = \{'name': bname, 'anyone': False, 'halves': \{\},\s*'shut': SHUT_BENCHES\[bname\]\}/.test(py.slice(iShut)));
 
@@ -213,8 +211,8 @@ try {
       !!A && !!A[TABLE] && A[TABLE].anyone === false && JSON.stringify(A[TABLE].halves) === "{}" && A[TABLE].shut === SAYS);
     yes("both benches' furniture is still in BENCH_BY_BASE",
       !!B && B["900:Skyrim.esm"] === WHEEL && B["901:Skyrim.esm"] === TABLE);
-    yes("the forge is untouched: open furniture with its owner",
-      !!A && !!A["88105:Skyrim.esm"] && A["88105:Skyrim.esm"].anyone === true && !A["88105:Skyrim.esm"].shut &&
+    yes("the forge is untouched: with no row nobody owns it opens for its owner alone (#3080)",
+      !!A && !!A["88105:Skyrim.esm"] && A["88105:Skyrim.esm"].anyone === false && !A["88105:Skyrim.esm"].shut &&
       JSON.stringify(A["88105:Skyrim.esm"].halves) === '{"edgewright":"novice"}');
     yes("the run says both benches are shut", /CraftingSmithingArmorTable\s+adb78:Skyrim\.esm\s+shut/.test(r.out) &&
       /CraftingSmithingSharpeningWheel\s+88108:Skyrim\.esm\s+shut/.test(r.out));
