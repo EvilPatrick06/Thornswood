@@ -3,7 +3,8 @@
 // #1400. Smelting an ingot belongs to the smith halves. Tanning a hide into
 // leather belongs to the Platewright. One row of each stays. Duplicate ingot
 // rows stay cut. Nails, hinges, locks and iron fittings stay refused. The
-// tanning rack and the forge stay open to anybody, for the rows nobody owns there.
+// tanning rack and the forge open only for somebody who can make something there
+// (#3080: they are trades' benches, TRADE_BENCHES in Build-BenchTable.py).
 //
 // Read only.
 const REPO_DIR = require("path").join(__dirname, "..");
@@ -140,8 +141,8 @@ if (P && RECIPES && craftSrc && rowSrc && KEPT) {
     return Object.keys(benches).map(function (k) { return benches[k]; }).filter(function (b) { return b.name === name; })[0];
   }
   yes("the smelter still opens for anybody", bench("CraftingSmelter") && bench("CraftingSmelter").anyone === true);
-  yes("the tanning rack still opens for anybody", bench("CraftingTanningRack") && bench("CraftingTanningRack").anyone === true);
-  yes("the forge still opens for anybody", bench("CraftingSmithingForge") && bench("CraftingSmithingForge").anyone === true);
+  yes("the tanning rack opens only for somebody who can make something there", bench("CraftingTanningRack") && bench("CraftingTanningRack").anyone === false && bench("CraftingTanningRack").rows.length > 0);
+  yes("the forge opens only for somebody who can make something there", bench("CraftingSmithingForge") && bench("CraftingSmithingForge").anyone === false && bench("CraftingSmithingForge").rows.length > 0);
 
   const onCraft = cut("mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId) {") ||
     slice(gm, "mp.onCraft = guard('onCraft'", "desc === KEY_RECIPE");

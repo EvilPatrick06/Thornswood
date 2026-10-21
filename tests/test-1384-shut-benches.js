@@ -55,7 +55,8 @@ yes("SHUT_SAYS in the builder is that sentence, word for word", !!ps && ps[1] + 
 const knob = (/SHUT_BENCHES = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
 yes("SHUT_BENCHES names the sharpening wheel", /'CraftingSmithingSharpeningWheel': SHUT_SAYS,/.test(knob));
 yes("SHUT_BENCHES names the armour table", /'CraftingSmithingArmorTable': SHUT_SAYS,/.test(knob));
-yes("and nothing else", (knob.match(/^\s+'[^']+': /gm) || []).length === 2);
+yes("SHUT_BENCHES names the Aetherium forge, with its own sentence (#3080)", /'DLC1LD_CraftingForgeAetherium': AETHERIUM_SAYS,/.test(knob));
+yes("and nothing else", (knob.match(/^\s+'[^']+': /gm) || []).length === 3);
 yes("no list of open furniture is left to call the armour table open (#3080)", py.indexOf("OPEN_FURNITURE") < 0);
 const iShut = py.indexOf("for bname in sorted(SHUT_BENCHES):");
 yes("the shut benches are written after the rows nobody owns, so none opens one again",
@@ -76,9 +77,10 @@ yes("BENCH_ACCESS and BENCH_BY_BASE parse", !!ACCESS && !!BY_BASE);
   yes(b[1] + " is still in BENCH_BY_BASE, which recipelessCraft and TWO_HANDS read", bases.length > 0);
 });
 const shutRows = Object.keys(ACCESS || {}).filter(function (k) { return ACCESS[k].shut; });
-yes("no other bench is shut", shutRows.length === 2);
-yes("the forge still opens for anybody, so the fix closed only the temper benches",
-  Object.keys(ACCESS || {}).some(function (k) { return ACCESS[k].name === "CraftingSmithingForge" && ACCESS[k].anyone === true && !ACCESS[k].shut; }));
+yes("no other bench is shut but the Aetherium forge (#3080)", shutRows.length === 3 &&
+  shutRows.some(function (k) { return ACCESS[k].name === "DLC1LD_CraftingForgeAetherium" && ACCESS[k].shut === "Nobody works the Aetherium forge."; }));
+yes("the forge is not shut, so the fix closed only the temper benches",
+  Object.keys(ACCESS || {}).some(function (k) { return ACCESS[k].name === "CraftingSmithingForge" && !ACCESS[k].shut && (ACCESS[k].rows || []).length > 0; }));
 
 // ---- the gate, run against the real table ---------------------------------
 const gs = gm.indexOf("function benchGate(actorId, baseDesc) {");
@@ -90,9 +92,12 @@ yes("benchGate answers a shut bench's sentence before it reads the character",
   gateSrc.indexOf("if (bench.shut)") < gateSrc.indexOf("__thornswoodCharacter"));
 function gateWith(character, progression) {
   const g = { __thornswoodCharacter: character, __thornswoodProgression: progression };
+  // craftRow and craftAnswer are the gamemode's; here every row is one this
+  // master smith may make.
   const make = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
-    gateSrc + "\nreturn benchGate;");
-  return make(BY_BASE, ACCESS, g, function () {}, "NO PROFESSION", function (r) { return r; });
+    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;");
+  return make(BY_BASE, ACCESS, g, function () {}, "NO PROFESSION", function (r) { return r; },
+    function () { return {}; }, function () { return { refusal: null }; });
 }
 const MASTER = { prof: "smith", half: "edgewright", ranks: { edgewright: "master", platewright: "master" } };
 const C = { stateOf: function () { return MASTER; }, nameOf: function (h) { return h; } };
@@ -111,6 +116,14 @@ if (gate) {
     unloaded(0x14, Object.keys(BY_BASE).filter(function (k) { return BY_BASE[k] === WHEEL; })[0]) === SAYS);
   const forge = Object.keys(BY_BASE).filter(function (k) { return ACCESS[BY_BASE[k]] && ACCESS[BY_BASE[k]].name === "CraftingSmithingForge"; })[0];
   yes("a forge still opens for that smith", !!forge && gate(0x14, forge) === null);
+  // #3080: somebody craftAnswer refuses every forge row is told so and the
+  // forge does not open, whatever halves canWork would have said.
+  const refusedAll = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
+    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;")(BY_BASE, ACCESS,
+    { __thornswoodCharacter: C, __thornswoodProgression: P }, function () {}, "NO PROFESSION", function (r) { return r; },
+    function () { return {}; }, function () { return { refusal: "no" }; });
+  const said = forge ? refusedAll(0x14, forge) : null;
+  yes("a forge does not open for somebody who may make none of its rows", typeof said === "string" && /^There is nothing you can make here\./.test(said));
 }
 
 // ---- onActivate refuses on the gate's answer, and the refusal stays behind it

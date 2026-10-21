@@ -19,9 +19,11 @@
 // tests/test-1384-shut-benches.js).
 //
 // #3080 took the knob away. Patrick, 21 October: "An open bench opens only for
-// somebody with at least one recipe there that they may make." A bench opens
-// for anybody only when it holds a row nobody owns, so the cookpot, which
-// holds none since #1391, is the Hearthcook's, and the page says so.
+// somebody with at least one recipe there that they may make." Each bench
+// carries its rows and benchGate asks craftAnswer of them. A bench opens for
+// anybody only when it holds a row nobody owns and is not a trade's bench
+// (the forge, the tanning rack, the loom), so the cookpot, which holds none
+// since #1391, is the Hearthcook's, and the page says so.
 //
 // This holds the gamemode's markers, the table in the gamemode against the
 // page and against game/data/recipes.json, and runs the builder against a
@@ -71,11 +73,15 @@ yes("the BENCH_ACCESS block holds its comment and the table and nothing else",
 
 // ---- no knob: a bench opens for anybody only on a row nobody owns ---------
 yes("the builder has no OPEN_FURNITURE knob", py.indexOf("OPEN_FURNITURE") < 0);
-yes("anyone is set only from the rows nobody owns",
+yes("anyone is set only from the rows nobody owns, never at a trade's bench",
   (py.match(/a\['anyone'\] = True/g) || []).length === 1 &&
-  /for row in unowned\.values\(\):[\s\S]*?a\['anyone'\] = True/.test(py));
-yes("a door opened by a race's or a roll's rows stops the run",
-  /RESTRICTED = \('race', 'roll'\)/.test(py) && /STOP\. %d bench door\(s\) would open/.test(py));
+  /for row in unowned\.values\(\):[\s\S]*?if bname not in TRADE_BENCHES:\s*a\['anyone'\] = True/.test(py));
+const trade = (/TRADE_BENCHES = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
+yes("TRADE_BENCHES is the forge, the tanning rack and the loom (Patrick, 21 October)",
+  ["CraftingSmithingForge", "CraftingTanningRack", "MCE_CraftingLoom"].every(function (n) { return trade.indexOf("'" + n + "'") >= 0; }) &&
+  (trade.match(/^\s+'[^']+': /gm) || []).length === 3);
+yes("benchGate asks craftAnswer of the bench's rows",
+  /if \(Array\.isArray\(bench\.rows\)\) \{[\s\S]{0,200}craftRow\(bench\.rows\[i\]\)[\s\S]{0,100}!craftAnswer\(actorId, row\)\.refusal\) \{ return null; \}/.test(gm));
 
 // The page's bench table: | Bench | Who |.
 const rows = {};
@@ -116,7 +122,8 @@ yes("the cookpot is the Hearthcook's at novice and opens for nobody else",
   rows["Cookpot"] === "Hearthcook, from novice");
 
 // The table in the gamemode against recipes.json: a bench opens for anybody
-// exactly when it holds a row nobody owns and is not shut.
+// exactly when it holds a row nobody owns and is neither shut nor a trade's
+// bench, and it carries every row there that reaches the server.
 let RECIPES = null;
 try { RECIPES = JSON.parse(read("game/data/recipes.json")); } catch (e) { RECIPES = null; }
 yes("game/data/recipes.json parses", !!RECIPES);
@@ -125,13 +132,35 @@ if (RECIPES && ACCESS) {
   Object.keys(RECIPES.unowned).forEach(function (k) { unownedAt[RECIPES.unowned[k].benchName] = true; });
   const owned = {};
   Object.keys(RECIPES.recipes).forEach(function (k) { if (RECIPES.recipes[k].benchName) { owned[RECIPES.recipes[k].benchName] = true; } });
+  const TRADE = { CraftingSmithingForge: 1, CraftingTanningRack: 1, MCE_CraftingLoom: 1 };
   const wrong = Object.keys(ACCESS).filter(function (k) {
     const a = ACCESS[k];
     if (!owned[a.name] && !unownedAt[a.name]) { return false; }
-    return a.anyone !== (!!unownedAt[a.name] && !a.shut);
+    return a.anyone !== (!!unownedAt[a.name] && !a.shut && !TRADE[a.name]);
   }).map(function (k) { return ACCESS[k].name; });
-  yes("every bench in BENCH_ACCESS opens for anybody exactly when it holds a row nobody owns" +
+  yes("every bench in BENCH_ACCESS opens for anybody exactly when it holds a row nobody owns and is not a trade's" +
     (wrong.length ? " (not: " + wrong.join(", ") + ")" : ""), wrong.length === 0);
+  const rowsAt = {};
+  Object.keys(RECIPES.recipes).forEach(function (d) {
+    const r = RECIPES.recipes[d];
+    if (r.bench && r.fires !== false) { (rowsAt[r.bench] = rowsAt[r.bench] || []).push(d); }
+  });
+  const badRows = Object.keys(ACCESS).filter(function (k) {
+    const a = ACCESS[k];
+    const want = a.shut ? [] : (rowsAt[k] || []).slice().sort();
+    return JSON.stringify(a.rows || []) !== JSON.stringify(want);
+  }).map(function (k) { return ACCESS[k].name; });
+  yes("every bench carries exactly its rows that reach the server, sorted" +
+    (badRows.length ? " (not: " + badRows.join(", ") + ")" : ""), badRows.length === 0);
+  const lib = gm.slice(gm.indexOf("const KEPT_SMELT"), gm.indexOf("function craftRow("));
+  const unresolved = [];
+  Object.keys(ACCESS).forEach(function (k) {
+    (ACCESS[k].rows || []).forEach(function (d) {
+      if (gm.indexOf('"' + d + '": {') < 0 && lib.indexOf('"' + d + '"') < 0) { unresolved.push(d); }
+    });
+  });
+  yes("every row a bench carries is one craftRow finds" + (unresolved.length ? " (not: " + unresolved.slice(0, 3).join(", ") + ")" : ""),
+    unresolved.length === 0);
 }
 
 // ---- the builder, run ----------------------------------------------------
@@ -218,23 +247,8 @@ try {
     const r2 = build(lf);
     yes("a second run changes nothing", r2.code === 0 && fs.readFileSync(lf, "utf8") === after);
 
-    // An oven whose only novice Confectioner row is a race's own gear: a door
-    // at novice would let in a Confectioner craftAnswer refuses everything
-    // there, so the run stops and writes nothing.
-    const raced = path.join(tmp, "recipes-raced.json");
-    fs.writeFileSync(raced, JSON.stringify({
-      recipes: {
-        "a1:Skyrim.esm": { bench: "800:Skyrim.esm", benchName: "CraftingCookpot", half: "Hearthcook", rank: "novice" },
-        "a2:Skyrim.esm": { bench: "801:Skyrim.esm", benchName: "BYOHCraftingOven", half: "Confectioner", rank: "novice", race: "riekling" },
-        "a3:Skyrim.esm": { bench: "801:Skyrim.esm", benchName: "BYOHCraftingOven", half: "Confectioner", rank: "expert" }
-      },
-      unowned: {}
-    }));
-    const r4 = build(lf, raced);
-    yes("a door only a race's rows would open stops the run and writes nothing",
-      r4.code === 1 && /STOP\. 1 bench door\(s\) would open/.test(r4.out) &&
-      /BYOHCraftingOven: confectioner from novice, but a row with no race or roll only from expert/.test(r4.out) &&
-      fs.readFileSync(lf, "utf8") === after);
+    yes("the builder writes each bench's rows", !!A && JSON.stringify(A["800:Skyrim.esm"].rows) === '["a1:Skyrim.esm"]' &&
+      JSON.stringify(A["801:Skyrim.esm"].rows) === '["a2:Skyrim.esm"]' && !A.alchemy.rows);
 
     // A gamemode from before .gitattributes, CRLF: both blocks go in LF.
     const crlf = path.join(tmp, "gamemode-crlf.js");
