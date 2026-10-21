@@ -155,7 +155,16 @@ Say ("  icon-$iconHash.ico") 'DarkGray'
 #
 # The dev build gets its own name, so the two can never overwrite each other,
 # and a dev build never touches the Desktop icon the play install owns.
-$isDevRoot = $Root.TrimEnd('\') -match '-DevBuild$'
+#
+# The dev build is the one folder C:\Thornswood-DevBuild, asked by its whole
+# name like the play install below. MEASURED 20 OCTOBER on One (#2900): this
+# asked only for a name ending in -DevBuild, and -match ignores case, so the
+# dev release folder local\release-devbuild in the repository counted as the
+# dev install. A dev Ship installs its launcher there, so every one rewrote
+# the Desktop's Thornswood Dev.lnk to start the release folder's launcher
+# (2:57 PM that day) instead of the dev build Patrick plays, and a Ship dry
+# run's Play-DevBuild test folder did the same.
+$isDevRoot = $Root.TrimEnd('\') -ieq 'C:\Thornswood-DevBuild'
 $lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
 
 # AND A SCRATCH BUILD TOUCHES THE DESKTOP AT ALL.

@@ -520,6 +520,13 @@ try {
         $src -notmatch "if \(-not \`$path -or" -and $src -match "elseif \(Test-GameImageRunning \(Join-Path \`$Root \('Game\\' \+ \`$n \+ '\.exe'\)\)\)")
     Yes 'U5 and matches the root with its backslash, so C:\Thornswood is not C:\Thornswood-DevBuild' ($src.Contains("`$prefix = `$Root.TrimEnd('\') + '\'"))
 
+    # The dev install is asked by its whole name (#2900): a folder whose name
+    # merely ends in -devbuild, such as the dev release folder
+    # local\release-devbuild, is a scratch root and leaves the Desktop alone.
+    $inst = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Install-Launcher.ps1') -Raw
+    Yes 'V1 the dev install is C:\Thornswood-DevBuild by its whole name, not any folder ending in -DevBuild' (
+        $inst.Contains("`$isDevRoot = `$Root.TrimEnd('\') -ieq 'C:\Thornswood-DevBuild'") -and $inst -notmatch "isDevRoot\s*=[^\r\n]*-match")
+
     # ---- 8. who calls the install ------------------------------------------------
     # By code, not by comment: Build-Launcher.ps1's header names the install
     # script to say where its old half went, and that is not a call. In a
