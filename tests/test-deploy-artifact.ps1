@@ -362,9 +362,11 @@ try {
             $b64 = ($cmd -split ' ')[-1]
             $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($b64))
             # A script past Send-Script.ps1's limit (the store's lock from
-            # Lock-Folder.ps1 makes Send-ThornswoodArtifact's one) comes on
-            # standard input under the reader (#3027).
-            if ($text -eq (Get-ThornswoodStdinReader)) { $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
+            # Lock-Folder.ps1 makes Send-ThornswoodArtifact's one) comes by
+            # scp, and the runner on the line takes the copy off the box and
+            # runs it (#3059).
+            $rp = Get-ThornswoodRemoteRunnerPath $text
+            if ($rp) { $rf = $global:tsFarTemp + ($rp -split '\\')[-1]; $text = [IO.File]::ReadAllText($rf); Remove-Item -LiteralPath $rf -Force }
             & ([ScriptBlock]::Create($text))
         }
         $global:LASTEXITCODE = 0

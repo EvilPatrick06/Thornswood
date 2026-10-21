@@ -26,7 +26,8 @@
   of anything goes only after a backup holds it.
 
   WHAT IT REFUSES.
-    - anywhere with SkyrimSE.exe on it, which is the gaming PC, not the VPS
+    - anywhere that is not the box: a Windows workstation, which a gaming PC
+      is, or a machine Windows will not say is a server (BoxGuard.ps1)
     - a folder that is a link or holds one anywhere inside it: it is left as
       it is and said, because removing through a link can reach whatever the
       link points at
@@ -41,15 +42,27 @@ param(
     # Where to look. Only the tests pass anything else.
     [string[]]$TempDirs = @(),
     [string]$BackupDir = 'C:\Thornswood-Backup',
-    # The tests run on a machine with the game on it. Nothing else passes it.
+    # The tests run on a developer's machine, a workstation. Nothing else
+    # passes it.
     [switch]$AllowGamingPc
 )
 $ErrorActionPreference = 'Stop'
 function Say([string]$m) { Write-Output $m }
 
-if (-not $AllowGamingPc -and (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe')) {
-    Say 'REFUSED: SkyrimSE.exe is here, so this is the gaming PC, not the VPS. Nothing was removed.'
-    exit 1
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
+}
+# ---- end BoxGuard.ps1 ----
+if (-not $AllowGamingPc) {
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) { Say ('REFUSED: ' + $notBox + '. Nothing was removed.'); exit 1 }
 }
 # Passed as one word with commas when it comes through powershell -File.
 $TempDirs = @($TempDirs | ForEach-Object { "$_" -split ',' } | Where-Object { $_ })

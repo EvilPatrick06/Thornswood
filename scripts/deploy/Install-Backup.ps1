@@ -67,7 +67,7 @@ foreach ($t in 'ssh', 'scp') {
 
 function Remote($script) {
   # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
-  # on ssh's standard input (nothing of it is left on the box), and the far
+  # by scp and its run takes it off the box before it runs, and the far
   # side's exit code comes back.
   return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }

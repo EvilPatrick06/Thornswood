@@ -112,7 +112,11 @@ function listening(srv, port) {
     r = await request(port, 'GET', '/api/allowed', K);
     yes('a bans.json cut short: the door lets nobody through', r.status === 200 && Array.isArray(r.j.profiles) && r.j.profiles.length === 0);
     yes('  and says the ban list is broken', !!r.j && r.j.bansBroken === true);
-    yes('  and the site log says BANS BROKEN', /BANS BROKEN/.test(log));
+    // Read from site.log, which the site writes before it answers; the pipe
+    // can bring the line in after the answer (#3060, test-2180-site-state.js).
+    let said = '';
+    try { said = fs.readFileSync(path.join(dir, 'site.log'), 'utf8'); } catch (e) { }
+    yes('  and the site log says BANS BROKEN', /BANS BROKEN/.test(said));
     r = await request(port, 'POST', '/api/staff/ban', staffC, { id: BJORN_D, minutes: 60, why: 'testing' });
     yes('a ban from the hub is not taken over a broken file', r.status !== 200);
     yes('  and the broken file is left exactly as it was', fs.readFileSync(BANS, 'utf8') === broken);

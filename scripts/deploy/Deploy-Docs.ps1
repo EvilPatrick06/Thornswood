@@ -234,8 +234,8 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 # contain a method named 'Trim'" after the files had already gone up. The two
 # places that build a list from this take only the strings.
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes on ssh's standard input
-  # (nothing of it is left on the box), and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 

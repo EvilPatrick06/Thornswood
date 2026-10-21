@@ -64,7 +64,15 @@ function ssh {
     $a = @($args | % { [string]$_ }); $cmd = $a[-1]
     [void]$script:lines.Add(($a -join ' '))
     $m = [regex]::Match($cmd, '-EncodedCommand (\S+)$')
-    if ($m.Success) { @($input) | & $ps51 -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value; return }
+    if ($m.Success) {
+        # A long script's runner (Send-Script.ps1, #3059) takes its copy from
+        # the stand-in box, and sweeps that, not this machine's temp folder.
+        $run = $m.Groups[1].Value
+        $said = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($run))
+        $copy = Get-ThornswoodRemoteRunnerPath $said
+        if ($copy) { $run = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($said.Replace($copy, (MapFar $copy.Replace('\', '/'))).Replace("'C:\Windows\Temp'", ("'" + $script:fakeBox + "'")))) }
+        @($input) | & $ps51 -NoProfile -NonInteractive -EncodedCommand $run; return
+    }
     $m = [regex]::Match($cmd, '-File (\S+)$')
     if ($m.Success) { @($input) | & $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (MapFar $m.Groups[1].Value); return }
     if ($cmd -match 'Remove-Item') { $global:LASTEXITCODE = 0; return }

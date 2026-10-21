@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  64,
-    "callCount":  260,
+    "callCount":  262,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2016,8 +2016,26 @@
                   {
                       "script":  "scripts/vps/Send-Script.ps1",
                       "scope":  "Invoke-ThornswoodRemote",
+                      "via":  "scp",
+                      "anchor":  "$sent = @(Invoke-ThornswoodNative { \u0026 scp @ssh $tmp ($Target + \u0027:\u0027 + $far.Replace(\u0027\\\u0027, \u0027/\u0027)) } 2\u003e\u00261)",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/vps/Send-Script.ps1",
+                      "scope":  "Invoke-ThornswoodRemote",
                       "via":  "ssh",
-                      "anchor":  "return ($wire | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh $Target $run } 2\u003e\u00261)",
+                      "anchor":  "if ($piped) { $out = @($Stdin | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh $Target $run } 2\u003e\u00261) }",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/vps/Send-Script.ps1",
+                      "scope":  "Invoke-ThornswoodRemote",
+                      "via":  "ssh",
+                      "anchor":  "else { $out = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $Target $run } 2\u003e\u00261) }",
                       "does":  "sends a script or file for its caller",
                       "class":  "transport",
                       "reason":  "carries what its caller hands it; each caller is mapped"
