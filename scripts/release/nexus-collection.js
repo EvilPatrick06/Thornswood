@@ -41,6 +41,23 @@
 //                "md5": "<32 hex>", "fileSize": 148896610,
 //                "logicalFilename": "Thornswood Client Runtime" }]
 // On stdout, one line per field changed: <entry name>\t<field>\t<was>\t<now>.
+//
+// ADDING A MOD (#2969). An entry with "add": true is a mod the revision does
+// not carry yet, written the way Vortex writes a mod it installed with its
+// basic installer (no installer answers, no file hashes, no patches):
+//   { "add": true, "modId": "1932", "fileId": "8662", "version": "1.3",
+//     "md5": "<32 hex>", "fileSize": 52221104,
+//     "logicalFilename": "KS Hairdos Lite SE NoNPCs",
+//     "name": "KS Hairdos Lite SE - KS Hairdos Lite SE NoNPCs",
+//     "author": "...", "category": "Body, Face, and Hair",
+//     "plugins": [{ "name": "KS_Hairdo's_Lite_NoNPCs.esp", "after": ["Playable Rieklings.esp"] }] }
+// Each plugin goes on the end of the plugin list, switched on, and its
+// "after" becomes a plugin rule, lower case as Vortex keeps them, so Vortex
+// and LOOT put it where the list does. Every "after" has to be a plugin the
+// list already has, or one added before it. It refuses a file the revision
+// already carries and a plugin the list already names. The tag Vortex gives
+// an installed mod is made the way shortid makes one, unless "tag" is given.
+// On stdout: <entry name>\tadded\t\tfile <id>, and <plugin>\tplugin\t\tafter <names>.
 
 'use strict';
 const fs = require('fs');
@@ -133,6 +150,7 @@ function applySwaps(collection, swaps) {
   const lines = [];
   if (!Array.isArray(collection.mods)) stop('collection.json has no mods list, so it is not a collection Vortex wrote.');
   for (const sw of swaps) {
+    if (sw.add === true) { applyAdd(collection, sw, lines); continue; }
     for (const k of ['modId', 'fileId', 'version', 'md5', 'fileSize', 'logicalFilename']) {
       if (sw[k] === undefined || sw[k] === null || sw[k] === '') stop('A swap has no ' + k + '.');
     }
@@ -170,6 +188,65 @@ function applySwaps(collection, swaps) {
   return lines;
 }
 
+// shortid's alphabet, which Vortex's reference tags are drawn from.
+const TAG_CHARS = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_-';
+function newTag() {
+  const bytes = require('crypto').randomBytes(10);
+  let t = '';
+  for (const b of bytes) t += TAG_CHARS[b % TAG_CHARS.length];
+  return t;
+}
+
+function applyAdd(collection, add, lines) {
+  for (const k of ['modId', 'fileId', 'version', 'md5', 'fileSize', 'logicalFilename', 'name', 'author', 'category']) {
+    if (add[k] === undefined || add[k] === null || add[k] === '') stop('A mod to add has no ' + k + '.');
+  }
+  if (!/^\d+$/.test(String(add.modId)) || !/^\d+$/.test(String(add.fileId))) stop('A mod to add has a mod number or file id that is not a number.');
+  if (!/^[0-9a-f]{32}$/.test(String(add.md5))) stop('The md5 for mod ' + add.modId + ' is not 32 lower case hex characters.');
+  const plugins = Array.isArray(add.plugins) ? add.plugins : [];
+  const same = collection.mods.find(m => m.source && m.source.type === 'nexus' && String(m.source.fileId) === String(add.fileId));
+  if (same) stop(same.name + ' is already file ' + add.fileId + ' in this revision, so it is not added again.');
+  if (!Array.isArray(collection.plugins)) collection.plugins = [];
+  if (!collection.pluginRules || typeof collection.pluginRules !== 'object') collection.pluginRules = { plugins: [], groups: [] };
+  if (!Array.isArray(collection.pluginRules.plugins)) collection.pluginRules.plugins = [];
+  const known = new Set(collection.plugins.map(p => String(p.name).toLowerCase()));
+  for (const m of ['skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm']) known.add(m);
+  for (const p of plugins) {
+    if (!p || !p.name || !/\.es[mpl]$/i.test(p.name)) stop('A plugin of ' + add.name + ' has no plugin name (.esm, .esp or .esl).');
+    const low = String(p.name).toLowerCase();
+    if (collection.plugins.some(q => String(q.name).toLowerCase() === low)) stop('The plugin list already names ' + p.name + ', so ' + add.name + ' would put a second one in Data.');
+    const after = Array.isArray(p.after) ? p.after : [];
+    if (!after.length) stop(p.name + ' says nothing to load after, so Vortex and LOOT would place it where they liked.');
+    for (const a of after) if (!known.has(String(a).toLowerCase())) stop(p.name + ' is to load after ' + a + ', which the plugin list does not name.');
+    known.add(low);
+  }
+  collection.mods.push({
+    name: String(add.name),
+    version: String(add.version),
+    optional: false,
+    domainName: (collection.info && collection.info.domainName) || 'skyrimspecialedition',
+    source: {
+      type: 'nexus',
+      modId: Number(add.modId),
+      fileId: Number(add.fileId),
+      md5: String(add.md5),
+      fileSize: Number(add.fileSize),
+      logicalFilename: String(add.logicalFilename),
+      updatePolicy: 'exact',
+      tag: add.tag ? String(add.tag) : newTag(),
+    },
+    author: String(add.author),
+    details: { category: String(add.category), type: '' },
+    phase: 0,
+  });
+  lines.push([String(add.name), 'added', '', 'file ' + add.fileId].join('\t'));
+  for (const p of plugins) {
+    collection.plugins.push({ name: String(p.name), enabled: true });
+    collection.pluginRules.plugins.push({ name: String(p.name).toLowerCase(), after: p.after.map(a => String(a).toLowerCase()) });
+    lines.push([String(p.name), 'plugin', '', 'after ' + p.after.join(', ')].join('\t'));
+  }
+}
+
 function main(argv) {
   if (argv.length !== 4) stop('usage: node nexus-collection.js <collection.json> <swaps.json> <out collection.json> <out payload.json>');
   const [inPath, swapsPath, outPath, payloadPath] = argv;
@@ -187,4 +264,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2));
-module.exports = { payloadOf, applySwaps, filterInfo, toV3CollectionPayload };
+module.exports = { payloadOf, applySwaps, applyAdd, filterInfo, toV3CollectionPayload };
