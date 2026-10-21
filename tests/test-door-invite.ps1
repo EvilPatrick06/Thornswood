@@ -63,6 +63,7 @@ Yes 'site\server.js sends why role with the invite on /api/play/join' (
     $server -match "(?s)why:'role', message:\s*notAcceptedYet\(\),\s*invite: cfg\.discord\.invite")
 
 # ---- the compiler the launcher is built with --------------------------------
+if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Done }
 Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 $refs = @('System.dll', 'System.Core.dll', 'System.Xaml.dll', 'WindowsBase.dll', 'PresentationCore.dll', 'PresentationFramework.dll') |

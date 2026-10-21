@@ -51,6 +51,12 @@ Yes 'Install-Bot puts py-libs under the folder''s rules and refuses before stopp
 # VPS), else whatever py -3 finds. Taken by its full path, so the swap below
 # starts the same one. Until #1880 this asked py for 3.9, which neither the
 # bot nor the VPS has, so on the build runner it stopped at the first wheel.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the swap: the bot''s swap runs on the box under Windows PowerShell 5.1, which only Windows has'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
 $py = ''
 foreach ($c in @(@('python'), @('py', '-3'))) {
     if (-not (Get-Command $c[0] -CommandType Application -EA SilentlyContinue)) { continue }
@@ -61,9 +67,8 @@ foreach ($c in @(@('python'), @('py', '-3'))) {
     $null = & $o -m pip --version 2>$null
     if ($LASTEXITCODE -eq 0) { $py = $o; break }
 }
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $py -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  needs a python 3 with pip, and Windows PowerShell 5.1'
+if (-not $py) {
+    Write-Host 'SKIP  needs a python 3 with pip'
     Done
 }
 

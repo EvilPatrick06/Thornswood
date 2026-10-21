@@ -45,7 +45,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $installer = Join-Path $repo 'scripts\deploy\Install-ThornswoodServer.ps1'
 $lockBox = Join-Path $repo 'scripts\vps\Lock-VpsFolders.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  who may read the server folders is a Windows ACL, read back with Get-Acl, so this runs only on Windows'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {

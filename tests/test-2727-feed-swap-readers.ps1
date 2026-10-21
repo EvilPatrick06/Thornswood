@@ -164,9 +164,11 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
 
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     $shells = @(@{ Name = ('this shell, PowerShell ' + $PSVersionTable.PSVersion.ToString()); Run = { param($d) & $held $storePs1 $d } })
-    $ps51 = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    Yes 'Windows PowerShell 5.1, which the VPS runs the store''s script with, is here' (Test-Path -LiteralPath $ps51)
-    if (Test-Path -LiteralPath $ps51) {
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the same under Windows PowerShell 5.1, which the VPS runs the store''s script with: this is not Windows'
+    } else {
+        $ps51 = Get-WindowsPowerShell
         $shells += @{ Name = 'Windows PowerShell 5.1'; Run = { param($d) & $ps51 -NoProfile -ExecutionPolicy Bypass -File $held $storePs1 $d 2>&1 } }
     }
     $k = 0

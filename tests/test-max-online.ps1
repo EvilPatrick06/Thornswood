@@ -296,8 +296,12 @@ if ($open -ge 0 -and $close -gt $marker) {
     }
 
     # The far end is Windows PowerShell 5.1, so that is what runs it.
-    $ps = Get-Command powershell.exe -ErrorAction SilentlyContinue
-    $psExe = if ($ps) { $ps.Source } else { (Get-Process -Id $PID).Path }
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if ($OnWindows) { $psExe = Get-WindowsPowerShell }
+    else {
+        $psExe = (Get-Process -Id $PID).Path
+        Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+    }
 
     function Invoke-Remote([string]$rootWin, $maxOnline, $seats) {
         $text = Expand-Remote $rootWin $maxOnline $seats

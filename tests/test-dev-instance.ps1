@@ -39,7 +39,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $script = Join-Path $repo 'scripts\vps\vps-dev-instance.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 # Every file the voice service requires, read out of the repository's
 # voice\voice-server.js and whatever that requires in turn: the relative
@@ -75,12 +75,37 @@ function Put([string]$p, [string]$t) {
     [IO.File]::WriteAllText($p, $t)
 }
 function Get([string]$p) { if (Test-Path -LiteralPath $p) { return [IO.File]::ReadAllText($p) } return $null }
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
 function Broad([string]$p) {
     $acl = Get-Acl -LiteralPath $p
     return @($acl.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) |
              Where-Object { @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11') -contains $_.IdentityReference.Value }).Count
 }
 
+# ---- the parts -FilesOnly does not run ----------------------------------------------
+$body = Get-Content -LiteralPath $script -Raw
+$copy = [regex]::Match($body, '(?m)^\s*& robocopy \$liveVoice \$devVoice ([^\r\n/]+)/')
+$named = @($copy.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
+Yes ('voice-server.js requires ' + ($required -join ', ') + ', each a file beside it in voice\') ($required.Count -ge 1 -and $outside.Count -eq 0)
+foreach ($o in $outside) { Write-Host "      $o" }
+Yes ('the script copies each of them to dev voice by name, with the program and the log writer (' + ($named -join ' ') + ')') (
+    $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'server-log.js' -and
+    @($required | Where-Object { $named -notcontains $_ }).Count -eq 0)
+Yes 'the script opens no firewall rule for dev voice' ($body -notmatch "Name = 'Thornswood Dev Voice'")
+Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")
+Yes 'it never copies live''s private folder' ($body -match '& robocopy \$live \$dev [^\r\n]*/XD [^\r\n]*\bprivate\b')
+
+# ---- run -FilesOnly, on the box's Windows PowerShell -----------------------------
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the -FilesOnly runs: the script runs only on the box, under Windows PowerShell 5.1, with robocopy and Windows ACLs'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
 $box = Join-Path ([IO.Path]::GetTempPath()) ('ts-dev-instance-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $box
 # The Users rule every folder under C:\ carries, given to the scratch folder
@@ -191,23 +216,7 @@ try {
     Yes 'run again, it works' ($script:code -eq 0)
     Yes 'and keeps dev''s own characters and door' ((Get (Join-Path $dev 'private\characters.json')) -match 'a dev character' -and (Get (Join-Path $dev 'private\door.json')) -match '/dev')
     Yes 'and still takes no allowed.json of live''s' (-not (Test-Path -LiteralPath (Join-Path $dev 'private\allowed.json')) -and -not (Test-Path -LiteralPath (Join-Path $dev 'data\allowed.json')))
-
-    # ---- the parts -FilesOnly does not run ----------------------------------------------
-    $body = Get-Content -LiteralPath $script -Raw
-    $copy = [regex]::Match($body, '(?m)^\s*& robocopy \$liveVoice \$devVoice ([^\r\n/]+)/')
-    $named = @($copy.Groups[1].Value.Trim() -split '\s+' | Where-Object { $_ })
-    Yes ('voice-server.js requires ' + ($required -join ', ') + ', each a file beside it in voice\') ($required.Count -ge 1 -and $outside.Count -eq 0)
-    foreach ($o in $outside) { Write-Host "      $o" }
-    Yes ('the script copies each of them to dev voice by name, with the program and the log writer (' + ($named -join ' ') + ')') (
-        $copy.Success -and $named -contains 'voice-server.js' -and $named -contains 'server-log.js' -and
-        @($required | Where-Object { $named -notcontains $_ }).Count -eq 0)
-    Yes 'the script opens no firewall rule for dev voice' ($body -notmatch "Name = 'Thornswood Dev Voice'")
-    Yes 'and takes an old one down' ($body -match "Remove-NetFirewallRule -DisplayName 'Thornswood Dev Voice'")
-    Yes 'it never copies live''s private folder' ($body -match '& robocopy \$live \$dev [^\r\n]*/XD [^\r\n]*\bprivate\b')
 } finally {
     Remove-Item -LiteralPath $box -Recurse -Force -ErrorAction SilentlyContinue
 }
-Write-Host ''
-Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
-if ($script:fail) { exit 1 }
-exit 0
+Done

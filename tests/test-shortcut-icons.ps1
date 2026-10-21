@@ -33,6 +33,7 @@ param()
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -53,6 +54,7 @@ function Hash8([byte[]]$b) {
     ([BitConverter]::ToString($sha.ComputeHash($b), 0, 4)).Replace('-', '').ToLower()
 }
 
+if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Done }
 Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
@@ -198,7 +200,7 @@ namespace Thornswood
     $out = & $LauncherCsc /nologo /target:winexe "/out:$(Join-Path $stage 'Thornswood.exe')" "/resource:$devIco,app.ico" $prog 2>&1
     Yes 'a stand-in exe carrying other art compiles' ($LASTEXITCODE -eq 0)
     $sroot = Join-Path $work 'scratchroot'
-    $ps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    $ps = Get-WindowsPowerShell
     $inst = Join-Path $Repo 'scripts\release\Install-Launcher.ps1'
     $sLauncher = Join-Path $sroot 'Launcher'
     New-Item -ItemType Directory -Force -Path $sLauncher | Out-Null
