@@ -72,10 +72,10 @@ param(
 
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $Here 'Vps.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
-$ErrorActionPreference = 'Stop'
 
 if ($PSCmdlet.ParameterSetName -eq 'File') {
     if (-not (Test-Path -LiteralPath $File)) { throw "There is no script at $File" }

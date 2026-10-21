@@ -340,6 +340,7 @@ param(
     # order on the box. Runs off Windows. Keeps the feed's launcher.
     ,[switch]$FromFeed
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
@@ -962,7 +963,6 @@ function Assert-DevVersionSelection([string]$selected, [string]$current, [bool]$
 }
 
 Set-StrictMode -Version Latest
-$ErrorActionPreference = 'Stop'
 
 # Declared here because Set-StrictMode is on: reading a variable that was never
 # set is an error, and the whole point of this one is that it is usually never

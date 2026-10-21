@@ -9,6 +9,7 @@
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded>
       .\scripts\release\New-NexusRevision.ps1 -Add <mods to add>.json -WhatIf
+      pwsh scripts/release/New-NexusRevision.ps1 -SetLight RaceMenu.esp,XPMSE.esp -Layout <the -Record folder> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3 -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3
 
@@ -74,6 +75,28 @@
   while there is one. -WhatIf builds on the draft instead, so the revision
   after it can be laid out and checked while the draft waits.
 
+  LIGHT FLAGS (#2979). -SetLight and -ClearLight name plugins whose ESL flag
+  (0x200 in the TES4 header) the revision sets or clears, the way the
+  collection already sets FNIS.esp's: a binary patch on the entry that
+  installs the plugin, patches\<entry name>\<plugin>.diff, with the CRC-32 of
+  the archive's own file under the entry's "patches". Vortex applies it after
+  it installs the mod (collections/util/binaryPatching.ts), and
+  Install-NexusRevision.ps1 does the same.
+  Why: until 20 October the flag was set on the Plugins page in Vortex on One,
+  which writes it into Vortex's copy of the file and nowhere else. On 26
+  September eight plugins were marked light there and CBBE.esp unmarked, and
+  the collection was made from that install with no patch for any of them, so
+  One and the servers had the edited bytes and every other install had the
+  archives' (#2979).
+  -Layout is the folder Install-NexusRevision.ps1 -Record wrote for the
+  revision this starts from. Its files.txt says which Nexus file puts each
+  plugin in Data and what its bytes are; the archive is downloaded, held to
+  the revision's md5 and size, and the plugin is found in it by that sha256.
+  Each patch is read back and applied before it is packed, and the plugin it
+  makes is compared with records\collection-plugins.json, the bytes One
+  deploys. Lay the new archive out with Install-NexusRevision.ps1
+  -CollectionArchive ... -Record to check it end to end.
+
   Nothing in this checks the game. A new Client Runtime is checked on Dev
   before the draft is published (docs\COLLECTION-REVISION-2.md, steps 8 to
   14, and #2754 and #2903 for running those off One).
@@ -97,6 +120,16 @@
 
 .PARAMETER Add
   A JSON file of mods to add, as ADDING A MOD above says.
+
+.PARAMETER SetLight
+  Plugins the revision gives the ESL flag, as LIGHT FLAGS above says.
+
+.PARAMETER ClearLight
+  Plugins the revision takes the ESL flag off.
+
+.PARAMETER Layout
+  The -Record folder of the revision this starts from, for -SetLight and
+  -ClearLight.
 
 .PARAMETER From
   The published revision to start from: its .7z, or a folder holding it
@@ -131,6 +164,9 @@ param(
   [string[]]$FileId = @(),
   [string[]]$Archive = @(),
   [string]$Add,
+  [string[]]$SetLight = @(),
+  [string[]]$ClearLight = @(),
+  [string]$Layout,
   [string]$From,
   [int]$BaseRevision = 0,
   [string]$Slug = '7essxf',
@@ -145,6 +181,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Nexus.ps1')
+. (Join-Path $Here 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 $script:Done = New-Object System.Collections.Generic.List[string]
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -197,6 +234,92 @@ function Get-ArchivePaths([string]$sz, [string]$archive) {
   return @($paths | Sort-Object)
 }
 
+# BSDIFF40, the patch format Vortex's binaryPatching applies (bsdiff 4): a 32
+# byte header of the magic, the control block's length, the diff block's and
+# the new file's size, each a sign-magnitude int64, then the three blocks,
+# each bzip2. 7-Zip packs and unpacks the blocks, as Install-NexusRevision.ps1
+# does, because neither PowerShell has bzip2.
+function ConvertTo-OffT([long]$v) {
+  $m = [Math]::Abs($v); $b = New-Object byte[] 8
+  for ($i = 0; $i -lt 8; $i++) { $b[$i] = [byte]($m -band 0xFF); $m = $m -shr 8 }
+  if ($v -lt 0) { $b[7] = $b[7] -bor 0x80 }
+  return , $b
+}
+function ConvertFrom-OffT([byte[]]$b, [int]$at) {
+  [long]$y = $b[$at + 7] -band 0x7F
+  for ($i = 6; $i -ge 0; $i--) { $y = $y * 256 + $b[$at + $i] }
+  if ($b[$at + 7] -band 0x80) { $y = -$y }
+  return $y
+}
+function Compress-Bzip2([string]$sz, [byte[]]$bytes, [string]$path) {
+  [IO.File]::WriteAllBytes($path, $bytes)
+  $r = Invoke-Tool $sz @('a', '-tbzip2', '-mx=9', '-y', ($path + '.bz2'), $path)
+  if ($r.Code -ne 0) { throw ('7-Zip could not pack ' + $path + ' as bzip2: ' + $r.Err.Trim()) }
+  return , [IO.File]::ReadAllBytes($path + '.bz2')
+}
+function Expand-Bzip2([string]$sz, [byte[]]$bytes, [string]$path) {
+  [IO.File]::WriteAllBytes($path + '.bz2', $bytes)
+  $r = Invoke-Tool $sz @('e', '-y', ('-o' + (Split-Path -Parent $path)), ($path + '.bz2'))
+  if ($r.Code -ne 0) { throw ('7-Zip could not unpack ' + $path + '.bz2: ' + $r.Err.Trim()) }
+  return , [IO.File]::ReadAllBytes($path)
+}
+# The patch from one file to another of the same size: one control entry that
+# adds the whole new file to the old, byte by byte, and copies nothing extra.
+function New-BsdiffPatch([string]$sz, [byte[]]$old, [byte[]]$new, [string]$dir) {
+  if ($old.Length -ne $new.Length) { throw 'a patch here only changes bytes in place, and the two files are not one size' }
+  $diff = New-Object byte[] $new.Length
+  for ($i = 0; $i -lt $new.Length; $i++) { $diff[$i] = [byte](($new[$i] - $old[$i] + 256) % 256) }
+  $ctrl = [byte[]]((ConvertTo-OffT $new.Length) + (ConvertTo-OffT 0) + (ConvertTo-OffT 0))
+  $c = Compress-Bzip2 $sz $ctrl (Join-Path $dir 'ctrl')
+  $d = Compress-Bzip2 $sz $diff (Join-Path $dir 'diff')
+  $e = Compress-Bzip2 $sz (New-Object byte[] 0) (Join-Path $dir 'extra')
+  $head = [byte[]]([Text.Encoding]::ASCII.GetBytes('BSDIFF40') + (ConvertTo-OffT $c.Length) + (ConvertTo-OffT $d.Length) + (ConvertTo-OffT $new.Length))
+  return , [byte[]]($head + $c + $d + $e)
+}
+# Any BSDIFF40 patch applied to a file, the way bspatch does, to read back
+# what Vortex will make of it.
+function Invoke-Bspatch([string]$sz, [byte[]]$old, [byte[]]$patch, [string]$dir) {
+  if ($patch.Length -lt 32 -or [Text.Encoding]::ASCII.GetString($patch, 0, 8) -ne 'BSDIFF40') { throw 'it is not a BSDIFF40 patch' }
+  $cl = ConvertFrom-OffT $patch 8; $dl = ConvertFrom-OffT $patch 16; $n = ConvertFrom-OffT $patch 24
+  if ($cl -lt 0 -or $dl -lt 0 -or $n -lt 0 -or 32 + $cl + $dl -gt $patch.Length) { throw 'its header does not fit it' }
+  $blocks = @()
+  $at = 32
+  foreach ($len in @($cl, $dl, ($patch.Length - 32 - $cl - $dl))) {
+    $part = New-Object byte[] $len
+    [Array]::Copy($patch, $at, $part, 0, $len)
+    $blocks += , (Expand-Bzip2 $sz $part (Join-Path $dir ('block' + $blocks.Count)))
+    $at += $len
+  }
+  $ctrl = $blocks[0]; $diff = $blocks[1]; $extra = $blocks[2]
+  $out = New-Object byte[] $n
+  [long]$o = 0; [long]$w = 0; $ci = 0; [long]$di = 0; [long]$ei = 0
+  while ($w -lt $n) {
+    if ($ci + 24 -gt $ctrl.Length) { throw 'its control block ends early' }
+    $add = ConvertFrom-OffT $ctrl $ci; $copy = ConvertFrom-OffT $ctrl ($ci + 8); $seek = ConvertFrom-OffT $ctrl ($ci + 16); $ci += 24
+    if ($add -lt 0 -or $copy -lt 0 -or $w + $add -gt $n -or $di + $add -gt $diff.Length) { throw 'it is corrupt' }
+    for ($i = 0; $i -lt $add; $i++) {
+      $ob = if ($o + $i -ge 0 -and $o + $i -lt $old.Length) { $old[$o + $i] } else { 0 }
+      $out[$w + $i] = [byte](($diff[$di + $i] + $ob) % 256)
+    }
+    $di += $add; $w += $add; $o += $add
+    if ($w + $copy -gt $n -or $ei + $copy -gt $extra.Length) { throw 'it is corrupt' }
+    if ($copy) { [Array]::Copy($extra, $ei, $out, $w, $copy) }
+    $ei += $copy; $w += $copy; $o += $seek
+  }
+  return , $out
+}
+function Get-Sha256Hex([byte[]]$b) {
+  $h = [Security.Cryptography.SHA256]::Create()
+  try { return (-join ($h.ComputeHash($b) | ForEach-Object { $_.ToString('x2') })) } finally { $h.Dispose() }
+}
+# The CRC-32 Vortex records for a patched file, as 7-Zip's hash command gives it.
+function Get-Crc32Hex([string]$sz, [string]$path) {
+  $r = Invoke-Tool $sz @('h', '-scrcCRC32', $path)
+  $m = [regex]::Match($r.Out, 'CRC32\s+for data:\s+([0-9A-Fa-f]{8})')
+  if ($r.Code -ne 0 -or -not $m.Success) { throw ('7-Zip gave no CRC-32 for ' + $path + ': ' + $r.Err.Trim()) }
+  return $m.Groups[1].Value.ToUpperInvariant()
+}
+
 Write-Host ''
 Write-Host '  THORNSWOOD  -  a revision of the collection on Nexus Mods' -ForegroundColor White
 if ($WhatIf) { Say '  -WhatIf: reads only, and says what it would write.' 'Yellow' }
@@ -216,7 +339,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add or -From.' }
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add -or $SetLight.Count -or $ClearLight.Count) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add, -SetLight, -ClearLight or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -245,7 +368,7 @@ if ($Publish) {
 }
 
 # ------------------------------------------------------- refused up front ---
-if (-not $Mod.Count -and -not $Add) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, or publish a draft with -Publish.' }
+if (-not $Mod.Count -and -not $Add -and -not $SetLight.Count -and -not $ClearLight.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, which plugins get or lose the light flag with -SetLight and -ClearLight, or publish a draft with -Publish.' }
 $Mod = @($Mod | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $FileId = @($FileId | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Mod.Count -ne $FileId.Count -or $Mod.Count -ne $Archive.Count) { Die ('-Mod, -FileId and -Archive go together, one of each for every mod: ' + $Mod.Count + ', ' + $FileId.Count + ' and ' + $Archive.Count + ' were given.') }
@@ -264,6 +387,17 @@ if ($Add) {
     if ([string]$a.fileId -notmatch '^\d+$') { Die ('Mod ' + $a.modId + ' in ' + $Add + ' has the file id "' + $a.fileId + '".') }
     if (-not $a.archive -or -not (Test-Path -LiteralPath ([string]$a.archive) -PathType Leaf)) { Die ('Mod ' + $a.modId + ' in ' + $Add + ' names no archive that is there: "' + $a.archive + '".') }
   }
+}
+$lights = @()
+foreach ($n in @($SetLight | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { $lights += [pscustomobject]@{ Name = $n; Light = $true } }
+foreach ($n in @($ClearLight | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })) { $lights += [pscustomobject]@{ Name = $n; Light = $false } }
+foreach ($l in $lights) {
+  if ($l.Name -notmatch '^[^\\/:*?"<>|]+\.es[mp]$') { Die ($l.Name + ' is not a plugin file name (.esm or .esp): an .esl is light by its name, with no flag to set.') }
+  if (@($lights | Where-Object { $_.Name -ieq $l.Name }).Count -gt 1) { Die ($l.Name + ' is named more than once in -SetLight and -ClearLight.') }
+}
+if ($lights.Count) {
+  if (-not $Layout) { Die '-SetLight and -ClearLight need -Layout, the Install-NexusRevision.ps1 -Record folder of the revision this starts from.' }
+  foreach ($f in 'layout.json', 'files.txt') { if (-not (Test-Path -LiteralPath (Join-Path $Layout $f) -PathType Leaf)) { Die ('There is no ' + $f + ' in ' + $Layout + ', so it is not an Install-NexusRevision.ps1 -Record folder.') } }
 }
 # The revision this starts from: the latest published, or the waiting draft
 # for a -WhatIf, as A DRAFT WAITING above says.
@@ -387,9 +521,95 @@ foreach ($a in $adds) {
     logicalFilename = $fileName; name = $entryName; author = $author; category = $category; plugins = $plugins })
 }
 
+# ------------------------------------------------------- the light flags ---
+# LIGHT FLAGS above: each plugin found by the layout, its archive downloaded
+# and held to the revision, the patch made, read back and staged.
+$staged = Join-Path $scratch 'light'
+$lightPaths = @()
+if ($lights.Count) {
+  Head 'The light flags'
+  if (-not $isArchive) { Die ('-SetLight and -ClearLight hold -Layout to the archive it was laid out from, and -From is a folder.') }
+  $lay = Step { ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText((Join-Path $Layout 'layout.json'))) (Join-Path $Layout 'layout.json') }
+  $fromMd5 = (Get-FileHash -LiteralPath $From -Algorithm MD5).Hash.ToLowerInvariant()
+  if ([int]$lay.collection.revision -ne $BaseRevision -or [string]$lay.collection.archiveMd5 -ne $fromMd5) { Die ($Layout + ' is the layout of revision ' + $lay.collection.revision + ' (archive md5 ' + $lay.collection.archiveMd5 + '), not of revision ' + $BaseRevision + ' as downloaded (md5 ' + $fromMd5 + '). Lay this revision out with Install-NexusRevision.ps1 -Record first.') }
+  $placedBy = @{}
+  foreach ($line in [IO.File]::ReadAllLines((Join-Path $Layout 'files.txt'))) {
+    if ($line.StartsWith('#')) { continue }
+    $c = $line.Split("`t")
+    if ($c.Count -eq 4) { $placedBy[$c[3].ToLowerInvariant()] = [pscustomobject]@{ Sha256 = $c[0]; Size = [long]$c[1]; FileId = $c[2] } }
+  }
+  $recordPath = Join-Path $Here '..\..\records\collection-plugins.json'
+  $onOne = @{}
+  if (Test-Path -LiteralPath $recordPath) { foreach ($p in @((ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($recordPath)) $recordPath).plugins)) { $onOne[([string]$p.name).ToLowerInvariant()] = [string]$p.sha256 } }
+  $baseCol = Step { ConvertFrom-Json ([IO.File]::ReadAllText($baseJson)) }
+  if (Test-Path -LiteralPath $staged) { Remove-Item -LiteralPath $staged -Recurse -Force }
+  New-Item -ItemType Directory -Force -Path $staged | Out-Null
+  $unpacked = @{}
+  foreach ($l in $lights) {
+    $what = $l.Name + $(if ($l.Light) { ' light' } else { ' not light' })
+    $row = $placedBy[('data\' + $l.Name).ToLowerInvariant()]
+    if (-not $row) { Die ('Revision ' + $BaseRevision + ' puts no ' + $l.Name + ' in Data, by ' + $Layout + '\files.txt.') }
+    $hits = @($baseCol.mods | Where-Object { $_.source -and [string]$_.source.fileId -eq $row.FileId })
+    if ($hits.Count -ne 1) { Die ('Revision ' + $BaseRevision + ' has ' + $hits.Count + ' entries for file ' + $row.FileId + ', which puts ' + $l.Name + ' in Data, so there is no one entry to patch.') }
+    $e = $hits[0]
+    # Vortex keeps a mod's patches under patches\<its name>, and an entry of
+    # the default mod type deploys into Data, so the file's path in the mod
+    # is its path in Data.
+    $type = if ($e.details -and $e.details.PSObject.Properties['type']) { [string]$e.details.type } else { '' }
+    if ($type) { Die ($e.name + ' is mod type "' + $type + '", which does not deploy into Data, so its patch path is not ' + $l.Name + '.') }
+    if (([string]$e.name).IndexOfAny([IO.Path]::GetInvalidFileNameChars()) -ge 0) { Die ('The entry name "' + $e.name + '" cannot be a folder under patches.') }
+    if ($e.PSObject.Properties['patches'] -and $e.patches -and @($e.patches.PSObject.Properties | Where-Object { $_.Name -ieq $l.Name }).Count) { Die ($e.name + ' already patches ' + $l.Name + ' in revision ' + $BaseRevision + '.') }
+    $fid = [string]$row.FileId
+    if (-not $unpacked.ContainsKey($fid)) {
+      $dir = Join-Path $staged $fid
+      $dl = Get-NexusField (Step { Invoke-NexusApi 'GET' ('/v3/games/' + $Game + '/mod-file-versions/' + $fid + '/download-link') '' ('Asking for the download of ' + $e.name) }) 'data'
+      $url = [string](Get-NexusField (@(Get-NexusField $dl 'links') | Select-Object -First 1) 'url')
+      if (-not $url) { Die ('Nexus gave no download address for ' + $e.name + ', file ' + $fid + '.') }
+      $got = Step { Receive-NexusPresigned $url $dir ('Downloading ' + $e.name) ($fid + '.archive') }
+      if ($got.Size -ne [long]$e.source.fileSize -or $got.Md5Hex -ne [string]$e.source.md5) { Die ('The download of ' + $e.name + ' is ' + $got.Size + ' bytes, md5 ' + $got.Md5Hex + ', and revision ' + $BaseRevision + ' says ' + $e.source.fileSize + ' bytes, md5 ' + $e.source.md5 + '.') }
+      $x = Join-Path $dir 'unpacked'
+      $r = Invoke-Tool $sz @('x', '-y', ('-o' + $x), $got.Path, '-ir!*.esp', '-ir!*.esm')
+      if ($r.Code -ne 0) { Die ('7-Zip could not unpack ' + $got.Path + ': ' + $r.Err.Trim()) }
+      [IO.File]::Delete($got.Path)
+      $unpacked[$fid] = $x
+    }
+    $src = @(Get-ChildItem -LiteralPath $unpacked[$fid] -Recurse -File | Where-Object { $_.Length -eq $row.Size -and (Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash -eq $row.Sha256 }) | Select-Object -First 1
+    if (-not $src) { Die ($e.name + '''s archive holds no file with the bytes revision ' + $BaseRevision + ' puts in Data as ' + $l.Name + ' (sha256 ' + $row.Sha256 + ').') }
+    $old = [IO.File]::ReadAllBytes($src.FullName)
+    if ($old.Length -lt 12 -or [Text.Encoding]::ASCII.GetString($old, 0, 4) -ne 'TES4') { Die ($l.Name + ' in ' + $e.name + ' has no TES4 header, so it is not a plugin.') }
+    $flags = [BitConverter]::ToUInt32($old, 8)
+    if ((($flags -band 0x200) -ne 0) -eq $l.Light) { Die ($l.Name + ' is already' + $(if ($l.Light) { '' } else { ' not' }) + ' light in ' + $e.name + ', so there is nothing to patch.') }
+    $new = [byte[]]$old.Clone()
+    $nf = if ($l.Light) { $flags -bor 0x200 } else { $flags -band (-bnot [uint32]0x200) }
+    [Array]::Copy([BitConverter]::GetBytes([uint32]$nf), 0, $new, 8, 4)
+    $work = Join-Path $staged ('work-' + $l.Name)
+    New-Item -ItemType Directory -Force -Path $work | Out-Null
+    $patch = Step { New-BsdiffPatch $sz $old $new $work }
+    $back = Step { Invoke-Bspatch $sz $old $patch $work }
+    $want = Get-Sha256Hex $new
+    if ((Get-Sha256Hex $back) -ne $want) { Die ('The patch made for ' + $l.Name + ' does not give back the file it was made for, so it was not packed.') }
+    $crc = Step { Get-Crc32Hex $sz $src.FullName }
+    $rel = 'patches\' + $e.name + '\' + $l.Name + '.diff'
+    $to = Join-Path $staged ('patches\' + $e.name)
+    New-Item -ItemType Directory -Force -Path $to | Out-Null
+    [IO.File]::WriteAllBytes((Join-Path $to ($l.Name + '.diff')), $patch)
+    Remove-Item -LiteralPath $work -Recurse -Force
+    $lightPaths += $rel
+    if (-not ($basePaths -contains ('patches\' + $e.name))) { $lightPaths += ('patches\' + $e.name) }
+    $one = $onOne[$l.Name.ToLowerInvariant()]
+    $vs = if (-not $one) { 'records\collection-plugins.json does not name it' } elseif ($one -eq $want) { 'the same bytes as records\collection-plugins.json' } else { 'NOT the bytes records\collection-plugins.json has (' + $one + ')' }
+    Say ('  ' + $what + ': ' + $e.name + ', file ' + $fid + ', CRC-32 ' + $crc + ', flags 0x' + $flags.ToString('X8') + ' -> 0x' + ([uint32]$nf).ToString('X8') + ', sha256 ' + $want)
+    Say ('    ' + $rel + ', ' + $patch.Length + ' bytes, read back; ' + $vs) $(if ($one -and $one -ne $want) { 'Yellow' } else { 'DarkGray' })
+    $swaps.Add([ordered]@{ patch = $true; fileId = $fid; path = $l.Name; crc = $crc })
+  }
+  foreach ($k in @($unpacked.Keys)) { Remove-Item -LiteralPath (Split-Path -Parent $unpacked[$k]) -Recurse -Force }
+  if (-not ($basePaths -contains 'patches')) { $lightPaths += 'patches' }
+}
+
 # --------------------------------------------------------- the new archive ---
 Head 'The new revision'
 Copy-Item -Path (Join-Path $base '*') -Destination $build -Recurse -Force
+if ($lights.Count) { Copy-Item -Path (Join-Path $staged 'patches') -Destination $build -Recurse -Force }
 $swapsJson = Join-Path $scratch 'swaps.json'
 $payloadJson = Join-Path $scratch 'payload.json'
 [IO.File]::WriteAllText($swapsJson, (ConvertTo-Json -InputObject @($swaps.ToArray()) -Depth 6), (New-Object Text.UTF8Encoding($false)))
@@ -397,7 +617,7 @@ $r = Invoke-Tool $node.Source @((Join-Path $Here 'nexus-collection.js'), $baseJs
 if ($r.Code -ne 0) { Die ($r.Err.Trim() + ' Nothing was built.') }
 foreach ($line in ($r.Out -split "`r?`n" | Where-Object { $_ })) {
   $c = $line.Split("`t")
-  if ($c[1] -eq 'added' -or $c[1] -eq 'plugin') { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[3]) }
+  if ($c[1] -eq 'added' -or $c[1] -eq 'plugin' -or $c[1] -eq 'patch') { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[3]) }
   else { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[2] + ' -> ' + $c[3]) }
 }
 $newRev = $start + 1
@@ -407,11 +627,12 @@ $r = Invoke-Tool $sz (@('a', '-t7z', '-y', $out) + $tops) $build
 if ($r.Code -ne 0) { Die ('7-Zip could not pack the new revision: ' + $r.Err.Trim()) }
 $newPaths = @(Step { Get-ArchivePaths $sz $out })
 $gone = @($basePaths | Where-Object { $newPaths -notcontains $_ })
-$extra = @($newPaths | Where-Object { $basePaths -notcontains $_ })
+$extra = @($newPaths | Where-Object { $basePaths -notcontains $_ -and $lightPaths -notcontains $_ })
 if ($gone.Count -or $extra.Count) { Die ('The new archive does not hold the same files and folders as revision ' + $start + ' (missing: ' + ($gone -join ', ') + '; extra: ' + ($extra -join ', ') + '). Nothing was sent.') }
 $facts = Step { Get-NexusArchiveFacts $out }
 Say ('  ' + $out)
-Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + $newPaths.Count + ' files and folders as revision ' + $start)
+$addedPaths = @($newPaths | Where-Object { $basePaths -notcontains $_ })
+Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + ($newPaths.Count - $addedPaths.Count) + ' files and folders as revision ' + $start + $(if ($addedPaths.Count) { ' and ' + $addedPaths.Count + ' more for the light flags' } else { '' }))
 $payloadText = ([IO.File]::ReadAllText($payloadJson)).Trim()
 
 if ($WhatIf) {

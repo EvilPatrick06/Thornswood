@@ -63,6 +63,7 @@ param(
     [switch]   $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -151,8 +152,6 @@ $RANK_BY_ORE = [ordered]@{
 $YIELD_FLOOR   = 1
 $YIELD_EXTRA   = 1     # the most one swing gives is $YIELD_FLOOR + $YIELD_EXTRA
 $RANK_ORDER    = @('novice', 'advanced', 'expert', 'master')
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\ores.json' }
 

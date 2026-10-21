@@ -245,6 +245,7 @@ param(
     [switch] $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -754,8 +755,6 @@ $CROP_RANK_BY_EDITOR_ID = @{
 $CROP_GROW_MINUTES_BASE     = 60
 $CROP_GROW_MINUTES_PER_GOLD = 15
 $CROP_GROW_MINUTES_MAX      = 360
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\harvests.json' }
 
