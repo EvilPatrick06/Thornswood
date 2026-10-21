@@ -537,6 +537,8 @@ Put (Join-Path $repo 'voice\headlines.js') "module.exports = {};`n"
 Put (Join-Path $repo 'bot\card.py') 'CARD = 1'
 # Install-Bot packs and sends _pyguard.py beside bot.py since #2421 (Refs #2276).
 Put (Join-Path $repo 'bot\_pyguard.py') 'PYGUARD = 1'
+# And trust.py, the roots it trusts, since #3111.
+Put (Join-Path $repo 'bot\trust.py') 'TRUST = 1'
 Put (Join-Path $repo 'bot\requirements.txt') ''
 Put (Join-Path $repo 'bot\factions.json') '[]'
 Put (Join-Path $repo 'bot\staff-channel.txt') '0'
@@ -866,7 +868,7 @@ try {
     # shorter loop than the real one (tests\test-bot-wrapper.ps1 runs that).
     Bot 'bot v1'
     $null = [IO.Directory]::CreateDirectory($botRoot)
-    foreach ($f in 'bot.py', '_pyguard.py', 'card.py', 'staff-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
+    foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt') { Copy-Item -LiteralPath (Join-Path $repo "bot\$f") -Destination (Join-Path $botRoot $f) -Force }
     Put (Join-Path $botRoot 'bot.env.json') '{ "DISCORD_TOKEN": "not a token" }'
     $bq = $botRoot.Replace("'", "''")
     # bot.log in the data folder under the bot's, where the service writes it

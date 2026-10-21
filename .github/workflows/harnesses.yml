@@ -18,6 +18,13 @@
 # runs. The names reach the script through the environment, never pasted into
 # the script's text, so nothing typed into the box can run as code.
 #
+# The word gate in place of names runs the pull request gate's own list, the
+# one scripts\dev\Gate-Harnesses.ps1 prints, and throttle runs that many side
+# by side, the way build.yml runs them (#3114). That is how a throttle is
+# measured on the box without a pull request:
+#
+#   gh workflow run harnesses.yml --ref main -f harnesses=gate -f throttle=3
+#
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
 name: Run named harnesses
@@ -25,8 +32,12 @@ on:
   workflow_dispatch:
     inputs:
       harnesses:
-        description: 'Harness names, split by spaces or commas (test-x.ps1, test-y.js, voice/test-z.js)'
+        description: 'Harness names, split by spaces or commas (test-x.ps1, test-y.js, voice/test-z.js), or gate for the pull request gate''s list'
         required: true
+      throttle:
+        description: 'How many run at once, 1 to 16'
+        required: false
+        default: '1'
 permissions:
   contents: read
 jobs:
@@ -69,8 +80,17 @@ jobs:
         shell: pwsh
         env:
           HARNESSES: ${{ inputs.harnesses }}
+          THROTTLE: ${{ inputs.throttle }}
         run: |
-          # One at a time, each on its clock, each printed as it ends, then
-          # every one that failed: scripts\dev\Nightly-Harnesses.ps1 says why.
+          # As many at once as asked, each on its clock, each printed as it
+          # ends, then every one that failed: scripts\dev\Nightly-Harnesses.ps1
+          # says why.
           Write-Host ('commit ' + $env:GITHUB_SHA + ' on ' + $env:GITHUB_REF_NAME)
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -BudgetSeconds 2400
+          if ($env:HARNESSES.Trim() -eq 'gate') {
+            $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
+            if ($LASTEXITCODE -ne 0) { exit 1 }
+            $env:HARNESSES = $gate -join ' '
+          }
+          $throttle = 0
+          if (-not [int]::TryParse($env:THROTTLE, [ref]$throttle)) { Write-Host ('::error::throttle is not a number: ' + $env:THROTTLE); exit 2 }
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -Throttle $throttle -BudgetSeconds 2400
