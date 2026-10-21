@@ -220,7 +220,9 @@ function Collection([object[]]$mods, [object[]]$rules) {
         info = [ordered]@{ author = 'Someone'; authorUrl = ''; name = 'Made Up'; description = ''; installInstructions = ''; domainName = 'skyrimspecialedition'; gameVersions = @('1.6.1170.0') }
         mods = $mods; modRules = $rules; tools = @()
         plugins = @(@{ name = 'Alpha.esp'; enabled = $true }, @{ name = 'Gamma.esp'; enabled = $true }, @{ name = 'Beta.esp'; enabled = $true }, @{ name = 'Eps.esp'; enabled = $true })
-        pluginRules = [ordered]@{ plugins = @([ordered]@{ name = 'gamma.esp'; after = @('alpha.esp') }); groups = @() }
+        # alpha after zeta names a plugin the list leaves off, so disabled:
+        # it orders nothing the game loads and does not stop the run (#2969).
+        pluginRules = [ordered]@{ plugins = @([ordered]@{ name = 'gamma.esp'; after = @('alpha.esp') }, [ordered]@{ name = 'alpha.esp'; after = @('zeta.esp') }); groups = @() }
         collectionConfig = [ordered]@{ recommendNewProfile = $true; referenceTagScheme = 'v1' }
     }
 }
@@ -460,7 +462,7 @@ Deployed $true
 Put (P $vg2 'Data\Beta.esp') 'beta plugin, edited'
 Put (P $T 'game-plugins.txt') "*Alpha.esp`r`n*Beta.esp`r`n*Gamma.esp`r`n*Eps.esp`r`n*Zeta.esp`r`n*ccBGSSSE001-Fish.esm`r`n"
 $r = RunCmp @('-Record', $recDir, '-Vortex', $vg2, '-Plugins', (P $T 'game-plugins.txt'))
-YesR 'a mod made on the machine, a changed file and a moved plugin are each named' ($r.Code -eq 1 -and $r.Out -match 'Generated Files: 1 files, Data\\meshes\\made\.nif' -and $r.Out -match 'different bytes: 1' -and $r.Out -match 'Data\\Beta\.esp  layout: Beta \(file 900002\), Vortex: Mod-1' -and $r.Out -match 'plugins only in the other: 1' -and $r.Out -match 'position 2 of the 5 plugins both name: Gamma\.esp here, Beta\.esp there' -and $r.Out -match 'Zeta\.esp is disabled here and enabled there') $r
+YesR 'a mod made on the machine, a changed file and a moved plugin are each named' ($r.Code -eq 1 -and $r.Out -match 'Generated Files: 1 files, Data\\meshes\\made\.nif' -and $r.Out -match 'different bytes: 1' -and $r.Out -match 'Data\\Beta\.esp  layout: Beta \(file 900002\), Vortex: Mod-1' -and $r.Out -match 'plugins only in the other: 1' -and $r.Out -match 'position 2 of the 4 plugins both enable: Gamma\.esp here, Beta\.esp there' -and $r.Out -match 'Zeta\.esp is disabled here and enabled there') $r
 
 # ---- the key, across every run ---------------------------------------------------
 Yes ('no run printed the key, in ' + $script:outs.Count + ' runs') (@($script:outs | Where-Object { $_.Contains($KEY) }).Count -eq 0)

@@ -210,16 +210,19 @@ Head 'Plugins'
 $ia = @{}; for ($i = 0; $i -lt $pa.Count; $i++) { $ia[$pa[$i].Name.ToLowerInvariant()] = $i }
 $ib = @{}; for ($i = 0; $i -lt $pb.Count; $i++) { $ib[$pb[$i].Name.ToLowerInvariant()] = $i }
 $both = @($pa | Where-Object { $ib.ContainsKey($_.Name.ToLowerInvariant()) })
-$bothB = @($pb | Where-Object { $ia.ContainsKey($_.Name.ToLowerInvariant()) })
+# The order that matters is the one the game loads: the plugins both name
+# and both enable. Where a disabled plugin sits loads nothing.
+$onA = @($both | Where-Object { $_.Enabled -and $pb[$ib[$_.Name.ToLowerInvariant()]].Enabled })
+$onB = @($pb | Where-Object { $_.Enabled -and $ia.ContainsKey($_.Name.ToLowerInvariant()) -and $pa[$ia[$_.Name.ToLowerInvariant()]].Enabled })
 $order = @()
-for ($i = 0; $i -lt $both.Count; $i++) {
-  if ($both[$i].Name -ine $bothB[$i].Name) { $order += ('position ' + ($i + 1) + ' of the ' + $both.Count + ' plugins both name: ' + $both[$i].Name + ' here, ' + $bothB[$i].Name + ' there'); break }
+for ($i = 0; $i -lt $onA.Count; $i++) {
+  if ($onA[$i].Name -ine $onB[$i].Name) { $order += ('position ' + ($i + 1) + ' of the ' + $onA.Count + ' plugins both enable: ' + $onA[$i].Name + ' here, ' + $onB[$i].Name + ' there'); break }
 }
 $state = @($both | Where-Object { $_.Enabled -ne $pb[$ib[$_.Name.ToLowerInvariant()]].Enabled } | ForEach-Object { $_.Name + ' is ' + $(if ($_.Enabled) { 'enabled here and disabled there' } else { 'disabled here and enabled there' }) })
 Say ('  ' + $pa.Count + ' plugins in the record, ' + $pb.Count + ' in the other, ' + $both.Count + ' in both')
 Show 'plugins only in the record' @($pa | Where-Object { -not $ib.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
 Show 'plugins only in the other' @($pb | Where-Object { -not $ia.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
-Show 'the first place the order differs' $order
+Show 'the first place the load order differs' $order
 Show 'enabled in one and not the other' $state
 
 if ($Out) {

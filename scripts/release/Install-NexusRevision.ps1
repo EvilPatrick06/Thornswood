@@ -499,8 +499,12 @@ foreach ($p in $col.Plugins) {
 if ($missingPlugins.Count) { Die ('The collection lists plugins no mod in it has: ' + ($missingPlugins -join ', ') + '.') }
 $unlisted = @($present.Keys | Where-Object { -not $seen.ContainsKey($_) } | Sort-Object | ForEach-Object { $present[$_] })
 foreach ($n in $unlisted) { $order.Add([pscustomobject]@{ Name = $n; Enabled = $false }) }
+# The rules are held over the plugins the game loads, the enabled ones. A
+# rule naming a disabled plugin orders nothing the game loads: revision 3
+# has CommonClothes.esp after RaceMenuMorphsCBBE.esp, which the curator left
+# off (measured 21 Oct, #2969).
 $pos = @{}
-for ($i = 0; $i -lt $order.Count; $i++) { $pos[$order[$i].Name.ToLowerInvariant()] = $i }
+for ($i = 0; $i -lt $order.Count; $i++) { if ($order[$i].Enabled) { $pos[$order[$i].Name.ToLowerInvariant()] = $i } }
 $broken = @()
 foreach ($r in $col.PluginRules) {
   $k = $r.Name.ToLowerInvariant()
