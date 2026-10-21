@@ -67,7 +67,7 @@ $writes = @($writes | Where-Object { $_ -notmatch '^>\s*\d' })
 Yes ("it runs nothing that changes the machine" + $(if ($writes.Count) { ': ' + ($writes -join ', ') } else { '' })) ($writes.Count -eq 0)
 Yes '  its window is 10 to 300 seconds, 60 unless told' ($t -match '\[ValidateRange\(10, 300\)\]\[int\]\$Seconds = 60')
 Yes '  and it reads the TCP totals any account may read, at both ends of the window' (([regex]::Matches($code, 'GetTcpIPv4Statistics\(\)')).Count -eq 1 -and $code -match '\$t0 = Get-Tcp' -and $code -match '\$t1 = Get-Tcp')
-Yes '  not the performance counters, which read as zeros under the Windows runner's account (#2995)' ($code -notmatch 'Win32_PerfRawData|Get-Counter')
+Yes '  not the performance counters, which read as zeros under the Windows runner''s account (#2995)' ($code -notmatch 'Win32_PerfRawData|Get-Counter')
 Yes '  and when it cannot read them it says UNKNOWN and exits 1, never a window of zeros' ($code -match "if \(-not \`$t0\) \{ 'VERDICT UNKNOWN the TCP totals could not be read[^']*'; exit 1 \}")
 
 # ---- 3. no address leaves the box ---------------------------------------------
