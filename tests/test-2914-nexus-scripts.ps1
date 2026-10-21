@@ -161,7 +161,7 @@ $facts = Get-NexusArchiveFacts $archive
 # had its own, which took Ubuntu's 7z (no RAR) ahead of Get-SevenZip.ps1's.
 $own7z = @(Get-ChildItem -LiteralPath $rel -Filter '*.ps1' | Where-Object { (Get-Content -Raw -LiteralPath $_.FullName) -match '(?m)^\s*function Find-SevenZip\b' } | ForEach-Object { $_.Name })
 Yes 'Find-SevenZip is defined once, in Nexus.ps1, for Install-NexusRevision and New-NexusRevision alike' ($own7z.Count -eq 1 -and $own7z[0] -eq 'Nexus.ps1')
-if (-not $IsWindows -and -not $env:ProgramFiles) {
+if (-not $OnWindows -and -not $env:ProgramFiles) {
     $got7z = & (Join-Path $rel 'Get-SevenZip.ps1') -Check 6>$null
     if ($LASTEXITCODE -eq 0 -and $got7z) { Yes 'off Windows it takes Get-SevenZip.ps1''s 7zz first, whatever 7z is on PATH' ((Find-SevenZip) -eq [string]$got7z) }
     else { Skip 'off Windows it takes Get-SevenZip.ps1''s 7zz first: that 7zz is not on this machine' }
