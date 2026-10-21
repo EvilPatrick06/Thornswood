@@ -402,16 +402,14 @@ collection and Vortex's staging folder on the shipping machine:
   header's description still names the SkyMP server the records were
   salvaged from, and so does the description of the release plugins in the
   table below. The repository's plugin carries Thornswood's own description
-  since 15 October (#400, Patrick: the name is mentioned nowhere): "Thornswood's
-  crafting and gathering content: stations, salt, ore, charcoal kilns, skill
-  manuals, tools, keys, fishing, repair kits, treatments, the notice board and
-  drop box, house parts, and their recipes." The collection's copy keeps the
-  old one until a later revision patches it. Since 16 October (#2553, Patrick,
-  15 October, option B on #2177) the repository's plugin is remade as
-  Thornswood's own. Since 17 October (#2553, Patrick, 16 October, A) it is
-  110,915 bytes, sha256
-  `491e5c78915a2dea1104ec44e4304728ac44ddfddf4ee594c7f81b5e8c2a7cb3`, 161
-  records. `scripts\mods\Add-ContentRecords.py` writes every record of it from
+  since 15 October (#400, Patrick: the name is mentioned nowhere), and since
+  21 October (#2993) `scripts\mods\Add-ContentRecords.py` builds it from the
+  records the plugin holds, so it names what is in it and nothing that left.
+  The collection's copy keeps the old one until a later revision patches it.
+  Since 16 October (#2553, Patrick, 15 October, option B on #2177) the
+  repository's plugin is remade as Thornswood's own; its bytes and sha256 are
+  the ones `records\asset-provenance.json` registers, which
+  `tests\test-asset-provenance.js` holds to the file. `scripts\mods\Add-ContentRecords.py` writes every record of it from
   its own numbers, or copies Bethesda's own, and places the kiln, the salt
   quarry, the hive and the alchemy lab where `scripts\dev\Build-StationSites.py`
   measured Thornswood's own spots (`game\data\station-sites.json`). The other
