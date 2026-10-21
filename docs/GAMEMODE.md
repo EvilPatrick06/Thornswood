@@ -312,7 +312,7 @@ because each reads the one before.
 | `RECIPES_BY_ID` | `Build-RecipeTable.ps1`, which also reads `docs/systems/cut-items.json` for what leaves the open book | `recipes.json` | `Build-RecipeTable.ps1:// ==== end RECIPES_BY_ID ====` |
 | `STAFF_SPELLS` (staff spells block) | `Build-RecipeTable.ps1`, with each spell's school and rank | none | the STAFF_SPELLS markers |
 | `BUILDING_BY_DOOR`, `BUILDING_NAME`, `WAY_OUT` | `Build-DoorTable.py` | `doors.json` | `Build-DoorTable.py:'const BUILDING_BY_DOOR = '` |
-| `BENCH_BY_BASE`, `BENCH_ACCESS` | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:The blocks are written with the line ending the gamemode already has.` |
+| `BENCH_BY_BASE`, `BENCH_ACCESS` | `Build-BenchTable.py`, from `recipes.json` | none | `Build-BenchTable.py:The blocks are written with LF` |
 | `SPELL_IDS` | `Build-SpellTable.ps1` | `spells.json` | `Build-SpellTable.ps1:// ==== end SPELL_IDS ====` |
 | `DATA` | `Install-GamemodeConsts.js` | `data.json` | `Install-GamemodeConsts.js` |
 | `DATA.worldspaces`, inside `DATA` | `Build-WorldspaceTable.js`, from the WRLD records of the load order | `data.json` (`worldspaces`) | `Build-WorldspaceTable.js:install`, the list and nothing else of the line |

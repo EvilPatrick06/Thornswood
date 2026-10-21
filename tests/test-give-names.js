@@ -103,7 +103,7 @@ if (fs.existsSync(builder)) {
   const twice = fs.readFileSync(gm, 'utf8');
   yes('the builder runs', r1.status === 0 && r2.status === 0);
   yes('a second run changes nothing', once === twice);
-  yes('it keeps CRLF line endings', once.indexOf('\n') === once.indexOf('\r\n') + 1 && once.split('\n').length === once.split('\r\n').length);
+  yes('a CRLF gamemode comes out LF (#3029)', once.indexOf('\r') < 0 && once.indexOf('\n') >= 0);
   yes('a shared name goes to Skyrim.esm', once.indexOf('"iron ingot": ["Iron Ingot", "5ace4:Skyrim.esm"]') !== -1);
   yes('ingredients are named, spaces tidied', once.indexOf('"iron ore": ["Iron Ore", "71cf3:Skyrim.esm"]') !== -1);
   yes('a mod-only name is kept', once.indexOf('"odd thing": ["Odd Thing", "801:Mod.esp"]') !== -1);

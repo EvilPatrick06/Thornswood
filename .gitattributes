@@ -1,0 +1,12 @@
+# What the content table builders write (scripts/mods/content-tables.json) is
+# stored and checked out with LF on every machine, because every builder writes
+# LF. Without this a checkout with core.autocrlf true (One, the Windows runners)
+# held these files CRLF, so each rebuild there rewrote every one of them whether
+# it changed or not, and a table that pins its inputs by sha256 pinned bytes no
+# other checkout has (#3029). tests/test-3029-builder-eol.js holds this list to
+# content-tables.json. What ships still goes out as scripts/release/ShippedBytes.ps1
+# reads it, whatever the checkout.
+game/data/** text eol=lf
+game/gamemode.js text eol=lf
+game/plugins/thornswood-front.js text eol=lf
+docs/systems/** text eol=lf
