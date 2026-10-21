@@ -255,6 +255,19 @@ siteFiles.filter(function (n) { return /\.woff2?$/i.test(n); }).forEach(function
 ['Cinzel', 'Spectral', 'marked'].forEach(function (what) {
   yes('the credits page names ' + what + ', which the site serves', C.indexOf(what) >= 0);
 });
+// The MIT and OFL ask for their text to go with the files, not only a name in
+// a header (#421): marked's and each font family's licence are served beside
+// them, by the sha256 THIRD-PARTY.md gives, and the credits page links each.
+const LICENCE_TEXTS = { 'marked-LICENSE.txt': /Permission is hereby granted, free of charge/,
+  'cinzel-OFL.txt': /Copyright 2020 The Cinzel Project Authors[\s\S]*SIL OPEN FONT LICENSE Version 1\.1/,
+  'spectral-OFL.txt': /Copyright 2017 The Spectral Project Authors[\s\S]*SIL OPEN FONT LICENSE Version 1\.1/ };
+Object.keys(LICENCE_TEXTS).forEach(function (n) {
+  const t = read(path.join(PUB, n));
+  yes(n + ' is in site\\public and is the licence it says it is', t !== null && LICENCE_TEXTS[n].test(t));
+  const sha = t === null ? '' : crypto.createHash('sha256').update(Buffer.from(t, 'utf8')).digest('hex');
+  yes(n + ' is in THIRD-PARTY.md under the site by its sha256, ' + sha.slice(0, 16), !!sha && siteSection.indexOf(sha) >= 0);
+  yes('the credits page links /' + n, C.indexOf('](/' + n + ')') >= 0);
+});
 
 // ---------------------------------------------------------------- the client
 //
