@@ -466,8 +466,18 @@ try {
   Yes 'the run log names no runner' ($public -notmatch 'thornswood-vps')
   Yes 'the run log does not name the private repository' ($public -notmatch 'EvilPatrick06')
   Yes 'the run log says nothing about the runners but the outcome' (
-    @($script:printed | Where-Object { $_ -match '^\s+runner\s' -and $_ -notmatch '^\s+runner\s+(ok|WRONG|COULD NOT CHECK)\s+\(about a private repository, so not shown here\)$' }).Count -eq 0 -and
-    @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK' }).Count -gt 0)
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s+(ok|WRONG)\s' -and $_ -notmatch '^\s+runner\s+(ok|WRONG)\s+\(about a private repository, so not shown here\)$' }).Count -eq 0 -and
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s+(ok|WRONG)\s' }).Count -gt 0)
+  # Could not check prints why (#2755, 21 Oct): a refused token says so with
+  # its HTTP code, and no reason names a runner or the repository (above).
+  Yes 'could not check the runners says why in the run log' (
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK\s+\S' }).Count -gt 0 -and
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK\s+\(about a private' }).Count -eq 0)
+  $env:WATCH_RUNNER_TOKEN = 'github_pat_FAKETOKEN123'; $script:ghRunners = 401
+  $u = Unknown (& $realGetRunners 'EvilPatrick06/Thornswood').Error; $u.Private = $true
+  $env:WATCH_RUNNER_TOKEN = ''
+  $shown = (Write-Results ([ordered]@{ runner = $u }) 6>&1 | Out-String)
+  Yes '  a refused token is printed as refused, with its HTTP code, and nothing else' ($shown -match 'runner\s+COULD NOT CHECK\s+GitHub refused the runner token \(HTTP 401\)' -and $shown -notmatch 'Thornswood|FAKETOKEN')
   Yes 'the run log carries no message text, only ids' ($public -notmatch 'is down\.|are not all online|cannot check|Checked from outside')
   Yes 'the run log holds no webhook and no token' ($public -notmatch 'SECRETHOOKTOKEN|api/webhooks|FAKETOKEN')
   Yes 'the public lines are there: the site and a feed say what they saw' ($public -match 'site\s+ok\s+answered 200' -and $public -match 'feed\s+ok\s+answered, release')
