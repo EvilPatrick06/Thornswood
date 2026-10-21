@@ -124,17 +124,24 @@ Yes '  and records what the box runs only once it answers' ($install.IndexOf('Se
 Yes 'the task is LOCAL SERVICE with its own SID, granted its folder, after the fail-safe' (
     $installCode -match 'New-ThornswoodServicePrincipal -AsSystem:\$system' -and $installCode -match 'Get-ThornswoodTaskSid' -and
     $installCode -match 'Grant-ThornswoodServiceFolder' -and
-    $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -ge 0 -and $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -lt $installCode.IndexOf('if (-not (StopIt))'))
+    $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -ge 0 -and $installCode.IndexOf('Test-ThornswoodServiceCannotReach (') -lt $installCode.IndexOf('if (-not $stopOk)'))
 Yes '  at priority 4, normal (#1968)' ($installCode -match 'New-ScheduledTaskSettingsSet [^\r\n]*-Priority 4\b')
 Yes '  and runs the bridge under server-log.js, kept 90 days with a time on each line (#2166)' ($installCode -match '--log "\{1\}" --days 90 --stamp bridge\.js')
 Yes '  on the port the Caddyfile hands /box/ to' ($installCode -match 'THORNSWOOD_BRIDGE_PORT=7790&&')
 Yes 'the folder takes nothing from C:\ and no broad group keeps a rule on it' (
     $install -match 'SetAccessRuleProtection\(`\$true, `\$false\)' -and $install -match "'S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19'")
 Yes 'the stage is checked by hash and node --check before the bridge is stopped' (
-    $installCode.IndexOf('did not arrive as it was sent') -lt $installCode.IndexOf('if (-not (StopIt))') -and
-    $installCode.IndexOf('--check') -lt $installCode.IndexOf('if (-not (StopIt))'))
+    $installCode.IndexOf('did not arrive as it was sent') -lt $installCode.IndexOf('if (-not $stopOk)') -and
+    $installCode.IndexOf('--check') -lt $installCode.IndexOf('if (-not $stopOk)'))
 Yes 'a bridge that does not answer gets the old files and the old task back' ($installCode -match 'Register-ScheduledTask -TaskName .Thornswood Bridge. -Xml \$oldXml' -and $installCode -match "BRIDGE ROLLED BACK")
 Yes 'StopIt stops only what names bridge.log, and the child it started' ($stopIt -match [regex]::Escape("like ('*' + 'C:\Thornswood-Bridge\bridge.log' + '*')") -and $stopIt -match 'ParentProcessId -eq')
+# #2928: each opened before the task stops, waited for until it has exited,
+# with StopAndMove.ps1 sent in front of it, and a stop that left one running
+# is refused rather than read as true because the function said a line.
+Yes '  and waits for each to exit, with StopAndMove.ps1 sent in front, and is refused on $stopOk' (
+    $stopIt -match 'Get-ThornswoodProcessHeld' -and $stopIt -match 'Stop-ThornswoodProcessHeld' -and $stopIt -notmatch 'Start-Sleep' -and
+    $install.Contains("`$stopIt = [IO.File]::ReadAllText((Join-Path `$Here 'StopAndMove.ps1')) + ") -and
+    $installCode -match "StopIt\r?\nif \(-not \`$stopOk\) \{ 'BRIDGE REFUSED'; exit 1 \}")
 # #2875: the site's own 404 says "not here" too, so every check that the
 # bridge answers looks for its whole line, never a status code or "not here".
 $bridgeJs = Text (P 'scripts', 'vps', 'bridge', 'bridge.js')
