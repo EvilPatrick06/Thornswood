@@ -800,7 +800,7 @@ jobs:
                  'test-release-parity.ps1', 'test-dev-version.ps1', 'test-ship-launcher-reuse.ps1', 'test-2347-dev-launcher-version.ps1', 'test-2347-publish-launcher-number.ps1', 'test-2661-keep-feed-launcher.ps1', 'test-2662-dev-root-launcher.ps1',
                  'test-2401-legacy-dev-marks.ps1',
                  'test-server-stage-directories.ps1',
-                 'test-dev-settings-keys.ps1',
+                 'test-dev-settings-keys.ps1', 'test-dev-start-point-light.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
                  'test-2308-content-before-ship.ps1', 'test-2947-chargen-box-light.ps1',
