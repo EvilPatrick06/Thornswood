@@ -7,7 +7,8 @@ table. A bandit camp and a giant camp have no tier. A camp enemy
 carries a little on the body instead.
 
 The world's own coin, weapons, and armour are still taken out of
-containers and off the world. What this pays is created by the server,
+containers, and nothing the world placed lies on the floor of a
+dungeon or anywhere else. What this pays is created by the server,
 the same way a scene quest creates its reward. See [Gold](gold.md).
 
 ## What opens

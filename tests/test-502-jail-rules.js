@@ -17,8 +17,9 @@
       the cells, and game/data/jails.json saying the same;
     - the claim: only the Jarl of the jail's hold is offered it, may make it,
       or takes it by presenting its deed; a house anywhere is as it was;
-    - the keys: a jail key on the floor or dropped is left where it lies, one
-      in a chest is taken out with the swords, any other key is untouched;
+    - the keys: none lies on the floor (#3077) and a press on one is not
+      refused, one in a chest is taken out with the swords, any other key is
+      untouched;
     - /stuck: refused in a jail where a guard has a cell locked, for anybody
       but that hold's guards, and nowhere else;
     - a death in any of the ten jails wakes on consecrated ground outside it;
@@ -363,18 +364,19 @@ vm.runInNewContext(spoilsBlock, kbox, { filename: 'gamemode.js spoils' });
 const spoils = kbox.__thornswoodSpoils;
 yes('K1 the spoils block knows every jail key and no other key',
     Object.keys(JAIL_KEY).every(function (k) { return spoils.isJailKey(idOf(k)); }) && !spoils.isJailKey(KEY_HOUSE));
-const floor = spoils.activate(PRISONER.a, 0x000f1228, '5aec4:Skyrim.esm');
-yes('K2 a jail key lying where the game put it is left there, and the person is told why: "' + floor + '"',
-    floor === 'That key belonged to the old jail. The cells answer to the hold\'s guards now, so it stays where it lies.');
-yes('K3 so is one somebody dropped', !!spoils.activate(PRISONER.a, 0xff00a001, '5aec4:Skyrim.esm'));
-yes('K4 any other key comes up off the floor as before', spoils.activate(PRISONER.a, 0x000f2000, '1234:Skyrim.esm') === null);
+// No jail key lies where the game put it: Thornswood-Last.esp switches every
+// placed item off (#3077), so the block answers no press on a floor key.
+yes('K2 a press on a key is never refused by the spoils block, a jail key or any other (#3077)',
+    spoils.activate(PRISONER.a, 0x000f1228, '5aec4:Skyrim.esm') === null &&
+    spoils.activate(PRISONER.a, 0x000f2000, '1234:Skyrim.esm') === null &&
+    !/belonged to the old jail/.test(spoilsBlock));
 spoils.strip(CHEST);
 const left = refs[CHEST].inventory.entries.map(function (e) { return e.baseId; });
 yes('K5 a chest gives up its jail key with the sword, and keeps the other key',
     left.length === 1 && left[0] === KEY_HOUSE);
-const onAct = slice(gm, '  const spoils = globalThis.__thornswoodSpoils;', '\n  }\n');
-yes('K6 onActivate asks the spoils block before anything else answers a press, so the refusal ends it',
-    !!onAct && /return false;/.test(onAct) && gm.indexOf(onAct) < gm.indexOf('const quests = globalThis.__thornswoodQuests;'));
+const onAct = slice(gm, '\n  const spoils = globalThis.__thornswoodSpoils;\n  if (spoils && spoils.activate)', '\n  }\n');
+yes('K6 onActivate lets the spoils block empty a container before anything else answers a press',
+    !!onAct && /spoils\.activate\(/.test(onAct) && gm.indexOf(onAct) < gm.indexOf('const quests = globalThis.__thornswoodQuests;'));
 
 // ------------------------------------------------------------- D. a death
 const arrivalSrc = (function () {

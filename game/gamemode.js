@@ -9006,19 +9006,15 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     NOTHING IS SPAWNED IN THE WORLD. See the spoils block.
 
     Before every branch below it, because a container is emptied on the press
-    that opens it and a weapon on the floor is refused before anything else gets
-    a chance to answer for it. It says nothing at all for the other million
-    presses in the world, which is why it is one lookup and a memo.
+    that opens it, before anything else gets a chance to answer for it. It
+    refuses nothing: nothing a plugin placed lies on the floor any more
+    (#3077). It does nothing at all for the other million presses in the
+    world, which is why it is one lookup and a memo.
   */
   const spoils = globalThis.__thornswoodSpoils;
   if (spoils && spoils.activate) {
     try {
-      const no = spoils.activate(casterRefrId, refrId, baseDesc);
-      if (no) {
-        notify(casterRefrId, no);
-        say(casterRefrId, no);
-        return false;
-      }
+      spoils.activate(casterRefrId, refrId, baseDesc);
     } catch (e) {
       log('the spoils rule threw, so the press goes on:', e);
     }
@@ -46688,11 +46684,12 @@ module.exports = {
   so it survives a restart; a mark that did not would eat somebody's swords the
   first time the server came back up.
 
-  AND THE GROUND IS TOLD APART FROM A DROPPED THING BY ITS FORM ID. MpForm's
-  IsEspmForm is id < 0xff000000, so a reference below that line was placed by a
-  plugin and one above it was made at runtime, which is what a person dropping
-  something makes. A sword Bethesda left on a table cannot be picked up; a sword
-  somebody put down can.
+  THE FLOOR IS NOT IN HERE AT ALL (#3077). Patrick, 21 October 2026: "don't
+  spawn floor items anymore at all no matter what they are". Every item and
+  coin purse a plugin placed is switched off in Thornswood-Last.esp
+  (scripts/mods/Build-LastPlugin.py, step 5), so no machine draws it and the
+  server never makes it, and there is nothing on the floor to refuse. What a
+  person drops is made at runtime, in no plugin, and picks up as it always did.
 
   WHAT IS DELIBERATELY NOT HERE. A body cannot be opened by anybody at all,
   which gamemode.js has written out at length above, so nothing has to be done
@@ -46717,9 +46714,9 @@ module.exports = {
     arrows and bolts, which are the ammunition half of a weapon and would be a
     strange thing to leave lying about when the bow is not.
 
-    Everything else stays. Food, ingredients, ore, potions, books, clutter and
-    keys are all things the world is meant to have in it, and stripping them
-    would empty Skyrim rather than close the economy.
+    Everything else stays in a container. Food, ingredients, ore, potions,
+    books, clutter and keys are all things the world is meant to have in it,
+    and stripping them would empty Skyrim rather than close the economy.
   */
   var SPOIL_TYPES = { WEAP: true, ARMO: true, AMMO: true };
 
@@ -46794,62 +46791,6 @@ module.exports = {
     return Object.prototype.hasOwnProperty.call(toolIds, baseId);
   }
 
-  /*
-    COIN PURSES ARE GOLD, THOUGH NOT ONE OF THEM IS A COIN.
-
-    Patrick, 24 September, after a playtest: "people can pick up coin pocuhes
-    off the ground that was supposed to be included in no gold lol".
-
-    A purse is a FLOR, flora, whose produce is a leveled list of Gold001. The
-    press goes to the engine, and MpObjectReference::ProcessActivateNormal in
-    the fork treats a FLOR as something to pick: GivePickupItemsToActivationSource
-    rolls the list and AddItems the coin straight into the pack. No gold ever
-    lies on the ground and nothing in here is asked what it is, so isSpoil
-    looked at a FLOR, said no, and the purse paid out. And again an hour later,
-    since the fork puts flora back after an hour.
-
-    These six are every FLOR in the load order whose produce is coin, read off
-    tools\harvests.json 'unranked', which Build-HarvestTable.ps1 fills from all
-    of the collection's plugins: the three purses and the three the Thieves
-    Guild's jobs use. The other leveled-list produce there is fish and horker
-    meat. test-spoils.js fails if a rebuilt table has a coin purse that is not
-    on this list.
-  */
-  var PURSES = [
-    'd790c:Skyrim.esm',    // CoinPurseSmall
-    'd8e7f:Skyrim.esm',    // CoinPurseMedium
-    'd8e80:Skyrim.esm',    // CoinPurseLarge
-    'd8e8a:Skyrim.esm',    // TGCoinPurseLargeNEW
-    'd8e8b:Skyrim.esm',    // TGCoinPurseMediumNEW
-    'd8e8c:Skyrim.esm'     // TGCoinPurseSmallNEW
-  ];
-  /*
-    Resolve the six form ids lazily, and KEEP TRYING until they all land.
-
-    idOf answers 0 while the load order is still coming up. The old memo
-    built an empty map on the first press and then never looked again, so
-    every purse after that first empty resolve paid out (and on one machine
-    the client's own roll of the leveled gold list then crashed the client).
-    Retry until all six descriptors have a non-zero id, then freeze.
-  */
-  var purseIds = {};
-  var pursesAllIn = false;
-  function isPurse(baseId) {
-    if (!baseId) { return false; }
-    if (!pursesAllIn) {
-      var n = 0;
-      for (var i = 0; i < PURSES.length; i++) {
-        var id = idOf(PURSES[i]);
-        if (id) {
-          purseIds[id] = true;
-          n++;
-        }
-      }
-      if (n >= PURSES.length) { pursesAllIn = true; }
-    }
-    return Object.prototype.hasOwnProperty.call(purseIds, baseId);
-  }
-
   /** True when the world must not hand this over. */
   var CUT_OUTS = ["3ada4:Skyrim.esm","bff20:Playable Rieklings.esp","bff21:Playable Rieklings.esp"];
   var cutOutIds = null;
@@ -46897,7 +46838,6 @@ module.exports = {
   function isSpoil(baseId) {
     if (!baseId) { return false; }
     if (baseId === GOLD) { return true; }
-    if (isPurse(baseId)) { return true; }
     if (isTool(baseId)) { return true; }
     // #2479: the cut rows (#1511) are held back the way a sword is.
     if (isCutOut(baseId)) { return true; }
@@ -46977,13 +46917,11 @@ module.exports = {
   }
 
   /*
-    The answer to a press, or null when this block has nothing to say.
-
-    Three cases and only the third refuses. A container is emptied and then
-    opens as it always did, because the point is what is inside it rather than
-    whether it opens. A dropped thing is somebody's and is left alone. A thing a
-    plugin placed, that is a weapon, a piece of armour, ammunition, a tool or a
-    coin, does not come up off the floor.
+    A press. It refuses nothing and always answers null. A container is
+    emptied and then opens as it always did, because the point is what is
+    inside it rather than whether it opens. Anything else is left to the
+    engine: nothing a plugin placed lies on the floor any more (#3077, see the
+    block comment), and a thing a person dropped is theirs to pick up.
   */
   function activate(actorId, refrId, baseDesc) {
     var baseId = idOf(baseDesc);
@@ -47034,39 +46972,8 @@ module.exports = {
       } catch (eLoot) {
         slog('dungeon loot threw:', eLoot);
       }
-      return null;
     }
-    /*
-      A purse before the dropped-thing test, since nobody can drop a purse:
-      it is a piece of the world, and the coin in it is never somebody's.
-      And it is put back, the way a refused plant is (PUT THAT PLANT BACK),
-      because the person's own game empties a FLOR before this answers and
-      would otherwise show every refused purse as taken.
-    */
-    if (isPurse(baseId)) {
-      slog('purse: refused world purse', baseDesc, 'at', refrId.toString(16), 'by', actorId.toString(16));
-      if (typeof putBack === 'function') {
-        try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
-      }
-      // #627: say plainly the world put it there and no person left it (the
-      // old 'by nobody' line was read as flavour rather than as the rule).
-      return 'That coin purse was put here by the world, not left by a person. Coin comes from ' +
-             'people in this world, not off the ground.';
-    }
-    /*
-      A jail key, before the dropped-thing test too (#502): a key somebody
-      had and put down still opens a cell in whoever's pack it reaches.
-    */
-    if (isJailKey(baseId)) {
-      slog('jail key: refused', baseDesc, 'at', refrId.toString(16), 'to', actorId.toString(16));
-      return 'That key belonged to the old jail. The cells answer to the hold\'s guards now, ' +
-             'so it stays where it lies.';
-    }
-    // Made at runtime rather than placed by a plugin, so somebody put it there.
-    if (refrId >= 0xff000000) { return null; }
-    if (!isSpoil(baseId)) { return null; }
-    return 'That was put here by the world, not left by a person. Weapons, armour and coin come ' +
-           'from people in this world, not off the ground.';
+    return null;
   }
 
   // ------------------------------------------------- where gold comes from --
@@ -47145,7 +47052,7 @@ module.exports = {
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
     activate: activate, strip: strip, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
-    isTool: isTool, isPurse: isPurse, PURSES: PURSES, alreadyStripped: alreadyStripped,
+    isTool: isTool, alreadyStripped: alreadyStripped,
     SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD, STRIPPED_PROPERTY: STRIPPED_PROPERTY
   };
   slog('ready');

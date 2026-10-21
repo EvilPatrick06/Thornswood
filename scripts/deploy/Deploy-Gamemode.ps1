@@ -777,9 +777,10 @@ $s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue $true -Fo
   infinites (Except for the thigs that hang like the meats, garlic, elves ears,
   etc.)".
 
-  The gamemode already refuses to hand over a weapon, a piece of armour, a tool
-  or a coin that the world placed, and empties a container of those once. What it
-  cannot do from inside is stop the ENGINE putting everything back an hour later.
+  Nothing the world placed lies on the floor (Thornswood-Last.esp switches it
+  off, #3077), and the gamemode empties a container of weapons, armour, tools and
+  coin once. What it cannot do from inside is stop the ENGINE putting everything
+  back in a container an hour later.
   MpObjectReference::GetRelootTime returns an hour for CONT, an hour for anything
   espm::utils::IsItem calls an item, and an hour for FLOR and TREE. So a chest
   emptied of its bread refills with bread at teatime, for ever, and that is an

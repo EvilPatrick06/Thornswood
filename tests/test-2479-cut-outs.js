@@ -4,14 +4,14 @@
 
   #2479. The spoils block's cut-out list (Dragon Bone and the two Riekling
   spear spell tomes, cut by #1511) was never read: isCutOut had no caller, so
-  a chest and the floor both handed all three out. isSpoil now asks it.
+  a chest and the floor both handed all three out. isSpoil now asks it for a
+  chest; the floor holds none of them since #3077.
 
   Drives the REAL spoils block out of gamemode.js over a fake mp, the way
   test-spoils.js does, and checks:
     - each of the three is a spoil, with no record kind that would make it one;
     - each is taken out of a chest the world filled, beside bread that stays;
-    - each placed by the world on the floor is refused;
-    - one a person dropped is left alone, like any spoil;
+    - a press on one is never refused here: nothing lies on the floor (#3077);
     - while the load order is still coming in, nothing is refused by mistake,
       and once it is in, the cut rows are;
     - isCutOut has a caller in the block, so it cannot sit unread again.
@@ -123,15 +123,14 @@ function rig(ready) {
 }
 
 // ------------------------------------------------------------ the floor
+// None of the three is refused off the floor any more, because none lies
+// there: Thornswood-Last.esp switches every placed item off (#3077,
+// tests/test-3077-floor-items.js), so the block refuses no press at all.
 {
   const g = rig();
   CUTS.forEach(function (d) { g.kind(d, d.indexOf('3ada4') === 0 ? 'MISC' : 'BOOK'); });
-  const placed = 0x00012345, dropped = 0xff000123;
-  CUTS.forEach(function (d, i) {
-    const said = g.activate(1, placed + i, d);
-    yes('F' + (i + 1) + ' ' + d + ' placed by the world is refused off the floor', typeof said === 'string' && said.length > 0);
-  });
-  yes('F4 one a person dropped is left alone, like any spoil', g.activate(1, dropped, CUTS[0]) === null);
+  yes('F1 a press on one is never refused here, placed or dropped',
+      g.activate(1, 0x00012345, CUTS[0]) === null && g.activate(1, 0xff000123, CUTS[0]) === null);
 }
 
 // ------------------------------------------------------------ load order

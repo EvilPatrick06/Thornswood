@@ -67,7 +67,7 @@ In file order, top to bottom. Search for a name to find it; the sections have no
 | Progression | The rulebook: `RANKS`, `SPELL_IDS`, `TUNING`, state, rules, the spell book, `TABLE`, `canDo`. |
 | Farming | Plots, rank and time, the land, claims in `private\farm-claims.json`, pressing, commands `/plant`, `/claim`, `/plot`. |
 | Property | See "Property, offices and rent". |
-| Spoils | Nothing weapon, armour, tool or gold is spawned in the world; `strip`, purses (`isPurse`, `purse`), where gold comes from. |
+| Spoils | Nothing weapon, armour, tool or gold is spawned in a container (`strip`); the floor is empty by Thornswood-Last.esp (#3077); where gold comes from (`purse`). |
 | Character | Stores the answer as `thornswoodCharacter` and pushes the panel; `gate`, `gateHalf`, `credit`, `/pick` and `/spend` in `command`. |
 | Chat commands | See "Chat and commands". |
 | Containers and the audit | `mp.onPutItem`, `mp.onTakeItem`, `mp.onDropItem`, audit helpers, lines `take:` and `drop:` in `thornswood.log`. |
@@ -205,8 +205,8 @@ steward can `evict`. A hold's box is the drop box on its board
 (`dropboxCmd`), where rent (`rentDue`, `rentCmd`) is paid; board fees
 (`takeGold`) are counted on the hold's ledger (`funds`). Notice boards come after them. Coin enters the world in one
 place, the starting purse (`purse`, `test-one-mint.js`), and otherwise
-moves by trade (`gold`). The spoils block strips spawned gold from the
-world, and a coin purse found in it counts as gold.
+moves by trade (`gold`). The spoils block strips spawned gold from
+containers; nothing lies on the floor (Thornswood-Last.esp, #3077).
 
 ## Needs
 

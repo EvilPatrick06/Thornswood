@@ -79,7 +79,25 @@ WHAT IT PUTS IN THE PLUGIN
      the hold's own when none covers it. Everything else on each record is
      the winner's own.
 
-  A placed actor's override needs the cell it stands in, and the worldspace
+  5. Nothing lies on the floor (Patrick, 21 October 2026, #3077: "don't
+     spawn floor items anymore at all no matter what they are"). Every
+     placed reference whose base a person could pick up is overridden
+     initially disabled, keeping its base and position, the way a cut actor
+     is: every weapon, armour piece, arrow, misc item, potion, ingredient,
+     book, soul gem, scroll, key and note, every light that can be carried
+     (a torch; every other light is the world's lighting), and the six coin
+     purses, which are flora. Every other flora (plants, fish, hanging game)
+     is a harvestable and stays. A thing a person drops is made at runtime,
+     in no plugin, and is never touched. A Thornswood plugin's own floor
+     item, and a reference whose enable parent is a floor item, stop the
+     build, so each is decided rather than switched off unasked. What the
+     servers saved about a floor item before needs no clearing: the server
+     attaches a plugin reference's saved state only to a reference its
+     reader made (WorldState::LoadChangeForm holds it back,
+     WorldState::LoadForm applies it), and the reader never makes an
+     initially disabled one.
+
+  A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
   are copied the same way. The plugin's own masters are every plugin those
@@ -134,9 +152,11 @@ WHAT IT WRITES
   manifest: the plugin's sha256, the load order it was built against, every
   cut actor it switches off and every one it leaves and why, every quest it
   stops and every quest it keeps, and every place it gives a hold, with the
-  parent or location it had before. tests/test-2468-last-plugin.js holds the
-  two together on every build, without the game, and
-  tests/test-2551-place-holds.js the place holds.
+  parent or location it had before, and the floor items it switches off,
+  counted by type and by the plugin that won each, with the cells only they
+  needed (#2791 reads those). tests/test-2468-last-plugin.js holds the two
+  together on every build, without the game, tests/test-2551-place-holds.js
+  the place holds and tests/test-3077-floor-items.js the floor items.
 
 HOW IT REACHES PEOPLE
 
@@ -169,8 +189,8 @@ Usage:
 
 --check builds it in memory and says whether the committed plugin and manifest
 are those bytes. --verify reads the load order with the committed plugin at
-its end and checks, record by record, that no cut actor is left able to show
-and no cut quest is left able to start, and lists the gate, door and arrival
+its end and checks, record by record, that no cut actor and no floor item is
+left able to show and no cut quest is left able to start, and lists the gate, door and arrival
 talk with what stops each. Exit 1 on any refusal.
 """
 
@@ -555,6 +575,34 @@ GATES = (('skyrim.esm', 0x01B1F1), ('skyrim.esm', 0x042284), ('skyrim.esm', 0x04
 GATE_DROP = {b'XLOC', b'VMAD'}
 GATE_PLAIN = {b'EDID', b'DATA'}
 GATE_FID_FIRST = {b'NAME', b'XTEL', b'XNDP', b'XLRT'}
+
+
+# ------------------------------------------------------ the floor items
+
+# Nothing on the floor (#3077). Patrick, 21 Oct 2026: "don't spawn floor
+# items anymore at all no matter what they are". Every placed reference whose
+# base is something a person can pick up is switched off here the way a cut
+# actor is, so no machine draws it and the server's reader never makes it.
+# The types are the ones the engine's espm::utils::IsItem calls items, the
+# same list forbiddenReloot carries (scripts/deploy/Deploy-Gamemode.ps1), with
+# one narrowing: a light is an item only when it can be carried (a torch).
+# Every other light is the world's lighting and stays.
+FLOOR_TYPES = (b'WEAP', b'ARMO', b'AMMO', b'MISC', b'ALCH', b'INGR', b'BOOK', b'SLGM', b'SCRL',
+               b'LIGH', b'KEYM', b'NOTE')
+# A light's DATA: time, radius, colour, then its flags; Can Be Carried is 0x2.
+LIGHT_FLAGS_AT = 12
+LIGHT_CARRIED = 0x2
+# The coin purses are flora, not items, and lie on the floor all the same.
+# These six are every FLOR in the load order whose produce is coin
+# (game/data/harvests.json 'unranked'; tests/test-3077-floor-items.js holds the
+# two together): the three purses and the Thieves Guild's three. Every other
+# flora is a harvestable (plants, fish, hanging game) and stays.
+COIN_PURSES = (('skyrim.esm', 0x0D790C),   # CoinPurseSmall
+               ('skyrim.esm', 0x0D8E7F),   # CoinPurseMedium
+               ('skyrim.esm', 0x0D8E80),   # CoinPurseLarge
+               ('skyrim.esm', 0x0D8E8A),   # TGCoinPurseLargeNEW
+               ('skyrim.esm', 0x0D8E8B),   # TGCoinPurseMediumNEW
+               ('skyrim.esm', 0x0D8E8C))   # TGCoinPurseSmallNEW
 
 
 # ------------------------------------------------- what holds a form id
@@ -963,11 +1011,51 @@ def place_holds(policy, plugins, win, canon):
     return locs, cells
 
 
+def floor_bases(plugins, win, canon):
+    """{base: what it is} for every base whose placed references may not lie in
+    the world (#3077): the item types, a light only when it can be carried,
+    and the coin purses. win has to hold FLOOR_TYPES and FLOR."""
+    out = {}
+    for (tag, gid), e in win.items():
+        if tag not in FLOOR_TYPES or e.flags & DELETED:
+            continue
+        if tag == b'LIGH':
+            d = dict(subrecords(plugins[e.pi].data(e))).get(b'DATA', b'')
+            if len(d) < LIGHT_FLAGS_AT + 4 or not struct.unpack_from('<I', d, LIGHT_FLAGS_AT)[0] & LIGHT_CARRIED:
+                continue
+        out[gid] = tag.decode()
+    for g in COIN_PURSES:
+        if (b'FLOR', g) not in win:
+            raise SystemExit('STOP. no plugin has the coin purse %s. Read game/data/harvests.json again '
+                             'and change COIN_PURSES. Nothing was written.' % desc_of(g, canon))
+        out[g] = 'coin purse'
+    return out
+
+
+def floor_scan(plugins, win, bases):
+    """Every winning placed reference whose base is in bases, as {ref: (entry,
+    what its base is)}, and every placed reference or actor with an enable
+    parent, as {ref: (entry, its enable parent)}."""
+    floor, parents = {}, {}
+    for (tag, gid), e in win.items():
+        if tag not in (b'REFR', b'ACHR'):
+            continue
+        src = plugins[e.pi]
+        pairs = dict(subrecords(src.data(e)))
+        if b'XESP' in pairs:
+            parents[gid] = (e, src.gid(struct.unpack_from('<I', pairs[b'XESP'], 0)[0]))
+        if tag == b'REFR' and b'NAME' in pairs:
+            kind = bases.get(src.gid(struct.unpack('<I', pairs[b'NAME'])[0]))
+            if kind:
+                floor[gid] = (e, kind)
+    return floor, parents
+
+
 def build(data_dir):
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     policy = json.load(open(POLICY, encoding='utf-8'))
     order, canon, plugins = load(data_dir, catalogue)
-    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST', b'LCTN'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'CELL', b'WRLD', b'QUST', b'LCTN', b'FLOR'} | set(FLOOR_TYPES))
     tables = {}
 
     def strings(src, kind):
@@ -1051,9 +1139,41 @@ def build(data_dir):
                              'Nothing was written.' % (what, plugins[e.pi].name))
         gates.append(e)
 
-    # The cells and worlds the actors and gates stand in, each from its own winner.
+    # 4. The floor items (#3077): every placed reference a person could pick
+    # up, switched off like a cut actor. Left alone, the same way: one a later
+    # plugin deleted, and one already off with no enable parent.
+    bases = floor_bases(plugins, win, canon)
+    found, parents = floor_scan(plugins, win, bases)
+    floor, floor_rows = [], {'deleted': [], 'alreadyOff': []}
+    for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
+        e, kind = found[g]
+        src = plugins[e.pi]
+        if own_plugins.is_own(canon[g[0]]) or own_plugins.is_own(src.name):
+            raise SystemExit('STOP. %s puts %s on the floor (a %s). A Thornswood plugin\'s own floor item '
+                             'is Patrick\'s to keep or take out (#3077), never switched off unasked. '
+                             'Nothing was written.' % (src.name, desc_of(g, canon), kind))
+        tags = [t for t, _ in subrecords(src.data(e))]
+        if e.flags & DELETED:
+            floor_rows['deleted'].append(desc_of(g, canon))
+        elif e.flags & DISABLED and b'XESP' not in tags:
+            floor_rows['alreadyOff'].append(desc_of(g, canon))
+        else:
+            floor.append((g, e, kind))
+    # A reference whose enable parent is a floor item would go out with it, or
+    # come on as it goes (the opposite flag). Neither is decided by this.
+    off_now = {g for g, _, _ in floor} | {plugins[e.pi].gid(e.fid) for e in actors}
+    followers = sorted('%s follows %s' % (desc_of(g, canon), desc_of(p, canon))
+                       for g, (e, p) in parents.items() if p in off_now and g not in off_now)
+    if followers:
+        raise SystemExit('STOP. %d reference(s) have a floor item as their enable parent, and switching '
+                         'the item off would switch them too:\n  %s\nDecide them on #3077. Nothing was written.'
+                         % (len(followers), '\n  '.join(followers[:40])))
+
+    # The cells and worlds the actors, gates and floor items stand in, each
+    # from its own winner.
     cells, worlds = {}, {}
-    for e in actors + gates:
+
+    def stand(e):
         src = plugins[e.pi]
         world, cell, child, block, sub = e.ctx
         if cell is None or child not in (8, 9):
@@ -1071,13 +1191,22 @@ def build(data_dir):
             if cw is None or plugins[cells[cg].pi].gid(cw) != wg:
                 raise SystemExit('STOP. %s 0x%08X stands in a world its cell is not in. '
                                  'Nothing was written.' % (src.name, e.fid))
+        return cg
 
-    # 4. The places given a hold (#2551). A room given a location is copied
+    for e in actors + gates:
+        stand(e)
+    # The cells only the floor items need: what this adds to the records the
+    # plugin copies from other authors (#2791), counted by who wins each.
+    had = set(cells)
+    floor_cells = {stand(e) for _, e, _ in floor} - had
+
+    # 5. The places given a hold (#2551). A room given a location is copied
     # like any other cell, with nothing placed under it unless an actor here
     # stands in it too.
     hold_locs, hold_cells = place_holds(policy, plugins, win, canon)
     for g, (e, le, row) in hold_cells.items():
         cells[g] = e
+    floor_cells -= set(hold_cells)
 
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()
@@ -1117,6 +1246,21 @@ def build(data_dir):
             fid = rn.one(src, e.fid, what)
             flags = (e.flags & ~(COMPRESSED | DELETED)) | DISABLED
             out['achr'].append((fid, flags, pack_subrecords(keep), e))
+        # A floor item the same way: its base and its place, nothing else.
+        for g, e, kind in floor:
+            src = plugins[e.pi]
+            what = '%s REFR 0x%08X' % (src.name, e.fid)
+            keep = []
+            for t, b in subrecords(src.data(e)):
+                if t == b'NAME':
+                    keep.append((t, struct.pack('<I', rn.one(src, struct.unpack('<I', b)[0], what))))
+                elif t in (b'EDID', b'DATA'):
+                    keep.append((t, b))
+            if [t for t, _ in keep] not in ([b'NAME', b'DATA'], [b'EDID', b'NAME', b'DATA']):
+                raise SystemExit('STOP. %s does not have its base and its position. Nothing was written.'
+                                 % what)
+            flags = (e.flags & ~(COMPRESSED | DELETED)) | DISABLED
+            out['refr'].append((rn.one(src, e.fid, what), flags, pack_subrecords(keep), e))
         for g, e in cells.items():
             src = plugins[e.pi]
             what = '%s CELL 0x%08X' % (src.name, e.fid)
@@ -1181,7 +1325,24 @@ def build(data_dir):
         'placeHolds': {'locations': [row for _, _, row in hold_locs],
                        'rooms': [hold_cells[g][2] for g in sorted(hold_cells)]},
         'arrivalTalk': arrival_talk(plugins, canon),
+        # The floor items switched off (#3077), counted rather than listed
+        # (there are tens of thousands); refsSha256 is the sha256 of every one,
+        # 'object id:plugin' sorted and joined by newlines, which
+        # tests/test-3077-floor-items.js reads back out of the plugin itself.
+        'floorItems': {
+            'off': len(floor),
+            'byType': dict(sorted(collections.Counter(k for _, _, k in floor).items())),
+            'byWinner': dict(sorted(collections.Counter(plugins[e.pi].name for _, e, _ in floor).items())),
+            'refsSha256': hashlib.sha256('\n'.join(sorted(desc_of(g, canon) for g, _, _ in floor))
+                                         .encode('utf-8')).hexdigest(),
+            'deleted': len(floor_rows['deleted']),
+            'alreadyOff': len(floor_rows['alreadyOff']),
+            'cellsAdded': len(floor_cells),
+            'cellsAddedByWinner': dict(sorted(collections.Counter(plugins[cells[g].pi].name
+                                                                  for g in floor_cells).items())),
+        },
     }
+    manifest['counts']['floorItemsOff'] = len(floor)
     return plugin, manifest
 
 
@@ -1318,8 +1479,9 @@ def read_plugin(buf, name, index):
 
 
 def verify(data_dir, plugin_bytes, manifest):
-    """The load order with the plugin at its end: no cut actor left able to
-    show, no cut quest left able to start. Returns a list of failures."""
+    """The load order with the plugin at its end: no cut actor or floor item
+    left able to show, no cut quest left able to start. Returns a list of
+    failures."""
     catalogue = json.load(open(CATALOGUE, encoding='utf-8'))
     order, canon, plugins = load(data_dir, catalogue)
     last = read_plugin(plugin_bytes, PLUGIN, len(plugins))
@@ -1328,7 +1490,7 @@ def verify(data_dir, plugin_bytes, manifest):
     if not last.hflags & LIGHT:
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
-    win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL'})
+    win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR'} | set(FLOOR_TYPES))
     fails = []
     for desc in manifest.get('gatesUnlocked', []):
         e = win.get((b'REFR', ref_key(desc)))
@@ -1378,6 +1540,25 @@ def verify(data_dir, plugin_bytes, manifest):
         if row['quest'] not in stopped and row['quest'] not in kept:
             fails.append('arrival talk %s %s is in no list: decide it in the policy'
                          % (row['quest'], row['edid']))
+    # No floor item is left able to show (#3077), and nothing follows one off
+    # or on through its enable parent.
+    found, parents = floor_scan(plugins, win, floor_bases(plugins, win, canon))
+    here = 0
+    for g, (e, kind) in found.items():
+        tags = [t for t, _ in subrecords(plugins[e.pi].data(e))]
+        if e.flags & DELETED:
+            continue
+        if e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
+            here += e.pi == last.index
+            continue
+        fails.append('floor item %s (a %s) is left able to show' % (desc_of(g, canon), kind))
+    floor = manifest.get('floorItems') or {}
+    if here != floor.get('off'):
+        fails.append('%d floor items are off by this plugin, and the manifest says %s' % (here, floor.get('off')))
+    mine = {g for g, (e, _) in found.items() if e.pi == last.index}
+    for g, (e, p) in parents.items():
+        if p in mine:
+            fails.append('%s has the floor item %s as its enable parent' % (desc_of(g, canon), desc_of(p, canon)))
     return fails
 
 
@@ -1415,8 +1596,11 @@ def main():
               % (c['actorsOff'], c['questsStopped'], c['questsKept'], c['modQuestsStopped']))
         print('  ok    %d locations and %d rooms are in the hold the policy gives them'
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
+        print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
         return 0
 
+    committed = {m.lower() for m in json.load(open(MANIFEST, encoding='utf-8'))['masters']} \
+        if os.path.isfile(MANIFEST) else set()
     plugin, manifest = build(args.data)
     c = manifest['counts']
     print('Built %s: %s bytes, %d masters' % (PLUGIN, format(len(plugin), ','), len(manifest['masters'])))
@@ -1431,6 +1615,13 @@ def main():
                                                     row['parent'], row['hold']))
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
+    fl = manifest['floorItems']
+    print('  %d floor items off (%s); left as they are: %d deleted by a plugin, %d already off'
+          % (fl['off'], ', '.join('%d %s' % (n, k) for k, n in fl['byType'].items()), fl['deleted'], fl['alreadyOff']))
+    print('  %d cells copied only for the floor items, by the plugin that wins each:' % fl['cellsAdded'])
+    for name, n in sorted(fl['cellsAddedByWinner'].items(), key=lambda x: -x[1]):
+        print('    %6d  %s%s' % (n, name, '' if name.lower() in committed else
+                                  '   (not a master of the committed plugin)'))
     fails = verify(args.data, plugin, manifest)
     if fails:
         for f in fails[:40]:
@@ -1438,7 +1629,7 @@ def main():
         print('STOP. what this built does not verify. Nothing was written.')
         return 1
     print('  ok    read back in the load order: every cut actor off, every cut quest unable to start, '
-          'every place in the hold the policy gives it')
+          'every place in the hold the policy gives it, no floor item able to show')
     if args.check:
         a = same_or_say(OUT, plugin, 'game/content/' + PLUGIN)
         # The manifest is compared as what it says, not as bytes.
