@@ -30,8 +30,11 @@
     C  Thornswood-Content.esp places no item of its own on the floor (a
        Thornswood plugin's floor item is Patrick's to decide; the builder stops
        on one with the game's records too)
-    N  no plugin the policy never copies from (notCopiedFrom: Immersive
-       Armors, Patrick, 17 Oct 2026) is a master of the plugin
+    N  nothing of a plugin the policy never copies from (notCopiedFrom:
+       Immersive Armors, Patrick, 17 Oct 2026) is in the plugin but the
+       records its row carries (Patrick, 21 Oct 2026: the 6 floor items it
+       places, switched off, and the 5 cell and world headers they stand
+       under)
     G  the gamemode refuses nothing off the floor: no "put here by the world"
        line, no coin purse rule, no jail key floor line
 
@@ -152,14 +155,33 @@ yes('P3 and they are the ones it says: their ids hash to its refsSha256', !!fl &
 
 // ---------------------------------------------------------------- N
 // Nothing is copied out of a plugin Patrick rules is never handed on
-// (notCopiedFrom in the policy: Immersive Armors, 17 Oct 2026, #2454).
+// (notCopiedFrom in the policy: Immersive Armors, 17 Oct 2026, #2454), but
+// the records its row carries, which he allowed on 21 Oct 2026 (#3077).
 const policy = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), 'utf8'));
-const never = (policy.notCopiedFrom || []).map((r) => r.plugin);
+const rows = policy.notCopiedFrom || [];
+const never = rows.map((r) => r.plugin);
+const carried = [].concat(...rows.map((r) => r.carried || []));
 yes('N1 the policy never copies from Immersive Armors', never.indexOf('Hothtrooper44_ArmorCompilation.esp') >= 0);
-yes('N2 and no plugin it names is a master of Thornswood-Last.esp, so no record of it is in there',
-    never.length > 0 && never.every((n) => last.masters.every((m) => m.toLowerCase() !== n.toLowerCase())));
-yes('N3 the manifest was built with the same list (rebuild the plugin after a policy change)',
-    !!manifest.notCopiedFrom && JSON.stringify(manifest.notCopiedFrom.plugins) === JSON.stringify(never.slice().sort()));
+const lower = (n) => n.toLowerCase();
+const theirs = (d) => never.some((n) => lower(d).endsWith(':' + lower(n)));
+const carries = new Set(carried.map(lower));
+const extra = [];
+for (const r of last.recs) {
+  const name = r.tag === 'REFR' ? r.subs.find((s) => s.t === 'NAME') : null;
+  const base = name ? last.desc(name.b.readUInt32LE(0)) : '';
+  if ((theirs(r.desc) || theirs(base)) && !carries.has(lower(r.tag + ' ' + r.desc))) { extra.push(r.tag + ' ' + r.desc); }
+}
+yes('N2 no record in Thornswood-Last.esp is or places one of a plugin it names, but the ones its row carries' +
+    (extra.length ? ' (not: ' + extra.slice(0, 5).join(', ') + ')' : ''), never.length > 0 && extra.length === 0);
+const needs = never.filter((n) => last.masters.some((m) => lower(m) === lower(n)));
+yes('N3 one is a master only when its row carries a record of its own (' + needs.join(', ') + ')',
+    needs.every((n) => carried.some((c) => lower(c).endsWith(':' + lower(n)))));
+yes('N4 the manifest was built with the same list and carries exactly those records (rebuild the plugin after a policy change)',
+    !!manifest.notCopiedFrom && JSON.stringify(manifest.notCopiedFrom.plugins) === JSON.stringify(never.slice().sort()) &&
+    JSON.stringify(manifest.notCopiedFrom.carried || []) === JSON.stringify(carried.slice().sort()));
+const carriedRefs = carried.filter((c) => c.startsWith('REFR '));
+yes('N5 every carried reference is a floor item switched off here, keeping only its base and place',
+    carriedRefs.every((c) => refs.some((r) => lower('REFR ' + r.desc) === lower(c))));
 
 // ---------------------------------------------------------------- C
 const content = readPlugin(CONTENT, 'Thornswood-Content.esp');

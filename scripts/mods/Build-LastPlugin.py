@@ -1148,9 +1148,24 @@ def build(data_dir):
     # its own record says nothing more (compared below, after the numbering);
     # any other record it wins stops the build. A floor item it wins but
     # does not place is switched off from the plugin below it: off, the
-    # reference shows nothing of either.
+    # reference shows nothing of either. The only records of it copied are the
+    # ones its row names under carried, each by tag and id (Patrick, 21 Oct
+    # 2026, #3077: the 6 floor items Immersive Armors places, switched off,
+    # and the 5 cell and world headers they stand under); one named there that
+    # this build does not need stops it, so the list stays exactly what he
+    # allowed.
     blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    carried = {r.lower(): r for row in policy.get('notCopiedFrom', []) for r in row.get('carried', [])}
+    used = set()
     below = {}
+
+    def carries(tag, g):
+        """Whether the policy carries the record tag g from the never-copied plugin that wins it."""
+        k = ('%s %s' % (tag.decode(), desc_of(g, canon))).lower()
+        if k in carried:
+            used.add(k)
+            return True
+        return False
 
     def under(e, tag, gid):
         """The record tag gid as the highest plugin below e's has it, or None."""
@@ -1195,7 +1210,7 @@ def build(data_dir):
         # here, without the script.
         elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
-        elif src.name.lower() in blocked:
+        elif src.name.lower() in blocked and not carries(b'REFR', g):
             if under(e, b'REFR', g) is None:
                 held_floor.append('REFR %s (won by %s)%s' % (desc_of(g, canon), src.name, placed(e)))
             else:
@@ -1257,7 +1272,8 @@ def build(data_dir):
     floor_cells -= set(hold_cells)
 
     # 6. Nothing is copied out of a plugin the policy never copies from
-    # (notCopiedFrom, above); what it would contribute stops the build.
+    # (notCopiedFrom, above) but what it carries; anything else it would
+    # contribute stops the build, and so does a carried record not needed.
     held = sorted('%s %s (won by %s)%s' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon),
                                            plugins[e.pi].name, placed(e))
                   for e in actors + gates + qentries +
@@ -1266,7 +1282,7 @@ def build(data_dir):
     swapped = []
     for kind, table in ((b'CELL', cells), (b'WRLD', worlds)):
         for g, e in list(table.items()):
-            if plugins[e.pi].name.lower() not in blocked:
+            if plugins[e.pi].name.lower() not in blocked or carries(kind, g):
                 continue
             prev = under(e, kind, g)
             if prev is None:
@@ -1275,6 +1291,7 @@ def build(data_dir):
             table[g] = prev
             swapped.append((kind, g, e, prev))
     held += held_floor
+    stale = [carried[k] for k in sorted(set(carried) - used)]
 
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()
@@ -1379,12 +1396,15 @@ def build(data_dir):
         if changed:
             differs.append('%s: %s changes it from %s (%s)' % (what, plugins[e.pi].name, plugins[prev.pi].name,
                                                                 ', '.join(changed)))
-    if held or differs:
+    if held or differs or stale:
         raise SystemExit('STOP. %d record(s) the plugin would copy are won by a plugin the policy never '
                          'copies from (notCopiedFrom):\n  %s\n%d record(s) are changed by one, so neither its '
-                         'record nor the one below is right to copy:\n  %s\nDecide them on #3077. '
-                         'Nothing was written.' % (len(held), '\n  '.join(sorted(held)[:60]) or 'none',
-                                                   len(differs), '\n  '.join(sorted(differs)[:60]) or 'none'))
+                         'record nor the one below is right to copy:\n  %s\n%d record(s) the policy carries '
+                         'from one are not needed by this build (take them off carried):\n  %s\n'
+                         'Decide them on #3077. Nothing was written.'
+                         % (len(held), '\n  '.join(sorted(held)[:60]) or 'none',
+                            len(differs), '\n  '.join(sorted(differs)[:60]) or 'none',
+                            len(stale), '\n  '.join(stale) or 'none'))
     made = copies()
     masters = [canon[m] for m in rn.masters]
     plugin = write_plugin(made, masters, plugins, rn)
@@ -1435,11 +1455,13 @@ def build(data_dir):
     }
     manifest['counts']['floorItemsOff'] = len(floor)
     # The cells and worlds a never-copied plugin wins, copied from the plugin
-    # below it, whose record that plugin does not change (step 6).
+    # below it, whose record that plugin does not change (step 6), and the
+    # records the policy carries from it.
     manifest['notCopiedFrom'] = {
         'plugins': sorted(row['plugin'] for row in policy.get('notCopiedFrom', [])),
         'takenFromBelow': sorted('%s %s from %s, not %s' % (k.decode(), desc_of(g, canon), plugins[p.pi].name,
                                                             plugins[e.pi].name) for k, g, e, p in swapped),
+        'carried': sorted(carried[k] for k in used),
     }
     return plugin, manifest
 
@@ -1715,6 +1737,8 @@ def main():
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
     for row in manifest['notCopiedFrom']['takenFromBelow']:
         print('  never copied from: %s' % row)
+    for row in manifest['notCopiedFrom']['carried']:
+        print('  carried from a never-copied plugin (the policy allows it): %s' % row)
     fl = manifest['floorItems']
     print('  %d floor items off (%s); left as they are: %d deleted by a plugin, %d already off'
           % (fl['off'], ', '.join('%d %s' % (n, k) for k, n in fl['byType'].items()), fl['deleted'], fl['alreadyOff']))
