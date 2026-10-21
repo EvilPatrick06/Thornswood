@@ -154,7 +154,9 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell, [string[]]$std
         if ($text -eq $far.Reader -and $stdin.Count) {
             $piped = ''
             try { $piped = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($stdin[0])) } catch { }
-            foreach ($s in $far.Scripts) { if ($piped.EndsWith($s)) { $ok = $true } }
+            # Contains, as for the file it once went as: Remote.ps1 -File
+            # sends a file's text, which may end with a line break.
+            foreach ($s in $far.Scripts) { if ($piped.Contains($s)) { $ok = $true } }
         }
     }
     if (-not $ok) {
