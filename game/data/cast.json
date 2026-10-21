@@ -15,24 +15,24 @@
   "everyoneElse": 3378,
   "failedToInflate": 0,
   "guards": 393,
-  "noHold": 591,
-  "notPeople": 7722,
-  "offAtStart": 2548,
-  "people": 6932,
-  "placed": 14664,
+  "noHold": 639,
+  "notPeople": 7723,
+  "offAtStart": 2549,
+  "people": 6935,
+  "placed": 14668,
   "stringTables": 6,
   "traders": 588,
-  "transport": 25,
+  "transport": 27,
   "uniqueTraders": 243,
-  "uniqueTransport": 25
+  "uniqueTransport": 27
  },
  "holdFrom": {
   "its own location": 3149,
-  "nothing placed it": 591,
-  "the cell it stands in": 2147,
-  "the ground it stands on": 99,
-  "the nearest named place": 640,
-  "whose law it answers to": 306
+  "nothing placed it": 639,
+  "the cell it stands in": 2108,
+  "the ground it stands on": 107,
+  "the nearest named place": 570,
+  "whose law it answers to": 362
  },
  "holds": {
   "Eastmarch": {
@@ -886,11 +886,11 @@
       "KmodFerryRoute1Faction"
      ],
      "edid": "KmodFerrymanWindhelm",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Gort",
      "ref": "fb1b:CFTO.esp",
      "unique": true,
-     "where": "WindhelmDocksExterior01"
+     "where": "open ground in Tamriel"
     }
    ]
   },
@@ -1653,11 +1653,11 @@
       "KmodFerryRoute3Faction"
      ],
      "edid": "KmodFerrymanGuardian",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Bryst",
      "ref": "332f6:CFTO.esp",
      "unique": true,
-     "where": "GuardianStones"
+     "where": "open ground in Tamriel"
     },
     {
      "base": "332ed:CFTO.esp",
@@ -1701,23 +1701,21 @@
   },
   "Haafingar": {
    "counts": {
-    "everyoneElse": 360,
+    "everyoneElse": 354,
     "guards": 56,
     "notPeople": 462,
-    "offAtStart": 291,
-    "people": 1005,
+    "offAtStart": 250,
+    "people": 959,
     "traders": 295,
-    "transport": 3
+    "transport": 4
    },
    "everyoneElse": {
     "Ahtar": 1,
     "Aia Arria": 1,
     "Alchemist": 1,
     "Apprentice Conjurer": 1,
-    "Araniel the Wise": 1,
     "Arena Vendor": 1,
     "Argonian": 2,
-    "Arrowsong": 1,
     "Ataf": 1,
     "Azzada Lylvieve": 1,
     "Bandit": 44,
@@ -1794,11 +1792,8 @@
     "Katla": 1,
     "Kayd": 1,
     "Kharag gro-Shurkul": 1,
-    "Klog the Ogre": 1,
-    "Klug the Dwarf": 1,
     "Knud": 1,
     "Labourer": 5,
-    "Legate Adventus Caesennius": 1,
     "Legate Rikke": 1,
     "Leper": 1,
     "Lisette": 1,
@@ -1875,7 +1870,6 @@
     "Varnius Junius": 1,
     "Veteran": 1,
     "Viarmo": 1,
-    "White": 1,
     "Witch": 1,
     "Wood Elf": 1,
     "Xander": 1
@@ -1909,7 +1903,7 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 234,
+    "everyoneElse": 193,
     "guards": 55,
     "traders": 0,
     "transport": 2
@@ -1949,7 +1943,7 @@
      "name": "Angeline Morrard",
      "ref": "198d2:Skyrim.esm",
      "unique": true,
-     "where": "The Lucky Cauldron"
+     "where": "Angeline's Aromatics"
     },
     {
      "base": "d6ad8:Skyrim.esm",
@@ -2377,7 +2371,7 @@
       "LSDfactionrestaurant"
      ],
      "edid": "LSDCHEFfo",
-     "holdFrom": "the nearest named place",
+     "holdFrom": "whose law it answers to",
      "name": "Chef of the Restaurant",
      "ref": "1021:Solitude Arena.esp",
      "unique": false,
@@ -2822,7 +2816,7 @@
       "ooooSolitudeMerchantHumanFaction"
      ],
      "edid": "ssssSolitudeMerchantHuman",
-     "holdFrom": "the nearest named place",
+     "holdFrom": "whose law it answers to",
      "name": "Merchant",
      "ref": "e2d7:Populated Cities Towns Villages Legendary.esp",
      "unique": false,
@@ -2834,7 +2828,7 @@
       "ooooSolitudeMerchantOldFaction"
      ],
      "edid": "ssssSolitudeMerchantOld",
-     "holdFrom": "the nearest named place",
+     "holdFrom": "whose law it answers to",
      "name": "Merchant",
      "ref": "e2d9:Populated Cities Towns Villages Legendary.esp",
      "unique": false,
@@ -5456,7 +5450,7 @@
      "name": "Vivienne Onis",
      "ref": "198d3:Skyrim.esm",
      "unique": true,
-     "where": "The Lucky Cauldron"
+     "where": "Angeline's Aromatics"
     }
    ],
    "transport": [
@@ -5467,11 +5461,11 @@
       "KmodFerryRoute1Faction"
      ],
      "edid": "KmodFerrymanSolitude",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Jolf",
      "ref": "fb18:CFTO.esp",
      "unique": true,
-     "where": "SolitudeDocks01"
+     "where": "open ground in Tamriel"
     },
     {
      "base": "14c5a:CFTO.esp",
@@ -5483,6 +5477,19 @@
      "holdFrom": "the nearest named place",
      "name": "Perius",
      "ref": "14c5b:CFTO.esp",
+     "unique": true,
+     "where": "open ground in Tamriel"
+    },
+    {
+     "base": "2d4c09:CFTO.esp",
+     "because": [
+      "KmodFastTravelDialogueFaction",
+      "KmodFerryRoute1Faction"
+     ],
+     "edid": "KmodFerrymanDragonBridge",
+     "holdFrom": "the ground it stands on",
+     "name": "Rolf",
+     "ref": "2d4c0a:CFTO.esp",
      "unique": true,
      "where": "open ground in Tamriel"
     },
@@ -6238,11 +6245,11 @@
       "KmodFerryRoute4Faction"
      ],
      "edid": "KmodFerrymanRavenRock",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Maslyn",
      "ref": "14c6f:CFTO.esp",
      "unique": true,
-     "where": "DLC2RavenRock03"
+     "where": "open ground in DLC2SolstheimWorld"
     }
    ]
   },
@@ -6897,11 +6904,11 @@
    "counts": {
     "everyoneElse": 207,
     "guards": 4,
-    "notPeople": 708,
+    "notPeople": 709,
     "offAtStart": 148,
-    "people": 375,
+    "people": 376,
     "traders": 15,
-    "transport": 1
+    "transport": 2
    },
    "everyoneElse": {
     "Ancano": 1,
@@ -7182,22 +7189,36 @@
      "ref": "153f0c:CFTO.esp",
      "unique": true,
      "where": "open ground in Tamriel"
+    },
+    {
+     "base": "1be45a:CFTO.esp",
+     "because": [
+      "KmodFastTravelDialogueFaction"
+     ],
+     "edid": "KmodCarriageDriverWinterhold",
+     "holdFrom": "the ground it stands on",
+     "name": "Thors",
+     "ref": "1c355d:CFTO.esp",
+     "unique": true,
+     "where": "open ground in Tamriel"
     }
    ]
   },
   "no hold": {
    "counts": {
-    "everyoneElse": 347,
+    "everyoneElse": 353,
     "guards": 50,
     "notPeople": 702,
-    "offAtStart": 169,
-    "people": 591,
+    "offAtStart": 211,
+    "people": 639,
     "traders": 25,
     "transport": 0
    },
    "everyoneElse": {
     "Alchemist": 1,
     "Anger": 1,
+    "Araniel the Wise": 1,
+    "Arrowsong": 1,
     "Azura": 1,
     "Bandit": 17,
     "Blood Horker": 5,
@@ -7221,6 +7242,9 @@
     "Imperial Soldier": 7,
     "Jiub": 1,
     "Jurgen Windcaller": 1,
+    "Klog the Ogre": 1,
+    "Klug the Dwarf": 1,
+    "Legate Adventus Caesennius": 1,
     "Lord Harkon": 1,
     "M'aiq the Liar": 1,
     "Malyn Varen": 1,
@@ -7253,12 +7277,24 @@
     "Vampire Cattle": 10,
     "Vingalmo": 1,
     "Watchman": 1,
+    "White": 1,
     "Ysgramor": 1
    },
    "guards": {
     "Imperial Soldier": 50
    },
    "offAtStart": [
+    {
+     "base": "1f0e6a:CFTO.esp",
+     "because": [
+      "KmodFastTravelDialogueFaction",
+      "KmodFerryRoute1Faction"
+     ],
+     "column": "transport",
+     "name": "Enthralled Ferryman",
+     "offBy": "its enable parent",
+     "ref": "1f0e6b:CFTO.esp"
+    },
     {
      "base": "336d:Dawnguard.esm",
      "because": [
@@ -7281,10 +7317,10 @@
     }
    ],
    "offAtStartBy": {
-    "everyoneElse": 117,
+    "everyoneElse": 158,
     "guards": 50,
     "traders": 2,
-    "transport": 0
+    "transport": 1
    },
    "traders": [
     {
@@ -9277,11 +9313,11 @@
       "KmodFerryRoute2Faction"
      ],
      "edid": "KmodFerrymanRiften",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Heirmir",
      "ref": "fb29:CFTO.esp",
      "unique": true,
-     "where": "RiftenPlankside03"
+     "where": "open ground in Tamriel"
     },
     {
      "base": "6ae96:CFTO.esp",
@@ -9302,16 +9338,16 @@
       "KmodFerryRoute2Faction"
      ],
      "edid": "KmodFerrymanHeartwood",
-     "holdFrom": "the cell it stands in",
+     "holdFrom": "the ground it stands on",
      "name": "Thalldar",
      "ref": "fb25:CFTO.esp",
      "unique": true,
-     "where": "HeartwoodMillExterior"
+     "where": "open ground in Tamriel"
     }
    ]
   }
  },
- "readFrom": "99 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
+ "readFrom": "101 plugins, the five masters then C:\\Thornswood\\Profile\\Default\\plugins.txt",
  "sellers": {
   "0GQShopFaction": 1,
   "0WHBakeryFaction": 1,
