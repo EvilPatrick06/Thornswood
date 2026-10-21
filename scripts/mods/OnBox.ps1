@@ -24,10 +24,15 @@
 # names. scripts\mods\Send-GameArchives.ps1 puts them there, and with them,
 # under Strings, the loose string tables records\game-strings.json names: a
 # localized master whose names are in no archive (RaceCompatibility.esm,
-# measured 20 Oct) stops Build-LastPlugin without them.
+# measured 20 Oct) stops Build-LastPlugin without them. _ResourcePack.bsa,
+# the game's own archive beside _ResourcePack.esl, since #3100: that master
+# is localized and its string tables are in that archive alone, so on 21 Oct
+# the hunt and ore builders failed on the box with "_ResourcePack.esl:
+# localised and no english string table found" (records\skyrim-files.json
+# pins its size and sha1 like the others).
 $ThornswoodGameArchiveStore = 'C:\Thornswood-GameData'
 $ThornswoodGameArchives = @('Skyrim - Interface.bsa', 'Skyrim - Meshes0.bsa', 'Skyrim - Meshes1.bsa') +
-    @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' })
+    @(0..8 | ForEach-Object { 'Skyrim - Textures' + $_ + '.bsa' }) + @('_ResourcePack.bsa')
 
 # Text for the box: makes a file readable, and linkable, and nothing more to
 # everyone but SYSTEM. A run reaches the archives through hard links, which
@@ -70,12 +75,16 @@ catch { 'STOP. the run''s folder could not be held through its lock, so nothing 
 # -Run is the run's own folder on the box, holding tools.zip; -ServerRoot the
 # game server whose plugins folder is copied; -Tool the repository path of
 # the tool, a .py run by Python, a .js by node or a .ps1 by PowerShell 7
-# (#3100); -Arguments what it is run with, '{data}', '{plugins}' and '{repo}'
-# standing for the data folder, the plugin list and the repository folder of
-# the run. The plugin list is the server's loadOrder as the game's
-# plugins.txt, made only when an argument names it: server-settings.json
-# holds the server's secrets too, so only its loadOrder is read, and only
-# the file names in it are written.
+# (#3100); -Arguments what it is run with, '{data}', '{plugins}',
+# '{settings}' and '{repo}' standing for the data folder, the plugin list,
+# the load order settings and the repository folder of the run. The plugin
+# list is the server's loadOrder as the game's plugins.txt; the load order
+# settings are a server-settings.json holding that loadOrder alone, each
+# plugin in the run's data folder, for the builders that read a server's
+# settings (Build-NpcPopulation.py), so they read this commit's own plugins
+# and not the server's copies. Each is made only when an argument names it:
+# server-settings.json holds the server's secrets too, so only its loadOrder
+# is read, and only the file names in it are written.
 function Get-ThornswoodOnBoxScript {
     param(
         [Parameter(Mandatory = $true)][string]$Run,
@@ -86,6 +95,7 @@ function Get-ThornswoodOnBoxScript {
     )
     $argText = (@($Arguments | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', ')
     $wantsPlugins = [bool]@($Arguments | Where-Object { $_ -like '*{plugins}*' }).Count
+    $wantsSettings = [bool]@($Arguments | Where-Object { $_ -like '*{settings}*' }).Count
     $kind = [IO.Path]::GetExtension($Tool).ToLowerInvariant()
     $toolFar = $Tool.Replace('/', '\')
     return @"
@@ -126,14 +136,22 @@ if (Test-Path -LiteralPath `$storeStrings) {
 }
 if (`$linkedStrings) { 'strings   ' + `$linkedStrings + ' loose string table(s) from ' + `$storeStrings + ', linked, read only' }
 `$pluginList = Join-Path `$run 'plugins.txt'
-if (`$$wantsPlugins) {
+`$orderSettings = Join-Path `$run 'server-settings.json'
+if (`$$wantsPlugins -or `$$wantsSettings) {
   try { `$order = @(([IO.File]::ReadAllText('$ServerRoot\server-settings.json') | ConvertFrom-Json).loadOrder) } catch { `$order = @() }
   `$names = @(`$order | ForEach-Object { [IO.Path]::GetFileName([string]`$_) } | Where-Object { `$_ })
-  if (-not `$names.Count) { 'STOP. ' + '$ServerRoot\server-settings.json' + ' names no loadOrder, so there is no plugin list to give the tool.'; exit 2 }
+  if (-not `$names.Count) { 'STOP. ' + '$ServerRoot\server-settings.json' + ' names no loadOrder, so there is no load order to give the tool.'; exit 2 }
+}
+if (`$$wantsPlugins) {
   `$masters = @('skyrim.esm', 'update.esm', 'dawnguard.esm', 'hearthfires.esm', 'dragonborn.esm')
   `$lines = @(`$names | Where-Object { `$masters -notcontains `$_.ToLowerInvariant() } | ForEach-Object { '*' + `$_ })
   [IO.File]::WriteAllLines(`$pluginList, [string[]]`$lines, (New-Object Text.UTF8Encoding(`$false)))
   'plugins   ' + `$lines.Count + ' line(s) in plugins.txt: the loadOrder of ' + '$ServerRoot\server-settings.json' + ' after the five masters'
+}
+if (`$$wantsSettings) {
+  `$inData = @(`$names | ForEach-Object { (Join-Path `$data `$_).Replace('\', '/') })
+  [IO.File]::WriteAllText(`$orderSettings, (ConvertTo-Json -InputObject @{ loadOrder = [string[]]`$inData } -Depth 3), (New-Object Text.UTF8Encoding(`$false)))
+  'settings  ' + `$inData.Count + ' plugin(s) in server-settings.json: the loadOrder of ' + '$ServerRoot\server-settings.json' + ', in the run''s data folder, and nothing else of it'
 }
 
 `$sha = [Security.Cryptography.SHA256]::Create()
@@ -179,7 +197,7 @@ switch ('$kind') {
 }
 `$given = @($argText)
 `$words += '"' + (Join-Path `$repo '$toolFar') + '"'
-foreach (`$a in `$given) { `$words += '"' + `$a.Replace('{data}', `$data).Replace('{plugins}', `$pluginList).Replace('{repo}', `$repo) + '"' }
+foreach (`$a in `$given) { `$words += '"' + `$a.Replace('{data}', `$data).Replace('{plugins}', `$pluginList).Replace('{settings}', `$orderSettings).Replace('{repo}', `$repo) + '"' }
 `$env:THORNSWOOD_DATA = `$data
 `$env:PYTHONUTF8 = '1'
 `$env:PYTHONIOENCODING = 'utf-8'

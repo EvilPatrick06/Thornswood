@@ -645,13 +645,13 @@ The first push sets the upstream. It puts this branch on GitHub under the same n
 
 #### After a change to the content plugin
 
-A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit, on a PC with the game at `C:\Thornswood`:
+A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit. No game is needed: commit the plugin first, then run the rebuild on the VPS box, against the dev server's plugins and load order, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first):
 
 ```powershell
-.\scripts\mods\Rebuild-ContentTables.ps1
+pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'
 ```
 
-It runs every builder in `scripts\mods\content-tables.json`, in order, and writes each plugin's new sha256 into `records\asset-provenance.json`. It ends with `All <n> builders ran.` and a list of every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it.
+It sends the commit, runs every builder in `scripts\mods\content-tables.json` there, in order, and brings back every file that changed. On a PC with the game at `C:\Thornswood`, `.\scripts\mods\Rebuild-ContentTables.ps1` does the same against that game. Either way it writes each plugin's new sha256 into `records\asset-provenance.json`, ends with `All <n> builders ran.` and lists every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it. One builder alone runs the same way (`Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'`); `{settings}` stands for a server-settings.json of the dev server's load order, for `Build-NpcPopulation.py --settings`.
 
 #### Switch between branches
 

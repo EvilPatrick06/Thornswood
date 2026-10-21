@@ -27,10 +27,12 @@
   session: both game servers on the box hold every plugin of the load order
   in their plugins folder (103 files, 383 MB), because a server loads them,
   and the box has Python 3.12. So the tool goes to the plugins, and no
-  Bethesda or mod author's file is copied anywhere it was not already. What
-  the box does not hold is Skyrim's own archives (.bsa): a tool that reads
-  string tables, meshes or the interface stops there with its own sentence,
-  and where those may go is Patrick's question on #2899.
+  Bethesda or mod author's file is copied anywhere it was not already.
+  Skyrim's own archives (.bsa) and the loose string tables a localized
+  master needs are in C:\Thornswood-GameData on the box (Patrick's A on
+  #2899; Send-GameArchives.ps1 puts them there), and every run links them
+  into its data folder, so the tools that read names, meshes or the
+  interface read them there too.
 
   WHAT GOES UP. The commit, never the working tree: the tools, the plugins
   and the tables they read (scripts\mods, scripts\dev, game\content,

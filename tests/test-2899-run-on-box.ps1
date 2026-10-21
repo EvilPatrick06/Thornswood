@@ -179,7 +179,12 @@ $ro = Get-ThornswoodArchiveReadOnlyScript
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($ro, [ref]$null, [ref]$errs)
 Yes 'the archives'' read-only rule is ASCII and parses' (-not $ro.ToCharArray().Where({ [int]$_ -gt 127 }, 'First') -and (-not $errs -or $errs.Count -eq 0))
-Yes 'twelve archives: Interface, Meshes0-1 and Textures0-8, Patrick''s A on #2899' ($ThornswoodGameArchives.Count -eq 12 -and $ThornswoodGameArchives[0] -eq 'Skyrim - Interface.bsa' -and $ThornswoodGameArchives[11] -eq 'Skyrim - Textures8.bsa')
+Yes 'thirteen archives: Interface, Meshes0-1 and Textures0-8 (Patrick''s A on #2899) and _ResourcePack.bsa (#3100)' ($ThornswoodGameArchives.Count -eq 13 -and $ThornswoodGameArchives[0] -eq 'Skyrim - Interface.bsa' -and $ThornswoodGameArchives[11] -eq 'Skyrim - Textures8.bsa' -and $ThornswoodGameArchives[12] -eq '_ResourcePack.bsa')
+$recorded = (Get-Content -LiteralPath (Join-Path $Repo 'records\skyrim-files.json') -Raw | ConvertFrom-Json).files
+Yes 'and records\skyrim-files.json holds the size and sha1 of every one of them' (-not @($ThornswoodGameArchives | Where-Object { -not $recorded.('Data\' + $_).sha1 -or -not $recorded.('Data\' + $_).bytes }).Count)
+$farSet = Get-ThornswoodOnBoxScript -Run 'C:\Windows\Temp\thornswood-onbox-test' -ServerRoot 'C:\Thornswood-Server-Dev' -Tool 'scripts/dev/Build-NpcPopulation.py' -Arguments @('--settings', '{settings}')
+Yes '{settings} makes a server-settings.json of the loadOrder alone, each plugin in the run''s data folder, and only when an argument names it' (
+    $farSet.Contains('if ($False -or $True) {') -and $farSet.Contains('loadOrder = [string[]]$inData') -and $farSet.Contains(".Replace('{settings}', `$orderSettings)") -and $far.Contains('if ($False -or $False) {'))
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($keep, [ref]$null, [ref]$errs)
 Yes 'the keeper''s text parses' (-not $errs -or $errs.Count -eq 0)
