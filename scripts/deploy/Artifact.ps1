@@ -744,8 +744,8 @@ function Invoke-ThornswoodArtifactRemote([string]$Target, [string[]]$SshArgs, [s
   $ErrorActionPreference = 'Continue'
   try {
     # cmd.exe on the box stops at 8,191 characters (tests\test-remote-length.ps1).
-    # These scripts are short; one that is not goes up as a file of its own
-    # name and is run from there (Send-Script.ps1, issue #1070).
+    # These scripts are short; one that is not goes on ssh's standard input
+    # (Send-Script.ps1, issues #1070 and #3027).
     $out = @(Invoke-ThornswoodRemote -Target $Target -SshArgs @($SshArgs | Where-Object { $_ }) -Script $Script | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() })
   } finally { $ErrorActionPreference = $eap }
   return $out
