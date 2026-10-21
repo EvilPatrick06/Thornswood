@@ -367,6 +367,13 @@ $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
 $built = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_3.7z'
 YesR '-WhatIf builds collection_3.7z with the same files as revision 2 and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'source\.fileId: 809366 -> 812346' -and $r.Out -match 'the same 5 files and folders as revision 2' -and (Test-Path -LiteralPath $built) -and @(Writes @(Since $n0)).Count -eq 0) $r
+# Issue #2969: with no -From the published revision comes from Nexus, as it
+# does in a cloud session, where there is no Vortex.
+Control @{ addRevision = @{ n = 2; id = 801014; status = 'published'; archive = $baseArchive } }
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
+$got = @(Since $n0)
+YesR 'with no -From it downloads the published revision from Nexus, the CDN getting no key' ($r.Code -eq 0 -and $r.Out -match 'revision 2, the latest published' -and $r.Out -match 'the same 5 files and folders as revision 2' -and @($got | Where-Object { $_.path -eq '/v2/collections/515846/revisions/801014/download_link' }).Count -eq 1 -and @($got | Where-Object { $_.path -like '/cdn/collection/801014*' -and $_.key -eq 'none' }).Count -eq 1 -and @(Writes $got).Count -eq 0) $r
 
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
