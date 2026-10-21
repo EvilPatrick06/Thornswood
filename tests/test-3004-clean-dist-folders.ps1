@@ -26,7 +26,7 @@ param([string]$Tools)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Here = Split-Path -Parent $Here
 if (-not $Tools) { $Tools = $Here }
 $realRepo = $Tools
