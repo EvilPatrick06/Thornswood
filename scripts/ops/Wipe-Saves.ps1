@@ -115,6 +115,14 @@
     .\Wipe-Saves.ps1          asks
     .\Wipe-Saves.ps1 -Yes     does not ask
 
+  -Server dev or -Server main wipes only that server: the folder whose
+  server-settings.json says thornswoodServer is that name (Deploy-DevGamemode
+  writes dev, Deploy-Gamemode main). Without it every server on the box goes,
+  as before. Added for #3078, where Patrick chose to wipe dev and leave main
+  to its next wipe:
+
+    .\Wipe-Saves.ps1 -Server dev
+
   Read-Host reads the console rather than standard input, so a wipe run from a
   script or from an agent cannot answer the question however it is fed: it comes
   back empty and the script stops with "Left alone.". That is the whole reason
@@ -130,6 +138,10 @@ param(
   # parameter that no longer decides anything is worse than no parameter: it
   # reads like it works.
   [switch]$NoPause,
+  # Only the server whose settings name it (thornswoodServer); every one when
+  # left out. See the header.
+  [ValidateSet('', 'dev', 'main')]
+  [string]$Server = '',
   # Skip the typed confirmation. The list of what would go is still printed
   # first, so an unattended run still leaves a record of exactly what it took.
   [switch]$Yes
@@ -216,6 +228,10 @@ foreach (`$t in (Get-ScheduledTask -EA SilentlyContinue)) {
 }
 foreach (`$r in `$roots) {
   'ROOT|' + `$r
+  # Which server this is, as its own settings say (-Server).
+  `$name = ''
+  try { `$name = [string]((Get-Content (Join-Path `$r 'server-settings.json') -Raw | ConvertFrom-Json).thornswoodServer) } catch { }
+  'NAME|' + `$r + '|' + `$name
   if (`$taskOf.ContainsKey(`$r)) { 'TASK|' + `$r + '|' + `$taskOf[`$r] } else { 'NOTASK|' + `$r }
   foreach (`$n in @($movesLit)) {
     `$p = Join-Path `$r `$n
@@ -243,10 +259,24 @@ foreach (`$r in `$roots) {
 $roots  = @()
 $taskOf = @{}
 $items  = @()
+# -Server: which folders are that server, read before anything is listed, so
+# the list says only what this run takes. Every line after a ROOT line is that
+# root's, until the next.
+$nameOf = @{}
+foreach ($l in $lines) {
+  $bits = "$l" -split '\|'
+  if ($bits[0] -eq 'NAME') { $nameOf[$bits[1]] = $bits[2] }
+}
+$keep = $true
 foreach ($l in $lines) {
   $s = "$l"
   if ($s -eq 'NOROOT') { Die 'No server-settings.json anywhere under C:\ on that machine, so there is no server to wipe.' }
   $bits = $s -split '\|'
+  if ($bits[0] -eq 'ROOT') {
+    $keep = (-not $Server) -or ($nameOf[$bits[1]] -eq $Server)
+    if (-not $keep) { Say "  server at $($bits[1]) is not $Server, so it is left as it is" 'DarkGray'; continue }
+  }
+  if (-not $keep) { continue }
   switch ($bits[0]) {
     'ROOT'   { $roots += $bits[1]; Say "  server at $($bits[1])" 'DarkGray' }
     'TASK'   { $taskOf[$bits[1]] = $bits[2]; Say ("    run by the '{0}' task" -f $bits[2]) 'DarkGray' }
@@ -256,6 +286,7 @@ foreach ($l in $lines) {
     'NONE'  { Say ("  not there: {0}" -f $bits[1]) 'DarkGray' }
   }
 }
+if ($Server -and -not $roots.Count) { Die "No server on that machine says thornswoodServer is $Server in its server-settings.json, so nothing was wiped." }
 if ($items.Count -eq 0) { Die 'Nothing to wipe. Either it is already empty or the paths moved.' }
 
 # ------------------------------------------------------------------- ask it ---
