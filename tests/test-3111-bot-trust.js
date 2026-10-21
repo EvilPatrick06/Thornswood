@@ -14,11 +14,16 @@
     A  trust.py run on tests\fixtures\3111-roots.pem (four emSign roots from
        certifi 2026.7.22 and four roots the bot does need) trusts the four it
        needs, names the four it leaves out, and writes exactly those four,
-       byte for byte, over whatever was at the path before.
+       byte for byte, over whatever was at the path before; a context made
+       from that file trusts those four and nothing from the machine.
     B  a bundle of nothing but eMudhra roots is refused, not written as an
        empty trust.
     C  bot.py writes the bundle before it imports discord, from its data
        folder, and points SSL_CERT_FILE at it whatever the environment said.
+       Every connection it makes, urllib's and discord.py's, goes through a
+       context made from that file alone (trust.context), because on Windows
+       a default context also loads the machine's stores, and the box's
+       LocalMachine\Root holds emSign Root CA - G1 (read 21 Oct).
     D  Install-Bot.ps1 packs, sends and parse-checks trust.py with the code,
        runs it against the certifi it installed before anything is stopped,
        and no longer writes an SSL_CERT_FILE of its own into bot.env.json.
@@ -96,6 +101,16 @@ try {
       w.status === 0 && JSON.stringify(blocks(written)) === JSON.stringify(kept) && written.indexOf('planted') === -1, w.stdout + w.stderr);
     yes('A5 nothing written names eMudhra or emSign', written && !/emudhra|emsign/i.test(written));
     yes('A6 and no half written .tmp is left beside it', !fs.existsSync(dest + '.tmp'));
+    // On Windows a context made with no file loads the machine's stores too,
+    // and the box's LocalMachine\Root holds emSign Root CA - G1; the gate runs
+    // on the box, so this is that measurement.
+    const c = run(['-c', 'import sys, json; sys.path.insert(0, sys.argv[1]); import trust; ' +
+      'print(json.dumps([dict(kv for rdn in x["subject"] for kv in rdn).get("organizationName", "") for x in trust.context(sys.argv[2]).get_ca_certs()]))',
+      path.join(ROOT, 'bot'), dest]);
+    let orgs = null;
+    try { orgs = JSON.parse(String(c.stdout).trim()); } catch (e) { orgs = null; }
+    yes('A7 trust.context on that file trusts those four and nothing from the machine\'s own stores',
+      Array.isArray(orgs) && orgs.length === 4 && !orgs.some((o) => /emudhra/i.test(o)), c.stdout + c.stderr);
 
     // ---- B: nothing but eMudhra
     const only = path.join(scratch, 'only-emudhra.pem');
@@ -114,6 +129,16 @@ try {
     head.indexOf("\nROOTS = os.path.join(DATA_DIR, 'roots.pem')\n") !== -1 &&
     head.indexOf('\n_trusted, _left_out = trust.write_bundle(ROOTS)\n') !== -1 &&
     bot.indexOf('\nDATA_DIR = ') !== -1 && bot.indexOf('\nDATA_DIR = ') < iTrust);
+  yes('C4 every urllib request goes through a context made from that file alone',
+    head.indexOf('\nCONTEXT = trust.context(ROOTS)\n') !== -1 &&
+    head.indexOf('urllib.request.HTTPSHandler(context=CONTEXT)') !== -1 &&
+    head.indexOf('urllib.request.install_opener(') !== -1 &&
+    !/urlopen\([^)]*context=/.test(bot));
+  const after = bot.slice(iDiscord);
+  yes('C5 and so does discord.py: TrustedClient gives its HTTP client a connector on CONTEXT at login',
+    /class TrustedClient\(discord\.Client\):[\s\S]*?async def login\(self, token\):\n\s+self\.http\.connector = aiohttp\.TCPConnector\(limit=0, ssl=CONTEXT\)\n\s+await super\(\)\.login\(token\)/.test(after));
+  yes('C6 every client the bot makes is a TrustedClient', /\nclass Thornswood\(TrustedClient\):/.test(bot) &&
+    !/discord\.Client\(/.test(bot.replace('class TrustedClient(discord.Client):', '')));
   yes('C3 and points SSL_CERT_FILE at it on every start, whatever the environment named',
     head.indexOf("\nos.environ['SSL_CERT_FILE'] = ROOTS\n") !== -1 &&
     bot.indexOf("if not os.environ.get('SSL_CERT_FILE')") === -1 &&

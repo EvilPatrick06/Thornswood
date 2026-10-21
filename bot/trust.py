@@ -2,8 +2,8 @@
 trust.py
 
 The root certificates the bot trusts (issue #3111). bot.py writes this file's
-bundle at every start, before anything opens a connection, and points
-SSL_CERT_FILE at it, so discord.py, aiohttp and urllib all verify against it.
+bundle at every start, before anything opens a connection, and makes every
+connection, discord.py's, aiohttp's and urllib's, through context() on it.
 
 It is certifi's bundle (Mozilla's roots, pinned by hash in requirements.txt)
 with every root whose subject or issuer names an organisation in DISTRUSTED
@@ -114,6 +114,16 @@ def write_bundle(path, source=None):
         f.write(text)
     os.replace(tmp, path)
     return count, out
+
+
+def context(path):
+    """
+    A client SSL context that trusts the roots in path and nothing else.
+    Given a file, ssl.create_default_context loads only that file; given
+    none, on Windows it also loads the machine's certificate stores, and the
+    box's LocalMachine Root store holds emSign Root CA - G1 (read 21 Oct).
+    """
+    return ssl.create_default_context(cafile=path)
 
 
 if __name__ == '__main__':

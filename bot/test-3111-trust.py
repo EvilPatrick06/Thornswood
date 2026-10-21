@@ -14,6 +14,11 @@ on a fixture in the gate; this is the nightly half, with the bot's libraries.
      folder and SSL_CERT_FILE pointing somewhere else, writes roots.pem
      there over a planted file, and SSL_CERT_FILE and ssl's default cafile
      both name it afterwards, and the import prints nothing.
+  4. Every connection goes through bot.CONTEXT, made from that file alone:
+     it holds exactly the written roots, urllib's installed opener uses it,
+     and both clients bot.py makes log in with a connector on it. On the box,
+     where a default context also loads LocalMachine Root and its emSign
+     Root CA - G1, the count of those is printed beside it.
 
 Never connects to anything.
 """
@@ -32,6 +37,55 @@ import trust
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 PASS, FAIL = [], []
+
+# Run in a child Python: imports bot.py, then reads back what its connections
+# verify against. login() is stopped where discord.py would first reach the
+# network, so nothing is connected to.
+PROBE = '''
+import asyncio, json, os, ssl, sys, urllib.request
+sys.path.insert(0, sys.argv[1])
+import bot
+import discord.http
+
+
+def orgs(ctx):
+    return [dict(kv for rdn in c['subject'] for kv in rdn).get('organizationName', '') for c in ctx.get_ca_certs()]
+
+
+class Stop(Exception):
+    pass
+
+
+seen = []
+
+
+async def static_login(self, token):
+    seen.append(getattr(self.connector, '_ssl', None) is bot.CONTEXT)
+    raise Stop()
+
+
+discord.http.HTTPClient.static_login = static_login
+
+
+async def logins():
+    for c in (bot.client, bot.TrustedClient(intents=discord.Intents(guilds=True))):
+        try:
+            await c.login('not-a-real-token')
+        except Stop:
+            pass
+
+
+asyncio.run(logins())
+handlers = [h for h in urllib.request._opener.handlers if isinstance(h, urllib.request.HTTPSHandler)]
+default = orgs(ssl.create_default_context())
+print(json.dumps({
+    'env': os.environ['SSL_CERT_FILE'], 'req': os.environ['REQUESTS_CA_BUNDLE'],
+    'cafile': ssl.get_default_verify_paths().cafile,
+    'context': len(orgs(bot.CONTEXT)), 'context_orgs': orgs(bot.CONTEXT),
+    'default': len(default), 'default_emudhra': len([o for o in default if 'emudhra' in o.lower()]),
+    'urllib': len(handlers) == 1 and handlers[0]._context is bot.CONTEXT,
+    'login': seen}))
+'''
 
 
 def yes(what, cond, why=''):
@@ -78,10 +132,11 @@ try:
     shutil.copy(certifi.where(), elsewhere)
     env = dict(os.environ, THORNSWOOD_BOT_DATA=data, SSL_CERT_FILE=elsewhere,
                REQUESTS_CA_BUNDLE=elsewhere, DISCORD_TOKEN='not-a-real-token')
-    probe = ('import json, os, ssl, sys; sys.path.insert(0, sys.argv[1]); import bot; '
-             'print(json.dumps({"env": os.environ["SSL_CERT_FILE"], "req": os.environ["REQUESTS_CA_BUNDLE"], '
-             '"cafile": ssl.get_default_verify_paths().cafile}))')
-    r = subprocess.run([sys.executable, '-c', probe, HERE], env=env, capture_output=True, text=True, timeout=120)
+    probe = open(os.path.join(scratch, 'probe.py'), 'w')
+    probe.write(PROBE)
+    probe.close()
+    r = subprocess.run([sys.executable, os.path.join(scratch, 'probe.py'), HERE], env=env,
+                       capture_output=True, text=True, timeout=120)
     said = {}
     try:
         said = json.loads(r.stdout.strip().splitlines()[-1])
@@ -92,6 +147,14 @@ try:
     same = lambda p: bool(p) and os.path.normcase(os.path.abspath(p)) == os.path.normcase(planted)
     yes('SSL_CERT_FILE, REQUESTS_CA_BUNDLE and ssl\'s default cafile all name data\\roots.pem afterwards',
         same(said.get('env')) and same(said.get('req')) and same(said.get('cafile')), json.dumps(said))
+    yes('CONTEXT trusts exactly the written roots, none eMudhra\'s, and nothing from the machine\'s stores',
+        said.get('context') == len(ours) and not [o for o in said.get('context_orgs', []) if 'emudhra' in o.lower()],
+        json.dumps({k: said.get(k) for k in ('context', 'default')}))
+    print('      (a default context here holds %s roots, %s of them eMudhra\'s: what CONTEXT keeps the bot from)'
+          % (said.get('default'), said.get('default_emudhra')))
+    yes('every urllib request goes through CONTEXT', said.get('urllib') is True)
+    yes('the bot\'s client and the --setup-channels client both log in with a connector on CONTEXT',
+        said.get('login') == [True, True], json.dumps(said.get('login')))
     text = open(planted, encoding='ascii').read()
     yes('the planted roots.pem was written over with the bundle, and it holds no eMudhra root',
         'planted' not in text and blocks(text) == ours)

@@ -118,14 +118,21 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
     os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
 
-# Windows Server ships with an empty root certificate store and the automatic
-# update for it switched off, so Python cannot verify discord.com and the
-# handshake dies with "unable to get local issuer certificate". So the bot
-# carries its roots in a file of its own, roots.pem in its data folder: the
+# The roots the bot trusts are its own file, roots.pem in its data folder: the
 # roots in certifi's bundle (requirements.txt, by hash) less those trust.py
 # leaves out, eMudhra's (#3111). It is written again at every start, before
-# discord.py or urllib makes a single connection, and SSL_CERT_FILE names it,
-# which each SSL context made from here on reads.
+# discord.py or urllib makes a single connection.
+#
+# Not the box's certificate store. Its automatic root update is off by
+# policy, so it lacks what discord.com chains to and the handshake died with
+# "unable to get local issuer certificate" (#2736); and it holds emSign Root
+# CA - G1 in LocalMachine\Root (read on the box 21 Oct). Python's default
+# SSL context on Windows loads that store as well as SSL_CERT_FILE, so
+# pointing SSL_CERT_FILE at the file is not enough on its own. Every
+# connection the bot makes goes through CONTEXT instead, made from the file
+# alone: urllib through the opener installed here, discord.py's HTTP and
+# gateway through the connector TrustedClient gives it at login.
+# SSL_CERT_FILE names the same file for anything else in the process.
 #
 # Always this file, whatever the environment named before. Install-Bot used to
 # set SSL_CERT_FILE to certifi's bundle as the box's own Python found it, with
@@ -139,10 +146,26 @@ ROOTS = os.path.join(DATA_DIR, 'roots.pem')
 _trusted, _left_out = trust.write_bundle(ROOTS)
 os.environ['SSL_CERT_FILE'] = ROOTS
 os.environ['REQUESTS_CA_BUNDLE'] = ROOTS
+CONTEXT = trust.context(ROOTS)
+urllib.request.install_opener(
+    urllib.request.build_opener(urllib.request.HTTPSHandler(context=CONTEXT)))
 
+import aiohttp
 import discord
 
 import card
+
+
+class TrustedClient(discord.Client):
+    """
+    A discord.Client whose every request and gateway connection verifies
+    against CONTEXT (#3111). discord.py makes its aiohttp session in login()
+    with whatever connector its HTTPClient holds, and a connector can only
+    be made once the event loop is running, so it is given here.
+    """
+    async def login(self, token):
+        self.http.connector = aiohttp.TCPConnector(limit=0, ssl=CONTEXT)
+        await super().login(token)
 
 
 def _load_env_file(argv):
@@ -406,7 +429,7 @@ if not TOKEN:
 intents = discord.Intents(guilds=True, members=True)
 
 
-class Thornswood(discord.Client):
+class Thornswood(TrustedClient):
     async def setup_hook(self):
         """
         Everything that has to happen once per process, and not once per
@@ -5552,7 +5575,7 @@ def run_cli(argv):
         if not a.title or not body:
             ap.error('--post-task needs --title and --body or --body-file')
     out = {'code': 0}
-    cli = discord.Client(intents=discord.Intents(guilds=True))
+    cli = TrustedClient(intents=discord.Intents(guilds=True))
 
     @cli.event
     async def on_ready():
