@@ -32,7 +32,11 @@
        staff-notice.yml on main with the text on gh's standard input, reads
        the runner's annotation, and says what the box said; -From other than
        claude, a stopped runner, a run with no answer, a run not taken in
-       time and -Run of another workflow each say so.
+       time and -Run of another workflow each say so. A run GitHub has
+       started but does not serve yet is waited for like a queued one, never
+       a stop (#3081); a failed read after the start says the notice was
+       sent, exit 2, with the -Run line; -Run of a run GitHub does not have
+       stops at once.
     5. Grant-BoxAccess.ps1: a notices key's line is taken only through the
        bridge and only runs say-staff.ps1 as its own name; -List reads that
        back; the box change stops with nothing changed when say-staff.ps1 is
@@ -382,15 +386,34 @@ if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
     $ghBody = Join-Path $tmp 'gh-body.json'
     $ghRun = Join-Path $tmp 'gh-run.json'
     $ghNotes = Join-Path $tmp 'gh-annotations.json'
+    # How many reads of run 77 are Not Found before it is served (-1: every
+    # one), whether its jobs read is refused, and whether the dispatch names
+    # no run (#3081).
+    $ghMiss = Join-Path $tmp 'gh-miss.txt'
+    $ghJobsRefused = Join-Path $tmp 'gh-jobs-refused.txt'
+    $ghNoRun = Join-Path $tmp 'gh-no-run.txt'
     [IO.File]::WriteAllText($ghIn, @"
 `$all = @(`$args | ForEach-Object { [string]`$_ })
 [IO.File]::AppendAllText('$ghCalls', ((`$all -join ' ') + "``n"))
 `$p = @(`$all | Where-Object { `$_ -like 'repos/*' }) | Select-Object -First 1
 if (`$all -contains '--input') { [IO.File]::WriteAllText('$ghBody', [Console]::In.ReadToEnd()) }
 switch -Regex (`$p) {
-    'actions/workflows/staff-notice\.yml/dispatches$' { '{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}'; exit 0 }
-    'actions/runs/77$' { [IO.File]::ReadAllText('$ghRun'); exit 0 }
-    'actions/runs/77/jobs$' { '{"total_count":1,"jobs":[{"id":555}]}'; exit 0 }
+    'actions/workflows/staff-notice\.yml/dispatches$' {
+        if (Test-Path -LiteralPath '$ghNoRun') { exit 0 }
+        '{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}'; exit 0
+    }
+    'actions/runs/77$' {
+        `$miss = [int][IO.File]::ReadAllText('$ghMiss')
+        if (`$miss -ne 0) {
+            if (`$miss -gt 0) { [IO.File]::WriteAllText('$ghMiss', [string](`$miss - 1)) }
+            [Console]::Error.WriteLine('gh: Not Found (HTTP 404)'); exit 1
+        }
+        [IO.File]::ReadAllText('$ghRun'); exit 0
+    }
+    'actions/runs/77/jobs$' {
+        if (Test-Path -LiteralPath '$ghJobsRefused') { [Console]::Error.WriteLine('gh: Server Error (HTTP 502)'); exit 1 }
+        '{"total_count":1,"jobs":[{"id":555}]}'; exit 0
+    }
     'check-runs/555/annotations$' { [IO.File]::ReadAllText('$ghNotes'); exit 0 }
 }
 [Console]::Error.WriteLine('gh: Not Found (HTTP 404)')
@@ -405,8 +428,11 @@ exit 1
     }
     $done = '{"status":"completed","conclusion":"success","path":".github/workflows/staff-notice.yml","html_url":"https://github.com/x/actions/runs/77"}'
     function Note([string]$level, [string]$title, [string]$message) { return @{ annotation_level = $level; title = $title; message = $message } }
-    function ThroughGitHub([string[]]$a, [string]$run, [object[]]$notes) {
-        Remove-Item -LiteralPath $ghCalls, $ghBody -ErrorAction SilentlyContinue
+    function ThroughGitHub([string[]]$a, [string]$run, [object[]]$notes, [int]$miss = 0, [switch]$jobsRefused, [switch]$noRun) {
+        Remove-Item -LiteralPath $ghCalls, $ghBody, $ghJobsRefused, $ghNoRun -ErrorAction SilentlyContinue
+        [IO.File]::WriteAllText($ghMiss, [string]$miss, $enc)
+        if ($jobsRefused) { [IO.File]::WriteAllText($ghJobsRefused, 'yes', $enc) }
+        if ($noRun) { [IO.File]::WriteAllText($ghNoRun, 'yes', $enc) }
         [IO.File]::WriteAllText($ghRun, $run, $enc)
         [IO.File]::WriteAllText($ghNotes, (ConvertTo-Json -InputObject @($notes) -Compress), $enc)
         $path = $env:PATH
@@ -448,6 +474,23 @@ exit 1
     Yes '-Run reads that run''s answer, starting nothing' ($g.Code -eq 0 -and $g.Out -match 'by the bot' -and $null -eq $g.Body)
     $g = ThroughGitHub @('-Run', '77') $done.Replace('staff-notice.yml', 'build.yml') @((Note 'notice' 'Say-Staff' 'POSTED bot'))
     Yes '  and refuses a run of another workflow' ($g.Code -eq 1 -and $g.Out -match 'not a staff-notice run')
+
+    # #3081: the dispatch names the run before every read of GitHub serves it.
+    $runReads = { param($calls) @($calls | Where-Object { $_ -eq 'api repos/EvilPatrick06/Thornswood/actions/runs/77' }).Count }
+    $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 1
+    Yes 'a started run GitHub does not serve yet is waited for, then read: queued, exit 0, no stop' (
+        $g.Code -eq 0 -and $g.Out -match 'queued agent-claude-' -and $g.Out -match 'does not serve the new run yet' -and $g.Out -notmatch 'STOP' -and (& $runReads $g.Calls) -eq 2)
+    $g = ThroughGitHub @('-Text', $text, '-WaitMinutes', '0') $done @() -1
+    Yes '  one still not served by -WaitMinutes is exit 2 with the -Run line, not a stop' (
+        $g.Code -eq 2 -and $g.Out -match 'not served by GitHub yet' -and $g.Out -match 'Say-Staff\.ps1 -Run 77' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Text', $text) $done @((Note 'notice' 'Say-Staff' $queued)) 0 -jobsRefused
+    Yes '  a read that fails after the start says the notice was sent, exit 2, with the -Run line' (
+        $g.Code -eq 2 -and $g.Out -match 'the notice was sent: GitHub started run 77' -and $g.Out -match 'HTTP 502' -and $g.Out -match 'Say-Staff\.ps1 -Run 77' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Text', $text) $done @() 0 -noRun
+    Yes '  a start that names no run says the notice was sent and where its runs are, exit 2' (
+        $g.Code -eq 2 -and $g.Out -match 'the notice was sent' -and $g.Out -match 'actions/workflows/staff-notice\.yml' -and $g.Out -notmatch 'STOP')
+    $g = ThroughGitHub @('-Run', '77') $done @() -1
+    Yes '-Run of a run GitHub does not have stops at once, exit 1' ($g.Code -eq 1 -and $g.Out -match 'STOP\..*HTTP 404' -and (& $runReads $g.Calls) -eq 1)
 
     # ---- 5. Grant-BoxAccess.ps1's notices key ------------------------------
     $gast = $asts[$grantPath]
