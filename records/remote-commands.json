@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  63,
-    "callCount":  270,
+    "callCount":  269,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1634,15 +1634,6 @@
                       "does":  "seeds the server root",
                       "class":  "admin",
                       "reason":  "first install, writes outside any stage"
-                  },
-                  {
-                      "script":  "scripts/release/Publish-Server.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "ssh",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -Command `\"if (Test-Path \u0027$VpsRoot\\server.log\u0027) { Get-Content \u0027$VpsRoot\\server.log\u0027 -Tail 40 } else { \u0027server.log is not there, so node never started. Check that node is on the machine PATH up there.\u0027 }`\"\" }",
-                      "does":  "reads files, settings, logs or status",
-                      "class":  "read-status",
-                      "reason":  "reads files, settings, logs or status only"
                   },
                   {
                       "script":  "scripts/release/Sign-OnGitHub.ps1",
