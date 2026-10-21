@@ -48,6 +48,18 @@
 //   (records\skyrim-files.json), all active, as a new Vortex profile sees them
 //   while a collection installs: nothing of the collection is deployed until
 //   its phase ends. The game version is that record's build.
+//
+//   OFF WINDOWS (#2969). Every path inside a mod is kept the way Vortex has it
+//   on Windows, joined with \ and compared ignoring case, and the string work
+//   on those paths (WinPath) follows .NET on Windows, so a layout worked out
+//   in a Linux cloud session is the one worked out on One. Only where a path
+//   meets the disk does the platform show: the walk sorts each folder's
+//   entries as NTFS lists them, takes two folders whose names differ only in
+//   case as the one folder Windows would have made, and stops on two files
+//   that would be one file on Windows; a \ inside a name that 7-Zip kept is
+//   made the folders Windows makes of it (SplitBackslashNames); a path is
+//   found on disk ignoring case (OnDisk); and a link is link(2) instead of
+//   CreateHardLink.
 
 using System;
 using System.Collections.Generic;
@@ -369,20 +381,91 @@ namespace Thornswood.Layout
         public static List<string> FileList(string dir)
         {
             var list = new List<string>();
-            Walk(dir, dir, list);
+            var index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            Walk(new List<string> { dir }, "", list, index);
+            lock (Indexes) Indexes[Path.GetFullPath(dir)] = index;
             return list;
         }
-        static void Walk(string baseDir, string dir, List<string> list)
+        // One folder of the walk, as Windows would hold it. On Windows that is
+        // one folder on disk, listed in the disk's order. Off Windows it is
+        // every folder on disk whose name differs only in case (7-Zip on Linux
+        // makes Textures and textures as two, where Windows makes one), and
+        // their entries are sorted as NTFS lists them: by name ignoring case.
+        static void Walk(List<string> dirs, string relPrefix, List<string> list, Dictionary<string, string> index)
         {
-            var subs = new List<string>();
-            foreach (var p in Directory.EnumerateFileSystemEntries(dir))
+            var entries = new List<KeyValuePair<string, string>>();
+            foreach (var d in dirs)
+                foreach (var p in Directory.EnumerateFileSystemEntries(d))
+                    entries.Add(new KeyValuePair<string, string>(Path.GetFileName(p), p));
+            if (!OperatingSystem.IsWindows())
+                entries = entries.OrderBy(e => e.Key, StringComparer.OrdinalIgnoreCase).ThenBy(e => e.Key, StringComparer.Ordinal).ToList();
+            var subs = new List<KeyValuePair<string, List<string>>>();
+            var seen = new Dictionary<string, bool>(StringComparer.OrdinalIgnoreCase);
+            foreach (var e in entries)
             {
-                string rel = p.Substring(baseDir.Length).TrimStart('\\');
-                var attr = File.GetAttributes(p);
-                if ((attr & FileAttributes.Directory) != 0) { list.Add(rel + "\\"); subs.Add(p); }
-                else list.Add(rel);
+                if (e.Key.IndexOf('\\') >= 0) throw new InvalidDataException("the archive unpacked a name with a \\ in it, " + relPrefix + e.Key + ", which SplitBackslashNames was not run on");
+                bool isDir = (File.GetAttributes(e.Value) & FileAttributes.Directory) != 0;
+                bool wasDir;
+                if (seen.TryGetValue(e.Key, out wasDir))
+                {
+                    if (!isDir || !wasDir) throw new InvalidDataException("the archive holds " + relPrefix + e.Key + " twice, differing only in case, and on Windows one would have overwritten the other");
+                    subs.First(x => string.Equals(x.Key, relPrefix + e.Key + "\\", StringComparison.OrdinalIgnoreCase)).Value.Add(e.Value);
+                    continue;
+                }
+                seen[e.Key] = isDir;
+                string rel = relPrefix + e.Key;
+                if (isDir) { list.Add(rel + "\\"); subs.Add(new KeyValuePair<string, List<string>>(rel + "\\", new List<string> { e.Value })); }
+                else { list.Add(rel); index[rel] = e.Value; }
             }
-            foreach (var s in subs) Walk(baseDir, s, list);
+            foreach (var s in subs) Walk(s.Value, s.Key, list, index);
+        }
+
+        // A zip made on Windows can keep \ between its folders. 7-Zip on Windows
+        // makes folders of it; off Windows it keeps the \ inside one name
+        // (measured 21 Oct on Skyrim Priority SE AE, file 355110, whose
+        // Data\SKSE\Plugins\PriorityMod.dll came out as one file). So off
+        // Windows each such name is moved to the folders Windows would have
+        // made, deepest first, before the walk; a name that would land on one
+        // already there stops, as on Windows one would overwrite the other.
+        // Returns how many names were moved.
+        public static int SplitBackslashNames(string dir)
+        {
+            if (OperatingSystem.IsWindows()) return 0;
+            var odd = Directory.EnumerateFileSystemEntries(dir, "*", SearchOption.AllDirectories)
+                .Where(p => Path.GetFileName(p).IndexOf('\\') >= 0).OrderByDescending(p => p.Length).ToList();
+            foreach (var p in odd)
+            {
+                var parts = Path.GetFileName(p).Split(new[] { '\\' }, StringSplitOptions.RemoveEmptyEntries);
+                string target = Path.Combine(new[] { Path.GetDirectoryName(p) }.Concat(parts).ToArray());
+                if (parts.Length == 0 || File.Exists(target) || Directory.Exists(target))
+                    throw new InvalidDataException("the archive holds " + p.Substring(dir.Length).TrimStart('/') + ", which Windows unpacks onto a name the archive already has");
+                Directory.CreateDirectory(Path.GetDirectoryName(target));
+                if (Directory.Exists(p)) Directory.Move(p, target); else File.Move(p, target);
+            }
+            return odd.Count;
+        }
+
+        // Each walked folder's files by their path inside the mod, for OnDisk.
+        static readonly Dictionary<string, Dictionary<string, string>> Indexes = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+
+        // A file of the unpacked archive by its path inside the mod (\ or /,
+        // any case), as Windows would find it. Off Windows the walk's index is
+        // asked, so a FOMOD script naming Textures\x.dds finds textures/x.dds.
+        public static string OnDisk(string unpacked, string rel)
+        {
+            string j = JoinRel(rel ?? "") ?? "";
+            if (OperatingSystem.IsWindows()) return Path.Combine(unpacked, j);
+            Dictionary<string, string> index;
+            string full;
+            lock (Indexes) Indexes.TryGetValue(Path.GetFullPath(unpacked), out index);
+            if (index != null && index.TryGetValue(j, out full)) return full;
+            return Path.Combine(unpacked, j.Replace('\\', '/'));
+        }
+
+        // Forgets a walked folder's index once its unpacked copy is gone.
+        public static void Forget(string unpacked)
+        {
+            lock (Indexes) Indexes.Remove(Path.GetFullPath(unpacked));
         }
 
         // ------------------------------------------------------- installers ---
@@ -410,7 +493,7 @@ namespace Thornswood.Layout
         }
 
         static bool IsDir(string f) { return f.EndsWith("\\", StringComparison.Ordinal); }
-        static string Leaf(string f) { return Path.GetFileName(f.TrimEnd('\\')); }
+        static string Leaf(string f) { return WinPath.FileName(f.TrimEnd('\\')); }
         static string NodeDirname(string f)
         {
             int i = f.LastIndexOf('\\');
@@ -422,8 +505,8 @@ namespace Thornswood.Layout
         static bool ScriptMatch(string f, string script)
         {
             if (IsDir(f)) return false;
-            string parent = Path.GetFileName(Path.GetDirectoryName(f) ?? "");
-            return Path.GetFileName(f).IndexOf(script, StringComparison.OrdinalIgnoreCase) >= 0 && parent.IndexOf("fomod", StringComparison.OrdinalIgnoreCase) >= 0;
+            string parent = WinPath.FileName(WinPath.DirectoryName(f));
+            return WinPath.FileName(f).IndexOf(script, StringComparison.OrdinalIgnoreCase) >= 0 && parent.IndexOf("fomod", StringComparison.OrdinalIgnoreCase) >= 0;
         }
 
         public static ModPlan PlanMod(Entry e, string unpacked, List<string> files, Fomod.World world)
@@ -436,7 +519,7 @@ namespace Thornswood.Layout
                 foreach (var f in files)
                 {
                     if (IsDir(f)) continue;
-                    lookup[Md5Of(Path.Combine(unpacked, f))] = f;
+                    lookup[Md5Of(OnDisk(unpacked, f))] = f;
                 }
                 foreach (var h in e.Hashes)
                 {
@@ -449,7 +532,7 @@ namespace Thornswood.Layout
             Func<string, bool> fomodSegment = f => f.ToLowerInvariant().Split('\\').Contains("fomod");
             if (files.Any(f => !IsDir(f) && fomodSegment(f) && Leaf(f).Equals("script.cs", StringComparison.OrdinalIgnoreCase)))
             { plan.Stop = "its archive has a C# FOMOD script, which Vortex asks before it runs"; return plan; }
-            if (files.Any(f => Path.GetExtension(f.TrimEnd('\\')) == ".fomod"))
+            if (files.Any(f => WinPath.Extension(f.TrimEnd('\\')) == ".fomod"))
             { plan.Stop = "its archive holds another .fomod archive, which Vortex installs as a nested mod"; return plan; }
             bool hasXml = files.Any(f => !IsDir(f) && fomodSegment(f) && (Leaf(f).Equals("moduleconfig.xml", StringComparison.OrdinalIgnoreCase) || Leaf(f).Equals("script.xml", StringComparison.OrdinalIgnoreCase)));
             string scriptXml = files.FirstOrDefault(f => ScriptMatch(f, "script.xml"));
@@ -533,7 +616,7 @@ namespace Thornswood.Layout
             {
                 string rel = JoinRel(c.Destination);
                 if (rel == null || rel.Length == 0) { plan.Stop = "its installer gives the destination \"" + c.Destination + "\", outside the mod's folder"; return plan; }
-                string full = Path.Combine(unpacked, JoinRel(c.Source) ?? "");
+                string full = OnDisk(unpacked, c.Source);
                 if (!File.Exists(full)) { plan.Warnings.Add("the installer named " + c.Source + ", which is not in the archive"); continue; }
                 string key = rel.ToLowerInvariant();
                 Staged was;
@@ -667,6 +750,8 @@ namespace Thornswood.Layout
 
         [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
         static extern bool CreateHardLink(string lpFileName, string lpExistingFileName, IntPtr lpSecurityAttributes);
+        [DllImport("libc", EntryPoint = "link", SetLastError = true)]
+        static extern int Link(string oldpath, string newpath);
 
         // A file of its own at to: a hard link to from when they are on one
         // volume (the unpacked copy is deleted after, so the link is the only
@@ -674,9 +759,52 @@ namespace Thornswood.Layout
         public static bool LinkOrCopy(string from, string to)
         {
             Directory.CreateDirectory(Path.GetDirectoryName(to));
-            if (CreateHardLink(@"\\?\" + to, @"\\?\" + from, IntPtr.Zero)) return true;
+            if (OperatingSystem.IsWindows() ? CreateHardLink(@"\\?\" + to, @"\\?\" + from, IntPtr.Zero) : Link(from, to) == 0) return true;
             File.Copy(from, to, false);
             return false;
+        }
+    }
+
+    // ------------------------------------------------------------ WinPath ---
+    //
+    // Path.Combine, GetFileName, GetDirectoryName and GetExtension as .NET
+    // answers them on Windows, where Vortex and its FOMOD installer run: \ and
+    // / both separate, a rooted second part replaces the first, and
+    // GetDirectoryName gives \. On Linux .NET takes only /, so the same calls
+    // on a mod's Windows paths would answer differently there (#2969).
+    public static class WinPath
+    {
+        static bool Sep(char c) { return c == '\\' || c == '/'; }
+        public static string Combine(string a, string b)
+        {
+            if (string.IsNullOrEmpty(b)) return a ?? "";
+            if (string.IsNullOrEmpty(a)) return b;
+            if (Sep(b[0]) || (b.Length >= 2 && b[1] == ':')) return b;
+            char last = a[a.Length - 1];
+            return Sep(last) || last == ':' ? a + b : a + "\\" + b;
+        }
+        public static string FileName(string p)
+        {
+            if (p == null) return "";
+            int i = p.Length - 1;
+            while (i >= 0 && !Sep(p[i]) && !(i == 1 && p[i] == ':')) i--;
+            return p.Substring(i + 1);
+        }
+        public static string DirectoryName(string p)
+        {
+            if (string.IsNullOrEmpty(p)) return "";
+            int i = p.Length - 1;
+            while (i >= 0 && !Sep(p[i])) i--;
+            if (i <= 0) return "";
+            int j = i;
+            while (j > 0 && Sep(p[j - 1])) j--;
+            return p.Substring(0, j).Replace('/', '\\');
+        }
+        public static string Extension(string p)
+        {
+            string n = FileName(p);
+            int i = n.LastIndexOf('.');
+            return i < 0 || i == n.Length - 1 ? "" : n.Substring(i);
         }
     }
 
@@ -1003,7 +1131,7 @@ namespace Thornswood.Layout
         public static void Install(ModPlan plan, string unpacked, List<string> files, string moduleConfig, World world)
         {
             Script script;
-            try { script = Parse(ReadText(File.ReadAllBytes(Path.Combine(unpacked, moduleConfig)))); }
+            try { script = Parse(ReadText(File.ReadAllBytes(NexusLayout.OnDisk(unpacked, moduleConfig)))); }
             catch (Refused r) { plan.Stop = r.Message; return; }
             catch (System.Xml.XmlException x) { plan.Stop = "its FOMOD script is not XML that reads: " + x.Message; return; }
 
@@ -1131,8 +1259,8 @@ namespace Thornswood.Layout
         {
             if (f.IsFolder)
             {
-                var list = GetFiles(Path.Combine(prefix, f.Source), modFiles);
-                string from = NormalizeSeparators(Path.Combine(prefix, f.Source));
+                var list = GetFiles(WinPath.Combine(prefix, f.Source), modFiles);
+                string from = NormalizeSeparators(WinPath.Combine(prefix, f.Source));
                 if (!from.EndsWith("\\", StringComparison.Ordinal)) from += "\\";
                 string to = NormalizeSeparators(f.Destination);
                 if (to.Length > 0 && !to.EndsWith("\\", StringComparison.Ordinal)) to += "\\";
@@ -1141,12 +1269,12 @@ namespace Thornswood.Layout
                     int len = m.Length - from.Length;
                     if (len <= 0) throw new FolderFailed("Failed to install \"" + from + "\" as folder");
                     string name = m.Substring(from.Length, len);
-                    if (to.Length > 0) name = Path.Combine(to, name);
+                    if (to.Length > 0) name = WinPath.Combine(to, name);
                     FromMod(m, name, f.Priority, instr);
                 }
                 return true;
             }
-            string src = NormalizeSeparators(Path.Combine(prefix, f.Source));
+            string src = NormalizeSeparators(WinPath.Combine(prefix, f.Source));
             int count = GetFiles(src, modFiles).Count;
             if (count == 1) FromMod(src, NormalizeSeparators(f.Destination), f.Priority + offset, instr);
             else instr.Add(new Instr { Type = "warning", Source = count == 0 ? "Source doesn't match any files: \"" + src + "\"" : "Source matches a directory, was supposed to be a file: \"" + src + "\"" });
@@ -1156,7 +1284,7 @@ namespace Thornswood.Layout
         static void FromMod(string from, string to, int priority, List<Instr> instr)
         {
             if (to.EndsWith("/", StringComparison.Ordinal) || to.EndsWith("\\", StringComparison.Ordinal)) { instr.Add(new Instr { Type = "mkdir", Destination = to }); return; }
-            if (to == "") to = Path.GetFileName(from);
+            if (to == "") to = WinPath.FileName(from);
             int idx = instr.FindIndex(i => i.Type == "copy" && i.Destination == to);
             var next = new Instr { Type = "copy", Source = from, Destination = to, Priority = priority };
             if (idx == -1) instr.Add(next);

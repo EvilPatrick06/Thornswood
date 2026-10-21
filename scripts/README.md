@@ -145,6 +145,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/Check-Build.ps1](release/Check-Build.ps1) | The server does not check plugin names. It checks size and crc32 of every plugin it names, so the wrong version of a mod is the same to it as not having the mod. |
 | [release/Check-Records.ps1](release/Check-Records.ps1) | Holds the committed high-risk records to their shape and version, fail closed (#2180). |
 | [release/Check-ShipReady.ps1](release/Check-ShipReady.ps1) | Whether THIS machine can run a release, and what is missing if it cannot. |
+| [release/Compare-NexusLayout.ps1](release/Compare-NexusLayout.ps1) | Says whether a collection revision's layout record (what Install-NexusRevision.ps1 writes) is the same as another layout record, or the same as what Vortex deployed into a game folder, file by file and plugin by plugin (#2969). |
 | [release/Dev-News.ps1](release/Dev-News.ps1) | Which notes on the dev feed are marked DEV, worked out from main's feed, and the one place that writes those marks and the dev feed's mainVersion. |
 | [release/EngineJobs.ps1](release/EngineJobs.ps1) | How many projects an engine build compiles at once, and whether a compile that failed ran the machine out of memory. |
 | [release/Export-ServerPayload.ps1](release/Export-ServerPayload.ps1) | Packages everything the VPS needs into one zip. |
@@ -156,6 +157,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [release/ForkEngineBuild.ps1](release/ForkEngineBuild.ps1) | Finds the public fork's own build of an engine commit, and puts it where a build of that commit on this machine would be, for engine.yml to record. |
 | [release/Front.ps1](release/Front.ps1) | What Build-Front.ps1 and Go.ps1 share about the front build, the page skymp5-front's webpack makes for Data\Platform\UI: the record of it, the zip it travels in, and the check that a zip is the recorded build. |
 | [release/Get-ScratchDir.ps1](release/Get-ScratchDir.ps1) | Says where a short-lived build scratch folder goes, so Ship and Install-Thornswood take their launcher build (and the CI setup stub) from one place instead of each calling [IO.Path]::GetTempPath(). |
+| [release/Get-SevenZip.ps1](release/Get-SevenZip.ps1) | Puts 7-Zip's own Linux build (7zz, 25.01) on a Linux machine, checked against its pinned sha256, and prints where it is, so a cloud session can unpack every archive of the collection (#2969). |
 | [release/Go.ps1](release/Go.ps1) | Installs the front, the overlays and the plugins, then reports what the server is doing. |
 | [release/Install-Launcher.ps1](release/Install-Launcher.ps1) | Puts a launcher that Build-Launcher.ps1 has already built into an install, and does the things around it that only an install should do. |
 | [release/Install-NexusRevision.ps1](release/Install-NexusRevision.ps1) | Lays out one revision of the Thornswood collection on Nexus Mods (slug 7essxf) into a game folder, the way Vortex installs and deploys it, without Vortex (#2754). |

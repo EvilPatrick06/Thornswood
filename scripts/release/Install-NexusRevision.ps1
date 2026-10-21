@@ -8,6 +8,7 @@
       .\scripts\release\Install-NexusRevision.ps1 -Revision 3 -Game <folder> -WhatIf
       .\scripts\release\Install-NexusRevision.ps1 -Revision 3 -Game <folder>
       .\scripts\release\Install-NexusRevision.ps1 -CollectionArchive <collection_3.7z> -Revision 3 -Game <folder>
+      pwsh scripts/release/Install-NexusRevision.ps1 -Revision 3 -Record <folder>
 
   WHY. Until 20 October One's Vortex deployment in the Steam copy was the only
   thing that turned a revision into files, and every release step read it:
@@ -61,7 +62,19 @@
   -WhatIf does steps 1 to 5: it downloads into the cache and works the whole
   layout out in the scratch folder, prints it, and changes nothing in -Game.
 
-  Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip,
+  -Record <folder>, in place of -Game, does steps 1 to 5 and writes the four
+  records of step 6 into that folder, placing no file anywhere. Each mod's
+  unpacked copy is hashed and deleted as soon as it is worked out, so the
+  scratch folder never holds more than one mod. This is how a revision is
+  laid out from a cloud session (#2969): there the Nexus key is the
+  environment variable, 7-Zip is the build Get-SevenZip.ps1 fetches, the cache is
+  $XDG_CACHE_HOME/thornswood/nexus-cache (~/.cache when that is not set), and
+  every path in the records is the Windows path the layout has on One.
+  Laying files into a game folder is for Windows only, where the game runs.
+
+  Needs PowerShell 7 (NexusLayout.cs reads JSON with System.Text.Json), 7-Zip
+  (off Windows, 7-Zip's own build, which Get-SevenZip.ps1 fetches, because
+  Ubuntu's cannot unpack the collection's RAR archives),
   and records\skyrim-files.json, which answers a FOMOD's questions about the
   game's own plugins and version. The Nexus API key is read as Nexus.ps1 says.
 
@@ -73,7 +86,11 @@
   it unpacked, in place of reading it from Nexus.
 
 .PARAMETER Game
-  The folder to lay the revision out in.
+  The folder to lay the revision out in. Windows only.
+
+.PARAMETER Record
+  A folder for the layout's record (layout.json, files.txt, plugins.txt,
+  loadorder.txt), with no file laid out. In place of -Game.
 
 .PARAMETER Slug
   The collection. 7essxf unless said otherwise.
@@ -96,6 +113,7 @@ param(
   [int]$Revision = 0,
   [string]$CollectionArchive,
   [string]$Game,
+  [string]$Record,
   [string]$Slug = '7essxf',
   [string]$GameDomain = 'skyrimspecialedition',
   [string]$Cache,
@@ -117,6 +135,7 @@ function Die($m) {
   Write-Host "STOP. $m" -ForegroundColor Red
   if ($script:Changed) { Write-Host $script:Changed -ForegroundColor Yellow }
   elseif ($Game) { Write-Host ('Nothing in ' + $Game + ' was changed.') -ForegroundColor Yellow }
+  elseif ($Record) { Write-Host ('Nothing was written to ' + $Record + '.') -ForegroundColor Yellow }
   if ($script:Work -and (Test-Path -LiteralPath $script:Work)) { Write-Host ('This run''s scratch folder, ' + $script:Work + ', is left for a look; the next run empties it first.') -ForegroundColor Yellow }
   if ($Cache -and (Test-Path -LiteralPath $Cache)) { Write-Host ('Archives already downloaded stay in ' + $Cache + ' and are used again.') -ForegroundColor Yellow }
   if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
@@ -140,9 +159,15 @@ function Invoke-Tool([string]$exe, [string[]]$arguments) {
   $p.WaitForExit()
   return [pscustomobject]@{ Code = $p.ExitCode; Out = $out; Err = $err.Result }
 }
+# Off Windows, 7-Zip's own build that Get-SevenZip.ps1 puts in place comes
+# first: Ubuntu's cannot unpack RAR (#2969).
 function Find-SevenZip {
   if ($env:ProgramFiles) { $p = Join-Path $env:ProgramFiles '7-Zip\7z.exe'; if (Test-Path -LiteralPath $p) { return $p } }
-  foreach ($n in '7z', '7zz', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { return $g.Source } }
+  if (-not $IsWindows) {
+    $own = & (Join-Path $Here 'Get-SevenZip.ps1') -Check 6>$null
+    if ($LASTEXITCODE -eq 0 -and $own) { return [string]$own }
+  }
+  foreach ($n in '7zz', '7z', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { return $g.Source } }
   return ''
 }
 # 7-Zip is looked for when the first archive is unpacked, so a revision given
@@ -158,38 +183,59 @@ function Expand-Archive7([string]$archive, [string]$to, [string]$what) {
   if (Test-Path -LiteralPath $to) { [IO.Directory]::Delete($to, $true) }
   New-Item -ItemType Directory -Force -Path $to | Out-Null
   $r = Invoke-Tool $script:SevenZip @('x', '-y', '-ssc-', ('-o' + $to), $archive)
-  if ($r.Code -ne 0) { throw ('7-Zip could not unpack ' + $what + ' (' + $archive + '): ' + ($r.Err.Trim() -replace '\s+', ' ')) }
+  if ($r.Code -ne 0) { throw ('7-Zip (' + $script:SevenZip + ') could not unpack ' + $what + ' (' + $archive + '), exit ' + $r.Code + ': ' + ($r.Err.Trim() -replace '\s+', ' ')) }
 }
 function Test-Under([string]$path, [string]$folder) {
   if (-not $folder) { return $false }
-  $f = [IO.Path]::GetFullPath($folder).TrimEnd('\') + '\'
-  return ($path.TrimEnd('\') + '\').StartsWith($f, [StringComparison]::OrdinalIgnoreCase)
+  $sep = [IO.Path]::DirectorySeparatorChar
+  $f = [IO.Path]::GetFullPath($folder).TrimEnd($sep) + $sep
+  return ($path.TrimEnd($sep) + $sep).StartsWith($f, [StringComparison]::OrdinalIgnoreCase)
 }
+# A path the layout keeps the Windows way (Data\Textures\x.dds), under a
+# folder on this machine.
+function Join-Rel([string]$root, [string]$rel) { return (Join-Path $root ($rel.Replace('\', [IO.Path]::DirectorySeparatorChar))) }
 
 Write-Host ''
 Write-Host '  THORNSWOOD  -  a collection revision laid out without Vortex' -ForegroundColor White
 if ($WhatIf) { Say '  -WhatIf: downloads and works it all out, and changes nothing in -Game.' 'Yellow' }
 
 # ------------------------------------------------------------ refused up front ---
-if (-not $Game) { Die 'Say which folder to lay the revision out in with -Game. There is no default: it is never the Steam copy or a folder Vortex deploys into.' }
-$Game = [IO.Path]::GetFullPath($Game).TrimEnd('\')
-if ($Game -match '^[A-Za-z]:$') { Die ('-Game ' + $Game + ' is a whole drive.') }
-if ($Game -match '\\steamapps\\common(\\|$)') { Die ('-Game ' + $Game + ' is in a Steam library. The Steam copy stays the person''s own; lay the revision out in a folder of its own.') }
-foreach ($rec in @((Join-Path $Game 'Data\vortex.deployment.json'), (Join-Path $Game 'vortex.deployment.json'))) {
-  if (Test-Path -LiteralPath $rec) { Die ('-Game ' + $Game + ' is a folder Vortex deploys into (' + $rec + '). Lay the revision out in a folder of its own.') }
+if ($Game -and $Record) { Die 'Give -Game to lay the revision out, or -Record to write only its record, not both.' }
+if ($Record) {
+  $Record = [IO.Path]::GetFullPath($Record).TrimEnd([IO.Path]::DirectorySeparatorChar)
+  if ($WhatIf) { Die '-Record already changes nothing but its own folder; leave -WhatIf off.' }
+  if ((Test-Path -LiteralPath $Record) -and @(Get-ChildItem -LiteralPath $Record -Force | Where-Object { @('layout.json', 'files.txt', 'plugins.txt', 'loadorder.txt') -notcontains $_.Name }).Count) { Die ('-Record ' + $Record + ' holds more than a layout''s record. Give it a folder of its own.') }
 }
-if ((Test-Path -LiteralPath $Game) -and @(Get-ChildItem -LiteralPath $Game -Filter 'vortex.deployment*.json' -File -ErrorAction SilentlyContinue).Count) { Die ('-Game ' + $Game + ' has a Vortex deployment record in it. Lay the revision out in a folder of its own.') }
-if ($env:APPDATA -and (Test-Under $Game (Join-Path $env:APPDATA 'Vortex'))) { Die ('-Game ' + $Game + ' is inside Vortex''s own folder.') }
+elseif (-not $Game) { Die 'Say which folder to lay the revision out in with -Game, or where to write only its record with -Record. There is no default: it is never the Steam copy or a folder Vortex deploys into.' }
+elseif (-not $IsWindows) { Die 'Laying files into a game folder is done on Windows, where the game runs. Here, write the layout''s record with -Record <folder> instead of -Game.' }
+else {
+  $Game = [IO.Path]::GetFullPath($Game).TrimEnd('\')
+  if ($Game -match '^[A-Za-z]:$') { Die ('-Game ' + $Game + ' is a whole drive.') }
+  if ($Game -match '\\steamapps\\common(\\|$)') { Die ('-Game ' + $Game + ' is in a Steam library. The Steam copy stays the person''s own; lay the revision out in a folder of its own.') }
+  foreach ($rec in @((Join-Path $Game 'Data\vortex.deployment.json'), (Join-Path $Game 'vortex.deployment.json'))) {
+    if (Test-Path -LiteralPath $rec) { Die ('-Game ' + $Game + ' is a folder Vortex deploys into (' + $rec + '). Lay the revision out in a folder of its own.') }
+  }
+  if ((Test-Path -LiteralPath $Game) -and @(Get-ChildItem -LiteralPath $Game -Filter 'vortex.deployment*.json' -File -ErrorAction SilentlyContinue).Count) { Die ('-Game ' + $Game + ' has a Vortex deployment record in it. Lay the revision out in a folder of its own.') }
+  if ($env:APPDATA -and (Test-Under $Game (Join-Path $env:APPDATA 'Vortex'))) { Die ('-Game ' + $Game + ' is inside Vortex''s own folder.') }
+}
 if ($Slug -notmatch '^[a-z0-9]+$') { Die ('-Slug ' + $Slug + ' is not a collection slug.') }
 if ($GameDomain -notmatch '^[a-z0-9]+$') { Die ('-GameDomain ' + $GameDomain + ' is not a game domain.') }
 if (-not $CollectionArchive -and $Revision -le 0) { Die 'Say which revision with -Revision, or give its archive with -CollectionArchive.' }
 if (-not $Cache) {
-  if (-not $env:LOCALAPPDATA) { Die 'There is no %LOCALAPPDATA% here for the download cache; give one with -Cache.' }
-  $Cache = Join-Path $env:LOCALAPPDATA 'Thornswood\nexus-cache'
+  if ($IsWindows) {
+    if (-not $env:LOCALAPPDATA) { Die 'There is no %LOCALAPPDATA% here for the download cache; give one with -Cache.' }
+    $Cache = Join-Path (Join-Path $env:LOCALAPPDATA 'Thornswood') 'nexus-cache'
+  }
+  else {
+    $xdg = if ($env:XDG_CACHE_HOME) { $env:XDG_CACHE_HOME } elseif ($HOME) { Join-Path $HOME '.cache' } else { '' }
+    if (-not $xdg) { Die 'There is no XDG_CACHE_HOME or HOME here for the download cache; give one with -Cache.' }
+    $Cache = Join-Path (Join-Path $xdg 'thornswood') 'nexus-cache'
+  }
 }
 $Cache = [IO.Path]::GetFullPath($Cache)
 if (Test-Under $Cache $Game) { Die ('The cache ' + $Cache + ' is inside -Game.') }
-$skyrimRecord = Join-Path $Repo 'records\skyrim-files.json'
+if (Test-Under $Cache $Record) { Die ('The cache ' + $Cache + ' is inside -Record.') }
+$skyrimRecord = Join-Path (Join-Path $Repo 'records') 'skyrim-files.json'
 if (-not (Test-Path -LiteralPath $skyrimRecord)) { Die ('records\skyrim-files.json is not in this checkout (' + $skyrimRecord + '), and it is what a FOMOD''s questions about the game are answered from.') }
 Step { Add-Type -LiteralPath (Join-Path $Here 'NexusLayout.cs') } | Out-Null
 
@@ -200,7 +246,7 @@ foreach ($p in $sky.files.PSObject.Properties.Name) {
 }
 $world.GameVersion = [string]$sky.build
 if (([string]$sky.build).Split('.').Count -eq 3) { $world.GameVersion = [string]$sky.build + '.0' }
-Say ('  game: ' + $Game)
+if ($Record) { Say ('  record only, into ' + $Record) } else { Say ('  game: ' + $Game) }
 Say ('  the game''s own plugins and version for FOMOD questions: ' + $world.Present.Count + ' plugins, ' + $world.GameVersion + ' (records\skyrim-files.json)') 'DarkGray'
 Say ('  cache: ' + $Cache) 'DarkGray'
 
@@ -264,7 +310,7 @@ $no = [Thornswood.Layout.NexusLayout]::Unsupported($col, $GameDomain)
 if ($no.Count) { Die ("This revision has what is not laid out here the way Vortex would, so nothing was downloaded:`n  " + ($no -join "`n  ")) }
 foreach ($e in $col.Entries) {
   foreach ($p in $e.Patches) {
-    $diff = Join-Path (Join-Path (Join-Path $colDir 'patches') $e.Name) ($p.Key + '.diff')
+    $diff = Join-Rel (Join-Path (Join-Path $colDir 'patches') $e.Name) ($p.Key + '.diff')
     if (-not (Test-Path -LiteralPath $diff)) { Die ($e.Say() + ' has a patch for ' + $p.Key + ', and the collection has no ' + $diff.Substring($colDir.Length + 1) + ' for it.') }
   }
 }
@@ -315,17 +361,42 @@ foreach ($e in $col.Entries) {
   Say ('  ' + $got.Name + ', ' + ([double]$got.Size / 1MB).ToString('N1') + ' MB in ' + [Math]::Round($sw.Elapsed.TotalSeconds) + ' s') 'DarkGray'
 }
 Say ('  ' + $reused + ' from the cache, ' + $fetched + ' downloaded, every one the revision''s size and md5') 'Green'
+# A RAR archive needs a 7-Zip that unpacks RAR. Ubuntu's does not: measured
+# 21 Oct (#2969), its 7zip package has no RAR codec ("Unsupported Method" on
+# Skyrim Sewers) and its 7zip-rar codec crashes on every RAR (exit 139). So
+# one RAR archive is tested with this 7-Zip before any archive is unpacked.
+$rars = @($col.Entries | Where-Object {
+    $sig = New-Object byte[] 4
+    $fs = [IO.File]::OpenRead($archives[$_.Index]); try { [void]$fs.Read($sig, 0, 4) } finally { $fs.Dispose() }
+    [Text.Encoding]::ASCII.GetString($sig) -eq 'Rar!'
+  })
+if ($rars.Count) {
+  Step { Use-SevenZip }
+  $t = Invoke-Tool $script:SevenZip @('t', $archives[$rars[0].Index])
+  if ($t.Code -ne 0) { Die ($rars.Count + ' of the archives are RAR (' + (($rars | Select-Object -First 3 | ForEach-Object { $_.Name }) -join ', ') + $(if ($rars.Count -gt 3) { ', ...' } else { '' }) + '), and ' + $script:SevenZip + ' could not test the first of them (exit ' + $t.Code + '), so it cannot unpack them.' + $(if (-not $IsWindows) { ' 7-Zip''s own Linux build unpacks RAR: pwsh scripts/release/Get-SevenZip.ps1 puts it where this script looks first.' } else { '' })) }
+}
 
 # ---------------------------------------------------------------- the install ---
 Head 'Installing, as Vortex would'
+# Size and sha256 of each file, by its unpacked path, taken before -Record
+# deletes the unpacked copy.
+$script:Facts = @{}
+function Remove-Unpacked($e, [string]$u) {
+  [Thornswood.Layout.NexusLayout]::Forget($u)
+  if (Test-Path -LiteralPath $u) { [IO.Directory]::Delete($u, $true) }
+  $pd = Join-Path (Join-Path $script:Work 'patch') ([string]$e.Index)
+  if (Test-Path -LiteralPath $pd) { [IO.Directory]::Delete($pd, $true) }
+}
 $plans = New-Object 'System.Collections.Generic.List[Thornswood.Layout.ModPlan]'
 $stops = New-Object System.Collections.Generic.List[string]
 foreach ($e in $col.Entries) {
-  $u = Join-Path $script:Work ('mods\' + $e.Index)
+  $u = Join-Path (Join-Path $script:Work 'mods') ([string]$e.Index)
   Step { Expand-Archive7 $archives[$e.Index] $u $e.Say() }
-  $files = [Thornswood.Layout.NexusLayout]::FileList($u)
+  $files = $null
+  try { [void][Thornswood.Layout.NexusLayout]::SplitBackslashNames($u); $files = [Thornswood.Layout.NexusLayout]::FileList($u) }
+  catch { $ex = $_.Exception; while ($ex.InnerException) { $ex = $ex.InnerException }; $stops.Add($e.Say() + ': ' + $ex.Message); continue }
   $plan = Step { [Thornswood.Layout.NexusLayout]::PlanMod($e, $u, $files, $world) }
-  if ($plan.Stop) { $stops.Add($e.Say() + ': ' + $plan.Stop); $plans.Add($plan); continue }
+  if ($plan.Stop) { $stops.Add($e.Say() + ': ' + $plan.Stop); $plans.Add($plan); if ($Record) { Remove-Unpacked $e $u }; continue }
   if ($plan.SetModType -and $plan.SetModType -ne $e.Type) { $stops.Add($e.Say() + ': its installer makes it mod type ' + $plan.SetModType + ' and the collection says "' + $e.Type + '"') }
   # Patches: collections/util/binaryPatching.ts applyPatches.
   foreach ($p in $e.Patches) {
@@ -334,8 +405,8 @@ foreach ($e in $col.Entries) {
     $staged = $plan.Files[$key]
     $crc = [Thornswood.Layout.NexusLayout]::Crc32Of($staged.Full)
     if ($crc -ne $p.Value.ToUpperInvariant()) { $stops.Add($e.Say() + ': the patch for ' + $p.Key + ' is for a file with CRC-32 ' + $p.Value + ', and the archive''s is ' + $crc + '. Vortex would skip the patch and say nothing'); continue }
-    $diff = Join-Path (Join-Path (Join-Path $colDir 'patches') $e.Name) ($p.Key + '.diff')
-    $pd = Join-Path $script:Work ('patch\' + $e.Index + '\' + [IO.Path]::GetFileName($p.Key))
+    $diff = Join-Rel (Join-Path (Join-Path $colDir 'patches') $e.Name) ($p.Key + '.diff')
+    $pd = Join-Path (Join-Path (Join-Path $script:Work 'patch') ([string]$e.Index)) ([Thornswood.Layout.WinPath]::FileName($p.Key))
     New-Item -ItemType Directory -Force -Path $pd | Out-Null
     $head = Step { [Thornswood.Layout.NexusLayout]::BsdiffHeader($diff) }
     $bytes = [IO.File]::ReadAllBytes($diff)
@@ -352,12 +423,18 @@ foreach ($e in $col.Entries) {
       $blocks += , [IO.File]::ReadAllBytes((Join-Path $pd ('block' + $blocks.Count)))
       $at += $len
     }
-    $out = Join-Path $pd ([IO.Path]::GetFileName($p.Key))
+    $out = Join-Path $pd ([Thornswood.Layout.WinPath]::FileName($p.Key))
     Step { [Thornswood.Layout.NexusLayout]::BsdiffApply($staged.Full, $blocks[0], $blocks[1], $blocks[2], $head[2], $out) }
     $staged.Full = $out; $staged.Patched = $p.Key
     Say ('  ' + $e.Name + ': patched ' + $p.Key + ' (CRC-32 ' + $crc + ' -> ' + [Thornswood.Layout.NexusLayout]::Crc32Of($out) + ')') 'DarkGray'
   }
   foreach ($w in $plan.Warnings) { Say ('  ' + $e.Name + ': the installer says ' + $w) 'Yellow' }
+  # -Record places nothing, so each file is measured now and the mod's
+  # unpacked copy goes before the next is unpacked.
+  if ($Record) {
+    foreach ($s in $plan.Files.Values) { $script:Facts[$s.Full] = [pscustomobject]@{ Size = (Get-Item -LiteralPath $s.Full).Length; Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($s.Full) } }
+    Remove-Unpacked $e $u
+  }
   $plans.Add($plan)
 }
 if ($stops.Count) { Die ("These are not laid out the way Vortex would:`n  " + ($stops -join "`n  ")) }
@@ -434,9 +511,65 @@ if ($broken.Count) { Die ('The collection''s plugin order breaks its own plugin 
 Say ('  ' + $order.Count + ' plugins: ' + @($order | Where-Object { $_.Enabled }).Count + ' enabled in the collection''s order' + $(if ($unlisted.Count) { ', ' + $unlisted.Count + ' it does not list, disabled: ' + ($unlisted -join ', ') } else { '' }))
 
 Say '  working out every file''s sha256' 'DarkGray'
-foreach ($x in $placed) { $x.Size = (Get-Item -LiteralPath $x.Full).Length; $x.Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($x.Full) }
+foreach ($x in $placed) {
+  $f = $script:Facts[$x.Full]
+  if ($f) { $x.Size = $f.Size; $x.Sha256 = $f.Sha256 }
+  else { $x.Size = (Get-Item -LiteralPath $x.Full).Length; $x.Sha256 = [Thornswood.Layout.NexusLayout]::Sha256Of($x.Full) }
+}
 $bytesAll = ($placed | Measure-Object -Property Size -Sum).Sum
 Say ('  ' + ([double]$bytesAll / 1GB).ToString('N2') + ' GB in all')
+
+# The record, the same whether it goes beside a layout or alone (-Record).
+# Paths sort by ordinal ignoring case and every line ends in CRLF, so One and
+# a cloud session write the same bytes for the same layout, and files.txt's
+# sha256 alone says whether two runs laid out the same files.
+$utf8 = New-Object Text.UTF8Encoding($false)
+function Write-Crlf([string]$path, $list) { [IO.File]::WriteAllText($path, ((@($list) -join "`r`n") + "`r`n"), $utf8) }
+$sorted = New-Object 'System.Collections.Generic.List[object]'
+foreach ($x in $placed) { $sorted.Add($x) }
+$sorted.Sort([Comparison[object]] { param($a, $b) [StringComparer]::OrdinalIgnoreCase.Compare($a.Rel, $b.Rel) })
+$lines = New-Object System.Collections.Generic.List[string]
+$lines.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision + '. sha256, size, Nexus file id, path in the game folder.')
+foreach ($x in $sorted) { $lines.Add($x.Sha256 + "`t" + $x.Size + "`t" + $col.Entries[$x.Entry].FileId + "`t" + $x.Rel) }
+$pl = New-Object System.Collections.Generic.List[string]
+$lo = New-Object System.Collections.Generic.List[string]
+$pl.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision)
+$lo.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision)
+foreach ($p in $order) { $pl.Add($(if ($p.Enabled) { '*' } else { '' }) + $p.Name); $lo.Add($p.Name) }
+$counts = @{}
+foreach ($x in $placed) { $counts[$x.Entry] = 1 + [int]$counts[$x.Entry] }
+$layoutRecord = [ordered]@{
+  schema     = 1
+  made       = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
+  tool       = 'scripts\release\Install-NexusRevision.ps1'
+  collection = [ordered]@{ slug = $Slug; domain = $GameDomain; name = $col.Name; revision = $Revision; revisionId = $revInfo.revisionId; status = $revInfo.status; archive = $revInfo.archive; archiveMd5 = $revInfo.archiveMd5; archiveSize = $revInfo.archiveSize }
+  gameVersion = $world.GameVersion
+  files      = $placed.Count
+  bytes      = $bytesAll
+  mods       = @($plans | ForEach-Object {
+      $e = $_.Entry
+      [ordered]@{ name = $e.Name; version = $e.Version; modId = $e.ModId; fileId = $e.FileId; md5 = $e.Md5; size = $e.Size; archive = [IO.Path]::GetFileName($archives[$e.Index]); installer = $_.Installer; type = $e.Type; files = [int]$counts[$e.Index]; patched = @($e.Patches | ForEach-Object { $_.Key }); warnings = @($_.Warnings) }
+    })
+  plugins    = @($order | ForEach-Object { [ordered]@{ name = $_.Name; enabled = [bool]$_.Enabled } })
+}
+function Write-LayoutRecord([string]$dir, [bool]$withFiles) {
+  New-Item -ItemType Directory -Force -Path $dir | Out-Null
+  if ($withFiles) { Write-Crlf (Join-Path $dir 'files.txt') $lines }
+  Write-Crlf (Join-Path $dir 'plugins.txt') $pl
+  Write-Crlf (Join-Path $dir 'loadorder.txt') $lo
+  [IO.File]::WriteAllText((Join-Path $dir 'layout.json'), ($layoutRecord | ConvertTo-Json -Depth 6), $utf8)
+}
+
+if ($Record) {
+  Write-LayoutRecord $Record $true
+  [IO.Directory]::Delete($script:Work, $true); $script:Work = ''
+  Head 'Done'
+  Say ('  revision ' + $Revision + ' of ' + $Slug + ': ' + $placed.Count + ' files, ' + $order.Count + ' plugins, nothing placed') 'Green'
+  Say ('  ' + (Join-Path $Record 'layout.json') + ', files.txt, plugins.txt, loadorder.txt')
+  Write-Host ''
+  if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+  exit 0
+}
 
 $recDir = Join-Path $Game 'Thornswood Layout'
 if ($WhatIf) {
@@ -489,11 +622,9 @@ foreach ($d in @($old.Values | ForEach-Object { Split-Path -Parent $_.Rel } | Wh
 # files.txt first, saying the layout is not whole yet, so a stop part way
 # leaves a record a run again can take out.
 New-Item -ItemType Directory -Force -Path $recDir | Out-Null
-$utf8 = New-Object Text.UTF8Encoding($false)
-$lines = New-Object System.Collections.Generic.List[string]
-$lines.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision + '. Being placed; layout.json is written when it is whole.')
-foreach ($x in ($placed | Sort-Object Rel)) { $lines.Add($x.Sha256 + "`t" + $x.Size + "`t" + $col.Entries[$x.Entry].FileId + "`t" + $x.Rel) }
-[IO.File]::WriteAllLines($oldFiles, $lines, $utf8)
+$whole = $lines[0]
+$lines[0] = '# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision + '. Being placed; layout.json is written when it is whole.'
+Write-Crlf $oldFiles $lines
 $script:Changed = 'In ' + $Game + ': the earlier layout is out and this one is part way in. Thornswood Layout\files.txt lists every file this run meant to place; run the same command again to put the rest in.'
 $linked = 0; $copied = 0
 $used = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
@@ -508,32 +639,8 @@ try {
   }
 }
 catch { Die ('Placing ' + $x.Rel + ' failed after ' + ($linked + $copied) + ' files: ' + $_.Exception.Message) }
-$lines[0] = '# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision + '. sha256, size, Nexus file id, path in the game folder.'
-[IO.File]::WriteAllLines($oldFiles, $lines, $utf8)
-$pl = New-Object System.Collections.Generic.List[string]
-$lo = New-Object System.Collections.Generic.List[string]
-$pl.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision)
-$lo.Add('# Install-NexusRevision.ps1: collection ' + $Slug + ' revision ' + $Revision)
-foreach ($p in $order) { $pl.Add($(if ($p.Enabled) { '*' } else { '' }) + $p.Name); $lo.Add($p.Name) }
-[IO.File]::WriteAllText((Join-Path $recDir 'plugins.txt'), (($pl -join "`r`n") + "`r`n"), $utf8)
-[IO.File]::WriteAllText((Join-Path $recDir 'loadorder.txt'), (($lo -join "`r`n") + "`r`n"), $utf8)
-$counts = @{}
-foreach ($x in $placed) { $counts[$x.Entry] = 1 + [int]$counts[$x.Entry] }
-$record = [ordered]@{
-  schema     = 1
-  made       = [DateTime]::UtcNow.ToString('yyyy-MM-ddTHH:mm:ssZ')
-  tool       = 'scripts\release\Install-NexusRevision.ps1'
-  collection = [ordered]@{ slug = $Slug; domain = $GameDomain; name = $col.Name; revision = $Revision; revisionId = $revInfo.revisionId; status = $revInfo.status; archive = $revInfo.archive; archiveMd5 = $revInfo.archiveMd5; archiveSize = $revInfo.archiveSize }
-  gameVersion = $world.GameVersion
-  files      = $placed.Count
-  bytes      = $bytesAll
-  mods       = @($plans | ForEach-Object {
-      $e = $_.Entry
-      [ordered]@{ name = $e.Name; version = $e.Version; modId = $e.ModId; fileId = $e.FileId; md5 = $e.Md5; size = $e.Size; archive = [IO.Path]::GetFileName($archives[$e.Index]); installer = $_.Installer; type = $e.Type; files = [int]$counts[$e.Index]; patched = @($e.Patches | ForEach-Object { $_.Key }); warnings = @($_.Warnings) }
-    })
-  plugins    = @($order | ForEach-Object { [ordered]@{ name = $_.Name; enabled = [bool]$_.Enabled } })
-}
-[IO.File]::WriteAllText((Join-Path $recDir 'layout.json'), ($record | ConvertTo-Json -Depth 6), $utf8)
+$lines[0] = $whole
+Write-LayoutRecord $recDir $true
 $script:Changed = ''
 [IO.Directory]::Delete($script:Work, $true); $script:Work = ''
 

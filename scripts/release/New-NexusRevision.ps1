@@ -32,9 +32,11 @@
   WHAT THIS DOES DIFFERENTLY, on purpose. It does not rebuild collection.json
   from an installed game, because that is Vortex's own work from its state on
   One (mods, installer choices, file hashes, patches, plugin rules). It starts
-  from the archive of the revision that is published now, which Vortex keeps
-  in its downloads (%APPDATA%\Vortex\downloads\skyrimse\collection_7essxf_<n>_*.7z),
-  changes only the entries named, and packs the rest exactly as it was. So:
+  from the archive of the revision that is published now, downloaded from
+  Nexus (the GraphQL collectionRevision's downloadLink), the same archive
+  Vortex keeps in its downloads when it installs the collection; so it runs
+  the same from One or a cloud session (#2969). It changes only the entries
+  named, and packs the rest exactly as it was. So:
     - it checks the archive is the latest published revision, and that no
       draft is waiting, before anything else;
     - it refuses an entry whose new file would need anything worked out from
@@ -76,8 +78,7 @@
 
 .PARAMETER From
   The published revision to start from: its .7z, or a folder holding it
-  unpacked. The newest collection_<slug>_<n>_*.7z in Vortex's downloads
-  unless said otherwise.
+  unpacked. Downloaded from Nexus unless said otherwise.
 
 .PARAMETER BaseRevision
   The revision number -From is, when its name does not say.
@@ -235,12 +236,20 @@ if (-not $node) { Die 'node is not on this machine, and nexus-collection.js writ
 $sz = Find-SevenZip
 if (-not $sz) { Die '7-Zip is not on this machine (7z.exe in Program Files, or 7z, 7zz or 7za on PATH), and the collection is a 7z archive.' }
 
+$scratch = & (Join-Path $Here 'Get-ScratchDir.ps1') ('nexus-revision-' + $Slug)
 if (-not $From) {
-  if (-not $env:APPDATA) { Die 'There is no %APPDATA% here, so Vortex''s downloads cannot be looked in; give the published revision''s archive with -From.' }
-  $dl = Join-Path $env:APPDATA 'Vortex\downloads\skyrimse'
-  $cands = @(Get-ChildItem -LiteralPath $dl -Filter ('collection_' + $Slug + '_*.7z') -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -match ('^collection_' + $Slug + '_(\d+)_') } | Sort-Object { [int]([regex]::Match($_.Name, '_(\d+)_').Groups[1].Value) })
-  if (-not $cands.Count) { Die ('There is no collection_' + $Slug + '_<n>_*.7z in ' + $dl + '; give the published revision''s archive with -From.') }
-  $From = $cands[-1].FullName
+  $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $latest + ', domainName: "' + $Game + '") { id status downloadLink } }'
+  $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $latest) }) 'collectionRevision'
+  $link = [string](Get-NexusField $rev 'downloadLink')
+  if ([string](Get-NexusField $rev 'status') -ne 'published' -or $link -notmatch '^/v2/collections/\d+/revisions/\d+/download_link$') { Die ('Nexus gave revision ' + $latest + ' as ' + [string](Get-NexusField $rev 'status') + ' with the download link "' + $link + '", not a published revision''s API path, so it was not downloaded.') }
+  $links = @(Get-NexusField (Step { Invoke-NexusApi 'GET' $link '' ('Asking for revision ' + $latest + '''s download') }) 'download_links')
+  $uri = [string](Get-NexusField ($links | Select-Object -First 1) 'URI')
+  if (-not $uri) { Die ('Nexus gave no download address for revision ' + $latest + '.') }
+  $pub = Join-Path $scratch 'published'
+  if (Test-Path -LiteralPath $pub) { Remove-Item -LiteralPath $pub -Recurse -Force }
+  $got = Step { Receive-NexusPresigned $uri $pub ('Downloading revision ' + $latest) ('collection_' + $Slug + '_' + $latest + '_.7z') }
+  $From = $got.Path
+  $BaseRevision = $latest
 }
 if (-not (Test-Path -LiteralPath $From)) { Die ('There is nothing at ' + $From + '.') }
 if (-not $BaseRevision) {
@@ -250,10 +259,9 @@ if (-not $BaseRevision) {
 }
 Head 'The revision it starts from'
 Say ('  ' + $From)
-if ($BaseRevision -ne $latest) { Die ('That is revision ' + $BaseRevision + ', but Nexus''s latest published revision is ' + $latest + '. Start from revision ' + $latest + ' (Vortex downloads it when the collection is installed or updated).') }
+if ($BaseRevision -ne $latest) { Die ('That is revision ' + $BaseRevision + ', but Nexus''s latest published revision is ' + $latest + '. Start from revision ' + $latest + ' (leave -From off and it is downloaded from Nexus).') }
 Say ('  revision ' + $BaseRevision + ', the latest published') 'Green'
 
-$scratch = & (Join-Path $Here 'Get-ScratchDir.ps1') ('nexus-revision-' + $Slug)
 $base = Join-Path $scratch 'base'; $build = Join-Path $scratch 'build'; $outDir = Join-Path $scratch 'out'
 foreach ($d in $base, $build, $outDir) {
   if (Test-Path -LiteralPath $d) { Remove-Item -LiteralPath $d -Recurse -Force }
