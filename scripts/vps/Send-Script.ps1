@@ -77,20 +77,26 @@ $ThornswoodStdinLimit = 8000
 # Windows form), deletes it, deletes every copy older than ten minutes that
 # a cut run left (the header says why), and runs what it read in its own
 # scope, as -Command would run it. A file it cannot read or delete is exit
-# 254, with nothing run; a script that does not parse is 1, as under -File. Kept apart so the harnesses know it when they see it
-# (Get-ThornswoodRemoteRunnerPath, tests\test-remote-big-script.ps1).
+# 254, with nothing run; a script that does not parse is 1, as under -File.
+# What it says goes on the error stream with Write-Error, never straight to
+# the console's: Windows PowerShell with its output redirected writes that
+# stream as CLIXML once anything (the first module it loads) has put a
+# progress record there, and a raw line after that is a line the caller's
+# PowerShell cannot read (measured on the VPS runners, #3059). Kept apart so
+# the harnesses know it when they see it (Get-ThornswoodRemoteRunnerPath,
+# tests\test-remote-big-script.ps1).
 function Get-ThornswoodRemoteRunner([Parameter(Mandatory = $true)][string]$Path) {
     if ($Path -notmatch '^C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1$') { throw ('not a runner''s file: ' + $Path) }
     return @"
 `$ThornswoodRunFile = '$Path'
 try { `$ThornswoodRunText = [IO.File]::ReadAllText(`$ThornswoodRunFile, [Text.Encoding]::UTF8); [IO.File]::Delete(`$ThornswoodRunFile) }
-catch { [Console]::Error.WriteLine('the script could not be taken from ' + `$ThornswoodRunFile + ': ' + `$_.Exception.Message + ' Nothing ran.'); exit 254 }
+catch { Write-Error -Message ('the script could not be taken from ' + `$ThornswoodRunFile + ': ' + `$_.Exception.GetBaseException().Message + ' Nothing ran.') -ErrorAction Continue; exit 254 }
 foreach (`$ThornswoodRunOld in @(Get-ChildItem -LiteralPath 'C:\Windows\Temp' -Filter 'thornswood-remote-*.ps1' -File -ErrorAction SilentlyContinue)) {
   if (`$ThornswoodRunOld.Name -match '^thornswood-remote-[0-9a-f]{32}\.ps1`$' -and `$ThornswoodRunOld.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddMinutes(-10)) {
-    try { [IO.File]::Delete(`$ThornswoodRunOld.FullName) } catch { [Console]::Error.WriteLine('could not remove ' + `$ThornswoodRunOld.FullName + ', left by a run cut short: ' + `$_.Exception.Message) }
+    try { [IO.File]::Delete(`$ThornswoodRunOld.FullName) } catch { Write-Error -Message ('could not remove ' + `$ThornswoodRunOld.FullName + ', left by a run cut short: ' + `$_.Exception.GetBaseException().Message) -ErrorAction Continue }
   }
 }
-try { `$ThornswoodRunBlock = [scriptblock]::Create(`$ThornswoodRunText) } catch { [Console]::Error.WriteLine('the script does not parse: ' + `$_.Exception.InnerException.Message); exit 1 }
+try { `$ThornswoodRunBlock = [scriptblock]::Create(`$ThornswoodRunText) } catch { Write-Error -Message ('the script does not parse: ' + `$_.Exception.GetBaseException().Message) -ErrorAction Continue; exit 1 }
 Remove-Variable -Name ThornswoodRunFile, ThornswoodRunOld, ThornswoodRunText -ErrorAction SilentlyContinue
 . `$ThornswoodRunBlock
 "@
