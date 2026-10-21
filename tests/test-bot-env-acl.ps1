@@ -34,6 +34,8 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  this proves NTFS rules on bot.env.json, read and written with Get-Acl and Set-Acl, which only Windows has'; exit 0 }
 
 $script:pass = 0
 $script:fail = 0
