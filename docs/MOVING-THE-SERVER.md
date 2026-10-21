@@ -373,7 +373,7 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\vps\Fetch-Backups.ps1 -Schedule` brings the new box's backups
     here every day. The outside watcher runs on GitHub's runners from its own
     public repository and asks for the address it was exported with, so
-    `.\scripts\vps\Watch-Outside.ps1 -Export "C:\ThornswoodTemps&Worktrees\temp\watch-outside"`
+    `.\scripts\vps\Watch-Outside.ps1 -Export "C:\Thornswood-Repo\temp\watch-outside"`
     into a clone of that repository, then commit and push it there, and its
     dns check expects the new box.
 
