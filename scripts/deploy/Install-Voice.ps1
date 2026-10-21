@@ -734,17 +734,20 @@ if (Test-Path -LiteralPath '$Root') {
 'REMOVED'
 "@
 
-if ($Restart -or $Remove) {
+if ($Restart) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
-    $block = $(if ($Restart) { $restartBlock } else { $removeBlock })
-    $out = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $block) | ForEach-Object { Say "  $_"; "$_".Trim() })
-    if ($Restart) {
-        if ($out -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
-        Say 'restarted, and voice answers again' 'Green'
-    } else {
-        if ($out -notcontains 'REMOVED') { Die 'voice was not taken off. The lines above say what is left.' }
-        Say 'Gone. The game server is untouched.' 'Green'
-    }
+    $restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($restartOut -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
+    Say 'restarted, and voice answers again' 'Green'
+    if (-not $NoPause) { [void](Read-Host 'Enter to close') }
+    exit 0
+}
+
+if ($Remove) {
+    $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
+    $removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    if ($removeOut -notcontains 'REMOVED') { Die 'voice was not taken off. The lines above say what is left.' }
+    Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }

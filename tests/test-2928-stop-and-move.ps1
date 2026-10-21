@@ -159,7 +159,9 @@ Yes 'voice''s -TaskOnly run sends StopAndMove.ps1 in front of its StopIt too' ($
 # Start-ScheduledTask, and -Remove took the folder away the same instant.
 # Stop-ScheduledTask returns before voice has exited (measured on dev voice,
 # 21 Oct: 63 ms, all four processes still running and node on the port).
-Yes 'voice''s -Restart and -Remove send StopAndMove.ps1 in front of its StopIt' ($voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $block)'))
+Yes 'voice''s -Restart and -Remove send StopAndMove.ps1 in front of its StopIt' (
+    $voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock)') -and
+    $voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock)'))
 foreach ($b in @(@{ Name = '-Restart'; Var = 'restartBlock'; Then = 'StartIt' }, @{ Name = '-Remove'; Var = 'removeBlock'; Then = 'Unregister-ScheduledTask' })) {
     $s = [regex]::Match($voice, '(?ms)^\$' + $b.Var + ' = @"\r?\n(.*?)^"@').Groups[1].Value.Replace('`', '')
     Yes ('voice''s ' + $b.Name + ' stops through StopIt, starts or takes away nothing until StoppedAll says it has all exited, and sleeps nowhere') (
