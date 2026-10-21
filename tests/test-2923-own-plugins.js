@@ -148,7 +148,11 @@ for (const dir of ['scripts/dev', 'scripts/mods']) {
 // A builder that reads a load order names a plugin list or the load order a
 // table was built against.
 const LOAD_ORDER = /plugins\.txt|PluginsTxt|PluginList|last-plugin\.json|npc-population\.json'?\)?\[?['"]loadOrder/;
-const readers = builders.filter((b) => LOAD_ORDER.test(read(b)));
+// Or reads npc-population.json into a name and walks its loadOrder later, as
+// Build-MerchantRetrievalSources.py does; the line above missed that one, so
+// a content change left its table stale with no step to rebuild it (#2993).
+const POPULATION_WALK = (src) => /npc-population\.json/.test(src) && /\[['"]loadOrder['"]\]|\.loadOrder\b/.test(src);
+const readers = builders.filter((b) => LOAD_ORDER.test(read(b)) || POPULATION_WALK(read(b)));
 const RAW = [
   /path\.join\(\s*(DATA|data|dataDir)\s*,\s*(pl|p|file|name|n|plugin)\s*\)/,
   /Join-Path\s+\$Data\s+\$(pl|p|plugin)\b/,

@@ -17,11 +17,19 @@
      worked, and when pip fails it says so with pip's own words and exit 1.
   D  --register adds the hook once to the settings it is pointed at and keeps
      every other key; off Linux it refuses and writes nothing.
+  E  scripts/dev/cloud-environment-setup.sh, the text of the environment's
+     setup script, which every session of the environment runs, the project
+     chat too (#3085): it is stored LF, names the clone in one place, and
+     runs Setup-CloudSession.sh --register only when the clone is there. A
+     session with no clone gets through it with exit 0, one with the clone
+     runs the register line, and one whose clone lacks the script stops.
 
-  B to D run the script with bash and a stand-in python3.12 that only writes
+  B to E run the script with bash and a stand-in python3.12 that only writes
   down how it was called, so nothing is installed. They need a Linux bash: on
   Windows `bash` can be WSL's or Git's, and the script never runs there, so
-  they say SKIP. Writes only its own temp folder.
+  they say SKIP. E runs a copy of the setup script with its clone line
+  pointed at a temp folder and every installer on PATH a stand-in, so it
+  installs nothing. Writes only its own temp folder.
 */
 const fs = require('fs');
 const os = require('os');
@@ -61,6 +69,20 @@ let eol = '';
 try { eol = cp.execFileSync('git', ['ls-files', '--eol', '--', 'scripts/dev/Setup-CloudSession.sh'], { cwd: ROOT, encoding: 'utf8' }).trim(); }
 catch (e) { eol = 'git did not answer: ' + e.message; }
 yes('A5 it is stored LF, so bash reads it on the Linux machine it runs on (' + eol + ')', /^i\/lf\s/.test(eol));
+
+// ---- E, what can be read on any machine -------------------------------------
+const SETUP = path.join(ROOT, 'scripts', 'dev', 'cloud-environment-setup.sh');
+yes('E1 scripts/dev/cloud-environment-setup.sh, the setup script\'s text, is in the repository', fs.existsSync(SETUP));
+const setupSrc = fs.existsSync(SETUP) ? fs.readFileSync(SETUP, 'utf8').split('\r').join('') : '';
+let setupEol = '';
+try { setupEol = cp.execFileSync('git', ['ls-files', '--eol', '--', 'scripts/dev/cloud-environment-setup.sh'], { cwd: ROOT, encoding: 'utf8' }).trim(); }
+catch (e) { setupEol = 'git did not answer: ' + e.message; }
+yes('E2 it is stored LF (' + setupEol + ')', /^i\/lf\s/.test(setupEol));
+const CLONE_LINE = 'clone=/home/user/Thornswood';
+yes('E3 it names the clone in one line, ' + CLONE_LINE + ', and nowhere else',
+  setupSrc.split('\n').filter(function (l) { return l === CLONE_LINE; }).length === 1 &&
+  setupSrc.split('/home/user/Thornswood').length === 2);
+yes('E4 it stops at the first failure (set -euo pipefail)', /^set -euo pipefail$/m.test(setupSrc));
 
 // ---- B to D -------------------------------------------------------------------
 if (process.platform === 'win32') {
@@ -133,6 +155,43 @@ else {
     }
     r = run(['--bogus'], { CLAUDE_CODE_REMOTE: 'true' });
     yes('D5 an option it does not know stops it with exit 2', r.status === 2);
+
+    // E, run
+    const ebin = path.join(tmp, 'ebin');
+    fs.mkdirSync(ebin);
+    const ecalls = path.join(tmp, 'ecalls.txt');
+    // Every command the setup script runs that would install, download or
+    // touch the image: a stand-in that writes down its name and arguments.
+    ['pwsh', 'curl', 'dpkg', 'apt-get', 'npm', 'sha256sum', 'install', 'ln', 'ls',
+      'chromium', 'lighthouse', 'linkinator', 'osv-scanner'].forEach(function (n) {
+      fs.writeFileSync(path.join(ebin, n), '#!/bin/sh\necho "' + n + ' $*" >> \'' + ecalls + '\'\nexit 0\n');
+      fs.chmodSync(path.join(ebin, n), 0o755);
+    });
+    function setup(clone) {
+      const copy = path.join(tmp, 'setup.sh');
+      fs.writeFileSync(copy, setupSrc.split(CLONE_LINE).join("clone='" + clone + "'"));
+      if (fs.existsSync(ecalls)) { fs.unlinkSync(ecalls); }
+      const e = Object.assign({}, process.env, { PATH: ebin + path.delimiter + process.env.PATH });
+      return cp.spawnSync('bash', [copy], { env: e, encoding: 'utf8' });
+    }
+    function ecalled() { return fs.existsSync(ecalls) ? fs.readFileSync(ecalls, 'utf8') : ''; }
+
+    r = setup(path.join(tmp, 'no-clone'));
+    yes('E5 with no clone (the project chat) the setup script exits 0 (' + r.status + ': ' + r.stderr.trim().split('\n').pop() + ')',
+      r.status === 0 && r.stdout.indexOf('No Thornswood clone in this session') >= 0);
+    yes('E6 having run every step before the clone\'s', /^npm install -g /m.test(ecalled()) && /^osv-scanner --version$/m.test(ecalled()));
+
+    const fake = path.join(tmp, 'clone');
+    fs.mkdirSync(path.join(fake, '.git'), { recursive: true });
+    fs.mkdirSync(path.join(fake, 'scripts', 'dev'), { recursive: true });
+    fs.writeFileSync(path.join(fake, 'scripts', 'dev', 'Setup-CloudSession.sh'), 'echo "register $*" >> \'' + ecalls + '\'\n');
+    r = setup(fake);
+    yes('E7 with the clone it exits 0 having run Setup-CloudSession.sh --register from it (' + r.status + ')',
+      r.status === 0 && /^register --register$/m.test(ecalled()) && r.stdout.indexOf('No Thornswood clone') < 0);
+
+    fs.unlinkSync(path.join(fake, 'scripts', 'dev', 'Setup-CloudSession.sh'));
+    r = setup(fake);
+    yes('E8 a clone without Setup-CloudSession.sh stops the setup script (' + r.status + ')', r.status !== 0);
   }
   finally { fs.rmSync(tmp, { recursive: true, force: true }); }
 }
