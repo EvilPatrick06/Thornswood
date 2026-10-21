@@ -160,7 +160,8 @@ $m = Refusal { Start-ThornswoodRemote -Target 'nobody@box.invalid' -Script ("'" 
 Yes 'and a script too long for the command line, rather than sending it as a file' ($m -match 'over 6000' -and $m -match 'Nothing was sent')
 $m = Refusal { Start-ThornswoodRemote -Target 'nobody@box.invalid' -SshArgs @('-o', 'User="x"') -Script "'hi'" }
 Yes 'and an ssh word with a double quote in it' ($m -match 'double quote' -and $m -match 'Nothing was sent')
-if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) {
     Write-Host 'SKIP  Start-ThornswoodRemote against a stand-in ssh: ssh is ssh.exe here, and a stand-in would have to be one too (the Linux runs check it)'
 } else {
     $bin = Join-Path ([IO.Path]::GetTempPath()) ('ts-2999-bin-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))

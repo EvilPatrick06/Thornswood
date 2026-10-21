@@ -23,7 +23,7 @@
   the box are not commands, so they never count) and finds each command named
   ssh, scp, ssh-keyscan, Invoke-ThornswoodRemote,
   Invoke-ThornswoodSecretRemote, Invoke-ThornswoodArtifactRemote,
-  Send-ThornswoodArtifactFile or Remote, and each call of Remote.ps1 by path.
+  Send-ThornswoodArtifactFile, Start-ThornswoodRemote or Remote, and each call of Remote.ps1 by path.
 
   A ROW NAMES ITS CALL BY TEXT, NOT BY PLACE (#2498). A row is script, the
   function the call sits in (<top> outside one), the command, and an anchor:
