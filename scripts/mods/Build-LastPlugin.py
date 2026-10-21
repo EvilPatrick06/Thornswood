@@ -1163,12 +1163,23 @@ def build(data_dir):
                 return below[(i, tag)][gid]
         return None
 
+    def placed(e):
+        """What a placed reference is and where, for a person to decide it."""
+        if e.tag not in (b'REFR', b'ACHR'):
+            return ''
+        src = plugins[e.pi]
+        b = src.gid(struct.unpack('<I', dict(subrecords(src.data(e)))[b'NAME'])[0])
+        be = next((win[(t, b)] for t in FLOOR_TYPES + (b'FLOR', b'ACHR') if (t, b) in win), None)
+        ce = win.get((b'CELL', src.gid(e.ctx[1]))) if e.ctx[1] is not None else None
+        return ': %s %s%s' % (be.tag.decode() if be else '?', edid_of(plugins, be) if be else desc_of(b, canon),
+                              (' in ' + (edid_of(plugins, ce) or desc_of(src.gid(e.ctx[1]), canon))) if ce else '')
+
     # 4. The floor items (#3077): every placed reference a person could pick
     # up, switched off like a cut actor. Left alone, the same way: one a later
     # plugin deleted, and one already off with no enable parent.
     bases = floor_bases(plugins, win, canon)
     found, parents = floor_scan(plugins, win, bases)
-    floor, floor_rows = [], {'deleted': [], 'alreadyOff': []}
+    floor, floor_rows, held_floor = [], {'deleted': [], 'alreadyOff': []}, []
     for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
         e, kind = found[g]
         src = plugins[e.pi]
@@ -1184,8 +1195,11 @@ def build(data_dir):
         # here, without the script.
         elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
-        elif src.name.lower() in blocked and under(e, b'REFR', g) is not None:
-            floor.append((g, under(e, b'REFR', g), kind))
+        elif src.name.lower() in blocked:
+            if under(e, b'REFR', g) is None:
+                held_floor.append('REFR %s (won by %s)%s' % (desc_of(g, canon), src.name, placed(e)))
+            else:
+                floor.append((g, under(e, b'REFR', g), kind))
         else:
             floor.append((g, e, kind))
     # A reference whose enable parent is a floor item would go out with it, or
@@ -1244,8 +1258,9 @@ def build(data_dir):
 
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above); what it would contribute stops the build.
-    held = sorted('%s %s (won by %s)' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon), plugins[e.pi].name)
-                  for e in actors + gates + [e for _, e, _ in floor] + qentries +
+    held = sorted('%s %s (won by %s)%s' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon),
+                                           plugins[e.pi].name, placed(e))
+                  for e in actors + gates + qentries +
                   [e for e, _, _ in hold_locs]
                   if plugins[e.pi].name.lower() in blocked)
     swapped = []
@@ -1259,10 +1274,7 @@ def build(data_dir):
                 continue
             table[g] = prev
             swapped.append((kind, g, e, prev))
-    if held:
-        raise SystemExit('STOP. %d record(s) the plugin would copy are won by a plugin the policy never '
-                         'copies from (notCopiedFrom):\n  %s\nDecide them on #3077. Nothing was written.'
-                         % (len(held), '\n  '.join(held[:60])))
+    held += held_floor
 
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()
@@ -1364,10 +1376,12 @@ def build(data_dir):
             same = False
         if not same:
             differs.append('%s: %s changes it from %s' % (what, plugins[e.pi].name, plugins[prev.pi].name))
-    if differs:
-        raise SystemExit('STOP. %d record(s) are changed by a plugin the policy never copies from '
-                         '(notCopiedFrom), so neither its record nor the one below is right to copy:\n  %s\n'
-                         'Decide them on #3077. Nothing was written.' % (len(differs), '\n  '.join(sorted(differs)[:60])))
+    if held or differs:
+        raise SystemExit('STOP. %d record(s) the plugin would copy are won by a plugin the policy never '
+                         'copies from (notCopiedFrom):\n  %s\n%d record(s) are changed by one, so neither its '
+                         'record nor the one below is right to copy:\n  %s\nDecide them on #3077. '
+                         'Nothing was written.' % (len(held), '\n  '.join(sorted(held)[:60]) or 'none',
+                                                   len(differs), '\n  '.join(sorted(differs)[:60]) or 'none'))
     made = copies()
     masters = [canon[m] for m in rn.masters]
     plugin = write_plugin(made, masters, plugins, rn)
