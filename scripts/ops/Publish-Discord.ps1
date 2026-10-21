@@ -97,9 +97,8 @@ param(
   # Write the current release into the shared record as announced, post nothing.
   [switch]$Record
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
-
-$ErrorActionPreference = 'Stop'
 
 # Ship.ps1 runs under strict mode, and reaching for a property a JSON object
 # simply does not have throws there rather than returning nothing. A news entry

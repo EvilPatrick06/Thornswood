@@ -2,8 +2,10 @@
   Vps.ps1
 
   The one place every script gets the VPS address, user, and ports from.
-  Dot-source it:
+  Dot-source it under Stop, so a copy without it ends on the load instead of
+  going on with no address (#3006, tests\test-3006-loads-under-stop.ps1):
 
+      $ErrorActionPreference = 'Stop'
       . (Join-Path $PSScriptRoot '..\vps\Vps.ps1')
 
   Then, after the param block:

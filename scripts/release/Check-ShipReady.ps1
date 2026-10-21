@@ -58,12 +58,18 @@ param(
   [switch]$NoPause
 )
 
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\deploy\ServerBuild.ps1')
 . (Join-Path $Here '..\mods\Generated.ps1')
+. (Join-Path $Here '..\mods\LoadOrder.ps1')
+. (Join-Path $Here 'Find-MSBuild.ps1') -Load
+. (Join-Path $Here 'Assert-PublishSigned.ps1')
+. (Join-Path $Here 'Feed-Store.ps1')
+# Each check below is a row, not a stop: what fails is said, and the rest are still asked.
+$ErrorActionPreference = 'Continue'
 $script:VpsAddress = Get-ThornswoodVpsAddress
 $RepoDir = Split-Path -Parent (Split-Path -Parent $Here)
 $Dev = ($Channel -eq 'dev')
@@ -438,7 +444,6 @@ $hasGame = [bool]($GameDir -and (Test-Path $GameDir))
 # what Vortex has deployed here, and nothing checked whether that deployment
 # was current. Vortex knew all along and wrote it in its own state.
 try {
-    . (Join-Path $Here '..\mods\LoadOrder.ps1')
     # No config.json is the launcher's own collection (Get-CollectionSlug's
     # default). One that is there and does not read could name another, so
     # the revision is not asked of the default in its place.
@@ -484,7 +489,6 @@ if ($hasGame) {
 # ------------------------------------------------------------- the compiler --
 Head 'The build'
 # The launcher builds only with MSBuild from its project files (#498).
-. (Join-Path $PSScriptRoot 'Find-MSBuild.ps1') -Load
 $msb = Find-ThornswoodMSBuild
 Ready 'MSBuild and the .NET Framework 4.8.1 reference assemblies are here' ([bool]($msb.MSBuild -and $msb.Csc -and $msb.RefAssemblies)) $msb.MSBuild `
   'Developer-Guide.md "Setting up a machine" has the one install line (Visual Studio 2022 Build Tools with the MSBuild workload and the 4.8.1 targeting pack)'
@@ -497,7 +501,6 @@ Ready 'node is on the path' ($null -ne $node) $(if ($node) { (& node --version 2
 
 # ------------------------------------------------------------- the signing --
 Head 'Signing'
-. (Join-Path $Here 'Assert-PublishSigned.ps1')
 $signCfg = Join-Path $RepoDir 'records\signing\signing.json'
 $signRefuse = ''
 if (Test-Path -LiteralPath $signCfg) { $signRefuse = Get-SigningConfigRefusal -ConfigPath $signCfg -RepoRoot $RepoDir }
@@ -603,7 +606,6 @@ if (-not $Dev) {
                      @((& $where ServerDist), (& $where Payload)))) { Show-Row $r }
   # Main's feed as the site serves it, as Ship reads it (Get-PublishedLauncher),
   # and the number this checkout's launcher carries, as Publish-Update reads it.
-  . (Join-Path $Here 'Feed-Store.ps1')
   $mainFeed = $null
   try { $mainFeed = Read-SiteFeed 'main' } catch { $mainFeed = $null }
   $current = ''
@@ -633,7 +635,6 @@ if ($NoVps) {
   if ($sshOk) {
     $storeOk = $false; $storeSaid = ''
     try {
-      . (Join-Path $PSScriptRoot 'Feed-Store.ps1')
       $there = Get-FeedStoreThere $Channel
       $storeOk = [bool]$there['version.json'] -and [bool]$there['published.json']
       $storeSaid = $(if ($storeOk) { 'version.json and published.json' } else { 'missing ' + ((@('version.json', 'published.json') | Where-Object { -not $there[$_] }) -join ' and ') })

@@ -918,6 +918,7 @@ jobs:
                  'test-client-by-hash.ps1',
                  'test-build-vs-install.ps1',
                  'test-ship-dry-run.ps1',
+                 'test-3006-loads-under-stop.ps1',
                  'test-launcher-icons.js',
                  'test-whose-game-gate.js',
                  'test-gate-list.ps1',
