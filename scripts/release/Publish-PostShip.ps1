@@ -96,7 +96,7 @@
 [CmdletBinding()]
 param(
     [ValidateSet('main', 'dev')][string]$Channel = 'main',
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot 'Where.ps1') Install),
     [string]$DistRoot = (& (Join-Path $PSScriptRoot 'Where.ps1') Dist),
     [string]$Installer,
     [switch]$AlsoLauncher,

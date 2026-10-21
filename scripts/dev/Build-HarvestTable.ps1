@@ -237,8 +237,8 @@
   or if the game folder changed underneath it.
 #>
 param(
-    [string] $Data       = 'C:\Thornswood\Game\Data',
-    [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
+    [string] $Data       = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string] $PluginList = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\OwnGame\plugins.txt'),
     [string] $Out        = '',
     [string] $JsOut      = '',
     # Print the table and leave game\gamemode.js alone.

@@ -298,7 +298,8 @@ param(
     [switch]$ModsOnly,
     [switch]$DryRun,
     [switch]$Package,
-    [string]$Root = 'C:\Thornswood'
+    # Left out, Where.ps1 ShipRoot or ShipRootDev, asked below (#1692, #3031).
+    [string]$Root
     # Where releases are staged and zipped, passed straight through to
     # Publish-Update and Package-Thornswood so all three agree. Not under
     # $Root: that is the folder people play from.

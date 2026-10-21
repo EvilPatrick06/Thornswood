@@ -44,7 +44,7 @@
 
 [CmdletBinding()]
 param(
-  [string] $Game     = 'C:\Thornswood',
+  [string] $Game     = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
   [string] $Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
   [string] $After    = 'SkyUI_SE.esp'
 )

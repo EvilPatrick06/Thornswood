@@ -12,7 +12,7 @@
       .\scripts\mods\Fix-Icons.ps1
 #>
 [CmdletBinding()]
-param([string]$Root = 'C:\Thornswood')
+param([string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install))
 
 $ErrorActionPreference = 'Continue'
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }

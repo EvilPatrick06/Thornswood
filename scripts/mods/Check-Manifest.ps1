@@ -44,7 +44,7 @@ if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 # The dev server is a second install beside the live one, and the dev build is
 # a second launcher beside the main one. Asking about one against the other is
 # what made this worth a switch rather than two paths typed by hand.
-if (-not $Client) { $Client = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' } }
+if (-not $Client) { $Client = [string](& (Join-Path $Here '..\release\Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' })) }
 
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 

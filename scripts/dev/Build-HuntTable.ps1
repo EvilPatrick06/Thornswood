@@ -230,10 +230,10 @@
 #>
 param(
     # The build's Data folder. Read only.
-    [string] $Data       = 'C:\Thornswood\Game\Data',
+    [string] $Data       = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # The load order. The five Bethesda masters are always first and are never
     # in this file, so they are put in front of it.
-    [string] $PluginList = 'C:\Thornswood\Profile\OwnGame\plugins.txt',
+    [string] $PluginList = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\OwnGame\plugins.txt'),
     [string] $Out        = '',
     [string] $JsOut      = '',
     # Archives may be stored separately from a verified server plugin snapshot.

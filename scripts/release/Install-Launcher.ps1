@@ -164,7 +164,12 @@ Say ("  icon-$iconHash.ico") 'DarkGray'
 # the Desktop's Thornswood Dev.lnk to start the release folder's launcher
 # (2:57 PM that day) instead of the dev build Patrick plays, and a Ship dry
 # run's Play-DevBuild test folder did the same.
-$isDevRoot = $Root.TrimEnd('\') -ieq 'C:\Thornswood-DevBuild'
+#
+# Both installs are what Where.ps1 InstallDev and Install answer (#3031), so
+# a developer whose launcher is on another drive gets the same shortcuts.
+$devInstall  = [string](& (Join-Path $Here 'Where.ps1') InstallDev)
+$playInstall = [string](& (Join-Path $Here 'Where.ps1') Install)
+$isDevRoot = $Root.TrimEnd('\') -ieq $devInstall
 $lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
 
 # AND A SCRATCH BUILD TOUCHES THE DESKTOP AT ALL.
@@ -185,7 +190,7 @@ $lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
 # So a root that is neither of the two real installs gets its shortcut inside
 # its own folder and nowhere else. It still builds and it still gets an icon;
 # nothing outside that folder changes.
-$playRoot  = $Root.TrimEnd('\') -ieq 'C:\Thornswood'
+$playRoot  = $Root.TrimEnd('\') -ieq $playInstall
 $isScratch = -not ($isDevRoot -or $playRoot)
 
 # A .lnk is made through Windows' own shell (WScript.Shell), which no other

@@ -22,7 +22,7 @@
 [CmdletBinding()]
 param(
   [string]$Url,
-  [string]$Root = 'C:\Thornswood',
+  [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
   [string]$ReleaseDir,
   [switch]$Clear,
   [switch]$NoPush,

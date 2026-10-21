@@ -22,7 +22,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root   = 'C:\Thornswood',
+    [string]$Root   = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [string]$Server = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
     [string]$Client = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ClientDist),
     [string]$ServerIp = '',
@@ -219,7 +219,7 @@ foreach ($s in $steps) {
     if ($help.Parameters.ContainsKey('ServerIp'))   { $splat['ServerIp'] = $ServerIp }
     if ($help.Parameters.ContainsKey('ServerPort')) { $splat['ServerPort'] = $ServerPort }
 
-    # These scripts each default to C:\Thornswood on their own, which is
+    # These scripts each default to the install Where.ps1 finds, which is
     # right until somebody passes -Root. Handing them the folder this run is
     # actually working on is what makes -Root mean anything.
     if ($help.Parameters.ContainsKey('Data')) { $splat['Data'] = $Data }

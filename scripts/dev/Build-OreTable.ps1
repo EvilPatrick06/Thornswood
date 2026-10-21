@@ -51,10 +51,10 @@
 #>
 param(
     # The build's Data folder. Read only.
-    [string]   $Data       = 'C:\Thornswood\Game\Data',
+    [string]   $Data       = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # The load order. The five Bethesda masters are always first and are never
     # in this file, so they are put in front of it.
-    [string]   $PluginsTxt = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [string]   $PluginsTxt = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt'),
     # Overrides the load order entirely when it is given.
     [string[]] $Plugins    = @(),
     [string]   $Out        = '',

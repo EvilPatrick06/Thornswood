@@ -35,7 +35,7 @@
 
 [CmdletBinding()]
 param(
-  [string] $Game = 'C:\Thornswood',
+  [string] $Game = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
   [switch] $Undo
 )
 # The refusal comes before anything else, above the strict mode line and above
