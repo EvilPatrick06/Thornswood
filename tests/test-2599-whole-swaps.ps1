@@ -90,6 +90,8 @@ Yes 'the records keep their own SwapIn, a different name from ReplaceName' ($og 
 Yes 'ReplaceName renames with write through and never opens next for writing: a link to the Steam copy is not flushed' ($region.Success -and $region.Groups[1].Value -match 'internal static void ReplaceName\(string next, string path, bool clearReadOnly\)\s*\{\s*int err = MoveOver\(next, path\);' -and $region.Groups[1].Value -match 'fs\.Flush\(true\)' -and $region.Groups[1].Value -match 'MoveReplaceExisting \| MoveWriteThrough')
 Yes 'SwapCopyIn flushes the fresh copy it made before it takes the file''s place' ($block.Success -and $block.Groups[1].Value -match '(?s)internal static void SwapCopyIn\(string path, string aside\).*?File\.Copy\(path, aside, false\);.*?FlushToDisk\(aside\);\s*SwapNameIn\(aside, path, false\);')
 if (-not ($region.Success -and $block.Success)) { Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the swaps, run: the launcher''s .NET Framework code renames through kernel32, which only Windows has'; Done }
 
 $work = Join-Path $Scratch ('thornswood-2599-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -179,7 +181,7 @@ __BLOCK__
     $src = Join-Path $work 'WholeSwapTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-swap-test.exe'
-    $fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
+    $fw = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319'
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', "/langversion:$LauncherLangVersion", "/out:$exe",
                  "/reference:$(Join-Path $fw 'System.dll')", "/reference:$(Join-Path $fw 'System.Core.dll')", $src)
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'

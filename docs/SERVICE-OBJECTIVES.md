@@ -29,12 +29,15 @@ Three things watch the services, and one bot posts what they find.
   runs (`Watch-Services.ps1:$backAfter = 2`). It writes one message
   when something goes down and one when it is back into
   `C:\Thornswood-Watch\alerts.jsonl`.
-- **The outside watcher on One**, `scripts/vps/Watch-Outside.ps1`, the task
-  `Thornswood Watch Outside` on Patrick's machine, every five minutes while he
-  is signed in. It asks what a stranger on the internet sees: the site, both
-  feeds, the certificate, the name, the registration, the build runners,
-  signing and the Nexus collection (`Watch-Outside.ps1:Get-Checks`). It only
-  watches while One is on.
+- **The outside watcher**, `scripts/vps/Watch-Outside.ps1`, on GitHub's Linux
+  runners from a public repository of its own, about every five minutes,
+  whether One is on or not (issue #2755). It asks what a stranger on the
+  internet sees: the site, both feeds, the certificate, the name, the
+  registration, the build runners and the Nexus collection
+  (`Watch-Outside.ps1:Get-Checks`). A check whose remote service did not
+  answer says it could not check, never that the thing is down, and is told
+  only once it has lasted about an hour (`Watch-Outside.ps1:function Blind`,
+  issue #2857).
 - **The bot's uptime ping**, `bot/bot.py` `uptime_ping`, to an outside monitor
   at `PING_URL` in `bot.env.json` on the VPS, every minute while the bot is on
   Discord (issue #449). Whether `PING_URL` is set is not visible from the
@@ -44,8 +47,8 @@ Three things watch the services, and one bot posts what they find.
   `bot/staff-channel.txt`. When the bot has not posted one within two and a
   half minutes (`Watch-Services.ps1:$ackWait = 150`), the watchdog posts it
   through its webhook, which `-SetWebhook` only accepts in that channel. The outside watcher
-  appends its messages to the same file over ssh, and posts through its own
-  copy of that webhook when the VPS cannot be reached.
+  posts its messages through the same webhook itself, from GitHub's runners,
+  which cannot reach the box.
 
 ## The objectives
 
@@ -65,7 +68,7 @@ check calls it one.
 | Dev voice | The same on port 7789 | 2 runs, 10 minutes | The same | `Watch-Services.ps1:Health = 'http://127.0.0.1:7789/health'` | Staff channel | 5 min | Whoever deployed dev last |
 | Bot | The bot's python process runs and `heartbeat.json` is under 10 minutes old | 10 minutes | Heartbeat older than 600 s, or no process: restart the service | `Watch-Services.ps1:$beatStale = 600`, `Watch-Services.ps1:BotSilent`; heartbeat every 60 s (`bot/bot.py:HEARTBEAT_EVERY`) | Staff channel, through the webhook when the bot is the thing down | 5 min | Patrick |
 | Backup freshness | The `Thornswood Backup` task's last result, and the newest backup's age | 1 run | Last result not 0 (or running), or newest over 26 hours old | `Watch-Services.ps1:BackupProblem`, `Watch-Services.ps1:Hours = 26` | Staff channel | 5 min | Patrick (holds the passphrase) |
-| Off-box copy | Age of the newest backup on One, in `local\backups`, by the stamp in its name | 1 run | Over 26 hours old, or none there | `Watch-Outside.ps1:function Check-OffBox`, `Watch-Outside.ps1:OffBoxHours = 26`; filled by `Fetch-Backups.ps1` at 4:15 AM (`Fetch-Backups.ps1:every day at 04:15`) | Staff channel | Hourly, while One is on | Patrick |
+| Off-box copy | Age of the newest backup on One that Fetch-Backups.ps1 checked, by the stamp in the name it writes into `offbox.txt` on the box | 1 run | Over 26 hours old, or none said | `Watch-Services.ps1:function OffBoxProblem`, `Watch-Services.ps1:OffBox = (Join-Path $root 'offbox.txt'); Hours = 26`; filled by `Fetch-Backups.ps1` at 4:15 AM (`Fetch-Backups.ps1:every day at 04:15`) | Staff channel | 5 min, on the box, One on or off | Patrick |
 | Disk on the VPS | Free space on C: | 1 run | Under 20% DISK LOW, under 10% DISK CRITICAL | `Watch-Services.ps1:$diskLow = 20`, `Watch-Services.ps1:$diskCritical = 10` | Staff channel | 5 min | Installer lane (as `Forecast-Storage.ps1` names it), with Patrick |
 | Disk forecast | Days until free space on C: crosses 10% and 20%, a straight line through one sample a day over the last 30 days | 14 samples over at least 7 days before any forecast | Warning: 10% within 30 days, or 20% within 7. Critical: 10% within 7 days, or already under | `Forecast-Storage.ps1:$WarnDays = 30`, `Forecast-Storage.ps1:$CriticalDays = 7`; the `Thornswood Disk History` task, daily at 04:00 box time | Staff channel, once when the forecast turns and once when it is back | Daily | Warning: Installer lane. Critical: whoever is on staff |
 | Build runners | Every runner's service runs, and GitHub lists every runner online | 1 run on the box; 3 runs, 15 minutes from outside | Any runner not running or not online | `Watch-Services.ps1:$tellOnly`; `Watch-Outside.ps1:are not all online on GitHub` | Staff channel | 5 min | GitHub lane, with Patrick |
@@ -83,19 +86,21 @@ its own check (`Watch-Services.ps1:SiteAnswers`). The 21 September outage, Caddy
 stopped for hours while the app answered 3001, is why
 (`Watch-Services.ps1:on 21 September Caddy was stopped for hours`).
 
-Limitations: the outside watcher sees nothing while One is off. Its own log,
-`%LOCALAPPDATA%\Thornswood\Watch-Outside\watch.log`, holds 16 lines from
-30 September to 9 October where One itself was offline and nothing was judged;
-its newest run, 12:48 AM on 12 October, ended with result 0 and every check up.
+Limitations: until 20 October the outside watcher ran on One and saw nothing
+while One was off. Its log there held 16 lines from 30 September to
+9 October where One itself was offline and nothing was judged. Since #2755
+it runs on GitHub's runners, whose scheduled runs can start late when GitHub
+is busy, so "about every five minutes" is the most it promises.
 Response time is not recorded anywhere: the 213 ms in the outside watcher's
 header is one reading from 28 September.
 
 **Proposal:** availability of 99% a calendar month for the site from outside
 (about seven hours down). The metric is the availability
-`Read-Availability.ps1` gives for `outside site` (what Watch-Outside sees) and
-`caddy` (the box asking over the public name) from `alerts.jsonl` (see
-"Availability"). `outside site` records nothing while One is off, so `caddy`
-is the half that runs all the time. The figure stays a proposal until the
+`Read-Availability.ps1` gives for `caddy` (the box asking over the public
+name) from `alerts.jsonl` (see "Availability"). The outside watcher's own
+down and back lines no longer reach that file, because GitHub's runners
+cannot reach the box (#2755); its messages in the staff channel are the
+record of what it saw. The figure stays a proposal until the
 baseline has been read, and this page does not say the site meets it.
 
 ### Feed
@@ -138,15 +143,16 @@ half minutes.
 The nightly backup runs at 3:15 AM by the box's clock (`Install-Backup.ps1:$At = '03:15'`)
 and keeps seven daily and four weekly (`vps-nightly-backup.ps1:$KeepDaily = 7`, `vps-nightly-backup.ps1:$KeepWeekly = 4`). What it
 takes is in `docs/SYSTEM.md`. On One, `Thornswood Fetch Backups` brings each
-one down at 4:15 AM. Since #2183 the outside watcher tells the staff channel
-when the newest copy there is over 26 hours old (`Watch-Outside.ps1:function Check-OffBox`).
+one down at 4:15 AM, checks each copy opens, and writes the name of the
+newest into `offbox.txt` on the box. Since #2755 the watchdog there tells the
+staff channel when that copy is over 26 hours old (`Watch-Services.ps1:function OffBoxProblem`);
+from #2183 until then the outside watcher on One did.
 `local\backups` on One held 14 copies on 12 October, the newest
 `thornswood-20261011-152237.zip.enc`. The copy for 7 October arrived on
 9 October, so a day One is off is a day the off-box copy falls behind. On
 15 October the newest copy on One was `thornswood-20261013-031501`: the fetch
 task's last run was 4:15 AM on 13 October (result 0), and nothing had said so.
-The outside watcher runs only while One is on, so this is told the next time
-it is, not while it is off.
+Judged on the box, it is told while One is off, which is when it falls behind.
 
 The backup's contents are proved every night on stand-in folders by
 `tests/test-backup-restore.ps1` in the nightly checks (`.github/workflows/nightly.yml`, which runs every `tests/test-*`
@@ -159,8 +165,8 @@ How much can be lost:
 - **The box is fine, a folder is damaged:** up to the age of the newest backup
   on the box, at most 26 hours before the watchdog says so (backup freshness).
 - **The box is gone:** up to the age of the newest copy on One, which is the
-  last 4:15 AM fetch, or older when One was off. The outside watcher says so
-  past 26 hours.
+  last 4:15 AM fetch, or older when One was off. The watchdog on the box says
+  so past 26 hours.
 - During the alpha all world and character data is throwaway
   ([RESTORING.md](RESTORING.md), "The box is gone"), so this is the most that
   can be lost, not a promise that nothing will be.

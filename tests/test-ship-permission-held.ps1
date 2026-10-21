@@ -6,6 +6,13 @@
 # it is redistributed. No game folder needed; a second or two.
 $env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $Repo = Split-Path -Parent $PSScriptRoot
 . (Join-Path $Repo 'scripts\release\Ship-Rules.ps1')
 $pass = 0; $fail = 0
@@ -80,7 +87,7 @@ try {
     New-Item -ItemType Directory $loneTools, $loneRec | Out-Null
     foreach ($f in 'Ship-Rules.ps1', 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy-Item -LiteralPath (Join-Path $Repo ('scripts\release\' + $f)) -Destination $loneTools }
     Copy-Item -LiteralPath (Join-Path $Repo 'records\ui-gone.json') -Destination $loneRec
-    $n = @(& powershell -NoProfile -ExecutionPolicy Bypass -Command "& { `$ErrorActionPreference = 'Stop'; . '$loneTools\Ship-Rules.ps1'; 'held=' + `$ShipPermissionHeld.Count }" 2>$null)
+    $n = @(& $winPs -NoProfile -ExecutionPolicy Bypass -Command "& { `$ErrorActionPreference = 'Stop'; . '$loneTools\Ship-Rules.ps1'; 'held=' + `$ShipPermissionHeld.Count }" 2>$null)
     Yes ('a copy of Ship-Rules with no list beside it loads with no holds ({0})' -f ($n -join ' ')) (@($n | Where-Object { $_ -eq 'held=0' }).Count -eq 1)
 
     # Releasing a hold (only on a new ruling): the same list without its line.

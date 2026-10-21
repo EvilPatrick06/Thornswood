@@ -86,7 +86,6 @@ $hostExe = ''
 try { $hostExe = [Diagnostics.Process]::GetCurrentProcess().MainModule.FileName } catch { $hostExe = '' }
 if (-not $hostExe) {
     $c = Get-Command pwsh -ErrorAction SilentlyContinue
-    if (-not $c) { $c = Get-Command powershell -ErrorAction SilentlyContinue }
     if ($c) { $hostExe = $c.Source }
 }
 

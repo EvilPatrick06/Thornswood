@@ -8,6 +8,13 @@
 # Read-ThornswoodRecord, and Check-Records.ps1 over the committed records.
 # Offline: bad copies are written to a scratch folder; no record is changed.
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $repo = Split-Path -Parent $PSScriptRoot
 . (Join-Path $repo 'scripts\release\RecordShape.ps1')
 # Kinds with a committed file; server-settings is each box's own (#2180, slice 4).
@@ -24,7 +31,7 @@ foreach ($kind in $fileKinds) {
     $p = Join-Path $repo $script:ThornswoodRecordKinds[$kind].File
     Yes "the committed $kind record reads at a known version with its fields" ((Refusal { Read-ThornswoodRecord -Path $p -Kind $kind }) -eq '')
 }
-$out = & powershell -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Check-Records.ps1') 2>&1
+$out = & $winPs -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Check-Records.ps1') 2>&1
 Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 1))
 Yes 'docs\JSON-STATE-INVENTORY.md lists each of these records' ((Test-Path -LiteralPath (Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')) -and -not @($script:ThornswoodRecordKinds.Values | Where-Object { $_.File } | Where-Object { -not ([IO.File]::ReadAllText((Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')).Contains($_.File.Replace('\', '/'))) }).Count)
 
@@ -59,6 +66,11 @@ try {
     $d = $real['server-build'] | ConvertFrom-Json; $d.source.commit = '9284855'; $d.bytes = '5775872'
     $b = Bad 'server-build' ($d | ConvertTo-Json -Depth 10)
     Yes 'server-build: a short source.commit and bytes as a string are refused, both named' ($b.Why -match 'source\.commit is missing or not a full commit SHA' -and $b.Why -match 'bytes is missing or not a whole number')
+    # The front (#2754): built from the pinned commit, written out in full.
+    $d = $real['front-build'] | ConvertFrom-Json; $d.forkCommit = '3d2cb747'
+    Yes 'front-build: a short forkCommit is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'forkCommit is missing or not a full commit SHA')
+    $d = $real['front-build'] | ConvertFrom-Json; $d.files = [pscustomobject]@{}
+    Yes 'front-build: an empty files map is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'files is missing, empty')
     $d = $real['server-build'] | ConvertFrom-Json; $d | Add-Member -NotePropertyName lightPlugins -NotePropertyValue 'yes' -Force
     $b = Bad 'server-build' ($d | ConvertTo-Json -Depth 10)
     Yes 'server-build: lightPlugins that is not true or false is refused' ($b.Why -match 'lightPlugins is there and not true or false')

@@ -245,6 +245,10 @@ param(
     [switch] $NoInstall
 )
 
+# Thornswood's own plugins are read from game\content, every other plugin
+# from -Data (#2923, OwnPlugins.ps1).
+. (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+
 # ---------------------------------------------------------------- knobs ----
 # classes.md is the rulebook. It says a gatherer harvests flora and loose
 # material, that four ranks climb by doing the work, and that rank decides
@@ -974,26 +978,15 @@ Ok ("{0}: {1} entries before" -f $Data, $fingerBefore.Count)
 Write-Host ''
 Write-Host 'the load order' -ForegroundColor Cyan
 if (-not (Test-Path -LiteralPath $PluginList)) { throw "not found: $PluginList" }
-# The five masters are always loaded and the reference list does not name them,
-# so they go on the front. Everything else is a line in that list: '*' means
-# enabled, '#' is a comment, and a line with no '*' is a plugin sitting in the
-# folder switched off, which is not part of this build.
-$order = New-Object 'System.Collections.Generic.List[string]'
-foreach ($m in @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')) { $order.Add($m) }
-$offCount = 0
-foreach ($ln in [System.IO.File]::ReadAllLines($PluginList)) {
-    $t = $ln.Trim()
-    if (-not $t) { continue }
-    if ($t.StartsWith('#')) { continue }
-    if (-not $t.StartsWith('*')) { $offCount++; continue }
-    $t = $t.Substring(1).Trim()
-    if (-not $order.Contains($t)) { $order.Add($t) }
-}
+# The five masters, then each '*' line; a line with no '*' is a plugin
+# switched off, which the game does not load (OwnPlugins.ps1, #1712, #2976).
+$order = Get-LoadOrder $PluginList
+$offCount = (Get-SwitchedOff $PluginList).Count
 Ok ("{0} plugins: the 5 masters and {1} from {2}" -f $order.Count, ($order.Count - 5), $PluginList)
 if ($offCount -gt 0) { Note "$offCount line(s) in that list are switched off and were left out" }
 
 $missing = New-Object 'System.Collections.Generic.List[string]'
-foreach ($pl in $order) { if (-not (Test-Path -LiteralPath (Join-Path $Data $pl))) { $missing.Add($pl) } }
+foreach ($pl in $order) { if (-not (Test-Path -LiteralPath (Get-PluginPath $Data $pl))) { $missing.Add($pl) } }
 if ($missing.Count -gt 0) {
     Bad ("{0} plugin(s) the list enables are not in {1}: {2}" -f $missing.Count, $Data, ($missing -join ', '))
 } else {
@@ -1024,7 +1017,7 @@ function Get-BsaCached([string]$name) {
 
 $localised = @{}
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $head = New-Object byte[] 12
     $fs = [System.IO.File]::OpenRead($path)
@@ -1093,7 +1086,7 @@ $fromEdid = New-Object 'System.Collections.Generic.List[string]'
 $overrides = 0
 
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }
@@ -1214,7 +1207,7 @@ Ok ("{0} distinct produce records to resolve" -f $wanted.Count)
 # and a base item is never in one.
 $produce = @{}
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { continue }

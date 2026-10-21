@@ -80,7 +80,7 @@ Yes '  but from the REST list of releases, drafts included' ($dl.Contains('repos
 Yes '  and by asset id, as application/octet-stream' ($dl.Contains("'Accept: application/octet-stream', `"repos/`$repo/releases/assets/`$(`$a.id)`""))
 Yes '  straight from gh''s standard output into the file, not through a PowerShell redirect' ($dl.Contains('$p.StandardOutput.BaseStream.CopyTo($to)') -and $dl.Contains('[IO.File]::Create($path)'))
 
-$onWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
+. (Join-Path $PSScriptRoot 'Windows.ps1')   # $OnWindows (#2957)
 
 function Run-Git {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'

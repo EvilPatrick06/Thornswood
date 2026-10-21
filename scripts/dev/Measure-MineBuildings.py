@@ -84,6 +84,8 @@ _spec = importlib.util.spec_from_file_location('door_table', os.path.join(HERE, 
 dt = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(dt)
 
+import own_plugins  # noqa: E402
+
 # Record flags. A deleted reference is gone from the world. An initially
 # disabled one is placed but not there until something enables it, so it is
 # counted and said, rather than hidden or passed off as a vein anybody can see.
@@ -225,16 +227,8 @@ def main():
     doors = json.load(io.open(args.doors, encoding='utf-8'))
     claimable = set(by_door.values())
 
-    order = list(dt.MASTERS)
-    for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if line.startswith('*'):
-            line = line[1:]
-        if line not in order:
-            order.append(line)
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    order = own_plugins.load_order(args.plugins)
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d plugin(s) are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))
@@ -246,7 +240,7 @@ def main():
     cells, worlds, veins, removed = {}, {}, {}, set()
     failed = 0
     for name in order:
-        pl = dt.Plugin(os.path.join(args.data, name), name)
+        pl = dt.Plugin(own_plugins.plugin_path(args.data, name), name)
         if not pl.ok:
             continue
         # Only a vein's cell needs a name a person would know, and only when the

@@ -93,9 +93,11 @@ foreach ($f in $Build, $Lib, (Join-Path $Repo 'scripts\release\Ship-Rules.ps1'),
     Yes ("$(Split-Path -Leaf $f) parses") (@($e).Count -eq 0)
 }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the runs: the stand-ins for the two tools are .NET Framework programs, built with the .NET Framework csc, which only Windows has'; Done }
 $csc = @(
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
-    (Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
+    (Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'),
+    (Get-WindowsPath 'Microsoft.NET\Framework\v4.0.30319\csc.exe')
 ) | Where-Object { Test-Path -LiteralPath $_ } | Select-Object -First 1
 Yes 'the .NET Framework csc is here to build the stand-ins' ([bool]$csc)
 if (-not $csc) { Done }

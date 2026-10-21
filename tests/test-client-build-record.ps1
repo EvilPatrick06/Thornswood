@@ -32,6 +32,13 @@ param([string]$Scratch)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repoRoot = Split-Path -Parent $Here
@@ -143,7 +150,7 @@ try {
     function Run([string]$dist, [string]$cl, [string]$recorder = $script) {
         $out = Join-Path $root ('rec-' + [guid]::NewGuid().ToString('N').Substring(0, 6) + '.json')
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        $o = (& powershell -NoProfile -ExecutionPolicy Bypass -File $recorder -Dist $dist -Clone $cl -Out $out 2>&1 | Out-String)
+        $o = (& $winPs -NoProfile -ExecutionPolicy Bypass -File $recorder -Dist $dist -Clone $cl -Out $out 2>&1 | Out-String)
         $code = $LASTEXITCODE; $ErrorActionPreference = $eap
         [pscustomobject]@{ Code = $code; Out = $o; Path = $out; Doc = $(if (Test-Path -LiteralPath $out) { Get-Content -LiteralPath $out -Raw | ConvertFrom-Json } else { $null }) }
     }

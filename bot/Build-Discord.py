@@ -37,7 +37,9 @@
        Administrator, and Discord refuses that from a bot without it.
     5. Server Settings, Enable Community. Without it there are no forum
        channels, no announcement channels and no rules screen, and this falls
-       back to plain text channels for those.
+       back to plain text channels for those. That screen asks for a
+       Community Updates and a Safety Notifications channel: take what it
+       offers, and the next run of this moves both to #staff-updates.
 
   The bot needs to be ABOVE the roles it creates, so drag its own role to the
   top of the role list once it has joined.
@@ -325,7 +327,7 @@ NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 # (#1407): widening a mode widens every channel that uses it, so the lead
 # gamemaster role gets the one channel it needs by name, on that channel's own
 # line, through extra_roles. Both still see every hold through HOLD_STAFF.
-# Moving either of them in here is a line in #staff-general first, because it
+# Moving either of them in here is a line in #staff-updates first, because it
 # opens #reports and every other staff channel.
 STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
 
@@ -548,7 +550,8 @@ PLAN = [
         topic='Nobody else can see this.'),
    dict(kind='voice', name='Staff Room',    mode='staff'),
    # Gone from the server. Named here so prune leaves them alone, never made
-   # again: #staff-general and #dev-test-results carry all three now.
+   # again: #staff-updates, #staff-general and #dev-test-results carry all
+   # three now.
    dict(kind='text',  name='dev-notes',     mode='staff', make=False,
         topic='What we\u2019re on, and what broke doing it.'),
    dict(kind='text',  name='deploys',       mode='staff', make=False,
@@ -1185,6 +1188,58 @@ async def apply_welcome_and_afk(guild, found):
         say('note', 'could not set the AFK channel')
 
 
+# Discord's own notices about the server (#2955): Community Updates and Safety
+# Notifications, the second about raids, DM spam and moderation, some of it
+# about named people. Both go to #staff-updates, where staff notices go
+# (Patrick, 20 Oct), and never to #staff-general, which is for talk. By the id
+# in staff-channel.txt, the one bot.py speaks in, not by name: a name can be
+# two channels. They were a hand step on the Enable Community screen, written
+# up in the README as #staff-general, until this set them from the plan.
+STAFF_CHANNEL_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                                  'staff-channel.txt')
+
+
+async def apply_notice_channels(guild):
+    """Points Discord's Community Updates and Safety Notifications channels at
+    #staff-updates.
+
+    Neither field exists until Community is on, and the closing lines of a
+    run already say to turn it on and run again, so a server without it is
+    left alone. Under -Check this says would change only when either one
+    points somewhere else, and it never says set. What it cannot do goes
+    under "did not manage" with the reason.
+    """
+    if 'COMMUNITY' not in set(getattr(guild, 'features', []) or []):
+        return
+    what = "Discord's own community and safety notices"
+    try:
+        with open(STAFF_CHANNEL_FILE, encoding='utf-8') as f:
+            want_id = int(f.read().strip())
+    except (OSError, ValueError) as e:
+        failed.append('%s: staff-channel.txt gives no channel id (%s)' % (what, e))
+        return
+    want = guild.get_channel(want_id)
+    if want is None:
+        failed.append('%s: this server has no channel %d, the id in '
+                      'staff-channel.txt' % (what, want_id))
+        return
+    have = (getattr(guild.public_updates_channel, 'id', None),
+            getattr(guild.safety_alerts_channel, 'id', None))
+    if have == (want_id, want_id):
+        say('left alone', '%s already go to #%s' % (what, want.name))
+        return
+    if CHECK:
+        say('would change', '%s to #%s' % (what, want.name))
+        return
+    try:
+        await guild.edit(public_updates_channel=want, safety_alerts_channel=want,
+                         reason='Thornswood setup')
+    except discord.HTTPException as e:
+        failed.append('%s: could not move them to #%s (%s)' % (what, want.name, refused(e)))
+        return
+    say('set', '%s go to #%s' % (what, want.name))
+
+
 @client.event
 async def on_ready():
     try:
@@ -1295,7 +1350,7 @@ async def on_ready():
                     print('             #' + ch.name)
                 print('             -Prune is what deletes them, and a channel')
                 print('             somebody is using belongs in the plan')
-                print('             instead. Ask in #staff-general first.')
+                print('             instead. Ask in #staff-updates first.')
 
         print('')
         if CHECK:
@@ -1325,6 +1380,7 @@ async def on_ready():
                 failed.append('the news webhook (no permission)')
 
         await apply_welcome_and_afk(guild, found)
+        await apply_notice_channels(guild)
 
         print('\n  made %d, already there %d' % (len(made), len(kept)))
         if failed:
@@ -1343,7 +1399,7 @@ async def on_ready():
                 print('  at #rules. Nothing makes people accept them until you do.')
             if not PRUNE:
                 print('  Nothing was deleted. -Prune is what deletes, and it')
-                print('  goes through #staff-general before anybody runs it.')
+                print('  goes through #staff-updates before anybody runs it.')
         print('')
         # Only after a real build that did all it set out to. After -Check
         # nothing was built, and after a failure the run that fixes it still

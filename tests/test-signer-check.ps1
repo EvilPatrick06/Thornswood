@@ -66,14 +66,10 @@ param([string]$Signed = 'C:\Thornswood-DevBuild\Launcher\Thornswood.exe')
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
 if ($PSVersionTable.PSEdition -eq 'Core') {
-    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not (Test-Path -LiteralPath $winps)) {
-        Write-Host 'FAIL  Windows PowerShell is here to run this on the .NET Framework the launcher runs on'
-        Write-Host ''
-        Write-Host '0 passed, 1 failed'
-        exit 1
-    }
+    $winps = Get-WindowsPowerShell
     & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Signed $Signed
     exit $LASTEXITCODE
 }
@@ -125,7 +121,7 @@ Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBui
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
 # Programs Microsoft signed that every Windows has, for the refusals below;
 # nothing is compiled with them.
-$fw = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319'
+$fw = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319'
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('tssigner-' + [Guid]::NewGuid().ToString('N'))
 $null = New-Item -ItemType Directory -Force -Path $tmp
@@ -285,7 +281,7 @@ try {
         (Join-Path $fw 'csc.exe'),
         (Join-Path $fw 'MSBuild.exe'),
         (Join-Path $env:ProgramFiles 'Windows Defender\MpCmdRun.exe'),
-        (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')
+        (Get-WindowsPath 'System32\WindowsPowerShell\v1.0\powershell.exe')
     )
     foreach ($c in $candidates) {
         if (-not (Test-Path -LiteralPath $c)) { continue }
@@ -418,14 +414,14 @@ try {
         # Trust uses WTD_CHOICE_FILE, so catalogs are never honoured.
         $catalogOnly = $null
         foreach ($c in @(
-            (Join-Path $env:WINDIR 'System32\notepad.exe'),
-            (Join-Path $env:WINDIR 'System32\cmd.exe'),
-            (Join-Path $env:WINDIR 'System32\conhost.exe'),
-            (Join-Path $env:WINDIR 'System32\svchost.exe'),
-            (Join-Path $env:WINDIR 'explorer.exe'),
-            (Join-Path $env:WINDIR 'System32\ntdll.dll'),
-            (Join-Path $env:WINDIR 'System32\kernel32.dll'),
-            (Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe')
+            (Get-WindowsPath 'System32\notepad.exe'),
+            (Get-WindowsPath 'System32\cmd.exe'),
+            (Get-WindowsPath 'System32\conhost.exe'),
+            (Get-WindowsPath 'System32\svchost.exe'),
+            (Get-WindowsPath 'explorer.exe'),
+            (Get-WindowsPath 'System32\ntdll.dll'),
+            (Get-WindowsPath 'System32\kernel32.dll'),
+            (Get-WindowsPath 'System32\WindowsPowerShell\v1.0\powershell.exe')
         )) {
             if (-not (Test-Path -LiteralPath $c)) { continue }
             $catSig = Get-AuthenticodeSignature -LiteralPath $c

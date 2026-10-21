@@ -51,6 +51,7 @@ import struct
 import sys
 
 import bsa
+import own_plugins
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -89,18 +90,6 @@ def creation_records():
 
 def u32(b, off=0):
     return struct.unpack_from('<I', b, off)[0]
-
-
-def load_order(plugins_txt):
-    order = list(MASTERS)
-    for line in io.open(plugins_txt, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line.startswith('*'):
-            continue
-        line = line[1:].strip()
-        if line.lower() not in [o.lower() for o in order]:
-            order.append(line)
-    return order
 
 
 def read(pl, rank, recs):
@@ -207,8 +196,8 @@ def main():
     ap.add_argument('--gamemode', default=os.path.join(HERE, '..', '..', 'game', 'gamemode.js'))
     a = ap.parse_args()
 
-    order = load_order(a.plugins)
-    missing = [n for n in order if not os.path.isfile(os.path.join(a.data, n))]
+    order = own_plugins.load_order(a.plugins)
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(a.data, n))]
     if missing:
         print('STOP. %d plugin(s) are not in %s: %s' % (len(missing), a.data, ', '.join(missing[:6])))
         return 1
@@ -216,7 +205,7 @@ def main():
     rank = dict((n.lower(), i) for i, n in enumerate(order))
     recs, failed = {}, 0
     for name in order:
-        pl = Plugin(os.path.join(a.data, name), name)
+        pl = Plugin(own_plugins.plugin_path(a.data, name), name)
         if not pl.ok:
             continue
         pl.masters = [canon.get(m.lower(), m) for m in pl.masters]

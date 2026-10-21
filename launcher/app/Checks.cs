@@ -1102,12 +1102,52 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                     // are exactly the ones that need closing: one of them left
                     // holding the profile folder is what makes the next launch
                     // fail with access denied.
-                    if (!skip && Where(p) == false) skip = true;
+                    //
+                    // But a path we cannot read is also every process of another
+                    // Windows account. The build runners on the box are eight
+                    // accounts, and one runner's stand-in Skyrim made another
+                    // runner's Scan see a running game (#2856). So an unreadable
+                    // one counts only while this build's own file of that name is
+                    // running, which is told from the folder's side and needs no
+                    // access to the process. A game of ours that fell over but is
+                    // still there still has that file open, so it still counts.
+                    if (!skip)
+                    {
+                        bool? at = Where(p);
+                        if (at == false || (at == null && !OwnImageRunning(n))) skip = true;
+                    }
                     if (skip) { try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.GameProcesses, dispose", ex); } }
                     else l.Add(p);
                 }
             }
             return l;
+        }
+
+        /// <summary>
+        /// False only when this build's own Game\name.exe is provably not
+        /// running, told from the folder's side: Windows will not open a
+        /// running program's file for writing, which is how the scripts tell
+        /// the same thing (#2233, #2412). Needs no access to the process, so it
+        /// answers for a game whose path cannot be read. A file that is gone is
+        /// not running. A file that is there and cannot be opened for writing
+        /// is running, or says nothing either way, and then the game counts, as
+        /// every unreadable one did before #2856.
+        /// </summary>
+        static bool OwnImageRunning(string name)
+        {
+            if (string.IsNullOrEmpty(Paths.Game)) return false;
+            string path = Path.Combine(Paths.Game, name + ".exe");
+            try
+            {
+                if (!File.Exists(path)) return false;
+                using (new FileStream(path, FileMode.Open, FileAccess.ReadWrite, FileShare.ReadWrite)) { }
+                return false;
+            }
+            catch (FileNotFoundException) { return false; }
+            catch (DirectoryNotFoundException) { return false; }
+            catch (IOException) { return true; }
+            catch (UnauthorizedAccessException) { return true; }
+            catch (Exception ex) { Swallow.Note("Checks.OwnImageRunning", ex); return true; }
         }
 
         static void Release(List<Process> ps)
@@ -1318,7 +1358,10 @@ l.Add(new Check("Steam", SteamRunning(), "running"));
                 foreach (Process p in found)
                 {
                     // Only a path we could actually read counts as somebody
-                    // else's game. Anything else stays our problem.
+                    // else's game. One we cannot read is ours while this
+                    // build's own file of that name runs (GameProcesses), and
+                    // otherwise another Windows account's (#2856), which runs
+                    // under that account's Steam, not this player's.
                     bool foreign = Where(p) == false;
                     try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.OtherSkyrimRunning, dispose", ex); }
                     if (foreign) return true;

@@ -63,6 +63,10 @@ param(
     [switch]   $NoInstall
 )
 
+# Thornswood's own plugins are read from game\content, every other plugin
+# from -Data (#2923, OwnPlugins.ps1).
+. (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+
 # ---------------------------------------------------------------- knobs ----
 # classes.md is the rulebook. It settles who may mine and that rank decides
 # what a source gives, and it settles nothing below. These are the judgement
@@ -417,40 +421,23 @@ if (-not (Test-Path -LiteralPath $Data)) { throw "not found: $Data" }
 $before = Get-FolderPrint $Data
 Ok ("{0}: {1} files before this ran, {2}" -f $Data, $before.Count, $before.Hash.Substring(0, 16))
 
-# Bethesda's five load before the game reads any list and are never written to
-# plugins.txt, which is why they are put in front of it here rather than
-# expected to be in it.
-$MASTERS_FIRST = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')
 $order = New-Object 'System.Collections.Generic.List[string]'
 if ($Plugins.Count -gt 0) {
     foreach ($p in $Plugins) { if (-not $order.Contains($p)) { $order.Add($p) } }
     Ok ("{0} plugins, given on the command line" -f $order.Count)
 } else {
-    foreach ($p in $MASTERS_FIRST) { $order.Add($p) }
     if (-not (Test-Path -LiteralPath $PluginsTxt)) { throw "not found: $PluginsTxt" }
-    # Vortex marks the plugins that are switched on with '*'. A line without
-    # one is a plugin it knows about and has switched off: the game does not
-    # load it and the server never sees its records, so it is not part of this
-    # build. Until 5 October this read every line and only stripped the '*',
-    # the way Build-RecipeTable.ps1 did before issue #1622. Collection revision
-    # 2 switched off five plugins and left three of them out of the game folder
-    # altogether, so the build stopped on three plugins the game does not load
-    # (issue #1712).
-    $offCount = 0
-    foreach ($line in [System.IO.File]::ReadAllLines($PluginsTxt)) {
-        $t = $line.Trim()
-        if (-not $t -or $t.StartsWith('#')) { continue }
-        if (-not $t.StartsWith('*')) { $offCount++; continue }
-        $t = $t.Substring(1).Trim()
-        if (-not $t) { continue }
-        if (-not $order.Contains($t)) { $order.Add($t) }
-    }
+    # The five masters, then each '*' line; a line with no '*' is a plugin
+    # switched off, which the game does not load (OwnPlugins.ps1, #1622,
+    # #1712, #2976).
+    foreach ($p in (Get-LoadOrder $PluginsTxt)) { $order.Add($p) }
+    $offCount = (Get-SwitchedOff $PluginsTxt).Count
     Ok ("{0} plugins: the five masters, then {1}" -f $order.Count, $PluginsTxt)
     if ($offCount -gt 0) { Note "$offCount line(s) in that list are switched off and were left out" }
 }
 
 $missing = New-Object 'System.Collections.Generic.List[string]'
-foreach ($p in $order) { if (-not (Test-Path -LiteralPath (Join-Path $Data $p))) { $missing.Add($p) } }
+foreach ($p in $order) { if (-not (Test-Path -LiteralPath (Get-PluginPath $Data $p))) { $missing.Add($p) } }
 if ($missing.Count -gt 0) {
     Bad ("{0} plugin(s) in the load order are not in {1}: {2}" -f $missing.Count, $Data, ($missing -join ', '))
 } else {
@@ -465,7 +452,7 @@ $tables = @{}
 $looseDir = Join-Path $Data 'Strings'
 $bsaFiles = $null
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     # only a plugin flagged localised keeps its names in a string table
     $head = New-Object byte[] 12
@@ -522,7 +509,7 @@ $perType = @{}
 $oreNameFromEdid = 0
 
 foreach ($pl in $order) {
-    $path = Join-Path $Data $pl
+    $path = Get-PluginPath $Data $pl
     if (-not (Test-Path -LiteralPath $path)) { continue }
     $b = [System.IO.File]::ReadAllBytes($path)
     if ([System.Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { Bad "not a plugin: $path"; continue }

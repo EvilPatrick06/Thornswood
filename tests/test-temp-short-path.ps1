@@ -16,6 +16,9 @@
 param()
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the nightly backup runs on the box under Windows PowerShell 5.1, and a short TEMP is an 8.3 name, which only Windows has'; exit 0 }
+$winPs = Get-WindowsPowerShell
 $script:pass = 0
 $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -27,9 +30,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Nightly = Join-Path (Join-Path (Split-Path -Parent $Here) 'scripts\vps') 'vps-nightly-backup.ps1'
 
-$base = 'C:\ThornswoodTemps&Worktrees\temp'
-if (-not (Test-Path -LiteralPath $base)) { $base = [IO.Path]::GetTempPath() }
-$work = Join-Path $base ('longtemp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+$work = & (Join-Path (Split-Path -Parent $Here) 'scripts\release\Get-ScratchDir.ps1') ('longtemp-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $long = Join-Path $work 'LongTempNameForShortPath'
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
@@ -72,7 +73,7 @@ try {
         '-KeyFile', (Join-Path $short 'key.txt'),
         '-Plain'
     )
-    $nightlyOut = & powershell.exe @arg 2>&1 | Out-String
+    $nightlyOut = & $winPs @arg 2>&1 | Out-String
     $code = $LASTEXITCODE
     Yes "vps-nightly-backup.ps1 runs with TEMP short (exit $code)" ($code -eq 0)
     if ($code -ne 0) { Write-Host $nightlyOut }

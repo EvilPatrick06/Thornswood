@@ -28,6 +28,8 @@ param()
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $engine = Join-Path $root 'scripts\release\Build-Engine.ps1'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  a build''s drive letter is a subst, and the stand-in build a cmd.exe run, and only Windows has either'; exit 0 }
 
 $script:pass = 0
 $script:fail = 0
@@ -63,7 +65,7 @@ $buildText = @(
     'try {'
     '    if ($m.Drive) {'
     '        $bat = Join-Path $m.Fork ''build.bat'''
-    '        $o = & (Join-Path $env:SystemRoot ''System32\cmd.exe'') /d /c (''"'' + $bat + ''" '' + ($Seconds * 2)) 2>&1'
+    '        $o = & ''__CMD__'' /d /c (''"'' + $bat + ''" '' + ($Seconds * 2)) 2>&1'
     '        $res.Exit = $LASTEXITCODE'
     '        $res.Reads = @($o | Where-Object { "$_" -match ''^read '' }).Count'
     '        $res.Missed = @($o | Where-Object { "$_" -match ''^missed '' }).Count'
@@ -71,6 +73,7 @@ $buildText = @(
     '} finally { Dismount-EngineFork $m }'
     '[IO.File]::WriteAllText($Out, ($res | ConvertTo-Json -Compress))'
 ) -join "`r`n"
+$buildText = $buildText.Replace('__CMD__', (Get-WindowsPath 'System32\cmd.exe').Replace("'", "''"))
 $build = Join-Path $work 'build.ps1'
 [IO.File]::WriteAllText($build, $buildText, (New-Object Text.UTF8Encoding($true)))
 
@@ -98,7 +101,7 @@ function NewFork([string]$name, [string]$cacheLetter) {
     return $f
 }
 function SubstHas([string]$letter) {
-    return [bool](@(& (Join-Path $env:SystemRoot 'System32\subst.exe')) | Where-Object { "$_" -match ('^' + $letter + ':') })
+    return [bool](@(& (Get-WindowsPath 'System32\subst.exe')) | Where-Object { "$_" -match ('^' + $letter + ':') })
 }
 $shell = (Get-Process -Id $PID).Path
 function TwoAtOnce([string]$forkA, [string]$forkB, [switch]$ShortFirst) {

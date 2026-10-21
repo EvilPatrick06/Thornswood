@@ -727,6 +727,14 @@ function Get-CimInstance { [CmdletBinding()] param([Parameter(Position = 0)][str
     if ($ClassName -eq 'Win32_Service') { return [pscustomobject]@{ State = 'Running'; StartName = 'NT SERVICE\ThornswoodBot' } }
     return $script:procs }
 function Stop-Process { [CmdletBinding()] param([int]$Id, [switch]$Force) $script:calls += ('Stop-Process ' + $Id) }
+# The stop and wait (StopAndMove.ps1, which Install-Bot sends in front of
+# Bot-Service.ps1, #2928): opening is taking the id, and ending and waiting
+# is the stop, called in the same order Stop-Process was.
+$ThornswoodNotHeld = @()
+$ThornswoodStillRunning = @()
+function Get-ThornswoodProcessHeld([int[]]$Ids) { @($Ids | Where-Object { $_ -gt 0 -and $_ -ne $PID }) }
+function Stop-ThornswoodProcessHeld($Held) { foreach ($id in @($Held)) { $script:calls += ('Stop-Process ' + $id) } }
+function Get-ThornswoodPathHolders([string]$Path) { 'nothing' }
 function Test-ThornswoodEventSource([string]$Name) { return $false }
 function New-EventLog { [CmdletBinding()] param([string]$LogName, [string]$Source) $script:calls += ('New-EventLog ' + $LogName + ' ' + $Source) }
 function Start-Sleep { }

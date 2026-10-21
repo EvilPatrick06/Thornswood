@@ -24,8 +24,14 @@
     4. Eight runs in separate processes, half under PowerShell 7 and half
        under Windows PowerShell 5.1 where both are here, released at once,
        three times over: every one finishes with the same artifact.
-    5. No .building-* or .unpacking-* is left behind, and the source never
-       Remove-Items the shared folder.
+    5. No .building-* file and no unpacked folder but the one the .folder
+       file names is left behind, and the source never Remove-Items the
+       shared folder.
+
+  Since #2888 a run unpacks into a folder of its own that is never renamed,
+  and what is named is the small <zip basename>.folder file that says which
+  folder is the artifact's; tests\test-2888-artifact-folder-name.ps1 holds
+  that no folder is ever what gets named.
 
   Read only apart from files under its own temp folder.
 #>
@@ -93,10 +99,13 @@ function RecordSame($Want, [string]$Path) {
     }
     return $true
 }
-# What a run must not leave in its folder.
+# What a run must not leave in its folder: a .building-* of its own, or an
+# unpacked folder that no .folder file there names.
 function Leftovers([string]$OutDir) {
+    $named = @(Get-ChildItem -LiteralPath $OutDir -Force -File -Filter '*.folder' -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notlike '.building-*' } | ForEach-Object { ([IO.File]::ReadAllText($_.FullName)).Trim() })
     return @(Get-ChildItem -LiteralPath $OutDir -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like '.building-*' -or $_.Name -like '.unpacking-*' } | ForEach-Object { $_.Name })
+        Where-Object { $_.Name -like '.building-*' -or ($_.PSIsContainer -and $named -notcontains $_.Name) } | ForEach-Object { $_.Name })
 }
 
 $oldCeiling = $env:GIT_CEILING_DIRECTORIES
@@ -226,11 +235,13 @@ try {
     Yes '  and is left exactly as it was' ([IO.File]::ReadAllText($plantedRecord) -eq $wrong)
     Yes '  and nothing of this run is left beside it' ((Leftovers $o4).Count -eq 0)
 
-    # A folder at the name that is short of a file.
+    # A folder the .folder file names that is short of a file.
     $o5 = Join-Path $tmp 'out-short-folder'
     New-Item -ItemType Directory -Force -Path $o5 | Out-Null
-    $shortFolder = Join-Path $o5 ([IO.Path]::GetFileNameWithoutExtension($good.Name))
+    $shortLeaf = [IO.Path]::GetFileNameWithoutExtension($good.Name) + '.' + ('5' * 32)
+    $shortFolder = Join-Path $o5 $shortLeaf
     Put (Join-Path $shortFolder 'game\gamemode.js') 'short'
+    Put (Join-Path $o5 ([IO.Path]::GetFileNameWithoutExtension($good.Name) + '.folder')) $shortLeaf
     $err = $null
     try { Build $o5 | Out-Null } catch { $err = $_ }
     Yes 'a folder at the name short of a file refuses the build' ($null -ne $err -and $err.Exception.Message.Contains($shortFolder))
@@ -317,8 +328,9 @@ try {
     $srcText = Get-Content -LiteralPath $helper -Raw
     Yes 'Artifact.ps1 no longer Remove-Items the shared unpack folder' (
         $srcText -notmatch 'if \(Test-Path -LiteralPath \$folder\) \{ Remove-Item -LiteralPath \$folder -Recurse -Force \}')
-    Yes 'Artifact.ps1 unpacks to a unique .unpacking- staging dir' (
-        $srcText -match '\.unpacking-')
+    Yes 'Artifact.ps1 unpacks into a folder of its own and names its .folder file' (
+        $srcText.Contains('$mine = Join-Path $OutDir ($base + ''.'' + [Guid]::NewGuid()') -and
+        $srcText -match 'Save-ThornswoodArtifactFolderName \$folderName')
 } finally {
     $env:GIT_CEILING_DIRECTORIES = $oldCeiling
     if (Test-Path -LiteralPath $tmp) { Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue }

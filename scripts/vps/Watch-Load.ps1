@@ -23,7 +23,7 @@
   CPU, memory and I/O, and when the busiest hour was.
 
   Leave it a week that includes a busy evening before reading anything into
-  it. What to do about the answer is for Patrick and Djinn in #staff-general.
+  it. What to do about the answer is for Patrick and Djinn in #staff-updates.
 
   The collector is its own task, not part of the watchdog, so it can never get
   in the way of a restart. -Remove takes the task off and leaves the record.

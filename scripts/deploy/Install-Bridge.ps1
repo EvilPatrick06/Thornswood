@@ -1,30 +1,32 @@
 <#
   Install-Bridge.ps1
 
-  Puts the box's end of ssh from cloud Claude threads on the VPS (#2753):
-  scripts\vps\bridge\bridge.js, as the task "Thornswood Bridge", listening on
-  127.0.0.1:7790. Caddy hands wss://thornswood.net/box/ to it (the
-  handle_path /box/* block in scripts\deploy\Caddyfile, sent by
-  Setup-Domain.ps1), and it joins each WebSocket that brings its token to the
-  box's own sshd on 127.0.0.1:22. Run it from a machine whose key already
-  works; it does the remote half over ssh.
+  Puts the box's end of ssh on the VPS (#2753, #2891), the way every machine
+  reaches the box's ssh: scripts\vps\bridge\bridge.js, as the task
+  "Thornswood Bridge", listening on 127.0.0.1:7790. Caddy hands
+  wss://thornswood.net/box/ to it (the handle_path /box/* block in
+  scripts\deploy\Caddyfile, sent by Setup-Domain.ps1), and it joins each
+  WebSocket that brings a token it holds to the box's own sshd on
+  127.0.0.1:22. Run it from a machine whose way in already works; it does the
+  remote half over ssh, so a bridge that does not answer is put back as it
+  was before this ends.
 
       .\scripts\deploy\Install-Bridge.ps1            install it, or the newest
                                                      commit of it, and start it
       .\scripts\deploy\Install-Bridge.ps1 -Status    what is there and its log
       .\scripts\deploy\Install-Bridge.ps1 -Remove    take it off again
 
-  Nobody gets through it until scripts\vps\New-CloudAccess.ps1 has written
-  its token (token.txt in -Root) and put the cloud key on the box. With no
-  token.txt every WebSocket is refused, and New-CloudAccess.ps1 -Remove takes
-  both away again.
+  Nobody gets through it until scripts\vps\Grant-BoxAccess.ps1 has given
+  somebody a token (its digest in -Root\tokens, one file per name) and put
+  their key on the box. With no tokens every WebSocket is refused.
+  Grant-BoxAccess.ps1 -Remove takes one name's away again.
 
   WHAT IT RUNS AS. LOCAL SERVICE, Limited, with a SID of its own, like voice
   and Caddy (#2578, ServiceAccount.ps1), after the same fail-safe. The folder
   takes nothing from C:\: SYSTEM, Administrators and whoever runs this, plus
   the task's own SID to read it and write its log, so no other service, all
-  LOCAL SERVICE too, can read the token. -AsSystem registers it as SYSTEM,
-  Highest, the way back if LOCAL SERVICE cannot run it.
+  LOCAL SERVICE too, can read the tokens' digests. -AsSystem registers it as
+  SYSTEM, Highest, the way back if LOCAL SERVICE cannot run it.
 
   WHAT IT SENDS. A commit or nothing (Artifact.ps1, #459, #1121): bridge.js,
   ws.js and Server-Log.js out of HEAD, checked against the commit
@@ -129,8 +131,9 @@ if ($Status) {
 `$ErrorActionPreference = 'SilentlyContinue'
 `$t = Get-ScheduledTask -TaskName '$TaskName'
 if (`$t) { `$i = Get-ScheduledTaskInfo -TaskName '$TaskName'; 'task      ' + `$t.State + ' as ' + `$t.Principal.UserId + ', last ran ' + `$i.LastRunTime + ' result ' + `$i.LastTaskResult } else { 'task      NOT REGISTERED' }
-# Whether a token is there, never what it is.
-if (Test-Path -LiteralPath '$Root\token.txt') { 'token     there, so New-CloudAccess.ps1 has run' } else { 'token     NOT THERE, so every WebSocket is refused' }
+# Whose tokens are there, never what they are.
+`$names = @(Get-ChildItem -LiteralPath '$Root\tokens' -File | ForEach-Object { `$_.Name })
+if (`$names.Count) { 'tokens    for ' + (`$names -join ', ') } else { 'tokens    NONE, so every WebSocket is refused' }
 $SendPlainAnswer
 `$a = Get-PlainAnswer 'http://127.0.0.1:$Port/' 5
 if (`$a.Code -eq 404 -and `$a.Body -eq '$Plain') { 'port      $Port answers as the bridge' }
@@ -144,23 +147,34 @@ if (Test-Path -LiteralPath '$log') { ''; '--- bridge.log, last 15 ---'; Get-Cont
 }
 
 # The task, then anything of ours still running: server-log.js names
-# bridge.log on its command line, and bridge.js is its child.
-$stopIt = @"
+# bridge.log on its command line, and bridge.js is its child. Each found and
+# opened before the task is asked to stop, then waited for until it has
+# exited (StopAndMove.ps1, which goes up in front, #2928), so the port is free
+# and no file is open when the install renames it. Until 20 Oct this waited
+# for the port to close instead, ten seconds at most. Says what it stopped,
+# and leaves in $stopOk whether everything of ours exited and the port is
+# free: a function that returned that as well as saying lines gave its caller
+# the lines, and a stop that failed was never refused.
+$stopIt = [IO.File]::ReadAllText((Join-Path $Here 'StopAndMove.ps1')) + "`r`n" + @"
 function StopIt {
-    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
     `$all = @(Get-CimInstance Win32_Process -Filter "Name='node.exe'" -EA SilentlyContinue)
     `$mine = @(`$all | Where-Object { `$_.CommandLine -and `$_.CommandLine -like ('*' + '$log' + '*') })
+    `$ids = @()
     foreach (`$p in `$mine) {
-        foreach (`$c in @(`$all | Where-Object { `$_.ParentProcessId -eq `$p.ProcessId })) { Stop-Process -Id `$c.ProcessId -Force -EA SilentlyContinue }
-        Stop-Process -Id `$p.ProcessId -Force -EA SilentlyContinue
+        `$ids += [int]`$p.ProcessId
+        `$ids += @(`$all | Where-Object { `$_.ParentProcessId -eq `$p.ProcessId } | ForEach-Object { [int]`$_.ProcessId })
     }
+    `$held = @(Get-ThornswoodProcessHeld `$ids)
+    `$ThornswoodNotHeld
+    Stop-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue
+    Stop-ThornswoodProcessHeld `$held
     if (`$mine.Count) { 'stopped ' + `$mine.Count + ' bridge process(es)' }
-    for (`$i = 0; `$i -lt 20; `$i++) {
-        if (-not (Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue)) { return `$true }
-        Start-Sleep -Milliseconds 500
+    `$script:stopOk = -not @(@(`$ThornswoodStillRunning) + @(`$ThornswoodNotHeld) | Where-Object { `$_ }).Count
+    # Ours have exited, so anything still listening is not ours.
+    if (`$stopOk -and (Get-NetTCPConnection -State Listen -LocalPort $Port -EA SilentlyContinue)) {
+        'something that is not ours is listening on port $Port'
+        `$script:stopOk = `$false
     }
-    'something is still listening on port $Port and would not let go'
-    return `$false
 }
 "@
 
@@ -169,13 +183,13 @@ if ($Remove) {
     Head 'Removing'
     $out = @(Remote @"
 $stopIt
-`$null = StopIt
+StopIt
 Unregister-ScheduledTask -TaskName '$TaskName' -Confirm:`$false -EA SilentlyContinue
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Get-ScheduledTask -TaskName '$TaskName' -EA SilentlyContinue) { 'STILL THERE' } elseif (Test-Path -LiteralPath '$Root') { 'FOLDER STILL THERE' } else { 'REMOVED' }
 "@ | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($out -notcontains 'REMOVED') { Die 'it was not all taken off. The lines above say what is left.' }
-    Say '  Gone, token and all. The cloud key on the box goes with scripts\vps\New-CloudAccess.ps1 -Remove.' 'Green'
+    Say '  Gone, tokens and all. Each key on the box goes with scripts\vps\Grant-BoxAccess.ps1 -Name <name> -Remove.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
     exit 0
 }
@@ -207,7 +221,7 @@ $prev = '.prev-' + $stamp
 $made = @(Remote @"
 `$ErrorActionPreference = 'Stop'
 if (-not (Test-Path -LiteralPath '$Root')) { New-Item -ItemType Directory -Path '$Root' -Force | Out-Null }
-# Nothing from C:\: the token is in here (the header says why).
+# Nothing from C:\: the tokens' digests are in here (the header says why).
 try {
   `$broad = @('S-1-1-0', 'S-1-5-11', 'S-1-5-32-545', 'S-1-5-19')
   `$acl = Get-Acl -LiteralPath '$Root'
@@ -304,7 +318,8 @@ function Answers([string[]]`$Lines) {
     return `$false
 }
 
-if (-not (StopIt)) { 'BRIDGE REFUSED'; exit 1 }
+StopIt
+if (-not `$stopOk) { 'BRIDGE REFUSED'; exit 1 }
 New-Item -ItemType Directory -Force -Path '$Root\$prev' | Out-Null
 foreach (`$f in `$want.Keys) {
     `$live = Join-Path '$Root' `$f
@@ -329,12 +344,12 @@ try { & `$node.Source `$writer --log '$log' --days 90 --roll } catch { 'could no
 Start-ScheduledTask -TaskName '$TaskName'
 if (Answers @('$Plain')) {
     'the bridge answers on 127.0.0.1:$Port'
-    if (-not (Test-Path -LiteralPath '$Root\token.txt')) { 'there is no token.txt yet, so it refuses everybody until New-CloudAccess.ps1 runs' }
+    if (-not @(Get-ChildItem -LiteralPath '$Root\tokens' -File -EA SilentlyContinue).Count) { 'there are no tokens yet, so it refuses everybody until Grant-BoxAccess.ps1 gives somebody one' }
     'BRIDGE OK'; exit 0
 }
 'it did not answer on 127.0.0.1:$Port within $Wait seconds. bridge.log says:'
 if (Test-Path -LiteralPath '$log') { Get-Content -LiteralPath '$log' -Tail 15 } else { 'nothing was written' }
-`$null = StopIt
+StopIt
 `$back = @(Get-ChildItem -LiteralPath '$Root\$prev' -File -EA SilentlyContinue)
 foreach (`$f in `$back) { Move-Item -LiteralPath `$f.FullName -Destination (Join-Path '$Root' `$f.Name) -Force }
 if (`$oldXml) {

@@ -127,11 +127,12 @@ $r = Get-RehearsalPorts 0 0 @(Get-ReservedPorts @()) $all
 Yes 'every game port busy: refused, saying name one with -Port' ($r.Why -match 'Name one with -Port')
 
 # ---- 2. the real script, run whole -------------------------------------------
-$ps51 = $(if ($env:SystemRoot) { Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' } else { '' })
-if (-not $ps51 -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the whole runs need Windows PowerShell 5.1, which runs these on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the whole runs need Windows PowerShell 5.1, which runs these on the VPS; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 $utf8 = New-Object Text.UTF8Encoding($false)
 function Put([string]$path, [string]$body) {
     [void][IO.Directory]::CreateDirectory((Split-Path -Parent $path))

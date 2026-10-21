@@ -30,6 +30,13 @@ param([string]$Temp)
 $env:THORNSWOOD_HARNESS = '1'
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $Repo = Split-Path -Parent $PSScriptRoot
 $publish = Join-Path $Repo 'scripts\release\Publish-Server.ps1'
 $setDoor = Join-Path $Repo 'scripts\ops\Set-Door.ps1'
@@ -99,7 +106,7 @@ function Seed([string]$case, [string]$liveSite, [bool]$liveDoor = $true, [bool]$
     }
     $s = $seed.Replace("'C:\Thornswood-Server\private'", "'" + $live + "'").Replace('@@DEVROOT@@', $devRoot)
     $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($s))
-    $out = & powershell.exe -NoProfile -EncodedCommand $enc 2>&1
+    $out = & $winPs -NoProfile -EncodedCommand $enc 2>&1
     return @{ out = @($out | ForEach-Object { [string]$_ }); dev = (Join-Path $devRoot 'private'); code = $LASTEXITCODE }
 }
 function Quiet($r) {

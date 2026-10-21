@@ -35,7 +35,8 @@
   never goes to GitHub. Backups is local\backups, where Backup-Server.ps1 and
   Fetch-Backups.ps1 put what they bring off the VPS and Clean-Everything.ps1
   looks for old ones. Patrick's rule that day: Thornswood work on One lives
-  only in the repository, the vault and C:\ThornswoodTemps&Worktrees, and the
+  only in the repository, the vault and C:\ThornswoodTemps&Worktrees (moved
+  into the repository's temp and worktrees on 20 Oct, #2900), and the
   backups were the last of it in Downloads\Thornswood-Backups. A worktree has
   a local folder of its own that goes with it, so the scripts that write
   backups stop when this answer is inside a worktree rather than leave the
@@ -55,7 +56,7 @@
   launcher there and then stopped at its generated files. ShipRoots is the
   file in this machine's own data (not in the repository, so every clone and
   worktree reads it) that names the folder for a channel, as
-  {"dev": "C:\\Users\\evilp\\Downloads\\Thornswood-Repo\\local\\release-devbuild"}
+  {"dev": "C:\\Thornswood-Repo\\local\\release-devbuild"}
   on One since 5 October; Setup-ShipMachine.ps1 -Root writes it. A channel
   it does not name is the rule above. These three are this machine's, and
   only the PowerShell release scripts ask, so where.js does not answer them.
@@ -107,13 +108,24 @@ $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent (Split-Path -Parent $here)
 
-$layoutPath = Join-Path $repo 'layout.json'
-if (-not (Test-Path -LiteralPath $layoutPath)) {
-    throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
+# layout.json, read the first time a place or folder of the repository is
+# asked for. This machine's own places (MachineData and the files under it)
+# come from the platform and never from it, so asking for one of those does
+# not need it (#2903): Publish-Update, Publish-Discord and Package-Thornswood
+# ask Where.ps1 for them since then, and run in harnesses from a copy of the
+# scripts with no layout.json beside them.
+$script:layout = $null
+function Get-Layout {
+    if ($null -ne $script:layout) { return $script:layout }
+    $layoutPath = Join-Path $repo 'layout.json'
+    if (-not (Test-Path -LiteralPath $layoutPath)) {
+        throw "layout.json is not at $layoutPath. It is in the repository, so the path is wrong."
+    }
+    $layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
+    if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
+    try { $script:layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
+    return $script:layout
 }
-$layoutText = "$(Get-Content -LiteralPath $layoutPath -Raw -Encoding UTF8)"
-if (-not $layoutText.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "layout.json at $layoutPath is empty." }
-try { $layout = $layoutText.TrimStart([char]0xFEFF) | ConvertFrom-Json } catch { throw ("layout.json at $layoutPath is not valid JSON: " + $_.Exception.Message) }
 
 # This machine's own data (feed copies, ship-roots.json, engine-build.json):
 # %LOCALAPPDATA%\Thornswood, which tests point elsewhere by setting it. Off
@@ -202,6 +214,8 @@ function Get-EngineBuild {
 function Get-Place([string]$name) {
     switch ($name) {
         'Repo'   { return $repo }
+        # This machine's own data, the folder below (#2903).
+        'MachineData' { return Get-MachineData }
         # This machine's working copies of the feeds (Feed-Store.ps1, #907),
         # not clones of Thornswood-Releases beside the repository any more.
         'Releases'    { return Join-Path (Get-MachineData) 'feed\main' }
@@ -217,9 +231,9 @@ function Get-Place([string]$name) {
         'EngineBuilds' { return Join-Path (Get-MachineData) 'engine-build.json' }
         'EngineBuild'  { return Get-EngineBuild }
     }
-    $place = Get-Named $layout.places $name
+    $place = Get-Named (Get-Layout).places $name
     if ($null -ne $place) { return Join-Under $repo ([string]$place) }
-    $der = Get-Named $layout.derived $name
+    $der = Get-Named (Get-Layout).derived $name
     if ($null -ne $der) {
         $base = Get-Place ([string]$der.from)
         return Join-Under $base ([string]$der.join)
@@ -227,18 +241,17 @@ function Get-Place([string]$name) {
     return $null
 }
 
-$placeNames = @('Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+$placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
                 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
-$folderNames = @($layout.folders.PSObject.Properties.Name)
-
 if ($placeNames -contains $What) {
     Get-Place $What
 }
-elseif ($folderNames -contains $What) {
-    Join-Under $repo ([string](Get-Named $layout.folders $What))
+elseif (@((Get-Layout).folders.PSObject.Properties.Name) -contains $What) {
+    Join-Under $repo ([string](Get-Named (Get-Layout).folders $What))
 }
 else {
+    $folderNames = @((Get-Layout).folders.PSObject.Properties.Name)
     $known = ($placeNames + $folderNames) -join ', '
     throw "Where.ps1 does not know '$What'. Known: $known"
 }

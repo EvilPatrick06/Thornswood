@@ -26,9 +26,12 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-$ps = $null
-$cmd = Get-Command powershell.exe -ErrorAction SilentlyContinue
-if ($cmd) { $ps = $cmd.Source } else { $ps = (Get-Command pwsh).Source }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $ps = Get-WindowsPowerShell }
+else {
+    $ps = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 
 $scratch = Join-Path ([IO.Path]::GetTempPath()) ('ts-test-2061-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $vps = Join-Path $scratch 'vps'

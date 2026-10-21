@@ -647,6 +647,100 @@ POULTICE_VALUE, POULTICE_WEIGHT = 5, 0.2
 REMEDY_VALUE, REMEDY_WEIGHT = 15, 0.2
 
 # ---------------------------------------------------------------------------
+# TEA AND THE DRUNK SCREEN (#1382, Patrick's decisions 3 and 4 of 12 October
+# 2026). Their form ids are 0x5018000 on, a range no version of this plugin
+# has used, kept apart from the stations (0x5015500 on) and the furniture
+# (0x5016000 on).
+#
+# TEA. docs/systems/exhaustion.md, A stimulant: "A tea holds the rest drain at
+# half for 20 real minutes, then costs 15 rest". No record in the load order
+# was a tea, so Patrick's decision 4 adds tea items to this plugin, brewable at
+# a cooking pot. The server knows them by game\data\food-groups.json (group
+# tea) and does the holding and the crash; the record only has to be something
+# a person drinks. Each is two of one herb a gatherer brings in at novice or
+# advanced (game\data\harvests.json), at the cooking pot, as Skyrim's own soups
+# are made: the pot holds the water, no recipe of Skyrim's asks for it.
+#
+# Every ALCH in the five masters carries at least one effect, so a tea carries
+# one too: ThornswoodTeaSteepEffect, a script effect with no script, which does
+# nothing in the game. It says on the item what the server does. Its DATA is
+# Skyrim.esm's VoiceStormCallEmptyAIScriptEffect (MGEF 0xECEB5): a script
+# effect with no script, fire and forget, on the self. Its own flags say no
+# duration, no magnitude and no area, and it is not hidden.
+TEA_EFFECT = 0x5018000
+TEA_EFFECT_FLAGS = 0x00000E00
+TEA_EFFECT_WORDS = ('Rest drains at half for 20 minutes. When that is over, '
+                    '15 rest is owed. A second cup in the window starts it again and owes it again.')
+# VoiceStormCallEmptyAIScriptEffect's DATA as Skyrim.esm has it; the flags, its first four
+# bytes, are written over with TEA_EFFECT_FLAGS where the record is made.
+TEA_EFFECT_DATA = bytes.fromhex(
+    '008000000000000000000000ffffffffffffffff000000000000000000000000000000000000000000000000'
+    '000000000000000000000000000000000000000001000000ffffffff00000000000000000100000000000000'
+    'ffffffff00000000000000000000000000000000000000000000803f00000000000000000000000000000000'
+    '0000000000000000010000000000484200007042')
+TEA_MODEL = 'Clutter\\GlazedCup01.nif'          # Skyrim's GlazedCup01 (MISC 0xB9BDC)
+TEA_BOUNDS = (-5, -5, 0, 5, 5, 10)              # the cup's own
+TEA_VALUE, TEA_WEIGHT = 5, 0.5
+VENDOR_ITEM_FOOD = 0x0008CDEA                   # VendorItemFood, every drink of Skyrim's carries it
+TEA_PICK_UP = 0x000FC21F                        # the jug of milk's pick up sound (BYOHFoodMilk YNAM)
+TEA_DRINK = 0x0010E2EA                          # the jug of milk's drinking sound (BYOHFoodMilk ENIT)
+COOKPOT_KEYWORD = 0x000A5CB3                    # CraftingCookpot, NEEDS.cookKeyword in gamemode.js
+LAVENDER = 0x00045C28                           # a gatherer's at novice
+JUNIPER_BERRIES = 0x0005076E                    # a gatherer's at novice
+SNOWBERRIES = 0x0001B3BD                        # a gatherer's at advanced
+TEAS = (
+    # item       recipe     editor id                    name               herb
+    (0x5018001, 0x5018011, 'ThornswoodFoodTeaLavender', 'Lavender Tea', LAVENDER),
+    (0x5018002, 0x5018012, 'ThornswoodFoodTeaJuniper', 'Juniper Tea', JUNIPER_BERRIES),
+    (0x5018003, 0x5018013, 'ThornswoodFoodTeaSnowberry', 'Snowberry Tea', SNOWBERRIES),
+)
+TEA_HERBS = 2
+
+# THE WELL BUCKET (#1382). Patrick, 12 October 2026: water is drawn at a well
+# by activating it, and the 30 placed wells in the load order are statics,
+# which raise no activation (game\data\wells.json). So the plugin stands a
+# bucket beside each well, an activator wearing Skyrim's wooden bucket
+# (Bucket02a, MISC 0x747FB, its mesh and bounds), and activating it fills an
+# empty bottle at that well (NEEDS.wellActivators in gamemode.js). Where each
+# one stands is game\data\station-sites.json, kind well, measured by
+# scripts\dev\Build-StationSites.py.
+WELL_BUCKET = 0x5018030
+WELL_BUCKET_MODEL = 'Clutter\\Bucket02a.nif'
+WELL_BUCKET_BOUNDS = (-18, -18, 0, 18, 18, 46)
+# THE WATER BUCKET (#1382): the same bucket on a river's or a lake's bank, its
+# own record so the server knows the water drawn there is a river's
+# (NEEDS.riverActivators; Patrick, 20 October 2026: lake water is worth what
+# river water is), placed where game\data\station-sites.json, kind river,
+# measures.
+RIVER_BUCKET = 0x5018031
+
+# THE DRUNK SCREEN. docs/systems/drink.md: from the third ale "the client draws
+# a sway and a soft edge". Skyrim has no drunk image space modifier (measured
+# on #1382, 12 October), so this is Thornswood's own: a little double vision,
+# a little blur, a soft radial blur at the edges and some motion blur, which
+# is what smears into a sway as the head turns. No tint and no colour change.
+# It is not animatable, so it holds its values for as long as it is applied;
+# the front plugin applies it as the one cross fade modifier while the server
+# says the character is drunk, and takes it off when that ends. The layout,
+# every keyed list two keys long, is Skyrim.esm's dunSleepingTreeCampISMD
+# (IMAD 0xE3CBC), the giants' camp haze, which is the same kind of thing: a
+# static modifier held over the screen. The values are this plugin's own.
+DRUNK_IMOD = 0x5018020
+DRUNK_LOOK = {
+    b'BNAM': 0.3,      # blur radius
+    b'VNAM': 0.006,    # double vision strength
+    b'RNAM': 0.12,     # radial blur strength
+    b'SNAM': 0.0,      # radial blur ramp up
+    b'UNAM': 0.35,     # radial blur start: the edges only
+    b'NAM1': 0.0,      # radial blur ramp down
+    b'NAM2': 0.0,      # radial blur down start
+    b'WNAM': 0.0,      # depth of field strength
+    b'XNAM': 0.0,      # depth of field distance
+    b'YNAM': 0.0,      # depth of field range
+    b'NAM4': 0.25,     # motion blur strength
+}
+
+# ---------------------------------------------------------------------------
 # THE SALVAGED RECORDS, REMADE AS THORNSWOOD'S OWN (#2553)
 #
 # Every record below is written by this tool, field by field, from the numbers
@@ -807,6 +901,65 @@ def bench(fid, edid, box, name, model, kws, flags=0, skill=0xFF):
         (b'MNAM', BENCH_MARKERS), (b'WBDT', bytes([1, skill])), (b'FNPR', BENCH_ENTRY)])
 
 
+def drunk_imad():
+    """The drunk screen (#1382): an IMAD laid out the way dunSleepingTreeCampISMD
+    is, every keyed list two keys long, its values DRUNK_LOOK and the rest
+    neutral."""
+    dnam = bytearray(244)
+    struct.pack_into('<If', dnam, 0, 0, 1.0)           # not animatable; a duration of 1
+    for at in list(range(8, 200, 4)) + [212, 216, 220, 228, 232, 236, 240]:
+        struct.pack_into('<I', dnam, at, 2)             # how many keys each list holds
+    struct.pack_into('<ff', dnam, 204, 0.5, 0.5)        # the radial blur's centre: the middle
+
+    def keyed(value):
+        return struct.pack('<4f', 0.0, value, 1.0, value)
+
+    def colour():
+        # Time, red, green, blue, and how much: nothing, at both keys.
+        return struct.pack('<10f', 0.0, 1.0, 1.0, 1.0, 0.0, 1.0, 1.0, 1.0, 1.0, 0.0)
+
+    pairs = [(b'EDID', zstr('ThornswoodDrunkImod')), (b'DNAM', bytes(dnam)),
+             (b'BNAM', keyed(DRUNK_LOOK[b'BNAM'])), (b'VNAM', keyed(DRUNK_LOOK[b'VNAM'])),
+             (b'TNAM', colour()), (b'NAM3', colour())]
+    for tag in (b'RNAM', b'SNAM', b'UNAM', b'NAM1', b'NAM2', b'WNAM', b'XNAM', b'YNAM', b'NAM4'):
+        pairs.append((tag, keyed(DRUNK_LOOK[tag])))
+    # The HDR and cinematic lists: each one a multiply (times one) and an add (nothing).
+    for i in range(21):
+        pairs.append((bytes([i]) + b'IAD', keyed(1.0)))
+        pairs.append((bytes([0x40 + i]) + b'IAD', keyed(0.0)))
+    return own_record(b'IMAD', DRUNK_IMOD, pairs)
+
+
+def needs_records():
+    """Tea, its recipes and its effect, and the drunk screen (#1382)."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    out = [own_record(b'MGEF', TEA_EFFECT, [
+        (b'EDID', zstr('ThornswoodTeaSteepEffect')), (b'FULL', zstr('Steeped')),
+        (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(TEA_EFFECT_WORDS))])]
+    for item, recipe, edid, name, herb in TEAS:
+        out.append(own_record(b'ALCH', item, [
+            (b'EDID', zstr(edid)), (b'OBND', bounds(TEA_BOUNDS)), (b'FULL', zstr(name))] +
+            keywords((VENDOR_ITEM_FOOD,)) + [
+            (b'MODL', zstr(TEA_MODEL)), (b'YNAM', struct.pack('<I', TEA_PICK_UP)),
+            (b'DATA', struct.pack('<f', TEA_WEIGHT)),
+            # Worth, no auto calc and a food item, no addiction, the drinking sound.
+            (b'ENIT', struct.pack('<iIIfI', TEA_VALUE, 0x3, 0, 0.0, TEA_DRINK)),
+            (b'EFID', struct.pack('<I', TEA_EFFECT)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))]))
+    for item, recipe, edid, name, herb in TEAS:
+        out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'),
+                        [(herb, TEA_HERBS)], item, COOKPOT_KEYWORD))
+    out.append(drunk_imad())
+    # The verb on the crosshair says what activating it does.
+    out.append(own_record(b'ACTI', WELL_BUCKET, [
+        (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
+        (b'FULL', zstr('Well Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
+    out.append(own_record(b'ACTI', RIVER_BUCKET, [
+        (b'EDID', zstr('ThornswoodActivatorWaterBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
+        (b'FULL', zstr('Water Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
+    return out
+
+
 def thornswood_records(passage, clam):
     """Every record this tool writes from its own numbers, in the order it
     writes new ones. passage is the Whiterun passage book, Thornswood's own
@@ -917,6 +1070,8 @@ def thornswood_records(passage, clam):
              REMEDY, ALCHEMY_KEYWORD),
         misc(MASTER_KEY, 'ThornswoodMiscMasterKey', 'Master Key', KEY_MODEL, KEY_BOUNDS, 0, 0.0),
     ]
+    # Tea, its recipes and the drunk screen (#1382).
+    out += needs_records()
     # Placeable furniture (#2679), one MISC and one woodworking recipe a row.
     out += furniture_records()
     out += quest_records()
@@ -1102,7 +1257,7 @@ def bethesdas_world_records(masters_dir, plugin_masters, wanted):
 STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                               'game', 'data', 'station-sites.json'))
 STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
-                 ALCHEMY_LAB: 'alchemy labs'}
+                 ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets', RIVER_BUCKET: 'water buckets'}
 STATION_BASES = set(STATION_NAMES)
 QUEST_CONTENT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
                                              'game', 'data', 'quest-content.json'))
@@ -1680,6 +1835,10 @@ def main():
     plugin_masters = masters_of(raw)
     salvaged_hashes = {}
     dropping, bethesdas, remade, same_by_design = set(), set(), set(), set()
+    # A Bethesda's cell or worldspace whose winning master's own bytes the
+    # register hashed: the record may be those bytes even where the salvaged
+    # copy was too (List-SalvagedRecords.py, bethesdaSha256).
+    bethesda_hash = {}
     gone_before = set()
     for row in register['records']:
         fid = local_fid(row['formId'], plugin_masters, args.plugin)
@@ -1699,6 +1858,8 @@ def main():
             dropping.add(fid)
         elif d == "Bethesda's":
             bethesdas.add(fid)
+            if row.get('bethesdaSha256'):
+                bethesda_hash[fid] = row['bethesdaSha256']
         elif d == 'remade':
             remade.add(fid)
             if row.get('sameByDesign'):
@@ -1958,7 +2119,8 @@ def main():
         # One the register says left before #2553 (the skill manuals, the
         # Execution Block and its placement) is refused by its form id too,
         # however it was edited since.
-        salvaged_bytes = body_hash(plain(r)) in salvaged_hashes and r.fid not in same_by_design
+        h = body_hash(plain(r))
+        salvaged_bytes = h in salvaged_hashes and r.fid not in same_by_design and bethesda_hash.get(r.fid) != h
         if r.fid in gone_before or salvaged_bytes:
             print('')
             print('STOP. %s 0x%07X %s is a salvaged record (#2553), by its %s, and the register '
@@ -2184,7 +2346,7 @@ def main():
     left_salvaged = []
     for r in after_records:
         h = body_hash(plain(r))
-        if h in salvaged_hashes and r.fid not in same_by_design:
+        if h in salvaged_hashes and r.fid not in same_by_design and bethesda_hash.get(r.fid) != h:
             left_salvaged.append(r)
     if left_salvaged:
         for r in left_salvaged:

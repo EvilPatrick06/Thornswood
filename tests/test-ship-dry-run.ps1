@@ -279,7 +279,7 @@ try {
     Copy-Item -LiteralPath $ShipPath -Destination (Join-Path $repo 'scripts\release\Ship.ps1') -Force
     # The real files Ship dot-sources, beside it, so it runs as it does for real.
     $realRel = Split-Path -Parent $ShipPath
-    foreach ($n in 'Ship-Rules.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1') {
+    foreach ($n in 'Ship-Rules.ps1', 'ShippedBytes.ps1', 'Assert-PublishSigned.ps1', 'Feed-Store.ps1', 'Feed-Json.ps1', 'Release-Name.ps1', 'Note-Rules.ps1', 'Where.ps1', 'Get-ScratchDir.ps1', 'Read-JsonFile.ps1', 'RecordShape.ps1', 'RepoPlugins.ps1') {
         Copy-Item -LiteralPath (Join-Path $realRel $n) -Destination (Join-Path $repo ('scripts\release\' + $n)) -Force
     }
     Copy-Item -LiteralPath (Join-Path $realRel '..\..\layout.json') -Destination (Join-Path $repo 'layout.json') -Force
@@ -349,6 +349,7 @@ function Get-LoadOrderCopyDiffs([hashtable]$Copies) { return @() }
 [IO.File]::WriteAllText((Join-Path $Root 'Launcher\Thornswood.exe'), 'the launcher this run built')
 '@
     Stub 'Go' '[switch]$SkipServer, [string]$Game, [switch]$Vortex' ''
+    Stub 'Build-Front' '[string]$Fork, [string]$Commit, [string]$Out, [switch]$Record' ''
     Stub 'Sync-Client' '[switch]$Check, [switch]$NoPause, [string]$Game' ''
     # The ship root (#2019): passes unless TS_SHIPROOT_EXIT says otherwise, for N.
     # tests\test-2019-ship-roots.ps1 runs the real one on a stand-in root.
@@ -419,8 +420,8 @@ if (-not $NoPublish) { & (Join-Path $PSScriptRoot 'Publish-Installer.ps1') -OutD
     # PATH before an .exe further along it and runs it with every argument
     # whole. A .cmd gets its arguments through cmd.exe, which ends a command at
     # a bare &, so under C:\ThornswoodTemps&Worktrees (where every temp file on
-    # the shipping machine goes) the gh download's --dir was cut in two and the
-    # real main Ship case went red.
+    # the shipping machine went until #2900) the gh download's --dir was cut
+    # in two and the real main Ship case went red.
     $standIn = @'
 [IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@('NAME') + @($args | ForEach-Object { [string]$_ })) -join ' ') + "`r`n")
 '@

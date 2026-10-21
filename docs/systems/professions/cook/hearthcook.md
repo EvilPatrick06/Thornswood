@@ -82,15 +82,15 @@ Grand Chef's second serving is in the server.
 
 ## Every recipe
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 53 recipes. 53 reach the server. None of them are tempering. The same rows, with ids, are in [cook-hearthcook](../../lists/cook-hearthcook.md).
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 56 recipes. 56 reach the server. None of them are tempering. The same rows, with ids, are in [cook-hearthcook](../../lists/cook-hearthcook.md).
 
 The rank on the row is the rank. It is the dearest ingredient a class produces. An item has no gold price.
 
 ### Names that reach the server
 
-**Novice** (26 names). Baked Potatoes. Beef Stew. Cabbage Soup. Carrot Soup. Clam Chowder. Cooked Beef. Cooked Dog. Cooked Skeever. Goat Roast. Goat Stew. Gourd Soup. Grilled Chicken Breast. Grilled Leeks. Pheasant Roast. Pheasant Stew. Potato Soup. Rabbit Haunch. Rabbit Stew. Roasted Carrots. Roasted Mushrooms. Sack of Flour. Salmon Steak. Slaughterfish Steak. Steamed Mudcrab Legs. Venison Chop. Venison Stew.
+**Novice** (28 names). Baked Potatoes. Beef Stew. Cabbage Soup. Carrot Soup. Clam Chowder. Cooked Beef. Cooked Dog. Cooked Skeever. Goat Roast. Goat Stew. Gourd Soup. Grilled Chicken Breast. Grilled Leeks. Juniper Tea. Lavender Tea. Pheasant Roast. Pheasant Stew. Potato Soup. Rabbit Haunch. Rabbit Stew. Roasted Carrots. Roasted Mushrooms. Sack of Flour. Salmon Steak. Slaughterfish Steak. Steamed Mudcrab Legs. Venison Chop. Venison Stew.
 
-**Advanced** (17 names). Ash Hopper Stew. Ash Yam Soup. Braided Bread. Bread Loaf. Cooked Boar Meat. Eidar Cheese Fondue. Garlic Bread. Goat Cheese Fondue. Horker Loaf. Horker Stew. Horse Haunch. Mammoth Cheese Fondue. Potato Bread. Roasted Glowing Mushroom. Roasted Wild Mushrooms. Roasted Yams. Tomato Soup.
+**Advanced** (18 names). Ash Hopper Stew. Ash Yam Soup. Braided Bread. Bread Loaf. Cooked Boar Meat. Eidar Cheese Fondue. Garlic Bread. Goat Cheese Fondue. Horker Loaf. Horker Stew. Horse Haunch. Mammoth Cheese Fondue. Potato Bread. Roasted Glowing Mushroom. Roasted Wild Mushrooms. Roasted Yams. Snowberry Tea. Tomato Soup.
 
 **Expert** (7 names). Boar Stew. Cabbage Potato Soup. Cabbage and Tomato Soup. Glowing Mushroom Stew. Mushroom Stew. Vegetable Soup. Wild Mushroom Stew.
 
@@ -110,6 +110,8 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Rabbit Haunch | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Raw Rabbit Leg |  | yes | `f430f:Skyrim.esm` |
 | Venison Chop | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Venison |  | yes | `f4311:Skyrim.esm` |
 | Cooked Dog | 1 | novice | Other food and drink | Cookpot | 1 Salt Pile, 1 Dog Meat |  | yes | `8ab:Gourmet.esp` |
+| Juniper Tea | 1 | novice | Other food and drink | Cookpot | 2 Juniper Berries |  | yes | `18012:Thornswood-Content.esp` |
+| Lavender Tea | 1 | novice | Other food and drink | Cookpot | 2 Lavender |  | yes | `18011:Thornswood-Content.esp` |
 | Roasted Mushrooms | 1 | novice | Other food and drink | Cookpot | 1 Garlic, 1 Namira's Rot, 1 Butter |  | yes | `904:Gourmet.esp` |
 | Sack of Flour | 1 | novice | Other food and drink | isGrainMill | 1 Wheat |  | yes | `17ec3:HearthFires.esm` |
 | Cabbage Soup | 1 | novice | Soups | Cookpot | 1 Salt Pile, 1 Cabbage, 1 Leek |  | yes | `3cd5c:Dragonborn.esm` |
@@ -136,6 +138,7 @@ The rank on the row is the rank. It is the dearest ingredient a class produces. 
 | Horse Haunch | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horse Meat |  | yes | `f430c:Skyrim.esm` |
 | Roasted Glowing Mushroom | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Glowing Mushroom, 1 Butter |  | yes | `906:Gourmet.esp` |
 | Roasted Wild Mushrooms | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Scaly Pholiota, 1 Butter |  | yes | `905:Gourmet.esp` |
+| Snowberry Tea | 1 | advanced | Other food and drink | Cookpot | 2 Snowberries |  | yes | `18013:Thornswood-Content.esp` |
 | Ash Yam Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Garlic, 1 Horker Meat, 1 Ash Yam |  | yes | `3cd5d:Dragonborn.esm` |
 | Tomato Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Tomato, 1 Leek |  | yes | `f4318:Skyrim.esm` |
 | Ash Hopper Stew | 1 | advanced | Stews | Cookpot | 1 Salt Pile, 1 Frost Mirriam, 1 Ash Hopper Meat, 1 Ash Hopper Leg |  | yes | `81b:Gourmet.esp` |
