@@ -20,6 +20,9 @@
     - -NoVerify: nothing checked, says so, passes
     - a short copy is set aside too, and a set-aside file is fetched again
       on the next run rather than taken for a copy already here
+    - the box is told the newest copy that opened, into offbox.txt in the
+      watchdog's folder (#2755); never one nobody opened, and a box that
+      does not take it fails the run
 
   Runs under Windows PowerShell 5.1 and PowerShell 7. No network, no VPS,
   nothing outside a scratch folder under the temp folder.
@@ -44,9 +47,24 @@ $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-fetch-verify-' + [guid
 $bin = Join-Path $root 'bin'
 $null = New-Item -ItemType Directory -Force -Path $bin
 
-# The fake ssh prints the listing in FAKE_LIST; the fake scp copies from
+# The fake ssh prints the listing in FAKE_LIST, or, asked to write
+# offbox.txt, writes the name it was given into FAKE_MARK and says MARKED
+# (nothing at all when FAKE_MARK_REFUSE is set); the fake scp copies from
 # FAKE_SRC, and copies only FAKE_SHORT_BYTES bytes of the file FAKE_SHORT.
-Set-Content -LiteralPath (Join-Path $bin 'ssh.cmd') -Encoding ASCII -Value '@type "%FAKE_LIST%"'
+Set-Content -LiteralPath (Join-Path $bin 'ssh.ps1') -Encoding ASCII -Value @'
+$cmd = '' + $args[-1]
+$said = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($cmd.Substring($cmd.LastIndexOf(' ') + 1)))
+if ($said -match "offbox\.txt' -Value '([^']+)'") {
+  if ($env:FAKE_MARK_REFUSE) { exit 1 }
+  Set-Content -LiteralPath $env:FAKE_MARK -Value ($said -replace '^.*-LiteralPath ''([^'']+)''.*$', '$1') -Encoding ASCII
+  Add-Content -LiteralPath $env:FAKE_MARK -Value $Matches[1] -Encoding ASCII
+  'MARKED'
+  exit 0
+}
+Get-Content -LiteralPath $env:FAKE_LIST
+exit 0
+'@
+Set-Content -LiteralPath (Join-Path $bin 'ssh.cmd') -Encoding ASCII -Value ('@"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "%~dp0ssh.ps1" %*')
 Set-Content -LiteralPath (Join-Path $bin 'scp.ps1') -Encoding ASCII -Value @'
 $src = $args[-2]; $dst = $args[-1]
 $name = $src.Substring($src.LastIndexOf('/') + 1)
@@ -94,6 +112,7 @@ function Scene([hashtable]$files, [switch]$NoRestore, [switch]$NoKey, [string[]]
     Set-Content -LiteralPath $env:FAKE_LIST -Value $list -Encoding ASCII
     $env:FAKE_SRC = $src
     $env:FAKE_CHECKED = Join-Path $s 'checked.txt'
+    $env:FAKE_MARK = Join-Path $s 'mark.txt'
     $argv = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', (Join-Path $scripts 'Fetch-Backups.ps1'),
               '-VpsHost', '203.0.113.9', '-VpsUser', 'nobody', '-To', $to, '-KeyFile', $key, '-NoPause') + $More
     $out = (& $exe @argv 2>&1 | Out-String)
@@ -101,7 +120,10 @@ function Scene([hashtable]$files, [switch]$NoRestore, [switch]$NoKey, [string[]]
     $checked = @()
     if (Test-Path -LiteralPath $env:FAKE_CHECKED) { $checked = @(Get-Content -LiteralPath $env:FAKE_CHECKED) }
     $left = @(Get-ChildItem -LiteralPath $to -File | ForEach-Object { $_.Name })
-    [pscustomobject]@{ Code = $code; Out = $out; Checked = $checked; Left = $left; To = $to }
+    # Where the box was told to write, and the name, or nothing when it was not told.
+    $mark = @()
+    if (Test-Path -LiteralPath $env:FAKE_MARK) { $mark = @(Get-Content -LiteralPath $env:FAKE_MARK) }
+    [pscustomobject]@{ Code = $code; Out = $out; Checked = $checked; Left = $left; To = $to; Mark = $mark }
 }
 
 $old = 'thornswood-20261009-031500.zip.enc'
@@ -116,6 +138,7 @@ try {
         ($r.Left -notcontains $old) -and @($r.Left | Where-Object { $_ -like "$old.failed-*" }).Count -eq 1)
     Yes '  the good one stays as a backup' ($r.Left -contains $new)
     Yes '  and fetch.log names both' ((Get-Content -Raw (Join-Path $r.To 'fetch.log')) -match [regex]::Escape($old))
+    Yes '  the box is told the newest copy that opened, in the watchdog''s folder' ($r.Mark.Count -eq 2 -and $r.Mark[0] -eq 'C:\Thornswood-Watch\offbox.txt' -and $r.Mark[1] -eq $new)
 
     $keep = $r.To
     $r2 = Scene @{ $old = 'good now'; $new = 'good newest' } -Keep $keep
@@ -125,12 +148,21 @@ try {
     $r = Scene @{ $old = 'good older'; $new = 'BAD newest' }
     Yes "the other way round, a bad newest: the run fails all the same (exit $($r.Code))" ($r.Code -ne 0)
     Yes '  and the bad newest is the one set aside' (($r.Left -notcontains $new) -and ($r.Left -contains $old))
+    Yes '  so the box is told the older one, the newest that opened' ($r.Mark.Count -eq 2 -and $r.Mark[1] -eq $old)
 
     $r = Scene @{ $old = 'good'; $new = 'good' }
     Yes "two good files: both checked and the run passes (exit $($r.Code))" ($r.Code -eq 0 -and $r.Checked.Count -eq 2)
+    Yes '  and the box is told the newest' ($r.Mark.Count -eq 2 -and $r.Mark[1] -eq $new -and $r.Out -match ('told the box the newest copy here is ' + [regex]::Escape($new)))
+    $r = Scene @{ $old = 'good'; $new = 'good' } -Keep $r.To
+    Yes "nothing new: the box is told the newest all the same, so the line moves on (exit $($r.Code))" ($r.Code -eq 0 -and $r.Checked.Count -eq 0 -and $r.Mark.Count -eq 2 -and $r.Mark[1] -eq $new)
+    $env:FAKE_MARK_REFUSE = '1'
+    $r = Scene @{ $old = 'good'; $new = 'good' }
+    $env:FAKE_MARK_REFUSE = ''
+    Yes "a box that does not take offbox.txt fails the run and says so (exit $($r.Code))" ($r.Code -ne 0 -and $r.Out -match 'NOT TOLD' -and $r.Mark.Count -eq 0)
 
     $r = Scene @{ $old = 'good'; $new = 'good' } -NoKey
     Yes "no passphrase is a failure, never a pass (exit $($r.Code))" ($r.Code -ne 0 -and $r.Out -match 'NOT CHECKED' -and $r.Checked.Count -eq 0)
+    Yes '  and the box is told nothing, since none of them was opened' ($r.Mark.Count -eq 0 -and $r.Out -match 'box was not told')
 
     $r = Scene @{ $old = 'good'; $new = 'good' } -NoRestore
     Yes "no Restore-Backup.ps1 beside it is a failure (exit $($r.Code))" ($r.Code -ne 0 -and $r.Out -match 'NOT CHECKED')
@@ -138,6 +170,7 @@ try {
     $r = Scene @{ $old = 'BAD'; $new = 'good' } -More @('-NoVerify')
     Yes "-NoVerify checks nothing, says so, and passes (exit $($r.Code))" (
         $r.Code -eq 0 -and $r.Checked.Count -eq 0 -and $r.Out -match 'NOT checked' -and $r.Left -contains $old)
+    Yes '  and tells the box nothing' ($r.Mark.Count -eq 0 -and $r.Out -match 'box was not told')
 
     $env:FAKE_SHORT = $old; $env:FAKE_SHORT_BYTES = '3'
     $r = Scene @{ $old = 'good but long'; $new = 'good' }

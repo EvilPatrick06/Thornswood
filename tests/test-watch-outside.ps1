@@ -4,23 +4,23 @@
       pwsh -NoProfile -File .\tests\test-watch-outside.ps1
       powershell -NoProfile -File .\tests\test-watch-outside.ps1
 
-  scripts\vps\Watch-Outside.ps1 runs on One, outside the VPS, and tells staff
-  in Discord when the site, a feed, the certificate, the address, the build
-  runner, code signing or the Nexus collection breaks, once, and once more
-  when it is fixed (issue #448).
+  scripts\vps\Watch-Outside.ps1 runs on GitHub's Linux runners, from a public
+  repository, outside the VPS (#2755), and tells staff in Discord when the
+  site, a feed, the certificate, the address, the registration, the build
+  runners or the Nexus collection breaks, once, and once more when it is
+  fixed (issue #448).
 
-  These drive the real script, dot-sourced, with the functions that touch
-  the internet, the VPS or the clock (Get-Http, Get-Cert, Get-Dns,
-  Get-Runners, Get-AzureToken, Send-Webhook, Send-ToVps, Get-Now) replaced by
-  a table of fake answers. Nothing leaves the machine and nothing is posted.
-  The cases: everything fine, a certificate near its end and then renewed,
-  the site down and back, the runner offline and back, code signing with the
-  wrong identity, the address moved, a feed that is not a feed, the messages
-  handed to the VPS watchdog's outbox (#447's path), the VPS unreachable so
-  the webhook posts them, the watchdog not installed, a webhook that fails and
-  then works, no webhook at all, and this machine offline. And once, the real
-  Send-ToVps with ssh replaced by a stand-in that runs the script it would
-  have sent on the VPS here, against a folder standing in for the watchdog's.
+  These drive the real script, dot-sourced, with the functions that touch the
+  internet or the clock (Get-Http, Get-Cert, Get-Dns, Get-Runners,
+  Send-Webhook, Get-Now) replaced by a table of fake answers. Nothing leaves
+  the machine and nothing is posted. The cases: everything fine, a
+  certificate near its end and then renewed, the site down and back, the
+  runners offline and back, GitHub not answering about the runners (#2857:
+  could not check, never "down"), a registry that does not answer, the
+  address moved, a feed that is not a feed, a webhook that fails and then
+  works, no webhook at all, this machine offline, what -Export writes for the
+  public repository, and that the run log, which is public there, names
+  nothing private.
 
   Read only apart from files under its own temp folder.
 #>
@@ -29,7 +29,7 @@ param([string]$ScriptPath, [string]$Temp)
 
 $ErrorActionPreference = 'Stop'
 $Root = Split-Path -Parent $PSScriptRoot
-if (-not $ScriptPath) { $ScriptPath = Join-Path $Root 'scripts\vps\Watch-Outside.ps1' }
+if (-not $ScriptPath) { $ScriptPath = Join-Path (Join-Path (Join-Path $Root 'scripts') 'vps') 'Watch-Outside.ps1' }
 if (-not $Temp) { $Temp = [IO.Path]::GetTempPath() }
 
 $script:pass = 0
@@ -42,6 +42,11 @@ function Yes([string]$what, [bool]$cond) {
 Yes 'Watch-Outside.ps1 is there' (Test-Path -LiteralPath $ScriptPath)
 if (-not (Test-Path -LiteralPath $ScriptPath)) { Write-Host ''; Write-Host '0 passed, 1 failed' -ForegroundColor Red; exit 1 }
 
+$oldHook = $env:WATCH_WEBHOOK
+$oldToken = $env:WATCH_RUNNER_TOKEN
+$env:WATCH_WEBHOOK = ''
+$env:WATCH_RUNNER_TOKEN = ''
+
 . $ScriptPath
 $ErrorActionPreference = 'Stop'
 
@@ -50,120 +55,139 @@ $S = Read-Settings $Root ''
 Yes 'the live feed is Updater.cs''s MainFeed' ((@($S.Feeds | Where-Object { $_.Name -eq 'feed' })[0].Url) -eq 'https://thornswood.net/feed/version.json')
 Yes 'the dev feed is Updater.cs''s DevFeed' ((@($S.Feeds | Where-Object { $_.Name -eq 'feed-dev' })[0].Url) -eq 'https://thornswood.net/feed-dev/version.json')
 Yes 'the site is the feed''s host' ($S.Site -eq 'https://thornswood.net/' -and $S.SiteHost -eq 'thornswood.net')
-Yes 'the pinned identity comes from Signature.cs' (@($S.Identities).Count -ge 1 -and @($S.Identities)[0] -match '^1\.3\.6\.1\.4\.1\.311\.97\.')
-Yes 'the signing account comes from records\signing\metadata.json' ($S.SignAccount -and $S.SignProfile -and $S.SignEndpoint -match '^https://')
 Yes 'the collection comes from Config.cs' ($S.NexusSlug -and $S.NexusGame)
 Yes 'the VPS address comes from scripts\vps\vps.json' ($S.VpsAddress -match '^\d+\.\d+\.\d+\.\d+$')
 Yes 'the certificate line is 14 days' ($S.CertDays -eq 14)
-Yes 'the VPS user comes from scripts\vps\vps.json' ($S.VpsUser -eq 'Administrator')
-Yes 'the off-box line is 26 hours, the box''s own (#2183)' ($S.OffBoxHours -eq 26)
-Yes 'the off-box folder is Where.ps1 Backups' (('' + $S.BackupsFolder) -match 'local[\\/]backups$')
-Yes 'the watchdog''s folder is Watch-Services.ps1''s own -Root' ($S.WatchRoot -eq 'C:\Thornswood-Watch')
 Yes 'the webhook''s channel is #staff-updates, bot\staff-channel.txt''s id (#2501)' ($S.StaffChannel -eq '1549254991082946570')
-
-# Fixed values from here on, so nothing below depends on what the repository says.
-$S.VpsAddress = '192.0.2.10'
-$S.Identities = @('1.3.6.1.4.1.311.97.1.2.3.4')
-
-# ---- the fakes ------------------------------------------------------------
-$HookUrl = 'https://discord.com/api/webhooks/123456/SECRETHOOKTOKEN_abc'
-$script:clock = [datetime]::new(2026, 10, 1, 12, 0, 0, [DateTimeKind]::Local)
-$script:posted = New-Object 'System.Collections.Generic.List[string]'
-$script:hookFails = $false
-$script:asked = New-Object 'System.Collections.Generic.List[string]'
-
-$script:bk = Join-Path $Temp ('thornswood-offbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
-$null = New-Item -ItemType Directory -Path $script:bk -Force
-$S.BackupsFolder = $script:bk
-function Set-Copies([string[]]$names) {
-  Get-ChildItem -LiteralPath $script:bk -File | Remove-Item -Force
-  foreach ($n in $names) { [IO.File]::WriteAllText((Join-Path $script:bk $n), 'x') }
-}
-function Copy-Aged([double]$hours) { return ('thornswood-' + $script:clock.AddHours(-$hours).ToString('yyyyMMdd-HHmmss') + '.zip.enc') }
-
-function Reset-World {
-  Set-Copies @((Copy-Aged 3))
-  $script:online = $true
-  $script:site = 200
-  $script:feed = 200
-  $script:feedBody = '{"launcherVersion":"1.2.4","launcherUrl":"https://thornswood.net/feed/assets/abc","packs":[],"baseline":{"id":"20261012-115531"}}'
-  $script:launcher = 206
-  $script:certEnd = $script:clock.ToUniversalTime().AddDays(60)
-  $script:certProblems = 'None'
-  $script:dns = @('192.0.2.10')
-  $script:rdapEnd = '2027-09-15T01:11:45Z'
-  $script:runner = 'online'
-  $script:runner2 = ''
-  $script:token = 'eyFAKE'
-  $script:sign = 200
-  $script:signBody = '["1.3.6.1.4.1.311.97.1.2.3.4"]'
-  $script:nexus = '{"data":{"collection":{"name":"Thornswood","latestPublishedRevision":{"revisionNumber":1}}}}'
-}
-
-function Get-Now { return $script:clock }
-function Get-Http([string]$url, [string]$method = 'GET', [string]$body = '', [hashtable]$headers = @{}, [switch]$FirstByte, [int]$timeout = 20) {
-  $script:asked.Add($url)
-  if (-not $script:online) { return @{ Code = 0; Body = ''; Error = 'could not be reached' } }
-  if ($url -eq 'https://api.github.com/' -or $url -like 'https://discord.com/api/v10/gateway') { return @{ Code = 200; Body = '{}'; Error = '' } }
-  if ($url -eq 'https://thornswood.net/') { return @{ Code = $script:site; Body = ''; Error = $(if ($script:site) { '' } else { 'did not answer within 20 seconds' }) } }
-  if ($url -like 'https://thornswood.net/feed*/version.json') { return @{ Code = $script:feed; Body = $script:feedBody; Error = '' } }
-  if ($url -like 'https://thornswood.net/feed/assets/*') { return @{ Code = $script:launcher; Body = ''; Error = '' } }
-  if ($url -like 'https://rdap.org/domain/*') { return @{ Code = 200; Body = ('{"events":[{"eventAction":"expiration","eventDate":"' + $script:rdapEnd + '"}]}'); Error = '' } }
-  if ($url -like '*codesigning.azure.net/*') {
-    $script:signAuth = $headers['Authorization']
-    return @{ Code = $script:sign; Body = $script:signBody; Error = '' }
-  }
-  if ($url -eq 'https://api.nexusmods.com/v2/graphql') { $script:nexusQuery = $body; return @{ Code = 200; Body = $script:nexus; Error = '' } }
-  if ($url -eq $HookUrl -and $method -eq 'GET') { return @{ Code = $script:hookCode; Body = $script:hookBody; Error = '' } }
-  return @{ Code = 0; Body = ''; Error = 'not in the table' }
-}
-function Get-Cert([string]$hostName) { return @{ NotAfter = $script:certEnd; Problems = $script:certProblems; Error = '' } }
-function Get-Dns([string]$name) { return @{ Addresses = @($script:dns); Error = $(if (@($script:dns).Count) { '' } else { 'does not resolve' }) } }
-function Get-Runners([string]$repo) {
-  if ($script:runner -eq 'gh-fails') { return @{ Runners = @(); Error = 'gh could not ask GitHub: HTTP 401' } }
-  $list = @(@{ Name = 'thornswood-vps'; Status = $script:runner; Busy = $false })
-  # A numbered runner beside it (Install-Runner.ps1 -Number), and one whose
-  # name only starts the same, which is not one of them.
-  if ($script:runner2) { $list += @{ Name = 'thornswood-vps-2'; Status = $script:runner2; Busy = $true }; $list += @{ Name = 'thornswood-vpsx'; Status = 'offline'; Busy = $false } }
-  return @{ Runners = $list; Error = '' }
-}
-function Get-AzureToken { if ($script:token) { return @{ Token = $script:token; Error = '' } } else { return @{ Token = ''; Error = 'az on this machine has no Azure sign in (az account get-access-token failed)' } } }
-function Send-Webhook([string]$url, [string]$text) {
-  if ($script:hookFails) { return 'HTTP 500' }
-  $script:posted.Add($text)
-  return ''
-}
-# The VPS path. 'down' is ssh not reaching the box, the case the webhook is
-# for, and the default, so the cases above it count what the webhook posts.
-$realSendToVps = ${function:Send-ToVps}
-$script:vps = 'down'
-$script:handed = New-Object 'System.Collections.Generic.List[string]'
-function Send-ToVps($S, [string[]]$rows) {
-  if ($script:vps -eq 'down') { return 'ssh could not reach the VPS (exit 255)' }
-  if ($script:vps -eq 'nowatcher') { return 'the watchdog is not installed on the VPS (no C:\Thornswood-Watch\watch.ps1)' }
-  foreach ($r in $rows) { $script:handed.Add($r) }
-  return ''
-}
-function Handed([string]$like) { return @($script:handed | Where-Object { $_ -like $like }).Count }
+Yes 'the runners are the repository''s, from thornswood-vps' ($S.Repo -eq 'EvilPatrick06/Thornswood' -and $S.RunnerName -eq 'thornswood-vps')
+Yes 'signing and the off-box copy are not asked from outside any more (#2755)' (-not $S.ContainsKey('SignAccount') -and -not $S.ContainsKey('BackupsFolder'))
 
 $dir = Join-Path $Temp ('thornswood-watchoutside-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Path $dir -Force
-$P = Paths $dir
-[IO.File]::WriteAllText($P.Hook, $HookUrl)
-
-function Tick([int]$minutes = 5) { $script:clock = $script:clock.AddMinutes($minutes) }
-function Pass-Once { $r = Invoke-Watch $S $P -Remember; Tick; return $r }
-function Posted([string]$like) { return @($script:posted | Where-Object { $_ -like $like }).Count }
-function Clear-Posted { $script:posted.Clear() }
 
 try {
+  # ---- what -Export writes for the public repository -------------------------
+  $pub = Join-Path $dir 'public'
+  $pwshExe = (Get-Process -Id $PID).Path
+  $null = & $pwshExe -NoProfile -NonInteractive -File $ScriptPath -Export $pub -NoPause 2>&1
+  Yes ('-Export ends 0 (exit ' + $LASTEXITCODE + ')') ($LASTEXITCODE -eq 0)
+  $files = @(Get-ChildItem -LiteralPath $pub -Recurse -File -Force | ForEach-Object { $_.FullName.Substring($pub.Length + 1).Replace('\', '/') })
+  $expect = @('.github/workflows/keep-alive.yml', '.github/workflows/watch-outside.yml', 'README.md', 'Watch-Outside.ps1', 'watch-outside.json')
+  Yes ('-Export writes the watcher, its settings, two workflows and the README, nothing else: ' + ($files -join ', ')) (
+    $files.Count -eq $expect.Count -and @($expect | Where-Object { $files -cnotcontains $_ }).Count -eq 0)
+  Yes 'the watcher there is this script, byte for byte' (
+    (Test-Path -LiteralPath (Join-Path $pub 'Watch-Outside.ps1')) -and
+    [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $pub 'Watch-Outside.ps1'))) -eq [Convert]::ToBase64String([IO.File]::ReadAllBytes($ScriptPath)))
+  $json = Join-Path $pub 'watch-outside.json'
+  $keys = @()
+  if (Test-Path -LiteralPath $json) { $keys = @((Get-Content -LiteralPath $json -Raw | ConvertFrom-Json).PSObject.Properties | ForEach-Object { $_.Name }) }
+  Yes ('watch-outside.json holds only the public settings: ' + ($keys -join ', ')) ($keys.Count -gt 0 -and @($keys | Where-Object { $PublicSettings -notcontains $_ }).Count -eq 0)
+  $S2 = Read-Settings (Join-Path $dir 'no-repository-here') $json
+  Yes 'read back there, it asks what the repository says' (
+    $S2.Site -eq $S.Site -and $S2.VpsAddress -eq $S.VpsAddress -and $S2.NexusSlug -eq $S.NexusSlug -and $S2.Repo -eq $S.Repo -and
+    @($S2.Feeds).Count -eq 2 -and @($S2.Feeds)[1].Url -eq @($S.Feeds)[1].Url -and $S2.StaffChannel -eq $S.StaffChannel)
+  $wf = ''
+  if (Test-Path -LiteralPath (Join-Path $pub '.github/workflows/watch-outside.yml')) { $wf = Get-Content -LiteralPath (Join-Path $pub '.github/workflows/watch-outside.yml') -Raw }
+  Yes 'the workflow runs every five minutes' ($wf -match "cron: '\*/5 \* \* \* \*'")
+  Yes 'it keeps its memory in the Actions cache, restored from the newest and saved under a new key' (
+    $wf -match 'actions/cache/restore@[0-9a-f]{40}' -and $wf -match 'restore-keys: watch-outside-' -and $wf -match 'actions/cache/save@[0-9a-f]{40}' -and $wf -match 'key: watch-outside-\$\{\{ github\.run_id \}\}-')
+  Yes 'it passes -Run -Folder state and the two secrets by name' (
+    $wf -match '-Run -Folder state' -and $wf -match 'WATCH_WEBHOOK: \$\{\{ secrets\.STAFF_WEBHOOK \}\}' -and $wf -match 'WATCH_RUNNER_TOKEN: \$\{\{ secrets\.RUNNER_TOKEN \}\}')
+  Yes 'it reads the repository and writes nothing to it' ($wf -match "permissions:\s+contents: read" -and $wf -notmatch 'contents: write')
+  Yes 'every action it uses is pinned to a commit' (@([regex]::Matches($wf, 'uses: \S+')).Count -gt 0 -and @([regex]::Matches($wf, 'uses: (?!\S+@[0-9a-f]{40}\b)\S+')).Count -eq 0)
+  $ka = ''
+  if (Test-Path -LiteralPath (Join-Path $pub '.github/workflows/keep-alive.yml')) { $ka = Get-Content -LiteralPath (Join-Path $pub '.github/workflows/keep-alive.yml') -Raw }
+  Yes 'keep-alive commits once a month, inside the 60 days GitHub allows' ($ka -match "cron: '17 6 1 \* \*'" -and $ka -match 'git push' -and $ka -match 'alive\.txt')
+
+  # Fixed values from here on, so nothing below depends on what the repository says.
+  $S.VpsAddress = '192.0.2.10'
+
+  # ---- the fakes ------------------------------------------------------------
+  $HookUrl = 'https://discord.com/api/webhooks/123456/SECRETHOOKTOKEN_abc'
+  $script:clock = [datetime]::new(2026, 10, 1, 12, 0, 0, [DateTimeKind]::Local)
+  $script:posted = New-Object 'System.Collections.Generic.List[string]'
+  $script:hookFails = $false
+  $script:asked = New-Object 'System.Collections.Generic.List[string]'
+
+  function Reset-World {
+    $script:online = $true
+    $script:site = 200
+    $script:feed = 200
+    $script:feedBody = '{"launcherVersion":"1.2.4","launcherUrl":"https://thornswood.net/feed/assets/abc","packs":[],"baseline":{"id":"20261012-115531"}}'
+    $script:launcher = 206
+    $script:certEnd = $script:clock.ToUniversalTime().AddDays(60)
+    $script:certProblems = 'None'
+    $script:certError = ''
+    $script:dns = @('192.0.2.10')
+    $script:rdap = 200
+    $script:rdapEnd = '2027-09-15T01:11:45Z'
+    $script:runner = 'online'
+    $script:runner2 = ''
+    $script:nexus = '{"data":{"collection":{"name":"Thornswood","latestPublishedRevision":{"revisionNumber":1}}}}'
+    $script:ghRunners = 200
+  }
+
+  function Get-Now { return $script:clock }
+  function Get-Http([string]$url, [string]$method = 'GET', [string]$body = '', [hashtable]$headers = @{}, [switch]$FirstByte, [int]$timeout = 20) {
+    $script:asked.Add($url)
+    if (-not $script:online) { return @{ Code = 0; Body = ''; Error = 'could not be reached' } }
+    if ($url -eq 'https://api.github.com/' -or $url -like 'https://discord.com/api/v10/gateway') { return @{ Code = 200; Body = '{}'; Error = '' } }
+    if ($url -like 'https://api.github.com/repos/*/actions/runners*') {
+      $script:runnerAuth = $headers['Authorization']
+      if ($script:ghRunners -eq 0) { return @{ Code = 0; Body = ''; Error = 'did not answer within 20 seconds' } }
+      return @{ Code = $script:ghRunners; Body = '{"total_count":2,"runners":[{"name":"thornswood-vps","status":"online","busy":true},{"name":"thornswood-vps-2","status":"offline","busy":false}]}'; Error = '' }
+    }
+    if ($url -eq 'https://thornswood.net/') { return @{ Code = $script:site; Body = ''; Error = $(if ($script:site) { '' } else { 'did not answer within 20 seconds' }) } }
+    if ($url -like 'https://thornswood.net/feed*/version.json') { return @{ Code = $script:feed; Body = $script:feedBody; Error = '' } }
+    if ($url -like 'https://thornswood.net/feed/assets/*') { return @{ Code = $script:launcher; Body = ''; Error = '' } }
+    if ($url -like 'https://rdap.org/domain/*') {
+      if ($script:rdap -ne 200) { return @{ Code = $script:rdap; Body = ''; Error = $(if ($script:rdap) { '' } else { 'did not answer within 20 seconds' }) } }
+      return @{ Code = 200; Body = ('{"events":[{"eventAction":"expiration","eventDate":"' + $script:rdapEnd + '"}]}'); Error = '' }
+    }
+    if ($url -eq 'https://api.nexusmods.com/v2/graphql') { $script:nexusQuery = $body; return @{ Code = 200; Body = $script:nexus; Error = '' } }
+    if ($url -eq $HookUrl -and $method -eq 'GET') { return @{ Code = $script:hookCode; Body = $script:hookBody; Error = '' } }
+    return @{ Code = 0; Body = ''; Error = 'not in the table' }
+  }
+  function Get-Cert([string]$hostName) { return @{ NotAfter = $script:certEnd; Problems = $script:certProblems; Error = $script:certError } }
+  function Get-Dns([string]$name) { return @{ Addresses = @($script:dns); Error = $(if (@($script:dns).Count) { '' } else { 'does not resolve' }) } }
+  # The real one, kept to drive against the fake Get-Http below.
+  $realGetRunners = ${function:Get-Runners}
+  function Get-Runners([string]$repo) {
+    if ($script:runner -eq 'no-answer') { return @{ Runners = @(); Error = 'GitHub did not answer within 20 seconds' } }
+    $list = @(@{ Name = 'thornswood-vps'; Status = $script:runner; Busy = $false })
+    # A numbered runner beside it (Install-Runner.ps1 -Number), and one whose
+    # name only starts the same, which is not one of them.
+    if ($script:runner2) { $list += @{ Name = 'thornswood-vps-2'; Status = $script:runner2; Busy = $true }; $list += @{ Name = 'thornswood-vpsx'; Status = 'offline'; Busy = $false } }
+    return @{ Runners = $list; Error = '' }
+  }
+  function Send-Webhook([string]$url, [string]$text) {
+    if ($script:hookFails) { return 'HTTP 500' }
+    $script:posted.Add($text)
+    return ''
+  }
+
+  $P = Paths (Join-Path $dir 'state')
+  $env:WATCH_WEBHOOK = $HookUrl
+
+  # What the run log got, which is public on the runner: Note writes there.
+  $script:printed = New-Object 'System.Collections.Generic.List[string]'
+  function Tick([int]$minutes = 5) { $script:clock = $script:clock.AddMinutes($minutes) }
+  function Pass-Once {
+    $script:last = $null
+    $out = @(& { $script:last = Invoke-Watch $S $P -Remember; if ($script:last) { Write-Results $script:last } } 6>&1)
+    foreach ($o in $out) { $script:printed.Add("$o") }
+    Tick
+    return $script:last
+  }
+  function Posted([string]$like) { return @($script:posted | Where-Object { $_ -like $like }).Count }
+  function Clear-Posted { $script:posted.Clear() }
+
   # ---- everything fine ----------------------------------------------------
   Reset-World
   $r = Pass-Once
-  Yes 'a healthy world: every check ran' ($r.Count -eq 10)
-  Yes 'a healthy world: nothing is wrong' (@($r.Values | Where-Object { $_.Bad }).Count -eq 0)
+  Yes 'a healthy world: every check ran, eight of them' ($r.Count -eq 8)
+  Yes 'a healthy world: nothing is wrong and nothing could not be checked' (@($r.Values | Where-Object { $_.Bad -or $_.Unknown }).Count -eq 0)
   Yes 'a healthy world: nothing is posted' ($script:posted.Count -eq 0)
-  Yes 'signing was asked with the Azure token as a bearer' ($script:signAuth -eq 'Bearer eyFAKE')
   Yes 'Nexus was asked for the collection from Config.cs' ($script:nexusQuery -match $S.NexusSlug)
 
   # ---- the hourly and daily ones are not asked every run -------------------
@@ -191,16 +215,19 @@ try {
   Yes 'and no more after that' ((Posted '*certificate for thornswood.net*') -eq 2)
   Clear-Posted
 
-  # Out of date entirely, and a certificate Windows will not accept.
+  # Out of date entirely, one the runner will not accept, and no handshake.
   $script:certEnd = $script:clock.ToUniversalTime().AddDays(-1)
   Yes 'a certificate that ran out is wrong' ((Check-Cert $S).Bad -and (Check-Cert $S).Why -match 'ran out')
   $script:certEnd = $script:clock.ToUniversalTime().AddDays(60); $script:certProblems = 'RemoteCertificateNameMismatch'
-  Yes 'a certificate Windows does not accept is wrong' ((Check-Cert $S).Bad -and (Check-Cert $S).Why -match 'NameMismatch')
+  Yes 'a certificate the runner does not accept is wrong' ((Check-Cert $S).Bad -and (Check-Cert $S).Why -match 'not accepted.*NameMismatch')
   $script:certEnd = $script:clock.ToUniversalTime().AddDays(15); $script:certProblems = 'None'
-  Yes 'a certificate at 15 days is fine' (-not (Check-Cert $S).Bad)
+  Yes 'a certificate at 15 days is fine' (-not (Check-Cert $S).Bad -and -not (Check-Cert $S).Unknown)
+  $script:certError = 'no TLS handshake on 443'
+  $c = Check-Cert $S
+  Yes 'no handshake is could not check, not a certificate gone wrong (#2857)' ($c.Unknown -and -not $c.Bad -and $c.Why -match 'could not be read')
+  Reset-World
 
   # ---- site down, then back -------------------------------------------------
-  Reset-World
   $script:site = 0
   $null = Pass-Once
   Yes 'site down on one run: nothing yet, one slow answer is not an outage' ((Posted '*thornswood.net, asked from outside the VPS, is down*') -eq 0)
@@ -211,7 +238,7 @@ try {
   Yes 'the message says why, in words' ($down -match 'did not answer within 20 seconds')
   Yes 'an address at the start of the reason keeps its small letters' ($down -cmatch '\*\* https://thornswood\.net/ did not')
   Yes 'the message says when, in each reader''s own clock' ($down -match '<t:\d+:f>')
-  Yes 'the message says it was checked from outside the VPS' ($down -match 'Checked from One, outside the VPS, every 5 minutes')
+  Yes 'the message says where it was checked from' ($down -match 'Checked from outside the VPS, on GitHub''s servers, about every 5 minutes')
   $null = Pass-Once; $null = Pass-Once; $null = Pass-Once
   Yes 'still down three runs later: still one message' ((Posted '*is down*') -eq 1)
   $script:site = 200
@@ -256,22 +283,81 @@ try {
   $null = Pass-Once; $null = Pass-Once
   Yes '  and back once' ((Posted '*are all online again*') -eq 1)
   Clear-Posted
+
+  # ---- #2857: GitHub not answering about the runners --------------------------
+  # 19 Oct, 5:01 PM: One's call to GitHub timed out and the message said the
+  # runners were down while all four were online.
   Reset-World
-  $script:runner = 'gh-fails'
-  Yes 'GitHub not answering gh is told as One''s side' ((Check-Runner $S).Bad -and (Check-Runner $S).Why -match 'One could not ask GitHub')
+  $script:runner = 'no-answer'
+  $c = Check-Runner $S
+  Yes 'GitHub not answering is could not check, not the runners down' ($c.Unknown -and -not $c.Bad -and $c.Why -match 'GitHub did not answer')
+  for ($i = 0; $i -lt 11; $i++) { $null = Pass-Once }
+  Yes 'eleven runs in a row that could not ask: nothing said, it may be a blip' ($script:posted.Count -eq 0)
+  $null = Pass-Once
+  Yes 'the twelfth, an hour of them: told once, as the watcher that cannot check' ((Posted '`*`*The outside watcher cannot check the build runners.`*`* GitHub did not answer*') -eq 1)
+  Yes '  never as the runners being down' ((Posted '*are not all online*') -eq 0)
+  Yes '  and it says what that leaves unwatched, and where the token is' ((Posted '*could break and nobody would be told*RUNNER_TOKEN*') -eq 1)
+  for ($i = 0; $i -lt 6; $i++) { $null = Pass-Once }
+  Yes '  and not again while it still cannot' ((Posted '*outside watcher cannot check*') -eq 1)
+  $script:runner = 'online'
+  $null = Pass-Once
+  Yes 'able to ask again: one message saying so, on the first run' ((Posted '*The outside watcher can check the build runners again*') -eq 1)
+  Yes '  and that is all: two messages' ($script:posted.Count -eq 2)
+  Clear-Posted
+
+  # Could not check in the middle of a real outage changes nothing about it.
+  Reset-World
+  $script:runner = 'offline'
+  $null = Pass-Once; $null = Pass-Once; $null = Pass-Once
+  Yes 'runners really offline: told once' ((Posted '*are not all online on GitHub*') -eq 1)
+  $script:runner = 'no-answer'
+  $null = Pass-Once; $null = Pass-Once; $null = Pass-Once
+  Yes 'then GitHub not answering: not taken for the runners coming back' ((Posted '*are all online again*') -eq 0)
+  $before = @(Get-Content -LiteralPath $P.Outages | Where-Object { $_ -like 'runner|*' })[0]
+  Yes '  and the outage is kept as it was' ($before -like 'runner|down|*')
+  $script:runner = 'offline'
+  $null = Pass-Once
+  Yes '  asked again and still offline: no second message' ((Posted '*are not all online on GitHub*') -eq 1)
+  $script:runner = 'online'
+  $null = Pass-Once; $null = Pass-Once
+  Yes '  and back once when they are' ((Posted '*are all online again*') -eq 1)
+  Clear-Posted
+
+  # The real Get-Runners, against the fake Get-Http.
+  $env:WATCH_RUNNER_TOKEN = ''
+  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  Yes 'Get-Runners: no token is said, never asked without one' ($g.Error -match 'no runner token' -and $g.Error -match 'WATCH_RUNNER_TOKEN')
+  $env:WATCH_RUNNER_TOKEN = 'github_pat_FAKETOKEN123'
+  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  Yes 'Get-Runners: the token goes as a bearer, and the list comes back' ($script:runnerAuth -eq 'Bearer github_pat_FAKETOKEN123' -and @($g.Runners).Count -eq 2 -and @($g.Runners)[1].Status -eq 'offline' -and -not $g.Error)
+  $script:ghRunners = 401
+  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  Yes 'Get-Runners: a refused token is said as refused' ($g.Error -match 'refused the runner token \(HTTP 401\)')
+  $script:ghRunners = 0
+  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  Yes 'Get-Runners: GitHub not answering is said in words' ($g.Error -eq 'GitHub did not answer within 20 seconds')
+  $script:ghRunners = 502
+  $g = & $realGetRunners 'EvilPatrick06/Thornswood'
+  Yes 'Get-Runners: GitHub answering 502 is said' ($g.Error -eq 'GitHub answered HTTP 502')
+  Yes 'Get-Runners: no reason names the repository or holds the token' (-not ($g.Error -match 'Thornswood|FAKETOKEN'))
+  $env:WATCH_RUNNER_TOKEN = ''
   Reset-World
 
-  # ---- code signing ---------------------------------------------------------
-  $script:signBody = '["1.3.6.1.4.1.311.97.9.9.9"]'
-  Yes 'signing with another identity is wrong' ((Check-Signing $S).Bad -and (Check-Signing $S).Why -match 'identity the launcher pins')
-  $script:signBody = '["1.3.6.1.4.1.311.97.1.2.3.4"]'; $script:sign = 403
-  Yes 'signing refusing the sign in is wrong' ((Check-Signing $S).Why -match 'HTTP 403')
-  $script:sign = 404
-  Yes 'signing without the account is wrong' ((Check-Signing $S).Why -match 'not there')
-  $script:sign = 200; $script:token = ''
-  Yes 'no az sign in on One is wrong and says az login' ((Check-Signing $S).Why -match 'az login')
+  # ---- the registry not answering is could not check --------------------------
+  $script:rdap = 0
+  $d = Check-Domain $S
+  Yes 'RDAP not answering is could not check, not the domain running out' ($d.Unknown -and -not $d.Bad -and $d.Why -match 'registry')
+  $script:rdap = 503
+  Yes 'RDAP answering 503 is could not check too' ((Check-Domain $S).Unknown)
+  Clear-Posted
+  Tick 1440; $null = Pass-Once
+  Tick 1440; $null = Pass-Once
+  Yes 'a daily check that could not ask on two days running is told once' ((Posted '*outside watcher cannot check the registration of thornswood.net*') -eq 1 -and (Posted '*runs out soon*') -eq 0)
+  $script:rdap = 200
+  Tick 1440; $null = Pass-Once
+  Yes '  and once when it can again' ((Posted '*can check the registration of thornswood.net again*') -eq 1)
+  Clear-Posted
   Reset-World
-  Yes 'signing with the pinned identity is fine' (-not (Check-Signing $S).Bad)
 
   # ---- the address, the feed, the domain, Nexus ------------------------------
   $script:dns = @('203.0.113.5')
@@ -300,37 +386,6 @@ try {
   Yes 'a collection Nexus no longer has is wrong' ((Check-Nexus $S).Bad)
   Reset-World
 
-  # ---- the copy of the backups off the VPS (#2183) ----------------------------
-  Reset-World
-  Yes 'off-box: a copy 3 hours old is fine' (-not (Check-OffBox $S).Bad)
-  Set-Copies @((Copy-Aged 25.5))
-  Yes 'off-box: 25.5 hours is still inside the 26 hour line' (-not (Check-OffBox $S).Bad)
-  Set-Copies @((Copy-Aged 57), (Copy-Aged 81))
-  $o = Check-OffBox $S
-  Yes 'off-box: newest 57 hours old is wrong, and says its age and the line' ($o.Bad -and $o.Why -match '57 hours old, and the line is 26')
-  Set-Copies @(((Copy-Aged 2) + '.failed-20261015-040000'), (Copy-Aged 40))
-  Yes 'off-box: a copy set aside as failed does not count as fresh' ((Check-OffBox $S).Bad)
-  Set-Copies @('notes.txt', 'thornswood-latest.zip.enc')
-  Yes 'off-box: no backup by the box''s naming is wrong' ((Check-OffBox $S).Bad -and (Check-OffBox $S).Why -match 'no backup in')
-  $keep = $S.BackupsFolder; $S.BackupsFolder = (Join-Path $script:bk 'gone')
-  Yes 'off-box: the folder missing is wrong' ((Check-OffBox $S).Bad -and (Check-OffBox $S).Why -match 'is not there')
-  $S.BackupsFolder = ''
-  Yes 'off-box: no folder known is wrong and says -Install' ((Check-OffBox $S).Why -match '-Install')
-  $S.BackupsFolder = $keep
-  Clear-Posted
-  Reset-World
-  Tick 60
-  Set-Copies @((Copy-Aged 30))
-  $null = Pass-Once
-  Yes 'off-box stale: one message at once' ((Posted '*copy of the backups off the VPS, on this machine, is out of date*') -eq 1)
-  Yes 'it says what to run' ((Posted '*Fetch-Backups.ps1*') -eq 1)
-  Tick 60; $null = Pass-Once
-  Yes 'still stale an hour later: no second message' ((Posted '*off the VPS, on this machine*') -eq 1)
-  Set-Copies @((Copy-Aged 1))
-  Tick 60; $null = Pass-Once
-  Yes 'a new copy: one message saying it is up to date again' ((Posted '*is up to date again*') -eq 1)
-  Clear-Posted
-  Reset-World
   # ---- a webhook that fails, then works ---------------------------------------
   Clear-Posted
   $script:hookFails = $true
@@ -355,12 +410,15 @@ try {
   Yes ('every outbox row has id, at, service, kind and text, ' + $rows.Count + ' rows') ($rows.Count -gt 0 -and $shape.Count -eq $rows.Count)
 
   # ---- no webhook at all ----------------------------------------------------------
-  Remove-Item -LiteralPath $P.Hook -Force
+  $env:WATCH_WEBHOOK = ''
   $script:site = 0
   $null = Pass-Once; $null = Pass-Once
   Yes 'no webhook: nothing is posted' ($script:posted.Count -eq 0)
-  Yes 'no webhook: watch.log says where to set one' ((Get-Content -LiteralPath $P.Log -Raw) -match 'no webhook in .*-SetWebhook')
-  [IO.File]::WriteAllText($P.Hook, $HookUrl)
+  Yes 'no webhook: the log says it waits and names the setting' ((Get-Content -LiteralPath $P.Log -Raw) -match 'no webhook is set here \(WATCH_WEBHOOK\), so outside-\d+-site-down waits')
+  $env:WATCH_WEBHOOK = 'https://example.com/not-a-webhook'
+  $null = Pass-Once
+  Yes 'something that is not a Discord webhook is no webhook' ($script:posted.Count -eq 0)
+  $env:WATCH_WEBHOOK = $HookUrl
   $null = Pass-Once
   Yes 'webhook set later: the waiting message goes out' ((Posted '*is down*') -eq 1)
   Reset-World; $null = Pass-Once; $null = Pass-Once
@@ -371,10 +429,10 @@ try {
   $rowsBefore = @(Get-Content -LiteralPath $P.Alerts).Count
   $script:online = $false
   $r = Pass-Once; $null = Pass-Once; $null = Pass-Once
-  Yes 'One offline: the pass says so' ($null -eq $r)
-  Yes 'One offline: nothing is told, however long' ($script:posted.Count -eq 0 -and @(Get-Content -LiteralPath $P.Alerts).Count -eq $rowsBefore)
-  Yes 'One offline: what is down is left as it was' ((Get-Content -LiteralPath $P.Outages -Raw) -eq $before)
-  Yes 'One offline: watch.log says this machine is offline' ((Get-Content -LiteralPath $P.Log -Raw) -match 'this machine is offline')
+  Yes 'offline: the pass says so' ($null -eq $r)
+  Yes 'offline: nothing is told, however long' ($script:posted.Count -eq 0 -and @(Get-Content -LiteralPath $P.Alerts).Count -eq $rowsBefore)
+  Yes 'offline: what is down is left as it was' ((Get-Content -LiteralPath $P.Outages -Raw) -eq $before)
+  Yes 'offline: watch.log says this machine is offline' ((Get-Content -LiteralPath $P.Log -Raw) -match 'this machine is offline')
   Reset-World
 
   # ---- looking without -Remember ---------------------------------------------------------
@@ -386,91 +444,9 @@ try {
   Yes 'a look without -Remember writes nothing and posts nothing' (-not (Test-Path -LiteralPath $look) -and $script:posted.Count -eq 0)
   Reset-World
 
-  # ---- #447's path: the VPS watchdog's outbox -------------------------------------------
-  Clear-Posted
-  $script:vps = 'up'
-  $script:site = 0
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'VPS reachable: the down message is handed to the watchdog''s outbox' ((Handed '*asked from outside the VPS, is down*') -eq 1)
-  Yes 'VPS reachable: nothing goes through the webhook from here' ($script:posted.Count -eq 0)
-  $row = $null
-  if ($script:handed.Count) { $row = ConvertFrom-Json @($script:handed)[0] }
-  Yes 'what is handed is the VPS outbox''s shape: id, at, service, kind, text' ($row -and $row.id -like 'outside-*-site-down' -and $row.at -gt 0 -and $row.service -eq 'outside site' -and $row.kind -eq 'down' -and $row.text -like '`*`**')
-  Yes 'its id is kept in alerts-sent-vps.txt' ((Get-Content -LiteralPath $P.SentVps -Raw) -match 'outside-\d+-site-down')
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'handed once, never again' ((Handed '*is down*') -eq 1)
-  $script:site = 200
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'the back message takes the same path' ((Handed '*asked from outside the VPS, is back*') -eq 1 -and $script:posted.Count -eq 0)
-  Yes 'watch.log says what was handed to the VPS' ((Get-Content -LiteralPath $P.Log -Raw) -match 'handed 1 message\(s\) to the watchdog''s outbox on the VPS')
-
-  # The box gone: the webhook from here, the case this exists for.
-  $script:handed.Clear()
-  $script:vps = 'down'
-  $script:site = 0
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'VPS unreachable: the down message is posted through the webhook from One' ((Posted '*is down*') -eq 1 -and $script:handed.Count -eq 0)
-  Yes 'watch.log says why it went that way' ((Get-Content -LiteralPath $P.Log -Raw) -match 'the VPS did not take 1 message\(s\): ssh could not reach the VPS')
-  # The box back before the site is: the back message goes the usual way, and the down message is not said again.
-  $script:vps = 'up'
-  $script:site = 200
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'VPS back: the back message is handed to it' ((Handed '*is back*') -eq 1)
-  Yes 'VPS back: the down message the webhook already said is not handed again' ((Handed '*is down*') -eq 0 -and (Posted '*is down*') -eq 1)
-  Clear-Posted; $script:handed.Clear()
-
-  # The watchdog not installed on the box: the webhook from here too.
-  $script:vps = 'nowatcher'
-  $script:site = 0
-  $null = Pass-Once; $null = Pass-Once
-  Yes 'watchdog not installed: posted through the webhook from One' ((Posted '*is down*') -eq 1)
-  Yes 'watch.log names what is missing on the VPS' ((Get-Content -LiteralPath $P.Log -Raw) -match 'watchdog is not installed on the VPS')
-  # Neither path: it waits, and the VPS takes it when it can.
-  $script:vps = 'down'; $script:hookFails = $true
-  $script:site = 200; $null = Pass-Once; $null = Pass-Once
-  Yes 'neither path: the back message waits' ((Posted '*is back*') -eq 0 -and $script:handed.Count -eq 0)
-  $script:vps = 'up'; $script:hookFails = $false
-  $null = Pass-Once
-  Yes 'the VPS reachable again: the waiting message is handed, once' ((Handed '*is back*') -eq 1)
-  $null = Pass-Once
-  Yes 'and not again' ((Handed '*is back*') -eq 1 -and (Posted '*is back*') -eq 0)
-  Clear-Posted; $script:handed.Clear()
-  $script:vps = 'down'
-  Reset-World
-
-  # The real Send-ToVps, with ssh replaced by a stand-in that runs the script
-  # it would have sent to the VPS here, reading the same standard input,
-  # against a folder standing in for the watchdog's.
-  $box = Join-Path $dir 'vps'
-  $null = New-Item -ItemType Directory -Path $box -Force
-  $script:sshArgs = @()
-  function ssh {
-    $script:sshArgs = @($args)
-    $cmd = '' + $args[$args.Count - 1]
-    $enc = $cmd.Substring($cmd.LastIndexOf(' ') + 1)
-    $input | powershell -NoProfile -NonInteractive -EncodedCommand $enc
-  }
-  $S2 = @{}; foreach ($k in $S.Keys) { $S2[$k] = $S[$k] }
-  $S2.WatchRoot = $box
-  $rows = @('{"id":"outside-1-site-down","at":1790000000,"service":"outside site","kind":"down","text":"**Down.** Why. <t:1790000000:f>"}',
-            '{"id":"outside-2-site-back","at":1790000300,"service":"outside site","kind":"back","text":"**Back.** Fine since then."}')
-  $w = & $realSendToVps $S2 $rows
-  Yes 'the real Send-ToVps with no watchdog there says so' ($w -match 'watchdog is not installed')
-  Set-Content -LiteralPath (Join-Path $box 'watch.ps1') -Value '# stands in for the watchdog'
-  [IO.File]::WriteAllText((Join-Path $box 'alerts.jsonl'), '{"id":"20261001-caddy-down","at":1,"service":"caddy","kind":"down","text":"x"}' + "`r`n")
-  $w = & $realSendToVps $S2 $rows
-  Yes 'the real Send-ToVps: the VPS says it took both' ($w -eq '')
-  $got = @(Get-Content -LiteralPath (Join-Path $box 'alerts.jsonl'))
-  Yes 'both lines are appended after the watchdog''s own, exactly as sent' ($got.Count -eq 3 -and $got[1] -eq $rows[0] -and $got[2] -eq $rows[1])
-  Yes 'each ends with a line ending, so the bot does not wait for more of it' ([IO.File]::ReadAllText((Join-Path $box 'alerts.jsonl')).EndsWith("`r`n"))
-  Yes 'ssh is asked without a prompt, as the VPS user' ($script:sshArgs -contains 'BatchMode=yes' -and $script:sshArgs -contains ('Administrator@' + $S.VpsAddress))
-  Yes 'the message text is not on the command line, only on standard input' (-not ((@($script:sshArgs) -join ' ') -match 'Down|Fine since'))
-  Remove-Item function:ssh
-
   # ---- where the webhook posts (#2501) ----------------------------------------------------
   # Asked of Discord by a GET on the webhook itself, which answers with its
-  # channel_id. -SetWebhook refuses any channel but #staff-updates and -Status
-  # says which it is; both go through Webhook-Channel.
+  # channel_id. -TestPost refuses any channel but #staff-updates.
   $script:hookCode = 200; $script:hookBody = '{"id":"123456","channel_id":"1549254991082946570","name":"Watchdog"}'
   $wc = Webhook-Channel $HookUrl
   Yes 'Webhook-Channel: a webhook in #staff-updates says so' ($wc.Channel -eq '1549254991082946570' -and -not $wc.Why)
@@ -482,17 +458,31 @@ try {
   Yes 'Webhook-Channel: a deleted webhook is no channel, and says why' (-not $wc.Channel -and $wc.Why -match '404')
   Yes 'Webhook-Channel: neither answer holds the address' ((('' + $wc.Why) -notmatch 'SECRETHOOKTOKEN') -and (('' + $wc.Why) -notmatch 'api/webhooks'))
 
+  # ---- the run log is public ----------------------------------------------------------------
+  # Everything Pass-Once printed above, through outages of every kind: the
+  # runners named, offline and back, GitHub not answering, the token refused.
+  $public = $script:printed -join "`n"
+  Yes ('the run log was written to (' + $script:printed.Count + ' lines)') ($script:printed.Count -gt 100)
+  Yes 'the run log names no runner' ($public -notmatch 'thornswood-vps')
+  Yes 'the run log does not name the private repository' ($public -notmatch 'EvilPatrick06')
+  Yes 'the run log says nothing about the runners but the outcome' (
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s' -and $_ -notmatch '^\s+runner\s+(ok|WRONG|COULD NOT CHECK)\s+\(about a private repository, so not shown here\)$' }).Count -eq 0 -and
+    @($script:printed | Where-Object { $_ -match '^\s+runner\s+COULD NOT CHECK' }).Count -gt 0)
+  Yes 'the run log carries no message text, only ids' ($public -notmatch 'is down\.|are not all online|cannot check|Checked from outside')
+  Yes 'the run log holds no webhook and no token' ($public -notmatch 'SECRETHOOKTOKEN|api/webhooks|FAKETOKEN')
+  Yes 'the public lines are there: the site and a feed say what they saw' ($public -match 'site\s+ok\s+answered 200' -and $public -match 'feed\s+ok\s+answered, release')
+
   # ---- words and secrets ----------------------------------------------------------------
   $all = (Get-Content -LiteralPath $P.Alerts -Raw) + (Get-Content -LiteralPath $P.Log -Raw)
   Yes 'the webhook address is in neither the outbox nor watch.log' ($all -notmatch 'SECRETHOOKTOKEN' -and $all -notmatch 'api/webhooks')
-  Yes 'the Azure token is in neither' ($all -notmatch 'eyFAKE')
-  $words = (Get-Content -LiteralPath $ScriptPath -Raw) + $all
-  Yes 'no em dash in the script or anything it wrote' ($words.IndexOf([char]0x2014) -lt 0)
+  $words = (Get-Content -LiteralPath $ScriptPath -Raw) + $all + (Get-Content -LiteralPath (Join-Path $pub 'README.md') -Raw) + $wf + $ka
+  Yes 'no em dash in the script, the public repository''s files or anything it wrote' ($words.IndexOf([char]0x2014) -lt 0)
   Yes 'never the word player' ($words -notmatch '(?i)\bplayers?\b')
 }
 finally {
+  $env:WATCH_WEBHOOK = $oldHook
+  $env:WATCH_RUNNER_TOKEN = $oldToken
   Remove-Item -LiteralPath $dir -Recurse -Force -EA SilentlyContinue
-  Remove-Item -LiteralPath $script:bk -Recurse -Force -EA SilentlyContinue
 }
 
 Write-Host ''
