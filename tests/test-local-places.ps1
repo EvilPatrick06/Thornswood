@@ -127,7 +127,7 @@ try {
         'scripts\release\Where.ps1',
         'scripts\vps\Backup-Server.ps1', 'scripts\vps\Fetch-Backups.ps1', 'scripts\vps\Restore-Backup.ps1',
         'scripts\vps\Vps.ps1', 'scripts\vps\Send-Script.ps1', 'scripts\vps\vps.json',
-        'scripts\mods\Clean-Everything.ps1'
+        'scripts\mods\Clean-Everything.ps1', 'scripts\mods\OnBox.ps1'
     )
     function New-Scratch([string]$dir, [bool]$worktree) {
         foreach ($rel in $copy) {

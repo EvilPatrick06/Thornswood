@@ -4,8 +4,9 @@
 
 .DESCRIPTION
   Do not run this by hand. Set-SshScope.ps1 proves key login works first, from
-  your machine, sends this to C:\Windows\Temp, runs it with Windows
-  PowerShell 5.1, and this file deletes itself when it is done.
+  your machine, then sends this file's text on ssh's standard input and
+  Windows PowerShell 5.1 runs it from there, so nothing of it is ever
+  written on the box (#3035).
 
   Issue #2182, decision 2 (Patrick, 11 Oct 2026): restrict the inbound rules on
   port 22 to known addresses, only after the hosting console login is
@@ -48,16 +49,12 @@
   A file that replaces the functions below that touch Windows (the firewall,
   scheduled tasks, SSH_CLIENT, the save folder, the save's rules). Only
   tests\test-ssh-scope.ps1 passes it, to run this against stand-ins.
-
-.PARAMETER KeepSelf
-  Do not delete this file at the end. The test harness passes it.
 #>
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)][string]$From,
     [switch]$DryRun,
-    [string]$Layer = '',
-    [switch]$KeepSelf
+    [string]$Layer = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -276,7 +273,6 @@ finally {
     if ($DryRun) { Say 'DONE' ([string]$script:changes + ' change(s) would be made. Nothing was changed.') }
     elseif ($script:stopped) { Say 'DONE' ([string]$script:changes + ' change(s) made before it stopped.') }
     else { Say 'DONE' ([string]$script:changes + ' change(s) made.') }
-    if (-not $KeepSelf -and $PSCommandPath) { Remove-Item -LiteralPath $PSCommandPath -Force -ErrorAction SilentlyContinue }
 }
 if ($script:stopped) { exit 1 }
 exit 0

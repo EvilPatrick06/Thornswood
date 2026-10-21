@@ -286,7 +286,7 @@ if ($open -ge 0 -and $close -gt $marker) {
     # Expanded the way the real script expands it, as the here-string it is,
     # with the values the script would put in.
     function Expand-Remote([string]$rootWin, $maxOnline, $seats) {
-        $farOrder = ''
+        $orderWire = ''
         $remotePlugins = 'C:/Thornswood-Server-Dev/plugins'
         $fullIndexDef = $script:fullIndexDef
         $lightDef = ''
