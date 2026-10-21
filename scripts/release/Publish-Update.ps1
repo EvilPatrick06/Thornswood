@@ -14,7 +14,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root    = 'C:\Thornswood',
+    [string]$Root,
     # Where releases are staged and zipped. Deliberately NOT under $Root: that
     # is the folder people play from, and staging there put 10.9 GB of old
     # packs on the game drive. The dev tree is where build output belongs.
@@ -115,24 +115,15 @@ $Dev = ($Channel -eq 'dev')
 
 # ---- where the launcher is installed ----------------------------------------
 #
-# C:\Thornswood on most machines. A second developer may have put it on
-# another drive, so when C: has no launcher every fixed drive is tried for
-# <drive>:\Thornswood\Launcher\Thornswood.exe. The dev build is always the
-# main root plus -DevBuild, on the same drive; that is where the main
-# launcher's Settings page installs it (DevBuild.cs). -Root still wins.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
+# The install Where.ps1 finds (#3003): C:\Thornswood on most machines, or
+# Thornswood on another drive when the launcher is there. The dev launcher
+# lives beside the main one, the install plus -DevBuild, where the main
+# launcher's Settings page installs it (DevBuild.cs), and Where.ps1 InstallDev
+# answers that. Its config.json carries the dev ports and its Launcher folder
+# holds the exe that gets uploaded. -Root still wins.
+if (-not $PSBoundParameters.ContainsKey('Root')) {
+    $Root = [string](& (Join-Path $Here 'Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' }))
 }
-if (-not $PSBoundParameters.ContainsKey('Root')) { $Root = Find-Root }
-# The dev launcher lives beside the main one. Its config.json carries the dev
-# ports and its Launcher folder holds the exe that gets uploaded.
-if ($Dev -and -not $PSBoundParameters.ContainsKey('Root')) { $Root = $Root + '-DevBuild' }
 # Only the folder worked out here is asked for a Launcher folder (#2662): no
 # Launcher folder in <install>-DevBuild means the dev build was never
 # installed. A folder named by -Root is not: Ship always passes one, the ship

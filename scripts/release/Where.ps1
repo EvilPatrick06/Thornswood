@@ -88,13 +88,26 @@
   and never falls back to another folder. where.js answers EngineBuild the
   same way, so both read one engine build.
 
+  THE LAUNCHER INSTALL, issue #3003. Install is the folder this machine's
+  launcher is installed in: C:\Thornswood, or Thornswood on the first other
+  fixed drive with Launcher\Thornswood.exe in it, else C:\Thornswood.
+  InstallDev is the same with -DevBuild on the end, where the main launcher's
+  Settings page installs the dev build (DevBuild.cs). Until 21 October six
+  scripts (Publish-Update, Repair-Manifest, Sync-Client, Go, Deploy-Gamemode
+  and Check-CollectionRules) each carried a pasted Find-Root with this rule,
+  and Check-Editions a seventh copy inline, so a change to it had to be made
+  seven times, and the copies that asked Join-Path for C: stopped on a machine
+  with none. They ask here now, and tests\test-3003-one-install-rule.ps1
+  fails on a new copy. Like ShipRoots these are this machine's, and only the
+  PowerShell scripts ask, so where.js does not answer them.
+
   Read only. It creates nothing and prints nothing but the one path.
 
 .PARAMETER What
   Which place: Repo, Engine, EngineBuild, EngineBuilds, ServerDist,
   ClientDist, ServerSettings, ChangeForms, Out, Dist, Package, Payload,
-  ServerZip, Local, Backups, Releases, ReleasesDev, ShipRoot, ShipRootDev,
-  ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
+  ServerZip, Local, Backups, Releases, ReleasesDev, Install, InstallDev,
+  ShipRoot, ShipRootDev, ShipRoots, ShipRootNamed or ShipRootNamedDev; or a top folder
   from layout.json (docs, bot, voice, site, tests, game, launcher,
   installer, records, scripts).
 #>
@@ -158,10 +171,12 @@ function Get-Named($obj, [string]$name) {
     return $prop.Value
 }
 
-# The launcher install: C:\Thornswood, or Thornswood on the first other fixed
-# drive that has Launcher\Thornswood.exe in it, else C:\Thornswood. The first
-# is asked as a plain string, so a machine with no C: drive (a harness off
-# Windows) gets an answer rather than an error from Join-Path.
+# The launcher install (#3003, see the header): C:\Thornswood, or Thornswood
+# on the first other fixed drive that has Launcher\Thornswood.exe in it, else
+# C:\Thornswood. The only copy of the rule: every script asks Where.ps1
+# Install or InstallDev for it. The first is asked as a plain string, so a
+# machine with no C: drive (a harness off Windows) gets an answer rather than
+# an error from Join-Path.
 function Find-InstallRoot {
     $first = 'C:\Thornswood'
     if (Test-Path -LiteralPath ($first + '\Launcher\Thornswood.exe')) { return $first }
@@ -189,9 +204,8 @@ function Get-NamedShipRoot([string]$channel) {
 function Get-ShipRoot([string]$channel) {
     $named = Get-NamedShipRoot $channel
     if ($named) { return $named }
-    $root = Find-InstallRoot
-    if ($channel -eq 'dev') { return ($root + '-DevBuild') }
-    return $root
+    if ($channel -eq 'dev') { return Get-Place 'InstallDev' }
+    return Get-Place 'Install'
 }
 
 # The fork folder whose build\dist is this machine's engine build (#2019, see
@@ -221,6 +235,9 @@ function Get-Place([string]$name) {
         'Releases'    { return Join-Path (Get-MachineData) 'feed\main' }
         'ReleasesDev' { return Join-Path (Get-MachineData) 'feed\dev' }
         # The folder a release is built from here, and the file that names it (#1692).
+        # The launcher install, and the dev build beside it (#3003).
+        'Install'     { return Find-InstallRoot }
+        'InstallDev'  { return ((Find-InstallRoot) + '-DevBuild') }
         'ShipRoots'   { return Join-Path (Get-MachineData) 'ship-roots.json' }
         'ShipRoot'    { return Get-ShipRoot 'main' }
         'ShipRootDev' { return Get-ShipRoot 'dev' }
@@ -243,7 +260,7 @@ function Get-Place([string]$name) {
 
 $placeNames = @('Repo', 'MachineData', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
                 'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups', 'Releases', 'ReleasesDev',
-                'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
+                'Install', 'InstallDev', 'ShipRoot', 'ShipRootDev', 'ShipRoots', 'ShipRootNamed', 'ShipRootNamedDev')
 if ($placeNames -contains $What) {
     Get-Place $What
 }

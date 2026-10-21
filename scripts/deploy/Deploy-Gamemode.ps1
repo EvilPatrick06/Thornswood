@@ -58,10 +58,11 @@
 param(
     [string]$Gamemode,
     [string]$Dist     = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
-    # C:\Thornswood\... on most machines; Find-Root below retargets when the
-    # launcher is on another drive. -Data, -Plugins and -Vortex still win.
-    [string]$Data     = 'C:\Thornswood\Game\Data',
-    [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
+    # Under the launcher install, which Where.ps1 Install finds (C:\Thornswood
+    # on most machines, another drive's when the launcher is there, #3003).
+    # -Data, -Plugins and -Vortex still win.
+    [string]$Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string]$Plugins  = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt'),
     [string]$ServerName = 'Thornswood',
     [int]   $Port     = 7777,
     [switch]$MinimalLoadOrder,   # masters plus Thornswood-Content.esp only
@@ -141,27 +142,6 @@ param(
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
-# Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1. -Data,
-# -Plugins and -Vortex still win; this only fills the defaults when they were
-# not passed, so a machine whose launcher lives on another drive is not stuck
-# on C:\Thornswood.
-function Find-Root {
-    $first = 'C:\Thornswood'
-    if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }
-    foreach ($d in @(Get-PSDrive -PSProvider FileSystem | Where-Object { $_.Root -match '^[A-Za-z]:\\$' })) {
-        $cand = Join-Path $d.Root 'Thornswood'
-        if (Test-Path -LiteralPath (Join-Path $cand 'Launcher\Thornswood.exe')) { return $cand }
-    }
-    return $first
-}
-if (-not $Vortex) {
-    if (-not $PSBoundParameters.ContainsKey('Data')) {
-        $Data = Join-Path (Find-Root) 'Game\Data'
-    }
-    if (-not $PSBoundParameters.ContainsKey('Plugins')) {
-        $Plugins = Join-Path (Find-Root) 'Profile\Default\plugins.txt'
-    }
-}
 # ---------------------------------------------------------------- -Vortex ---
 #
 # Where the build actually is.
@@ -390,7 +370,7 @@ if (-not (Test-Path -LiteralPath $lo)) {
 else {
     . $lo
     $cfgPath = Join-Path (Split-Path -Parent $Data) 'config.json'
-    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = Join-Path (Find-Root) 'config.json' }
+    if (-not (Test-Path -LiteralPath $cfgPath)) { $cfgPath = (& (Join-Path $Here '..\release\Where.ps1') Install) + '\config.json' }
     # Which collection is read from config.json. One that is not there, or does
     # not read, names none, so the revision cannot be read below either, and
     # the stop there says why.
