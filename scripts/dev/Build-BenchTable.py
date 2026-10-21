@@ -75,7 +75,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import own_plugins  # noqa: E402
 
 COMPRESSED = 0x00040000
-MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
+MASTERS = own_plugins.MASTERS
 RANKS = ['novice', 'advanced', 'expert', 'master']
 # The record types a bench can be. A crafting station is FURN; the grain mill and
 # a handful of modded stations are ACTI.
@@ -299,24 +299,10 @@ def main():
             a['halves'][half] = rank
 
     # ------------------------------------------------- the load order, once
-    # Vortex marks the plugins that are switched on with '*'. A line without one
-    # is a plugin it knows about and has switched off: the game does not load it
-    # and the server never sees its records, so it is not part of this build.
-    # Until 5 October this read every line and only stripped the '*', so
-    # collection revision 2's five switched off plugins, three of them not in the
-    # game folder at all, stopped it (issue #1712).
-    order = list(MASTERS)
-    off = 0
-    for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if not line.startswith('*'):
-            off += 1
-            continue
-        line = line[1:].strip()
-        if line and line not in order:
-            order.append(line)
+    # A switched off line is not part of this build: the game does not load it
+    # and the server never sees its records (#1712, own_plugins.load_order).
+    order, off = own_plugins.read_plugins_txt(args.plugins)
+    off = len(off)
     print('Load order')
     print('  %d plugin(s): the five masters, then %s' % (len(order), args.plugins))
     if off:

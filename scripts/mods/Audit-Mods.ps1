@@ -24,6 +24,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path (Join-Path (Split-Path -Parent $Here) 'dev') 'OwnPlugins.ps1')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
@@ -39,13 +40,11 @@ Say '  Reading. A few minutes: it is about thirty thousand files.' 'DarkGray'
 
 # ---------------------------------------------------------- the plugins ---
 $plugFile = Join-Path $Root 'Profile\LocalAppData\plugins.txt'
+# The plugins the game loads: the five masters, then each '*' line
+# (OwnPlugins.ps1). A master owns its archives the way any plugin does.
 $enabled = @{}
 if (Test-Path -LiteralPath $plugFile) {
-    foreach ($l in (Get-Content -LiteralPath $plugFile)) {
-        $t = $l.Trim()
-        if ($t.Length -eq 0 -or $t.StartsWith('#')) { continue }
-        if ($t.StartsWith('*')) { $enabled[$t.Substring(1).ToLowerInvariant()] = $true }
-    }
+    foreach ($p in (Get-LoadOrder $plugFile)) { $enabled[$p.ToLowerInvariant()] = $true }
 }
 Head ("Plugins: " + $enabled.Count + " enabled")
 
