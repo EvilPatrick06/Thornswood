@@ -99,11 +99,12 @@ $secure = ConvertTo-SecureString $secret -AsPlainText -Force
 
 function Leaks([string]$text) { return $text.Contains($secret) -or $text.Contains($wire) -or $text.Contains($wide) }
 
-# Proves one run; hands back what it printed and its exit code.
-function Prove([scriptblock]$run, [string[]]$sshCommand = @($fakeSsh), $value = $secure) {
+# Proves one run; hands back what it printed, its exit code and how long it took.
+function Prove([scriptblock]$run, [string[]]$sshCommand = @($fakeSsh), $value = $secure, [int]$max = 120) {
     $global:LASTEXITCODE = 99
-    $out = @(& $prove -Run $run -Secret $value -VpsHost 'box.invalid' -VpsUser 'tester' -MaxSeconds 120 -SshCommand $sshCommand *>&1 | ForEach-Object { "$_" })
-    return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE }
+    $sw = [Diagnostics.Stopwatch]::StartNew()
+    $out = @(& $prove -Run $run -Secret $value -VpsHost 'box.invalid' -VpsUser 'tester' -MaxSeconds $max -SshCommand $sshCommand *>&1 | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Out = ($out -join "`n"); Code = $LASTEXITCODE; Seconds = $sw.Elapsed.TotalSeconds }
 }
 
 try {
@@ -121,6 +122,9 @@ Start-Sleep -Seconds 2
     Yes 'Send-Secret way: it read some command lines' ($r.Out -match '\((\d+) process command lines read\)' -and [int]$Matches[1] -gt 0)
     Yes 'Send-Secret way: prints neither the value nor its base64' (-not (Leaks $r.Out))
     Yes 'Send-Secret way: prints no command line' ($r.Out -notmatch 'EncodedCommand|powershell -|cmd\.exe')
+    # The watcher no longer reads standard input after the value, so only its
+    # stop event ends it before the 120 second limit (#2912).
+    Yes 'Send-Secret way: the stop event ends the watch when the run is over, not at the limit' ($r.Seconds -lt 60 -and $r.Out -notmatch 'did not reach')
 
     # ---- 2. control, the old way: the value base64'd into the command line.
     # It must say FOUND, or the watcher is known to see nothing.
@@ -133,14 +137,20 @@ Start-Sleep -Seconds 2
     Yes 'control, the old way: still prints neither the value nor its base64' (-not (Leaks $r.Out))
     Yes 'control, the old way: still prints no command line' ($r.Out -notmatch 'EncodedCommand|powershell -|cmd\.exe')
 
-    # ---- 3. the watcher's own command line holds the watcher and nothing else
+    # ---- 3. the watcher's and the stop's command lines hold their scripts and
+    # nothing else, and each stop names its own watcher's event
     $sent = [IO.File]::ReadAllText($calls)
     $decoded = New-Object Text.StringBuilder
+    $watchers = @(); $stops = @()
     foreach ($m in [regex]::Matches($sent, '-EncodedCommand ([A-Za-z0-9+/=]+)')) {
-        [void]$decoded.AppendLine([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)))
+        $d = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+        [void]$decoded.AppendLine($d)
+        $n = [regex]::Match($d, 'Global\\Thornswood-ProofStop-[0-9a-f]{32}').Value
+        if ($d.Contains('WATCHER READY')) { $watchers += $n } elseif ($d.Contains('STOP SET')) { $stops += $n }
     }
-    Yes 'the watcher went up twice, with host key checking on' (([regex]::Matches($sent, 'StrictHostKeyChecking=yes tester@box\.invalid')).Count -eq 2)
-    Yes 'the watcher''s command line holds neither the value nor its base64, decoded or not' (-not (Leaks $sent) -and -not (Leaks $decoded.ToString()) -and $decoded.ToString().Contains('WATCHER READY'))
+    Yes 'the watcher and its stop went up twice each, with host key checking on' (([regex]::Matches($sent, 'StrictHostKeyChecking=yes tester@box\.invalid')).Count -eq 4 -and $watchers.Count -eq 2 -and $stops.Count -eq 2)
+    Yes 'each stop sets its own watcher''s event, a new one each run' ($watchers.Count -eq 2 -and $watchers[0] -and $watchers[1] -and $watchers[0] -eq $stops[0] -and $watchers[1] -eq $stops[1] -and $watchers[0] -ne $watchers[1])
+    Yes 'the watcher''s and the stop''s command lines hold neither the value nor its base64, decoded or not' (-not (Leaks $sent) -and -not (Leaks $decoded.ToString()))
 
     # ---- 4. no value, nothing started
     $before = [IO.File]::ReadAllText($calls)
@@ -161,45 +171,74 @@ Start-Sleep -Seconds 2
     Yes 'no watcher: the run is not run' (-not $global:wasRun)
     Yes 'no watcher: says nothing is proved, exit code 2' ($r.Out -match 'did not start' -and $r.Code -eq 2)
 
-    # ---- 6. the watcher ends with standard input still open (#451, 20 Oct).
-    # The fake ssh above passes the end of standard input on; the VPS's did
-    # not, and the watcher never answered. Here it runs straight in Windows
-    # PowerShell 5.1 with its standard input left open: a stop line must end
-    # it, and so must its time limit with no line at all.
+    # ---- 6. the watcher ends with standard input still open (#451, #2912).
+    # The fake ssh above passes the end of standard input on; the VPS's
+    # OpenSSH passes on nothing written after the session starts, and the
+    # watcher never answered until its limit. Here it runs straight in Windows
+    # PowerShell 5.1 with its standard input left open, as on the VPS: its
+    # stop event must end it, set by the same script the second ssh session
+    # runs, and so must its time limit with nothing set at all.
     $ast = [Management.Automation.Language.Parser]::ParseFile($prove, [ref]$null, [ref]$null)
-    $fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Get-ThornswoodSecretWatcher' }, $true)
-    . ([scriptblock]::Create($fn.Extent.Text))
-    function Watch-Open([int]$seconds, [bool]$stopLine) {
+    foreach ($name in 'Get-ThornswoodSecretWatcher', 'Get-ThornswoodSecretWatcherStop') {
+        $fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }.GetNewClosure(), $true)
+        . ([scriptblock]::Create($fn.Extent.Text))
+    }
+    function Run-Ps([string]$script, [bool]$keepOpen) {
         $psi = New-Object Diagnostics.ProcessStartInfo
         $psi.FileName = 'powershell.exe'
-        $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodSecretWatcher $seconds)))
+        $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
         $psi.UseShellExecute = $false
         $psi.RedirectStandardInput = $true
         $psi.RedirectStandardOutput = $true
         $psi.CreateNoWindow = $true
         $p = [Diagnostics.Process]::Start($psi)
+        if (-not $keepOpen) { $p.StandardInput.Close() }
+        return $p
+    }
+    function Watch-Open([int]$seconds, [bool]$stopIt, [string]$name = ('Global\Thornswood-ProofStop-' + [Guid]::NewGuid().ToString('N'))) {
+        $p = Run-Ps (Get-ThornswoodSecretWatcher $seconds $name) $true
         $o = $p.StandardOutput.ReadToEndAsync()
         $p.StandardInput.WriteLine($wire)
         $p.StandardInput.Flush()
-        if ($stopLine) { Start-Sleep -Seconds 2; $p.StandardInput.WriteLine('STOP'); $p.StandardInput.Flush() }
+        $set = ''
+        if ($stopIt) {
+            Start-Sleep -Seconds 2
+            $s = Run-Ps (Get-ThornswoodSecretWatcherStop $name) $false
+            $set = $s.StandardOutput.ReadToEnd()
+            $s.WaitForExit()
+        }
         $sw = [Diagnostics.Stopwatch]::StartNew()
         $ended = $p.WaitForExit(($seconds + 20) * 1000)
         if (-not $ended) { $p.Kill(); [void]$p.WaitForExit(5000) }
-        return [pscustomobject]@{ Ended = $ended; Seconds = $sw.Elapsed.TotalSeconds; Out = $o.Result }
+        return [pscustomobject]@{ Ended = $ended; Seconds = $sw.Elapsed.TotalSeconds; Out = $o.Result; Set = $set; Code = $p.ExitCode }
     }
     $w = Watch-Open 120 $true
-    Yes 'standard input open: a stop line ends the watcher well before its limit' ($w.Ended -and $w.Seconds -lt 30)
-    Yes 'standard input open: after a stop line it answers NOT FOUND over some command lines' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
-    # And this side sends that line: a watcher that reads two lines, the value
-    # and the next, and keeps the second.
-    $lineFile = Join-Path $work 'second-line.txt'
-    $liner = Join-Path $work 'liner.cmd'
-    [IO.File]::WriteAllText($liner, ("@echo off`r`nset /p first=`r`necho WATCHER READY`r`nset /p second=`r`n>`"" + $lineFile + "`" echo [%second%]`r`necho WATCHER NOT FOUND`r`necho WATCHER READ 1`r`n"), (New-Object Text.ASCIIEncoding))
-    $r = Prove { 'ran' } -sshCommand @($liner)
-    Yes 'this side sends the watcher a stop line when the run is over' ((Test-Path -LiteralPath $lineFile) -and ([IO.File]::ReadAllText($lineFile).Trim() -eq '[STOP]') -and $r.Code -eq 0)
+    Yes 'standard input open: the stop script finds the event and sets it' ($w.Set -match '(?m)^STOP SET')
+    Yes 'standard input open: the stop event ends the watcher well before its limit' ($w.Ended -and $w.Seconds -lt 30)
+    Yes 'standard input open: after the stop it answers NOT FOUND over some command lines' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
     $w = Watch-Open 3 $false
-    Yes 'standard input open, no stop line: the time limit ends the watcher' $w.Ended
-    Yes 'standard input open, no stop line: it still answers' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
+    Yes 'standard input open, no stop: the time limit ends the watcher, and powershell.exe with it' $w.Ended
+    Yes 'standard input open, no stop: it still answers' ($w.Out -match 'WATCHER NOT FOUND' -and $w.Out -match 'WATCHER READ [1-9]')
+    $late = Run-Ps (Get-ThornswoodSecretWatcherStop ('Global\Thornswood-ProofStop-' + [Guid]::NewGuid().ToString('N'))) $false
+    $lateSaid = $late.StandardOutput.ReadToEnd()
+    $late.WaitForExit()
+    Yes 'a stop after the watcher has ended says STOP GONE' ($lateSaid -match '(?m)^STOP GONE')
+
+    # ---- 7. a stop name somebody made first: the watcher refuses it before it
+    # says it is watching, so it cannot be stopped early from outside.
+    $taken = 'Global\Thornswood-ProofStop-' + [Guid]::NewGuid().ToString('N')
+    $squat = [Threading.EventWaitHandle]::new($false, [Threading.EventResetMode]::ManualReset, $taken)
+    try { $w = Watch-Open 30 $false $taken }
+    finally { $squat.Dispose() }
+    Yes 'a stop name already taken: the watcher says so and never says it is watching' ($w.Ended -and $w.Seconds -lt 20 -and $w.Out -match 'WATCHER STOP TAKEN' -and $w.Out -notmatch 'WATCHER READY' -and $w.Code -eq 2)
+
+    # ---- 8. a stop session that cannot reach the box: the watcher still
+    # answers at its limit, and this side says the stop did not reach it.
+    $once = Join-Path $work 'once.cmd'
+    $mark = Join-Path $work 'once-used.txt'
+    [IO.File]::WriteAllText($once, ("@echo off`r`nif exist `"" + $mark + "`" exit /b 255`r`n>`"" + $mark + "`" echo used`r`n" + ($cmd -replace '(?m)^@echo off\r?\n', '') + "`r`n"), (New-Object Text.ASCIIEncoding))
+    $r = Prove { 'ran' } -sshCommand @($once) -max 5
+    Yes 'the stop cannot reach the box: says so, and still answers NOT FOUND at the limit' ($r.Out -match 'stop did not reach' -and $r.Out -match '(?m)^NOT FOUND ' -and $r.Code -eq 0)
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
