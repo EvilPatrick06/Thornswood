@@ -38,15 +38,22 @@
               packs on purpose, so packs are not asked for. Every launcher
               reads these to update, and a new install starts from them. The
               addresses are Updater.cs's own.
-    cert      the certificate on thornswood.net has more than 14 days left.
-              Let's Encrypt (issuer YE2), 13 December 2026 that day, 75.8
-              days. Caddy renews it about 30 days before, so under 14 means a
-              renewal has been failing for two weeks.
-    dns       thornswood.net resolves to the VPS in scripts\vps\vps.json and
-              nothing else. The name servers are Cloudflare's (brenna and
-              robert.ns.cloudflare.com) and the A record points straight at
-              the VPS itself, not through Cloudflare's proxy. If
-              the proxy is ever switched on, this is the line to change.
+    cert      the certificate a visitor gets on thornswood.net has more than
+              14 days left. Since #2995 that is Cloudflare's own, which
+              Cloudflare renews itself; Caddy's on the box can no longer be
+              reached from here (the box takes 443 only from Cloudflare), so
+              the box's watchdog asks it (Watch-Services.ps1, cert).
+    dns       thornswood.net resolves only into Cloudflare's ranges
+              (scripts\deploy\cloudflare-ranges.txt), so its proxy is on.
+              The name servers are Cloudflare's (brenna and
+              robert.ns.cloudflare.com). Since #2995 (Patrick's A, 21 Oct
+              2026) the box takes 80 and 443 only from those ranges, so a
+              record pointing straight at the VPS reaches nobody: that is
+              what this tells.
+    ranges    Cloudflare's published ranges (api.cloudflare.com/client/v4/ips)
+              are still the ones in cloudflare-ranges.txt, once a day. The
+              Caddyfile trusts that list and the box's firewall takes 443
+              from it, so a range Cloudflare adds is visitors refused.
     domain    the registration has more than 30 days left, once a day.
               Registered 15 September 2026 through Cloudflare, runs out 15
               September 2027 (RDAP, rdap.org).
@@ -156,12 +163,12 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # and reads watch-outside.json, which -Export writes from these: only the
 # keys in $PublicSettings, each something anybody can already see or a name
 # the runner check needs.
-$PublicSettings = @('Site', 'SiteHost', 'Feeds', 'VpsAddress', 'Repo', 'RunnerName', 'NexusGame', 'NexusSlug', 'StaffChannel', 'CertDays', 'DomainDays')
+$PublicSettings = @('Site', 'SiteHost', 'Feeds', 'VpsAddress', 'FrontRanges', 'Repo', 'RunnerName', 'NexusGame', 'NexusSlug', 'StaffChannel', 'CertDays', 'DomainDays')
 
 function Read-Settings([string]$repo, [string]$saved) {
   $s = @{
     Site = 'https://thornswood.net/'; SiteHost = 'thornswood.net'
-    Feeds = @(); VpsAddress = ''; StaffChannel = ''
+    Feeds = @(); VpsAddress = ''; FrontRanges = @(); StaffChannel = ''
     Repo = 'EvilPatrick06/Thornswood'; RunnerName = 'thornswood-vps'
     NexusGame = ''; NexusSlug = ''
     CertDays = 14; DomainDays = 30; Minutes = $(if ($Minutes) { $Minutes } else { 5 })
@@ -180,6 +187,9 @@ function Read-Settings([string]$repo, [string]$saved) {
     # Through Vps.ps1, so this machine's own VPS file and THORNSWOOD_VPS count (#459).
     . (Join-Path $repo 'scripts/vps/Vps.ps1')
     $s.VpsAddress = Get-ThornswoodVpsAddress
+    # Cloudflare's ranges, the ones the box takes 443 from (#2995).
+    $cf = Join-Path $repo 'scripts/deploy/cloudflare-ranges.txt'
+    if (Test-Path -LiteralPath $cf) { $s.FrontRanges = @(Get-Content -LiteralPath $cf | ForEach-Object { ("$_" -replace '#.*$', '').Trim() } | Where-Object { $_ }) }
     # #staff-updates, the channel the bot says the watchdog's messages in and
     # so the one the webhook has to post in: the id the bot reads (#2501).
     $sc = Join-Path $repo 'bot/staff-channel.txt'
@@ -191,6 +201,7 @@ function Read-Settings([string]$repo, [string]$saved) {
     $j = Get-Content -LiteralPath $saved -Raw | ConvertFrom-Json
     foreach ($p in $j.PSObject.Properties) { if ($PublicSettings -contains $p.Name) { $s[$p.Name] = $p.Value } }
     $s.Feeds = @($j.Feeds | ForEach-Object { @{ Name = $_.Name; Say = $_.Say; Url = $_.Url } })
+    $s.FrontRanges = @($j.FrontRanges | Where-Object { $_ } | ForEach-Object { '' + $_ })
     return $s
   }
   throw 'Neither the repository (launcher/app/Updater.cs) nor watch-outside.json is beside this script, so there is nothing to say what to ask.'
@@ -393,15 +404,71 @@ function Check-Cert($S) {
   return (Ok ('good until ' + $when + ', ' + [math]::Round($left, 1) + ' days'))
 }
 
+# Whether an address is inside one of the ranges, each an address and a
+# prefix length. The same rule as scripts\vps\vps-web-firewall.ps1's, which
+# tests\test-2995-cloudflare-front.ps1 holds the two to.
+function Test-InRanges([string]$address, $ranges) {
+  $ip = $null
+  if (-not [Net.IPAddress]::TryParse($address, [ref]$ip)) { return $false }
+  if ($ip.AddressFamily -eq [Net.Sockets.AddressFamily]::InterNetworkV6 -and $ip.IsIPv4MappedToIPv6) { $ip = $ip.MapToIPv4() }
+  $b = $ip.GetAddressBytes()
+  foreach ($t in @($ranges)) {
+    $parts = ('' + $t).Split('/')
+    $net = $null
+    if ($parts.Count -ne 2 -or -not [Net.IPAddress]::TryParse($parts[0], [ref]$net)) { continue }
+    $rb = $net.GetAddressBytes()
+    if ($rb.Length -ne $b.Length) { continue }
+    $left = [int]$parts[1]
+    $same = $true
+    for ($i = 0; $i -lt $b.Length -and $left -gt 0; $i++) {
+      $take = [Math]::Min(8, $left)
+      $mask = [byte]((0xFF -shl (8 - $take)) -band 0xFF)
+      if (($b[$i] -band $mask) -ne ($rb[$i] -band $mask)) { $same = $false; break }
+      $left -= $take
+    }
+    if ($same) { return $true }
+  }
+  return $false
+}
+
+# Every address the name has must be Cloudflare's: one that is not, the
+# VPS's own above all, is a record with the proxy off, and the box refuses
+# 443 to everybody who follows it (#2995).
 function Check-Dns($S) {
   $d = Get-Dns $S.SiteHost
   if ($d.Error -or @($d.Addresses).Count -eq 0) { return (Wrong ($S.SiteHost + ' does not resolve')) }
-  $v4 = @($d.Addresses | Where-Object { $_ -match '^\d+\.\d+\.\d+\.\d+$' })
-  $other = @($v4 | Where-Object { $_ -ne $S.VpsAddress })
-  if ($v4.Count -eq 0 -or $other.Count -gt 0) {
-    return (Wrong ($S.SiteHost + ' resolves to ' + (@($d.Addresses) -join ', ') + ', not only the VPS at ' + $S.VpsAddress))
+  if (-not @($S.FrontRanges).Count) { return (Unknown 'there is no list of Cloudflare''s ranges here (cloudflare-ranges.txt) to compare the name with') }
+  $out = @($d.Addresses | Where-Object { -not (Test-InRanges $_ $S.FrontRanges) })
+  if ($out.Count) {
+    $why = $S.SiteHost + ' resolves to ' + (@($d.Addresses) -join ', ') + ', and ' + ($out -join ', ') + ' is not Cloudflare''s'
+    if ($out -contains $S.VpsAddress) { $why += ': that is the VPS itself, with the proxy off, and the VPS takes 443 only from Cloudflare' }
+    return (Wrong $why)
   }
-  return (Ok ('resolves to ' + ($v4 -join ', ')))
+  return (Ok ('resolves to ' + (@($d.Addresses) -join ', ') + ', Cloudflare''s'))
+}
+
+# Cloudflare is asked, not the site: Cloudflare's API not answering says
+# nothing about the ranges.
+function Check-Ranges($S) {
+  $a = Get-Http 'https://api.cloudflare.com/client/v4/ips' '' '' @{ Accept = 'application/json' }
+  if ($a.Code -ne 200) { return (Unknown ('Cloudflare''s API ' + $(if ($a.Code) { 'answered HTTP ' + $a.Code } else { $a.Error }))) }
+  $now = @()
+  try {
+    $j = $a.Body | ConvertFrom-Json
+    if (-not $j.success) { throw 'not a success' }
+    $now = @(@($j.result.ipv4_cidrs) + @($j.result.ipv6_cidrs) | Where-Object { $_ } | ForEach-Object { '' + $_ })
+  } catch { $now = @() <# an answer that is not the list is said on the next line, as could not check #> }
+  if (-not $now.Count) { return (Unknown 'Cloudflare''s API answered without its ranges') }
+  $have = @($S.FrontRanges | ForEach-Object { '' + $_ })
+  $new = @($now | Where-Object { $have -notcontains $_ })
+  $gone = @($have | Where-Object { $now -notcontains $_ })
+  if ($new.Count -or $gone.Count) {
+    $why = 'Cloudflare publishes ranges cloudflare-ranges.txt does not match'
+    if ($new.Count) { $why += ': new ' + ($new -join ', ') }
+    if ($gone.Count) { $why += $(if ($new.Count) { '; ' } else { ': ' }) + 'no longer listed ' + ($gone -join ', ') }
+    return (Wrong $why)
+  }
+  return (Ok ('the ' + $now.Count + ' ranges match cloudflare-ranges.txt'))
 }
 
 # The registry is asked, not the domain: a registry that does not answer says
@@ -462,10 +529,12 @@ function Get-Checks($S) {
                 Fix = 'Every launcher reads it to update and a new install starts from it, so until it answers nobody can update or install.' }
   }
   $list += @(
-    @{ Name = 'cert'; Say = ('The certificate for ' + $S.SiteHost); What = ('the certificate for ' + $S.SiteHost); Fails = 'needs a look'; Recovers = 'is fine again'; Misses = 1; Back = 1; Every = 60
-       Fix = 'Caddy on the VPS renews it by itself about 30 days before the end, so a renewal has been failing: read Caddy''s log on the VPS.' },
-    @{ Name = 'dns'; Say = $S.SiteHost; What = ('where ' + $S.SiteHost + ' points'); Fails = 'does not point at the VPS'; Recovers = 'points at the VPS again'; Misses = 2; Back = 2; Every = 0
-       Fix = 'The name servers are Cloudflare''s: check the A record for it in the Cloudflare dashboard.' },
+    @{ Name = 'cert'; Say = ('Cloudflare''s certificate for ' + $S.SiteHost); What = ('Cloudflare''s certificate for ' + $S.SiteHost); Fails = 'needs a look'; Recovers = 'is fine again'; Misses = 1; Back = 1; Every = 60
+       Fix = 'Cloudflare renews it by itself: look in the Cloudflare dashboard, SSL/TLS, Edge Certificates. Caddy''s own certificate on the VPS is the box watchdog''s cert check.' },
+    @{ Name = 'dns'; Say = $S.SiteHost; What = ('where ' + $S.SiteHost + ' points'); Fails = 'does not point at Cloudflare'; Recovers = 'points at Cloudflare again'; Misses = 2; Back = 2; Every = 0
+       Fix = 'The name servers are Cloudflare''s: in the Cloudflare dashboard, DNS, Records, the records for @ and www must be Proxied (the orange cloud). The VPS takes 443 only from Cloudflare (#2995), so a record pointing straight at it reaches nobody.' },
+    @{ Name = 'ranges'; Say = 'Cloudflare''s list of its addresses'; What = 'Cloudflare''s list of its addresses'; Fails = 'has changed'; Recovers = 'matches ours again'; Misses = 1; Back = 1; Every = 1440
+       Fix = 'The VPS takes 443 only from the ranges in scripts\deploy\cloudflare-ranges.txt, and Caddy believes only those for the visitor''s address. Put Cloudflare''s list into that file and the Caddyfile''s trusted_proxies line (tests\test-2995-cloudflare-front.ps1 holds the two equal), merge it, then send the Caddyfile with Setup-Domain.ps1 and run Set-WebFirewall.ps1.' },
     @{ Name = 'domain'; Say = ('The registration of ' + $S.SiteHost); What = ('the registration of ' + $S.SiteHost); Fails = 'runs out soon'; Recovers = 'was renewed'; Misses = 1; Back = 1; Every = 1440
        Fix = 'It is registered through Cloudflare: renew it there, under Domain Registration.' },
     @{ Name = 'runner'; Say = ('The build runners, ' + $S.RunnerName + ' and the numbered ones,'); What = 'the build runners'; Fails = 'are not all online on GitHub'; Recovers = 'are all online again'; Misses = 3; Back = 2; Every = 0; Private = $true
@@ -482,6 +551,7 @@ function Invoke-Check($S, $c) {
     'site'    { return (Check-Site $S) }
     'cert'    { return (Check-Cert $S) }
     'dns'     { return (Check-Dns $S) }
+    'ranges'  { return (Check-Ranges $S) }
     'domain'  { return (Check-Domain $S) }
     'runner'  { return (Check-Runner $S) }
     'nexus'   { return (Check-Nexus $S) }
