@@ -148,6 +148,12 @@ function Write-GeneratedRecord([string]$Path, [string]$Game, $Inputs, $Files) {
     if (-not (Test-Path -LiteralPath $dir)) { New-Item -ItemType Directory -Force -Path $dir | Out-Null }
     $tmp = $Path + '.new'
     [IO.File]::WriteAllLines($tmp, $lines.ToArray(), (New-Object Text.UTF8Encoding($false)))
+    # Off Windows (a Ship or a release script run in a cloud session) there is
+    # no kernel32, and the first write stopped with "Value cannot be null"
+    # loading it. There File.Move with overwrite is rename(2), which replaces
+    # the record in one step as MoveFileEx does here. Windows PowerShell 5.1
+    # never reaches this line, so the overload it lacks is never asked of it.
+    if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { [IO.File]::Move($tmp, $Path, $true); return }
     if (-not ('Thornswood.RecordSwap' -as [type])) {
         Add-Type -TypeDefinition @'
 using System;

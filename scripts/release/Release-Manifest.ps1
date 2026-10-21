@@ -104,6 +104,11 @@ function New-ReleaseManifestFiles($doc, [string]$Id, [string]$Channel, [string]$
     [IO.File]::WriteAllText($json, ($m | ConvertTo-Json -Depth 8 -Compress), (New-Object Text.UTF8Encoding($false)))
     $cat = Join-Path $Dir 'release.cat'
     if ($NoCatalog) { return [pscustomobject]@{ Json = $json; Catalog = $cat; Files = $files } }
+    # Said in words: off Windows the command is simply not there (#2989).
+    if (-not (Get-Command New-FileCatalog -ErrorAction SilentlyContinue)) {
+        throw ('the catalog is made with New-FileCatalog, which is only on Windows, so a release that signs here can only be published ' +
+               'from Windows. A release from the feed signs on GitHub instead (Ship -FromFeed).')
+    }
     New-FileCatalog -Path $files -CatalogFilePath $cat -CatalogVersion 2.0 | Out-Null
     if (-not (Test-Path -LiteralPath $cat -PathType Leaf)) { throw "New-FileCatalog wrote no catalog at $cat." }
     return [pscustomobject]@{ Json = $json; Catalog = $cat; Files = $files }
