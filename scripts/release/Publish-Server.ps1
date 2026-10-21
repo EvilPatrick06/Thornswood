@@ -33,7 +33,8 @@
        into the site's deployed-build.json (DeployedBuild.ps1), for the
        credits page (#2303). A record that cannot be written stops the run
        with exit 1, the server up.
-    6. waits for the resources port to answer, from here
+    6. tries the resources port once, from here (#2975): the box has
+       already had it answer, so this is the try a firewall rule shows up in
 
   The gamemode in the payload is game\gamemode.js as the commit holds it, the
   gamemode artifact (Artifact.ps1), and its build stamp (thornswood-build.json,
@@ -1008,40 +1009,33 @@ $GamePort = $wantPort
 $ResPort  = if ($ResourcesPort -gt 0) { $ResourcesPort } elseif ($GamePort -eq 7777) { 3000 } else { $GamePort + 1 }
 
 Head 'Checking it answers'
-$up = $false
-# A connect that throws (the name does not resolve, say) is not an answer,
-# and the last one is said below with the rest of what went wrong (#2711).
-$connectWhy = ''
-for ($i = 0; $i -lt 30; $i++) {
-    $c = New-Object Net.Sockets.TcpClient
-    try {
-        $null = $c.BeginConnect($VpsHost, $ResPort, $null, $null).AsyncWaitHandle.WaitOne(1000)
-        $up = $c.Connected
-    } catch { $connectWhy = $_.Exception.Message }
-    finally { $c.Close() }
-    if ($up) { break }
-    Start-Sleep -Seconds 2
-}
+# ONE TRY (#2975). The installer has already had the new server answer on
+# both its ports from the box itself (INSTALL OK), and the server listens on
+# every address with that one socket, behind standing firewall rules, so
+# nothing is left to wait for: Vps.ps1 "from outside" has the measurements.
+# Until 21 Oct 2026 this tried up to 30 times two seconds apart. The witness
+# is the other server's resources port, which answers everybody, so a
+# machine that reaches no raw port on the box (a cloud thread's) is told
+# apart from a port that is shut (#2711's "say why" is NotKnown's).
+$witness = if ($ResPort -eq 3000) { 7788 } else { 3000 }
+$outside = Test-ThornswoodFromOutside $VpsHost $ResPort $witness
 
 Write-Host ''
-if ($up) {
+if ($outside.Answered) {
     Say ("{0} is up at {1}:{2}, resources on {3}" -f $(if ($IsDev) { 'The DEV server' } else { 'Thornswood' }), $VpsHost, $GamePort, $ResPort) 'Green'
     Write-Host ''
-} else {
-    Say "The install finished but nothing is answering on ${VpsHost}:${ResPort}." 'Red'
-    if ($connectWhy) { Say "  the last try to connect said: $connectWhy" 'Red' }
-
-    # Rather than list what it might be, fetch what it actually said. The task
-    # redirects everything the server prints into this file for exactly this.
-    Head 'What the server printed up there'
-    Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -Command `"if (Test-Path '$VpsRoot\server.log') { Get-Content '$VpsRoot\server.log' -Tail 40 } else { 'server.log is not there, so node never started. Check that node is on the machine PATH up there.' }`"" }
-
+} elseif ($outside.NotKnown) {
+    # The box's own answer is the measurement that the server is up; this one
+    # could not be taken from here, so it is said and the run carries on.
+    Say ("{0} answers on the box, and whether {1}:{2} answers from outside is not known: {3}." -f $(if ($IsDev) { 'The DEV server' } else { 'Thornswood' }), $VpsHost, $ResPort, $outside.NotKnown) 'Yellow'
     Write-Host ''
-    Say 'If that log is empty or says nothing useful, the other candidate is the' 'Yellow'
-    Say 'firewall. The server can be up and still unreachable from here:' 'Yellow'
-    Say "    ssh $target `"powershell -NoProfile -Command Get-NetFirewallRule -DisplayName '*Thornswood*' ^| Format-Table DisplayName,Enabled,Direction`"" 'DarkGray'
-    # The box said it answers on its own ports, so the new server stays: this
-    # is the network or the firewall, and the previous folder would not change it.
+} else {
+    Say ("The install finished and the server answers on the box, but {0}:{1} was {2} from out here, though {3} on the box answers from here." -f $VpsHost, $ResPort, $outside.Said, $witness) 'Red'
+    # The box had the server answer on this port from 127.0.0.1, so this is the
+    # inbound rule for it, or something between, and the previous folder would
+    # not change it: the new server stays. The rule is what to look at.
+    Say ("  The box's inbound rule for TCP {0} is not letting it in. What the box holds for it:" -f $ResPort) 'Red'
+    Say ("  .\scripts\vps\Remote.ps1 `"Get-NetFirewallPortFilter -Protocol TCP | Where-Object LocalPort -eq {0} | Get-NetFirewallRule | Format-Table DisplayName,Enabled,Action,Profile`"" -f $ResPort) 'DarkGray'
     Write-Host ''
     if (-not $NoPause) { [void](Read-Host 'Enter to exit') }
     exit 1
@@ -1055,7 +1049,9 @@ if ($up) {
 # Said plainly in the entry, because it is the useful part: nobody downloads
 # anything for this. Somebody reading a headline about instruments should not
 # go looking for an update button that is not going to light up.
-if (-not $NoNews -and $up) {
+# Reached only when the server answers: from here, or on the box when here
+# could not measure it (a failed try from here stopped the run above).
+if (-not $NoNews) {
     if (-not $RepoDir) { $RepoDir = Split-Path -Parent (Split-Path -Parent $Here) }
     # THE LIVE FEED, NOT THE COPY IN THIS REPO. Until 23 September this wrote
     # into the repo's own version.json. That file is not dead, it is the
