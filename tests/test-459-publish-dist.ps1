@@ -94,7 +94,15 @@ try {
     $bin = Join-Path $Scratch 'bin'
     $log = Join-Path $Scratch 'calls.txt'
     $env:TS_459D_CALLS = $log
-    foreach ($t in 'ssh', 'scp') { Put (Join-Path $bin "$t.cmd") ("@echo $t %*>>""%TS_459D_CALLS%""`r`n@exit /b 0`r`n") }
+    # A .cmd on Windows, a shell script anywhere else, where a .cmd is not run.
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    foreach ($t in 'ssh', 'scp') {
+        if ($OnWindows) { Put (Join-Path $bin "$t.cmd") ("@echo $t %*>>""%TS_459D_CALLS%""`r`n@exit /b 0`r`n") }
+        else {
+            Put (Join-Path $bin $t) ("#!/bin/sh`necho $t ""`$*"" >> ""`$TS_459D_CALLS""`nexit 0`n")
+            & chmod 755 (Join-Path $bin $t)
+        }
+    }
     $env:PATH = $bin + [IO.Path]::PathSeparator + $oldPath
 
     function Run([string]$shell, [string[]]$more) {
@@ -112,7 +120,6 @@ try {
 
     # ---- 1. no -Dist, from the fresh checkout -----------------------------------------------
     $shells = @([pscustomobject]@{ Name = 'PowerShell 7'; Path = (Get-Process -Id $PID).Path })
-    . (Join-Path $PSScriptRoot 'Windows.ps1')
     if (-not $OnWindows) { Write-Host 'SKIP  the same under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs' }
     else {
         $ps51 = Get-WindowsPowerShell

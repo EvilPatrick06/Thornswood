@@ -40,5 +40,13 @@ if(process.argv[5]==='orchard') {
  const rows=require('../game/data/merchant-orchard.json').sources;
  require('../game/quest-resource-sources').createQuestOrchardSources(mp,rows);
  console.log('PASS all ten actual native orchard references, apple base/produce and original positions');
+ const {createOrchardStorage,createOrchardPlots}=require('../game/quest-orchard-plots');
+ const priv=path.join(scratch,'private');fs.mkdirSync(priv,{recursive:true});
+ const refs=rows.map(r=>r.reference),settings={privDir:priv,dataDir:path.join(scratch,'resources')};
+ const storage=()=>createOrchardStorage(fs,path,settings,mp.writeFileWhole.bind(mp),refs);
+ const plots=createOrchardPlots(storage(),refs);
+ assert.equal(plots.write(refs[0],{by:0,crop:'',at:0,ms:0,step:0}),true);
+ assert.equal(createOrchardPlots(storage(),refs).read(refs[0]).crop,'');
+ console.log('PASS actual native whole-file writer initializes and reloads authoritative private orchard plots');
 }
 process.exit(0);
