@@ -5,9 +5,10 @@
   (#2903). Dot-sourced by Go.ps1, Ship.ps1 and Publish-Update.ps1; defines
   functions and nothing else. ASCII, and Windows PowerShell 5.1 as well as 7.
 
-  WHY. The repository has no .gitattributes, and Git for Windows checks text
-  files out with CRLF line endings, so every text file a release carries from
-  the repo (game\plugins, game\ui, skyhud.txt) has gone out with CRLF. Measured
+  WHY. Git for Windows checks text files out with CRLF line endings, and
+  .gitattributes says otherwise only for the content builders' outputs (#3029),
+  so every text file a release carries from the repo (game\plugins, game\ui,
+  skyhud.txt) has gone out with CRLF. Measured
   20 Oct on dev 20261020-111032-dev: all 26 of them are the CRLF form of the
   committed file, and the launcher fingerprint the feed holds (launcherInputs,
   #921) is the hash of the CRLF form of the launcher's 100 text files and its
@@ -15,7 +16,8 @@
   send all 26 again to every machine with nothing changed, and never find the
   feed's launcher its own. So a text file is read as a Windows checkout holds
   it: every line ending CRLF. One's checkout already is, so nothing it ships or
-  fingerprints changes.
+  fingerprints changes. game\plugins\thornswood-front.js is one of those
+  outputs and is checked out LF everywhere since #3029; it still goes out CRLF.
 
   Text is what git takes for text: no NUL byte in the first 8000. Anything
   else, the plugins, the pictures, the sounds, is its bytes as they are.

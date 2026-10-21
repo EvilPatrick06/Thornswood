@@ -278,10 +278,10 @@ function readLoadOrder(dataDir, pluginsTxt) {
 // "ownWorlds" and "ownWorldDoors" written into data.json's text as its last
 // keys, laid out the way the rest of the file is (one space a level), and
 // into the DATA line. Nothing else in either moves.
-const DATA_RE = /^const DATA = (.*);\r?$/m;
+const DATA_RE = /^const DATA = (.*);$/m;
 const KEYS = ['ownWorlds', 'ownWorldDoors'];
 function install(tables, jsonText, gmText) {
-  const nl = jsonText.indexOf('\r\n') >= 0 ? '\r\n' : '\n';
+  const nl = '\n';
   const end = jsonText.lastIndexOf(nl + '}');
   if (end < 0) { return { error: 'data.json does not end in a closing brace' }; }
   // Ours are the last keys, so everything from the first of them is rewritten.

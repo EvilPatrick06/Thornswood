@@ -310,7 +310,8 @@ def main():
         validate_provenance(payload)
         if input_hashes != {name: digest(ROOT / name) for name in INPUTS}:
             raise ValueError('Role-table input sources changed during generation')
-        OUT.write_text(json.dumps(payload, ensure_ascii=True, indent=2) + '\n', encoding='utf-8')
+        with OUT.open('w', encoding='utf-8', newline='\n') as output:
+            output.write(json.dumps(payload, ensure_ascii=True, indent=2) + '\n')
         print(json.dumps(payload['counts'], sort_keys=True))
     print('PASS inactive six-role item data follows its public sources')
 

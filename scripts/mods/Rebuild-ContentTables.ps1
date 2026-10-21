@@ -41,7 +41,10 @@
 
   WHAT IT SAYS. Every file under game, docs\systems and records that is
   different from before it ran, by sha256. git diff then shows what each one
-  is.
+  is. The bytes are what git stores because .gitattributes checks every
+  builder's output out with LF, as the builders write it (#3029); before it,
+  a checkout with autocrlf (One) listed every output a builder wrote, changed
+  or not.
 
   -List prints the steps it would run, with their arguments, and runs none.
 #>
