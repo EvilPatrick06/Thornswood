@@ -25,11 +25,24 @@
 
   WHAT IT KEEPS. Only TCP packets on port 443 with SYN or RST set, 128 bytes
   of each, in a circular file of at most 64 MB:
-      C:\Windows\Temp\thornswood-443.etl    the capture
-      C:\Windows\Temp\thornswood-443.txt    its text form, written at the end
+      C:\Thornswood-Watch\capture-443\capture.etl    the capture
+      C:\Thornswood-Watch\capture-443\capture.txt    its text form, written at the end
   It changes nothing else: no firewall rule, no service, no other filter.
   -Start refuses while a capture of its own is still set to stop, and while
   pktmon has filters it did not add, since it would remove them at the end.
+
+  WHERE IT KEEPS THEM. The two files outlive the run that starts the capture:
+  the task writes the text form after this script has gone, and -Status and
+  whoever reads the capture come later. C:\Windows\Temp is the scratch every
+  script sent to the box shares, one run's files under names of their own
+  (tests\test-send-script.ps1), so a file kept past its run is not put there
+  (#3017). The capture holds the address of everything that connects to 443,
+  so it goes in the watchdog's folder, which takes nothing from C:\, is
+  SYSTEM's and Administrators' only, gives the bot read on its own files and
+  nothing below them, and is on the list of places no service may reach
+  (Lock-VpsFolders.ps1, Bot-Service.ps1, ServiceAccount.ps1). The capture's
+  folder is made inside it and takes those rules. -Start refuses on a box
+  without the watchdog's folder rather than make one with C:\'s rules.
 
   WHAT IT PRINTS:
       STARTED <minutes> min, stops at <UTC>     -Start
@@ -51,8 +64,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $ProgressPreference = 'SilentlyContinue'
-$Etl = 'C:\Windows\Temp\thornswood-443.etl'
-$Txt = 'C:\Windows\Temp\thornswood-443.txt'
+$Watch = 'C:\Thornswood-Watch'
+$Dir = 'C:\Thornswood-Watch\capture-443'
+$Etl = 'C:\Thornswood-Watch\capture-443\capture.etl'
+$Txt = 'C:\Thornswood-Watch\capture-443\capture.txt'
 $Task = 'Thornswood capture 443 stop'
 $Filters = @('tw443syn', 'tw443rst')
 
@@ -86,6 +101,8 @@ if (Get-Ours) { 'REFUSED a capture is already running; -Status says when it stop
 $list = (& pktmon filter list 2>&1 | Out-String)
 $others = @([regex]::Matches($list, '(?m)^\s*\d+\s+(\S+)') | ForEach-Object { $_.Groups[1].Value } | Where-Object { $Filters -notcontains $_ })
 if ($others.Count) { 'REFUSED pktmon has filters this script did not add (' + ($others -join ', ') + '), and the end of a capture removes every filter. Nothing was changed.'; exit 1 }
+if (-not (Test-Path -LiteralPath $Watch -PathType Container)) { 'REFUSED the watchdog''s folder ' + $Watch + ' is not on this box, and the capture is kept inside it (Watch-Services.ps1 -Install makes it). Nothing was changed.'; exit 1 }
+if (-not (Test-Path -LiteralPath $Dir)) { $null = New-Item -ItemType Directory -Path $Dir }
 
 & pktmon filter remove | Out-Null
 & pktmon filter add $Filters[0] -t TCP SYN -p 443

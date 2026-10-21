@@ -12,7 +12,8 @@
     2. it does nothing unless told exactly one of -Start, -Status, -Stop,
        and takes no capture longer than 30 minutes;
     3. it keeps only TCP SYN and RST on port 443, 128 bytes a packet, in a
-       circular file of at most 64 MB, at the card;
+       circular file of at most 64 MB, at the card, in a folder of its own
+       inside the watchdog's and never in the box's temp folder (#3017);
     4. it never holds the ssh session for the capture: no sleep, and the end
        is a one-shot task that stops pktmon, removes the filters, writes the
        text form and deletes itself;
@@ -70,7 +71,10 @@ Yes '  and the limit is the parameter''s own range' ($t -match '\[ValidateRange\
 Yes 'it filters TCP SYN on 443' ($t -match "pktmon filter add \`$Filters\[0\] -t TCP SYN -p 443")
 Yes '  and TCP RST on 443, and nothing else' ($t -match "pktmon filter add \`$Filters\[1\] -t TCP RST -p 443" -and ([regex]::Matches($t, 'pktmon filter add')).Count -eq 2)
 Yes '  at the network card, 128 bytes a packet, circular, at most 64 MB' ($t -match 'pktmon start --capture --comp nics --pkt-size 128 --file-name \$Etl --file-size 64 --log-mode circular')
-Yes '  into C:\Windows\Temp\thornswood-443.etl, and its text form beside it' ($t -match "\`$Etl = 'C:\\Windows\\Temp\\thornswood-443\.etl'" -and $t -match "\`$Txt = 'C:\\Windows\\Temp\\thornswood-443\.txt'")
+Yes '  into C:\Thornswood-Watch\capture-443\capture.etl, and its text form beside it' ($t -match "\`$Etl = 'C:\\Thornswood-Watch\\capture-443\\capture\.etl'" -and $t -match "\`$Txt = 'C:\\Thornswood-Watch\\capture-443\\capture\.txt'")
+Yes '  never in the box''s temp folder, which is one run''s scratch (#3017)' ($t -notmatch "(?im)^[^#]*'C:\\Windows\\Temp")
+Yes '  it refuses on a box without the watchdog''s folder, before pktmon is touched' ($t -match "(?s)if \(-not \(Test-Path -LiteralPath \`$Watch -PathType Container\)\) \{ 'REFUSED the watchdog''s folder.*?& pktmon filter remove \| Out-Null")
+Yes '  and makes only its own folder, inside the watchdog''s, whose rules it takes' ($t -match "\`$Dir = 'C:\\Thornswood-Watch\\capture-443'" -and $t -match "if \(-not \(Test-Path -LiteralPath \`$Dir\)\) \{ \`$null = New-Item -ItemType Directory -Path \`$Dir \}" -and ([regex]::Matches($t, 'New-Item')).Count -eq 1)
 
 # ---- 4. it never waits ------------------------------------------------------------------
 Yes 'it never sleeps through the capture over ssh' ($t -notmatch '(?m)^[^#]*\bStart-Sleep\b')
