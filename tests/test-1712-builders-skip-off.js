@@ -12,6 +12,15 @@
 // lines switched off, one of them a plugin that is not on disk. Both must take
 // the switched on plugins, leave the two out, say so, and not stop on the
 // missing one. Nothing outside a temporary folder is read or written.
+//
+// #2976. The same was still true of Build-DoorTable.py, Build-CastTable.py,
+// Build-WellTable.py and the fire, warmth, water and weather builders, which
+// parsed plugins.txt on their own: on 20 Oct the door builder stopped on
+// ElysiumEstateSSE.esp, a switched off line whose file the launcher had removed.
+// They all read the load order through scripts/dev/OwnPlugins.js and
+// own_plugins.py now, and are run here on the same folder. And a builder that
+// reads every plugin of the load order stops on a switched on plugin that is
+// not on disk, rather than building a table of a load order nobody runs.
 const REPO_DIR = require("path").join(__dirname, "..");
 const fs = require("fs");
 const os = require("os");
@@ -100,6 +109,43 @@ try {
       console.log(o.out.split("\n").slice(0, 40).join("\n"));
     }
   }
+
+  // ---- #2976: the door, cast and well builders ---------------------------
+  if (py) {
+    const out = path.join(tmp, "out.json");
+    for (const b of ["Build-DoorTable.py", "Build-CastTable.py", "Build-WellTable.py"]) {
+      const a = [path.join(REPO_DIR, "scripts", "dev", b), "--data", data, "--plugins", pluginsTxt, "--out", out, "--check"];
+      if (b !== "Build-CastTable.py") { a.push("--gamemode", gamemode); }
+      const r = run(py.c, a);
+      // The well builder stops later, on well bases this folder has none of.
+      if (b !== "Build-WellTable.py") {
+        yes(b + " takes the five masters and the two switched on plugins, and nothing else",
+          r.out.indexOf("7 plugins, the five masters then") >= 0);
+      }
+      yes(b + " does not stop on, skip or name a switched off plugin",
+        r.out.indexOf("STOP. 1 plugin") < 0 && r.out.indexOf("skipped") < 0 && r.out.indexOf("Off ") < 0);
+      if (r.out.indexOf("Off ") >= 0 || r.out.indexOf("STOP. 1 plugin") >= 0) { console.log(r.out.split("\n").slice(0, 10).join("\n")); }
+    }
+    yes("--check wrote nothing into the gamemode", fs.readFileSync(gamemode, "utf8") === "// nothing\n");
+  }
+
+  // ---- #2976: the fire, warmth, water and weather builders ---------------
+  // Their tables are empty here, so their own checks fail and they write
+  // nothing; only the load order they read is held.
+  const out = path.join(tmp, "out.json");
+  const said = { "Build-FireTable.js": "7 plugins in the order", "Build-WarmthTable.js": "7 plugins read",
+                 "Build-WaterTable.js": "7 plugins read", "Build-WeatherTable.js": "7 plugins read" };
+  for (const b of Object.keys(said)) {
+    const r = run(process.execPath, [path.join(REPO_DIR, "scripts", "dev", b), "--data", data, "--plugins", pluginsTxt, "--out", out]);
+    yes(b + " reads the five masters and the two switched on plugins, and nothing else", r.out.indexOf(said[b]) >= 0);
+    if (r.out.indexOf(said[b]) < 0) { console.log(r.out.split("\n").slice(-8).join("\n")); }
+  }
+  yes("and none of them wrote a table", !fs.existsSync(out));
+  const onGone = path.join(tmp, "plugins-on-gone.txt");
+  fs.writeFileSync(onGone, "*On One.esp\r\n*On Not On Disk.esp\r\n");
+  const g = run(process.execPath, [path.join(REPO_DIR, "scripts", "dev", "Build-FireTable.js"), "--data", data, "--plugins", onGone, "--out", out]);
+  yes("a switched on plugin that is not on disk stops Build-FireTable.js, by name (exit " + g.code + ")",
+    g.code === 1 && g.out.indexOf("STOP. 1 plugin(s) are not in " + data + ": On Not On Disk.esp") >= 0);
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
 }

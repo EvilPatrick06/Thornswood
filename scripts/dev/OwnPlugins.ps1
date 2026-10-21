@@ -12,7 +12,17 @@
   rule is OwnPlugins.js and own_plugins.py; tests\test-2923-own-plugins.js
   holds the three to it.
 
+  Which plugins are in the load order is read here too (#2976). The game loads
+  Skyrim's five masters, then every line of plugins.txt that starts with '*'.
+  A line without one is a plugin Vortex or the launcher knows about and has
+  switched off: the game does not load it, and its file may be gone. Eight
+  builders parsed plugins.txt on their own and four of those took the
+  switched off lines as loaded, so on 20 Oct Build-DoorTable.py stopped on
+  ElysiumEstateSSE.esp, a switched off line whose file the launcher had
+  removed on 1 Oct. Every builder takes its load order from Get-LoadOrder.
+
       . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
+      $order = Get-LoadOrder $PluginsTxt
       $path = Get-PluginPath $Data 'Thornswood-Content.esp'
 #>
 
@@ -26,3 +36,30 @@ function Get-PluginPath([string]$Data, [string]$Name) {
     if (Test-OwnPlugin $Name) { return (Join-Path $script:OwnPluginDir $Name) }
     return (Join-Path $Data $Name)
 }
+
+# The five masters load before the game reads plugins.txt, and are never
+# written to it.
+$script:LoadOrderMasters = @('Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm')
+
+# plugins.txt as the game reads it: On is the load order (the masters, then
+# each '*' line, once, names matched without case the way Windows matches
+# files), Off is each line the game skips because it has no '*'.
+function Read-PluginsTxt([string]$Path) {
+    $on = New-Object 'System.Collections.Generic.List[string]'
+    $off = New-Object 'System.Collections.Generic.List[string]'
+    $seen = New-Object 'System.Collections.Generic.HashSet[string]' ([System.StringComparer]::OrdinalIgnoreCase)
+    foreach ($m in $script:LoadOrderMasters) { $on.Add($m); [void]$seen.Add($m) }
+    $lines = New-Object 'System.Collections.Generic.List[string]'
+    foreach ($ln in [System.IO.File]::ReadAllLines($Path, (New-Object System.Text.UTF8Encoding($false)))) {
+        $t = $ln.Trim()
+        if (-not $t -or $t.StartsWith('#')) { continue }
+        if (-not $t.StartsWith('*')) { $lines.Add($t); continue }
+        $name = $t.Substring(1).Trim()
+        if ($name -and $seen.Add($name)) { $on.Add($name) }
+    }
+    foreach ($name in $lines) { if ($seen.Add($name)) { $off.Add($name) } }
+    return [pscustomobject]@{ On = $on.ToArray(); Off = $off.ToArray() }
+}
+
+function Get-LoadOrder([string]$Path) { return (Read-PluginsTxt $Path).On }
+function Get-SwitchedOff([string]$Path) { return (Read-PluginsTxt $Path).Off }

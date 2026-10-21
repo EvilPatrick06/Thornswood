@@ -130,18 +130,6 @@ FRAGMENT_PREFIXES = (('qf_', 'quest'), ('tif_', 'dialogue line'), ('sf_', 'scene
                      ('pf_', 'package'), ('prkf_', 'perk'))
 
 
-def active_order(plugins_txt):
-    order = list(dt.MASTERS)
-    for line in io.open(plugins_txt, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line.startswith('*'):
-            continue
-        line = line[1:]
-        if line not in order:
-            order.append(line)
-    return order
-
-
 def top_groups(pl, want):
     """Each record in the top groups named in want, as (tag, flags, fid, offset, size)."""
     buf = pl.buf
@@ -297,7 +285,7 @@ def main():
     if not os.path.isfile(args.plugins) or not os.path.isdir(args.data):
         print('STOP. no load order here: %s, %s' % (args.plugins, args.data))
         return 1
-    order = active_order(args.plugins)
+    order = own_plugins.load_order(args.plugins)
     missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d active plugin(s) are not in %s: %s'
