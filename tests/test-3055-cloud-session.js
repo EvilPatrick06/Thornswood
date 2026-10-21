@@ -38,7 +38,9 @@ function yes(what, cond) {
 
 // ---- A ----------------------------------------------------------------------
 yes('A1 scripts/dev/Setup-CloudSession.sh is in the repository', fs.existsSync(SCRIPT));
-const src = fs.existsSync(SCRIPT) ? fs.readFileSync(SCRIPT, 'utf8') : '';
+// A Windows checkout can hold it CRLF (A5 checks what is stored), so the
+// text is read without CRs.
+const src = fs.existsSync(SCRIPT) ? fs.readFileSync(SCRIPT, 'utf8').split('\r').join('') : '';
 let claudeFiles = [];
 try {
   claudeFiles = cp.execFileSync('git', ['ls-files', '-z', '--', '.claude'], { cwd: ROOT, encoding: 'utf8' })
