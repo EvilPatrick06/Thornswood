@@ -96,6 +96,16 @@ dungeon chest. Those enemies use the body pile.
 
 ## Bodies
 
+An NPC gives only the loot Thornswood assigns: the body pile below,
+the Hunter carcass table, or goods deliberately handed to that NPC by
+a server system. Its plugin's pockets and death-item list do not add
+gold, potions or other loot. Its inherited clothes and weapons remain
+owned inside the engine so it can dress and fight, but cannot be taken,
+traded or dropped. An assigned copy of the same weapon is separate and
+can still be handed over. This applies alive, dead and after returning.
+Nothing strips a corpse after death; the native initialization and
+transfer rules prevent the extra loot at its source.
+
 Every dead body that is not a person, and not a hunter carcass, can
 be searched. The pile is rolled when that actor dies and stays on
 that life. The first person to search it takes what is there. If the
