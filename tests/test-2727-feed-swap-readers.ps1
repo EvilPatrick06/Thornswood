@@ -164,9 +164,11 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
 
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     $shells = @(@{ Name = ('this shell, PowerShell ' + $PSVersionTable.PSVersion.ToString()); Run = { param($d) & $held $storePs1 $d } })
-    $ps51 = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    Yes 'Windows PowerShell 5.1, which the VPS runs the store''s script with, is here' (Test-Path -LiteralPath $ps51)
-    if (Test-Path -LiteralPath $ps51) {
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the same under Windows PowerShell 5.1, which the VPS runs the store''s script with: this is not Windows'
+    } else {
+        $ps51 = Get-WindowsPowerShell
         $shells += @{ Name = 'Windows PowerShell 5.1'; Run = { param($d) & $ps51 -NoProfile -ExecutionPolicy Bypass -File $held $storePs1 $d 2>&1 } }
     }
     $k = 0
@@ -179,7 +181,10 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
         $a = @(Line 'shared'); $b = @(Line 'unshared'); $c = @(Line 'send')
         $why = { param($l) if ($l.Count) { ' (' + ($l[0] -replace '^(OK|NO) \S+ \| ', '') + ')' } else { ' (no answer: ' + (($out | Select-Object -Last 2) -join ' ') + ')' } }
         Yes ("$($s.Name): a reader with share-delete open on a store file does not stop the POSIX rename; it reads the old bytes, the name the new" + (& $why $a)) ($a.Count -eq 1 -and $a[0].StartsWith('OK '))
-        Yes ("$($s.Name): a holder without share-delete is refused, and the file stays the old one, whole" + (& $why $b)) ($b.Count -eq 1 -and $b[0].StartsWith('OK '))
+        # Share modes are Windows': off Windows an open file refuses no rename,
+        # so there is no refusal to see. The box, where the store runs, is Windows.
+        if ($OnWindows) { Yes ("$($s.Name): a holder without share-delete is refused, and the file stays the old one, whole" + (& $why $b)) ($b.Count -eq 1 -and $b[0].StartsWith('OK ')) }
+        else { Write-Host "SKIP  $($s.Name): a holder without share-delete is refused: share modes are Windows', and off Windows an open file refuses no rename" }
         Yes ("$($s.Name): the real send lands as the next generation while a reader holds the one before, which stays as it was" + (& $why $c)) ($c.Count -eq 1 -and $c[0].StartsWith('OK '))
     }
     $env:LOCALAPPDATA = $oldAppData

@@ -95,18 +95,6 @@ TOWN_OF_HOLD = {
 }
 
 
-def active_order(plugins_txt):
-    order = list(dt.MASTERS)
-    for line in io.open(plugins_txt, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line.startswith('*'):
-            continue
-        line = line[1:]
-        if line not in order:
-            order.append(line)
-    return order
-
-
 def edid_of(pairs):
     for st, body in pairs:
         if st == b'EDID':
@@ -220,7 +208,7 @@ def main():
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 
-    order = active_order(args.plugins)
+    order = own_plugins.load_order(args.plugins)
     missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d active plugin(s) are not in %s: %s'

@@ -178,7 +178,7 @@ try {
     Yes '  and a refusal from either stops the script (the first before anything is sent)' (
         $pub -match '(?s)\$listCode = \$LASTEXITCODE.{0,600}throw \("files\.json on the site.{0,200}Nothing was sent' -and
         $pub -match '(?s)\$listWriteCode = \$LASTEXITCODE.{0,200}if \(\$listWriteCode -ne 0\) \{\s*throw')
-    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
     function Run-Remote([string]$body) {
         $rootWin = $docs
         $b64 = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes(($meta | ConvertTo-Json -Depth 4 -Compress)))
@@ -186,11 +186,13 @@ try {
         $f = Join-Path $work ('remote-' + [Guid]::NewGuid().ToString('N') + '.ps1')
         [IO.File]::WriteAllText($f, $text, (New-Object Text.UTF8Encoding($true)))
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = @(& $winps -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }); $code = $LASTEXITCODE }
+        try { $out = @(& (Get-WindowsPowerShell) -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }
         return @{ Out = ($out -join ' '); Code = $code }
     }
-    if ($checkBody -and $writeBody) {
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the two scripts, run: the box runs them under Windows PowerShell 5.1, and this is not Windows'
+    } elseif ($checkBody -and $writeBody) {
         $r = Run-Remote $checkBody
         Yes 'no files.json yet: the check lets the send go on' ($r.Code -eq 0 -and $r.Out -match 'FILESJSON\|none')
         [IO.File]::WriteAllText($listFile, '{"Other-Download.zip":{"label":"something else on the page","sha256":"ab"}}', $noBom)

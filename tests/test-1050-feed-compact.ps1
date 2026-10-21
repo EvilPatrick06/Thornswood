@@ -39,6 +39,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -152,7 +153,8 @@ $writers = @{}
 $bad = @()
 foreach ($f in @(Get-ChildItem -LiteralPath (Join-Path $Repo 'scripts') -Recurse -File -Filter '*.ps1')) {
     $text = [IO.File]::ReadAllText($f.FullName)
-    $rel = $f.FullName.Substring($Repo.Length + 1)
+    # Named with \ whatever the machine, the way $known names them.
+    $rel = $f.FullName.Substring($Repo.Length + 1).Replace([IO.Path]::DirectorySeparatorChar, '\')
     $vars = @([regex]::Matches($text, '\$(\w+)\s*=\s*Join-Path\s+[^\r\n]*?[''"]version\.json[''"]') | ForEach-Object { $_.Groups[1].Value } | Select-Object -Unique)
     foreach ($n in $vars) {
         $e = [regex]::Escape($n)
@@ -266,10 +268,10 @@ try {
 
     Write-Host ''
     Write-Host 'the launcher reads it'
-    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not (Test-Path -LiteralPath $winps)) {
-        Yes 'Windows PowerShell is here to run the launcher half on the .NET Framework' $false
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the launcher half: it runs on the .NET Framework the launcher runs on, which only Windows has'
     } else {
+        $winps = Get-WindowsPowerShell
         $out = & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Src $Src -ParseFeed $vf 2>&1
         $rc = $LASTEXITCODE
         $childPass = 0; $childFail = 0

@@ -30,6 +30,8 @@
 param([string]$RepoPath)
 
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$winPs = if ($OnWindows) { Get-WindowsPowerShell } else { $null }
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
@@ -329,12 +331,24 @@ if ($pyBlocks.Count -eq 1) {
         $sent.Contains("'$pySha'") -and $sent -match 'Get-FileHash[^\r\n]*-Algorithm SHA256' -and
         $sent.IndexOf('Get-FileHash') -lt $sent.IndexOf('Start-Process'))
 
+}
+if ($pyBlocks.Count -eq 1) {
+    # The block downloads into the box's TEMP. Here that is a folder of this
+    # run's own, handed to the shell that runs it, so nothing lands in this
+    # machine's temp folder and the same run works where TEMP is not set.
+    $boxTemp = Join-Path $work 'box-temp'
+    $null = New-Item -ItemType Directory -Force -Path $boxTemp
+    $pyShell = $winPs
+    if (-not $OnWindows) {
+        $pyShell = (Get-Process -Id $PID).Path
+        Write-Host 'NOTE  the python block runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+    }
     $fakeExe = Join-Path $work 'stand-in-python.exe'
     Set-Content -LiteralPath $fakeExe -Value 'stand-in python' -NoNewline
     $fakeSha = (Get-FileHash -LiteralPath $fakeExe -Algorithm SHA256).Hash
     $runner = Join-Path $work 'run-python-pin.ps1'
     $started = Join-Path $work 'python-installer-started.txt'
-    $landed = Join-Path $env:TEMP ('python-{0}-amd64.exe' -f $pyVersion)
+    $landed = Join-Path $boxTemp ('python-{0}-amd64.exe' -f $pyVersion)
 
     function Write-PythonRunner([string]$sha) {
         $text = Expand $pyHere @{ PythonVersion = $pyVersion; PythonSha256 = $sha }
@@ -360,10 +374,13 @@ function Start-Process {
     $pinErr = Join-Path $work 'python-pin-err.txt'
     $pref = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
+    $savedTemp = $env:TEMP
+    $env:TEMP = $boxTemp
     # -ExecutionPolicy Bypass, as the other harnesses that run a script under
     # Windows PowerShell do: where its policy is Restricted the runner never
     # loads, and that non-zero exit is not the checksum refusing anything.
-    $said = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner 2>$pinErr)
+    try { $said = @(& $pyShell -NoProfile -ExecutionPolicy Bypass -File $runner 2>$pinErr) }
+    finally { $env:TEMP = $savedTemp }
     $ErrorActionPreference = $pref
     $pinSaid = if (Test-Path -LiteralPath $pinErr) { Get-Content -LiteralPath $pinErr -Raw } else { '' }
     Yes 'a python installer that does not match the checksum exits non-zero' ($LASTEXITCODE -ne 0)
@@ -373,7 +390,9 @@ function Start-Process {
 
     Remove-Item -LiteralPath $started -Force -ErrorAction SilentlyContinue
     Write-PythonRunner $fakeSha
-    $said = @(& powershell.exe -NoProfile -ExecutionPolicy Bypass -File $runner)
+    $env:TEMP = $boxTemp
+    try { $said = @(& $pyShell -NoProfile -ExecutionPolicy Bypass -File $runner) }
+    finally { $env:TEMP = $savedTemp }
     Yes 'a python installer that matches exits 0 and is run' (
         $LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $started))
     Yes '  and it says the checksum matched' (($said -join ' ') -match 'checksum matched')

@@ -354,7 +354,7 @@ $devRecordCommit = [string]$devRecord.source.commit
 # record's, which the check below holds the dev server's own record to.
 $devRecordLight = ($devRecord.PSObject.Properties.Name -contains 'lightPlugins' -and $devRecord.lightPlugins -eq $true)
 $devBoxSaid = @(Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script ($ThornswoodRecordSumText + "`r`n" + @"
-`$rp = '$($Root.Replace('/', '\').Replace("'", "''"))\server-build.json'
+`$rp = Join-Path '$($Root.Replace('/', '\').Replace("'", "''"))' 'server-build.json'
 if (Test-Path -LiteralPath `$rp) {
   'RECORD ' + (Get-ThornswoodRecordSum ([IO.File]::ReadAllBytes(`$rp)))
   try { 'RECORDCOMMIT ' + [string](([IO.File]::ReadAllText(`$rp) | ConvertFrom-Json).source.commit) }
@@ -442,7 +442,7 @@ if ($LoadOrder) {
     }
     $built = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
     if (-not $built.loadOrder) { throw "$settingsSrc has no loadOrder" }
-    $pluginNames = @($built.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) })
+    $pluginNames = @($built.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] })
     Write-Host ('  load order from the build at {0}, written over the dev server''s' -f $Dist) -ForegroundColor DarkGray
     # Held to the order the dev server runs (#2320): one that leaves out a
     # plugin it loads is refused unless -DropPlugins names each one.
@@ -983,7 +983,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     # is the stage folder for as long as it runs (issue #446).
     $rootWin = $stageWin
 Remote @"
-`$p = '$rootWin\server-settings.json'
+`$p = Join-Path '$rootWin' 'server-settings.json'
 if (-not (Test-Path `$p)) { 'NO server-settings.json AT ' + `$p; exit 0 }
 # Read once, as bytes, for the byte order mark below as well. A file that is
 # there and does not read stops the block before anything is written, and the
@@ -1036,7 +1036,7 @@ $lightDef
 if (`$loadsLight) {
   foreach (`$o in `$order2) {
     `$leaf = Split-Path `$o -Leaf
-    `$f = '$rootWin\plugins\' + `$leaf
+    `$f = Join-Path '$rootWin' ('plugins\' + `$leaf)
     if (-not (Test-Path -LiteralPath `$f)) { `$f = '$remotePlugins/' + `$leaf }
     try { `$lightOf[`$leaf.ToLowerInvariant()] = Test-ThornswoodPluginLight `$f } catch { `$unread += `$leaf.ToLowerInvariant() }
   }

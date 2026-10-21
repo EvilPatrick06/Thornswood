@@ -140,16 +140,20 @@ try {
   T $threw 'a file that is not there is refused'
 
   # ---------------------------------------------------------- 6
+  . (Join-Path $PSScriptRoot 'Windows.ps1')
+  # Each shell by name, for the lines; 5.1 is started from where Windows keeps it.
   $shells = @('pwsh')
-  if (Get-Command powershell.exe -EA SilentlyContinue) { $shells += 'powershell.exe' }
+  $ps51 = $null
+  if ($OnWindows) { $ps51 = Get-WindowsPowerShell; $shells += 'powershell.exe' }
   foreach ($sh in $shells) {
-    $out = & $sh -NoProfile -ExecutionPolicy Bypass -File $script -Path $f1 -From $W.From -To $W.To -NoPause 2>&1 | Out-String
+    $exe = if ($sh -eq 'powershell.exe') { $ps51 } else { $sh }
+    $out = & $exe -NoProfile -ExecutionPolicy Bypass -File $script -Path $f1 -From $W.From -To $W.To -NoPause 2>&1 | Out-String
     $code = $LASTEXITCODE
     T ($code -eq 0) ($sh + ': the report exits 0') $out
     T ($out -match '(?m)^\s+game\s+2\s+45\.0\s+96\.875%') ($sh + ': it prints game, 2 outages, 45.0 minutes, 96.875%') $out
     T ($out -match 'undercounted by up to that window' -and $out -match 'Nothing is counted while the watchdog itself is off') ($sh + ': it says both limitations') $out
     T ($out -notmatch '(?i)\b(meets|met|meeting)\b') ($sh + ': it never says a service met a target') $out
-    $miss = & $sh -NoProfile -ExecutionPolicy Bypass -File $script -Path (Join-Path $tmp 'none.jsonl') -NoPause 2>&1 | Out-String
+    $miss = & $exe -NoProfile -ExecutionPolicy Bypass -File $script -Path (Join-Path $tmp 'none.jsonl') -NoPause 2>&1 | Out-String
     T ($LASTEXITCODE -eq 1 -and $miss -match 'NO FILE') ($sh + ': a missing file exits 1 and says NO FILE') $miss
   }
 

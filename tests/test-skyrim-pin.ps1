@@ -39,15 +39,10 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root) { $Root = Split-Path -Parent $Here }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
 if ($PSVersionTable.PSEdition -eq 'Core') {
-    $wp = $null
-    if ($env:WINDIR) { $wp = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe' }
-    if (-not $wp -or -not (Test-Path -LiteralPath $wp)) {
-        Write-Host 'FAIL  Windows PowerShell is not on this machine, so the launcher''s own compiler cannot be asked'
-        Write-Host ''
-        Write-Host '0 passed, 1 failed'
-        exit 1
-    }
+    $wp = Get-WindowsPowerShell
     & $wp -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Root $Root
     exit $LASTEXITCODE
 }

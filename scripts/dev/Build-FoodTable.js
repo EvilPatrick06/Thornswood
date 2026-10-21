@@ -56,7 +56,7 @@
 //   node scripts\dev\Build-FoodTable.js --plugins "C:\path\to\plugins.txt"
 const fs = require('fs');
 const path = require('path');
-const { pluginPath } = require('./OwnPlugins.js');
+const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -69,31 +69,17 @@ const DATA = opt('data', 'C:\\Thornswood\\Game\\Data');
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'food.json'));
 const PLUGINS_TXT = opt('plugins', '');
 
-/* The load order, the same way Build-FireTable reads it. */
-function loadOrder() {
+/* The plugin list the load order is read from (OwnPlugins.js loadedOrder). */
+function pluginsTxt() {
   // --plugins <file>, same flag as Build-WarmthTable.js / Build-WaterTable.js /
   // Build-FireTable.js / Build-WeatherTable.js. Empty means today's default:
   // Profile\\Default next to Data, then %LOCALAPPDATA%\\Skyrim Special Edition.
-  const candidates = PLUGINS_TXT
-    ? [PLUGINS_TXT]
-    : [
-        path.join(DATA, '..', '..', 'Profile', 'Default', 'plugins.txt'),
-        path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'plugins.txt')
-      ];
-  for (const f of candidates) {
-    if (!fs.existsSync(f)) { continue; }
-    const names = fs.readFileSync(f, 'utf8').split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.startsWith('*'))
-      .map((l) => l.slice(1).trim())
-      .filter(Boolean);
-    if (names.length) {
-      return ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
-        .filter((n) => names.indexOf(n) === -1)
-        .concat(names);
-    }
-  }
-  return ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm'];
+  if (PLUGINS_TXT) { return PLUGINS_TXT; }
+  const candidates = [
+    path.join(DATA, '..', '..', 'Profile', 'Default', 'plugins.txt'),
+    path.join(process.env.LOCALAPPDATA || '', 'Skyrim Special Edition', 'plugins.txt')
+  ];
+  return candidates.filter((f) => fs.existsSync(f))[0] || candidates[0];
 }
 
 /*
@@ -267,12 +253,10 @@ function walk(b, start, end) {
   }
 }
 
-const order = loadOrder();
+const order = loadedOrder(pluginsTxt(), DATA);
 here.order = order;
-const missing = [];
 for (const file of order) {
   const full = pluginPath(DATA, file);
-  if (!fs.existsSync(full)) { missing.push(file); continue; }
   here.file = file;
   let buf = null;
   try { buf = fs.readFileSync(full); } catch (e) { continue; }
@@ -303,7 +287,7 @@ for (const desc in byDesc) {
 const counts = { food: 0, drink: 0, ale: 0, potion: 0, poison: 0 };
 for (const desc in items) { counts[items[desc].k]++; }
 
-console.log(order.length + ' plugins in the order, ' + missing.length + ' not installed');
+console.log(order.length + ' plugins in the order');
 console.log(scanned + ' ALCH records read, ' + Object.keys(items).length +
             ' can be swallowed');
 console.log('  food   ' + counts.food);

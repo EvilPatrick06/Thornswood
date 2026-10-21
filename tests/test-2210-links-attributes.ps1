@@ -108,6 +108,11 @@ namespace $ns {
 "@
 $t = [type]"$ns.OwnGame"
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs: Links opens the file through CreateFile in kernel32, and the links are made with cmd.exe''s mklink, which only Windows has'
+    Done
+}
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2210-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
 try {
@@ -115,7 +120,7 @@ try {
     $b = Join-Path $work 'b.txt'
     [IO.File]::WriteAllText($a, 'one')
     Yes 'a file with one name counts 1' ($t::Links($a) -eq 1)
-    cmd /c mklink /H "$b" "$a" | Out-Null
+    & (Get-WindowsPath 'System32\cmd.exe') /c mklink /H "$b" "$a" | Out-Null
     Yes 'a hard link makes 2' ($t::Links($a) -eq 2 -and $t::Links($b) -eq 2)
     $held = [IO.File]::Open($a, 'Open', 'ReadWrite', 'None')
     try { Yes 'a file another handle holds with no sharing is still counted' ($t::Links($b) -eq 2) }

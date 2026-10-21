@@ -342,7 +342,7 @@ try {
   yes('with the archive\'s compression, flipped for the one file that says so',
       packed.packedmenu && packed.packedmenu.compressed && packed.packedraw && !packed.packedraw.compressed);
 
-  const order = A.readLoadOrder(PLUGINS);
+  const order = require(path.join(REPO_DIR, 'scripts', 'dev', 'OwnPlugins.js')).loadOrder(PLUGINS);
   const find = A.scriptFinder(DATA, order);
   const pm = find('PackedMenu') || {};
   yes('an LZ4 script out of an archive reads, and extends SKI_ConfigBase', pm.parent === 'SKI_ConfigBase' && pm.from === 'Packed.bsa');

@@ -88,18 +88,25 @@ try {
     $unsigned = Join-Path $work 'Thornswood.exe'
     [IO.File]::WriteAllBytes($unsigned, [byte[]](0x4D, 0x5A, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00))
     $refuse = Get-PublishSignRefusal -Path $unsigned -ExpectedSigner $frag
-    Yes 'unsigned launcher tip is refused' ($refuse -match 'not Authenticode Valid' -and $refuse -match 'Nothing was published')
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if ($OnWindows) {
+        Yes 'unsigned launcher tip is refused' ($refuse -match 'not Authenticode Valid' -and $refuse -match 'Nothing was published')
+    } else {
+        # Only Windows reads a signature, so here every file is refused, and the
+        # refusal says why in words rather than as a command not found.
+        Yes 'unsigned launcher tip is refused: off Windows no signature can be read, and it says so' (
+            $refuse -match 'cannot be checked for a signature on this machine' -and $refuse -match 'Nothing was published' -and $refuse -notmatch 'not recognized')
+    }
 
     $missingFile = Get-PublishSignRefusal -Path (Join-Path $work 'gone.exe') -ExpectedSigner $frag
     Yes 'missing tip file is refused' ($missingFile -match 'missing file')
 
-    $sys = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (Test-Path -LiteralPath $sys) {
-        $wrong = Get-PublishSignRefusal -Path $sys -ExpectedSigner $frag
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  a file Microsoft signed, refused for its signer: Windows PowerShell 5.1 is that file, and only Windows has it'
+    } else {
+        $wrong = Get-PublishSignRefusal -Path (Get-WindowsPowerShell) -ExpectedSigner $frag
         Yes 'Valid signature without ExpectedSigner is refused' (
             $wrong -match 'ExpectedSigner' -or $wrong -match 'does not contain')
-    } else {
-        Yes 'Valid signature without ExpectedSigner is refused' $false
     }
 
     # A signing.json with no "enabled" (#1072), the shape records\signing\README.md

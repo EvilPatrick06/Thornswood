@@ -87,10 +87,15 @@ Yes '-Password is a switch, not a typed value' ($deployText -match '\[switch\]\$
 Yes 'the branch sends the password the hidden prompt gave' ($branch -match '-Secret \$newPassword\b' -and $deployText -match '\$newPassword = Read-ThornswoodSecret ')
 
 # ---- what runs it -------------------------------------------------------------
-$ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the rest: it runs in Windows PowerShell 5.1, which only Windows has'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
 $node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $ps51 -or -not $node) {
-    Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and node, which are not both here'
+if (-not $node) {
+    Write-Host 'SKIP  the rest needs node, which is not here'
     Done
 }
 
@@ -107,7 +112,7 @@ function ssh {
     $m = [regex]::Match($a[-1], '-EncodedCommand (\S+)$')
     if (-not $m.Success) { throw 'the fake ssh was handed no encoded command' }
     [void]$script:lines.Add([Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)))
-    @($input) | & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value
+    @($input) | & $ps51 -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value
 }
 
 # Runs the branch with the two things it takes from the rest of Deploy-Docs:

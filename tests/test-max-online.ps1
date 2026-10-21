@@ -272,7 +272,7 @@ Yes 'and reads the dev numbers, never main''s' ($dd.Contains('$got = Get-MostOnl
 Yes 'it reads the number before the dev server is stopped' ($read -ge 0 -and $stop -gt $read)
 Yes 'and has no launcher root to read it from any more' (-not $dd.Contains('LauncherRoot'))
 
-$marker = $dd.IndexOf('`$p = ''$rootWin\server-settings.json''')
+$marker = $dd.IndexOf('`$p = Join-Path ''$rootWin'' ''server-settings.json''')
 $open = -1; $close = -1
 if ($marker -ge 0) {
     $open = $dd.LastIndexOf('Remote @"', $marker)
@@ -296,8 +296,12 @@ if ($open -ge 0 -and $close -gt $marker) {
     }
 
     # The far end is Windows PowerShell 5.1, so that is what runs it.
-    $ps = Get-Command powershell.exe -ErrorAction SilentlyContinue
-    $psExe = if ($ps) { $ps.Source } else { (Get-Process -Id $PID).Path }
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if ($OnWindows) { $psExe = Get-WindowsPowerShell }
+    else {
+        $psExe = (Get-Process -Id $PID).Path
+        Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+    }
 
     function Invoke-Remote([string]$rootWin, $maxOnline, $seats) {
         $text = Expand-Remote $rootWin $maxOnline $seats
@@ -363,9 +367,9 @@ if ($open -ge 0 -and $close -gt $marker) {
 $pubs = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Publish-Server.ps1') -Raw
 $capAt = $pubs.IndexOf('$mostOnline = Get-MostOnline -Channel $Channel')
 $ifAt = -1
-if ($capAt -ge 0) { $ifAt = $pubs.LastIndexOf('if (Test-Path -LiteralPath $settingsPath) {', $capAt) }
+if ($capAt -ge 0) { $ifAt = $pubs.LastIndexOf('if ($settingsPath -and (Test-Path -LiteralPath $settingsPath)) {', $capAt) }
 $capBlock = $null
-if ($ifAt -ge 0) { $capBlock = Get-BlockText $pubs.Substring($ifAt) 'if (Test-Path -LiteralPath $settingsPath) {' }
+if ($ifAt -ge 0) { $capBlock = Get-BlockText $pubs.Substring($ifAt) 'if ($settingsPath -and (Test-Path -LiteralPath $settingsPath)) {' }
 Yes 'Publish-Server.ps1 writes the number into the settings it packs' ($null -ne $capBlock -and $capBlock.Contains('Set-MaxPlayers $capJson $mostOnline'))
 $zipAt = $pubs.IndexOf('-File $export -Dist $Dist -Zip $Zip')
 Yes 'before the zip is made' ($capAt -ge 0 -and $zipAt -gt $capAt)

@@ -170,6 +170,7 @@ $body = New-Object System.Text.StringBuilder
 foreach ($k in $lifted.Keys) { [void]$body.AppendLine($lifted[$k]) }
 $probe = $probe.Replace('__LIFTED__', $body.ToString())
 
+if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Done }
 Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 
