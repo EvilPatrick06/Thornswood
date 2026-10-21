@@ -94,10 +94,10 @@ for(const [x,y] of [[a,b],[b,a]]){x.on('data',(d)=>setTimeout(()=>y.write(d),ms)
         }
         throw ('lag.js did not listen on ' + $p + ': ' + (Get-Content -LiteralPath (Join-Path $tmp "lag-$to.err") -Raw -ErrorAction SilentlyContinue))
     }
-    $LAG = 20
-    $lagSshd = Start-Lag $port $LAG
-    $lagBridge = Start-Lag $bport $LAG
-    Write-Host "  a link with $LAG ms each way: sshd behind 127.0.0.1:$lagSshd, the bridge behind 127.0.0.1:$lagBridge"
+    $lagMs = 20
+    $lagSshd = Start-Lag $port $lagMs
+    $lagBridge = Start-Lag $bport $lagMs
+    Write-Host "  a link with $lagMs ms each way: sshd behind 127.0.0.1:$lagSshd, the bridge behind 127.0.0.1:$lagBridge"
 
     $file = Join-Path $tmp 'r.bin'
     $b = New-Object byte[] (32MB); (New-Object Random 2932).NextBytes($b); [IO.File]::WriteAllBytes($file, $b)
@@ -113,11 +113,11 @@ for(const [x,y] of [[a,b],[b,a]]){x.on('data',(d)=>setTimeout(()=>y.write(d),ms)
         @{ Name = 'straight to the port';                        Args = @('-P', "$port");                                             Big = $true }
         @{ Name = 'through a plain pipe relay';                  Args = @('-o', "ProxyCommand=`"$node`" `"$relay`" $port");          Big = $true }
         @{ Name = 'through connect.js and bridge.js';            Args = @('-o', "ProxyCommand=`"$node`" `"$connect`"");              Big = $true }
-        @{ Name = "$LAG ms each way, straight";                  Args = @('-P', "$lagSshd");                                          Big = $false }
-        @{ Name = "$LAG ms each way, straight, scp -O";          Args = @('-O', '-P', "$lagSshd");                                    Big = $false }
-        @{ Name = "$LAG ms each way, plain pipe relay";          Args = @('-o', "ProxyCommand=`"$node`" `"$relay`" $lagSshd");       Big = $false }
-        @{ Name = "$LAG ms each way, connect.js and bridge.js";  Args = @('-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
-        @{ Name = "$LAG ms each way, connect.js and bridge.js, scp -O"; Args = @('-O', '-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
+        @{ Name = "$lagMs ms each way, straight";                  Args = @('-P', "$lagSshd");                                          Big = $false }
+        @{ Name = "$lagMs ms each way, straight, scp -O";          Args = @('-O', '-P', "$lagSshd");                                    Big = $false }
+        @{ Name = "$lagMs ms each way, plain pipe relay";          Args = @('-o', "ProxyCommand=`"$node`" `"$relay`" $lagSshd");       Big = $false }
+        @{ Name = "$lagMs ms each way, connect.js and bridge.js";  Args = @('-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
+        @{ Name = "$lagMs ms each way, connect.js and bridge.js, scp -O"; Args = @('-O', '-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
     )
     $n = 0
     foreach ($w in $ways) {
