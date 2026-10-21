@@ -111,7 +111,7 @@ foreach ($k in $planted.Keys) {
     Yes ("found: $k") (@(Get-RuleCopies (Parse-Text $planted[$k])).Count -gt 0)
 }
 $clean = @'
-$root = [string](& (Join-Path $Here '..\release\Where.ps1') Install)
+$root = [string](& $whereScript Install)
 $free = (Get-PSDrive C).Free
 Write-Host 'no launcher at C:\Thornswood\Launcher\Thornswood.exe' # a word about it is not a copy
 '@
