@@ -115,8 +115,8 @@ foreach ($t in 'ssh', 'scp') {
 if ($Status -and $Remove) { Die '-Status only reads and -Remove takes it off, so pass one of them. Nothing was sent.' }
 
 function Remote($script) {
-    # Send-Script.ps1 (issue #1070): a long script goes as a file of its own
-    # name, removed after, and the far side's exit code comes back.
+    # Send-Script.ps1 (issue #1070): a long script goes on ssh's standard input
+    # (nothing of it is left on the box), and the far side's exit code comes back.
     return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script
 }
 

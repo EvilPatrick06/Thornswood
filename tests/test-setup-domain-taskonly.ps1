@@ -57,11 +57,14 @@ try {
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'ServiceAccount.ps1')) -Destination (Join-Path $deploy 'ServiceAccount.ps1')
 
     # The box, as far as the script can tell: ssh runs what it is given and
-    # says it went well, scp takes the file. A script sent as a file is read
-    # here before the scratch file is removed.
+    # says it went well, scp takes the file. A long script comes on standard
+    # input under a short reader (Send-Script.ps1, #3027), and is read here.
     function global:ssh {
+        $in = @($input | ForEach-Object { [string]$_ })
         $text = ($args | ForEach-Object { "$_" }) -join ' '
-        [void]$global:TsDomainCalls.Add([pscustomobject]@{ Tool = 'ssh'; Text = $text })
+        $sent = ''
+        if ($in.Count) { try { $sent = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) } catch { } }
+        [void]$global:TsDomainCalls.Add([pscustomobject]@{ Tool = 'ssh'; Text = $text; Sent = $sent })
         $global:LASTEXITCODE = 0
         'caddy up, pid 1'
     }

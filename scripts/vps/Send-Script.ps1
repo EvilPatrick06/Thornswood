@@ -17,23 +17,30 @@
   that failed on the far side looked like one that worked.
 
   WHAT IT DOES. Under the limit the script goes on the command line, one
-  round trip. Over it, the script goes up as a file of its own name
-  (thornswood-remote-<guid>.ps1), is run from there, and is removed whether
-  the run worked or not. $LASTEXITCODE afterwards is the far side's, never the
-  tidy up's.
+  round trip. Over it, the script goes on ssh's standard input, also one round
+  trip: the command line holds only a short reader, which takes the first
+  line of its standard input, base64 of the script's UTF-8, and runs it.
+  $LASTEXITCODE afterwards is the far side's.
 
-  Why a file at all: sshd on Windows hands the command to cmd.exe, which stops
-  at 8,191 characters and says nothing, and base64 of UTF-16 is about 2.7
-  times the script. On 17 and 20 September a long block arrived cut in half
-  and the far side complained about a brace in a script nobody could see.
+  Why not the command line: sshd on Windows hands the command to cmd.exe,
+  which stops at 8,191 characters and says nothing, and base64 of UTF-16 is
+  about 2.7 times the script. On 17 and 20 September a long block arrived cut
+  in half and the far side complained about a brace in a script nobody could
+  see. Standard input has no such limit.
 
-  The path goes bare, with no quotes round it: it is ours and has no spaces.
-  Measured on this machine on 24 September, not on the VPS: bare runs whether
-  cmd.exe or Windows PowerShell hands the line on, and the path in single
-  quotes fails under cmd.exe (tests\test-remote-big-script.ps1).
+  Why not a file (issue #3027). Until 21 Oct 2026 a long script went up as a
+  file of its own name (thornswood-remote-<guid>.ps1 in C:\Windows\Temp), was
+  run with a second ssh call and removed with a third. A run cut before the
+  third (a bridge reset, the machine running it going away) left the file on
+  the box, and nothing there ever removed it. Sent on standard input, the
+  script is never written on the box, so there is nothing to remove and no
+  call left to miss. The reader runs it the way -File ran the file: an exit
+  inside it is the far side's exit code, an error that stops it is 1, and
+  otherwise 0.
 
-  The file is written UTF-8 with a byte order mark, so Windows PowerShell on
-  the box reads it as UTF-8 whichever PowerShell sent it.
+  The reader strips anything that is not base64 from the line before it
+  decodes it (a byte order mark, a stray CR), the same as Send-Secret.ps1's
+  prelude, so whichever PowerShell sends it, the box reads the same script.
 
   Host key checking is always on (issues #450 and #1078): a caller's own
   weaker StrictHostKeyChecking is refused before anything is sent, because
@@ -51,14 +58,26 @@
 
 . (Join-Path $PSScriptRoot 'Vps.ps1')
 
+# What a long script runs under on the box: the first line of standard input,
+# anything that is not base64 dropped, decoded as UTF-8 and run in the
+# reader's own scope, as -Command would run it. Kept apart so the harnesses
+# know it when they see it (tests\test-remote-big-script.ps1).
+function Get-ThornswoodStdinReader {
+    return ". ([scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((('' + [Console]::In.ReadLine()) -replace '[^A-Za-z0-9+/=]', '')))))"
+}
+
 # Runs $Script on the VPS and hands back what the far side printed (2>&1, the
 # same as every Remote here).
 #   -Target   user@host
-#   -SshArgs  the caller's ssh options (@ssh), used for ssh and scp alike
+#   -SshArgs  the caller's ssh options (@ssh)
 #   -Bypass   -ExecutionPolicy Bypass on the command line as well, for a
-#             script that dot-sources a file (the file form always has it)
-#   -Limit    the longest command line sent; over it the script goes by file
-#   -Stdin    one line for the far side's standard input (Send-Secret.ps1)
+#             script that dot-sources a file (a long script always has it,
+#             as the file it once went as did)
+#   -Limit    the longest command line sent; over it the script goes on
+#             standard input
+#   -Stdin    one line for the far side's standard input (Send-Secret.ps1).
+#             For a long script it is the line after the script's own, so
+#             the script reads it as its first
 function Invoke-ThornswoodRemote {
     param(
         [Parameter(Mandatory = $true)][string]$Target,
@@ -87,26 +106,12 @@ function Invoke-ThornswoodRemote {
         return (Invoke-ThornswoodNative { & ssh @ssh $Target $cmd } 2>&1)
     }
 
-    $far = 'C:/Windows/Temp/thornswood-remote-' + [Guid]::NewGuid().ToString('N') + '.ps1'
-    $tmp = [IO.Path]::GetTempFileName()
-    $sent = $false
-    $rc = 1
-    try {
-        [IO.File]::WriteAllText($tmp, $Script, (New-Object Text.UTF8Encoding($true)))
-        Invoke-ThornswoodNative { & scp @ssh $tmp "${Target}:$far" } 2>&1 | Out-Null
-        if ($LASTEXITCODE -ne 0) { throw "could not send a script to $Target. Nothing was run." }
-        $sent = $true
-        $run = "powershell -NoProfile -ExecutionPolicy Bypass -File $far"
-        if ($piped) { $Stdin | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $run } 2>&1 }
-        else { Invoke-ThornswoodNative { & ssh @ssh $Target $run } 2>&1 }
-        $rc = $LASTEXITCODE
-    }
-    finally {
-        # Removed whether the run worked or not, and before anything else can
-        # stop this: a script left there is one the next run could trip on.
-        if ($sent) { Invoke-ThornswoodNative { & ssh @ssh $Target "powershell -NoProfile -Command Remove-Item -LiteralPath '$far' -Force" } 2>&1 | Out-Null }
-        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
-        # The far side's exit code, not the tidy up's.
-        $global:LASTEXITCODE = $rc
-    }
+    # Over the limit: the reader on the command line, the script on standard
+    # input, and the caller's line after it. Plain ASCII on the pipe, so no
+    # byte order mark goes in front of the script's line.
+    $OutputEncoding = New-Object Text.ASCIIEncoding
+    $wire = @([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Script)))
+    if ($piped) { $wire += $Stdin }
+    $run = 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodStdinReader)))
+    return ($wire | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $run } 2>&1)
 }

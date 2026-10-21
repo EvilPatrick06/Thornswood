@@ -482,7 +482,7 @@ function New-FeedStoreScript([string]$root, [string]$prefix, [string]$op, [strin
 # Runs the one script, up there or on -SiteDir, and hands back its lines.
 # Up there it goes through Send-Script.ps1 (Invoke-ThornswoodRemote, issue
 # #1167, the same way as #1070): under the limit on the command line, over
-# it as a file of its own name, removed whether the run worked or not, and
+# it on ssh's standard input, so nothing of it is left up there, and
 # the far side's exit code comes back. -SiteDir needs nothing of the VPS.
 function Invoke-FeedStoreOp([string]$Channel, [string]$op, [string[]]$names, [hashtable]$expect, [hashtable]$sizes, [string]$SiteDir, [hashtable]$To) {
     $prefix = Get-FeedStorePrefix $Channel
