@@ -298,7 +298,7 @@ try { `$patch = `$ThornswoodSecret | ConvertFrom-Json }
 catch { `$ThornswoodSecret = `$null; 'NOT WRITTEN: what arrived on standard input is not the JSON Set-DiscordLogin.ps1 sends. Nothing written.'; return }
 `$ThornswoodSecret = `$null
 if (-not `$patch) { 'NOTHING ARRIVED on standard input. Nothing written.'; return }
-`$f = '$rootWin\config.json'
+`$f = Join-Path '$rootWin' 'config.json'
 # A config.json that is there and does not read is not empty: written over,
 # it would lose the bot token, botKey, the cookie secret and the rest (#2317).
 `$cfg = @{}

@@ -244,7 +244,7 @@ exit 0
     foreach ($n in 'ssh', 'scp') {
         [IO.File]::WriteAllText((Join-Path $bin ($n + '.ps1')), $fake.Replace('NAME', $n))
     }
-    $env:PATH = $bin + ';' + $oldPath
+    $env:PATH = $bin + [IO.Path]::PathSeparator + $oldPath
     $env:TS_PUB_CALLS = $log
     $env:TS_PUB_STORE = Join-Path $T 'store-server'
     New-Item -ItemType Directory -Force -Path $env:TS_PUB_STORE | Out-Null

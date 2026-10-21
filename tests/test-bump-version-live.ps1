@@ -24,6 +24,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $BumpPath) { $BumpPath = Join-Path $Here 'scripts\release\Bump-Version.ps1' }
 $shell = (Get-Process -Id $PID).Path
 
@@ -112,11 +113,16 @@ try {
             & git -C $repo commit -q -m one 2>&1 | Out-Null }
         $bin = Join-Path $root 'bin'
         New-Item -ItemType Directory -Path $bin -Force | Out-Null
-        [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'), "@echo off`r`necho $ghSays`r`nexit /b $ghExit`r`n")
+        # A .cmd runs only on Windows; elsewhere the stand-in is a shell script.
+        if ($OnWindows) { [IO.File]::WriteAllText((Join-Path $bin 'gh.cmd'), "@echo off`r`necho $ghSays`r`nexit /b $ghExit`r`n") }
+        else {
+            [IO.File]::WriteAllText((Join-Path $bin 'gh'), "#!/bin/sh`nprintf '%s\n' '" + $ghSays.Replace("'", "'\''") + "'`nexit $ghExit`n")
+            & chmod 755 (Join-Path $bin 'gh')
+        }
         $site = Join-Path $root 'site'
         New-Item -ItemType Directory -Path (Join-Path $site 'feed') -Force | Out-Null
         $oldSite = $env:THORNSWOOD_TEST_SITE_DIR; $oldPath = $env:PATH
-        $env:THORNSWOOD_TEST_SITE_DIR = $site; $env:PATH = $bin + ';' + $env:PATH
+        $env:THORNSWOOD_TEST_SITE_DIR = $site; $env:PATH = $bin + [IO.Path]::PathSeparator + $env:PATH
         try { $out = (& $shell -NoProfile -File (Join-Path $repo 'scripts\release\Bump-Version.ps1') -NoPause 2>&1 | Out-String); $code = $LASTEXITCODE }
         finally { $env:THORNSWOOD_TEST_SITE_DIR = $oldSite; $env:PATH = $oldPath }
         return @{ Out = $out; Code = $code }

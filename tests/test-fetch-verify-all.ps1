@@ -34,6 +34,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Vps = Join-Path (Split-Path -Parent $Here) 'scripts\vps'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -64,7 +65,17 @@ if ($said -match "offbox\.txt' -Value '([^']+)'") {
 Get-Content -LiteralPath $env:FAKE_LIST
 exit 0
 '@
-Set-Content -LiteralPath (Join-Path $bin 'ssh.cmd') -Encoding ASCII -Value ('@"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "%~dp0ssh.ps1" %*')
+# Each is started through a .cmd on Windows; elsewhere through a shell script,
+# since only Windows runs a .cmd (#2989).
+function Put-Launcher([string]$name) {
+    if ($OnWindows) {
+        Set-Content -LiteralPath (Join-Path $bin "$name.cmd") -Encoding ASCII -Value ('@"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "%~dp0' + $name + '.ps1" %*')
+    } else {
+        Set-Content -LiteralPath (Join-Path $bin $name) -Encoding ASCII -NoNewline -Value ("#!/bin/sh`nexec '" + $exe + "' -NoProfile -File '" + (Join-Path $bin "$name.ps1") + "' ""`$@""`n")
+        & chmod 755 (Join-Path $bin $name)
+    }
+}
+Put-Launcher 'ssh'
 Set-Content -LiteralPath (Join-Path $bin 'scp.ps1') -Encoding ASCII -Value @'
 $src = $args[-2]; $dst = $args[-1]
 $name = $src.Substring($src.LastIndexOf('/') + 1)
@@ -75,7 +86,7 @@ if ($env:FAKE_SHORT -eq $name) { $b = $b[0..([int]$env:FAKE_SHORT_BYTES - 1)] }
 [IO.File]::WriteAllBytes($dst, $b)
 exit 0
 '@
-Set-Content -LiteralPath (Join-Path $bin 'scp.cmd') -Encoding ASCII -Value ('@"' + $exe + '" -NoProfile -ExecutionPolicy Bypass -File "%~dp0scp.ps1" %*')
+Put-Launcher 'scp'
 
 $fakeRestore = @'
 param([string]$Backup, [string]$KeyFile, [switch]$CheckOnly, [switch]$NoPause)
@@ -86,7 +97,7 @@ exit 0
 '@
 
 $oldPath = $env:PATH
-$env:PATH = $bin + ';' + $env:PATH
+$env:PATH = $bin + [IO.Path]::PathSeparator + $env:PATH
 
 $n = 0
 function Scene([hashtable]$files, [switch]$NoRestore, [switch]$NoKey, [string[]]$More = @(), [string]$Keep) {

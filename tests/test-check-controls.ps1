@@ -31,6 +31,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $CheckPath) { $CheckPath = Join-Path $Here 'scripts\dev\Check-Controls.ps1' }
 $RealXaml = Join-Path $Here 'launcher\ui.xaml'
 $RealApp  = Join-Path $Here 'launcher\app'
@@ -72,7 +73,8 @@ try {
     Yes 'nothing is NEW' ($r.Out -notmatch '\bNEW\b')
     $known = @([regex]::Matches($r.Out, '(?m)^\s*known\s+\S+')).Count
     Yes ("the baseline names are reported as known ({0})" -f $known) ($known -ge 1)
-    Yes 'it says ui.xaml parses' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*yes\s*$')
+    if ($OnWindows) { Yes 'it says ui.xaml parses' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*yes\s*$') }
+    else { Yes 'off Windows it says the parse was not checked, and why' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*not checked: WPF, which reads it, is only on Windows\s*$') }
 
     # ---- a looked up control renamed in ui.xaml -------------------------------
     #
@@ -84,22 +86,26 @@ try {
     $r = Run-Check $renamed $RealApp
     Yes 'a renamed control is reported as NEW' ($r.Out -match 'NEW\s+TxtPing\b')
     Yes 'a renamed control exits 1' ($r.Code -eq 1)
-    Yes 'the renamed window still parses, so the 1 is the name alone' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*yes\s*$')
+    if ($OnWindows) { Yes 'the renamed window still parses, so the 1 is the name alone' ($r.Out -match '(?ms)Does ui\.xaml parse.*?^\s*yes\s*$') }
 
     # ---- a window WPF refuses -------------------------------------------------
     #
     # Well formed XML and every name intact, so only a real parse sees it.
-    Yes 'ui.xaml sets Width="1220" on the window' ($xamlText.Contains('Width="1220"'))
-    $badValue = Xaml-With 'bad-value.xaml' 'Width="1220"' 'Width="wide"'
-    $r = Run-Check $badValue $RealApp
-    Yes 'a property value WPF refuses is reported as not parsing' ($r.Out -match 'does not parse')
-    Yes 'a property value WPF refuses exits 1' ($r.Code -eq 1)
-    Yes 'the report carries the line it failed on' ($r.Out -match '(?i)line\D{0,20}3\b')
-    Yes 'and the names alone were fine' ($r.Out -notmatch '\bNEW\b')
+    if ($OnWindows) {
+        Yes 'ui.xaml sets Width="1220" on the window' ($xamlText.Contains('Width="1220"'))
+        $badValue = Xaml-With 'bad-value.xaml' 'Width="1220"' 'Width="wide"'
+        $r = Run-Check $badValue $RealApp
+        Yes 'a property value WPF refuses is reported as not parsing' ($r.Out -match 'does not parse')
+        Yes 'a property value WPF refuses exits 1' ($r.Code -eq 1)
+        Yes 'the report carries the line it failed on' ($r.Out -match '(?i)line\D{0,20}3\b')
+        Yes 'and the names alone were fine' ($r.Out -notmatch '\bNEW\b')
 
-    $badXml = Xaml-With 'bad-xml.xaml' '</Window>' ''
-    $r = Run-Check $badXml $RealApp
-    Yes 'a window with no closing tag exits 1' (($r.Out -match 'does not parse') -and $r.Code -eq 1)
+        $badXml = Xaml-With 'bad-xml.xaml' '</Window>' ''
+        $r = Run-Check $badXml $RealApp
+        Yes 'a window with no closing tag exits 1' (($r.Out -match 'does not parse') -and $r.Code -eq 1)
+    } else {
+        Write-Host 'SKIP  a window WPF refuses: XamlReader, which reads it, is in WPF, which only Windows has'
+    }
 
     # ---- a baseline line that covers nothing any more -------------------------
     #

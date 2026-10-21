@@ -249,7 +249,11 @@ $rootWin   = $Root.Replace('/','\')
 # no backslash at the end. The fail-safe and the site's grants name the other
 # folders from it, so a deploy into a scratch box never reaches the real ones
 # (#1273).
-$boxWin    = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
+# It is taken as text by Windows rules: Split-Path here is this machine's,
+# and off Windows it made C:\Thornswood-Docs's parent C:/ and every grant
+# C:/\Thornswood-Server (#2989).
+$boxWin    = $rootWin.TrimEnd('\')
+$boxWin    = if ($boxWin.LastIndexOf('\') -ge 0) { $boxWin.Substring(0, $boxWin.LastIndexOf('\')) } else { '' }
 $stamp     = Get-Date -Format 'yyyyMMdd-HHmmss'
 $stageName = '.stage-' + $stamp
 $prevName  = '.prev-' + $stamp

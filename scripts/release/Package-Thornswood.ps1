@@ -425,7 +425,10 @@ try {
 # path (issue #1156).
 $listedGame = (Get-Item -LiteralPath $GameDir).FullName
 $all = @(Get-ChildItem -LiteralPath $listedGame -Recurse -File -Force)
-$prefix = $listedGame.TrimEnd('\') + '\'
+# Named with \ on any machine, as every rule and record names them; off
+# Windows FullName is joined with / (#2989), as Publish-Update already reads it.
+$sep = [string][IO.Path]::DirectorySeparatorChar
+$prefix = $listedGame.TrimEnd($sep) + $sep
 
 $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
 $collectionBytes = 0; $collectionCount = 0
@@ -438,7 +441,7 @@ Say ("  collection revision {0}: loose files held for the collection until then 
 $clientShipped = 0
 $clientWrong = @()
 foreach ($f in $all) {
-    $rel = $f.FullName.Substring($prefix.Length)
+    $rel = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
     # Ours by record, before any filter is asked. See the note over
     # $shipClientFiles: these six are the only files a tester cannot get from
     # anywhere else, and a missing one is a Play button that will not press.

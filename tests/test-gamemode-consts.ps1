@@ -6,7 +6,8 @@ $Here = Split-Path -Parent $MyInvocation.MyCommand.Path
 $Root = Resolve-Path (Join-Path $Here '..')
 Push-Location $Root
 try {
-    node .\scripts\dev\Install-GamemodeConsts.js --check
+    # Named by Join-Path: node reads .\ as part of the name off Windows (#2989).
+    node (Join-Path $Root 'scripts\dev\Install-GamemodeConsts.js') --check
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 } finally {
     Pop-Location

@@ -84,8 +84,8 @@ try {
     $env:THORNSWOOD_VPS_LOCAL = 'D:\mine\vps.json'
     Check 'Get-ThornswoodVpsLocalPath: THORNSWOOD_VPS_LOCAL wins' ((Get-ThornswoodVpsLocalPath) -eq 'D:\mine\vps.json')
     $env:THORNSWOOD_VPS_LOCAL = ''
-    $env:LOCALAPPDATA = Join-Path $env:SystemDrive 'AppLocal'
-    Check 'Get-ThornswoodVpsLocalPath: otherwise %LOCALAPPDATA%\Thornswood\vps.json' ((Get-ThornswoodVpsLocalPath) -eq (Join-Path $env:SystemDrive 'AppLocal\Thornswood\vps.json'))
+    $env:LOCALAPPDATA = Join-Path $scratch 'AppLocal'
+    Check 'Get-ThornswoodVpsLocalPath: otherwise %LOCALAPPDATA%\Thornswood\vps.json' ((Get-ThornswoodVpsLocalPath) -eq (Join-Path $scratch 'AppLocal\Thornswood\vps.json'))
     $env:LOCALAPPDATA = ''
     Check 'Get-ThornswoodVpsLocalPath: no LOCALAPPDATA is no file, not a path at the drive root' ((Get-ThornswoodVpsLocalPath) -eq '')
     Check 'Get-ThornswoodKnownHostsPath: the user''s own .ssh\known_hosts' ((Get-ThornswoodKnownHostsPath) -eq (Join-Path (Join-Path $HOME '.ssh') 'known_hosts'))

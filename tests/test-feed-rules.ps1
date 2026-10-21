@@ -334,7 +334,7 @@ try {
     # ---- the live feed, measured on a copy
     # This machine's working copy of the live feed (Feed-Store.ps1, #907).
     $clone = ''
-    $cand = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main'
+    $cand = & (Join-Path $here 'scripts\release\Where.ps1') Releases
     if (Test-Path -LiteralPath (Join-Path $cand 'version.json')) { $clone = $cand }
     if (-not $clone) {
         Write-Host 'SKIP  no live feed received on this machine, so it was not measured'

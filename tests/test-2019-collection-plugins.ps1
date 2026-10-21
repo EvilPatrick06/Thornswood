@@ -73,7 +73,13 @@ try {
     $good = @((Join-Path $mine '3BBB.esp'))
     Yes 'the collection''s own bytes pass' ((Refusal { Assert-ThornswoodCollectionPlugins -RecordPath $rec -Files $good }) -eq '')
     Yes 'nothing to send passes, whatever the record' ((Refusal { Assert-ThornswoodCollectionPlugins -RecordPath (Join-Path $tmp 'none.json') -Files @() }) -eq '')
-    Yes 'names compare without case, as Windows does' ((Refusal { Assert-ThornswoodCollectionPlugins -RecordPath $rec -Files @((Join-Path $col 'B Mod.esm').Replace('B Mod', 'b mod')) }) -eq '')
+    # A file of its own named in another case: a path with its case changed
+    # finds the file only where the file system ignores case, which Linux's
+    # does not (#2989).
+    $lower = Join-Path $tmp 'lower'
+    New-Item -ItemType Directory -Path $lower -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $col 'B Mod.esm') -Destination (Join-Path $lower 'b mod.esm')
+    Yes 'names compare without case, as Windows does' ((Refusal { Assert-ThornswoodCollectionPlugins -RecordPath $rec -Files @((Join-Path $lower 'b mod.esm')) }) -eq '')
     Put (Join-Path $mine 'small\3BBB.esp' | ForEach-Object { $null = New-Item -ItemType Directory -Path (Split-Path $_) -Force; $_ }) ([byte[]](1..50))
     $why = Refusal { Assert-ThornswoodCollectionPlugins -RecordPath $rec -Files @((Join-Path $mine 'small\3BBB.esp')) -What 'the full deploy' }
     Yes 'another size is refused, naming the plugin and both sizes' ($why -match '^Refused: the full deploy would send 1 plugin' -and $why.Contains('3BBB.esp  (this machine''s is 50 bytes, the collection''s is 200)') -and $why -match 'Nothing was sent')

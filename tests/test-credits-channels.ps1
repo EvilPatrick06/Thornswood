@@ -142,8 +142,10 @@ finally {
 
 # ---- the credits page, against the feeds when they are on disk -------------
 $asked = [bool]($PublicFeed -or $DevFeed)
-if (-not $PublicFeed) { $PublicFeed = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\version.json' }
-if (-not $DevFeed) { $DevFeed = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\version.json' }
+# This machine's working copies of the feeds, where Where.ps1 says they are.
+$where = Join-Path $Repo 'scripts\release\Where.ps1'
+if (-not $PublicFeed) { $PublicFeed = Join-Path (& $where Releases) 'version.json' }
+if (-not $DevFeed) { $DevFeed = Join-Path (& $where ReleasesDev) 'version.json' }
 $hasPublic = Test-Path -LiteralPath $PublicFeed
 $hasDev = Test-Path -LiteralPath $DevFeed
 if ($asked -or ($hasPublic -and $hasDev)) {

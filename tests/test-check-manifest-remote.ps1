@@ -90,7 +90,7 @@ function Invoke-ThornswoodRemote {
     Reset
     Server "O'Neill Server" $order 'world data'
     $r = Run @()
-    Yes "a root with an apostrophe is read (it broke the remote script's quoting)" ($r.Out -match "server wants\s+7 plugins" -and $r.Out -match "dataDir\s+.*O'Neill Server\\world data")
+    Yes "a root with an apostrophe is read (it broke the remote script's quoting)" ($r.Out -match "server wants\s+7 plugins" -and $r.Out -match "dataDir\s+.*O'Neill Server[\\/]world data")
 
     # 4. Nothing there.
     Reset
