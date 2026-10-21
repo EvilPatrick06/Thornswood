@@ -1160,10 +1160,15 @@ def build(data_dir):
         else:
             floor.append((g, e, kind))
     # A reference whose enable parent is a floor item would go out with it, or
-    # come on as it goes (the opposite flag). Neither is decided by this.
-    off_now = {g for g, _, _ in floor} | {plugins[e.pi].gid(e.fid) for e in actors}
+    # come on as it goes (the opposite flag). Neither is decided by this. Only
+    # a floor item's followers count: a cut actor's go out with it, as they
+    # have since #2468 (measured 21 Oct 2026: 30 references follow 11 cut
+    # actors, and none follows a floor item). A follower that is switched off
+    # here itself, a floor item or a cut actor, has no enable parent left.
+    items_off = {g for g, _, _ in floor}
+    off_here = items_off | {plugins[e.pi].gid(e.fid) for e in actors}
     followers = sorted('%s follows %s' % (desc_of(g, canon), desc_of(p, canon))
-                       for g, (e, p) in parents.items() if p in off_now and g not in off_now)
+                       for g, (e, p) in parents.items() if p in items_off and g not in off_here)
     if followers:
         raise SystemExit('STOP. %d reference(s) have a floor item as their enable parent, and switching '
                          'the item off would switch them too:\n  %s\nDecide them on #3077. Nothing was written.'
