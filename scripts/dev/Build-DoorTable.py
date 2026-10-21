@@ -360,7 +360,7 @@ def main():
         'doors': placed,
         'buildings': {k: sorted(v) for k, v in buildings.items()},
     }
-    io.open(args.out, 'w', encoding='utf-8').write(
+    io.open(args.out, 'w', encoding='utf-8', newline='\n').write(
         json.dumps(payload, indent=1, sort_keys=True))
     print('')
     print('  wrote %s (%s bytes)' % (args.out, format(os.path.getsize(args.out), ',')))
@@ -475,8 +475,8 @@ def main():
             print('    // ==== %s, generated ====' % mark)
             print('    // ==== end %s ====' % mark)
             continue
-        text = (text[:a] + '\r\n'.join(['// ==== %s, generated ====' % mark] + lines)
-                + '\r\n' + text[b:])
+        text = (text[:a] + '\n'.join(['// ==== %s, generated ====' % mark] + lines)
+                + '\n' + text[b:])
         print('  wrote %s into the gamemode' % mark)
     io.open(args.gamemode, 'w', encoding='utf-8', newline='').write(text)
     return 0
