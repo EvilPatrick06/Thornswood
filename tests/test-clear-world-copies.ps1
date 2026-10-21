@@ -29,7 +29,9 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $clear = Join-Path $repo 'scripts\vps\Clear-OldWorldCopies.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  Clear-OldWorldCopies.ps1 runs on the box under Windows PowerShell 5.1, and its link case is an NTFS junction; only Windows has either'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -61,7 +63,7 @@ try {
     Put (Join-Path $target 'keep.txt') 'must survive'
     $linked = Join-Path $t1 'serverdata-20260921-100000'
     $null = New-Item -ItemType Directory -Force -Path $linked
-    $null = & cmd.exe /c ('mklink /J "' + (Join-Path $linked 'link') + '" "' + $target + '"')
+    $null = & (Get-WindowsPath 'System32\cmd.exe') /c ('mklink /J "' + (Join-Path $linked 'link') + '" "' + $target + '"')
     $haveLink = There (Join-Path $linked 'link\keep.txt')
 
     function Run([string[]]$more) {

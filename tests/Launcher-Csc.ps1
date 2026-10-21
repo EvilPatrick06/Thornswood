@@ -38,13 +38,21 @@
   paths that do not exist, so the harness's own "the compiler is here" check
   (Test-Path -LiteralPath $LauncherCsc) says so plainly rather than a null
   somewhere further down. Developer-Guide.md "Setting up a machine" has the
-  install line.
+  install line. Off Windows there are no Build Tools at all, and the same is
+  said without asking: Find-MSBuild.ps1 looks under Program Files, which only
+  Windows has, and joining onto that unset folder ended every harness that
+  loads this file on its first line (#2957). This file dot-sources
+  tests\Windows.ps1, so a harness that loads it has $OnWindows too, and asks
+  it before "the compiler is here":
+
+      if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: ...'; Done }
 #>
 # In a scope of its own: dot-sourcing Find-MSBuild.ps1 here would also bring
 # its parameters ($Report, $Load, typed [switch]) into the harness, and a
 # harness's own $report = ... then fails (measured 15 Oct, test-crash-snapshot).
 $launcherFindMsb = Join-Path $PSScriptRoot '..\scripts\release\Find-MSBuild.ps1'
-$launcherMsb = & { . $launcherFindMsb -Load; Find-ThornswoodMSBuild }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$launcherMsb = if ($OnWindows) { & { . $launcherFindMsb -Load; Find-ThornswoodMSBuild } } else { [pscustomobject]@{ Csc = $null; RefAssemblies = $null } }
 $LauncherCsc = if ($launcherMsb.Csc) { $launcherMsb.Csc } else { Join-Path ([IO.Path]::GetTempPath()) 'no-build-tools-roslyn-csc\csc.exe' }
 $LauncherRefDir = if ($launcherMsb.RefAssemblies) { $launcherMsb.RefAssemblies } else { Join-Path ([IO.Path]::GetTempPath()) 'no-build-tools-net481-refs' }
 function Find-LauncherRef([string]$name) {

@@ -126,11 +126,12 @@ Yes 'S9 the reset''s body carries the writer and asks it for a list with no prof
     $resetBody.Contains('$found = Get-ThornswoodCharacterIds $moved') -and
     ([regex]::Matches($resetBody, 'Write-ThornswoodReleaseList -Root \$Root -Actors \$found\.ids\)\)')).Count -eq 1)
 
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 
 $T = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2668-' + [Guid]::NewGuid().ToString('N'))
 $A1 = 4278192641; $A2 = 4278192642; $A9 = 4278192649     # ff000a01, ff000a02, ff000a09

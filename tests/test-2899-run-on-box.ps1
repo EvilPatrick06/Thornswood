@@ -104,12 +104,14 @@ Yes 'twelve archives: Interface, Meshes0-1 and Textures0-8, Patrick''s A on #289
 Yes 'the clean-up removes the run''s folder and says whether it went' ($clean -match "Remove-Item -LiteralPath 'C:\\Windows\\Temp\\thornswood-onbox-test' -Recurse" -and $clean -match "'GONE'")
 
 # ---- 3. run as on the box, under Windows PowerShell 5.1 ------------------
-$ps51 = $null
-if ($env:SystemRoot) { $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe' }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $py = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $ps51 -or -not (Test-Path -LiteralPath $ps51) -or -not $py) {
-    Write-Host 'SKIP  the run under Windows PowerShell 5.1: no powershell.exe or py on this machine (the Windows runner runs it)'
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the run under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs (the Windows runner runs it)'
+} elseif (-not $py) {
+    Write-Host 'SKIP  the run under Windows PowerShell 5.1: no py on this machine (the Windows runner runs it)'
 } else {
+    $ps51 = Get-WindowsPowerShell
     $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2899-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
     try {
         $server = Join-Path $work 'server'
