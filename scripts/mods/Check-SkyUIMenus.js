@@ -118,6 +118,25 @@ function archiveIndex(file) {
 }
 
 /*
+  The loose file at k (lower case, folders split by \) under Data, or null.
+  Each folder and the file are matched in any case, because Windows, where
+  the game reads them, matches them so: Data\Scripts\SKI_Main.pex is
+  scripts\ski_main.pex to it. Joined as one string, k named a file called
+  "scripts\ski_main.pex" on Linux, found nothing, and every menu passed (#3005).
+*/
+function looseFile(data, k) {
+  let at = data;
+  for (const part of k.split('\\')) {
+    let names;
+    try { names = fs.readdirSync(at); } catch (e) { return null; }
+    const hit = names.filter(function (n) { return n.toLowerCase() === part; })[0];
+    if (hit === undefined) { return null; }
+    at = path.join(at, hit);
+  }
+  return fs.statSync(at).isFile() ? at : null;
+}
+
+/*
   Where the game would take a file under Data from: loose first, unless the
   release deletes it; then the archive loaded last. Returns { from, bytes }
   or null, and throws when the file is there and cannot be read.
@@ -146,9 +165,9 @@ function fileFinder(data, order, gone) {
   }
   function find(rel) {
     const k = rel.toLowerCase().replace(/\//g, '\\');
-    const loose = path.join(data, k);
-    if (!gone[('data\\' + k)] && fs.existsSync(loose)) {
-      return { from: 'loose in Data\\' + path.dirname(rel.replace(/\//g, '\\')), bytes: fs.readFileSync(loose) };
+    const loose = gone[('data\\' + k)] ? null : looseFile(data, k);
+    if (loose) {
+      return { from: 'loose in Data\\' + path.win32.dirname(rel.replace(/\//g, '\\')), bytes: fs.readFileSync(loose) };
     }
     if (!archived) { indexArchives(); }
     const entry = archived[k];
