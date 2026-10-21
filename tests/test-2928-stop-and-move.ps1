@@ -28,7 +28,9 @@
     3. On Windows, run for real ten times: a node holding a file in a folder
        is ended, waited for, and the folder renamed at once, every time.
     4. A rename Windows refuses is tried once, returns false, and says the
-       Windows error and the process holding the file (this one).
+       Windows error and the process holding the file (this one); a folder
+       another process has as its current directory, which the Restart
+       Manager cannot see, is named by the handle list (#3131).
     5. This process, and an id with nothing running, are never opened.
 
   It also prints, without failing on it, how many of ten folders were refused
@@ -78,13 +80,18 @@ $e = $null
 [void][System.Management.Automation.Language.Parser]::ParseInput($lib, [ref]$null, [ref]$e)
 Yes 'it parses, and is plain ASCII, which Windows PowerShell 5.1 on the box reads right' (@($e).Count -eq 0 -and $lib -notmatch '[^\x00-\x7F]')
 Yes 'it has no sleep, and no loop that tries a rename again' ($lib -notmatch 'Start-Sleep|Thread\]::Sleep' -and $lib -notmatch 'for \(\$i')
-foreach ($fn in 'Get-ThornswoodProcessHeld', 'Stop-ThornswoodProcessHeld', 'Get-ThornswoodPathHolders', 'Move-ThornswoodPath') {
+foreach ($fn in 'Get-ThornswoodProcessHeld', 'Stop-ThornswoodProcessHeld', 'Get-ThornswoodPathHolders', 'Get-ThornswoodFileHolders', 'Get-ThornswoodPathHandles', 'Move-ThornswoodPath') {
     Yes "  and defines $fn" ([bool](FunctionText $lib $fn))
 }
 Yes 'each process is opened before it is ended, and waited for by its own handle' (
     (FunctionText $lib 'Get-ThornswoodProcessHeld') -match '\$null = \$p\.Handle' -and
     (FunctionText $lib 'Stop-ThornswoodProcessHeld') -match '\$p\.Kill\(\)' -and
     (FunctionText $lib 'Stop-ThornswoodProcessHeld') -match '\$p\.WaitForExit\(\$left\)')
+Yes 'a refusal says what the Restart Manager names and every handle under the path, folders and current directories too (#3131)' (
+    (FunctionText $lib 'Get-ThornswoodPathHolders') -match 'Get-ThornswoodFileHolders \$Path' -and
+    (FunctionText $lib 'Get-ThornswoodPathHolders') -match 'Get-ThornswoodPathHandles \$Path' -and
+    (FunctionText $lib 'Get-ThornswoodPathHandles') -match 'NtQuerySystemInformation\(64' -and
+    (FunctionText $lib 'Get-ThornswoodPathHandles') -match 't\.Join\(20000\)')
 $move = FunctionText $lib 'Move-ThornswoodPath'
 Yes 'a move is tried once and says why when it is refused' (
     ([regex]::Matches($move, '::Move\(')).Count -eq 2 -and $move -match '\$script:ThornswoodMoveWhy = \(' -and $move -match 'Get-ThornswoodPathHolders \$From')
@@ -233,6 +240,23 @@ try {
     Yes 'a folder with a file this process holds is refused, once, and left where it is' ((-not $ok) -and (Test-Path -LiteralPath $f))
     Yes ('  saying the Windows error and who holds it: ' + $ThornswoodMoveWhy) ($ThornswoodMoveWhy -match '\(0x8007[0-9A-F]{4}\)' -and $ThornswoodMoveWhy -match ('pid ' + $PID + '\b'))
     Yes '  and once it is let go, the same move goes through' (Move-ThornswoodPath $d ($d + '-moved'))
+
+    # 4b. #3131: a folder another process has as its current directory. The
+    # Restart Manager is asked about files and names nothing; the handle list
+    # names the process.
+    $d = Join-Path $work 'cwd-here'
+    $null = New-Item -ItemType Directory -Path $d
+    [IO.File]::WriteAllText((Join-Path $d 'a.txt'), 'x')
+    $c = Start-Process -FilePath $node.Source -ArgumentList @('-e', '"setInterval(()=>{},1000)"') -WorkingDirectory $d -PassThru -WindowStyle Hidden
+    $started += $c
+    $ok = Move-ThornswoodPath $d ($d + '-moved')
+    Yes 'a folder another process has as its current directory is refused, once' ((-not $ok) -and (Test-Path -LiteralPath $d))
+    Yes ('  and the handle list names that process, where the Restart Manager names none: ' + $ThornswoodMoveWhy) (
+        $ThornswoodMoveWhy -match '\(0x8007[0-9A-F]{4}\)' -and $ThornswoodMoveWhy -match 'no process the Restart Manager can see' -and
+        $ThornswoodMoveWhy -match ('handles: .*pid ' + $c.Id + ' node: ' + [regex]::Escape($d)))
+    $held = @(Get-ThornswoodProcessHeld @($c.Id))
+    $null = @(Stop-ThornswoodProcessHeld $held)
+    Yes '  and once it has exited, the same move goes through' (Move-ThornswoodPath $d ($d + '-moved'))
 
     # 5. never this process, never an id with nothing running.
     $gone = Start-Process -FilePath $node.Source -ArgumentList @('-e', '0') -PassThru -WindowStyle Hidden

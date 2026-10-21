@@ -101,10 +101,19 @@ function Stop-ThornswoodProcessHeld($Held) {
   }
 }
 
-# What the Restart Manager says has a file at or under $Path open right now,
-# as "pid name" pairs, or why it could not be asked. A refusal it names
-# nothing for is held by a driver or by a process that is still exiting.
+# What has $Path or anything under it open right now: what the Restart
+# Manager says, then every handle on the box that names it. Both, because the
+# Restart Manager is asked about files only. A process whose current
+# directory is in the folder, or that has a folder in it open, holds a handle
+# on a folder, which it cannot see; that is the sharing violation (0x80070020)
+# a dev publish was refused with on 21 Oct 2026 while it named nothing (#3131).
 function Get-ThornswoodPathHolders([string]$Path) {
+  return (Get-ThornswoodFileHolders $Path) + '; handles: ' + (Get-ThornswoodPathHandles $Path)
+}
+
+# What the Restart Manager says has a file at or under $Path open right now,
+# as "pid name" pairs, or why it could not be asked.
+function Get-ThornswoodFileHolders([string]$Path) {
   if (-not ('ThornswoodRestartManager' -as [type])) {
     try {
       Add-Type -TypeDefinition @'
@@ -152,11 +161,125 @@ public static class ThornswoodRestartManager {
   $files = @($Path)
   if (Test-Path -LiteralPath $Path -PathType Container) {
     $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -EA SilentlyContinue | ForEach-Object { $_.FullName })
-    if (-not $files.Count) { return 'the folder holds no files, so only an open handle on a folder in it can be holding it' }
+    if (-not $files.Count) { return 'the folder holds no files for the Restart Manager to ask about' }
   }
   $who = [ThornswoodRestartManager]::Holders([string[]]$files)
-  if (-not $who) { return 'no process the Restart Manager can see, so a driver or a process still exiting' }
+  if (-not $who) { return 'no process the Restart Manager can see' }
   return $who
+}
+
+# Every handle on the box that names $Path or a path under it, as "pid name:
+# path (access 0x...)" groups, then the processes it could not look into
+# (protected ones, Windows Defender among them, which even an administrator
+# cannot open). Read only: each handle is copied into this process, its path
+# read, and the copy closed. A handle whose path cannot be read without
+# waiting (a pipe with a read pending) is passed over by its access mask, and
+# the whole look is given 20 seconds and says so if it ran out.
+function Get-ThornswoodPathHandles([string]$Path) {
+  if (-not ('ThornswoodHandles' -as [type])) {
+    try {
+      Add-Type -TypeDefinition @'
+using System;
+using System.Collections.Generic;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
+public static class ThornswoodHandles {
+  [StructLayout(LayoutKind.Sequential)] struct ENTRY { public IntPtr Object; public IntPtr Pid; public IntPtr Handle; public uint Access; public ushort Creator; public ushort Type; public uint Attr; public uint Reserved; }
+  [DllImport("ntdll.dll")] static extern int NtQuerySystemInformation(int cls, IntPtr buf, int len, out int ret);
+  [DllImport("kernel32.dll", SetLastError = true)] static extern IntPtr OpenProcess(uint access, bool inherit, int pid);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+  [DllImport("kernel32.dll")] static extern IntPtr GetCurrentProcess();
+  [DllImport("kernel32.dll", SetLastError = true)] static extern bool DuplicateHandle(IntPtr sp, IntPtr sh, IntPtr tp, out IntPtr th, uint access, bool inherit, uint opt);
+  [DllImport("kernel32.dll")] static extern uint GetFileType(IntPtr h);
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode)] static extern uint GetFinalPathNameByHandle(IntPtr h, StringBuilder sb, uint len, uint flags);
+  static string found;
+  public static string Under(string path) {
+    found = null;
+    Thread t = new Thread(delegate() { found = Look(path); });
+    t.IsBackground = true;
+    t.Start();
+    if (!t.Join(20000)) return "the handle list did not finish in 20 seconds";
+    return found;
+  }
+  static string Look(string path) {
+    string under = path.TrimEnd('\\');
+    int len = 1 << 22, ret, st;
+    IntPtr buf;
+    while (true) {
+      buf = Marshal.AllocHGlobal(len);
+      st = NtQuerySystemInformation(64, buf, len, out ret);
+      if (st == 0) break;
+      Marshal.FreeHGlobal(buf);
+      if (len >= (1 << 30)) return "the handles could not be listed (0x" + st.ToString("X8") + ")";
+      len *= 2;
+    }
+    Dictionary<int, IntPtr> procs = new Dictionary<int, IntPtr>();
+    Dictionary<int, List<string>> held = new Dictionary<int, List<string>>();
+    List<int> unopened = new List<int>();
+    try {
+      long count = Marshal.ReadIntPtr(buf).ToInt64();
+      int size = Marshal.SizeOf(typeof(ENTRY));
+      long first = buf.ToInt64() + IntPtr.Size * 2;
+      int self = System.Diagnostics.Process.GetCurrentProcess().Id;
+      IntPtr me = GetCurrentProcess();
+      for (long i = 0; i < count; i++) {
+        ENTRY e = (ENTRY)Marshal.PtrToStructure(new IntPtr(first + i * size), typeof(ENTRY));
+        int pid = (int)e.Pid.ToInt64();
+        if (pid == self || pid <= 4) continue;
+        // The masks a synchronous pipe is opened with: reading its path can wait for ever.
+        if (e.Access == 0x0012019F || e.Access == 0x00120189 || e.Access == 0x00100000 || e.Access == 0x0016019F) continue;
+        IntPtr p;
+        if (!procs.TryGetValue(pid, out p)) {
+          p = OpenProcess(0x40, false, pid);
+          procs[pid] = p;
+          if (p == IntPtr.Zero) unopened.Add(pid);
+        }
+        if (p == IntPtr.Zero) continue;
+        IntPtr d;
+        if (!DuplicateHandle(p, e.Handle, me, out d, 0, false, 2)) continue;
+        try {
+          if (GetFileType(d) != 1) continue;
+          StringBuilder sb = new StringBuilder(1024);
+          uint n = GetFinalPathNameByHandle(d, sb, 1024, 0);
+          if (n == 0 || n >= 1024) continue;
+          string at = sb.ToString();
+          if (at.StartsWith(@"\\?\")) at = at.Substring(4);
+          if (!at.Equals(under, StringComparison.OrdinalIgnoreCase) && !at.StartsWith(under + @"\", StringComparison.OrdinalIgnoreCase)) continue;
+          if (!held.ContainsKey(pid)) held[pid] = new List<string>();
+          held[pid].Add(at + " (access 0x" + e.Access.ToString("X") + ")");
+        } finally { CloseHandle(d); }
+      }
+    } finally {
+      foreach (IntPtr p in procs.Values) if (p != IntPtr.Zero) CloseHandle(p);
+      Marshal.FreeHGlobal(buf);
+    }
+    List<string> said = new List<string>();
+    foreach (KeyValuePair<int, List<string>> h in held) {
+      List<string> paths = h.Value;
+      string more = paths.Count > 6 ? " and " + (paths.Count - 6) + " more" : "";
+      if (paths.Count > 6) paths = paths.GetRange(0, 6);
+      said.Add("pid " + h.Key + " " + Name(h.Key) + ": " + string.Join(", ", paths.ToArray()) + more);
+    }
+    string text = said.Count > 0 ? string.Join("; ", said.ToArray()) : "none in any process it could look into";
+    if (unopened.Count > 0) {
+      List<string> names = new List<string>();
+      foreach (int u in unopened) names.Add(u + " " + Name(u));
+      text += "; could not look into " + string.Join(", ", names.ToArray());
+    }
+    return text;
+  }
+  static string Name(int pid) {
+    try { return System.Diagnostics.Process.GetProcessById(pid).ProcessName; } catch { return "(exited)"; }
+  }
+}
+'@
+    } catch { return 'the handles could not be listed: ' + $_.Exception.Message }
+  }
+  # Without the debug privilege an administrator cannot open the services' processes.
+  try { [System.Diagnostics.Process]::EnterDebugMode() } catch {}
+  try { return [ThornswoodHandles]::Under([IO.Path]::GetFullPath($Path)) }
+  catch { return 'the handles could not be listed: ' + $_.Exception.Message }
 }
 
 # Moves a file or a folder on one volume, once, making the folder it goes
