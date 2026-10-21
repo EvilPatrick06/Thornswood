@@ -12,7 +12,7 @@ try {
   const merchantBytes=fs.readFileSync(merchantFile,'utf8');
   const storage=ctx.createPrivateEconomyLedger(fs,path,settings,'dungeon-rewards',[]);
   assert.equal(Object.keys(storage.load().entries).length,0);
-  const record={version:1,entries:{'2:Skyrim.esm':{at:1000000000000,legacy:true}}};
+  const record={version:1,entries:{'2:Skyrim.esm':{at:1000000000000,actor:20,tier:1,gold:9,items:[]}}};
   storage.save(record);
   const file=path.join(settings.privDir,'dungeon-rewards-ledger.json');
   assert.equal(ctx.createPrivateEconomyLedger(fs,path,settings,'dungeon-rewards',[]).load().entries['2:Skyrim.esm'].at,1000000000000);

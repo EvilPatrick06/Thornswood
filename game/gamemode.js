@@ -47156,7 +47156,6 @@ module.exports = {
     3: [['novice', 92], ['master', 8]],
     4: [['novice', 70], ['master', 30]]
   };
-  var PROP = 'thornswoodDungeonLoot';
   var GOLD_DESC = 'f:Skyrim.esm';
   if(g.__thornswoodDungeonLoot && g.__thornswoodDungeonLoot.shutdown) g.__thornswoodDungeonLoot.shutdown();
   var active=true,storage=null,ledger=null;
@@ -47170,8 +47169,6 @@ module.exports = {
       for(var key of Object.keys(ledger.entries)) {
         var saved=ledger.entries[key];
         if(!/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(key)) throw new Error('Invalid dungeon reward identity');
-        if(saved && saved.legacy===true && Number.isSafeInteger(saved.at) && saved.at>0 &&
-            Object.keys(saved).length===2) continue;
         if(saved && saved.kind==='body') {
           if(!Number.isSafeInteger(saved.at) || saved.at<=0 || typeof saved.taken!=='boolean' ||
             !Number.isInteger(saved.gold) || saved.gold<0 || saved.gold>6 ||
@@ -47836,17 +47833,6 @@ module.exports = {
     try {reference=mp.getDescFromId(refrId);} catch(error) {return null;}
     if(typeof reference!=='string' || !/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(reference)) return null;
     var prior=ledger.entries[reference],last=prior ? prior.at : 0;
-    if(!prior) {
-      var legacy=0;
-      try {legacy=mp.get(refrId,PROP);} catch(error) {return null;}
-      if(legacy!==null && legacy!==undefined && legacy!==0) {
-        if(!Number.isSafeInteger(legacy) || legacy<=0) return null;
-        var migrated=JSON.parse(JSON.stringify(ledger));
-        migrated.entries[reference]={at:legacy,legacy:true};
-        try {storage.save(migrated);} catch(error) {return null;}
-        ledger=migrated;last=legacy;
-      }
-    }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
     var boss = BOSS_WORD.test(baseName);
@@ -47854,11 +47840,11 @@ module.exports = {
       boss ? { secondExclusive: tier === 4 } : null);
     var next=JSON.parse(JSON.stringify(ledger));
     next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
-    // Reserve durably before touching inventory. An uncertain native write
-    // cannot be replayed by reopening, reload or loss of its cooldown mirror.
+    // Reserve durably before touching inventory. The ledger is the only
+    // record of when a chest paid, so an uncertain inventory write cannot be
+    // replayed by reopening or reload.
     try {storage.save(next);} catch(error) {console.log('[dungeon] reservation failed: '+error);return null;}
     ledger=next;
-    try {mp.set(refrId,PROP,now);} catch(error) {console.log('[dungeon] cooldown mirror failed: '+error);}
     if (!give(actorId, rolled)) return null;
     var line = heldLine(rolled);
     if (line) {
@@ -48113,7 +48099,7 @@ module.exports = {
     var next = JSON.parse(JSON.stringify(ledger));
     Object.keys(next.entries).forEach(function (key) {
       var e = next.entries[key];
-      if (e && e.kind !== 'body' && e.legacy !== true && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
+      if (e && e.kind !== 'body' && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
     });
     if (!c.chests) { return { counts: c, saved: true }; }
     try { storage.save(next); } catch (error) {
@@ -48146,8 +48132,7 @@ module.exports = {
     GOLD_DESC: GOLD_DESC,
     TOME_CHANCE: TOME_CHANCE,
     EXCL_CHANCE: EXCL_CHANCE,
-    GOODS_CHANCE: GOODS_CHANCE,
-    PROP: PROP
+    GOODS_CHANCE: GOODS_CHANCE
   };
 })();
 // ==== end thornswood dungeon loot ====
