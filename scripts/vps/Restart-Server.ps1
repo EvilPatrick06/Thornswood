@@ -63,8 +63,8 @@ function Die($m) {
 
 # Progress stays quiet, or a bar from the far side comes back as lines mixed
 # in with the state this prints. The send itself is Send-Script.ps1 (issue
-# #1166, the same way as #1070): a long script goes as a file of its own
-# name, removed after, and the far side's exit code comes back.
+# #1166, the same way as #1070): a long script goes on ssh's standard input
+# (nothing of it is left on the box), and the far side's exit code comes back.
 function Remote($script) {
   $script = "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script

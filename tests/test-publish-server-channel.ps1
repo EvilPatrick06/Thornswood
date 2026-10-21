@@ -219,17 +219,15 @@ try {
     # the artifact there, and the box answers for it with the hash of what
     # arrived, the way Send-ThornswoodArtifact asks after a send.
     $fake = @'
+$in = @($input | ForEach-Object { [string]$_ })
 [IO.File]::AppendAllText($env:TS_PUB_CALLS, ('NAME ' + ($args -join ' ') + [Environment]::NewLine))
 $all = $args -join ' '
 $text = $all
 if ($all -match '-EncodedCommand (\S+)') { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1])) }
-# A script over the command line's limit goes up as a file and is run from
-# there (Send-Script.ps1), so the stand-in keeps it to read when it is run.
-elseif ($all -match '-File \S*(thornswood-remote-[0-9a-f]+\.ps1)') {
-    $kept = Join-Path $env:TS_PUB_STORE $Matches[1]
-    if (Test-Path -LiteralPath $kept) { $text = [IO.File]::ReadAllText($kept) }
-}
-if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/|Windows/Temp/)((?:server-|thornswood-remote-).+)$') {
+# A script over the command line's limit comes on standard input under a
+# short reader (Send-Script.ps1, #3027), so the stand-in reads it there.
+if ($text -match '\[Console\]::In\.ReadLine\(\)' -and $in.Count) { $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
+if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/)(server-.+)$') {
     Copy-Item -LiteralPath ([string]$args[-2]) -Destination (Join-Path $env:TS_PUB_STORE $Matches[1]) -Force
 }
 'INSTALL OK'

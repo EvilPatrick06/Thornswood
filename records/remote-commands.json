@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  63,
-    "callCount":  269,
+    "callCount":  266,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2052,35 +2052,8 @@
                   {
                       "script":  "scripts/vps/Send-Script.ps1",
                       "scope":  "Invoke-ThornswoodRemote",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp \"${Target}:$far\" } 2\u003e\u00261 | Out-Null",
-                      "does":  "sends a script or file for its caller",
-                      "class":  "transport",
-                      "reason":  "carries what its caller hands it; each caller is mapped"
-                  },
-                  {
-                      "script":  "scripts/vps/Send-Script.ps1",
-                      "scope":  "Invoke-ThornswoodRemote",
                       "via":  "ssh",
-                      "anchor":  "if ($piped) { $Stdin | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh $Target $run } 2\u003e\u00261 }",
-                      "does":  "sends a script or file for its caller",
-                      "class":  "transport",
-                      "reason":  "carries what its caller hands it; each caller is mapped"
-                  },
-                  {
-                      "script":  "scripts/vps/Send-Script.ps1",
-                      "scope":  "Invoke-ThornswoodRemote",
-                      "via":  "ssh",
-                      "anchor":  "else { Invoke-ThornswoodNative { \u0026 ssh @ssh $Target $run } 2\u003e\u00261 }",
-                      "does":  "sends a script or file for its caller",
-                      "class":  "transport",
-                      "reason":  "carries what its caller hands it; each caller is mapped"
-                  },
-                  {
-                      "script":  "scripts/vps/Send-Script.ps1",
-                      "scope":  "Invoke-ThornswoodRemote",
-                      "via":  "ssh",
-                      "anchor":  "if ($sent) { Invoke-ThornswoodNative { \u0026 ssh @ssh $Target \"powershell -NoProfile -Command Remove-Item -LiteralPath \u0027$far\u0027 -Force\" } 2\u003e\u00261 | Out-Null }",
+                      "anchor":  "return ($wire | Invoke-ThornswoodNative { $input | \u0026 ssh @ssh $Target $run } 2\u003e\u00261)",
                       "does":  "sends a script or file for its caller",
                       "class":  "transport",
                       "reason":  "carries what its caller hands it; each caller is mapped"
