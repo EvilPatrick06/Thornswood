@@ -186,7 +186,11 @@ Added by Patrick on 27 Sep, after a session found 624 local branches and 15
 worktrees in the shared clone and read a session-start snapshot as the truth.
 
 - `C:\Thornswood-Repo` is shared with Patrick's Grok Bot lanes and sits
-  detached at `origin/main`, because they build from it. Do branch work in a
+  detached at `origin/main`, because they build from it. Move it there with
+  `.\scripts\release\Update-Checkout.ps1`, which takes `engine\skymp` to
+  main's pin with it and refuses when anything would be left behind; a bare
+  `git checkout --detach origin/main` left the submodule three pins behind
+  and stopped a dev Ship (#2981). Do branch work in a
   worktree in its ignored `worktrees` folder (`git worktree add
   worktrees\claude-<what> -b claude/<what> origin/main`), and afterwards
   remove the worktree and delete the branch. Never leave that folder on a

@@ -325,6 +325,14 @@ jobs:
           # tests\test-launcher-icons.js fails if any frame of
           # launcher\app.ico matches a frame of site\public\favicon.ico, or
           # if app.ico and app-dev.ico share a frame.
+          # Issue #2981: tests\test-2981-update-checkout.ps1 builds a scratch
+          # fork and a clone that pins it, moves the pin, and holds
+          # Fresh-Checkout.ps1, Check-ShipReady.ps1 and Update-Checkout.ps1 to
+          # one answer: a submodule behind its pin is a refusal on both
+          # channels, named, and Update-Checkout moves the clone with it.
+          # test-ship-ready.ps1 and test-fresh-checkout.ps1 ran only in the
+          # nightly, so Check-ShipReady calling a dirty dev checkout READY
+          # went unseen; both are here now. Seconds each.
           # Issue #2177: every picture, video, sound, font, mesh, interface
           # file and plugin in the repository is in the asset provenance
           # register, recordsasset-provenance.json, by its sha256, so a
@@ -797,7 +805,7 @@ jobs:
                  'test-join-outage.js', 'test-join-pass-site.js', 'test-2180-site-state.js', 'test-open-switch.js', 'test-component-readmes.js',
                  'test-site-front-resilience.js', 'test-site-upload-guard.js',
                  'test-report-limits.js', 'test-site-hangs.js',
-                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2436-installer-hotfix.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
+                 'test-site-oauth-gaps.js', 'test-site-escaping.js', 'test-2185-site-bind.js', 'test-2193-hero-video.js', 'test-2187-signin-addr.js', 'test-2192-age-expiry.js', 'test-2189-log-rotation.js', 'test-2188-board-revision.js', 'test-2235-dev-ship-guard.ps1', 'test-2981-update-checkout.ps1', 'test-ship-ready.ps1', 'test-fresh-checkout.ps1', 'test-2436-installer-hotfix.ps1', 'test-2243-installer-throw.ps1', 'test-2251-key-press-log.js', 'test-swap-helpers.ps1',
                  'test-backup-restore.ps1', 'test-1046-restore-rehearse.ps1', 'test-1046-rehearsal-due.ps1', 'test-backup-streaming.ps1', 'test-fetch-verify-all.ps1', 'test-2199-zip-policy.ps1', 'test-2199-fetch-whole-path.ps1',
                  'test-content-release.ps1',
                  'test-cooldown-sweep.js', 'test-voice-moved-clients.js',
