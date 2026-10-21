@@ -42,11 +42,15 @@ function own(obj, name) {
 }
 
 // This machine's own data, the same folder Where.ps1's Get-MachineData names:
-// %LOCALAPPDATA%\Thornswood, or off Windows the folder .NET gives for it
-// ($XDG_DATA_HOME, else ~/.local/share). Before #2872 a missing LOCALAPPDATA
-// made these paths relative to wherever node was started.
+// %LOCALAPPDATA%\Thornswood, or with no LOCALAPPDATA the folder .NET's
+// GetFolderPath('LocalApplicationData') gives for it. On Windows that is the
+// Local AppData known folder, AppData\Local in the profile; off Windows it is
+// $XDG_DATA_HOME, else ~/.local/share. Before #2872 a missing LOCALAPPDATA
+// made these paths relative to wherever node was started, and until #1273
+// Windows got the off-Windows folder, so the two scripts named two places.
 function machineData() {
   let d = process.env.LOCALAPPDATA;
+  if (!d && process.platform === 'win32') d = path.join(os.homedir(), 'AppData', 'Local');
   if (!d) d = process.env.XDG_DATA_HOME && path.isAbsolute(process.env.XDG_DATA_HOME) ? process.env.XDG_DATA_HOME : path.join(os.homedir(), '.local', 'share');
   return path.join(d, 'Thornswood');
 }
