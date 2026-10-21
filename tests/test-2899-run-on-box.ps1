@@ -19,24 +19,29 @@
      writes into the data folder leaves the server's files as they were,
      only what changed under game\ and records\ is listed and zipped back,
      the tool's exit code comes back, and the keeper removes the run's folder
-     when its input closes. Skyrim's archives in the store are linked into the data folder,
+     when its end event is set. Skyrim's archives in the store are linked into the data folder,
      and a tool that opens one to write is refused, the store keeping its
      bytes; the loose string tables in the store's Strings are linked into
      the data folder's Strings, where the tools look for them. Off Windows
      there is no powershell.exe and no py, and this part says so and is
      skipped; the Windows runner runs it.
-  5. The run's folder lives as long as its keeper's session (#2999): the
-     keeper's text is ASCII, parses and fits on the command line;
+  5. The run's folder lives as long as its keeper (#2999): the keeper's
+     text is ASCII, parses, fits on the command line and reads nothing from
+     its standard input, which on the box never closes (#3063); the end
+     script parses, and both refuse an event name not made for a keeper;
      Start-ThornswoodRemote refuses a weaker host key check, a script too
      long for the command line and a word with a double quote, and hands the
      far side its words whole and its input until it is closed. On Windows,
      under Windows PowerShell 5.1: a keeper removes the folders whose lock
      nobody holds (one from before the lock, an orphaned lock) and leaves
-     one that is held and anything not named like a run's; a keeper killed
-     as a dropped session kills it leaves its folder, and the next keeper
-     removes it; a keeper whose run still holds the folder leaves it, says
-     so, and the next keeper removes it once the run let go; the run refuses
-     to start in a folder no keeper holds.
+     one that is held and anything not named like a run's; its input closing
+     does not end it, its end event set from another process does, and an
+     end sent after that finds no keeper; a second keeper given an event
+     already made refuses before it makes anything; a keeper that is ended
+     leaves its folder, and the next keeper removes it; a keeper whose run
+     still holds the folder leaves it, says so, and the next keeper removes
+     it once the run let go; the run refuses to start in a folder no keeper
+     holds.
   4. scripts\mods\Send-GameArchives.ps1 refuses archives that are missing or
      not the bytes records\skyrim-files.json names, before it asks the box
      anything, and its far side text is ASCII and parses. Every file
@@ -123,7 +128,8 @@ Yes 'records\game-strings.json names loose string tables under Strings, each wit
 # ---- 2. the far side text ------------------------------------------------
 . $lib
 $far = Get-ThornswoodOnBoxScript -Run 'C:\Windows\Temp\thornswood-onbox-test' -ServerRoot 'C:\Thornswood-Server-Dev' -Tool 'scripts/mods/Add-ContentRecords.py' -Arguments @('--check', '--masters', '{data}', "it's")
-$keep = Get-ThornswoodOnBoxKeepScript -Run 'C:\Windows\Temp\thornswood-onbox-0123456789ab'
+function New-End { 'Global\Thornswood-OnBoxEnd-' + [Guid]::NewGuid().ToString('N') }
+$keep = Get-ThornswoodOnBoxKeepScript -Run 'C:\Windows\Temp\thornswood-onbox-0123456789ab' -End (New-End)
 Yes 'the far side text is ASCII, as Windows PowerShell 5.1 reads it' (-not ($far + $keep).ToCharArray().Where({ [int]$_ -gt 127 }, 'First'))
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($far, [ref]$null, [ref]$errs)
@@ -143,14 +149,25 @@ $errs = $null
 Yes 'the keeper''s text parses' (-not $errs -or $errs.Count -eq 0)
 $keepLine = 'powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($keep))
 Yes ('and fits on the command line, so nothing is sent ahead of it as a file (' + $keepLine.Length + ' of 6000)') ($keepLine.Length -le 6000)
+Yes 'and reads nothing from its standard input, which on the box never closes (#3063): it waits on its end event' ($keep -notmatch '\[Console\]::In' -and $keep.Contains('[void]$end.WaitOne()'))
+$endText = Get-ThornswoodOnBoxEndScript -End (New-End)
+$errs = $null
+[void][Management.Automation.Language.Parser]::ParseInput($endText, [ref]$null, [ref]$errs)
+Yes 'the end script is ASCII and parses' (-not $endText.ToCharArray().Where({ [int]$_ -gt 127 }, 'First') -and (-not $errs -or $errs.Count -eq 0))
+$m = ''
+try { Get-ThornswoodOnBoxEndScript -End "Global\Thornswood-OnBoxEnd-x'; Remove-Item C:\ -Recurse; '" | Out-Null } catch { $m = $_.Exception.Message }
+$m2 = ''
+try { Get-ThornswoodOnBoxKeepScript -Run 'C:\Windows\Temp\thornswood-onbox-0123456789ab' -End 'Global\Something-Else' | Out-Null } catch { $m2 = $_.Exception.Message }
+Yes 'and both refuse an event name that is not a keeper''s' ($m -match 'not a keeper''s end event' -and $m2 -match 'not a keeper''s end event')
 Yes 'the run holds its folder''s lock while it runs, and stops when it cannot' ($far.Contains("New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')") -and $far -match 'could not be held through its lock')
 $runText = Get-Content -LiteralPath $runOnBox -Raw
 # The keeper is started and told the run is over in OnBox.ps1, for every
 # script that lands files on the box (#3035), and Run-OnBox.ps1 goes through it.
 $onBoxText = Get-Content -LiteralPath (Join-Path $Repo 'scripts\mods\OnBox.ps1') -Raw
-Yes 'OnBox.ps1 starts the keeper for a run''s folder and closes its input to end the run' (
-    $onBoxText -match 'Start-ThornswoodRemote -Target \$Target -SshArgs \$SshArgs -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run\)' -and
-    $onBoxText -match "StandardInput\.Close\(\)" -and $onBoxText -match "'GONE ' \+ \`$Folder\.Run")
+Yes 'OnBox.ps1 starts the keeper for a run''s folder and sets its end event from a second session to end the run' (
+    $onBoxText -match 'Start-ThornswoodRemote -Target \$Target -SshArgs \$SshArgs -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run -End \$end\)' -and
+    $onBoxText -match 'Invoke-ThornswoodRemote -Target \$Folder\.Target -SshArgs \$Folder\.SshArgs -Script \(Get-ThornswoodOnBoxEndScript -End \$Folder\.End\)' -and
+    $onBoxText -notmatch 'StandardInput\.Close\(\)' -and $onBoxText -match "'GONE ' \+ \`$Folder\.Run")
 Yes 'Run-OnBox.ps1 opens its folder there, sends the run into it and no longer removes the folder by a call of its own' (
     $runText -match 'Open-ThornswoodOnBoxFolder -Target \$target -SshArgs \$ssh' -and $runText -match 'Close-ThornswoodOnBoxFolder \$box' -and
     $runText -match "\(\`$runFar \+ '/run\.ps1'\)" -and $runText -notmatch 'Start-ThornswoodRemote' -and
@@ -199,19 +216,23 @@ if ($OnWindows) {
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 
 # A keeper as the box runs one: Windows PowerShell 5.1, the script on the
-# command line, its standard input and output pipes. Start-Keeper reads up to
-# its MADE line; Stop-Keeper closes its input and reads what it says after.
-# Each read gives up after a minute, so a keeper that never answers fails the
-# check rather than holding the build.
+# command line, its standard input and output pipes, an end event of its own.
+# Start-Keeper reads up to its MADE line; Stop-Keeper sets its event from
+# another Windows PowerShell, as the second ssh session does on the box, and
+# reads what it says after. Each read gives up after a minute, so a keeper
+# that never answers fails the check rather than holding the build.
 function Read-KeeperLine($p) {
     $t = $p.StandardOutput.ReadLineAsync()
     if (-not $t.Wait(60000)) { $p.Kill(); throw 'a keeper said nothing for a minute' }
     return $t.Result
 }
-function Start-Keeper([string]$Run) {
+function Set-End([string]$End) {
+    return @(& $ps51 -NoProfile -NonInteractive -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodOnBoxEndScript -End $End)))) 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+}
+function Start-Keeper([string]$Run, [string]$End = (New-End)) {
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = $ps51
-    $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodOnBoxKeepScript -Run $Run)))
+    $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodOnBoxKeepScript -Run $Run -End $End)))
     $psi.UseShellExecute = $false
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
@@ -219,15 +240,15 @@ function Start-Keeper([string]$Run) {
     $said = @()
     while ($null -ne ($l = Read-KeeperLine $p)) {
         $said += $l.Trim()
-        if ($l.Trim() -like 'MADE *') { break }
+        if ($l.Trim() -like 'MADE *' -or $l.Trim() -like 'TAKEN *') { break }
     }
     # What it said, so a red check here names its cause in the log.
     foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
-    return [pscustomobject]@{ P = $p; Said = $said }
+    return [pscustomobject]@{ P = $p; Said = $said; End = $End }
 }
 function Stop-Keeper($k) {
-    $k.P.StandardInput.Close()
-    $said = @()
+    $set = @(Set-End $k.End)
+    $said = @($set)
     while ($null -ne ($l = Read-KeeperLine $k.P)) { if ($l.Trim()) { $said += $l.Trim() } }
     $k.P.WaitForExit()
     foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
@@ -325,7 +346,7 @@ sys.exit(3)
         Yes 'the tool''s exit code comes back' ($lines -contains 'EXIT 3')
 
         $gone = Stop-Keeper $runKeeper
-        Yes 'the keeper removes the run''s folder and its lock when its input closes, and the archive stays in the store' (
+        Yes 'the keeper removes the run''s folder and its lock when its end event is set, and the archive stays in the store' (
             ($gone -contains ('GONE ' + $run)) -and -not (Test-Path -LiteralPath $run) -and -not (Test-Path -LiteralPath ($run + '.lock')) -and [IO.File]::ReadAllText($archive) -eq 'archive bytes')
     } finally {
         if ($runKeeper -and -not $runKeeper.P.HasExited) { $runKeeper.P.Kill() }
@@ -364,16 +385,25 @@ if (-not $OnWindows) {
         Yes 'and leaves a folder a run still holds, saying so' (@($k.Said | Where-Object { $_ -like ('HELD ' + $busy + ':*') }).Count -eq 1 -and (Test-Path -LiteralPath $busy))
         Yes 'and anything not named like a run''s folder' (Test-Path -LiteralPath $other)
         Yes 'then makes its own' (($k.Said[-1] -eq ('MADE ' + (Folder 'dddddddddddd'))) -and (Test-Path -LiteralPath (Folder 'dddddddddddd')))
+        # On the box no close of its input arrives (#3063); here one does, and
+        # it must not end the keeper either: only its event does.
+        $k.P.StandardInput.Close()
+        Yes 'its input closing does not end it, and its folder stays' (-not $k.P.WaitForExit(3000) -and (Test-Path -LiteralPath (Folder 'dddddddddddd')))
+        $twin = Start-Keeper (Folder '999999999999') $k.End
+        $keepers += $twin
+        Yes 'a second keeper given an event already made refuses before it removes or makes anything' (
+            ($twin.Said -contains ('TAKEN ' + $k.End)) -and $twin.P.WaitForExit(30000) -and $twin.P.ExitCode -eq 2 -and -not (Test-Path -LiteralPath (Folder '999999999999')) -and (Test-Path -LiteralPath $busy))
         $m = @(Stop-Keeper $k)
-        Yes 'and removes it when its input closes' (($m -contains ('GONE ' + (Folder 'dddddddddddd'))) -and -not (Test-Path -LiteralPath (Folder 'dddddddddddd')))
+        Yes 'its end event set from another process ends it, and it removes its folder' (($m -contains 'END SET') -and ($m -contains ('GONE ' + (Folder 'dddddddddddd'))) -and -not (Test-Path -LiteralPath (Folder 'dddddddddddd')) -and $k.P.HasExited)
+        Yes 'an end sent after that finds no keeper' ((@(Set-End $k.End) -join '|') -eq 'END GONE')
 
-        # A dropped session: the keeper is killed and can remove nothing.
+        # A keeper that is ended (the box restarting) can remove nothing.
         $cut = Folder 'eeeeeeeeeeee'
         $k = Start-Keeper $cut
         $keepers += $k
         $k.P.Kill()
         $k.P.WaitForExit()
-        Yes 'a keeper killed with its session leaves its folder' ((Test-Path -LiteralPath $cut))
+        Yes 'a keeper that is ended leaves its folder' ((Test-Path -LiteralPath $cut))
         # A keeper whose run still holds the folder when its input closes.
         $still = Folder 'ffffffffffff'
         $k = Start-Keeper $still
@@ -382,7 +412,7 @@ if (-not $OnWindows) {
         $runHold = New-Object IO.FileStream(($still + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')
         $held += $runHold
         $m = @(Stop-Keeper $k)
-        Yes 'a keeper whose run still holds the folder leaves it, and says so' (@($m | Where-Object { $_ -like ('HELD ' + $still + ':*') }).Count -eq 1 -and (Test-Path -LiteralPath $still))
+        Yes 'a keeper whose run still holds the folder leaves it when its event is set, and says so' (@($m | Where-Object { $_ -like ('HELD ' + $still + ':*') }).Count -eq 1 -and (Test-Path -LiteralPath $still))
         $runHold.Dispose()
         $busyHold.Dispose()
 

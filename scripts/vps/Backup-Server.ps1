@@ -293,7 +293,10 @@ $box = Open-ThornswoodOnBoxFolder -Target "$User@$Vps" -SshArgs $ssh
 function Shut {
   $shut = Close-ThornswoodOnBoxFolder $box
   if ($shut.Gone) { Say '  nothing of it is left on the server' 'DarkGray' }
-  else { Say ('  ' + $box.Run + ' is still on the server (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'its keeper''s session ended without a word' }) + '). The next run of this or Run-OnBox.ps1 removes it.') 'Yellow' }
+  else {
+    $then = $(if ($shut.Told) { 'The next run of this or Run-OnBox.ps1 removes it once nothing holds it.' } else { 'Its keeper could not be told to end, so it still holds it (#3063).' })
+    Say ('  ' + $box.Run + ' is still on the server (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'its keeper''s session ended without a word' }) + '). ' + $then) 'Yellow'
+  }
 }
 try {
   foreach ($l in $box.Said) { Say "  box  $l" 'DarkGray' }

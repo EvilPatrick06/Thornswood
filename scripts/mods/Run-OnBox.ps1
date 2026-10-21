@@ -181,7 +181,8 @@ try {
     if ($box) {
         $shut = Close-ThornswoodOnBoxFolder $box
         if (-not $shut.Gone) {
-            Write-Host ($box.Run + ' is still on the box (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'the keeper''s session ended without a word' }) + '). The next run removes it.') -ForegroundColor Yellow
+            $then = $(if ($shut.Told) { 'The next run removes it once nothing holds it.' } else { 'Its keeper could not be told to end, so it still holds it (#3063).' })
+            Write-Host ($box.Run + ' is still on the box (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'the keeper''s session ended without a word' }) + '). ' + $then) -ForegroundColor Yellow
         }
     }
     Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue

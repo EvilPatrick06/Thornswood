@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  64,
-    "callCount":  262,
+    "callCount":  263,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2260,8 +2260,17 @@
                       "script":  "scripts/mods/OnBox.ps1",
                       "scope":  "Open-ThornswoodOnBoxFolder",
                       "via":  "Start-ThornswoodRemote",
-                      "anchor":  "$keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run)",
-                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its input closes (#2999), for Run-OnBox.ps1 and Backup-Server.ps1 (#3035)",
+                      "anchor":  "$keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run -End $end)",
+                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its end event is set (#2999, #3063), for Run-OnBox.ps1 and Backup-Server.ps1 (#3035)",
+                      "class":  "stage",
+                      "reason":  "writes and removes stage folders the runs own"
+                  },
+                  {
+                      "script":  "scripts/mods/OnBox.ps1",
+                      "scope":  "Close-ThornswoodOnBoxFolder",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$told = @(Invoke-ThornswoodRemote -Target $Folder.Target -SshArgs $Folder.SshArgs -Script (Get-ThornswoodOnBoxEndScript -End $Folder.End)",
+                      "does":  "sets the run\u0027s keeper\u0027s end event, so the keeper removes the run\u0027s folder and ends (#3063)",
                       "class":  "stage",
                       "reason":  "writes and removes stage folders the runs own"
                   },
