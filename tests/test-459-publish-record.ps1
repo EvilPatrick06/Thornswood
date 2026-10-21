@@ -64,13 +64,11 @@ function ReadJson([string]$path) { if (-not (Test-Path -LiteralPath $path)) { re
 
 # The box's PowerShell: the text goes up as a file and runs under Windows
 # PowerShell 5.1, as Send-Script.ps1 has it run on the VPS. Off Windows there
-# is none, and the far side runs in this shell, which is said.
+# is none, and the far side's store is Windows paths (run in pwsh on Linux it
+# wrote a file named \tmp\...\thornswood-server-dev.json into the working
+# folder), so sections 1 to 3 say SKIP there.
 . (Join-Path $PSScriptRoot 'Windows.ps1')
-if ($OnWindows) { $ps51 = Get-WindowsPowerShell }
-else {
-    $ps51 = (Get-Process -Id $PID).Path
-    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
-}
+$ps51 = if ($OnWindows) { Get-WindowsPowerShell } else { $null }
 $script:sent = @()
 function Invoke-ThornswoodArtifactRemote([string]$Target, [string[]]$SshArgs, [string]$Script) {
   $script:sent += , @($Target, $Script)
@@ -114,99 +112,103 @@ try {
   $history = Join-Path $store 'history.log'
 
   # ---- 1. a publish ------------------------------------------------------------
-  Write-Host ''; Write-Host 'a publish that answered'
-  New-Item -ItemType Directory -Force -Path (Join-Path $store 'current'), (Join-Path $store 'gamemode') | Out-Null
-  $a1 = Fake-Artifact $gmSha
-  Put-StoreRecord $a1
-  Put-Root $root $gmText $gmSha
-  $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  Yes 'a root whose gamemode.js and stamp are the artifact''s is recorded' ($said -contains ('SERVER RECORDED ' + $a1.Name))
-  $b = ReadJson $beside; $c = ReadJson $current
-  Yes '  beside it, in data, naming the artifact and its commit' ($b -and $b.name -eq $a1.Name -and $b.commit -eq $a1.Commit -and $b.part -eq 'thornswood-server-dev' -and $b.component -eq 'gamemode')
-  Yes '  and the store''s current record is the same' ($c -and [IO.File]::ReadAllText($current) -eq [IO.File]::ReadAllText($beside))
-  Yes '  with no byte order mark (node reads it)' ([IO.File]::ReadAllBytes($beside)[0] -eq [byte][char]'{')
-  Yes '  and a line in history.log' ((Test-Path -LiteralPath $history) -and ([IO.File]::ReadAllText($history) -match [regex]::Escape('thornswood-server-dev ' + $a1.Name + ' from ')))
-  $err = $null; $null = [Management.Automation.PSParser]::Tokenize($script:sent[-1][1], [ref]$err)
-  Yes '  through the one remote helper, to the target it was given, as text that parses' ($script:sent.Count -eq 1 -and $script:sent[-1][0] -eq 'u@box' -and $err.Count -eq 0)
+  if (-not $OnWindows) {
+      Write-Host 'SKIP  1 to 3, a publish, a put-back and the installer''s Carry: the far side runs on the box under Windows PowerShell 5.1, on the box''s Windows paths, so only Windows can run it'
+  } else {
+      Write-Host ''; Write-Host 'a publish that answered'
+      New-Item -ItemType Directory -Force -Path (Join-Path $store 'current'), (Join-Path $store 'gamemode') | Out-Null
+      $a1 = Fake-Artifact $gmSha
+      Put-StoreRecord $a1
+      Put-Root $root $gmText $gmSha
+      $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      Yes 'a root whose gamemode.js and stamp are the artifact''s is recorded' ($said -contains ('SERVER RECORDED ' + $a1.Name))
+      $b = ReadJson $beside; $c = ReadJson $current
+      Yes '  beside it, in data, naming the artifact and its commit' ($b -and $b.name -eq $a1.Name -and $b.commit -eq $a1.Commit -and $b.part -eq 'thornswood-server-dev' -and $b.component -eq 'gamemode')
+      Yes '  and the store''s current record is the same' ($c -and [IO.File]::ReadAllText($current) -eq [IO.File]::ReadAllText($beside))
+      Yes '  with no byte order mark (node reads it)' ([IO.File]::ReadAllBytes($beside)[0] -eq [byte][char]'{')
+      Yes '  and a line in history.log' ((Test-Path -LiteralPath $history) -and ([IO.File]::ReadAllText($history) -match [regex]::Escape('thornswood-server-dev ' + $a1.Name + ' from ')))
+      $err = $null; $null = [Management.Automation.PSParser]::Tokenize($script:sent[-1][1], [ref]$err)
+      Yes '  through the one remote helper, to the target it was given, as text that parses' ($script:sent.Count -eq 1 -and $script:sent[-1][0] -eq 'u@box' -and $err.Count -eq 0)
 
-  $before = [IO.File]::ReadAllText($beside)
-  $a2 = Fake-Artifact (TextSha '// another gamemode') ('d' * 40)
-  foreach ($case in @(
-      @{ Label = 'a gamemode.js that is not the artifact''s'; Gm = '// something else'; Stamp = $gmSha; Why = 'is not the one in' },
-      @{ Label = 'no stamp'; Gm = $gmText; Stamp = ''; Why = 'does not describe that gamemode' },
-      @{ Label = 'a stamp for another gamemode'; Gm = $gmText; Stamp = ('e' * 64); Why = 'does not describe that gamemode' })) {
-    Put-Root $root $case.Gm $case.Stamp
-    $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-    Yes ($case.Label + ': nothing is recorded, and it says why') (
-      @($said | Where-Object { $_ -like 'SERVER NOT RECORDED:*' -and $_ -match $case.Why }).Count -eq 1 -and -not @($said | Where-Object { $_ -like 'SERVER RECORDED *' }).Count)
-    Yes '  and the record beside it and in the store is as it was' ([IO.File]::ReadAllText($beside) -eq $before -and [IO.File]::ReadAllText($current) -eq $before)
-  }
-  Remove-Item -LiteralPath (Join-Path $root 'gamemode.js') -Force
-  $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  Yes 'a root with no gamemode.js records nothing' ([bool]@($said | Where-Object { $_ -like 'SERVER NOT RECORDED: there is no gamemode.js*' }).Count)
-  $n = $script:sent.Count
-  $said = @(Set-ThornswoodServerRecord -Artifact (Fake-Artifact $gmSha ('c' * 40) 'game/other.js') -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  Yes 'an artifact that lists no gamemode.js records nothing, and asks the box nothing' ($script:sent.Count -eq $n -and [bool]@($said | Where-Object { $_ -like 'SERVER NOT RECORDED:*lists no game/gamemode.js' }).Count)
+      $before = [IO.File]::ReadAllText($beside)
+      $a2 = Fake-Artifact (TextSha '// another gamemode') ('d' * 40)
+      foreach ($case in @(
+          @{ Label = 'a gamemode.js that is not the artifact''s'; Gm = '// something else'; Stamp = $gmSha; Why = 'is not the one in' },
+          @{ Label = 'no stamp'; Gm = $gmText; Stamp = ''; Why = 'does not describe that gamemode' },
+          @{ Label = 'a stamp for another gamemode'; Gm = $gmText; Stamp = ('e' * 64); Why = 'does not describe that gamemode' })) {
+        Put-Root $root $case.Gm $case.Stamp
+        $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+        Yes ($case.Label + ': nothing is recorded, and it says why') (
+          @($said | Where-Object { $_ -like 'SERVER NOT RECORDED:*' -and $_ -match $case.Why }).Count -eq 1 -and -not @($said | Where-Object { $_ -like 'SERVER RECORDED *' }).Count)
+        Yes '  and the record beside it and in the store is as it was' ([IO.File]::ReadAllText($beside) -eq $before -and [IO.File]::ReadAllText($current) -eq $before)
+      }
+      Remove-Item -LiteralPath (Join-Path $root 'gamemode.js') -Force
+      $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      Yes 'a root with no gamemode.js records nothing' ([bool]@($said | Where-Object { $_ -like 'SERVER NOT RECORDED: there is no gamemode.js*' }).Count)
+      $n = $script:sent.Count
+      $said = @(Set-ThornswoodServerRecord -Artifact (Fake-Artifact $gmSha ('c' * 40) 'game/other.js') -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      Yes 'an artifact that lists no gamemode.js records nothing, and asks the box nothing' ($script:sent.Count -eq $n -and [bool]@($said | Where-Object { $_ -like 'SERVER NOT RECORDED:*lists no game/gamemode.js' }).Count)
 
-  # ---- 2. a put-back -------------------------------------------------------------
-  Write-Host ''; Write-Host 'a put-back'
-  # The folder that came back carries the record it was written with.
-  Put-Root $root $gmText $gmSha
-  $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  $own = [IO.File]::ReadAllText($beside)
-  Put $current '{ "name": "what ran before the put-back" }'
-  $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  Yes 'a folder whose own record the store''s artifact confirms becomes current' ($said -contains ('SERVER RECORDED ' + $a1.Name) -and [IO.File]::ReadAllText($current) -eq $own)
-  Yes '  and its record is left as it was' ([IO.File]::ReadAllText($beside) -eq $own)
-  Yes '  and history.log says it was put back to it' ([IO.File]::ReadAllText($history) -match [regex]::Escape('thornswood-server-dev put back to ' + $a1.Name))
+      # ---- 2. a put-back -------------------------------------------------------------
+      Write-Host ''; Write-Host 'a put-back'
+      # The folder that came back carries the record it was written with.
+      Put-Root $root $gmText $gmSha
+      $said = @(Set-ThornswoodServerRecord -Artifact $a1 -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      $own = [IO.File]::ReadAllText($beside)
+      Put $current '{ "name": "what ran before the put-back" }'
+      $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      Yes 'a folder whose own record the store''s artifact confirms becomes current' ($said -contains ('SERVER RECORDED ' + $a1.Name) -and [IO.File]::ReadAllText($current) -eq $own)
+      Yes '  and its record is left as it was' ([IO.File]::ReadAllText($beside) -eq $own)
+      Yes '  and history.log says it was put back to it' ([IO.File]::ReadAllText($history) -match [regex]::Escape('thornswood-server-dev put back to ' + $a1.Name))
 
-  # A folder installed before #459: the record in it is the one the folder
-  # before it had, carried in, naming another gamemode.
-  Put-StoreRecord $a2
-  $stale = (ConvertFrom-Json $own); $stale.name = $a2.Name; $stale.commit = $a2.Commit
-  Put $beside (ConvertTo-Json -InputObject $stale)
-  $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  $b = ReadJson $beside; $c = ReadJson $current
-  Yes 'a folder whose record names another gamemode is recorded as an older copy, with no commit' (
-    $said -contains 'SERVER RECORDED an older copy its record does not describe' -and $b.commit -eq '' -and $b.putBack -eq $true -and
-    $b.name -eq 'an older copy its record does not describe' -and [IO.File]::ReadAllText($current) -eq [IO.File]::ReadAllText($beside))
-  Yes '  and it is not named after the gamemode it does not run' (-not ([IO.File]::ReadAllText($current)).Contains($a2.Name))
-  Remove-Item -LiteralPath $beside -Force
-  $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
-  $c = ReadJson $current
-  Yes 'a folder with no record is recorded as one kept before deploys were recorded' (
-    $said -contains 'SERVER RECORDED an older copy kept before deploys were recorded' -and $c.commit -eq '' -and $c.root -eq $root.Replace('\', '/') -and (Test-Path -LiteralPath $beside))
-  # A box with no store yet: the put-back makes it, then records.
-  $store2 = Join-Path $tmp 'Fresh-Deploys'
-  $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store2)
-  Yes 'a box with no store yet: it is made, and the put-back recorded in it' (
-    [bool]@($said | Where-Object { $_ -like 'SERVER RECORDED *' }).Count -and (Test-Path -LiteralPath (Join-Path $store2 'current\thornswood-server-dev.json')))
-  $err = $null; $null = [Management.Automation.PSParser]::Tokenize($script:sent[-1][1], [ref]$err)
-  Yes '  and the text for the box parses' ($err.Count -eq 0)
+      # A folder installed before #459: the record in it is the one the folder
+      # before it had, carried in, naming another gamemode.
+      Put-StoreRecord $a2
+      $stale = (ConvertFrom-Json $own); $stale.name = $a2.Name; $stale.commit = $a2.Commit
+      Put $beside (ConvertTo-Json -InputObject $stale)
+      $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      $b = ReadJson $beside; $c = ReadJson $current
+      Yes 'a folder whose record names another gamemode is recorded as an older copy, with no commit' (
+        $said -contains 'SERVER RECORDED an older copy its record does not describe' -and $b.commit -eq '' -and $b.putBack -eq $true -and
+        $b.name -eq 'an older copy its record does not describe' -and [IO.File]::ReadAllText($current) -eq [IO.File]::ReadAllText($beside))
+      Yes '  and it is not named after the gamemode it does not run' (-not ([IO.File]::ReadAllText($current)).Contains($a2.Name))
+      Remove-Item -LiteralPath $beside -Force
+      $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store)
+      $c = ReadJson $current
+      Yes 'a folder with no record is recorded as one kept before deploys were recorded' (
+        $said -contains 'SERVER RECORDED an older copy kept before deploys were recorded' -and $c.commit -eq '' -and $c.root -eq $root.Replace('\', '/') -and (Test-Path -LiteralPath $beside))
+      # A box with no store yet: the put-back makes it, then records.
+      $store2 = Join-Path $tmp 'Fresh-Deploys'
+      $said = @(Restore-ThornswoodServerRecord -Target 'u@box' -SshArgs @() -Root $root -Store $store2)
+      Yes 'a box with no store yet: it is made, and the put-back recorded in it' (
+        [bool]@($said | Where-Object { $_ -like 'SERVER RECORDED *' }).Count -and (Test-Path -LiteralPath (Join-Path $store2 'current\thornswood-server-dev.json')))
+      $err = $null; $null = [Management.Automation.PSParser]::Tokenize($script:sent[-1][1], [ref]$err)
+      Yes '  and the text for the box parses' ($err.Count -eq 0)
 
-  # ---- 3. the installer's Carry --------------------------------------------------
-  Write-Host ''; Write-Host 'the installer carries runtime data and not the deploy record'
-  $inst = Join-Path $Repo 'scripts\deploy\Install-ThornswoodServer.ps1'
-  $ast = [Management.Automation.Language.Parser]::ParseFile($inst, [ref]$null, [ref]$null)
-  $carryAst = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Carry' }, $true)
-  Yes 'Install-ThornswoodServer.ps1 has its Carry' ($null -ne $carryAst)
-  if ($carryAst) {
-    function Say([string]$m, [string]$c) { }
-    function MoveDir([string]$from, [string]$to) { try { [IO.Directory]::Move($from, $to); return $true } catch { return $false } }
-    . ([scriptblock]::Create($carryAst.Extent.Text))
-    $old = Join-Path $tmp 'carry-old'; $new = Join-Path $tmp 'carry-new'
-    Put (Join-Path $old 'data\book.txt') 'the character book'
-    Put (Join-Path $old 'data\thornswood-deploy.json') '{ "name": "the old folder''s gamemode" }'
-    Put (Join-Path $new 'data\shipped.txt') 'shipped'
-    Put (Join-Path $new '.payload-data.txt') 'shipped.txt'
-    Carry $old $new $false
-    Yes 'runtime data crosses to the new folder' ([IO.File]::ReadAllText((Join-Path $new 'data\book.txt')) -eq 'the character book')
-    Yes '  and the old folder''s deploy record does not' (-not (Test-Path -LiteralPath (Join-Path $new 'data\thornswood-deploy.json')))
-    # A put-back the other way: the folder coming back keeps its own record.
-    Put (Join-Path $new 'data\thornswood-deploy.json') '{ "name": "the newer gamemode" }'
-    Carry $new $old $false
-    Yes 'a put-back leaves the record of the folder that came back alone' (
-      [IO.File]::ReadAllText((Join-Path $old 'data\thornswood-deploy.json')) -eq '{ "name": "the old folder''s gamemode" }')
+      # ---- 3. the installer's Carry --------------------------------------------------
+      Write-Host ''; Write-Host 'the installer carries runtime data and not the deploy record'
+      $inst = Join-Path $Repo 'scripts\deploy\Install-ThornswoodServer.ps1'
+      $ast = [Management.Automation.Language.Parser]::ParseFile($inst, [ref]$null, [ref]$null)
+      $carryAst = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Carry' }, $true)
+      Yes 'Install-ThornswoodServer.ps1 has its Carry' ($null -ne $carryAst)
+      if ($carryAst) {
+        function Say([string]$m, [string]$c) { }
+        function MoveDir([string]$from, [string]$to) { try { [IO.Directory]::Move($from, $to); return $true } catch { return $false } }
+        . ([scriptblock]::Create($carryAst.Extent.Text))
+        $old = Join-Path $tmp 'carry-old'; $new = Join-Path $tmp 'carry-new'
+        Put (Join-Path $old 'data\book.txt') 'the character book'
+        Put (Join-Path $old 'data\thornswood-deploy.json') '{ "name": "the old folder''s gamemode" }'
+        Put (Join-Path $new 'data\shipped.txt') 'shipped'
+        Put (Join-Path $new '.payload-data.txt') 'shipped.txt'
+        Carry $old $new $false
+        Yes 'runtime data crosses to the new folder' ([IO.File]::ReadAllText((Join-Path $new 'data\book.txt')) -eq 'the character book')
+        Yes '  and the old folder''s deploy record does not' (-not (Test-Path -LiteralPath (Join-Path $new 'data\thornswood-deploy.json')))
+        # A put-back the other way: the folder coming back keeps its own record.
+        Put (Join-Path $new 'data\thornswood-deploy.json') '{ "name": "the newer gamemode" }'
+        Carry $new $old $false
+        Yes 'a put-back leaves the record of the folder that came back alone' (
+          [IO.File]::ReadAllText((Join-Path $old 'data\thornswood-deploy.json')) -eq '{ "name": "the old folder''s gamemode" }')
+      }
   }
 
   # ---- 4. Export-ServerPayload.ps1 -Stamp ---------------------------------------
