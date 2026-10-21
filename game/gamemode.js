@@ -77032,7 +77032,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   seam is, and every vein of that seam anywhere else stays shut. The other
   scarce sources and scene places are specified in quest-locations.md.
   Seven retrievals use measured original sources and their appointed specialists;
-  the mammoth ground and existing Farmer orchard remain separate source work. The miner offer requires an explicit
+  the mammoth ground and existing Farmer orchard use their verified source controllers. The miner offer requires an explicit
   choice among the four gems on the miner page.
 */
 (function () {

@@ -61,7 +61,12 @@ renames is not established by this change.
 Final award checks retain the original character identity, source, claims,
 shovel, rank and verifiable seasonal growth. Missing property/season
 services refuse quest harvests. Identity is checked again before each
-post-success claim refresh, farming credit and tool wear.
+post-success claim refresh, farming credit and tool wear, and immediately
+before publishing the refreshed plot line. Sowing holds the same source
+lock across its atomic seed debit and filled-plot write. These are separate
+saves; a failure between them can leave only one recorded. This change does
+not add cross-store sowing recovery to the existing alpha farming rules.
+Definite seed shortages retain the existing starter-seed recovery.
 
 Offline native proof and isolated Farmer/quest fixtures cover these paths.
 Required CI, source merge and Claude's matching Dev delivery remain
