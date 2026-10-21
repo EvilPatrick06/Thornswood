@@ -1,11 +1,11 @@
 <#
   Say-Staff.ps1
 
-  Posts one staff notice in #staff-updates through the bot, from any machine
-  that reaches the box: a line before an edit to one of the six shared files,
-  taking the dev feed, what was merged or published. Agents post their own
-  notices this way instead of asking a person to (Patrick, 20 Oct 2026,
-  #2934).
+  Posts one staff notice in #staff-updates through the bot, from One, a
+  developer's PC or a cloud thread: a line before an edit to one of the six
+  shared files, taking the dev feed, what was merged or published. Agents
+  post their own notices this way instead of asking a person to (Patrick,
+  20 Oct 2026, #2934).
 
       pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Taking the dev feed for the cooking fix, Ship at 4:30 PM."
                        queue it; prints its id
@@ -21,24 +21,43 @@
   down (#447). No Discord token or webhook leaves the box, and nothing here
   knows one. The text is never on a command line.
 
-  WHICH KEY.
+  WHICH WAY, the first that fits:
+    -OnTheBox (the staff-notice workflow, on a VPS runner; #3045): ssh to
+        127.0.0.1, the box's own sshd, with the notices key in
+        THORNSWOOD_NOTICE_KEY_B64. The box takes every agent key only from
+        127.0.0.1, and a runner is on the box, so no bridge and no token: the
+        key is no use anywhere else. The host key is checked against the
+        three vps.json pins, and the key and known_hosts live in a folder of
+        this run's own that goes when it ends.
     THORNSWOOD_NOTICE_KEY_B64 and THORNSWOOD_NOTICE_TOKEN set (an agent
         environment given a notices key by Grant-BoxAccess.ps1 -NoticesOnly
         -MakeKey): that key, through the bridge with that token. The box
         runs say-staff.ps1 for it whatever is asked, with -From set to the
         key's own name, so -From here is not needed and is not what shows.
-    otherwise: ssh to the box the way every script here goes (One, a
-        developer's PC set up by Setup-SshKey.ps1, a cloud thread after
-        Setup-CloudSsh.ps1). -From is then who the notice is from: one lower
-        case word, claude, codex, djinn.
+    ssh here: ssh to the box the way every script here goes (One, a
+        developer's PC set up by Setup-SshKey.ps1). -From is then who the
+        notice is from: one lower case word, claude, codex, djinn.
+    no ssh here, gh here (a cloud thread; #3045): it starts
+        .github/workflows/staff-notice.yml on main with the notice, waits for
+        the run to end, and prints the run's answer. The workflow runs this
+        script with -OnTheBox on a VPS runner, with the notices key named
+        claude out of the "notices" environment, which only main may use. So
+        the notice says [claude], and -From, if given, has to be claude.
+        Nothing secret is in the container or crosses it: the text and the
+        answer do. A run that has not ended in -WaitMinutes still posts when
+        a runner takes it, and -Run <its id> reads its answer then.
 
   WHAT IT SAYS AND EXITS.
     queued    0, with the id, after the box wrote it to the outbox
     posted    0 (-Check), by the bot or the webhook
     waiting   2 (-Check), in the outbox, not said yet; the bot reads every
               minute and the webhook takes over after two and a half
+    waiting   2, through GitHub: the run had not ended in -WaitMinutes
     refused, not found, expired, no watchdog, or the box not reached: 1,
               with why. Nothing was posted.
+  In a GitHub Actions job it also writes the box's answer, or why it
+  stopped, as an annotation titled Say-Staff, which is how the cloud half
+  reads the runner's answer.
 
   The notice: 1800 characters at most, 30 an hour for each sender, no
   mentions (the bot and the webhook both send with mentions off).
@@ -52,6 +71,13 @@ param(
     [string]$From = '',
     [Parameter(ParameterSetName = 'Check', Mandatory = $true)]
     [string]$Check,
+    # Through GitHub: the answer of a staff-notice run that had not ended.
+    [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
+    [long]$Run,
+    # The staff-notice workflow's half: this runs on the box itself.
+    [switch]$OnTheBox,
+    [int]$WaitMinutes = 15,
+    [string]$GitHubRepo = 'EvilPatrick06/Thornswood',
     [string]$VpsHost = '',
     [string]$VpsUser = ''
 )
@@ -63,75 +89,187 @@ $vpsDir = Join-Path (Split-Path -Parent $Here) 'vps'
 . (Join-Path $vpsDir 'Vps.ps1')
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
-$target = "$VpsUser@$VpsHost"
 $far = 'C:\Thornswood-Watch\say-staff.ps1'
 $maxText = 1800
+$workflow = 'staff-notice.yml'
+# The name the workflow's notices key was made with (Grant-BoxAccess.ps1
+# -Name claude -MakeKey -NoticesOnly -ToEnvironment notices). The box sets
+# -From to it, so it is what a notice through GitHub says.
+$workflowSender = 'claude'
+$inActions = ($env:GITHUB_ACTIONS -eq 'true')
 
+# An annotation on the job, which GitHub keeps on its check run, so the cloud
+# half reads the answer without reading the log.
+function Note([string]$level, [string]$m) {
+    if ($inActions) { Write-Host ('::' + $level + ' title=Say-Staff::' + ($m -replace '%', '%25' -replace "`r", '%0D' -replace "`n", '%0A')) }
+}
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
-function Die($m) { Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
+function Die($m) { Note 'error' $m; Write-Host "STOP. $m" -ForegroundColor Red; exit 1 }
 
 $noticeKey = [string]$env:THORNSWOOD_NOTICE_KEY_B64
 $noticeToken = [string]$env:THORNSWOOD_NOTICE_TOKEN
 $withNoticeKey = [bool]($noticeKey -and $noticeToken)
-if (($noticeKey -or $noticeToken) -and -not $withNoticeKey) {
-    Die 'only one of THORNSWOOD_NOTICE_KEY_B64 and THORNSWOOD_NOTICE_TOKEN is set; a notices key needs both. Grant-BoxAccess.ps1 -NoticesOnly -MakeKey on One makes the pair. Nothing was posted.'
+
+# ------------------------------------------------------------- the way -----
+$route = ''
+if ($OnTheBox) {
+    if (-not $noticeKey) { Die 'THORNSWOOD_NOTICE_KEY_B64 is not set, so there is no key to post with. In the staff-notice workflow it is the NOTICE_KEY_B64 secret of the "notices" environment, which .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly -ToEnvironment notices puts there from One. Nothing was posted.' }
+    $route = 'box'
+} elseif ($noticeKey -or $noticeToken) {
+    if (-not $withNoticeKey) { Die 'only one of THORNSWOOD_NOTICE_KEY_B64 and THORNSWOOD_NOTICE_TOKEN is set; a notices key needs both. Grant-BoxAccess.ps1 -NoticesOnly -MakeKey on One makes the pair. Nothing was posted.' }
+    $route = 'bridge'
+} elseif (Get-Command ssh -ErrorAction SilentlyContinue) {
+    $route = 'ssh'
+} elseif (Get-Command gh -ErrorAction SilentlyContinue) {
+    $route = 'github'
+} else {
+    Die 'there is no ssh here to reach the box and no gh to start the staff-notice workflow with. Nothing was posted.'
 }
+if ($PSCmdlet.ParameterSetName -eq 'Run' -and $route -ne 'github') { Die '-Run reads a staff-notice run on GitHub, which is the way only where there is no ssh.' }
 
 # ----------------------------------------------------------- what to send --
 if ($PSCmdlet.ParameterSetName -eq 'Check') {
     if ($Check -notmatch '^agent-[a-z0-9-]{1,80}$') { Die "$Check is not a notice id; Say-Staff.ps1 printed one like agent-claude-20261020214500-1a2b3c." }
     $line = 'check ' + $Check
-} else {
+} elseif ($PSCmdlet.ParameterSetName -eq 'Say') {
     $t = ($Text -replace '\r\n?', "`n").Trim()
     if (-not $t) { Die 'the notice is empty. Nothing was posted.' }
     if ($t.Length -gt $maxText) { Die ('the notice is ' + $t.Length + ' characters and ' + $maxText + ' is the most. Say it shorter; nothing was cut and nothing was posted.') }
     $line = 'say ' + [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($t))
-}
-if (-not $withNoticeKey -and $PSCmdlet.ParameterSetName -eq 'Say' -and $From -cnotmatch '^[a-z0-9][a-z0-9-]{0,31}$') {
-    Die '-From says who the notice is from: one lower case word, letters, digits and hyphens (claude, codex, djinn). Nothing was posted.'
+    if ($route -eq 'ssh' -and $From -cnotmatch '^[a-z0-9][a-z0-9-]{0,31}$') {
+        Die '-From says who the notice is from: one lower case word, letters, digits and hyphens (claude, codex, djinn). Nothing was posted.'
+    }
+    if ($route -eq 'github' -and $From -and $From -cne $workflowSender) {
+        Die ("through GitHub a notice is from the workflow's key, named $workflowSender, and the box sets that, so it cannot say it is from $From. Post it from a machine with ssh to the box for another name. Nothing was posted.")
+    }
 }
 if (-not $From) { $From = 'agent' }
-# What the box is asked to run. A notices key runs it anyway, with its own name.
-$remote = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $far -From $From"
 
-# --------------------------------------------------------------- the way ---
-$sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=20')
-$restore = $null
-$keyFile = ''
-try {
-    if ($withNoticeKey) {
-        $node = Get-Command node -ErrorAction SilentlyContinue
-        if (-not $node) { Die 'node is not on PATH, and the bridge client is node. Nothing was posted.' }
-        $keyText = ''
-        try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($noticeKey -replace '\s', ''))) } catch { $keyText = '' }
-        if (-not $keyText.Trim()) { Die 'THORNSWOOD_NOTICE_KEY_B64 is not a base64 key. Make it again with Grant-BoxAccess.ps1 -NoticesOnly -MakeKey on One. Nothing was posted.' }
-        $keyFile = Join-Path (Join-Path $HOME '.ssh') 'thornswood_notice_ed25519'
-        Write-ThornswoodPrivateFile -Path $keyFile -Text ($keyText.Replace("`r`n", "`n").TrimEnd() + "`n")
-        $keyText = $null
-        $client = Install-ThornswoodBridgeClient (Join-Path $vpsDir 'bridge')
-        # connect.js and listen.js read the token from the environment, for
-        # this process and what it starts, and from no command line.
-        $restore = @{ Token = $env:THORNSWOOD_BOX_TOKEN }
-        $env:THORNSWOOD_BOX_TOKEN = $noticeToken
-        $null = Add-ThornswoodKnownHostThroughBridge -Address $VpsHost -Node $node.Source -Listen (Join-Path $client 'listen.js')
-        $sshArgs = @('-F', 'none', '-i', $keyFile, '-o', 'IdentitiesOnly=yes') + $sshArgs +
-                   @('-o', ('ProxyCommand="' + $node.Source + '" "' + (Join-Path $client 'connect.js') + '"'))
-    }
-
+# ----------------------------------------------------------- through GitHub --
+# One GET, its answer as an object; a refusal stops the script with why.
+function Get-GitHub([string]$path) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $out = @(Invoke-ThornswoodNative { @($line) | & ssh @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
-             Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
-    $code = $LASTEXITCODE
+    $o = @(& gh api $path 2>&1 | ForEach-Object { "$_" })
+    $c = $LASTEXITCODE
     $ErrorActionPreference = $old
+    if ($c -ne 0) { Die ("GitHub answered GET $path with: " + (($o | Select-Object -Last 2) -join ' ')) }
+    return (($o -join "`n") | ConvertFrom-Json)
 }
-finally {
-    if ($null -ne $restore) {
-        if ($null -ne $restore.Token) { $env:THORNSWOOD_BOX_TOKEN = $restore.Token } else { Remove-Item Env:THORNSWOOD_BOX_TOKEN -ErrorAction SilentlyContinue }
+
+# Waits for the run to end, then reads what the runner said: the Say-Staff
+# annotation on its job. Returns the box's answer line.
+function Read-RunAnswer([long]$id) {
+    $runPath = "repos/$GitHubRepo/actions/runs/$id"
+    $deadline = [DateTime]::UtcNow.AddMinutes($WaitMinutes)
+    $run = Get-GitHub $runPath
+    $told = $false
+    while ($run.status -ne 'completed') {
+        if ([DateTime]::UtcNow -gt $deadline) {
+            Say ("the run has not ended after $WaitMinutes minutes (it was " + $run.status + '), so every runner is busy. It still posts when one takes it.') 'Yellow'
+            Say ('  its answer then: pwsh scripts/ops/Say-Staff.ps1 -Run ' + $id) 'DarkGray'
+            Say ('  ' + $run.html_url) 'DarkGray'
+            exit 2
+        }
+        if (-not $told -and $run.status -ne 'in_progress') { Say ('  waiting for a runner (' + $run.status + ')') 'DarkGray'; $told = $true }
+        Start-Sleep -Seconds 5
+        $run = Get-GitHub $runPath
+    }
+    if ($run.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a staff-notice run (it is " + $run.path + ').') }
+    $notes = @()
+    foreach ($job in @((Get-GitHub "$runPath/jobs").jobs)) {
+        $notes += @(Get-GitHub ("repos/$GitHubRepo/check-runs/" + $job.id + '/annotations') | Where-Object { $_.title -eq 'Say-Staff' })
+    }
+    $said = @($notes | Where-Object { $_.annotation_level -eq 'notice' }) | Select-Object -Last 1
+    if ($said) { return ([string]$said.message).Trim() }
+    $why = @($notes | Where-Object { $_.annotation_level -eq 'failure' }) | Select-Object -Last 1
+    if ($why) { Die ('the runner stopped: ' + ([string]$why.message).Trim() + ' (' + $run.html_url + ')') }
+    Die ('the run ended ' + $run.conclusion + ' without an answer from the box, so nothing was posted that it knows of. Its log says why: ' + $run.html_url)
+}
+
+if ($route -eq 'github') {
+    if ($PSCmdlet.ParameterSetName -eq 'Run') {
+        $answer = Read-RunAnswer $Run
+    } else {
+        # The body on gh's standard input, so the text is on no command line.
+        $inputs = if ($PSCmdlet.ParameterSetName -eq 'Check') { @{ check = $Check } } else { @{ text = $t } }
+        $body = @{ ref = 'main'; inputs = $inputs; return_run_details = $true } | ConvertTo-Json -Compress
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $o = @($body | & gh api -X POST "repos/$GitHubRepo/actions/workflows/$workflow/dispatches" --input - 2>&1 | ForEach-Object { "$_" })
+        $c = $LASTEXITCODE
+        $ErrorActionPreference = $old
+        if ($c -ne 0) { Die ('GitHub did not start the staff-notice workflow: ' + (($o | Select-Object -Last 2) -join ' ') + '. Nothing was posted.') }
+        $started = ($o -join "`n") | ConvertFrom-Json
+        if (-not $started.workflow_run_id) { Die ('GitHub started the workflow but named no run: ' + ($o -join ' ')) }
+        Say ('sent to the staff-notice workflow: ' + $started.html_url) 'DarkGray'
+        $answer = Read-RunAnswer ([long]$started.workflow_run_id)
+    }
+    $out = @($answer)
+    $code = 1
+} else {
+    # What the box is asked to run. A notices key runs it anyway, with its own name.
+    $target = "$VpsUser@$VpsHost"
+    $remote = "powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $far -From $From"
+    $sshArgs = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', '-o', 'ConnectTimeout=20')
+    $restore = $null
+    # The key, when there is one, for this run only.
+    $work = ''
+    try {
+        if ($route -eq 'box' -or $route -eq 'bridge') {
+            $base = if ($env:RUNNER_TEMP) { $env:RUNNER_TEMP } else { [IO.Path]::GetTempPath() }
+            $work = Join-Path $base ('thornswood-notice-' + [Guid]::NewGuid().ToString('N'))
+            # ssh reads a -o file option up to the first space as one file.
+            if ($work -match '\s') { Die "the temp folder ($work) has a space in it, which ssh would read as two files. Nothing was posted." }
+            New-Item -ItemType Directory -Path $work -Force | Out-Null
+            $keyText = ''
+            try { $keyText = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($noticeKey -replace '\s', ''))) } catch { $keyText = '' }
+            if (-not $keyText.Trim()) { Die 'THORNSWOOD_NOTICE_KEY_B64 is not a base64 key. Make it again with Grant-BoxAccess.ps1 -NoticesOnly -MakeKey on One. Nothing was posted.' }
+            $keyFile = Join-Path $work 'notice_ed25519'
+            Write-ThornswoodPrivateFile -Path $keyFile -Text ($keyText.Replace("`r`n", "`n").TrimEnd() + "`n")
+            $keyText = $null
+            $sshArgs = @('-F', 'none', '-i', $keyFile, '-o', 'IdentitiesOnly=yes') + $sshArgs
+        }
+        if ($route -eq 'box') {
+            # The box's own sshd, its host key held to the pins in a
+            # known_hosts of this run's own: nothing in the runner account's
+            # .ssh is read or written. The pins and the user are the
+            # checkout's vps.json alone, not a machine's own override file,
+            # which an earlier job on the same runner account could leave.
+            $pinned = Get-Content -LiteralPath (Join-Path $vpsDir 'vps.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+            $knownHosts = Join-Path $work 'known_hosts'
+            try { $null = Add-ThornswoodKnownHost -Address '127.0.0.1' -KnownHosts $knownHosts -Pinned @($pinned.hostKeys) }
+            catch { Die ('the box''s own sshd on 127.0.0.1: ' + $_.Exception.Message) }
+            $sshArgs += @('-o', "UserKnownHostsFile=$knownHosts")
+            $target = ([string]$pinned.user) + '@127.0.0.1'
+        }
+        if ($route -eq 'bridge') {
+            $node = Get-Command node -ErrorAction SilentlyContinue
+            if (-not $node) { Die 'node is not on PATH, and the bridge client is node. Nothing was posted.' }
+            $client = Install-ThornswoodBridgeClient (Join-Path $vpsDir 'bridge')
+            # connect.js and listen.js read the token from the environment, for
+            # this process and what it starts, and from no command line.
+            $restore = @{ Token = $env:THORNSWOOD_BOX_TOKEN }
+            $env:THORNSWOOD_BOX_TOKEN = $noticeToken
+            $null = Add-ThornswoodKnownHostThroughBridge -Address $VpsHost -Node $node.Source -Listen (Join-Path $client 'listen.js')
+            $sshArgs += @('-o', ('ProxyCommand="' + $node.Source + '" "' + (Join-Path $client 'connect.js') + '"'))
+        }
+
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $out = @(Invoke-ThornswoodNative { @($line) | & ssh @sshArgs $target $remote } 2>&1 | ForEach-Object { "$_".Trim() } |
+                 Where-Object { $_ -and $_ -notmatch 'post-quantum|store now, decrypt later|openssh\.com/pq\.html' })
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $old
+    }
+    finally {
+        if ($null -ne $restore) {
+            if ($null -ne $restore.Token) { $env:THORNSWOOD_BOX_TOKEN = $restore.Token } else { Remove-Item Env:THORNSWOOD_BOX_TOKEN -ErrorAction SilentlyContinue }
+        }
+        if ($work) { Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue }
     }
 }
 
 # ------------------------------------------------------------ the answer ---
 $answer = @($out | Where-Object { $_ -match '^(QUEUED|POSTED|WAITING|EXPIRED|NOT FOUND|NOWATCHER|REFUSED|READY)\b' }) | Select-Object -Last 1
+if ($answer -and $route -ne 'github') { Note 'notice' $answer }
 switch -Regex ("$answer") {
     '^QUEUED (\S+)$' {
         Say ('queued ' + $Matches[1] + '. The bot says it in #staff-updates within a minute.') 'Green'

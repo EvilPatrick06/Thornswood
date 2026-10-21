@@ -1,0 +1,80 @@
+# Posts one staff notice in #staff-updates for a session that cannot reach the
+# box itself (#3045).
+#
+# WHY. scripts/ops/Say-Staff.ps1 posts by ssh to the box, and a cloud thread
+# has no ssh client and holds no key, so on 21 Oct every cloud thread's
+# notice (PRs #3040, #3042, #3044, #3048) went to One for the Releases desk to
+# post. Every agent key on the box is taken only from 127.0.0.1, and these
+# runners are on the box, so a notices key works here with no bridge and no
+# token, and nowhere else. Measured 21 Oct 2026 (run 39603583967, runner 7,
+# already under the #2161 outbound limits): the runner's ssh reaches the box's
+# own sshd on 127.0.0.1:22, which shows the three host keys vps.json pins, and
+# the runner account cannot read the watchdog's files.
+#
+# HOW. A cloud thread runs the same line as anybody else:
+#
+#   pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Merged the scan button fix."
+#
+# With no ssh there, it starts this workflow on main with the text (or an id
+# to -Check), waits for the run, and prints the answer this run left as an
+# annotation titled Say-Staff. Here Say-Staff.ps1 -OnTheBox hands the notice
+# to C:\Thornswood-Watch\say-staff.ps1 the way every other way does, so it
+# reaches #staff-updates through the bot in the same form, [claude] <text>.
+#
+# THE KEY. NOTICE_KEY_B64 is a secret of the "notices" environment, which only
+# main may use, so a workflow on any other branch cannot read it. It is a
+# notices key named claude: its line on the box is from="127.0.0.1", restrict,
+# and forced to run say-staff.ps1 -From claude, so it can queue a notice
+# (30 an hour, 1800 characters, no mentions) and do nothing else. On One,
+# .\scripts\vps\Grant-BoxAccess.ps1 -Name claude -MakeKey -NoticesOnly
+# -ToEnvironment notices makes it and puts it here; nothing prints it. Missing,
+# the run goes red and says so.
+#
+# WHAT IT RUNS. Main's Say-Staff.ps1 under pwsh with no profile, so nothing a
+# job left in the runner account's profile runs beside the key. The text and
+# the id reach it through the environment, never pasted into the script. The
+# key is written to a folder of this run's own and removed when it ends.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Staff notice
+run-name: Staff notice by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      text:
+        description: 'The notice, 1800 characters at most'
+        required: false
+      check:
+        description: 'Or a notice id to check, agent-claude-...'
+        required: false
+permissions:
+  contents: read
+jobs:
+  notice:
+    name: Say it in #staff-updates
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    environment: notices
+    # One ssh to the box's own sshd. Past this it is stuck, not slow.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      - name: Hand the notice to the box
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          THORNSWOOD_NOTICE_KEY_B64: ${{ secrets.NOTICE_KEY_B64 }}
+          NOTICE_TEXT: ${{ inputs.text }}
+          NOTICE_CHECK: ${{ inputs.check }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $say = Join-Path $env:GITHUB_WORKSPACE 'scripts/ops/Say-Staff.ps1'
+          if ($env:NOTICE_TEXT -and $env:NOTICE_CHECK) { Write-Host '::error title=Say-Staff::give the notice or an id to check, not both. Nothing was posted.'; exit 1 }
+          if ($env:NOTICE_CHECK) { & $say -OnTheBox -Check $env:NOTICE_CHECK }
+          elseif ($env:NOTICE_TEXT) { & $say -OnTheBox -Text $env:NOTICE_TEXT }
+          else { Write-Host '::error title=Say-Staff::no notice and no id to check. Nothing was posted.'; exit 1 }
+          # 2 is "not said yet" from a check, an answer rather than a failure.
+          if ($LASTEXITCODE -eq 2) { exit 0 }
+          exit $LASTEXITCODE

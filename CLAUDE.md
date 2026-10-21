@@ -94,10 +94,14 @@ No Discord token or webhook is needed or touched. It prints the notice's id;
 0 said, 2 still waiting). Say it the way staff read it: what, why, when, and
 the pull request's link. 1800 characters at most, 30 an hour, no mentions.
 
-It needs ssh to the box: on One and a developer's PC it works as it is, and
-in a cloud thread after `pwsh scripts/vps/Setup-CloudSsh.ps1`. An agent
-environment with no other way in may instead hold a notices key
-(`THORNSWOOD_NOTICE_KEY_B64` and `THORNSWOOD_NOTICE_TOKEN`, made on One with
+On One and a developer's PC it goes over ssh to the box as it is. In a
+cloud thread, which has no ssh, the same line starts
+`.github/workflows/staff-notice.yml` on main, waits for the run on a VPS
+runner and prints its answer (#3045): the notice says `[claude]`, no secret is
+in the container, and a run no runner took in time prints the
+`Say-Staff.ps1 -Run <id>` line that reads it later. An agent environment with
+no other way in may instead hold a notices key (`THORNSWOOD_NOTICE_KEY_B64`
+and `THORNSWOOD_NOTICE_TOKEN`, made on One with
 `Grant-BoxAccess.ps1 -Name <name> -MakeKey -NoticesOnly`), which can do
 nothing on the box but this. When it stops, what it prints is a failure like
 any other: fix it at its cause, or put it on the board with what it printed,
