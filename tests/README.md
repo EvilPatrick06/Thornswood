@@ -92,6 +92,15 @@ A path a harness compares with what a script prints is built with
 swallow baseline's, is made from a path by replacing
 `[IO.Path]::DirectorySeparatorChar`. Off Windows `\` is part of a file name.
 
+A `.js` harness does the same with `process.platform === 'win32'`: off
+Windows it says SKIP for the part that needs Windows, with why, and checks
+the rest. A path it builds from a name written with `\` splits the name
+first (`path.join.apply(path, [dir].concat(rel.split('\\')))`), and a script
+that reads the game folder matches each folder and file in any case, as
+Windows does (`Check-SkyUIMenus.js` `looseFile`). The C# compiler is
+`tests\launcher-csc.js`, whose `onWindows` is asked before its `csc`; the
+bot's Python is `tests\bot-python.js` (#3005).
+
 ## A harness that compiles launcher code
 
 A `.ps1` harness that compiles C# out of `launcher\app` or `installer\setup`

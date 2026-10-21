@@ -848,7 +848,10 @@ async function adminRoleOnly() {
     yes('Roster.cs reads the site\'s pk and banned lists', !!readIds &&
         /ReadIds\(text, "pk"\)/.test(rosterCs) && /ReadIds\(text, "banned"\)/.test(rosterCs));
     const csc = require('./launcher-csc').csc || path.join(require('os').tmpdir(), 'no-build-tools-roslyn-csc', 'csc.exe');
-    if (readIds && fs.existsSync(csc)) {
+    const onWindows = require('./launcher-csc').onWindows;
+    if (readIds && !onWindows) {
+      console.log('SKIP  the lifted ReadIds compiled and run: the compiler the launcher builds with is the Roslyn csc of Visual Studio\'s Build Tools, which only Windows has');
+    } else if (readIds && fs.existsSync(csc)) {
       const prog = 'using System; using System.Collections.Generic; using System.Text.RegularExpressions;\n' +
         'static class T {\n ' + readIds + '\n static void Main() {\n' +
         '  string a = "{\\"ok\\":true,\\"rows\\":{\\"2003\\":{\\"name\\":\\"H\\"}},\\"gone\\":[],\\"goneAt\\":0,\\"pk\\":[2003, 4002],\\"banned\\":[2002]}";\n' +
@@ -896,7 +899,9 @@ async function adminRoleOnly() {
     yes('Chars has RaiseRevived, run in Prepare after BuryDead and before the slots are tidied',
         !!raise && prep.indexOf('RaiseRevived(rows)') > prep.indexOf('BuryDead(rows)') &&
         prep.indexOf('RaiseRevived(rows)') < prep.indexOf('TidySlots(rows, slots)'));
-    if (raise && nextSlot && findSlot && fs.existsSync(csc)) {
+    if (raise && nextSlot && findSlot && !onWindows) {
+      console.log('SKIP  the lifted RaiseRevived compiled and run: the compiler the launcher builds with is the Roslyn csc of Visual Studio\'s Build Tools, which only Windows has');
+    } else if (raise && nextSlot && findSlot && fs.existsSync(csc)) {
       const prog = 'using System; using System.Collections.Generic;\n' +
         'static class Roster { public static HashSet<int> back = new HashSet<int>();\n' +
         '  public static bool Revived(int id) { return back.Contains(id); } }\n' +
