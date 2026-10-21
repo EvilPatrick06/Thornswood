@@ -29,8 +29,8 @@
 
 [CmdletBinding()]
 param(
-  [string] $Data     = 'C:\Thornswood\Game\Data',
-  [string] $Plugins  = 'C:\Thornswood\Profile\LocalAppData\Plugins.txt',
+  [string] $Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+  [string] $Plugins  = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\LocalAppData\Plugins.txt'),
   [string] $Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
   [switch] $WhatIfOnly
 )

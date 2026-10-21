@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root    = 'C:\Thornswood',
+    [string]$Root    = (& (Join-Path $PSScriptRoot 'Where.ps1') Install),
     # Out of the play install since 22 September. Staging a 508 MB installer
     # and its 956 MB stage folder inside the folder people play from put 10.9
     # GB on the game drive over five days. Ship passes this explicitly; the
@@ -172,6 +172,24 @@ if (-not (Test-Path -LiteralPath $vLive)) {
          "https://thornswood.net/feed/version.json into a folder and pass -ReleaseDir with it.")
 }
 # ==== end thornswood release feed ====
+
+# The release this installer is level with: the newest the feed names, since
+# the game folder it is built from has every one of them. Written beside the
+# exe once it is built (Thornswood-Setup.release.json), Publish-Installer puts
+# it in the site's files.json, and Ship's installer gate counts the releases
+# after it (#3043). A feed that names no release cannot say that, so it stops
+# here rather than after twenty minutes of building.
+. (Join-Path $Here 'Read-JsonFile.ps1')
+. (Join-Path $Here 'Release-Name.ps1')
+try {
+    $installerRelease = Get-NewestFeedRelease (ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $vLive -Raw) $vLive) `
+                                              (Read-ReleaseListFile (Join-Path $ReleaseDir 'releases.json'))
+} catch { Die ("The feed in $ReleaseDir did not read, so which release this installer carries is not known: " + $_.Exception.Message) }
+if (-not $installerRelease) {
+    Die ("$vLive names no release, so which release this installer carries is not known, and Ship could not tell how far behind it is. " +
+         'Receive the live feed (any Ship or feed edit on this machine does) and run this again.')
+}
+Say "  built level with release $installerRelease, the newest on the feed" 'DarkGray'
 
 # ==== thornswood setup stub ====
 # The setup program is compiled by Build-Launcher.ps1 into out\setup-stub.exe,
@@ -1105,6 +1123,10 @@ if (-not $stub) {
 }
 
 if (Test-Path $exe) { Remove-Item $exe -Force }
+# The last build's release note goes with its exe, so a build that stops
+# before the note below is written leaves none to vouch for it.
+$releaseNote = Get-InstallerReleaseNotePath $OutDir
+if (Test-Path -LiteralPath $releaseNote) { Remove-Item -LiteralPath $releaseNote -Force }
 Copy-Item $stub $exe -Force
 Say "  stub: $stub" 'DarkGray'
 
@@ -1283,6 +1305,12 @@ if ($ok) {
 }
 
 if (-not $ok) { Die 'The installer did not come out right. Do not send these files.' }
+
+# Which release this installer carries, beside it and bound to it by the
+# signed exe's sha256 (#3043): Publish-Installer reads it into the site's
+# files.json, and Ship's installer gate counts from there.
+Write-InstallerReleaseNote $OutDir $installerRelease (Get-Sha256 $exe)
+Say "  carries release $installerRelease (Thornswood-Setup.release.json)" 'Green'
 
 $gb = [math]::Round((Get-Item $zip).Length / 1GB, 2)
 Head 'Done'

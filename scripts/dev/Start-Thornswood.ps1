@@ -27,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [switch]$NoWait,        # return as soon as the game starts
     [switch]$RestoreOnly,   # just undo a stale swap and exit
     [switch]$SkipServerCheck # launch even with no server answering

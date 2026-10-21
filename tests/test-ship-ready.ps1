@@ -22,8 +22,9 @@
   real Sync-Client.ps1 answering:
     1. A fresh worktree: no engine\skymp at all, the recorded client in the
        game folder. READY.
-    2. No matching client anywhere. NOT READY, and the fix names the build
-       folder, Sync-Client -Check -Dist and Build-Engine.
+    2. No matching client anywhere. NOT READY, and the fix names CI's build
+       (Setup-ShipMachine -EngineBuild ci) and Sync-Client -Check -Dist, and
+       never a rebuild, which cannot match a record (#3047).
     3. A matching build and a game folder that differs: READY, Ship copies it.
     4. A build that is not the recorded one: READY when the game folder holds
        the recorded client, NOT READY when it does not.
@@ -163,8 +164,8 @@ try {
     Yes '2. the client row fails' (-not $r.Ok)
     Yes '2. and it is a need, not a warn' ($r.Level -eq 'need')
     Yes '2. it says the build was not found and the game folder is not right' ($r.Detail -match 'client build not found' -and $r.Detail -match '1 of 2 in place')
-    Yes '2. the fix names the build folder' ($r.Fix.Contains($dist))
-    Yes '2. the fix says how to check a candidate and how to build one' ($r.Fix -match 'Sync-Client\.ps1 -Check -Dist' -and $r.Fix -match 'Build-Engine\.ps1')
+    Yes '2. the fix says how to check a candidate, and to take CI''s build of the pin, not a rebuild (#3047)' (
+        $r.Fix -match 'Sync-Client\.ps1 -Check -Dist' -and $r.Fix -match 'Setup-ShipMachine\.ps1 -EngineBuild ci' -and $r.Fix -notmatch 'Build-Engine')
     Yes '2. the verdict is NOT READY' (-not (Get-ShipVerdict (Client-Rows)).Ready)
 
     Set-Game 'empty'; Set-Dist 'none'
@@ -239,7 +240,7 @@ try {
     Put $srv 'scam_native.node' 'an edited server'
     Put $payload 'scam_native.node' 'another edited server'
     $b = @(Main-Rows 'main' | Where-Object { $_.What -like '*server build*' })[0]
-    Yes '5. no matching server build anywhere fails, pointing at Build-Engine' (-not $b.Ok -and $b.Fix -match 'Build-Engine')
+    Yes '5. no matching server build anywhere fails, pointing at CI''s build, not a rebuild (#3047)' (-not $b.Ok -and $b.Fix -match '-EngineBuild ci' -and $b.Fix -notmatch 'Build-Engine')
 
     # A record that does not read (#2711): it was read in a try with an empty
     # catch, and then every build "did not match" and the fix named a build.

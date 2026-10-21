@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  63,
-    "callCount":  266,
+    "scriptCount":  64,
+    "callCount":  260,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -155,15 +155,6 @@
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
                       "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $send[$rel] \"$User@${Vps}:$stageFar/$rel\" }",
-                      "does":  "writes or checks a stage folder",
-                      "class":  "stage",
-                      "reason":  "writes or checks a stage folder or file"
-                  },
-                  {
-                      "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $orderFile \"$User@${Vps}:$farOrder\" }",
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
                       "reason":  "writes or checks a stage folder or file"
@@ -1026,26 +1017,17 @@
                   {
                       "script":  "scripts/deploy/Rotate-BotToken.ps1",
                       "scope":  "Remote",
-                      "via":  "ssh",
-                      "anchor":  "return Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" $cmd } 2\u003e\u00261",
-                      "does":  "runs the token scripts",
-                      "class":  "admin",
-                      "reason":  "only used for the bot token"
-                  },
-                  {
-                      "script":  "scripts/deploy/Rotate-BotToken.ps1",
-                      "scope":  "SendWriter",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $writer \"${User}@${Vps}:$far\" } 2\u003e\u00261 | Out-Null",
-                      "does":  "uploads Write-BotToken.ps1",
-                      "class":  "admin",
-                      "reason":  "secret handling"
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $script",
+                      "does":  "sends a script for its caller, with Write-BotToken.ps1\u0027s text in front of it",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
                   },
                   {
                       "script":  "scripts/deploy/Rotate-BotToken.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$out = Remote @\"",
+                      "anchor":  "$out = Remote ($writerText + \"`n\" + @\"",
                       "does":  "reads the bot token state",
                       "class":  "admin",
                       "reason":  "reads secret files"
@@ -1054,7 +1036,7 @@
                       "script":  "scripts/deploy/Rotate-BotToken.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Invoke-ThornswoodSecretRemote",
-                      "anchor":  "$out = Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Bypass -Secret $token -Script @\"",
+                      "anchor":  "$out = Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $token -Script ($writerText + \"`n\" + @\"",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends ThornswoodSecret"
@@ -1657,8 +1639,8 @@
                       "script":  "scripts/vps/Backup-Server.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$lines = Remote $gather",
-                      "does":  "gathers a backup into C:\\Windows\\Temp",
+                      "anchor":  "$lines = Remote ((Get-ThornswoodOnBoxHoldScript -Run $box.Run) + \"`r`n\" + $gather)",
+                      "does":  "gathers a backup into the run\u0027s folder in C:\\Windows\\Temp, which its keeper removes (#3035)",
                       "class":  "admin",
                       "reason":  "reads every secret and config"
                   },
@@ -1670,15 +1652,6 @@
                       "does":  "downloads the backup",
                       "class":  "admin",
                       "reason":  "carries every secret"
-                  },
-                  {
-                      "script":  "scripts/vps/Backup-Server.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Remote",
-                      "anchor":  "[void](Remote \"Remove-Item \u0027$($remoteZip.Replace(\u0027/\u0027,\u0027\\\u0027))\u0027 -Force -EA SilentlyContinue\")",
-                      "does":  "removes the backup zip",
-                      "class":  "admin",
-                      "reason":  "tidy of the admin gather"
                   },
                   {
                       "script":  "scripts/vps/Check-LiveGamemode.ps1",
@@ -1854,18 +1827,9 @@
                   {
                       "script":  "scripts/vps/Harden-VPS.ps1",
                       "scope":  "Invoke-Box",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $BoxScript \"${User}@${Vps}:$far\" } 2\u003e\u00261 | Out-Null",
-                      "does":  "uploads the hardening script",
-                      "class":  "admin",
-                      "reason":  "hardening"
-                  },
-                  {
-                      "script":  "scripts/vps/Harden-VPS.ps1",
-                      "scope":  "Invoke-Box",
-                      "via":  "ssh",
-                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" $cmd } 2\u003e\u00261)",
-                      "does":  "runs the hardening script",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs the hardening script, sent on standard input (#3035)",
                       "class":  "admin",
                       "reason":  "hardening"
                   },
@@ -2088,18 +2052,9 @@
                   {
                       "script":  "scripts/vps/Set-SshScope.ps1",
                       "scope":  "Invoke-Box",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $BoxScript \"${User}@${Vps}:$far\" } 2\u003e\u00261 | Out-Null",
-                      "does":  "uploads vps-ssh-scope.ps1",
-                      "class":  "admin",
-                      "reason":  "firewall change for port 22"
-                  },
-                  {
-                      "script":  "scripts/vps/Set-SshScope.ps1",
-                      "scope":  "Invoke-Box",
-                      "via":  "ssh",
-                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" $cmd } 2\u003e\u00261)",
-                      "does":  "runs vps-ssh-scope.ps1, which sets the remote addresses of the port 22 rules",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-ssh-scope.ps1, sent on standard input (#3035), which sets the remote addresses of the port 22 rules",
                       "class":  "admin",
                       "reason":  "firewall change for port 22"
                   },
@@ -2115,18 +2070,9 @@
                   {
                       "script":  "scripts/vps/Set-TimeWait.ps1",
                       "scope":  "Invoke-Box",
-                      "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $BoxScript \"${User}@${Vps}:$far\" } 2\u003e\u00261 | Out-Null",
-                      "does":  "uploads vps-time-wait.ps1",
-                      "class":  "admin",
-                      "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
-                  },
-                  {
-                      "script":  "scripts/vps/Set-TimeWait.ps1",
-                      "scope":  "Invoke-Box",
-                      "via":  "ssh",
-                      "anchor":  "$out = Clean @(Invoke-ThornswoodNative { \u0026 ssh @ssh \"$User@$Vps\" $cmd } 2\u003e\u00261)",
-                      "does":  "runs vps-time-wait.ps1, which sets TcpTimedWaitDelay and, with -Restart, restarts the box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-time-wait.ps1, sent on standard input (#3035), which sets TcpTimedWaitDelay and, with -Restart, restarts the box",
                       "class":  "admin",
                       "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
                   },
@@ -2293,11 +2239,11 @@
                       "reason":  "reads files, settings, logs or status only"
                   },
                   {
-                      "script":  "scripts/mods/Run-OnBox.ps1",
-                      "scope":  "\u003ctop\u003e",
+                      "script":  "scripts/mods/OnBox.ps1",
+                      "scope":  "Open-ThornswoodOnBoxFolder",
                       "via":  "Start-ThornswoodRemote",
-                      "anchor":  "$keeper = Start-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-ThornswoodOnBoxKeepScript -Run $run)",
-                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its input closes (#2999)",
+                      "anchor":  "$keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run)",
+                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its input closes (#2999), for Run-OnBox.ps1 and Backup-Server.ps1 (#3035)",
                       "class":  "stage",
                       "reason":  "writes and removes stage folders the runs own"
                   },

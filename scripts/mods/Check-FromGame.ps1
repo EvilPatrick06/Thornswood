@@ -20,7 +20,8 @@
 
 .PARAMETER Data
   The game's Data folder, whose Skyrim - Interface.bsa and Skyrim - Meshes0.bsa
-  and Meshes1.bsa are read. Default C:\Thornswood\Game\Data.
+  and Meshes1.bsa are read. Default Game\Data in the install Where.ps1
+  Install finds (C:\Thornswood on most machines).
 
 .PARAMETER Out
   A folder to write the three into, under their game folder paths. Optional.
@@ -31,7 +32,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string] $Data = 'C:\Thornswood\Game\Data',
+  [string] $Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
   [string] $Out = ''
 )
 $ErrorActionPreference = 'Stop'

@@ -9,8 +9,8 @@
   record, which is the first record in the file.
 #>
 param(
-    [string]$Data = 'C:\Thornswood\Game\Data',
-    [string]$Plugins = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string]$Plugins = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt'),
     [switch]$NoPause
 )
 

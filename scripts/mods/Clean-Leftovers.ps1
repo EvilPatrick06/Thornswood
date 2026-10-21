@@ -39,7 +39,7 @@ function MB($b) { '{0,9:n2} MB' -f ($b / 1MB) }
 
 # The same folders the audit walks.
 $roots = @(
-    'C:\Thornswood'
+    (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install)
     (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine)
     'C:\SkyrimRP'
     (Join-Path $env:USERPROFILE 'Downloads')
@@ -148,7 +148,7 @@ if ($stuck.Count) {
 }
 
 Write-Host ''
-Say 'If anything came out of C:\Thornswood\Game\Data, ship a build so the' 'Gray'
+Say ('If anything came out of ' + $roots[0] + '\Game\Data, ship a build so the') 'Gray'
 Say 'installer stops carrying it:  .\Ship.ps1 -Package' 'Gray'
 Write-Host ''
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }

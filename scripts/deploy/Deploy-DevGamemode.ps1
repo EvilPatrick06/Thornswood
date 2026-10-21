@@ -225,7 +225,7 @@ param(
   [string[]]$DropPlugins = @(),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
-  [string]$Data = 'C:\Thornswood\Game\Data',
+  [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
   # The warning, the same four switches Deploy-Server.ps1 has. See WHO IS ON in
   # the header. Why is only worded into -Mode restart.
   [double]$Minutes = 1,
@@ -415,11 +415,10 @@ else { Write-Host ('  most online: {0} gave no number ({1}), so the dev server k
 # Worked out before anything is stopped, so a missing plugin or an unreadable
 # build stops this while the dev server is still up and serving.
 $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
-$farOrder      = ''
+$orderWire     = ''
 $pluginNames   = @()
 $sendPlugins   = @()
 $changed       = @()
-$orderFile     = ''
 
 if ($LoadOrder) {
   # ==== thornswood dev load order source ====
@@ -563,18 +562,17 @@ if ($LoadOrder) {
 
   # Only a build's order goes up to be written over the dev one (-Dist). The
   # dev server's own order needs no list: it stays as it is.
-  # The list goes up as a file of its own. Putting 57 paths inside the settings
-  # block below would add some 4,000 characters to something that is base64 of
-  # UTF-16 on a command line, which is the length problem Remote() exists to
-  # work around; and the dev settings file is edited in place here rather than
+  # The list goes inside the settings block below that reads it, as base64 of
+  # its UTF-8 so no name can break the quoting, and so it reaches the box the
+  # way that block does: on ssh's standard input when it is long
+  # (Send-Script.ps1). Until 21 Oct 2026 (#3035) it went up as a file of its
+  # own in C:\Windows\Temp, because a block that long on a command line was
+  # cut short, and a deploy that stopped between the copy and the block that
+  # removed it left the file there for good. Nothing of it is written on the
+  # box now: the dev settings file is edited in place here rather than
   # written from a local build, which is the rule this script is built on.
-  # A name of its own each run, here and on the box, so two deploys at once
-  # cannot read or remove each other's list (#1070).
   if ($Dist -or $orderMoved) {
-    $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
-    $orderFile = Join-Path ([IO.Path]::GetTempPath()) $orderName
-    [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
-    $farOrder = 'C:/Windows/Temp/' + $orderName
+    $orderWire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pluginNames -join "`n"))
   }
 }
 
@@ -835,13 +833,6 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     if ($LASTEXITCODE -ne 0) { throw "scp failed for $rel. The dev server has not been touched." }
     Write-Host "  $rel"
   }
-  if ($orderFile) {
-    Invoke-ThornswoodNative { & scp @ssh $orderFile "$User@${Vps}:$farOrder" }
-    $sentOrder = $LASTEXITCODE
-    Remove-Item -LiteralPath $orderFile -Force -ErrorAction SilentlyContinue
-    if ($sentOrder -ne 0) { throw 'scp failed for the load order list. The dev server has not been touched.' }
-    Write-Host ('  the load order list, {0} plugins' -f $pluginNames.Count)
-  }
   $hashes = Get-SwapHashes $send
 
   Write-Host ''
@@ -1001,9 +992,9 @@ foreach (`$k in 'equipmentSlotCheckEnabled','equipmentSpellCheckEnabled','equipm
 }
 `$wantOrder = `$false
 `$newOrder = @()
-`$orderPath = '$farOrder'
-if (`$orderPath -and (Test-Path `$orderPath)) {
-  `$names = @(Get-Content `$orderPath | ForEach-Object { `$_.Trim() } | Where-Object { `$_ })
+`$orderWire = '$orderWire'
+if (`$orderWire) {
+  `$names = @([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(`$orderWire)) -split "``n" | ForEach-Object { `$_.Trim() } | Where-Object { `$_ })
   if (`$names.Count) {
     `$newOrder = @(`$names | ForEach-Object { '$remotePlugins/' + `$_ })
     `$oldOrder = @(`$s.loadOrder)
@@ -1226,8 +1217,6 @@ if (Test-Path `$mf) {
     'manifest: ' + @(`$m.loadOrder).Count + ' plugins, written ' + (Get-Item `$mf).LastWriteTime
   } catch { 'manifest: UNREADABLE, ' + `$_.Exception.Message }
 } else { 'manifest: not written yet' }
-`$tmpOrder = '$farOrder'
-if (`$tmpOrder -and (Test-Path `$tmpOrder)) { Remove-Item -LiteralPath `$tmpOrder -Force -EA SilentlyContinue }
 if (Test-Path '$rootWin\server.log') {
   '--- server.log, last 15 ---'
   Get-Content '$rootWin\server.log' -Tail 15

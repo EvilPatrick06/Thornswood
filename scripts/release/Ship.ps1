@@ -298,7 +298,8 @@ param(
     [switch]$ModsOnly,
     [switch]$DryRun,
     [switch]$Package,
-    [string]$Root = 'C:\Thornswood'
+    # Left out, Where.ps1 ShipRoot or ShipRootDev, asked below (#1692, #3031).
+    [string]$Root
     # Where releases are staged and zipped, passed straight through to
     # Publish-Update and Package-Thornswood so all three agree. Not under
     # $Root: that is the folder people play from.
@@ -1937,7 +1938,7 @@ if ($LASTEXITCODE -eq 2) {
 }
 if ($LASTEXITCODE -ne 0) {
     Unbump 'the client build could not be checked'
-    Die 'Sync-Client.ps1 refused. Rebuild the client, run .\scripts\release\New-ClientBuildRecord.ps1, and Ship again.'
+    Die 'Sync-Client.ps1 refused, and says why above. The client that matches the record is CI''s build of the pin: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci, then Ship again (engine\README.md, A Ship machine takes CI''s build).'
 }
 
 # ------------------------------------------------------------ covered bodies
@@ -2033,76 +2034,66 @@ if ($FromFeed) {
     Say '  no game folder here, so SkyUI''s menus were not read' 'DarkGray'
 }
 
-# HOW FAR BEHIND the public installer is: the zip on disk against the releases
-# the feed lists. Asked twice, and the two answers differ on purpose. Before
-# publishing, the gate just below reads it to refuse a main release that would
-# leave an already-behind installer further behind. After publishing, the
-# closing note reads it again, by which point version.json carries this
-# release's pack (a dry run puts it back), so a fresh installer that was current
-# now reads as one behind. Reading the zip and the feed each time keeps both
-# answers true to the disk rather than to a value cached before the publish.
+# HOW FAR BEHIND the public installer is: the release the installer on the site
+# carries against the releases the main feed lists. Asked twice, and the two
+# answers differ on purpose. Before publishing, the gate just below reads it to
+# refuse a main release that would leave an already-behind installer further
+# behind. After publishing, the closing note reads it again, by which point
+# version.json carries this release (a dry run puts it back), so an installer
+# that was current now reads as one behind. Reading the site and the feed each
+# time keeps both answers true to what is published rather than to a value
+# cached before the publish.
 #
-# Staged out of the play install since 22 September: one folder per install
-# root under the dev tree, the same shape Publish-Update and Package-Thornswood
-# use, so the three agree on one answer. -DistRoot moves the lot. The old
-# $Root\_dist is still read when it is the only one there, so a machine that has
-# not published since the move still finds its installer.
+# THE INSTALLER ON THE SITE, NOT A ZIP ON THIS DISK (#3043). This used to time
+# a Thornswood-Setup.zip in this machine's _dist against the release ids. With
+# no zip there, which Clean-Everything -Installers, a new shipping machine and
+# a Ship from another install root all lead to, it had nothing to count and the
+# gate let a main release through however far behind the published installer
+# was. Now Package-Thornswood names the release an installer is level with,
+# Publish-Installer writes that into the exe's entry in the site's files.json,
+# and this counts the feed's releases after it (Release-Name.ps1). Known is
+# false, with Why saying what was missing, when that cannot be read; the gate
+# refuses then, because an installer nobody can measure is not a current one.
+#
+# DistDir is only where this root's installer is built, one folder per install
+# root under -DistRoot, the same shape Publish-Update and Package-Thornswood
+# use; -Package builds into it.
 function Measure-Installer {
     $distDir = Join-Path (Join-Path $DistRoot (Split-Path -Leaf $Root.TrimEnd('\'))) '_dist'
-    $z = Join-Path $distDir 'Thornswood-Setup.zip'
-    if (-not (Test-Path -LiteralPath $z)) {
-        $wasZip = Join-Path $Root '_dist\Thornswood-Setup.zip'
-        if (Test-Path -LiteralPath $wasZip) { $z = $wasZip }
+    $o = [pscustomobject]@{ DistDir = $distDir; Known = $false; Why = ''; Release = ''; Behind = 0 }
+    $list = $null
+    try { $list = Read-SiteDownloads }
+    catch { $o.Why = "the site's list of downloads (files.json) did not read: $($_.Exception.Message)"; return $o }
+    $tip = $null
+    if ($null -ne $list -and $list.PSObject.Properties['Thornswood-Setup.exe']) { $tip = $list.'Thornswood-Setup.exe' }
+    if ($null -eq $tip) { $o.Why = 'the site lists no Thornswood-Setup.exe, so nobody new can install'; return $o }
+    if ($tip.PSObject.Properties['release'] -and $tip.release) { $o.Release = [string]$tip.release }
+    if (-not $o.Release) {
+        $o.Why = 'the site''s Thornswood-Setup.exe does not say which release it carries (it was published before Publish-Installer recorded that)'
+        return $o
     }
-    $have = Test-Path $z
-    $count = 0
-    $when = [datetime]::MinValue
-    if ($have) {
-        $when = (Get-Item $z).LastWriteTime
-        $vf = Join-Path $ReleaseDir 'version.json'
-        if (Test-Path $vf) {
-            $doc = ConvertFrom-ThornswoodJson (Get-Content $vf -Raw) $vf
-            # Each release by its id: the packs on the feed, and since the packs
-            # came off it (#1050) the releases the store lists beside it and the
-            # one the feed is on. A release that carried a pack has the same id
-            # in both, so it counts once.
-            $ids = @()
-            if ($doc.PSObject.Properties['packs'] -and $doc.packs) { $ids += @($doc.packs) }
-            if ($doc.PSObject.Properties['releases'] -and $doc.releases) { $ids += @($doc.releases) }
-            if ($doc.PSObject.Properties['release'] -and $doc.release) { $ids += @($doc.release) }
-            $rf = Join-Path $ReleaseDir 'releases.json'
-            if (Test-Path -LiteralPath $rf) {
-                try { $ids += @(Read-ReleaseListFile $rf) }
-                catch { Say "  could not read $rf for the installer count: $($_.Exception.Message)" 'Yellow' }
-            }
-            if ($ids.Count) {
-                $seen = @{}
-                foreach ($p in @($ids | Where-Object { $null -ne $_ -and $_.PSObject.Properties['id'] })) {
-                    # ids are yyyyMMdd-HHmm, yyyyMMdd-HHmmss since #1057, with
-                    # -2 -3 on the split ones, and three parts of one release
-                    # are still one release; two releases in one minute are two.
-                    $m = [regex]::Match("$($p.id)", '^\d{8}-\d{4}(\d{2})?')
-                    if (-not $m.Success) { continue }
-                    if ($seen.ContainsKey($m.Value)) { continue }
-                    $seen[$m.Value] = $true
-                    $t = [datetime]::MinValue
-                    if ([datetime]::TryParseExact($m.Value.Substring(0, 13), 'yyyyMMdd-HHmm', $null, 'None', [ref]$t)) {
-                        if ($t -gt $when) { $count++ }
-                    }
-                }
-            }
-        }
-    }
-    return [pscustomobject]@{ DistDir = $distDir; Zip = $z; HaveZip = $have; Behind = $count; ZipTime = $when }
+    $vf = Join-Path $MainReleaseDir 'version.json'
+    if (-not (Test-Path -LiteralPath $vf)) { $o.Why = "there is no main feed here ($vf) to count its releases from"; return $o }
+    try {
+        $doc = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $vf -Raw) $vf
+        $rl = Read-ReleaseListFile (Join-Path $MainReleaseDir 'releases.json')
+    } catch { $o.Why = "the main feed here did not read: $($_.Exception.Message)"; return $o }
+    $n = Get-ReleasesAfter $o.Release $doc $rl
+    if ($n -lt 0) { $o.Why = "the site's Thornswood-Setup.exe names '$($o.Release)', which is not a release id"; return $o }
+    $o.Behind = $n
+    $o.Known = $true
+    return $o
 }
 
 # ---------------------------------------------------- the installer gate
 # A MAIN RELEASE REFUSES TO GO OUT WHILE THE PUBLIC INSTALLER IS BEHIND, and
-# this is the whole of that rule. Every main Ship adds a pack the installer does
-# not carry, so an already-stale Thornswood-Setup.zip only gets staler, and a
-# new person installing from it sits through the whole pile on first launch. The
+# this is the whole of that rule. Every main Ship adds a release the installer
+# does not carry, so an already-stale installer only gets staler, and a new
+# person installing from it sits through the whole pile on first launch. The
 # closing note has counted this for a long time and warned; a warning on the one
-# screen nobody rereads let the installer drift release after release.
+# screen nobody rereads let the installer drift release after release. It also
+# refuses when how far behind cannot be told (#3043): that is not the same as
+# current, and reading it as current is how a cleaned-away zip let releases out.
 #
 # BEFORE PUBLISH, on purpose. A refusal after the pack is on the feed would
 # leave a release out with #news, the site and the server never told, which is
@@ -2118,12 +2109,18 @@ function Measure-Installer {
 # twenty-minute installer rebuild is the opposite of what a hotfix is for.
 if (-not $Dev -and -not $hotfix -and -not $DryRun -and -not $Package) {
     $ins = Measure-Installer
-    if ($ins.HaveZip -and $ins.Behind -gt 0) {
+    $rebuild = ('Rebuild it as part of this release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile ' +
+                'first, which publishes it, then Ship.')
+    if (-not $ins.Known) {
+        Unbump 'how far behind the installer is could not be told'
+        Die ("How far behind the installer on the site is cannot be told: $($ins.Why). A main release does not go out " +
+             "past an installer nobody can measure. $rebuild")
+    }
+    if ($ins.Behind -gt 0) {
         Unbump 'the installer is behind and nothing here was going to rebuild it'
-        Die (("Thornswood-Setup.zip is {0} release{1} behind, built {2:d MMM HH:mm}, and a main release would leave it further behind. " -f `
-                 $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' }), $ins.ZipTime) +
-             'Anyone installing from it would sit through all of those on first launch. Rebuild it as part of this ' +
-             'release by adding -Package, or run .\scripts\release\Package-Thornswood.ps1 -OneFile first, then Ship.')
+        Die (("The installer on the site (Thornswood-Setup.exe) carries release {0} and is {1} release{2} behind, and a main release would leave it further behind. " -f `
+                 $ins.Release, $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' })) +
+             "Anyone installing from it would sit through all of those on first launch. $rebuild")
     }
 }
 
@@ -2326,31 +2323,27 @@ if (-not $DryRun -and $published -eq 0) {
   only appears on the runs where it is least urgent is not a warning.
 
   Measure-Installer is the same reading the gate above the publish took, run
-  again because version.json has moved: by now it carries this release's pack
-  (a dry run put it back), so a fresh installer reads as one behind, which is
-  what the closing note says.
+  again because version.json has moved: by now it carries this release (a dry
+  run put it back), so an installer that was current reads as one behind,
+  which is what the closing note says.
 #>
 $ins = Measure-Installer
 $DistDir = $ins.DistDir
-$haveZip = $ins.HaveZip
-$behind = $ins.Behind
-$zipTime = $ins.ZipTime
 
 function Show-Installer {
-    if (-not $haveZip) {
-        Head 'The installer'
-        Say '  there is no Thornswood-Setup.zip yet, so nobody new can install.' 'Yellow'
-        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   builds it' 'Yellow'
-        return
-    }
-    if ($behind -le 0) {
-        Head 'The installer'
-        Say '  Thornswood-Setup.zip is current' 'Green'
-        return
-    }
     Head 'The installer'
-    Say ("  Thornswood-Setup.zip is {0} release{1} behind, built {2:d MMM HH:mm}." -f `
-         $behind, $(if ($behind -eq 1) { '' } else { 's' }), $zipTime) 'Yellow'
+    if (-not $ins.Known) {
+        Say "  how far behind the installer on the site is could not be told: $($ins.Why)" 'Yellow'
+        Say '  The next main release refuses until it can be. Rebuilding the installer puts that right.' 'Yellow'
+        Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   builds and publishes it, twenty minutes or so' 'Yellow'
+        return
+    }
+    if ($ins.Behind -le 0) {
+        Say "  the installer on the site is current, release $($ins.Release)" 'Green'
+        return
+    }
+    Say ("  the installer on the site carries release {0} and is {1} release{2} behind." -f `
+         $ins.Release, $ins.Behind, $(if ($ins.Behind -eq 1) { '' } else { 's' })) 'Yellow'
     Say '  Anyone installing from it sits through all of those on first launch.' 'Yellow'
     Say '  Nobody who already has the game is affected.' 'DarkGray'
     Say '  .\scripts\release\Package-Thornswood.ps1 -OneFile   to rebuild it, twenty minutes or so' 'Yellow'
@@ -2428,11 +2421,11 @@ elseif ($Package -and $DryRun) {
     # put a new installer in front of every new person, which is the opposite
     # of a dry run. Found on 24 September by the script index run (entry 260).
     #
-    # Skipped rather than built with -NoPublish. That build is twenty minutes,
-    # and it would leave a Thornswood-Setup.zip in the staging folder that the
-    # site does not have, so the next Ship would call the installer current
-    # while the one people download is not. A dry run leaves nothing behind
-    # that changes what the next release says; see the Publishing section.
+    # Skipped rather than built with -NoPublish. That build is twenty minutes
+    # and leaves an installer in the staging folder that the site does not
+    # have. The gate reads the installer on the site since #3043, so that one
+    # could no longer pass for current, but a dry run still leaves nothing
+    # behind that a real run would not; see the Publishing section.
     Show-Installer
     Say '  dry run, so not rebuilt: Package-Thornswood.ps1 puts what it builds on the site' 'Yellow'
     Say ('  .\scripts\release\Package-Thornswood.ps1 -OneFile -NoPublish -OutDir "' + $DistDir + '"   builds it and publishes nothing') 'DarkGray'

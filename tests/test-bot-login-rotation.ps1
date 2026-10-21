@@ -268,13 +268,19 @@ $allowed = @(
     '^\$token = \$null$',
     # Issue #451: the token goes on ssh's standard input, as -Secret, and
     # nowhere else. It used to be base64'd into the script sent as a command.
-    '^\$out = Invoke-ThornswoodSecretRemote -Target "\$User@\$Vps" -SshArgs \$ssh -Bypass -Secret \$token -Script @"$'
+    # The writer's text goes in front of the script since #3035.
+    '^\$out = Invoke-ThornswoodSecretRemote -Target "\$User@\$Vps" -SshArgs \$ssh -Secret \$token -Script \(\$writerText \+ "`n" \+ @"$'
 )
 $odd = @($uses | Where-Object { $u = $_; -not @($allowed | Where-Object { $u -match $_ }).Count })
 Yes ('every use of $token in Rotate-BotToken.ps1 is the prompt, the shape check, the standard input it is sent on or clearing it' +
      $(if ($odd.Count) { ': ' + ($odd -join ' | ') } else { '' })) ($uses.Count -ge 4 -and $odd.Count -eq 0)
 Yes 'no ssh or scp line in Rotate-BotToken.ps1 names $token, except as the -Secret sent on standard input' (@(($rot -split "`n") | ForEach-Object { $_ -replace '-Secret \$token\b', '' } | Where-Object { $_ -match '\b(ssh|scp)\b' -and $_ -match '\$token\b' }).Count -eq 0)
 Yes 'no base64 of the token is made in Rotate-BotToken.ps1 (#451)' ($rot -notmatch 'GetBytes\(\$token\)')
+# Issue #3035: the writer went up as a file of its own in C:\Windows\Temp, and
+# a run cut before the next call left it there. Now its text goes in front of
+# each script that calls it, as Install-Bot.ps1 and Set-DiscordLogin.ps1 send it.
+Yes 'Rotate-BotToken.ps1 copies nothing to the box: no scp, and no file of its own under C:\Windows\Temp' ($rot -notmatch '\bscp\b' -and $rot -notmatch '(?i)Windows[\\/]Temp')
+Yes '  it sends the writer''s text in front of the script for the check and for the write' (([regex]::Matches($rot, '\(\$writerText \+ "`n" \+ @"')).Count -eq 2)
 Yes 'Rotate-BotToken.ps1 writes through Write-ThornswoodBotToken' ($rot -match 'Write-ThornswoodBotToken -Token')
 Yes 'Rotate-BotToken.ps1 restarts the bot and the site' ($rot -match 'Restart-ThornswoodBot ' -and $rot -match 'Restart-ThornswoodSite ')
 
