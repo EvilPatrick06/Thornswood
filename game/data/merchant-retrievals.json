@@ -1,7 +1,7 @@
 {
   "version": 1,
   "loadOrderSha256": "4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d",
-  "contentSha256": "de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6",
+  "contentSha256": "8f28805af10db8c40427d35793e7aca29daed3f7fe2f405c9491a2666dae1b0a",
   "sources": [
     {
       "quest": "satchel",
@@ -58,7 +58,7 @@
       "provenance": {
         "fileIndex": 51,
         "plugin": "Thornswood-Content.esp",
-        "pluginSha256": "de9182aa6661dd59d78e40e63e76ac45bb7da0272afe928e860313655ca857e6",
+        "pluginSha256": "8f28805af10db8c40427d35793e7aca29daed3f7fe2f405c9491a2666dae1b0a",
         "recordSha256": "c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a",
         "rawId": 83980808
       }
