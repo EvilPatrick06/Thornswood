@@ -1,6 +1,6 @@
 {
   "builtBy": "scripts\\dev\\Build-WaterTable.js",
-  "builtAt": "2026-10-21T06:05:15.121Z",
+  "builtAt": "2026-10-21T09:37:26.278Z",
   "source": "the WATR, CELL and WRLD records of 101 plugins in load order",
   "readFrom": "XCWT on a cell, NAM2 on a worldspace, and the editor id of the WATR they point at",
   "note": "what a class is WORTH is balance and lives in NEEDS.water in gamemode.js. There is no ice water record in Skyrim: a frozen swim is cold weather, a dark hour and a high place, which the exposure half already measures.",

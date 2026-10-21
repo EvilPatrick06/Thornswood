@@ -10,8 +10,8 @@
 //     stop at novice, and Twin Souls is the second enchantment.
 //   * A batch is one piece of work, through creditWork, however many
 //     effects or bottles it has.
-//   * Master Chemist is a second batch on the same stack, once the first
-//     arrived.
+//   * Master Chemist's batch is two, named before the engine gives it
+//     (craftOutput, #2906), and nothing waits for the engine.
 //   * Twin Souls reaches the menu: the owner property hands over the
 //     slots and the script puts the Extra Effect perk on, once.
 //   * Until the engine reports the effects (engine/skymp at the pinned
@@ -332,28 +332,27 @@ if (P && listsSrc && parts.every(function (p) { return !!p; })) {
         brew(physNovice, undefined, { made: IRON_SWORD, bench: 'CraftingEnchantingTable' }).credited.length === 0);
   }
 
-  // L9: MASTER CHEMIST, a second batch once the first is in the pack.
+  // L9: MASTER CHEMIST, the batch twice, named before the engine gives it
+  // (craftOutput, #2906). props.craftOutput stands in for the engine's
+  // property inside onCraft: the brew and one bottle.
   {
     const w = world(physMaster, LAB);
+    w.props.craftOutput = { baseId: BREWED, count: 1 };
     w.api.recipelessCraft(0xff000058, BREWED, 0x1234, [ID('3eb15:Skyrim.esm')]);
-    yes('L9 a master Physicker\'s brew waits for the engine before the second batch', w.timers.length === 1 && w.added.length === 0);
-    // The engine adds the first bottle, then the timer runs.
-    w.setInventory({ entries: [{ baseId: BREWED, count: 1 }] });
-    w.timers[0]();
-    yes('L9 and then the second bottle goes on the same stack, two in all',
-        w.added.length === 1 && w.added[0][0] === '1234' && w.added[0][1] === 1 &&
-        w.inventory().entries[0].count === 2);
+    yes('L9 a master Physicker\'s brew names a batch of two before the engine gives it',
+        w.props.craftOutput.count === 2);
+    yes('L9 and the bottle stays the engine\'s, the brew\'s own runtime form',
+        w.props.craftOutput.baseId === undefined);
+    yes('L9 and nothing waits for the engine or is added on top', w.timers.length === 0 && w.added.length === 0);
     yes('L9 and it is still one piece of work', w.credited.length === 1);
-    const n = world(physMaster, LAB);
-    n.api.recipelessCraft(0xff000058, BREWED, 0x1234, [ID('3eb15:Skyrim.esm')]);
-    n.timers[0]();
-    yes('L9 a brew the engine did not finish gets no second batch', n.added.length === 0);
     const novice = world(physNovice, LAB);
+    novice.props.craftOutput = { baseId: BREWED, count: 1 };
     novice.api.recipelessCraft(0xff000058, BREWED, 0x1234, [ID('3eb15:Skyrim.esm')]);
-    yes('L9 a novice gets no second batch', novice.timers.length === 0);
+    yes('L9 a novice gets no second batch', novice.props.craftOutput.count === 1 && novice.timers.length === 0);
     const bm = world(bladeMaster, TABLE);
+    bm.props.craftOutput = { baseId: IRON_SWORD, count: 1 };
     bm.api.recipelessCraft(0xff000058, IRON_SWORD, 0x1234, [ID('4605a:Skyrim.esm')]);
-    yes('L9 an enchantment is never doubled', bm.timers.length === 0);
+    yes('L9 an enchantment is never doubled', bm.props.craftOutput.count === 1 && bm.timers.length === 0);
   }
 
   // L10: THE SLOTS REACH THE MENU.
