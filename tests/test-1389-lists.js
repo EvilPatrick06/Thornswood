@@ -63,7 +63,7 @@ const parts = [
   cut('function craftAnswer(actorId, row) {'),
   cut('function holdsPerk(actorId, key) {'),
   cut('function packCount(actorId, itemDesc) {'),
-  cut('function masterCraft(actorId, row, count) {'),
+  cut('function wovenOutput(actorId, row) {'),
   cut('function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {')
 ];
 const noProfM = /^const NO_PROFESSION_AT_A_BENCH = '([^']*)';$/m.exec(gm);
@@ -180,10 +180,9 @@ function world(state, opts) {
     lookupEspmRecordById: function () { return { record: { editorId: opts.bench || 'AlchemyWorkbench' } }; }
   };
   const fn = new Function('globalThis', 'mp', 'log', 'notify', 'say', 'setTimeout', 'creditWork', 'raceGate',
-    'idOf', 'addItem', 'markWoven', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'BENCH_BY_BASE', 'RECIPES_BY_ID',
-    'MASTER_CRAFT_AFTER_MS',
+    'idOf', 'addItem', 'wovenMark', 'RANK_LADDER', 'NO_PROFESSION_AT_A_BENCH', 'BENCH_BY_BASE', 'RECIPES_BY_ID',
     parts.join('\n') + '\n' + listsSrc +
-    '\nreturn { recipelessCraft: recipelessCraft, listAnswer: listAnswer, masterCraft: masterCraft,' +
+    '\nreturn { recipelessCraft: recipelessCraft, listAnswer: listAnswer, wovenOutput: wovenOutput,' +
     ' enchantSlots: enchantSlots, handEnchantSlots: handEnchantSlots, enchantSlotsScript: enchantSlotsScript,' +
     ' ENCHANT_SLOTS_PROPERTY: ENCHANT_SLOTS_PROPERTY };');
   const api = fn(g, mp,
