@@ -29,8 +29,13 @@
   is asked anything. Commit it first; what ran is then a commit anyone can
   name.
 
-  ON THE BOX, one folder of the run's own under C:\Windows\Temp, removed
-  afterwards whatever happened:
+  ON THE BOX, one folder of the run's own under C:\Windows\Temp. It lives
+  as long as one ssh session, the keeper's (scripts\mods\OnBox.ps1, #2999):
+  the keeper makes it, holds it for the whole run and removes it when this
+  says the run is over or the session drops. A keeper killed with its session
+  cannot remove anything, but it stops holding the folder when it dies, and
+  the next run's keeper removes every folder nobody holds before it makes its
+  own. So nothing stays on the box past the next run, however a run ended:
     repo\   the artifact, laid out like the repository; the tool runs here
     data\   a copy of the server's plugins folder, with this commit's own
             Thornswood plugins in place of the ones the server runs. A copy,
@@ -113,21 +118,35 @@ Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 $run = 'C:\Windows\Temp\thornswood-onbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
 $runFar = $run.Replace('\', '/')
 $farRun = Get-ThornswoodOnBoxScript -Run $run -ServerRoot $serverRoot -Tool $tool -Arguments $Arguments
-$farClean = Get-ThornswoodOnBoxCleanScript -Run $run
 
-$local = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-onbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
+# Not named like the box's run folders, so a run on a machine whose temp
+# folder is C:\Windows\Temp is never taken for one of them.
+$local = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-runonbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 New-Item -ItemType Directory -Force -Path $local | Out-Null
+$keeper = $null
+$made = $false
 $code = 1
 try {
-    # Everything ssh says comes back with the answer, its own errors too, so a
-    # refusal names its reason (Invoke-ThornswoodArtifactRemote keeps only text).
+    # The keeper first: it removes what earlier runs left, then makes this
+    # run's folder and holds it until its input is closed, below.
+    $keeper = Start-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-ThornswoodOnBoxKeepScript -Run $run)
+    while ($null -ne ($l = $keeper.StandardOutput.ReadLine())) {
+        $l = $l.Trim()
+        if ($l -eq ('MADE ' + $run)) { $made = $true; break }
+        if ($l) { Say ('box  ' + $l) 'DarkGray' }
+    }
+    if (-not $made) { throw ('could not make ' + $run + ' on the box. What ssh said is above.') }
+    # The run's own script goes into its folder, so it goes with the folder:
+    # sent the usual way, as a file of its own in the temp folder, a cut
+    # session would leave that file behind instead.
+    $farFile = Join-Path $local 'run.ps1'
+    [IO.File]::WriteAllText($farFile, $farRun, (New-Object Text.UTF8Encoding($true)))
+    Send-ThornswoodArtifactFile $artifact.Zip $target $ssh ($runFar + '/tools.zip')
+    Send-ThornswoodArtifactFile $farFile $target $ssh ($runFar + '/run.ps1')
+    Say ("running $tool on the box, against the $Server server's plugins") 'Cyan'
     $eap = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
-    try { $made = @(Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script "New-Item -ItemType Directory -Force -Path '$run' | Out-Null; 'MADE'" 2>&1 | ForEach-Object { "$_".Trim() }) } finally { $ErrorActionPreference = $eap }
-    if ($made -notcontains 'MADE') { throw ('could not make ' + $run + ' on the box. ssh said: ' + ($made -join ' ')) }
-    Send-ThornswoodArtifactFile $artifact.Zip $target $ssh ($runFar + '/tools.zip')
-    Say ("running $tool on the box, against the $Server server's plugins") 'Cyan'
-    $lines = @(Invoke-ThornswoodArtifactRemote $target $ssh $farRun | ForEach-Object { "$_" })
+    try { $lines = @(Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Bypass -Script ("& '" + $run + "\run.ps1'") | Where-Object { $_ -is [string] } | ForEach-Object { $_.Trim() }) } finally { $ErrorActionPreference = $eap }
     $changed = @()
     $exit = $null
     foreach ($l in $lines) {
@@ -168,8 +187,17 @@ try {
         Say 'the tool wrote nothing under game/ or records/' 'DarkGray'
     }
 } finally {
-    $gone = @(Invoke-ThornswoodArtifactRemote $target $ssh $farClean | ForEach-Object { "$_".Trim() })
-    if ($gone -notcontains 'GONE') { Write-Host ("could not remove $run on the box: " + ($gone -join ' ')) -ForegroundColor Yellow }
+    if ($keeper) {
+        # Closing its input is how the keeper is told the run is over; it
+        # removes the folder and ends. One that has already ended (its session
+        # dropped) has said what it did, and its output is read the same way.
+        if (-not $keeper.HasExited) { $keeper.StandardInput.Close() }
+        $said = @($keeper.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+        $keeper.WaitForExit()
+        if ($made -and $said -notcontains ('GONE ' + $run)) {
+            Write-Host ("$run is still on the box (" + $(if ($said.Count) { $said -join ' ' } else { 'the keeper''s session ended without a word' }) + '). The next run removes it.') -ForegroundColor Yellow
+        }
+    }
     Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue
 }
 Say ('the tool exited ' + $code) $(if ($code -eq 0) { 'Green' } else { 'Yellow' })
