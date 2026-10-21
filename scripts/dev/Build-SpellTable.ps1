@@ -39,7 +39,7 @@
   same record, or if a name had to be resolved by a rule other than the first.
 #>
 param(
-    [string]   $Data     = 'C:\Thornswood\Game\Data',
+    [string]   $Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     [string]   $Book     = '',
     [string]   $Out      = '',
     [string]   $JsOut    = '',

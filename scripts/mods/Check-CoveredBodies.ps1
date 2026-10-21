@@ -68,7 +68,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Game = 'C:\Thornswood\Game',
+    [string]$Game = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game'),
     [switch]$Quiet
 )
 

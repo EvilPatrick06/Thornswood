@@ -118,7 +118,7 @@ param(
     [string]$SiteDir,
     # The install whose config.json names the collection, for the revision
     # Ship-Rules holds loose files against (#1178).
-    [string]$Root = 'C:\Thornswood'
+    [string]$Root = (& (Join-Path $PSScriptRoot 'Where.ps1') Install)
 )
 
 Set-StrictMode -Version Latest

@@ -24,7 +24,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [switch]$Full,
     [switch]$Locked,
     [switch]$NoPause

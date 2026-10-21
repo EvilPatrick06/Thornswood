@@ -27,7 +27,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Data = 'C:\Thornswood\Game\Data',
+  [string]$Data = ((& (Join-Path $PSScriptRoot 'Where.ps1') Install) + '\Game\Data'),
   # A manifest on disk. Without one it asks the game server, which is the copy
   # that is actually deciding whether people get in.
   [string]$Manifest,

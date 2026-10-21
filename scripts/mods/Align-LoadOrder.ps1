@@ -20,14 +20,14 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$Data     = 'C:\Thornswood\Game\Data',
-    [string]$Plugins  = 'C:\Thornswood\Profile\Default\plugins.txt',
+    [string]$Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string]$Plugins  = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt'),
     [string]$Settings = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerSettings),
     [switch]$Fix,
     # Other plugin lists -Fix also edits, beside the two names next to -Plugins.
     # The launcher's LocalAppData copy by default; a test passes @() so nothing
     # outside its scratch folder is written.
-    [string[]]$AlsoFix = @('C:\Thornswood\Profile\LocalAppData\Plugins.txt')
+    [string[]]$AlsoFix = @(((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\LocalAppData\Plugins.txt'))
 )
 $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
