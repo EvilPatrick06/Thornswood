@@ -28064,6 +28064,144 @@ function handEnchantSlots(actorId, state) {
   }
 }
 
+/*
+  WHAT SOMEBODY CANNOT MAKE IS NOT LISTED (#613).
+
+  Patrick, reporting the forge on 25 September: "It should only show if you
+  can craft it with your level+half+race". The crafting menu is Skyrim's own
+  (SkyUI draws it), and it lists every recipe whose workbench keyword is the
+  bench's and whose own conditions pass, on the machine in front of the
+  person. Nothing about a profession, a half, a rank, a roll or a race is on
+  that machine, so the menu listed every row of RECIPES_BY_ID to everybody
+  and craftAnswer refused most of them once picked: a list made mostly of
+  things the person would be told no to.
+
+  THE ANSWER IS THE GATE'S, ASKED AHEAD. For every row craftAnswer refuses
+  this person, the client takes that recipe's workbench keyword off the
+  record in its own game (SKSE's ConstructibleObject.SetWorkbenchKeyword), so
+  no bench lists it, and puts the keyword back when the answer changes. One
+  question decides both what is listed and what is made, so the two cannot
+  disagree. The server's records are untouched and the craft gate is still
+  the gate: a client that listed everything is refused exactly as before.
+
+  Asked whenever the character is written (writeState: a profession, a half,
+  a rank, a Master taking somebody on or letting them go), at spawn, and when
+  somebody goes onto or off a roll. A recipe nobody owns is not in the table
+  and stays listed for everybody.
+
+  The value is { at, files: { plugin: 'hex,hex,...' } }, the refused rows by
+  plugin, and it is written only when the list changes. updateOwner runs
+  every frame, so the script acts on a new stamp only, and spreads the
+  records over frames (RECIPES_PER_FRAME): a character with no profession is
+  refused every owned row, and two thousand records in one frame is a stall.
+*/
+var RECIPES_HIDDEN_PROPERTY = 'thornswoodRecipesHidden';
+var RECIPES_PER_FRAME = 150;
+
+function recipesHiddenScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    var st = ctx.state;',
+    '    if (!st || !v || typeof v !== "object" || !v.files) { return; }',
+    '    var sp = ctx.sp;',
+    '    var own = Object.prototype.hasOwnProperty;',
+    // What each hidden recipe's keyword was, by "hex:plugin", so it can go back.
+    '    if (!st.thornswoodRecipesBench) { st.thornswoodRecipesBench = {}; }',
+    '    var put = st.thornswoodRecipesBench;',
+    '    if (st.thornswoodRecipesAt !== v.at) {',
+    '      st.thornswoodRecipesAt = v.at;',
+    '      var want = {};',
+    '      for (var f in v.files) {',
+    '        if (!own.call(v.files, f)) { continue; }',
+    '        var ids = String(v.files[f] || "").split(",");',
+    '        for (var i = 0; i < ids.length; i++) { if (ids[i]) { want[ids[i] + ":" + f] = true; } }',
+    '      }',
+    '      var todo = [];',
+    '      for (var k in want) { if (!own.call(put, k)) { todo.push(k); } }',
+    '      for (var h in put) { if (own.call(put, h) && !want[h]) { todo.push(h); } }',
+    '      st.thornswoodRecipesWant = want;',
+    '      st.thornswoodRecipesTodo = todo;',
+    '    }',
+    '    var queue = st.thornswoodRecipesTodo;',
+    '    if (!queue || !queue.length) { return; }',
+    '    var wanted = st.thornswoodRecipesWant || {};',
+    '    for (var n = 0; queue.length && n < ' + RECIPES_PER_FRAME + '; n++) {',
+    '      var key = queue.pop();',
+    '      var at = key.indexOf(":");',
+    '      var cobj = null;',
+    '      try { cobj = sp.ConstructibleObject.from(sp.Game.getFormFromFile(parseInt(key.slice(0, at), 16), key.slice(at + 1))); } catch (e) { cobj = null; }',
+    // A plugin this game does not have lists nothing, so there is nothing to hide.
+    '      if (!cobj) { continue; }',
+    '      if (wanted[key] && !own.call(put, key)) {',
+    '        var kw = cobj.getWorkbenchKeyword();',
+    '        put[key] = kw ? kw.getFormID() : 0;',
+    '        cobj.setWorkbenchKeyword(null);',
+    '      } else if (!wanted[key] && own.call(put, key)) {',
+    '        var was = put[key];',
+    '        cobj.setWorkbenchKeyword(was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null);',
+    '        delete put[key];',
+    '      }',
+    '    }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(RECIPES_HIDDEN_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: recipesHiddenScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/**
+ * Every row of the recipe table that craftAnswer refuses this person, by
+ * plugin: { 'Skyrim.esm': 'f6f2a,dd97a', ... }. The kept dwarven smelt is a
+ * row too (craftRow), so it is asked with the rest.
+ */
+function recipesRefused(actorId) {
+  var lists = {};
+  var tables = [RECIPES_BY_ID, KEPT_SMELT];
+  for (var t = 0; t < tables.length; t++) {
+    var table = tables[t];
+    for (var desc in table) {
+      if (!Object.prototype.hasOwnProperty.call(table, desc)) { continue; }
+      var row = table[desc];
+      if (!row || typeof row !== 'object') { continue; }
+      var at = desc.indexOf(':');
+      if (at <= 0) { continue; }
+      if (!craftAnswer(actorId, row).refusal) { continue; }
+      var file = desc.slice(at + 1);
+      (lists[file] = lists[file] || []).push(desc.slice(0, at));
+    }
+  }
+  var files = {};
+  for (var f in lists) {
+    if (Object.prototype.hasOwnProperty.call(lists, f)) { files[f] = lists[f].join(','); }
+  }
+  return files;
+}
+
+/** Hand the owner the recipes they cannot make, when the list has changed. */
+function handRecipesHidden(actorId) {
+  var files = recipesRefused(actorId);
+  var had = null;
+  try { had = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { had = null; }
+  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files)) { return; }
+  try {
+    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files });
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed the recipes they cannot make:', e);
+  }
+}
+
 function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
@@ -45746,7 +45884,18 @@ module.exports = {
       elog('could not write', file + ':', e);
       return false;
     }
+    var was = reg[roll];
     reg = next;
+    /*
+      A roll's gear is listed in the crafting menu only for somebody on that
+      roll (#613), so whoever went on or came off is handed the list again.
+    */
+    if (typeof handRecipesHidden === 'function') {
+      var moved = was.concat(list).map(function (r) { return r.actor; }).filter(function (a, i, all) {
+        return all.indexOf(a) === i && !rowIn(was, a) !== !rowIn(list, a);
+      });
+      for (var m = 0; m < moved.length; m++) { handRecipesHidden(moved[m]); }
+    }
     return true;
   }
 
@@ -47173,7 +47322,6 @@ module.exports = {
     3: [['novice', 92], ['master', 8]],
     4: [['novice', 70], ['master', 30]]
   };
-  var PROP = 'thornswoodDungeonLoot';
   var GOLD_DESC = 'f:Skyrim.esm';
   if(g.__thornswoodDungeonLoot && g.__thornswoodDungeonLoot.shutdown) g.__thornswoodDungeonLoot.shutdown();
   var active=true,storage=null,ledger=null;
@@ -47187,8 +47335,6 @@ module.exports = {
       for(var key of Object.keys(ledger.entries)) {
         var saved=ledger.entries[key];
         if(!/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(key)) throw new Error('Invalid dungeon reward identity');
-        if(saved && saved.legacy===true && Number.isSafeInteger(saved.at) && saved.at>0 &&
-            Object.keys(saved).length===2) continue;
         if(saved && saved.kind==='body') {
           if(!Number.isSafeInteger(saved.at) || saved.at<=0 || typeof saved.taken!=='boolean' ||
             !Number.isInteger(saved.gold) || saved.gold<0 || saved.gold>6 ||
@@ -47853,17 +47999,6 @@ module.exports = {
     try {reference=mp.getDescFromId(refrId);} catch(error) {return null;}
     if(typeof reference!=='string' || !/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(reference)) return null;
     var prior=ledger.entries[reference],last=prior ? prior.at : 0;
-    if(!prior) {
-      var legacy=0;
-      try {legacy=mp.get(refrId,PROP);} catch(error) {return null;}
-      if(legacy!==null && legacy!==undefined && legacy!==0) {
-        if(!Number.isSafeInteger(legacy) || legacy<=0) return null;
-        var migrated=JSON.parse(JSON.stringify(ledger));
-        migrated.entries[reference]={at:legacy,legacy:true};
-        try {storage.save(migrated);} catch(error) {return null;}
-        ledger=migrated;last=legacy;
-      }
-    }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
     var boss = BOSS_WORD.test(baseName);
@@ -47871,11 +48006,11 @@ module.exports = {
       boss ? { secondExclusive: tier === 4 } : null);
     var next=JSON.parse(JSON.stringify(ledger));
     next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
-    // Reserve durably before touching inventory. An uncertain native write
-    // cannot be replayed by reopening, reload or loss of its cooldown mirror.
+    // Reserve durably before touching inventory. The ledger is the only
+    // record of when a chest paid, so an uncertain inventory write cannot be
+    // replayed by reopening or reload.
     try {storage.save(next);} catch(error) {console.log('[dungeon] reservation failed: '+error);return null;}
     ledger=next;
-    try {mp.set(refrId,PROP,now);} catch(error) {console.log('[dungeon] cooldown mirror failed: '+error);}
     if (!give(actorId, rolled)) return null;
     var line = heldLine(rolled);
     if (line) {
@@ -48130,7 +48265,7 @@ module.exports = {
     var next = JSON.parse(JSON.stringify(ledger));
     Object.keys(next.entries).forEach(function (key) {
       var e = next.entries[key];
-      if (e && e.kind !== 'body' && e.legacy !== true && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
+      if (e && e.kind !== 'body' && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
     });
     if (!c.chests) { return { counts: c, saved: true }; }
     try { storage.save(next); } catch (error) {
@@ -48163,8 +48298,7 @@ module.exports = {
     GOLD_DESC: GOLD_DESC,
     TOME_CHANCE: TOME_CHANCE,
     EXCL_CHANCE: EXCL_CHANCE,
-    GOODS_CHANCE: GOODS_CHANCE,
-    PROP: PROP
+    GOODS_CHANCE: GOODS_CHANCE
   };
 })();
 // ==== end thornswood dungeon loot ====
@@ -50577,6 +50711,8 @@ return module.exports;
     // Twin Souls is a second enchantment slot in the menu (#1389). It lives
     // beside the craft gate, outside this block, the way spellOn does.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And what the crafting menu lists, from the same answer the craft gate gives (#613).
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return s;
   }
 
@@ -50822,6 +50958,9 @@ return module.exports;
     // And the second enchantment slot Twin Souls gives (#1389): a session
     // starts from a save with no perks on it.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And the recipes the crafting menu leaves out (#613): a session starts
+    // from a game whose records list every one.
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return n;
   }
 
@@ -77139,7 +77278,7 @@ module.exports.orchardPlots = ORCHARD_PLOTS;
 module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
 module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"2f3f1435fa0d0587d21be00fe405b0f3898b302f73a66f82eb7cf4ca03792f88","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"2f3f1435fa0d0587d21be00fe405b0f3898b302f73a66f82eb7cf4ca03792f88","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
 module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };

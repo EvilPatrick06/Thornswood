@@ -460,8 +460,8 @@
     },
     {
       "path": "game/content/Thornswood-Content.esp",
-      "sha256": "2f3f1435fa0d0587d21be00fe405b0f3898b302f73a66f82eb7cf4ca03792f88",
-      "what": "Thornswood's own plugin, 272,098 bytes on 21 Oct (#1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
+      "sha256": "fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf",
+      "what": "Thornswood's own plugin, 272,393 bytes on 21 Oct (#2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
       "published": "Every pack and the installer on both channels, and Nexus Mods mod 192001 through the collection",
       "source": "Remade under #2553 (Patrick, 15 Oct, option B on #2177): the salvaged keywords, stations, charcoal and recipes are written from Thornswood's rulebook and pointers to Bethesda's own records; the other server's placements, its 57 of Thornswood's stations included (Patrick, 16 Oct, A on #2553), and its changes to Skyrim's own placements are gone.",
       "creator": "Thornswood (scripts/mods/Add-ContentRecords.py and scripts/dev/Build-StationSites.py)",
@@ -685,15 +685,27 @@
       "issue": 2177
     },
     {
+      "path": "Data\\Platform\\UI\\dc3cbd21104d40477da6.ttf",
+      "what": "Barlow SemiBold, in the skymp5-front build every Ship makes from the fork since 20 Oct 2026 (#2931): the face that build draws the rest of its text in, in place of DIN Pro.",
+      "published": "Every pack and the installer made since 20 Oct 2026",
+      "source": "The fork's skymp5-front\\src\\fonts\\Barlow-SemiBold.ttf (fork #40, 9 Oct 2026, for #1317), from google/fonts 2eb0b48d; 108,348 bytes, sha256 86577cb3, as records\\front-build.json records it",
+      "creator": "Jeremy Tribby (Tribby Type) and the Barlow Project Authors, https://github.com/jpt/barlow, version 1.408, by the file's own name table",
+      "licence": "OFL-1.1, by the file's licence field ('This Font Software is licensed under the SIL Open Font License, Version 1.1.'); the fork keeps the full text beside it as skymp5-front\\src\\fonts\\OFL.txt",
+      "attribution": "Keep the font's notice; named on the public credits page",
+      "approved": "Not needed: an open licence",
+      "evidence": "The font's name table, read 21 Oct (#421); records\\front-build.json; THIRD-PARTY.md, SkyMP's interface, built from the fork.",
+      "status": "cleared"
+    },
+    {
       "path": "Data\\Platform\\UI\\ (the other files build.js names by hash)",
       "what": "The skymp5-front build's sounds and pictures. 26 of build.js's files are byte for byte upstream's skymp5-front\\src; Ship parses the names from build.js at pack time (#1318).",
       "published": "Every pack and the installer",
-      "source": "Upstream SkyMP skymp5-front, build commit not recorded",
+      "source": "Since 20 Oct 2026 (#2931) the fork's skymp5-front at the pin, recorded in records\\front-build.json; main's releases from before then carry upstream SkyMP's skymp5-front, build commit not recorded",
       "creator": "Upstream SkyMP and the authors it bundles",
       "licence": "GPL-3.0, as build.js (skymp5-front's package.json)",
       "attribution": "The source offer, THIRD-PARTY.md Where the source is",
       "approved": "not recorded",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP and What is still missing (build.js has no recorded source commit).",
+      "evidence": "THIRD-PARTY.md, From upstream SkyMP, SkyMP's interface, built from the fork, and What is still missing (main's older build.js has no recorded source commit).",
       "status": "cleared"
     },
     {
