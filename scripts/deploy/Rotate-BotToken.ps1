@@ -28,8 +28,12 @@
     1. Asks for the new token at a prompt, hidden, never as a parameter and
        never as a word on a command line, and checks it looks like a bot token
        before anything leaves this machine.
-    2. Sends the writer up, then the token inside a base64 payload, the same way
-       Install-Bot.ps1 and Set-DiscordLogin.ps1 always have.
+    2. Sends the writer's text inline with the script that calls it, and the
+       token on ssh's standard input after it, the same way Install-Bot.ps1
+       and Set-DiscordLogin.ps1 do. Nothing is written on the box but the two
+       files the token goes into (#3035: until 21 Oct 2026 the writer went up
+       as a file of its own in C:\Windows\Temp first, and a run cut before
+       the next call left it there).
     3. Writes both files, reads both back, and refuses a token for a different
        application than the one they hold (-AnyApplication, only when moving to
        a new application on purpose).
@@ -66,38 +70,30 @@ $ErrorActionPreference = 'Stop'
 $ssh = @('-o','BatchMode=yes','-o','StrictHostKeyChecking=yes')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-. (Join-Path $Here '..\vps\Vps.ps1')
 . (Join-Path $Here '..\vps\Send-Secret.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $writer = Join-Path $Here '..\vps\Write-BotToken.ps1'
 . $writer
+$writerText = [IO.File]::ReadAllText($writer)
 
 $botWin  = $BotRoot.Replace('/','\')
 $docsWin = $DocsRoot.Replace('/','\')
 $envFile = $botWin + '\bot.env.json'
 $cfgFile = $docsWin + '\config.json'
-# A name of its own each run, so two at once cannot remove each other's (#1070).
-$far     = 'C:/Windows/Temp/thornswood-write-bottoken-' + [Guid]::NewGuid().ToString('N') + '.ps1'
-$farWin  = $far.Replace('/','\')
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Host ('-' * $m.Length) -ForegroundColor DarkGray }
 function Done([int]$code) { Write-Host ''; if (-not $NoPause) { [void](Read-Host 'Enter to close') }; exit $code }
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Done 1 }
 
-# The remote scripts here are short on purpose: the writer goes up as a file
-# first, so what goes on the command line is a few lines. The token itself goes
-# on ssh's standard input (Send-Secret.ps1, issue #451), so it is on no command
-# line and in no file on either machine. Until then it went base64'd inside
-# the command line, which a comment here called never a word on one.
+# Every remote script here starts with the writer's own text, so the box
+# never holds a copy of it (#3035), and is sent the way every script here is
+# (Send-Script.ps1): too long for a command line, so on ssh's standard input.
+# The token goes on standard input too, after the script (Send-Secret.ps1,
+# issue #451), so it is on no command line and in no file on either machine.
 function Remote($script) {
-  $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
-  # Bypass, because the script dot-sources the writer from a file, and a file
-  # is what an execution policy looks at.
-  $cmd = "powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e"
-  if ($cmd.Length -gt 8000) { throw 'the remote script is too long for one command line' }
-  return Invoke-ThornswoodNative { & ssh @ssh "$User@$Vps" $cmd } 2>&1
+  return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
 function Show($lines) {
@@ -110,26 +106,17 @@ function Show($lines) {
   }
 }
 
-function SendWriter {
-  Invoke-ThornswoodNative { & scp @ssh $writer "${User}@${Vps}:$far" } 2>&1 | Out-Null
-  if ($LASTEXITCODE -ne 0) { Die "could not send Write-BotToken.ps1 to $Vps. Is the VPS key set up? .\scripts\vps\Setup-SshKey.ps1 -Test" }
-}
-
 Write-Host ''
 Write-Host '  THORNSWOOD  -  rotate the bot token' -ForegroundColor White
 
 # ---------------------------------------------------------------- check ---
 if ($Check) {
   Head 'What the VPS holds now'
-  SendWriter
-  $out = Remote @"
+  $out = Remote ($writerText + "`n" + @"
 `$ErrorActionPreference = 'Continue'
-try {
-  . '$farWin'
-  if (-not (Get-Command Get-ThornswoodBotTokenState -EA SilentlyContinue)) { 'CANNOT READ: Write-BotToken.ps1 did not load on the VPS'; return }
-  Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
-} finally { Remove-Item -LiteralPath '$farWin' -Force -EA SilentlyContinue }
-"@
+if (-not (Get-Command Get-ThornswoodBotTokenState -EA SilentlyContinue)) { 'CANNOT READ: Write-BotToken.ps1 did not load on the VPS'; return }
+Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
+"@)
   Show $out
   Say ''
   Say '  Read only. Nothing was written and nothing was restarted.' 'DarkGray'
@@ -161,31 +148,27 @@ if ($AnyApplication) { $any = ' -AnyApplication' }
 
 # --------------------------------------------------------------- write ---
 Head 'Writing both files, then restarting the bot and the site'
-SendWriter
 # The token goes on ssh's standard input and arrives as $ThornswoodSecret.
-$out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Bypass -Secret $token -Script @"
+$out = Invoke-ThornswoodSecretRemote -Target "$User@$Vps" -SshArgs $ssh -Secret $token -Script ($writerText + "`n" + @"
 `$ErrorActionPreference = 'Continue'
-try {
-  . '$farWin'
-  if (-not (Get-Command Write-ThornswoodBotToken -EA SilentlyContinue)) {
-    'NOT WRITTEN: Write-BotToken.ps1 did not load on the VPS. Nothing changed.'
-    return
-  }
-  `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
-  if (-not `$t) { 'NOT WRITTEN: nothing arrived on standard input. Nothing changed.'; return }
-  `$r = Write-ThornswoodBotToken -Token `$t -BotEnv '$envFile' -SiteConfig '$cfgFile'$any
-  `$t = `$null
-  `$r.Lines
-  if (`$r.Ok) {
-    '--- the bot ---'
-    Restart-ThornswoodBot -Root '$botWin' -Service '$BotService'
-    '--- the site ---'
-    Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
-  }
-  '--- on the disk now ---'
-  Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
-} finally { Remove-Item -LiteralPath '$farWin' -Force -EA SilentlyContinue }
-"@
+if (-not (Get-Command Write-ThornswoodBotToken -EA SilentlyContinue)) {
+  'NOT WRITTEN: Write-BotToken.ps1 did not load on the VPS. Nothing changed.'
+  return
+}
+`$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
+if (-not `$t) { 'NOT WRITTEN: nothing arrived on standard input. Nothing changed.'; return }
+`$r = Write-ThornswoodBotToken -Token `$t -BotEnv '$envFile' -SiteConfig '$cfgFile'$any
+`$t = `$null
+`$r.Lines
+if (`$r.Ok) {
+  '--- the bot ---'
+  Restart-ThornswoodBot -Root '$botWin' -Service '$BotService'
+  '--- the site ---'
+  Restart-ThornswoodSite -Root '$docsWin' -Task '$SiteTask'
+}
+'--- on the disk now ---'
+Get-ThornswoodBotTokenState -BotEnv '$envFile' -SiteConfig '$cfgFile'
+"@)
 $token = $null
 Show $out
 

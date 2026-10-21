@@ -6,6 +6,12 @@
   tests\test-2899-run-on-box.ps1 runs the same text under Windows PowerShell
   5.1 against a stand-in folder. Defines functions and nothing else.
 
+  The keeper's folder is the one way a script here lands files on the box or
+  makes them there to bring back (#3035): Open-ThornswoodOnBoxFolder and
+  Close-ThornswoodOnBoxFolder, below, for Run-OnBox.ps1 and Backup-Server.ps1
+  alike. A script that only needs its text run there sends it on ssh's
+  standard input instead (Send-Script.ps1), and writes nothing.
+
   The far side runs under Windows PowerShell 5.1: ASCII, and .NET for the
   hashes, not Get-FileHash (ServerContent.ps1 says why).
 #>
@@ -47,6 +53,20 @@ function Set-ThornswoodArchiveReadOnly([string]$Path) {
 '@
 }
 
+# Text for the box: names the run's folder $run and holds it through its lock
+# for as long as the process that runs this lives. The folder is in use while
+# its lock is held (the keeper, below), and a run holds it too, so even with
+# the keeper's session gone no other run's sweep takes the folder from under
+# what is running in it. The handle goes when the process ends, however it
+# ends. A folder no keeper made has no lock, and nothing runs in it.
+function Get-ThornswoodOnBoxHoldScript([Parameter(Mandatory = $true)][string]$Run) {
+    return @"
+`$run = '$Run'
+try { `$hold = New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite') }
+catch { 'STOP. the run''s folder could not be held through its lock, so nothing ran: ' + `$_.Exception.GetBaseException().Message; exit 2 }
+"@
+}
+
 # -Run is the run's own folder on the box, holding tools.zip; -ServerRoot the
 # game server whose plugins folder is copied; -Tool the repository path of
 # the Python tool; -Arguments what it is run with, '{data}' and '{repo}'
@@ -63,13 +83,7 @@ function Get-ThornswoodOnBoxScript {
     return @"
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
-`$run = '$run'
-# The run's folder is in use while its lock is held (the keeper, below), and
-# this holds it too for as long as the tool runs, so even with the keeper's
-# session gone no other run's sweep takes the folder from under the tool. The
-# handle goes when this process ends, however it ends.
-try { `$hold = New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite') }
-catch { 'STOP. the run''s folder could not be held through its lock, so nothing ran: ' + `$_.Exception.GetBaseException().Message; exit 2 }
+$(Get-ThornswoodOnBoxHoldScript -Run $Run)
 `$repo = Join-Path `$run 'repo'
 `$data = Join-Path `$run 'data'
 `$plugins = '$serverRoot\plugins'
@@ -218,4 +232,41 @@ Say ('MADE ' + `$run)
 `$own.Dispose()
 Drop `$run
 "@
+}
+
+# A folder of its own on the box for one run, held by its keeper for as long
+# as the keeper's ssh session lives (above). Needs Send-Script.ps1 loaded.
+# Hands back Run (the folder, Windows form), Far (with forward slashes, for
+# scp), Made, Keeper (the ssh process) and Said (what the keeper's sweep of
+# earlier folders said before MADE). Made false means there is no folder: the
+# caller stops, and still hands this to Close-ThornswoodOnBoxFolder.
+function Open-ThornswoodOnBoxFolder {
+    param(
+        [Parameter(Mandatory = $true)][string]$Target,
+        [string[]]$SshArgs = @()
+    )
+    $run = 'C:\Windows\Temp\thornswood-onbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+    # The keeper first: it removes what earlier runs left, then makes this
+    # run's folder and holds it until its input is closed.
+    $keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run)
+    $said = @()
+    $made = $false
+    while ($null -ne ($l = $keeper.StandardOutput.ReadLine())) {
+        $l = $l.Trim()
+        if ($l -eq ('MADE ' + $run)) { $made = $true; break }
+        if ($l) { $said += $l }
+    }
+    return [pscustomobject]@{ Run = $run; Far = $run.Replace('\', '/'); Made = $made; Keeper = $keeper; Said = $said }
+}
+
+# Tells the keeper the run is over: closing its input is how it is told, and
+# it removes the folder and ends. One that has already ended (its session
+# dropped) has said what it did, and its output is read the same way. Hands
+# back Gone (the folder is not on the box) and Said (the keeper's last lines).
+function Close-ThornswoodOnBoxFolder([Parameter(Mandatory = $true)]$Folder) {
+    $k = $Folder.Keeper
+    if (-not $k.HasExited) { $k.StandardInput.Close() }
+    $said = @($k.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $k.WaitForExit()
+    return [pscustomobject]@{ Gone = ((-not $Folder.Made) -or ($said -contains ('GONE ' + $Folder.Run))); Said = $said }
 }
