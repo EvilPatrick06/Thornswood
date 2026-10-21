@@ -507,7 +507,18 @@ jobs:
           # harness on its first lines off Windows, and asking Get-Command for
           # powershell.exe let a Windows machine without it skip or run pwsh
           # instead. A few seconds.
+          # Issue #2821: eighteen harnesses compiled launcher and setup code
+          # with Add-Type or a CSharpCodeProvider, C# 5 under Windows
+          # PowerShell and .NET 8's libraries under pwsh, never what the build
+          # compiles; they call Add-LauncherType (tests\Launcher-Csc.ps1) now
+          # and run here, so the build's compiler proves them on every pull
+          # request. tests\test-2821-launcher-compiler.ps1 fails on a harness
+          # that compiles launcher code any other way. Seconds each.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+                 'test-2821-launcher-compiler.ps1', 'test-feed-notice.ps1', 'test-prior-acceptance.ps1', 'test-setup-own-folder.ps1',
+                 'test-skyrim-pin.ps1', 'test-mustcopy-distribution.ps1', 'test-browser-args.ps1', 'test-installer-own-payload.ps1',
+                 'test-load-order.ps1', 'test-log-upload.ps1', 'test-no-bethesda-files.ps1', 'test-payload-hash.ps1',
+                 'test-setup-in-window.ps1', 'test-voice-ticket.ps1', 'test-swallow.ps1', 'test-setup-agreements.ps1', 'test-downgrade-asks.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',

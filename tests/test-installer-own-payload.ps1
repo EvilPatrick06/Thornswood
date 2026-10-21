@@ -14,7 +14,9 @@
   download is checked against its SHA-256 (test-payload-hash.ps1); a loose zip
   never was.
 
-  This compiles the real Locate out of Bootstrap.cs and gives it a stand-in
+  This compiles the real Locate out of Bootstrap.cs, with the compiler the
+  build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821; off Windows it
+  says SKIP, the build's compiler is only there), and gives it a stand-in
   installer with old zips beside it, with and without a payload attached, and
   reads Work and ShowWhatWasFound for where the payload can come from.
   Pointed at the file before the fix, the loose zip checks fail:
@@ -32,6 +34,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $BootstrapPath) { $BootstrapPath = Join-Path $Here 'installer\setup\Bootstrap.cs' }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -142,9 +145,14 @@ $(($members -join "`n`n").Replace('new Payload', 'new ThornswoodOwnPayload_Paylo
 }
 "@
 $compiled = $false
-try { Add-Type -TypeDefinition $cs -Language CSharp; $compiled = $true }
-catch { Write-Host ("      " + $_.Exception.Message) }
-Yes 'Locate compiles as it is in Bootstrap.cs' $compiled
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the real Locate, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+}
+else {
+    try { $null = Add-LauncherType -Source $cs; $compiled = $true }
+    catch { Write-Host ("      " + $_.Exception.Message) }
+    Yes 'Locate compiles as it is in Bootstrap.cs, with the compiler the build runs' $compiled
+}
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-own-payload-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work -Force | Out-Null

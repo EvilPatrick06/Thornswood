@@ -12,14 +12,18 @@
     1. Rules is 6 and the history comment names Distribution redistributables,
        so every folder made under 5 refreshes once.
     2. MustCopy, ClientFile, ClientFiles, CopyTypes, Masters and Generated,
-       lifted from launcher\app\OwnGame.cs and compiled, over files.txt-shaped
+       lifted from launcher\app\OwnGame.cs and compiled with the compiler the
+       build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821), over
+       files.txt-shaped
        inputs: the 68 Distribution rows marked V come out linked; the two
        recorded Distribution paths come out copied whether or not they are in
        the deployed set; other Data\Platform paths stay copied.
     3. On this machine, where Profile\OwnGame\files.txt exists, the real 68
        Distribution V rows are asked the same way.
 
-  Read only apart from Add-Type in this process.
+  Read only apart from the compiled dll, under the temp folder and removed
+  once loaded. Off Windows, 2 and 3 say SKIP: the build's compiler is only
+  there.
 #>
 [CmdletBinding()]
 param(
@@ -32,6 +36,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
 if (-not $AppPath) { $AppPath = Join-Path $Repo 'launcher\app' }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -151,6 +156,10 @@ foreach ($k in @($lifted.Keys)) {
     Yes "lifted $k from OwnGame.cs" ([bool]$lifted[$k])
 }
 if (@($lifted.Values | Where-Object { -not $_ }).Count -gt 0) { Done }
+if (-not $OnWindows) {
+    Write-Host 'SKIP  2 and 3, MustCopy and its helpers compiled and asked: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Done
+}
 
 $ns = 'MustCopyDist_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
 $cs = @"
@@ -171,15 +180,12 @@ namespace $ns {
 }
 "@
 $compiled = $true
-try {
-    if ($PSVersionTable.PSEdition -eq 'Core') { Add-Type -TypeDefinition $cs -Language CSharp }
-    else { Add-Type -TypeDefinition $cs -Language CSharp -ReferencedAssemblies 'System.Core' }
-} catch {
+try { $null = Add-LauncherType -Source $cs }
+catch {
     $compiled = $false
     Write-Host ('      ' + $_.Exception.Message)
-    if ($_.Exception.InnerException) { Write-Host ('      ' + $_.Exception.InnerException.Message) }
 }
-Yes 'MustCopy and its helpers compile as lifted' $compiled
+Yes 'MustCopy and its helpers compile as lifted, with the compiler the build runs' $compiled
 if (-not $compiled) { Done }
 
 $T = [type]("$ns.OwnGame")
