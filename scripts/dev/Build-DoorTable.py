@@ -62,7 +62,7 @@ import bsa
 import own_plugins
 
 COMPRESSED = 0x00040000
-MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
+MASTERS = own_plugins.MASTERS
 
 # A cell is an interior when bit 0 of its DATA flags is set. Everything else is
 # a piece of a worldspace.
@@ -236,15 +236,7 @@ def main():
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 
-    order = list(MASTERS)
-    for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if line.startswith('*'):
-            line = line[1:]
-        if line not in order:
-            order.append(line)
+    order = own_plugins.load_order(args.plugins)
     missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d plugin(s) are not in %s: %s'

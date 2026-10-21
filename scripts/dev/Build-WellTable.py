@@ -139,23 +139,15 @@ def main():
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     args = ap.parse_args()
 
-    order = list(dt.MASTERS)
-    for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if line.startswith('*'):
-            line = line[1:]
-        if line not in order:
-            order.append(line)
+    order = own_plugins.load_order(args.plugins)
     missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
-        # Said, written into wells.json, and skipped: a plugin that is not on
-        # this machine cannot be read, and the table says so rather than
-        # pretending it was.
-        print('NOTE. %d plugin(s) in plugins.txt are not in %s, skipped: %s'
-              % (len(missing), args.data, ', '.join(missing)))
-        order = [n for n in order if n not in missing]
+        # The game loads every plugin of the load order, so a table built
+        # without one describes a load order nobody runs. Until #2976 this
+        # skipped them, because the order then held switched off lines too.
+        print('STOP. %d plugin(s) are not in %s: %s'
+              % (len(missing), args.data, ', '.join(missing[:6])))
+        return 1
 
     # Two passes, as the door table: the bases first, then the placements.
     bases, seen, placed = {}, {}, {}
@@ -191,7 +183,6 @@ def main():
         json.dump({
             'builtBy': 'scripts\\dev\\Build-WellTable.py',
             'source': 'the STAT and placed REFR records of %d plugins in load order' % len(order),
-            'skipped': missing,
             'rule': 'Patrick, 12 Oct 2026 (#1382): every vanilla well object placed in towns, '
                     'farms and camps counts, and well water is safe without boiling.',
             'wells': WELLS, 'notWells': NOT_WELLS,
