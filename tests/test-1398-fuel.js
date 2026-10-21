@@ -150,25 +150,24 @@ const pieces = {
   handle: lineOf(/^const HANDLE_DESC = .*$/m),
   tools: slice(gm, 'const TOOLS = {', '\n};'),
   key: lineOf(/^const KEY_RECIPE = .*$/m),
-  after: lineOf(/^const MASTER_CRAFT_AFTER_MS = .*$/m),
   fns: ['function idOf(descriptor)', 'function mintedEntry(entry)', 'function takeItem(actorId, itemDesc, count)', 'function addItem(actorId, itemDesc, count)',
         'function craftRow(recipeDesc)', 'function fuelFor(recipeDesc)', 'function packCount(actorId, itemDesc)',
         'function charcoalHeld(actorId, grade)', 'function fuelRefusal(fuel)', 'function wantsAHandle(row)',
-        'function holdsPerk(actorId, key)', 'function wovenMark(actorId)', 'function markWoven(actorId, outDesc, name, n)',
-        'function masterCraft(actorId, row, count)', 'function cookedOutput(actorId, row)',
+        'function holdsPerk(actorId, key)', 'function wovenMark(actorId)',
+        'function wovenOutput(actorId, row)', 'function cookedOutput(actorId, row)',
         'function unfitToMake(actorId, workbenchId)'].map(cut),
   onCraft: slice(gm, "mp.onCraft = guard('onCraft', function (actorId, craftedItemBaseId, count, recipeId, workbenchId, effects) {", '\n});\n')
 };
 yes('the craft pieces are all in the gamemode',
-    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key && !!pieces.after &&
+    !!pieces.grades && !!pieces.hafted && !!pieces.handle && !!pieces.tools && !!pieces.key &&
     pieces.fns.every(function (f) { return !!f; }) && !!pieces.onCraft);
 
 /*
   The rig: one pack per person, every descriptor its own number, a recipe id
-  that is the descriptor's number, and the timers caught so a test can run
-  them once the craft has landed. craftOutput is the engine's property inside
-  onCraft (fork #92, #2906): what the craft gives, which the handler may name,
-  and what lands is what it names.
+  that is the descriptor's number, and any timer the craft sets caught, so a
+  test can say none was (#3026). craftOutput is the engine's property inside
+  onCraft (fork #92, #2906, and fork #93 for the name): what the craft gives,
+  which the handler may name, and what lands is what it names, as one entry.
 */
 function craftRig(state) {
   const ids = {}, descs = {};
@@ -189,7 +188,10 @@ function craftRig(state) {
     },
     set: function (a, key, v) {
       if (key === 'inventory') { packs[a] = v.entries.map(function (e) { return Object.assign({}, e); }); }
-      if (key === 'craftOutput' && output) { output = Object.assign({}, output, v); }
+      if (key === 'craftOutput' && output) {
+        output = Object.assign({}, output, v);
+        if (output.name === null) { delete output.name; }
+      }
     },
     onCraft: null
   };
@@ -199,7 +201,7 @@ function craftRig(state) {
     __thornswoodNeeds: { NEEDS: { wear: { woven: { degrees: 4, mark: 'Master-Woven ' } } } },
     __thornswoodManeuvers: { WOVEN: WOVEN }
   };
-  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key, pieces.after]
+  const body = [pieces.grades, fuelLine[0], pieces.hafted, pieces.handle, pieces.tools, pieces.key]
     .concat(pieces.fns).join('\n') + '\n' + pieces.onCraft + '\nreturn mp.onCraft;';
   const onCraft = new Function('mp', 'globalThis', 'ITEMS', 'RECIPES_BY_ID', 'KEPT_SMELT', 'guard', 'notify', 'say', 'log',
     'setTimeout', 'recipelessCraft', 'craftAnswer', 'creditWork', body)(
@@ -210,19 +212,24 @@ function craftRig(state) {
     function (a, half) { credited.push(half); return ''; });
   const A = 0xff000001;
   return {
-    A: A, packs: packs, said: said, credited: credited,
+    A: A, packs: packs, said: said, credited: credited, timers: timers,
     give: function (desc, n, extra) { (packs[A] = packs[A] || []).push(Object.assign({ baseId: id(desc), count: n }, extra || {})); },
     count: function (desc) {
       return (packs[A] || []).filter(function (e) { return e.baseId === id(desc); }).reduce(function (t, e) { return t + e.count; }, 0);
     },
     entries: function (desc) { return (packs[A] || []).filter(function (e) { return e.baseId === id(desc); }); },
     // What the engine does after an allowed craft: the output lands, what
-    // craftOutput names, the recipe's own unless the handler named another.
+    // craftOutput names, the recipe's own unless the handler named another,
+    // under the name it was given when it was given one.
     craft: function (recipe, made) {
       const row = RECIPES[recipe] || KEPT[recipe];
       output = { baseId: id(row.out), count: made || 1 };
       const r = onCraft(A, id(row.out), made || 1, id(recipe), 0);
-      if (r !== false) { (packs[A] = packs[A] || []).push({ baseId: output.baseId, count: output.count }); }
+      if (r !== false) {
+        const landed = { baseId: output.baseId, count: output.count };
+        if (output.name) { landed.name = output.name; }
+        (packs[A] = packs[A] || []).push(landed);
+      }
       output = null;
       return r;
     },
@@ -351,8 +358,6 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     behind.craftThatFails(cookRow, 1);
     behind.later();
     yes('and the food already in the pack is not doubled either', behind.count(row.out) === 3);
-    yes('the timer that is left (the weaver\'s mark) waits for nothing but the end of the engine\'s call (0)',
-        /^const MASTER_CRAFT_AFTER_MS = 0;$/.test(pieces.after));
   });
 
   attempt('Master Weaver, the mark', function () {
@@ -362,30 +367,32 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     r.give(T1, 1);
     r.give(RECIPES[hood].out, 2);
     r.craft(hood, 1);
-    r.later();
     const woven = r.entries(RECIPES[hood].out).filter(function (e) { return e.name === 'Master-Woven Fur Hood'; });
-    yes('a master tailor\'s new garment is named as woven', woven.length === 1 && woven[0].count === 1);
+    yes('a master tailor\'s new garment is named as woven, by the craft itself', woven.length === 1 && woven[0].count === 1);
+    yes('and nothing waits on a timer for it (#3026)', r.timers.length === 0);
     yes('and the other hoods in the pack stay plain, with nothing added', r.count(RECIPES[hood].out) === 3 &&
         r.entries(RECIPES[hood].out).filter(function (e) { return !e.name; })
           .reduce(function (t, e) { return t + e.count; }, 0) === 2);
     const plain = craftRig(person('tailor', 'haberdasher', 'expert'));
     plain.give(T1, 1);
     plain.craft(hood, 1);
-    plain.later();
     yes('an expert tailor\'s garment is not', plain.entries(RECIPES[hood].out).every(function (e) { return !e.name; }));
     const refused = craftRig(weaver);
     refused.give(T1, 1);
     refused.give(RECIPES[hood].out, 1);
     refused.craftThatFails(hood, 1);
-    refused.later();
     yes('a craft the engine refuses does not name a hood the master already had',
         refused.entries(RECIPES[hood].out).every(function (e) { return !e.name; }) && refused.count(RECIPES[hood].out) === 1);
     const armour = P.clone(weaver);
     armour.weave = 'armour';
+    const batch = craftRig(weaver);
+    batch.give(T1, 1);
+    batch.craft(hood, 2);
+    yes('a batch of two comes out as two woven hoods in one entry',
+        batch.entries(RECIPES[hood].out).map(function (e) { return e.name + ' x' + e.count; }).join() === 'Master-Woven Fur Hood x2');
     const lined = craftRig(armour);
     lined.give(T1, 1);
     lined.craft(hood, 1);
-    lined.later();
     const names = lined.entries(RECIPES[hood].out).map(function (e) { return e.name || ''; });
     yes('a master tailor on Armour makes a hood named Master-Lined (' + names.join(', ') + ')',
         names.length === 1 && names[0] === 'Master-Lined Fur Hood');
@@ -397,7 +404,6 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     const woven2 = craftRig(warm);
     woven2.give(T1, 1);
     woven2.craft(hood, 1);
-    woven2.later();
     yes('on Warmth it is Master-Woven, as every woven garment was before there was a pick',
         woven2.entries(RECIPES[hood].out).map(function (e) { return e.name; }).join() === 'Master-Woven Fur Hood');
     const forged = person('tailor', 'haberdasher', 'expert');
@@ -405,14 +411,12 @@ if (RECIPES && KEPT && pieces.onCraft && P) {
     const notWeaver = craftRig(forged);
     notWeaver.give(T1, 1);
     notWeaver.craft(hood, 1);
-    notWeaver.later();
     yes('an expert tailor with armour written on the character still makes a plain hood',
         notWeaver.entries(RECIPES[hood].out).every(function (e) { return !e.name; }));
     const already = craftRig(armour);
     already.give(T1, 1);
     already.give(RECIPES[hood].out, 1, { name: 'Master-Woven Fur Hood' });
     already.craft(hood, 1);
-    already.later();
     yes('a hood already woven for warmth is not marked again: the new one is the one named Master-Lined',
         already.entries(RECIPES[hood].out).map(function (e) { return e.name; }).sort().join() === 'Master-Lined Fur Hood,Master-Woven Fur Hood');
     yes('Mastercraft is read nowhere outside the rules: a smith\'s master perk is not a temper bonus',

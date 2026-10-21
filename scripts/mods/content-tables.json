@@ -63,13 +63,17 @@
   { "tool": "scripts/dev/Build-MerchantRoleTables.py", "data": "--data", "plugins": null,
     "reads": ["game/data/recipes.json", "game/data/harvests.json", "game/data/hunts.json", "docs/systems/cut-items.json", "game/data/npc-population.json"],
     "writes": ["game/data/merchant-role-tables.json"] },
+  { "tool": "scripts/dev/Build-MerchantRetrievalSources.py", "data": "--data", "plugins": null,
+    "reads": ["game/data/npc-population.json", "game/data/merchant-roster.json"],
+    "writes": ["game/data/merchant-retrievals.json", "tests/fixtures/merchant-retrieval-records.json"] },
   { "tool": "scripts/dev/Build-MerchantGamemode.js", "data": null, "plugins": null,
-    "reads": ["game/data/merchant-role-tables.json", "game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/npc-population.json"],
+    "reads": ["game/data/merchant-role-tables.json", "game/data/merchant-retrievals.json", "game/data/recipes.json", "game/data/harvests.json", "game/data/ores.json", "game/data/npc-population.json"],
     "writes": ["game/gamemode.js"] }
  ],
  "notInChain": {
   "scripts/dev/Build-NpcPopulation.py": "Reads the server's load order from a server-settings file (or, with --data, its own committed load order out of one folder, which is how Run-OnBox.ps1 rebuilds it after Build-LastPlugin.py), and reads placed actors: Thornswood-Content.esp places none (measured 20 Oct: IMAD, ALCH, MGEF, MESG, WRLD, CELL, REFR, COBJ, FURN, FLOR, MISC, BOOK, ACTI and KYWD records, no ACHR). It is rebuilt when the collection's load order moves, and Build-LastPlugin.py says so when it has.",
-  "scripts/dev/Build-StationSites.py": "Comes before the content plugin, not after it: it measures where the plugin's stations stand, and scripts/mods/Add-ContentRecords.py writes them into the plugin from its table. docs/systems/station-placement.md says how a site changes.",
+  "scripts/dev/Build-ResourceLocations.py": "Reads the server's load order from a server-settings file, like Build-NpcPopulation.py, and refuses any plugin whose bytes are not the ones npc-population.json pins, its Thornswood-Content.esp row included. So it is rebuilt together with Build-NpcPopulation.py when the collection's load order moves, never alone after a content change.",
+  "scripts/dev/Build-StationSites.py":"Comes before the content plugin, not after it: it measures where the plugin's stations stand, and scripts/mods/Add-ContentRecords.py writes them into the plugin from its table. docs/systems/station-placement.md says how a site changes.",
   "scripts/dev/Audit-PapyrusEvents.py": "An audit: it says which scripts in the load order register for which events and writes no table a server or another builder reads.",
   "scripts/mods/Audit-ModMenus.js": "An audit: it says where each mod settings menu keeps its values and writes no table a server or another builder reads.",
   "scripts/mods/Audit-Mods.ps1": "An audit of the game folder's own install (its archives, folders and plugin list), which is what it is about. It reads no plugin's records."
