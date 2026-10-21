@@ -19,7 +19,7 @@
     - nothing not named exactly like the installer named them is touched
     - -IncludeNewest removes the newest too once a backup newer than them is
       there, and keeps them while there is none
-    - it refuses the gaming PC
+    - it refuses a machine that is not the box (scripts\vps\BoxGuard.ps1)
   Touches nothing but its scratch folder.
 #>
 [CmdletBinding()]
@@ -32,6 +32,7 @@ $clear = Join-Path $repo 'scripts\vps\Clear-OldWorldCopies.ps1'
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) { Write-Host 'NOT RUN  Clear-OldWorldCopies.ps1 runs on the box under Windows PowerShell 5.1, and its link case is an NTFS junction; only Windows has either'; exit 0 }
 $ps51 = Get-WindowsPowerShell
+. (Join-Path $repo 'scripts\vps\BoxGuard.ps1')
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -109,11 +110,14 @@ try {
     $o = Run @()
     Yes 'and then there is nothing left to clear' ($o -match 'NOTHING TO CLEAR' -and $script:code -eq 0)
 
-    if (There 'C:\Thornswood\Game\SkyrimSE.exe') {
+    # Off the box (a developer's workstation) it is refused without
+    # -AllowGamingPc, in the rule's words (#3041).
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) {
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $o = (@(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $clear -TempDirs $t1 2>&1 | ForEach-Object { "$_" }) -join ' ') } finally { $ErrorActionPreference = $eap }
-        Yes 'on the gaming PC it refuses and removes nothing' ($o -match 'REFUSED: SkyrimSE\.exe is here' -and $LASTEXITCODE -ne 0)
-    } else { Write-Host 'SKIP  the gaming PC refusal: no game on this machine' }
+        Yes 'off the box it refuses, says why, and removes nothing' ($o.Contains('REFUSED: ' + $notBox) -and $LASTEXITCODE -ne 0)
+    } else { Write-Host 'SKIP  the refusal off the box: this is the box, a server (tests\test-3041-box-guard.ps1 runs it with a workstation stood in)' }
 } finally {
     $j = Join-Path $box 'admin-temp\serverdata-20260921-100000\link'
     if (Test-Path -LiteralPath $j) { [IO.Directory]::Delete($j) }

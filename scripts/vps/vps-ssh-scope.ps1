@@ -71,11 +71,18 @@ function Say([string]$word, [string]$what) { Write-Output ($word + ' ' + $what) 
 
 function Get-CallerAddress { return ([string]$env:SSH_CLIENT -split '\s+')[0] }
 function Get-SaveFolder { return (Join-Path $env:ProgramData 'ssh') }
-function Test-IsServer {
-    $pt = 0
-    try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
-    return ($pt -ne 1)
+# Is this the box? scripts\vps\BoxGuard.ps1 (#3041).
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
 }
+# ---- end BoxGuard.ps1 ----
 
 # Enabled inbound Allow rules as Name, DisplayName, Protocol, Ports, Program,
 # Package (the app container the rule is for, '' when none), Service ('Any'
@@ -187,7 +194,10 @@ function Change([string]$what) {
 }
 
 function Invoke-Scope {
-    if (-not $Layer -and -not (Test-IsServer)) { $script:stopped = $true; Say 'STOP' 'this is a workstation, not the VPS. Run Set-SshScope.ps1 on your machine; it sends this to the box.'; return }
+    if (-not $Layer) {
+        $notBox = Get-ThornswoodBoxRefusal
+        if ($notBox) { $script:stopped = $true; Say 'STOP' ($notBox + '. Run Set-SshScope.ps1 on your machine; it sends this to the box.'); return }
+    }
 
     # ---------------------------------------------------------- the list ---
     $entries = @($From -split '[,\s]+' | Where-Object { $_ })
