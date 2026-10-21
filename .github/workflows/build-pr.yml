@@ -516,6 +516,11 @@ jobs:
           # harness on its first lines off Windows, and asking Get-Command for
           # powershell.exe let a Windows machine without it skip or run pwsh
           # instead. A few seconds.
+          # Issue #2946: tests\test-time-wait.ps1 runs vps-time-wait.ps1 on
+          # stand-ins for the registry, the UDP ports and the restart, with
+          # real server folders, and Set-TimeWait.ps1 against a fake ssh. The
+          # box restarts only while nobody is on either server, and never
+          # while a count cannot be read. A few seconds.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -812,6 +817,7 @@ jobs:
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
                  'test-prove-secret.ps1',
+                 'test-time-wait.ps1',
                  'test-mod-menus.js'
           $failed = @()
           foreach ($n in $six) {
