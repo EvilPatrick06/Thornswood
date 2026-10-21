@@ -20,7 +20,7 @@
                     and restarts it). That is the existing Main path in
                     scripts\deploy. -SkipGameMode leaves this step out.
 
-      2  installer  Package-Thornswood.ps1 -Root C:\Thornswood (MAIN even when Channel=dev) -OutDir DistRoot -NoPause.
+      2  installer  Package-Thornswood.ps1 -Root <Where.ps1 Install> (MAIN even when Channel=dev) -OutDir DistRoot -NoPause.
                     Publish-Installer runs from Package unless -NoPublish is
                     used on Package itself; this stack does not pass
                     -NoPublish. -SkipInstaller leaves this step out.
@@ -71,7 +71,8 @@
   in-world restart warning.
 
 .PARAMETER Root
-  The MAIN play install Package builds from (C:\Thornswood by default). Always
+  The MAIN play install Package builds from (Where.ps1 Install by default,
+  C:\Thornswood on most machines, #3031). Always
   the main Root for packaging, including when Channel=dev: Dev umbrella does
   not package from a DevBuild folder. Same default Ship uses for the main install.
 
@@ -99,7 +100,9 @@ param(
     [switch]$SkipInstaller,
     [switch]$SkipGameMode,
     [switch]$NoPause,
-    [string]$Root = 'C:\Thornswood',
+    # The launcher install, Where.ps1 Install, unless told otherwise (#3031).
+    # Empty until after $Here is resolved, like -DistRoot below.
+    [string]$Root = '',
     # Empty until after $Here is resolved. $PSScriptRoot can be empty when this
     # script is invoked certain ways (dot-source, some hosts), which made the
     # old Join-Path $PSScriptRoot default fail the first Dev Ship-Stack run.
@@ -133,6 +136,7 @@ if (-not $Here) {
     Die 'Could not resolve the scripts\release folder for Ship-Stack (PSCommandPath, MyInvocation, and PSScriptRoot were all empty).'
 }
 
+if ([string]::IsNullOrWhiteSpace($Root)) { $Root = [string](& (Join-Path $Here 'Where.ps1') Install) }
 if ([string]::IsNullOrWhiteSpace($DistRoot)) {
     $where = Join-Path $Here 'Where.ps1'
     if (Test-Path -LiteralPath $where) {

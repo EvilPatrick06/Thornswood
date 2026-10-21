@@ -8,7 +8,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root    = 'C:\Thornswood',
+    [string]$Root    = (& (Join-Path $PSScriptRoot 'Where.ps1') Install),
     # Out of the play install since 22 September. Staging a 508 MB installer
     # and its 956 MB stage folder inside the folder people play from put 10.9
     # GB on the game drive over five days. Ship passes this explicitly; the

@@ -37,7 +37,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\Thornswood',
+    [string]$Root      = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [switch]$SkipRefits,
     [string]$Notes = "Bodies, and the physics to go with them`n- CBBE and 3BA for women, HIMBO and The New Gentleman for men, all nude by default`n- XPMSSE skeleton underneath, CBPC doing the physics`n- everyone gets identical meshes, because mismatched bodies is the one thing that actually breaks co-op",

@@ -19,7 +19,7 @@
 #>
 [CmdletBinding(SupportsShouldProcess)]
 param(
-    [string]$Data = 'C:\Thornswood\Game\Data',
+    [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     [switch]$Undo
 )
 # The refusal comes before anything else, above the strict mode line and above

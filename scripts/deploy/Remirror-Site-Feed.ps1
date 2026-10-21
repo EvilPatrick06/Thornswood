@@ -566,7 +566,7 @@ foreach ($b in $badUpThere) { Say "  BAD BYTES up there, this sends them again: 
 # hashed. Those are what Publish-Update leaves behind for the release that just
 # went out (pack-<id>.zip, client-runtime-<commit>.zip) and what Build-Launcher
 # leaves in the install folder (Thornswood.exe).
-$gameRoot = if ($Dev) { 'C:\Thornswood-DevBuild' } else { 'C:\Thornswood' }
+$gameRoot = [string](& (Join-Path $Here '..\release\Where.ps1') $(if ($Dev) { 'InstallDev' } else { 'Install' }))
 $folders = @()
 foreach ($d in @($AssetDir)) { if ($d) { $folders += $d } }
 $folders += (Join-Path $FeedDir 'assets')

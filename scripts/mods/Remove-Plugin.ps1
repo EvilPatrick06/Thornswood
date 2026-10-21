@@ -26,7 +26,7 @@
 [CmdletBinding()]
 param(
   [string]$Plugin,
-  [string]$Root = 'C:\Thornswood',
+  [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
   [switch]$NoPause
 )
 # The refusal comes before anything else, above the strict mode line and above

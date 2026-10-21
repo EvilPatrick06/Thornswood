@@ -35,7 +35,7 @@
 #>
 param(
     [string]$Dist = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') ServerDist),
-    [string]$Data = 'C:\Thornswood\Game\Data',
+    [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     # Whose settings to read: the build on this machine, or a server's own.
     [ValidateSet('build', 'live', 'dev')][string]$From = 'build',
     [string]$Vps  = '',

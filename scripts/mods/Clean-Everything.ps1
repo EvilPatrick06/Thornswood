@@ -29,7 +29,7 @@
 param(
   [string]$Vps  = '',
   [string]$User = '',
-  [string]$Root = 'C:\Thornswood',
+  [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
   # Another repository whose release assets to look at. Thornswood-Releases
   # was the default until #907 deleted it.
   [string]$Repo = '',

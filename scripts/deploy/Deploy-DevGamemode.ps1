@@ -225,7 +225,7 @@ param(
   [string[]]$DropPlugins = @(),
   # Where the other plugins live on this machine. Ours is taken from the repo
   # instead; see the header.
-  [string]$Data = 'C:\Thornswood\Game\Data',
+  [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
   # The warning, the same four switches Deploy-Server.ps1 has. See WHO IS ON in
   # the header. Why is only worded into -Mode restart.
   [double]$Minutes = 1,
