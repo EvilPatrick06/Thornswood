@@ -50,6 +50,11 @@ bot/joins.json.tmp
 bot/heartbeat.json
 bot/heartbeat.json.tmp
 
+# The roots the bot trusts, which it writes at every start from certifi and
+# trust.py (#3111); a copy here is some other run's.
+bot/roots.pem
+bot/roots.pem.tmp
+
 # The dev build's own news webhook, for the dev updates channel. Same rule as
 # news-webhook.txt above: anyone holding the URL can post as the bot.
 bot/dev-webhook.txt
