@@ -135,7 +135,16 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy
     foreach ($n in $names) {
         Yes ("ours, the recorded bytes: {0}" -f $n) ((Ask { (Test-ShipOtherServer $n) -or (Test-ShipMachine $n) }) -eq $false)
     }
+    # Where the file system keeps case (Linux), the path in lower case is a
+    # file of its own, so it is given the same bytes while it is asked (#2989).
+    $lowFull = Join-Path $fixGame $bundle.ToLowerInvariant()
+    $lowMade = -not (Test-Path -LiteralPath $lowFull)
+    if ($lowMade) {
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path $lowFull -Parent)
+        [IO.File]::WriteAllBytes($lowFull, $goodBundle)
+    }
     Yes 'whatever the case of the path' ((Ask { Test-ShipOtherServer $bundle.ToLowerInvariant() }) -eq $false)
+    if ($lowMade) { Remove-Item -LiteralPath (Join-Path $fixGame ($bundle.Split('\')[0].ToLowerInvariant())) -Recurse -Force }
     Yes 'Test-ShipClientRecorded takes the file itself too' ((Ask { Test-ShipClientRecorded $bundle $bundleFull }) -eq $true)
 
     Set-OneByteChanged $bundleFull 7
@@ -233,6 +242,8 @@ foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'RepoPlugins.ps1') { Copy
 function Invoke-Listing($all, $prefix) {
     $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0
     $collectionBytes = 0; $collectionCount = 0
+    $notOursBytes = 0; $notOursCount = 0
+    $sep = [string][IO.Path]::DirectorySeparatorChar
     $clientShipped = 0
     $clientWrong = @()
     foreach ($f in $all)
@@ -247,7 +258,7 @@ function Invoke-Listing($all, $prefix) {
 }
 '@
         . ([scriptblock]::Create($src))
-        $prefix = $GameDir.TrimEnd('\') + '\'
+        $prefix = $GameDir.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
 
         $r = Invoke-Listing @(Get-ChildItem -LiteralPath $GameDir -Recurse -File -Force) $prefix
         Yes 'the recorded build: all six go into the installer' (@($names | Where-Object { $r.Ship -contains $_ }).Count -eq $names.Count)
@@ -311,7 +322,9 @@ function Invoke-Listing($all, $prefix) {
     Write-Host ''
     Write-Host 'This machine''s game folder' -ForegroundColor Cyan
 
-    if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe'))) {
+    # Join-Path stops on a drive this machine does not have (C: off Windows),
+    # so whether the folder is here at all is asked first.
+    if (-not (Test-Path -LiteralPath $Game) -or -not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe'))) {
         Write-Host ("SKIP  no game folder at {0}; nothing on this machine to measure" -f $Game) -ForegroundColor Yellow
     } else {
         # The real record now, from the real tools folder.

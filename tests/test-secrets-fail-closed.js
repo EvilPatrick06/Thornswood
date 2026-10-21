@@ -117,9 +117,6 @@ yes('nothing else in the launcher calls Protect',
       .filter((n) => read('launcher/app/' + n).indexOf('Secrets.Protect') >= 0)
       .sort().join(',') === 'Config.cs,Discord.cs');
 
-yes('Secrets.cs is C# 5: no interpolated string, no ?., no nameof, no out var',
-    !/\$"|\?\.|\bnameof\s*\(|\bout var\b/.test(noComments(src).replace(/\?\?/g, '')));
-
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

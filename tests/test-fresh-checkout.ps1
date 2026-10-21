@@ -132,8 +132,10 @@ try {
     # this machine's own file and the scripts name, with the flag on.
     $vj = Get-Content -Raw (Join-Path $Repo 'scripts\vps\vps.json') | ConvertFrom-Json
     $hosts = @([string]$vj.address)
-    $local = Join-Path (Join-Path ([string]$env:LOCALAPPDATA) 'Thornswood') 'vps.json'
-    if ($env:LOCALAPPDATA -and (Test-Path $local)) { try { $hosts += [string](Get-Content -Raw $local | ConvertFrom-Json).address } catch { } }
+    # Where Vps.ps1 keeps it; '' when this machine has no place for one.
+    . (Join-Path $Repo 'scripts\vps\Vps.ps1')
+    $local = Get-ThornswoodVpsLocalPath
+    if ($local -and (Test-Path -LiteralPath $local)) { try { $hosts += [string](Get-Content -Raw $local | ConvertFrom-Json).address } catch { } }
     $scan = Get-ChildItem (Join-Path $Repo 'scripts') -Recurse -Include *.ps1, *.json | ForEach-Object { Get-Content -Raw -LiteralPath $_.FullName }
     foreach ($s in $scan) {
         foreach ($mm in [regex]::Matches([string]$s, '\b(?:\d{1,3}\.){3}\d{1,3}\b|\b[a-z0-9-]+(?:\.[a-z0-9-]+)*\.(?:net|com|org|io|gg|invalid)\b')) { $hosts += $mm.Value }

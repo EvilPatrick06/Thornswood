@@ -89,6 +89,34 @@ A path a harness compares with what a script prints is built with
 swallow baseline's, is made from a path by replacing
 `[IO.Path]::DirectorySeparatorChar`. Off Windows `\` is part of a file name.
 
+## A harness that compiles launcher code
+
+A `.ps1` harness that compiles C# out of `launcher\app` or `installer\setup`
+dot-sources `tests\Launcher-Csc.ps1` and hands the source to
+`Add-LauncherType`, which compiles it the way the build does: the Roslyn csc
+beside MSBuild, the project's `LangVersion`, the .NET Framework 4.8.1
+reference assemblies. It returns the loaded assembly and throws with the
+compiler's words when the code does not compile. Off Windows that compiler is
+not there, so the harness says SKIP for the compiled part:
+
+```
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  Updater.IsNewer, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Done
+}
+$asm = Add-LauncherType -Source $configSrc, $stub
+$T = $asm.GetType('Thornswood.Updater')
+```
+
+Before issue #2821 eighteen harnesses compiled launcher code with `Add-Type`
+or a `CSharpCodeProvider`, copied from one to the next: C# 5 under Windows
+PowerShell and .NET 8's libraries under pwsh, never the build's compiler.
+`test-2821-launcher-compiler.ps1` fails on a harness that names launcher or
+setup code and gives `Add-Type` anything but C# written out in full in the
+harness itself (a stand-in server or a probe of a Windows call is that), or
+makes a `CSharpCodeProvider`.
+
 ## A harness that reads a child's error
 
 pwsh's default error view wraps a script error's message at the console's

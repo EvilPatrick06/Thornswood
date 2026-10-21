@@ -1,5 +1,5 @@
 {
-  "builtBy": "tools\\Build-SpellTable.ps1",
+  "builtBy": "scripts\\dev\\Build-SpellTable.ps1",
   "source": "the SPEL records of Skyrim.esm, Update.esm, Dawnguard.esm, HearthFires.esm, Dragonborn.esm",
   "language": "english",
   "count": 85,

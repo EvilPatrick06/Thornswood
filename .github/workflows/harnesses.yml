@@ -1,0 +1,62 @@
+# Runs the test harnesses somebody names, on the VPS's Windows runners, the
+# way the nightly runs them (#2970).
+#
+# Why. A cloud session runs on Linux, and a harness that needs Windows
+# PowerShell (a deploy swap, a scheduled task, a Windows path) was run by
+# logging in to the box and typing it there. On 21 Oct the safety check
+# refused that from the #2952 thread ("Remote Shell Writes"), and a harness
+# has no business on the live box anyway. This workflow runs it where the
+# nightly already runs every harness: a runner account that reaches none of
+# the live server's folders (records\runner-isolation.json, #2161).
+#
+# How. Dispatch it on main, or on a branch to try that branch's harnesses,
+# with the names as the nightly prints them, split by spaces or commas:
+#
+#   gh workflow run harnesses.yml --ref main -f harnesses='test-deploy-swaps.ps1 voice/test-most.js'
+#
+# A name that is no harness in that commit fails the run before anything
+# runs. The names reach the script through the environment, never pasted into
+# the script's text, so nothing typed into the box can run as code.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Run named harnesses
+on:
+  workflow_dispatch:
+    inputs:
+      harnesses:
+        description: 'Harness names, split by spaces or commas (test-x.ps1, test-y.js, voice/test-z.js)'
+        required: true
+permissions:
+  contents: read
+jobs:
+  harnesses:
+    name: Named harnesses
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Install the eslint the lint harness copies
+        if: ${{ contains(inputs.harnesses, 'test-eslint-amp-path') }}
+        shell: pwsh
+        run: |
+          # The same pinned install nightly.yml makes for this one harness
+          # (tests\test-eslint-amp-path.ps1), into the folder it reads.
+          $cache = Join-Path $env:TEMP 'herald-lint'
+          npm install --prefix $cache --no-save --no-audit --no-fund --silent eslint@9.39.5
+          if (-not (Test-Path -LiteralPath (Join-Path $cache 'node_modules\eslint\bin\eslint.js'))) {
+            Write-Host '::error file=tests/test-eslint-amp-path.ps1::could not install eslint 9.39.5, so the lint harness has nothing to copy'
+            exit 1
+          }
+          Write-Host ('eslint 9.39.5 is in ' + $cache)
+
+      - name: Run the named harnesses
+        shell: pwsh
+        env:
+          HARNESSES: ${{ inputs.harnesses }}
+        run: |
+          # One at a time, each on its clock, each printed as it ends, then
+          # every one that failed: scripts\dev\Nightly-Harnesses.ps1 says why.
+          Write-Host ('commit ' + $env:GITHUB_SHA + ' on ' + $env:GITHUB_REF_NAME)
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only $env:HARNESSES -BudgetSeconds 2400

@@ -13,7 +13,9 @@
     1. Links opens the file for its attributes alone (FILE_READ_ATTRIBUTES
        through CreateFile), never FileStream with FileAccess.Read.
     2. Links, lifted from launcher\app\OwnGame.cs with what it needs and
-       compiled, over scratch files: one name is 1, a hard link makes 2,
+       compiled with the compiler the build runs (Add-LauncherType,
+       tests\Launcher-Csc.ps1, #2821), over scratch files: one name is 1, a
+       hard link makes 2,
        dropping it is 1 again, a file another handle holds with no sharing at
        all is still counted, and a missing file throws FileNotFoundException,
        as FileStream did, which every caller catches.
@@ -90,8 +92,13 @@ $consts = ([regex]::Matches($og, '(?m)^\s*const uint (FileReadAttributes|FileSha
 $imports = ([regex]::Matches($og, '(?s)\[DllImport\("kernel32\.dll"[^\]]*\]\s*static extern (?:bool GetFileInformationByHandle|SafeFileHandle CreateFile)\([^;]+;') | ForEach-Object { $_.Value }) -join "`n"
 Yes 'lifted the struct, the two imports and the four constants' ($struct -and ($imports -split 'static extern').Count -eq 3 -and ($consts -split "`n").Count -eq 4)
 
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
+if (-not $OnWindows) {
+    Write-Host 'SKIP  2, Links compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, Links opens the file through CreateFile in kernel32, and the links are made with cmd.exe''s mklink, which only Windows has'
+    Done
+}
 $ns = 'Links2210_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
-Add-Type -TypeDefinition @"
+$null = Add-LauncherType -Source @"
 using System;
 using System.IO;
 using System.Runtime.InteropServices;
@@ -108,11 +115,6 @@ namespace $ns {
 "@
 $t = [type]"$ns.OwnGame"
 
-. (Join-Path $PSScriptRoot 'Windows.ps1')
-if (-not $OnWindows) {
-    Write-Host 'SKIP  the runs: Links opens the file through CreateFile in kernel32, and the links are made with cmd.exe''s mklink, which only Windows has'
-    Done
-}
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2210-' + [guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $work | Out-Null
 try {

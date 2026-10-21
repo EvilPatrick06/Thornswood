@@ -21,7 +21,9 @@ try {
     if ($LASTEXITCODE) { throw 'Runtime/Keep regression failed' }
 } finally {
     $target = [IO.Path]::GetFullPath($work)
-    $parent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd('\') + '\'
+    # This machine's separator: off Windows the temp folder ends in / (#2989).
+    $sep = [IO.Path]::DirectorySeparatorChar
+    $parent = [IO.Path]::GetFullPath([IO.Path]::GetTempPath()).TrimEnd($sep) + $sep
     if (-not $target.StartsWith($parent, [StringComparison]::OrdinalIgnoreCase) -or [IO.Path]::GetFileName($target) -notlike 'thornswood-runtime-keep-*') { throw 'Unsafe fixture cleanup target' }
     Remove-Item -LiteralPath $target -Recurse -Force
 }

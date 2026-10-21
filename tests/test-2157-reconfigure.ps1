@@ -26,6 +26,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $root = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
     if ($cond) { $script:pass++; Write-Host "PASS  $what" } else { $script:fail++; Write-Host "FAIL  $what" }
@@ -117,10 +118,16 @@ try {
     $bin = Join-Path $scratch 'bin'; $null = New-Item -ItemType Directory -Path $bin
     $log = Join-Path $scratch 'cmake-args.txt'
     function ServerStep([int]$exit) {
-        Set-Content -LiteralPath (Join-Path $bin 'cmake.cmd') -Value ("@echo %*>" + '"' + $log + '"' + "`r`n@exit /b $exit") -Encoding ASCII
+        # A .cmd runs only on Windows; elsewhere the stand-in is a shell script.
+        if ($OnWindows) {
+            Set-Content -LiteralPath (Join-Path $bin 'cmake.cmd') -Value ("@echo %*>" + '"' + $log + '"' + "`r`n@exit /b $exit") -Encoding ASCII
+        } else {
+            Set-Content -LiteralPath (Join-Path $bin 'cmake') -Value ("#!/bin/sh`nprintf '%s\n' ""`$*"" > '" + $log + "'`nexit $exit`n") -Encoding ASCII -NoNewline
+            & chmod 755 (Join-Path $bin 'cmake')
+        }
         Remove-Item -LiteralPath $log -ErrorAction SilentlyContinue
         $script:died = ''
-        $old = $env:PATH; $env:PATH = $bin + ';' + $old
+        $old = $env:PATH; $env:PATH = $bin + [IO.Path]::PathSeparator + $old
         try {
             $sb = [scriptblock]::Create('param($BuildDir, $vsPath) function Say($m, $c) {}; function Ok($m) {}; function Die($m) { $script:died = $m; return }; ' + $step)
             & $sb 'C:\scratch\build' 'C:\nowhere'

@@ -76,7 +76,7 @@ param(
   [string]$Remote  = 'C:/Thornswood-Backup',
   [string]$WatchRoot = 'C:/Thornswood-Watch',
   [string]$To      = '',
-  [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
+  [string]$KeyFile = (Join-Path ([Environment]::GetFolderPath('UserProfile')) 'Documents\thornswood-backup-key.txt'),
   [int]$KeepDays   = 30,
   [string]$At      = '04:15',
   [string]$TaskName = 'Thornswood Fetch Backups',
@@ -190,7 +190,12 @@ if (-not $To -and -not $Unschedule) {
 # made that folder inside the worktree it ran from and registered the task
 # with it, so the next 4:15 AM run would have fetched into a new folder under
 # its own copy's folder and left local\backups to go stale.
-function Test-WholePath([string]$p) { return ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^\\\\[^\\/]+[\\/][^\\/]+') }
+function Test-WholePath([string]$p) {
+  if ($p -match '^[A-Za-z]:[\\/]' -or $p -match '^\\\\[^\\/]+[\\/][^\\/]+') { return $true }
+  # Off Windows a whole path starts at / (#2989). On Windows /x is relative to
+  # the current drive, so there it stays refused.
+  return ([IO.Path]::DirectorySeparatorChar -eq '/' -and $p.StartsWith('/'))
+}
 function Stop-NotWholePath([string]$name, [string]$p) {
   Die ("-{0} is not a whole path: '{1}'. Give it as C:\folder\... or \\server\share\... A path like C:Users... is what a shell that dropped the backslashes passes on (Git Bash does this to an unquoted C:\...); run it from PowerShell, or quote the path." -f $name, $p)
 }

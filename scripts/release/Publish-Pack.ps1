@@ -140,10 +140,11 @@ foreach ($id in $order) {
         $files = @(Get-ChildItem -LiteralPath $src -Recurse -File -Force)
         # The long path, which is what FullName starts with. $GameDir
         # itself is the short 8.3 form when the build sits under a short
-        # TEMP (issue #1156).
-        $prefix = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd('\') + '\'
+        # TEMP (issue #1156). Named with \ on any machine (#2989).
+        $sep = [string][IO.Path]::DirectorySeparatorChar
+        $prefix = (Get-Item -LiteralPath $GameDir).FullName.TrimEnd($sep) + $sep
         foreach ($f in $files) {
-            $r = $f.FullName.Substring($prefix.Length)
+            $r = $f.FullName.Substring($prefix.Length).Replace($sep, '\')
             $ext = $f.Extension.ToLowerInvariant()
             if ($ext -in '.esp', '.esm', '.esl', '.bsa') { $plugins += $r; continue }
             $dest = Join-Path (Join-Path $stage 'game') $r

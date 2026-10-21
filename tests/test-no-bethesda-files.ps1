@@ -35,7 +35,9 @@
        fails, by rule name.
     4. Publish-Update's record guard and Rollback-Feed's filter, each lifted out
        of the shipped script between its markers and run.
-    5. The launcher: OwnGame.BethesdaTool, lifted and compiled, agrees with
+    5. The launcher: OwnGame.BethesdaTool, lifted and compiled with the
+       compiler the build runs (Add-LauncherType, tests\Launcher-Csc.ps1,
+       #2821; off Windows that part says SKIP), agrees with
        Ship-Rules on every path, finds exactly those files in a scratch folder,
        Refresh drops them, and Rules moved so every folder refreshes once.
 
@@ -56,6 +58,7 @@ $RollPath    = Join-Path $Repo 'scripts\release\Rollback-Feed.ps1'
 $PackagePath = Join-Path $Repo 'scripts\release\Package-Thornswood.ps1'
 $SecretsPath = Join-Path $Repo 'scripts\dev\Check-Secrets.ps1'
 $OwnGamePath = Join-Path $Repo 'launcher\app\OwnGame.cs'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 if (-not $Record) { $Record = Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json' }
 
 $script:pass = 0
@@ -382,9 +385,14 @@ namespace $ns
     }
 }
 "@
-$compiled = $true
-try { Add-Type -TypeDefinition $cs -Language CSharp } catch { $compiled = $false; Write-Host ('      ' + $_.Exception.Message) }
-Yes 'and they compile as lifted' $compiled
+$compiled = $false
+if (-not $OnWindows) {
+    Skip 'BethesdaTool and BethesdaToolsIn, compiled and asked: their compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+}
+else {
+    try { $null = Add-LauncherType -Source $cs; $compiled = $true } catch { Write-Host ('      ' + $_.Exception.Message) }
+    Yes 'and they compile as lifted, with the compiler the build runs' $compiled
+}
 if ($compiled) {
     $T = [type]($ns + '.OwnGame')
     $twins = @($bethesda) + @('SkyrimSE.exe', 'SkyrimSELauncher.exe', 'skse64_loader.exe',

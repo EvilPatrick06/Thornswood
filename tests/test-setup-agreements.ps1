@@ -15,7 +15,9 @@
     - the window, parsed out of Bootstrap.cs's own markup, has three unticked
       boxes with the agreed words, each beside a link to its page on
       https://thornswood.net (terms, privacy, rules), and the age box is kept;
-    - the gate, compiled out of Bootstrap.cs and wired to that parsed window,
+    - the gate, compiled out of Bootstrap.cs with the compiler the build runs
+      (Add-LauncherType, tests\Launcher-Csc.ps1, #2821) and wired to that
+      parsed window,
       leaves Install off for every one of the sixteen ways the four boxes can
       be ticked except all four, and turns it off again when one is unticked;
     - Run wires the gate and the links, Install locks the boxes, and Work
@@ -48,6 +50,7 @@ if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA' -or $PSVersi
     & (Get-WindowsPowerShell) @args2
     exit $LASTEXITCODE
 }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -114,15 +117,9 @@ $site = [regex]::Match($bs, 'const string Site = "([^"]+)";')
 Yes 'and the one site it is built for' ($site.Success -and $site.Groups[1].Value -eq 'https://thornswood.net')
 
 Add-Type -AssemblyName PresentationFramework, PresentationCore, WindowsBase, System.Xaml
-$refs = @(
-    [Windows.Window].Assembly.Location
-    [Windows.UIElement].Assembly.Location
-    [Windows.DependencyObject].Assembly.Location
-    [Xaml.XamlReader].Assembly.Location
-    'System.Xml'
-)
-# Warnings are the fields Run and Start use and this copy does not.
-Add-Type -IgnoreWarnings -ReferencedAssemblies $refs -TypeDefinition (@'
+$asm = $null
+try {
+    $asm = Add-LauncherType -Source ((@'
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
@@ -146,8 +143,11 @@ public static class Ts1009 {
     public static void Write(string dir, DateTime at) { RecordAcceptance(dir, at); }
     public static string FileName() { return AcceptedFile; }
 }
-'@)
-Yes 'the block compiles on its own' ($true)
+'@))
+}
+catch { Write-Host ('      ' + $_.Exception.Message) }
+Yes 'the block compiles on its own, with the compiler the build runs' ($null -ne $asm)
+if ($null -eq $asm) { Done }
 $names = [Ts1009]::PageNames()
 Yes 'the pages are terms, privacy and rules, in that order' (($names -join ',') -eq 'terms,privacy,rules')
 

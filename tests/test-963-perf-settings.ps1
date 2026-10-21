@@ -25,13 +25,17 @@
 
   HOW. Compiles the shipped Enforce.cs, AutoJoin.cs, Hold.cs, Watched.cs and
   ChannelWait.cs together, with small stand-ins for Paths, Swallow, Config
-  and Keep, and runs them against a pretend game folder in a temp folder
+  and Keep, with the compiler the build runs (Add-LauncherType,
+  tests\Launcher-Csc.ps1, #2821), and runs them against a pretend game folder in a temp folder
   Get-ScratchDir.ps1 names (the repository's temp, or %TEMP% outside a checkout).
-  Reads the rest as text. Changes nothing outside that folder.
+  Reads the rest as text. Changes nothing outside that folder. Off Windows
+  it stops before the compile and says SKIP: the build's compiler is only
+  there.
 #>
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $root 'launcher\app'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -129,7 +133,11 @@ foreach ($f in 'Enforce.cs', 'AutoJoin.cs', 'Hold.cs', 'Watched.cs', 'ChannelWai
 $stubUsings = [regex]::Matches($sources[0], '(?m)^using [\w.]+;\s*$')
 foreach ($u in $stubUsings) { $null = $usings.Add($u.Value.Trim()) }
 $sources[0] = [regex]::Replace($sources[0], '(?m)^using [\w.]+;\s*$', '')
-Add-Type -TypeDefinition ((@($usings) -join "`n") + "`n" + ($sources -join "`n")) -Language CSharp
+if (-not $OnWindows) {
+    Write-Host 'SKIP  1 to 8: they run Enforce.cs, AutoJoin.cs, Hold.cs, Watched.cs and ChannelWait.cs compiled with the compiler the build runs, the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Write-Host ""; Write-Host "$($script:pass) passed, $($script:fail) failed"; exit $(if ($script:fail) { 1 } else { 0 })
+}
+$null = Add-LauncherType -Source ((@($usings) -join "`n") + "`n" + ($sources -join "`n"))
 $Api = [Thornswood963.Api]
 
 $tmp = & (Join-Path $root 'scripts\release\Get-ScratchDir.ps1') ('test-963-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
