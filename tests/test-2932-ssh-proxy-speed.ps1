@@ -19,7 +19,12 @@
        the sshd's port (relay.js, written here), so what it adds is the pipe
        between ssh and its ProxyCommand and nothing of the bridge;
     3. through connect.js and bridge.js, the way One reaches the box.
-  It prints each rate. Every copy must arrive whole.
+  Then an 8 MB file the same ways across a link that holds every piece 20 ms
+  each way (lag.js, written here), with scp's sftp and its old protocol
+  (-O), since One reaches the box across the internet and not on loopback.
+  It prints each rate. Every copy must arrive whole. It is a measurement,
+  not a check, so it is off the gate (tests\gate-excluded.txt); run it by
+  name with harnesses.yml.
 
   Windows only: it says NOT RUN elsewhere. The scratch folder, the sshd and
   every process it starts are gone when it ends.
