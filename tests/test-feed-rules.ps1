@@ -364,118 +364,18 @@ finally {
 #
 # The repair settles the dead pack ids in this machine's applied.txt as well,
 # or the launcher here keeps the update card up until the repaired feed comes
-# back down. It used to reach for C:\Thornswood and nothing else, so on a
-# machine whose launcher is on another drive it wrote nothing and said nothing.
-# It now finds the install the way Publish-Update.ps1 does, and the two
-# functions are held identical here rather than left to drift apart.
-#
-# Find-Root is lifted out of each script by the parser and driven with
-# Test-Path and Get-PSDrive shadowed, so nothing is read off this machine and
-# the answer does not depend on which drives it has.
+# back down. It finds the install the way Publish-Update.ps1 does, by asking
+# Where.ps1 Install (InstallDev on the dev channel), the one copy of the rule
+# since #3003. tests\test-3003-one-install-rule.ps1 holds the rule itself, on
+# made up drives, and holds every script to asking Where.ps1 for it.
 Write-Host ''
 Write-Host 'where applied.txt is looked for'
 
 $pubUpd = Join-Path $here 'scripts\release\Publish-Update.ps1'
-function Get-Fn([string]$path, [string]$name) {
-    $t = $null; $e = $null
-    $a = [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path, [ref]$t, [ref]$e)
-    $hit = @($a.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq $name }, $true))
-    if ($hit.Count -ne 1) { return '' }
-    return $hit[0].Extent.Text
-}
-function Get-Ast([string]$path) {
-    $t = $null; $e = $null
-    return [System.Management.Automation.Language.Parser]::ParseFile((Resolve-Path -LiteralPath $path).Path, [ref]$t, [ref]$e)
-}
-$repairFind = Get-Fn $repair 'Find-Root'
-$publishFind = Get-Fn $pubUpd 'Find-Root'
-Yes 'Repair-Manifest.ps1 has a Find-Root' ($repairFind -ne '')
-Yes 'Publish-Update.ps1 still has the one it is copied from' ($publishFind -ne '')
-function Flat([string]$s) { return (($s -replace '\s+', ' ').Trim()) }
-Yes 'and the two are the same function, word for word' (($repairFind -ne '') -and ((Flat $repairFind) -eq (Flat $publishFind)))
-
-# No install path is written into the script any more outside that function.
-# By the parser, over string literals only, so the paragraph above Find-Root
-# that explains the rule in words is not mistaken for one.
-if ($repairFind -ne '') {
-    $rast = Get-Ast $repair
-    $fn = @($rast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Find-Root' }, $true))[0]
-    $roots = @($rast.FindAll({
-        param($n)
-        ($n -is [System.Management.Automation.Language.StringConstantExpressionAst] -or
-         $n -is [System.Management.Automation.Language.ExpandableStringExpressionAst]) -and
-        ($n.Value -match '(?i)^[a-z]:\\Thornswood')
-    }, $true))
-    $outside = @($roots | Where-Object { $_.Extent.StartOffset -lt $fn.Extent.StartOffset -or $_.Extent.EndOffset -gt $fn.Extent.EndOffset })
-    Yes 'no install folder is written into the script outside Find-Root' ($outside.Count -eq 0)
-    foreach ($o in $outside) { Write-Host ("      line {0}: {1}" -f $o.Extent.StartLineNumber, $o.Extent.Text) }
-
-    $rsrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $repair).Path)
-    $rest = $rsrc.Replace($repairFind, '')
-    Yes 'the default applied.txt is built from it, plus -DevBuild on the dev channel' (
-        ($rest -match '\$root = Find-Root') -and ($rest -match "'-DevBuild'") -and ($rest -match "Profile.applied\.txt"))
-}
-
-# Runs the lifted Find-Root against made up drives. Test-Path answers only for
-# the paths given, so a launcher is where this says it is and nowhere else.
-# Get-PSDrive gives the drives asked for, and Join-Path joins with a backslash
-# whatever this machine's separator is, because Join-Path on Linux refuses a
-# path on a drive called C. So the answers below are the same in the cloud and
-# on the VPS, and none of them is read off the machine running this.
-function Run-FindRoot([string]$text, [string[]]$has, [string[]]$roots) {
-    $head = @'
-param($has, $roots)
-function Test-Path { param([string]$LiteralPath) return ($has -contains $LiteralPath) }
-function Get-PSDrive { param([string]$PSProvider) return @($roots | ForEach-Object { [pscustomobject]@{ Root = $_ } }) }
-function Join-Path { param([string]$Path, [string]$ChildPath) return ($Path.TrimEnd('\', '/') + '\' + $ChildPath) }
-'@
-    return [string](& ([scriptblock]::Create($head + "`n" + $text + "`nFind-Root")) $has $roots)
-}
-if ($repairFind -ne '') {
-    $onC = 'C:\Thornswood'
-    $onD = 'D:\Thornswood'
-    $drives = @('C:\', 'D:\', '/')
-
-    Yes 'the launcher on C: is found first' ((Run-FindRoot $repairFind @($onC + '\Launcher\Thornswood.exe') $drives) -eq $onC)
-    Yes 'a launcher on another drive is found when C: has none' ((Run-FindRoot $repairFind @($onD + '\Launcher\Thornswood.exe') $drives) -eq $onD)
-    Yes 'no launcher anywhere falls back to C:, so the message names a real place' ((Run-FindRoot $repairFind @() $drives) -eq $onC)
-    Yes 'a drive whose root is not a letter is not tried' ((Run-FindRoot $repairFind @('\Thornswood\Launcher\Thornswood.exe') @('/')) -eq $onC)
-    Yes 'Publish-Update answers the same, on the same drives' ((Run-FindRoot $publishFind @($onD + '\Launcher\Thornswood.exe') $drives) -eq $onD)
-}
-
-
-# Sync-Client, Go and Deploy-Gamemode find the install the same way now (#546).
-# Their Find-Root is the Publish-Update one word for word, and each fills its
-# path default from it when the caller did not pass one. No shared helper yet.
-$sync = Join-Path $here 'scripts\release\Sync-Client.ps1'
-$go = Join-Path $here 'scripts\release\Go.ps1'
-$deploy = Join-Path $here 'scripts\deploy\Deploy-Gamemode.ps1'
-$syncFind = Get-Fn $sync 'Find-Root'
-$goFind = Get-Fn $go 'Find-Root'
-$deployFind = Get-Fn $deploy 'Find-Root'
-Yes 'Sync-Client.ps1 has a Find-Root' ($syncFind -ne '')
-Yes 'Go.ps1 has a Find-Root' ($goFind -ne '')
-Yes 'Deploy-Gamemode.ps1 has a Find-Root' ($deployFind -ne '')
-Yes 'Sync-Client Find-Root matches Publish-Update' (($syncFind -ne '') -and ((Flat $syncFind) -eq (Flat $publishFind)))
-Yes 'Go Find-Root matches Publish-Update' (($goFind -ne '') -and ((Flat $goFind) -eq (Flat $publishFind)))
-Yes 'Deploy-Gamemode Find-Root matches Publish-Update' (($deployFind -ne '') -and ((Flat $deployFind) -eq (Flat $publishFind)))
-$syncSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $sync).Path)
-$goSrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $go).Path)
-$deploySrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $deploy).Path)
-Yes 'Sync-Client fills -Game from Find-Root when it was not passed' (
-    $syncSrc -match "ContainsKey\('Game'\)" -and $syncSrc -match 'Join-Path \(Find-Root\) ''Game''')
-Yes 'Go fills -Game from Find-Root when neither -Game nor -Vortex was passed' (
-    $goSrc.Contains('-not $Vortex -and -not $PSBoundParameters.ContainsKey') -and
-    $goSrc -match 'Join-Path \(Find-Root\) ''Game''')
-Yes 'Deploy-Gamemode fills -Data and -Plugins from Find-Root when not passed' (
-    $deploySrc -match "ContainsKey\('Data'\)" -and $deploySrc -match "ContainsKey\('Plugins'\)" -and
-    $deploySrc -match "Join-Path \(Find-Root\) 'Game\\Data'" -and
-    $deploySrc -match "Join-Path \(Find-Root\) 'Profile\\Default\\plugins\.txt'")
-$onD2 = 'D:\Thornswood'
-$drives2 = @('C:\', 'D:\', '/')
-if ($syncFind -ne '') {
-    Yes 'Sync-Client Find-Root answers the same on another drive' ((Run-FindRoot $syncFind @($onD2 + '\Launcher\Thornswood.exe') $drives2) -eq $onD2)
-}
+$rsrc = [IO.File]::ReadAllText((Resolve-Path -LiteralPath $repair).Path)
+Yes 'the default applied.txt is under the install Where.ps1 names, InstallDev on the dev channel' (
+    $rsrc.Contains("`$root = [string](& (Join-Path `$Here 'Where.ps1') `$(if (`$Channel -eq 'dev') { 'InstallDev' } else { 'Install' }))") -and
+    ($rsrc -match "Join-Path \`$root 'Profile.applied\.txt'"))
 
 # A Dev Ship reads main's feed as the site serves it before it writes
 # mainVersion, so the Dev News tab cannot keep showing a stale main (1.1.37
