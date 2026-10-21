@@ -4,7 +4,7 @@
 
       . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
 
-  It sets these variables, and one function below them, and nothing else:
+  It sets these variables, and two functions below them, and nothing else:
 
     $LauncherCsc          the Roslyn csc.exe that MSBuild itself runs when it
                           builds launcher\app\Thornswood.csproj, found the way
@@ -17,9 +17,30 @@
     $LauncherRefDir       the .NET Framework 4.8.1 reference assemblies the
                           project builds against, the WPF ones included.
 
-  And one function, Find-LauncherRef <name.dll>: that assembly's path in
-  $LauncherRefDir, or $null. A harness that names framework references
-  itself (with /noconfig, as the build does) takes them from here.
+  Find-LauncherRef <name.dll>: that assembly's path in $LauncherRefDir, or
+  $null. A harness that names framework references itself (with /noconfig,
+  as the build does) takes them from here.
+
+  Add-LauncherType -Source <code>[, <code>...] [-Reference <name.dll>|<path>...]:
+  what a harness calls where it would have called Add-Type on launcher or
+  setup code. It compiles the sources the way the build does ($LauncherCsc,
+  /langversion:$LauncherLangVersion, /noconfig, mscorlib and every
+  $LauncherNeeded assembly from $LauncherRefDir, and any -Reference), loads
+  the dll from its bytes and returns the assembly. A refusal throws, with
+  what the compiler said; off Windows, or without the Build Tools, it throws
+  saying so, so a harness asks $OnWindows before calling it.
+
+      $asm = Add-LauncherType -Source $configSrc, $noticeSrc
+      $T = $asm.GetType('Thornswood.FeedNotice')
+
+  Add-Type and CodeDom were never the build's compiler (#2821). Under
+  Windows PowerShell 5.1 they are the in-box .NET Framework csc, which stops
+  at C# 5, so a harness refused a line the build takes; under pwsh 7 they are
+  .NET's Roslyn against .NET 8's libraries, so a harness passed code the
+  build refuses on .NET Framework 4.8.1. Sixteen harnesses compiled launcher
+  files that way, and five text checks held those files to C# 5 for them.
+  What a harness compiles a script's own C# with (Signature.cs and
+  VortexProfileState.cs, which scripts load with Add-Type) stays theirs.
 
   WHY ONE PLACE (#498, 15 Oct). Until the switch every harness found the
   in-box .NET Framework csc by itself and compiled at /langversion:5, because
@@ -76,3 +97,40 @@ $launcherNs = New-Object Xml.XmlNamespaceManager($launcherProjXml.NameTable)
 $launcherNs.AddNamespace('m', 'http://schemas.microsoft.com/developer/msbuild/2003')
 $LauncherNeeded = @($launcherProjXml.SelectNodes('//m:Reference[not(m:HintPath)]/@Include', $launcherNs) | ForEach-Object { $_.Value.Trim() + '.dll' })
 $LauncherWv2Managed = @($launcherProjXml.SelectNodes('//m:Reference/m:HintPath', $launcherNs) | ForEach-Object { [IO.Path]::GetFileName($_.InnerText.Trim()) })
+
+function Add-LauncherType {
+    param(
+        [Parameter(Mandatory = $true)][string[]]$Source,
+        [string[]]$Reference = @()
+    )
+    if (-not $OnWindows) { throw 'Add-LauncherType: the compiler the build runs is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has. Ask $OnWindows first, and say what does not run.' }
+    if (-not (Test-Path -LiteralPath $LauncherCsc)) { throw ('Add-LauncherType: the compiler the build runs is not on this machine (' + $LauncherCsc + '). Developer-Guide.md "Setting up a machine" has the Build Tools install line.') }
+    $refs = New-Object System.Collections.Generic.List[string]
+    foreach ($r in @('mscorlib.dll') + $LauncherNeeded + $Reference) {
+        $p = if ([IO.Path]::IsPathRooted($r)) { $r } else { Find-LauncherRef $r }
+        if (-not $p -or -not (Test-Path -LiteralPath $p)) { throw ('Add-LauncherType: ' + $r + ' is not in ' + $LauncherRefDir + ', the reference assemblies the build compiles against.') }
+        if (-not $refs.Contains($p)) { $refs.Add($p) }
+    }
+    $dir = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-launchertype-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $null = New-Item -ItemType Directory -Force -Path $dir
+    try {
+        # One file a source, so what the compiler says names which one.
+        $files = for ($i = 0; $i -lt $Source.Count; $i++) {
+            $f = Join-Path $dir ('source' + $i + '.cs')
+            [IO.File]::WriteAllText($f, $Source[$i], (New-Object Text.UTF8Encoding($false)))
+            $f
+        }
+        $dll = Join-Path $dir 'launcher-type.dll'
+        # /noconfig and /nostdlib with mscorlib named, as MSBuild runs it: csc.rsp
+        # and the compiler's own mscorlib are the runtime's copies, not the 4.8.1
+        # reference assemblies the build compiles against.
+        $cscArgs = @('/noconfig', '/nostdlib+', '/nologo', '/target:library', ('/langversion:' + $LauncherLangVersion), ('/out:' + $dll)) +
+                   @($refs | ForEach-Object { '/reference:' + $_ }) + @($files)
+        $said = & $LauncherCsc @cscArgs 2>&1 | Out-String
+        if ($LASTEXITCODE -ne 0) { throw ('Add-LauncherType: the compiler the build runs refused it:' + [Environment]::NewLine + $said.TrimEnd()) }
+        # From its bytes, so the folder can go now.
+        [Reflection.Assembly]::Load([IO.File]::ReadAllBytes($dll))
+    } finally {
+        Remove-Item -LiteralPath $dir -Recurse -Force
+    }
+}

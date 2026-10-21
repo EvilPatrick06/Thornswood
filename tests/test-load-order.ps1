@@ -34,8 +34,10 @@
   THE LAUNCHER. LoadOrder.ps1 says it and launcher\app\LoadOrder.cs "are held to
   identical output by a test". No such test was in the repo: the commit that
   added both on 20 September measured it once, by hand. The last part of this
-  file compiles LoadOrder.cs and runs both sides over the same cases, so that
-  sentence is true from now on.
+  file compiles LoadOrder.cs, with the compiler the build runs
+  (Add-LauncherType, tests\Launcher-Csc.ps1, #2821; off Windows it says SKIP,
+  that compiler is only there), and runs both sides over the same cases, so
+  that sentence is true from now on.
 
   -LoadOrderPath and -LauncherPath point it at other copies, which is how it
   was shown to fail on a broken rule before it was trusted to pass.
@@ -55,6 +57,7 @@ $Here = Split-Path -Parent $Here
 if (-not $LoadOrderPath) { $LoadOrderPath = Join-Path $Here 'scripts\mods\LoadOrder.ps1' }
 if (-not $LauncherPath) { $LauncherPath = Join-Path $Here 'launcher\app\LoadOrder.cs' }
 . $LoadOrderPath
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -541,19 +544,14 @@ try {
     # stubs above are handed to it as the same Func<string, bool> the launcher
     # passes.
     $cs = $null
-    try {
-        $added = Add-Type -TypeDefinition ([IO.File]::ReadAllText($LauncherPath)) -PassThru -ErrorAction Stop
-        foreach ($ty in @($added)) { if ($ty.FullName -eq 'Thornswood.LoadOrder') { $cs = $ty } }
-        if ($null -eq $cs) {
-            foreach ($asm in [AppDomain]::CurrentDomain.GetAssemblies()) {
-                $ty = $asm.GetType('Thornswood.LoadOrder', $false)
-                if ($null -ne $ty) { $cs = $ty; break }
-            }
-        }
-    } catch {
-        Write-Host ('      ' + $_.Exception.Message) -ForegroundColor Red
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the launcher applies the same rule: LoadOrder.cs is compiled with the compiler the build runs, the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
     }
-    Yes 'launcher\app\LoadOrder.cs compiles on its own' ($null -ne $cs)
+    else {
+        try { $cs = (Add-LauncherType -Source ([IO.File]::ReadAllText($LauncherPath))).GetType('Thornswood.LoadOrder') }
+        catch { Write-Host ('      ' + $_.Exception.Message) -ForegroundColor Red }
+        Yes 'launcher\app\LoadOrder.cs compiles on its own, with the compiler the build runs' ($null -ne $cs)
+    }
 
     if ($null -ne $cs) {
         function Cs([string]$name, [object[]]$argv) { return (Show ($cs.GetMethod($name).Invoke($null, $argv))) }

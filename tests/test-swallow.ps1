@@ -30,7 +30,9 @@
        empty catch in a copy of the real site\server.js or bot\bot.py goes
        red against the real baseline's own line for it.
     4. Swallow.Note, compiled from the real Swallow.cs with a stand-in for
-       Paths, and called. It has to write the line, and it has to not throw
+       Paths, with the compiler the build runs (Add-LauncherType,
+       tests\Launcher-Csc.ps1, #2821; off Windows that part says SKIP), and
+       called. It has to write the line, and it has to not throw
        with no log set, with the log's folder missing, or with the log held
        open by something else, because a helper that throws from inside a
        catch is worse than the empty catch it replaced.
@@ -51,6 +53,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoPath) { $RepoPath = $Here }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -467,9 +470,14 @@ namespace $ns
 }
 "@
     $compiled = $false
-    try { Add-Type -TypeDefinition ($src + "`r`n" + $stand) -Language CSharp; $compiled = $true }
-    catch { Write-Host ("      " + $_.Exception.Message) }
-    Yes 'Swallow.cs compiles on its own with only Paths.LogFile beside it' $compiled
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  4, Swallow.Note compiled and called: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    }
+    else {
+        try { $null = Add-LauncherType -Source $src, $stand; $compiled = $true }
+        catch { Write-Host ("      " + $_.Exception.Message) }
+        Yes 'Swallow.cs compiles on its own with only Paths.LogFile beside it, with the compiler the build runs' $compiled
+    }
 
     if ($compiled) {
         $door = [type]($ns + '.Door')
@@ -508,7 +516,7 @@ namespace $ns
     Yes 'Swallow.cs never calls Shell.Log' ($body -notmatch '\bLog\s*\(')
     Yes 'Swallow.cs touches no control, window or dispatcher' ($body -notmatch 'txtStatus|Dispatcher|MessageBox|System\.Windows')
     Yes 'Swallow.cs writes straight to Paths.LogFile' ($body -match 'Paths\.LogFile' -and $body -match 'File\.AppendAllText')
-    Yes 'Swallow.cs is C# 5: no interpolation, ?., nameof or =>' ($body -notmatch '\$"|\?\.|\bnameof\b|=>')
+
     Yes 'Swallow.cs has no silent catch of its own' (-not ([regex]'\bcatch\s*(\([^)]*\))?\s*\{\s*\}').IsMatch($src))
 }
 finally {

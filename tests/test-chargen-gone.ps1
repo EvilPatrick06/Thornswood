@@ -54,7 +54,9 @@
        shipping machine out of the pack.
     4. The launcher side, compiled. OwnGame's Skip and Foreign, and Keep's
        Seed and Forget, are lifted by text out of the launcher source and
-       compiled against stubs for Paths and Checks. Then the whole sequence
+       compiled against stubs for Paths and Checks, with the compiler the
+       build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821; off
+       Windows 4 and 5 say SKIP, that compiler is only there). Then the whole sequence
        runs on scratch folders: a Steam copy holding the old dresser, a game
        folder and a kept copy holding the stub, the pack's delete.txt with
        Keep.Forget, a refresh modelled on OwnGame.Refresh's own loop, and
@@ -389,12 +391,14 @@ namespace $ns
     }
 }
 "@
+if (-not $OnWindows) {
+    Write-Host 'SKIP  4 and 5, OwnGame''s Skip and Foreign and Keep''s Seed and Forget compiled and run: their compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+    Done
+}
 $compiled = $true
-try {
-    if ($PSVersionTable.PSEdition -eq 'Core') { Add-Type -TypeDefinition $cs -Language CSharp }
-    else { Add-Type -TypeDefinition $cs -Language CSharp -ReferencedAssemblies 'System.Core' }
-} catch { $compiled = $false; Write-Host ('      ' + $_.Exception.Message) }
-Yes 'OwnGame''s Skip and Foreign and Keep''s Seed and Forget compile as lifted' $compiled
+try { $null = Add-LauncherType -Source $cs }
+catch { $compiled = $false; Write-Host ('      ' + $_.Exception.Message) }
+Yes 'OwnGame''s Skip and Foreign and Keep''s Seed and Forget compile as lifted, with the compiler the build runs' $compiled
 if (-not $compiled) { Done }
 $OwnGameT = [type]($ns + '.OwnGame')
 $KeepT    = [type]($ns + '.Keep')
