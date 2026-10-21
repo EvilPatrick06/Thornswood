@@ -24,9 +24,10 @@
     - a maintenance value that is not plainly on holds nothing, and a value
       that would have thrown as a bool reads without a word
 
-  The C# is compiled under Windows PowerShell, which hands it to the .NET
-  Framework csc, the same C# 5 compiler Build-Launcher.ps1 uses, and runs it on
-  the same serializer the launcher reads the feed with. Measured on 24
+  The C# is compiled with the compiler the build runs, at the C# version the
+  project names (Add-LauncherType, tests\Launcher-Csc.ps1, #2821), and run
+  under Windows PowerShell on the same serializer the launcher reads the feed
+  with. Measured on 24
   September: that serializer turns "maintenance": null or "yes" on a bool field
   into an exception, and an exception there is the whole document unread and
   Play shut for everybody. Under pwsh this hands itself to powershell.exe for
@@ -36,8 +37,8 @@
   the log line is gone, the hold is on the button and in Play(), it can only be
   set from a document that was read, and the bar has a grid row of its own.
 
-  Read only. The compiler writes its scratch files under the temp folder and
-  cleans them up.
+  Read only. The compiler writes its dll under the temp folder, and it is
+  removed once loaded.
 #>
 [CmdletBinding()]
 param(
@@ -55,13 +56,14 @@ if (-not $Xaml) { $Xaml = Join-Path $Here 'launcher\ui.xaml' }
 
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
-# The launcher's compiler and serializer are the .NET Framework's, so the
-# answer has to come from there and not from .NET under pwsh.
+# The launcher's serializer is the .NET Framework's, so the answer has to come
+# from there and not from .NET under pwsh.
 if ($PSVersionTable.PSEdition -eq 'Core') {
     $wp = Get-WindowsPowerShell
     & $wp -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -AppDir $AppDir -Xaml $Xaml
     exit $LASTEXITCODE
 }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -130,20 +132,12 @@ $updaterStub = "using System;`r`nnamespace Thornswood`r`n{`r`n    static class U
                $isNewer + "`r`n" + $parts + "`r`n    }`r`n}`r`n"
 
 # ---- compile Config.cs, FeedNotice.cs and the comparison --------------------
-$provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-$cp = New-Object System.CodeDom.Compiler.CompilerParameters
-$cp.GenerateInMemory = $true
-$cp.GenerateExecutable = $false
-foreach ($r in @('System.dll', 'System.Core.dll', 'System.Xml.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll')) {
-    [void]$cp.ReferencedAssemblies.Add($r)
-}
-$built = $provider.CompileAssemblyFromSource($cp, [string[]]@($configSrc, $secretsSrc, $swallowSrc, $pathsStub, $noticeSrc, $updaterStub))
-$errors = @($built.Errors | Where-Object { -not $_.IsWarning })
-foreach ($e in $errors) { Write-Host ('      ' + [IO.Path]::GetFileName($e.FileName) + ':' + $e.Line + '  ' + $e.ErrorNumber + '  ' + $e.ErrorText) }
-Yes 'Config.cs and FeedNotice.cs compile with the .NET Framework C# compiler' ($errors.Count -eq 0)
-if ($errors.Count) { Done }
+$asm = $null
+try { $asm = Add-LauncherType -Source $configSrc, $secretsSrc, $swallowSrc, $pathsStub, $noticeSrc, $updaterStub }
+catch { Write-Host ('      ' + $_.Exception.Message) }
+Yes 'Config.cs and FeedNotice.cs compile with the compiler the build runs' ($null -ne $asm)
+if ($null -eq $asm) { Done }
 
-$asm = $built.CompiledAssembly
 $DocT = $asm.GetType('Thornswood.VersionDoc')
 $NoticeT = $asm.GetType('Thornswood.FeedNotice')
 $UpdaterT = $asm.GetType('Thornswood.Updater')

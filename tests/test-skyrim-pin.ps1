@@ -22,9 +22,11 @@
     - the record, the compiled fallback and Setup-Thornswood.ps1 agree
 
   Config.cs is compiled whole and the pin methods are lifted out of
-  Downgrade.cs by brace matching, under Windows PowerShell, so it is the .NET
-  Framework csc (C# 5) and the same serializer the launcher reads the feed
-  with. Under pwsh this hands itself to powershell.exe for that reason.
+  Downgrade.cs by brace matching, with the compiler the build runs at the C#
+  version the project names (Add-LauncherType, tests\Launcher-Csc.ps1,
+  #2821), and run under Windows PowerShell, on the same serializer the
+  launcher reads the feed with. Under pwsh this hands itself to
+  powershell.exe for that reason.
 
   Read only apart from its own scratch folder under the temp folder, which it
   removes.
@@ -46,6 +48,7 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     & $wp -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Root $Root
     exit $LASTEXITCODE
 }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -108,9 +111,6 @@ foreach ($k in $wanted.Keys) {
     Yes "Downgrade.cs has $k" ($null -ne $m)
     if ($null -eq $m) { Done }
     [void]$lifted.AppendLine($m)
-    if ($k -ne 'FallbackDepots') {
-        Yes "$k is C# 5: no interpolated string, no ?., no nameof, no out var" (-not ($m -match '\$"|\?\.|\bnameof\s*\(|\bout var\b'))
-    }
 }
 $newerConst = [regex]::Match($downSrc, '(?m)^\s*public const long NewerExeBytes = (\d+);')
 $appIdConst = [regex]::Match($downSrc, '(?m)^\s*const int AppId = (\d+);')
@@ -142,20 +142,12 @@ namespace Older
 }
 '@
 
-$provider = New-Object Microsoft.CSharp.CSharpCodeProvider
-$cp = New-Object System.CodeDom.Compiler.CompilerParameters
-$cp.GenerateInMemory = $true
-$cp.GenerateExecutable = $false
-foreach ($r in @('System.dll', 'System.Core.dll', 'System.Xml.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll')) {
-    [void]$cp.ReferencedAssemblies.Add($r)
-}
-$built = $provider.CompileAssemblyFromSource($cp, [string[]]@($configSrc, $secretsSrc, $swallowSrc, $pathsStub, $downStub, $oldDoc))
-$errors = @($built.Errors | Where-Object { -not $_.IsWarning })
-foreach ($e in $errors) { Write-Host ('      ' + $e.Line + '  ' + $e.ErrorNumber + '  ' + $e.ErrorText) }
-Yes 'Config.cs and the pin methods compile with the .NET Framework C# compiler' ($errors.Count -eq 0)
-if ($errors.Count) { Done }
+$asm = $null
+try { $asm = Add-LauncherType -Source $configSrc, $secretsSrc, $swallowSrc, $pathsStub, $downStub, $oldDoc }
+catch { Write-Host ('      ' + $_.Exception.Message) }
+Yes 'Config.cs and the pin methods compile with the compiler the build runs' ($null -ne $asm)
+if ($null -eq $asm) { Done }
 
-$asm = $built.CompiledAssembly
 $DocT = $asm.GetType('Thornswood.VersionDoc')
 $CfgT = $asm.GetType('Thornswood.Config')
 $DownT = $asm.GetType('Thornswood.Downgrade')

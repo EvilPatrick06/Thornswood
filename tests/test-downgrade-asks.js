@@ -151,14 +151,6 @@ yes('no em or en dash in the words', !/[–—]/.test(words));
 const noLine = (afterAsk.match(/Log\("([^"]+)"\)/) || [])[1] || '';
 yes('the log line for No is plain words too', noLine.length > 0 && !/player/i.test(noLine) && !/[–—]/.test(noLine));
 
-// ---- C# 5 --------------------------------------------------------------------
-for (const [name, src] of [['RunDowngrade', run], ['Downgrade.Commands', commandsBody], ['Downgrade.PinnedDepots', body(DOWN, 'static string[][] PinnedDepots(Config cfg)')], ['Downgrade.AdoptPin', body(DOWN, 'public static bool AdoptPin(Config cfg, VersionDoc v)')], ['Downgrade.Command', body(DOWN, 'static string Command(string[] depot)')]]) {
-  yes(name + ' is C# 5: no interpolated strings', !/\$"/.test(src));
-  yes(name + ' is C# 5: no ?.', !/\?\./.test(src));
-  yes(name + ' is C# 5: no nameof, no out var', !/\bnameof\s*\(/.test(src) && !/\bout var\b/.test(src));
-  yes(name + ' is C# 5: no expression bodied member', src.length > 0 && !/\)\s*=>/.test(src.split('\n')[0]));
-}
-
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

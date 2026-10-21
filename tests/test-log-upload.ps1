@@ -26,8 +26,10 @@
      there has ever been.
 
   This lifts the real methods out of launcher\app\Discord.cs by text and compiles
-  them, so what is under test is the shipped code rather than a copy of it,
-  and a rename fails loudly. The JSON is read by node's JSON.parse, which is
+  them with the compiler the build runs (Add-LauncherType,
+  tests\Launcher-Csc.ps1, #2821; off Windows it says SKIP, that compiler is
+  only there), so what is under test is the shipped code rather than a copy of
+  it, and a rename fails loudly. The JSON is read by node's JSON.parse, which is
   what the site reads it with.
 
   Read only apart from files under its own temp folder.
@@ -41,6 +43,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 $src = [IO.File]::ReadAllText((Join-Path $Here 'launcher\app\Discord.cs'))
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0; $script:fail = 0
 function Yes($what, $cond) {
@@ -95,13 +98,16 @@ $code = "using System;`nusing System.Globalization;`nusing System.IO;`nusing Sys
         "public static class $name`n{`nconst int LogTailBytes = 192 * 1024;`n" +
         ($parts -join "`n") + "`n}`n"
 $T = $null
-try {
-  Add-Type -TypeDefinition $code -Language CSharp
-  $T = $name -as [type]
-} catch {
-  Write-Host ("the lifted methods did not compile: " + $_.Exception.Message)
+if (-not $OnWindows) {
+  Write-Host 'SKIP  the lifted methods, compiled and run: their compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+} else {
+  try {
+    $T = (Add-LauncherType -Source $code).GetType($name)
+  } catch {
+    Write-Host ("the lifted methods did not compile: " + $_.Exception.Message)
+  }
+  Yes 'the lifted methods compile, with the compiler the build runs' ($null -ne $T)
 }
-Yes 'the lifted methods compile' ($null -ne $T)
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-logupload-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $root
