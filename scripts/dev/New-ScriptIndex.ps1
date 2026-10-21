@@ -187,7 +187,11 @@ function Get-IndexText([string]$dir) {
     $out = New-Object System.Collections.Generic.List[string]
     $out.Add('# The PowerShell scripts')
     $out.Add('')
-    $out.Add('Every `.ps1` under this folder, ' + $names.Count + ' of them, by area: `release` builds and')
+    # No count of the scripts in this text (#2755). Two pull requests that each
+    # added two scripts to the same base each wrote 225; git merged all four rows
+    # and the one identical number without a conflict, so main's file said 225
+    # beside 227 rows and failed every build after it. The rows are the count.
+    $out.Add('Every `.ps1` under this folder, by area: `release` builds and')
     $out.Add('ships, `deploy` puts things on the VPS, `vps` looks after the box, `ops` runs')
     $out.Add('the world day to day, `mods` works on the collection and the plugins, `dev`')
     $out.Add('is for whoever is changing this repository. `oneoff` holds finished one time')

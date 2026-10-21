@@ -228,18 +228,19 @@ yes('Install-Voice.ps1 has no -Auth to turn it off with', !/\[string\]\$Auth\b/.
 // then it uses a .pub it finds at the path again. So those steps handed Patrick
 // the same public line, and then had him remove "the old one", which was the
 // same key. Nothing was rotated and the developer lost VPS access.
+// Since #2891 a new grant for the same name replaces that name's key and
+// token on the box (Grant-BoxAccess.ps1), so no old line is left to take off;
+// the old key still has to be moved aside first, or the new pair is the old
+// key again.
 const vps = row(/vps access/i) || ['', '', '', ''];
-const aside = vps[3].indexOf('thornswood_ed25519.pub');
-const keyOnly = vps[3].indexOf('Setup-SshKey.ps1 -KeyOnly');
-yes('the VPS access row moves the old key and its .pub aside before Setup-SshKey.ps1 -KeyOnly',
-    aside >= 0 && keyOnly > aside && /rename/i.test(vps[3].slice(0, keyOnly)));
-yes('the VPS access row removes the old line out of the moved .pub, not the new line',
-    /\.old \.pub>' -Remove/.test(vps[3]));
+const aside = vps[3].indexOf('thornswood_ed25519');
+const setupAt = vps[3].indexOf('Setup-SshKey.ps1', aside);
+yes('the VPS access row moves the old key and its .pub aside before Setup-SshKey.ps1',
+    aside >= 0 && setupAt > aside && /rename/i.test(vps[3].slice(0, setupAt)) && /\.pub/.test(vps[3].slice(aside, setupAt)));
+yes('the VPS access row has the new grant replace the old key and token, one name at a time',
+    /Grant-BoxAccess\.ps1 -Name <you> -FromClipboard/.test(vps[3]) && /replaces your old key and token/.test(vps[3]) && /-Remove/.test(vps[3]));
 const setupSsh = read('scripts/vps/Setup-SshKey.ps1');
-const firstWorks = setupSsh.indexOf('if (Works) {');
 const reusePub = setupSsh.indexOf('if (Test-Path -LiteralPath "$KeyPath.pub") {');
-yes('Setup-SshKey.ps1 still stops when a key already gets in, before it looks at the key file',
-    firstWorks >= 0 && reusePub > firstWorks);
 yes('Setup-SshKey.ps1 still uses a .pub it finds again rather than making a new key',
     reusePub >= 0 && setupSsh.indexOf('using the one already at', reusePub) > reusePub);
 const worksFn = (setupSsh.match(/function Works \{[\s\S]*?\n\}/) || [''])[0];

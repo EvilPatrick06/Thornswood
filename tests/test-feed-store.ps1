@@ -122,6 +122,13 @@ try {
     $dir = Get-FeedStoreDir 'dev'
     Yes 'the dev working folder is under LOCALAPPDATA, not a clone beside the repo' ($dir -eq (Join-Path $appdata 'Thornswood\feed\dev'))
     Yes 'and main has its own' ((Get-FeedStoreDir 'main') -eq (Join-Path $appdata 'Thornswood\feed\main'))
+    # With no LOCALAPPDATA, as off Windows, it is Where.ps1's answer rather
+    # than a null path (#2903).
+    $env:LOCALAPPDATA = $null
+    try {
+        $platformDev = Join-Path (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Thornswood') 'feed\dev'
+        Yes 'with no LOCALAPPDATA the dev working folder is in the platform''s folder for this machine''s data (#2903)' ((Get-FeedStoreDir 'dev') -eq $platformDev)
+    } finally { $env:LOCALAPPDATA = $appdata }
     $read = Receive-FeedStore 'dev' $dir -SiteDir $site
     Yes 'both files arrive byte for byte' ((Sha (Join-Path $dir 'version.json')) -eq (Sha (Feed (Join-Path $site 'feed-dev'))) -and
                                           (Sha (Join-Path $dir 'published.json')) -eq (Sha (Join-Path $site 'feed-dev\published.json')))

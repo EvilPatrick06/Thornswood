@@ -58,7 +58,7 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 # Same rule as Find-Root in Publish-Update.ps1 / Repair-Manifest.ps1, kept
 # identical so Sync-Client copies into the install this machine's launcher
 # actually uses. No shared helper yet: that would pull Find-Root out of
-# Publish-Update.ps1, which needs a line in #staff-general first.
+# Publish-Update.ps1, which needs a line in #staff-updates first.
 function Find-Root {
     $first = 'C:\Thornswood'
     if (Test-Path -LiteralPath (Join-Path $first 'Launcher\Thornswood.exe')) { return $first }

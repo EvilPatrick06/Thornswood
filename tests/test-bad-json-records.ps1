@@ -27,9 +27,15 @@ function Yes([string]$what, [bool]$cond) {
 $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-badjson-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 [void][IO.Directory]::CreateDirectory($T)
 function W([string]$p, [string]$t) { [void][IO.Directory]::CreateDirectory((Split-Path -Parent $p)); [IO.File]::WriteAllText($p, $t, (New-Object Text.UTF8Encoding($false))) }
+# Each script runs through this launcher so its error comes back as written:
+# pwsh's default error view wraps a message at the console's width, breaking
+# the path in it when the temp folder's path is long (#2933). The exit code is
+# the one -File would give.
+$childRun = Join-Path $T 'run-child.ps1'
+W $childRun "`$global:ErrorView = 'NormalView'`r`n`$script, `$rest = `$args`r`n& `$script @rest`r`nif (-not `$?) { exit `$LASTEXITCODE }`r`nexit 0`r`n"
 function Child([string[]]$a) {
     $ErrorActionPreference = 'Continue'
-    $o = & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File @a 2>&1 | Out-String
+    $o = & $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $childRun @a 2>&1 | Out-String
     return @{ Code = $LASTEXITCODE; Out = ($o -replace '\s+', ' ') }
 }
 $bad = [ordered]@{ 'empty' = ''; 'cut off' = '{"files": {"a": {"sha256": "ab'; 'not JSON' = 'this is not json' }
@@ -84,9 +90,10 @@ try {
     # put in at each break. On the nightly runner the scratch path is long
     # enough that the break fell inside 'is not valid JSON' (#1273), so the
     # sentence is read from the exception itself, the way the Ship-Rules
-    # case below reads its throw.
+    # case below reads its throw. It asks for Out, a place layout.json
+    # holds: Repo and this machine's own places never read it (#2903).
     $whCall = Join-Path $wh 'call.ps1'
-    W $whCall ("`$ErrorActionPreference = 'Stop'`ntry { `$null = & '" + (Join-Path $wh 'scripts\release\Where.ps1').Replace("'", "''") + "' Repo; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
+    W $whCall ("`$ErrorActionPreference = 'Stop'`ntry { `$null = & '" + (Join-Path $wh 'scripts\release\Where.ps1').Replace("'", "''") + "' Out; 'ANSWERED' } catch { 'THREW ' + `$_.Exception.Message; exit 1 }`n")
     foreach ($k in $bad.Keys) {
         W (Join-Path $wh 'layout.json') $bad[$k]
         $r = Child @($whCall)

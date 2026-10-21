@@ -101,6 +101,7 @@ try {
   fs.mkdirSync(path.join(repo, "game", "data"), { recursive: true });
   const ps1 = path.join(repo, "scripts", "dev", "Build-OreTable.ps1");
   fs.writeFileSync(ps1, script);
+  fs.copyFileSync(path.join(REPO_DIR, "scripts", "dev", "OwnPlugins.ps1"), path.join(repo, "scripts", "dev", "OwnPlugins.ps1"));
   const gm = path.join(repo, "game", "gamemode.js");
   const out = path.join(repo, "game", "data", "ores.json");
 

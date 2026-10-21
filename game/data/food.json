@@ -1,13 +1,13 @@
 {
- "builtBy": "toolsBuild-FoodTable.js",
- "builtAt": "2026-09-24T23:03:40.858Z",
+ "builtBy": "scriptsdevBuild-FoodTable.js",
+ "builtAt": "2026-10-20T17:06:52.685Z",
  "source": "the ALCH records of the plugins in load order",
  "readFrom": "ENIT for the food and poison flags, FULL for the name",
  "note": "what a kind is WORTH is balance and lives in NEEDS in gamemode.js",
- "count": 458,
+ "count": 461,
  "byKind": {
   "food": 97,
-  "drink": 38,
+  "drink": 41,
   "ale": 35,
   "potion": 208,
   "poison": 80
@@ -4134,6 +4134,33 @@
    "name": "Goodberry",
    "kind": "food",
    "gold": 50
+  },
+  "18001:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x18001",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodTeaLavender",
+   "name": "Lavender Tea",
+   "kind": "drink",
+   "gold": 5
+  },
+  "18002:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x18002",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodTeaJuniper",
+   "name": "Juniper Tea",
+   "kind": "drink",
+   "gold": 5
+  },
+  "18003:Thornswood-Content.esp": {
+   "file": "Thornswood-Content.esp",
+   "local": "0x18003",
+   "from": "Thornswood-Content.esp",
+   "edid": "ThornswoodFoodTeaSnowberry",
+   "name": "Snowberry Tea",
+   "kind": "drink",
+   "gold": 5
   }
  }
 }

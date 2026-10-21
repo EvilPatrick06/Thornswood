@@ -71,8 +71,11 @@ import os
 import struct
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import own_plugins  # noqa: E402
+
 COMPRESSED = 0x00040000
-MASTERS = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']
+MASTERS = own_plugins.MASTERS
 RANKS = ['novice', 'advanced', 'expert', 'master']
 # The record types a bench can be. A crafting station is FURN; the grain mill and
 # a handful of modded stations are ACTI.
@@ -296,31 +299,17 @@ def main():
             a['halves'][half] = rank
 
     # ------------------------------------------------- the load order, once
-    # Vortex marks the plugins that are switched on with '*'. A line without one
-    # is a plugin it knows about and has switched off: the game does not load it
-    # and the server never sees its records, so it is not part of this build.
-    # Until 5 October this read every line and only stripped the '*', so
-    # collection revision 2's five switched off plugins, three of them not in the
-    # game folder at all, stopped it (issue #1712).
-    order = list(MASTERS)
-    off = 0
-    for line in io.open(args.plugins, encoding='utf-8', errors='replace'):
-        line = line.strip()
-        if not line or line.startswith('#'):
-            continue
-        if not line.startswith('*'):
-            off += 1
-            continue
-        line = line[1:].strip()
-        if line and line not in order:
-            order.append(line)
+    # A switched off line is not part of this build: the game does not load it
+    # and the server never sees its records (#1712, own_plugins.load_order).
+    order, off = own_plugins.read_plugins_txt(args.plugins)
+    off = len(off)
     print('Load order')
     print('  %d plugin(s): the five masters, then %s' % (len(order), args.plugins))
     if off:
         print('  %d line(s) in that list are switched off and were left out' % off)
     print('')
 
-    missing = [n for n in order if not os.path.isfile(os.path.join(args.data, n))]
+    missing = [n for n in order if not os.path.isfile(own_plugins.plugin_path(args.data, n))]
     if missing:
         print('STOP. %d plugin(s) in the load order are not in %s: %s'
               % (len(missing), args.data, ', '.join(missing[:6])))
@@ -332,7 +321,7 @@ def main():
     # leaves open to everybody.
     keywords = {}
     for name in order:
-        scan(os.path.join(args.data, name), name, set(), keywords)
+        scan(own_plugins.plugin_path(args.data, name), name, set(), keywords)
 
     # An unowned recipe is one anybody may make, so its bench opens for everyone.
     no_desc = set()
@@ -409,7 +398,7 @@ def main():
     wanted = set(access)
     by_base = {}
     for name in order:
-        for base, keyword in scan(os.path.join(args.data, name), name, wanted):
+        for base, keyword in scan(own_plugins.plugin_path(args.data, name), name, wanted):
             # Last in the load order wins, because that is the record the game
             # is using, the same rule Build-RecipeTable settles overrides with.
             by_base[base] = keyword

@@ -1,8 +1,8 @@
 # Cook/Hearthcook
 
-Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 53 recipes, 53 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
+Generated from `game/data/recipes.json` by `scripts/dev/Write-SystemLists.js`. 56 recipes, 56 of them reach the server. A row the server is not asked about is tempering: the armour table and the grindstone never call the server.
 
-By rank: novice 26, advanced 17, expert 7, master 3.
+By rank: novice 28, advanced 18, expert 7, master 3.
 
 | Item | Makes | Rank | Kind | Bench | Asks for | Race | Server asked | Id |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -18,6 +18,8 @@ By rank: novice 26, advanced 17, expert 7, master 3.
 | Rabbit Haunch | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Raw Rabbit Leg |  | yes | `f430f:Skyrim.esm` |
 | Venison Chop | 1 | novice | Meat dishes | Cookpot | 1 Salt Pile, 1 Venison |  | yes | `f4311:Skyrim.esm` |
 | Cooked Dog | 1 | novice | Other food and drink | Cookpot | 1 Salt Pile, 1 Dog Meat |  | yes | `8ab:Gourmet.esp` |
+| Juniper Tea | 1 | novice | Other food and drink | Cookpot | 2 Juniper Berries |  | yes | `18012:Thornswood-Content.esp` |
+| Lavender Tea | 1 | novice | Other food and drink | Cookpot | 2 Lavender |  | yes | `18011:Thornswood-Content.esp` |
 | Roasted Mushrooms | 1 | novice | Other food and drink | Cookpot | 1 Garlic, 1 Namira's Rot, 1 Butter |  | yes | `904:Gourmet.esp` |
 | Sack of Flour | 1 | novice | Other food and drink | isGrainMill | 1 Wheat |  | yes | `17ec3:HearthFires.esm` |
 | Cabbage Soup | 1 | novice | Soups | Cookpot | 1 Salt Pile, 1 Cabbage, 1 Leek |  | yes | `3cd5c:Dragonborn.esm` |
@@ -44,6 +46,7 @@ By rank: novice 26, advanced 17, expert 7, master 3.
 | Horse Haunch | 1 | advanced | Meat dishes | Cookpot | 1 Salt Pile, 1 Horse Meat |  | yes | `f430c:Skyrim.esm` |
 | Roasted Glowing Mushroom | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Glowing Mushroom, 1 Butter |  | yes | `906:Gourmet.esp` |
 | Roasted Wild Mushrooms | 1 | advanced | Other food and drink | Cookpot | 1 Garlic, 1 Scaly Pholiota, 1 Butter |  | yes | `905:Gourmet.esp` |
+| Snowberry Tea | 1 | advanced | Other food and drink | Cookpot | 2 Snowberries |  | yes | `18013:Thornswood-Content.esp` |
 | Ash Yam Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Garlic, 1 Horker Meat, 1 Ash Yam |  | yes | `3cd5d:Dragonborn.esm` |
 | Tomato Soup | 1 | advanced | Soups | Cookpot | 1 Salt Pile, 1 Tomato, 1 Leek |  | yes | `f4318:Skyrim.esm` |
 | Ash Hopper Stew | 1 | advanced | Stews | Cookpot | 1 Salt Pile, 1 Frost Mirriam, 1 Ash Hopper Meat, 1 Ash Hopper Leg |  | yes | `81b:Gourmet.esp` |

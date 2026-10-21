@@ -131,6 +131,9 @@ fs.writeFileSync(path.join(DATA, 'Update.esm'), plugin(0x81, ['Skyrim.esm'], [
   alch(0x00034c5e, 'Ale', 0x25a6, true),
   alch(0x00065c37, 'RiftenSpecial01', 0x46e4, true)
 ]));
+// The other three masters carry no food here, but a game folder holds them and
+// the builder stops on a plugin of the load order that is not on disk (#2976).
+for (const m of ['Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) { fs.writeFileSync(path.join(DATA, m), plugin(0x81, ['Skyrim.esm'], [])); }
 fs.writeFileSync(path.join(DATA, 'LowerCase.esp'), plugin(0, ['skyrim.esm'], [
   alch(0x00064b41, 'FoodPotato', 'Potato', true)
 ]));
@@ -148,6 +151,7 @@ fs.writeFileSync(path.join(DATA, 'Gourmet.esp'), plugin(0x200, FIVE, [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*LowerCase.esp', '*Gourmet.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'Build-FoodTable.js'), path.join(TMP, 'scripts', 'dev', 'Build-FoodTable.js'));
+fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'OwnPlugins.js'), path.join(TMP, 'scripts', 'dev', 'OwnPlugins.js'));
 fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
   ['const WARMTH = {"items":{}};', 'const FOODS = {"items":{}};', ''].join(String.fromCharCode(10)));
 
@@ -162,7 +166,7 @@ function installed() {
 
 const run1 = build();
 if (run1.status !== 0) { console.log(run1.stdout + run1.stderr); }
-yes('A1 the builder runs on a load order of four plugins and exits 0', run1.status === 0);
+yes('A1 the builder runs on a load order of seven plugins and exits 0', run1.status === 0);
 const got = installed() || {};
 const built = (function () {
   try { return JSON.parse(fs.readFileSync(path.join(TMP, 'game', 'data', 'food.json'), 'utf8')).items; }

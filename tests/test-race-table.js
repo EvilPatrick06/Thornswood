@@ -135,6 +135,9 @@ fs.writeFileSync(path.join(DATA, 'Update.esm'), plugin(0x81, ['Skyrim.esm'], [
 fs.writeFileSync(path.join(DATA, 'Dawnguard.esm'), plugin(0x81, ['Skyrim.esm', 'Update.esm'], [
   race(0x00088794, 'NordRaceVampire', 0x2a1f, false)
 ]));
+// HearthFires.esm carries no race here, but a game folder holds it and the
+// builder stops on a plugin of the load order that is not on disk (#2976).
+fs.writeFileSync(path.join(DATA, 'HearthFires.esm'), plugin(0x81, ['Skyrim.esm', 'Update.esm'], []));
 fs.writeFileSync(path.join(DATA, 'Dragonborn.esm'), plugin(0x81, ['Skyrim.esm', 'Update.esm'], [
   race(0x001052a3, 'UndeadDragonRace', 0x8c01, false),
   race(0x02017f44, 'DLC2RieklingRace', 0x3c11, false)
@@ -151,6 +154,7 @@ fs.writeFileSync(path.join(DATA, 'LowerCase.esp'), plugin(0, ['skyrim.esm'], [
 fs.writeFileSync(path.join(TMP, 'Profile', 'Default', 'plugins.txt'),
   ['*RaceMod.esp', '*LowerCase.esp', ''].join(String.fromCharCode(13, 10)));
 fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'Build-RaceTable.js'), path.join(TMP, 'scripts', 'dev', 'Build-RaceTable.js'));
+fs.copyFileSync(path.join(REPO, 'scripts', 'dev', 'OwnPlugins.js'), path.join(TMP, 'scripts', 'dev', 'OwnPlugins.js'));
 fs.writeFileSync(path.join(TMP, 'game', 'gamemode.js'),
   ['const FOODS = {"items":{}};', 'const RACES = {"items":{}};', ''].join(String.fromCharCode(10)));
 
@@ -165,7 +169,7 @@ function installed() {
 
 const run1 = build();
 if (run1.status !== 0) { console.log(run1.stdout + run1.stderr); }
-yes('A1 the builder runs on a load order of six plugins and exits 0', run1.status === 0);
+yes('A1 the builder runs on a load order of seven plugins and exits 0', run1.status === 0);
 const got = installed() || {};
 const built = (function () {
   try { return JSON.parse(fs.readFileSync(path.join(TMP, 'game', 'data', 'races.json'), 'utf8')).items; }

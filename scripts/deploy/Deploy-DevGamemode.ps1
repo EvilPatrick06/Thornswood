@@ -394,7 +394,7 @@ $rootWin = $Root.Replace('/', '\')
 # BuildStamp.ps1. -RepoDir is this script's own repo, which is the branch being
 # tried, and the dev feed is where the four part number lives.
 . (Join-Path $Here '..\release\BuildStamp.ps1')
-$stampFile = Join-Path $env:TEMP 'thornswood-dev-build.json'
+$stampFile = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-dev-build.json'
 $buildStamp = Save-ThornswoodBuildStamp -Gamemode $Gamemode -Channel dev -RepoDir (Split-Path -Parent (Split-Path -Parent $Here)) -Path $stampFile -Artifact $artifact
 Write-Host ('  build stamp: ' + (Format-ThornswoodBuildStamp $buildStamp))
 
@@ -503,7 +503,10 @@ if ($LoadOrder) {
   }
 
   foreach ($n in $pluginNames) {
-    $local = Join-Path $Data $n
+    # Combine, not Join-Path: a machine with no game folder (a cloud one, #2903)
+    # has no C: drive, and Join-Path refuses a path on a drive that is not
+    # there. The path then just is not there, which is the case handled below.
+    $local = [IO.Path]::Combine($Data, $n)
     # Ours (RepoPlugins.ps1) comes from the repo, never -Data (#2486).
     $isOurs = $false
     if (Test-ThornswoodRepoPlugin $n) {
@@ -569,7 +572,7 @@ if ($LoadOrder) {
   # cannot read or remove each other's list (#1070).
   if ($Dist -or $orderMoved) {
     $orderName = 'thornswood-dev-loadorder-' + [Guid]::NewGuid().ToString('N') + '.txt'
-    $orderFile = Join-Path $env:TEMP $orderName
+    $orderFile = Join-Path ([IO.Path]::GetTempPath()) $orderName
     [IO.File]::WriteAllText($orderFile, (($pluginNames -join "`n") + "`n"), (New-Object Text.UTF8Encoding($false)))
     $farOrder = 'C:/Windows/Temp/' + $orderName
   }
@@ -892,12 +895,20 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
   # plugins) and every new character died at login with
   #   Error: FromFormId failed due to invalid file index 94 (5e19bad4)
   # It counts with Get-ThornswoodFullIndex now, the one Deploy-Gamemode,
-  # Publish-Server and Check-Chargen use, sent up with the block. Which
-  # plugins are light is read here, from each header in $Data by the same
-  # Test-ThornswoodPluginLight, and goes up as a table; light ones count as
-  # unnumbered only when the box's own server-build.json says its engine loads
-  # them. A plugin in the box's order that this machine cannot read leaves the
-  # start point alone and says so, rather than guessing its index.
+  # Publish-Server and Check-Chargen use, sent up with the block. Light ones
+  # count as unnumbered only when the record this commit holds says the
+  # engine loads them (the check before anything is sent holds the box's
+  # record to it).
+  #
+  # WHICH PLUGINS ARE LIGHT IS READ ON THE BOX, from the plugins the dev
+  # server loads, since #2947: a plugin this run sends from the stage, every
+  # other from its plugins folder, by Test-ThornswoodPluginLight sent up with
+  # the block. Until then it was read here, from the headers in -Data, so a
+  # machine with no game folder (a cloud one) sent no table and left the
+  # start point where it was even when the order moved under it, and a game
+  # folder with another copy of a plugin could answer for the wrong file. A
+  # plugin in the order the box cannot read leaves the start point alone and
+  # says so, rather than guessing its index.
   #
   # AND HOW MANY IT HOLDS AT ONCE, #481. thornswoodMostOnline is the number the
   # gamemode turns people away past, and maxPlayers, the engine's own slot
@@ -962,21 +973,11 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
     'forbiddenReloot'
   )
-  # The light table and the counting function the block below takes up (#2011).
+  # The counting function (#2011) and the light rule (#2947) the block below
+  # takes up, both from ServerOrder.ps1.
   . (Join-Path $Here 'ServerOrder.ps1')
-  $lightRows = @()
-  foreach ($f in @(Get-ChildItem -LiteralPath $Data -File -ErrorAction SilentlyContinue | Where-Object { $_.Extension -in '.esp', '.esm', '.esl' })) {
-    try { $isLightPlugin = Test-ThornswoodPluginLight $f.FullName } catch { continue }
-    $lightRows += ("'{0}' = {1}" -f $f.Name.ToLowerInvariant().Replace("'", "''"), $(if ($isLightPlugin) { '$true' } else { '$false' }))
-  }
-  # The plugin that loads last is read from the repository, where it is made.
-  $lastRepoPath = Join-Path $Here '..\..\game\content\Thornswood-Last.esp'
-  if (Test-Path -LiteralPath $lastRepoPath) {
-    $lightRows = @($lightRows | Where-Object { $_ -notlike "'thornswood-last.esp' = *" })
-    $lightRows += ("'thornswood-last.esp' = {0}" -f $(if (Test-ThornswoodPluginLight $lastRepoPath) { '$true' } else { '$false' }))
-  }
-  $lightTable = $lightRows -join '; '
   $fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
+  $lightDef = 'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}"
   & {
     # The block below edits the staged copy, never the running one: $rootWin
     # is the stage folder for as long as it runs (issue #446).
@@ -1027,13 +1028,19 @@ if (`$orderPath -and (Test-Path `$orderPath)) {
 `$startWant = 0
 `$order2 = @(`$(if (`$wantOrder) { `$newOrder } else { @(`$s.loadOrder) }))
 $fullIndexDef
+$lightDef
 `$loadsLight = `$$devRecordLight
-`$lightOf = @{ $lightTable }
+`$lightOf = @{}
 `$unread = @()
 `$isLight = `$null
 if (`$loadsLight) {
-  foreach (`$o in `$order2) { `$leaf = (Split-Path `$o -Leaf).ToLowerInvariant(); if (`$leaf -notmatch '\.esl`$' -and -not `$lightOf.ContainsKey(`$leaf)) { `$unread += `$leaf } }
-  `$isLight = { param(`$n) (`$n -match '\.esl`$') -or [bool]`$lightOf[`$n.ToLowerInvariant()] }.GetNewClosure()
+  foreach (`$o in `$order2) {
+    `$leaf = Split-Path `$o -Leaf
+    `$f = '$rootWin\plugins\' + `$leaf
+    if (-not (Test-Path -LiteralPath `$f)) { `$f = '$remotePlugins/' + `$leaf }
+    try { `$lightOf[`$leaf.ToLowerInvariant()] = Test-ThornswoodPluginLight `$f } catch { `$unread += `$leaf.ToLowerInvariant() }
+  }
+  `$isLight = { param(`$n) [bool]`$lightOf[`$n.ToLowerInvariant()] }.GetNewClosure()
 }
 `$unb = Get-ThornswoodFullIndex ([string[]]`$order2) `$isLight 'Skyrim Unbound.esp'
 `$pt = @(`$s.startPoints)[0]

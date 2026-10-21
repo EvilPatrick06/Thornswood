@@ -4,7 +4,7 @@ Every row the recipe, harvest, ore and hunt tables currently hold. The pages tha
 
 - [Alchemist/Physicker](alchemist-physicker.md) (2, 2 reach the server)
 - [Cook/Confectioner](cook-confectioner.md) (12, 12 reach the server)
-- [Cook/Hearthcook](cook-hearthcook.md) (53, 53 reach the server)
+- [Cook/Hearthcook](cook-hearthcook.md) (56, 56 reach the server)
 - [Enchanter/Bladebinder](enchanter-bladebinder.md) (13, 13 reach the server)
 - [Smith/Edgewright](smith-edgewright.md) (79, 79 reach the server)
 - [Smith/Platewright](smith-platewright.md) (157, 157 reach the server)

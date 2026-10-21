@@ -100,6 +100,10 @@ if (-not ($checkClass -and $row -and $file -and $name)) {
   Done
 }
 
+if (-not $OnWindows) {
+  Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+  Done
+}
 if (-not (Test-Path -LiteralPath $LauncherCsc)) {
   Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' $false
   Done

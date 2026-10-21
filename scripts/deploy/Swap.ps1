@@ -29,6 +29,10 @@
     4. If a rename fails, or it does not answer, the old files go back, the
        old one is started again, and the run says SWAP ROLLED BACK and exits 1.
 
+  The stop waits for each process it stopped to have exited, and each rename
+  is tried once, saying why when Windows refuses it (StopAndMove.ps1, whose
+  text goes in front of both swap blocks, #2928).
+
   The newest two .prev folders are kept, and the newest two .undone ones
   (Patrick, 29 Sep, #1121: two, not three). -PutBack on each of those
   scripts puts the newest one back the same checked way, and keeps what it
@@ -232,7 +236,6 @@ function Held {
 }
 
 function StopOurs {
-  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
   # The process on this root's own port and nothing else. Matching every
   # node.exe running skymp5-server took the dev server down with the live one
   # and only started the live one back up.
@@ -246,11 +249,16 @@ function StopOurs {
   # 7778, which is the voice service, a separate process that carries voice
   # chat, the launcher's character choices and the chat command queue the
   # lockpick fix rides on. Stopping the game server must never take that down.
-  foreach ($id in ($pids | Sort-Object -Unique)) {
-    if ($id -gt 0) { Stop-Process -Id $id -Force -EA SilentlyContinue; 'stopped pid ' + $id }
-  }
-  for ($i = 0; $i -lt 20 -and (Held); $i++) { Start-Sleep -Milliseconds 500 }
-  Start-Sleep -Seconds 2
+  #
+  # Found and opened before the task is asked to stop, then waited for until
+  # it has exited, so its files are closed before anything is renamed
+  # (StopAndMove.ps1, #2928). Until 20 Oct this waited for the port to close
+  # and then two seconds more, and the renames were tried ten times over.
+  $held = @(Get-ThornswoodProcessHeld $pids)
+  $ThornswoodNotHeld
+  Stop-ScheduledTask -TaskName $Task -EA SilentlyContinue
+  foreach ($p in $held) { 'stopped pid ' + $p.Id }
+  Stop-ThornswoodProcessHeld $held
   # Once the process is gone, so is any restart.json it never read. The
   # gamemode deletes that file when it reads it, and a process that is down,
   # or whose gamemode failed at load, never does. The next one to start then
@@ -314,19 +322,8 @@ function Answering {
   }
 }
 
-# A rename on one volume, retried, because a process that has just been told
-# to stop does not always let go of its files the same instant.
-function Shift([string]$from, [string]$to) {
-  for ($i = 0; $i -lt 10; $i++) {
-    try {
-      $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
-      [IO.File]::Move($from, $to)
-      return $true
-    } catch { Start-Sleep -Milliseconds 500 }
-  }
-  return $false
-}
-
+# Each rename is Move-ThornswoodPath (StopAndMove.ps1): once, after StopOurs
+# has waited for the server to exit, saying why when it is refused.
 function PutBack {
   $rels = @($Want.Keys)
   [array]::Reverse($rels)
@@ -334,10 +331,10 @@ function PutBack {
     $r = $rel -replace '/', '\'
     $at = Join-Path $Root $r
     if ($placed -contains $rel) {
-      if (-not (Shift $at (Join-Path $stageDir $r))) { 'COULD NOT TAKE THE NEW ' + $rel + ' BACK OUT'; $script:clean = $false; continue }
+      if (-not (Move-ThornswoodPath $at (Join-Path $stageDir $r))) { 'COULD NOT TAKE THE NEW ' + $rel + ' BACK OUT: ' + $ThornswoodMoveWhy; $script:clean = $false; continue }
     }
     if ($aside -contains $rel) {
-      if (-not (Shift (Join-Path $prevDir $r) $at)) { 'COULD NOT PUT THE OLD ' + $rel + ' BACK'; $script:clean = $false }
+      if (-not (Move-ThornswoodPath (Join-Path $prevDir $r) $at)) { 'COULD NOT PUT THE OLD ' + $rel + ' BACK: ' + $ThornswoodMoveWhy; $script:clean = $false }
     }
   }
 }
@@ -349,8 +346,10 @@ if (-not $port) {
   exit 1
 }
 StopOurs
-if (Held) {
-  if ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
+$notGone = @($ThornswoodStillRunning) + @($ThornswoodNotHeld)
+if ($notGone.Count -or (Held)) {
+  if ($notGone.Count) { 'what the stop ended has not all exited, so its files may still be open, and nothing was swapped' }
+  elseif ($heldWhy) { 'the UDP ports could not be listed after the stop (' + $heldWhy + '), so whether UDP ' + $port + ' let go is not known, and nothing was swapped' }
   else { 'UDP ' + $port + ' is still held by pid ' + ($heldBy -join ', ') + ' after the stop, so nothing was swapped' }
   Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
   'SWAP REFUSED'
@@ -364,10 +363,10 @@ foreach ($rel in @($Want.Keys)) {
   $r = $rel -replace '/', '\'
   $at = Join-Path $Root $r
   if (Test-Path -LiteralPath $at) {
-    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move the old ' + $rel + ' aside'; $moved = $false; break }
+    if (-not (Move-ThornswoodPath $at (Join-Path $prevDir $r))) { 'could not move the old ' + $rel + ' aside: ' + $ThornswoodMoveWhy; $moved = $false; break }
     $aside += $rel
   }
-  if (-not (Shift (Join-Path $stageDir $r) $at)) { 'could not move the new ' + $rel + ' into place'; $moved = $false; break }
+  if (-not (Move-ThornswoodPath (Join-Path $stageDir $r) $at)) { 'could not move the new ' + $rel + ' into place: ' + $ThornswoodMoveWhy; $moved = $false; break }
   $placed += $rel
 }
 
@@ -489,6 +488,11 @@ $checkBlock = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'ServerBuild.ps1')
 $ThornswoodRecordShapeText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\Read-JsonFile.ps1')) + "`r`n" +
                              [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\release\RecordShape.ps1')) + "`r`n"
 $checkBlock = $ThornswoodRecordShapeText + $checkBlock
+# And the stop and the renames (#2928): each process waited for until it has
+# exited, each rename tried once and said when refused. In front of the swap
+# here, and of the service swap below.
+$ThornswoodStopAndMoveText = [IO.File]::ReadAllText((Join-Path $PSScriptRoot 'StopAndMove.ps1')) + "`r`n"
+$swapBlock = $ThornswoodStopAndMoveText + $swapBlock
 
 # ==== put-back pick ====
 #
@@ -535,7 +539,10 @@ if (-not $Want.Count) {
 # in its settings, a build record). What is different about each service is
 # five functions the caller puts in front of the swap block:
 #
-#   StopIt    stops it, by its own folder or port, and says what it stopped
+#   StopIt    stops it, by its own folder or port, and says what it stopped;
+#             it opens what it will stop with Get-ThornswoodProcessHeld and
+#             ends it with Stop-ThornswoodProcessHeld (StopAndMove.ps1), so
+#             it returns once that has exited
 #   StartIt   starts it; $Rolling is true when it is the old files starting
 #   Healthy   $true once it answers within $Wait seconds, and nothing else
 #   Answer    one line saying what answered
@@ -603,21 +610,8 @@ $prevDir  = Join-Path $Root $Prev
 $clean    = $true
 $Rolling  = $false
 
-# A rename on one volume, retried, because a process that has just been told
-# to stop does not always let go of its files the same instant.
-function Shift([string]$from, [string]$to) {
-  $dir = Test-Path -LiteralPath $from -PathType Container
-  for ($i = 0; $i -lt 10; $i++) {
-    try {
-      $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $to))
-      if ($dir) { [IO.Directory]::Move($from, $to) }
-      else { [IO.File]::Move($from, $to) }
-      return $true
-    } catch { Start-Sleep -Milliseconds 500 }
-  }
-  return $false
-}
-
+# Each rename is Move-ThornswoodPath (StopAndMove.ps1): once, after StopIt
+# has waited for what it stopped to exit, saying why when it is refused.
 function PutBack {
   $rels = @($moveRels)
   [array]::Reverse($rels)
@@ -625,10 +619,10 @@ function PutBack {
     $r = $rel -replace '/', '\'
     $at = Join-Path $Root $r
     if ($placed -contains $rel) {
-      if (-not (Shift $at (Join-Path $stageDir $r))) { 'COULD NOT TAKE THE NEW ' + $rel + ' BACK OUT'; $script:clean = $false; continue }
+      if (-not (Move-ThornswoodPath $at (Join-Path $stageDir $r))) { 'COULD NOT TAKE THE NEW ' + $rel + ' BACK OUT: ' + $ThornswoodMoveWhy; $script:clean = $false; continue }
     }
     if ($aside -contains $rel) {
-      if (-not (Shift (Join-Path $prevDir $r) $at)) { 'COULD NOT PUT THE OLD ' + $rel + ' BACK'; $script:clean = $false }
+      if (-not (Move-ThornswoodPath (Join-Path $prevDir $r) $at)) { 'COULD NOT PUT THE OLD ' + $rel + ' BACK: ' + $ThornswoodMoveWhy; $script:clean = $false }
     }
   }
 }
@@ -644,18 +638,29 @@ foreach ($rel in @($Dirs)) {
   if (Test-Path -LiteralPath $atDir -PathType Container) { $moveRels += $rel }
 }
 
+# StopIt ends what it stops through Stop-ThornswoodProcessHeld, which leaves
+# what had not exited in $ThornswoodStillRunning (and what it could not open
+# in $ThornswoodNotHeld). Nothing it may still hold is moved: the old one is
+# started again as it was.
+$ThornswoodStillRunning = @()
+$ThornswoodNotHeld = @()
 StopIt
 $placed = @()
 $aside = @()
 $moved = $true
+if (@($ThornswoodStillRunning).Count -or @($ThornswoodNotHeld).Count) {
+  'what the stop ended has not all exited, so its files may still be open, and nothing was moved'
+  $moved = $false
+}
 foreach ($rel in @($moveRels)) {
+  if (-not $moved) { break }
   $r = $rel -replace '/', '\'
   $at = Join-Path $Root $r
   if (Test-Path -LiteralPath $at) {
-    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move the old ' + $rel + ' aside'; $moved = $false; break }
+    if (-not (Move-ThornswoodPath $at (Join-Path $prevDir $r))) { 'could not move the old ' + $rel + ' aside: ' + $ThornswoodMoveWhy; $moved = $false; break }
     $aside += $rel
   }
-  if (-not (Shift (Join-Path $stageDir $r) $at)) { 'could not move the new ' + $rel + ' into place'; $moved = $false; break }
+  if (-not (Move-ThornswoodPath (Join-Path $stageDir $r) $at)) { 'could not move the new ' + $rel + ' into place: ' + $ThornswoodMoveWhy; $moved = $false; break }
   $placed += $rel
 }
 
@@ -689,7 +694,7 @@ if ($moved -and (Test-Path variable:Owns) -and @($Owns | Where-Object { $_ }).Co
   }
   foreach ($rel in @(Strays $Root '')) {
     $r = $rel -replace '/', '\'
-    if (-not (Shift (Join-Path $Root $r) (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy did not send, aside'; $moved = $false; break }
+    if (-not (Move-ThornswoodPath (Join-Path $Root $r) (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy did not send, aside: ' + $ThornswoodMoveWhy; $moved = $false; break }
     $aside += $rel
     $moveRels += $rel
     $strays += $rel
@@ -709,7 +714,7 @@ if ($moved) {
     $r = $rel -replace '/', '\'
     $at = Join-Path $Root $r
     if (-not (Test-Path -LiteralPath $at -PathType Leaf)) { continue }
-    if (-not (Shift $at (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy no longer has, aside'; $moved = $false; break }
+    if (-not (Move-ThornswoodPath $at (Join-Path $prevDir $r))) { 'could not move ' + $rel + ', which this deploy no longer has, aside: ' + $ThornswoodMoveWhy; $moved = $false; break }
     $aside += $rel
     $moveRels += $rel
     $goneAside += $rel
@@ -755,6 +760,8 @@ if ($clean) {
 }
 exit 1
 '@
+# The stop and the renames in front of it, as in front of $swapBlock above.
+$serviceSwapBlock = $ThornswoodStopAndMoveText + $serviceSwapBlock
 
 # The values the service blocks run with, the same way SwapVars does it for
 # the game server: quoted once here, every single quote doubled.

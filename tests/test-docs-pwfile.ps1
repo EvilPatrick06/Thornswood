@@ -27,8 +27,9 @@ function Yes([string]$what, [bool]$cond) {
 }
 function Done { Write-Host ''; Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail); if ($script:fail) { exit 1 }; exit 0 }
 
-$ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
-if (-not $ps51) { Write-Host 'SKIP  needs Windows PowerShell 5.1'; Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the runs: they need Windows PowerShell 5.1, which only Windows has'; Done }
+$ps51 = Get-WindowsPowerShell
 
 . (Join-Path $Repo 'scripts\vps\Vps.ps1')
 . (Join-Path $Repo 'scripts\vps\Send-Script.ps1')
@@ -63,9 +64,9 @@ function ssh {
     $a = @($args | % { [string]$_ }); $cmd = $a[-1]
     [void]$script:lines.Add(($a -join ' '))
     $m = [regex]::Match($cmd, '-EncodedCommand (\S+)$')
-    if ($m.Success) { @($input) | & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value; return }
+    if ($m.Success) { @($input) | & $ps51 -NoProfile -NonInteractive -EncodedCommand $m.Groups[1].Value; return }
     $m = [regex]::Match($cmd, '-File (\S+)$')
-    if ($m.Success) { @($input) | & $ps51.Source -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (MapFar $m.Groups[1].Value); return }
+    if ($m.Success) { @($input) | & $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (MapFar $m.Groups[1].Value); return }
     if ($cmd -match 'Remove-Item') { $global:LASTEXITCODE = 0; return }
     throw "the fake ssh was handed something it does not know: $cmd"
 }

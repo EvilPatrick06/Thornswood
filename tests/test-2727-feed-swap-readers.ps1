@@ -39,10 +39,14 @@
        as a new generation while a reader holds the one before open, which
        is untouched.
     3. node reading the feed the way site\server.js does (feedFile lifted
-       from it, then statSync and readFileSync, 2000 times) while this shell
-       makes new generations the way the store's script does, for as long as
-       node reads (300 to 3000 of them): the reader never found it missing
-       or failed to read it, and it saw the feed move on while it read.
+       from it, then statSync and readFileSync) from before this shell makes
+       its first new generation the way the store's script does until after
+       its 300th: the reader never found it missing or failed to read it,
+       and it saw the feed move on while it read. The reader reads once
+       before it says it is reading and once more after this shell says it
+       is done, so both ends of the run are inside its reads whatever the
+       runner's load (#2888's run on 20 Oct: a reader that read a fixed 2000
+       times finished before the first new generation and saw only one).
 
   -Repo runs it against another checkout's scripts (for the code before the
   fix). Nothing outside its own temp folder is written.
@@ -160,9 +164,11 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
 
     $env:LOCALAPPDATA = Join-Path $work 'appdata'
     $shells = @(@{ Name = ('this shell, PowerShell ' + $PSVersionTable.PSVersion.ToString()); Run = { param($d) & $held $storePs1 $d } })
-    $ps51 = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    Yes 'Windows PowerShell 5.1, which the VPS runs the store''s script with, is here' (Test-Path -LiteralPath $ps51)
-    if (Test-Path -LiteralPath $ps51) {
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the same under Windows PowerShell 5.1, which the VPS runs the store''s script with: this is not Windows'
+    } else {
+        $ps51 = Get-WindowsPowerShell
         $shells += @{ Name = 'Windows PowerShell 5.1'; Run = { param($d) & $ps51 -NoProfile -ExecutionPolicy Bypass -File $held $storePs1 $d 2>&1 } }
     }
     $k = 0
@@ -187,13 +193,13 @@ Say 'send' ($err -eq '' -and $sent -contains 'version.json' -and $names -eq '000
     . $storePs1
 
     # feedFile and what it needs, lifted out of site\server.js, then the feed
-    # route's statSync and readFileSync, 2000 times, while this shell makes
-    # new generations the way the store's script does.
+    # route's statSync and readFileSync, over and over until this shell has
+    # made its new generations the way the store's script does and says so.
     $loopJs = Join-Path $work 'reads.js'
     [IO.File]::WriteAllText($loopJs, @'
 const fs = require('fs');
 const path = require('path');
-const [serverJs, ROOT] = process.argv.slice(2);
+const [serverJs, ROOT, done] = process.argv.slice(2);
 const src = fs.readFileSync(serverJs, 'utf8').split(String.fromCharCode(13)).join('');
 const from = src.indexOf('const feedNewest = {};');
 const head = src.indexOf('function feedFile(', from);
@@ -202,16 +208,21 @@ for (; end < src.length; end++) { if (src[end] === '{') d++; else if (src[end] =
 if (from < 0 || head < 0) { console.log('no feedFile in server.js'); process.exit(1); }
 eval(src.slice(from, end));
 let passes = 0, missing = 0, other = 0; const said = {}; const seen = new Set();
-console.log('reading');
-for (let i = 0; i < 2000; i++) {
+function read() {
   try {
     const file = feedFile('feed');
-    if (!file) { missing++; continue; }
+    if (!file) { missing++; return; }
     fs.statSync(file); fs.readFileSync(file); passes++; seen.add(path.basename(file));
   } catch (e) {
     if (e.code === 'ENOENT') missing++; else { other++; const k = e.code + ' ' + e.syscall; said[k] = (said[k] || 0) + 1; }
   }
 }
+// One read before the shell starts, then until it says it is done, then one
+// more: the first and the last generation are both read whatever the load.
+read();
+console.log('reading');
+while (!fs.existsSync(done)) read();
+read();
 console.log('passes ' + passes + ' missing ' + missing + ' other ' + other + ' generations ' + seen.size + (other ? ' ' + JSON.stringify(said) : ''));
 '@, (New-Object Text.UTF8Encoding($false)))
     $root = Join-Path $work 'race'
@@ -220,7 +231,8 @@ console.log('passes ' + passes + ' missing ' + missing + ' other ' + other + ' g
     $doc = '{"launcherVersion":"1.0.1","news":"' + ('x' * 90000) + '"}'
     [IO.File]::WriteAllText((Join-Path $chan 'version\00000001.json'), $doc)
     $psi = New-Object Diagnostics.ProcessStartInfo
-    $psi.FileName = $node.Source; $psi.Arguments = '"' + $loopJs + '" "' + $serverJs + '" "' + $root + '"'
+    $doneFile = Join-Path $work 'writer-done'
+    $psi.FileName = $node.Source; $psi.Arguments = '"' + $loopJs + '" "' + $serverJs + '" "' + $root + '" "' + $doneFile + '"'
     $psi.UseShellExecute = $false; $psi.CreateNoWindow = $true; $psi.RedirectStandardOutput = $true
     $reader = [Diagnostics.Process]::Start($psi)
     $first = $reader.StandardOutput.ReadLineAsync()
@@ -232,12 +244,13 @@ console.log('passes ' + passes + ' missing ' + missing + ' other ' + other + ' g
     $last = $reader.StandardOutput.ReadToEndAsync()
     $refused = 0; $said = ''; $made = 0
     $part = Join-Path $chan 'version.json.part'
-    while (($made -lt 300 -or -not $last.IsCompleted) -and $made -lt 3000) {
+    while ($made -lt 300) {
         [IO.File]::WriteAllText($part, $doc)
         try { [IO.File]::Move($part, (Join-Path (Join-Path $chan 'version') (Get-FeedVersionNext $chan))) }
         catch { $refused++; if (-not $said) { $said = $_.Exception.Message } }
         $made++
     }
+    [IO.File]::WriteAllText($doneFile, 'done')
     $null = $reader.WaitForExit(30000)
     $tally = [regex]::Match([string]$last.Result, 'passes (\d+) missing (\d+) other (\d+) generations (\d+)')
     Yes ("{0} new generations while node read the feed the way server.js serves it: none refused ({1} refused{2})" -f $made, $refused, $(if ($said) { ', first: ' + $said } else { '' })) ($refused -eq 0)

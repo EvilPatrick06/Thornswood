@@ -538,7 +538,8 @@ namespace $emptyNs {
     }
 }
 "@)
-    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not $OnWindows) { Write-Host 'SKIP  the empty embedded record, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has' }
+    else { Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc) }
     $emptyBuilt = $false
     if (Test-Path -LiteralPath $LauncherCsc) {
         $cscArgs = @(
@@ -558,8 +559,10 @@ namespace $emptyNs {
     if ($emptyBuilt) {
         $emptySaid = & $emptyExe 2>&1 | Out-String
     }
-    Yes 'OwnGame refuses when the embedded gone record is empty' (
-        $emptySaid -match 'is empty' -and $emptySaid -match 'ui-gone\.json')
+    if ($OnWindows) {
+        Yes 'OwnGame refuses when the embedded gone record is empty' (
+            $emptySaid -match 'is empty' -and $emptySaid -match 'ui-gone\.json')
+    }
 
     $OwnGameT::SetUiGoneRecordForTest($goneText)
     $PathsT::Game = $savedGame

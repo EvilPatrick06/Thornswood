@@ -27,25 +27,37 @@
   HOW. The watcher goes up the way every secret does (Send-Secret.ps1): the
   value on ssh's standard input, only the watcher's own script on the command
   line. On the VPS it reads Win32_Process about ten times a second until this
-  machine sends it a stop line when the run is over, and looks in every
+  machine sets its stop event when the run is over, and looks in every
   command line for the value, its UTF-8 base64 and its UTF-16 base64, with any
   -EncodedCommand decoded first. It writes nothing to disk and prints only
   counts: never a command line and never the value, whichever way it comes
   out.
 
-  WHY A STOP LINE (#451, 20 Oct). The stop signal used to be this machine
-  closing ssh's standard input. Against the real VPS that never reached the
-  watcher: the Deploy-Docs run ended at 8:31 AM and no verdict had come back
-  by 9:15 AM, well past the 900 second limit. And the limit did not end it
-  either, because the reader waiting for the close is still blocked on
-  Console.In when the watch ends, and that keeps powershell.exe alive after
-  the script (measured in Windows PowerShell 5.1 on One: answered, never
-  exited). Lines do reach it (the value is one), so the stop is a line, and
-  the far side ends its own process once it has answered.
+  WHY A STOP EVENT (#2912, 20 Oct). The box's OpenSSH hands the remote command
+  only what is on standard input when the session starts. Measured from One
+  with no secret: a far side that read two lines got the first at once and
+  not the second, written 8 seconds later, in 40 seconds; closing standard
+  input 30 seconds after that did not end it either. So neither a stop line
+  (#2893) nor the end of standard input (#1212) ever reached the watcher, and
+  every proof waited out the whole time limit after the run had ended (the
+  #451 run at 11:29 AM: over by 11:31 AM, verdict at 11:45 AM). The same
+  watcher in Windows PowerShell 5.1 on One with a plain pipe and no sshd got
+  both, which is why the harness never saw it.
+
+  So the watcher reads standard input once, for the value, and is stopped on a
+  channel that does not go through it: it makes a named event,
+  Global\Thornswood-ProofStop-<guid>, the guid new for each run and sent in
+  the watcher's script (it is not secret), and waits on it between looks. When
+  the run is over this machine opens a second ssh session that sets it. A
+  watcher that finds the name already taken stops before it says it is
+  watching, so nobody can stop it early by making the name first. With no read
+  left waiting on standard input, powershell.exe ends when the script does, at
+  the stop or at the time limit, and ssh with it.
 
   The harness is tests\test-prove-secret.ps1: it runs this against a fake ssh,
   once the way Send-Secret sends (NOT FOUND) and once the old way, the value
-  base64'd into the command line (FOUND).
+  base64'd into the command line (FOUND), and runs the watcher in Windows
+  PowerShell 5.1 with its standard input held open, as on the VPS.
 
   Never prints the value. Reads nothing on the VPS but the process list.
 #>
@@ -77,13 +89,19 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 if (-not $VpsUser) { $VpsUser = Get-ThornswoodVpsUser }
 if (-not $VpsHost) { $VpsHost = Get-ThornswoodVpsAddress }
 
-# What runs on the VPS, after Send-Secret's prelude has read the value.
-function Get-ThornswoodSecretWatcher([int]$Seconds) {
+# What runs on the VPS, after Send-Secret's prelude has read the value. $Stop
+# is the name of the event that ends the watch.
+function Get-ThornswoodSecretWatcher([int]$Seconds, [string]$Stop) {
     $body = @'
 $v = $ThornswoodSecret; $ThornswoodSecret = $null
 if (-not $v) { 'WATCHER EMPTY'; exit 2 }
 $forms = @($v, [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($v)), [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($v)))
 $v = $null
+# The stop signal, set from a second ssh session when the run is over. Made
+# here, so a name somebody else made first is refused before the watch starts.
+$made = $false
+$stop = [Threading.EventWaitHandle]::new($false, [Threading.EventResetMode]::ManualReset, 'STOPNAME', [ref]$made)
+if (-not $made) { 'WATCHER STOP TAKEN'; exit 2 }
 $hit = @{}; $read = @{}
 function Look {
   foreach ($p in @(Get-CimInstance -ClassName Win32_Process -Property ProcessId, CommandLine)) {
@@ -95,26 +113,63 @@ function Look {
     foreach ($f in $forms) { if ($c.Contains($f)) { $hit[[string]$p.ProcessId] = 1 } }
   }
 }
-# The stop signal: the next line from this machine, sent when the run is over.
-# Read on a runspace of its own, because Console.In's ReadLineAsync does not
-# return until it is read.
-$stop = [powershell]::Create().AddScript('[void][Console]::In.ReadLine()').BeginInvoke()
 $end = (Get-Date).AddSeconds(SECONDS)
 'WATCHER READY'
-do { Look; Start-Sleep -Milliseconds 100 } while (-not $stop.IsCompleted -and (Get-Date) -lt $end)
+do { Look } while (-not $stop.WaitOne(100) -and (Get-Date) -lt $end)
 Look
+$stop.Dispose()
 if ($hit.Count) { 'WATCHER FOUND ' + $hit.Count } else { 'WATCHER NOT FOUND' }
 'WATCHER READ ' + $read.Count
-# At the time limit the reader is still blocked on Console.In, and that keeps
-# powershell.exe running after the script, so ssh never ends. Answered: end.
-[Environment]::Exit(0)
 '@
-    return (Get-ThornswoodSecretPrelude) + "`r`n" + $body.Replace('SECONDS', [string]$Seconds)
+    return (Get-ThornswoodSecretPrelude) + "`r`n" + $body.Replace('SECONDS', [string]$Seconds).Replace('STOPNAME', $Stop)
+}
+
+# What the second ssh session runs: sets the watcher's stop event. It says
+# STOP SET, or STOP GONE when the watcher has already ended.
+function Get-ThornswoodSecretWatcherStop([string]$Stop) {
+    return @'
+$e = $null
+if ([Threading.EventWaitHandle]::TryOpenExisting('STOPNAME', [ref]$e)) { [void]$e.Set(); $e.Dispose(); 'STOP SET' } else { 'STOP GONE' }
+'@.Replace('STOPNAME', $Stop)
 }
 
 function ConvertTo-ThornswoodArg([string]$a) {
     if ($a -match '[\s"]') { return '"' + $a.Replace('"', '\"') + '"' }
     return $a
+}
+
+# One ssh session to the VPS running $Script, every stream this side's.
+function Start-ThornswoodProofSsh([string]$Script) {
+    $encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
+    $sshArgs = @($SshCommand | Select-Object -Skip 1) + @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', "$VpsUser@$VpsHost", "powershell -NoProfile -EncodedCommand $encoded")
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = $SshCommand[0]
+    $psi.Arguments = (@($sshArgs | ForEach-Object { ConvertTo-ThornswoodArg $_ }) -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $psi.RedirectStandardError = $true
+    $psi.CreateNoWindow = $true
+    return [Diagnostics.Process]::Start($psi)
+}
+
+# The value to the watcher's ssh, alone on its line, then its standard input
+# closed. False when that ssh has already ended: an ssh that cannot reach the
+# VPS (no route, a refused key, BatchMode with no way in) exits 255 without
+# reading standard input, and a write into the pipe it has closed throws "The
+# pipe is being closed" (#2959). Whether it ends before the write or after is
+# a race, and both mean the same thing: the watcher did not start. Anything
+# but that IOException still throws.
+function Send-ThornswoodProofValue([Diagnostics.Process]$Proc, [string]$Wire) {
+    try {
+        $Proc.StandardInput.WriteLine($Wire)
+        $Proc.StandardInput.Flush()
+        $Proc.StandardInput.Close()
+        return $true
+    } catch {
+        if (-not ($_.Exception -is [IO.IOException] -or $_.Exception.InnerException -is [IO.IOException])) { throw }
+        return $false
+    }
 }
 
 if ($PSBoundParameters.ContainsKey('Secret')) { $value = ConvertFrom-ThornswoodSecureString $Secret }
@@ -124,31 +179,22 @@ if (-not $value) { throw 'No value given, so there is nothing to look for. Nothi
 $wire = ConvertTo-ThornswoodSecretWire $value
 $value = $null
 
-$encoded = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodSecretWatcher $MaxSeconds)))
-$sshArgs = @($SshCommand | Select-Object -Skip 1) + @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes', "$VpsUser@$VpsHost", "powershell -NoProfile -EncodedCommand $encoded")
-
-$psi = New-Object Diagnostics.ProcessStartInfo
-$psi.FileName = $SshCommand[0]
-$psi.Arguments = (@($sshArgs | ForEach-Object { ConvertTo-ThornswoodArg $_ }) -join ' ')
-$psi.UseShellExecute = $false
-$psi.RedirectStandardInput = $true
-$psi.RedirectStandardOutput = $true
-$psi.RedirectStandardError = $true
-$psi.CreateNoWindow = $true
-$proc = [Diagnostics.Process]::Start($psi)
+$stopName = 'Global\Thornswood-ProofStop-' + [Guid]::NewGuid().ToString('N')
+$proc = Start-ThornswoodProofSsh (Get-ThornswoodSecretWatcher $MaxSeconds $stopName)
 # Read and dropped: an ssh error line is not the verdict, and is not shown in
 # case anything in it came from the far side.
 $null = $proc.StandardError.ReadToEndAsync()
+$stopper = $null
 $verdict = 2
 try {
     # The value first, alone on its line, then wait for the watcher to say it
-    # is reading the process list before anything is run.
-    $proc.StandardInput.WriteLine($wire)
-    $proc.StandardInput.Flush()
+    # is reading the process list before anything is run. The value is all
+    # that goes on standard input: the VPS passes on nothing written later.
+    $sent = Send-ThornswoodProofValue $proc $wire
     $wire = $null
     $lines = New-Object Collections.Generic.List[string]
     $ready = $false
-    while ($true) {
+    while ($sent) {
         $l = $proc.StandardOutput.ReadLine()
         if ($null -eq $l) { break }
         $lines.Add($l)
@@ -163,13 +209,11 @@ try {
         Remove-Variable -Name Secret, value, wire -ErrorAction SilentlyContinue
         try { & $Run }
         finally {
-            # A line is the watcher's signal to take one more look and answer.
-            # Closing standard input alone never reached it on the VPS.
-            if (-not $proc.HasExited) {
-                $proc.StandardInput.WriteLine('STOP')
-                $proc.StandardInput.Flush()
-            }
-            $proc.StandardInput.Close()
+            # The run is over: the watcher takes one more look and answers.
+            $stopper = Start-ThornswoodProofSsh (Get-ThornswoodSecretWatcherStop $stopName)
+            $stopper.StandardInput.Close()
+            $stopSaid = $stopper.StandardOutput.ReadToEndAsync()
+            $null = $stopper.StandardError.ReadToEndAsync()
         }
         while ($true) {
             $l = $proc.StandardOutput.ReadLine()
@@ -177,6 +221,10 @@ try {
             $lines.Add($l)
         }
         $proc.WaitForExit()
+        $stopper.WaitForExit()
+        if (-not ($stopSaid.Result -match '(?m)^STOP (SET|GONE)\s*$')) {
+            Write-Host "The stop did not reach the watcher on $VpsHost, so it watched to its $MaxSeconds second limit (ssh exit $($stopper.ExitCode))." -ForegroundColor Yellow
+        }
         $said = @($lines | ForEach-Object { $_.Trim() } | Where-Object { $_ -like 'WATCHER *' })
         $read = @($said | Where-Object { $_ -like 'WATCHER READ *' } | ForEach-Object { $_.Substring(13) }) | Select-Object -First 1
         $found = @($said | Where-Object { $_ -like 'WATCHER FOUND *' } | ForEach-Object { $_.Substring(14) }) | Select-Object -First 1
@@ -197,6 +245,9 @@ try {
 }
 finally {
     $wire = $null
+    # Even when the run threw, the stop is let through, so the watcher on the
+    # VPS ends now rather than at its limit.
+    if ($stopper) { $stopper.WaitForExit() }
     if (-not $proc.HasExited) { try { $proc.Kill() } catch { } }
 }
 exit $verdict

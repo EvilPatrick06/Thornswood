@@ -33,7 +33,8 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-if (-not (($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows)) {
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
     Write-Host 'SKIP  Test-ReleaseFiles.ps1 reads Authenticode, which is Windows only'
     exit 0
 }

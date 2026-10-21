@@ -39,6 +39,7 @@
 // which is the one check that says the byte offset is still right.
 const fs = require('fs');
 const path = require('path');
+const { pluginPath, loadedOrder } = require('./OwnPlugins.js');
 const zlib = require('zlib');
 
 const args = process.argv.slice(2);
@@ -51,28 +52,12 @@ const PLUGINS_TXT = opt('plugins', 'C:\\Thornswood\\Profile\\Default\\plugins.tx
 const OUT = opt('out', path.join(__dirname, '..', '..', 'game', 'data', 'weather.json'));
 const PRINT = args.indexOf('--print') !== -1;
 
-const BETHESDA = ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm',
-                  'HearthFires.esm', 'Dragonborn.esm'];
-
 // The record that proves the offsets are still right. If Bethesda's own
 // blizzard stops being the windiest weather in Skyrim.esm, byte 0 is not the
 // wind any more and every number in this table is noise.
 const CANARY = 'SkyrimStormSnow';
 
 function fail(msg) { console.error('FAIL  ' + msg); process.exitCode = 1; }
-
-function loadOrder() {
-  const out = BETHESDA.slice();
-  let raw = '';
-  try { raw = fs.readFileSync(PLUGINS_TXT, 'utf8'); } catch (e) { return out; }
-  raw.split(/\r?\n/).forEach(function (line) {
-    const t = line.trim();
-    if (!t || t[0] === '#') { return; }
-    const name = t[0] === '*' ? t.slice(1).trim() : t;
-    if (name && out.indexOf(name) === -1) { out.push(name); }
-  });
-  return out;
-}
 
 function masters(b, headerSize) {
   const out = [];
@@ -151,11 +136,10 @@ function walk(b, start, end, mast, self) {
   }
 }
 
-const order = loadOrder();
+const order = loadedOrder(PLUGINS_TXT, DATA);
 let parsed = 0;
 for (const pl of order) {
-  const p = path.join(DATA, pl);
-  if (!fs.existsSync(p)) { continue; }
+  const p = pluginPath(DATA, pl);
   let b;
   try { b = fs.readFileSync(p); } catch (e) { fail('could not read ' + pl); continue; }
   if (b.length < 24 || b.toString('ascii', 0, 4) !== 'TES4') { fail('not a plugin: ' + pl); continue; }

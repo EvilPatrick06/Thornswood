@@ -57,10 +57,15 @@ Yes '-SetPing sends the address with Invoke-ThornswoodSecretRemote -Secret' ($te
 Yes '-SetPing asks for it hidden' ($text -match "if \(\`$SetPing\) \{[\s\S]{0,600}Read-Host '  Paste it' -AsSecureString")
 Yes 'a full run keeps settings it does not write, the ping address among them, and stops on a file it cannot read (#2711)' ($text -match '`\$env2 = Read-ThornswoodJsonFile `\$f' -and $text -match 'SETTINGS NOT WRITTEN: '' \+ `\$_\.Exception\.Message')
 
-if (-not (Get-Command powershell.exe -ErrorAction SilentlyContinue) -or -not (Get-Command cmd.exe -ErrorAction SilentlyContinue)) {
-    Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and cmd.exe, as on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the rest: it runs as the VPS does, through cmd.exe into Windows PowerShell 5.1, which only Windows has'
     Done
 }
+# The far line names powershell, which cmd.exe finds as the VPS does; it has
+# to be Windows PowerShell 5.1, where Windows keeps it.
+$null = Get-WindowsPowerShell
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
 
 # ---- scratch --------------------------------------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-bot-ping-' + [Guid]::NewGuid().ToString('N'))
@@ -95,8 +100,8 @@ function ssh {
     # The box's C:/Windows/Temp is the scratch folder here, quoted for cmd.exe.
     $line = [regex]::Replace($a[-1], 'C:/Windows/Temp/(\S+)', { param($m) '"' + $ScFar + '\' + $m.Groups[1].Value + '"' })
     $in = @($input)
-    if ($in.Count) { $in | & cmd.exe /d /c $line }
-    else { & cmd.exe /d /c $line }
+    if ($in.Count) { $in | & $cmdExe /d /c $line }
+    else { & $cmdExe /d /c $line }
 }
 
 function scp {
