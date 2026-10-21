@@ -137,6 +137,34 @@ if ($lib) {
     Yes '  and it is read back, not taken on trust' ($lib -match 'AreAccessRulesProtected' -and $lib -match 'still open')
 }
 
+# ---- TEMP IN ITS OWN FOLDER (#3117) ---------------------------------------------------
+# A job's temp files went to the account's own temp folder, outside the folder
+# Defender skips and never emptied: 26,214 to 28,472 entries per build runner
+# on 21 Oct 2026. The runner's .env sends TEMP and TMP to its _work\_temp.
+if ($lib -and $all) {
+    Yes 'the runner''s .env sends a job''s TEMP and TMP to its own _work\_temp (#3117)' ($lib -match "function Set-RunnerTemp" -and $lib.Contains("Join-Path `$root '_work\_temp'") -and $lib.Contains("@(('TEMP=' + `$temp), ('TMP=' + `$temp))"))
+    Yes '  -Lock writes it for every runner on the box' ($all.Contains('Set-RunnerTemp $root $svc.Name'))
+    Yes '  and the install writes it before config.cmd first starts the service' ($text.IndexOf('Set-RunnerTemp `$root ''$service''') -gt 0 -and $text.IndexOf('Set-RunnerTemp `$root ''$service''') -lt $text.IndexOf('config.cmd --unattended'))
+    # Run on a scratch folder, any OS: no service is asked about there.
+    . ([scriptblock]::Create($lib))
+    function Get-CimInstance { $null }
+    $tr = Join-Path ([IO.Path]::GetTempPath()) ('tw-runner-temp-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Path $tr -Force | Out-Null
+    try {
+        $envFile = Join-Path $tr '.env'
+        [IO.File]::WriteAllText($envFile, "http_proxy=none`r`nTEMP=C:\old`r`n")
+        $said1 = Set-RunnerTemp $tr 'actions.runner.x'
+        $lines = @(Get-Content -LiteralPath $envFile)
+        $want = Join-Path $tr '_work\_temp'
+        Yes 'Set-RunnerTemp keeps the runner''s own lines and puts TEMP and TMP right' ($lines.Count -eq 3 -and $lines[0] -eq 'http_proxy=none' -and $lines -contains ('TEMP=' + $want) -and $lines -contains ('TMP=' + $want) -and $said1 -like '* now sends *')
+        $said2 = Set-RunnerTemp $tr 'actions.runner.x'
+        Yes '  and a second run changes nothing and says so' ($said2 -like '* already' -and @(Get-Content -LiteralPath $envFile).Count -eq 3)
+    } finally {
+        Remove-Item -LiteralPath $tr -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item Function:\Get-CimInstance -ErrorAction SilentlyContinue
+    }
+}
+
 # ---- for real, on scratch folders -----------------------------------------------------
 $icacls = $null
 . (Join-Path $PSScriptRoot 'Windows.ps1')
