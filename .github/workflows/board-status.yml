@@ -125,8 +125,16 @@ jobs:
             $option = @($field.options | Where-Object { (Key $_.name) -eq (Key $wanted) })
             if ($option.Count -ne 1) { throw ("the board has no Status '{0}'; it has: {1}" -f $wanted, (@($field.options | ForEach-Object { $_.name }) -join ', ')) }
             if ((Key $option[0].name) -eq 'done' -and $env:ISSUE_STATE -ne 'closed') {
-              if ($autoClose.Count -ne 1) { throw ('the board did not say whether its Auto-close issue workflow is on, so Done could close #{0} before its fix is on main; it named: {1}' -f $env:ISSUE, (@($flows | ForEach-Object { $_.name }) -join ', ')) }
-              if ($autoClose[0].enabled) { throw ('the board''s Auto-close issue workflow is on, so Done would close #{0} now, before its fix is on main (#3076). The card stays where it is. The board''s owner turns it off on the board: the ... menu, Workflows, Auto-close issue' -f $env:ISSUE) }
+              # Said whole on a line of its own, since PowerShell wraps a long
+              # thrown message to the console width.
+              if ($autoClose.Count -ne 1) {
+                Write-Host ('::error::the board did not say whether its Auto-close issue workflow is on, so Done could close #{0} before its fix is on main; it named: {1}' -f $env:ISSUE, (@($flows | ForEach-Object { $_.name }) -join ', '))
+                throw 'Done refused: the board did not say whether Auto-close issue is on (#3076)'
+              }
+              if ($autoClose[0].enabled) {
+                Write-Host ('::error::the board''s Auto-close issue workflow is on, so Done would close #{0} now, before its fix is on main (#3076). The card stays where it is. The board''s owner turns it off on the board: the ... menu, Workflows, Auto-close issue' -f $env:ISSUE)
+                throw 'Done refused: the board''s Auto-close issue workflow is on (#3076)'
+              }
             }
             $value = @{ singleSelectOptionId = $option[0].id }
             $said = 'Status set to ' + $option[0].name
