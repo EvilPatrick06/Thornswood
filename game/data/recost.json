@@ -1,0 +1,2909 @@
+{
+ "version": 1,
+ "builtBy": "scripts/dev/Build-Recost.py",
+ "issue": 613,
+ "decision": "Patrick, 21 October 2026, report page q-613-forge-recipes, A: re-cost only the outliers to the typical ratio, in a generated plugin built on One and shipped as a release.",
+ "readFrom": "game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked about, every input priced at the worth of the record a recipe makes it as",
+ "rule": {
+  "owner": "Smith",
+  "benches": [
+   "CraftingSmithingForge",
+   "CraftingSmithingSkyforge"
+  ],
+  "low": 0.5,
+  "high": 4.0,
+  "target": 1.6949,
+  "how": "ratio = worth x makes / what the inputs are worth. A row under low or at high and over has every input count multiplied by the one factor that brings it to target, rounded, never under one. A row already listed keeps the original inputs it was first measured with."
+ },
+ "counts": {
+  "priced": 645,
+  "recosted": 101,
+  "unreachable": 3
+ },
+ "recipes": [
+  {
+   "recipe": "19f8d:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingBoots",
+   "name": "Riekling Fur Boots",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.49,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "19f9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingHelmet2Alt",
+   "name": "Riekling Skull Grassless Helmet",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 60,
+   "makes": 1,
+   "ratioWas": 4.286,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 5,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.714
+  },
+  {
+   "recipe": "21475:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerHide",
+   "name": "Hide Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "worth": 15,
+   "makes": 1,
+   "ratioWas": 0.455,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.833
+  },
+  {
+   "recipe": "21f7f:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IAROrcishMaskHelm",
+   "name": "Orcish Masked Helmet",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "worth": 500,
+   "makes": 1,
+   "ratioWas": 4.854,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 45
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 6,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.618
+  },
+  {
+   "recipe": "2b067:Dragonborn.esm",
+   "editorId": "DLC2RecipeArmorNordicHeavyCuirass",
+   "name": "Nordic Carved Armor",
+   "plugin": "Dragonborn.esm",
+   "worth": 1600,
+   "makes": 1,
+   "ratioWas": 4.72,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 8,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 6,
+     "to": 17,
+     "price": 20
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 150
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 60
+    }
+   ],
+   "ratioNow": 1.61
+  },
+  {
+   "recipe": "2b082:Dragonborn.esm",
+   "editorId": "DLC2RecipeWeaponNordicMace",
+   "name": "Nordic Mace",
+   "plugin": "Dragonborn.esm",
+   "worth": 410,
+   "makes": 1,
+   "ratioWas": 4.94,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 3,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 20
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 60
+    }
+   ],
+   "ratioNow": 1.647
+  },
+  {
+   "recipe": "2b085:Dragonborn.esm",
+   "editorId": "DLC2RecipeWeaponNordicWarhammer",
+   "name": "Nordic Warhammer",
+   "plugin": "Dragonborn.esm",
+   "worth": 700,
+   "makes": 1,
+   "ratioWas": 4.142,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 5,
+     "to": 12,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 7,
+     "price": 3
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 2,
+     "price": 60
+    }
+   ],
+   "ratioNow": 1.837
+  },
+  {
+   "recipe": "843:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorBanditBoots",
+   "name": "Fur Shoes",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 4,
+   "makes": 1,
+   "ratioWas": 0.111,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.222
+  },
+  {
+   "recipe": "848:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorBanditGauntlets",
+   "name": "Fur Bracers",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 10,
+   "makes": 1,
+   "ratioWas": 0.476,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  },
+  {
+   "recipe": "849:YokuWeapons.esp",
+   "editorId": "0_RecipeCutlass",
+   "name": "Mercenary Cutlass",
+   "plugin": "YokuWeapons.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.1,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 0.167
+  },
+  {
+   "recipe": "84a:YokuWeapons.esp",
+   "editorId": "0_RecipeNimcha",
+   "name": "Sentinelese Nimcha",
+   "plugin": "YokuWeapons.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.06,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 40
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    }
+   ],
+   "ratioNow": 0.079
+  },
+  {
+   "recipe": "84b:YokuWeapons.esp",
+   "editorId": "0_RecipeSaber",
+   "name": "Forebears' Saber",
+   "plugin": "YokuWeapons.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.06,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 40
+    }
+   ],
+   "ratioNow": 0.079
+  },
+  {
+   "recipe": "84c:YokuWeapons.esp",
+   "editorId": "0_RecipeTakoba",
+   "name": "Crowns' Sword",
+   "plugin": "YokuWeapons.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.035,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 40
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 60
+    }
+   ],
+   "ratioNow": 0.041
+  },
+  {
+   "recipe": "851:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiArm",
+   "name": "Mahayi Armor",
+   "plugin": "YokuWeapons.esp",
+   "worth": 825,
+   "makes": 1,
+   "ratioWas": 5.156,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 40
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 4,
+     "to": 12,
+     "price": 15
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 9,
+     "price": 20
+    }
+   ],
+   "ratioNow": 1.719
+  },
+  {
+   "recipe": "855:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorCompanionsBoots",
+   "name": "Wolf Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 11,
+   "makes": 1,
+   "ratioWas": 0.151,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.367
+  },
+  {
+   "recipe": "857:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorCompanionsGauntlets",
+   "name": "Wolf Gauntlets",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 11,
+   "makes": 1,
+   "ratioWas": 0.208,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.367
+  },
+  {
+   "recipe": "860:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardBootsLight",
+   "name": "Dawnguard Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.446,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.658
+  },
+  {
+   "recipe": "861:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardCuirassHeavy1",
+   "name": "Dawnguard Heavy Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 425,
+   "makes": 1,
+   "ratioWas": 4.087,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 4,
+     "to": 10,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 7,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 2,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.693
+  },
+  {
+   "recipe": "862:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardCuirassHeavy2",
+   "name": "Dawnguard Heavy Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 425,
+   "makes": 1,
+   "ratioWas": 4.087,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 4,
+     "to": 10,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 7,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 2,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.693
+  },
+  {
+   "recipe": "868:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC1DawnguardHelmetHeavy",
+   "name": "Dawnguard Full Helmet",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 220,
+   "makes": 1,
+   "ratioWas": 4.151,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 2,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 5,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.705
+  },
+  {
+   "recipe": "8d1:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorPenitusCuirass",
+   "name": "Penitus Oculatus Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 500,
+   "makes": 1,
+   "ratioWas": 6.329,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 7,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 11,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 7,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.799
+  },
+  {
+   "recipe": "8d4:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearBoots",
+   "name": "Stormcloak Officer Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 7,
+   "makes": 1,
+   "ratioWas": 0.163,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 0.28
+  },
+  {
+   "recipe": "8d5:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearCuirass",
+   "name": "Stormcloak Officer Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 35,
+   "makes": 1,
+   "ratioWas": 0.422,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 4,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.4
+  },
+  {
+   "recipe": "8d6:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBearGauntlets",
+   "name": "Stormcloak Officer Bracers",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 7,
+   "makes": 1,
+   "ratioWas": 0.25,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 0.28
+  },
+  {
+   "recipe": "8d8:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakBoots",
+   "name": "Fur Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.139,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.278
+  },
+  {
+   "recipe": "8d9:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakCuirass",
+   "name": "Stormcloak Cuirass",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.253,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 6,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8da:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakGauntlets",
+   "name": "Fur Gauntlets",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.238,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.278
+  },
+  {
+   "recipe": "8db:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorStormcloakHelmetFull",
+   "name": "Stormcloak Helmet",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 12,
+   "makes": 1,
+   "ratioWas": 0.444,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 3,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.2
+  },
+  {
+   "recipe": "8dc:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildBoots",
+   "name": "Thieves Guild Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.417,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 5,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8de:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildGauntlets",
+   "name": "Thieves Guild Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.439,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8e0:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahBoots",
+   "name": "Karliah's Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.417,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 5,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8e2:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahGauntlets",
+   "name": "Karliah's Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.439,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8e9:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantBoots",
+   "name": "Thieves Guild Gray Boots",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.417,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 5,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8eb:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantGauntlets",
+   "name": "Thieves Guild Gray Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.439,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "8ee:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorTsunCuirass",
+   "name": "Tsun's Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 550,
+   "makes": 1,
+   "ratioWas": 5.729,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 4,
+     "to": 14,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.662
+  },
+  {
+   "recipe": "8f6:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeWeaponExecutionerAxe",
+   "name": "Headsman's Axe",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 15,
+   "makes": 1,
+   "ratioWas": 0.441,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 4,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.5
+  },
+  {
+   "recipe": "8ff:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeWeaponScimitar",
+   "name": "Scimitar",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.1,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.167
+  },
+  {
+   "recipe": "923:YokuWeapons.esp",
+   "editorId": "0_RecipeMIRRORGaun",
+   "name": "Mirror Bezubands",
+   "plugin": "YokuWeapons.esp",
+   "worth": 325,
+   "makes": 1,
+   "ratioWas": 4.333,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 20
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 3,
+     "price": 15
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 40
+    }
+   ],
+   "ratioNow": 1.444
+  },
+  {
+   "recipe": "929:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleIronArma",
+   "name": "Gray-Scale Armor",
+   "plugin": "YokuWeapons.esp",
+   "worth": 625,
+   "makes": 1,
+   "ratioWas": 6.313,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 4,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 15,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 7,
+     "price": 20
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 4,
+     "price": 40
+    }
+   ],
+   "ratioNow": 1.676
+  },
+  {
+   "recipe": "92b:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleIronGaun",
+   "name": "Gray-Scale Bezubands",
+   "plugin": "YokuWeapons.esp",
+   "worth": 325,
+   "makes": 1,
+   "ratioWas": 4.643,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 3,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 20
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 40
+    }
+   ],
+   "ratioNow": 1.548
+  },
+  {
+   "recipe": "93b:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonArma",
+   "name": "Ebon-Scale Armor",
+   "plugin": "YokuWeapons.esp",
+   "worth": 2025,
+   "makes": 1,
+   "ratioWas": 5.444,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 150
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 13,
+     "price": 3
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 60
+    }
+   ],
+   "ratioNow": 1.81
+  },
+  {
+   "recipe": "93d:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonGaun",
+   "name": "Ebon-Scale Bezubands",
+   "plugin": "YokuWeapons.esp",
+   "worth": 925,
+   "makes": 1,
+   "ratioWas": 4.343,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 150
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 3,
+     "price": 3
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 60
+    }
+   ],
+   "ratioNow": 1.448
+  },
+  {
+   "recipe": "93e:YokuWeapons.esp",
+   "editorId": "0_RecipeScaleEbonHelm",
+   "name": "Ebon-Scale Helmet",
+   "plugin": "YokuWeapons.esp",
+   "worth": 960,
+   "makes": 1,
+   "ratioWas": 4.507,
+   "inputs": [
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 60
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 3,
+     "price": 3
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 150
+    }
+   ],
+   "ratioNow": 1.502
+  },
+  {
+   "recipe": "943:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadArma",
+   "name": "Gray-Scale Armor",
+   "plugin": "YokuWeapons.esp",
+   "worth": 625,
+   "makes": 1,
+   "ratioWas": 10.593,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 12,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 25,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 6,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.751
+  },
+  {
+   "recipe": "944:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadArmaRED",
+   "name": "Alik'r Red Nomad Robes",
+   "plugin": "YokuWeapons.esp",
+   "worth": 625,
+   "makes": 1,
+   "ratioWas": 10.593,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 6,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 25,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 12,
+     "price": 20
+    }
+   ],
+   "ratioNow": 1.751
+  },
+  {
+   "recipe": "945:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadHead",
+   "name": "Alik'r Nomad Turban",
+   "plugin": "YokuWeapons.esp",
+   "worth": 260,
+   "makes": 1,
+   "ratioWas": 8.667,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 5,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 5,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 5,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.733
+  },
+  {
+   "recipe": "946:YokuWeapons.esp",
+   "editorId": "0_RecipeNomadHeadRED",
+   "name": "Alik'r Red Nomad Turban",
+   "plugin": "YokuWeapons.esp",
+   "worth": 260,
+   "makes": 1,
+   "ratioWas": 8.667,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 5,
+     "price": 7
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 5,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 5,
+     "price": 20
+    }
+   ],
+   "ratioNow": 1.733
+  },
+  {
+   "recipe": "961:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorDLC2ClothesSkaalHat",
+   "name": "Skaal Hat",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 400,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 5,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 15,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "9dd:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorGeneralTullius",
+   "name": "General Tullius' Armor",
+   "plugin": "MoreCraftableEquipment.esp",
+   "worth": 1600,
+   "makes": 1,
+   "ratioWas": 13.445,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 4,
+     "to": 32,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 24,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 16,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.681
+  },
+  {
+   "recipe": "bfe65:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingForswornCuirass",
+   "name": "Riekling Forsworn Armour",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 100,
+   "makes": 1,
+   "ratioWas": 16.667,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 20,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe67:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerCuirass",
+   "name": "Riekling Falmer Armour",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 275,
+   "makes": 1,
+   "ratioWas": 30.556,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 54,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.698
+  },
+  {
+   "recipe": "bfe68:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerBoots",
+   "name": "Riekling Falmer Boots",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 55,
+   "makes": 1,
+   "ratioWas": 9.167,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 11,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe69:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingFalmerGauntlets",
+   "name": "Riekling Falmer Bracers",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 55,
+   "makes": 1,
+   "ratioWas": 9.167,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 11,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe6b:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditKilt",
+   "name": "Riekling Bandit Fur Kilt",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe6c:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditFurCloak",
+   "name": "Riekling Bandit Fur Cloak",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe6d:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditCuirass02",
+   "name": "Riekling Bandit Fur Armour, Sleeveless",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe6e:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassFalkreath",
+   "name": "Riekling Guard's Armor Falkreath ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe70:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassHjaalmarch",
+   "name": "Riekling Guard's Armor Hjaalmarch ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe72:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassMarkarth",
+   "name": "Riekling Guard's Armor Markarth ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe74:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassRiften",
+   "name": "Riekling Guard's Armor Riften ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe76:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassSolitude",
+   "name": "Riekling Guard's Armor Solitude ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe78:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassThePale",
+   "name": "Riekling Guard's Armor Pale ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe7a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWhiterun",
+   "name": "Riekling Guard's Armor Whiterun ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe7c:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWinterhold",
+   "name": "Riekling Guard's Armor Winterhold ",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 12.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 15,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfe80:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorHideGauntlets",
+   "name": "Riekling Hide Bracers",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 10,
+   "makes": 1,
+   "ratioWas": 0.476,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  },
+  {
+   "recipe": "bfe84:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorImperialGauntlets",
+   "name": "Riekling Imperial Bracers",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 15,
+   "makes": 1,
+   "ratioWas": 0.326,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.652
+  },
+  {
+   "recipe": "bfe98:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirass",
+   "name": "Riekling Scaled Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 350,
+   "makes": 1,
+   "ratioWas": 4.07,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 5,
+     "price": 40
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.628
+  },
+  {
+   "recipe": "bfe9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirassB",
+   "name": "Riekling Scaled Horn Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 350,
+   "makes": 1,
+   "ratioWas": 4.07,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 5,
+     "price": 40
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.628
+  },
+  {
+   "recipe": "bfea8:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorStormcloakCuirass",
+   "name": "Riekling Stormcloak Cuirass",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.379,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.087
+  },
+  {
+   "recipe": "bfeaa:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorStormcloakCuirassSleeves",
+   "name": "Riekling Stormcloak Cuirass",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.379,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.087
+  },
+  {
+   "recipe": "bfeb0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildGauntletsPlayer",
+   "name": "Riekling Thieves Guild Gauntlets",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 4.167,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfeb2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderCuirass",
+   "name": "Riekling Thieves Guild Master's Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 300,
+   "makes": 1,
+   "ratioWas": 50.0,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 59,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.695
+  },
+  {
+   "recipe": "bfeb4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderGauntlets",
+   "name": "Riekling Thieves Guild Master's Gauntlets",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 100,
+   "makes": 1,
+   "ratioWas": 16.667,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 20,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfebc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDA05SaviorsHide",
+   "name": "Riekling Savior's Hide",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 2000,
+   "makes": 1,
+   "ratioWas": 6.536,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 8,
+     "price": 150
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 8,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.634
+  },
+  {
+   "recipe": "bfebe:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmor",
+   "name": "Riekling Shrouded Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 225,
+   "makes": 1,
+   "ratioWas": 37.5,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 44,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.705
+  },
+  {
+   "recipe": "bfec0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmet",
+   "name": "Riekling Shrouded Cowl",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 110,
+   "makes": 1,
+   "ratioWas": 18.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 22,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfec2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmetMaskLess",
+   "name": "Riekling Shrouded Cowl Maskless",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 110,
+   "makes": 1,
+   "ratioWas": 18.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 22,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfec4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorShortSleeve",
+   "name": "Riekling Shrouded Armor Sleeveless",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 300,
+   "makes": 1,
+   "ratioWas": 33.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 59,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.695
+  },
+  {
+   "recipe": "bfeca:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight1",
+   "name": "Riekling Dawnguard Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 220,
+   "makes": 1,
+   "ratioWas": 4.783,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 6,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.594
+  },
+  {
+   "recipe": "bfecc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight2",
+   "name": "Riekling Dawnguard Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 220,
+   "makes": 1,
+   "ratioWas": 4.783,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 6,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.594
+  },
+  {
+   "recipe": "bfece:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorDawnguardCuirassLight3",
+   "name": "Riekling Dawnguard Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 220,
+   "makes": 1,
+   "ratioWas": 4.783,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 6,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.594
+  },
+  {
+   "recipe": "bfed0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorHunterCuirass",
+   "name": "Riekling Dawnguard Armor",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 125,
+   "makes": 1,
+   "ratioWas": 13.889,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 25,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bfed2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirass",
+   "name": "Riekling Ancient Falmer Cuirass",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 900,
+   "makes": 1,
+   "ratioWas": 5.769,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 7,
+     "price": 75
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 7,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.648
+  },
+  {
+   "recipe": "bfed4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirassAlternate",
+   "name": "Riekling Ancient Falmer Cuirass Alternate",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 0.321,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 1,
+     "price": 75
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    }
+   ],
+   "ratioNow": 0.641
+  },
+  {
+   "recipe": "bff05:Playable Rieklings.esp",
+   "editorId": "RecipeArmorExecutionHood",
+   "name": "Riekling Execution Hood",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.238,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.278
+  },
+  {
+   "recipe": "bff06:Playable Rieklings.esp",
+   "editorId": "RecipeArmorExecutionHoodDB",
+   "name": "Riekling Execution Hood",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.238,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.278
+  },
+  {
+   "recipe": "bff32:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass",
+   "name": "Riekling Bandit Fur Armor Sleeves",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "bff34:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass2",
+   "name": "Riekling Bandit Fur Kilt&Cloak",
+   "plugin": "Playable Rieklings.esp",
+   "worth": 50,
+   "makes": 1,
+   "ratioWas": 8.333,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 10,
+     "price": 3
+    }
+   ],
+   "ratioNow": 1.667
+  },
+  {
+   "recipe": "db28e:Skyrim.esm",
+   "editorId": "RecipeArmorHideGauntlets",
+   "name": "Hide Bracers",
+   "plugin": "Skyrim.esm",
+   "worth": 10,
+   "makes": 1,
+   "ratioWas": 0.476,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  },
+  {
+   "recipe": "db5d3:Skyrim.esm",
+   "editorId": "RecipeArmorHideBoots",
+   "name": "Hide Boots",
+   "plugin": "Skyrim.esm",
+   "worth": 10,
+   "makes": 1,
+   "ratioWas": 0.278,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  },
+  {
+   "recipe": "db5d6:Skyrim.esm",
+   "editorId": "RecipeArmorHideShield",
+   "name": "Hide Shield",
+   "plugin": "Skyrim.esm",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.379,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 4,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.389
+  },
+  {
+   "recipe": "db89a:Skyrim.esm",
+   "editorId": "RecipeWeaponOrcishGreatsword",
+   "name": "Orcish Greatsword",
+   "plugin": "Skyrim.esm",
+   "worth": 75,
+   "makes": 1,
+   "ratioWas": 0.369,
+   "inputs": [
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 4,
+     "to": 1,
+     "price": 45
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.364
+  },
+  {
+   "recipe": "dc9fa:Skyrim.esm",
+   "editorId": "RecipeArmorElvenBoots",
+   "name": "Elven Boots",
+   "plugin": "Skyrim.esm",
+   "worth": 45,
+   "makes": 1,
+   "ratioWas": 0.253,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 1,
+     "price": 75
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 0.45
+  },
+  {
+   "recipe": "dc9fc:Skyrim.esm",
+   "editorId": "RecipeArmorElvenGauntlets",
+   "name": "Elven Gauntlets",
+   "plugin": "Skyrim.esm",
+   "worth": 45,
+   "makes": 1,
+   "ratioWas": 0.437,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1,
+     "price": 15
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 1,
+     "price": 75
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 0.45
+  },
+  {
+   "recipe": "dc9fe:Skyrim.esm",
+   "editorId": "RecipeArmorElvenShield",
+   "name": "Elven Shield",
+   "plugin": "Skyrim.esm",
+   "worth": 115,
+   "makes": 1,
+   "ratioWas": 0.367,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 4,
+     "to": 1,
+     "price": 75
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.353
+  },
+  {
+   "recipe": "dd97f:Skyrim.esm",
+   "editorId": "RecipeArmorSteelPlateCuirass",
+   "name": "Steel Plate Armor",
+   "plugin": "Skyrim.esm",
+   "worth": 625,
+   "makes": 1,
+   "ratioWas": 5.388,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 10,
+     "price": 20
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 10,
+     "price": 3
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 40
+    }
+   ],
+   "ratioNow": 1.685
+  },
+  {
+   "recipe": "dd984:Skyrim.esm",
+   "editorId": "RecipeArmorOrcishCuirass",
+   "name": "Orcish Armor",
+   "plugin": "Skyrim.esm",
+   "worth": 1000,
+   "makes": 1,
+   "ratioWas": 5.102,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 9,
+     "price": 3
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 4,
+     "to": 12,
+     "price": 45
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.701
+  },
+  {
+   "recipe": "dd986:Skyrim.esm",
+   "editorId": "RecipeArmorOrcishHelmet",
+   "name": "Orcish Helmet",
+   "plugin": "Skyrim.esm",
+   "worth": 500,
+   "makes": 1,
+   "ratioWas": 4.854,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 6,
+     "price": 3
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 2,
+     "to": 6,
+     "price": 45
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 7
+    }
+   ],
+   "ratioNow": 1.618
+  },
+  {
+   "recipe": "f19:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiArm2",
+   "name": "Mahayi Armor(NoCoat)",
+   "plugin": "YokuWeapons.esp",
+   "worth": 825,
+   "makes": 1,
+   "ratioWas": 5.156,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 9,
+     "price": 20
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 3,
+     "price": 40
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 4,
+     "to": 12,
+     "price": 15
+    }
+   ],
+   "ratioNow": 1.719
+  },
+  {
+   "recipe": "f46cd:Skyrim.esm",
+   "editorId": "RecipeArmorSkyforgeBoots",
+   "name": "Ancient Nord Boots",
+   "plugin": "Skyrim.esm",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.188,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 4,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  },
+  {
+   "recipe": "f46cf:Skyrim.esm",
+   "editorId": "RecipeArmorSkyforgeGauntlets",
+   "name": "Ancient Nord Gauntlets",
+   "plugin": "Skyrim.esm",
+   "worth": 25,
+   "makes": 1,
+   "ratioWas": 0.221,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 1,
+     "price": 3
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 3,
+     "to": 1,
+     "price": 20
+    },
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 2,
+     "to": 1,
+     "price": 15
+    }
+   ],
+   "ratioNow": 0.556
+  }
+ ],
+ "unreachable": [
+  {
+   "recipe": "1548d:Thornswood-Content.esp",
+   "editorId": "ThornswoodRecipeWeaponPickaxe",
+   "name": "Pickaxe",
+   "plugin": "Thornswood-Content.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.417,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "15490:Thornswood-Content.esp",
+     "name": "Tool Handle",
+     "count": 1,
+     "to": 1,
+     "price": 5
+    }
+   ],
+   "ratioNow": 0.417,
+   "why": "every input is already at the count the rule rounds to (one each at the least), so only the record's worth could bring it to the band, and that is not a recipe change"
+  },
+  {
+   "recipe": "1548e:Thornswood-Content.esp",
+   "editorId": "ThornswoodRecipeWeaponAxe",
+   "name": "Woodcutter's Axe",
+   "plugin": "Thornswood-Content.esp",
+   "worth": 5,
+   "makes": 1,
+   "ratioWas": 0.417,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "15490:Thornswood-Content.esp",
+     "name": "Tool Handle",
+     "count": 1,
+     "to": 1,
+     "price": 5
+    }
+   ],
+   "ratioNow": 0.417,
+   "why": "every input is already at the count the rule rounds to (one each at the least), so only the record's worth could bring it to the band, and that is not a recipe change"
+  },
+  {
+   "recipe": "15492:Thornswood-Content.esp",
+   "editorId": "ThornswoodRecipeToolShovel",
+   "name": "Shovel",
+   "plugin": "Thornswood-Content.esp",
+   "worth": 3,
+   "makes": 1,
+   "ratioWas": 0.25,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 1,
+     "price": 7
+    },
+    {
+     "item": "15490:Thornswood-Content.esp",
+     "name": "Tool Handle",
+     "count": 1,
+     "to": 1,
+     "price": 5
+    }
+   ],
+   "ratioNow": 0.25,
+   "why": "every input is already at the count the rule rounds to (one each at the least), so only the record's worth could bring it to the band, and that is not a recipe change"
+  }
+ ]
+}
