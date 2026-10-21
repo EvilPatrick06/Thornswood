@@ -22,8 +22,11 @@ $fail = 0; $pass = 0
 $total = 100GB
 $t0 = [datetime]'2026-10-01T00:00:00Z'
 . (Join-Path $PSScriptRoot 'Windows.ps1')
+# Each shell by name, for the lines and the folders named after it; 5.1 is
+# started from where Windows keeps it.
 $shells = @('pwsh')
-if ($OnWindows) { $shells += Get-WindowsPowerShell }
+$ps51 = $null
+if ($OnWindows) { $ps51 = Get-WindowsPowerShell; $shells += 'powershell.exe' }
 function Hist([string]$name, [int]$count, [double]$startFree, [double]$perDay, [double]$stepDays = 1) {
   $p = Join-Path $tmp $name
   $lines = for ($i = 0; $i -lt $count; $i++) {
@@ -32,7 +35,8 @@ function Hist([string]$name, [int]$count, [double]$startFree, [double]$perDay, [
   Set-Content $p $lines -Encoding utf8; $p
 }
 function Run([string]$shell, [object[]]$argv) {
-  $out = & $shell -NoProfile -ExecutionPolicy Bypass -File $script @argv 2>&1 | Out-String
+  $exe = if ($shell -eq 'powershell.exe') { $ps51 } else { $shell }
+  $out = & $exe -NoProfile -ExecutionPolicy Bypass -File $script @argv 2>&1 | Out-String
   return @{ Code = $LASTEXITCODE; Out = $out }
 }
 function T([bool]$cond, [string]$what, [string]$detail = '') {
