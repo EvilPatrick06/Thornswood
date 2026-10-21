@@ -188,8 +188,12 @@ $lnkName   = if ($isDevRoot) { 'Thornswood Dev.lnk' } else { 'Thornswood.lnk' }
 $playRoot  = $Root.TrimEnd('\') -ieq 'C:\Thornswood'
 $isScratch = -not ($isDevRoot -or $playRoot)
 
-$ws = New-Object -ComObject WScript.Shell
-$places = if ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
+# A .lnk is made through Windows' own shell (WScript.Shell), which no other
+# machine has. Off Windows (Ship.ps1's Install-FeedLauncher in a cloud Ship, for one) the
+# exe and its icon are put in place as above and no shortcut is made (#2989).
+$canLink = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+$places = if (-not $canLink) { @() } elseif ($isScratch) { @($Root) } else { @([Environment]::GetFolderPath('Desktop'), $Root) }
+if ($canLink) { $ws = New-Object -ComObject WScript.Shell }
 foreach ($dest in $places) {
     # A dev build that previously wrote the play install's name here left a
     # shortcut behind pointing at the dev exe. Take it away rather than leave
@@ -218,7 +222,8 @@ foreach ($dest in $places) {
     $sc.Description      = if ($isDevRoot) { 'Thornswood Dev' } else { 'Thornswood' }
     $sc.Save()
 }
-Say ("  $lnkName points at the exe now, no PowerShell in the chain") 'Green'
+if ($canLink) { Say ("  $lnkName points at the exe now, no PowerShell in the chain") 'Green' }
+else { Say "  no $lnkName made: a shortcut is made through Windows' shell, which this machine does not have" 'Yellow' }
 if ($isDevRoot) { Say '  the play install''s own Thornswood.lnk is left alone' 'DarkGray' }
 if ($isScratch) { Say '  a throwaway build, so the Desktop is left alone entirely' 'DarkGray' }
 

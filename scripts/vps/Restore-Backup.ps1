@@ -191,7 +191,10 @@ if ($src.ToLower().EndsWith('.enc')) {
 #
 # Returns one record per entry: Entry, Name (as in the zip), Rel, Dir.
 function Test-ThornswoodBackupEntries($Entries, [string]$Root) {
-  $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd('\') + '\'
+  # This machine's separator ends the root: off Windows GetFullPath joins with
+  # /, and a root ending in \ refused every entry as outside it (#2989).
+  $sep = [IO.Path]::DirectorySeparatorChar
+  $rootFull = [IO.Path]::GetFullPath($Root).TrimEnd($sep) + $sep
   $list = @($Entries)
   if ($list.Count -gt 200000) { throw ("oversized: " + $list.Count + " entries, more than 200000") }
   $reserved = '^(CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(\..*)?$'
@@ -360,7 +363,7 @@ try {
     $stage = Join-Path $toParent ('.' + (Split-Path -Leaf $To) + '.restore-' + [Guid]::NewGuid().ToString('N'))
     [void][IO.Directory]::CreateDirectory($stage)
     $script:stageOwned = $true
-    $stageFull = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
+    $stageFull = [IO.Path]::GetFullPath($stage).TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     $buf = New-Object byte[] 81920
     foreach ($p in $plan) {
       $dest = [IO.Path]::GetFullPath((Join-Path $stageFull $p.Rel))
@@ -385,14 +388,16 @@ try {
   } finally { $zf.Dispose() }
 
   # The staged tree is what will be published, so it is the one checked.
-  $stageRoot = [IO.Path]::GetFullPath($stage).TrimEnd('\') + '\'
+  # Named with \ on any machine, as the plan names them (#2989).
+  $sep = [IO.Path]::DirectorySeparatorChar
+  $stageRoot = [IO.Path]::GetFullPath($stage).TrimEnd($sep) + $sep
   $got = @(Get-ChildItem -LiteralPath $stage -Recurse -Force -File)
   if ($got.Count -ne $want.Count) { throw ("unpacked " + $got.Count + " file(s), the zip holds " + $want.Count) }
   Add-Type -AssemblyName System.IO.Compression
   $zf = [System.IO.Compression.ZipFile]::OpenRead($zipPath)
   try {
     foreach ($f in $got) {
-      $rel = $f.FullName.Substring($stageRoot.Length)
+      $rel = $f.FullName.Substring($stageRoot.Length).Replace($sep, '\')
       if (-not $want.ContainsKey($rel)) { throw ("unpacked a file the zip does not name: " + $rel) }
       if ([long]$f.Length -ne $want[$rel].Length) { throw ("unpacked " + $rel + " at " + $f.Length + " bytes, the zip says " + $want[$rel].Length) }
       $en = $zf.GetEntry(($rel -replace '\\', '/'))

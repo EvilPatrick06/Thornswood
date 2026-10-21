@@ -917,7 +917,8 @@ if (Test-Path -LiteralPath $rp) {
   $settingsSrc = Join-Path $Dist 'server-settings.json'
   $settings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
-  $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  # Split on either separator: GetFileName off Windows takes \ as part of the name (#2989).
+  $pluginNames = @($settings.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
   $settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
   $settingsForVps = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-server-settings-vps.json'

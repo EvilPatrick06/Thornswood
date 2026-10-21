@@ -87,6 +87,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $ShipPath) { $ShipPath = Join-Path $Here 'scripts\release\Ship.ps1' }
 
 $script:pass = 0
@@ -214,6 +215,8 @@ function Stub([string]$name, [string]$params, [string]$body) {
 }
 
 $oldPath = $env:PATH
+# PATH's separator: ; on Windows, : elsewhere.
+$pathSep = [string][IO.Path]::PathSeparator
 $oldAppData = $env:LOCALAPPDATA
 $oldTemp = $env:TEMP
 $oldTmp = $env:TMP
@@ -464,7 +467,7 @@ if ($target -match '^repos/[^/]+/[^/]+/releases\?per_page=100&page=(\d+)$') {
     [IO.File]::WriteAllText((Join-Path $bin 'gh.ps1'), $standIn.Replace('NAME', 'gh') + "`r`n" +
         "if (`$args.Count -ge 2 -and `$args[0] -eq 'api') { & `$env:TS_GH_DL @args }`r`nexit 0`r`n")
 
-    $env:PATH = $bin + ';' + $oldPath
+    $env:PATH = $bin + $pathSep + $oldPath
     $env:LOCALAPPDATA = $appdata
     # Ship stages the launcher under Get-ScratchDir (issue #1272), not %TEMP%.
     # Point the scratch root at this run's own folder so the gh stand-in writes
@@ -745,9 +748,11 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
     $nodeStandIn = Join-Path $bin 'node.ps1'
     $nodeLine = '[IO.File]::AppendAllText($env:TS_DRY_CALLS, ((@(''node'') + @($args | ForEach-Object { [string]$_ })) -join '' '') + "`r`n")'
     # PATH without any folder that holds a real node, for J.
-    $noNodePath = (@($bin) + @($oldPath -split ';' | Where-Object {
-        $_ -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.exe')) -and -not (Test-Path -LiteralPath (Join-Path $_ 'node.cmd'))
-    })) -join ';'
+    # A real node is node.exe or node.cmd on Windows, and node elsewhere.
+    $nodeNames = if ($OnWindows) { @('node.exe', 'node.cmd') } else { @('node') }
+    $noNodePath = (@($bin) + @($oldPath -split [regex]::Escape($pathSep) | Where-Object {
+        $d = $_; $d -and -not @($nodeNames | Where-Object { Test-Path -LiteralPath (Join-Path $d $_) }).Count
+    })) -join $pathSep
     $skyNote = "The map marker points at the right door`n- The marker over a house now sits on the door you walk through"
     $skyArgs = @($skyNote, '-Channel', 'dev', '-DryRun', '-Root', $skyRoot, '-DistRoot', $dist, '-NoPause')
     $oldNodeExit = $env:TS_NODE_EXIT
@@ -756,7 +761,7 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         # J: no node at all.
         $env:PATH = $noNodePath
         $j = Invoke-Ship $skyArgs
-        $env:PATH = $bin + ';' + $oldPath
+        $env:PATH = $bin + $pathSep + $oldPath
         Yes ("J a Ship with a game folder and no node is refused (exit {0})" -f $j.Code) ($j.Code -eq 1 -and $j.Out -match 'STOP\. node is not on this machine')
         Yes '  and says why: SkyUI''s menus are read with it, and how to install it' (
             $j.Out -match 'Check-SkyUIMenus\.js' -and $j.Out -match 'SkyUI error box' -and $j.Out -match 'winget install --id OpenJS\.NodeJS\.LTS')
@@ -817,7 +822,7 @@ function Get-GeneratedStaleSays($State, [string]$Channel) { return '' }
         Yes ("M a nude body on dev still warns and runs to the end (exit {0})" -f $n.Code) (
             $n.Code -eq 0 -and $n.Out -match 'a body in the game folder is nude \(issue #405\); shipping anyway' -and $n.Out -match 'Dry run finished')
     } finally {
-        $env:PATH = $bin + ';' + $oldPath
+        $env:PATH = $bin + $pathSep + $oldPath
         $env:TS_NODE_EXIT = $oldNodeExit
         $env:TS_BODIES_EXIT = $oldBodiesExit
         Remove-Item -LiteralPath $nodeStandIn -Force -ErrorAction SilentlyContinue

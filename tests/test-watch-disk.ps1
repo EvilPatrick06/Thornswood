@@ -35,6 +35,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $WatchPath) { $WatchPath = Join-Path $Here 'scripts\vps\Watch-Services.ps1' }
 
 $script:pass = 0
@@ -136,6 +137,10 @@ foreach ($n in @('Note', 'DiskNow', 'DiskLevel', 'DiskCheck')) {
 }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-watchdisk-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+# The watcher names the volume by its folder's first two characters, the drive
+# on the box (C:). Every scratch box here is under $tmp, so that is the name it
+# must print: C: or D: on Windows, and off Windows the same two characters.
+$drive = [regex]::Escape($tmp.Substring(0, 2))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
 
 # A fresh box: its own folder, its own watch.log, no disk.txt, and the
@@ -198,13 +203,13 @@ try {
         }
         if ($w[0] -eq 19.5 -and $said -eq 0) {
             $said = 1
-            Yes 'a run prints the free percentage' ("$out" -match '^disk\s+19\.5% free on [A-Z]:, 15\.6 GB of 80 GB \(low\)$')
+            Yes 'a run prints the free percentage' ("$out" -match ('^disk\s+19\.5% free on ' + $drive + ', 15\.6 GB of 80 GB \(low\)$'))
         }
     }
     Yes 'nothing else was written to watch.log' ((AllLines) -eq 5)
     $lowLine = @(Get-Content -LiteralPath $script:log | Where-Object { $_ -match 'DISK LOW:' })[0]
     $critLine = @(Get-Content -LiteralPath $script:log | Where-Object { $_ -match 'DISK CRITICAL:' })[0]
-    Yes 'DISK LOW is a watch.log line like every other, stamped by Note' ("$lowLine" -match '^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}  DISK LOW: 19\.5% free on [A-Z]:, 15\.6 GB of 80 GB\.')
+    Yes 'DISK LOW is a watch.log line like every other, stamped by Note' ("$lowLine" -match ('^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}  DISK LOW: 19\.5% free on ' + $drive + ', 15\.6 GB of 80 GB\.'))
     Yes 'DISK LOW says it is the whole box and that nothing was restarted' ("$lowLine" -match 'whole box' -and "$lowLine" -match 'Nothing was restarted')
     Yes 'DISK CRITICAL says what to clear and that nothing was restarted' ("$critLine" -match 'Clear old logs' -and "$critLine" -match 'Nothing was restarted')
 
@@ -235,7 +240,7 @@ try {
         if (-not ($top[$i] -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $body += $top[$i].Extent.Text }
     }
     $printed = @(. ([scriptblock]::Create($body -join "`n")))
-    $m = [regex]::Match("$($printed[-1])", '^disk\s+[\d.]+% free on [A-Z]:, [\d.]+ GB of [\d.]+ GB \((ok|low|critical)\)$')
+    $m = [regex]::Match("$($printed[-1])", '^disk\s+[\d.]+% free on ' + $drive + ', [\d.]+ GB of [\d.]+ GB \((ok|low|critical)\)$')
     Yes 'run as the box runs it, the watcher prints the free percentage' ($printed.Count -eq 1 -and $m.Success)
     if ($m.Success) {
         $level = $m.Groups[1].Value
@@ -253,8 +258,12 @@ try {
         $di = New-Object IO.DriveInfo ($script:root.Substring(0, 1))
         Yes 'the size it reads is the size Windows reports, within a percent' (
             [math]::Abs($real.Size - $di.TotalSize) -le 0.01 * $di.TotalSize)
-        Yes 'the free space it reads is what Windows reports, within a percent of the drive' (
-            [math]::Abs($real.Free - $di.TotalFreeSpace) -le 0.01 * $di.TotalSize)
+        # Get-PSDrive's Free is the space a writer may still use. On Windows
+        # that is all the free space; Linux keeps blocks back for root (and a
+        # container may allow less), and there Free is the available figure.
+        $sysFree = if ($OnWindows) { $di.TotalFreeSpace } else { $di.AvailableFreeSpace }
+        Yes 'the free space it reads is what the system reports, within a percent of the drive' (
+            [math]::Abs($real.Free - $sysFree) -le 0.01 * $di.TotalSize)
 
         $pct = 100.0 * $real.Free / $real.Size
         Write-Host ("      this machine: {0:N1}% free on {1}" -f $pct, $script:root.Substring(0, 2))
@@ -269,7 +278,7 @@ try {
         Yes ("with DISK LOW set just above it, at {0}%, three runs write it exactly once" -f $script:diskLow) (
             (Lines 'DISK LOW:') -eq 1 -and (AllLines) -eq 1)
         Yes 'and each run prints the free percentage it read' (
-            @($outs | Where-Object { "$_" -match '^disk\s+[\d.]+% free on [A-Z]:, [\d.]+ GB of [\d.]+ GB \(low\)$' }).Count -eq 3)
+            @($outs | Where-Object { "$_" -match ('^disk\s+[\d.]+% free on ' + $drive + ', [\d.]+ GB of [\d.]+ GB \(low\)$') }).Count -eq 3)
 
         # "and putting them back"
         $script:diskLow = [math]::Floor($pct) - 1

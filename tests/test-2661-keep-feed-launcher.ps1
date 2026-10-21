@@ -138,7 +138,8 @@ try {
     [IO.File]::WriteAllText($feedExe, "signed by $who`nthe 1.2.5 main's feed offers`n")
     $theirs = Join-Path $feedDir 'Theirs.exe'
     [IO.File]::WriteAllText($theirs, "signed by Somebody Else`nnot ours`n")
-    function Url([string]$p) { return ([Uri]$p).AbsoluteUri }
+    # Absolute by name: a cast takes /tmp/... as a relative URI off Windows (#2989).
+    function Url([string]$p) { return ([Uri]::new($p, [UriKind]::Absolute)).AbsoluteUri }
     function Pub([string]$url, [string]$sha) { return [pscustomobject]@{ Version = '1.2.5'; Url = $url; Sha = $sha; Inputs = 'abc' } }
     $good = Pub (Url $feedExe) (Sha $feedExe)
 

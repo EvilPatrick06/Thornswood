@@ -150,7 +150,11 @@ if ($stale.Count) {
 # start STA unless told -MTA.
 Head 'Does ui.xaml parse'
 $broken = $null
-if ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne [System.Threading.ApartmentState]::STA) {
+if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) {
+  # Off Windows the thread is MTA as well, and saying -MTA was the reason sent
+  # people looking for a switch nobody passed (#2989).
+  Say '  not checked: WPF, which reads it, is only on Windows' 'Yellow'
+} elseif ([System.Threading.Thread]::CurrentThread.GetApartmentState() -ne [System.Threading.ApartmentState]::STA) {
   Say '  not checked: WPF needs an STA thread and this PowerShell was started with -MTA' 'Yellow'
 } else {
   Add-Type -AssemblyName PresentationFramework
