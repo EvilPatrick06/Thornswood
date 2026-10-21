@@ -35,6 +35,20 @@
 # number is a label of its own and they would pile up in the label list; the
 # three board: labels stay.
 #
+# DONE IS NOT CLOSED (#3076). Done is "merged and only needs testing", and an
+# issue whose fix people would notice stays open until the fix is on main
+# (Developer-Guide.md, the board). The board's built-in workflow "Auto-close
+# issue" closes an issue the moment its Status becomes Done, acting as whoever
+# set it: on 20 and 21 Oct every one of the 12 open issues this workflow set
+# to Done was closed within five seconds, #2906 among them while its fix was
+# not even on dev, and a closed issue is what the bot posts as a Main test
+# task. So before it sets Done on an open issue, the run reads the board's
+# workflows, and while "Auto-close issue" is on it moves nothing, leaves the
+# label on and goes red, naming the setting. An issue already closed has
+# nothing left to close, so its Done goes ahead. Every run prints whether the
+# setting is on. Only the board's owner can turn it off, on the board: the ...
+# menu, Workflows, Auto-close issue.
+#
 # Runs for one issue go one at a time, in the order the labels went on. When
 # two wait, GitHub keeps the newer and cancels the older, and the run that
 # goes takes the cancelled one's label off with its own, so the card ends on
@@ -80,6 +94,7 @@ jobs:
           BOARD_NUMBER: '1'
           ISSUE: ${{ github.event.issue.number }}
           ISSUE_NODE: ${{ github.event.issue.node_id }}
+          ISSUE_STATE: ${{ github.event.issue.state }}
           LABEL: ${{ github.event.label.name }}
         run: |
           $ErrorActionPreference = 'Stop'
@@ -96,14 +111,31 @@ jobs:
             return $r.data
           }
 
-          $d = Board 'query($o:String!,$n:Int!){user(login:$o){projectV2(number:$n){id status:field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name}}} order:field(name:"Order"){... on ProjectV2Field{id dataType}}}}}' @{ o = $env:BOARD_OWNER; n = [int]$env:BOARD_NUMBER }
+          $d = Board 'query($o:String!,$n:Int!){user(login:$o){projectV2(number:$n){id status:field(name:"Status"){... on ProjectV2SingleSelectField{id options{id name}}} order:field(name:"Order"){... on ProjectV2Field{id dataType}} workflows(first:50){nodes{name enabled}}}}}' @{ o = $env:BOARD_OWNER; n = [int]$env:BOARD_NUMBER }
           $project = $d.user.projectV2
           if (-not $project) { throw "board $env:BOARD_NUMBER of $env:BOARD_OWNER is not there, or the token cannot see it" }
+          $flows = @()
+          if ($project.PSObject.Properties['workflows'] -and $project.workflows) { $flows = @($project.workflows.nodes) }
+          $autoClose = @($flows | Where-Object { (Key $_.name) -eq 'autocloseissue' })
+          if ($autoClose.Count -eq 1) { Write-Host ("the board's Auto-close issue workflow is {0}" -f $(if ($autoClose[0].enabled) { 'on' } else { 'off' })) }
+          else { Write-Host ("the board named no Auto-close issue workflow; it named: {0}" -f (@($flows | ForEach-Object { $_.name }) -join ', ')) }
           if ($kind -eq 'board') {
             $field = $project.status
             if (-not $field -or -not $field.PSObject.Properties['options']) { throw 'the board has no single-select field named Status' }
             $option = @($field.options | Where-Object { (Key $_.name) -eq (Key $wanted) })
             if ($option.Count -ne 1) { throw ("the board has no Status '{0}'; it has: {1}" -f $wanted, (@($field.options | ForEach-Object { $_.name }) -join ', ')) }
+            if ((Key $option[0].name) -eq 'done' -and $env:ISSUE_STATE -ne 'closed') {
+              # Said whole on a line of its own, since PowerShell wraps a long
+              # thrown message to the console width.
+              if ($autoClose.Count -ne 1) {
+                Write-Host ('::error::the board did not say whether its Auto-close issue workflow is on, so Done could close #{0} before its fix is on main; it named: {1}' -f $env:ISSUE, (@($flows | ForEach-Object { $_.name }) -join ', '))
+                throw 'Done refused: the board did not say whether Auto-close issue is on (#3076)'
+              }
+              if ($autoClose[0].enabled) {
+                Write-Host ('::error::the board''s Auto-close issue workflow is on, so Done would close #{0} now, before its fix is on main (#3076). The card stays where it is. The board''s owner turns it off on the board: the ... menu, Workflows, Auto-close issue' -f $env:ISSUE)
+                throw 'Done refused: the board''s Auto-close issue workflow is on (#3076)'
+              }
+            }
             $value = @{ singleSelectOptionId = $option[0].id }
             $said = 'Status set to ' + $option[0].name
           } else {
