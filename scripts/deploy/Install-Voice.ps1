@@ -734,9 +734,13 @@ if (Test-Path -LiteralPath '$Root') {
 'REMOVED'
 "@
 
+# Each part of a run's far script is a here-string, and a here-string's last
+# line has no line break after it, so the parts are joined on line breaks: put
+# end to end, $remote's last line and -TaskOnly's first were one line the box
+# could not parse (#2952, 20 Oct).
 if ($Restart) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
-    $restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $restartOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $restartBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($restartOut -notcontains 'RESTART OK') { Die 'voice was not restarted. The lines above say what is running.' }
     Say 'restarted, and voice answers again' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -745,7 +749,7 @@ if ($Restart) {
 
 if ($Remove) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $true' + "`r`n"
-    $removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $removeOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $removeBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($removeOut -notcontains 'REMOVED') { Die 'voice was not taken off. The lines above say what is left.' }
     Say 'Gone. The game server is untouched.' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -754,7 +758,7 @@ if ($Remove) {
 
 if ($TaskOnly) {
     $vars = (ServiceSwapVars $Root 'none' 'none' $Wait ([ordered]@{}) @()) + '$KeepTask = $false' + "`r`n"
-    $taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+    $taskOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $remote, $taskOnlyBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
     if ($taskOut -notcontains 'TASK OK') { Die 'voice was not restarted under a new task. The lines above say what is running.' }
     Say 'registered again, and voice answers under the new task' 'Green'
     if (-not $NoPause) { [void](Read-Host 'Enter to close') }
@@ -765,7 +769,7 @@ $keepTask = '$KeepTask = $false'
 $pick = ''
 if ($PutBack) { $keepTask = '$KeepTask = $true'; $pick = $putBackPick }
 $vars = (ServiceSwapVars $Root $stageName $prevName $Wait $hashes @()) + $keepTask + "`r`n" + $pick
-$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say "  $_"; "$_".Trim() })
+$swapOut = @(Remote (@($vars, $voiceTools, $remote, $serviceSwapBlock) -join "`r`n") | ForEach-Object { Say "  $_"; "$_".Trim() })
 if (-not (Show-SwapResult $swapOut "$Root\.prev-<stamp>")) { Die 'voice was not swapped in. The lines above say what is running.' }
 
 # ---------------------------------------------------------------- verify ----
