@@ -40,5 +40,7 @@ cache, and a fork's pull request workflow can read this repository's cache.
 ## Its logs are public
 
 Anybody can read a public repository's run logs, so the watcher prints only
-what anybody can already see. For the build runners it prints only ok, WRONG
-or COULD NOT CHECK. What it tells staff goes only to Discord.
+what anybody can already see. For the build runners it prints only ok or
+WRONG, and for COULD NOT CHECK the reason GitHub gave (the token refused, with
+its HTTP code, or GitHub not answering), which names nothing in the project's
+repository. What it tells staff goes only to Discord.

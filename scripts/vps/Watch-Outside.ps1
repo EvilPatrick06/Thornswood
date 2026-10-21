@@ -122,7 +122,13 @@
   THE RUN LOG IS PUBLIC. Everything -Run prints says only what anybody can
   already see: the site, feeds, certificate, name, registration and the
   collection are public, and for the runners (a private repository's) it
-  prints only the outcome, never a name, a count or the reason. The secrets
+  prints only the outcome, never a name or a count. When it could not ask, it
+  prints why, because each reason Get-Runners gives is a fixed sentence with
+  at most an HTTP code in it (a token GitHub refuses, GitHub not answering)
+  and names nothing in that repository. Hidden, a token that did not work
+  could not be told from the log apart from one that was never set (#2755,
+  21 Oct: RUNNER_TOKEN was set and the line said only COULD NOT CHECK). The
+  secrets
   are never printed (GitHub masks them too), and a message's text goes only
   to Discord, never to the log.
 
@@ -745,7 +751,7 @@ function Outcome($r) {
   return 'ok'
 }
 function Shown-Line($r) {
-  if ($r.Private) { return '(about a private repository, so not shown here)' }
+  if ($r.Private -and -not $r.Unknown) { return '(about a private repository, so not shown here)' }
   return $r.Line
 }
 
