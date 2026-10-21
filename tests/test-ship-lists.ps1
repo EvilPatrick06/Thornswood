@@ -483,8 +483,11 @@ function Show-Groups([string[]]$items, [string]$colour) {
     } | Sort-Object Name | ForEach-Object { Write-Host ("      {0,5}  {1}" -f $_.Count, $_.Name) -ForegroundColor $colour }
 }
 
-$record = Join-Path $ProfileDir 'OwnGame\files.txt'
-if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Test-Path -LiteralPath $record)) {
+# Join-Path stops on a drive this machine does not have (C: off Windows),
+# so whether the folder is here at all is asked first.
+$gameHere = (Test-Path -LiteralPath $Game) -and (Test-Path -LiteralPath $ProfileDir)
+$record = $(if ($gameHere) { Join-Path $ProfileDir 'OwnGame\files.txt' } else { '' })
+if (-not $gameHere -or -not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Test-Path -LiteralPath $record)) {
     Write-Host ("SKIP  no game folder at {0} with a launcher record beside it; nothing on this machine to measure" -f $Game) -ForegroundColor Yellow
 } else {
     $collection = & $pack.Module { param($p) Get-ShipOwnGameCollection $p } $ProfileDir
@@ -510,11 +513,12 @@ if (-not (Test-Path -LiteralPath (Join-Path $Game 'SkyrimSE.exe')) -or -not (Tes
     $instVanilla = $inst.Module
     $repoRoot = $Tools
     $relSibling = Split-Path -Parent $repoRoot
+    $where = Join-Path $repoRoot 'scripts\release\Where.ps1'
     $baselinePaths = @(
-        @{ Name = 'main store';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\main\published.json') },
-        @{ Name = 'dev store';     Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\feed\dev\published.json') },
-        @{ Name = 'legacy main';   Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json') },
-        @{ Name = 'legacy dev';    Path = (Join-Path $env:LOCALAPPDATA 'Thornswood\published-dev.json') }
+        @{ Name = 'main store';    Path = (Join-Path (& $where Releases) 'published.json') },
+        @{ Name = 'dev store';     Path = (Join-Path (& $where ReleasesDev) 'published.json') },
+        @{ Name = 'legacy main';   Path = (Join-Path (& $where MachineData) 'published.json') },
+        @{ Name = 'legacy dev';    Path = (Join-Path (& $where MachineData) 'published-dev.json') }
     )
     $seen = @{}
     foreach ($cand in $baselinePaths) {

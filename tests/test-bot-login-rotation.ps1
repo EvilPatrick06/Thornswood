@@ -209,13 +209,26 @@ try {
 
     Reset-Fakes
     # The second write fails: bot.env.json has already been written by then,
-    # and has to be put back.
-    $before = (Bytes $envFile) + '|' + (Bytes $cfgFile)
-    (Get-Item -LiteralPath $cfgFile).IsReadOnly = $true
-    $r = Run { Write-ThornswoodBotToken -Token $newToken -BotEnv $envFile -SiteConfig $cfgFile }
-    (Get-Item -LiteralPath $cfgFile).IsReadOnly = $false
-    Yes 'a write that fails half way says so' (-not $r.Ok -and (($r.Lines -join ' ') -match 'NOT WRITTEN: stopped while writing'))
-    Yes '  and bot.env.json is put back as it was' (((Bytes $envFile) + '|' + (Bytes $cfgFile)) -eq $before)
+    # and has to be put back. A read-only file is what stops it, which holds on
+    # Windows and for any account but root; root writes through it (a cloud
+    # session runs as root), so the probe asks first (#2989).
+    $probe = Join-Path $Scratch ('ro-probe-' + [Guid]::NewGuid().ToString('N') + '.txt')
+    [IO.File]::WriteAllText($probe, 'probe')
+    (Get-Item -LiteralPath $probe).IsReadOnly = $true
+    $roStops = $false
+    try { [IO.File]::WriteAllText($probe, 'written through') } catch { $roStops = $true }
+    (Get-Item -LiteralPath $probe).IsReadOnly = $false
+    Remove-Item -LiteralPath $probe -Force
+    if ($roStops) {
+        $before = (Bytes $envFile) + '|' + (Bytes $cfgFile)
+        (Get-Item -LiteralPath $cfgFile).IsReadOnly = $true
+        $r = Run { Write-ThornswoodBotToken -Token $newToken -BotEnv $envFile -SiteConfig $cfgFile }
+        (Get-Item -LiteralPath $cfgFile).IsReadOnly = $false
+        Yes 'a write that fails half way says so' (-not $r.Ok -and (($r.Lines -join ' ') -match 'NOT WRITTEN: stopped while writing'))
+        Yes '  and bot.env.json is put back as it was' (((Bytes $envFile) + '|' + (Bytes $cfgFile)) -eq $before)
+    } else {
+        Write-Host 'SKIP  a write that fails half way: this account writes through a read-only file (root does), so the second write cannot be made to fail that way here'
+    }
 
     NoSecretIn 'nothing printed or returned in any of the above carries a token, the key or a secret' $script:allSaid.ToString()
 }

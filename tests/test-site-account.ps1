@@ -112,9 +112,11 @@ $deploy = Join-Path $RepoPath 'scripts\deploy\Deploy-Docs.ps1'
 $errs = $null
 $ast = [System.Management.Automation.Language.Parser]::ParseFile($deploy, [ref]$null, [ref]$errs)
 Yes 'Deploy-Docs.ps1 parses' ($errs.Count -eq 0)
-# Build below fills $boxWin the way this line does (#1273).
+# Build below fills $boxWin the way these lines do (#1273): the folder its root
+# is in, taken as text by Windows rules (#2989).
 Yes 'Deploy-Docs.ps1 takes the box from the folder its root is in' (
-    $ast.Extent.Text.Contains("`$boxWin    = (Split-Path -Parent `$rootWin.TrimEnd('\')).TrimEnd('\')"))
+    $ast.Extent.Text.Contains("`$boxWin    = `$rootWin.TrimEnd('\')") -and
+    $ast.Extent.Text.Contains("`$boxWin    = if (`$boxWin.LastIndexOf('\') -ge 0) { `$boxWin.Substring(0, `$boxWin.LastIndexOf('\')) } else { '' }"))
 
 # ---- the parameter ------------------------------------------------------------
 $params = @{}
@@ -168,7 +170,8 @@ function Build([string]$account, [string]$docsRoot, [string]$taskName = 'Thornsw
     $RunAs = $account
     $rootWin = $docsRoot
     # The same line Deploy-Docs fills it from: the folder the site's root is in.
-    $boxWin = (Split-Path -Parent $rootWin.TrimEnd('\')).TrimEnd('\')
+    $boxWin = $rootWin.TrimEnd('\')
+    $boxWin = if ($boxWin.LastIndexOf('\') -ge 0) { $boxWin.Substring(0, $boxWin.LastIndexOf('\')) } else { '' }
     $Task = $taskName
     $Port = 3001
     # The helpers are checked on their own below; here the setup script is what is under test.
@@ -285,7 +288,8 @@ $serverJs = Get-Content -LiteralPath (Join-Path $RepoPath 'site\server.js') -Raw
 $outside = @()
 foreach ($m in [regex]::Matches($serverJs, "'([A-Za-z]:(?:\\\\|/)[^']*)'")) {
     $p = $m.Groups[1].Value.Replace('\\', '\').Replace('/', '\')
-    if ([IO.Path]::GetExtension($p)) { $p = Split-Path -Parent $p }
+    # A box path: its folder is taken as text, since Split-Path off Windows turns \ into /.
+    if ([IO.Path]::GetExtension($p)) { $p = $p.Substring(0, $p.LastIndexOf('\')) }
     if ($outside -notcontains $p) { $outside += $p }
 }
 Yes "server.js names places outside its folder to read ($($outside.Count) of them)" ($outside.Count -ge 4)

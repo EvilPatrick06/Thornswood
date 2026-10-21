@@ -1679,7 +1679,12 @@ function Get-ShipLoadOrderDir([string]$Root, [string]$ProfileDir) {
         if ($tw -and (Test-Path -LiteralPath (Join-Path $tw 'plugins.txt'))) { return $tw }
     }
     if (-not (Test-Path -LiteralPath (Join-Path $Root 'Game'))) {
-        return (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition')
+        # Off Windows there is no LOCALAPPDATA, and Join-Path stopped on the
+        # null before the Ship could say there was no list (#2989); the
+        # platform's own folder answers instead, as in Where.ps1 (#2872).
+        $local = $env:LOCALAPPDATA
+        if (-not $local) { $local = [Environment]::GetFolderPath('LocalApplicationData') }
+        return (Join-Path $local 'Skyrim Special Edition')
     }
     return (Join-Path $ProfileDir 'Default')
 }

@@ -242,19 +242,31 @@ function Remote($script) {
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
+# The box's folders, worked out on this machine. .NET resolves a path by this
+# machine's rules, and off Windows (a deploy from a cloud session) it took the
+# box's \ as part of a name, so every file was refused as escaping the stage
+# (#2989). The segments are resolved here by Windows' rules instead: either
+# separator, . dropped, .. taking one back and never above the stage.
 function Get-StageDirectories([string]$stageRoot, [string[]]$relativePaths) {
-  $stagePath = [IO.Path]::GetFullPath($stageRoot).TrimEnd('\')
-  $prefix = $stagePath + '\'
+  $stagePath = $stageRoot.TrimEnd('\', '/')
   $parents = [Collections.Generic.HashSet[string]]::new([StringComparer]::OrdinalIgnoreCase)
   foreach ($relative in $relativePaths) {
-    if (-not $relative -or [IO.Path]::IsPathRooted($relative) -or $relative.Contains(':')) {
+    if (-not $relative -or $relative.Contains(':') -or $relative -match '^[\\/]') {
       throw "Invalid stage destination: $relative"
     }
-    $target = [IO.Path]::GetFullPath([IO.Path]::Combine($stagePath, $relative.Replace('/', '\')))
-    if (-not $target.StartsWith($prefix, [StringComparison]::OrdinalIgnoreCase)) {
-      throw "Stage destination escapes its directory: $relative"
+    $parts = [Collections.Generic.List[string]]::new()
+    foreach ($seg in ($relative -split '[\\/]')) {
+      if ($seg -eq '' -or $seg -eq '.') { continue }
+      if ($seg -eq '..') {
+        if ($parts.Count -eq 0) { throw "Stage destination escapes its directory: $relative" }
+        $parts.RemoveAt($parts.Count - 1)
+        continue
+      }
+      $parts.Add($seg)
     }
-    $null = $parents.Add([IO.Path]::GetDirectoryName($target))
+    if ($parts.Count -eq 0) { throw "Stage destination escapes its directory: $relative" }
+    $parts.RemoveAt($parts.Count - 1)
+    $null = $parents.Add((@($stagePath) + @($parts)) -join '\')
   }
   return @($parents | Sort-Object)
 }
@@ -905,7 +917,8 @@ if (Test-Path -LiteralPath $rp) {
   $settingsSrc = Join-Path $Dist 'server-settings.json'
   $settings = ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $settingsSrc -Raw) $settingsSrc
   if (-not $settings.loadOrder) { throw 'server-settings.json has no loadOrder' }
-  $pluginNames = @($settings.loadOrder | ForEach-Object { [IO.Path]::GetFileName($_) })
+  # Split on either separator: GetFileName off Windows takes \ as part of the name (#2989).
+  $pluginNames = @($settings.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] })
   $remotePlugins = ($Root -replace '\\', '/') + '/plugins'
   $settings.loadOrder = @($pluginNames | ForEach-Object { "$remotePlugins/$_" })
   $settingsForVps = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-server-settings-vps.json'

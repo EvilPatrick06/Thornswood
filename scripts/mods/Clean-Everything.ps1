@@ -110,11 +110,13 @@ function Folder-Bytes($path) {
 }
 
 # ------------------------------------------------------- this machine ---
-$dist = Join-Path $Root '_dist'
+# Join-Path stops on a drive this machine does not have (C: off Windows), and
+# with no install folder here there is no _dist in it to look at (#2989).
+$dist = $(if (Test-Path -LiteralPath $Root) { Join-Path $Root '_dist' } else { '' })
 
 if ($Installers) {
   Head 'Old installers on this machine'
-  foreach ($n in @('Thornswood-Setup.zip', 'Thornswood-Setup.exe')) {
+  foreach ($n in @($(if ($dist) { 'Thornswood-Setup.zip', 'Thornswood-Setup.exe' }))) {
     $p = Join-Path $dist $n
     if (Test-Path -LiteralPath $p) {
       $i = Get-Item -LiteralPath $p
@@ -127,7 +129,7 @@ if ($Installers) {
 
 if ($Packs) {
   Head 'Old pack builds'
-  $packs = @(Get-ChildItem -LiteralPath $dist -Filter 'pack-*.zip' -File -EA SilentlyContinue | Sort-Object LastWriteTime -Descending)
+  $packs = @(if ($dist) { Get-ChildItem -LiteralPath $dist -Filter 'pack-*.zip' -File -EA SilentlyContinue | Sort-Object LastWriteTime -Descending })
   if ($packs.Count -eq 0) { Say '  none' 'DarkGray' }
   else {
     $keep = [Math]::Min(2, $packs.Count)
@@ -142,7 +144,7 @@ if ($Packs) {
 
 if ($Stage) {
   Head 'Packaging leftovers'
-  foreach ($n in @('stage', 'removed-plugins', 'unbound-locked', 'unbound-original', 'sfx', 'server')) {
+  foreach ($n in @($(if ($dist) { 'stage', 'removed-plugins', 'unbound-locked', 'unbound-original', 'sfx', 'server' }))) {
     $p = Join-Path $dist $n
     if (Test-Path -LiteralPath $p) {
       $b = Folder-Bytes $p

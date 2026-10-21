@@ -95,7 +95,7 @@ $hash = (Get-FileHash -LiteralPath $bin -Algorithm SHA256).Hash.ToLowerInvariant
 function Read-Git([string[]]$a) {
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
-  try { $o = & git.exe -C $Clone @a 2>$null } finally { $ErrorActionPreference = $eap }
+  try { $o = & git -C $Clone @a 2>$null } finally { $ErrorActionPreference = $eap }
   if ($LASTEXITCODE -ne 0) { return '' }
   return ($o | Out-String).Trim()
 }
@@ -105,7 +105,7 @@ function Read-Git([string[]]$a) {
 function Read-GitOrStop([string[]]$a, [string]$what) {
   $eap = $ErrorActionPreference
   $ErrorActionPreference = 'Continue'
-  try { $o = @(& git.exe -C $Clone @a 2>&1); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $eap }
+  try { $o = @(& git -C $Clone @a 2>&1); $code = $LASTEXITCODE } finally { $ErrorActionPreference = $eap }
   if ($code -ne 0) {
     $err = (@($o | Where-Object { $_ -is [System.Management.Automation.ErrorRecord] } | ForEach-Object { "$_" }) -join ' ').Trim()
     throw ("cannot read {0} from {1}: git {2} exited {3} ({4}). Nothing was recorded." -f $what, $Clone, ($a -join ' '), $code, $err)

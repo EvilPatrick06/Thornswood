@@ -184,6 +184,10 @@ try {
     $r = Invoke-Check $g
     Yes ('first-person bodies are not judged, the camera never draws the torso: exit 0 (got {0})' -f $r.Code) ($r.Code -eq 0)
 
+    $g = New-Game @{ '..\FaceGenData\FaceGeom\Skyrim.esm\00013BA1.nif' = (S @('3BA', '3BA_Vagina')) }
+    $r = Invoke-Check $g
+    Yes ('FaceGenData is heads and is not judged, on any machine''s separator: exit 0 (got {0})' -f $r.Code) ($r.Code -eq 0)
+
     # ------------------------------------------ Astrid's burned body
     $g = New-Game @{ 'femalebodyastrid_1.nif' = (S @('CBBE')) }
     $r = Invoke-Check $g
@@ -234,8 +238,10 @@ Yes 'the step comes after the client build check and before anything is publishe
 
 # ======================================================== this machine
 
-$live = Join-Path $GameRoot 'Game'
-if (Test-Path -LiteralPath (Join-Path $live 'Data\meshes\actors\character\character assets\femalebody_1.nif')) {
+# Join-Path stops on a drive this machine does not have (C: off Windows),
+# so whether the folder is here at all is asked first.
+$live = $(if (Test-Path -LiteralPath $GameRoot) { Join-Path $GameRoot 'Game' } else { '' })
+if ($live -and (Test-Path -LiteralPath (Join-Path $live 'Data\meshes\actors\character\character assets\femalebody_1.nif'))) {
     $r = Invoke-Check $live
     $lines = @($r.Out -split "\r?\n" | Where-Object { $_ -match '^\s+(covered|NUDE|UNREAD|vanilla|burned)\s' } | ForEach-Object { $_.Trim() })
     Yes ('the real meshes in ' + $live + ' parse (exit ' + $r.Code + ')') ($r.Code -ne 1)
@@ -246,7 +252,7 @@ if (Test-Path -LiteralPath (Join-Path $live 'Data\meshes\actors\character\charac
               '. That changes with a collection revision, which is Patrick''s, not with code.')
     }
 } else {
-    Skip ('no game folder at ' + $live)
+    Skip ('no game folder in ' + $GameRoot)
 }
 
 Write-Host ''

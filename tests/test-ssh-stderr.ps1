@@ -50,6 +50,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -62,7 +63,7 @@ $warning = '** WARNING: connection is not using a post-quantum key exchange algo
 
 if ($Child) {
     # ------------------------------------------------------ one PowerShell -----
-    $env:PATH = $Child + ';' + $env:PATH
+    $env:PATH = $Child + [IO.Path]::PathSeparator + $env:PATH
     $v = $PSVersionTable.PSVersion.Major
     $tag = "[PS $v]"
     . (Join-Path $repo 'scripts\vps\Vps.ps1')
@@ -159,11 +160,30 @@ try {
         'if "%TS_FAKE_STDIN%"=="1" for /f "usebackq delims=" %%L in (`findstr /r "^"`) do echo stdin:%%L',
         'exit /b %TS_FAKE_RC%'
     ) -join "`r`n"
-    [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
-    [IO.File]::WriteAllText((Join-Path $bin 'scp.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+    if ($OnWindows) {
+        [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+        [IO.File]::WriteAllText((Join-Path $bin 'scp.cmd'), $cmd + "`r`n", (New-Object Text.ASCIIEncoding))
+    } else {
+        # Off Windows nothing runs a .cmd, so the same stand-in as a shell script.
+        $sh = @(
+            '#!/bin/sh',
+            ("printf '%s\n' '" + $warning + "' 1>&2"),
+            'if [ "$TS_FAKE_RC" = "255" ]; then exit 255; fi',
+            'echo far-end-said-hi',
+            'if [ "$TS_FAKE_STDIN" = "1" ]; then while IFS= read -r l || [ -n "$l" ]; do printf ''stdin:%s\n'' "$l"; done; fi',
+            'exit "${TS_FAKE_RC:-0}"'
+        ) -join "`n"
+        foreach ($n in 'ssh', 'scp') {
+            $f = Join-Path $bin $n
+            [IO.File]::WriteAllText($f, $sh + "`n", (New-Object Text.ASCIIEncoding))
+            & chmod 755 $f
+        }
+    }
 
+    # Each PowerShell by the name its platform gives it: off Windows there is
+    # only pwsh.
     $shells = @()
-    foreach ($s in 'powershell.exe', 'pwsh.exe') {
+    foreach ($s in $(if ($OnWindows) { 'powershell.exe', 'pwsh.exe' } else { 'pwsh' })) {
         $c = Get-Command $s -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
         if ($c) { $shells += $c.Source }
     }
@@ -195,7 +215,7 @@ $bare = @()
 $users = @()
 $wrapped = 0
 foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Filter *.ps1 -File -Recurse)) {
-    $rel = $f.FullName.Substring($repo.Length + 1)
+    $rel = $f.FullName.Substring($repo.Length + 1).Replace([string][IO.Path]::DirectorySeparatorChar, '\')
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$null, [ref]$null)
     $uses = $false
     foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {

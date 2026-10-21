@@ -270,7 +270,7 @@ if ($OffBox) {
   $n = $(if ($Number -gt 1) { '' + $Number } else { '' })
   if (-not $PSBoundParameters.ContainsKey('Root'))       { $Root = 'C:\Thornswood-RunnerPR' + $n }
   if (-not $PSBoundParameters.ContainsKey('Account'))    { $Account = 'thornswood-pr' + $n }
-  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + $env:COMPUTERNAME.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
+  if (-not $PSBoundParameters.ContainsKey('RunnerName')) { $RunnerName = 'thornswood-pr-' + [Environment]::MachineName.ToLower() + $(if ($n) { '-' + $n } else { '' }) }
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
   if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }

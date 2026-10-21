@@ -63,8 +63,9 @@ foreach ($p in $wanted) {
     $gameList += $p
 }
 
+# Split on either separator: GetFileName off Windows takes \ as part of the name (#2989).
 $server = @((ConvertFrom-ThornswoodJson (Get-Content -LiteralPath $Settings -Raw) $Settings).loadOrder |
-            ForEach-Object { [IO.Path]::GetFileName($_) })
+            ForEach-Object { @(([string]$_) -split '[\\/]')[-1] })
 
 Write-Host ''
 Write-Host ("game will index : {0} plugins" -f $gameList.Count) -ForegroundColor Cyan
