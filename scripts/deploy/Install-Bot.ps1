@@ -688,7 +688,7 @@ function Invoke-BotSwap([bool]$noServiceOk) {
 # in front of it for Repair-ThornswoodBotData.
 $botThereBlock = @'
 $ErrorActionPreference = 'Continue'
-'asked of ' + $env:COMPUTERNAME + ', where the bot runs from ' + $Root
+'asked of ' + [Environment]::MachineName + ', where the bot runs from ' + $Root
 # The folder the service writes, then the log in it. Repair makes the folder
 # and grants the account what it needs when it had to make it; it says
 # nothing when there was nothing to do.

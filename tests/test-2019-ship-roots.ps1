@@ -409,57 +409,61 @@ namespace Thornswood
 }
 '@
 
-Yes 'the Build Tools csc the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
-if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
-$refs = @(); $missing = @()
-foreach ($n in $LauncherNeeded) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
-Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
-$real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs') |
-    ForEach-Object { Join-Path $App $_ }
-$real += @((Join-Path $Tool 'ShipRoot.cs'), (Join-Path $Tool 'OwnGameShipRoot.cs'))
-foreach ($f in $real) { Yes ("$([IO.Path]::GetFileName($f)) is there") (Test-Path -LiteralPath $f) }
-$stubFile = Join-Path $work 'Stubs.cs'
-$driverFile = Join-Path $work 'Driver.cs'
-[IO.File]::WriteAllText($stubFile, $stubs, $utf8)
-[IO.File]::WriteAllText($driverFile, $driver, $utf8)
-$skyrimList = Join-Path $work 'skyrim-files.json'
-# Real SHA-1s of what the driver puts in its Steam copy (#2603): the exe is
-# 37,157,144 zero bytes, the rest short texts.
-function Sha1Of([byte[]]$b) { return ([BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash($b)) -replace '-', '').ToLowerInvariant() }
-$listed = [ordered]@{
-    'SkyrimSE.exe' = @(37157144, (Sha1Of (New-Object byte[] 37157144)))
-    'Data\\Skyrim.esm' = @(10, (Sha1Of $utf8.GetBytes('PIN-MASTER')))
-    'Data\\Skyrim - Misc.bsa' = @(11, (Sha1Of $utf8.GetBytes('PIN-ARCHIVE')))
-    'Data\\ccBGSSSE037-Curios.esl' = @(9, (Sha1Of $utf8.GetBytes('CC-CURIOS')))
-}
-$rows = @($listed.Keys | ForEach-Object { '    "' + $_ + '": { "bytes": ' + $listed[$_][0] + ', "sha1": "' + $listed[$_][1] + '", "depot": "1" }' })
-[IO.File]::WriteAllText($skyrimList, ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($rows -join ",`n") + "`n  }`n}`n"), $utf8)
-$exe = Join-Path $work 'ship-root-test.exe'
-$cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/langversion:$LauncherLangVersion", '/main:Thornswood.ShipRootTest', "/out:$exe",
-             "/resource:$skyrimList,skyrim-files.json", ("/resource:" + (Join-Path $Here 'records\ui-gone.json') + ",ui-gone.json"))
-foreach ($r in $refs) { $cscArgs += "/reference:$r" }
-foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
-$cscArgs += $stubFile, $driverFile
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$compiled = & $LauncherCsc @cscArgs 2>&1
-$ErrorActionPreference = $old
-$built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
-Yes 'the ship root tool compiles with the real OwnGame and the driver' $built
-if ($built) {
-    $scene = Join-Path $work 'machine'
-    $null = New-Item -ItemType Directory -Force -Path $scene
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $out = & $exe $scene 2>&1
-    $code = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    foreach ($l in @($out)) {
-        $s = [string]$l
-        if ($s.StartsWith('PASS  ')) { $script:pass++; Write-Host $s }
-        elseif ($s.StartsWith('FAIL  ')) { $script:fail++; Write-Host $s }
-        else { Write-Host $s }
+if ($OnWindows) {
+    Yes 'the Build Tools csc the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
+    $refs = @(); $missing = @()
+    foreach ($n in $LauncherNeeded) { $p = Find-LauncherRef $n; if ($p) { $refs += $p } else { $missing += $n } }
+    Yes ('every framework reference Thornswood.csproj names is on this machine' + $(if ($missing.Count) { ', missing ' + ($missing -join ', ') } else { '' })) ($missing.Count -eq 0)
+    $real = @('OwnGame.cs', 'OwnGameShare.cs', 'OwnGameKinds.cs', 'Downgrade.cs', 'Steam.cs', 'Paths.cs', 'Config.cs', 'Secrets.cs', 'LoadOrder.cs', 'Swallow.cs', 'Progress.cs', 'DevBuild.cs') |
+        ForEach-Object { Join-Path $App $_ }
+    $real += @((Join-Path $Tool 'ShipRoot.cs'), (Join-Path $Tool 'OwnGameShipRoot.cs'))
+    foreach ($f in $real) { Yes ("$([IO.Path]::GetFileName($f)) is there") (Test-Path -LiteralPath $f) }
+    $stubFile = Join-Path $work 'Stubs.cs'
+    $driverFile = Join-Path $work 'Driver.cs'
+    [IO.File]::WriteAllText($stubFile, $stubs, $utf8)
+    [IO.File]::WriteAllText($driverFile, $driver, $utf8)
+    $skyrimList = Join-Path $work 'skyrim-files.json'
+    # Real SHA-1s of what the driver puts in its Steam copy (#2603): the exe is
+    # 37,157,144 zero bytes, the rest short texts.
+    function Sha1Of([byte[]]$b) { return ([BitConverter]::ToString([Security.Cryptography.SHA1]::Create().ComputeHash($b)) -replace '-', '').ToLowerInvariant() }
+    $listed = [ordered]@{
+        'SkyrimSE.exe' = @(37157144, (Sha1Of (New-Object byte[] 37157144)))
+        'Data\\Skyrim.esm' = @(10, (Sha1Of $utf8.GetBytes('PIN-MASTER')))
+        'Data\\Skyrim - Misc.bsa' = @(11, (Sha1Of $utf8.GetBytes('PIN-ARCHIVE')))
+        'Data\\ccBGSSSE037-Curios.esl' = @(9, (Sha1Of $utf8.GetBytes('CC-CURIOS')))
     }
-    Yes 'the driver finished and agrees' ($code -eq 0)
-} else { foreach ($l in @($compiled)) { Write-Host "      $l" } }
+    $rows = @($listed.Keys | ForEach-Object { '    "' + $_ + '": { "bytes": ' + $listed[$_][0] + ', "sha1": "' + $listed[$_][1] + '", "depot": "1" }' })
+    [IO.File]::WriteAllText($skyrimList, ("{`n  ""build"": ""1.6.1170"",`n  ""files"": {`n" + ($rows -join ",`n") + "`n  }`n}`n"), $utf8)
+    $exe = Join-Path $work 'ship-root-test.exe'
+    $cscArgs = @('/noconfig', '/nologo', '/target:exe', '/warn:0', "/langversion:$LauncherLangVersion", '/main:Thornswood.ShipRootTest', "/out:$exe",
+                 "/resource:$skyrimList,skyrim-files.json", ("/resource:" + (Join-Path $Here 'records\ui-gone.json') + ",ui-gone.json"))
+    foreach ($r in $refs) { $cscArgs += "/reference:$r" }
+    foreach ($f in $real) { $cscArgs += (Resolve-Path -LiteralPath $f).Path }
+    $cscArgs += $stubFile, $driverFile
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $compiled = & $LauncherCsc @cscArgs 2>&1
+    $ErrorActionPreference = $old
+    $built = ($LASTEXITCODE -eq 0) -and (Test-Path -LiteralPath $exe)
+    Yes 'the ship root tool compiles with the real OwnGame and the driver' $built
+    if ($built) {
+        $scene = Join-Path $work 'machine'
+        $null = New-Item -ItemType Directory -Force -Path $scene
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        $out = & $exe $scene 2>&1
+        $code = $LASTEXITCODE
+        $ErrorActionPreference = $old
+        foreach ($l in @($out)) {
+            $s = [string]$l
+            if ($s.StartsWith('PASS  ')) { $script:pass++; Write-Host $s }
+            elseif ($s.StartsWith('FAIL  ')) { $script:fail++; Write-Host $s }
+            else { Write-Host $s }
+        }
+        Yes 'the driver finished and agrees' ($code -eq 0)
+    } else { foreach ($l in @($compiled)) { Write-Host "      $l" } }
+} else {
+    Write-Host 'SKIP  1. the ship root tool, compiled with the real OwnGame and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows'
+}
 
 # ============================================== 2. Where.ps1 and where.js ====
 $repo = Join-Path $work 'repo'
