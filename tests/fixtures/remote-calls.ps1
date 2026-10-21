@@ -2,7 +2,7 @@
 # Dot-sourced by tests\test-remote-command-map.ps1; defines functions only.
 
 $RemoteCallNames = @('Invoke-ThornswoodRemote', 'Invoke-ThornswoodSecretRemote', 'Invoke-ThornswoodArtifactRemote',
-    'Send-ThornswoodArtifactFile', 'Remote', 'ssh', 'scp', 'ssh-keyscan')
+    'Send-ThornswoodArtifactFile', 'Start-ThornswoodRemote', 'Remote', 'ssh', 'scp', 'ssh-keyscan')
 
 # How many source lines above a call count as its own, for an anchor when
 # several calls in one scope send the same text (Remote @", Remote $sample).

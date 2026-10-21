@@ -89,7 +89,6 @@ lines.push('  };');
 lines.push('  // ==== end ITEM_NAMES ====');
 
 let src = fs.readFileSync(GM, 'utf8');
-const crlf = src.indexOf('\r\n') !== -1;
 src = src.split('\r\n').join('\n');
 const block = lines.join(NL);
 const re = /  \/\/ ==== ITEM_NAMES ====[\s\S]*?  \/\/ ==== end ITEM_NAMES ====/;
@@ -100,6 +99,5 @@ if (re.test(src)) {
   if (src.indexOf(anchor) === -1) { console.error('no RECIPES_BY_ID end marker in ' + GM); process.exit(1); }
   src = src.replace(anchor, function () { return anchor + NL + NL + block; });
 }
-if (crlf) src = src.split('\n').join('\r\n');
 fs.writeFileSync(GM, src);
 console.log('ITEM_NAMES: ' + keys.length + ' names from ' + Object.keys(rows).length + ' recipes, ' + clashes + ' shared name(s), written to ' + GM);

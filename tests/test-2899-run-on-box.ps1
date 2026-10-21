@@ -18,13 +18,25 @@
      in their place, '{data}' reaches the tool as that folder, a tool that
      writes into the data folder leaves the server's files as they were,
      only what changed under game\ and records\ is listed and zipped back,
-     the tool's exit code comes back, and the clean-up removes the run's
-     folder. Skyrim's archives in the store are linked into the data folder,
+     the tool's exit code comes back, and the keeper removes the run's folder
+     when its input closes. Skyrim's archives in the store are linked into the data folder,
      and a tool that opens one to write is refused, the store keeping its
      bytes; the loose string tables in the store's Strings are linked into
      the data folder's Strings, where the tools look for them. Off Windows
      there is no powershell.exe and no py, and this part says so and is
      skipped; the Windows runner runs it.
+  5. The run's folder lives as long as its keeper's session (#2999): the
+     keeper's text is ASCII, parses and fits on the command line;
+     Start-ThornswoodRemote refuses a weaker host key check, a script too
+     long for the command line and a word with a double quote, and hands the
+     far side its words whole and its input until it is closed. On Windows,
+     under Windows PowerShell 5.1: a keeper removes the folders whose lock
+     nobody holds (one from before the lock, an orphaned lock) and leaves
+     one that is held and anything not named like a run's; a keeper killed
+     as a dropped session kills it leaves its folder, and the next keeper
+     removes it; a keeper whose run still holds the folder leaves it, says
+     so, and the next keeper removes it once the run let go; the run refuses
+     to start in a folder no keeper holds.
   4. scripts\mods\Send-GameArchives.ps1 refuses archives that are missing or
      not the bytes records\skyrim-files.json names, before it asks the box
      anything, and its far side text is ASCII and parses. Every file
@@ -111,8 +123,8 @@ Yes 'records\game-strings.json names loose string tables under Strings, each wit
 # ---- 2. the far side text ------------------------------------------------
 . $lib
 $far = Get-ThornswoodOnBoxScript -Run 'C:\Windows\Temp\thornswood-onbox-test' -ServerRoot 'C:\Thornswood-Server-Dev' -Tool 'scripts/mods/Add-ContentRecords.py' -Arguments @('--check', '--masters', '{data}', "it's")
-$clean = Get-ThornswoodOnBoxCleanScript -Run 'C:\Windows\Temp\thornswood-onbox-test'
-Yes 'the far side text is ASCII, as Windows PowerShell 5.1 reads it' (-not ($far + $clean).ToCharArray().Where({ [int]$_ -gt 127 }, 'First'))
+$keep = Get-ThornswoodOnBoxKeepScript -Run 'C:\Windows\Temp\thornswood-onbox-0123456789ab'
+Yes 'the far side text is ASCII, as Windows PowerShell 5.1 reads it' (-not ($far + $keep).ToCharArray().Where({ [int]$_ -gt 127 }, 'First'))
 $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($far, [ref]$null, [ref]$errs)
 Yes 'and it parses' (-not $errs -or $errs.Count -eq 0)
@@ -126,10 +138,95 @@ $errs = $null
 [void][Management.Automation.Language.Parser]::ParseInput($ro, [ref]$null, [ref]$errs)
 Yes 'the archives'' read-only rule is ASCII and parses' (-not $ro.ToCharArray().Where({ [int]$_ -gt 127 }, 'First') -and (-not $errs -or $errs.Count -eq 0))
 Yes 'twelve archives: Interface, Meshes0-1 and Textures0-8, Patrick''s A on #2899' ($ThornswoodGameArchives.Count -eq 12 -and $ThornswoodGameArchives[0] -eq 'Skyrim - Interface.bsa' -and $ThornswoodGameArchives[11] -eq 'Skyrim - Textures8.bsa')
-Yes 'the clean-up removes the run''s folder and says whether it went' ($clean -match "Remove-Item -LiteralPath 'C:\\Windows\\Temp\\thornswood-onbox-test' -Recurse" -and $clean -match "'GONE'")
+$errs = $null
+[void][Management.Automation.Language.Parser]::ParseInput($keep, [ref]$null, [ref]$errs)
+Yes 'the keeper''s text parses' (-not $errs -or $errs.Count -eq 0)
+$keepLine = 'powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($keep))
+Yes ('and fits on the command line, so nothing is sent ahead of it as a file (' + $keepLine.Length + ' of 6000)') ($keepLine.Length -le 6000)
+Yes 'the run holds its folder''s lock while it runs, and stops when it cannot' ($far.Contains("New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')") -and $far -match 'could not be held through its lock')
+$runText = Get-Content -LiteralPath $runOnBox -Raw
+Yes 'Run-OnBox.ps1 starts the keeper, sends the run into its folder and no longer removes the folder by a call of its own' (
+    $runText -match 'Start-ThornswoodRemote -Target \$target -SshArgs \$ssh -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run\)' -and
+    $runText -match "\(\`$runFar \+ '/run\.ps1'\)" -and $runText -match "StandardInput\.Close\(\)" -and
+    $runText -notmatch 'OnBoxCleanScript' -and $runText -notmatch 'Invoke-ThornswoodArtifactRemote \$target \$ssh \$farRun')
+Yes 'and its own scratch folder here is not named like a run folder on the box' ($runText -match "'thornswood-runonbox-'" -and $runText -notmatch "GetTempPath\(\)\) \('thornswood-onbox-'")
+
+# ---- 5. Start-ThornswoodRemote -------------------------------------------
+. (Join-Path $Repo 'scripts\vps\Send-Script.ps1')
+function Refusal([scriptblock]$b) { try { & $b | Out-Null; return '' } catch { return $_.Exception.Message } }
+$m = Refusal { Start-ThornswoodRemote -Target 'nobody@box.invalid' -SshArgs @('-o', 'StrictHostKeyChecking=no') -Script "'hi'" }
+Yes 'Start-ThornswoodRemote refuses a weaker host key check, before sending anything' ($m -match 'host key checking turned down' -and $m -match 'Nothing was sent')
+$m = Refusal { Start-ThornswoodRemote -Target 'nobody@box.invalid' -Script ("'" + ('x' * 3000) + "'") }
+Yes 'and a script too long for the command line, rather than sending it as a file' ($m -match 'over 6000' -and $m -match 'Nothing was sent')
+$m = Refusal { Start-ThornswoodRemote -Target 'nobody@box.invalid' -SshArgs @('-o', 'User="x"') -Script "'hi'" }
+Yes 'and an ssh word with a double quote in it' ($m -match 'double quote' -and $m -match 'Nothing was sent')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) {
+    Write-Host 'SKIP  Start-ThornswoodRemote against a stand-in ssh: ssh is ssh.exe here, and a stand-in would have to be one too (the Linux runs check it)'
+} else {
+    $bin = Join-Path ([IO.Path]::GetTempPath()) ('ts-2999-bin-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    New-Item -ItemType Directory -Force -Path $bin | Out-Null
+    $savedPath = $env:PATH
+    try {
+        $fake = Join-Path $bin 'ssh'
+        [IO.File]::WriteAllText($fake, "#!/bin/sh`nfor a in `"`$@`"; do echo `"ARG `$a`"; done`necho READY`ncat`necho EOF`n")
+        & chmod +x $fake
+        $env:PATH = $bin + [IO.Path]::PathSeparator + $savedPath
+        $p = Start-ThornswoodRemote -Target 'nobody@box.invalid' -SshArgs @('-o', 'BatchMode=yes') -Script "'hi there'"
+        $first = @()
+        while ($null -ne ($l = $p.StandardOutput.ReadLine())) { if ($l -eq 'READY') { break }; $first += $l }
+        $p.StandardInput.WriteLine('a line in')
+        $p.StandardInput.Close()
+        $rest = @($p.StandardOutput.ReadToEnd() -split '\r?\n' | Where-Object { $_ })
+        $p.WaitForExit()
+        $want = @('ARG -o', 'ARG BatchMode=yes', 'ARG -o', 'ARG StrictHostKeyChecking=yes', 'ARG nobody@box.invalid',
+            ('ARG powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("'hi there'"))))
+        Yes 'ssh is handed its words whole, host key checking on, the script on the command line' (($first -join '|') -eq ($want -join '|'))
+        Yes 'and the far side reads its input until it is closed, then ends' (($rest -join '|') -eq 'a line in|EOF' -and $p.ExitCode -eq 0)
+    } finally {
+        $env:PATH = $savedPath
+        Remove-Item -LiteralPath $bin -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
 
 # ---- 3. run as on the box, under Windows PowerShell 5.1 ------------------
 . (Join-Path $PSScriptRoot 'Windows.ps1')
+
+# A keeper as the box runs one: Windows PowerShell 5.1, the script on the
+# command line, its standard input and output pipes. Start-Keeper reads up to
+# its MADE line; Stop-Keeper closes its input and reads what it says after.
+# Each read gives up after a minute, so a keeper that never answers fails the
+# check rather than holding the build.
+function Read-KeeperLine($p) {
+    $t = $p.StandardOutput.ReadLineAsync()
+    if (-not $t.Wait(60000)) { $p.Kill(); throw 'a keeper said nothing for a minute' }
+    return $t.Result
+}
+function Start-Keeper([string]$Run) {
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = $ps51
+    $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodOnBoxKeepScript -Run $Run)))
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    $p = [Diagnostics.Process]::Start($psi)
+    $said = @()
+    while ($null -ne ($l = Read-KeeperLine $p)) {
+        $said += $l.Trim()
+        if ($l.Trim() -like 'MADE *') { break }
+    }
+    # What it said, so a red check here names its cause in the log.
+    foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
+    return [pscustomobject]@{ P = $p; Said = $said }
+}
+function Stop-Keeper($k) {
+    $k.P.StandardInput.Close()
+    $said = @()
+    while ($null -ne ($l = Read-KeeperLine $k.P)) { if ($l.Trim()) { $said += $l.Trim() } }
+    $k.P.WaitForExit()
+    foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
+    return $said
+}
 $py = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
 if (-not $OnWindows) {
     Write-Host 'SKIP  the run under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs (the Windows runner runs it)'
@@ -141,8 +238,11 @@ if (-not $OnWindows) {
     try {
         $server = Join-Path $work 'server'
         $plugins = Join-Path $server 'plugins'
-        $run = Join-Path $work 'run'
-        New-Item -ItemType Directory -Force -Path $plugins, $run | Out-Null
+        $run = Join-Path $work 'thornswood-onbox-0123456789ab'
+        New-Item -ItemType Directory -Force -Path $plugins | Out-Null
+        # The run's folder, made and held by its keeper as on the box.
+        $runKeeper = Start-Keeper $run
+        Yes 'the keeper makes the run''s folder and holds its lock' (($runKeeper.Said -contains ('MADE ' + $run)) -and (Test-Path -LiteralPath $run) -and (Test-Path -LiteralPath ($run + '.lock')))
         [IO.File]::WriteAllText((Join-Path $plugins 'Skyrim.esm'), 'vanilla')
         [IO.File]::WriteAllText((Join-Path $plugins 'Thornswood-Content.esp'), 'server copy')
         $store = Join-Path $work 'store'
@@ -218,13 +318,90 @@ sys.exit(3)
         Yes 'the tool''s output and its errors are shown' (($lines -contains 'to stderr') -and (($lines -match '^-------- scripts/mods/t.py --------$').Count -eq 1))
         Yes 'the tool''s exit code comes back' ($lines -contains 'EXIT 3')
 
-        $cleanText = Get-ThornswoodOnBoxCleanScript -Run $run
-        $cleanFile = Join-Path $work 'clean.ps1'
-        [IO.File]::WriteAllText($cleanFile, $cleanText, (New-Object Text.UTF8Encoding($true)))
-        $gone = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $cleanFile 2>&1 | ForEach-Object { "$_".Trim() })
-        Yes 'the clean-up removes the run''s folder, and the archive stays in the store' (($gone -contains 'GONE') -and -not (Test-Path -LiteralPath $run) -and [IO.File]::ReadAllText($archive) -eq 'archive bytes')
+        $gone = Stop-Keeper $runKeeper
+        Yes 'the keeper removes the run''s folder and its lock when its input closes, and the archive stays in the store' (
+            ($gone -contains ('GONE ' + $run)) -and -not (Test-Path -LiteralPath $run) -and -not (Test-Path -LiteralPath ($run + '.lock')) -and [IO.File]::ReadAllText($archive) -eq 'archive bytes')
     } finally {
+        if ($runKeeper -and -not $runKeeper.P.HasExited) { $runKeeper.P.Kill() }
         Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+    }
+}
+
+# ---- 5b. the keeper, as on the box, under Windows PowerShell 5.1 ---------
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the keeper under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs (the Windows runner runs it)'
+} else {
+    $ps51 = Get-WindowsPowerShell
+    $top = Join-Path ([IO.Path]::GetTempPath()) ('ts-2999-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+    $held = @()
+    $keepers = @()
+    try {
+        New-Item -ItemType Directory -Force -Path $top | Out-Null
+        function Folder([string]$id) { Join-Path $top ('thornswood-onbox-' + $id) }
+        function Hold([string]$d) { New-Object IO.FileStream(($d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'ReadWrite') }
+        $before = Folder 'aaaaaaaaaaaa'
+        New-Item -ItemType Directory -Force -Path (Join-Path $before 'data') | Out-Null
+        [IO.File]::WriteAllText((Join-Path $before 'data\Skyrim.esm'), 'left by a cut run')
+        $orphan = Folder 'bbbbbbbbbbbb'
+        [IO.File]::WriteAllText($orphan + '.lock', '')
+        $busy = Folder 'cccccccccccc'
+        New-Item -ItemType Directory -Force -Path $busy | Out-Null
+        $busyHold = Hold $busy
+        $held += $busyHold
+        $other = Join-Path $top 'thornswood-onbox-notarun'
+        New-Item -ItemType Directory -Force -Path $other | Out-Null
+
+        $k = Start-Keeper (Folder 'dddddddddddd')
+        $keepers += $k
+        Yes 'a keeper removes a run folder from before the lock, which nobody holds' (($k.Said -contains ('GONE ' + $before)) -and -not (Test-Path -LiteralPath $before) -and -not (Test-Path -LiteralPath ($before + '.lock')))
+        Yes 'and an orphaned lock' (($k.Said -contains ('GONE ' + $orphan)) -and -not (Test-Path -LiteralPath ($orphan + '.lock')))
+        Yes 'and leaves a folder a run still holds, saying so' (@($k.Said | Where-Object { $_ -like ('HELD ' + $busy + ':*') }).Count -eq 1 -and (Test-Path -LiteralPath $busy))
+        Yes 'and anything not named like a run''s folder' (Test-Path -LiteralPath $other)
+        Yes 'then makes its own' (($k.Said[-1] -eq ('MADE ' + (Folder 'dddddddddddd'))) -and (Test-Path -LiteralPath (Folder 'dddddddddddd')))
+        $m = @(Stop-Keeper $k)
+        Yes 'and removes it when its input closes' (($m -contains ('GONE ' + (Folder 'dddddddddddd'))) -and -not (Test-Path -LiteralPath (Folder 'dddddddddddd')))
+
+        # A dropped session: the keeper is killed and can remove nothing.
+        $cut = Folder 'eeeeeeeeeeee'
+        $k = Start-Keeper $cut
+        $keepers += $k
+        $k.P.Kill()
+        $k.P.WaitForExit()
+        Yes 'a keeper killed with its session leaves its folder' ((Test-Path -LiteralPath $cut))
+        # A keeper whose run still holds the folder when its input closes.
+        $still = Folder 'ffffffffffff'
+        $k = Start-Keeper $still
+        $keepers += $k
+        Yes 'the next keeper removes the killed keeper''s folder' (($k.Said -contains ('GONE ' + $cut)) -and -not (Test-Path -LiteralPath $cut) -and -not (Test-Path -LiteralPath ($cut + '.lock')))
+        $runHold = New-Object IO.FileStream(($still + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')
+        $held += $runHold
+        $m = @(Stop-Keeper $k)
+        Yes 'a keeper whose run still holds the folder leaves it, and says so' (@($m | Where-Object { $_ -like ('HELD ' + $still + ':*') }).Count -eq 1 -and (Test-Path -LiteralPath $still))
+        $runHold.Dispose()
+        $busyHold.Dispose()
+
+        $next = Folder '0123456789ab'
+        $k = Start-Keeper $next
+        $keepers += $k
+        Yes 'the next keeper removes the ones whose runs have let go' (($k.Said -contains ('GONE ' + $still)) -and ($k.Said -contains ('GONE ' + $busy)) -and -not (Test-Path -LiteralPath $still) -and -not (Test-Path -LiteralPath $busy))
+
+        # The run refuses a folder no keeper holds.
+        $loose = Folder '123456789abc'
+        New-Item -ItemType Directory -Force -Path $loose | Out-Null
+        $file = Join-Path $top 'far.ps1'
+        [IO.File]::WriteAllText($file, (Get-ThornswoodOnBoxScript -Run $loose -ServerRoot $top -Tool 'scripts/mods/t.py'), (New-Object Text.UTF8Encoding($true)))
+        $lines = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" })
+        $code = $LASTEXITCODE
+        Yes 'the run stops in a folder no keeper holds, before anything is unpacked' ($code -eq 2 -and @($lines | Where-Object { $_ -like 'STOP. the run''s folder could not be held*' }).Count -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $loose 'repo')))
+        Remove-Item -LiteralPath $loose -Recurse -Force
+
+        $m = @(Stop-Keeper $k)
+        $left = @(Get-ChildItem -LiteralPath $top -Force | Where-Object { $_.Name -ne 'far.ps1' } | ForEach-Object { $_.Name })
+        Yes ('and when the last keeper is done, only what is not a run''s is left' + $(if ($left.Count -ne 1) { ': ' + ($left -join ', ') } else { '' })) (($m -contains ('GONE ' + $next)) -and ($left -join ',') -eq 'thornswood-onbox-notarun')
+    } finally {
+        foreach ($h in $held) { $h.Dispose() }
+        foreach ($k in $keepers) { if (-not $k.P.HasExited) { $k.P.Kill() } }
+        Remove-Item -LiteralPath $top -Recurse -Force -ErrorAction SilentlyContinue
     }
 }
 
