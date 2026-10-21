@@ -12,7 +12,7 @@ const measured=doc=>{
 };
 function validateRetrievalSources(doc,population,content,roster) {
  const fail=()=>{throw new Error('Invalid retrieval source evidence');};
- if(!doc||hash(measured(doc))!=='5139dbb0ea38f2f426b2bee80437985effb2a74c7d5f9f61a07b4f0bb807cf8c'||
+ if(!doc||hash(measured(doc))!=='bf81b78390d00bfffbdab7125f80cd7e989a546e150777fb2d2f974e879e3d32'||
    !population||loadOrderSha256(population)!==doc.loadOrderSha256||
    !Buffer.isBuffer(content)||crypto.createHash('sha256').update(content).digest('hex')!==doc.contentSha256||
    !roster||!Array.isArray(roster.merchants))fail();
