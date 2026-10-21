@@ -54,6 +54,9 @@
   name goes in disabled, after the rest: Vortex leaves the curator's disabled
   plugins out of the list, and on One they are off. The collection's plugin
   rules are checked against the order, and a broken one stops the run.
+  layout.json carries the rules too (pluginRules), because a Vortex install
+  does not take the list's order: it sorts the plugins itself under those
+  rules, so two installs agree on the rules and may differ elsewhere.
 
   -Game is required, and it is never the Steam copy (any folder under a
   steamapps\common), a folder Vortex deploys into (vortex.deployment*.json),
@@ -584,6 +587,10 @@ $layoutRecord = [ordered]@{
       [ordered]@{ name = $e.Name; version = $e.Version; modId = $e.ModId; fileId = $e.FileId; md5 = $e.Md5; size = $e.Size; archive = [IO.Path]::GetFileName($archives[$e.Index]); installer = $_.Installer; type = $e.Type; files = [int]$counts[$e.Index]; patched = @($e.Patches | ForEach-Object { $_.Key }); warnings = @($_.Warnings) }
     })
   plugins    = @($order | ForEach-Object { [ordered]@{ name = $_.Name; enabled = [bool]$_.Enabled } })
+  # The collection's plugin rules, as it gives them. Vortex sorts each
+  # install's load order itself under these rules, so they, and not the
+  # list's order, are what a deployment is held to (Compare-NexusLayout.ps1).
+  pluginRules = @($col.PluginRules | ForEach-Object { [ordered]@{ name = $_.Name; after = @($_.After | ForEach-Object { [string]$_ }) } })
 }
 function Write-LayoutRecord([string]$dir, [bool]$withFiles) {
   New-Item -ItemType Directory -Force -Path $dir | Out-Null
