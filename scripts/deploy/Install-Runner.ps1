@@ -291,6 +291,19 @@ if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
   $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
   if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
 }
+# On the box, the folders records\runner-isolation.json says no runner may
+# reach that are not C:\Thornswood-* (C:\ProgramData\ssh, the
+# administrator's profile) are denied with the Thornswood ones, at every
+# install and every -Lock. Until 21 Oct only C:\Thornswood-* and a hand-given
+# -AlsoDeny were, and Check-RunnerIsolation.ps1 -Collect read on 21 Oct that
+# every runner account's rights on C:\ProgramData\ssh included read (#2161).
+# A noReach entry that is a file, or under C:\Thornswood-*, is passed over
+# here: the box script skips anything that is not a folder, and the
+# Thornswood folders are denied by $liveFilter already.
+if (-not $OffBox) {
+  $isolation = Get-Content -LiteralPath (Join-Path $Here '..\..\records\runner-isolation.json') -Raw | ConvertFrom-Json
+  $AlsoDeny = @(@($AlsoDeny) + @($isolation.noReach | Where-Object { $_ -and $_ -notlike 'C:\Thornswood-*' }) | Select-Object -Unique)
+}
 # The lists the scripts below are given, as PowerShell source. $leaveList is
 # the folders under C:\ that Lock-VpsFolders.ps1 gives the runner accounts
 # write on, which this script never denies them (the header's CRASH DUMPS).
