@@ -198,4 +198,12 @@ open().then(({ sock, rest }) => {
     }
   });
   process.stdin.on('end', () => { sendClose(); sock.end(); });
+  // ssh ends its ProxyCommand with SIGHUP a moment after it closes standard
+  // input (measured 21 Oct 2026, #2961: 2 ms apart). Left to the default,
+  // that killed this before the close frame was out, so bridge.js held the
+  // session's slot until the proxy and Caddy let the connection go, about
+  // 11 s later, and one install's ssh calls a second apart filled all eight
+  // slots and were refused. The close goes out and this ends when the
+  // connection does, the same as when standard input ends.
+  process.on('SIGHUP', () => { sendClose(); sock.end(); });
 }).catch((e) => die(e.message));
