@@ -155,7 +155,7 @@ function boot(opts) {
   const was = process.cwd();
   process.chdir(box);
   try {
-    vm.runInNewContext(guardSrc + '\n' + watchSrc + '\n' + limitSrc, sandbox,
+    vm.runInNewContext(require('./fixtures/ordinary-quest-items') + guardSrc + '\n' + watchSrc + '\n' + limitSrc, sandbox,
                        { filename: 'gamemode.js take limit' });
   } finally {
     process.chdir(was);

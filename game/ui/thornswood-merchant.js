@@ -98,13 +98,14 @@
         return gem + ': ' + quest.locations[gem];
       }).join('; ');
       if (quest.gem && quest.locations && typeof quest.locations === 'object') location = quest.locations[quest.gem] || location;
-      var status = quest.state === 'open' ? (quest.waiting?'Waiting for the saved trade.':quest.kind==='commission'?'Accepted; payment reserved.':quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
+      var status = quest.state === 'open' ? (quest.waiting?'Waiting for the saved trade.':quest.kind==='commission'?'Accepted; payment reserved.':quest.kind==='retrieval'?(quest.drawn>=1?'Item collected.':'Find the named item.'):quest.kind==='kill' ? 'Defeated '+quest.kills+' of '+quest.count :
         'Drawn ' + quest.drawn + ' of ' + quest.holds + (quest.gem ? ', ' + quest.gem : '')) :
         quest.state === 'cooldown' ? ('Returns in ' + quest.waitMinutes + ' minutes') : quest.state === 'locked' ? ('Requires ' + quest.who) :
         quest.state==='unavailable' ? 'This work is unavailable.' : 'Available';
       var terms=quest.kind==='commission'?'Deliver '+(Array.isArray(quest.goods)?quest.goods.map(function(good){return good.count+' '+good.name;}).join('; '):quest.count+' '+quest.item)+'. '+
         (quest.gold===null?'No submitted payment is available.':'Payment '+quest.gold+' gold.')+
-        ' Return to this specialist. This work rests for '+quest.hours+' hours after the trade settles.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
+        ' Return to this specialist. This work rests for '+quest.hours+' hours after the trade settles.':quest.kind==='retrieval' ?
+        'Retrieve one item. Reward '+quest.gold+' gold. Return to the named specialist. Rests for '+quest.hours+' hours.':quest.kind==='kill' ? 'Defeat '+quest.count+' at this place. Reward '+quest.gold+' gold. '+
         (quest.exactMerchant?'Return to this specialist.':'Return to a guild trader in this hold.')+' Returns after '+quest.hours+' hours.' :
         'Draw up to '+quest.holds+', return '+quest.ask+' to finish, and keep the rest. Returns after '+quest.hours+' hours.';
       body += '<div class="line"><div class="quest-copy"><strong>' + esc(quest.name) + '</strong>' +

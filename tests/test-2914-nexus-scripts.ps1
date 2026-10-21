@@ -157,6 +157,15 @@ $crc = Get-NexusCrc64Nvme $archive
 $check = [Convert]::ToBase64String([byte[]](0xAE, 0x8B, 0x14, 0x86, 0x0A, 0x79, 0x98, 0x88))
 Yes 'CRC-64/NVME of "123456789" is the published check value AE8B14860A799888, most significant byte first' ([ThornswoodCrc64Nvme]::OfBytes([Text.Encoding]::ASCII.GetBytes('123456789')) -ceq $check -and $check -ceq 'rosUhgp5mIg=')
 $facts = Get-NexusArchiveFacts $archive
+# One 7-Zip lookup for both revision scripts (#2969, 21 Oct): New-NexusRevision
+# had its own, which took Ubuntu's 7z (no RAR) ahead of Get-SevenZip.ps1's.
+$own7z = @(Get-ChildItem -LiteralPath $rel -Filter '*.ps1' | Where-Object { (Get-Content -Raw -LiteralPath $_.FullName) -match '(?m)^\s*function Find-SevenZip\b' } | ForEach-Object { $_.Name })
+Yes 'Find-SevenZip is defined once, in Nexus.ps1, for Install-NexusRevision and New-NexusRevision alike' ($own7z.Count -eq 1 -and $own7z[0] -eq 'Nexus.ps1')
+if (-not $OnWindows -and -not $env:ProgramFiles) {
+    $got7z = & (Join-Path $rel 'Get-SevenZip.ps1') -Check 6>$null
+    if ($LASTEXITCODE -eq 0 -and $got7z) { Yes 'off Windows it takes Get-SevenZip.ps1''s 7zz first, whatever 7z is on PATH' ((Find-SevenZip) -eq [string]$got7z) }
+    else { Skip 'off Windows it takes Get-SevenZip.ps1''s 7zz first: that 7zz is not on this machine' }
+}
 Yes 'the md5 is the file''s md5, in hex and in base64' ($facts.Md5Hex -eq $md5 -and [Convert]::ToBase64String([Convert]::FromBase64String($facts.Md5Base64)) -eq $facts.Md5Base64 -and (($([Convert]::FromBase64String($facts.Md5Base64)) | ForEach-Object { $_.ToString('x2') }) -join '') -eq $md5)
 Yes 'while the stand-in is set the key read is its made-up one' ((Read-NexusKey) -eq $KEY)
 $env:THORNSWOOD_NEXUS_STANDIN = 'http://203.0.113.5:80'

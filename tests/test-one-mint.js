@@ -860,7 +860,7 @@ function tradeWorld() {
   });
   new Function(
     'globalThis', 'mp', 'console', 'setInterval', 'clearInterval', 'guard', 'say', 'notify',
-    tradeBlock)(
+    require('./fixtures/ordinary-quest-items') + tradeBlock)(
     g, mp, { log: function () { } }, function () { return 1; }, function () { },
     function (n, f) { return f; }, function () { }, function () { });
   return {

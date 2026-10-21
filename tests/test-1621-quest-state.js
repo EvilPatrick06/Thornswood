@@ -279,13 +279,14 @@ w = restart();
 yes('a restart keeps the camp\'s 6 hour cooldown, so its gold cannot be taken again',
     w.svc.offer(4, 'camp',{traderRef:9000}).why === 'cooldown' && have(4, 'f:Skyrim.esm') === 45);
 
-w.svc.bindPlace('satchel', { ref: 'sack-1', cell: 'road-1', item: 'satchel-item' });
-yes('the satchel', w.svc.offer(4, 'satchel').ok === true && w.svc.noteContainer(4, 'sack-1', 'road-1') === 'You take it.');
-w = restart();
-w.svc.bindPlace('satchel', { ref: 'sack-1', cell: 'road-1', item: 'satchel-item' });
-yes('after a restart the satchel taken is still counted: no second one',
-    w.svc.noteContainer(4, 'sack-1', 'road-1') === null && have(4, 'satchel-item') === 1);
-yes('and walking away puts it back', w.svc.walkAway(4, 'satchel').ok === true && have(4, 'satchel-item') === 0);
+{
+  const fixture=require('./merchant-retrieval-fixture'),retrieval=fixture.setup(),row=fixture.data.sources[0];
+  yes('the satchel',retrieval.take(row).ok===true && retrieval.pickup(row)==='You take it.');
+  retrieval.restart();
+  yes('after a restart the satchel taken is still counted: no second one',
+    retrieval.pickup(row)==='You already have this quest item.' && fixture.h.have(500,row.item)===1);
+  yes('and walking away puts it back',retrieval.leave(row).ok===true && fixture.h.have(500,row.item)===0);
+}
 
 // ------------------------------------------------ a record rebuilt -------
 forms[5] = { inv: {}, props: {} };
@@ -591,17 +592,13 @@ yes('the miner page says the same', /kept on the character/.test(mWhere) &&
   yes('mining qualification cannot adopt a new actor session',have(82,EBONY.ore)===0 && forms[82].props[PROP].open.ebony.drawn===0);
 }
 {
-  w=restart();w.ctx.__identityToken='old';
-  w.svc.bindPlace('satchel',{ref:9800,cell:'satchel-cell',item:'satchel-item'});
-  w.svc.offer(83,'satchel',{traderRef:9000});
-  const get=w.ctx.mp.get;
-  w.ctx.mp.get=function(id,key){
-    if(id===9800 && key==='locationalData'){w.ctx.__identityToken='new';return {cellOrWorldDesc:'satchel-cell'};}
-    return get(id,key);
-  };
-  w.ctx.mp.getDescFromId=function(){return 'satchel-ref';};
-  w.svc.onActivate(83,9800);
-  yes('retrieval activation cannot adopt a new actor session',have(83,'satchel-item')===0 && forms[83].props[PROP].open.satchel.drawn===0);
+  const fixture=require('./merchant-retrieval-fixture'),s=fixture.setup(),row=fixture.data.sources[0];
+  s.w.ctx.__identityToken='old';
+  const accepted=s.take(row).ok;
+  s.sourceChange(function(){s.w.ctx.__identityToken='new';});
+  s.pickup(row);
+  yes('retrieval activation cannot adopt a new actor session',accepted && fixture.h.have(500,row.item)===0 &&
+    fixture.h.form(500).props[PROP].open.satchel.drawn===0);
 }
 
 {

@@ -112,7 +112,7 @@ function tradeWorld(company) {
   const said = [];
   new Function(
     'globalThis', 'mp', 'console', 'setInterval', 'clearInterval', 'guard', 'say', 'notify',
-    TRADE)(
+    require('./fixtures/ordinary-quest-items') + TRADE)(
     g, mp, { log: function () { } }, function () { return 1; }, function () { },
     function (n, f) { return f; }, function (id, line) { said.push([id, line]); }, function () { });
   const tr = g.__thornswoodTrade;

@@ -435,8 +435,8 @@ CONTENTS = (
     (r'FLOR ThornswoodFloraBeehive$', 'own', 'beehives'),
     (r'ACTI ThornswoodActivator(Well|Water)Bucket$', 'own', 'well and water buckets'),
     # The placements, and the cells and worlds they stand in, are the stations
-    # above put in the world (the tool refuses any other placement), so the
-    # stations' names already say them.
+    # above and the quest sites below put in the world (the tool refuses any
+    # other placement), so those rows' words already say them.
     (r'(REFR|CELL|WRLD) ', 'own', None),
     (r'ACTI ThornswoodMessageBoard$', 'own', 'notice boards'),
     (r'ACTI ThornswoodDropBox$', 'own', 'drop boxes'),
@@ -451,14 +451,15 @@ CONTENTS = (
     (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
     (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
     (r'(ALCH ThornswoodFoodTea|COBJ ThornswoodRecipeTea)\w+$|MGEF ThornswoodTeaSteepEffect$', 'own', 'teas'),
-    (r'ALCH ThornswoodFoodBurntMeal$|MGEF ThornswoodBurntEffect$', 'own', 'burnt meals'),
-    (r'ALCH ThornswoodFoodFine\w+$|MGEF ThornswoodFineEffect$', 'own', 'fine meals'),
+    (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
+     'burnt and fine meals'),
+    (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
     (r'IMAD ThornswoodDrunkImod$', 'own', 'the drunk screen'),
     (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
     (r'BOOK ThornswoodWelcome$', 'own', 'the welcome letter'),
     (r'COBJ (DLC[12])?Recipe(Weapon\w+Bow|Arrow\w+|TechBolt\w+)$', 'bethesda',
      'bows, arrows and bolts to the woodworking bench'),
-    (r'COBJ BYOHRecipe(Nails|Hinge|Lock|Fittings)$', 'bethesda', "Hearthfire's house parts off the forge"),
+    (r'COBJ BYOHRecipe(Nails|Hinge|Lock|Fittings)$', 'bethesda', 'house parts off the forge'),
     (r'COBJ RecipeIngotDwarvenScrap\w+$', 'bethesda', 'Dwarven scrap to one recipe'),
 )
 
@@ -1310,6 +1311,7 @@ def thornswood_records(passage, clam):
     out += needs_records()
     # Placeable furniture (#2679), one MISC and one woodworking recipe a row.
     out += furniture_records()
+    out += quest_records()
     return out
 
 
@@ -1507,12 +1509,68 @@ STATION_SITES = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__
 STATION_NAMES = {KILN: 'charcoal kilns', SALT_QUARRY: 'salt quarries', BEEHIVE: 'beehives',
                  ALCHEMY_LAB: 'alchemy labs', WELL_BUCKET: 'well buckets', RIVER_BUCKET: 'water buckets'}
 STATION_BASES = set(STATION_NAMES)
+QUEST_CONTENT = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                             'game', 'data', 'quest-content.json'))
 
 
-def placement(fid, base, pos, angle):
+def quest_content(path=QUEST_CONTENT):
+    """The dedicated quest objects, not copies of vanilla quest/skill records."""
+    doc = json.load(open(path, encoding='utf-8'))
+    keys = ['satchel', 'ledger', 'signet', 'locket', 'case', 'dispatch', 'seal']
+    sites = ['longfin%d' % n for n in range(1, 9)] + ['ledger']
+    def vector(value):
+        return (isinstance(value, list) and len(value) == 3 and
+                all(isinstance(n, (float, int)) and not isinstance(n, bool) and math.isfinite(n) for n in value))
+    if (doc.get('version') != 1 or not isinstance(doc.get('items'), list) or
+            [r.get('key') for r in doc['items']] != keys or list(doc.get('sites', {})) != sites):
+        raise ValueError('Invalid dedicated quest content catalogue')
+    if doc.get('seaWater') != {'world': '3c:Skyrim.esm', 'height': -14000, 'depth': 32}:
+        raise ValueError('Invalid measured sea water level')
+    for i, row in enumerate(doc['items']):
+        if (row.get('ref') != '%x:Thornswood-Content.esp' % (0x17000 + i) or row.get('weight') != 0 or
+                row.get('edid') != 'ThornswoodQuest' + keys[i].title() or not row.get('name') or
+                not isinstance(row.get('model'), str) or not row['model'].lower().endswith('.nif') or
+                len(row.get('bounds', [])) != 6 or
+                any(not isinstance(n, int) or isinstance(n, bool) or not -32768 <= n <= 32767 for n in row['bounds'])):
+            raise ValueError('Invalid dedicated quest item: ' + keys[i])
+    for i, key in enumerate(sites):
+        row = doc['sites'][key]
+        ledger = key == 'ledger'
+        if (row.get('ref') != '%x:Thornswood-Content.esp' % (0x17200 + i) or
+                row.get('base') != ('17100:Thornswood-Content.esp' if ledger else '154a5:Thornswood-Content.esp') or
+                row.get('interior') is not ledger or row.get('angle') != 0 or
+                not vector(row.get('pos')) or not vector(row.get('anchorPosition')) or
+                not isinstance(row.get('anchor'), str) or not row['anchor'].endswith(':Skyrim.esm') or
+                not isinstance(row.get('cell'), str) or not row['cell'].endswith(':Skyrim.esm') or
+                row.get('space') != (row['cell'] if ledger else '3c:Skyrim.esm')):
+            raise ValueError('Invalid dedicated quest placement: ' + key)
+        expected = list(row['anchorPosition'])
+        expected[2 if ledger else 0] += 12 if ledger else 48
+        if not ledger:
+            expected[2] = doc['seaWater']['height'] - doc['seaWater']['depth']
+        if row['pos'] != expected or ledger and row['cell'] != '133c9:Skyrim.esm':
+            raise ValueError('Quest placement differs from its measured anchor: ' + key)
+    return doc
+
+
+def quest_records():
+    doc = quest_content()
+    records = [misc(0x5017000 + i, row['edid'], row['name'], row['model'], row['bounds'], 0, 0.0, kws=())
+               for i, row in enumerate(doc['items'])]
+    ledger = doc['items'][1]
+    records.append(acti(0x5017100, 'ThornswoodQuestLedgerSource', ledger['bounds'], 'Guild Ledger', ledger['model']))
+    return records
+
+
+def quest_identity(have, edid):
+    if have is not None and have.editor_id() != edid:
+        raise ValueError('A dedicated quest form ID belongs to another record: ' + edid)
+
+
+def placement(fid, base, pos, angle, edid=None):
     """A placed station: its base and where it stands, turned angle degrees."""
     x, y, z = pos
-    return own_record(b'REFR', fid, [(b'NAME', struct.pack('<I', base)),
+    return own_record(b'REFR', fid, ([(b'EDID', zstr(edid))] if edid else []) + [(b'NAME', struct.pack('<I', base)),
                                      (b'DATA', struct.pack('<6f', x, y, z, 0.0, 0.0, math.radians(angle)))])
 
 
@@ -2083,6 +2141,8 @@ def main():
         '4947040003ba0e00534e414d04002605100050465043040064646464')
     clam = Rec(b'FLOR', 0, 0x85F80, clam_raw[16:24], clam_raw[24:])
     own = thornswood_records(passage, clam)
+    if len({r.fid for r in own}) != len(own):
+        raise ValueError('Two authored records share a form ID')
     unmade = sorted(remade - set(r.fid for r in own))
     if unmade:
         print('')
@@ -2107,6 +2167,8 @@ def main():
             print('STOP. 0x%07X is a %s here and this writes a %s. Nothing was written.'
                   % (r.fid, have.tag.decode(), r.tag.decode()))
             return 1
+        if 0x5017000 <= r.fid <= 0x5017100:
+            quest_identity(have, name)
         if (have.data, have.flags, have.extra) != (r.data, r.flags, r.extra):
             rewritten.append((have, r))
 
@@ -2254,11 +2316,20 @@ def main():
     sites = json.load(open(STATION_SITES, encoding='utf-8'))
     want, want_cell, want_world = {}, {}, {}
     own_index = len(plugin_masters)
-    for name, row in sorted(sites['sites'].items()):
+    quest_doc = quest_content()
+    quest_sites = quest_doc['sites']
+    authored_sites = dict(sites['sites'])
+    if set(authored_sites) & set(quest_sites):
+        raise ValueError('A quest and a station share a site name')
+    authored_sites.update(quest_sites)
+    record_ids = {r.fid for r in own}
+    for name, row in sorted(authored_sites.items()):
         fid = local_fid(row['ref'], plugin_masters, args.plugin)
         base = local_fid(row['base'], plugin_masters, args.plugin)
         cell = local_fid(row['cell'], plugin_masters, args.plugin)
-        if base not in STATION_BASES or (fid >> 24) != own_index or (cell >> 24) >= own_index or fid in want:
+        allowed_bases = {CATCH_LONGFIN, 0x5017100} if name in quest_sites else STATION_BASES
+        if (base not in allowed_bases or (fid >> 24) != own_index or (cell >> 24) >= own_index or
+                fid in want or fid in record_ids):
             print('')
             print('STOP. the station table\'s %s is not a placement of a station in this plugin, in a cell of '
                   'its masters, under a form id of its own. Nothing was written.' % name)
@@ -2268,9 +2339,39 @@ def main():
             print('STOP. the station table gives %s 0x%07X, which this plugin uses for something else. '
                   'Nothing was written.' % (name, fid))
             return 1
-        want[fid] = placement(fid, base, row['pos'], row['angle'])
+        edid = 'ThornswoodQuestSite' + name.title() if name in quest_sites else None
+        if edid:
+            quest_identity(by_fid.get(fid), edid)
+        want[fid] = placement(fid, base, row['pos'], row['angle'], edid)
         want_cell[fid] = cell
         want_world[fid] = None if row['interior'] else local_fid(row['space'], plugin_masters, args.plugin)
+    # A shifted sea marker must remain in its declared exterior grid. Verify
+    # against Bethesda's CELL data, rather than assuming its anchor's cell.
+    exterior = {(b'CELL', local_fid(r['cell'], plugin_masters, args.plugin))
+                for r in quest_sites.values() if not r['interior']}
+    exterior.add((b'WRLD', 0x3C))
+    quest_cells = bethesdas_world_records(args.masters, plugin_masters, sorted(exterior))
+    if quest_cells is not None:
+        for name, row in quest_sites.items():
+            if row['interior']:
+                continue
+            cell = local_fid(row['cell'], plugin_masters, args.plugin)
+            data = dict(subrecords(quest_cells[(b'CELL', cell)][1]))
+            if b'XCLC' not in data or len(data[b'XCLC']) < 8:
+                raise ValueError('Quest sea marker has no native CELL grid: ' + name)
+            grid = struct.unpack_from('<ii', data[b'XCLC'])
+            if grid != tuple(math.floor(n / 4096) for n in row['pos'][:2]):
+                raise ValueError('Quest sea marker crosses its declared CELL: ' + name)
+            water = data.get(b'XCLW', b'')
+            flags = data.get(b'DATA', b'')
+            world = dict(subrecords(quest_cells[(b'WRLD', 0x3C)][1]))
+            if len(water) != 4 or not flags or not flags[0] & 2 or len(world.get(b'DNAM', b'')) != 8:
+                raise ValueError('Quest sea marker has no verified native water: ' + name)
+            level = struct.unpack('<f', water)[0]
+            if level > 3e38:
+                level = struct.unpack('<2f', world[b'DNAM'])[1]
+            if level != quest_doc['seaWater']['height']:
+                raise ValueError('Native sea water changed; remeasure quest markers: ' + name)
     stays, moved, to_place = set(), set(), []
     for r, parent, cell in placements_in(tree):
         if r.fid in removing:
@@ -2534,6 +2635,8 @@ def main():
     print('')
     print('Does the result verify')
     after_records = list(every_record(parse(out, len(head), len(out))))
+    if len({r.fid for r in after_records}) != len(after_records):
+        raise ValueError('The authored plugin contains duplicate form IDs; nothing was written')
     # The header: the other server's name and short forms nowhere in it, and
     # nothing changed but the description and the record count.
     out_head = out[:len(head)]
