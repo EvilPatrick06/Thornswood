@@ -8,7 +8,7 @@ cast in `npc-population.json`. Counts and rewards come from [Custom quests](ques
 This is the binding specification. The four rare-mine offers have an
 implementation in PR2065. The six kill contracts have bindings in PR2130;
 their matching native and gamemode changes still need to be released by
-Claude. The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The mammoth ground and existing Farmer orchard still need their resource interactions. A
+Claude. The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The [mammoth ground](merchant-mammoth-work.md) now uses its existing three native bodies. The orchard still needs its resource interaction through existing Farmer rules. A
 reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
@@ -43,7 +43,7 @@ references `17200` through `17207:Thornswood-Content.esp`, using the existing
 base `154a5:Thornswood-Content.esp`. Each is48 units east of its listed clam
 anchor,32 units below the recorded sea surface and in the same CELL. Exact positions and authoring
 checks are in `quest-content.json`. The original clams remain independent.
-The runtime quest still needs its interaction and matching content delivery.
+The runtime longfin interaction is connected in code; matching content delivery remains with Claude.
 The Fisher page requires master rank for longfin; the quest's broad Fisher
 label does not remove that rank gate.
 

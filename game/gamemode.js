@@ -8619,6 +8619,14 @@ function saidInOrder(parts) {
  * asked for this says it must do.
  */
 function loot(actorId, refrId, baseDesc) {
+  if([0x33fa6,0x846ea,0x846eb].includes(refrId)) {
+    const quests=globalThis.__thornswoodQuests;
+    if(!quests || typeof quests.dressMammoth!=='function')return 'This mammoth ground is unavailable for now.';
+    const result=quests.dressMammoth(actorId,refrId,baseDesc);
+    if(!result || !result.ok)return result && result.text || 'This mammoth ground is unavailable for now.';
+    const rank=creditWork(actorId,'loot');
+    return result.text+(rank?' '+rank:'');
+  }
   // Every read wrapped, and the type first. A throw here is a reference the
   // world does not have any more, or one this binding cannot answer for, and
   // the answer to both is the same: this is not ours, leave it alone. Never
@@ -8755,6 +8763,12 @@ function kindIsContainer(baseDesc) {
 }
 
 mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
+  if([0x33fa6,0x846ea,0x846eb].includes(refrId)) {
+    if(!casterRefrId)return false;
+    try {notify(casterRefrId,loot(casterRefrId,refrId,mp.get(refrId,'baseDesc')));}
+    catch(error){try {log('Mammoth dressing refused:',String(error));}catch(logError){}}
+    return false;
+  }
   if(globalThis.__thornswoodQuestRetrievalRefs && globalThis.__thornswoodQuestRetrievalRefs[refrId]) {
     if(!casterRefrId)return false;
     try {
@@ -71701,13 +71715,22 @@ function createSharedResourceStock(api, now) {
     if(!Number.isSafeInteger(span) || span<=0) throw new Error('Invalid resource interval');
     return Math.max(0,read(ref).readyAt-now());
   }
-  function grantReserved(ref,before,reserved,grant) {
+  function grantReserved(ref,before,reserved,grant,fence) {
+    if(fence && (fence()!==true || JSON.stringify(read(ref))!==JSON.stringify(before)))return {ok:false,waitMs:0};
     api.set(ref,property,reserved);
+    function restore() {
+      if(fence) {
+        try {
+          if(fence()!==true || JSON.stringify(read(ref))!==JSON.stringify(reserved))return;
+        }catch(error){return;}
+      }
+      api.set(ref,property,before);
+    }
     try {
-      if(grant()===false) {api.set(ref,property,before);return {ok:false,waitMs:0};}
+      if(grant()===false) {restore();return {ok:false,waitMs:0};}
       return {ok:true,waitMs:0};
     } catch(error) {
-      api.set(ref,property,before);
+      restore();
       throw error;
     }
   }
@@ -71718,10 +71741,11 @@ function createSharedResourceStock(api, now) {
     if(!Number.isSafeInteger(deadline)) throw new Error('Invalid resource deadline');
     return grantReserved(ref,before,{...before,readyAt:deadline},grant);
   }
-  function recordDeath(ref) {
+  function recordDeath(ref,fence) {
     const state=read(ref);
     const generation=lifeGeneration(ref);
     if(state.dead && (generation===undefined || state.generation===generation)) return;
+    if(fence && (fence()!==true || JSON.stringify(read(ref))!==JSON.stringify(state)))return false;
     api.set(ref,property,{...state,generation,life:state.life+1,dead:true,dressed:false});
   }
   function lifeGeneration(ref) {
@@ -71737,13 +71761,16 @@ function createSharedResourceStock(api, now) {
     api.set(ref,property,{...state,generation:lifeGeneration(ref),dead:false,dressed:false});
     return true;
   }
-  function dress(ref,grant) {
+  function dress(ref,grant,fence) {
+    if(fence && fence()!==true)return {ok:false,waitMs:0};
     if(api.get(ref,'isDead')!==true) return {ok:false,waitMs:0};
     let before=read(ref);
     const generation=lifeGeneration(ref);
-    if(!before.dead || generation!==undefined && before.generation!==generation) {recordDeath(ref);before=read(ref);}
+    if(!before.dead || generation!==undefined && before.generation!==generation) {
+      if(recordDeath(ref,fence)===false)return {ok:false,waitMs:0};before=read(ref);
+    }
     if(before.dressed) return {ok:false,waitMs:0};
-    return grantReserved(ref,before,{...before,dressed:true},grant);
+    return grantReserved(ref,before,{...before,dressed:true},grant,fence);
   }
   return {left,take,recordDeath,recordRespawn,dress};
 }
@@ -75374,6 +75401,114 @@ function createQuestItemPolicy(mp) {
 }
 module.exports={createQuestItemPolicy};
 return module.exports;})();
+const QUEST_MAMMOTH_SOURCES = (function () { const module = {exports:{}};
+'use strict';
+const apply=Reflect.apply;
+const point=v=>Array.isArray(v)&&v.length===3&&[0,1,2].every(i=>Number.isFinite(v[i]));
+const distance=(a,b)=>a.reduce((sum,n,i)=>sum+(n-b[i])**2,0);
+const revision=v=>typeof v==='string'&&/^[1-9][0-9]{0,19}$/.test(v)&&(v.length<20||v<='18446744073709551615');
+function createQuestMammothSources(mp,population) {
+ const fail=()=>{throw new Error('Mammoth source evidence cannot be verified.');};
+ const methods={};
+ for(const key of ['get','getIdFromDesc','getDescFromId','lookupEspmRecordById','getNpcAIState']) {
+  if(!mp||typeof mp[key]!=='function')fail();methods[key]=mp[key];
+ }
+ const call=(key,...args)=>apply(methods[key],mp,args),byId=new Map();
+ const refs=['33fa6:Skyrim.esm','846ea:Skyrim.esm','846eb:Skyrim.esm'];
+ const originalPositions=[[519.6705932617188,3950.623291015625,-5856],
+  [-1923.1177978515625,3608.172119140625,-6275.24169921875],[-1810.09521484375,2847.945556640625,-6141.3271484375]];
+ for(const [index,ref] of refs.entries()) {
+  const matches=population&&Array.isArray(population.keep)?population.keep.filter(r=>r[0]===ref):[];
+  if(matches.length!==1)fail();const row=JSON.parse(JSON.stringify(matches[0]));
+  if(row[1]!=='dd641:Skyrim.esm'||row[2]!=='3c:Skyrim.esm'||!point(row[3])||distance(row[3],originalPositions[index])!==0||row[4]!==[2048,1536,1536][index]||
+    row[5]!==240||row[6]!=='animal'||row[12]!=='mammoth')fail();
+  const id=call('getIdFromDesc',ref);
+  if(id!==parseInt(ref,16)||call('getDescFromId',id)!==ref)fail();
+  byId.set(id,row);
+ }
+ function placement(id,row) {
+  const lookup=call('lookupEspmRecordById',id),record=lookup&&lookup.record;
+  if(!record||record.type!=='ACHR'||record.id!==id||!Number.isInteger(record.flags)||record.flags<0||record.flags>0xffffffff||record.flags&0x820||
+    typeof lookup.toGlobalRecordId!=='function')return false;
+  const fields=record.fields||[],names=fields.filter(f=>f.type==='NAME'),transforms=fields.filter(f=>f.type==='DATA');
+  if(names.length!==1||transforms.length!==1||!(names[0].data instanceof Uint8Array)||names[0].data.byteLength!==4||
+    !(transforms[0].data instanceof Uint8Array)||transforms[0].data.byteLength!==24)return false;
+  const name=Buffer.from(names[0].data.buffer,names[0].data.byteOffset,4).readUInt32LE();
+  const base=apply(lookup.toGlobalRecordId,lookup,[name]),baseLookup=call('lookupEspmRecordById',base);
+  const baseRecord=baseLookup&&baseLookup.record;
+  if(call('getDescFromId',base)!==row[1]||!baseRecord||baseRecord.type!=='NPC_'||
+    !Number.isInteger(baseRecord.flags)||baseRecord.flags<0||baseRecord.flags>0xffffffff||baseRecord.flags&0x820||
+    typeof baseLookup.toGlobalRecordId!=='function'||apply(baseLookup.toGlobalRecordId,baseLookup,[baseRecord.id])!==base)return false;
+  const bytes=transforms[0].data,data=Buffer.from(bytes.buffer,bytes.byteOffset,24);
+  const values=Array.from({length:6},(_,i)=>data.readFloatLE(i*4));
+  return values.every(Number.isFinite)&&distance(values.slice(0,3),row[3])<=0.01**2;
+ }
+ for(const [id,row] of byId)if(!placement(id,row))fail();
+ function read(actor,id) {
+  try {
+   const row=byId.get(id);if(!row||!placement(id,row)||call('getDescFromId',id)!==row[0])return null;
+   const ai=JSON.parse(JSON.stringify(call('getNpcAIState',id)));
+   if(!ai||ai.isHuman!==false||ai.isServerControlled!==true||ai.isDisabled===true||ai.isDead!==true||
+     !Number.isInteger(ai.profileId)||ai.profileId>=0||!Number.isSafeInteger(ai.lifeGeneration)||ai.lifeGeneration<0||
+     !revision(ai.runtimeLifeIdentity)||!point(ai.pos)||distance(ai.pos,row[3])>row[4]**2||
+     ai.pos[0]<-2500||ai.pos[0]>1000||ai.pos[1]<2000||ai.pos[1]>4500||
+     call('get',id,'baseDesc')!==row[1]||call('get',id,'worldOrCellDesc')!==row[2])return null;
+   const loc=call('get',actor,'locationalData');
+   if(!loc||loc.cellOrWorldDesc!==row[2]||!point(loc.pos)||distance(loc.pos,ai.pos)>400**2)return null;
+   const final=call('getNpcAIState',id);
+   if(!final||final.profileId!==ai.profileId||final.lifeGeneration!==ai.lifeGeneration||final.runtimeLifeIdentity!==ai.runtimeLifeIdentity||
+     final.isHuman!==false||final.isServerControlled!==true||final.isDisabled===true||final.isDead!==true||
+     !point(final.pos)||distance(final.pos,ai.pos)!==0)return null;
+   return {ref:row[0],life:ai.lifeGeneration,body:ai.runtimeLifeIdentity};
+  }catch(error){return null;}
+ }
+ return Object.freeze({contains:ref=>refs.includes(ref),read,verify(actor,id,expected) {
+  const body=read(actor,id);return !!body&&!!expected&&body.ref===expected.ref&&body.life===expected.life&&body.body===expected.body;
+ }});
+}
+module.exports={createQuestMammothSources};
+return module.exports;})();
+const QUEST_HUNT_BUNDLES = (function () { const module = {exports:{}};
+'use strict';
+const refs=new Set(['33fa6:Skyrim.esm','846ea:Skyrim.esm','846eb:Skyrim.esm']);
+const items=['3ad6c:Skyrim.esm','669a4:Skyrim.esm'];
+const object=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const clone=v=>JSON.parse(JSON.stringify(v));
+function readMammothDraw(entry) {
+ try {
+  if(!object(entry)||!Number.isInteger(entry.drawn)||entry.drawn<0||entry.drawn>3||entry.kills!==0||entry.itemDesc!==null||
+    !Array.isArray(entry.bundles)||entry.bundles.length!==entry.drawn)return null;
+  const seen=new Set();
+  for(const row of entry.bundles) {
+   if(!object(row)||!refs.has(row.ref)||!Number.isSafeInteger(row.life)||row.life<0||
+     typeof row.body!=='string'||!/^[1-9][0-9]{0,19}$/.test(row.body)||row.body.length===20&&row.body>'18446744073709551615'||
+     !Array.isArray(row.goods)||row.goods.length!==2||[0,1].some(i=>!Number.isInteger(row.goods[i])||row.goods[i]<1||row.goods[i]>5))return null;
+   const key=JSON.stringify([row.ref,row.life,row.body]);
+   if(seen.has(key))return null;seen.add(key);
+  }
+  return clone(entry);
+ }catch(error){return null;}
+}
+function appendMammothDraw(entry,body) {
+ const before=readMammothDraw(entry),one=readMammothDraw({drawn:1,kills:0,itemDesc:null,bundles:[body]});
+ if(!before||!one||before.drawn>=3)return {ok:false};
+ before.drawn++;before.bundles.push(one.bundles[0]);
+ return readMammothDraw(before)?{ok:true,next:before}:{ok:false};
+}
+function changes(rows) {
+ const totals=[0,0];rows.forEach(row=>row.goods.forEach((n,i)=>{totals[i]+=n;}));
+ return items.flatMap((item,i)=>totals[i]?[{item,count:-totals[i]}]:[]);
+}
+function mammothReturn(entry) {
+ const value=readMammothDraw(entry);
+ return value&&value.drawn>0?{ok:true,changes:changes(value.bundles.slice(0,1))}:{ok:false};
+}
+function mammothAbandon(entry) {
+ const value=readMammothDraw(entry);
+ return value?{ok:true,changes:changes(value.bundles)}:{ok:false};
+}
+module.exports={readMammothDraw,appendMammothDraw,mammothReturn,mammothAbandon};
+return module.exports;})();
 const SCENE_BUDGET = (function () { const module = {exports:{}};
 'use strict';
 // Pure projection. Only the caller's fenced native CAS
@@ -76394,6 +76529,8 @@ module.exports.createQuestGeodeSources = QUEST_FISHING_SOURCES.createQuestGeodeS
 module.exports.createQuestLongfinSources = QUEST_FISHING_SOURCES.createQuestLongfinSources;
 module.exports.createQuestRetrievalSources = QUEST_FISHING_SOURCES.createQuestRetrievalSources;
 module.exports.createQuestItemPolicy = QUEST_ITEMS.createQuestItemPolicy;
+module.exports.createQuestMammothSources = QUEST_MAMMOTH_SOURCES.createQuestMammothSources;
+module.exports.huntBundles = QUEST_HUNT_BUNDLES;
 module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"bb160f188bf4159e24ae4acaf66e7686a50dce4e515e25f3015e275738035caf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"bb160f188bf4159e24ae4acaf66e7686a50dce4e515e25f3015e275738035caf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
 module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
@@ -76627,19 +76764,20 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
   var byId = {};
   SCARCE.concat(SCENE).forEach(function (row) { byId[row.id] = row; });
   var LEGACY_TRADE = {longfin:'Alchemist',pearl:'Enchanter',ebony:'Smith',gem:'Enchanter',stalhrim:'Smith',heartstone:'Smith',
-    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist',geode:'Enchanter'};
+    wolf:'Tailor',sabre:'Tailor',camp:'Smith',bear:'Tailor',barrow:'Smith',giant:'Smith',crimson:'Alchemist',geode:'Enchanter',mammoth:'Cook'};
   // New legacy work has one appointed specialist. Already accepted work
   // keeps its former compatible trade and destination rules after the cut.
   var LEGACY_OFFER_REF = {longfin:'198d2:Skyrim.esm',pearl:'177da:Dragonborn.esm',ebony:'1828f:Dragonborn.esm',gem:'177da:Dragonborn.esm',
     stalhrim:'1828f:Dragonborn.esm',heartstone:'1828f:Dragonborn.esm',
     wolf:'1a684:Skyrim.esm',sabre:'1b124:Skyrim.esm',camp:'1a67c:Skyrim.esm',
-    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm',geode:'1e7d6:Skyrim.esm'};
+    bear:'31efc3:Riften Expansion.esp',barrow:'3a19f:Skyrim.esm',giant:'1a67c:Skyrim.esm',crimson:'1c1aa:Skyrim.esm',geode:'1e7d6:Skyrim.esm',mammoth:'1a66e:Skyrim.esm'};
 
   function createCustomQuests(deps) {
     deps = deps || {};
     var active = true;
     var GOLD_DESC = deps.goldDesc;
     var places = {};
+    var huntBundles=deps.huntBundles || (typeof MERCHANT_TRADING!=='undefined' && MERCHANT_TRADING.huntBundles);
     var retrievalRows=deps.retrievalData ? JSON.parse(JSON.stringify(deps.retrievalData.sources)) : [];
     var retrievalByQuest=Object.create(null);
     var retrievalPlaces={satchel:'The roadside sack outside Whiterun',ledger:'The upstairs books at Riverwood Trader',
@@ -76655,6 +76793,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     var budget=typeof MERCHANT_TRADING!=='undefined' ? MERCHANT_TRADING.sceneBudget : null;
     if(expandedRows.length && !budget)throw new Error('Expanded scene reward authority is unavailable.');
     function traderFor(row,ref,recovery) {
+      if(row.id==='mammoth')return active && typeof deps.traderRole==='function' && deps.traderRole(ref)==='Cook' && descOf(ref)===LEGACY_OFFER_REF.mammoth;
       var retrieval=retrievalByQuest[row.id];
       if(retrieval) {
         if(!active || typeof deps.traderRole!=='function' || deps.traderRole(ref)!==retrieval.role)return false;
@@ -76749,6 +76888,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       var open = (raw.open && typeof raw.open === 'object') ? raw.open : {};
       Object.keys(open).forEach(function (id) {
         var o = open[id];
+        if(id==='mammoth') {out.open[id]=JSON.parse(JSON.stringify(o));return;}
         if (own(byId,id) && byId[id].kind==='kill') {
           out.open[id]=JSON.parse(JSON.stringify(o));
           return;
@@ -76905,6 +77045,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         if (row.gems.indexOf(gem) < 0) return { ok: false, why: 'gem' };
       }
       b.open[id] = { drawn: 0, kills: 0, gem: opts && opts.gem, itemDesc: null };
+      if(id==='mammoth')b.open[id].bundles=[];
       if (!keep(actor, b, [], eligible)) return { ok: false, why: 'unwritten' };
       return { ok: true };
     }
@@ -76956,6 +77097,32 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         full:'This work has given you all six gems. Return or abandon it first.',
         refused:'This geode needs Enchanter standing and a closer approach.',
         wait:'This geode has already been worked. Come back after it returns.'});
+    }
+    function dressMammoth(actor,ref,base) {
+      var unavailable={ok:false,text:'This mammoth ground is unavailable for now.'};
+      if(!active || !huntBundles || !deps.mammothSources || !deps.mammothGoods || !deps.mammothStock || base!=='dd641:Skyrim.esm')return unavailable;
+      var held=questsOf(actor),entry=held && held.open.mammoth,row=byId.mammoth;
+      if(!held)return unavailable;
+      if(!entry)return {ok:false,text:'Take the mammoth-ground work from the Whiterun Cook first.'};
+      var before=huntBundles.readMammothDraw(entry);
+      if(!before)return unavailable;
+      if(before.drawn>=3)return {ok:false,text:'This work has given you all three mammoths. Return or abandon it first.'};
+      var body=deps.mammothSources.read(actor,ref);
+      if(!body || !qualify(actor,row,held).ok)return {ok:false,text:'This ground needs Master Hunter standing and a closer approach to an undisturbed mammoth carcass.'};
+      var goods=deps.mammothGoods(actor,base);
+      var appended=huntBundles.appendMammothDraw(before,Object.assign({},body,{goods:goods}));
+      if(!appended.ok)return unavailable;
+      var stock=deps.mammothStock(),wrote=false;
+      if(!stock || typeof stock.dress!=='function')return unavailable;
+      held.open.mammoth=appended.next;
+      var fence=function(){return active && deps.mammothSources.verify(actor,ref,body);};
+      var changes=[{item:'3ad6c:Skyrim.esm',count:goods[0]},{item:'669a4:Skyrim.esm',count:goods[1]}];
+      var claimed=stock.dress(ref,function(){
+        wrote=keep(actor,held,changes,function(){return fence() && qualify(actor,row,held,true).ok;});
+        return wrote || typeof deps.available==='function' && !deps.available();
+      },fence);
+      if(!wrote)return claimed.ok ? unavailable : {ok:false,text:'This carcass cannot be dressed now.'};
+      return {ok:true,text:'You take '+goods[0]+' Mammoth Tusk and '+goods[1]+' Mammoth Snout off the mammoth.'};
     }
     function bindPlace(id, place) {
       if (!byId[id]) return null;
@@ -77063,6 +77230,12 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       }
       var open = b.open[id];
       if (!open) return { ok: false, why: 'none' };
+      if(id==='mammoth') {
+        var abandoned=huntBundles && huntBundles.mammothAbandon(open);
+        if(!abandoned || !abandoned.ok)return {ok:false,why:'unavailable'};
+        delete b.open[id];
+        return keep(actor,b,abandoned.changes) ? {ok:true} : {ok:false,why:'unwritten'};
+      }
       var changes = open.drawn > 0 ? [{item: open.itemDesc, count: -open.drawn}] : [];
       delete b.open[id];
       if (!keep(actor, b, changes)) return { ok: false, why: 'unwritten' };
@@ -77098,7 +77271,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       if(row.expanded && !sceneActionCurrent(row,b,token))return {ok:false,why:'session'};
       if (!row.scarce && row.kind !== 'retrieval' && row.kind !== 'kill') return { ok: false, why: 'unknown' };
       var changes = [];
-      if (row.scarce) {
+      if (id==='mammoth') {
+        var returned=huntBundles && huntBundles.mammothReturn(open);
+        if(!returned || !returned.ok)return {ok:false,why:'short'};
+        changes=returned.changes;
+      } else if (row.scarce) {
         if (open.drawn < row.ask) return { ok: false, why: 'short' };
         changes.push({item: open.itemDesc, count: -row.ask});
       } else if (row.kind === 'retrieval') {
@@ -77127,7 +77304,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       }
       delete b.open[id];
       b.cool[id] = deps.now() + (row.expanded ? open.terms.hours : row.hours) * HOUR;
-      var eligible=retrieval ? function(){return traderFor(row,traderRef,true) && descOf(traderRef)===retrieval.destination && qualify(actor,row,b,true).ok;} : undefined;
+      var eligible=retrieval ? function(){return traderFor(row,traderRef,true) && descOf(traderRef)===retrieval.destination && qualify(actor,row,b,true).ok;} : id==='mammoth' ? function(){return traderFor(row,traderRef,true) && qualify(actor,row,b,true).ok;} : undefined;
       if (!keep(actor, b, changes,eligible)) return { ok: false, why: 'unwritten' };
       return { ok: true, gold: row.scarce ? 0 : row.gold };
     }
@@ -77180,10 +77357,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     }
     var mineNames = {
       ebony: 'Raven Rock Mine', stalhrim: 'Kolbjorn Barrow', heartstone: 'Coldcinder Cave',
-      pearl: 'Raven Rock coast',
+      pearl: 'Raven Rock coast', mammoth:'Bleakwind Basin and its western tundra',
       gem: {Ruby: 'White Ridge Sanctum', Sapphire: 'Highpoint Tower', Emerald: 'Kolbjorn Barrow', Amethyst: 'Highpoint Tower'}
     };
     function bound(row) {
+      if(row.id==='mammoth')return !!deps.mammothSources && !!huntBundles;
       if(row.kind==='retrieval' && typeof deps.traderRole==='function')return !!retrievalByQuest[row.id] && !!deps.retrievalSources;
       if(row.id==='longfin')return !!deps.longfinSources && !!deps.longfinData;
       if(row.id==='pearl')return !!deps.fishingSources && !!deps.fishingData;
@@ -77200,14 +77378,17 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       var ready = active && (!deps.ready || deps.ready(actor));
       var offers=SCARCE.filter(bound).filter(function(row){return traderFor(row,traderRef,own(held.open,row.id));}).map(function(row){
         var open = held.open[row.id], gate = qualify(actor,row,held), until = held.cool[row.id] || 0;
+        var validDraw=row.id!=='mammoth' || !open || !!huntBundles.readMammothDraw(open);
+        var huntCheck=row.id==='mammoth' ? 'Master Hunters may dress up to three mammoths. Return the tusks and snouts from the first carcass and keep the other draws. Leaving the work returns all outstanding goods.' : '';
+        if(row.id==='mammoth' && validDraw && open && open.drawn>0)huntCheck+=' Return '+open.bundles[0].goods[0]+' Mammoth Tusk and '+open.bundles[0].goods[1]+' Mammoth Snout.';
         var state = open ? 'open' : until > deps.now() ? 'cooldown' : gate.ok ? 'available' : 'locked';
         var location = mineNames[row.id] || '';
-        return {id:row.id,name:row.name,who:row.who,ask:row.ask,holds:row.holds,hours:row.hours,
+        return {id:row.id,name:row.name,who:row.who,ask:row.ask,holds:row.holds,hours:row.hours,check:huntCheck,
           state:state,drawn:open ? open.drawn : 0,gem:open && open.gem || '',
           gems:row.gems ? row.gems.slice() : [],locations:location,
           waitMinutes:until ? Math.max(0,Math.ceil((until-deps.now())/60000)) : 0,
-          canTake:ready && state==='available',canReturn:ready && !!open && open.drawn>=row.ask,
-          canAbandon:ready && !!open};
+          canTake:ready && validDraw && state==='available',canReturn:ready && validDraw && !!open && open.drawn>=row.ask && (row.id!=='mammoth' || gate.ok),
+          canAbandon:ready && validDraw && !!open};
       });
       var hold=deps.traderHold && deps.traderHold(traderRef);
       retrievalRows.forEach(function(source){
@@ -77286,7 +77467,7 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
     return {
       lineup: lineup, offer: offer, bindPlace: bindPlace, walkAway: walkAway,
       turnIn: turnIn, noteKill: noteKill, noteContainer: noteContainer,
-      mineRare: mineRare, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
+      mineRare: mineRare, dressMammoth:dressMammoth, isRareSeam: function (seam) { return !!RARE[seam && seam.name]; },
       onActivate: onActivate, speak: speak, describe: describe, act: act, capture: questsOf, fishScarce:fishScarce, longfinScarce:longfinScarce, harvestScarce:harvestScarce, geodeScarce:geodeScarce,
       shutdown: function () { active = false; }
     };
@@ -77331,6 +77512,11 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
       }
       var questRulesSource=globalThis.__thornswoodProgression;
       var questCharacterSource=globalThis.__thornswoodCharacter;
+      var mammothSources=null;
+      if(typeof MERCHANT_TRADING.createQuestMammothSources==='function') {
+        try {mammothSources=MERCHANT_TRADING.createQuestMammothSources(mp,NPC_POPULATION_DATA);}
+        catch(error){log('The mammoth ground stays unavailable: '+String(error));}
+      }
       var fishingData=typeof MERCHANT_TRADING.scarceFishing==='function'?MERCHANT_TRADING.scarceFishing():null;
       var longfinData=typeof MERCHANT_TRADING.scarceLongfin==='function'?MERCHANT_TRADING.scarceLongfin():null;
       var fishingSources=null,longfinSources=null,fishingRefs=Object.create(null);
@@ -77366,6 +77552,13 @@ if (typeof globalThis.__thornswoodReleaseWaiting === 'function') { globalThis.__
         catch(error){log('The geode work stays unavailable: '+String(error));}
       }
       globalThis.__thornswoodQuests = createCustomQuests({
+        mammothSources:mammothSources,mammothStock:function(){return globalThis.__thornswoodResourceStock;},
+        mammothGoods:function(actor,base){
+          var row=HUNTS_BY_BASE[base],pair=row && row.yield && row.yield[3];
+          if(!pair || pair[0]!==1 || pair[1]!==5 || !row.gives || row.gives.length!==2 ||
+            row.gives[0].item!=='3ad6c:Skyrim.esm' || row.gives[1].item!=='669a4:Skyrim.esm')return null;
+          return row.gives.map(function(){return randInt(pair[0],pair[1]);});
+        },
         retrievalData:retrievalData,retrievalSources:retrievalSources,
         geodeData:geodeData,geodeSources:geodeSources,geodeRules:function(actor){return toolGate(actor,'enchanter');},
         geodeStock:function(){return globalThis.__thornswoodResourceStock;},
