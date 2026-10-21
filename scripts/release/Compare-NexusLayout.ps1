@@ -171,7 +171,7 @@ else {
   if (-not (Test-Path -LiteralPath $recs[0][0])) { Die ('There is no ' + $recs[0][0] + ', so Vortex has not deployed into ' + $Vortex + '.') }
   foreach ($r in $recs) {
     if (-not (Test-Path -LiteralPath $r[0])) { continue }
-    $doc = ([IO.File]::ReadAllText($r[0]) -replace '^﻿', '') | ConvertFrom-Json
+    $doc = ([IO.File]::ReadAllText($r[0]) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json
     Say ('    ' + (Split-Path -Leaf $r[0]) + ': ' + @($doc.files).Count + ' files, deployed by ' + [string]$doc.deploymentMethod) 'DarkGray'
     foreach ($vf in @($doc.files)) {
       $rel = $r[1] + ([string]$vf.relPath).TrimStart('\', '/').Replace('/', '\')
