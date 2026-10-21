@@ -504,6 +504,18 @@ jobs:
           # to writing nothing there. It ran only in the nightly, and its
           # fixture wrote Windows paths, so off Windows it failed 22 checks
           # and nothing said so. Under a second.
+          # Issue #2970: tests\test-nightly-harnesses.ps1 runs
+          # Nightly-Harnesses.ps1 against stand-in harnesses (the shares, each
+          # kind of failure, the budget, and -Only, which harnesses.yml uses to
+          # run named harnesses on demand from a cloud session) and reads
+          # nightly.yml and harnesses.yml. It ran only in the nightly, so a
+          # change to the runner the nightly itself depends on went out with no
+          # run. About twenty seconds.
+          # Issue #2970: tests\test-capture-443.ps1 holds the #2946 packet
+          # capture (scripts\vps\vps-capture-443.ps1, sent to the box by
+          # Remote.ps1 in place of lines typed there) to parsing under 5.1,
+          # one action at a time, SYN and RST on 443 only, and ending on a
+          # task of its own so no ssh session waits it out. A few seconds.
           # Issue #2961: tests\test-2961-voice-port-once.ps1 holds
           # Install-Voice.ps1's outside check to one try that says what it
           # answered, and to "not known" rather than "correctly shut" from
@@ -836,6 +848,7 @@ jobs:
                  'test-watch-outside.ps1',
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
+                 'test-nightly-harnesses.ps1', 'test-capture-443.ps1',
                  'test-prove-secret.ps1',
                  'test-time-wait.ps1',
                  'test-mod-menus.js',
