@@ -154,6 +154,10 @@ __WRITERECORD__
     $src = Join-Path $work 'WholeRecordTest.cs'
     [IO.File]::WriteAllText($src, $driver, (New-Object Text.UTF8Encoding($false)))
     $exe = Join-Path $work 'whole-record-test.exe'
+    # Named, as the other harnesses that compile launcher code name it, so a
+    # Windows machine without it fails here rather than saying nothing (#2965).
+    Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+    if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
     $cscArgs = @('/noconfig', '/nologo', '/target:exe', "/langversion:$LauncherLangVersion", "/out:$exe",
                  "/reference:$(Join-Path $LauncherRefDir 'System.dll')", "/reference:$(Join-Path $LauncherRefDir 'System.Core.dll')",
                  $src, (Join-Path $App 'SteamUpdates.cs'))

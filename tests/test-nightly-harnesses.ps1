@@ -114,7 +114,7 @@ try {
     $of = $(if ($calls.Count) { [int]$calls[0].Groups[1].Value } else { 0 })
     Yes ("  in a job of its own whose matrix is the shares 1 to $of (" + ($shards -join ', ') + ")") ($shards.Count -ge 2 -and (($shards -join ',') -eq ((1..$of) -join ',')))
     Yes '  where one share failing does not cancel the other' ($job -match '(?m)^\s+fail-fast:\s*false\s*$')
-    Yes '  on the VPS runners, the same as every nightly job' ($job -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps\]\s*$')
+    Yes '  on the VPS runners that take builds, one build slot a share (#2994)' ($job -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\s*$')
     $minutes = [int][regex]::Match($job, '(?m)^\s+timeout-minutes:\s*(\d+)').Groups[1].Value
     $budget = $(if ($calls.Count) { [int]$calls[0].Groups[2].Value } else { 0 })
     Yes ("  with a budget ($budget s) that leaves room inside the job's $minutes minutes for the rest of it") ($budget -gt 0 -and $minutes -gt 0 -and $budget -le ($minutes * 60 - 180))

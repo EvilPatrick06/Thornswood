@@ -79,6 +79,16 @@ harness that names `$env:SystemRoot` or `$env:WINDIR`, runs powershell or cmd
 by name, asks `$IsWindows` (which 5.1 does not have), or uses `$OnWindows`
 without loading `Windows.ps1`.
 
+The temp folder is `[IO.Path]::GetTempPath()`, never a path built on
+`$env:TEMP` or `$env:TMP`, which only Windows sets (#2965). A harness may set
+TEMP for a script it runs and put the old value back; `test-temp-folder.ps1`
+fails on any other read of them.
+
+A path a harness compares with what a script prints is built with
+`Join-Path` or `[IO.Path]::Combine`, and a key written with `\`, like the
+swallow baseline's, is made from a path by replacing
+`[IO.Path]::DirectorySeparatorChar`. Off Windows `\` is part of a file name.
+
 ## A harness that compiles launcher code
 
 A `.ps1` harness that compiles C# out of `launcher\app` or `installer\setup`

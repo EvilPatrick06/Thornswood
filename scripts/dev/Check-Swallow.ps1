@@ -98,7 +98,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root)     { $Root     = Join-Path $Here '..\..' }
-$Root = [IO.Path]::GetFullPath($Root).TrimEnd('\')
+$Root = [IO.Path]::GetFullPath($Root).TrimEnd([IO.Path]::DirectorySeparatorChar)
 if (-not $AppDir)   { $AppDir   = Join-Path $Root 'launcher\app' }
 if (-not $Baseline) { $Baseline = Join-Path $Here 'swallow-baseline.txt' }
 if (-not $PSBoundParameters.ContainsKey('ScriptDirs')) { $ScriptDirs = @((Join-Path $Root 'scripts'), (Join-Path $Root 'installer')) }
@@ -179,18 +179,20 @@ function Find-SilentPy([string]$full) {
   return , $at
 }
 # A file's key in the baseline is its path from -Root, for the scripts, the
-# site, voice and the bot alike.
+# site, voice and the bot alike, written with \ on any machine, as the
+# baseline writes it.
+$Sep = [IO.Path]::DirectorySeparatorChar
 function Key-Of($f) {
-  if (-not $f.FullName.StartsWith($Root + '\', [StringComparison]::OrdinalIgnoreCase)) {
+  if (-not $f.FullName.StartsWith($Root + $Sep, [StringComparison]::OrdinalIgnoreCase)) {
     Say "  $($f.FullName) is not under $Root, so it has no key in the baseline" 'Red'; exit 1
   }
-  return $f.FullName.Substring($Root.Length + 1)
+  return $f.FullName.Substring($Root.Length + 1).Replace($Sep, '\')
 }
 # What is never read under site\, voice\ and bot\, by its path below the
 # folder named: other people's packages, a vendored minified library, and a
 # harness kept beside the code (the header says why for each).
 function Skip-Source($f, [string]$dir) {
-  $below = '\' + $f.FullName.Substring($dir.TrimEnd('\').Length + 1)
+  $below = '\' + $f.FullName.Substring($dir.TrimEnd($Sep).Length + 1).Replace($Sep, '\')
   if ($below -match '\\(node_modules|__pycache__|venv|\.venv)\\') { return $true }
   if ($f.Name -like '*.min.js') { return $true }
   if ($f.Name -like 'test-*') { return $true }

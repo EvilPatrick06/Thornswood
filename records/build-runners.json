@@ -1,0 +1,6 @@
+{
+  "about": "Which VPS runners take the heavy jobs: the pull request and main build fallbacks, the engine fallback and the nightly checks. Each of those jobs asks for this label beside thornswood-vps, so no more of them run at once than there are runners carrying it. Every other job on the box (board cards, dropped claims, the release jobs) still runs on any VPS runner. scripts/deploy/Set-BuildRunners.ps1 makes GitHub's runner labels match this file, and Install-Runner.ps1 registers a runner in this list with the label. Issue #2994.",
+  "label": "thornswood-build",
+  "runners": [1, 2, 3, 4],
+  "measured": "21 Oct 2026, the 558 box jobs that ran a harness step from 18 Oct to 04:30Z 21 Oct, by how many box jobs ran beside them on average. Since 20 Oct, a whole job took a median 18 min with 1 or 2 at once, 20.4 with 3, 21.7 with 4, 26.1 with 5, 31.7 with 6 and 36.2 with 7, and the box finished 3.4, 6.7, 8.8, 11.1, 11.5, 11.3 and 11.6 jobs an hour. Past four the box's six cores finish no more builds an hour; each build only takes longer, and at seven at once the harness step alone took 34 to 39 minutes and the 40-minute limit cancelled builds that were passing. Four at once keeps the most builds an hour with each job near 22 minutes, half its limit."
+}
