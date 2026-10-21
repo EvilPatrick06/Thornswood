@@ -162,17 +162,6 @@ function Invoke-Tool([string]$exe, [string[]]$arguments) {
   $p.WaitForExit()
   return [pscustomobject]@{ Code = $p.ExitCode; Out = $out; Err = $err.Result }
 }
-# Off Windows, 7-Zip's own build that Get-SevenZip.ps1 puts in place comes
-# first: Ubuntu's cannot unpack RAR (#2969).
-function Find-SevenZip {
-  if ($env:ProgramFiles) { $p = Join-Path $env:ProgramFiles '7-Zip\7z.exe'; if (Test-Path -LiteralPath $p) { return $p } }
-  if (-not $IsWindows) {
-    $own = & (Join-Path $Here 'Get-SevenZip.ps1') -Check 6>$null
-    if ($LASTEXITCODE -eq 0 -and $own) { return [string]$own }
-  }
-  foreach ($n in '7zz', '7z', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { return $g.Source } }
-  return ''
-}
 # 7-Zip is looked for when the first archive is unpacked, so a revision given
 # as an unpacked folder is read, and refused, without it.
 $script:SevenZip = ''
