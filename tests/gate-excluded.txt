@@ -42,6 +42,7 @@ test-2354-signin-retention.js  not sorted yet, runs in the nightly (#2513)
 test-2434-main-version-live.ps1  not sorted yet, runs in the nightly (#2513)
 test-2473-look-prompt.js  not sorted yet, runs in the nightly (#2513)
 test-2474-heads.js  not sorted yet, runs in the nightly (#2513)
+test-2932-ssh-proxy-speed.ps1  a measurement for #2932, not a check: it starts a throwaway sshd and times eight copies by scp; run it by name with harnesses.yml
 test-481-voice-most.ps1  not sorted yet, runs in the nightly (#2513)
 test-498-msbuild.ps1  own step in build.yml, "Check the MSBuild launcher against its sources"
 test-611-miner-pickaxe-restore.js  not sorted yet, runs in the nightly (#2513)
