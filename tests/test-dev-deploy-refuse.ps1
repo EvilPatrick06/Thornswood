@@ -65,7 +65,7 @@ function Run-Block([string]$value, $settings, [string]$npcValue = '') {
     $farOrder = ''
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
-    $lightTable = ''
+    $lightDef = ''
     $devRecordLight = $false
     $VoicePort = 7789
     $maxOnline = 0
@@ -117,7 +117,7 @@ try {
         Get-ChildItem $tmp -Filter 'server-settings.json.before-*' | Remove-Item -Force
         [IO.File]::WriteAllText($p, $bad)
         $rootWin = $tmp; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $fullIndexDef = $script:fullIndexDef
-        $lightTable = ''; $devRecordLight = $false; $VoicePort = 7789; $maxOnline = 0; $seats = 0
+        $lightDef = ''; $devRecordLight = $false; $VoicePort = 7789; $maxOnline = 0; $seats = 0
         $LoadOrderRefuse = 'on'; $RequirePass = ''; $Npcs = ''
         $file = Join-Path $tmp 'block.ps1'
         [IO.File]::WriteAllText($file, $ExecutionContext.InvokeCommand.ExpandString($body), (New-Object Text.UTF8Encoding $true))
