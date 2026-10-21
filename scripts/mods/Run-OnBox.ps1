@@ -1,13 +1,25 @@
 <#
   Run-OnBox.ps1
 
-  Runs one of the repository's Python tools on the VPS box, against the game
+  Runs one of the repository's content tools on the VPS box, against the game
   plugins a game server there already holds, and brings back what the tool
-  wrote into the repository's game\ and records\ folders. Issue #2899.
+  wrote into the repository's game\, records\ and docs\systems\ folders.
+  Issue #2899.
 
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Add-ContentRecords.py --check --masters '{data}'
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Add-ContentRecords.py --masters '{data}'
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-WoodworkerTrailOverrides.py --check --masters '{data}' -Server main
+      pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
+      pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'
+
+  A tool is a .py (run by the box's Python), a .js (its node) or a .ps1 (its
+  PowerShell 7) under scripts\mods or scripts\dev. The last line above is
+  "After a change to the content plugin" in Developer-Guide.md, the whole
+  chain of scripts\mods\content-tables.json, from a machine with no game:
+  until #3100 only the Python builders could run here, so every content
+  change still went to One or a PC with the game at C:\Thornswood (#2923's
+  two rebuilds, #2906's records and #3077's plugin all ran on One on 21 Oct
+  2026, though the box held what they read).
 
   WHY. Patrick, 20 Oct 2026: "let's make the content plugin available in the
   cloud". The content plugin's tools read the game's Data folder, which was
@@ -36,27 +48,35 @@
   cannot remove anything, but it stops holding the folder when it dies, and
   the next run's keeper removes every folder nobody holds before it makes its
   own. So nothing stays on the box past the next run, however a run ended:
-    repo\   the artifact, laid out like the repository; the tool runs here
-    data\   a copy of the server's plugins folder, with this commit's own
-            Thornswood plugins in place of the ones the server runs. A copy,
-            not links, so a tool given --data {data} that writes can never
-            reach the server's own files
-  '{data}' in an argument is the data folder and '{repo}' the repository
-  folder, both on the box. THORNSWOOD_DATA names the data folder too, for
-  the tools that read it. The tool runs at below normal priority, because
-  the box is also where both game servers run.
+    repo\         the artifact, laid out like the repository; the tool runs here
+    data\         a copy of the server's plugins folder, with this commit's own
+                  Thornswood plugins in place of the ones the server runs. A
+                  copy, not links, so a tool given --data {data} that writes
+                  can never reach the server's own files
+    plugins.txt   the server's load order as the game's plugin list: a '*'
+                  line for each plugin of its server-settings.json loadOrder
+                  after Skyrim's five masters, which the game loads first and
+                  never lists (own_plugins.py). The builders that take a
+                  plugin list read the load order the server runs, not
+                  whichever profile a PC last had
+  '{data}' in an argument is the data folder, '{plugins}' the plugin list and
+  '{repo}' the repository folder, all on the box. THORNSWOOD_DATA names the
+  data folder too, for the tools that read it. The tool runs at below normal
+  priority, because the box is also where both game servers run.
 
-  WHAT COMES BACK. Every file under game\ and records\ that the tool wrote
-  or changed, by sha256 against what was sent, and nothing else. It is put
-  into this checkout at the same path, and listed, so git diff shows what
-  the run did. A tool that changed nothing brings nothing back.
+  WHAT COMES BACK. Every file under game\, records\ and docs\systems\ that
+  the tool wrote or changed, by sha256 against what was sent, and nothing
+  else (Rebuild-ContentTables.ps1 writes the cut item list into
+  docs\systems). It is put into this checkout at the same path, and listed,
+  so git diff shows what the run did. A tool that changed nothing brings
+  nothing back.
 
   The tools themselves are unchanged: run on One, they read
   C:\Thornswood\Game\Data as before.
 #>
 [CmdletBinding()]
 param(
-    # The tool, as a repository path: scripts/mods/<name>.py or scripts/dev/<name>.py.
+    # The tool, as a repository path: scripts/mods/<name> or scripts/dev/<name>, a .py, .js or .ps1.
     [Parameter(Mandatory = $true, Position = 0)]
     [string]$Script,
 
@@ -87,8 +107,8 @@ function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
 
 # Only a tool of the repository's, named as the artifact will hold it.
 $tool = $Script.Replace('\', '/').TrimStart('.', '/')
-if ($tool -notmatch '^scripts/(mods|dev)/[A-Za-z0-9_.-]+\.py$') {
-    throw "$Script is not a Python tool under scripts/mods or scripts/dev. Nothing was sent."
+if ($tool -notmatch '^scripts/(mods|dev)/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.(py|js|ps1)$') {
+    throw "$Script is not a Python, node or PowerShell tool under scripts/mods or scripts/dev. Nothing was sent."
 }
 if (-not (Test-Path -LiteralPath (Join-Path $repo $tool))) { throw "There is no $tool in this checkout. Nothing was sent." }
 foreach ($a in $Arguments) {
@@ -99,17 +119,46 @@ foreach ($a in $Arguments) {
 
 $serverRoot = $(if ($Server -eq 'main') { 'C:\Thornswood-Server' } else { 'C:\Thornswood-Server-Dev' })
 $paths = @('scripts/mods', 'scripts/dev', 'game/content', 'game/data', 'records', 'layout.json')
-# And whatever else a Python builder of the content chain reads or writes
+# And whatever else a builder of the content chain reads or writes
 # (scripts\mods\content-tables.json). Until #2962 the artifact held only the
 # folders above, so every builder that writes its table into game\gamemode.js
 # (the building holds, the woodworking benches, the doors and five more)
 # stopped on the box with "No such file" for gamemode.js, and the one that
-# reads docs\systems\cut-items.json would have too.
+# reads docs\systems\cut-items.json would have too. Every builder since
+# #3100, not only the Python ones, because the whole chain runs here.
 $chainFiles = [IO.File]::ReadAllText((Join-Path $Here 'content-tables.json')) | ConvertFrom-Json
-foreach ($s in @($chainFiles.steps | Where-Object { $_.tool -like '*.py' })) {
+foreach ($s in @($chainFiles.steps)) {
     foreach ($p in @(@($s.reads) + @($s.readsBack) + @($s.writes) | Where-Object { $_ })) {
         $p = [string]$p
         if (-not @($paths | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $paths += $p }
+    }
+}
+# And every script a builder, or this run's own tool, loads from beside it
+# outside the folders above, and what that one loads in turn: a .ps1's
+# . (Join-Path $PSScriptRoot '<path>') and a .js's require('./<path>').
+# Build-RecipeTable.ps1 loads scripts\deploy\ServerOrder.ps1, which loads
+# scripts\release\Read-JsonFile.ps1.
+$load = New-Object 'Collections.Generic.Queue[string]'
+foreach ($t in @(@($chainFiles.steps | ForEach-Object { [string]$_.tool }) + $tool)) { $load.Enqueue($t) }
+$seen = @{}
+while ($load.Count) {
+    $t = $load.Dequeue()
+    if ($seen.ContainsKey($t)) { continue }
+    $seen[$t] = $true
+    $full = Join-Path $repo $t
+    if (-not (Test-Path -LiteralPath $full)) { continue }
+    $text = [IO.File]::ReadAllText($full)
+    $found = @([regex]::Matches($text, "\.\s+\(Join-Path\s+\`$PSScriptRoot\s+'([^']+)'\)") + [regex]::Matches($text, "require\(\s*['""](\.\.?/[^'""]+)['""]\s*\)"))
+    foreach ($m in $found) {
+        $parts = New-Object 'Collections.Generic.List[string]'
+        foreach ($w in @(($t.Substring(0, $t.LastIndexOf('/')) + '/' + $m.Groups[1].Value.Replace('\', '/')).Split('/'))) {
+            if ($w -eq '..') { if ($parts.Count) { $parts.RemoveAt($parts.Count - 1) } } elseif ($w -and $w -ne '.') { $parts.Add($w) }
+        }
+        $p = $parts -join '/'
+        if ($t -like '*.js' -and -not [IO.Path]::GetExtension($p)) { $p += '.js' }
+        if ($p -notmatch '^scripts/') { continue }
+        if (-not @($paths | Where-Object { $p -eq $_ -or $p.StartsWith($_ + '/') }).Count) { $paths += $p }
+        $load.Enqueue($p)
     }
 }
 $artifact = New-ThornswoodArtifact -Component tools -RepoDir $repo -Paths $paths
@@ -157,11 +206,11 @@ try {
         Add-Type -AssemblyName System.IO.Compression.FileSystem
         $zip = [IO.Compression.ZipFile]::OpenRead($back)
         try {
-            # Only what the box listed, and only under game/ and records/.
+            # Only what the box listed, and only under game/, records/ and docs/systems/.
             foreach ($e in $zip.Entries) {
                 $p = $e.FullName.Replace('\', '/')
-                if ($changed -notcontains $p -or $p -notmatch '^(game|records)/' -or $p -match '(^|/)\.\.(/|$)') {
-                    throw ("the box sent back $p, which it did not list as written under game/ or records/. This checkout was not changed.")
+                if ($changed -notcontains $p -or $p -notmatch '^(game|records|docs/systems)/' -or $p -match '(^|/)\.\.(/|$)') {
+                    throw ("the box sent back $p, which it did not list as written under game/, records/ or docs/systems/. This checkout was not changed.")
                 }
             }
             Say ''
@@ -175,7 +224,7 @@ try {
         } finally { $zip.Dispose() }
     } else {
         Say ''
-        Say 'the tool wrote nothing under game/ or records/' 'DarkGray'
+        Say 'the tool wrote nothing under game/, records/ or docs/systems/' 'DarkGray'
     }
 } finally {
     if ($box) {
