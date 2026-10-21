@@ -1,12 +1,21 @@
-# Harnesses that stay off the pull request gate (build.yml), one a line:
+# Harnesses that stay off the pull request gate, one a line, in name order:
 #   name  reason
-# tests\test-2513-every-harness-listed.ps1 fails on a harness that is in neither
-# build.yml nor here, and on a line with no reason. To put one on the gate, add
-# it to the list in build.yml, run node scripts\dev\Build-PrWorkflow.js, and
-# take its line out of this file. Every harness still runs in the nightly.
+# The gate (build.yml, "Run the gate harnesses") runs every tests\test-*.js and
+# tests\test-*.ps1 not named here, as scripts\dev\Gate-Harnesses.ps1 lists them
+# (#3009). A new harness is on the gate without touching any shared line. To
+# take one off, add its line here in name order; to put one on, take its line
+# out. Gate-Harnesses.ps1 stops the build on a line with no reason, a name that
+# is not a file in tests, a name twice, or lines out of name order.
+# Every harness still runs in the nightly.
 #
-# The lines below were unlisted when #2513 added this check and are not sorted
-# yet. Each one wants either a place on the gate or a real reason here.
+# "own step in build.yml" is a harness build.yml runs in a step of its own,
+# so the gate does not run it a second time. tests\test-2513-every-harness-listed.ps1
+# holds those lines to what build.yml runs.
+#
+# "not sorted yet" lines were off the gate when #2513 added this file. Each one
+# wants either a place on the gate or a real reason here. Together they are
+# minutes: on 21 Oct 2026 the gate's 495 harnesses took 23 minutes of a 26
+# minute build inside a 40 minute job, so they come on a few at a time.
 
 test-1050-news-file.ps1  not sorted yet, runs in the nightly (#2513)
 test-1252-leftover-settings.ps1  not sorted yet, runs in the nightly (#2513)
@@ -34,6 +43,7 @@ test-2434-main-version-live.ps1  not sorted yet, runs in the nightly (#2513)
 test-2473-look-prompt.js  not sorted yet, runs in the nightly (#2513)
 test-2474-heads.js  not sorted yet, runs in the nightly (#2513)
 test-481-voice-most.ps1  not sorted yet, runs in the nightly (#2513)
+test-498-msbuild.ps1  own step in build.yml, "Check the MSBuild launcher against its sources"
 test-611-miner-pickaxe-restore.js  not sorted yet, runs in the nightly (#2513)
 test-613-dwarven-ingot-collapse.js  not sorted yet, runs in the nightly (#2513)
 test-614-riekling-clothes-remount.js  not sorted yet, runs in the nightly (#2513)
@@ -45,13 +55,14 @@ test-align-load-order.ps1  not sorted yet, runs in the nightly (#2513)
 test-allowed-failed.js  not sorted yet, runs in the nightly (#2513)
 test-allowed-rate-limit.js  not sorted yet, runs in the nightly (#2513)
 test-app-ico-png.ps1  not sorted yet, runs in the nightly (#2513)
+test-app-manifest.ps1  own step in build.yml, "Check the manifests in the built exes"
 test-arrival-line.js  not sorted yet, runs in the nightly (#2513)
 test-arrivals.js  not sorted yet, runs in the nightly (#2513)
 test-audit-handlers.js  not sorted yet, runs in the nightly (#2513)
 test-balance-ladders.ps1  not sorted yet, runs in the nightly (#2513)
-test-bans.js  not sorted yet, runs in the nightly (#2513)
 test-bans-broken.js  not sorted yet, runs in the nightly (#2513)
 test-bans-pk.js  not sorted yet, runs in the nightly (#2513)
+test-bans.js  not sorted yet, runs in the nightly (#2513)
 test-bard-instruments.js  not sorted yet, runs in the nightly (#2513)
 test-baseline-commit.ps1  not sorted yet, runs in the nightly (#2513)
 test-beds-sleepable.js  not sorted yet, runs in the nightly (#2513)
@@ -70,6 +81,7 @@ test-bot-service.ps1  not sorted yet, runs in the nightly (#2513)
 test-branch-rules.js  not sorted yet, runs in the nightly (#2513)
 test-browser-backend.js  not sorted yet, runs in the nightly (#2513)
 test-build-engine.ps1  not sorted yet, runs in the nightly (#2513)
+test-build-generated.ps1  own step in build.yml, "Run the generated-files build harness"
 test-build-stamp.ps1  not sorted yet, runs in the nightly (#2513)
 test-bump-version-live.ps1  not sorted yet, runs in the nightly (#2513)
 test-cast-table.js  not sorted yet, runs in the nightly (#2513)
@@ -83,19 +95,20 @@ test-check-controls.ps1  not sorted yet, runs in the nightly (#2513)
 test-check-manifest-remote.ps1  not sorted yet, runs in the nightly (#2513)
 test-check-outside.ps1  not sorted yet, runs in the nightly (#2513)
 test-check-secrets.ps1  not sorted yet, runs in the nightly (#2513)
+test-check-words.ps1  own step in build.yml, "Check the writing rules"
 test-chopping-blocks.js  not sorted yet, runs in the nightly (#2513)
 test-chopping-gate.js  not sorted yet, runs in the nightly (#2513)
-test-churn.js  not sorted yet, runs in the nightly (#2513)
 test-churn-producer.ps1  not sorted yet, runs in the nightly (#2513)
+test-churn.js  not sorted yet, runs in the nightly (#2513)
 test-claim-held-keys.js  not sorted yet, runs in the nightly (#2513)
 test-clean-install-run.js  not sorted yet, runs in the nightly (#2513)
 test-clear-world-copies.ps1  not sorted yet, runs in the nightly (#2513)
 test-collection-draw.ps1  not sorted yet, runs in the nightly (#2513)
 test-collection-export.ps1  not sorted yet, runs in the nightly (#2513)
 test-collection-newest.ps1  not sorted yet, runs in the nightly (#2513)
-test-collection-revision.js  not sorted yet, runs in the nightly (#2513)
 test-collection-revision-2.ps1  not sorted yet, runs in the nightly (#2513)
 test-collection-revision-3.ps1  not sorted yet, runs in the nightly (#2513)
+test-collection-revision.js  not sorted yet, runs in the nightly (#2513)
 test-collection-rules.ps1  not sorted yet, runs in the nightly (#2513)
 test-collection-threshold.js  not sorted yet, runs in the nightly (#2513)
 test-command-ack.js  not sorted yet, runs in the nightly (#2513)
@@ -127,9 +140,9 @@ test-discord-forget.ps1  not sorted yet, runs in the nightly (#2513)
 test-discord-members.js  not sorted yet, runs in the nightly (#2513)
 test-docs-backup.ps1  not sorted yet, runs in the nightly (#2513)
 test-docs-public.ps1  not sorted yet, runs in the nightly (#2513)
-test-door.js  not sorted yet, runs in the nightly (#2513)
 test-door-invite.ps1  not sorted yet, runs in the nightly (#2513)
 test-door-outage.ps1  not sorted yet, runs in the nightly (#2513)
+test-door.js  not sorted yet, runs in the nightly (#2513)
 test-downgrade-copy-order.js  not sorted yet, runs in the nightly (#2513)
 test-downgrade-foreground.ps1  not sorted yet, runs in the nightly (#2513)
 test-downgrade-leftover.ps1  not sorted yet, runs in the nightly (#2513)
@@ -170,18 +183,18 @@ test-harden-vps.ps1  not sorted yet, runs in the nightly (#2513)
 test-header-video.js  not sorted yet, runs in the nightly (#2513)
 test-headlines.js  not sorted yet, runs in the nightly (#2513)
 test-held-commands.js  not sorted yet, runs in the nightly (#2513)
-test-help.js  not sorted yet, runs in the nightly (#2513)
 test-help-parties.js  not sorted yet, runs in the nightly (#2513)
 test-help-report.js  not sorted yet, runs in the nightly (#2513)
+test-help.js  not sorted yet, runs in the nightly (#2513)
 test-home-html.js  not sorted yet, runs in the nightly (#2513)
 test-hud.js  not sorted yet, runs in the nightly (#2513)
 test-install-client-step.ps1  not sorted yet, runs in the nightly (#2513)
-test-installer-behind-gate.ps1  not sorted yet, runs in the nightly (#2513)
 test-install-launcher-iconstamp.ps1  not sorted yet, runs in the nightly (#2513)
 test-install-launcher-wait.ps1  not sorted yet, runs in the nightly (#2513)
 test-install-runner.ps1  not sorted yet, runs in the nightly (#2513)
 test-install-server.ps1  not sorted yet, runs in the nightly (#2513)
 test-install-ship-channel.ps1  not sorted yet, runs in the nightly (#2513)
+test-installer-behind-gate.ps1  not sorted yet, runs in the nightly (#2513)
 test-issue-616.js  not sorted yet, runs in the nightly (#2513)
 test-join-pass-game.js  not sorted yet, runs in the nightly (#2513)
 test-join-pass-launcher.ps1  not sorted yet, runs in the nightly (#2513)
@@ -209,18 +222,23 @@ test-new-character.js  not sorted yet, runs in the nightly (#2513)
 test-nightly-harnesses.ps1  not sorted yet, runs in the nightly (#2513)
 test-nightly-issue.ps1  not sorted yet, runs in the nightly (#2513)
 test-not-ours.ps1  not sorted yet, runs in the nightly (#2513)
+test-note-rules.ps1  own step in build.yml, "Check the writing rules"
 test-npc-merchant-native.js  not sorted yet, runs in the nightly (#2513)
 test-npc-runtime-native.js  not sorted yet, runs in the nightly (#2513)
 test-npc-settings.ps1  not sorted yet, runs in the nightly (#2513)
 test-npc-shared-native.js  not sorted yet, runs in the nightly (#2513)
 test-offices.js  not sorted yet, runs in the nightly (#2513)
+test-old-name-gone.js  own step in build.yml, "Check the old mod's name stays out"
+test-one-engine.js  own step in build.yml, "Check the engine is one commit"
 test-online-names.js  not sorted yet, runs in the nightly (#2513)
+test-other-server-name-gone.js  own step in build.yml, "Check the other server's name stays out"
 test-overlay-redraw.js  not sorted yet, runs in the nightly (#2513)
 test-own-press.js  not sorted yet, runs in the nightly (#2513)
-test-package-client-record.ps1  not sorted yet, runs in the nightly (#2513)
-test-package-sign-order.ps1  not sorted yet, runs in the nightly (#2513)
+test-ownership.js  own step in build.yml, "Check the ownership page"
 test-pack-feed.ps1  not sorted yet, runs in the nightly (#2513)
 test-pack-limit.ps1  not sorted yet, runs in the nightly (#2513)
+test-package-client-record.ps1  not sorted yet, runs in the nightly (#2513)
+test-package-sign-order.ps1  not sorted yet, runs in the nightly (#2513)
 test-papyrus-events.js  not sorted yet, runs in the nightly (#2513)
 test-party-markers.js  not sorted yet, runs in the nightly (#2513)
 test-party-trade-theme.js  not sorted yet, runs in the nightly (#2513)
@@ -281,6 +299,7 @@ test-setup-domain-taskonly.ps1  not sorted yet, runs in the nightly (#2513)
 test-setup-skyrim-drive.ps1  not sorted yet, runs in the nightly (#2513)
 test-setup-stub-age.ps1  not sorted yet, runs in the nightly (#2513)
 test-setup-stub-identity.ps1  not sorted yet, runs in the nightly (#2513)
+test-ship-check-words.ps1  own step in build.yml, "Check the writing rules"
 test-ship-ci-launcher.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-ci-sign.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-gate.ps1  not sorted yet, runs in the nightly (#2513)
@@ -292,6 +311,7 @@ test-ship-ready.ps1  not sorted yet, runs in the nightly (#2513)
 test-ship-revision-gate.ps1  not sorted yet, runs in the nightly (#2513)
 test-show-botlog.ps1  not sorted yet, runs in the nightly (#2513)
 test-sidebar-brand.js  not sorted yet, runs in the nightly (#2513)
+test-signer-check.ps1  own step in build.yml, "Run the signer check"
 test-signing-folder.ps1  not sorted yet, runs in the nightly (#2513)
 test-signing-relative.ps1  not sorted yet, runs in the nightly (#2513)
 test-signins.js  not sorted yet, runs in the nightly (#2513)
@@ -310,18 +330,18 @@ test-ssh-host-keys.ps1  not sorted yet, runs in the nightly (#2513)
 test-ssh-scope.ps1  not sorted yet, runs in the nightly (#2513)
 test-ssh-stderr.ps1  not sorted yet, runs in the nightly (#2513)
 test-staff-commands.js  not sorted yet, runs in the nightly (#2513)
-test-starting-clothes-equip.js  not sorted yet, runs in the nightly (#2513)
 test-start-on-save-gone.js  not sorted yet, runs in the nightly (#2513)
-test-start-screen.js  not sorted yet, runs in the nightly (#2513)
 test-start-screen-art.ps1  not sorted yet, runs in the nightly (#2513)
+test-start-screen.js  not sorted yet, runs in the nightly (#2513)
+test-starting-clothes-equip.js  not sorted yet, runs in the nightly (#2513)
 test-steam-updates.ps1  not sorted yet, runs in the nightly (#2513)
-test-stuck.js  not sorted yet, runs in the nightly (#2513)
 test-stuck-in-the-hall.js  not sorted yet, runs in the nightly (#2513)
+test-stuck.js  not sorted yet, runs in the nightly (#2513)
 test-submit-answers.js  not sorted yet, runs in the nightly (#2513)
 test-swap-task-priority.ps1  not sorted yet, runs in the nightly (#2513)
 test-take-limit.js  not sorted yet, runs in the nightly (#2513)
-test-temp.js  not sorted yet, runs in the nightly (#2513)
 test-temp-short-path.ps1  not sorted yet, runs in the nightly (#2513)
+test-temp.js  not sorted yet, runs in the nightly (#2513)
 test-thornswood-keys.js  not sorted yet, runs in the nightly (#2513)
 test-thornswood-log.js  not sorted yet, runs in the nightly (#2513)
 test-tls-protocol.js  not sorted yet, runs in the nightly (#2513)
@@ -348,6 +368,6 @@ test-vps-folders-on-create.ps1  not sorted yet, runs in the nightly (#2513)
 test-vps-service-folders.ps1  not sorted yet, runs in the nightly (#2513)
 test-watch-alerts.ps1  not sorted yet, runs in the nightly (#2513)
 test-watch-disk.ps1  not sorted yet, runs in the nightly (#2513)
-test-watchdog.js  not sorted yet, runs in the nightly (#2513)
 test-watch-load.ps1  not sorted yet, runs in the nightly (#2513)
+test-watchdog.js  not sorted yet, runs in the nightly (#2513)
 test-where.ps1  not sorted yet, runs in the nightly (#2513)
