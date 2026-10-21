@@ -15,7 +15,14 @@ The grain mill is Hearthcook only.
 ## Grand Chef
 
 At master, either half. Every batch yields two instead of one. The
-craft is still one piece of work toward the next rank.
+craft is still one piece of work toward the next rank. Both portions
+are the same quality.
+
+## Burnt, plain and fine
+
+A dish comes out burnt, plain or fine, more often fine and less often
+burnt the higher the cook's rank; a master never burns one. The odds
+and what each one does are on the [Food](../food.md) page.
 
 ## What you are handed
 
@@ -32,6 +39,6 @@ apply.
 
 ## Where this is
 
-Both lists, the oven, the mill, the cookpot's recipe gate, and Grand
-Chef's second portion are in the server. The food effects
+Both lists, the oven, the mill, the cookpot's recipe gate, Grand
+Chef's second portion and how a cook comes out are in the server. The food effects
 beyond the current hunger numbers are the plan on the food page.
