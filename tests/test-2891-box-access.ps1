@@ -226,8 +226,17 @@ try {
     Yes 'a new token is 43 characters of base64url, which the checks take' ($tok.Length -eq 43 -and (Test-ThornswoodBridgeToken $tok) -and $tok -match '^[A-Za-z0-9_-]+$')
     Yes '  and a cut one is refused' (-not (Test-ThornswoodBridgeToken $tok.Substring(0, 20)) -and -not (Test-ThornswoodBridgeToken ($tok + ' ')))
     if (Get-Command node -ErrorAction SilentlyContinue) {
-        $nodeHex = (& node -e "process.stdout.write(require('crypto').createHash('sha256').update(process.argv[1]).digest('hex'))" $tok)
-        Yes 'the digest is the SHA-256 in hex bridge.js computes for the same token' ((Get-ThornswoodBridgeDigest $tok) -eq $nodeHex)
+        # The token goes to node in the environment, not on its command line:
+        # base64url starts with '-' one time in 64, and node read such a token
+        # as an option of its own ("bad option") and printed no digest, which
+        # failed this check on PR #3049's build. A token that starts with '-'
+        # is checked every run, beside the random one.
+        foreach ($t in @($tok, ('-' + $tok.Substring(1)))) {
+            $env:TS_BRIDGE_TOKEN = $t
+            try { $nodeHex = (& node -e "process.stdout.write(require('crypto').createHash('sha256').update(process.env.TS_BRIDGE_TOKEN).digest('hex'))") }
+            finally { Remove-Item Env:TS_BRIDGE_TOKEN -ErrorAction SilentlyContinue }
+            Yes ("the digest is the SHA-256 in hex bridge.js computes for the same token" + $(if ($t.StartsWith('-')) { ", one that starts with '-' too" } else { '' })) ((Get-ThornswoodBridgeDigest $t) -eq $nodeHex)
+        }
     } else { Yes 'node is here to check the digest against' $false }
     $connectJs = Text (P 'scripts', 'vps', 'bridge', 'connect.js')
     Yes 'connect.js reads the token file where Setup-SshKey.ps1 keeps it' ($connectJs.Contains("path.join(os.homedir(), '.ssh', 'thornswood-box-token')") -and
