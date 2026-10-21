@@ -55,12 +55,12 @@ function Grant([string]$p, [string]$sid, [string]$type = 'Allow') {
     Set-Acl -LiteralPath $p -AclObject $acl
 }
 function Run51([string]$text) {
-    $f = Join-Path $env:TEMP ('tw-oncreate-' + [guid]::NewGuid().ToString('N') + '.ps1')
+    $f = Join-Path ([IO.Path]::GetTempPath()) ('tw-oncreate-' + [guid]::NewGuid().ToString('N') + '.ps1')
     [IO.File]::WriteAllText($f, $text, (New-Object Text.UTF8Encoding($true)))
     try { return @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $f 2>&1 | ForEach-Object { "$_" }) } finally { Remove-Item -LiteralPath $f -Force -EA SilentlyContinue }
 }
 
-$tmp = Join-Path $env:TEMP ('tw-oncreate-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
+$tmp = Join-Path ([IO.Path]::GetTempPath()) ('tw-oncreate-' + [guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Path $tmp
 try {
     # Like C:\: Users may read and make things in whatever is made under it.

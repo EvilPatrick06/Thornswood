@@ -21,7 +21,7 @@ const pr = read(path.join(WF, 'build-pr.yml'));
 yes('build.yml no longer runs on a pull request', build && triggers(build).indexOf('pull_request') < 0);
 yes('build.yml still runs a push to main and a manual run', /push:\n    branches: \[main\]/.test(build) && triggers(build).indexOf('workflow_dispatch') >= 0);
 yes('main builds default to GitHub\'s hosted runner', /\n  launcher:\n    name: Launcher builds\n    if: \$\{\{ vars\.BUILD_RUNNER != 'vps' && inputs\.runner != 'vps' \}\}\n    runs-on: windows-latest\n/.test(build));
-yes('the VPS is a fallback job, on the box', /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.test(build));
+yes('the VPS is a fallback job, on the box\'s build runners (#2994)', /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\n/.test(build));
 yes('  run only when the hosted job did not succeed (skipped by BUILD_RUNNER or a manual vps run, or failed)',
     /\n  launcher-vps:\n    name: [^\n]*\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' \}\}\n/.test(build));
 yes('  with the same steps as the hosted job (one anchor)', /steps: &checks\n/.test(build) && /steps: \*checks\n/.test(build));
@@ -30,7 +30,7 @@ yes('build-pr.yml exists', !!pr);
 yes('build-pr.yml runs on a pull request and nothing else', JSON.stringify(triggers(pr)) === '["pull_request"]');
 yes('on GitHub\'s hosted windows-latest', /\n    runs-on: windows-latest\n/.test(pr));
 const SAME = "github.event.pull_request.head.repo.full_name == github.repository";
-const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps\]\n/.exec(pr);
+const prVps = /\n  launcher-vps:\n[\s\S]*?\n    runs-on: \[self-hosted, Windows, thornswood-vps, thornswood-build\]\n/.exec(pr);
 yes('a VPS fallback job builds a pull request the hosted job did not', !!prVps &&
     /\n  launcher-vps:\n    name: Launcher builds \(VPS fallback\)\n    needs: launcher\n    if: \$\{\{ !cancelled\(\) && needs\.launcher\.result != 'success' && needs\.launcher\.result != 'cancelled' && github\.event\.pull_request\.head\.repo\.full_name == github\.repository \}\}\n/.test(pr));
 yes('  only for a branch of this repository, never a fork', !!prVps && code(pr).split(SAME).length - 1 === 1);

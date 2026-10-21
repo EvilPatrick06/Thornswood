@@ -9,7 +9,7 @@
       ./Watch-Outside.ps1 -Run -Folder state  one scheduled pass: remember, tell, post (what the workflow runs)
       ./Watch-Outside.ps1 -TestPost           post one test message through WATCH_WEBHOOK
       ./Watch-Outside.ps1 -Export <folder>    write the public repository's files into <folder>
-      .\scripts\vps\Watch-Outside.ps1 -Remove take the old scheduled task off a Windows machine (One)
+      .\scripts\vps\Watch-Outside.ps1 -Remove take the old scheduled task off a Windows machine (One), from an administrator shell
 
   WHY (issue #448). Watch-Services.ps1 runs on the VPS and watches the
   services there, and since #447 it tells staff when one dies. But a box
@@ -760,6 +760,51 @@ function Write-Results($seen) {
   foreach ($k in $seen.Keys) { Write-Host ('  {0,-9} {1,-15} {2}' -f $k, (Outcome $seen[$k]), (Shown-Line $seen[$k])) }
 }
 
+# True when this shell runs as an administrator. Only an elevated shell can
+# delete One's old task (#2990): its file under C:\Windows\System32\Tasks
+# gives the account it runs as Read only, and Delete to Administrators and
+# SYSTEM, so a plain shell's Unregister-ScheduledTask gets "Access is
+# denied" (0x80070005).
+function Test-Elevated {
+  try {
+    $me = New-Object Security.Principal.WindowsPrincipal ([Security.Principal.WindowsIdentity]::GetCurrent())
+    return $me.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+  } catch { return $false }
+}
+
+# -Remove: takes One's old task and its folder off this machine, saying each
+# step through $say and why when Windows refuses. Returns the exit code.
+# Until #2990 the unregister ran with -EA SilentlyContinue, so a refusal
+# printed only that the task was still registered, and never why.
+function Remove-OldWatch([string]$name, [string]$old, [string]$line, [scriptblock]$say) {
+  if (-not (Get-Command Unregister-ScheduledTask -EA SilentlyContinue)) { & $say '  STOP. -Remove takes the old task off a Windows machine, and this is not one.' 'Red'; return 1 }
+  # Listed and matched by name, so a task that is not there is no error and
+  # any error is a real one.
+  function Find-Task { return @(Get-ScheduledTask -EA Stop | Where-Object { $_.TaskName -eq $name }) }
+  try { $there = Find-Task } catch { & $say ('  STOP. Windows would not list the scheduled tasks: ' + $_.Exception.Message) 'Red'; return 1 }
+  if ($there.Count) {
+    if (-not (Test-Elevated)) {
+      & $say "  STOP. $name is registered, and Windows lets only an administrator delete it." 'Red'
+      & $say '  Nothing was changed. Open PowerShell as administrator (right-click it, Run as administrator) and run:' 'Yellow'
+      & $say ('      ' + $line) 'Yellow'
+      return 1
+    }
+    try { Unregister-ScheduledTask -TaskName $name -Confirm:$false -EA Stop }
+    catch { & $say ("  STOP. Windows refused to remove ${name}: " + $_.Exception.Message) 'Red'; return 1 }
+    try { $there = Find-Task } catch { & $say ('  STOP. Windows would not list the scheduled tasks: ' + $_.Exception.Message) 'Red'; return 1 }
+    if ($there.Count) { & $say "  STOP. $name is still registered, although Windows took the removal without an error." 'Red'; return 1 }
+    & $say "  removed $name" 'Green'
+  } else {
+    & $say "  $name is not registered on this machine." 'Green'
+  }
+  if ($old -and (Test-Path -LiteralPath $old)) {
+    try { Remove-Item -LiteralPath $old -Recurse -Force -EA Stop }
+    catch { & $say ("  STOP. ${old} was not removed: " + $_.Exception.Message) 'Red'; return 1 }
+    & $say "  removed $old, with its copy of the webhook" 'Green'
+  }
+  return 0
+}
+
 # Dot-sourced by tests\test-watch-outside.ps1, which wants the functions and
 # not a run against the internet.
 if ($MyInvocation.InvocationName -eq '.') { return }
@@ -774,17 +819,9 @@ $saved = Join-Path $Here 'watch-outside.json'
 if ($Remove) {
   # One ran this as a scheduled task until #2755. Its folder holds a copy of
   # the staff webhook's address and the old outbox, so it goes too.
-  if (-not (Get-Command Unregister-ScheduledTask -EA SilentlyContinue)) { Say '  STOP. -Remove takes the old task off a Windows machine, and this is not one.' 'Red'; Done 1 }
-  Unregister-ScheduledTask -TaskName $TaskName -Confirm:$false -EA SilentlyContinue
-  if (Get-ScheduledTask -TaskName $TaskName -EA SilentlyContinue) { Say "  STOP. $TaskName is still registered." 'Red'; Done 1 }
-  Say "  $TaskName is not registered on this machine." 'Green'
   $old = $(if ($env:LOCALAPPDATA) { Join-Path $env:LOCALAPPDATA 'Thornswood\Watch-Outside' } else { '' })
-  if ($old -and (Test-Path -LiteralPath $old)) {
-    Remove-Item -LiteralPath $old -Recurse -Force
-    if (Test-Path -LiteralPath $old) { Say "  STOP. $old is still there." 'Red'; Done 1 }
-    Say "  removed $old, with its copy of the webhook" 'Green'
-  }
-  Done 0
+  $line = "& '" + $MyInvocation.MyCommand.Path.Replace("'", "''") + "' -Remove -TaskName '" + $TaskName.Replace("'", "''") + "'"
+  Done (Remove-OldWatch $TaskName $old $line ${function:Say})
 }
 
 $S = Read-Settings $repo $saved

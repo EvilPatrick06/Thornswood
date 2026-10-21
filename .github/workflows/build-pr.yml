@@ -36,7 +36,11 @@ jobs:
     name: Launcher builds (VPS fallback)
     needs: launcher
     if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' && github.event.pull_request.head.repo.full_name == github.repository }}
-    runs-on: [self-hosted, Windows, thornswood-vps]
+    # thornswood-build (#2994): only the runners records/build-runners.json
+    # lists carry it, so no more builds run on the box at once than its six
+    # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
+    # the harness step alone and the limit below cancelled passing builds.
+    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
     # Often past twenty minutes on the VPS (#2557): it is shared with the live
     # server and other jobs, and the harness list keeps growing (#2544 added
     # test-release-workflow.ps1, #2525 the feed-watch test, #2546 the remote
@@ -495,16 +499,22 @@ jobs:
           # ends it before its limit. It ran nowhere before, so the stop line
           # that never reached the box went out unseen. Under a minute.
           # Issue #2975: tests\test-2975-server-port-once.ps1 holds
-          # Publish-Server.ps1's and Deploy-Server.ps1's check from outside
-          # to one try through Vps.ps1's Test-ThornswoodFromOutside, which says
-          # what it got and "not known" from a machine that reaches no raw
-          # port on the box. Under ten seconds, on loopback only.
+          # Publish-Server.ps1's, Deploy-Server.ps1's and Install-Voice.ps1's
+          # check from outside to one try through Vps.ps1's
+          # Test-ThornswoodFromOutside, which says what it got and "not known"
+          # from a machine that reaches no raw port on the box. Under ten
+          # seconds, on loopback only.
           # Issue #2938: tests\test-mod-menus.js builds a game folder byte by
           # byte (plugins, compiled scripts, archives, MCM Helper files) and
           # holds Audit-ModMenus.js to where each menu keeps its values, and
           # to writing nothing there. It ran only in the nightly, and its
           # fixture wrote Windows paths, so off Windows it failed 22 checks
           # and nothing said so. Under a second.
+          # Issue #2961: tests\test-2961-voice-port-once.ps1 holds
+          # Install-Voice.ps1's outside check to one try that says what it
+          # answered, and to "not known" rather than "correctly shut" from
+          # a machine that reaches no raw port on the box, as a cloud
+          # thread's does. Under ten seconds, on loopback only.
           # Issue #2957: tests\test-2957-windows-one-way.ps1 holds every harness
           # to finding Windows, Windows PowerShell 5.1 and cmd.exe through
           # tests\Windows.ps1: $OnWindows first, then Get-WindowsPowerShell or
@@ -512,6 +522,11 @@ jobs:
           # harness on its first lines off Windows, and asking Get-Command for
           # powershell.exe let a Windows machine without it skip or run pwsh
           # instead. A few seconds.
+          # Issue #2946: tests\test-time-wait.ps1 runs vps-time-wait.ps1 on
+          # stand-ins for the registry, the UDP ports and the restart, with
+          # real server folders, and Set-TimeWait.ps1 against a fake ssh. The
+          # box restarts only while nobody is on either server, and never
+          # while a count cannot be read. A few seconds.
           $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -527,8 +542,8 @@ jobs:
                  'test-hand-install-retired.ps1',
                  'test-downgrade-steam-window.ps1', 'test-address-library.ps1', 'test-vortex-folder.ps1',
                  'test-new-box-runbook.ps1', 'test-remote-header.ps1', 'test-2975-server-port-once.ps1',
-                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-2459-artifact-unpack-race.ps1', 'test-2888-artifact-folder-name.ps1', 'test-2928-stop-and-move.ps1', 'test-2899-run-on-box.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
-                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-2863-board-status.ps1', 'test-2753-cloud-ssh.ps1', 'test-2753-box-bridge.js', 'test-2891-box-access.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
+                 'test-vps-defaults.ps1', 'test-runner-lock.ps1', 'test-runner-offbox.ps1', 'test-2994-build-runners.ps1', 'test-498-buildtools.ps1', 'test-restore-staging.ps1', 'test-deploy-artifact.ps1', 'test-2459-artifact-unpack-race.ps1', 'test-2888-artifact-folder-name.ps1', 'test-2928-stop-and-move.ps1', 'test-2899-run-on-box.ps1', 'test-remote-command-map.ps1', 'test-deploy-records.js',
+                 'test-own-folder-alone.ps1', 'test-own-folder-first.ps1', 'test-own-folder-again.ps1', 'test-2627-scan-fix.ps1', 'test-shortcut-icons.ps1', 'test-runtime-keep.ps1', 'test-setup-game-files.ps1', 'test-setup-robocopy.ps1', 'test-sign-pilot.ps1', 'test-prod-parity.ps1', 'test-runner-isolation.ps1', 'test-2863-board-status.ps1', 'test-2753-cloud-ssh.ps1', 'test-2753-box-bridge.js', 'test-2961-voice-port-once.ps1', 'test-2891-box-access.ps1', 'test-discord-announced-shared.ps1', 'test-check-build.ps1', 'test-client-build-record.ps1', 'test-npc-runtime.js',
                  'test-mold-key.js', 'test-putback-flora.js', 'test-staff-spells.js', 'test-join-pass-trust.js',
                  'test-npc-shared-runtime.js', 'test-npc-navigation-equivalence.js', 'test-npc-population-runtime.js', 'test-npc-role-titles.js',
                  'test-shared-resource-stock.js', 'test-resource-stock-integration.js',
@@ -618,7 +633,7 @@ jobs:
                  'test-1588-tools-50.js',
                  'test-1741-encoding.js',
                  'test-1634-apprentice-gui.js',
-                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-507-property-restart.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2553-salvaged-gone.js', 'test-2553-station-sites.js', 'test-content-names.js', 'test-2468-last-plugin.js', 'test-2486-last-ships.ps1', 'test-2298-held-board.ps1',
+                 'test-1637-door-gui.js', 'test-2250-claim-door.js', 'test-2256-locked-for-everyone.js', 'test-507-property-restart.js', 'test-2245-drawn-pick.js', 'test-2244-after-mining-measure.js', 'test-item-names.js', 'test-2255-key-mold-models.js', 'test-2254-master-key.js', 'test-2258-house-parts-hidden.js', 'test-2553-salvaged-gone.js', 'test-2962-creation-menus-gone.js', 'test-2553-station-sites.js', 'test-content-names.js', 'test-2468-last-plugin.js', 'test-2486-last-ships.ps1', 'test-2298-held-board.ps1',
                  'test-2484-gates-unlocked.js',
                  'test-2487-key-recipe-hidden.js',
                  'test-502-no-bounty.js',
@@ -808,6 +823,7 @@ jobs:
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
                  'test-prove-secret.ps1',
+                 'test-time-wait.ps1',
                  'test-mod-menus.js'
           $failed = @()
           foreach ($n in $six) {
@@ -870,6 +886,23 @@ jobs:
         run: |
           & python tests/test-npc-population.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+      - name: Check our plugins are clean
+        shell: pwsh
+        run: |
+          # Issue #2790. Our three plugins are written by scripts and change
+          # most weeks; this is the half of SSEEdit's error and cleaning check
+          # that needs no game: every record inside its group, sizes that add
+          # up, no form id twice or past the plugin's own index, nothing
+          # deleted. The identical-to-master half needs the masters, a game
+          # folder: python scripts/mods/Check-PluginClean.py where one is.
+          & python tests/test-2790-plugin-clean.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python scripts/mods/Check-PluginClean.py --no-masters
+          if ($LASTEXITCODE -ne 0) {
+            Write-Host '::error file=scripts/mods/Check-PluginClean.py::a plugin in game/content has a broken or deleted record; the lines above say which, and the cure is in the script that writes it'
+            exit 1
+          }
 
       - name: Check the launcher window
         shell: powershell

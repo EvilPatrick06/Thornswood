@@ -91,8 +91,11 @@ function Test-ThornswoodPluginLight([string]$Path) {
 function Get-ThornswoodLightTest([string[]]$Paths, [string]$Record) {
     if (-not (Test-ThornswoodEngineLoadsLight $Record)) { return $null }
     $light = @{}
+    # Each path as written: Windows reads / and \ alike, and anywhere else \
+    # is part of a file name, which .NET's open would look for in the
+    # working folder.
     foreach ($p in @($Paths)) {
-        $f = ([string]$p).Replace('/', '\')
+        $f = [string]$p
         $light[[IO.Path]::GetFileName($f)] = Test-ThornswoodPluginLight $f
     }
     return { param($n) [bool]$light[$n] }.GetNewClosure()

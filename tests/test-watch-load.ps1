@@ -185,11 +185,19 @@ foreach ($row in $r) {
 Yes ('every figure is a plain invariant number' + $(if ($bad.Count) { ': ' + ($bad -join ' ') } else { '' })) $shapeOk
 
 Yes 'cores is this machine''s logical processor count' ([int]$r[1].cores -eq [Environment]::ProcessorCount)
-$i1 = [double]::Parse($r[0].idle_s, $inv)
-$i2 = [double]::Parse($r[1].idle_s, $inv)
-Yes 'the idle total is there and does not go backwards' ($i1 -gt 0 -and $i2 -ge $i1)
-Yes 'memory in use is there and under the total' ([double]$r[1].mem_used_mb -gt 0 -and [double]$r[1].mem_used_mb -le [double]$r[1].mem_total_mb)
-Yes 'free space on C: is there' ("$($r[1].disk_free_gb)" -ne '' -and [double]$r[1].disk_free_gb -gt 0)
+# The idle time, memory, C:, every process and who listens on a port are read
+# from Windows' own counters (CIM and netstat.exe), as on the box. Off Windows
+# there are none, and those columns are empty.
+$counters = 'the idle time, memory, C:, the processes and who listens where come from Windows'' own counters (CIM and netstat.exe), which only Windows has'
+if ($OnWindows) {
+    $i1 = [double]::Parse($r[0].idle_s, $inv)
+    $i2 = [double]::Parse($r[1].idle_s, $inv)
+    Yes 'the idle total is there and does not go backwards' ($i1 -gt 0 -and $i2 -ge $i1)
+    Yes 'memory in use is there and under the total' ([double]$r[1].mem_used_mb -gt 0 -and [double]$r[1].mem_used_mb -le [double]$r[1].mem_total_mb)
+    Yes 'free space on C: is there' ("$($r[1].disk_free_gb)" -ne '' -and [double]$r[1].disk_free_gb -gt 0)
+} else {
+    Write-Host "SKIP  the idle total, memory and free space on C:: $counters"
+}
 
 # The card with a gateway, asked the same way, so this holds on a runner too.
 $hasCard = $false
@@ -207,13 +215,17 @@ if ($hasCard) {
 }
 
 # The game server stand-in, found by its port.
-Yes 'the game server is found by the port it listens on, and it is this process' ("$($r[0].game_pid)" -eq "$PID" -and "$($r[1].game_pid)" -eq "$PID")
-Yes 'its memory is there' ([double]$r[1].game_mem_mb -gt 0)
-$g1 = [double]::Parse($r[0].game_cpu_s, $inv)
-$g2 = [double]::Parse($r[1].game_cpu_s, $inv)
-Yes ('its processor time grew by the second and a half this spent busy ({0:N2} s)' -f ($g2 - $g1)) (($g2 - $g1) -ge 1.0)
-Yes 'its I/O total is there' ("$($r[1].game_io_bytes)" -ne '')
-Yes 'the people on the live server come from its online.json while it is up' ("$($r[1].online)" -eq '3')
+if ($OnWindows) {
+    Yes 'the game server is found by the port it listens on, and it is this process' ("$($r[0].game_pid)" -eq "$PID" -and "$($r[1].game_pid)" -eq "$PID")
+    Yes 'its memory is there' ([double]$r[1].game_mem_mb -gt 0)
+    $g1 = [double]::Parse($r[0].game_cpu_s, $inv)
+    $g2 = [double]::Parse($r[1].game_cpu_s, $inv)
+    Yes ('its processor time grew by the second and a half this spent busy ({0:N2} s)' -f ($g2 - $g1)) (($g2 - $g1) -ge 1.0)
+    Yes 'its I/O total is there' ("$($r[1].game_io_bytes)" -ne '')
+    Yes 'the people on the live server come from its online.json while it is up' ("$($r[1].online)" -eq '3')
+} else {
+    Write-Host "SKIP  the game server found by its port, its processor time, memory and I/O, and the people on it: $counters"
+}
 Yes 'a down dev server is empty, and so is its people count though its file says one' (
     "$($r[1].devgame_pid)" -eq '' -and "$($r[1].devonline)" -eq '')
 
@@ -230,8 +242,13 @@ $held.Start()
 Set-Content -LiteralPath (Join-Path $liveDir 'data\online.json') -Value 'this is not json' -Encoding ASCII
 $rc4 = Collect @()
 $r = @(Import-Csv -LiteralPath $csv)
-Yes 'a broken online.json leaves that column empty and the line still goes in' (
-    $rc4 -eq 0 -and $r.Count -eq 4 -and "$($r[3].online)" -eq '' -and "$($r[3].game_pid)" -eq "$PID")
+if ($OnWindows) {
+    Yes 'a broken online.json leaves that column empty and the line still goes in' (
+        $rc4 -eq 0 -and $r.Count -eq 4 -and "$($r[3].online)" -eq '' -and "$($r[3].game_pid)" -eq "$PID")
+} else {
+    Yes 'a broken online.json does not stop the line going in' ($rc4 -eq 0 -and $r.Count -eq 4)
+    Write-Host "SKIP  and leaves only that column empty while the game server is found: $counters"
+}
 $held.Stop()
 
 # Rolling at the size limit.
@@ -258,8 +275,12 @@ Set-Content -LiteralPath $pair -Value $lines -Encoding ASCII
 $real = & $reader -Path $pair -PassThru
 $g = @($real.Services | Where-Object { $_.Name -eq 'game' })
 Yes 'it measures one interval from two real lines' ($real.Intervals -eq 1)
-Yes 'it finds the game server stand-in busy in it' ($g.Count -eq 1 -and $g[0].CoresAvg -gt 0)
-Yes 'the box figure is a percentage' ($null -ne $real.CpuAvg -and $real.CpuAvg -ge 0 -and $real.CpuAvg -le 100)
+if ($OnWindows) {
+    Yes 'it finds the game server stand-in busy in it' ($g.Count -eq 1 -and $g[0].CoresAvg -gt 0)
+    Yes 'the box figure is a percentage' ($null -ne $real.CpuAvg -and $real.CpuAvg -ge 0 -and $real.CpuAvg -le 100)
+} else {
+    Write-Host "SKIP  the game server stand-in busy in them, and the box figure: $counters"
+}
 
 # =============================================== the reader, a made-up one ===
 Write-Host ''
