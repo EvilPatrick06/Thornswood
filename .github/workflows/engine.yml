@@ -18,6 +18,10 @@
 #     on a machine with no engine build;
 #   client\, the six client files at the paths the record names, which
 #     Sync-Client.ps1 -Dist puts in a game folder;
+#   and the whole of it is a Ship machine's engine build:
+#     Get-EngineArtifact.ps1 fetches it for the pin and holds every file to
+#     the records (#3047, engine\README.md "A Ship machine takes CI's build"),
+#     so keep its layout in step with scripts\release\EngineArtifact.ps1;
 #   fork-build.json, when the fork built it (below): the fork's run, and
 #     each file it kept with its sha256 and time;
 #   SHA256SUMS over all of it.

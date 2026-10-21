@@ -33,8 +33,9 @@
        refused.
     3. Puts the six recorded client files into the root's game folder from
        the configured engine build (Sync-Client.ps1, Where.ps1 ClientDist,
-       which is the build Setup-ShipMachine.ps1 -EngineBuild recorded), and
-       checks they are there.
+       which is the build Setup-ShipMachine.ps1 -EngineBuild recorded; for
+       -EngineBuild ci, CI's build of the pin, which Sync-Client fetches when
+       it is not here yet, #3047), and checks they are there.
 
   It changes nothing outside the root: OwnGame never writes into the Steam
   copy or into Vortex's files, and Sync-Client takes a file's name off before
@@ -153,7 +154,7 @@ if (-not $Check) {
     & (Join-Path $Here 'Sync-Client.ps1') -Game $game -NoPause
     if ($LASTEXITCODE -ne 0) {
         Die ('The recorded client could not be put into ' + $game + ' from the engine build (Where.ps1 ClientDist); Sync-Client says why above. ' +
-             'Build it, or record the fork folder that has it with .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild <the fork folder>.')
+             'The build that matches the record is CI''s: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci makes it this machine''s engine build, and Sync-Client then fetches it (engine\README.md, A Ship machine takes CI''s build).')
     }
 }
 $global:LASTEXITCODE = 0

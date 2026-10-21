@@ -371,7 +371,9 @@ function partD() {
     .map(function (h) { return lift(rosterCs, h); });
   yes('Roster.cs has Gone, Played and ReadGone', parts.every(Boolean));
   const csc = require('./launcher-csc').csc || path.join(require('os').tmpdir(), 'no-build-tools-roslyn-csc', 'csc.exe');
-  if (parts.every(Boolean) && fs.existsSync(csc)) {
+  if (parts.every(Boolean) && !require('./launcher-csc').onWindows) {
+    console.log('SKIP  Gone, Played and ReadGone compiled and run: the compiler the launcher builds with is the Roslyn csc of Visual Studio\'s Build Tools, which only Windows has');
+  } else if (parts.every(Boolean) && fs.existsSync(csc)) {
     const prog =
       'using System; using System.Collections.Generic; using System.Text.RegularExpressions;\n' +
       'static class Roster {\n static readonly object gate = new object();\n' +
