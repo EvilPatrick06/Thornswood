@@ -412,6 +412,7 @@ param(
     [switch]   $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -2044,8 +2045,6 @@ $BENCH_OWNER = [ordered]@{
     'DLC2StaffEnchanter'      = @{ Owner = 'Enchanter';  Half = 'Bladebinder'; Why = 'the Dragonborn staff enchanter. Every one of its recipes outputs a staff, and a staff is a weapon, so it is the Bladebinder''s by the same rule that gives him swords.' }
     'CraftingSmelter'         = @{ Owner = '';           Why = 'a smelter makes ingots, which are stock rather than a finished good. Both halves of the Smith need them, and a Miner who could not smelt his own ore would have nothing to sell. Left open to everybody on purpose.' }
 }
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Out) { $Out = Join-Path $PSScriptRoot '..\..\game\data\recipes.json' }
 

@@ -65,7 +65,7 @@ param(
 )
 
 Set-StrictMode -Off
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 $ProgressPreference    = 'SilentlyContinue'
 
 function Say($m, $c = 'Gray') { Write-Host $m -ForegroundColor $c }
@@ -74,6 +74,7 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here 'Vps.ps1')
+$ErrorActionPreference = 'Continue'
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 if (-not $Out) {
