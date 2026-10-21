@@ -569,7 +569,8 @@ function icacls { }
     Yes '  the key is that environment''s NOTICE_KEY_B64, handed over as THORNSWOOD_NOTICE_KEY_B64' ($wf -match [regex]::Escape('THORNSWOOD_NOTICE_KEY_B64: ${{ secrets.NOTICE_KEY_B64 }}') -and @([regex]::Matches($wf, 'secrets\.')).Count -eq 1)
     Yes '  the checkout keeps no token in the runner''s folder' ($wf -match '(?ms)uses: actions/checkout@[0-9a-f]{40}[^\n]*\n\s+with:\n\s+persist-credentials: false')
     Yes '  its script runs under pwsh with no profile' ($wf -match [regex]::Escape('shell: pwsh -NoProfile -NonInteractive -Command ". ''{0}''"'))
-    $run = [regex]::Match($wf, '(?ms)^(\s+)run: \|\n(.*)$')
+    # The notice step's script, not the re-checkout step's before it (#3029).
+    $run = [regex]::Match($wf, '(?ms)- name: Hand the notice to the box\n.*?^(\s+)run: \|\n(.*)$')
     $wfScript = ''
     if ($run.Success) {
         $lines = $run.Groups[2].Value -split "`n"
@@ -581,7 +582,7 @@ function icacls { }
         }
         $wfScript = ($body -join "`n").TrimEnd() + "`n"
     }
-    Yes 'the script has no ${{ }} in it: the text and the id come in through the environment' ($wfScript.Length -gt 0 -and $wfScript -notmatch '\$\{\{' -and
+    Yes 'the script has no ${{ }} in it: the text and the id come in through the environment' ($wfScript.Length -gt 0 -and $wfScript -match 'OnTheBox' -and $wfScript -notmatch 'git ' -and $wfScript -notmatch '\$\{\{' -and
         $wf -match [regex]::Escape('NOTICE_TEXT: ${{ inputs.text }}') -and $wf -match [regex]::Escape('NOTICE_CHECK: ${{ inputs.check }}'))
     $sayText = [IO.File]::ReadAllText($say)
     Yes 'Say-Staff.ps1 starts this workflow by its file name, and says notices through it are from claude' (
