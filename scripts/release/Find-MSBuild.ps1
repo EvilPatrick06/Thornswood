@@ -33,6 +33,9 @@ function Find-ThornswoodMSBuild {
     $r = @{ MSBuild = $null; Csc = $null; RefAssemblies = $null; VsWhere = $null; Instance = $null }
     $pf86 = ${env:ProgramFiles(x86)}
     if (-not $pf86) { $pf86 = $env:ProgramFiles }
+    # Off Windows neither is set, so there is no Visual Studio to find; the
+    # join below stopped on the null before saying so (#2989).
+    if (-not $pf86) { return $r }
     $vswhere = Join-Path $pf86 'Microsoft Visual Studio\Installer\vswhere.exe'
     if (Test-Path -LiteralPath $vswhere) {
         $r.VsWhere = $vswhere

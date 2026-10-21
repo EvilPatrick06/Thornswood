@@ -530,8 +530,15 @@ try {
     # Skyrim's list once when it was read from AppData with the game closed.
     $scratchRoot = Join-Path $work 'Root'
     New-Item -ItemType Directory -Path $scratchRoot -Force | Out-Null
-    Yes 'no Game folder reads the list Vortex writes into AppData' (
-        (Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition'))
+    $oldLocal = $env:LOCALAPPDATA
+    try {
+        $env:LOCALAPPDATA = Join-Path $work 'AppLocal'
+        Yes 'no Game folder reads the list Vortex writes into AppData' (
+            (Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $env:LOCALAPPDATA 'Skyrim Special Edition'))
+        $env:LOCALAPPDATA = $null
+        Yes '  and with no LOCALAPPDATA, as off Windows, the platform''s own folder' (
+            (Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path ([Environment]::GetFolderPath('LocalApplicationData')) 'Skyrim Special Edition'))
+    } finally { $env:LOCALAPPDATA = $oldLocal }
     New-Item -ItemType Directory -Path (Join-Path $scratchRoot 'Game') -Force | Out-Null
     Yes 'an older Game folder reads Profile\Default' ((Get-ShipLoadOrderDir $scratchRoot $profileDir) -eq (Join-Path $profileDir 'Default'))
     [IO.File]::WriteAllText((Join-Path $profileDir 'OwnGame\plugins.txt'), "*SkyUI_SE.esp`r`n")
@@ -689,9 +696,10 @@ if ($oursBlock.Success) {
 $diskRoot = Join-Path $Here 'game\ours'
 $onDisk = @()
 if (Test-Path -LiteralPath $diskRoot) {
-    $prefix = $diskRoot.TrimEnd('\') + '\'
+    # Named with \ on any machine, as Go.ps1 and the rules write them.
+    $prefix = $diskRoot.TrimEnd([IO.Path]::DirectorySeparatorChar) + [IO.Path]::DirectorySeparatorChar
     $onDisk = @(Get-ChildItem -LiteralPath $diskRoot -Recurse -File | ForEach-Object {
-        $_.FullName.Substring($prefix.Length)
+        $_.FullName.Substring($prefix.Length).Replace([IO.Path]::DirectorySeparatorChar, '\')
     })
 }
 $inRules = @($ShipOursFiles | Where-Object {
@@ -712,7 +720,7 @@ Yes 'and those paths are the ShipOursFiles entries, no more and no less' (Same-L
 $baseline = $null
 foreach ($cand in @(
     (Join-Path (Split-Path -Parent ($Here)) 'Thornswood-Releases\published.json'),
-    (Join-Path $env:LOCALAPPDATA 'Thornswood\published.json')
+    (Join-Path (& (Join-Path $Here 'scripts\release\Where.ps1') MachineData) 'published.json')
 )) {
     if ($cand -and (Test-Path -LiteralPath $cand)) { $baseline = $cand; break }
 }
@@ -726,8 +734,10 @@ if ($baseline) {
     Write-Host 'SKIP  no pack baseline on this machine'
 }
 
-$filesRecord = Join-Path $Root 'Profile\OwnGame\files.txt'
-if (Test-Path -LiteralPath $filesRecord) {
+# Join-Path stops on a drive this machine does not have (C: off Windows),
+# so whether the folder is here at all is asked first.
+$filesRecord = $(if (Test-Path -LiteralPath $Root) { Join-Path $Root 'Profile\OwnGame\files.txt' } else { '' })
+if ($filesRecord -and (Test-Path -LiteralPath $filesRecord)) {
     # What the installer carries under textures and meshes out of an own game
     # folder: everything the record does not mark as the collection's (V).
     $rows = @()
@@ -748,7 +758,7 @@ if (Test-Path -LiteralPath $filesRecord) {
         Yes 'the record''s MarketplaceTextures.bsa is left out' (Test-ShipMachine $inRecord[0].Rel)
     }
 } else {
-    Write-Host "SKIP  no $filesRecord on this machine"
+    Write-Host "SKIP  no $Root\Profile\OwnGame\files.txt on this machine"
 }
 
 # ---- what the rules read that does not read (#2711) -----------------------------------
