@@ -6,7 +6,7 @@
     "game/data/recipes.json": "83f861196601f46c874b1e3b609d2027eef7c9bb887b44cbe73e0f4ae135f548",
     "game/data/harvests.json": "9ca477811631c8027faf92151acdc039f1879df6db2240828631dd00807b4f09",
     "game/data/hunts.json": "de563914653ae6ec58532e5afb5b4aec1b5b18dfa3b16b2ba7907c1bc3661c24",
-    "game/data/items.json": "b91464db89a6a455f5f00bffc81329a5801f236519949bb1cb394e02d9354b4c",
+    "game/data/items.json": "c292372a724a1155b0713028c92b9f464ddbaf497928b8594cc30ea8cc6e5677",
     "docs/systems/cut-items.json": "fd3122104482fe441cba2e54cac3374dab42f13d6737de29ce93c8ef15b856c3"
   },
   "loadOrder": [
