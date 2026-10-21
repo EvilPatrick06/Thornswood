@@ -298,7 +298,7 @@ function Close-ThornswoodOnBoxFolder([Parameter(Mandatory = $true)]$Folder) {
     if (-not $k.HasExited -and -not ($told -contains 'END SET')) {
         # With the bridge's node under it on One: the whole tree where .NET
         # can (PowerShell 7), the ssh alone where it cannot (5.1).
-        try { $k.Kill($true) } catch { try { $k.Kill() } catch { } }
+        if ($PSVersionTable.PSVersion.Major -ge 6) { $k.Kill($true) } else { $k.Kill() }
     }
     $said = @($k.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     $k.WaitForExit()
