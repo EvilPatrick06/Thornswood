@@ -23,7 +23,8 @@
        MoveDir and StopServer have no sleep; Bot-Service.ps1 replaces the
        service program once; Install-Bot sends it in front of Bot-Service.ps1
        every time; the site's, voice's and the bridge's StopIt wait on it and
-       sleep nowhere.
+       sleep nowhere; voice's -Restart and -Remove stop through that StopIt
+       and start or take away nothing until it has all exited (#2952).
     3. On Windows, run for real ten times: a node holding a file in a folder
        is ended, waited for, and the folder renamed at once, every time.
     4. A rename Windows refuses is tried once, returns false, and says the
@@ -152,7 +153,21 @@ foreach ($c in @(
         $plain.IndexOf('Stop-ThornswoodProcessHeld') -gt $plain.IndexOf('Stop-ScheduledTask'))
 }
 $voice = Text (P 'scripts', 'deploy', 'Install-Voice.ps1')
-Yes 'voice''s -TaskOnly run sends StopAndMove.ps1 in front of its StopIt too' ($voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $remote + $taskOnlyBlock)'))
+Yes 'voice''s install sends its StopIt in front of the swap, which carries StopAndMove.ps1' ($voice.Contains('Remote ($vars + $voiceTools + $remote + $serviceSwapBlock)'))
+Yes 'voice''s -TaskOnly run sends StopAndMove.ps1 in front of its StopIt too' ($voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock)'))
+# Issue #2952: -Restart was Stop-ScheduledTask, a second's sleep and
+# Start-ScheduledTask, and -Remove took the folder away the same instant.
+# Stop-ScheduledTask returns before voice has exited (measured on dev voice,
+# 21 Oct: 63 ms, all four processes still running and node on the port).
+Yes 'voice''s -Restart and -Remove send StopAndMove.ps1 in front of its StopIt' ($voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $block)'))
+foreach ($b in @(@{ Name = '-Restart'; Var = 'restartBlock'; Then = 'StartIt' }, @{ Name = '-Remove'; Var = 'removeBlock'; Then = 'Unregister-ScheduledTask' })) {
+    $s = [regex]::Match($voice, '(?ms)^\$' + $b.Var + ' = @"\r?\n(.*?)^"@').Groups[1].Value.Replace('`', '')
+    Yes ('voice''s ' + $b.Name + ' stops through StopIt, starts or takes away nothing until StoppedAll says it has all exited, and sleeps nowhere') (
+        $s -and $s -notmatch 'Start-Sleep|Stop-ScheduledTask|Stop-Process' -and
+        $s.IndexOf('StopIt') -ge 0 -and $s.IndexOf('StopIt') -lt $s.IndexOf('StoppedAll') -and
+        $s.IndexOf('StoppedAll') -lt $s.IndexOf($b.Then))
+}
+Yes 'and neither is the one ssh line it was' ($voice -notmatch 'Start-Sleep -Seconds 1; Start-ScheduledTask' -and $voice -notmatch "Remove-Item -LiteralPath '\$Root' -Recurse -Force -EA SilentlyContinue")
 
 # ---- 3 to 5. run ------------------------------------------------------------
 $onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or ((Test-Path variable:IsWindows) -and $IsWindows)
