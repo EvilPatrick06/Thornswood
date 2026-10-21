@@ -88,7 +88,9 @@ WHAT IT PUTS IN THE PLUGIN
      (a torch; every other light is the world's lighting), and the six coin
      purses, which are flora. Every other flora (plants, fish, hanging game)
      is a harvestable and stays. A thing a person drops is made at runtime,
-     in no plugin, and is never touched. A Thornswood plugin's own floor
+     in no plugin, and is never touched. One already initially disabled is
+     left only when nothing could switch it on: no enable parent and no
+     script. A Thornswood plugin's own floor
      item, and a reference whose enable parent is a floor item, stop the
      build, so each is decided rather than switched off unasked. What the
      servers saved about a floor item before needs no clearing: the server
@@ -1155,7 +1157,10 @@ def build(data_dir):
         tags = [t for t, _ in subrecords(src.data(e))]
         if e.flags & DELETED:
             floor_rows['deleted'].append(desc_of(g, canon))
-        elif e.flags & DISABLED and b'XESP' not in tags:
+        # Off already only with nothing that could switch it on: no enable
+        # parent and no script. A disabled item with a script is switched off
+        # here, without the script.
+        elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
         else:
             floor.append((g, e, kind))
