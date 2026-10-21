@@ -13,7 +13,7 @@
   submodule was at ea523711 through three pin moves (#2866, #2881, #2925),
   while main pinned bf2b3b40. git pull on a branch does the same.
 
-  So this is the move, and it does four things, refusing at the first that
+  So this is the move, and it does three things, refusing at the first that
   fails with one sentence and nothing moved:
 
     1. Fetches origin/main, and refuses when anything here would be left
@@ -29,9 +29,17 @@
        commit when it is not here and never overwrites a change). One that
        was never fetched, as in a new worktree, stays as it is: git status
        does not count it and Ship does not need it.
-    4. Sets submodule.recurse in the clone's own config, so a git checkout,
-       switch or pull by hand or by a lane takes the submodules along too.
-       Worktrees share that config.
+
+  IT CHANGES NO GIT CONFIG (#3046). Until 21 Oct it also set
+  submodule.recurse in the clone's config, so a move by hand would take the
+  submodule along. Every worktree reads that config, and in a worktree that
+  never fetched engine\skymp a plain git checkout across a pin move then
+  tried to fill it from a modules folder that worktree does not have, and
+  stopped half moved (worktrees\claude-releases on One, 21 Oct 6:09 AM).
+  The per-worktree config is no way out either: git worktree add copies the
+  config.worktree of the tree it runs in into every new worktree. So the
+  move is this script, which takes each submodule along itself, and Ship
+  and Check-ShipReady name a submodule a move by hand left behind.
 
   Then it asks what Ship asks (Fresh-Checkout.ps1) and prints the answer.
 
@@ -160,7 +168,6 @@ foreach ($s in $subs) {
 
 # ---- what a run moves -------------------------------------------------------
 $moveTop = ($detached -and $head -ne $main)
-$recurse = First (Invoke-Git $Top @('config', '--local', '--get', 'submodule.recurse'))
 $moves = @()
 if ($moveTop) { $moves += "the checkout from $(Get-FreshShort $head) to origin/main at $(Get-FreshShort $main)" }
 if (-not $detached) { Say "  on $branch, so not moved: git pull moves a branch. Its submodules are brought to its own pins." 'DarkGray' }
@@ -170,7 +177,6 @@ foreach ($s in $subs) {
     $at = First (Invoke-Git $s.Dir @('rev-parse', 'HEAD'))
     if ($want -and $at -ne $want) { $moves += "$($s.Path) from $(Get-FreshShort $at) to the $(Get-FreshShort $want) it is pinned to" }
 }
-if ($recurse -ne 'true') { $moves += 'submodule.recurse to true in this clone''s config' }
 
 if ($Check) {
     if (-not $moves.Count) { Say '  Nothing to move: origin/main, and every submodule at its pin.' 'Green'; Done 0 }
@@ -182,7 +188,7 @@ if ($Check) {
 # ---- 2. the checkout ----------------------------------------------------------
 if ($moveTop) {
     # The submodules move in step 3, one by one with their own refusals, so
-    # this checkout leaves them alone whatever the clone's config says.
+    # this checkout leaves them alone whatever a config says.
     $c = Invoke-Git $Top @('-c', 'submodule.recurse=false', 'checkout', '--quiet', '--detach', $main)
     if ($c.Code -ne 0) { Die ("git checkout --detach origin/main refused (exited $($c.Code)): " + ($c.Out -join ' ') + '.') }
     Say "  moved to origin/main at $(Get-FreshShort $main)" 'Green'
@@ -200,13 +206,6 @@ foreach ($s in $subs) {
         Done 1
     }
     Say ("  $($s.Path) at " + (Get-FreshShort (First (Invoke-Git $s.Dir @('rev-parse', 'HEAD')))) + ', the commit the checkout pins') 'Green'
-}
-
-# ---- 4. so a move by hand takes the submodules along too ---------------------
-if ($recurse -ne 'true') {
-    $g = Invoke-Git $Top @('config', '--local', 'submodule.recurse', 'true')
-    if ($g.Code -ne 0) { Write-Host ("STOP. git config submodule.recurse true failed (exited $($g.Code)): " + ($g.Out -join ' ')) -ForegroundColor Red; Done 1 }
-    Say '  submodule.recurse is true in this clone''s config: a git checkout, switch or pull here or in its worktrees takes the submodules along' 'Green'
 }
 
 # ---- what Ship will say ------------------------------------------------------
