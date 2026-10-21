@@ -62,6 +62,20 @@ jobs:
         with:
           persist-credentials: false
 
+      # A runner keeps its folder from one job to the next, and a checkout
+      # there rewrites only the files that differ from the last job's commit,
+      # so every other file keeps the line endings the last job's
+      # .gitattributes gave it (#3029). Every tracked file is written again,
+      # the way this commit checks it out.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
       - name: Hand the notice to the box
         shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
         env:

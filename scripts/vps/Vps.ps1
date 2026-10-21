@@ -34,14 +34,7 @@
 #>
 
 function Get-ThornswoodVps {
-    $here = $PSScriptRoot
-    if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
-    $path = Join-Path $here 'vps.json'
-    if (-not (Test-Path -LiteralPath $path)) {
-        throw "VPS defaults not found: $path"
-    }
-    $raw = Get-Content -LiteralPath $path -Raw -Encoding UTF8
-    $j = $raw | ConvertFrom-Json
+    $j = Get-ThornswoodVpsCommitted
     $local = Get-ThornswoodVpsLocalPath
     if ($local -and (Test-Path -LiteralPath $local)) {
         $mine = $null
@@ -53,6 +46,20 @@ function Get-ThornswoodVps {
     if ($env:THORNSWOOD_VPS_USER) { $j | Add-Member -NotePropertyName user -NotePropertyValue ([string]$env:THORNSWOOD_VPS_USER) -Force }
     if (-not $j.address) { throw "vps.json has no address: $path" }
     return $j
+}
+
+# vps.json as the checkout holds it, with no machine's own file and no
+# environment over it. Say-Staff.ps1 -OnTheBox takes the pins and the user
+# from this alone: on a runner, a machine's own file is whatever an earlier
+# job on the same account left (#3045).
+function Get-ThornswoodVpsCommitted {
+    $here = $PSScriptRoot
+    if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+    $path = Join-Path $here 'vps.json'
+    if (-not (Test-Path -LiteralPath $path)) {
+        throw "VPS defaults not found: $path"
+    }
+    return (Get-Content -LiteralPath $path -Raw -Encoding UTF8 | ConvertFrom-Json)
 }
 
 # This machine's own VPS file, which nothing in git carries. It need not exist.

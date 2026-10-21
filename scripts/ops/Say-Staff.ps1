@@ -234,7 +234,7 @@ if ($route -eq 'github') {
             # .ssh is read or written. The pins and the user are the
             # checkout's vps.json alone, not a machine's own override file,
             # which an earlier job on the same runner account could leave.
-            $pinned = Get-Content -LiteralPath (Join-Path $vpsDir 'vps.json') -Raw -Encoding UTF8 | ConvertFrom-Json
+            $pinned = Get-ThornswoodVpsCommitted
             $knownHosts = Join-Path $work 'known_hosts'
             try { $null = Add-ThornswoodKnownHost -Address '127.0.0.1' -KnownHosts $knownHosts -Pinned @($pinned.hostKeys) }
             catch { Die ('the box''s own sshd on 127.0.0.1: ' + $_.Exception.Message) }
