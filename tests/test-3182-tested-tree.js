@@ -16,7 +16,8 @@
 //      a check sees the same files and no history either way. What differs
 //      is the event, the ref, the commit's id: no check step and no harness
 //      or script reads GitHub's event or ref variables, which is what would
-//      make one tree pass on a pull request and fail on main. (A check that
+//      make one tree pass on a pull request and fail on main. The lint
+//      (#3185) does, and only reports: it cannot fail a build. (A check that
 //      reads the commit id or branch name off git was looked for by running
 //      every gate harness on a pull request checkout and a main checkout of
 //      one tree, #3114; the nightly runs them all on main each night.)
@@ -148,7 +149,14 @@ async function ask(o, tree) { return T.find({ tree: tree || TREE, repo: REPO_NAM
   // ---- 3. why the tree is enough ---------------------------------------------
   const checkout = steps[0] || '';
   yes('the checks check out one commit, with no history on either build', /^      - uses: actions\/checkout@[0-9a-f]{40} # v\d+\n/.test(checkout + '\n') && !/^\s+with:/m.test(checkout));
-  const before = steps.slice(0, -2).join('\n').replace(/^\s*#.*$/gm, '');
+  // The lint step is the one step that reads the event and fetches the
+  // base (#3185): it reports warnings and cannot fail a build, and it is the
+  // last before the note, so no check runs after its fetch.
+  const lint = steps[steps.length - 3] || '';
+  yes('the step before the note is the lint, which cannot fail a build', /^      - name: Lint \(warnings only\)\n/.test(lint) &&
+      /\n        continue-on-error: true\n/.test(lint) && /\n          \.\\scripts\\dev\\Lint\.ps1 -All\n          exit 0\n/.test(lint) &&
+      /\nexit 0\s*$/.test(read(path.join(REPO, 'scripts', 'dev', 'Lint.ps1'))));
+  const before = steps.slice(0, -3).join('\n').replace(/^\s*#.*$/gm, '');
   const EVENT = /github\.(event|ref|ref_name|sha|head_ref|base_ref|run_id|run_number|actor)\b|GITHUB_(EVENT_NAME|EVENT_PATH|REF|REF_NAME|REF_TYPE|SHA|HEAD_REF|BASE_REF|RUN_ID|RUN_NUMBER|ACTOR)\b/;
   yes('no check step reads the event, the ref or the commit', !EVENT.test(before));
   yes('no check step fetches more history', !/git(\.exe)?\s+fetch|fetch-depth/.test(before));
