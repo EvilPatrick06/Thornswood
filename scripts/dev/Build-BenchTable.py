@@ -437,12 +437,12 @@ def main():
         return 0
 
     # ------------------------------------------------------------- the blocks
-    # The blocks are written with the line ending the gamemode already has.
-    # Until 5 October they were always CRLF, which a Windows checkout hides and
-    # a checkout that keeps LF does not: there, a run left two CRLF blocks in an
-    # LF file (issue #1713), the fault #1622 found in Build-RecipeTable.ps1.
+    # The blocks are written with LF, the ending .gitattributes gives the
+    # gamemode on every checkout (#3029). Until 5 October they were always CRLF,
+    # and a run left two CRLF blocks in an LF file (issue #1713); until #3029
+    # they took the ending of the gamemode they found.
     text = io.open(args.gamemode, encoding='utf-8', newline='').read()
-    eol = '\r\n' if '\r\n' in text else '\n'
+    eol = '\n'
 
     def block(open_mark, close_mark, lines, text):
         a, b = text.find(open_mark), text.find(close_mark)

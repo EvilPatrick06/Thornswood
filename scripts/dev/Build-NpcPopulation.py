@@ -535,9 +535,8 @@ def write_hunting_spots(npcs):
     hunts = json.loads((root / 'game/data/hunts.json').read_text(encoding='utf-8'))['hunts']
     rows = hunting_rows(npcs, hunts)
     target = root / 'docs' / 'HUNTING-SPOTS.csv'
-    # The line ending the file already uses, the way Build-HuntTable.ps1's
-    # EolOf keeps hunts.json's, so a run on any clone changes only the rows
-    # that changed.
+    # The line ending the file already uses, so a run on any clone changes
+    # only the rows that changed.
     eol = '\r\n' if target.is_file() and b'\r\n' in target.read_bytes() else '\n'
     with target.open('w', encoding='utf-8', newline='') as output:
         writer = csv.DictWriter(output, fieldnames=HUNTING_COLUMNS, lineterminator=eol)
@@ -597,8 +596,8 @@ def write_merchants(payload):
     by_ref = {row['ref']: {'name': row['guildRole'], 'role': row['guildRole'], 'hold': row['hold'],
         'bookHold': reverse_holds[row['hold']], 'locationName': row['locationName'],
         'cell': row['cell'], 'world': row['world'], 'pos': row['pos']} for row in merchants}
-    (root / 'game/data/merchant-traders.json').write_text(json.dumps(
-        {'version': 1, 'count': len(by_ref), 'byRef': by_ref}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+    with (root / 'game/data/merchant-traders.json').open('w', encoding='utf-8', newline='\n') as output:
+        output.write(json.dumps({'version': 1, 'count': len(by_ref), 'byRef': by_ref}, ensure_ascii=False, indent=2) + '\n')
     lines = ['# Merchant trader counts', '',
         '60 authored guild traders: one Smith, Woodworker, Tailor, Enchanter, Cook and Alchemist in each hold.',
         'People cannot join. Exact guild relocation remains separate. These are source counts, not release proof.', '',
@@ -608,7 +607,8 @@ def write_merchants(payload):
     lines += ['', 'Total: 60', '',
         'Each authored identity returns after360 minutes and keeps its existing512-unit home radius.',
         'Exact coordinates and the shared population rules are in [NPC spawns](../NPC-SPAWNS.csv).']
-    (root / 'docs/systems/merchant-traders.md').write_text('\n'.join(lines) + '\n', encoding='utf-8')
+    with (root / 'docs/systems/merchant-traders.md').open('w', encoding='utf-8', newline='\n') as output:
+        output.write('\n'.join(lines) + '\n')
 
 
 if __name__ == '__main__':

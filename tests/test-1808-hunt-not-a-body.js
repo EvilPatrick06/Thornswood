@@ -12,9 +12,9 @@
 // records (NOT A BODY TO DRESS in its knobs) and lists each under skipped with
 // the rule's words. This runs a copy of the builder against a small Data
 // folder made here, one base per rule and one beside it that the rule must not
-// reach, beside a copy of the real gamemode. It also holds the builder to the
-// line ending each file already has (the hunt table's share of #1787 and
-// #1828), and shows a knob that names nothing in the load order stops the run
+// reach, beside a copy of the real gamemode. It also holds the builder to LF
+// in both files whatever ending it finds (the hunt table's share of #1787,
+// #1828 and #3029), and shows a knob that names nothing in the load order stops the run
 // with the table left as it was. Nothing outside a temporary folder is written.
 const REPO_DIR = require("path").join(__dirname, "..");
 const fs = require("fs");
@@ -190,7 +190,6 @@ const BASES = [
 ];
 
 const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "tw-1808-"));
-function allCrlf(t) { return t.split("\n").length - 1 === t.split("\r\n").length - 1 && t.indexOf("\n") >= 0; }
 try {
   function buildData(dir, opts) {
     fs.mkdirSync(dir);
@@ -284,12 +283,14 @@ try {
     fs.writeFileSync(gm, ["// head", "var HUNTS_BY_BASE = {", "  \"old\": 1", "};", "", "// ==== end HUNTS_BY_BASE ====", "// tail", ""].join("\r\n"));
     fs.writeFileSync(out, "{\r\n  \"old\": true\r\n}\r\n");
     const r3 = build(data);
-    yes("a CRLF hunts.json stays CRLF", r3.code === 0 && allCrlf(fs.readFileSync(out, "utf8")));
-    yes("a CRLF gamemode stays CRLF", r3.code === 0 && allCrlf(fs.readFileSync(gm, "utf8")) &&
-      fs.readFileSync(gm, "utf8").indexOf('"500:Skyrim.esm"') >= 0);
+    yes("a CRLF hunts.json comes out LF", r3.code === 0 && fs.readFileSync(out, "utf8") === t1);
+    const g3 = fs.readFileSync(gm, "utf8");
+    const a3 = g3.indexOf("var HUNTS_BY_BASE = {"), b3 = g3.indexOf("// ==== end HUNTS_BY_BASE ====");
+    yes("the block written into a CRLF gamemode is LF", r3.code === 0 && g3.indexOf('"500:Skyrim.esm"') >= 0 &&
+      a3 >= 0 && b3 > a3 && g3.slice(a3, b3).indexOf(CR) < 0);
     fs.unlinkSync(out);
     const r4 = build(data);
-    yes("a new hunts.json is written with CRLF", r4.code === 0 && allCrlf(fs.readFileSync(out, "utf8")));
+    yes("a new hunts.json is written with LF", r4.code === 0 && fs.readFileSync(out, "utf8") === t1);
 
     // ---- the refusals: each stops the run and leaves the table as it was ------
     fs.writeFileSync(out, "{\n  \"kept\": true\n}\n");

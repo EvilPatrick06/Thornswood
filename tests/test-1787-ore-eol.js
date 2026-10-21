@@ -5,13 +5,16 @@
 // file already had. A Windows checkout hid it; a checkout that keeps LF (the
 // agents' VM, the VPS runner's clones) got a whole-file diff of ores.json and
 // CRLF lines inside an LF gamemode. #1622 fixed the same fault in
-// Build-RecipeTable.ps1 (EolOf) and #1713 in Build-BenchTable.py.
+// Build-RecipeTable.ps1 and #1713 in Build-BenchTable.py, by taking the ending
+// of the file found. Since #3029 .gitattributes checks both files out with LF
+// on every machine, so the builder writes LF and takes nothing from the file.
 //
 // This runs the builder against a small Data folder made here (two ores, two
 // veins) and a copy of the builder beside a copy of the real gamemode, so the
 // install step writes into the copy. An LF table and gamemode stay LF, a CRLF
-// pair stays CRLF, a new table is CRLF, and a second run changes nothing.
-// Nothing outside a temporary folder is written.
+// table comes out LF, the block it writes into a CRLF gamemode is LF, a new
+// table is LF, and a second run changes nothing. Nothing outside a temporary
+// folder is written.
 const REPO_DIR = require("path").join(__dirname, "..");
 const fs = require("fs");
 const os = require("os");
@@ -31,17 +34,15 @@ const script = fs.readFileSync(path.join(REPO_DIR, "scripts", "dev", "Build-OreT
 const gmReal = fs.readFileSync(path.join(REPO_DIR, "game", "gamemode.js"), "utf8").split(CR).join("");
 
 // ---- the script, read ----------------------------------------------------
-yes("Build-OreTable.ps1 has EolOf, the same as Build-RecipeTable.ps1",
-  /function EolOf\(\[string\]\$text\) \{\s*if \(\$text\.Contains\("`r`n"\)\) \{ return "`r`n" \}\s*return "`n"\s*\}/.test(script));
-yes("the table takes the ending of the table already there",
-  script.indexOf("if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }") >= 0 &&
-  script.indexOf("$json = ($docLines -join $jsonEol) + $jsonEol") >= 0);
+yes("Build-OreTable.ps1 writes with LF, the same as Build-RecipeTable.ps1",
+  script.indexOf('$Eol = "`n"') >= 0 && script.indexOf("EolOf") < 0);
+yes("the table is joined with it",
+  script.indexOf("$jsonEol = $Eol") >= 0 && script.indexOf("$json = ($docLines -join $jsonEol) + $jsonEol") >= 0);
 yes("and the detail rows inside it as well", script.indexOf("$docLines.Add(($fields -join (',' + $jsonEol)))") >= 0);
-yes("the gamemode block takes the gamemode's own",
+yes("the gamemode block is joined with it",
   script.indexOf("$new = $text.Substring(0, $a) + (($body -join $eol)) + $eol + $text.Substring($b)") >= 0 &&
-  /\$eol = EolOf \$text\s+\$new = \$text\.Substring\(0, \$a\)/.test(script));
-yes("no other CRLF is written: the two left are EolOf's answer and a new table's",
-  script.split('"`r`n"').length - 1 === 3);
+  /\$eol = \$Eol\s+\$new = \$text\.Substring\(0, \$a\)/.test(script));
+yes("no CRLF is written anywhere", script.split('"`r`n"').length - 1 === 0);
 
 // ---- a plugin with two ores and two veins --------------------------------
 function sub(tag, body) {
@@ -114,7 +115,6 @@ try {
   }
   function block(t) { const a = t.indexOf(OPEN); const b = t.indexOf(CLOSE); return a < 0 || b < 0 ? null : t.slice(a, b); }
   function outside(t) { return t.slice(0, t.indexOf(OPEN)) + t.slice(t.indexOf(CLOSE)); }
-  function allCrlf(t) { return t.split("\n").length - 1 === t.split("\r\n").length - 1 && t.indexOf("\n") >= 0; }
 
   if (!ver.error && ver.status === 0) {
     // ---- an LF checkout: the table and the real gamemode, both LF ----------
@@ -139,18 +139,20 @@ try {
     yes("a second run changes neither file", r2.code === 0 &&
       fs.readFileSync(out, "utf8") === t1 && fs.readFileSync(gm, "utf8") === g1);
 
-    // ---- a Windows checkout: both CRLF -------------------------------------
+    // ---- a checkout from before .gitattributes: both CRLF ------------------
     fs.writeFileSync(gm, ["// head", OPEN, "    old", "  };", "", CLOSE, "// tail", ""].join("\r\n"));
     fs.writeFileSync(out, "{\r\n  \"old\": true\r\n}\r\n");
     const r3 = build();
-    yes("a CRLF ores.json stays CRLF", r3.code === 0 && allCrlf(fs.readFileSync(out, "utf8")));
-    yes("a CRLF gamemode stays CRLF", r3.code === 0 && allCrlf(fs.readFileSync(gm, "utf8")) &&
-      fs.readFileSync(gm, "utf8").indexOf('"900:Skyrim.esm"') >= 0);
+    yes("a CRLF ores.json comes out LF", r3.code === 0 && fs.readFileSync(out, "utf8").indexOf(CR) < 0 &&
+      fs.readFileSync(out, "utf8") === t1);
+    const g3 = fs.readFileSync(gm, "utf8");
+    yes("the block written into a CRLF gamemode is LF", r3.code === 0 &&
+      g3.indexOf('"900:Skyrim.esm"') >= 0 && (block(g3) || CR).indexOf(CR) < 0);
 
-    // ---- no table yet: CRLF, as before ---------------------------------------
+    // ---- no table yet: LF as well ------------------------------------------
     fs.unlinkSync(out);
     const r4 = build();
-    yes("a new ores.json is written with CRLF", r4.code === 0 && allCrlf(fs.readFileSync(out, "utf8")));
+    yes("a new ores.json is written with LF", r4.code === 0 && fs.readFileSync(out, "utf8") === t1);
   }
 } finally {
   fs.rmSync(tmp, { recursive: true, force: true });
