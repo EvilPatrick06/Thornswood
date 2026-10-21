@@ -244,6 +244,14 @@ param(
 )
 
 $ErrorActionPreference = 'Stop'
+# A list typed as a,b,c reaches [string[]] as three items in this PowerShell
+# (& .\Install-Runner.ps1) but as ONE string through pwsh -File, which then
+# failed to resolve "pypi.org,files.pythonhosted.org,..." on the box (#2161,
+# 21 Oct) or, for -AlsoDeny, named one folder that is not there and was passed
+# over. Both are split on commas here, however the script was started. No
+# host name has a comma, and no folder these deny does.
+$AllowHost = @($AllowHost | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+$AlsoDeny = @($AlsoDeny | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 . (Join-Path $Here '..\vps\Vps.ps1')
@@ -609,10 +617,18 @@ function Get-GuardBlocks {
     if (-not $got.Count) { throw ('api.github.com/meta has no ' + $k + ' list, so no firewall rule was made') }
     $allow += $got
   }
+  # The dry run resolves each name too, so a name the real run cannot resolve
+  # stops the dry run the same way; it writes the stand-in 203.0.113.7 rather
+  # than the addresses, as it writes stand-in GitHub lists.
   foreach ($h in @($AllowHost | Where-Object { $_ })) {
-    if ($DryRunTo) { $allow += '203.0.113.7/32'; continue }
-    $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString })
+    $ips = @()
+    try { $ips = @([Net.Dns]::GetHostAddresses($h) | ForEach-Object { $_.IPAddressToString }) } catch { throw ('-AllowHost ' + $h + ' does not resolve: ' + $_.Exception.Message) }
     if (-not $ips.Count) { throw ('-AllowHost ' + $h + ' resolves to nothing') }
+    if ($DryRunTo) {
+      $allow += '203.0.113.7/32'
+      Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now; the dry run writes 203.0.113.7)') 'Yellow'
+      continue
+    }
     $allow += $ips
     Say ('  -AllowHost ' + $h + ': ' + ($ips -join ', ') + ' (as of now)') 'Yellow'
   }
