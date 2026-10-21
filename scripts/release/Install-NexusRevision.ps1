@@ -177,13 +177,42 @@ function Use-SevenZip {
   if (-not $script:SevenZip) { $script:SevenZip = Find-SevenZip }
   if (-not $script:SevenZip) { throw '7-Zip is not on this machine (7z.exe in Program Files, or 7z, 7zz or 7za on PATH), and Vortex unpacks every archive with it.' }
 }
+# A scratch folder and everything under it. 7-Zip keeps an archive's
+# read-only attribute on the files it unpacks, and on Windows
+# Directory.Delete refuses a read-only file ("Access to the path ... is
+# denied", the dialogue views in revision 2, #2969), so the attribute comes
+# off first. Off Windows a file's attributes do not stop its folder going.
+function Remove-Tree([string]$dir) {
+  if (-not (Test-Path -LiteralPath $dir)) { return }
+  foreach ($f in [IO.Directory]::EnumerateFiles($dir, '*', [IO.SearchOption]::AllDirectories)) {
+    $a = [IO.File]::GetAttributes($f)
+    if ($a -band [IO.FileAttributes]::ReadOnly) { [IO.File]::SetAttributes($f, $a -band -bnot [IO.FileAttributes]::ReadOnly) }
+  }
+  [IO.Directory]::Delete($dir, $true)
+}
 # Vortex unpacks with 7-Zip's x, case-insensitive (-ssc-).
 function Expand-Archive7([string]$archive, [string]$to, [string]$what) {
   Use-SevenZip
-  if (Test-Path -LiteralPath $to) { [IO.Directory]::Delete($to, $true) }
+  Remove-Tree $to
   New-Item -ItemType Directory -Force -Path $to | Out-Null
   $r = Invoke-Tool $script:SevenZip @('x', '-y', '-ssc-', ('-o' + $to), $archive)
   if ($r.Code -ne 0) { throw ('7-Zip (' + $script:SevenZip + ') could not unpack ' + $what + ' (' + $archive + '), exit ' + $r.Code + ': ' + ($r.Err.Trim() -replace '\s+', ' ')) }
+}
+# Every path in an archive, in the order 7-Zip lists and unpacks them. Off
+# Windows the walk names a folder the archive spells two ways as the first
+# entry spells it, as 7-Zip does on Windows (FileList, #2969).
+function Get-ArchiveOrder([string]$archive) {
+  if ($IsWindows) { return $null }
+  Use-SevenZip
+  $r = Invoke-Tool $script:SevenZip @('l', '-slt', $archive)
+  if ($r.Code -ne 0) { throw ('7-Zip (' + $script:SevenZip + ') could not list ' + $archive + ', exit ' + $r.Code + ': ' + ($r.Err.Trim() -replace '\s+', ' ')) }
+  $after = $false
+  $paths = New-Object System.Collections.Generic.List[string]
+  foreach ($line in ($r.Out -split "`r?`n")) {
+    if ($line -eq '----------') { $after = $true; continue }
+    if ($after -and $line.StartsWith('Path = ')) { $paths.Add($line.Substring(7)) }
+  }
+  return ,$paths.ToArray()
 }
 function Test-Under([string]$path, [string]$folder) {
   if (-not $folder) { return $false }
@@ -252,7 +281,7 @@ Say ('  cache: ' + $Cache) 'DarkGray'
 
 $label = if ($Revision -gt 0) { [string]$Revision } else { 'archive' }
 $script:Work = & (Join-Path $Here 'Get-ScratchDir.ps1') ('revision-layout-' + $Slug + '-' + $label)
-Step { if (Test-Path -LiteralPath $script:Work) { [IO.Directory]::Delete($script:Work, $true) }; New-Item -ItemType Directory -Force -Path $script:Work | Out-Null } | Out-Null
+Step { Remove-Tree $script:Work; New-Item -ItemType Directory -Force -Path $script:Work | Out-Null } | Out-Null
 
 # ------------------------------------------------------------- the revision ---
 Head ('Collection ' + $Slug)
@@ -383,9 +412,9 @@ Head 'Installing, as Vortex would'
 $script:Facts = @{}
 function Remove-Unpacked($e, [string]$u) {
   [Thornswood.Layout.NexusLayout]::Forget($u)
-  if (Test-Path -LiteralPath $u) { [IO.Directory]::Delete($u, $true) }
+  Remove-Tree $u
   $pd = Join-Path (Join-Path $script:Work 'patch') ([string]$e.Index)
-  if (Test-Path -LiteralPath $pd) { [IO.Directory]::Delete($pd, $true) }
+  Remove-Tree $pd
 }
 $plans = New-Object 'System.Collections.Generic.List[Thornswood.Layout.ModPlan]'
 $stops = New-Object System.Collections.Generic.List[string]
@@ -393,7 +422,7 @@ foreach ($e in $col.Entries) {
   $u = Join-Path (Join-Path $script:Work 'mods') ([string]$e.Index)
   Step { Expand-Archive7 $archives[$e.Index] $u $e.Say() }
   $files = $null
-  try { [void][Thornswood.Layout.NexusLayout]::SplitBackslashNames($u); $files = [Thornswood.Layout.NexusLayout]::FileList($u) }
+  try { [void][Thornswood.Layout.NexusLayout]::SplitBackslashNames($u); $files = [Thornswood.Layout.NexusLayout]::FileList($u, (Get-ArchiveOrder $archives[$e.Index])) }
   catch { $ex = $_.Exception; while ($ex.InnerException) { $ex = $ex.InnerException }; $stops.Add($e.Say() + ': ' + $ex.Message); continue }
   $plan = Step { [Thornswood.Layout.NexusLayout]::PlanMod($e, $u, $files, $world) }
   if ($plan.Stop) { $stops.Add($e.Say() + ': ' + $plan.Stop); $plans.Add($plan); if ($Record) { Remove-Unpacked $e $u }; continue }
@@ -566,7 +595,7 @@ function Write-LayoutRecord([string]$dir, [bool]$withFiles) {
 
 if ($Record) {
   Write-LayoutRecord $Record $true
-  [IO.Directory]::Delete($script:Work, $true); $script:Work = ''
+  Remove-Tree $script:Work; $script:Work = ''
   Head 'Done'
   Say ('  revision ' + $Revision + ' of ' + $Slug + ': ' + $placed.Count + ' files, ' + $order.Count + ' plugins, nothing placed') 'Green'
   Say ('  ' + (Join-Path $Record 'layout.json') + ', files.txt, plugins.txt, loadorder.txt')
@@ -581,7 +610,7 @@ if ($WhatIf) {
   Say ('  place ' + $placed.Count + ' files in ' + $Game + ' and write ' + $recDir + '\layout.json, files.txt, plugins.txt and loadorder.txt')
   Write-Host ''
   Say ('Nothing in ' + $Game + ' was changed.') 'Green'
-  [IO.Directory]::Delete($script:Work, $true); $script:Work = ''
+  Remove-Tree $script:Work; $script:Work = ''
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
   exit 0
 }
@@ -646,7 +675,7 @@ catch { Die ('Placing ' + $x.Rel + ' failed after ' + ($linked + $copied) + ' fi
 $lines[0] = $whole
 Write-LayoutRecord $recDir $true
 $script:Changed = ''
-[IO.Directory]::Delete($script:Work, $true); $script:Work = ''
+Remove-Tree $script:Work; $script:Work = ''
 
 Head 'Done'
 Say ('  revision ' + $Revision + ' of ' + $Slug + ': ' + $placed.Count + ' files (' + $linked + ' linked from the unpacked archives, ' + $copied + ' copied), ' + $order.Count + ' plugins') 'Green'

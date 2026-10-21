@@ -52,85 +52,89 @@ function Yes([string]$what, [bool]$cond) {
 # files on their own, under a namespace of their own so a session that already
 # loaded another copy is not answered by it.
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')
-Yes 'the build''s compiler is on this machine' (Test-Path -LiteralPath $LauncherCsc)
-$ns = 'T2163_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
-$build = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163b-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $build | Out-Null
-# /nostdlib and mscorlib from the reference assemblies, as MSBuild passes them.
-$cscArgs = @('/noconfig', '/nostdlib', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu', ('/out:' + (Join-Path $build 'm.dll')))
-foreach ($r in 'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll', 'System.Xml.dll') { $cscArgs += ('/reference:' + (Join-Path $LauncherRefDir $r)) }
-foreach ($f in 'Signature.cs', 'ReleaseManifest.cs') {
-    $to = Join-Path $build $f
-    [IO.File]::WriteAllText($to, [IO.File]::ReadAllText((Join-Path $App $f)).Replace('namespace Thornswood', "namespace $ns"))
-    $cscArgs += $to
-}
-$old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-$cscSaid = & $LauncherCsc @cscArgs 2>&1
-$cscRc = $LASTEXITCODE
-$ErrorActionPreference = $old
-Yes 'Signature.cs and ReleaseManifest.cs compile on their own with the build''s compiler' ($cscRc -eq 0)
-if ($cscRc -ne 0) { $cscSaid | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; exit 1 }
-$RM = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $build 'm.dll'))).GetType("$ns.ReleaseManifest")
-Remove-Item -LiteralPath $build -Recurse -Force -ErrorAction SilentlyContinue
-# The name on the signing certificate, written once, in Updater.cs (#1052).
-$Signer = [regex]::Match([IO.File]::ReadAllText((Join-Path $App 'Updater.cs')), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
-Yes 'ExpectedSigner is read from launcher\app\Updater.cs' ([bool]$Signer)
+if ($OnWindows) {
+    Yes 'the build''s compiler is on this machine' (Test-Path -LiteralPath $LauncherCsc)
+    $ns = 'T2163_' + [guid]::NewGuid().ToString('N').Substring(0, 8)
+    $build = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163b-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $build | Out-Null
+    # /nostdlib and mscorlib from the reference assemblies, as MSBuild passes them.
+    $cscArgs = @('/noconfig', '/nostdlib', '/nologo', "/langversion:$LauncherLangVersion", '/target:library', '/platform:anycpu', ('/out:' + (Join-Path $build 'm.dll')))
+    foreach ($r in 'mscorlib.dll', 'System.dll', 'System.Core.dll', 'System.Runtime.Serialization.dll', 'System.Security.dll', 'System.Xml.dll') { $cscArgs += ('/reference:' + (Join-Path $LauncherRefDir $r)) }
+    foreach ($f in 'Signature.cs', 'ReleaseManifest.cs') {
+        $to = Join-Path $build $f
+        [IO.File]::WriteAllText($to, [IO.File]::ReadAllText((Join-Path $App $f)).Replace('namespace Thornswood', "namespace $ns"))
+        $cscArgs += $to
+    }
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $cscSaid = & $LauncherCsc @cscArgs 2>&1
+    $cscRc = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    Yes 'Signature.cs and ReleaseManifest.cs compile on their own with the build''s compiler' ($cscRc -eq 0)
+    if ($cscRc -ne 0) { $cscSaid | Select-Object -First 20 | ForEach-Object { Write-Host "      $_" }; exit 1 }
+    $RM = [Reflection.Assembly]::Load([IO.File]::ReadAllBytes((Join-Path $build 'm.dll'))).GetType("$ns.ReleaseManifest")
+    Remove-Item -LiteralPath $build -Recurse -Force -ErrorAction SilentlyContinue
+    # The name on the signing certificate, written once, in Updater.cs (#1052).
+    $Signer = [regex]::Match([IO.File]::ReadAllText((Join-Path $App 'Updater.cs')), 'const string ExpectedSigner = "([^"]+)"').Groups[1].Value
+    Yes 'ExpectedSigner is read from launcher\app\Updater.cs' ([bool]$Signer)
 
-function Assets([string[]]$pairs) {
-    $l = New-Object 'System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string,string]]'
-    for ($i = 0; $i -lt $pairs.Count; $i += 2) { $l.Add((New-Object 'System.Collections.Generic.KeyValuePair[string,string]' $pairs[$i], $pairs[$i + 1])) }
-    return ,$l
-}
-function Check([string]$cat, [string]$json, $assets) {
-    $a = [object[]]@($cat, $json, $assets.PSObject.BaseObject, $Signer, $null)
-    $why = $RM.GetMethod('Refusal').Invoke($null, $a)
-    return [pscustomobject]@{ Why = [string]$why; Said = [string]$a[4] }
-}
-function Sha([string]$c) { return ([string]$c * 64).Substring(0, 64) }
+    function Assets([string[]]$pairs) {
+        $l = New-Object 'System.Collections.Generic.List[System.Collections.Generic.KeyValuePair[string,string]]'
+        for ($i = 0; $i -lt $pairs.Count; $i += 2) { $l.Add((New-Object 'System.Collections.Generic.KeyValuePair[string,string]' $pairs[$i], $pairs[$i + 1])) }
+        return ,$l
+    }
+    function Check([string]$cat, [string]$json, $assets) {
+        $a = [object[]]@($cat, $json, $assets.PSObject.BaseObject, $Signer, $null)
+        $why = $RM.GetMethod('Refusal').Invoke($null, $a)
+        return [pscustomobject]@{ Why = [string]$why; Said = [string]$a[4] }
+    }
+    function Sha([string]$c) { return ([string]$c * 64).Substring(0, 64) }
 
-$cat = Join-Path $Fix 'release.cat'
-$json = Join-Path $Fix 'release.json'
-Yes 'the fixture is there: release.json and its signed catalog' ((Test-Path -LiteralPath $cat) -and (Test-Path -LiteralPath $json))
-$all = Assets @('launcher 9.9.9', (Sha 'a'), 'client runtime fixture', (Sha 'b'), 'pack p1', (Sha 'c'), 'release record fixture-2163', (Sha 'e'))
+    $cat = Join-Path $Fix 'release.cat'
+    $json = Join-Path $Fix 'release.json'
+    Yes 'the fixture is there: release.json and its signed catalog' ((Test-Path -LiteralPath $cat) -and (Test-Path -LiteralPath $json))
+    $all = Assets @('launcher 9.9.9', (Sha 'a'), 'client runtime fixture', (Sha 'b'), 'pack p1', (Sha 'c'), 'release record fixture-2163', (Sha 'e'))
 
-# ---- 1. as signed ---------------------------------------------------------------
-$r = Check $cat $json $all
-Yes 'the fixture as signed passes with the four assets it lists' ($r.Why -eq '')
-Yes '  and the line says the release and that all four are listed, signed' ($r.Said -match 'fixture-2163' -and $r.Said -match 'all 4' -and $r.Said -match 'Artifact Signing')
-$r = Check $cat $json (Assets @('pack p1', (Sha 'c')))
-Yes '  a feed naming fewer assets than the manifest lists also passes' ($r.Why -eq '')
+    # ---- 1. as signed ---------------------------------------------------------------
+    $r = Check $cat $json $all
+    Yes 'the fixture as signed passes with the four assets it lists' ($r.Why -eq '')
+    Yes '  and the line says the release and that all four are listed, signed' ($r.Said -match 'fixture-2163' -and $r.Said -match 'all 4' -and $r.Said -match 'Artifact Signing')
+    $r = Check $cat $json (Assets @('pack p1', (Sha 'c')))
+    Yes '  a feed naming fewer assets than the manifest lists also passes' ($r.Why -eq '')
 
-# ---- 2. an asset the manifest does not list ------------------------------------
-$more = Assets @('launcher 9.9.9', (Sha 'a'), 'pack p2', (Sha '9'))
-$r = Check $cat $json $more
-Yes 'a feed asset the manifest does not list is refused, by name' ($r.Why -match 'does not list pack p2' -and $r.Said -eq '')
+    # ---- 2. an asset the manifest does not list ------------------------------------
+    $more = Assets @('launcher 9.9.9', (Sha 'a'), 'pack p2', (Sha '9'))
+    $r = Check $cat $json $more
+    Yes 'a feed asset the manifest does not list is refused, by name' ($r.Why -match 'does not list pack p2' -and $r.Said -eq '')
 
-$scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163c-' + [guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $scratch | Out-Null
-try {
-    # ---- 3. release.json changed after signing ----------------------------------
-    $changed = Join-Path $scratch 'release.json'
-    [IO.File]::WriteAllText($changed, ([IO.File]::ReadAllText($json)).Replace((Sha 'c'), (Sha '9')), (New-Object Text.UTF8Encoding($false)))
-    $r = Check $cat $changed $more
-    Yes 'a release.json changed after signing is refused: the catalog does not list it' ($r.Why -match 'does not list release.json as it arrived')
+    $scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2163c-' + [guid]::NewGuid().ToString('N'))
+    New-Item -ItemType Directory -Force -Path $scratch | Out-Null
+    try {
+        # ---- 3. release.json changed after signing ----------------------------------
+        $changed = Join-Path $scratch 'release.json'
+        [IO.File]::WriteAllText($changed, ([IO.File]::ReadAllText($json)).Replace((Sha 'c'), (Sha '9')), (New-Object Text.UTF8Encoding($false)))
+        $r = Check $cat $changed $more
+        Yes 'a release.json changed after signing is refused: the catalog does not list it' ($r.Why -match 'does not list release.json as it arrived')
 
-    # ---- 4. a catalog nobody signed -----------------------------------------------
-    $files = Join-Path $scratch 'files'
-    New-Item -ItemType Directory -Force -Path $files | Out-Null
-    Copy-Item -LiteralPath $json -Destination (Join-Path $files 'release.json')
-    $bare = Join-Path $scratch 'unsigned.cat'
-    New-FileCatalog -Path $files -CatalogFilePath $bare -CatalogVersion 2.0 | Out-Null
-    $r = Check $bare (Join-Path $files 'release.json') $all
-    Yes 'the same release.json under a catalog nobody signed is refused by Signature.cs' ($r.Why -match '^catalog ' -and $r.Said -eq '')
+        # ---- 4. a catalog nobody signed -----------------------------------------------
+        $files = Join-Path $scratch 'files'
+        New-Item -ItemType Directory -Force -Path $files | Out-Null
+        Copy-Item -LiteralPath $json -Destination (Join-Path $files 'release.json')
+        $bare = Join-Path $scratch 'unsigned.cat'
+        New-FileCatalog -Path $files -CatalogFilePath $bare -CatalogVersion 2.0 | Out-Null
+        $r = Check $bare (Join-Path $files 'release.json') $all
+        Yes 'the same release.json under a catalog nobody signed is refused by Signature.cs' ($r.Why -match '^catalog ' -and $r.Said -eq '')
 
-    # ---- 5. the digests -----------------------------------------------------------
-    $d = $RM.GetMethod('CatalogDigests').Invoke($null, [object[]]@([string]$cat))
-    $jsonSha = (Get-FileHash -LiteralPath $json -Algorithm SHA256).Hash.ToLowerInvariant()
-    Yes "the catalog's digests include release.json's sha256" ($d.Contains($jsonSha))
-    $r = Check (Join-Path $scratch 'missing.cat') $json $all
-    Yes 'a catalog that is not there is refused, never thrown' ($r.Why.Length -gt 0)
-} finally {
-    Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+        # ---- 5. the digests -----------------------------------------------------------
+        $d = $RM.GetMethod('CatalogDigests').Invoke($null, [object[]]@([string]$cat))
+        $jsonSha = (Get-FileHash -LiteralPath $json -Algorithm SHA256).Hash.ToLowerInvariant()
+        Yes "the catalog's digests include release.json's sha256" ($d.Contains($jsonSha))
+        $r = Check (Join-Path $scratch 'missing.cat') $json $all
+        Yes 'a catalog that is not there is refused, never thrown' ($r.Why.Length -gt 0)
+    } finally {
+        Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+    }
+} else {
+    Write-Host 'SKIP  1 to 5, the manifest check compiled and run: the build''s compiler and the catalog checks (Signature.cs asks WinVerifyTrust) are only on Windows'
 }
 
 # ---- 6. the wiring ----------------------------------------------------------------

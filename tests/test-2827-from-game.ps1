@@ -79,7 +79,10 @@ foreach ($n in 'python', 'python3') {
     if ($c) { $python = $c.Source; break }
 }
 Yes 'Python is on this machine, to write the made-up game' ([bool]$python)
-Yes 'the compiler the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc)
+# The launcher's own code is compiled with the build's compiler, the Build
+# Tools' csc against .NET Framework 4.8.1, which only Windows has; off Windows
+# the made-up game and the recipes are still checked, and that part says SKIP.
+if ($OnWindows) { Yes 'the compiler the launcher builds with is on this machine' (Test-Path -LiteralPath $LauncherCsc) }
 $real = @('FromGame.cs', 'FromGameArchive.cs', 'FromGameDeflate.cs', 'FromGameMath.cs', 'FromGameBoard.cs', 'FromGameMenu.cs') |
     ForEach-Object { Join-Path $App $_ }
 foreach ($f in $real) {
@@ -89,7 +92,7 @@ foreach ($f in $real) {
     Yes ("launcher\app\{0} is there{1}" -f [IO.Path]::GetFileName($f), $why) (Test-Path -LiteralPath $f)
 }
 $refs = @('System.dll', 'System.Core.dll') | ForEach-Object { Find-LauncherRef $_ }
-Yes 'System.dll and System.Core.dll are there to compile against' (@($refs | Where-Object { $_ }).Count -eq 2)
+if ($OnWindows) { Yes 'System.dll and System.Core.dll are there to compile against' (@($refs | Where-Object { $_ }).Count -eq 2) }
 if ($script:fail) { Done }
 
 $work = Join-Path $Scratch ('thornswood-2827-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
@@ -138,6 +141,12 @@ try {
     }
 
     # ---- 1, 3, 4 and 5: the launcher's own code, with a driver ------------------
+    # 7 holds the lists to the files the compiled FromGame says it makes, so it
+    # waits on this too.
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  1, 3 to 5 and 7, the launcher''s FromGame compiled and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows'
+        Done
+    }
     $driver = @'
 using System;
 using System.Collections.Generic;

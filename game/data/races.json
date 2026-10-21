@@ -1,8 +1,8 @@
 {
- "builtBy": "tools\\Build-RaceTable.js",
- "builtAt": "2026-09-25T00:28:44.204Z",
+ "builtBy": "scripts\\dev\\Build-RaceTable.js",
+ "builtAt": "2026-10-21T06:05:06.393Z",
  "source": "the RACE records of the plugins in load order",
- "note": "which recipes a race owns is in tools\\recipes.json; this only says what the races are",
+ "note": "which recipes a race owns is in game\\data\\recipes.json; this only says what the races are",
  "count": 215,
  "items": {
   "109c7c:Skyrim.esm": {
@@ -1037,18 +1037,6 @@
    "p": false,
    "from": "ElysiumEstate.esp"
   },
-  "169215:ZIA_Complete Pack.esp": {
-   "e": "ZWJ_Polymorph68_GiantMudcrabRace",
-   "n": "MudCrab",
-   "p": false,
-   "from": "ZIA_Complete Pack.esp"
-  },
-  "4d085:OarsRest.esp": {
-   "e": "OR_ChickenRace",
-   "n": "Chicken",
-   "p": false,
-   "from": "OarsRest.esp"
-  },
   "14520f:Triumvirate - Mage Archetypes.esp": {
    "e": "TVR_Primal_Race_CallSnakes",
    "n": "Rattlesnake",
@@ -1198,6 +1186,18 @@
    "n": "Totem Sabre Cat",
    "p": false,
    "from": "Apocalypse - Magic of Skyrim.esp"
+  },
+  "169215:ZIA_Complete Pack.esp": {
+   "e": "ZWJ_Polymorph68_GiantMudcrabRace",
+   "n": "MudCrab",
+   "p": false,
+   "from": "ZIA_Complete Pack.esp"
+  },
+  "4d085:OarsRest.esp": {
+   "e": "OR_ChickenRace",
+   "n": "Chicken",
+   "p": false,
+   "from": "OarsRest.esp"
   },
   "860:YokuWeapons.esp": {
    "e": "0_JarBOMBA",
