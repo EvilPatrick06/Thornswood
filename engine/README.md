@@ -321,8 +321,10 @@ on 15 October a dev Ship from a worktree whose build was three days old
 refused against the record. A record naming a folder with no `build\dist`
 stops the script that asks, with a sentence; it never falls back to another
 folder. After building a new engine commit in another worktree, record that
-one. On One the recorded build is
-`C:\Thornswood-Repo\worktrees\engine-3d2cb747`.
+one. A machine that ships records CI's build instead (`-EngineBuild ci`, "A
+Ship machine takes CI's build" below): a fork folder built on the machine
+matches only records made from it, so after a pin CI recorded it can never
+match.
 
 Two harnesses hold it. `tests\test-one-engine.js`, in the build check on every
 pull request, is red when the pin and the two records do not name one commit,
@@ -413,6 +415,54 @@ which holds each to the record first.
 A rebuild is never the same bytes ("Rebuilding the same commit", above), so a
 pin takes the records of the one build whose files are then sent: CI's, or
 one machine's, never a mix.
+
+### A Ship machine takes CI's build
+
+Issue #3047. Since the pins come from CI, the client and server the records
+name are the files in CI's artifact, and no build made on a Ship machine is.
+On 21 October #3040 moved the pin to `57fd87d8`; One's recorded engine build
+was still a fork worktree of the old pin, so the dev Ship stopped at Check-ShipReady with "the
+build is not the recorded one", and every fix it printed led to building the
+engine on One again, which could not have matched either. Run 39588485569's
+artifact held the exact client all along.
+
+So a machine that ships records CI's build as its engine build, once:
+
+```powershell
+.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci
+```
+
+It writes `{"ci": true}` to `%LOCALAPPDATA%\Thornswood\engine-build.json`
+(Setup-ShipMachine does it without being asked on a machine that records
+none and has no build in its checkout), and fetches the build. From then on
+`Where.ps1 EngineBuild` (and `where.js`) is `Where.ps1 EngineArtifact`,
+`%LOCALAPPDATA%\Thornswood\engine-ci\<fork commit 12>`, the commit the
+checkout's `records\server-build.json` names, so `ClientDist` and `ServerDist`
+are under it. The folder is named for the pin: a pin move is a new folder,
+never a stale one, and each checkout reads the build of its own pin.
+
+`.\scripts\release\Get-EngineArtifact.ps1` fills it. It asks GitHub (through
+`gh`) for `engine-<fork commit 12>` from a green `engine.yml` run, downloads
+it, and puts it in place only after holding it to the checkout's records
+(`scripts\release\EngineArtifact.ps1` says what is held): every file to
+`SHA256SUMS`, the artifact's two records to the checkout's, the six client
+files to `records\client-build.json`, and the server zip to
+`records\server-build.json` with the same check the box makes. The client goes
+to `build\dist\client`, the server's files to `build\dist\server`, and the
+artifact as it came to `artifact\`, where its server zip is what
+`Deploy-Server.ps1 -ServerBuild` and `Publish-Server.ps1 -ServerBuild` send.
+`-Check` says whether it is here or on GitHub, and changes nothing.
+
+Nobody has to run it by hand after a pin move: `Sync-Client.ps1` runs it when
+the game folder needs the client and the folder for the pin is not there
+yet, so the first Ship (through `Update-ShipRoot.ps1`) or `Go.ps1` after the
+merge fetches it, and Check-ShipReady counts a build GitHub keeps as one the
+Ship will have. No engine build on any machine is part of a release.
+
+`engine.yml` keeps its artifact 30 days. Past that, `gh workflow run
+engine.yml --ref main` makes it again: it takes the fork's own build of the
+commit, which the fork keeps 90 days, so the files are the same bytes and
+still match the records. `tests\test-3047-ci-engine-build.ps1` holds all of it.
 
 On the VPS the fallback needs the C++ half of the Build Tools, CMake and
 yarn, which the box did not have on 16 October:
