@@ -29,7 +29,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
 $script = Join-Path (Join-Path (Join-Path $repo 'scripts') 'vps') 'vps-capture-443.ps1'
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
