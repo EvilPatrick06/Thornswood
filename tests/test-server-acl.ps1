@@ -32,7 +32,7 @@
                     changes nothing, a server folder the site has no rule on is
                     refused and left as it was while the rest are locked, the
                     voice folder keeps the site's rule on chat, a folder that is
-                    not ours is never touched, and it refuses the gaming PC
+                    not ours is never touched, and it refuses a machine that is not the box
   test-install-server.ps1 runs the whole installer and reads the same back.
 #>
 [CmdletBinding()]
@@ -253,13 +253,16 @@ try {
     Yes 'Install-Backup.ps1 locks the backups'' folder, and before the script or the passphrase go up' (
         $lk -gt 0 -and $lk -lt $ib.IndexOf('& scp @ssh $script') -and $lk -lt $ib.IndexOf('& scp @ssh $KeyOut') -and $ib -match "'S-1-5-32-545'" -and $ib -match 'Die \("could not lock')
     Yes 'a folder that is not a server''s or voice''s is never touched' ((Broad (Join-Path $c 'Thornswood-Docs\x.txt')) -gt 0 -and (Broad (Join-Path $c 'Something-Else\x.txt')) -gt 0)
-    # The gaming PC, if this is one: refused without -AllowGamingPc.
-    if (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe') {
+    # Off the box (a developer's workstation): refused without
+    # -AllowGamingPc, in the rule's words (scripts\vps\BoxGuard.ps1, #3041).
+    . (Join-Path $repo 'scripts\vps\BoxGuard.ps1')
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) {
         $a = @('-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', $lockBox, '-Parent', $c, '-SiteSid', $site)
         $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $o = (@(& $ps51 @a 2>&1 | ForEach-Object { "$_" }) -join ' ') } finally { $ErrorActionPreference = $eap }
-        Yes 'on the gaming PC it refuses and changes nothing' ($o -match 'REFUSED: SkyrimSE\.exe is here' -and $LASTEXITCODE -ne 0)
-    } else { Write-Host 'SKIP  the gaming PC refusal: no game on this machine' }
+        Yes 'off the box it refuses, says why, and changes nothing' ($o.Contains('REFUSED: ' + $notBox) -and $LASTEXITCODE -ne 0)
+    } else { Write-Host 'SKIP  the refusal off the box: this is the box, a server (tests\test-3041-box-guard.ps1 runs it with a workstation stood in)' }
 } finally {
     Remove-Item -LiteralPath $box -Recurse -Force -ErrorAction SilentlyContinue
 }

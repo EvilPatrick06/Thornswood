@@ -145,6 +145,18 @@ function New-PrivateFile([string]$Path) {
 
 if ($Layer) { . $Layer }
 
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
+}
+# ---- end BoxGuard.ps1 ----
+
 # ---------------------------------------------------------------- the file ---
 # Sets Key to Value everywhere sshd would read it, and above the first Match
 # line when no global line says it: sshd takes the first value it reads, and a
@@ -182,12 +194,10 @@ function Change([string]$what) {
 }
 
 function Invoke-Harden {
-    # Only ever on the box. Windows calls a workstation ProductType 1 and a
-    # server 3, the same test Bootstrap-VPS.ps1 makes.
+    # Only ever on the box (BoxGuard.ps1, carried below its layer).
     if (-not $Layer) {
-        $pt = 0
-        try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
-        if ($pt -eq 1) { $script:stopped = $true; Say 'STOP' 'this is a workstation, not the VPS. Run Harden-VPS.ps1 on your machine; it sends this to the box.'; return }
+        $notBox = Get-ThornswoodBoxRefusal
+        if ($notBox) { $script:stopped = $true; Say 'STOP' ($notBox + '. Run Harden-VPS.ps1 on your machine; it sends this to the box.'); return }
     }
 
     # ---------------------------------------------------------- ssh stays ---

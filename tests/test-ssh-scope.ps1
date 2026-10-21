@@ -63,7 +63,7 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 $layerText = @'
 function Get-CallerAddress { return [string]$global:Fake.caller }
 function Get-SaveFolder { return [string]$global:Fake.save }
-function Test-IsServer { return $true }
+function Get-ThornswoodBoxRefusal { return '' }
 function Get-AllowRules {
     foreach ($r in $global:Fake.rules) {
         if ($r.Enabled -and $r.Action -eq 'Allow') {
@@ -128,7 +128,7 @@ try {
     $driverText = [IO.File]::ReadAllText($Driver)
     Yes 'Set-SshScope.ps1 is plain ASCII too' (-not ($driverText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Test-IsServer', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Get-ThornswoodBoxRefusal', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
