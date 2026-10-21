@@ -194,7 +194,10 @@ function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Ru
 `$top = Split-Path -Parent `$run
 function Say([string]`$l) { [Console]::Out.WriteLine(`$l); [Console]::Out.Flush() }
 function Drop([string]`$d) {
-  try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'None', 1, 'DeleteOnClose') }
+  # Typed: as a bare string, 'DeleteOnClose' picks the overload whose last
+  # word is useAsync, and the lock is never deleted (measured on Windows
+  # PowerShell 5.1, 21 Oct 2026).
+  try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'None', 1, ([IO.FileOptions]::DeleteOnClose)) }
   catch { Say ('HELD ' + `$d + ': ' + `$_.Exception.GetBaseException().Message); return }
   try {
     if (Test-Path -LiteralPath `$d) { Remove-Item -LiteralPath `$d -Recurse -Force }
