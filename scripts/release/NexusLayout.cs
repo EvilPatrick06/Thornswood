@@ -55,7 +55,8 @@
 //   in a Linux cloud session is the one worked out on One. Only where a path
 //   meets the disk does the platform show: the walk sorts each folder's
 //   entries as NTFS lists them, takes two folders whose names differ only in
-//   case as the one folder Windows would have made, and stops on two files
+//   case as the one folder Windows would have made, named by the archive's
+//   first entry for it as 7-Zip on Windows names it, and stops on two files
 //   that would be one file on Windows; a \ inside a name that 7-Zip kept is
 //   made the folders Windows makes of it (SplitBackslashNames); a path is
 //   found on disk ignoring case (OnDisk); and a link is link(2) instead of
@@ -378,20 +379,52 @@ namespace Thornswood.Layout
         // Vortex's buildFileList over an unpacked archive: each folder's own
         // entries in the order the disk lists them, folders with a trailing \,
         // then every subfolder the same way, one after another.
-        public static List<string> FileList(string dir)
+        public static List<string> FileList(string dir) { return FileList(dir, null); }
+
+        // archiveOrder is the archive's paths in the order 7-Zip lists them,
+        // which is the order it unpacks them in. Off Windows it says which
+        // letter case a folder gets when the archive names it more than one
+        // way: on Windows the first entry that makes the folder names it, and
+        // every later entry goes into it as it is. Measured 21 Oct on
+        // Immersive Armours' CBBE 3BA BodySlide file (461940): its folder
+        // entry meshes/ comes first and twelve files under Meshes/armor/
+        // later, and One's layout holds all 362 meshes under Data\meshes.
+        public static List<string> FileList(string dir, string[] archiveOrder)
         {
             var list = new List<string>();
             var index = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-            Walk(new List<string> { dir }, "", list, index);
+            Walk(new List<string> { dir }, "", list, index, FirstCasing(archiveOrder));
             lock (Indexes) Indexes[Path.GetFullPath(dir)] = index;
             return list;
+        }
+
+        // Each folder path in the archive (any case, \ between folders) and
+        // the name its first entry gives the last folder in it. A \ inside a
+        // name is a folder break here, as SplitBackslashNames makes it.
+        static Dictionary<string, string> FirstCasing(string[] archiveOrder)
+        {
+            if (archiveOrder == null || OperatingSystem.IsWindows()) return null;
+            var first = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var path in archiveOrder)
+            {
+                var parts = (path ?? "").Split(new[] { '/', '\\' }, StringSplitOptions.RemoveEmptyEntries);
+                string prefix = "";
+                foreach (var part in parts)
+                {
+                    prefix += part;
+                    if (!first.ContainsKey(prefix)) first[prefix] = part;
+                    prefix += "\\";
+                }
+            }
+            return first;
         }
         // One folder of the walk, as Windows would hold it. On Windows that is
         // one folder on disk, listed in the disk's order. Off Windows it is
         // every folder on disk whose name differs only in case (7-Zip on Linux
-        // makes Textures and textures as two, where Windows makes one), and
+        // makes Textures and textures as two, where Windows makes one), named
+        // as the archive's first entry names it (FileList's archiveOrder), and
         // their entries are sorted as NTFS lists them: by name ignoring case.
-        static void Walk(List<string> dirs, string relPrefix, List<string> list, Dictionary<string, string> index)
+        static void Walk(List<string> dirs, string relPrefix, List<string> list, Dictionary<string, string> index, Dictionary<string, string> firstCasing)
         {
             var entries = new List<KeyValuePair<string, string>>();
             foreach (var d in dirs)
@@ -413,11 +446,13 @@ namespace Thornswood.Layout
                     continue;
                 }
                 seen[e.Key] = isDir;
-                string rel = relPrefix + e.Key;
+                string name = e.Key, named;
+                if (isDir && firstCasing != null && firstCasing.TryGetValue(relPrefix + e.Key, out named)) name = named;
+                string rel = relPrefix + name;
                 if (isDir) { list.Add(rel + "\\"); subs.Add(new KeyValuePair<string, List<string>>(rel + "\\", new List<string> { e.Value })); }
                 else { list.Add(rel); index[rel] = e.Value; }
             }
-            foreach (var s in subs) Walk(s.Value, s.Key, list, index);
+            foreach (var s in subs) Walk(s.Value, s.Key, list, index, firstCasing);
         }
 
         // A zip made on Windows can keep \ between its folders. 7-Zip on Windows

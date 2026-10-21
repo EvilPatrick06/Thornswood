@@ -99,6 +99,9 @@ function Test-ThornswoodBotPython([string]$Python, [string]$LibDir) {
 function Build-ThornswoodBotHost([string]$Source, [string]$Out) {
   # A native program's standard error is a line to read here, not a stop.
   $ErrorActionPreference = 'Continue'
+  # WINDIR is set only on Windows, and the compiler is a part of Windows, so
+  # elsewhere it is said rather than joined onto nothing (#2989).
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return @{ Ok = $false; Lines = @('no .NET Framework compiler: it comes with Windows, and this machine is not Windows') } }
   $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
   if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
   if (-not (Test-Path -LiteralPath $csc)) { return @{ Ok = $false; Lines = @('no .NET Framework compiler at ' + $csc) } }

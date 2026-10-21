@@ -47,6 +47,10 @@ namespace Thornswood {
  }
 }
 '@
+# What is above read Shell.cs and held DrawStatus to one observation. What
+# follows compiles the real methods with the build's compiler, which only
+# Windows has.
+if(-not $OnWindows){Write-Host 'SKIP  the real collection methods compiled and run: the build''s compiler (the Build Tools'' csc, against .NET Framework 4.8.1) is only on Windows; DrawStatus was read and passes its one observation on';exit 0}
 $source=Join-Path $Scratch 'CollectionDrawFixture.cs'
 [IO.File]::WriteAllText($source,$harness.Replace('__METHODS__',$methods),(New-Object Text.UTF8Encoding($false)))
 $dll=Join-Path $Scratch 'CollectionDrawFixture.dll'
