@@ -62,7 +62,7 @@ still applies.
 | A gem | Miner, master | 2 of the gem they name | 6 | 24 hours |
 | The stalhrim | Miner, master | 3 stalhrim | 8 | 24 hours |
 | The heart stone | Miner, master | 3 heart stone | 8 | 24 hours |
-| The longfin | Fisher | 2 Abecean longfin | 8 spots | 12 hours |
+| The longfin | Fisher, master | 2 Abecean longfin | 8 spots | 12 hours |
 | The pearl bed | Fisher, expert | 1 pearl | 3 spots | 8 hours |
 | The crimson | Gatherer | 3 crimson nirnroot | 8 | 12 hours |
 | The mammoth ground | Hunter, master | Dress 1 mammoth | 3 mammoths | 24 hours |
@@ -161,7 +161,7 @@ save does not discard a later kill. Rewards still wait for the inventory
 save acknowledgement and are paid once with the completed quest.
 These bindings await the matching native engine and gamemode release;
 implementation does not establish availability on either server.
-The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. Three remaining scarce offers and seven retrieval offers still need their interactions. Source implementation is not a deployment record.
+The [pearl bed](merchant-pearl-bed.md) is connected to its three selected sources, with Expert Fisher and pole rules and existing shared stock. The [seven retrievals](merchant-retrieval-work.md) connect exact specialists, source items and fixed rewards. The [mammoth ground](merchant-mammoth-work.md) now uses its three existing bodies, normal Master hunting goods and exact one-body return. The [orchard](merchant-orchard-work.md) connects its ten trees through existing Farmer claims, sowing, seasonal growth and complete harvest yields. Source implementation is not a deployment record.
 Scene gold is created when the quest is finished. It is not taken
 from a trader's purse. Walking
 away puts the goods back and does not start the cooldown. The rank on
@@ -176,11 +176,12 @@ them. When a character's quests cannot be read, nothing is written
 over them and their quest steps are refused until it is put right.
 The remaining scarce places and scene objects have been selected in
 [Custom quest places](quest-locations.md), with exact source references,
-counts, cooldowns and the distinction between existing sources and markers
-still to be placed. The remaining scarce and retrieval interactions are not
-bound yet, so their offers stay shut. A dragon is not a bounty. Papyrus
+counts, cooldowns and the distinction between existing sources and the
+dedicated markers now authored in Content. The existing Farmer orchard interaction is bound in source; availability still requires Claude to deliver the merged sections. A dragon is not a bounty. Papyrus
 quests do not run.
 
 The [crimson work](merchant-crimson-work.md) now connects its eight existing Blackreach plants to the Winterhold Alchemist, using the original Gatherer rules, shared ten-minute returns, ask3/cap8 and12-hour personal rest. No orchard planting or cultivation mechanics are included. Source activation still requires Claude's release step.
 
 The [geode work](merchant-geode-work.md) connects six existing Blackreach deposits, requiring Enchanter standing and yielding empty petty soul gems. Its ask2/cap6 and12-hour personal rest follow the original table; selected sources share a documented thirty-minute return. Source implementation is not a deployment record.
+
+The [longfin work](merchant-longfin-work.md) connects eight dedicated sea markers to Haafingar's Alchemist. Master Fishers with suitable poles draw one fish per shared four-hour return, up to eight per open quest. Returning consumes two, keeps extras and starts a twelve-hour rest. Original clams remain independent. Matching Content delivery and runtime activation belong to Claude.

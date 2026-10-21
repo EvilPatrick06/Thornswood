@@ -168,7 +168,7 @@ function world() {
   function run(block) {
     new Function('globalThis', 'mp', 'Date', 'console', 'setInterval', 'clearInterval',
       'guard', 'say', 'notify', 'Math', 'Number', 'String', 'Object', 'Array',
-      'JSON', 'isFinite', 'parseInt', block)(
+      'JSON', 'isFinite', 'parseInt', require('./fixtures/ordinary-quest-items') + block)(
       g, mp, { now: function () { return 1700000000000; } }, { log: function () { } },
       function () { return 1; }, function () { }, function (n, f) { return f; },
       function (id, line) { said.push({ to: id, line: line }); },

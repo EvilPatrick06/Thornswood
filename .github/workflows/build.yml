@@ -319,6 +319,8 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           & python tests/test-2353-ticket-keeping.py
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & python tests/test-retrieval-source-reader.py
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run the gate harnesses
         shell: pwsh

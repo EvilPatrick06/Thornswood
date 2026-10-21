@@ -253,5 +253,37 @@ test('Repeated callbacks for one native life cannot refill a claimed corpse',() 
   assert.equal(grants,1);
 });
 
+test('A fenced old-body refusal cannot undo the next body reservation',() => {
+  const f=fixture(true);f.api.life.set(81,4);f.api.dead.set(81,true);f.stock.recordDeath(81);
+  const fence=()=>f.api.life.get(81)===4;let newer=0;
+  const result=f.stock.dress(81,()=>{
+    f.api.life.set(81,5);f.stock.recordDeath(81);
+    assert.equal(f.stock.dress(81,()=>{newer++;return true;}).ok,true);
+    return false;
+  },fence);
+  assert.equal(result.ok,false);assert.equal(newer,1);
+  assert.equal(f.stock.dress(81,()=>{newer++;return true;}).ok,false);
+  assert.equal(newer,1,'old rollback cannot refill an already-dressed replacement');
+});
+test('A failed native body fence reserves nothing, and a definite refusal releases only its own claim',() => {
+  const f=fixture(true);f.api.life.set(81,4);f.api.dead.set(81,true);let grants=0;
+  assert.equal(f.stock.dress(81,()=>{grants++;return true;},()=>false).ok,false);
+  assert.equal(grants,0);assert.equal(f.api.values.has('81:'+property),false);
+  assert.equal(f.stock.dress(81,()=>false,()=>true).ok,false);
+  assert.equal(f.stock.dress(81,()=>{grants++;return true;},()=>true).ok,true);
+  assert.equal(grants,1);
+});
+for(const phase of ['death','reservation'])test('A reentrant '+phase+' fence cannot pay the same body twice',() => {
+  const f=fixture(true);f.api.life.set(81,4);f.api.dead.set(81,true);
+  if(phase==='reservation')f.stock.recordDeath(81);
+  let calls=0,grants=0;
+  const result=f.stock.dress(81,()=>{grants++;return true;},()=>{
+    if(++calls===2)assert.equal(f.stock.dress(81,()=>{grants++;return true;}).ok,true);
+    return true;
+  });
+  assert.equal(result.ok,false);assert.equal(grants,1);
+  assert.equal(f.stock.dress(81,()=>{grants++;return true;}).ok,false);assert.equal(grants,1);
+});
+
 console.log(JSON.stringify({passed,failed}));
 process.exitCode = failed ? 1 : 0;

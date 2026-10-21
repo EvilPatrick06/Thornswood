@@ -287,7 +287,10 @@ assert.equal(box.adds.filter(function (row) { return row.count === camp.gold; })
 
 assert.equal(svc.offer(4, 'geode').ok, true, 'either Enchanter half may take the geode');
 box.chooseClass(1,'fisher');
-assert.equal(svc.offer(1, 'longfin').ok, true, 'a fisher of any rank may take the longfin');
+assert.equal(svc.offer(1, 'longfin').ok, false, 'a Novice Fisher cannot take the Master longfin work');
+const masterFisher = world({'5:fisher':'master'});
+masterFisher.chooseClass(5,'fisher');
+assert.equal(masterFisher.svc.offer(5, 'longfin').ok, true, 'a Master Fisher may take the longfin');
 assert.equal(svc.offer(3, 'longfin').ok, false, 'a miner is not a fisher');
 
 const mineBody = gm.slice(gm.indexOf('function mineOre'), gm.indexOf('function chopWood'));
