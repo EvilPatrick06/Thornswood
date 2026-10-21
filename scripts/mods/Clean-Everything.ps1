@@ -35,6 +35,8 @@ param(
   [string]$Repo = '',
   [string]$SourceRepo = 'EvilPatrick06/Thornswood',
   [string]$BackupDir,
+  # Where releases stage, one <install root's name>\_dist each: Where.ps1 Dist.
+  [string]$DistRoot,
   # How many of the newest to keep in each group that has a series.
   [int]$KeepBackups = 2,
   [int]$KeepReleases = 5,
@@ -83,6 +85,9 @@ function Gb($b) { return [math]::Round($b / 1GB, 2) }
 if (-not $BackupDir) {
   $BackupDir = [string](& (Join-Path $Here '..\release\Where.ps1') Backups)
 }
+if (-not $DistRoot) {
+  $DistRoot = [string](& (Join-Path $Here '..\release\Where.ps1') Dist)
+}
 
 $pickedAny = $Installers -or $Packs -or $Stage -or $Backups -or $Temp -or $Github -or $ServerSaves
 if (-not $pickedAny) {
@@ -110,18 +115,38 @@ function Folder-Bytes($path) {
 }
 
 # ------------------------------------------------------- this machine ---
-# Join-Path stops on a drive this machine does not have (C: off Windows), and
-# with no install folder here there is no _dist in it to look at (#2989).
-$dist = $(if (Test-Path -LiteralPath $Root) { Join-Path $Root '_dist' } else { '' })
+# Where releases stage (#3004). Since 22 September Ship, Publish-Update and
+# Package-Thornswood stage in <Where.ps1 Dist>\<install root's name>\_dist, one
+# per install root, and One ships from more than one root (release-main and
+# release-devbuild), so every _dist under Dist is looked at, not one root's.
+# Until then this looked only in $Root\_dist, where they staged before, and
+# missed the 5 GB installers a Ship leaves. $Root\_dist is still looked at
+# while one is there, since what it holds is left over from before the move.
+# Join-Path stops on a drive this machine does not have (C: off Windows), so
+# the install folder is tested before anything is joined to it (#2989).
+$dists = @()
+if (Test-Path -LiteralPath $DistRoot) {
+  foreach ($d in @(Get-ChildItem -LiteralPath $DistRoot -Directory | Sort-Object Name)) {
+    $p = Join-Path $d.FullName '_dist'
+    if (Test-Path -LiteralPath $p) { $dists += [pscustomobject]@{ Path = $p; Label = $d.Name + '\_dist'; Old = $false } }
+  }
+}
+if (Test-Path -LiteralPath $Root) {
+  $p = Join-Path $Root '_dist'
+  if (Test-Path -LiteralPath $p) { $dists += [pscustomobject]@{ Path = $p; Label = $p; Old = $true } }
+}
+function Old-Note($d) { return $(if ($d.Old) { '   the old place, nothing stages here now' } else { '' }) }
 
 if ($Installers) {
   Head 'Old installers on this machine'
-  foreach ($n in @($(if ($dist) { 'Thornswood-Setup.zip', 'Thornswood-Setup.exe' }))) {
-    $p = Join-Path $dist $n
-    if (Test-Path -LiteralPath $p) {
-      $i = Get-Item -LiteralPath $p
-      Add-Found 'this machine' 'old installer' $p $i.Length
-      Say ("  {0,10:n1} GB  {1}   built {2}" -f (Gb $i.Length), $n, $i.LastWriteTime.ToString('dd MMM HH:mm'))
+  foreach ($d in $dists) {
+    foreach ($n in 'Thornswood-Setup.zip', 'Thornswood-Setup.exe') {
+      $p = Join-Path $d.Path $n
+      if (Test-Path -LiteralPath $p) {
+        $i = Get-Item -LiteralPath $p
+        Add-Found 'this machine' 'old installer' $p $i.Length
+        Say ("  {0,10:n1} GB  {1}\{2}   built {3}{4}" -f (Gb $i.Length), $d.Label, $n, $i.LastWriteTime.ToString('dd MMM HH:mm'), (Old-Note $d))
+      }
     }
   }
   if (-not ($found | Where-Object { $_.What -eq 'old installer' })) { Say '  none' 'DarkGray' }
@@ -129,27 +154,36 @@ if ($Installers) {
 
 if ($Packs) {
   Head 'Old pack builds'
-  $packs = @(if ($dist) { Get-ChildItem -LiteralPath $dist -Filter 'pack-*.zip' -File -EA SilentlyContinue | Sort-Object LastWriteTime -Descending })
-  if ($packs.Count -eq 0) { Say '  none' 'DarkGray' }
-  else {
-    $keep = [Math]::Min(2, $packs.Count)
-    Say ("  {0} pack zip(s), keeping the newest {1}" -f $packs.Count, $keep) 'DarkGray'
-    for ($i = $keep; $i -lt $packs.Count; $i++) {
-      Add-Found 'this machine' 'old pack' $packs[$i].FullName $packs[$i].Length
+  # Each folder is its own series (Publish-Update prunes in the one it stages
+  # in), so the newest two are kept in each. Not $packZips: PowerShell names are
+  # not case sensitive, so that is the -Packs switch, and a list put in it
+  # stopped the script on the first pack zip it found.
+  $anyPacks = $false
+  foreach ($d in $dists) {
+    $packZips = @(Get-ChildItem -LiteralPath $d.Path -Filter 'pack-*.zip' -File | Sort-Object LastWriteTime -Descending)
+    if ($packZips.Count -eq 0) { continue }
+    $anyPacks = $true
+    $keep = [Math]::Min(2, $packZips.Count)
+    Say ("  {0}: {1} pack zip(s), keeping the newest {2}{3}" -f $d.Label, $packZips.Count, $keep, (Old-Note $d)) 'DarkGray'
+    for ($i = $keep; $i -lt $packZips.Count; $i++) {
+      Add-Found 'this machine' 'old pack' $packZips[$i].FullName $packZips[$i].Length
     }
-    $sum = ($packs | Select-Object -Skip $keep | Measure-Object -Property Length -Sum).Sum
-    Say ("  {0,10:n1} MB  in {1} older pack(s)" -f (Mb $sum), ($packs.Count - $keep))
+    $sum = ($packZips | Select-Object -Skip $keep | Measure-Object -Property Length -Sum).Sum
+    Say ("  {0,10:n1} MB  in {1} older pack(s)" -f (Mb $sum), ($packZips.Count - $keep))
   }
+  if (-not $anyPacks) { Say '  none' 'DarkGray' }
 }
 
 if ($Stage) {
   Head 'Packaging leftovers'
-  foreach ($n in @($(if ($dist) { 'stage', 'removed-plugins', 'unbound-locked', 'unbound-original', 'sfx', 'server' }))) {
-    $p = Join-Path $dist $n
-    if (Test-Path -LiteralPath $p) {
-      $b = Folder-Bytes $p
-      Add-Found 'this machine' 'packaging leftover' $p $b
-      Say ("  {0,10:n1} GB  _dist\{1}" -f (Gb $b), $n)
+  foreach ($d in $dists) {
+    foreach ($n in 'stage', 'removed-plugins', 'unbound-locked', 'unbound-original', 'sfx', 'server') {
+      $p = Join-Path $d.Path $n
+      if (Test-Path -LiteralPath $p) {
+        $b = Folder-Bytes $p
+        Add-Found 'this machine' 'packaging leftover' $p $b
+        Say ("  {0,10:n1} GB  {1}\{2}{3}" -f (Gb $b), $d.Label, $n, (Old-Note $d))
+      }
     }
   }
   # The build tree's debug symbols. Enormous and rebuildable.
