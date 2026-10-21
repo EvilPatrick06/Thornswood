@@ -58,6 +58,16 @@
 // already carries and a plugin the list already names. The tag Vortex gives
 // an installed mod is made the way shortid makes one, unless "tag" is given.
 // On stdout: <entry name>\tadded\t\tfile <id>, and <plugin>\tplugin\t\tafter <names>.
+//
+// A PATCH (#2979). An entry with "patch": true gives the entry that installs
+// Nexus file fileId a binary patch for one of its files, the way Vortex
+// records one it made: the file's path in the mod and the CRC-32 of the
+// archive's own copy, which Vortex checks before it applies
+// patches\<entry name>\<path>.diff (New-NexusRevision.ps1 packs that file):
+//   { "patch": true, "fileId": "743640", "path": "RaceMenu.esp", "crc": "1A2B3C4D" }
+// It refuses a file the entry already patches. "patches" goes after the
+// installer answers and file hashes, where Vortex writes it.
+// On stdout: <entry name>\tpatch\t\t<path> CRC-32 <crc>.
 
 'use strict';
 const fs = require('fs');
@@ -151,6 +161,7 @@ function applySwaps(collection, swaps) {
   if (!Array.isArray(collection.mods)) stop('collection.json has no mods list, so it is not a collection Vortex wrote.');
   for (const sw of swaps) {
     if (sw.add === true) { applyAdd(collection, sw, lines); continue; }
+    if (sw.patch === true) { applyPatch(collection, sw, lines); continue; }
     for (const k of ['modId', 'fileId', 'version', 'md5', 'fileSize', 'logicalFilename']) {
       if (sw[k] === undefined || sw[k] === null || sw[k] === '') stop('A swap has no ' + k + '.');
     }
@@ -247,6 +258,30 @@ function applyAdd(collection, add, lines) {
   }
 }
 
+function applyPatch(collection, pt, lines) {
+  for (const k of ['fileId', 'path', 'crc']) {
+    if (pt[k] === undefined || pt[k] === null || pt[k] === '') stop('A patch has no ' + k + '.');
+  }
+  if (!/^[0-9A-F]{8}$/.test(String(pt.crc))) stop('The CRC-32 for ' + pt.path + ' is not 8 upper case hex characters.');
+  const hits = collection.mods.filter(m => m.source && m.source.type === 'nexus' && String(m.source.fileId) === String(pt.fileId));
+  if (hits.length !== 1) stop('The revision has ' + hits.length + ' entries for Nexus file ' + pt.fileId + ', so there is no one entry to patch.');
+  const i = collection.mods.indexOf(hits[0]);
+  const e = hits[0];
+  const low = String(pt.path).toLowerCase();
+  if (e.patches && Object.keys(e.patches).some(k => k.toLowerCase() === low)) stop(e.name + ' already patches ' + pt.path + '.');
+  if (e.patches) { e.patches[String(pt.path)] = String(pt.crc); }
+  else {
+    const at = ['choices', 'hashes', 'source'].find(k => Object.prototype.hasOwnProperty.call(e, k));
+    const next = {};
+    for (const k of Object.keys(e)) {
+      next[k] = e[k];
+      if (k === at) next.patches = { [String(pt.path)]: String(pt.crc) };
+    }
+    collection.mods[i] = next;
+  }
+  lines.push([String(e.name), 'patch', '', String(pt.path) + ' CRC-32 ' + String(pt.crc)].join('\t'));
+}
+
 function main(argv) {
   if (argv.length !== 4) stop('usage: node nexus-collection.js <collection.json> <swaps.json> <out collection.json> <out payload.json>');
   const [inPath, swapsPath, outPath, payloadPath] = argv;
@@ -264,4 +299,4 @@ function main(argv) {
 }
 
 if (require.main === module) main(process.argv.slice(2));
-module.exports = { payloadOf, applySwaps, applyAdd, filterInfo, toV3CollectionPayload };
+module.exports = { payloadOf, applySwaps, applyAdd, applyPatch, filterInfo, toV3CollectionPayload };
