@@ -128,7 +128,7 @@ function Old($entry, [string[]]$keys) {
 }
 $chanKeys = 'name', 'topic', 'nsfw', 'rate_limit_per_user', 'parent_id', 'position', 'bitrate', 'user_limit'
 $roleKeys = 'name', 'permissions', 'color', 'hoist', 'mentionable'
-$guildKeys = 'system_channel_id', 'system_channel_flags', 'rules_channel_id', 'public_updates_channel_id'
+$guildKeys = 'system_channel_id', 'system_channel_flags', 'rules_channel_id', 'public_updates_channel_id', 'safety_alerts_channel_id'
 
 # Newest first, the order Discord returns them, so each is undone on top of
 # the state the later ones left.
