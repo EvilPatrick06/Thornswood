@@ -25,7 +25,9 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $helper = Join-Path $repo 'scripts\vps\Lock-Folder.ps1'
 $lockBox = Join-Path $repo 'scripts\vps\Lock-VpsFolders.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  each folder is made with its rights already set, a Windows ACL, by scripts the box runs in Windows PowerShell 5.1, which only Windows has'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 . $helper
 
 $script:pass = 0; $script:fail = 0
@@ -102,7 +104,7 @@ try {
     $sent = Run51 @"
 `$ErrorActionPreference = 'Stop'
 . '$($repo.Replace("'", "''"))\scripts\deploy\Artifact.ps1'
-function Invoke-ThornswoodArtifactRemote(`$t, `$s, `$text) { `$f = Join-Path `$env:TEMP ('tw-art-' + [guid]::NewGuid().ToString('N') + '.ps1'); [IO.File]::WriteAllText(`$f, `$text); try { & powershell -NoProfile -ExecutionPolicy Bypass -File `$f } finally { Remove-Item `$f -Force } }
+function Invoke-ThornswoodArtifactRemote(`$t, `$s, `$text) { `$f = Join-Path `$env:TEMP ('tw-art-' + [guid]::NewGuid().ToString('N') + '.ps1'); [IO.File]::WriteAllText(`$f, `$text); try { & '$ps51' -NoProfile -ExecutionPolicy Bypass -File `$f } finally { Remove-Item `$f -Force } }
 function Send-ThornswoodArtifactFile(`$l, `$t, `$s, `$far) { Copy-Item -LiteralPath `$l -Destination `$far.Replace('/', '\') -Force }
 `$zip = Join-Path `$env:TEMP ('tw-art-' + [guid]::NewGuid().ToString('N') + '.zip'); [IO.File]::WriteAllText(`$zip, 'zip')
 `$rec = `$zip + '.json'; [IO.File]::WriteAllText(`$rec, '{}')

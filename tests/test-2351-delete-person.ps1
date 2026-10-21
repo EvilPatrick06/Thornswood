@@ -90,11 +90,12 @@ if ($at -ge 0) {
         $pt -match '-DiscordId' -and $pt -match '-Delete -By' -and $pt -match 'C:\\Thornswood-Deletions\\requests\.jsonl' -and $pt -match '-Reapply')
 }
 
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs this on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs this on the VPS; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
     Write-Host 'SKIP  the runs need node, which the script edits the JSON with'
     Done

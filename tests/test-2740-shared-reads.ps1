@@ -92,6 +92,9 @@ $readShared = [regex]::Match($liveRoom, '(?s)function ReadShared\(.*?\n\}').Valu
 $storePs1 = Join-Path $Repo 'scripts\release\Feed-Store.ps1'
 Yes 'the read the deploys send and Feed-Store.ps1''s POSIX rename are both there' ($readShared.Length -gt 0 -and (Test-Path -LiteralPath $storePs1))
 if (-not $readShared -or -not (Test-Path -LiteralPath $storePs1)) { Done }
+# 3 is how Windows shares an open file with a rename, in the shells the box has.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  3, the reads while the file is renamed: they are Windows'' file sharing, in this shell and in Windows PowerShell 5.1, and this is not Windows'; Done }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2740-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $work
@@ -136,9 +139,7 @@ $h.Dispose()
 Say 'get-content' ($err -match 'being used by another process' -and [IO.File]::ReadAllText($to) -eq '{"now":3}') ("error '" + $err + "'")
 '@))
     $shells = @(@{ Name = 'this shell'; Exe = (Get-Process -Id $PID).Path })
-    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (Test-Path -LiteralPath $ps51) { $shells += @{ Name = 'Windows PowerShell 5.1'; Exe = $ps51 } }
-    Yes 'Windows PowerShell 5.1 is on this machine to run the box''s reads with' ($shells.Count -eq 2)
+    $shells += @{ Name = 'Windows PowerShell 5.1'; Exe = (Get-WindowsPowerShell) }
     foreach ($sh in $shells) {
         $dir = Join-Path $work ($sh.Name -replace '\W', '')
         $out = @(& $sh.Exe -NoProfile -ExecutionPolicy Bypass -File $held $storePs1 $dir 2>&1 | ForEach-Object { [string]$_ })

@@ -23,7 +23,9 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = (Resolve-Path (Join-Path $Here '..')).Path
 $lockBox = Join-Path $repo 'scripts\vps\Lock-VpsFolders.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  who may write the service folders is a Windows ACL that Lock-VpsFolders.ps1 sets under Windows PowerShell 5.1, which only Windows has'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {

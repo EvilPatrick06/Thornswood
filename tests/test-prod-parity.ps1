@@ -2,8 +2,10 @@
 # Issue #2165. Offline: scripts\vps\Check-ProdParity.ps1 against made-up box
 # facts, and scripts\vps\Get-ProdFacts.ps1's redaction against stand-in tasks
 # and settings. Nothing reaches the VPS.
-if ($PSVersionTable.PSEdition -eq 'Core' -and -not $IsWindows) { Write-Host 'Windows only'; exit 0 }
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the parity check and its collector run only on the box, under Windows PowerShell 5.1'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 $repo = Split-Path -Parent $PSScriptRoot
 $check = Join-Path $repo 'scripts\vps\Check-ProdParity.ps1'
 $collector = Join-Path $repo 'scripts\vps\Get-ProdFacts.ps1'
@@ -74,7 +76,7 @@ function Run($facts, [string]$record) {
     $facts | ConvertTo-Json -Depth 6 | Set-Content $fp -Encoding utf8
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $check, '-Facts', $fp, '-Report', $rp, '-Now', '2026-10-11T12:00:00Z', '-Strict')
     if ($record) { $a += @('-Record', $record) }
-    $o = & powershell @a 2>&1 | Out-String
+    $o = & $ps51 @a 2>&1 | Out-String
     @{ Code = $LASTEXITCODE; Out = $o; Report = $(if (Test-Path $rp) { Get-Content $rp -Raw } else { '' }) }
 }
 try {

@@ -24,6 +24,13 @@ param([string]$Scratch)
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+# What this runs, Windows runs in Windows PowerShell 5.1; off Windows, this shell.
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  what runs in Windows PowerShell 5.1 on Windows runs in this shell here: this is not Windows'
+}
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repoRoot = Split-Path -Parent $Here
@@ -80,7 +87,7 @@ function Run([string]$man, [string]$dataDir = $data, [switch]$All) {
     $a = @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', $script, '-Data', $dataDir, '-Manifest', $man, '-NoPause')
     if ($All) { $a += '-All' }
     $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $out = (& powershell @a 2>&1 | Out-String)
+    $out = (& $winPs @a 2>&1 | Out-String)
     $code = $LASTEXITCODE; $ErrorActionPreference = $eap
     [pscustomobject]@{ Code = $code; Out = $out }
 }

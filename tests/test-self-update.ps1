@@ -110,12 +110,13 @@ Yes '#497: Icons repoints no shortcut aimed at another exe' ($icons -cnotmatch '
 
 if (-not $haveSwap) { Finish }
 
+if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Finish }
 Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Finish }
 
 # `find` in the script has to be Windows' own. A PATH with Git's usr\bin ahead
 # of System32 would hand it GNU find, and the wait would end at once.
-$env:PATH = (Join-Path $env:SystemRoot 'System32') + ';' + $env:PATH
+$env:PATH = (Get-WindowsPath 'System32') + ';' + $env:PATH
 
 $root = Join-Path ([IO.Path]::GetTempPath()) ('tsself-' + [Guid]::NewGuid().ToString('N'))
 $bin = Join-Path $root 'bin'

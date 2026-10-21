@@ -43,8 +43,14 @@ Yes 'and the swap is told them as $Gone, empty for -PutBack' ($docs.Contains("('
 # ---- 2. the swap block, run ------------------------------------------------------
 Write-Host ''
 Write-Host 'Swap.ps1, the service swap block'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not (Test-Path -LiteralPath $ps51)) { $ps51 = (Get-Command pwsh).Source }
+# The box runs the block under Windows PowerShell 5.1; off Windows there is
+# none, and it runs in this shell, which is said.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $ps51 = Get-WindowsPowerShell }
+else {
+    $ps51 = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the block runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 $tmpRoot = if ($env:TEST_TMP) { $env:TEST_TMP } else { [IO.Path]::GetTempPath() }
 $work = Join-Path $tmpRoot ('ts-site-gone-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $work | Out-Null

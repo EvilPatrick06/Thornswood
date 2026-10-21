@@ -168,8 +168,8 @@ foreach ($ins in $installers) {
 
 # ---- 2. run, through Task Scheduler ----------------------------------------------
 Write-Host ''
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
-if (-not $onWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
 Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }
 
@@ -224,8 +224,8 @@ if ($admin) {
     $principal = New-ScheduledTaskPrincipal -UserId $me -LogonType Interactive -RunLevel Limited
     $who = $me + ', logged on interactively (not elevated, so not SYSTEM)'
 }
-$ps51 = [IO.Path]::Combine($env:SystemRoot, 'System32', 'WindowsPowerShell', 'v1.0', 'powershell.exe')
-$cmdExe = [IO.Path]::Combine($env:SystemRoot, 'System32', 'cmd.exe')
+$ps51 = Get-WindowsPowerShell
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
 
 
 foreach ($ins in $installers) {

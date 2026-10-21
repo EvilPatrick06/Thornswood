@@ -192,10 +192,14 @@ Yes 'and what it makes parses with the swap behind it' ($errors.Count -eq 0)
 
 # ---- run, against a scratch folder ------------------------------------------
 $node = Get-Command node -EA SilentlyContinue
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $node -or -not (Test-Path -LiteralPath $ps51) -or
-    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-    Write-Host 'SKIP  the runs need node, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+if (-not $node -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
 }
 

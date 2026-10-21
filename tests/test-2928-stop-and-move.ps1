@@ -172,10 +172,10 @@ foreach ($b in @(@{ Name = '-Restart'; Var = 'restartBlock'; Then = 'StartIt' },
 Yes 'and neither is the one ssh line it was' ($voice -notmatch 'Start-Sleep -Seconds 1; Start-ScheduledTask' -and $voice -notmatch "Remove-Item -LiteralPath '\$Root' -Recurse -Force -EA SilentlyContinue")
 
 # ---- 3 to 5. run ------------------------------------------------------------
-$onWindows = ($PSVersionTable.PSEdition -eq 'Desktop') -or ((Test-Path variable:IsWindows) -and $IsWindows)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
-if (-not $onWindows -or -not $node) {
-    Write-Host ('SKIP  the runs: they need Windows and node, and this is ' + $(if ($onWindows) { 'Windows with no node' } else { 'not Windows' }))
+if (-not $OnWindows -or -not $node) {
+    Write-Host ('SKIP  the runs: they need Windows and node, and this is ' + $(if ($OnWindows) { 'Windows with no node' } else { 'not Windows' }))
     Done
 }
 
