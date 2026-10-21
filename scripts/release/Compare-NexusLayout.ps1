@@ -123,12 +123,15 @@ Say ('    ' + $a.Map.Count + ' files, files.txt sha256 ' + $a.Sha256) 'DarkGray'
 
 $report = New-Object System.Collections.Generic.List[string]
 $diffs = 0
-function Show([string]$title, [string[]]$items) {
+# A kind of difference, the first 40 on screen. -Note is for what differs
+# only in where it came from, not in what is laid out: listed, not counted.
+function Show([string]$title, [string[]]$items, [switch]$Note) {
   if (-not $items.Count) { return }
-  $script:diffs += $items.Count
-  Say ('  ' + $title + ': ' + $items.Count) 'Yellow'
-  foreach ($i in ($items | Select-Object -First 40)) { Say ('    ' + $i) }
-  if ($items.Count -gt 40) { Say ('    and ' + ($items.Count - 40) + ' more' + $(if ($Out) { ', all in ' + $Out } else { '; give -Out for all of them' })) 'DarkGray' }
+  $show = 40
+  if ($Note) { $show = 5; Say ('  ' + $title + ': ' + $items.Count + ', not a difference in what is laid out') 'DarkGray' }
+  else { $script:diffs += $items.Count; Say ('  ' + $title + ': ' + $items.Count) 'Yellow' }
+  foreach ($i in ($items | Select-Object -First $show)) { Say ('    ' + $i) }
+  if ($items.Count -gt $show) { Say ('    and ' + ($items.Count - $show) + ' more' + $(if ($Out) { ', all in ' + $Out } else { '; give -Out for all of them' })) 'DarkGray' }
   $report.Add(''); $report.Add($title + ': ' + $items.Count)
   foreach ($i in $items) { $report.Add('  ' + $i) }
 }
@@ -156,7 +159,7 @@ if ($With) {
   Show 'only in the record' @($onlyA | Sort-Object)
   Show 'only in the other' @($onlyB | Sort-Object)
   Show 'different bytes' @($differ | Sort-Object)
-  Show 'the same bytes, from another file id or named in another case' @($moved | Sort-Object)
+  Show 'the same bytes, from another file id or named in another case' @($moved | Sort-Object) -Note
   $pa = Read-Plugins (Join-Path $Record 'plugins.txt')
   $pb = Read-Plugins (Join-Path $With 'plugins.txt')
 }
