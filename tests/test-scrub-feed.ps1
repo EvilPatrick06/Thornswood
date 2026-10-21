@@ -51,12 +51,10 @@ param()
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
 if ($PSVersionTable.PSEdition -eq 'Core') {
-    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not (Test-Path -LiteralPath $winps)) {
-        Write-Host 'FAIL  Windows PowerShell is here to run this on the .NET Framework the launcher runs on'
-        Write-Host ''; Write-Host '0 passed, 1 failed'; exit 1
-    }
+    $winps = Get-WindowsPowerShell
     & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
     exit $LASTEXITCODE
 }
@@ -65,7 +63,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
 $app = Join-Path $repo 'launcher\app'
-$winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
+$winps = Get-WindowsPowerShell
 $pwsh = Get-Command pwsh -ErrorAction SilentlyContinue
 $child = if ($pwsh) { $pwsh.Source } else { $winps }
 

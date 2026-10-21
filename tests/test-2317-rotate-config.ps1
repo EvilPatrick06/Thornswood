@@ -73,10 +73,15 @@ Yes 'its far side does not read config.json with Get-Content' (-not ($call -matc
 . (Join-Path $Here 'scripts\vps\Send-Secret.ps1')
 
 # ---- what runs it -------------------------------------------------------------
-$ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the rest: it runs in Windows PowerShell 5.1, which only Windows has'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
 $node = Get-Command node -ErrorAction SilentlyContinue
-if (-not $ps51 -or -not $node) {
-    Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and node, which are not both here'
+if (-not $node) {
+    Write-Host 'SKIP  the rest needs node, which is not here'
     Done
 }
 
@@ -101,7 +106,7 @@ function ssh {
     $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
     [void]$script:lines.Add($text)
     $run = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($stubs + $text))
-    @($input) | & $ps51.Source -NoProfile -NonInteractive -EncodedCommand $run
+    @($input) | & $ps51 -NoProfile -NonInteractive -EncodedCommand $run
 }
 # Over the length limit the script would go by file with scp; that is not this
 # path, and nothing here may copy anything anywhere.

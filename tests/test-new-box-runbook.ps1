@@ -516,11 +516,12 @@ try {
     }
 
     # ---- the box-side half, under Windows PowerShell 5.1 --------------------
-    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-        Write-Host 'SKIP  the box-side runs need Windows PowerShell 5.1, which runs them on the VPS'
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the box-side runs need Windows PowerShell 5.1, which runs them on the VPS; this is not Windows'
         throw 'skip'
     }
+    $ps51 = Get-WindowsPowerShell
     $old = Join-Path $work 'old'
     $site = Join-Path $old 'site'; $bot = Join-Path $old 'bot'; $caddy = Join-Path $old 'caddy'; $voice = Join-Path $old 'voice'
     Put (Join-Path $site 'data\board.json') '{"cards":[]}'

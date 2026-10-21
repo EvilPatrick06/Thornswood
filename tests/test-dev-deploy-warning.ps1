@@ -203,8 +203,12 @@ function Remote($text) {
     return @($script:canned[$i] -split '\|')
 }
 
-$winPs = 'powershell'
-if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { $winPs = 'pwsh' }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 function RunHere($text) {
     # The same hop the real Remote makes, base64 of UTF-16 into -EncodedCommand,
     # without the ssh in front of it. Continue, so an error the far end prints

@@ -29,6 +29,7 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
 $script = Join-Path (Join-Path (Join-Path $repo 'scripts') 'vps') 'vps-capture-443.ps1'
+. (Join-Path $Here 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -43,13 +44,13 @@ $t = [IO.File]::ReadAllText($script)
 $errs = $null
 [void][System.Management.Automation.Language.Parser]::ParseInput($t, [ref]$null, [ref]$errs)
 Yes 'it parses under pwsh' (-not ($errs -and $errs.Count))
-$ps51 = Get-Command powershell.exe -ErrorAction SilentlyContinue
-if ($ps51) {
+if ($OnWindows) {
+    $ps51 = Get-WindowsPowerShell
     $check = '$e = $null; [void][System.Management.Automation.Language.Parser]::ParseFile(''' + $script + ''', [ref]$null, [ref]$e); if ($e -and $e.Count) { $e | ForEach-Object { $_.Message }; exit 1 }; exit 0'
-    $said = & powershell.exe -NoProfile -NonInteractive -Command $check 2>&1 | Out-String
+    $said = & $ps51 -NoProfile -NonInteractive -Command $check 2>&1 | Out-String
     Yes ("  and under Windows PowerShell 5.1, which runs it on the box" + $(if ($LASTEXITCODE) { ': ' + $said.Trim() } else { '' })) ($LASTEXITCODE -eq 0)
 } else {
-    Write-Host 'SKIP  no Windows PowerShell here; the Windows runners parse it with 5.1'
+    Write-Host 'SKIP  the 5.1 parse: Windows PowerShell 5.1 is only on Windows; the Windows runners parse it'
 }
 
 # ---- 2. one thing at a time, and a limit -----------------------------------------

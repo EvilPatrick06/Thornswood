@@ -39,6 +39,9 @@ $env:THORNSWOOD_HARNESS = '1'
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the dev deploy''s settings block runs on the box under Windows PowerShell 5.1, on the box''s Windows paths, so only Windows can run it'; exit 0 }
+$winPs = Get-WindowsPowerShell
 
 $here = $PSScriptRoot
 if (-not $here) { $here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
@@ -108,7 +111,7 @@ function Run-Block($settings, [hashtable]$light, $loads, [hashtable]$stage = @{}
     $expanded = $ExecutionContext.InvokeCommand.ExpandString($body)
     $file = Join-Path $tmp 'block.ps1'
     [IO.File]::WriteAllText($file, $expanded, (New-Object Text.UTF8Encoding $true))
-    $said = & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }
+    $said = & $winPs -NoProfile -ExecutionPolicy Bypass -File $file 2>&1 | ForEach-Object { "$_" }
     $after = Get-Content $p -Raw | ConvertFrom-Json
     return @{ said = ($said -join "`n"); start = [string]@($after.startPoints)[0].worldOrCell }
 }

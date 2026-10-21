@@ -160,7 +160,8 @@ if (-not $Exe -and -not $Root) {
         $Root = $ownRoot
     }
 }
-if (-not $Exe -and $Root) {
+if (-not $OnWindows) { Write-Host 'SKIP  the built launcher and setup program, and their manifests: MSBuild builds them and kernel32 reads them, and only Windows has either' }
+elseif (-not $Exe -and $Root) {
     Write-Host "      building into $Root"
     & pwsh -NoProfile -File (Join-Path $repo 'scripts\release\Build-Launcher.ps1') -Root $Root -NoPause | Out-Null
     Yes 'Build-Launcher built' ($LASTEXITCODE -eq 0)
@@ -204,6 +205,7 @@ public static class ManifestProbe
 '@
 
 foreach ($pair in @(@('the built launcher', $Exe, 'Thornswood.Launcher.Thornswood'), @('the built setup program', $Stub, 'Thornswood.Installer.Setup'))) {
+    if (-not $OnWindows) { continue }
     $label = $pair[0]; $path = $pair[1]; $name = $pair[2]
     if (-not $path -or -not (Test-Path -LiteralPath $path)) {
         Yes "$label is at $path (pass -Exe/-Stub, or -Root to build)" $false
@@ -240,7 +242,8 @@ $sizes = @(
     @('setup', (Window-Size $bootHead 'the setup program'))
 )
 
-Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
+if (-not $OnWindows) { Write-Host 'SKIP  WindowFit.cs, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has' }
+else { Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc) }
 if (-not $Scratch) { $Scratch = Join-Path ([IO.Path]::GetTempPath()) 'thornswood-test-app-manifest' }
 $null = New-Item -ItemType Directory -Force -Path $Scratch
 $driver = Join-Path $Scratch 'FitDriver.cs'

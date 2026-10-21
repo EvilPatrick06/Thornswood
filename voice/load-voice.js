@@ -230,8 +230,11 @@ async function run(n, site) {
       if (!me.pos && text.startsWith('{"t":"pos"')) me.pos = true;
       if (me.peer && me.pos && late) { clearTimeout(late); ok(); }
     };
-    ws.onerror = () => { };
-    ws.onclose = () => { };
+    // Refused at the handshake (error, never followed by close on Node 22,
+    // #2818) or closed before its welcome and view: said now, not at 60 s.
+    // Once welcomed and walking, the promise is settled and these change nothing.
+    ws.onerror = () => { clearTimeout(late); bad(new Error('socket for ' + p.profileId + ' failed before its welcome and view')); };
+    ws.onclose = (ev) => { clearTimeout(late); bad(new Error('socket for ' + p.profileId + ' closed with ' + ev.code + ' before its welcome and view')); };
   })))));
   const stormMs = Date.now() - stormFrom;
   await new Promise((r) => setTimeout(r, 1500));

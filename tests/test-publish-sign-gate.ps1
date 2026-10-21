@@ -93,13 +93,13 @@ try {
     $missingFile = Get-PublishSignRefusal -Path (Join-Path $work 'gone.exe') -ExpectedSigner $frag
     Yes 'missing tip file is refused' ($missingFile -match 'missing file')
 
-    $sys = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (Test-Path -LiteralPath $sys) {
-        $wrong = Get-PublishSignRefusal -Path $sys -ExpectedSigner $frag
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  a file Microsoft signed, refused for its signer: Windows PowerShell 5.1 is that file, and only Windows has it'
+    } else {
+        $wrong = Get-PublishSignRefusal -Path (Get-WindowsPowerShell) -ExpectedSigner $frag
         Yes 'Valid signature without ExpectedSigner is refused' (
             $wrong -match 'ExpectedSigner' -or $wrong -match 'does not contain')
-    } else {
-        Yes 'Valid signature without ExpectedSigner is refused' $false
     }
 
     # A signing.json with no "enabled" (#1072), the shape records\signing\README.md

@@ -512,7 +512,14 @@ jobs:
           # Remote.ps1 in place of lines typed there) to parsing under 5.1,
           # one action at a time, SYN and RST on 443 only, and ending on a
           # task of its own so no ssh session waits it out. A few seconds.
-          $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
+          # Issue #2957: tests\test-2957-windows-one-way.ps1 holds every harness
+          # to finding Windows, Windows PowerShell 5.1 and cmd.exe through
+          # tests\Windows.ps1: $OnWindows first, then Get-WindowsPowerShell or
+          # Get-WindowsPath. Joining onto $env:SystemRoot stopped harness after
+          # harness on its first lines off Windows, and asking Get-Command for
+          # powershell.exe let a Windows machine without it skip or run pwsh
+          # instead. A few seconds.
+          $six ='test-script-index.ps1', 'test-2957-windows-one-way.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
                  'test-third-party.js',
