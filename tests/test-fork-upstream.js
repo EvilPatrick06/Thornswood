@@ -12,34 +12,38 @@
 // rule he set for fork changes on 29 Sep ("What's the point in the changes if
 // we aren't using them"), one level up.
 //
-// It asks GitHub's compare API, signed out (both repositories are public),
-// for the fork branch .gitmodules follows against upstream main, from the
-// upstream named in records\server-build.json. The commits GitHub lists are
-// the ones on upstream main since the two last met and not on the fork branch:
+// It asks over git (tests\fork-git.js, #3052) for the commits on upstream
+// main, from the upstream named in records\server-build.json, that the fork
+// branch .gitmodules follows does not have: the ones on upstream main since
+// the two last met.
 //   none (identical, or the fork is only ahead)   pass
-//   each listed one in records\upstream-not-taken.json with a reason
+//   each one in records\upstream-not-taken.json with a reason
 //                                                 pass, naming them
 //   any other                                     fail, naming each one
-//   more than GitHub lists in one answer          fail, with the count
 // It goes green when the commit is merged into the fork (a fork pull request,
 // then a build and new records here, engine/README.md "One engine"), or when
 // records\upstream-not-taken.json says that commit is not being taken and why.
 // An entry with no reason, or a sha that is not a full one, is a fail: a
-// turn-down nobody can read is not one. No answer from GitHub is a fail, not
-// a skip: a check that did not happen is the failure this exists to stop. It
-// needs the network, so it runs in the nightly checks and not in the build
-// check on every pull request.
+// turn-down nobody can read is not one. It asked GitHub's REST compare API
+// signed out until 21 Oct, which allows 60 requests an hour per address and
+// failed on every shared one (a cloud thread), and listed at most 250
+// commits; git's own fetch is under neither limit and needs no token, both
+// repositories being public. No answer is a fail, not a skip: a check that
+// did not happen is the failure this exists to stop. It needs the network,
+// so it runs in the nightly checks and not in the build check on every pull
+// request.
 //
 // The network is stood in for, so the logic is checked offline, by:
-//   THORNSWOOD_UPSTREAM_COMPARE_JSON  a path to a saved compare answer, read
-//                                     instead of asking GitHub
+//   THORNSWOOD_UPSTREAM_COMPARE_JSON  a path to a saved comparison (status,
+//                                     ahead_by, behind_by, commits), read
+//                                     instead of asking
 //   THORNSWOOD_UPSTREAM_NOT_TAKEN     a path to another record file
 // and by the made up answers below, which run every time, network or not.
 // Read only.
 'use strict';
 const fs = require('fs');
 const path = require('path');
-const https = require('https');
+const forkGit = require('./fork-git');
 const { execFileSync } = require('child_process');
 
 const REPO = path.resolve(__dirname, '..');
@@ -79,7 +83,7 @@ function readNotTaken(text) {
 // What a compare answer (base the fork branch, head upstream main) says, as
 // { ok, why, missing, turnedDown }.
 function verdict(cmp, notTaken) {
-  if (!cmp || typeof cmp.status !== 'string') { return { ok: false, why: 'GitHub gave no comparison', missing: [], turnedDown: [] }; }
+  if (!cmp || typeof cmp.status !== 'string') { return { ok: false, why: 'no comparison was made', missing: [], turnedDown: [] }; }
   const commits = Array.isArray(cmp.commits) ? cmp.commits : [];
   const ahead = Number(cmp.ahead_by) || 0;
   if (cmp.status === 'identical' || ahead === 0) {
@@ -87,9 +91,6 @@ function verdict(cmp, notTaken) {
   }
   const missing = commits.filter(function (c) { return !notTaken.has(String(c.sha || '')); });
   const turnedDown = commits.filter(function (c) { return notTaken.has(String(c.sha || '')); });
-  if (ahead > commits.length) {
-    return { ok: false, why: ahead + ' upstream commit(s) are not in the fork and GitHub listed only ' + commits.length + ' of them', missing: missing, turnedDown: turnedDown };
-  }
   if (missing.length === 0) {
     return { ok: true, why: ahead + ' upstream commit(s) not in the fork, each turned down in records\\upstream-not-taken.json', missing: [], turnedDown: turnedDown };
   }
@@ -97,7 +98,7 @@ function verdict(cmp, notTaken) {
 }
 
 // ---- the rule, on made up answers ------------------------------------------
-const A = 'f84a1940' + '0'.repeat(32), B = 'c13bd7b6' + '1'.repeat(32), C = '2849e676' + '2'.repeat(32);
+const A = 'f84a1940' + '0'.repeat(32), B = 'c13bd7b6' + '1'.repeat(32);
 function commit(sha, msg) { return { sha: sha, commit: { message: msg + '\n\nbody' } }; }
 const none = new Map();
 yes('identical passes', verdict({ status: 'identical', ahead_by: 0, behind_by: 0, commits: [] }, none).ok);
@@ -111,8 +112,6 @@ yes('one turned down, one not: still a fail, naming only the one not turned down
 v = verdict(two, new Map([[A, 'taken by hand as fork commit 1234abcd'], [B, 'nothing we build']]));
 yes('every one turned down with a reason passes', v.ok && v.turnedDown.length === 2);
 yes('a fork that is ahead and behind (diverged) is judged by what it lacks', !verdict(Object.assign({}, two, { status: 'ahead' }), none).ok);
-v = verdict({ status: 'diverged', ahead_by: 300, behind_by: 0, commits: [commit(A, 'one'), commit(C, 'two')] }, new Map([[A, 'x'], [C, 'y']]));
-yes('more upstream commits than GitHub lists fails, with the count', !v.ok && /300 upstream/.test(v.why));
 yes('no answer fails', !verdict(null, none).ok);
 yes('an answer with no status fails', !verdict({ message: 'API rate limit exceeded' }, none).ok);
 
@@ -125,21 +124,15 @@ yes('a short sha does not count, and is a fault', r.notTaken.size === 0 && /not 
 yes('a record that is not JSON is a fault', readNotTaken('{ commits: [').bad.length === 1);
 
 // ---- the fork and upstream, as this checkout names them ---------------------
-function getJson(url) {
-  return new Promise(function (resolve, reject) {
-    const headers = { 'User-Agent': 'thornswood-test-fork-upstream', Accept: 'application/vnd.github+json' };
-    const req = https.get(url, { headers: headers, timeout: 30000 }, function (res) {
-      let body = '';
-      res.setEncoding('utf8');
-      res.on('data', function (d) { body += d; });
-      res.on('end', function () {
-        if (res.statusCode !== 200) { reject(new Error('GitHub answered ' + res.statusCode + ' for ' + url)); return; }
-        try { resolve(JSON.parse(body)); } catch (e) { reject(e); }
-      });
-    });
-    req.on('timeout', function () { req.destroy(new Error('no answer from GitHub in 30 seconds')); });
-    req.on('error', reject);
-  });
+// Base the fork branch, head upstream main: what comes back is on upstream
+// and not on the fork.
+function askUpstream(forkUrl, branch, upstreamUrl) {
+  const repo = forkGit.open('fork-upstream');
+  try {
+    repo.fetch('fork', forkUrl, ['+refs/heads/' + branch + ':refs/compare/fork']);
+    repo.fetch('upstream', upstreamUrl, ['+refs/heads/' + UPSTREAM_BRANCH + ':refs/compare/upstream']);
+    return repo.compare('refs/compare/fork', 'refs/compare/upstream');
+  } finally { repo.close(); }
 }
 
 async function main() {
@@ -165,15 +158,11 @@ async function main() {
     text !== null && rec.bad.length === 0);
   if (!fork || !branch || !up) { return; }
 
-  // Base the fork branch, head upstream main: what GitHub lists is on
-  // upstream and not on the fork. The two are one network on GitHub, so the
-  // fork's branch is named owner:branch from upstream's side.
   let cmp = null;
   const saved = process.env.THORNSWOOD_UPSTREAM_COMPARE_JSON;
   try {
     cmp = saved ? JSON.parse(fs.readFileSync(saved, 'utf8'))
-      : await getJson('https://api.github.com/repos/' + up[1] + '/' + up[2] + '/compare/' +
-        fork[1] + ':' + encodeURIComponent(branch).replace(/%2F/g, '/') + '...' + UPSTREAM_BRANCH + '?per_page=250');
+      : askUpstream(url, branch, 'https://github.com/' + up[1] + '/' + up[2]);
   } catch (e) {
     console.log('      ' + (e && e.message || e));
     cmp = null;

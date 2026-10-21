@@ -131,7 +131,12 @@ try {
       hold.kill();
       hold.on('exit', () => { setTimeout(() => { fs.rmSync(held, { force: true }); runPart(); }, 300); });
     });
-  } else runPart();
+  } else {
+    // Linux deletes a file another program has open, so the sweep cannot be
+    // stopped this way here; the box, where it runs, is Windows (#3005).
+    console.log('SKIP  a rolled file another program holds: only Windows refuses to delete a file that is open elsewhere');
+    runPart();
+  }
 } catch (e) {
   fail++; console.log('FAIL  the harness stopped: ' + (e.stack || e.message));
   fs.rmSync(tmp, { recursive: true, force: true });
@@ -214,6 +219,17 @@ function jobPart() {
       clearInterval(look);
       yes('the writer started the server and wrote its first line', pid > 0);
       if (!pid) { try { w.kill(); } catch (e) { } finish(); return; }
+      // What ends the server is the job Windows puts every child of node in
+      // (libuv makes it kill on close). Measured 21 Oct on Linux (#3005): the
+      // server outlived a writer ended by SIGTERM, adopted by init, because
+      // Linux has no such job. The writer runs only on the box, which is Windows.
+      if (process.platform !== 'win32') {
+        console.log('SKIP  killing the writer ends the server too: what ends it is the job Windows puts a child of node in, and the writer runs only on the box, which is Windows');
+        try { w.kill(); } catch (e) { }
+        try { process.kill(pid); } catch (e) { }
+        finish();
+        return;
+      }
       w.kill();
       let left = 0;
       const gone = setInterval(() => {

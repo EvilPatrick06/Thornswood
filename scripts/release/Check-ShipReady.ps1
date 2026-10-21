@@ -38,7 +38,9 @@
   NOT READY means something that would stop a Ship, and nothing else. A Ship
   never builds the engine, so the fork in engine\skymp is a note, not a check:
   what it needs is the game folder holding the recorded client, or a build
-  that matches records\client-build.json for it to copy in (issue #946). What
+  that matches records\client-build.json for it to copy in (issue #946),
+  which is CI's build of the pin, fetched by the Ship itself on a machine
+  that takes it (Setup-ShipMachine.ps1 -EngineBuild ci, issue #3047). What
   only a main release asks for, the setup stub -Package attaches to and the
   server build the live deploys send (issue #932), prints as WARN on main and
   leaves the verdict alone.
@@ -126,7 +128,14 @@ function Get-ShipVerdict($rows) {
 # for Go.ps1 to copy in (exit 2). Until 28 Sep this asked whether
 # engine\skymp was a clone of the fork, and said NOT READY on two fresh Ship
 # worktrees whose Ships then ran to the end and published.
-function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [string]$ClientDist) {
+#
+# CI'S BUILD (#3047). The build that matches a record is the one it was made
+# from, and since #459 that is CI's: a build made here never is, so the fix
+# names CI's and never a rebuild. On a machine that takes it, ClientDist is
+# CI's build of the pin, and when that folder is not here yet Sync-Client
+# fetches it as a Ship starts. $Ci is then what Get-EngineArtifact.ps1 -Check
+# said (Code 2: GitHub keeps it, so the Ship gets it; else why not).
+function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [string]$ClientDist, $Ci = $null) {
   $rows = @()
   $hasRec = Test-Path -LiteralPath $Record
   $rows += New-Row 'the client build record is in the repo' $hasRec 'records\client-build.json' 'It is tracked in git, so git pull brings it'
@@ -156,10 +165,21 @@ function Get-ClientRows([string]$SyncClient, [string]$Record, [string]$Game, [st
     2       { 'a build that matches is at ' + $ClientDist + ', and Ship copies it in' }
     default { $(if ($stop.Success) { $stop.Groups[1].Value.Trim() } else { "Sync-Client -Check exit $code" }) }
   }
-  $fix = 'Copy a client build that matches records\client-build.json to ' + $ClientDist +
-         ' (another checkout''s engine\skymp\build\dist\client will do; .\scripts\release\Sync-Client.ps1 -Check -Dist <that folder> says whether it matches),' +
-         ' or build the fork with .\scripts\release\Build-Engine.ps1'
-  $rows += New-Row 'the recorded client is in the game folder, or here to copy in' (($code -eq 0) -or ($code -eq 2)) $detail $fix
+  $ok = ($code -eq 0) -or ($code -eq 2)
+  if ($null -ne $Ci -and -not $ok -and -not (Test-Path -LiteralPath $ClientDist)) {
+    if ($Ci.Code -eq 2) {
+      $ok = $true
+      $detail = 'CI''s build of the pin is not at ' + $ClientDist + ' yet; GitHub keeps it, and the Ship fetches it first'
+    } else {
+      $detail = 'CI''s build of the pin is not at ' + $ClientDist + ', and cannot be fetched: ' + $Ci.Said
+    }
+    $fix = '.\scripts\release\Get-EngineArtifact.ps1 says why, and what makes it again (engine\README.md, A Ship machine takes CI''s build)'
+  } else {
+    $fix = 'Take CI''s build of the pin, the one records\client-build.json names: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci' +
+           ' (engine\README.md, A Ship machine takes CI''s build). A build made on this machine matches only a record made from it;' +
+           ' .\scripts\release\Sync-Client.ps1 -Check -Dist <a folder> says whether another build matches'
+  }
+  $rows += New-Row 'the recorded client is in the game folder, or here to copy in' $ok $detail $fix
   return $rows
 }
 
@@ -221,7 +241,7 @@ function Get-MainOnlyRows([string]$Channel, [string]$ServerRecord, [string[]]$Se
       ('Copy ' + $match + ' to a scratch folder and pass it as -Dist to Deploy-Gamemode.ps1 and Deploy-Server.ps1 (Deploy-Gamemode writes into the folder it is given)') 'either' 'warn'
   } else {
     $rows += New-Row $what $false ('none in ' + ($ServerDists -join ' or ')) `
-      'Build the fork with .\scripts\release\Build-Engine.ps1, or pass Deploy-Gamemode.ps1 and Deploy-Server.ps1 -Dist with a server build whose files all match' 'either' 'warn'
+      '.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci puts CI''s server build of the pin under ServerDist (a build made here never matches); or deploy from the store with Deploy-Server.ps1 -FromStore' 'either' 'warn'
   }
   return $rows
 }
@@ -580,8 +600,21 @@ if ($hasGame -and $reqFiles.Count -gt 0) {
 Head 'The client runtime'
 $where = Join-Path $Here 'Where.ps1'
 $clientDist = (& $where ClientDist)
+# CI's build of the pin, when it is the one this machine reads and is not
+# here yet: whether GitHub keeps it for the Ship to fetch (#3047). Read only.
+$ci = $null
+$ciDist = ''
+try { $ciDist = Join-Path ([string](& $where EngineArtifact)) 'build\dist\client' } catch { $ciDist = '' }
+if ($hasGame -and $ciDist -and ([IO.Path]::GetFullPath($clientDist).TrimEnd('\', '/') -eq [IO.Path]::GetFullPath($ciDist).TrimEnd('\', '/')) -and -not (Test-Path -LiteralPath $clientDist)) {
+  $global:LASTEXITCODE = 0
+  $chunks = & (Join-Path $Here 'Get-EngineArtifact.ps1') -Check -NoPause 6>&1 2>&1
+  $ciCode = $global:LASTEXITCODE
+  $ciText = @(foreach ($o in @($chunks)) { if ($o -is [System.Management.Automation.InformationRecord]) { [string]$o.MessageData } else { [string]$o } }) -join [Environment]::NewLine
+  $ciStop = [regex]::Match($ciText, '(?m)^STOP\. (.+)$')
+  $ci = [pscustomobject]@{ Code = $ciCode; Said = $(if ($ciStop.Success) { $ciStop.Groups[1].Value.Trim() } else { 'Get-EngineArtifact -Check exit ' + $ciCode }) }
+}
 foreach ($r in @(Get-ClientRows (Join-Path $Here 'Sync-Client.ps1') (Join-Path $Here '..\..\records\client-build.json') `
-                   $(if ($hasGame) { $GameDir } else { '' }) $clientDist)) { Show-Row $r }
+                   $(if ($hasGame) { $GameDir } else { '' }) $clientDist $ci)) { Show-Row $r }
 if (-not $hasGame) {
   Say '  skip  no own game folder, so the client in it was not checked' 'DarkGray'
 }
@@ -593,7 +626,7 @@ if (Test-Path -LiteralPath (Join-Path $fork '.git')) {
   Say ('  note  the skymp fork is at ' + $fork + ', on ' + $forkBranch + '. A Ship does not build it.') 'DarkGray'
 } else {
   Say '  note  no clone of the skymp fork here. A Ship does not build the engine, so it is not needed;' 'DarkGray'
-  Say '        only rebuilding the client or the server is (.\scripts\release\Build-Engine.ps1).' 'DarkGray'
+  Say '        only an engine change is, and its build is CI''s (engine\README.md, The engine built in CI).' 'DarkGray'
 }
 
 # ------------------------------------------------ the generated files --

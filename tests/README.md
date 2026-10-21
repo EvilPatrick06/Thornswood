@@ -7,7 +7,11 @@ launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
 --live` is one that does; `test-collection-revision-2.ps1` reads both
-servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+servers' manifests over plain HTTP unless given `-Offline`). One that asks a
+GitHub repository which commits a branch has asks git, through
+`tests\fork-git.js`, and not GitHub's REST API: signed out, that allows 60
+requests an hour per address, and a cloud thread's address is shared (#3052).
+The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
@@ -91,6 +95,15 @@ A path a harness compares with what a script prints is built with
 `Join-Path` or `[IO.Path]::Combine`, and a key written with `\`, like the
 swallow baseline's, is made from a path by replacing
 `[IO.Path]::DirectorySeparatorChar`. Off Windows `\` is part of a file name.
+
+A `.js` harness does the same with `process.platform === 'win32'`: off
+Windows it says SKIP for the part that needs Windows, with why, and checks
+the rest. A path it builds from a name written with `\` splits the name
+first (`path.join.apply(path, [dir].concat(rel.split('\\')))`), and a script
+that reads the game folder matches each folder and file in any case, as
+Windows does (`Check-SkyUIMenus.js` `looseFile`). The C# compiler is
+`tests\launcher-csc.js`, whose `onWindows` is asked before its `csc`; the
+bot's Python is `tests\bot-python.js` (#3005).
 
 ## A harness that compiles launcher code
 

@@ -151,8 +151,10 @@ let n = 0;
 function game(files, order) {
   const root = path.join(TMP, 'g' + (n++));
   const data = path.join(root, 'Data');
+  // rel names folders with \ the way the game does; split, so Linux makes
+  // the folders too rather than one file with \ in its name (#3005).
   Object.keys(files).forEach(function (rel) {
-    const f = path.join(data, rel);
+    const f = path.join.apply(path, [data].concat(rel.split('\\')));
     fs.mkdirSync(path.dirname(f), { recursive: true });
     fs.writeFileSync(f, files[rel]);
   });
@@ -193,6 +195,10 @@ try {
   yes('  and what to do: take the loose scripts out', /Take the loose SkyUI scripts out of Data\\Scripts/.test(r.out));
   yes('  it never says player', !/player/i.test(r.out));
   yes('  and wrote nothing in the game folder', stamp(g1.data) === before);
+  const g1b = game({ 'SkyUI_SE.bsa': skyuiArchive(), 'SkyUI_SE.esp': Buffer.alloc(8), 'scripts\\SKI_Main.PEX': oldScript() });
+  r = run(g1b);
+  yes('  a loose script is found whatever the case of its folder and name, as Windows finds it (got ' + r.code + ')',
+    r.code === 2 && /loose in Data\\Scripts/.test(r.out));
 
   // 2. The same folder once a release has deleted the loose script.
   r = run(g1, ['Data\\Scripts\\ski_main.pex']);
