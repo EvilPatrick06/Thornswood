@@ -27437,7 +27437,9 @@ function wantsAHandle(row) {
   condition and a key its house: the fresh garment is named with the mark of
   the half it carries in front, the needs block's for the weather and the
   maneuvers block's for the armour, and each block reads its own mark off
-  what is worn.
+  what is worn. The name is the craft's own, given by the engine through
+  craftOutput (wovenOutput, below), so no garment is ever made plain and
+  renamed.
 
   The perk is the progression block's own answer (perks), so it is held at
   master in the half somebody picked and nowhere else.
@@ -27462,73 +27464,33 @@ function wovenMark(actorId) {
   return N && N.NEEDS && N.NEEDS.wear && N.NEEDS.wear.woven ? N.NEEDS.wear.woven.mark : '';
 }
 
-/** Name n plain units of a garment just made as a master weaver's. Answers how many. */
-function markWoven(actorId, outDesc, name, n) {
-  const mark = wovenMark(actorId);
-  const baseId = idOf(outDesc);
-  if (!mark || !baseId || !(n > 0)) { return 0; }
-  let inv = null;
-  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return 0; }
-  const entries = (inv && inv.entries) || [];
-  for (let i = 0; i < entries.length; i++) {
-    const e = entries[i];
-    if (!e || e.baseId !== baseId || e.name || e.worn || e.wornLeft || !(e.count > 0)) { continue; }
-    const take = Math.min(n, e.count);
-    const named = {};
-    for (const k in e) { if (Object.prototype.hasOwnProperty.call(e, k)) { named[k] = e[k]; } }
-    named.count = take;
-    named.name = mark + String(name || 'Garment');
-    e.count -= take;
-    if (e.count <= 0) { entries.splice(i, 1); }
-    entries.push(named);
-    try { mp.set(actorId, 'inventory', { entries: entries }); } catch (e2) { return 0; }
-    return take;
-  }
-  return 0;
-}
-
 /*
-  WHEN THE GARMENT IS IN THE PACK. The gamemode is asked before the engine does
-  anything: CraftEvent::Fire runs mp.onCraft, and only when it was not refused
-  does OnFireSuccess take the inputs and add the output, in the same
-  server.tick() call (the fork's CraftEvent.cpp, and index.ts, which awaits a
-  timer between ticks). So a timer set here runs after the engine has finished,
-  whatever its length, and nothing about it is a race; 0 says that.
+  THE MARK IS NAMED BEFORE THE ENGINE GIVES THE GARMENT (#3026). A woven
+  garment is a named entry of its record, and the engine fork's craftOutput
+  carries the entry's name beside the record and the count (fork #93): inside
+  mp.onCraft, mp.set(actorId, 'craftOutput', { name }) and OnFireSuccess adds
+  the garment named, in the step that takes the inputs. Until then the engine
+  could add only a plain one, so this waited on a timer for it to land,
+  counted the pack to see that it had, and renamed units off the plain stack.
+  A craft the engine refuses after the gamemode said yes gives nothing, named
+  or not, so there is nothing to check afterwards.
 
-  What the timer cannot assume is that the engine succeeded. RemoveItems throws
-  when the server does not hold what the client said went in ("Source
-  inventory doesn't have enough", seen on the dev server on 23 September),
-  after the gamemode already said yes. So the count of the output is taken now,
-  and the mark is given only if the craft's own n arrived. Otherwise a craft
-  the engine refused would name a garment the master did not make.
-
-  The mark is the one thing here that still waits for the engine: craftOutput
-  names a record and a count, and a woven garment is a named entry of a
-  record, which the engine cannot add yet (#3026). Grand Chef's and Master
-  Chemist's second batch used to wait the same way, counting the pack after
-  the engine and adding a batch on top; since #2906 the engine gives the
-  batch twice itself, and they are named before it does (cookedOutput, and
-  the brew in recipelessCraft).
+  The whole batch is named: every garment of one craft was made by the same
+  master on the same pick.
 */
-const MASTER_CRAFT_AFTER_MS = 0;
-
-/** After an allowed craft: Master Weaver's mark. */
-function masterCraft(actorId, row, count) {
-  if (!row || typeof row !== 'object' || !row.out) { return; }
-  const n = Number(count) > 0 ? Math.floor(Number(count)) : (Number(row.makes) || 1);
-  const weaver = row.owner === 'Tailor' && row.type === 'ARMO' && holdsPerk(actorId, 'masterweaver');
-  if (!weaver) { return; }
-  const before = packCount(actorId, row.out);
-  setTimeout(function () {
-    if (packCount(actorId, row.out) < before + n) {
-      log(actorId.toString(16), 'made no', row.name, 'after all (the engine refused the craft), so no master work is added');
-      return;
-    }
-    try {
-      const done = markWoven(actorId, row.out, row.name, n);
-      log(actorId.toString(16), 'is a Master Weaver:', done, row.name, 'woven');
-    } catch (e) { log('the woven garment', row.name, 'was not named:', e); }
-  }, MASTER_CRAFT_AFTER_MS);
+function wovenOutput(actorId, row) {
+  if (!row || typeof row !== 'object' || row.owner !== 'Tailor' || row.type !== 'ARMO') { return; }
+  if (!holdsPerk(actorId, 'masterweaver')) { return; }
+  const mark = wovenMark(actorId);
+  if (!mark) { return; }
+  const out = mp.get(actorId, 'craftOutput');
+  if (!out || !(out.baseId > 0) || !(out.count > 0)) {
+    log(actorId.toString(16), 'is weaving', row.name, 'and the engine names no craftOutput, so it comes out plain');
+    return;
+  }
+  const name = mark + String(row.name || 'Garment');
+  mp.set(actorId, 'craftOutput', { name: name });
+  log(actorId.toString(16), 'is a Master Weaver:', out.count, name);
 }
 
 /*
@@ -28777,7 +28739,7 @@ ecipes.json are hafted, and 126 of those are rows the server is
     }
   }
   cookedOutput(actorId, row);
-  masterCraft(actorId, row, count);
+  wovenOutput(actorId, row);
   return;
 });
 
@@ -50263,7 +50225,7 @@ return module.exports;
     the tailor picks one per garment, warmth or armour. The pick is on the
     profession card on K, whose two buttons send /pick weave warmth and
     /pick weave armour (nobody types either), and it is kept on the character
-    as weave until they press the other. markWoven reads it at the craft.
+    as weave until they press the other. wovenOutput reads it at the craft.
     Warmth until they pick armour, which is what every garment woven before
     there was a pick carries. null for anybody who does not hold the perk.
   */
@@ -53380,7 +53342,7 @@ mp.onSpellCast = guard('onSpellCast', function (casterId, spell, asked) {
     rating (the server's damage is the fork's TES5DamageFormula), and this
     adds no weight, which is the page's "still weighs what clothing weighs".
 
-    mark is what the craft writes in front of the garment's name (markWoven,
+    mark is what the craft writes in front of the garment's name (wovenOutput,
     beside mp.onCraft), the way the weather half writes NEEDS.wear.woven.mark.
     The two marks differ, so a garment carries one half and never both: the
     needs block reads only its own. One worn is enough and two do not give
@@ -63673,7 +63635,7 @@ mp.onUpdateAppearanceAttempt = guard('onUpdateAppearanceAttempt', function (acto
     the night and the height are taking, and never turn them into warmth.
 
     A woven garment is one whose name starts with NEEDS.wear.woven.mark, which
-    the craft writes on it (markWoven, beside mp.onCraft). One worn is enough
+    the craft writes on it (wovenOutput, beside mp.onCraft). One worn is enough
     and two do not ignore 8. A piece with an enchantment on it is not one: the
     enchanting table lets anybody name a piece, and the engine only enchants a
     plain one, which a woven garment is not.
