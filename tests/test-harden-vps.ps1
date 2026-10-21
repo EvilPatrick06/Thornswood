@@ -109,6 +109,11 @@ function Test-SshdFile([string]$Path) {
 }
 function Start-SshdRestart { $global:Fake.restarts++; $global:Fake.log.Add('Start-SshdRestart') }
 function Register-Rollback([string]$Backup) { $global:Fake.rollback = $Backup; $global:Fake.log.Add('Register-Rollback') }
+function New-PrivateFile([string]$Path) {
+    $global:Fake.private.Add([pscustomobject]@{ Path = $Path; Existed = (Test-Path -LiteralPath $Path) })
+    [IO.File]::WriteAllBytes($Path, [byte[]]@())
+    $global:Fake.log.Add('New-PrivateFile')
+}
 '@
 $Layer = Join-Path $tmp 'layer.ps1'
 [IO.File]::WriteAllText($Layer, $layerText, $utf8)
@@ -131,6 +136,7 @@ function New-Fake {
         rollback = ''
         log = New-Object System.Collections.Generic.List[string]
         checked = New-Object System.Collections.Generic.List[string]
+        private = New-Object System.Collections.Generic.List[object]
     }
 }
 function Rule([string]$name) { return @($global:Fake.rules | Where-Object { $_.Name -eq $name })[0] }
@@ -158,7 +164,7 @@ try {
     Yes 'vps-harden.ps1 parses' (-not $errs -or $errs.Count -eq 0)
     Yes '  and is plain ASCII, which Windows PowerShell on the box reads right without a byte order mark' (-not ($boxText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback')
+    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -176,6 +182,12 @@ try {
         if (-not $p -or $layerNames -notcontains $p.Name) { $loose += ('{0} at line {1}' -f $name, $c.Extent.StartLineNumber) }
     }
     Yes ('every command in it that touches Windows is inside a layer function' + $(if ($loose.Count) { ': ' + ($loose -join ', ') } else { '' })) ($loose.Count -eq 0)
+    # A copy written plainly into C:\ProgramData\ssh takes the folder's rule
+    # for every signed in account (#3034), so rules are set in one place.
+    $setAcl = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.InvokeMemberExpressionAst] -and [string]$n.Member -eq 'SetAccessControl' }, $true) | Where-Object {
+        $p = $_.Parent; while ($p -and -not ($p -is [System.Management.Automation.Language.FunctionDefinitionAst])) { $p = $p.Parent }; -not $p -or $p.Name -ne 'New-PrivateFile' })
+    $copies = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Copy-Item', 'Set-Acl', 'icacls', 'icacls.exe') -contains $n.GetCommandName() }, $true))
+    Yes '  a file''s rules are set only in New-PrivateFile, and no Copy-Item, Set-Acl or icacls makes or changes one' (-not $setAcl.Count -and -not $copies.Count)
 
     # ---- a dry run changes nothing ------------------------------------------------
     New-Fake
@@ -206,6 +218,8 @@ try {
     Yes '  and the rest of the file is as it was, Match block included' (($new -replace '(?m)^(PasswordAuthentication|KbdInteractiveAuthentication) no\r\n', '') -eq $defaultCfg)
     $backups = @(Get-ChildItem -LiteralPath $tmp -Filter 'sshd_config.before-harden-*')
     Yes '  the old file is kept beside it' ($backups.Count -eq 1 -and [IO.File]::ReadAllText($backups[0].FullName) -eq $defaultCfg)
+    Yes '  made by New-PrivateFile while it did not exist yet, so its rules are set before the old file goes in (#3034)' ($global:Fake.private.Count -eq 1 -and
+        $global:Fake.private[0].Path -eq $backups[0].FullName -and -not $global:Fake.private[0].Existed -and $global:Fake.log.IndexOf('New-PrivateFile') -lt $global:Fake.log.IndexOf('Register-Rollback'))
     Yes '  Remote Desktop refused' ($global:Fake.fDeny -eq 1)
     Yes '  its allow rules off, the group ones and the one on 3389' (-not (Rule 'RemoteDesktop-UserMode-In-TCP').Enabled -and -not (Rule 'RemoteDesktop-Shadow-In-TCP').Enabled -and -not (Rule 'Custom-RDP').Enabled)
     Yes '  ssh''s rule on 22 left on' ((Rule 'OpenSSH-Server-In-TCP').Enabled -and (Has $r.Lines "^KEPT ssh: firewall rule 'OpenSSH SSH Server"))
@@ -221,7 +235,7 @@ try {
     # ---- a second run -----------------------------------------------------------------
     $r2 = Invoke-BoxHere $cfg
     Yes 'second run: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and -not (Has $r2.Lines '^(CHANGED|WOULD) '))
-    Yes '  no second backup and no second restart' (@(Get-ChildItem -LiteralPath $tmp -Filter 'sshd_config.before-harden-*').Count -eq 1 -and $global:Fake.restarts -eq 1)
+    Yes '  no second backup and no second restart' (@(Get-ChildItem -LiteralPath $tmp -Filter 'sshd_config.before-harden-*').Count -eq 1 -and $global:Fake.restarts -eq 1 -and $global:Fake.private.Count -eq 1)
 
     # ---- sshd -t refuses the new file ---------------------------------------------------
     New-Fake
