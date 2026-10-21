@@ -29,10 +29,15 @@
   sits inside a layer function.
 
   The machine half runs Set-SshScope.ps1 with ssh, scp and ssh-keygen as
-  stand-ins. It checks: no pinned key, or no key login, means a refusal
-  before anything is sent; -WhatIf runs the box read only; a real run proves
-  a new key login before it cancels the put back; a new login that fails
-  leaves the put back armed and exits 1.
+  stand-ins. ssh, given the script Send-Script.ps1 sends on its standard
+  input, checks it carries the whole of vps-ssh-scope.ps1 and runs that file
+  against the stand-in layer with the -From and -DryRun the script gave it.
+  It checks: no pinned key, or no key login, means a refusal before anything
+  is sent; nothing is ever copied to the box (#3035); -WhatIf runs the box
+  read only; a real run proves a new key login before it cancels the put
+  back; a new login that fails leaves the put back armed and exits 1.
+  tests\test-3035-file-script.ps1 runs the sent form itself, in a process of
+  its own.
 #>
 [CmdletBinding()]
 param()
@@ -98,13 +103,11 @@ function Rule([string]$name) { return @($global:Fake.rules | Where-Object { $_.N
 function RemoteOf([string]$name) { return ((Rule $name).Remote -join ',') }
 
 function Invoke-BoxHere([string]$from, [switch]$Dry) {
-    $copy = Join-Path $tmp ('box-' + [Guid]::NewGuid().ToString('N') + '.ps1')
-    Copy-Item -LiteralPath $Box -Destination $copy
     $a = @{ Layer = $Layer; From = $from }
     if ($Dry) { $a.DryRun = $true }
     $global:LASTEXITCODE = 0
-    $out = @(& $copy @a 2>&1 | ForEach-Object { [string]$_ })
-    return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out; Copy = $copy }
+    $out = @(& $Box @a 2>&1 | ForEach-Object { [string]$_ })
+    return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out }
 }
 function Has($lines, [string]$rx) { return (@($lines | Where-Object { $_ -match $rx }).Count -gt 0) }
 function Untouched { return ($global:Fake.log.Count -eq 0 -and -not $global:Fake.rollback -and (RemoteOf 'OpenSSH-Server-In-TCP') -eq 'Any' -and (RemoteOf 'sshd-22-extra') -eq 'Any') }
@@ -146,7 +149,8 @@ try {
     Yes '  says WOULD for the save, the put back and both enabled rules for 22' ((Has $r.Lines '^WOULD saved the rules') -and (Has $r.Lines "^WOULD a task named 'Thornswood ssh scope rollback'") -and
         (Has $r.Lines "^WOULD rule 'OpenSSH SSH Server \(sshd\)' takes port 22 from 203\.0\.113\.7, 198\.51\.100\.0/24 \(was Any\)") -and (Has $r.Lines "^WOULD rule 'Open SSH Port 22'"))
     Yes '  and changes nothing, saves nothing, arms nothing' ((Untouched) -and @(Get-ChildItem -LiteralPath $global:Fake.save).Count -eq 0)
-    Yes '  deletes itself, and its last line says nothing was changed' (-not (Test-Path -LiteralPath $r.Copy) -and $r.Lines[-1] -match '^DONE \d+ change\(s\) would be made\. Nothing was changed\.')
+    Yes '  has nothing of its own to delete, since it is never written on the box (#3035), and its last line says nothing was changed' (
+        $boxText -notmatch 'PSCommandPath|KeepSelf' -and $r.Lines[-1] -match '^DONE \d+ change\(s\) would be made\. Nothing was changed\.')
 
     # ---- a real run ------------------------------------------------------------------
     $r = Invoke-BoxHere '203.0.113.7,198.51.100.0/24'
@@ -271,7 +275,9 @@ try {
     $far = Join-Path $tmp 'far'
     New-Item -ItemType Directory -Path $far -Force | Out-Null
 
-    $global:H = @{ KeyWorks = $true; KeyAfter = $true; Changed = $false; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string]); Far = $far; Layer = $Layer; Cancelled = $false; Sent = '' }
+    . (Join-Path $repo 'scripts\vps\Send-Script.ps1')
+    $global:H = @{ KeyWorks = $true; KeyAfter = $true; Changed = $false; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string]); Far = $far; Layer = $Layer; Cancelled = $false; Sent = ''
+                   Box = $Box; BoxText = [IO.File]::ReadAllText($Box); Reader = (Get-ThornswoodStdinReader) }
     function global:ssh-keygen {
         $a = @($args | ForEach-Object { [string]$_ })
         if ($a -contains '-F') { '# Host 127.0.0.1 found: line 1'; ('127.0.0.1 ED25519 ' + $global:H.HostFp); $global:LASTEXITCODE = 0; return }
@@ -291,24 +297,38 @@ try {
         $a = @($args | ForEach-Object { [string]$_ })
         # ssh -G, what ssh makes of its config: whether it goes through the bridge.
         if ($a -contains '-G') { 'hostname 127.0.0.1'; if ($global:H.Bridge) { 'proxycommand "node" "C:\Users\x\.ssh\thornswood-bridge\connect.js"' }; $global:LASTEXITCODE = 0; return }
-        $global:H.Calls.Add('ssh ' + ($a -join ' '))
+        $in = @($input | ForEach-Object { [string]$_ })
         $last = $a[-1]
-        if ($last -eq 'echo THORNSWOOD_KEY_OK') {
-            $ok = if ($global:H.Changed) { $global:H.KeyAfter } else { $global:H.KeyWorks }
-            if ($ok) { 'THORNSWOOD_KEY_OK'; $global:LASTEXITCODE = 0 } else { 'Administrator@127.0.0.1: Permission denied (publickey).'; $global:LASTEXITCODE = 255 }
-            return
+        # The script as the box would run it: inline, or Send-Script.ps1's
+        # reader on the line with the script on standard input.
+        $s = ''
+        if ($last -match 'EncodedCommand (\S+)') {
+            $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
+            if ($s -eq $global:H.Reader -and $in.Count) { $s = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
         }
-        if ($last -match '-File (\S+) -From "([^"]*)"( -DryRun)?$') {
-            $local = Join-Path $global:H.Far (($Matches[1] -split '/')[-1])
-            $dry = [bool]$Matches[3]
-            $out = @(& $local -Layer $global:H.Layer -From $Matches[2] -DryRun:$dry 2>&1 | ForEach-Object { [string]$_ })
+        # vps-ssh-scope.ps1 whole, as a block with its arguments after it: the
+        # file under test runs here with them, against the stand-in layer.
+        $at = $s.IndexOf($global:H.BoxText)
+        if ($at -ge 0) {
+            $given = $s.Substring($at + $global:H.BoxText.Length).Trim().TrimStart('}').Trim()
+            $m = [regex]::Match($given, "^-From '((?:[^']|'')*)'( -DryRun)?$")
+            if (-not $m.Success) { $global:H.Calls.Add('ssh UNREAD ' + $given); $global:LASTEXITCODE = 1; return }
+            $from = $m.Groups[1].Value.Replace("''", "'")
+            $dry = $m.Groups[2].Success
+            $global:H.Calls.Add('ssh ' + (($a | Select-Object -SkipLast 1) -join ' ') + ' BOX -From "' + $from + '"' + $(if ($dry) { ' -DryRun' } else { '' }))
+            $out = @(& $global:H.Box -Layer $global:H.Layer -From $from -DryRun:$dry 2>&1 | ForEach-Object { [string]$_ })
             $code = $LASTEXITCODE
             if (-not $dry -and $global:Fake.log.Count) { $global:H.Changed = $true }
             $out
             $global:LASTEXITCODE = $code; return
         }
-        if ($last -match 'EncodedCommand (\S+)') {
-            $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
+        $global:H.Calls.Add('ssh ' + ($a -join ' '))
+        if ($last -eq 'echo THORNSWOOD_KEY_OK') {
+            $ok = if ($global:H.Changed) { $global:H.KeyAfter } else { $global:H.KeyWorks }
+            if ($ok) { 'THORNSWOOD_KEY_OK'; $global:LASTEXITCODE = 0 } else { 'Administrator@127.0.0.1: Permission denied (publickey).'; $global:LASTEXITCODE = 255 }
+            return
+        }
+        if ($s) {
             if ($s -match 'Unregister-ScheduledTask -TaskName ''Thornswood ssh scope rollback''') { $global:H.Cancelled = $true; 'ROLLBACK_CANCELLED' }
             elseif ($s -match 'Get-NetFirewallAddressFilter') { foreach ($r in $global:Fake.rules) { if ($r.Enabled -and $r.Action -eq 'Allow' -and $r.Ports -contains '22') { 'rule      ' + $r.DisplayName + ': from ' + ($r.Remote -join ', ') } } }
             $global:LASTEXITCODE = 0; return
@@ -340,7 +360,8 @@ try {
     $r = Invoke-Driver @{ WhatIf = $true }
     Yes '-WhatIf: exit 0, the box ran read only, nothing changed' ($r.Code -eq 0 -and $r.Text -match 'Nothing was changed\. Run it again without -WhatIf' -and
         @($global:H.Calls | Where-Object { $_ -match '-From "203\.0\.113\.7,198\.51\.100\.0/24" -DryRun$' }).Count -eq 1 -and (Untouched))
-    Yes '  the copy sent up deleted itself' ($global:H.Sent -and -not (Test-Path -LiteralPath $global:H.Sent))
+    Yes '  vps-ssh-scope.ps1 went whole on ssh''s standard input, and nothing was copied to the box (#3035)' (
+        -not $global:H.Sent -and @($global:H.Calls | Where-Object { $_ -like 'scp *' -or $_ -match '-File |UNREAD' }).Count -eq 0)
 
     Fresh
     $r = Invoke-Driver @{}
@@ -348,7 +369,7 @@ try {
     $seq = ($global:H.Calls | ForEach-Object { $_ }) -join "`n"
     Yes '  a new key login after the change, before the put back is cancelled' ($global:H.Cancelled -and $seq -match '(?s)-From "[^"]*"\n[^\n]*echo THORNSWOOD_KEY_OK\n[^\n]*EncodedCommand')
     Yes '  and it reads the rules back' ($r.Text -match "rule      OpenSSH SSH Server \(sshd\): from 203\.0\.113\.7, 198\.51\.100\.0/24")
-    Yes '  every ssh and scp checked the host key' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' }).Count -eq 0)
+    Yes '  every ssh checked the host key, and nothing went by scp' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' -or $_ -like 'scp *' }).Count -eq 0)
 
     Fresh
     $global:H.KeyAfter = $false

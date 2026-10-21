@@ -145,9 +145,15 @@ $keepLine = 'powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String
 Yes ('and fits on the command line, so nothing is sent ahead of it as a file (' + $keepLine.Length + ' of 6000)') ($keepLine.Length -le 6000)
 Yes 'the run holds its folder''s lock while it runs, and stops when it cannot' ($far.Contains("New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')") -and $far -match 'could not be held through its lock')
 $runText = Get-Content -LiteralPath $runOnBox -Raw
-Yes 'Run-OnBox.ps1 starts the keeper, sends the run into its folder and no longer removes the folder by a call of its own' (
-    $runText -match 'Start-ThornswoodRemote -Target \$target -SshArgs \$ssh -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run\)' -and
-    $runText -match "\(\`$runFar \+ '/run\.ps1'\)" -and $runText -match "StandardInput\.Close\(\)" -and
+# The keeper is started and told the run is over in OnBox.ps1, for every
+# script that lands files on the box (#3035), and Run-OnBox.ps1 goes through it.
+$onBoxText = Get-Content -LiteralPath (Join-Path $Repo 'scripts\mods\OnBox.ps1') -Raw
+Yes 'OnBox.ps1 starts the keeper for a run''s folder and closes its input to end the run' (
+    $onBoxText -match 'Start-ThornswoodRemote -Target \$Target -SshArgs \$SshArgs -Script \(Get-ThornswoodOnBoxKeepScript -Run \$run\)' -and
+    $onBoxText -match "StandardInput\.Close\(\)" -and $onBoxText -match "'GONE ' \+ \`$Folder\.Run")
+Yes 'Run-OnBox.ps1 opens its folder there, sends the run into it and no longer removes the folder by a call of its own' (
+    $runText -match 'Open-ThornswoodOnBoxFolder -Target \$target -SshArgs \$ssh' -and $runText -match 'Close-ThornswoodOnBoxFolder \$box' -and
+    $runText -match "\(\`$runFar \+ '/run\.ps1'\)" -and $runText -notmatch 'Start-ThornswoodRemote' -and
     $runText -notmatch 'OnBoxCleanScript' -and $runText -notmatch 'Invoke-ThornswoodArtifactRemote \$target \$ssh \$farRun')
 Yes 'and its own scratch folder here is not named like a run folder on the box' ($runText -match "'thornswood-runonbox-'" -and $runText -notmatch "GetTempPath\(\)\) \('thornswood-onbox-'")
 

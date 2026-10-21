@@ -166,7 +166,7 @@ elseif ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
     $box = Join-Path $tmp 'dev-box'
     New-Item -ItemType Directory -Force -Path $box | Out-Null
     function Run-DevBlock {
-        $rootWin = $box; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
+        $rootWin = $box; $orderWire = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
         $fullIndexDef = $script:fullIndexDef
         $lightDef = ''
         $devRecordLight = $false

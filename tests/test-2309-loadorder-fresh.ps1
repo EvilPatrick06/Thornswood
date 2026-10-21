@@ -116,9 +116,8 @@ try {
         try { . ([scriptblock]::Create($block)) } catch { $thrown = $_.Exception.Message }
         $o = [pscustomobject]@{
             Thrown = $thrown; Names = @($pluginNames); Send = @($sendPlugins | ForEach-Object { Split-Path $_ -Leaf }); Changed = @($changed)
-            OrderFile = $orderFile; FarOrder = $farOrder; OrderText = $(if ($orderFile -and (Test-Path -LiteralPath $orderFile)) { [IO.File]::ReadAllText($orderFile) } else { '' })
+            OrderWire = $orderWire; OrderText = $(if ($orderWire) { [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($orderWire)) } else { '' })
         }
-        if ($orderFile) { Remove-Item -LiteralPath $orderFile -Force -ErrorAction SilentlyContinue }
         return $o
     }
 
@@ -129,7 +128,7 @@ try {
     $p = Plan $true ''
     Yes ('it goes through with no engine build' + $(if ($p.Thrown) { ': ' + $p.Thrown } else { '' })) ($p.Thrown -eq '')
     Yes ("  the order is the dev server's own ({0})" -f ($p.Names -join ', ')) (($p.Names -join '|') -eq 'Skyrim.esm|Thornswood-Content.esp')
-    Yes '  and it is kept: no list goes up to rewrite it' ($p.OrderFile -eq '' -and $p.FarOrder -eq '')
+    Yes '  and it is kept: no list goes up to rewrite it' ($p.OrderWire -eq '')
     Yes ("  our content plugin goes up, from the checkout, when the box holds another size ({0})" -f ($p.Send -join ', ')) (($p.Send -join '|') -eq 'Thornswood-Content.esp')
     Yes '  and Skyrim.esm, the same on both, does not' ($p.Send -notcontains 'Skyrim.esm')
 
@@ -167,7 +166,7 @@ try {
     Put (Join-Path $box 'plugins\Update.esm') $hdr
     $p = Plan $true $build
     Yes ('  with every plugin on the box, it goes through' + $(if ($p.Thrown) { ': ' + $p.Thrown } else { '' })) ($p.Thrown -eq '' -and $p.Send.Count -eq 0)
-    Yes '  and the build''s order goes up as the list that rewrites the dev one' ($p.FarOrder -match '^C:/Windows/Temp/thornswood-dev-loadorder-[0-9a-f]{32}\.txt$' -and $p.OrderText -eq "Skyrim.esm`nUpdate.esm`nThornswood-Content.esp`n")
+    Yes '  and the build''s order goes up as the list that rewrites the dev one' ($p.OrderText -eq "Skyrim.esm`nUpdate.esm`nThornswood-Content.esp")
     $p = Plan $true (Join-Path $Scratch 'no-build-here')
     Yes '-Dist naming no build is refused, saying to leave it out' ($p.Thrown -match '-Dist names no built server' -and $p.Thrown -match 'Leave -Dist out')
     # A build whose order leaves out a plugin the dev server loads (#2320):
@@ -176,9 +175,9 @@ try {
     Put (Join-Path $short 'server-settings.json') '{"port":7777,"loadOrder":["c:/steam/Data/Skyrim.esm"]}'
     $p = Plan $true $short
     Yes 'a build''s order that drops a plugin the dev server loads is refused before anything goes (#2320)' (
-        $p.Thrown -match 'leaves out 1 of the 2' -and $p.Thrown -match 'Thornswood-Content\.esp' -and $p.Thrown -match '-DropPlugins' -and $p.Send.Count -eq 0 -and $p.FarOrder -eq '')
+        $p.Thrown -match 'leaves out 1 of the 2' -and $p.Thrown -match 'Thornswood-Content\.esp' -and $p.Thrown -match '-DropPlugins' -and $p.Send.Count -eq 0 -and $p.OrderWire -eq '')
     $p = Plan $true $short @('Thornswood-Content.esp')
-    Yes '  and goes through when -DropPlugins names it' ($p.Thrown -eq '' -and $p.OrderText -eq "Skyrim.esm`n")
+    Yes '  and goes through when -DropPlugins names it' ($p.Thrown -eq '' -and $p.OrderText -eq 'Skyrim.esm')
     $p = Plan $true '' @('Thornswood-Content.esp')
     Yes '  -DropPlugins without -Dist is refused: the dev server''s own order drops nothing' ($p.Thrown -match '-DropPlugins goes with -Dist')
 
@@ -189,7 +188,10 @@ try {
     $distParam = @($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Dist' })
     Yes '  -Dist has no default' ($distParam.Count -eq 1 -and ($null -eq $distParam[0].DefaultValue -or $distParam[0].DefaultValue.Extent.Text -eq "''"))
     Yes '  and -Dist is read only inside -LoadOrder' (@([regex]::Matches($src.Substring(0, $open), '\$Dist\b')).Count -le 1)
-    Yes '  and the load order list goes up only when there is one' ($src.Contains("  if (`$orderFile) {`n    Invoke-ThornswoodNative { & scp @ssh `$orderFile"))
+    # Until #3035 the list went up as a file of its own in C:\Windows\Temp, and a
+    # deploy that stopped before the block that removed it left it there.
+    Yes '  and the load order list goes inside the settings block that reads it, with no file of its own on the box' (
+        $src.Contains("`$orderWire = '`$orderWire'") -and $src -notmatch 'dev-loadorder' -and $src -notmatch '\$farOrder\b')
 }
 finally {
     $env:THORNSWOOD_TEST_SERVER_DIR = $oldServerDir

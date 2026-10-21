@@ -35,8 +35,9 @@
   What the two shells showed on this machine on 24 September, when a long
   script still went as a file: the path bare ran under both, and the path in
   single quotes failed under cmd.exe ("The given path's format is not
-  supported"). Scripts that still copy a file of their own up and run it
-  with -File (Harden-VPS.ps1 and the like) are held to the bare form below.
+  supported"). Since #3035 no script copies a file of its own up to run it
+  with -File (Harden-VPS.ps1 and the like did); every script is still read
+  below for that shape, so none goes back to the quoted form.
 
   It runs only what this harness sent, in the exact shapes the helpers send:
   its own two scripts inline, or the reader with one of them on its standard
@@ -143,9 +144,8 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell, [string[]]$std
     # scripts inline, or Send-Script.ps1's reader with one of them as the
     # first line of its standard input.
     $ok = $false
-    # -ExecutionPolicy Bypass as well since Rotate-BotToken.ps1 (#902): its
-    # inline script dot-sources a writer it copied up, and a file is what an
-    # execution policy looks at.
+    # -ExecutionPolicy Bypass as well: the reader's line always has it, and a
+    # caller's -Bypass puts it on an inline one.
     $m = [regex]::Match($command, '^powershell -NoProfile (-ExecutionPolicy Bypass )?-EncodedCommand ([A-Za-z0-9+/=]+)$')
     if ($m.Success) {
         $text = ''
@@ -407,23 +407,10 @@ foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps
     }
     $helpers++
     try { Invoke-Expression $fn } catch { Yes ("the Remote in {0} can be lifted" -f $f.Name) $false; continue }
-    # A guard that refuses instead of sending a file. Rotate-BotToken.ps1
-    # (#902) does that on purpose: what it sends carries the bot token, and a
-    # script sent as a temp file would put the token on the disk at both
-    # ends, so its remote scripts are kept short and a long one is an error.
-    # Held to that instead: a 10 KB script stops before anything is sent, and
-    # a short one goes inline, whole, and runs.
-    if ($fn -match '\$cmd\.Length -gt \d+\)\s*\{\s*throw\b') {
-        $r = Measure-Send { Remote $big }
-        Yes ("{0} refuses a 10 KB script rather than send it, since its scripts carry the token" -f $f.Name) ($r.Stopped -ne '')
-        Yes '  and nothing went to the far end, by ssh or scp' ($r.Ssh.Count -eq 0 -and $r.Scp.Count -eq 0)
-        $r = Measure-Send { Remote $short }
-        Yes '  and a short one goes inline, in one call' ($r.Scp.Count -eq 0 -and $r.Ssh.Count -eq 1)
-        Yes '  whole' ($r.Ssh.Count -eq 1 -and (Get-Encoded $r.Ssh[0].Command).Contains($short))
-        Runs '  and runs' ($r.Out.Contains('short and sent inline'))
-        if (-not $r.Out.Contains('short and sent inline')) { Show-Why $r }
-        continue
-    }
+    # Rotate-BotToken.ps1 (#902) refused a long script here until #3035, when
+    # its writer went up as a file first; it sends through Send-Script.ps1
+    # now, the token on standard input after the script, so the loop above
+    # sends it a 10 KB script like any other.
     Test-Sends $f.Name { Remote $big } { Remote $short } $false
 }
 Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)

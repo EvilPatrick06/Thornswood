@@ -66,6 +66,28 @@ function Get-ThornswoodStdinReader {
     return ". ([scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((('' + [Console]::In.ReadLine()) -replace '[^A-Za-z0-9+/=]', '')))))"
 }
 
+# A script file of the repository's, as the text that runs it on the box with
+# $Arguments, for Invoke-ThornswoodRemote to send (#3035). $Arguments is
+# written as it would be typed after the file's name there: '-DryRun', or
+# "-From '203.0.113.7'". The file is never copied to the box: until 21 Oct
+# 2026 Harden-VPS.ps1, Set-SshScope.ps1 and Set-TimeWait.ps1 each copied
+# theirs into C:\Windows\Temp with scp and ran it with -File, and a run cut
+# between the copy and the end of the run left it there for good.
+#
+# Dot-sourced, not called with &, so the file's own top level is the scope
+# its functions reach with $script:, as under -File. Called with &, the
+# block's top level is a scope of its own and $script: is the one above it:
+# measured 21 Oct 2026, a file that sets $stopped = $false at its top, has a
+# function set $script:stopped = $true, and exits 3 when $stopped is true
+# exited 0 with &, and 3 dot-sourced (tests\test-3035-file-script.ps1).
+function Get-ThornswoodFileScript {
+    param(
+        [Parameter(Mandatory = $true)][string]$Path,
+        [string]$Arguments = ''
+    )
+    return ". {`r`n" + [IO.File]::ReadAllText($Path) + "`r`n} " + $Arguments.Trim()
+}
+
 # Runs $Script on the VPS and hands back what the far side printed (2>&1, the
 # same as every Remote here).
 #   -Target   user@host

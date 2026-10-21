@@ -115,27 +115,20 @@ foreach ($s in @($chainFiles.steps | Where-Object { $_.tool -like '*.py' })) {
 $artifact = New-ThornswoodArtifact -Component tools -RepoDir $repo -Paths $paths
 Say ('artifact ' + (Format-ThornswoodArtifact $artifact)) 'DarkGray'
 
-$run = 'C:\Windows\Temp\thornswood-onbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
-$runFar = $run.Replace('\', '/')
-$farRun = Get-ThornswoodOnBoxScript -Run $run -ServerRoot $serverRoot -Tool $tool -Arguments $Arguments
-
 # Not named like the box's run folders, so a run on a machine whose temp
 # folder is C:\Windows\Temp is never taken for one of them.
 $local = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-runonbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
 New-Item -ItemType Directory -Force -Path $local | Out-Null
-$keeper = $null
-$made = $false
+$box = $null
 $code = 1
 try {
-    # The keeper first: it removes what earlier runs left, then makes this
-    # run's folder and holds it until its input is closed, below.
-    $keeper = Start-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-ThornswoodOnBoxKeepScript -Run $run)
-    while ($null -ne ($l = $keeper.StandardOutput.ReadLine())) {
-        $l = $l.Trim()
-        if ($l -eq ('MADE ' + $run)) { $made = $true; break }
-        if ($l) { Say ('box  ' + $l) 'DarkGray' }
-    }
-    if (-not $made) { throw ('could not make ' + $run + ' on the box. What ssh said is above.') }
+    # The run's folder, held by its keeper until the finally below (OnBox.ps1).
+    $box = Open-ThornswoodOnBoxFolder -Target $target -SshArgs $ssh
+    $run = $box.Run
+    $runFar = $box.Far
+    foreach ($l in $box.Said) { Say ('box  ' + $l) 'DarkGray' }
+    if (-not $box.Made) { throw ('could not make ' + $run + ' on the box. What ssh said is above.') }
+    $farRun = Get-ThornswoodOnBoxScript -Run $run -ServerRoot $serverRoot -Tool $tool -Arguments $Arguments
     # The run's own script goes into its folder, so it goes with the folder.
     $farFile = Join-Path $local 'run.ps1'
     [IO.File]::WriteAllText($farFile, $farRun, (New-Object Text.UTF8Encoding($true)))
@@ -185,15 +178,10 @@ try {
         Say 'the tool wrote nothing under game/ or records/' 'DarkGray'
     }
 } finally {
-    if ($keeper) {
-        # Closing its input is how the keeper is told the run is over; it
-        # removes the folder and ends. One that has already ended (its session
-        # dropped) has said what it did, and its output is read the same way.
-        if (-not $keeper.HasExited) { $keeper.StandardInput.Close() }
-        $said = @($keeper.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
-        $keeper.WaitForExit()
-        if ($made -and $said -notcontains ('GONE ' + $run)) {
-            Write-Host ("$run is still on the box (" + $(if ($said.Count) { $said -join ' ' } else { 'the keeper''s session ended without a word' }) + '). The next run removes it.') -ForegroundColor Yellow
+    if ($box) {
+        $shut = Close-ThornswoodOnBoxFolder $box
+        if (-not $shut.Gone) {
+            Write-Host ($box.Run + ' is still on the box (' + $(if ($shut.Said.Count) { $shut.Said -join ' ' } else { 'the keeper''s session ended without a word' }) + '). The next run removes it.') -ForegroundColor Yellow
         }
     }
     Remove-Item -LiteralPath $local -Recurse -Force -ErrorAction SilentlyContinue

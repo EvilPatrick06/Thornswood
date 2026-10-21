@@ -95,7 +95,7 @@ function Run-Block($settings, [hashtable]$light, $loads, [hashtable]$stage = @{}
     $p = Join-Path $tmp 'server-settings.json'
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
     $rootWin = $tmp
-    $farOrder = ''
+    $orderWire = ''
     $remotePlugins = (Join-Path $tmp 'server-plugins').Replace('\', '/')
     Write-Plugins (Join-Path $tmp 'server-plugins') $light
     Write-Plugins (Join-Path $tmp 'plugins') $stage
