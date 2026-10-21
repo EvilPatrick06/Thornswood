@@ -135,14 +135,12 @@ named does not pay a chest. A camp does not pay a chest.
 This reward service runs on both servers, Main and Dev. A living human must be within 400
 units. A chest return is saved in the private ledger before the complete
 gold and goods bundle is queued into one inventory write. The return
-belongs to that container, shared by everyone, and survives reload or
-loss of the native cooldown. A body return is the same ledger, marked
+belongs to that container, shared by everyone, and survives reload.
+The ledger is the only record of when a chest paid; nothing is written
+on the chest itself. A body return is the same ledger, marked
 as a body, with coin from 0 to 6. It is cleared when that actor stands
 up. Missing or damaged private state refuses rewards. A failed save
 mints nothing.
-On the first update, an existing valid native cooldown is saved into the
-private ledger before another chest reward is considered. It is never
-replaced over an existing private reservation.
 
 The native inventory save is asynchronous. If that write fails or is lost
 in a crash after reservation, the reward can be missing. The reservation

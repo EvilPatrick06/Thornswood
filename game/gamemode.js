@@ -28047,6 +28047,144 @@ function handEnchantSlots(actorId, state) {
   }
 }
 
+/*
+  WHAT SOMEBODY CANNOT MAKE IS NOT LISTED (#613).
+
+  Patrick, reporting the forge on 25 September: "It should only show if you
+  can craft it with your level+half+race". The crafting menu is Skyrim's own
+  (SkyUI draws it), and it lists every recipe whose workbench keyword is the
+  bench's and whose own conditions pass, on the machine in front of the
+  person. Nothing about a profession, a half, a rank, a roll or a race is on
+  that machine, so the menu listed every row of RECIPES_BY_ID to everybody
+  and craftAnswer refused most of them once picked: a list made mostly of
+  things the person would be told no to.
+
+  THE ANSWER IS THE GATE'S, ASKED AHEAD. For every row craftAnswer refuses
+  this person, the client takes that recipe's workbench keyword off the
+  record in its own game (SKSE's ConstructibleObject.SetWorkbenchKeyword), so
+  no bench lists it, and puts the keyword back when the answer changes. One
+  question decides both what is listed and what is made, so the two cannot
+  disagree. The server's records are untouched and the craft gate is still
+  the gate: a client that listed everything is refused exactly as before.
+
+  Asked whenever the character is written (writeState: a profession, a half,
+  a rank, a Master taking somebody on or letting them go), at spawn, and when
+  somebody goes onto or off a roll. A recipe nobody owns is not in the table
+  and stays listed for everybody.
+
+  The value is { at, files: { plugin: 'hex,hex,...' } }, the refused rows by
+  plugin, and it is written only when the list changes. updateOwner runs
+  every frame, so the script acts on a new stamp only, and spreads the
+  records over frames (RECIPES_PER_FRAME): a character with no profession is
+  refused every owned row, and two thousand records in one frame is a stall.
+*/
+var RECIPES_HIDDEN_PROPERTY = 'thornswoodRecipesHidden';
+var RECIPES_PER_FRAME = 150;
+
+function recipesHiddenScript() {
+  return [
+    '(function(){',
+    '  try {',
+    '    var v = ctx.value;',
+    '    var st = ctx.state;',
+    '    if (!st || !v || typeof v !== "object" || !v.files) { return; }',
+    '    var sp = ctx.sp;',
+    '    var own = Object.prototype.hasOwnProperty;',
+    // What each hidden recipe's keyword was, by "hex:plugin", so it can go back.
+    '    if (!st.thornswoodRecipesBench) { st.thornswoodRecipesBench = {}; }',
+    '    var put = st.thornswoodRecipesBench;',
+    '    if (st.thornswoodRecipesAt !== v.at) {',
+    '      st.thornswoodRecipesAt = v.at;',
+    '      var want = {};',
+    '      for (var f in v.files) {',
+    '        if (!own.call(v.files, f)) { continue; }',
+    '        var ids = String(v.files[f] || "").split(",");',
+    '        for (var i = 0; i < ids.length; i++) { if (ids[i]) { want[ids[i] + ":" + f] = true; } }',
+    '      }',
+    '      var todo = [];',
+    '      for (var k in want) { if (!own.call(put, k)) { todo.push(k); } }',
+    '      for (var h in put) { if (own.call(put, h) && !want[h]) { todo.push(h); } }',
+    '      st.thornswoodRecipesWant = want;',
+    '      st.thornswoodRecipesTodo = todo;',
+    '    }',
+    '    var queue = st.thornswoodRecipesTodo;',
+    '    if (!queue || !queue.length) { return; }',
+    '    var wanted = st.thornswoodRecipesWant || {};',
+    '    for (var n = 0; queue.length && n < ' + RECIPES_PER_FRAME + '; n++) {',
+    '      var key = queue.pop();',
+    '      var at = key.indexOf(":");',
+    '      var cobj = null;',
+    '      try { cobj = sp.ConstructibleObject.from(sp.Game.getFormFromFile(parseInt(key.slice(0, at), 16), key.slice(at + 1))); } catch (e) { cobj = null; }',
+    // A plugin this game does not have lists nothing, so there is nothing to hide.
+    '      if (!cobj) { continue; }',
+    '      if (wanted[key] && !own.call(put, key)) {',
+    '        var kw = cobj.getWorkbenchKeyword();',
+    '        put[key] = kw ? kw.getFormID() : 0;',
+    '        cobj.setWorkbenchKeyword(null);',
+    '      } else if (!wanted[key] && own.call(put, key)) {',
+    '        var was = put[key];',
+    '        cobj.setWorkbenchKeyword(was ? sp.Keyword.from(sp.Game.getFormEx(was)) : null);',
+    '        delete put[key];',
+    '      }',
+    '    }',
+    '  } catch (e) { }',
+    '})();'
+  ].join('\n');
+}
+
+try {
+  mp.makeProperty(RECIPES_HIDDEN_PROPERTY, {
+    isVisibleByOwner: true,
+    isVisibleByNeighbors: false,
+    updateOwner: recipesHiddenScript(),
+    updateNeighbor: ''
+  });
+} catch (e) {
+  // Made by a previous load. makeProperty cannot change a property already
+  // made, so a changed script needs a restart, which a deploy is.
+}
+
+/**
+ * Every row of the recipe table that craftAnswer refuses this person, by
+ * plugin: { 'Skyrim.esm': 'f6f2a,dd97a', ... }. The kept dwarven smelt is a
+ * row too (craftRow), so it is asked with the rest.
+ */
+function recipesRefused(actorId) {
+  var lists = {};
+  var tables = [RECIPES_BY_ID, KEPT_SMELT];
+  for (var t = 0; t < tables.length; t++) {
+    var table = tables[t];
+    for (var desc in table) {
+      if (!Object.prototype.hasOwnProperty.call(table, desc)) { continue; }
+      var row = table[desc];
+      if (!row || typeof row !== 'object') { continue; }
+      var at = desc.indexOf(':');
+      if (at <= 0) { continue; }
+      if (!craftAnswer(actorId, row).refusal) { continue; }
+      var file = desc.slice(at + 1);
+      (lists[file] = lists[file] || []).push(desc.slice(0, at));
+    }
+  }
+  var files = {};
+  for (var f in lists) {
+    if (Object.prototype.hasOwnProperty.call(lists, f)) { files[f] = lists[f].join(','); }
+  }
+  return files;
+}
+
+/** Hand the owner the recipes they cannot make, when the list has changed. */
+function handRecipesHidden(actorId) {
+  var files = recipesRefused(actorId);
+  var had = null;
+  try { had = mp.get(actorId, RECIPES_HIDDEN_PROPERTY); } catch (e) { had = null; }
+  if (had && typeof had === 'object' && JSON.stringify(had.files) === JSON.stringify(files)) { return; }
+  try {
+    mp.set(actorId, RECIPES_HIDDEN_PROPERTY, { at: Date.now(), files: files });
+  } catch (e) {
+    log(actorId.toString(16), 'was not handed the recipes they cannot make:', e);
+  }
+}
+
 function recipelessCraft(actorId, craftedItemBaseId, workbenchId, effects) {
   /*
     WHAT MADE IT, NOT WHAT IT IS.
@@ -45729,7 +45867,18 @@ module.exports = {
       elog('could not write', file + ':', e);
       return false;
     }
+    var was = reg[roll];
     reg = next;
+    /*
+      A roll's gear is listed in the crafting menu only for somebody on that
+      roll (#613), so whoever went on or came off is handed the list again.
+    */
+    if (typeof handRecipesHidden === 'function') {
+      var moved = was.concat(list).map(function (r) { return r.actor; }).filter(function (a, i, all) {
+        return all.indexOf(a) === i && !rowIn(was, a) !== !rowIn(list, a);
+      });
+      for (var m = 0; m < moved.length; m++) { handRecipesHidden(moved[m]); }
+    }
     return true;
   }
 
@@ -47033,7 +47182,6 @@ module.exports = {
     3: [['novice', 92], ['master', 8]],
     4: [['novice', 70], ['master', 30]]
   };
-  var PROP = 'thornswoodDungeonLoot';
   var GOLD_DESC = 'f:Skyrim.esm';
   if(g.__thornswoodDungeonLoot && g.__thornswoodDungeonLoot.shutdown) g.__thornswoodDungeonLoot.shutdown();
   var active=true,storage=null,ledger=null;
@@ -47047,8 +47195,6 @@ module.exports = {
       for(var key of Object.keys(ledger.entries)) {
         var saved=ledger.entries[key];
         if(!/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(key)) throw new Error('Invalid dungeon reward identity');
-        if(saved && saved.legacy===true && Number.isSafeInteger(saved.at) && saved.at>0 &&
-            Object.keys(saved).length===2) continue;
         if(saved && saved.kind==='body') {
           if(!Number.isSafeInteger(saved.at) || saved.at<=0 || typeof saved.taken!=='boolean' ||
             !Number.isInteger(saved.gold) || saved.gold<0 || saved.gold>6 ||
@@ -47713,17 +47859,6 @@ module.exports = {
     try {reference=mp.getDescFromId(refrId);} catch(error) {return null;}
     if(typeof reference!=='string' || !/^[0-9a-f]{1,8}:[^:]+\.es[mpl]$/i.test(reference)) return null;
     var prior=ledger.entries[reference],last=prior ? prior.at : 0;
-    if(!prior) {
-      var legacy=0;
-      try {legacy=mp.get(refrId,PROP);} catch(error) {return null;}
-      if(legacy!==null && legacy!==undefined && legacy!==0) {
-        if(!Number.isSafeInteger(legacy) || legacy<=0) return null;
-        var migrated=JSON.parse(JSON.stringify(ledger));
-        migrated.entries[reference]={at:legacy,legacy:true};
-        try {storage.save(migrated);} catch(error) {return null;}
-        ledger=migrated;last=legacy;
-      }
-    }
     var wait = RETURN_MIN[tier] * 60000;
     if (last && (now - last) < wait) return null;
     var boss = BOSS_WORD.test(baseName);
@@ -47731,11 +47866,11 @@ module.exports = {
       boss ? { secondExclusive: tier === 4 } : null);
     var next=JSON.parse(JSON.stringify(ledger));
     next.entries[reference]={at:now,actor:actorId,tier:rolled.tier,gold:rolled.gold,items:rolled.items};
-    // Reserve durably before touching inventory. An uncertain native write
-    // cannot be replayed by reopening, reload or loss of its cooldown mirror.
+    // Reserve durably before touching inventory. The ledger is the only
+    // record of when a chest paid, so an uncertain inventory write cannot be
+    // replayed by reopening or reload.
     try {storage.save(next);} catch(error) {console.log('[dungeon] reservation failed: '+error);return null;}
     ledger=next;
-    try {mp.set(refrId,PROP,now);} catch(error) {console.log('[dungeon] cooldown mirror failed: '+error);}
     if (!give(actorId, rolled)) return null;
     var line = heldLine(rolled);
     if (line) {
@@ -47990,7 +48125,7 @@ module.exports = {
     var next = JSON.parse(JSON.stringify(ledger));
     Object.keys(next.entries).forEach(function (key) {
       var e = next.entries[key];
-      if (e && e.kind !== 'body' && e.legacy !== true && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
+      if (e && e.kind !== 'body' && e.actor > 0 && who.actor(e.actor)) { e.actor = 0; c.chests++; }
     });
     if (!c.chests) { return { counts: c, saved: true }; }
     try { storage.save(next); } catch (error) {
@@ -48023,8 +48158,7 @@ module.exports = {
     GOLD_DESC: GOLD_DESC,
     TOME_CHANCE: TOME_CHANCE,
     EXCL_CHANCE: EXCL_CHANCE,
-    GOODS_CHANCE: GOODS_CHANCE,
-    PROP: PROP
+    GOODS_CHANCE: GOODS_CHANCE
   };
 })();
 // ==== end thornswood dungeon loot ====
@@ -50437,6 +50571,8 @@ return module.exports;
     // Twin Souls is a second enchantment slot in the menu (#1389). It lives
     // beside the craft gate, outside this block, the way spellOn does.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And what the crafting menu lists, from the same answer the craft gate gives (#613).
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return s;
   }
 
@@ -50682,6 +50818,9 @@ return module.exports;
     // And the second enchantment slot Twin Souls gives (#1389): a session
     // starts from a save with no perks on it.
     if (typeof handEnchantSlots === 'function') { handEnchantSlots(actorId, s); }
+    // And the recipes the crafting menu leaves out (#613): a session starts
+    // from a game whose records list every one.
+    if (typeof handRecipesHidden === 'function') { handRecipesHidden(actorId); }
     return n;
   }
 
