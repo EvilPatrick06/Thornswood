@@ -91,6 +91,16 @@ $exeItem = Get-Item -LiteralPath $exe
 # scripts\release\Publish-VirusTotal.ps1 when somebody wants a report.
 $exeSha = (Get-FileHash -LiteralPath $exeItem.FullName -Algorithm SHA256).Hash
 
+# Which release this installer carries, from the note Package-Thornswood.ps1
+# left beside the exe it built, checked against the exe's own sha256 (#3043).
+# It goes into the exe's entry in files.json, and Ship's installer gate counts
+# the releases after it there. Read before anything is sent: an installer whose
+# release is not known would leave every main Ship unable to tell how far
+# behind it is, so it is not published.
+. (Join-Path $Here 'Release-Name.ps1')
+$installerRelease = Read-InstallerReleaseNote $OutDir $exeSha
+Write-Host ("  carries release {0}" -f $installerRelease)
+
 # Publish sign gate: the tip on the site must be Authenticode Valid under
 # ExpectedSigner. Package -NoPublish may leave an unsigned Setup for local use;
 # this script is the site path and refuses that soft skip.
@@ -179,6 +189,7 @@ if ($single) {
       label   = 'Thornswood installer'
       version = $Version
       sha256  = $exeSha
+      release = $installerRelease
       note    = 'One file. Download it and run it.'
     }
   }
@@ -192,6 +203,7 @@ if ($single) {
       label   = 'Thornswood installer'
       version = $Version
       sha256  = $exeSha
+      release = $installerRelease
       note    = 'One file. Download it and run it. It gets the mods itself, about 700 MB.'
     }
     $zipOut = @{
