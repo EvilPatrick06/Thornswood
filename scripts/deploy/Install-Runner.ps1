@@ -106,6 +106,14 @@
   first, with the names it has always had. -Status and -Remove take -Number
   the same way; -Lock does every runner on the box.
 
+  HOW MANY BUILD AT ONCE (#2994). More runners than the box's six cores can
+  carry only slow every build down: with seven at once on 21 October each
+  harness step took 34 to 39 minutes and the 40-minute limit cancelled
+  builds that were passing. The heavy jobs ask for a second label,
+  thornswood-build, which only the runners records\build-runners.json lists
+  carry (1 to 4). This install registers a listed runner with it;
+  Set-BuildRunners.ps1 puts GitHub right for runners already there.
+
   WHAT IT DOES ON THE BOX, in order:
     1. Checks what the build check needs is there: pwsh, node, python and git
        on the machine PATH, MSBuild and the .NET Framework 4.8.1 reference
@@ -266,6 +274,14 @@ if ($OffBox) {
   if (-not $PSBoundParameters.ContainsKey('Label'))      { $Label = 'thornswood-pr' }
   $liveFilter = 'Thornswood*'
   if ($Label -match 'thornswood-vps' -and -not $NetworkOnly) { Write-Host 'STOP. -OffBox never takes the VPS label: build.yml would send it main and release builds.' -ForegroundColor Red; exit 1 }
+}
+# HOW MANY BUILD AT ONCE (#2994). A VPS runner that records\build-runners.json
+# lists is registered with its build label as well, so a reinstall keeps the
+# cap Set-BuildRunners.ps1 put on GitHub. An off-box runner never carries it.
+$registerLabels = $Label
+if (-not $OffBox -and -not $PSBoundParameters.ContainsKey('Label')) {
+  $buildRecord = Get-Content -LiteralPath (Join-Path $Here '..\..\records\build-runners.json') -Raw | ConvertFrom-Json
+  if (@($buildRecord.runners | ForEach-Object { [int]$_ }) -contains $Number) { $registerLabels = $Label + ',' + $buildRecord.label }
 }
 # The lists the scripts below are given, as PowerShell source. $leaveList is
 # the folders under C:\ that Lock-VpsFolders.ps1 gives the runner accounts
@@ -904,7 +920,7 @@ Push-Location `$root
 `$env:ACTIONS_RUNNER_INPUT_TOKEN = `$regToken
 `$env:ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD = `$pw
 try {
-  `$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --name '$RunnerName' --labels '$Label' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) 2>&1
+  `$cfg = & .\config.cmd --unattended --url 'https://github.com/$Repo' --name '$RunnerName' --labels '$registerLabels' --work '_work' --replace --runasservice --windowslogonaccount (".\" + `$acct) 2>&1
   `$code = `$LASTEXITCODE
 } finally {
   Remove-Item Env:\ACTIONS_RUNNER_INPUT_TOKEN, Env:\ACTIONS_RUNNER_INPUT_WINDOWSLOGONPASSWORD -EA SilentlyContinue
