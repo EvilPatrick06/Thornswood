@@ -2,7 +2,7 @@
 const crypto=require('node:crypto');
 function validateScarceHarvest(doc,population) {
  const sha=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
- if(!doc||sha(doc)!=='c304b6901f9c2ba2e2d6410d1bd85d0f4e7404b76fd4720b723685c8e40be16a'||
+ if(!doc||sha(doc)!=='d73a62dace370193312c7f210781ad81cef12ae9b651bb5ffadfc6e860bd3a28'||
     !population||sha(population.loadOrder)!==doc.loadOrderSha256)
   throw new Error('Invalid scarce harvest source evidence');
  return JSON.parse(JSON.stringify(doc));
