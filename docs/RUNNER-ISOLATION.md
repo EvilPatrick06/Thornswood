@@ -68,6 +68,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | F4 | A job can read its runner's `.credentials` and leave files for the next job | GitHub's runner design; `_work\_temp` leftovers are counted by the check | Residual, inherent to persistent self-hosted runners |
 | F5 | Fork pull requests cannot run here | repository settings above | OK |
 | F6 | Runners are not administrators | account groups above | OK, rechecked by every run |
+| F7 | Every runner account could read `C:\ProgramData\ssh`, sshd's folder, which the record lists as no-reach | `Check-RunnerIsolation.ps1 -Collect`, 21 Oct 2026 10:37 AM UTC: `read=True write=False` for all eight accounts. Installs and `-Lock` on the box denied only `C:\Thornswood-*` and a hand-given `-AlsoDeny` | Fixed: every install and `-Lock` on the box now also denies the record's no-reach folders outside `C:\Thornswood-*` (`C:\ProgramData\ssh`, `C:\Users\Administrator`); proven by the check's reach rows after `-Lock` |
 
 ## 4. Cleanup, success and failure
 
