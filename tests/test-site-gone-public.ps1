@@ -38,7 +38,8 @@ Write-Host 'Deploy-Docs.ps1'
 Yes 'it names the top level public files the box has and the repository does not' (
     $docs.Contains('$gonePublic = @($publicThere.Keys | Where-Object { $repoPublic -notcontains $_ }'))
 Yes 'a gone file is a change to the app, so the swap runs' $docs.Contains('$appUnchanged = ($send.Count -eq 0 -and $gonePublic.Count -eq 0)')
-Yes 'and the swap is told them as $Gone, empty for -PutBack' ($docs.Contains("('`$Gone = @(' +") -and $docs.Contains("`$gonePublic = @()`r`n"))
+# The line ends as the checkout ends it: CRLF on a Windows runner, LF elsewhere.
+Yes 'and the swap is told them as $Gone, empty for -PutBack' ($docs.Contains("('`$Gone = @(' +") -and $docs -match '(?m)^\s*\$gonePublic = @\(\)\r?$')
 
 # ---- 2. the swap block, run ------------------------------------------------------
 Write-Host ''

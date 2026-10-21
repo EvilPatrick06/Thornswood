@@ -7,8 +7,8 @@
 
   It checks, in order:
     - the server's load order holds both plugins the flow needs
-    - the plugin carries the creation menus, the ten town passages and the
-      welcome book, each named and with a mesh
+    - the plugin carries the ten town passages and the welcome book, each
+      named and with a mesh
     - gamemode.js is the build that knows about all of it
     - the start point in server-settings.json is the creation room, computed
       from this load order rather than written down
@@ -55,13 +55,19 @@ function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++
 function Note($m) { Write-Host "        $m" -ForegroundColor DarkGray }
 
 # What the plugin at $Path holds for the checks below, one line a record:
-# 'BOOK <form id> <has a name> <has a mesh>' and 'MESG <form id> <buttons>'.
-# It runs here for the build and on the box for a server, in Windows
-# PowerShell there, so it only reads and only writes text.
+# 'BOOK <form id> <has a name> <has a mesh>'. It runs here for the build and
+# on the box for a server, in Windows PowerShell there, so it only reads and
+# only writes text.
+#
+# The four message boxes this also read, the trade menu and the town menu
+# over two pages each, are out of the plugin (#2962): the choices are made in
+# the K panel since 20 September, there is no trade to choose since 21
+# September, and nothing showed or named the boxes. This asked for them as if
+# creation needed them, which is what kept them.
 function Read-ThornswoodChargenRecords([string]$Path) {
     $bytes = [IO.File]::ReadAllBytes($Path)
-    # Walk the BOOK and MESG top groups rather than the whole file: the
-    # records are small, uncompressed, and all in one place.
+    # Walk the BOOK top group rather than the whole file: the records are
+    # small, uncompressed, and all in one place.
     $i = 0
     while ($i + 24 -le $bytes.Length) {
         $tag = [Text.Encoding]::ASCII.GetString($bytes, $i, 4)
@@ -69,14 +75,13 @@ function Read-ThornswoodChargenRecords([string]$Path) {
             $gs = [BitConverter]::ToUInt32($bytes, $i + 4)
             if ($gs -lt 24) { break }
             $label = [Text.Encoding]::ASCII.GetString($bytes, $i + 8, 4)
-            if ($label -eq 'MESG' -or $label -eq 'BOOK') {
+            if ($label -eq 'BOOK') {
                 $j = $i + 24
                 while ($j + 24 -le $i + $gs) {
                     $ds  = [BitConverter]::ToUInt32($bytes, $j + 4)
                     $fid = [BitConverter]::ToUInt32($bytes, $j + 12)
                     $body = [Text.Encoding]::GetEncoding(1252).GetString($bytes, $j + 24, $ds)
-                    if ($label -eq 'MESG') { 'MESG {0:X8} {1}' -f $fid, ([regex]::Matches($body, 'ITXT')).Count }
-                    else { 'BOOK {0:X8} {1} {2}' -f $fid, [int]$body.Contains('FULL'), [int]$body.Contains('MODL') }
+                    'BOOK {0:X8} {1} {2}' -f $fid, [int]$body.Contains('FULL'), [int]$body.Contains('MODL')
                     $j += 24 + $ds
                 }
             }
@@ -195,7 +200,7 @@ else { 'GAMEMODE AT ' + `$gm; Find-ThornswoodGamemodeText `$gm @($needleList) }
         elseif ($l -match '^UNREAD (.+)$') { $boxUnread += $Matches[1].Trim() }
         elseif ($l -match '^PLUGIN MISSING (.+)$') { $espWhere = "$($Matches[1]) on the $From server" }
         elseif ($l -match '^PLUGIN AT (.+)$') { $espWhere = "$($Matches[1]) on the $From server"; $espLines = @() }
-        elseif ($l -match '^(BOOK|MESG) ' -and $null -ne $espLines) { $espLines += $l }
+        elseif ($l -match '^BOOK ' -and $null -ne $espLines) { $espLines += $l }
         elseif ($l -match '^GAMEMODE MISSING (.+)$') { $gmWhere = "$($Matches[1]) on the $From server" }
         elseif ($l -match '^GAMEMODE AT (.+)$') { $gmWhere = "$($Matches[1]) on the $From server"; $gmLines = @() }
         elseif ($l -match '^HAS ' -and $null -ne $gmLines) { $gmLines += $l }
@@ -244,12 +249,9 @@ if ($null -eq $espLines) {
 } else {
     Note "read from $espWhere"
     $books = @{}
-    $menus = @{}
     foreach ($l in $espLines) {
         if ($l -match '^BOOK ([0-9A-F]{8}) ([01]) ([01])$') {
             $books[[Convert]::ToUInt32($Matches[1], 16)] = @{ HasName = ($Matches[2] -eq '1'); HasMesh = ($Matches[3] -eq '1') }
-        } elseif ($l -match '^MESG ([0-9A-F]{8}) (\d+)$') {
-            $menus[[Convert]::ToUInt32($Matches[1], 16)] = [int]$Matches[2]
         }
     }
 
@@ -273,22 +275,6 @@ if ($null -eq $espLines) {
     }
 
     Ok ("{0} BOOK records in the plugin" -f $books.Count)
-    foreach ($m in @(
-        @{ Id = 0x05E80050; Name = 'trade menu, page 1'; Want = 9 }
-        @{ Id = 0x05E80051; Name = 'trade menu, page 2'; Want = 9 }
-        @{ Id = 0x05E80052; Name = 'town menu, page 1';  Want = 6 }
-        @{ Id = 0x05E80053; Name = 'town menu, page 2';  Want = 6 }
-    )) {
-        if (-not $menus.ContainsKey([uint32]$m.Id)) {
-            Bad ("{0} message box is missing from the plugin" -f $m.Name)
-        } elseif ($menus[[uint32]$m.Id] -ne $m.Want) {
-            Bad ("{0} has {1} buttons, expected {2}" -f $m.Name, $menus[[uint32]$m.Id], $m.Want)
-        } elseif ($menus[[uint32]$m.Id] -gt 10) {
-            Bad ("{0} has {1} buttons; Skyrim shows at most ten" -f $m.Name, $menus[[uint32]$m.Id])
-        } else {
-            Ok ("{0}: {1} buttons" -f $m.Name, $menus[[uint32]$m.Id])
-        }
-    }
     CheckSet 'town passages'   $passages
     CheckSet 'welcome book'    $welcome
 }

@@ -78,11 +78,6 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if
 
 $target = "$VpsUser@$VpsHost"
 $ssh = @('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes')
-foreach ($t in 'ssh', 'scp') {
-  if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
-    Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
-  }
-}
 function Remote($script) {
   # Send-Script.ps1 (issue #1166, the same way as #1070): a long script goes
   # as a file of its own name, removed after, and the far side's exit code
@@ -130,6 +125,13 @@ $global:LASTEXITCODE = 0
 if ($LASTEXITCODE -ne 0) { Die 'The backup did not open here, so nothing was sent. The lines above say why.' }
 
 # ------------------------------------------------------------- the box ---
+# Asked for here, after what this machine can refuse on its own, so a
+# backup that would be refused is refused for itself, ssh or no ssh.
+foreach ($t in 'ssh', 'scp') {
+  if (-not (Get-Command $t -ErrorAction SilentlyContinue)) {
+    Die "$t is not on PATH. Windows ships it: Settings, Apps, Optional features, OpenSSH Client."
+  }
+}
 Head 'Is the box ready'
 $ready = @(Remote @'
 $ErrorActionPreference = 'SilentlyContinue'
