@@ -17,6 +17,11 @@ const panel=path.join(__dirname,'../../game/ui/thornswood-merchant.js');
 http.createServer((req,res)=>{
   if(req.url==='/merchant.js'){res.setHeader('Content-Type','text/javascript');res.end(fs.readFileSync(panel));return;}
   const data=JSON.parse(JSON.stringify(base));
+  if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='retrieval') {
+    data.trader='Cook';data.place='Eastmarch';data.quests=[{id:'dispatch',name:'The dispatch',kind:'retrieval',who:'Open to anyone',
+      state:'open',drawn:1,gold:60,hours:12,locations:'Halted Stream Camp. Return to the Eastmarch Cook.',
+      canTake:false,canReturn:true,canAbandon:true}];
+  }
   if(new URL(req.url,'http://localhost').searchParams.get('scenario')==='supply') {
     data.supply=[{name:'Iron Ingot',pay:15,unit:3,count:5,ready:true}];
   }

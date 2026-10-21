@@ -63,7 +63,7 @@ $utf8 = New-Object Text.UTF8Encoding($false)
 $layerText = @'
 function Get-CallerAddress { return [string]$global:Fake.caller }
 function Get-SaveFolder { return [string]$global:Fake.save }
-function Test-IsServer { return $true }
+function Get-ThornswoodBoxRefusal { return '' }
 function Get-AllowRules {
     foreach ($r in $global:Fake.rules) {
         if ($r.Enabled -and $r.Action -eq 'Allow') {
@@ -128,7 +128,7 @@ try {
     $driverText = [IO.File]::ReadAllText($Driver)
     Yes 'Set-SshScope.ps1 is plain ASCII too' (-not ($driverText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Test-IsServer', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-CallerAddress', 'Get-SaveFolder', 'Get-ThornswoodBoxRefusal', 'Get-AllowRules', 'Set-RuleRemote', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -291,7 +291,7 @@ try {
 
     . (Join-Path $repo 'scripts\vps\Send-Script.ps1')
     $global:H = @{ KeyWorks = $true; KeyAfter = $true; Changed = $false; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string]); Far = $far; Layer = $Layer; Cancelled = $false; Sent = ''
-                   Box = $Box; BoxText = [IO.File]::ReadAllText($Box); Reader = (Get-ThornswoodStdinReader) }
+                   Box = $Box; BoxText = [IO.File]::ReadAllText($Box); RunnerPath = ${function:Get-ThornswoodRemoteRunnerPath} }
     function global:ssh-keygen {
         $a = @($args | ForEach-Object { [string]$_ })
         if ($a -contains '-F') { '# Host 127.0.0.1 found: line 1'; ('127.0.0.1 ED25519 ' + $global:H.HostFp); $global:LASTEXITCODE = 0; return }
@@ -314,11 +314,13 @@ try {
         $in = @($input | ForEach-Object { [string]$_ })
         $last = $a[-1]
         # The script as the box would run it: inline, or Send-Script.ps1's
-        # reader on the line with the script on standard input.
+        # runner on the line, which takes the copy scp put in the far folder
+        # off it and runs that (#3059).
         $s = ''
         if ($last -match 'EncodedCommand (\S+)') {
             $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
-            if ($s -eq $global:H.Reader -and $in.Count) { $s = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
+            $rp = & $global:H.RunnerPath $s
+            if ($rp) { $rf = Join-Path $global:H.Far ($rp -split '\\')[-1]; $s = [IO.File]::ReadAllText($rf); Remove-Item -LiteralPath $rf -Force }
         }
         # vps-ssh-scope.ps1 whole, as a block with its arguments after it: the
         # file under test runs here with them, against the stand-in layer.
@@ -374,8 +376,9 @@ try {
     $r = Invoke-Driver @{ WhatIf = $true }
     Yes '-WhatIf: exit 0, the box ran read only, nothing changed' ($r.Code -eq 0 -and $r.Text -match 'Nothing was changed\. Run it again without -WhatIf' -and
         @($global:H.Calls | Where-Object { $_ -match '-From "203\.0\.113\.7,198\.51\.100\.0/24" -DryRun$' }).Count -eq 1 -and (Untouched))
-    Yes '  vps-ssh-scope.ps1 went whole on ssh''s standard input, and nothing was copied to the box (#3035)' (
-        -not $global:H.Sent -and @($global:H.Calls | Where-Object { $_ -like 'scp *' -or $_ -match '-File |UNREAD' }).Count -eq 0)
+    Yes '  vps-ssh-scope.ps1 went whole by scp to a copy its run took off the box, so nothing of it is left there (#3035, #3059)' (
+        $global:H.Sent -match 'thornswood-remote-[0-9a-f]{32}\.ps1$' -and @(Get-ChildItem -LiteralPath $global:H.Far -File).Count -eq 0 -and
+        @($global:H.Calls | Where-Object { $_ -like 'scp *' }).Count -ge 1 -and @($global:H.Calls | Where-Object { $_ -match '-File |UNREAD' }).Count -eq 0)
 
     Fresh
     $r = Invoke-Driver @{}
@@ -383,7 +386,7 @@ try {
     $seq = ($global:H.Calls | ForEach-Object { $_ }) -join "`n"
     Yes '  a new key login after the change, before the put back is cancelled' ($global:H.Cancelled -and $seq -match '(?s)-From "[^"]*"\n[^\n]*echo THORNSWOOD_KEY_OK\n[^\n]*EncodedCommand')
     Yes '  and it reads the rules back' ($r.Text -match "rule      OpenSSH SSH Server \(sshd\): from 203\.0\.113\.7, 198\.51\.100\.0/24")
-    Yes '  every ssh checked the host key, and nothing went by scp' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' -or $_ -like 'scp *' }).Count -eq 0)
+    Yes '  every ssh and scp checked the host key' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' }).Count -eq 0)
 
     Fresh
     $global:H.KeyAfter = $false

@@ -425,12 +425,19 @@ if (ORES && qBlock2) {
   // The custom properties on each character, as the server keeps them (#1621).
   const made = {};
   const props = {};
+  const orchardRows=require('../game/data/merchant-orchard.json').sources;
+  const orchardIds=new Map(orchardRows.map((row,i)=>[row.reference,0x6000000+i]));
+  const unusedOrchard=function(){throw new Error('The rare-mine fixture must not work an orchard plot.');};
   const ctx = { console: console, Map: Map, Set: Set, Math: Math, Number: Number, String: String,
+    require: require,
     Buffer: Buffer, JSON: JSON, Object: Object, Array: Array, RegExp: RegExp, Error: Error,
     Date: { now: function () { return clock.now; } },
     NPC_POPULATION_DATA: compactPopulation,
     raceEdidOf: function () { throw new Error('The rare-mine fixture must not query a kill target.'); },
     MERCHANT_TRADING: {createKillContracts: require('../game/kill-contracts').createKillContracts,
+      orchardSources:()=>({sources:orchardRows}),
+      createQuestOrchardSources:()=>({verify:unusedOrchard}),
+      orchardPlots:{createOrchardStorage:()=>({}),createOrchardPlots:()=>({available:()=>true,shutdown(){},read:unusedOrchard,write:unusedOrchard})},
       createQuestTransactions: function () {
       return {available: function () {return true;}, identity: function (a) {return 'actor:'+a;}, shutdown: function () {},
         commit: function (a, expected, next, changes, admission) {
@@ -446,6 +453,9 @@ if (ORES && qBlock2) {
       };
     }},
     mp: {
+      getServerSettings:()=>({}),
+      writeFileWhole:unusedOrchard,
+      getIdFromDesc:desc=>orchardIds.get(desc),
       makeProperty: function (name) { made[name] = true; },
       get: function (id, key) {
         if (key === 'thornswoodCharacter') {
@@ -463,7 +473,7 @@ if (ORES && qBlock2) {
         if (!made[key]) { throw new Error('Property \'' + key + '\' doesn\'t exist'); }
         props[id + '|' + key] = JSON.stringify(v);
       },
-      getDescFromId: function () { return ''; }
+      getDescFromId: function (id) {return orchardRows[id-0x6000000]?.reference || '';}
     },
     log: function () { logged.push([].slice.call(arguments).join(' ')); },
     idOf: function () { return 0; },

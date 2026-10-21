@@ -232,8 +232,15 @@ yes('2 every cell and world the register keeps is there and holds a placement ('
 const STATIONS = new Set([0x05042E69, 0x0501547E, 0x05DBF8B3, 0x05DDE4EF, 0x05018030, 0x05018031]);
 const table = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'station-sites.json'), 'utf8'));
 const sites = Object.keys(table.sites).map(k => table.sites[k]);
-const refs = plugin.records.filter(r => r.tag === 'REFR');
+const allRefs = plugin.records.filter(r => r.tag === 'REFR');
+const questSites = Object.values(JSON.parse(fs.readFileSync(path.join(ROOT, 'game/data/quest-content.json'), 'utf8')).sites);
+const questIds = new Set(questSites.map(s => localFid(s.ref)));
+const refs = allRefs.filter(r => !questIds.has(r.fid));
 const bySite = new Map(sites.map(s => [localFid(s.ref), s]));
+const declaredIds = new Set([...bySite.keys(), ...questIds]);
+yes('3 every placement is exactly a declared station or dedicated quest source',
+    allRefs.length === declaredIds.size && allRefs.every(r => declaredIds.has(r.fid)) &&
+    new Set(allRefs.map(r => r.fid)).size === allRefs.length);
 yes('3 the placements in the plugin are exactly the station table\'s ' + sites.length,
     sites.length > 0 && refs.length === sites.length && refs.every(r => bySite.has(r.fid)));
 yes('3 each is of the kiln, the salt quarry, the hive, the lab or the well bucket, switched on, the table\'s base',

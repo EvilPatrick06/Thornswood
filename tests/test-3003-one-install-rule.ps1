@@ -36,9 +36,7 @@
        writing an install folder (C:\Thornswood, C:\Thornswood-DevBuild or
        a folder under either, on any drive) into a string of its own. Left
        out: Where.ps1, whose rule starts there; installer\Setup-Thornswood.ps1,
-       which chooses where a new install goes; the box scripts' check for
-       C:\Thornswood\Game\SkyrimSE.exe, which asks "is this a gaming PC"
-       and means that one folder; scripts\oneoff, parked and not run
+       which chooses where a new install goes; scripts\oneoff, parked and not run
        (its README); and tests, whose folders are made up. The box's own
        folders (C:\Thornswood-Server, C:/Thornswood-Docs and the rest) are
        not the install and are not read as one;
@@ -204,11 +202,9 @@ $letOff = @{
     'scripts/release/Where.ps1'          = 'the rule'
     'installer/Setup-Thornswood.ps1'     = 'where a new install goes'
 }
-# The gaming-PC guard, only in the five box scripts that carry it (#3041 is
-# putting it in one place).
-$gamingPc = '(?i)^C:\\Thornswood(-DevBuild)?\\Game\\SkyrimSE\.exe'
-$boxChecks = @('scripts/vps/Bootstrap-VPS.ps1', 'scripts/vps/Clear-OldWorldCopies.ps1', 'scripts/vps/Delete-Person.ps1',
-               'scripts/vps/Lock-VpsFolders.ps1', 'scripts/deploy/Install-ThornswoodServer.ps1')
+# The box scripts' gaming-PC guard looked for C:\Thornswood\Game\SkyrimSE.exe
+# and was let off here until #3041; it asks Windows what the machine is now
+# (scripts\vps\BoxGuard.ps1), so nothing names the folder for it.
 $written = @()
 $read = 0
 foreach ($f in $files) {
@@ -216,14 +212,13 @@ foreach ($f in $files) {
     if ($letOff.ContainsKey($rel) -or $rel -like 'scripts/oneoff/*') { continue }
     $read++
     foreach ($l in @(Get-InstallLiterals (Parse-File $f.FullName))) {
-        if ($boxChecks -contains $rel -and $l.Value -match $gamingPc) { continue }
         $written += ("{0} line {1}: {2}" -f $rel, $l.Extent.StartLineNumber, $l.Extent.Text)
     }
 }
 Yes ("there are scripts to read here too ({0})" -f $read) ($read -gt 100)
 Yes 'no script writes the install folder (ask Where.ps1 Install or InstallDev)' ($written.Count -eq 0)
 foreach ($w in $written) { Write-Host "      $w" }
-foreach ($rel in @($letOff.Keys) + $boxChecks) {
+foreach ($rel in @($letOff.Keys)) {
     Yes ("  $rel, let off, is still here") (Test-Path -LiteralPath (Join-Path $Repo $rel))
 }
 

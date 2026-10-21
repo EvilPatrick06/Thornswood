@@ -52,7 +52,8 @@
   the repository makes Maint or Dumps, so those two are this script's alone.
 
   WHAT IT REFUSES.
-    - anywhere with SkyrimSE.exe on it, which is the gaming PC, not the VPS
+    - anywhere that is not the box: a Windows workstation, which a gaming PC
+      is, or a machine Windows will not say is a server (BoxGuard.ps1)
     - an account that is not an elevated Administrator
     - a folder whose name is not one of the above, or that is a link
     - a server or voice folder the site's account has no rule on by name,
@@ -72,8 +73,9 @@ param(
     # The site's account as a SID; worked out from the site's task when empty.
     # 'none' says there is no site on this box to keep reading.
     [string]$SiteSid = '',
-    # The tests run on a machine with the game, as an account that is not an
-    # elevated Administrator, against scratch folders. Nothing else passes it.
+    # The tests run on a developer's machine, a workstation, as an account
+    # that is not an elevated Administrator, against scratch folders. Nothing
+    # else passes it.
     [switch]$AllowGamingPc,
     # The bot's account as a SID; worked out from NT SERVICE\ThornswoodBot when
     # empty. 'none' says there is no bot on this box to keep reading the watchdog.
@@ -85,8 +87,20 @@ param(
 $ErrorActionPreference = 'Stop'
 function Say([string]$m) { Write-Output $m }
 
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
+}
+# ---- end BoxGuard.ps1 ----
 if (-not $AllowGamingPc) {
-    if (Test-Path 'C:\Thornswood\Game\SkyrimSE.exe') { Say 'REFUSED: SkyrimSE.exe is here, so this is the gaming PC, not the VPS. Nothing was changed.'; exit 1 }
+    $notBox = Get-ThornswoodBoxRefusal
+    if ($notBox) { Say ('REFUSED: ' + $notBox + '. Nothing was changed.'); exit 1 }
     $p = New-Object Security.Principal.WindowsPrincipal([Security.Principal.WindowsIdentity]::GetCurrent())
     if (-not $p.IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) { Say 'REFUSED: this is not an elevated Administrator. Nothing was changed.'; exit 1 }
 }
