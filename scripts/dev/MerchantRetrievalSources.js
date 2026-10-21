@@ -1,9 +1,17 @@
 'use strict';
 const crypto=require('node:crypto');
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
+// The pin covers what was measured, not the Content plugin's bytes: those are
+// checked against the file itself below, so a change to Content (a header, a
+// record elsewhere in it) is a rebuild of the manifest, not a new pin (#2993).
+const measured=doc=>{
+ const m=JSON.parse(JSON.stringify(doc));m.contentSha256='';
+ for(const row of m.sources||[])if(row.provenance&&row.provenance.plugin==='Thornswood-Content.esp')row.provenance.pluginSha256='';
+ return m;
+};
 function validateRetrievalSources(doc,population,content,roster) {
  const fail=()=>{throw new Error('Invalid retrieval source evidence');};
- if(!doc||hash(doc)!=='c4f563749f9e5c78c7d7fb6995f3c0d7e455eea7ebb8ff956e51e56a38aa7b69'||
+ if(!doc||hash(measured(doc))!=='5139dbb0ea38f2f426b2bee80437985effb2a74c7d5f9f61a07b4f0bb807cf8c'||
    !population||hash(population.loadOrder)!==doc.loadOrderSha256||
    !Buffer.isBuffer(content)||crypto.createHash('sha256').update(content).digest('hex')!==doc.contentSha256||
    !roster||!Array.isArray(roster.merchants))fail();

@@ -171,9 +171,19 @@ tools show beside the plugin. Until 12 October it still said the content was
 salvaged from the other server, by that server's full name, and was out of
 date besides. Patrick's answer B on #400: the description says what the plugin
 is for Thornswood, the salvaged records stay, and the other server's name is
-mentioned nowhere. So this writes DESCRIPTION into the header, changing only
-that subrecord and the header's size, and refuses to write a file whose
+mentioned nowhere. So this writes the description into the header, changing
+only that subrecord and the header's size, and refuses to write a file whose
 header or any record still carries the other server's full name.
+
+Since #2993 the description is built from the records the written plugin
+holds. Until then it was one sentence typed into this script, and nothing held
+it to the plugin: on 21 October it still listed the skill manuals, which left
+on 21 September, and named neither the woodworking bench, the furniture, the
+teas, the well and water buckets nor the burnt and fine meals, all added since.
+Now each kind of record has a row in CONTENTS with the words that name it. A
+row whose records have all left drops out of the description by itself, and a
+record no row names stops the tool, so whoever adds a new kind of record says
+in the same change how the header names it.
 
 If something ever does point at the base record, the tool keeps the base,
 takes only its script off as before, says what points at it, and still takes
@@ -382,6 +392,7 @@ import copy
 import json
 import math
 import os
+import re
 import struct
 import sys
 import zlib
@@ -404,11 +415,71 @@ OTHER_SERVER_NAME = bytes([107, 101, 105, 122, 97, 97, 108])
 OTHER_SERVER_SHORT = bytes([107, 122, 108])
 OTHER_SERVER_LONGER = bytes([111, 108, 105, 118, 97, 114])
 
-# What the header says the plugin is (SNAM), written by this tool (#400).
-DESCRIPTION = (b"Thornswood's crafting and gathering content: stations, salt, ore, "
-               b"charcoal kilns, skill manuals, tools, keys, fishing, repair kits, "
-               b"treatments, the notice board and drop box, house parts, and their "
-               b"recipes.")
+# What the header says the plugin is (SNAM), written by this tool (#400), built
+# from the records the plugin holds (#2993, THE HEADER'S DESCRIPTION at the top).
+# Each row: a pattern on "TAG EditorId", whose records it names, whose they are
+# (Thornswood's own, or Bethesda's records this plugin changes), and the words
+# that name them. A record takes the first row it matches. A record that
+# matches none stops the tool; a row that matches nothing is left out.
+DESCRIPTION_LEAD = "Thornswood's crafting and gathering content: "
+DESCRIPTION_BETHESDA = " Changes to Skyrim's: "
+# The file format gives the header's description 512 bytes at most, its closing
+# zero included (UESP, Skyrim Mod:Mod File Format/TES4, SNAM), which is what the
+# Creation Kit and the mod tools expect to read.
+DESCRIPTION_MOST = 512
+CONTENTS = (
+    (r'(KYWD|FURN) ThornswoodCraftingCharcoalKiln', 'own', 'charcoal kilns'),
+    (r'(KYWD|FURN) ThornswoodCraftingAlchemy', 'own', 'alchemy labs'),
+    (r'(KYWD|FURN) ThornswoodCraftingWoodworking', 'own', 'woodworking benches'),
+    (r'FURN ThornswoodFurnitureSaltMine$', 'own', 'salt quarries'),
+    (r'FLOR ThornswoodFloraBeehive$', 'own', 'beehives'),
+    (r'ACTI ThornswoodActivator(Well|Water)Bucket$', 'own', 'well and water buckets'),
+    # The placements, and the cells and worlds they stand in, are the stations
+    # above and the quest sites below put in the world (the tool refuses any
+    # other placement), so those rows' words already say them.
+    (r'(REFR|CELL|WRLD) ', 'own', None),
+    (r'ACTI ThornswoodMessageBoard$', 'own', 'notice boards'),
+    (r'ACTI ThornswoodDropBox$', 'own', 'drop boxes'),
+    (r'(MISC ThornswoodCharcoalTier|COBJ ThornswoodRecipeCharcoalTier)\d$', 'own', 'charcoal'),
+    (r'(MISC ThornswoodMiscToolHandle|COBJ ThornswoodRecipe(ToolHandle|ToolShovel|WeaponPickaxe|WeaponAxe))$',
+     'own', 'tools and handles'),
+    (r'BOOK ThornswoodBookDeed$', 'own', 'deeds'),
+    (r'(MISC ThornswoodMisc(Master)?Key(Mold)?|COBJ ThornswoodRecipeKey(Mold)?)$', 'own', 'keys and molds'),
+    (r'(MISC ThornswoodMisc(Pole\w+|FishTrap)|FLOR ThornswoodFish\w+|COBJ ThornswoodRecipe(Pole\w+|FishTrap))$',
+     'own', 'fishing'),
+    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Weapon|Armor|Sewing)Kit$', 'own', 'repair kits'),
+    (r'(MISC ThornswoodMisc|COBJ ThornswoodRecipe)(Bandage|Splint|Poultice|Remedy)$', 'own', 'treatments'),
+    (r'(MISC ThornswoodFurniture|COBJ ThornswoodRecipeFurniture)\w+$', 'own', 'furniture'),
+    (r'(ALCH ThornswoodFoodTea|COBJ ThornswoodRecipeTea)\w+$|MGEF ThornswoodTeaSteepEffect$', 'own', 'teas'),
+    (r'ALCH Thornswood(FoodBurntMeal|FoodFine\w+)$|MGEF Thornswood(Burnt|Fine)Effect$', 'own',
+     'burnt and fine meals'),
+    (r'(MISC ThornswoodQuest\w+|ACTI ThornswoodQuestLedgerSource)$', 'own', 'quest items'),
+    (r'IMAD ThornswoodDrunkImod$', 'own', 'the drunk screen'),
+    (r'BOOK ThornswoodPassage\w+$', 'own', 'starting town passages'),
+    (r'BOOK ThornswoodWelcome$', 'own', 'the welcome letter'),
+    (r'COBJ (DLC[12])?Recipe(Weapon\w+Bow|Arrow\w+|TechBolt\w+)$', 'bethesda',
+     'bows, arrows and bolts to the woodworking bench'),
+    (r'COBJ BYOHRecipe(Nails|Hinge|Lock|Fittings)$', 'bethesda', 'house parts off the forge'),
+    (r'COBJ RecipeIngotDwarvenScrap\w+$', 'bethesda', 'Dwarven scrap to one recipe'),
+)
+
+
+def description_of(keys):
+    """The header's description for a plugin whose records are keys, each
+    "TAG EditorId", and the keys no row of CONTENTS names."""
+    used, unnamed = set(), []
+    for key in keys:
+        row = next((i for i, (pattern, _, _) in enumerate(CONTENTS) if re.match(pattern, key)), None)
+        if row is None:
+            unnamed.append(key)
+        else:
+            used.add(row)
+    own = [words for i, (_, whose, words) in enumerate(CONTENTS) if i in used and whose == 'own' and words]
+    theirs = [words for i, (_, whose, words) in enumerate(CONTENTS) if i in used and whose == 'bethesda']
+    text = DESCRIPTION_LEAD + ', '.join(own[:-1]) + (', and ' if len(own) > 1 else '') + own[-1] + '.'
+    if theirs:
+        text += DESCRIPTION_BETHESDA + '; '.join(theirs) + '.'
+    return text.encode('ascii'), unnamed
 
 # Thornswood's own records that nothing shows or names any more, by object id
 # in this plugin's own numbering, type and editor id (THE CREATION MENUS, TAKEN
@@ -1846,12 +1917,12 @@ def other_server_in_header(head):
     return any(n in low for n in (OTHER_SERVER_NAME, OTHER_SERVER_SHORT, OTHER_SERVER_LONGER))
 
 
-def described(head):
-    """The header with DESCRIPTION as its SNAM, its size field set to match,
+def described(head, description):
+    """The header with description as its SNAM, its size field set to match,
     and whether that changed anything. A header with no SNAM gains one after
     CNAM, where the Creation Kit writes it."""
     pairs = subrecords(bytes(head[24:]))
-    want = DESCRIPTION + b'\x00'
+    want = description + b'\x00'
     out, put = [], False
     for tag, body in pairs:
         if tag == b'SNAM':
@@ -2423,11 +2494,41 @@ def main():
         print('  %d cell or world record(s) hold none of this plugin\'s records and go: %s'
               % (len(going_bare), ', '.join('0x%07X' % f for f in sorted(going_bare))))
 
-    new_head, head_changed = described(head)
+    # The description names what the written plugin will hold (#2993): what
+    # stays, what is added, and the cells and worlds copied in for stations.
+    holds = ([r for r in records if r.fid not in removing] + built + to_place)
+    # A record carrying the other server's name is that, not a new kind of
+    # record for the description to name, so it is said first. The written
+    # file is read for it again below.
+    left = [(r, w) for r in holds for w in other_server_names(r)]
+    if left:
+        print('')
+        for r, w in left:
+            print('STOP. %s 0x%07X still carries the other server\'s name: %s'
+                  % (r.tag.decode(), r.fid, w))
+        print('Nothing was written.')
+        return 1
+    keys = ['%s %s' % (r.tag.decode(), r.editor_id()) for r in holds]
+    keys += ['%s ' % tag.decode() for tag, _ in copies]
+    description, unnamed = description_of(keys)
+    if unnamed:
+        print('')
+        print('STOP. %d record(s) the plugin would hold are named by no row of CONTENTS, so the header '
+              'could not say they are here (#2993). Add a row for them. Nothing was written.' % len(unnamed))
+        for key in unnamed:
+            print('  %s' % key)
+        return 1
+    if len(description) + 1 > DESCRIPTION_MOST:
+        print('')
+        print('STOP. the header\'s description would be %d bytes with its end, and mod tools hold %d '
+              '(#2993). Shorten the words in CONTENTS. Nothing was written.'
+              % (len(description) + 1, DESCRIPTION_MOST))
+        return 1
+    new_head, head_changed = described(head, description)
     print('')
     print('The header')
     if head_changed:
-        print('  its description becomes: %s' % DESCRIPTION.decode('ascii'))
+        print('  its description becomes: %s' % description.decode('ascii'))
     else:
         print('  its description already reads as this tool writes it')
 
