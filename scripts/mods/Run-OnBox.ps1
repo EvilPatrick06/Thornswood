@@ -13,13 +13,13 @@
       pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'
 
   A tool is a .py (run by the box's Python), a .js (its node) or a .ps1 (its
-  PowerShell 7) under scripts\mods or scripts\dev. The last line above is
-  "After a change to the content plugin" in Developer-Guide.md, the whole
-  chain of scripts\mods\content-tables.json, from a machine with no game:
-  until #3100 only the Python builders could run here, so every content
-  change still went to One or a PC with the game at C:\Thornswood (#2923's
-  two rebuilds, #2906's records and #3077's plugin all ran on One on 21 Oct
-  2026, though the box held what they read).
+  PowerShell 7) under scripts\mods or scripts\dev. Until #3100 only a
+  Python tool could run here, and the threads did not know the box held
+  Skyrim's archives, so #2906's records and #3077's plugin ran on One on
+  21 Oct 2026 though the box held what they read. The last line above runs
+  the whole chain of scripts\mods\content-tables.json; its tables are not
+  yet the ones a game PC writes (#3105), so Developer-Guide.md still sends
+  the whole rebuild to a PC with the game.
 
   WHY. Patrick, 20 Oct 2026: "let's make the content plugin available in the
   cloud". The content plugin's tools read the game's Data folder, which was

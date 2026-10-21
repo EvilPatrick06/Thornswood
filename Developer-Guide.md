@@ -645,13 +645,22 @@ The first push sets the upstream. It puts this branch on GitHub under the same n
 
 #### After a change to the content plugin
 
-A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit. No game is needed: commit the plugin first, then run the rebuild on the VPS box, against the dev server's plugins and load order, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first):
+A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two beside it) changes the tables the server reads out of the load order. Rebuild all of them before you commit, on a PC with the game at `C:\Thornswood`:
 
 ```powershell
-pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'
+.\scripts\mods\Rebuild-ContentTables.ps1
 ```
 
-It sends the commit, runs every builder in `scripts\mods\content-tables.json` there, in order, and brings back every file that changed. On a PC with the game at `C:\Thornswood`, `.\scripts\mods\Rebuild-ContentTables.ps1` does the same against that game. Either way it writes each plugin's new sha256 into `records\asset-provenance.json`, ends with `All <n> builders ran.` and lists every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it. One builder alone runs the same way (`Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'`); `{settings}` stands for a server-settings.json of the dev server's load order, for `Build-NpcPopulation.py --settings`.
+It runs every builder in `scripts\mods\content-tables.json`, in order, and writes each plugin's new sha256 into `records\asset-provenance.json`. It ends with `All <n> builders ran.` and a list of every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it.
+
+One builder needs no game: commit first, then run it on the VPS box against the dev server's plugins, its load order and Skyrim's archives there, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first). What it writes under `game`, `records` and `docs\systems` comes back into your checkout:
+
+```powershell
+pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
+pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{settings}' --strings-dir '{data}'
+```
+
+`{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), but its tables are not yet the ones a game PC writes: #3105 says why.
 
 #### Switch between branches
 
