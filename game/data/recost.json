@@ -1,0 +1,1046 @@
+{
+ "version": 2,
+ "builtBy": "scripts/dev/Build-Recost.py",
+ "issue": 613,
+ "decision": "Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against the same kind of piece at the same rank and metal; a steel cuirass should cost about what other steel cuirasses cost. No gold worth.",
+ "readFrom": "game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked about, their family and rank, and the inputs of the tempering recipe for the same item",
+ "rule": {
+  "owner": "Smith",
+  "benches": [
+   "CraftingSmithingForge",
+   "CraftingSmithingSkyforge"
+  ],
+  "temper": [
+   "CraftingSmithingSharpeningWheel",
+   "CraftingSmithingArmorTable"
+  ],
+  "peers": 3,
+  "low": 0.5,
+  "high": 2.0,
+  "notMaterial": [
+   "f:Skyrim.esm"
+  ],
+  "how": "peers are the rows of the same family, rank and tempering material; cost is how many materials a row asks, every input counted but gold coins, whose counts stay as they are. A row under low or over high times its peers' median cost has every material count multiplied by the one factor that brings it to the median, rounded, never under one. A row already listed keeps the original inputs it was first measured with."
+ },
+ "counts": {
+  "measured": 1112,
+  "inGroups": 882,
+  "groups": 105,
+  "recosted": 39,
+  "unreachable": 0
+ },
+ "recipes": [
+  {
+   "recipe": "19f9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingHelmet2Alt",
+   "name": "Riekling Skull Grassless Helmet",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Helmets",
+   "rank": "novice",
+   "metal": "Bone Meal",
+   "peers": 4,
+   "usual": 4.5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 4
+  },
+  {
+   "recipe": "21474:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerGlass",
+   "name": "Glass Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "expert",
+   "metal": "Refined Malachite",
+   "peers": 3,
+   "usual": 7,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 4
+    },
+    {
+     "item": "5ada1:Skyrim.esm",
+     "name": "Refined Malachite",
+     "count": 1,
+     "to": 4
+    }
+   ],
+   "costNow": 8
+  },
+  {
+   "recipe": "21478:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerOrcish",
+   "name": "Orcish Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4
+  },
+  {
+   "recipe": "2147a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerSteel",
+   "name": "Steel Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "metal": "Steel Ingot",
+   "peers": 19,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4
+  },
+  {
+   "recipe": "2147b:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerWinterhold",
+   "name": "Winterhold Battlemage Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "master",
+   "metal": "Ebony Ingot",
+   "peers": 10,
+   "usual": 5.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4
+  },
+  {
+   "recipe": "2147c:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerYsgramor",
+   "name": "Buckler of Ysgramor",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4
+  },
+  {
+   "recipe": "238ff:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerCoif",
+   "name": "Bosmer Coif",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "expert",
+   "metal": "Refined Moonstone",
+   "peers": 3,
+   "usual": 5,
+   "costWas": 12,
+   "inputs": [
+    {
+     "item": "57f91:Skyrim.esm",
+     "name": "Hanging Moss",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "9151b:Skyrim.esm",
+     "name": "Spider Egg",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 2,
+     "to": 1
+    }
+   ],
+   "costNow": 7
+  },
+  {
+   "recipe": "2390a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerHeavyCoif",
+   "name": "Bosmer Reinforced Coif",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "expert",
+   "metal": "Corundum Ingot",
+   "peers": 4,
+   "usual": 5.0,
+   "costWas": 12,
+   "inputs": [
+    {
+     "item": "57f91:Skyrim.esm",
+     "name": "Hanging Moss",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "9151b:Skyrim.esm",
+     "name": "Spider Egg",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 2,
+     "to": 1
+    }
+   ],
+   "costNow": 8
+  },
+  {
+   "recipe": "89a:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiGau",
+   "name": "Mahayi Bezubands",
+   "plugin": "YokuWeapons.esp",
+   "kind": "Gauntlets",
+   "rank": "advanced",
+   "metal": "Quicksilver Ingot",
+   "peers": 5,
+   "usual": 7,
+   "costWas": 3,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 6
+  },
+  {
+   "recipe": "89b:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiBoot",
+   "name": "Mahayi Boots",
+   "plugin": "YokuWeapons.esp",
+   "kind": "Armoured boots",
+   "rank": "advanced",
+   "metal": "Quicksilver Ingot",
+   "peers": 5,
+   "usual": 7,
+   "costWas": 3,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 6
+  },
+  {
+   "recipe": "8de:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildGauntlets",
+   "name": "Thieves Guild Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "kind": "Gauntlets",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1
+    }
+   ],
+   "costNow": 3
+  },
+  {
+   "recipe": "8e2:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahGauntlets",
+   "name": "Karliah's Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "kind": "Gauntlets",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 2
+    }
+   ],
+   "costNow": 3
+  },
+  {
+   "recipe": "8eb:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantGauntlets",
+   "name": "Thieves Guild Gray Gloves",
+   "plugin": "MoreCraftableEquipment.esp",
+   "kind": "Gauntlets",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 22,
+   "usual": 3.0,
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 4,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 3,
+     "to": 1
+    }
+   ],
+   "costNow": 3
+  },
+  {
+   "recipe": "906:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponDragonsteelTanto",
+   "name": "Dragonsteel Tanto",
+   "plugin": "Immersive Weapons.esp",
+   "kind": "Daggers",
+   "rank": "expert",
+   "metal": "Dragon Bone",
+   "peers": 4,
+   "usual": 2.0,
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "3ada4:Skyrim.esm",
+     "name": "Dragon Bone",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1
+    }
+   ],
+   "costNow": 3
+  },
+  {
+   "recipe": "bfe6b:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditKilt",
+   "name": "Riekling Bandit Fur Kilt",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe6d:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditCuirass02",
+   "name": "Riekling Bandit Fur Armour, Sleeveless",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe6e:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassFalkreath",
+   "name": "Riekling Guard's Armor Falkreath ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe70:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassHjaalmarch",
+   "name": "Riekling Guard's Armor Hjaalmarch ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe72:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassMarkarth",
+   "name": "Riekling Guard's Armor Markarth ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe74:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassRiften",
+   "name": "Riekling Guard's Armor Riften ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe76:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassSolitude",
+   "name": "Riekling Guard's Armor Solitude ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe78:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassThePale",
+   "name": "Riekling Guard's Armor Pale ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe7a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWhiterun",
+   "name": "Riekling Guard's Armor Whiterun ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe7c:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWinterhold",
+   "name": "Riekling Guard's Armor Winterhold ",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfe98:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirass",
+   "name": "Riekling Scaled Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "advanced",
+   "metal": "Corundum Ingot",
+   "peers": 14,
+   "usual": 10.5,
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 5
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 10
+  },
+  {
+   "recipe": "bfe9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirassB",
+   "name": "Riekling Scaled Horn Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "advanced",
+   "metal": "Corundum Ingot",
+   "peers": 14,
+   "usual": 10.5,
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 2,
+     "to": 5
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 10
+  },
+  {
+   "recipe": "bfeae:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildCuirass",
+   "name": "Riekling Thieves Guild Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfeb2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderCuirass",
+   "name": "Riekling Thieves Guild Master's Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfeb6:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildVariantCuirass",
+   "name": "Riekling Thieves Guild Gray Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfeba:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorTsunCuirass",
+   "name": "Riekling Tsun's Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Iron Ingot",
+   "peers": 10,
+   "usual": 8.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 8
+    }
+   ],
+   "costNow": 8
+  },
+  {
+   "recipe": "bfebc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDA05SaviorsHide",
+   "name": "Riekling Savior's Hide",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "master",
+   "metal": "Ebony Ingot",
+   "peers": 26,
+   "usual": 10.0,
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 5
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 10
+  },
+  {
+   "recipe": "bfebe:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmor",
+   "name": "Riekling Shrouded Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfec0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmet",
+   "name": "Riekling Shrouded Cowl",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Helmets",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 16,
+   "usual": 5.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfec2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmetMaskLess",
+   "name": "Riekling Shrouded Cowl Maskless",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Helmets",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 16,
+   "usual": 5.0,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bfed0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorHunterCuirass",
+   "name": "Riekling Dawnguard Armor",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Steel Ingot",
+   "peers": 6,
+   "usual": 7.0,
+   "costWas": 3,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 3,
+     "to": 7
+    }
+   ],
+   "costNow": 7
+  },
+  {
+   "recipe": "bfed2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirass",
+   "name": "Riekling Ancient Falmer Cuirass",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "expert",
+   "metal": "Refined Moonstone",
+   "peers": 5,
+   "usual": 9,
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 4
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 8
+  },
+  {
+   "recipe": "bfed4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirassAlternate",
+   "name": "Riekling Ancient Falmer Cuirass Alternate",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "expert",
+   "metal": "Refined Moonstone",
+   "peers": 5,
+   "usual": 9,
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 4
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 4
+    }
+   ],
+   "costNow": 8
+  },
+  {
+   "recipe": "bff32:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass",
+   "name": "Riekling Bandit Fur Armor Sleeves",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  },
+  {
+   "recipe": "bff34:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass2",
+   "name": "Riekling Bandit Fur Kilt&Cloak",
+   "plugin": "Playable Rieklings.esp",
+   "kind": "Body armour",
+   "rank": "novice",
+   "metal": "Leather",
+   "peers": 47,
+   "usual": 5,
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 5
+    }
+   ],
+   "costNow": 5
+  }
+ ],
+ "unreachable": []
+}
