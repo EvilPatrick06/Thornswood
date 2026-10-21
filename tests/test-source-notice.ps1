@@ -142,15 +142,34 @@ Yes '  naming skymp5-client.js, skymp5-client, GNU GPL version 3' ($src -match '
 Yes '  and the recorded commit' ($src.Contains($fork + '/tree/' + $commit))
 Yes '  and not the files it does not carry' (-not $src.Contains('SkyrimPlatformImpl.dll') -and -not $src.Contains('thornswood-front.js'))
 Yes '  matched without regard to case' ((Names (Get-SourceNoticeEntries $record @('data\platform\plugins\SKYMP5-CLIENT.js') 'pack' $licences)) -contains 'SOURCE CODE.txt')
-$up = @(Get-SourceNoticeEntries $record @('Data\Platform\UI\build.js') 'pack' $licences)
-$upText = Text $up 'SOURCE CODE.txt'
-Yes 'a pack carrying only build.js names it as SkyMP''s skymp5-front, GNU GPL version 3' ($upText -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
-Yes '  says Thornswood did not build it and names no commit for it' ($upText.Contains('Thornswood did not build') -and -not $upText.Contains('/tree/'))
-Yes '  and points at upstream SkyMP' ($upText.Contains('https://github.com/skyrim-multiplayer/skymp'))
+# build.js is built from the fork's skymp5-front at the pin by every Ship since
+# #2931 and held to records\front-build.json, beside the client record.
+$fb = @(Get-SourceNoticeEntries $record @('Data\Platform\UI\build.js') 'pack' $licences)
+$fbText = Text $fb 'SOURCE CODE.txt'
+Yes 'a pack carrying only build.js names it as built from skymp5-front, GNU GPL version 3' ($fbText -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
+Yes '  at the recorded commit, with no group of what Thornswood did not build' ($fbText.Contains($fork + '/tree/' + $commit) -and -not $fbText.Contains('Thornswood did not build'))
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-source-notice-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $tmp
 try {
+    # A client record with no front record beside it, as before #2931: build.js
+    # is SkyMP's own, with no commit.
+    $bare = Join-Path $tmp 'bare'
+    $null = New-Item -ItemType Directory -Force -Path $bare
+    [IO.File]::Copy($record, (Join-Path $bare 'client-build.json'))
+    $up = @(Get-SourceNoticeEntries (Join-Path $bare 'client-build.json') @('Data\Platform\UI\build.js') 'pack' $licences)
+    $upText = Text $up 'SOURCE CODE.txt'
+    Yes 'with no front record, a pack carrying only build.js names it as SkyMP''s skymp5-front, GNU GPL version 3' ($upText -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
+    Yes '  says Thornswood did not build it and names no commit for it' ($upText.Contains('Thornswood did not build') -and -not $upText.Contains('/tree/'))
+    Yes '  and points at upstream SkyMP' ($upText.Contains('https://github.com/skyrim-multiplayer/skymp'))
+    # A front record of another commit stops it.
+    $fr = Read-Json (Join-Path $Repo 'records\front-build.json')
+    $fr.forkCommit = 'abcdef1234567890abcdef1234567890abcdef12'
+    [IO.File]::WriteAllText((Join-Path $bare 'front-build.json'), ($fr | ConvertTo-Json -Depth 6))
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries (Join-Path $bare 'client-build.json') @('Data\Platform\UI\build.js') 'pack' $licences } catch { $threw = $_.Exception.Message -match 'one commit' }
+    Yes 'a front record of another commit than the client record stops it' $threw
+
     $c3 = Read-Json $record
     $c3.files | Add-Member -NotePropertyName 'Data\SKSE\Plugins\Unheard.dll' -NotePropertyValue ([pscustomobject]@{ sha256 = '00'; bytes = 1 })
     $cp = Join-Path $tmp 'client-build.json'

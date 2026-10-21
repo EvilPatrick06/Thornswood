@@ -173,7 +173,12 @@ antigo is a trace logging library. The build links it into
 every target in `VCPKG_DEPENDENT`), but nothing in the client calls it, so the
 linker leaves it out. The only fork files that use it are the server's
 `addon\ScampServer.cpp` and `server_guest_lib\MpObjectReference.cpp` and
-`WorldState.cpp`. `MpClientPlugin.dll` takes `server_guest_lib` for its
+`WorldState.cpp`. One more fork file names it and uses none of it:
+`misc\tests\node\test_save_completion_addon.cpp`, a test fixture (fork #77)
+that writes stand-ins of its own for antigo's names so the server's addon
+code compiles without it, and that only the fork's own node test builds.
+Nothing under `misc\tests` goes into a file anybody receives.
+`MpClientPlugin.dll` takes `server_guest_lib` for its
 inventory code only, and none of the messages in those two files is in the
 recorded `MpClientPlugin.dll`. Nor is any of antigo's own (`resolved context
 with`, `stringstream error!`), while the recorded `scam_native.node` has every
@@ -183,7 +188,7 @@ and running the server hands nobody a copy: it asks nothing of Thornswood
 today. #1332 said this repository holds an `LGPL-3.0.txt`. It has none, and
 none is owed. The day a client file calls antigo, the LGPL's notice and text
 have to go with that file, and `tests\test-third-party.js` fails when a fork
-file outside those three starts using it.
+file outside those three and the fork's tests starts using it.
 
 frida-gum is Skyrim Platform's function hooking (`FridaHooks.cpp`,
 `FridaHookHandler.cpp`), and `GumInterceptor` is in the recorded
@@ -205,11 +210,11 @@ fork wherever the fork has a copy.
 | `Data\Platform\Fonts\Tavern.ttf` and `Tavern.spritefont` | Byte for byte the fork's `client-deps\common\Data\Platform\Fonts` copies. The font calls itself Typey McTypeface, by Paul J. Miller (2016) and Dieter Steffmann (1995). | SIL Open Font License, by the font's own licence field and by upstream's `THIRD_PARTY_LICENSES`. Neither gives the version. |
 | `Data\Platform\Fonts\DIN-Pro-bold.spritefont` | Byte for byte the fork's `client-deps` copy: a sprite font whose name says DIN Pro Bold. | None found. DIN Pro is FSI FontShop's typeface, whose own files point at FontFont's end user licence (below), and upstream names no licence for this file. |
 | `Data\Platform\Modules\skyrimPlatform.ts` | skyrim-platform's TypeScript declarations, an older copy (136,561 bytes) than the fork builds (136,768). | GPL-3.0 |
-| `Data\Platform\UI\build.js` | A development build of `skymp5-front`, dated 13 September 04:33 in the game folder. It was not built here, and nobody recorded the commit it came from. It bundles npm packages under their own licences, among them React 16.13.1 and 17.0.2, MIT by the `@license` comments inside it. | GPL-3.0 |
-| The files beside build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. Ship parses the names from build.js at pack time (#1318); it does not keep a count by hand. | As build.js, except the fonts below. |
+| `Data\Platform\UI\build.js`, in main's releases until its next one | A development build of `skymp5-front`, dated 13 September 04:33 in the game folder. It was not built here, and nobody recorded the commit it came from. It bundles npm packages under their own licences, among them React 16.13.1 and 17.0.2, MIT by the `@license` comments inside it. Since 20 October every release carries the fork's own build in its place ("SkyMP's interface, built from the fork", below). | GPL-3.0 |
+| The files beside that build.js that it names by hash | Its fonts, sounds and pictures. 26 are byte for byte files in the fork's `skymp5-front\src`. Ship parses the names from build.js at pack time (#1318); it does not keep a count by hand. | As build.js, except the fonts below. |
 
-The fonts in that front build, from their own name tables. All six are byte for
-byte the files in upstream's `skymp5-front\src\fonts`:
+The fonts in that older front build, from their own name tables. All six are
+byte for byte the files in upstream's `skymp5-front\src\fonts`:
 
 | File | Font | What the file says |
 |---|---|---|
@@ -222,7 +227,10 @@ byte the files in upstream's `skymp5-front\src\fonts`:
 
 Futura PT and DIN Pro point at their foundries' end user licences. This file
 found nothing that gives SkyMP or Thornswood the right to hand them on, and
-upstream names none. Upstream SkyMP ships them the same way.
+upstream names none. Upstream SkyMP ships them the same way. The fork's own
+build has none of the four (below), so they leave with main's next release;
+installs that already have them keep them until a release lists them as gone,
+which is #1317.
 
 Bankir-Retro and icomoon keep shipping, credited to SkyMP and to their makers
 (Patrick, 15 Oct 2026, #2177): they came to Thornswood with SkyMP's
@@ -244,24 +252,58 @@ a hidden password in icomoon. What each one carries, read on 16 October:
   Which icon set its glyphs come from is not recorded, so no licence is
   claimed here either.
 
+## SkyMP's interface, built from the fork
+
+Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.js`
+and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
+at the engine pin, with webpack, and holds what it built to
+`records\front-build.json`: 68 files, 8,434,780 bytes, from commit
+`445ded38`, the commit the client record names. Read on 21 October (#421):
+the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
+bytes, sha256
+`d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
+font in it is one the record names. Main's release `20261017-205912` still
+carries the 13 September build in the table above until main's next release.
+
+The licence is skymp5-front's, `GPL-3.0` by its `package.json`, and its source
+is the fork at that commit, under "Where the source is". It bundles npm
+packages under their own licences, among them React 16.13.1 and 17.0.2, MIT
+by the `@license` comments inside it, read from the dev feed's copy.
+
+The fonts in it, from their own name tables:
+
+| File | Font | What the file says |
+|---|---|---|
+| `855bfaf67c57745958d3.ttf` | Bankir-Retro, by Gophmann A.L., 2006 | The same file as in the older build, above. |
+| `d213051bb6f28a25fb26.ttf` | icomoon, made with the IcoMoon app | The same file as in the older build, above. |
+| `dc3cbd21104d40477da6.ttf` | Barlow SemiBold, version 1.408, by Jeremy Tribby (Tribby Type) | "Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)", and in its licence field "This Font Software is licensed under the SIL Open Font License, Version 1.1." with http://scripts.sil.org/OFL. 108,348 bytes, sha256 `86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5`, the fork's `skymp5-front\src\fonts\Barlow-SemiBold.ttf`. |
+
+Barlow came into the fork on 9 October (fork #40, for #1317) in place of DIN
+Pro, from Google Fonts' `google/fonts` at `2eb0b48d`, and the same change
+took out the Futura PT and DIN Pro faces. The OFL lets a font travel with its
+copyright notice and licence in its own metadata, which this one carries;
+the fork keeps the full text beside it as `skymp5-front\src\fonts\OFL.txt`.
+
 ## Thornswood Client Runtime, Thornswood's mod on Nexus Mods
 
 Thornswood publishes this itself, as its own mod: Nexus Mods mod 192762,
 https://www.nexusmods.com/skyrimspecialedition/mods/192762, by EvilPatrick06.
-Revision 5 of the collection carries version 1.0.0, file 809366, uploaded on
-22 September, and it is not optional. The collection's `collection.json`
-records the download as 148,896,610 bytes, md5
-`c515679068f6563750b1ca1f9260031f`.
+Revision 4 of the collection (`7essxf`, published 21 October 2026, revision id
+813945) carries version 1.0.1, file 823485, uploaded on 20 October, and it is
+not optional. Nexus gives that file as 152,002,702 bytes, and the archive it
+serves has md5 `74ef6a9f5cf0a5ba7dbab9c00cb67491`, the md5 the collection
+pins. Revision 3 carries the same file; revisions 1 and 2 carry version
+1.0.0, under "Version 1.0.0, which revisions 1 and 2 still install" below.
 
-It is the largest thing somebody else wrote that Thornswood hands out: 68
-files, 366,157,850 bytes, into `Data\Platform\Distribution`, and a README and
-six licence texts into `Data\Docs\Thornswood Client Runtime`. Read on
-24 September: Vortex's copy, in the staging folder `Thornswood Client Runtime
-192762 1.0 2026-09-22T22-17Z`, matched the 68 in `C:\Thornswood\Game` by
-sha256, and `Profile\OwnGame\files.txt` gives the collection as the origin of
-all 68. 67 of them are byte for byte the files the fork's build puts in
-`build\dist\client\Data\Platform\Distribution`. `___systemPolyfill.js` is the
-one that is not, and it has its own paragraph below.
+It is the largest thing somebody else wrote that Thornswood hands out: 67
+files, 366,155,245 bytes, into `Data\Platform\Distribution`, and a README and
+five licence texts into `Data\Docs\Thornswood Client Runtime`, 73 entries in
+all. Read on 21 October 2026 (#421) from that archive, downloaded from Nexus
+with its md5 checked, and from the record of revision 3 as
+`Install-NexusRevision.ps1 -Record` laid it out (files.txt, every file of
+file 823485 by sha256), which revision 4 changes only in nine plugins (#2979).
+The 67 are byte for byte the 67 of 1.0.0 that, read on 24 September, were the
+files the fork's build puts in `build\dist\client\Data\Platform\Distribution`.
 
 `SkyrimPlatformImpl.dll` and `SkyrimPlatformCEF.exe.hidden` are left out of the
 mod on purpose. They are two of the six recorded files above, and they come
@@ -274,13 +316,12 @@ agrees with the mod's README wherever the README gives one.
 | Part | Version | Files | Licence | Its text in the mod |
 |---|---|---|---|---|
 | Chromium Embedded Framework, and Chromium | CEF 108.4.13+ga98cd4c, Chromium 108.0.5359.125 | `RuntimeDependencies\libcef.dll`, `chrome_elf.dll`, `snapshot_blob.bin` and `v8_context_snapshot.bin`; `CEF\chrome_100_percent.pak`, `chrome_200_percent.pak` and `resources.pak`; 55 `CEF\locales\*.pak` | BSD-3-Clause | `CEF-LICENSE.txt`, `Chromium-LICENSE.txt` |
-| ICU data | ICU 71, by the name inside the file, `icudt71l` | `RuntimeDependencies\icudtl.dat` | Unicode's licence, below | `ICU-LICENSE.txt` |
+| ICU data | ICU 71, by the name inside the file, `icudt71l` | `RuntimeDependencies\icudtl.dat` | Unicode's licence, as ICU 71 carries it | `ICU-LICENSE.txt` |
 | ANGLE | 2.1.19724, git ceec659ac60b | `RuntimeDependencies\libEGL.dll`, `libGLESv2.dll` | BSD-3-Clause | `ANGLE-LICENSE.txt` |
 | Node.js | 23.2.0 | `RuntimeDependencies\libnode.dll` | MIT, with the licences of the libraries built into it | `Node-LICENSE.txt` |
-| Microsoft Direct3D HLSL Compiler | 10.0.20348.1 | `RuntimeDependencies\d3dcompiler_47.dll` | Microsoft's, handed on under the Windows SDK's terms for Distributable Code, below | None |
-| Skyrim Platform | upstream's last copy, below | `___systemPolyfill.js` | GPL-3.0 | `SkyrimPlatform-LICENSE.txt` |
+| Microsoft Direct3D HLSL Compiler | 10.0.20348.1 | `RuntimeDependencies\d3dcompiler_47.dll` | Microsoft's, handed on under the Windows SDK's terms for Distributable Code, below | None; the README says the terms |
 
-The programs, the ICU data and the script, by sha256:
+The programs and the ICU data, by sha256:
 
 | File | Bytes | sha256 |
 |---|---|---|
@@ -291,7 +332,6 @@ The programs, the ICU data and the script, by sha256:
 | `RuntimeDependencies\d3dcompiler_47.dll` | 4,891,080 | `e4bc3420a28069bd13dc3be725d46676a7c0e99de221026e8c43cd6f7ed45c0b` |
 | `RuntimeDependencies\chrome_elf.dll` | 1,411,072 | `4f5f1dc6d998b07e3919055b6f9cc8befc626d30479c7c2d07722051650491a0` |
 | `RuntimeDependencies\libEGL.dll` | 474,624 | `1100398a3fe57da76ea58b9b110be2f6a83a75a3e1863863f086d9218b46cc5a` |
-| `___systemPolyfill.js` | 2,605 | `38320fb897314ae7471bdab749f00442c00913f14d7b8f82bc793b3c2b669188` |
 
 Chromium and Node build other people's libraries into these files.
 `Node-LICENSE.txt`, 139,053 bytes, carries the licence of every library built
@@ -299,9 +339,11 @@ into libnode.dll. For Chromium the README points at Chromium's own source at
 108.0.5359.125, where each component keeps its LICENSE file. No list of those
 travels with the mod.
 
-`icudtl.dat` is ICU 71's data. The `ICU-LICENSE.txt` beside it is the Unicode
-License V3, with a copyright line that runs from 1991 to 2026. That is the text
-of a far later ICU than 71, which came out in 2022.
+`icudtl.dat` is ICU 71's data, and the `ICU-LICENSE.txt` beside it is ICU 71's
+own text, 25,505 bytes, sha256
+`af3e84c401f1a35e8d32d6eb1a33fe587c3981aa5cd206033d9527c1855b57a2`, ICU's
+`icu4c/LICENSE` at its tag `release-71-1`. Until 1.0.1 the mod carried the
+Unicode License V3 of a far later ICU in its place.
 
 ### d3dcompiler_47.dll, Microsoft's shader compiler
 
@@ -342,12 +384,12 @@ from that file:
   programs it goes out with.
 - Require distributors and external end users to agree to terms that
   protect it at least as much as the licence does. Patrick decided on
-  20 October 2026 (#421, option A) that the Client Runtime's README says so:
-  by installing the file you accept Microsoft's terms for it, use it only
-  with the Thornswood client, keep its notices, do not hand it on apart from
-  the mod, and Microsoft gives no warranty. That README goes up with the
-  mod's next upload on Nexus. Until then the README Vortex installs, version
-  1.0.0, does not say it, which is under "What is still missing".
+  20 October 2026 (#421, option A) that the Client Runtime's README says so,
+  and the README of 1.0.1, the version revisions 3 and 4 install, does: by
+  installing the file you accept Microsoft's terms for it, use it only with
+  the Thornswood client, keep its copyright and other notices as they are,
+  do not hand it on apart from the mod, and Microsoft gives no warranty for
+  it and it remains Microsoft's property.
 
 No licence text travels with it, and the SDK licence does not ask for one.
 Windows 8.1 and later carry their own `d3dcompiler_47.dll` in `System32`
@@ -355,20 +397,34 @@ Windows 8.1 and later carry their own `d3dcompiler_47.dll` in `System32`
 through, has needed Windows 10 or later since 1 January 2024. Whether Chromium in the game draws the same
 without the copy in `RuntimeDependencies` has not been measured.
 
-`___systemPolyfill.js`, 2,605 bytes, is the SystemJS module loader that Skyrim
-Platform used to run before a plugin's `index.js`. Line endings aside, it is
-upstream's `skyrim-platform/tools/system_polyfill/dist/___systemPolyfill.js`,
-which did not change from 28 June 2023 until upstream removed that folder on
-1 June 2026 (commit `ceba28bc`, "drop system-polyfill, multifile plugins &
-other deprecated features", #2711). That removal comes before `2849e676`, the
-upstream commit the fork starts from. So the fork at the recorded commit has
-no such file, no file there names it, its build does not make it, and nothing
-in the client Thornswood ships asks for it. It reaches everybody who installs
-the collection anyway. The folder's own `package.json` names no licence. It is
-part of skyrim-platform, whose `package.json` says `GPL-3.0`, and the mod's
-`SkyrimPlatform-LICENSE.txt` is byte for byte skyrim-platform's `LICENSE`, the
-GNU General Public License version 3, 35,149 bytes. Its source is under "Where
-the source is".
+### Version 1.0.0, which revisions 1 and 2 still install
+
+Version 1.0.0, file 809366, uploaded on 22 September, is archived on Nexus
+and still served: revisions 1 and 2 of the collection pin it, and Nexus gave
+a download for it on 21 October. Revision 2 records it as 148,896,610 bytes, md5
+`c515679068f6563750b1ca1f9260031f`.
+It is 1.0.1 with two more files and two older ones. Its README names the fork
+and its branch but no commit, and says nothing of Microsoft's terms for
+`d3dcompiler_47.dll`; its `ICU-LICENSE.txt` is the later ICU's text above.
+The two more are `___systemPolyfill.js` and
+`Data\Docs\Thornswood Client Runtime\licences\SkyrimPlatform-LICENSE.txt`,
+which Patrick dropped from the mod on 28 September because nothing in the
+client loads the script.
+
+`___systemPolyfill.js`, 2,605 bytes, sha256
+`38320fb897314ae7471bdab749f00442c00913f14d7b8f82bc793b3c2b669188`, is the
+SystemJS module loader that Skyrim Platform used to run before a plugin's
+`index.js`. Line endings aside, it is upstream's
+`skyrim-platform/tools/system_polyfill/dist/___systemPolyfill.js`, which did
+not change from 28 June 2023 until upstream removed that folder on 1 June 2026
+(commit `ceba28bc`, "drop system-polyfill, multifile plugins & other
+deprecated features", #2711). That removal comes before `2849e676`, the
+upstream commit the fork starts from, so the fork at the recorded commit has
+no such file. It is part of skyrim-platform, whose `package.json` says
+`GPL-3.0`, and 1.0.0's `SkyrimPlatform-LICENSE.txt` is byte for byte
+skyrim-platform's `LICENSE`, the GNU General Public License version 3, 35,149
+bytes. While 1.0.0 is served, its source stays offered, under "Where the
+source is".
 
 ## Thornswood Content, Thornswood's other mod on Nexus Mods
 
@@ -765,15 +821,19 @@ answered an anonymous request on 24 September. It builds with CMake and
 vcpkg from the fork's `vcpkg.json`. The licence texts are in that tree:
 `skymp5-client/LICENSE`, `skyrim-platform/LICENSE` and `skymp5-server/LICENSE`.
 
-That covers what Thornswood built. It does not cover
-`Data\Platform\UI\build.js`. Its source is upstream's `skymp5-front`, at
+That covers what Thornswood built, and since 20 October that includes
+`Data\Platform\UI\build.js` and the files beside it: `records\front-build.json`
+names the same commit. It does not cover the older build.js main's releases
+carry until main's next one. Its source is upstream's `skymp5-front`, at
 https://github.com/skyrim-multiplayer/skymp, but nobody recorded which commit
 it was built from.
 
-Nor does it cover `___systemPolyfill.js` in the Thornswood Client Runtime,
-because the fork no longer has it at the recorded commit. Its source is the
-TypeScript it was compiled from, `src/___systemPolyfill.ts`, in the same fork
-at the last commit before upstream removed it:
+Nor does it cover `___systemPolyfill.js`, which version 1.0.0 of the
+Thornswood Client Runtime carries (revisions 1 and 2 of the collection still
+install it; 1.0.1 does not), because the fork no longer has it at the
+recorded commit. Its source is the TypeScript it was compiled from,
+`src/___systemPolyfill.ts`, in the same fork at the last commit before
+upstream removed it:
 
 https://github.com/EvilPatrick06/skymp/tree/43eedb568e72d3ea2f04b946b7cf14cbd1139750/skyrim-platform/tools/system_polyfill
 
@@ -782,9 +842,9 @@ recorded commit, so it is in the history of the branch above, and the clone
 here showed `origin/thornswood/engine-changes` containing it on 24 September.
 The licence text is `skyrim-platform/LICENSE` in the same tree.
 
-The rest of that mod is CEF, Chromium, ANGLE, ICU and Node, under permissive
-licences that ask for no source offer, and Microsoft's compiler. The mod's
-README still gives the source of CEF (https://github.com/chromiumembedded/cef),
+The rest of that mod, and all of 1.0.1, is CEF, Chromium, ANGLE, ICU and
+Node, under permissive licences that ask for no source offer, and Microsoft's
+compiler. The mod's README gives the source of CEF (https://github.com/chromiumembedded/cef),
 Chromium (https://chromium.googlesource.com/chromium/src) and Node
 (https://github.com/nodejs/node).
 
@@ -812,38 +872,26 @@ zip has a `README.txt` and every pack that carries a SkyMP file has a
 with the GPL and AGPL texts beside it (Source-Notice.ps1, written by
 Publish-Update.ps1 from `records\client-build.json`). And the Thornswood
 Client Runtime's own README, installed as
-`Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch
-and upstream SkyMP, but no commit, and `___systemPolyfill.js` is not on that
-branch any more.
+`Data\Docs\Thornswood Client Runtime\README.txt`, names the fork, its branch,
+upstream SkyMP and https://thornswood.net/credits#source. It names no commit,
+and since 1.0.1 it needs none: nothing in that version is built from the
+fork.
+
+The GPL and AGPL texts go with the files they cover. The installer hands
+`GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt` into the install
+folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1 stages them from
+`installer\licences`, Setup copies them, Uninstall removes them). The update
+feed's client runtime zip and every pack that carries a SkyMP file hand the
+GPL and AGPL texts with a note naming the recorded commit (Source-Notice.ps1).
+Updates stopped going to GitHub release pages on 28 September (#907); the
+launcher's draft release notes in `.github/workflows/release.yml` still point
+at https://thornswood.net/credits#source. Version 1.0.0 of the Client Runtime
+also installs
+`Data\Docs\Thornswood Client Runtime\licences\SkyrimPlatform-LICENSE.txt`
+beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
-- The GPL text reaches people through Nexus: the Thornswood Client Runtime
-  installs `Data\Docs\Thornswood Client Runtime\licences\SkyrimPlatform-LICENSE.txt`,
-  the GNU General Public License version 3, with the CEF, Chromium, ANGLE, ICU
-  and Node texts beside it, for everybody who installs the collection. The
-  installer also hands `GPL-3.0.txt`, `AGPL-3.0.txt` and `WebView2-LICENSE.txt`
-  into the install folder beside `SOURCE CODE.txt` (Package-Thornswood.ps1
-  stages them from `installer\licences`, Setup copies them, Uninstall removes
-  them). The update feed's client runtime zip and every pack that carries a
-  SkyMP file hand the GPL and AGPL texts with a note naming the recorded
-  commit (Source-Notice.ps1). Updates stopped going to GitHub release pages on
-  28 September (#907); the launcher's draft release notes in
-  `.github/workflows/release.yml` still point at
-  https://thornswood.net/credits#source.
-- The Client Runtime's README names the fork's branch and no commit, and
-  `___systemPolyfill.js` is gone from that branch, so the README's directions
-  do not lead to that file's source. The exact place is under "Where the
-  source is". Nothing in the shipped client loads that file.
-- `d3dcompiler_47.dll` goes out in the Client Runtime under the Windows SDK's
-  terms for Distributable Code ("d3dcompiler_47.dll, Microsoft's shader
-  compiler", above), and one of their conditions is not met yet: nothing
-  asks the people who install it to agree to terms that protect it at least
-  as much as Microsoft's do. The README for the mod's next upload says so
-  (Patrick, 20 Oct 2026, #421), and this line goes when that upload is in
-  the collection.
-- The `ICU-LICENSE.txt` in the Client Runtime is a later ICU's text than the
-  ICU 71 data it sits beside.
 - The permissive vcpkg licence texts do not travel with the client runtime,
   and the MIT and BSD ones ask for their notice to go with a binary. The two
   that are not permissive ask nothing of what ships today (antigo and
@@ -851,10 +899,11 @@ branch any more.
 - The MIT and OFL texts are not on the site beside marked and the fonts. The
   files keep their copyright lines and name their licences, as the copies
   from npm and Google Fonts did.
-- build.js has no recorded source commit.
-- The Futura PT, DIN Pro, Bankir-Retro and icomoon fonts, and
-  `Futura.spritefont` under "Shipped today with no licence this file can
-  name", ship with no licence found. The 37 Daedric Online menu files do not:
+- Main's releases carry the older build.js, with no recorded source commit,
+  until main's next release carries the fork's own (#2754).
+- The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
+  and icomoon fonts in both builds, and `Futura.spritefont` under "Shipped
+  today with no licence this file can name", ship with no licence found. The 37 Daedric Online menu files do not:
   they are removed and deleted from installs (#1318), and so are the two
   pictures in `Images` and the ChainLink, NoticeIcon and VoiceIcon sprite
   fonts (#2177).
