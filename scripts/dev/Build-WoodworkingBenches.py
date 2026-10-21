@@ -750,13 +750,12 @@ def main():
                          'angle': v['angle']} for site, v in sorted(rows.items())}, sort_keys=True),
              '  // ==== end WOODWORKING_BENCHES ====']
     gm = io.open(args.gamemode, encoding='utf-8', newline='').read()
-    nl = '\r\n' if '\r\n' in gm else '\n'
     a = gm.find(block[0])
     b = gm.find(block[-1])
     if a < 0 or b < a:
         print('STOP. no WOODWORKING_BENCHES markers in %s' % args.gamemode)
         return 1
-    new_gm = gm[:a] + nl.join(block) + gm[b + len(block[-1]):]
+    new_gm = gm[:a] + '\n'.join(block) + gm[b + len(block[-1]):]
 
     if args.check:
         old = io.open(args.out, encoding='utf-8').read() if os.path.isfile(args.out) else ''

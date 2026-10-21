@@ -224,7 +224,6 @@ def main():
         print('  %-12s %s' % (probe, tab.get(probe)))
 
     raw = io.open(a.gamemode, encoding='utf-8', newline='').read()
-    crlf = '\r\n' in raw
     s = raw.replace('\r\n', '\n')
     text = block(items, actors, len(order))
     if START in s:
@@ -234,8 +233,6 @@ def main():
     else:
         i = s.index(AFTER) + len(AFTER) + 1
         s = s[:i] + '\n' + text + s[i:]
-    if crlf:
-        s = s.replace('\n', '\r\n')
     io.open(a.gamemode, 'w', encoding='utf-8', newline='').write(s)
     print('wrote the ADMIN_NAMES block into ' + a.gamemode)
     return 0

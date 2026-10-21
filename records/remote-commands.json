@@ -2295,11 +2295,11 @@
                   {
                       "script":  "scripts/mods/Run-OnBox.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodRemote",
-                      "anchor":  "-Script \"New-Item -ItemType Directory -Force -Path \u0027$run\u0027 | Out-Null; \u0027MADE\u0027\"",
-                      "does":  "makes the run\u0027s own folder under C:\\Windows\\Temp",
+                      "via":  "Start-ThornswoodRemote",
+                      "anchor":  "$keeper = Start-ThornswoodRemote -Target $target -SshArgs $ssh -Script (Get-ThornswoodOnBoxKeepScript -Run $run)",
+                      "does":  "removes the run folders under C:\\Windows\\Temp whose lock nobody holds, makes the run\u0027s own and holds it, and removes it when its input closes (#2999)",
                       "class":  "stage",
-                      "reason":  "writes a stage folder the run owns"
+                      "reason":  "writes and removes stage folders the runs own"
                   },
                   {
                       "script":  "scripts/mods/Run-OnBox.ps1",
@@ -2313,8 +2313,17 @@
                   {
                       "script":  "scripts/mods/Run-OnBox.ps1",
                       "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodArtifactRemote",
-                      "anchor":  "$lines = @(Invoke-ThornswoodArtifactRemote $target $ssh $farRun",
+                      "via":  "Send-ThornswoodArtifactFile",
+                      "anchor":  "Send-ThornswoodArtifactFile $farFile $target $ssh ($runFar + \u0027/run.ps1\u0027)",
+                      "does":  "uploads the run\u0027s own script to the run\u0027s folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the run owns"
+                  },
+                  {
+                      "script":  "scripts/mods/Run-OnBox.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "-Bypass -Script (\"\u0026 \u0027\" + $run + \"\\run.ps1\u0027\")",
                       "does":  "copies a game server\u0027s plugins into the run\u0027s folder, links Skyrim\u0027s archives, runs a repository Python tool there and zips what it wrote",
                       "class":  "admin",
                       "reason":  "runs a tool on the box, work outside the gate verbs"
@@ -2327,15 +2336,6 @@
                       "does":  "downloads what the tool wrote",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
-                  },
-                  {
-                      "script":  "scripts/mods/Run-OnBox.ps1",
-                      "scope":  "\u003ctop\u003e",
-                      "via":  "Invoke-ThornswoodArtifactRemote",
-                      "anchor":  "$gone = @(Invoke-ThornswoodArtifactRemote $target $ssh $farClean",
-                      "does":  "removes the run\u0027s folder",
-                      "class":  "stage",
-                      "reason":  "removes a stage folder the run owns"
                   },
                   {
                       "script":  "scripts/mods/Send-GameArchives.ps1",

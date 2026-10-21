@@ -80,14 +80,15 @@ yes("through the helper, which leaves a line Vortex switched off (no '*') out of
   loadOrder.indexOf("$offCount = (Get-SwitchedOff $PluginsTxt).Count") >= 0);
 yes("and the run says how many were left out", ps.indexOf("line(s) in that list are switched off and were left out") >= 0);
 
-// ---- the line ending the files already have (#1622) ---------------------
+// ---- the line ending (#1622, #3029) --------------------------------------
 // A checkout that keeps LF got CRLF lines in the table and the blocks, and the
-// fuel and name builders then turned the whole gamemode.js to CRLF.
-yes("the build writes recipes.json with the line ending it already has",
-  ps.indexOf("if (Test-Path -LiteralPath $Out) { $jsonEol = EolOf ([System.IO.File]::ReadAllText($Out)) }") >= 0 &&
-  ps.indexOf("$json = ($doc -join $jsonEol) + $jsonEol") >= 0);
-yes("and both gamemode blocks with the gamemode's own", ps.split("$eol = EolOf $text").length === 3 &&
-  ps.indexOf('(($body -join "`r`n"))') < 0);
+// fuel and name builders then turned the whole gamemode.js to CRLF. Since
+// #3029 .gitattributes checks both out with LF everywhere, and this writes LF.
+yes("the build writes recipes.json with LF",
+  ps.indexOf('$Eol = "`n"') >= 0 && ps.indexOf("EolOf") < 0 &&
+  ps.indexOf("$jsonEol = $Eol") >= 0 && ps.indexOf("$json = ($doc -join $jsonEol) + $jsonEol") >= 0);
+yes("and both gamemode blocks", ps.split("$eol = $Eol").length === 3 &&
+  ps.indexOf('"`r`n"') < 0);
 
 // ---- the cut file (#1391) ------------------------------------------------
 yes("the build reads docs/systems/cut-items.json",

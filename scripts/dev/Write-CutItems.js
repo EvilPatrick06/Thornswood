@@ -591,16 +591,11 @@ const json = {
   items: outCuts
 };
 
-// Each file keeps the line ending it already has (LF for a new one), so a run
-// that changes nothing writes the same bytes on a Windows checkout too.
+// Both are written with LF, the ending .gitattributes gives them on every
+// checkout (#3029), so a run that changes nothing writes the same bytes.
 const dir = path.join(ROOT, 'docs', 'systems');
-function writeKeepingEol(file, text) {
-  const had = fs.existsSync(file) ? fs.readFileSync(file, 'utf8') : '';
-  const eol = had.indexOf('\r\n') !== -1 ? '\r\n' : '\n';
-  fs.writeFileSync(file, eol === '\n' ? text : text.split('\n').join(eol), 'utf8');
-}
-writeKeepingEol(path.join(dir, 'cut-items.md'), md);
-writeKeepingEol(path.join(dir, 'cut-items.json'), JSON.stringify(json, null, 2) + '\n');
+fs.writeFileSync(path.join(dir, 'cut-items.md'), md, 'utf8');
+fs.writeFileSync(path.join(dir, 'cut-items.json'), JSON.stringify(json, null, 2) + '\n', 'utf8');
 if (ALREADY_CUT) {
   console.log('the recipe table is already cut, so the list is the one docs/systems/cut-items.json has');
 }

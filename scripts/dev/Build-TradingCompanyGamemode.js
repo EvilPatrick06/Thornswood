@@ -42,13 +42,12 @@ function region(dataText, moduleText) {
 }
 
 function build(gamemodeText, dataText, moduleText) {
-  const crlf = String(gamemodeText).indexOf('\r\n') >= 0;
   const gm = lf(gamemodeText);
   const a = gm.indexOf(START + '\n');
   const b = a < 0 ? -1 : gm.indexOf(END, a);
   if (a < 0 || b < 0) { throw new Error('Build-TradingCompanyGamemode: the TRADING_COMPANY markers are not in gamemode.js'); }
   const out = gm.slice(0, a) + region(dataText, moduleText) + gm.slice(b + END.length);
-  return crlf ? out.split('\n').join('\r\n') : out;
+  return out;
 }
 
 function read(p) { return fs.readFileSync(p, 'utf8'); }

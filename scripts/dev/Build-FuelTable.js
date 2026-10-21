@@ -163,7 +163,6 @@ if (require.main === module) {
     process.exit(0);
   }
   let src = fs.readFileSync(GM, 'utf8');
-  const crlf = src.indexOf('\r\n') !== -1;
   src = src.split('\r\n').join('\n');
   const open = lines[0];
   const close = lines[lines.length - 1];
@@ -174,7 +173,6 @@ if (require.main === module) {
     process.exit(1);
   }
   src = src.slice(0, a) + lines.join('\n') + src.slice(b + close.length);
-  if (crlf) { src = src.split('\n').join('\r\n'); }
   fs.writeFileSync(GM, src);
   console.log('FUEL_BY_RECIPE: ' + Object.keys(table).length + ' recipes written to ' + GM);
 }

@@ -191,10 +191,10 @@ def main():
         f.write('\n')
     gm = io.open(args.gamemode, encoding='utf-8', newline='').read()
     line = 'const WELLS = ' + json.dumps({'items': rows}, separators=(',', ':')) + ';'
-    if re.search(r'^const WELLS = .*;\r?$', gm, re.M):
-        gm2 = re.sub(r'^const WELLS = .*;(\r?)$', lambda m: line + m.group(1), gm, count=1, flags=re.M)
+    if re.search(r'^const WELLS = .*;$', gm, re.M):
+        gm2 = re.sub(r'^const WELLS = .*;$', lambda m: line, gm, count=1, flags=re.M)
     else:
-        gm2 = re.sub(r'^(const WATERS = .*;)(\r?\n)', lambda m: m.group(1) + m.group(2) + line + m.group(2), gm, count=1, flags=re.M)
+        gm2 = re.sub(r'^(const WATERS = .*;)\n', lambda m: m.group(1) + '\n' + line + '\n', gm, count=1, flags=re.M)
     if gm2 == gm and line not in gm:
         print('could not find where to put WELLS in gamemode.js')
         return 1
