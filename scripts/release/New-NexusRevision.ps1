@@ -213,14 +213,6 @@ function Invoke-Tool([string]$exe, [string[]]$arguments, [string]$cwd = '') {
   return [pscustomobject]@{ Code = $p.ExitCode; Out = $out; Err = $err.Result }
 }
 
-function Find-SevenZip {
-  $c = @()
-  if ($env:ProgramFiles) { $c += (Join-Path $env:ProgramFiles '7-Zip\7z.exe') }
-  foreach ($p in $c) { if (Test-Path -LiteralPath $p) { return $p } }
-  foreach ($n in '7z', '7zz', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { return $g.Source } }
-  return ''
-}
-
 # Every path in a 7z archive, as 7-Zip lists it, with \ between folders.
 function Get-ArchivePaths([string]$sz, [string]$archive) {
   $r = Invoke-Tool $sz @('l', '-slt', $archive)
