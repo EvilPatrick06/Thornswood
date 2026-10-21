@@ -153,6 +153,25 @@ function Start-ThornswoodProofSsh([string]$Script) {
     return [Diagnostics.Process]::Start($psi)
 }
 
+# The value to the watcher's ssh, alone on its line, then its standard input
+# closed. False when that ssh has already ended: an ssh that cannot reach the
+# VPS (no route, a refused key, BatchMode with no way in) exits 255 without
+# reading standard input, and a write into the pipe it has closed throws "The
+# pipe is being closed" (#2959). Whether it ends before the write or after is
+# a race, and both mean the same thing: the watcher did not start. Anything
+# but that IOException still throws.
+function Send-ThornswoodProofValue([Diagnostics.Process]$Proc, [string]$Wire) {
+    try {
+        $Proc.StandardInput.WriteLine($Wire)
+        $Proc.StandardInput.Flush()
+        $Proc.StandardInput.Close()
+        return $true
+    } catch {
+        if (-not ($_.Exception -is [IO.IOException] -or $_.Exception.InnerException -is [IO.IOException])) { throw }
+        return $false
+    }
+}
+
 if ($PSBoundParameters.ContainsKey('Secret')) { $value = ConvertFrom-ThornswoodSecureString $Secret }
 else { $value = Read-ThornswoodSecret 'The value the run will send (hidden)' }
 $Secret = $null
@@ -171,13 +190,11 @@ try {
     # The value first, alone on its line, then wait for the watcher to say it
     # is reading the process list before anything is run. The value is all
     # that goes on standard input: the VPS passes on nothing written later.
-    $proc.StandardInput.WriteLine($wire)
-    $proc.StandardInput.Flush()
-    $proc.StandardInput.Close()
+    $sent = Send-ThornswoodProofValue $proc $wire
     $wire = $null
     $lines = New-Object Collections.Generic.List[string]
     $ready = $false
-    while ($true) {
+    while ($sent) {
         $l = $proc.StandardOutput.ReadLine()
         if ($null -eq $l) { break }
         $lines.Add($l)

@@ -14,7 +14,9 @@
 
   HOW. The same as test-dev-deploy-pass.ps1: the settings block is lifted out
   of the script, expanded here with the values the script would have (its
-  counting function from ServerOrder.ps1, a light table and whether the record says the engine loads light plugins),
+  counting function and light rule from ServerOrder.ps1, and whether the record says the engine loads light plugins),
+  over plugin files written here with the TES4 header flags each case names,
+  since the block reads them where the dev server loads them (#2947),
   and run in Windows PowerShell, what sshd runs on the box, against a
   server-settings.json in a temp folder. Nothing connects to anything.
 
@@ -44,6 +46,7 @@ $repo = Split-Path -Parent $here
 $script = Join-Path $repo 'scripts\deploy\Deploy-DevGamemode.ps1'
 . (Join-Path $repo 'scripts\deploy\ServerOrder.ps1')
 $script:fullIndexDef = 'function Get-ThornswoodFullIndex {' + "`n" + (Get-Command Get-ThornswoodFullIndex).Definition + "`n}"
+$script:lightDef = 'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}"
 
 $script:pass = 0
 $script:fail = 0
@@ -59,22 +62,42 @@ $close = $text.IndexOf('"@ | ForEach-Object', $open)
 Yes 'the settings block is where it was' ($start -ge 0 -and $open -gt $start -and $close -gt $open)
 $body = $text.Substring($open + 'Remote @"'.Length, $close - $open - 'Remote @"'.Length).Trim("`r", "`n")
 Yes 'the block counts with Get-ThornswoodFullIndex, sent up with it' ($body.Contains('$fullIndexDef') -and $body.Contains("Get-ThornswoodFullIndex ([string[]]``"))
-Yes 'and the script builds the light table with Test-ThornswoodPluginLight, the shared rule' ($text.Contains('Test-ThornswoodPluginLight $f.FullName'))
+Yes 'and reads which plugins are light on the box with Test-ThornswoodPluginLight, the shared rule, sent up with it' ($body.Contains('$lightDef') -and $body.Contains('Test-ThornswoodPluginLight `$f'))
+Yes '  and no light table is built from a game folder here' (-not $text.Contains('$lightTable') -and -not $text.Contains('Test-ThornswoodPluginLight $f.FullName'))
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-dev-start-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Path $tmp | Out-Null
 
-# $light maps a plugin name to whether it is light; $loads is whether the
-# engine loads light plugins, which the block takes from the record this
-# commit holds (the check before anything is sent holds the box's to it).
-function Run-Block($settings, [hashtable]$light, $loads) {
+# Plugin files with only a TES4 header, light when its flags hold 0x200: what
+# Test-ThornswoodPluginLight reads on the box.
+function Write-Plugins([string]$dir, [hashtable]$light) {
+    if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
+    New-Item -ItemType Directory -Path $dir | Out-Null
+    foreach ($n in @($light.Keys)) {
+        $b = New-Object byte[] 24
+        [Text.Encoding]::ASCII.GetBytes('TES4').CopyTo($b, 0)
+        $flags = [uint32]0
+        if ($light[$n]) { $flags = [uint32]0x200 }
+        [BitConverter]::GetBytes($flags).CopyTo($b, 8)
+        [IO.File]::WriteAllBytes((Join-Path $dir $n), $b)
+    }
+}
+
+# $light maps a plugin name to whether it is light, written as the plugins
+# the dev server loads; $stage, when given, as plugins this run sends, which
+# sit in the stage until the swap. $loads is whether the engine loads light
+# plugins, which the block takes from the record this commit holds (the
+# check before anything is sent holds the box's to it).
+function Run-Block($settings, [hashtable]$light, $loads, [hashtable]$stage = @{}) {
     $p = Join-Path $tmp 'server-settings.json'
     [IO.File]::WriteAllText($p, ($settings | ConvertTo-Json -Depth 10), (New-Object Text.UTF8Encoding $false))
     $rootWin = $tmp
     $farOrder = ''
-    $remotePlugins = 'C:/nowhere'
+    $remotePlugins = (Join-Path $tmp 'server-plugins').Replace('\', '/')
+    Write-Plugins (Join-Path $tmp 'server-plugins') $light
+    Write-Plugins (Join-Path $tmp 'plugins') $stage
     $fullIndexDef = $script:fullIndexDef
-    $lightTable = ((@($light.Keys) | ForEach-Object { "'{0}' = {1}" -f $_.ToLowerInvariant().Replace("'", "''"), $(if ($light[$_]) { '$true' } else { '$false' }) }) -join '; ')
+    $lightDef = $script:lightDef
     $devRecordLight = [bool]$loads
     $VoicePort = 7789
     $maxOnline = 0
@@ -108,6 +131,15 @@ try {
     Yes 'with light plugins, a start point at the list position moves to the full index: 0x0219BAD4' ($r.start -eq '0x0219BAD4')
     Yes '  and says Unbound is full plugin 2' ($r.said -match 'Skyrim Unbound\.esp is full plugin 2' -and $r.said -match 'start point moved to 0x0219BAD4, index 2')
 
+    # A plugin this run sends is in the stage until the swap, and that copy is
+    # the one the server will load: here the server's own Light One.esp is
+    # full and the one going up is light.
+    $serverHas = $light.Clone(); $serverHas['Light One.esp'] = $false
+    $r = Run-Block (Settings $order '0x0419BAD4') $serverHas $true @{ 'Light One.esp' = $true }
+    Yes 'a plugin in the stage is read there, not in the server''s folder: 0x0219BAD4' ($r.start -eq '0x0219BAD4')
+    $r = Run-Block (Settings $order '0x0219BAD4') $serverHas $true
+    Yes '  and with nothing in the stage the server''s own copy counts: 0x0319BAD4' ($r.start -eq '0x0319BAD4')
+
     $before = @(Get-ChildItem $tmp -Filter 'server-settings.json.before-*').Count
     $r = Run-Block (Settings $order '0x0219BAD4') $light $true
     Yes 'a start point already at the full index is left as it is' ($r.start -eq '0x0219BAD4' -and $r.said -notmatch 'start point moved')
@@ -120,7 +152,7 @@ try {
 
     $odd = @('Skyrim.esm', 'Mystery.esp', 'Skyrim Unbound.esp')
     $r = Run-Block (Settings $odd '0x0919BAD4') $light $true
-    Yes 'a plugin this machine cannot read leaves the start point alone' ($r.start -eq '0x0919BAD4')
+    Yes 'a plugin the box does not have leaves the start point alone' ($r.start -eq '0x0919BAD4')
     Yes '  and says which' ($r.said -match 'cannot tell whether mystery\.esp is light, so the start point is left alone')
 
     # The measured case: the order the dev server runs and its light plugins,
