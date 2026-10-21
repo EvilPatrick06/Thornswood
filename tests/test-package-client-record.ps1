@@ -196,15 +196,22 @@ try {
         $vortexFiles = $null
         $Root = $scratch
         $stopText = $stops[0].Extent.Text
-        $src = (@(
-            'function Invoke-Listing($all, $prefix) {',
-            '    $ship = @(); $skipBytes = 0; $shipBytes = 0; $optionalBytes = 0; $optionalCount = 0; $machineCount = 0',
-            '    $collectionBytes = 0; $collectionCount = 0',
-            '    $notOursBytes = 0; $notOursCount = 0',
-            '    $clientShipped = 0',
-            '    $clientWrong = @()',
-            '    foreach ($f in $all)'
-        ) -join "`n") + "`n" + $loops[0].Body.Extent.Text + "`n" + (@(
+        # Package's listing as Package runs it: every statement from where it
+        # lists the game folder to the end of the loop, so what the loop reads
+        # ($sep, $prefix, the counters) is Package's and never a copy kept here
+        # (#3021: #3007 added $sep above the loop, and a copy here lacked it).
+        # Only the collection revision is left out: it reads this machine's
+        # Vortex, and the listing is held at Ship-Rules' 0, which ships
+        # nothing held for a later revision.
+        $top = @($loops[0].Parent.Statements)
+        $end = [array]::IndexOf($top, $loops[0])
+        $begin = -1
+        for ($i = $end; $i -ge 0; $i--) { if ($top[$i].Extent.Text -like '$listedGame = *') { $begin = $i; break } }
+        $lifted = @(if ($begin -ge 0) { $top[$begin..$end] | Where-Object { $_.Extent.Text -notlike '$ShipCollectionRevision = *' } })
+        Yes 'Package lists the game folder at the top of the script, above the loop' ($begin -ge 0)
+        Yes 'and everything between is lifted with the loop but the collection revision' ($begin -ge 0 -and $lifted.Count -eq ($end - $begin))
+        $src = 'function Invoke-Tree([string]$GameDir) {' + "`n" +
+            (($lifted | ForEach-Object { $_.Extent.Text }) -join "`n") + "`n" + (@(
             '    $stopped = ""',
             '    try {'
         ) -join "`n") + "`n" + $stopText + "`n" + (@(
@@ -213,12 +220,6 @@ try {
             '}'
         ) -join "`n")
         . ([scriptblock]::Create($src))
-
-        function Invoke-Tree([string]$dir) {
-            $script:GameDir = $dir
-            $prefix = $dir.TrimEnd('\') + '\'
-            return Invoke-Listing @(Get-ChildItem -LiteralPath $dir -Recurse -File -Force) $prefix
-        }
 
         $r = Invoke-Tree $launcherTree
         Yes 'Package keeps every file of the client the packed launcher was built with' (@($names | Where-Object { $r.Ship -contains $_ }).Count -eq $names.Count)

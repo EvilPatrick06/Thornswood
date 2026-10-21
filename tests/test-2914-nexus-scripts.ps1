@@ -346,6 +346,31 @@ foreach ($case in @(
     Yes ('an entry with ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
 }
 
+# Issue #2969: a mod the revision does not carry yet, added the way Vortex
+# writes one it put in with its basic installer.
+$addJson = Join-Path $T 'add.json'
+$hair = "KS_Hairdo's_Lite_NoNPCs.esp"
+function AddSpec([string]$fileId, [string]$plugin, [string]$after) {
+    $p = if ($plugin) { ',"plugins":[{"name":' + (ConvertTo-Json $plugin) + ',"after":[' + (ConvertTo-Json $after) + ']}]' } else { '' }
+    return '{"add":true,"modId":"1932","fileId":"' + $fileId + '","version":"1.3","md5":"' + $md5 + '","fileSize":52221104,"logicalFilename":"KS Hairdos Lite SE NoNPCs","name":"KS Hairdos Lite SE NoNPCs","author":"Brataccas","category":"Body, Face, and Hair","tag":"hairTag1234"' + $p + '}'
+}
+Put $addJson ('[' + (AddSpec '8662' $hair 'Dragonborn.esm') + ',' + (AddSpec '809224' 'cheddars_mashups.esl' $hair) + ']')
+$o1 = Join-Path $T 'add-collection.json'; $o2 = Join-Path $T 'add-payload.json'
+$said = & $node.Source $js $cj $addJson $o1 $o2
+Yes 'nexus-collection.js adds two mods and their plugins, and says each' ($LASTEXITCODE -eq 0 -and (@($said) -join '|') -eq ('KS Hairdos Lite SE NoNPCs' + "`tadded`t`tfile 8662|" + $hair + "`tplugin`t`tafter Dragonborn.esm|KS Hairdos Lite SE NoNPCs`tadded`t`tfile 809224|cheddars_mashups.esl`tplugin`t`tafter " + $hair))
+& $node.Source -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync(process.argv[1],'utf8')),b=JSON.parse(fs.readFileSync(process.argv[2],'utf8'));const e=b.mods[4];const want={name:'KS Hairdos Lite SE NoNPCs',version:'1.3',optional:false,domainName:'skyrimspecialedition',source:{type:'nexus',modId:1932,fileId:8662,md5:process.argv[3],fileSize:52221104,logicalFilename:'KS Hairdos Lite SE NoNPCs',updatePolicy:'exact',tag:'hairTag1234'},author:'Brataccas',details:{category:'Body, Face, and Hair',type:''},phase:0};if(JSON.stringify(e)!==JSON.stringify(want))process.exit(2);if(JSON.stringify(b.plugins)!==JSON.stringify([{name:process.argv[4],enabled:true},{name:'cheddars_mashups.esl',enabled:true}]))process.exit(3);if(JSON.stringify(b.pluginRules.plugins)!==JSON.stringify([{name:process.argv[4].toLowerCase(),after:['dragonborn.esm']},{name:'cheddars_mashups.esl',after:[process.argv[4].toLowerCase()]}]))process.exit(4);b.mods.splice(4,2);b.plugins=[];b.pluginRules.plugins=[];process.exit(JSON.stringify(a)===JSON.stringify(b)?0:1)" $cj $o1 $md5 $hair
+Yes 'the entry is written as Vortex writes a basic install, each plugin goes on the end switched on, and its rule is lower case; nothing else changes' ($LASTEXITCODE -eq 0)
+foreach ($case in @(
+        @((AddSpec '8662' $hair 'Nowhere.esp'), 'a plugin to load after one the list does not name'),
+        @((AddSpec '809366' $hair 'Dragonborn.esm'), 'a file the revision already carries'),
+        @(((AddSpec '8662' $hair 'Dragonborn.esm') + ',' + (AddSpec '8663' $hair 'Dragonborn.esm')), 'a plugin the list already names'),
+        @((AddSpec '8662' $hair ''), 'a plugin with nothing to load after'))) {
+    Put $addJson ('[' + $case[0] + ']')
+    Remove-Item -LiteralPath (Join-Path $T 'no.json') -ErrorAction SilentlyContinue
+    $null = & $node.Source $js $cj $addJson (Join-Path $T 'no.json') (Join-Path $T 'no-payload.json') 2>$null
+    Yes ('adding ' + $case[1] + ' is refused, and nothing is written') ($LASTEXITCODE -eq 1 -and -not (Test-Path -LiteralPath (Join-Path $T 'no.json')))
+}
+
 if (-not $sz) { Skip 'the collection revision runs: 7-Zip is not on this machine'; Done }
 $baseArchive = Join-Path $T 'vortex\collection_7essxf_2_2026-10-03T17-33-45Z.7z'
 New-Item -ItemType Directory -Force -Path (Split-Path -Parent $baseArchive) | Out-Null
@@ -394,8 +419,49 @@ $rv = (State).collection.revisions.PSObject.Properties['3']
 if ($rv) { $rv = $rv.Value }
 Yes 'the revision''s collection_data names the new runtime file' ($null -ne $rv -and $rv.status -eq 'draft' -and @($rv.data.collection_manifest.mods | Where-Object { $_.source.mod_id -eq '192762' -and $_.source.file_id -eq '812346' -and $_.source.md5 -eq $md5 }).Count -eq 1)
 
-$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive)
 YesR 'while revision 3 is a draft another one is refused' ($r.Code -eq 1 -and $r.Out -match 'Revision 3 is already a draft') $r
+# Issue #2969: a -WhatIf builds on the waiting draft, so the revision after it
+# can be laid out and checked while the draft waits.
+$r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
+YesR 'a -WhatIf from revision 2 while 3 is a draft is refused, naming the draft' ($r.Code -eq 1 -and $r.Out -match 'this starts from revision 3, the draft') $r
+
+# The mods a revision adds: an archive with the plugin at its top, one whose
+# plugins are not the ones named and one with a FOMOD installer.
+# Its archive is kept apart, because each run clears the scratch folder it was built in.
+$draft3 = Join-Path $T 'draft\collection_7essxf_3_.7z'
+New-Item -ItemType Directory -Force -Path (Split-Path -Parent $draft3) | Out-Null
+Copy-Item -LiteralPath $built -Destination $draft3
+Control @{ addRevision = @{ n = 3; id = 900003; status = 'draft'; archive = $draft3 } }
+$mk = Join-Path $T 'addmods'
+foreach ($k in 'plain', 'fomod\fomod') { New-Item -ItemType Directory -Force -Path (Join-Path $mk $k) | Out-Null }
+Put (Join-Path $mk ('plain\' + $hair)) 'TES4'; Put (Join-Path $mk 'plain\KS_Hairdo''s_Lite_NoNPCs.bsa') 'BSA'
+Put (Join-Path $mk ('fomod\' + $hair)) 'TES4'; Put (Join-Path $mk 'fomod\fomod\ModuleConfig.xml') '<config/>'
+$hairArc = Join-Path $T 'KS Hairdos Lite SE NoNPCs-1932-1-3.7z'
+foreach ($k in 'plain', 'fomod') {
+    $to = if ($k -eq 'plain') { $hairArc } else { Join-Path $T ($k + '.7z') }
+    Push-Location (Join-Path $mk $k); & $sz a -t7z -y $to '*' | Out-Null; Pop-Location
+}
+function AddFile([string]$arc, [string]$plugin) {
+    $p = if ($plugin) { '[{"name":' + (ConvertTo-Json $plugin) + ',"after":["Dragonborn.esm"]}]' } else { '[]' }
+    Put $addJson ('[{"modId":1932,"fileId":8662,"archive":' + (ConvertTo-Json $arc) + ',"plugins":' + $p + '}]')
+}
+AddFile $hairArc $hair
+$n0 = Count
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+$got = @(Since $n0)
+$built4 = Join-Path $T 'scratch\nexus-revision-7essxf\out\collection_4.7z'
+YesR '-Add -WhatIf downloads the draft, adds the mod from what Nexus says of it, builds collection_4.7z and writes nothing' ($r.Code -eq 0 -and $r.Out -match 'revision 3, the draft' -and $r.Out -match 'KS Hairdos Lite SE by Brataccas, Body, Face, and Hair\): file id 8662, "KS Hairdos Lite SE NoNPCs" 1\.3, optional' -and $r.Out -match 'KS Hairdos Lite SE NoNPCs, added: file 8662' -and $r.Out -match 'which makes revision 4 a draft' -and @($got | Where-Object { $_.path -like '/cdn/collection/900003*' }).Count -eq 1 -and (Test-Path -LiteralPath $built4) -and @(Writes $got).Count -eq 0) $r
+$x4 = Join-Path $T 'unpacked4'
+& $sz x -y ('-o' + $x4) $built4 | Out-Null
+& $node.Source -e "const fs=require('fs');const b=JSON.parse(fs.readFileSync(process.argv[1],'utf8'));const e=b.mods.find(m=>m.source.fileId===8662);process.exit(e&&e.source.md5===process.argv[2]&&e.source.fileSize===Number(process.argv[3])&&e.author==='Brataccas'&&/^[0-9A-Za-z_-]{10}$/.test(e.source.tag)&&b.plugins.some(p=>p.name===process.argv[4]&&p.enabled)?0:1)" (Join-Path $x4 'collection.json') ((Get-FileHash -LiteralPath $hairArc -Algorithm MD5).Hash.ToLowerInvariant()) ((Get-Item -LiteralPath $hairArc).Length) $hair
+Yes 'its entry has the archive''s md5 and size, a new tag, and the plugin switched on' ($LASTEXITCODE -eq 0)
+AddFile $hairArc ''
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'an archive whose plugins are not the ones named is refused' ($r.Code -eq 1 -and $r.Out -match 'are not the ones its archive holds') $r
+AddFile (Join-Path $T 'fomod.7z') $hair
+$r = Run 'New-NexusRevision.ps1' @('-Add', $addJson, '-WhatIf')
+YesR 'an archive with a FOMOD installer is refused' ($r.Code -eq 1 -and $r.Out -match 'has a FOMOD installer') $r
 $n0 = Count
 $r = Run 'New-NexusRevision.ps1' @('-Publish', '3', '-WhatIf')
 YesR '-Publish -WhatIf names the revision and sends no mutation' ($r.Code -eq 0 -and $r.Out -match 'publishRevision\(revisionId: "900003"\)' -and @(Writes @(Since $n0)).Count -eq 0) $r
@@ -406,7 +472,7 @@ YesR '-Publish publishes the draft with publishRevision and reads it back as the
 $r = Run 'New-NexusRevision.ps1' @('-Publish', '3')
 YesR 'publishing it again is refused' ($r.Code -eq 1 -and $r.Out -match 'Revision 3 is published, not a draft') $r
 $r = Run 'New-NexusRevision.ps1' @('-From', $baseArchive, '-Mod', '192762', '-FileId', '812346', '-Archive', $newFileArchive, '-WhatIf')
-YesR 'starting from revision 2 once 3 is published is refused' ($r.Code -eq 1 -and $r.Out -match 'latest published revision is 3') $r
+YesR 'starting from revision 2 once 3 is published is refused' ($r.Code -eq 1 -and $r.Out -match 'this starts from revision 3, the latest published') $r
 
 # ---- the key, across every run ---------------------------------------------------
 Yes ('no run printed the key, in ' + $script:outs.Count + ' runs') (@($script:outs | Where-Object { $_.Contains($KEY) }).Count -eq 0)

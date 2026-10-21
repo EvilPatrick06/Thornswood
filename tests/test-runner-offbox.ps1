@@ -133,8 +133,17 @@ try {
     $iG = $t.IndexOf('Set-RunnerFirewall $grdAcct'); $iC = $t.IndexOf('.\config.cmd --unattended')
     Yes '  both before config.cmd can start the runner' ($iG -gt 0 -and $iC -gt $iG)
     Yes '  GitHub''s lists came from a stand-in: gh never called' (-not (Test-Path -LiteralPath $ghCalled))
-    $r = Dry @('-OffBox', '-AllowHost', 'pypi.org')
+    # localhost, so the harness needs no network to resolve it.
+    $r = Dry @('-OffBox', '-AllowHost', 'localhost')
     Yes '-AllowHost lets its address through (stand-in 203.0.113.7)' ($r.Text -match [regex]::Escape("-203.0.113.6'") -and $r.Text -match [regex]::Escape("'203.0.113.8-"))
+    # #2161, 21 Oct: through pwsh -File (this Dry) a,b reached the script as one
+    # name, the real run failed to resolve it and the dry run never asked.
+    $r = Dry @('-OffBox', '-AllowHost', 'localhost,localhost')
+    Yes "  a comma list given through -File is split into its names (exit $($r.Code))" ($r.Code -eq 0 -and ([regex]::Matches($r.Said, '-AllowHost localhost:')).Count -eq 2 -and $r.Said -notmatch 'localhost,localhost')
+    $r = Dry @('-OffBox', '-AllowHost', 'no-such-host.invalid')
+    Yes "  the dry run resolves each name and stops on one that does not resolve, writing nothing (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'no-such-host\.invalid does not resolve|no-such-host\.invalid resolves to nothing' -and $r.Text -notmatch 'Set-RunnerFirewall \$grdAcct')
+    $r = Dry @('-OffBox', '-AlsoDeny', 'D:\One,D:\Two')
+    Yes '  -AlsoDeny given as a comma list through -File is two folders' ($r.Text -match [regex]::Escape("`$alsoDeny = @('D:\One', 'D:\Two')"))
     $r = Dry @('-OffBox', '-Lock')
     Yes "-OffBox -Lock fetches the lists again and puts the guards back (exit $($r.Code))" ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $r.Text -match [regex]::Escape('Close-RunnerReads'))
     $r = Dry @('-OffBox', '-Remove')
@@ -155,7 +164,7 @@ try {
     # A step run, not a function the guard library defines: a line that starts with it.
     $noLock = '(?m)^\s*(&\s*icacls|Close-RunnerReads|Open-RunnerReads|Lock-RunnerRoot|Close-RunnerAccount|New-LocalUser|Remove-LocalUser|Remove-RunnerWatchers)\b|config\.cmd|ExclusionPath'
     Yes 'the lock-step pattern does catch a full -OffBox install (a control)' ((Dry @('-OffBox')).Text -match $noLock)
-    $r = Dry @('-NetworkOnly', '-Number', '4', '-AllowHost', 'pypi.org')
+    $r = Dry @('-NetworkOnly', '-Number', '4', '-AllowHost', 'localhost')
     $t = $r.Text
     Yes "-NetworkOnly -Number 4 dry run ends 0 and goes to the VPS names (exit $($r.Code))" ($r.Code -eq 0 -and $t -match [regex]::Escape("`$grdAcct = 'thornswood-runner4'"))
     Yes '  it writes the outbound block rules for that account alone' ($t -match [regex]::Escape('Set-RunnerFirewall $grdAcct $grdGroup $grdBlocks') -and $t -match '-Direction Outbound -Action Block' -and $t -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner4'"))

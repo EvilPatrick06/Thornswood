@@ -8,12 +8,20 @@
   did. test-release-baseline.ps1 and test-publish-refusals.ps1 went red on
   main and the build stayed green, because neither was named there.
 
-  So every tests\test-*.ps1 and tests\test-*.js is either named in build.yml
-  or has a line in tests\gate-excluded.txt, "name  reason". This fails on:
-    1. a harness that is in neither;
-    2. an excluded line with no reason;
-    3. an excluded line naming a file that is not in tests\;
-    4. an excluded line naming a harness build.yml already runs.
+  Since #3009 there is no name to forget: the gate runs every tests\test-*.js
+  and tests\test-*.ps1 that tests\gate-excluded.txt does not name, as
+  scripts\dev\Gate-Harnesses.ps1 lists them (tests\test-gate-list.ps1 checks
+  that script and the gate step). What is left to hold is the excluded list
+  against what build.yml runs in steps of their own. This fails on:
+    1. a harness build.yml runs in a step of its own (by path, or by name in
+       quotes) that gate-excluded.txt does not name, since the gate would run
+       it a second time;
+    2. an excluded line that says "own step in build.yml" for a harness
+       build.yml does not run, since that harness then runs nowhere on a pull
+       request;
+    3. build.yml or build-pr.yml no longer running the gate through
+       Gate-Harnesses.ps1, or excluding test-release-baseline.ps1,
+       test-publish-refusals.ps1 or this harness.
   The same reader is then run over a planted repository with one of each,
   so a reader that finds nothing anywhere cannot pass by accident.
 
@@ -35,42 +43,39 @@ function Yes([string]$what, [bool]$cond) {
     else { $script:fail++; Write-Host "FAIL  $what" }
 }
 
-# What is wrong in one repository, as a list of lines. Empty means nothing.
-function Get-Unlisted([string]$repo) {
-    $problems = New-Object System.Collections.Generic.List[string]
-    $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\build.yml'))
-    $tests = Join-Path $repo 'tests'
-    $names = @(Get-ChildItem -LiteralPath $tests -File |
-        Where-Object { $_.Name -like 'test-*.ps1' -or $_.Name -like 'test-*.js' } |
-        ForEach-Object { $_.Name })
-    $inYml = @{}
-    foreach ($n in $names) {
-        # Named as a list element ('name') or run by path (tests\name), not
-        # merely mentioned in a comment.
-        $e = [regex]::Escape($n)
-        if ($yml -match ("'" + $e + "'") -or $yml -match ('tests[\\/]' + $e + '(?![\w.-])')) { $inYml[$n] = $true }
-    }
-    $excluded = @{}
-    $listFile = Join-Path $tests 'gate-excluded.txt'
+# The excluded names, and the reason on each line.
+function Get-Excluded([string]$repo) {
+    $why = @{}
+    $listFile = Join-Path $repo 'tests\gate-excluded.txt'
     if (Test-Path -LiteralPath $listFile) {
-        $i = 0
         foreach ($line in [IO.File]::ReadAllLines($listFile)) {
-            $i++
             $t = $line.Trim()
             if (-not $t -or $t.StartsWith('#')) { continue }
             $m = [regex]::Match($t, '^(\S+)(?:\s+(.*))?$')
-            $n = $m.Groups[1].Value
-            $why = $m.Groups[2].Value.Trim()
-            if (-not $why) { $problems.Add("gate-excluded.txt line ${i}: $n has no reason") }
-            if (-not (Test-Path -LiteralPath (Join-Path $tests $n))) { $problems.Add("gate-excluded.txt line ${i}: $n is not a file in tests") }
-            if ($inYml.ContainsKey($n)) { $problems.Add("gate-excluded.txt line ${i}: $n is already run by build.yml") }
-            $excluded[$n] = $true
+            $why[$m.Groups[1].Value] = $m.Groups[2].Value.Trim()
         }
     }
+    return $why
+}
+
+# What is wrong in one repository, as a list of lines. Empty means nothing.
+function Get-Unlisted([string]$repo) {
+    $problems = New-Object System.Collections.Generic.List[string]
+    # Comment lines say what a step does and run nothing, so they are left out.
+    $yml = ((Get-Content -LiteralPath (Join-Path $repo '.github\workflows\build.yml')) |
+        Where-Object { $_ -notmatch '^\s*#' }) -join "`n"
+    $names = @(Get-ChildItem -LiteralPath (Join-Path $repo 'tests') -File |
+        Where-Object { $_.Name -like 'test-*.ps1' -or $_.Name -like 'test-*.js' } |
+        ForEach-Object { $_.Name })
+    $why = Get-Excluded $repo
     foreach ($n in $names) {
-        if (-not $inYml.ContainsKey($n) -and -not $excluded.ContainsKey($n)) {
-            $problems.Add("$n is in neither build.yml nor tests\gate-excluded.txt")
-        }
+        # Named in quotes ('name') or run by path (node tests\name, -File
+        # tests\name), not merely in an ::error line naming the file.
+        $e = [regex]::Escape($n)
+        $own = ($yml -match ("'" + $e + "'")) -or ($yml -match ('(node|-File|python)\s+(\.[\\/])?tests[\\/]' + $e + '(?![\w.-])'))
+        $says = $why.ContainsKey($n) -and $why[$n].StartsWith('own step in build.yml')
+        if ($own -and -not $why.ContainsKey($n)) { $problems.Add("$n runs in a step of its own in build.yml and is not in tests\gate-excluded.txt, so the gate runs it twice") }
+        if ($says -and -not $own) { $problems.Add("gate-excluded.txt says build.yml runs $n in a step of its own, and it does not") }
     }
     return ,$problems
 }
@@ -78,38 +83,44 @@ function Get-Unlisted([string]$repo) {
 # 1. This repository.
 $real = Get-Unlisted $Repo
 foreach ($p in $real) { Write-Host "        $p" }
-Yes 'every harness in tests is named in build.yml or excluded with a reason' ($real.Count -eq 0)
+Yes 'every harness build.yml runs in a step of its own is excluded from the gate, and every "own step" line is true' ($real.Count -eq 0)
 
-$yml = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\build.yml'))
-Yes 'test-release-baseline.ps1 and test-publish-refusals.ps1 are in build.yml (#2513)' (
-    $yml.Contains("'test-release-baseline.ps1'") -and $yml.Contains("'test-publish-refusals.ps1'"))
-Yes 'and this check is too' ($yml.Contains("'test-2513-every-harness-listed.ps1'"))
-$pr = [IO.File]::ReadAllText((Join-Path $Repo '.github\workflows\build-pr.yml'))
-Yes 'and so is build-pr.yml, generated from it' (
-    $pr.Contains("'test-release-baseline.ps1'") -and $pr.Contains("'test-2513-every-harness-listed.ps1'"))
+$why = Get-Excluded $Repo
+$first = @('test-release-baseline.ps1', 'test-publish-refusals.ps1')
+Yes 'test-release-baseline.ps1 and test-publish-refusals.ps1 are on the gate (#2513)' (
+    @($first | Where-Object { $why.ContainsKey($_) -or -not (Test-Path -LiteralPath (Join-Path $Here $_)) }).Count -eq 0)
+Yes 'and this check is too' (-not $why.ContainsKey('test-2513-every-harness-listed.ps1'))
+foreach ($wf in 'build.yml', 'build-pr.yml') {
+    $t = [IO.File]::ReadAllText((Join-Path $Repo ".github\workflows\$wf"))
+    Yes "$wf runs the gate through Gate-Harnesses.ps1" ($t -match '(?m)^\s+\$gate = @\(& \.\\scripts\\dev\\Gate-Harnesses\.ps1\)')
+    Yes "  and has no hand-kept list left (#3009)" ($t -notmatch '(?m)^\s+\$six\s*=')
+}
 
 # 2. A planted repository with one of each fault, and one good of each kind.
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2513-' + [Guid]::NewGuid().ToString('N'))
 try {
     $null = New-Item -ItemType Directory -Force -Path (Join-Path $work '.github\workflows'), (Join-Path $work 'tests')
-    foreach ($n in 'test-listed.ps1', 'test-ok-excluded.js', 'test-forgotten.ps1', 'test-no-reason.js', 'test-both.ps1') {
+    foreach ($n in 'test-gate.ps1', 'test-own-ok.js', 'test-own-forgot.ps1', 'test-own-false.js', 'test-quoted.ps1', 'test-off.ps1', 'test-error-only.js') {
         Set-Content -LiteralPath (Join-Path $work "tests\$n") -Value '# stand-in'
     }
     Set-Content -LiteralPath (Join-Path $work '.github\workflows\build.yml') -Value @(
-        "          `$six = 'test-listed.ps1', 'test-both.ps1'")
+        '          # node tests\test-own-false.js is only said in a comment',
+        '          node tests\test-own-ok.js',
+        '          & pwsh -NoProfile -File tests\test-own-forgot.ps1',
+        "          foreach (`$n in 'test-quoted.ps1') { }",
+        "          Write-Host '::error file=tests/test-error-only.js::no node'")
     Set-Content -LiteralPath (Join-Path $work 'tests\gate-excluded.txt') -Value @(
         '# comment lines are skipped',
-        'test-ok-excluded.js  needs a game install',
-        'test-no-reason.js',
-        'test-gone.ps1  removed long ago',
-        'test-both.ps1  listed twice')
+        'test-off.ps1  needs a game install',
+        'test-own-false.js  own step in build.yml, "A step"',
+        'test-own-ok.js  own step in build.yml, "A step"',
+        'test-quoted.ps1  own step in build.yml, "Another step"')
     $got = (Get-Unlisted $work) -join "`n"
-    Yes 'planted: a harness in neither is named' ($got -match 'test-forgotten\.ps1 is in neither')
-    Yes 'planted: an excluded line with no reason is named' ($got -match 'test-no-reason\.js has no reason')
-    Yes 'planted: an excluded file that is gone is named' ($got -match 'test-gone\.ps1 is not a file')
-    Yes 'planted: an excluded harness build.yml runs is named' ($got -match 'test-both\.ps1 is already run')
-    Yes 'planted: a listed harness and a properly excluded one are not named' (
-        $got -notmatch 'test-listed\.ps1' -and $got -notmatch 'test-ok-excluded\.js')
+    Yes 'planted: a harness run by its own step and not excluded is named' ($got -match 'test-own-forgot\.ps1 runs in a step of its own')
+    Yes 'planted: an "own step" line for a harness only a comment names is named' ($got -match 'runs test-own-false\.js in a step of its own, and it does not')
+    Yes 'planted: an own-step harness excluded, a quoted one, an excluded one, a gate one and one only in an error line are not named' (
+        $got -notmatch 'test-own-ok\.js' -and $got -notmatch 'test-quoted\.ps1' -and $got -notmatch 'test-off\.ps1' -and
+        $got -notmatch 'test-gate\.ps1' -and $got -notmatch 'test-error-only\.js')
 }
 finally {
     Remove-Item -LiteralPath $work -Recurse -Force -EA SilentlyContinue
