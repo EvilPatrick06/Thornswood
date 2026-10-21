@@ -178,7 +178,7 @@ yes('2 a guard from a fine dish is told its 30 minutes (the injury block\'s guar
 // ------------------------------------------------- 3. cookedOutput, onCraft --
 const pieces = [cut('function holdsPerk(actorId, key) {'), cut('function cookedOutput(actorId, row) {')];
 yes('3 cookedOutput is in the gamemode, and mp.onCraft asks it once every gate has passed',
-  pieces.every(Boolean) && /\n  cookedOutput\(actorId, row\);\n  masterCraft\(actorId, row, count\);\n  return;\n\}\);/.test(gm));
+  pieces.every(Boolean) && /\n  cookedOutput\(actorId, row\);\n  wovenOutput\(actorId, row\);\n  return;\n\}\);/.test(gm));
 function onCraftRig(state, perks, roll) {
   let output = null;
   const said = [];
@@ -231,10 +231,12 @@ if (N && pieces.every(Boolean)) {
     yes('3 with no craftOutput from the engine nothing is named', onCraftRig(novice, [], 0.1).none(stewRow) === null);
   });
 }
-yes('3 nothing in the craft waits on a timer for the cook or the chemist: masterCraft is the weaver\'s alone',
+yes('3 nothing in the craft waits on a timer: wovenOutput is the weaver\'s alone and names through craftOutput (#3026)',
   (function () {
-    const m = cut('function masterCraft(actorId, row, count) {') || '';
-    return m && m.indexOf('grandchef') === -1 && m.indexOf('masterchemist') === -1 && m.indexOf('addItem(') === -1;
+    const m = cut('function wovenOutput(actorId, row) {') || '';
+    return m && m.indexOf('grandchef') === -1 && m.indexOf('masterchemist') === -1 && m.indexOf('addItem(') === -1 &&
+      m.indexOf('setTimeout') === -1 && m.indexOf("'inventory'") === -1 && m.indexOf("'craftOutput'") !== -1 &&
+      !/MASTER_CRAFT_AFTER_MS|function masterCraft\(|function markWoven\(/.test(gm);
   })());
 
 // ----------------------------------------------- 4. the committed plugin --
