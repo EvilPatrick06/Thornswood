@@ -129,10 +129,17 @@ async function stop(run, dir) {
   await new Promise((ok) => { if (run.site.exitCode !== null) ok(); else run.site.once('close', ok); });
   try { fs.rmSync(dir, { recursive: true, force: true }); } catch (e) { }
 }
-// The start log is written after "listening on", so it is waited for.
-async function logSays(run, re) {
-  for (let i = 0; i < 50 && !re.test(run.log); i++) await new Promise((ok) => setTimeout(ok, 100));
-  return re.test(run.log);
+/* What the site has written to its own site.log (#3060). Every console line
+   goes there with appendFileSync before the site goes on, so a line said
+   while answering a request is in the file before the answer leaves, and
+   the start log, said in the listen callback, is in it before any request
+   is answered. The pipe is not: measured 21 Oct, the answer to /api/ready
+   came in before the pipe's "reads again" line 1 time in 500 alone and 223
+   in 2,000 with four at once (0.2 to 5 ms behind), while site.log held the
+   line every time. So a check of what the site said reads this, after an
+   answer, and run.log is only printed when something fails. */
+function siteSaid(dir) {
+  try { return fs.readFileSync(path.join(dir, 'site.log'), 'utf8'); } catch (e) { return ''; }
 }
 
 (async function main() {
@@ -154,9 +161,9 @@ async function logSays(run, re) {
 
     // ------------------------------------------------------- 1. all read --
     console.log('\nall five read:');
-    yes('the start log says the state is ready', await logSays(run, /\[thornswood-docs\] ready: bans, pk, linked, sessions and signins read/));
     let r = await ready();
     yes('/api/ready answers 200 with nothing broken', r.status === 200 && r.j && r.j.ok === true && r.j.broken.length === 0);
+    yes('the start log says the state is ready', /\[thornswood-docs\] ready: bans, pk, linked, sessions and signins read/.test(siteSaid(dir)));
     r = await allowed();
     yes('the door lists the linked characters', r.status === 200 && r.j.profiles.indexOf(2002) >= 0 && !r.j.stateBroken);
     r = await passFor(BJORN_D, 2002);
@@ -171,7 +178,7 @@ async function logSays(run, re) {
         r.status === 503 && r.j && r.j.ok === false && r.j.broken.length === 1 &&
         r.j.broken[0].file === 'pk.json' && r.j.broken[0].why === 'will not parse' && r.j.broken[0].play === true);
     yes('  and nothing of what the file holds', JSON.stringify(r.j).indexOf('siege') < 0);
-    yes('  and the site log says STATE BROKEN for it', /STATE BROKEN: \S*pk\.json will not parse\. Nobody is let in to play/.test(run.log));
+    yes('  and the site log says STATE BROKEN for it', /STATE BROKEN: \S*pk\.json will not parse\. Nobody is let in to play/.test(siteSaid(dir)));
     r = await allowed();
     yes('the door lets nobody through', r.status === 200 && r.j.profiles.length === 0 && r.j.people.length === 0);
     yes('  and says why, by file', r.j.stateBroken === 'pk.json will not parse' && !r.j.bansBroken);
@@ -214,7 +221,7 @@ async function logSays(run, re) {
     r = await request(port, 'POST', '/api/play/start', {}, { ticket: ticketFor(BJORN_D), session: 'harness-session-1', profileId: 2002, channel: 'main' });
     yes('a session started over a broken sessions.json is refused as not saved', r.status === 500);
     yes('  and writes nothing over it', fs.readFileSync(SESSIONS, 'utf8') === '{"not": "a list"}');
-    yes('  and the site log says it is broken, without writing it', /STATE BROKEN: \S*sessions\.json is not a list\. Nothing is written over it/.test(run.log));
+    yes('  and the site log says it is broken, without writing it', /STATE BROKEN: \S*sessions\.json is not a list\. Nothing is written over it/.test(siteSaid(dir)));
 
     // ----------------------------------------------------- 5. repaired --
     console.log('\nrepaired:');
@@ -222,7 +229,8 @@ async function logSays(run, re) {
     fs.writeFileSync(SIGNINS, '[]');
     r = await ready();
     yes('/api/ready answers 200 again', r.status === 200 && r.j.ok === true);
-    yes('  and the log says each reads again', /pk\.json reads again\./.test(run.log) && /linked\.json reads again\./.test(run.log) && /sessions\.json reads again\./.test(run.log));
+    const said = siteSaid(dir);
+    yes('  and the log says each reads again', /pk\.json reads again\./.test(said) && /linked\.json reads again\./.test(said) && /sessions\.json reads again\./.test(said));
     r = await passFor(BJORN_D, 2002);
     yes('the join pass gives a pass again', r.status === 200 && !!r.j.pass);
     r = await join(BJORN_D, 2002);
@@ -242,8 +250,11 @@ async function logSays(run, re) {
   const run2 = await start(dir2);
   try {
     yes('the second site starts', run2.up);
-    yes('and its start log says NOT READY, naming linked.json', await logSays(run2, /NOT READY: linked\.json will not read, \/api\/ready answers 503/));
-    yes('  after saying STATE BROKEN for it', /STATE BROKEN: \S*linked\.json will not parse/.test(run2.log));
+    const r2 = await request(run2.port, 'GET', '/api/ready');
+    yes('its /api/ready answers 503 naming linked.json', r2.status === 503 && r2.j && r2.j.broken.length === 1 && r2.j.broken[0].file === 'linked.json');
+    const said2 = siteSaid(dir2);
+    yes('and its start log says NOT READY, naming linked.json', /NOT READY: linked\.json will not read, \/api\/ready answers 503/.test(said2));
+    yes('  after saying STATE BROKEN for it', /STATE BROKEN: \S*linked\.json will not parse[\s\S]*NOT READY: linked\.json/.test(said2));
   } finally {
     await stop(run2, dir2);
   }
