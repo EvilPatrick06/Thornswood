@@ -146,7 +146,9 @@ def main():
                 raise ValueError('Retrieval source evidence is stale: ' + target)
         else:
             path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(text, encoding='utf-8')
+            # LF on every machine, as .gitattributes stores it (#3029).
+            with path.open('w', encoding='utf-8', newline='\n') as output:
+                output.write(text)
     print('PASS seven retrieval sources measured in the complete pinned load order; manifest sha256=' + digest(doc))
 
 if __name__ == '__main__':
