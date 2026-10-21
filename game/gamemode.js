@@ -939,11 +939,12 @@ function ensureProperties() {
       updateOwner: swingScript(),
       updateNeighbor: '',
     });
-    // A plant picked by somebody who was then refused it. See PUTBACK_PROPERTY.
-    mp.makeProperty(PUTBACK_PROPERTY, {
+    // A plant that gave something, emptied on the presser's machine. See
+    // PICKED_PROPERTY.
+    mp.makeProperty(PICKED_PROPERTY, {
       isVisibleByOwner: true,
       isVisibleByNeighbors: false,
-      updateOwner: putBackScript(),
+      updateOwner: pickedScript(),
       updateNeighbor: '',
     });
     /*
@@ -2737,30 +2738,44 @@ const DEPOSIT_SIZE = 20;
 const SWING_PROPERTY = 'thornswoodSwing';
 
 /*
-  ==================== PUT THAT PLANT BACK ================================
+  ==================== A PLANT THAT GAVE SOMETHING LOOKS PICKED ============
 
-  Patrick, 23 September: "all of the harvestable ones correctly don't give
-  it to you if you aren't the right class but it removes it so someone who
-  is the right class has to wait for it to grow back it shouldn't be
-  harvested and removed from your inventory it should just not be harvested
-  at all".
+  #3080. Patrick, 21 October: "instead of replinishing things people can't
+  pickup to just block the pickup animation to begin with so that it doesnt
+  need to pick it back up".
 
-  He is right, and refusing the press is not enough on its own. Picking a
-  plant happens on the machine drawing the world: by the time onActivate
-  answers, that client has already played the animation, emptied the bush and
-  put the flower in its own pack. Returning false stops the SERVER handing
-  anything over, and the inventory sync then takes the flower back, so the
-  person gets nothing, which is right, and the bush stays empty for everybody
-  until it regrows, which is wrong. A gatherer walking up behind them finds a
-  stripped plant that nobody got anything from.
+  The engine fork's client blocks activation on Flora and Tree now
+  (objectReferenceEx.ts, dealWithRef), the way it already blocked containers,
+  items and doors. A press on a plant, a tree, a fish, hanging game, a nest, a
+  churn or a hive only sends the activation: the presser's own Skyrim no
+  longer picks it first. So a refused press changes nothing on their machine,
+  and there is nothing to put back. That is what the put-back property,
+  putBack() and its four second timer were for, and they are gone.
 
-  So the refusal says so to the client, which is the only place that can undo
-  it: ObjectReference.setHarvested(false) is the engine's own way to put a
-  picked plant back, and it is the exact opposite of what the press just did.
+  An ALLOWED press is answered here, as before: the branch hands the produce
+  over itself and answers false, so the engine never runs its own pick. The
+  one thing the presser's game no longer does for itself is empty the plant,
+  so the server tells it to, the way the engine's own model sync shows a
+  harvested plant (ModelApplyUtils.applyModelIsHarvested in the fork:
+  setHarvested, then the reference off and on again so the model follows).
+  On the presser's machine only, because that is the machine that used to
+  pick it: a nest, a churn and a hive wait per person (cooldownLeft), so
+  emptying them for everybody would show a nest empty to somebody who may
+  still take from it.
+
+  WHICH PRESS GAVE SOMETHING is read off the presser's pack, not off the
+  sentence: the press is on a FLOR or TREE record and some entry in the pack
+  went up while it was answered (answerFlora, under mp.onActivate). Every
+  branch that hands produce over, the quests' orchard and scarce water
+  included, goes through one place that way, and a press that took something
+  without giving (sowing a plot) leaves the plot as it is.
+
+  The order is cleared at every login (the per-session hook in the chargen
+  tick), so a pick from an earlier session never empties a plant again.
 */
-const PUTBACK_PROPERTY = 'thornswoodPutBack';
+const PICKED_PROPERTY = 'thornswoodPicked';
 
-function putBackScript() {
+function pickedScript() {
   return [
     '(function(){',
     '  try {',
@@ -2768,35 +2783,52 @@ function putBackScript() {
     '    if (!v || !v.at || !v.ref) { return; }',
     '    var st = ctx.state;',
     '    if (!st) { return; }',
-    '    if (st.thornswoodPutBackAt === v.at) { return; }',
-    '    st.thornswoodPutBackAt = v.at;',
+    '    if (st.thornswoodPickedAt === v.at) { return; }',
+    '    st.thornswoodPickedAt = v.at;',
     '    var sp = ctx.sp;',
     '    var ref = sp.ObjectReference.from(sp.Game.getFormEx(v.ref));',
-    '    if (!ref) { return; }',
-    // Only when it actually went. A press that was refused before the engine
-    // took anything leaves nothing to put back, and setting it twice would
-    // be a plant that never empties.
-    '    if (!ref.isHarvested()) { return; }',
-    '    ref.setHarvested(false);',
+    '    if (!ref || ref.isHarvested()) { return; }',
+    '    ref.setHarvested(true);',
+    '    ref.disable(false).then(function () {',
+    '      var again = sp.ObjectReference.from(sp.Game.getFormEx(v.ref));',
+    '      if (again) { again.enable(false); }',
+    '    });',
     '  } catch (e) { }',
     '})();'
   ].join('\n');
 }
 
-/** True when the toast means produce was handed over; leave the flora empty. */
-function floraHanded(message) {
-  return typeof message === 'string' && /^(You pick |You take )/.test(message);
+/** Empty this plant on the presser's machine. See PICKED_PROPERTY. */
+function showPicked(actorId, refrId) {
+  if (!actorId || !refrId) { return; }
+  try { mp.set(actorId, PICKED_PROPERTY, { ref: refrId, at: Date.now() }); } catch (e) {
+    log('could not show', refrId.toString(16), 'picked to', actorId.toString(16) + ':', e);
+  }
 }
 
-/** Put back whatever that press just picked. See PUTBACK_PROPERTY. */
-function putBack(actorId, refrId) {
-  if (!actorId || !refrId) { return; }
-  try { mp.set(actorId, PUTBACK_PROPERTY, { ref: refrId, at: Date.now() }); } catch (e) { return; }
-  // Cleared behind it, so nothing replays at the next login and un-picks a
-  // plant somebody has since taken properly.
-  setTimeout(function () {
-    try { mp.set(actorId, PUTBACK_PROPERTY, { ref: 0, at: 0 }); } catch (e) { }
-  }, 4000);
+/** Every entry's count in a pack, by base id and name. See answerFlora. */
+function packCounts(actorId) {
+  const counts = {};
+  let inv = null;
+  try { inv = mp.get(actorId, 'inventory'); } catch (e) { return counts; }
+  const entries = (inv && inv.entries) || [];
+  for (let i = 0; i < entries.length; i++) {
+    const e = entries[i];
+    if (!e) { continue; }
+    const key = e.baseId + ':' + (e.name || '');
+    counts[key] = (counts[key] || 0) + (Number(e.count) || 0);
+  }
+  return counts;
+}
+
+/** True when any entry in after holds more than it did in before. */
+function packGrew(before, after) {
+  for (const key in after) {
+    if (Object.prototype.hasOwnProperty.call(after, key) && after[key] > (before[key] || 0)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /*
@@ -5334,6 +5366,15 @@ function chargenTick() {
         if (c && c.grantKnown) { c.grantKnown(actorId); }
       } catch (e) {
         log('login', actorId.toString(16), 'could not put the known spells back:', e);
+      }
+
+      // A plant picked in an earlier session is not emptied again (#3080, see
+      // PICKED_PROPERTY): the order is done with once they are back.
+      try {
+        const order = mp.get(actorId, PICKED_PROPERTY);
+        if (order && order.at) { mp.set(actorId, PICKED_PROPERTY, { ref: 0, at: 0 }); }
+      } catch (e) {
+        log('login', actorId.toString(16), 'could not clear the last picked plant:', e);
       }
 
       // Their own profession, said back to them as they arrive, which proves
@@ -9097,22 +9138,13 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   // salmon as a flower for a gatherer. plantAt() refuses a fish base on its own
   // account as well, so neither half of that depends on this line staying where
   // it is. Same arrangement as the crops two lines up, same reason.
-  else if (isFish(baseDesc)) {
-    message = fish(casterRefrId, refrId, baseDesc);
-    /*
-      Same put-back rule as plants below (#382 leftovers). A refused fish press
-      still empties the FLOR on the presser's machine; without putBack a clam
-      stays stripped for everybody and nobody got the meat. A successful
-      "You take ..." toast must leave it empty.
-    */
-    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
-  }
-  // Hanging game before the plants, for the same reason and with the same
-  // safety net. All seven bases were rows in the plant table until the food
-  // rule of 21 September took them out, so on a gamemode built before that ran
-  // a plants-first order would answer a meat rack as a flower for a gatherer.
-  // plantAt() refuses a game base on its own account as well, so neither half
-  // of that depends on this line staying where it is.
+  else if (isFish(baseDesc)) message = fish(casterRefrId, refrId, baseDesc);
+  // Hanging game before the plants, for the same reason. All seven bases were
+  // rows in the plant table until the food rule of 21 September took them out,
+  // so on a gamemode built before that ran a plants-first order would answer a
+  // meat rack as a flower for a gatherer. plantAt() refuses a game base on its
+  // own account as well, so neither half of that depends on this line staying
+  // where it is.
   //
   // IT IS ABOVE loot() RATHER THAN INSIDE IT, and that is not a matter of
   // taste. loot() reads the reference itself and refuses anything the engine
@@ -9120,66 +9152,18 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   // actors, so loot() answers null for every one of them and the press would
   // fall out of this function untouched, with the engine handing the pheasant
   // to whoever pressed it.
-  else if (isGame(baseDesc)) {
-    message = game(casterRefrId, refrId, baseDesc);
-    /*
-      Same put-back rule as fish and plants (#382 leftovers). A refused hanging
-      game press empties the rack on the client; put it back unless the toast
-      says produce was handed over.
-    */
-    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
-  }
+  else if (isGame(baseDesc)) message = game(casterRefrId, refrId, baseDesc);
   // The chicken nest, which is the farmer's (#628). The harvest table leaves it
   // out (FARMYARD_BY_EDITOR_ID in Build-HarvestTable.ps1), so it is in no plant
   // table and the order against the plants does not matter; it sits with the
   // churn, the other farmyard work.
-  else if (isChickenNest(baseDesc)) {
-    message = collectEgg(casterRefrId, refrId, baseDesc);
-    /*
-      Same put-back rule as plants: a refusal arrives after the client's own
-      empty of the FLOR, so put it back unless the toast says produce was
-      handed over ("You take ...").
-    */
-    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
-  }
+  else if (isChickenNest(baseDesc)) message = collectEgg(casterRefrId, refrId, baseDesc);
   // The butter churn, which is the farmer's. It is in no plant table, so the
   // order against the plants does not matter today; it sits with the other
   // food the food rule moved off the gatherer.
-  else if (isChurn(baseDesc)) {
-    message = churn(casterRefrId, refrId, baseDesc);
-    /*
-      PUT BACK THE SAME WAY AS THE PLANTS BELOW, AND AFTER A BUTTER TOO. See
-      PUTBACK_PROPERTY. A churn is a FLOR, and the client leaves a FLOR
-      unblocked (objectReferenceEx.ts in the fork), so Skyrim has already
-      emptied it on the presser's machine by the time this runs. The server
-      never empties it: this function answers false for every churn press, and
-      SetHarvested(true) is only reached through ProcessActivateNormal, which a
-      false skips (MpObjectReference.cpp, read on 24 September). So a spent
-      churn exists on one machine only, after a Butter as much as after a
-      refusal, and the farmer's own ten minutes are the whole of the supply.
-      Put back, the churn they see is the one the server holds, and their next
-      press is on a churn their own machine does not think is empty.
-    */
-    if (message && message !== ALLOW) { putBack(casterRefrId, refrId); }
-  }
-  else if (isHive(baseDesc)) {
-    message = hive(casterRefrId, refrId, baseDesc);
-    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
-  }
-  else if (isPlant(baseDesc)) {
-    message = harvest(casterRefrId, refrId, baseDesc);
-    /*
-      A REFUSAL HERE ARRIVES AFTER THE PICKING. See PUTBACK_PROPERTY: the
-      client has already emptied the bush by the time this runs, so a refusal
-      that only blocks the handover leaves a stripped plant nobody got
-      anything from. ALLOW and an empty answer both mean it went ahead.
-
-      A SUCCESS TOAST ("You pick ...") ALSO MEANS IT WENT AHEAD (#382). The
-      old line put every non-ALLOW string back, which un-picked a real gather
-      the moment the toast was said. Only refusals put the plant back.
-    */
-    if (message && message !== ALLOW && !floraHanded(message)) { putBack(casterRefrId, refrId); }
-  }
+  else if (isChurn(baseDesc)) message = churn(casterRefrId, refrId, baseDesc);
+  else if (isHive(baseDesc)) message = hive(casterRefrId, refrId, baseDesc);
+  else if (isPlant(baseDesc)) message = harvest(casterRefrId, refrId, baseDesc);
   else if (isVein(baseDesc)) message = mineOre(casterRefrId, refrId, baseDesc);
   else {
     /*
@@ -9258,6 +9242,39 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
   }
   return false;
 });
+
+/*
+  AN ALLOWED PRESS ON A PLANT IS SHOWN PICKED ON THE PRESSER'S MACHINE (#3080).
+  See PICKED_PROPERTY for why the server does it now and not their Skyrim.
+
+  Around the handler rather than inside every branch, because the branches
+  that hand produce over are many (plants, fish, hanging game, nests, hives,
+  crops, the quests' orchard and scarce water) and each has its own sentence.
+  The pack says whether this press gave something, so no sentence is read.
+
+  A churn is left as it is. It is worked, not emptied: the server holds it
+  full, and its wait is the farmer's own (churn, cooldownLeft).
+*/
+function showsPick(refrId) {
+  let baseDesc = '';
+  try { baseDesc = mp.get(refrId, 'baseDesc'); } catch (e) { return false; }
+  if (!baseDesc || isChurn(baseDesc)) { return false; }
+  const spoils = globalThis.__thornswoodSpoils;
+  if (!spoils || !spoils.kindOf) { return false; }
+  let kind = '';
+  try { kind = spoils.kindOf(idOf(baseDesc)); } catch (e) { return false; }
+  return kind === 'FLOR' || kind === 'TREE';
+}
+
+(function answerFlora() {
+  const answer = mp.onActivate;
+  mp.onActivate = function (refrId, casterRefrId) {
+    const before = (refrId && casterRefrId && showsPick(refrId)) ? packCounts(casterRefrId) : null;
+    const result = answer(refrId, casterRefrId);
+    if (before && packGrew(before, packCounts(casterRefrId))) { showPicked(casterRefrId, refrId); }
+    return result;
+  };
+})();
 
 /*
   The bases this server answers for, published where the client can read them.
@@ -54115,8 +54132,8 @@ mp['onPapyrusEvent:OnHit'] = guard('onPapyrusEvent:OnHit', function (targetId, a
              equipment update names it (mp.onUpdateEquipmentAttempt). The
              engine cannot take back a spell it never recorded (Actor
              .RemoveSpell sends nothing for one), so the server tells that
-             client to, through TAKE_PROPERTY, the way PUTBACK_PROPERTY tells
-             a client to put back a plant it was refused. A spawn takes it
+             client to, through TAKE_PROPERTY, the way PICKED_PROPERTY tells
+             a client to empty a plant it was given. A spawn takes it
              off as well, because the client rebuilds its spells from the
              server's list every time it spawns (remoteServer.ts).
   Kept, because none of them is a spell of the book's kind: a disease, a
