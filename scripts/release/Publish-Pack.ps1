@@ -39,7 +39,7 @@
 param(
     [string]$Only,
     [switch]$DryRun,
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot 'Where.ps1') Install),
     # A folder holding the version.json to add the packs to. Left out, the
     # live feed is received from the VPS store into this machine's working
     # folder for main, and sent back (#907).

@@ -11,8 +11,8 @@
 #>
 param(
     [string]$Esp,
-    [string]$Data     = 'C:\Thornswood\Game\Data',
-    [string]$Profile  = 'C:\Thornswood\Profile',
+    [string]$Data     = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string]$Profile  = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile'),
     [string]$Before   = 'The Great Cities - Minor Cities and Towns.esp'
 )
 

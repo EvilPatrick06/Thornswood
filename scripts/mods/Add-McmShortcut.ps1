@@ -29,7 +29,7 @@
 #>
 [CmdletBinding()]
 param(
-    [string]$Root      = 'C:\Thornswood',
+    [string]$Root      = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [string]$Downloads = "$env:USERPROFILE\Downloads",
     [string]$Notes = 'Making a character now walks you through it. The starting location menu opens on its own after the face, and the class menu follows.',
     [switch]$NoShip,

@@ -44,7 +44,7 @@
 [CmdletBinding()]
 param(
     # The game's Data folder on this machine.
-    [string]$Data = 'C:\Thornswood\Game\Data',
+    [string]$Data = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
     [switch]$Check,
     [string]$VpsHost = '',
     [string]$VpsUser = ''

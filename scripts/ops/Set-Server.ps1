@@ -24,7 +24,7 @@
 param(
     [Parameter(Mandatory = $true)][string]$Address,
     [string]$Port = '7777',
-    [string]$Root = 'C:\Thornswood',
+    [string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
     [string]$RepoDir,
     [string]$ReleaseDir,
     [switch]$Force,

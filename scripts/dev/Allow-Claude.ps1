@@ -98,8 +98,8 @@ function Die($m)  { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; i
 #
 $WantDirs = @(
     @{ Path = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Engine); Why = 'the fork: our engine changes' },
-    @{ Path = 'C:\Thornswood\Game';      Why = 'the built game: the records the tables are read out of' },
-    @{ Path = 'C:\Thornswood\Profile';   Why = 'launcher.log and plugins.txt' }
+    @{ Path = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game');    Why = 'the built game: the records the tables are read out of' },
+    @{ Path = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile'); Why = 'launcher.log and plugins.txt' }
 )
 
 #

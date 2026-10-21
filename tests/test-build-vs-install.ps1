@@ -165,8 +165,9 @@ try {
     }
     $realRepo = $Here
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Build-Launcher.ps1') -Destination (Join-Path $fakeRepo 'scripts\release')
-    # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180).
-    foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
+    # Build-Launcher holds the embedded records to RecordShape.ps1 (#2180), and
+    # asks Where.ps1 which folders are the installs (#3031).
+    foreach ($n in 'RecordShape.ps1', 'Read-JsonFile.ps1', 'Where.ps1') { Copy-Item -LiteralPath (Join-Path $realRepo ('scripts\release\' + $n)) -Destination (Join-Path $fakeRepo 'scripts\release') -Force }
     # The build is MSBuild and the two project files since #498's switch:
     # Find-MSBuild.ps1 finds MSBuild, and the projects say what goes in.
     Copy-Item -LiteralPath (Join-Path $realRepo 'scripts\release\Find-MSBuild.ps1') -Destination (Join-Path $fakeRepo 'scripts\release') -Force
@@ -527,9 +528,11 @@ try {
     # The dev install is asked by its whole name (#2900): a folder whose name
     # merely ends in -devbuild, such as the dev release folder
     # local\release-devbuild, is a scratch root and leaves the Desktop alone.
+    # The whole name is what Where.ps1 InstallDev answers (#3031).
     $inst = Get-Content -LiteralPath (Join-Path $RepoDir 'scripts\release\Install-Launcher.ps1') -Raw
-    Yes 'V1 the dev install is C:\Thornswood-DevBuild by its whole name, not any folder ending in -DevBuild' (
-        $inst.Contains("`$isDevRoot = `$Root.TrimEnd('\') -ieq 'C:\Thornswood-DevBuild'") -and $inst -notmatch "isDevRoot\s*=[^\r\n]*-match")
+    Yes 'V1 the dev install is Where.ps1 InstallDev by its whole name, not any folder ending in -DevBuild' (
+        $inst.Contains("`$devInstall  = [string](& (Join-Path `$Here 'Where.ps1') InstallDev)") -and
+        $inst.Contains("`$isDevRoot = `$Root.TrimEnd('\') -ieq `$devInstall") -and $inst -notmatch "isDevRoot\s*=[^\r\n]*-match")
 
     # ---- 8. who calls the install ------------------------------------------------
     # By code, not by comment: Build-Launcher.ps1's header names the install

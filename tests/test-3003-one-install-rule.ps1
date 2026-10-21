@@ -18,18 +18,35 @@
   on a machine with no C:. #2989's pull request had just changed
   Check-CollectionRules's copy by hand for that, one copy of seven.
 
+  AND EVERY SCRIPT, issue #3031. Moving the seven left about forty scripts
+  that took C:\Thornswood, or a folder under it, as a fixed default instead
+  of asking, so on a developer whose launcher is on another drive they read
+  or wrote a folder that is not the install unless the path was typed each
+  time. Each script had been written with Patrick's own install as its
+  default before there was one place to ask, and nothing stopped the next
+  one. They ask Where.ps1 now, and part 3 holds every script to it.
+
   THIS FAILS ON:
     1. a function named Find-Root or Find-InstallRoot in any script outside
        Where.ps1;
     2. any script outside Where.ps1 that walks the drives for
        Launcher\Thornswood.exe, the rule itself under another name or none
        (a Get-PSDrive call and that file name in one script);
-    3. one of the seven scripts not asking Where.ps1 Install, or writing an
-       install folder (C:\Thornswood and the like) into a string of its own;
+    3. one of the seven scripts not asking Where.ps1 Install, or any script
+       writing an install folder (C:\Thornswood, C:\Thornswood-DevBuild or
+       a folder under either, on any drive) into a string of its own. Left
+       out: Where.ps1, whose rule starts there; installer\Setup-Thornswood.ps1,
+       which chooses where a new install goes; the box scripts' check for
+       C:\Thornswood\Game\SkyrimSE.exe, which asks "is this a gaming PC"
+       and means that one folder; scripts\oneoff, parked and not run
+       (its README); and tests, whose folders are made up. The box's own
+       folders (C:\Thornswood-Server, C:/Thornswood-Docs and the rest) are
+       not the install and are not read as one;
     4. Where.ps1's rule answering wrong on made up drives, or Install and
        InstallDev not answering as the rule says.
-  The reader in 1 and 2 is run over planted scripts first, one per way of
-  copying the rule, so a reader that finds nothing anywhere cannot pass.
+  The readers in 1, 2 and 3 are run over planted scripts first, one per way
+  of copying the rule or writing the folder, so a reader that finds nothing
+  anywhere cannot pass.
 
   Read only. The planted scripts are parsed from strings, not written.
 #>
@@ -139,9 +156,37 @@ Yes 'no script outside Where.ps1 carries the install rule (ask Where.ps1 Install
 foreach ($c in $copies) { Write-Host "      $c" }
 Yes 'Where.ps1 has it, once' (@((Parse-File $where).FindAll({ param($n) $n -is $FnAst -and $n.Name -eq 'Find-InstallRoot' }, $true)).Count -eq 1)
 
-# ---- 3. the seven scripts that had a copy -------------------------------------
+# ---- 3. no install folder written into a script ------------------------------
+# Over string literals only, so a comment that names C:\Thornswood in words
+# is not mistaken for a folder written in. A message that names the folder in
+# the middle of a sentence is not caught; one that starts with it is, the
+# same as a default.
+$installLit = '(?i)^[a-z]:[\\/]Thornswood(-DevBuild)?([\\/]|$)'
+function Get-InstallLiterals($ast) {
+    return @($ast.FindAll({ param($n) ($n -is $StrAst -or $n -is $XStrAst) -and $n.Value -match $installLit }, $true))
+}
 Write-Host ''
-Write-Host 'the seven scripts that had a copy'
+Write-Host 'the install folder reader, over planted scripts'
+$plantedLit = [ordered]@{
+    'a default of C:\Thornswood'               = "param([string]`$Root = 'C:\Thornswood')"
+    'a default under it, on another drive'     = "param([string]`$Data = 'D:\Thornswood\Game\Data')"
+    'the dev install, with forward slashes'    = "`$c = if (`$Dev) { 'C:/Thornswood-DevBuild' } else { 'x' }"
+    'a folder under it in double quotes'       = "`$p = `"C:\Thornswood\Profile\`$name`""
+    'the install in a list'                    = "`$roots = @('C:\Thornswood', 'C:\SkyrimRP')"
+}
+foreach ($k in $plantedLit.Keys) {
+    Yes ("found: $k") (@(Get-InstallLiterals (Parse-Text $plantedLit[$k])).Count -gt 0)
+}
+$cleanLit = @'
+# C:\Thornswood is where the launcher usually is; asked, not written.
+param([string]$Root = (& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install),
+      [string]$Server = 'C:\Thornswood-Server', [string]$Docs = 'C:/Thornswood-Docs', [string]$Any = 'C:\Thornswood-*')
+Write-Host ('no launcher at ' + $Root)
+'@
+Yes 'not found: a script that asks Where.ps1 and names the box''s own folders' (@(Get-InstallLiterals (Parse-Text $cleanLit)).Count -eq 0)
+
+Write-Host ''
+Write-Host 'the seven scripts that had a copy ask Where.ps1'
 $asks = [regex]"Where\.ps1'\) (Install\b|\`$\(if \(.+\) \{ 'InstallDev' \} else \{ 'Install' \}\))"
 foreach ($rel in 'scripts\release\Publish-Update.ps1', 'scripts\release\Repair-Manifest.ps1', 'scripts\release\Sync-Client.ps1',
                  'scripts\release\Go.ps1', 'scripts\deploy\Deploy-Gamemode.ps1', 'scripts\mods\Check-CollectionRules.ps1',
@@ -149,13 +194,37 @@ foreach ($rel in 'scripts\release\Publish-Update.ps1', 'scripts\release\Repair-M
     $path = Join-Path $Repo $rel
     $name = ($rel -split '\\')[-1]
     if (-not (Test-Path -LiteralPath $path)) { Yes "$name is here" $false; continue }
-    $src = [IO.File]::ReadAllText($path)
-    Yes "$name asks Where.ps1 for the install" ($asks.IsMatch($src))
-    # Over string literals only, so a comment that names C:\Thornswood in
-    # words is not mistaken for a folder written in.
-    $lits = @((Parse-File $path).FindAll({ param($n) ($n -is $StrAst -or $n -is $XStrAst) -and $n.Value -match '(?i)^[a-z]:\\Thornswood' }, $true))
-    Yes "  and writes no install folder of its own" ($lits.Count -eq 0)
-    foreach ($l in $lits) { Write-Host ("      line {0}: {1}" -f $l.Extent.StartLineNumber, $l.Extent.Text) }
+    Yes "$name asks Where.ps1 for the install" ($asks.IsMatch([IO.File]::ReadAllText($path)))
+}
+
+Write-Host ''
+Write-Host 'every script writes no install folder of its own'
+# Where each one is let off, and why: the header says.
+$letOff = @{
+    'scripts/release/Where.ps1'          = 'the rule'
+    'installer/Setup-Thornswood.ps1'     = 'where a new install goes'
+}
+# The gaming-PC guard, only in the five box scripts that carry it (#3041 is
+# putting it in one place).
+$gamingPc = '(?i)^C:\\Thornswood(-DevBuild)?\\Game\\SkyrimSE\.exe'
+$boxChecks = @('scripts/vps/Bootstrap-VPS.ps1', 'scripts/vps/Clear-OldWorldCopies.ps1', 'scripts/vps/Delete-Person.ps1',
+               'scripts/vps/Lock-VpsFolders.ps1', 'scripts/deploy/Install-ThornswoodServer.ps1')
+$written = @()
+$read = 0
+foreach ($f in $files) {
+    $rel = $f.FullName.Substring($Repo.Length).TrimStart('\', '/') -replace '\\', '/'
+    if ($letOff.ContainsKey($rel) -or $rel -like 'scripts/oneoff/*') { continue }
+    $read++
+    foreach ($l in @(Get-InstallLiterals (Parse-File $f.FullName))) {
+        if ($boxChecks -contains $rel -and $l.Value -match $gamingPc) { continue }
+        $written += ("{0} line {1}: {2}" -f $rel, $l.Extent.StartLineNumber, $l.Extent.Text)
+    }
+}
+Yes ("there are scripts to read here too ({0})" -f $read) ($read -gt 100)
+Yes 'no script writes the install folder (ask Where.ps1 Install or InstallDev)' ($written.Count -eq 0)
+foreach ($w in $written) { Write-Host "      $w" }
+foreach ($rel in @($letOff.Keys) + $boxChecks) {
+    Yes ("  $rel, let off, is still here") (Test-Path -LiteralPath (Join-Path $Repo $rel))
 }
 
 # ---- 4. the rule itself -------------------------------------------------------

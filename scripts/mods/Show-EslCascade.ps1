@@ -16,8 +16,8 @@ param(
     # Was the old build folder until 23 September, which is a folder neither
     # machine has had for weeks: this read an empty list and said so in a way
     # that looked like an answer.
-    [string]$Data    = 'C:\Thornswood\Game\Data',
-    [string]$Plugins = 'C:\Thornswood\Profile\Default\plugins.txt'
+    [string]$Data    = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Game\Data'),
+    [string]$Plugins = ((& (Join-Path $PSScriptRoot '..\release\Where.ps1') Install) + '\Profile\Default\plugins.txt')
 )
 
 function Read-Header([string]$path) {
