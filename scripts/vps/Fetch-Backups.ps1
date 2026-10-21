@@ -58,12 +58,23 @@
 
   Every run adds to fetch.log in the -To folder, because a task that runs
   unattended says nothing to anybody otherwise.
+
+  THE BOX IS TOLD (issue #2755). After a run that checked what it brought
+  down, or found nothing new, the name of the newest copy here goes into
+  offbox.txt in the watchdog's folder on the box (-WatchRoot), and
+  Watch-Services.ps1 there tells staff when that copy is over 26 hours old.
+  So a copy that falls behind is told while this machine is off, which is
+  when it falls behind. A run that could not check what it brought down
+  (-NoVerify, no passphrase, no Restore-Backup.ps1) tells the box nothing,
+  because the newest copy here is then not one anybody has opened. The box
+  not taking the name fails the run.
 #>
 [CmdletBinding()]
 param(
   [string]$VpsHost = '',
   [string]$VpsUser = '',
   [string]$Remote  = 'C:/Thornswood-Backup',
+  [string]$WatchRoot = 'C:/Thornswood-Watch',
   [string]$To      = '',
   [string]$KeyFile = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
   [int]$KeepDays   = 30,
@@ -137,6 +148,25 @@ function Prune {
   Say ("  kept {0} backup(s) here" -f ($mine.Count - $dropped)) 'DarkGray'
 }
 $script:pruneFailed = 0
+
+# The box's watchdog judges how old the copy off it is from this (THE BOX IS
+# TOLD above). Only a name matched the way the box names its backups is
+# written, so nothing else ever reaches the command line.
+function Send-OffBoxMark {
+  $newest = @(Get-ChildItem -LiteralPath $To -File -EA SilentlyContinue |
+              Where-Object { $_.Name -match '^thornswood-\d{8}-\d{6}\.zip(\.enc)?$' } |
+              Sort-Object Name -Descending | Select-Object -First 1)
+  if (-not $newest.Count) { Say '  the box was not told of a copy: there is none here' 'Yellow'; return }
+  $name = $newest[0].Name
+  $file = $WatchRoot.Replace('/', '\') + '\offbox.txt'
+  $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes("Set-Content -LiteralPath '$file' -Value '$name' -Encoding ASCII; 'MARKED'"))
+  $said = @(Invoke-ThornswoodNative { & ssh @ssh $target "powershell -NoProfile -EncodedCommand $enc" } 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+  if ($said -contains 'MARKED') { Say ("  told the box the newest copy here is {0}" -f $name) 'Green'; return }
+  $first = $(if ($said.Count) { $said[0] } else { 'it said nothing' })
+  Say ("  NOT TOLD  the box did not take {0} into {1}: {2}" -f $name, $file, $first) 'Red'
+  $script:markFailed++
+}
+$script:markFailed = 0
 
 # Where they land when -To is not given (WHERE THEY LAND above, 5 October).
 # The copy -Schedule makes has no Where.ps1 beside it and its task always
@@ -253,8 +283,9 @@ if (-not $want.Count) {
   Head 'Nothing new'
   Say "  Everything on the box is already in $To" 'Green'
   Prune
+  Send-OffBoxMark
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-  if ($script:pruneFailed) { exit 1 }
+  if ($script:pruneFailed -or $script:markFailed) { exit 1 }
   exit 0
 }
 
@@ -280,10 +311,11 @@ foreach ($b in $want) {
 
 if ($NoVerify -or -not $got.Count) {
   Write-Host ''
-  if ($NoVerify -and $got.Count) { Say ("  -NoVerify: {0} copied and NOT checked" -f $got.Count) 'Yellow' }
+  if ($NoVerify -and $got.Count) { Say ("  -NoVerify: {0} copied and NOT checked, so the box was not told of them" -f $got.Count) 'Yellow' }
   Prune
+  if (-not $NoVerify) { Send-OffBoxMark }
   if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-  if ($failed -or $script:pruneFailed) { exit 1 }
+  if ($failed -or $script:pruneFailed -or $script:markFailed) { exit 1 }
   exit 0
 }
 
@@ -294,6 +326,7 @@ Head ("Checking every one opens ({0})" -f $got.Count)
 # file this run brought down is checked, in name order, not only the newest
 # (#2200): a newest-only check proves nothing about the rest.
 $restore = Join-Path $Here 'Restore-Backup.ps1'
+$checked = $false
 if (-not (Test-Path -LiteralPath $restore)) {
   Say ("  NOT CHECKED  Restore-Backup.ps1 is not next to this script, so none of the {0} could be opened." -f $got.Count) 'Red'
   $failed++
@@ -301,6 +334,7 @@ if (-not (Test-Path -LiteralPath $restore)) {
   Say ("  NOT CHECKED  No passphrase at {0}, so none of the {1} could be opened. Pass -KeyFile, or -NoVerify to only copy." -f $KeyFile, $got.Count) 'Red'
   $failed++
 } else {
+  $checked = $true
   foreach ($one in ($got | Sort-Object)) {
     $leaf = Split-Path -Leaf $one
     $global:LASTEXITCODE = 0
@@ -317,9 +351,12 @@ if (-not (Test-Path -LiteralPath $restore)) {
 }
 
 Prune
+# A failed one was set aside out of the backup pattern, so the newest here is
+# one that opened. Unchecked copies are not told about.
+if ($checked) { Send-OffBoxMark } else { Say '  the box was not told of these, because none of them was opened' 'Yellow' }
 Write-Host ''
 Say "  They are in $To" 'DarkGray'
 Say '  Restoring one for real is docs\RESTORING.md.' 'DarkGray'
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
-if ($failed -or $script:pruneFailed) { exit 1 }
+if ($failed -or $script:pruneFailed -or $script:markFailed) { exit 1 }
 exit 0

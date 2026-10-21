@@ -54,7 +54,7 @@ $notInGit = @{
     'bot/announced.json'  = 'what Publish-Discord.ps1 has posted, written on the machine that ships'
     'bot/dev-webhook.txt' = 'a webhook, a secret kept out of git'
     'bot/news-webhook.txt'= 'a webhook, a secret kept out of git'
-    'scripts/vps/watch-outside.json'   = 'what Watch-Outside.ps1 -Install writes beside its installed copy in %LOCALAPPDATA%, never in the repository'
+    'scripts/vps/watch-outside.json'   = 'what Watch-Outside.ps1 -Export writes beside its copy in the public repository it runs from (#2755), never in this one'
     'launcher/app/app.ico'             = 'the second place the icon lookups try; the icon is launcher/app.ico'
 }
 # Setup-Thornswood.ps1 runs inside an unpacked installer, where its own folder

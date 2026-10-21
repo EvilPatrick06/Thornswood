@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  62,
-    "callCount":  266,
+    "callCount":  267,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1796,6 +1796,15 @@
                       "does":  "downloads backups",
                       "class":  "admin",
                       "reason":  "backups carry every secret"
+                  },
+                  {
+                      "script":  "scripts/vps/Fetch-Backups.ps1",
+                      "scope":  "Send-OffBoxMark",
+                      "via":  "ssh",
+                      "anchor":  "$said = @(Invoke-ThornswoodNative { \u0026 ssh @ssh $target \"powershell -NoProfile -EncodedCommand $enc\" }",
+                      "does":  "writes the newest checked copy\u0027s name into C:\\Thornswood-Watch\\offbox.txt, which the SYSTEM watchdog reads (#2755)",
+                      "class":  "admin",
+                      "reason":  "writes into the watchdog\u0027s locked folder, outside the gate verbs"
                   },
                   {
                       "script":  "scripts/vps/Forecast-Storage.ps1",

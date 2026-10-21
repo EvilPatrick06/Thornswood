@@ -43,8 +43,7 @@
 
   With a list of addresses instead, every address that needs ssh has to be
   in it: this machine, every other machine that deploys or ships (each
-  developer's own), and Watch-Outside.ps1's machine, which logs in every five
-  minutes. A home address that changes drops out of the list and that
+  developer's own). A home address that changes drops out of the list and that
   machine loses ssh until the list is changed from a machine still in it, or
   from the console.
 
