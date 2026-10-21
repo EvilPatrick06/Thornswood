@@ -29,8 +29,13 @@
   WHAT IT READS, and it changes nothing:
     the process that listens on 443;
     the half-open (SynReceived) connections on 443, every 10 seconds;
-    the TCPv4 raw counters (passive opens, failed connects, segments sent and
-    retransmitted) at the start and the end of the window;
+    the box's IPv4 TCP totals (passive opens, failed connects, segments sent
+    and resent), the ones netstat -s prints, at the start and the end of the
+    window. They come from GetTcpIPv4Statistics, the call netstat itself
+    makes, which any account may make. The TCPv4 performance class gave the
+    same totals at both ends of an 11 second window under the Windows
+    runner's account while the flood ran (#2995), and a window of zeros
+    reads like a box with no flood;
     the 443 process's CPU time and working set.
   No address is printed: only how many, and how many distinct /16s.
 
@@ -42,7 +47,8 @@
       COST <process> <p>% of one core, <n> MB; SYN-ACKs about <n> bytes/s out
       VERDICT FLOOD|QUIET <why>
   FLOOD is 20 or more half-open on 443 on average; a box nobody floods has a
-  handful at most. Exit 0 either way; 1 only when it could not measure.
+  handful at most. Exit 0 either way; 1 only when it could not measure, with
+  VERDICT UNKNOWN and why.
 
   tests\test-syn-flood.ps1 holds it to this.
 #>
@@ -57,7 +63,7 @@ $Every = 10
 # A SYN-ACK on the wire with only an MSS option, as the capture shows them.
 $SynAckBytes = 58
 
-function Get-Tcp { Get-CimInstance -ClassName Win32_PerfRawData_Tcpip_TCPv4 }
+function Get-Tcp { [Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetTcpIPv4Statistics() }
 function Get-Half {
     $h = @(Get-NetTCPConnection -State SynReceived -LocalPort 443 -ErrorAction SilentlyContinue)
     , @($h | ForEach-Object { $_.RemoteAddress })
@@ -69,6 +75,7 @@ $p = Get-Process -Id $l.OwningProcess
 'LISTENER {0} pid {1}' -f $p.ProcessName, $p.Id
 
 $t0 = Get-Tcp
+if (-not $t0) { 'VERDICT UNKNOWN the TCP totals could not be read, so nothing was measured'; exit 1 }
 $c0 = $null
 try { $c0 = $p.TotalProcessorTime.TotalSeconds } catch { $c0 = $null }
 $start = Get-Date
@@ -88,10 +95,10 @@ $m = $counts | Measure-Object -Minimum -Average -Maximum
 $sixteens = @($addrs.Keys | ForEach-Object { (($_ -split '\.')[0..1]) -join '.' } | Sort-Object -Unique).Count
 'HALF-OPEN 443 min {0} avg {1:N0} max {2}, {3} addresses in {4} /16s' -f $m.Minimum, $m.Average, $m.Maximum, $addrs.Count, $sixteens
 
-$passive = [long]$t1.ConnectionsPassive - [long]$t0.ConnectionsPassive
-$failed = [long]$t1.ConnectionFailures - [long]$t0.ConnectionFailures
-$sent = [long]$t1.SegmentsSentPersec - [long]$t0.SegmentsSentPersec
-$resent = [long]$t1.SegmentsRetransmittedPersec - [long]$t0.SegmentsRetransmittedPersec
+$passive = $t1.ConnectionsAccepted - $t0.ConnectionsAccepted
+$failed = $t1.FailedConnectionAttempts - $t0.FailedConnectionAttempts
+$sent = $t1.SegmentsSent - $t0.SegmentsSent
+$resent = $t1.SegmentsResent - $t0.SegmentsResent
 $failedPct = 0; if ($passive -gt 0) { $failedPct = 100 * $failed / $passive }
 $resentPct = 0; if ($sent -gt 0) { $resentPct = 100 * $resent / $sent }
 $perFailed = 0; if ($failed -gt 0) { $perFailed = $resent / $failed }

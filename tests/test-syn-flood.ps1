@@ -12,7 +12,8 @@
     2. it only reads: no cmdlet or command that changes the machine, and no
        window longer than five minutes;
     3. it prints no address, only counts and how many /16s;
-    4. on Windows, a short run under Windows PowerShell 5.1 prints every line
+    4. on Windows, a short run under Windows PowerShell 5.1, as an account
+       that is not an administrator, reads the TCP totals, prints every line
        it promises, ending in one VERDICT, and exits 0 (or 1 with VERDICT
        UNKNOWN where nothing listens on 443).
 
@@ -65,10 +66,13 @@ $writes = [regex]::Matches($code, '(?i)\b(Set|New|Remove|Register|Unregister|Dis
 $writes = @($writes | Where-Object { $_ -notmatch '^>\s*\d' })
 Yes ("it runs nothing that changes the machine" + $(if ($writes.Count) { ': ' + ($writes -join ', ') } else { '' })) ($writes.Count -eq 0)
 Yes '  its window is 10 to 300 seconds, 60 unless told' ($t -match '\[ValidateRange\(10, 300\)\]\[int\]\$Seconds = 60')
-Yes '  and it reads the TCP counters raw, at both ends of the window' (([regex]::Matches($code, 'Win32_PerfRawData_Tcpip_TCPv4')).Count -eq 1 -and $code -match '\$t0 = Get-Tcp' -and $code -match '\$t1 = Get-Tcp')
+Yes '  and it reads the TCP totals any account may read, at both ends of the window' (([regex]::Matches($code, 'GetTcpIPv4Statistics\(\)')).Count -eq 1 -and $code -match '\$t0 = Get-Tcp' -and $code -match '\$t1 = Get-Tcp')
+Yes '  not the performance counters, which read as zeros under the Windows runner's account (#2995)' ($code -notmatch 'Win32_PerfRawData|Get-Counter')
+Yes '  and when it cannot read them it says UNKNOWN and exits 1, never a window of zeros' ($code -match "if \(-not \`$t0\) \{ 'VERDICT UNKNOWN the TCP totals could not be read[^']*'; exit 1 \}")
 
 # ---- 3. no address leaves the box ---------------------------------------------
-$printed = @([regex]::Matches($code, "(?m)^\s*'[A-Z-]+ [^\r\n]*$") | ForEach-Object { $_.Value })
+# [^\r\n]* and no $: a Windows checkout has CRLF, and (?m)$ matches only before \n.
+$printed = @([regex]::Matches($code, "(?m)^[ \t]*'[A-Z-]+ [^\r\n]*") | ForEach-Object { $_.Value })
 Yes "every line it prints is one of its own labels ($($printed.Count) of them)" ($printed.Count -ge 6)
 Yes '  and none of them prints an address, only counts' (@($printed | Where-Object { $_ -match 'RemoteAddress|\$addrs\.Keys|\$a\b' }).Count -eq 0)
 
@@ -81,11 +85,12 @@ $out = @(& $ps51 -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $scrip
 $code51 = $LASTEXITCODE
 $all = $out -join "`n"
 Write-Host ($out | ForEach-Object { '      ' + $_ } | Out-String).TrimEnd()
-if ($all -match 'VERDICT UNKNOWN') {
+if ($all -match 'VERDICT UNKNOWN nothing listens on 443') {
     Yes "where nothing listens on 443 it says so and exits 1 (exit $code51)" ($code51 -eq 1)
     Done
 }
 Yes "a 10 second run exits 0 (exit $code51)" ($code51 -eq 0)
+Yes '  having read the TCP totals: segments were sent in the window' ($all -match '(?m)^RETRANSMITS [0-9.,]+/s of ([1-9][0-9,]*\.[0-9]|0\.[1-9])')
 foreach ($label in 'LISTENER', 'HALF-OPEN 443', 'CONNECTS', 'RETRANSMITS', 'COST') {
     Yes "  and prints its $label line" ($all -match "(?m)^$label ")
 }
