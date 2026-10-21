@@ -181,7 +181,9 @@ try {
         $oldE = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         try { $out = (& $Shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File (Join-Path $rel 'New-FeedRoot.ps1') -Channel $Channel -Root $root -SiteDir $site -ClientRecord $clientRec -EngineDist $engineDist 2>&1 | Out-String); $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $oldE }
-        return [pscustomobject]@{ Code = $code; Out = $out }
+        # Squashed: the refusal is an error record, which PowerShell wraps at the
+        # console's width (a word can break across two lines) on a runner.
+        return [pscustomobject]@{ Code = $code; Out = $out; Squashed = ($out -replace '[\s|]', '') }
     }
     Set-Feed (New-Record $true)
     Put (Join-Path $root 'Game\Data\stray.txt') 'left from something older'
@@ -226,13 +228,13 @@ try {
     Put (Join-Path $site 'feed\version\00000001.json') (([pscustomobject]$mfeed) | ConvertTo-Json -Depth 5)
     Set-ClientRecord @{ 'Data\Platform\Plugins\skymp5-client.js' = $newClient }
     $r = Stage 'main'
-    Yes 'a recorded client the last release lacks is refused when neither feed nor CI''s engine build has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js' -and $r.Out -match 'no engine build at')
+    Yes 'a recorded client the last release lacks is refused when neither feed nor CI''s engine build has it' ($r.Code -ne 0 -and $r.Out -match 'on neither feed' -and $r.Out -match 'skymp5-client\.js' -and $r.Squashed -match 'noenginebuildat')
     # A client no Ship has carried yet (#3088's d39a9a93): on neither feed, but
     # in CI's engine build of the pin.
     $ciFile = Join-Path $engineDist 'Data\Platform\Plugins\skymp5-client.js'
     Put $ciFile 'not the recorded client'
     $r = Stage 'main'
-    Yes '  and refused when CI''s engine build holds another file than the record names' ($r.Code -ne 0 -and $r.Out -match 'holds another Data.Platform.Plugins.skymp5-client\.js than the record names')
+    Yes '  and refused when CI''s engine build holds another file than the record names' ($r.Code -ne 0 -and $r.Squashed -match 'holdsanotherData.Platform.Plugins.skymp5-client\.jsthantherecordnames' -and -not (Test-Path -LiteralPath (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')))
     Put $ciFile ([byte[]]$newClient)
     $r = Stage 'main'
     Yes ("  and taken from CI's engine build of the pin when neither feed has it (exit {0})" -f $r.Code) ($r.Code -eq 0 -and (ShaFile (Join-Path $root 'Game\Data\Platform\Plugins\skymp5-client.js')) -eq $sNew -and $r.Out -match "skymp5-client\.js from CI's engine build of the pin")
