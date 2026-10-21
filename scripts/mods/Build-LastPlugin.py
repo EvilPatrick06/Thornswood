@@ -1141,6 +1141,28 @@ def build(data_dir):
                              'Nothing was written.' % (what, plugins[e.pi].name))
         gates.append(e)
 
+    # Nothing is copied out of a plugin the policy says is never handed on
+    # (notCopiedFrom: Patrick, 17 Oct 2026, Immersive Armors is used as-is
+    # through the collection and nothing built from it is redistributed). A
+    # cell it wins is copied from the plugin that wins it below, and only when
+    # its own record says nothing more (compared below, after the numbering);
+    # any other record it wins stops the build. A floor item it wins but
+    # does not place is switched off from the plugin below it: off, the
+    # reference shows nothing of either.
+    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    below = {}
+
+    def under(e, tag, gid):
+        """The record tag gid as the highest plugin below e's has it, or None."""
+        for i in range(e.pi - 1, -1, -1):
+            if plugins[i].name.lower() in blocked:
+                continue
+            if (i, tag) not in below:
+                below[(i, tag)] = {plugins[i].gid(x.fid): x for x in plugins[i].walk({tag})}
+            if gid in below[(i, tag)]:
+                return below[(i, tag)][gid]
+        return None
+
     # 4. The floor items (#3077): every placed reference a person could pick
     # up, switched off like a cut actor. Left alone, the same way: one a later
     # plugin deleted, and one already off with no enable parent.
@@ -1162,6 +1184,8 @@ def build(data_dir):
         # here, without the script.
         elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
+        elif src.name.lower() in blocked and under(e, b'REFR', g) is not None:
+            floor.append((g, under(e, b'REFR', g), kind))
         else:
             floor.append((g, e, kind))
     # A reference whose enable parent is a floor item would go out with it, or
@@ -1218,26 +1242,8 @@ def build(data_dir):
         cells[g] = e
     floor_cells -= set(hold_cells)
 
-    # 6. Nothing is copied out of a plugin the policy says is never handed on
-    # (notCopiedFrom: Patrick, 17 Oct 2026, Immersive Armors is used as-is
-    # through the collection and nothing built from it is redistributed). A
-    # cell it wins is copied from the plugin that wins it below, and only when
-    # its own record says nothing more (compared below, after the numbering);
-    # any other record it wins stops the build.
-    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
-    below = {}
-
-    def under(e, tag, gid):
-        """The record tag gid as the highest plugin below e's has it, or None."""
-        for i in range(e.pi - 1, -1, -1):
-            if plugins[i].name.lower() in blocked:
-                continue
-            if (i, tag) not in below:
-                below[(i, tag)] = {plugins[i].gid(x.fid): x for x in plugins[i].walk({tag})}
-            if gid in below[(i, tag)]:
-                return below[(i, tag)][gid]
-        return None
-
+    # 6. Nothing is copied out of a plugin the policy never copies from
+    # (notCopiedFrom, above); what it would contribute stops the build.
     held = sorted('%s %s (won by %s)' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon), plugins[e.pi].name)
                   for e in actors + gates + [e for _, e, _ in floor] + qentries +
                   [e for e, _, _ in hold_locs]
