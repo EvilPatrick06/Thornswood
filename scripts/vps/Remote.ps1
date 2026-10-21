@@ -109,11 +109,10 @@ if ($Show) {
 }
 
 # The sending is Send-Script.ps1's (issue #1070), the one helper every script
-# here uses: the command line when the script fits, otherwise a file of its
-# own name in C:/Windows/Temp, run, removed whether it worked or not, and the
-# far side's exit code handed back rather than the tidy up's. Why a long
-# script goes as a file, and why the path goes bare, is in its header;
-# tests\test-remote-big-script.ps1 sends a 10 KB script through it.
+# here uses: the command line when the script fits, otherwise ssh's standard
+# input, so nothing of it is left on the box (#3027), and the far side's exit
+# code handed back. Why a long script cannot go on the command line is in its
+# header; tests\test-remote-big-script.ps1 sends a 10 KB script through it.
 #
 # With a secret, Send-Secret.ps1 sends it: the value on standard input, the
 # script the same way as without one.
