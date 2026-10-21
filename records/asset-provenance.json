@@ -487,8 +487,8 @@
     },
     {
       "path": "game/content/Thornswood-Last.esp",
-      "sha256": "9cf7bd9fc6f52fd96dcf6a83a72d6c45f56859e837b6c7fe72f2f59d614a82a3",
-      "what": "The light plugin that loads last (#2468): 6,946 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551), and the three town gates Bethesda ships locked (1b1f1, 42284, 42286) overridden without their lock or script (#2484), and the 39 smith recipes that asked far more or far less than their peers re-costed (#613). 6,030,384 bytes on 21 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
+      "sha256": "1982a6bf193f7f5b9224026247f4506c1aae90f27e3aa461d508e424168ace8e",
+      "what": "The light plugin that loads last (#2468): 6,946 cut placed actors overridden initially disabled, with their cells and worldspaces copied exactly from the plugin that wins each, 2,226 vanilla quests and 16 of the collection's mod quests with gate, door or arrival talk stopped, and 8 location records and 3 rooms copied from the plugins that win them with a hold given (#2551), and the three town gates Bethesda ships locked (1b1f1, 42284, 42286) overridden without their lock or script (#2484), the 39 smith recipes that asked far more or far less than their peers re-costed (#613), and the gold coins taken out of the 21 forge recipes that charged them (#3115). 6,034,006 bytes on 21 Oct; the six-trade alpha roster removes189 extra guild traders (#1373).",
       "published": "Every pack and the installer on both channels, and handed out by both game servers, since #2486 (Patrick, 12 Oct: it ships from the repository like the content plugin)",
       "source": "Built by scripts\\mods\\Build-LastPlugin.py from the load order's own plugins (Skyrim's and the collection's), as overrides of their records",
       "creator": "Built here; the records it overrides and copies are those plugins' authors'",
