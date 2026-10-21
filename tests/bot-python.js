@@ -9,6 +9,10 @@
 //
 // This makes the same choice Setup-Discord.ps1 and Set-DiscordOnboarding.ps1
 // make (#2421): the py launcher's 3.12 first, then plain python, then python3.
+// Off Windows there is no py launcher, and 3.12 goes by python3.12, so that
+// is asked second (#3005): python3 on a Linux machine can be 3.13, where the
+// hash-pinned bot\requirements.txt does not install (discord.py wants
+// audioop-lts there, which it does not pin).
 // Each candidate is asked to import _pyguard and discord from bot\, so the
 // version floor is the bot's own and not a copy of it, and a Python without
 // the bot's libraries is passed over the same way.
@@ -24,6 +28,7 @@ const { spawnSync } = require('child_process');
 const BOT = path.join(__dirname, '..', 'bot');
 const CANDIDATES = [
   { cmd: 'py', args: ['-3.12'] },
+  { cmd: 'python3.12', args: [] },
   { cmd: 'python', args: [] },
   { cmd: 'python3', args: [] }
 ];
@@ -47,4 +52,12 @@ function find() {
   return { cmd: null, args: [], why: said.join('; ') };
 }
 
-module.exports = { find, BOT };
+// The line that puts the bot's libraries where find() looks, for a harness
+// to print when none loads the bot. On Windows it is Developer-Guide.md
+// "Setting up a machine"'s. Off Windows the system's python3.12 refuses a
+// plain pip install (PEP 668), so it goes into the user's own packages.
+const INSTALL = process.platform === 'win32'
+  ? 'py -3.12 -m pip install -r bot\\requirements.txt'
+  : 'python3.12 -m pip install --user --break-system-packages --require-hashes -r bot/requirements.txt';
+
+module.exports = { find, BOT, INSTALL };
