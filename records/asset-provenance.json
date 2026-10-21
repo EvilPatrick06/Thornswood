@@ -685,15 +685,27 @@
       "issue": 2177
     },
     {
+      "path": "Data\\Platform\\UI\\dc3cbd21104d40477da6.ttf",
+      "what": "Barlow SemiBold, in the skymp5-front build every Ship makes from the fork since 20 Oct 2026 (#2931): the face that build draws the rest of its text in, in place of DIN Pro.",
+      "published": "Every pack and the installer made since 20 Oct 2026",
+      "source": "The fork's skymp5-front\\src\\fonts\\Barlow-SemiBold.ttf (fork #40, 9 Oct 2026, for #1317), from google/fonts 2eb0b48d; 108,348 bytes, sha256 86577cb3, as records\\front-build.json records it",
+      "creator": "Jeremy Tribby (Tribby Type) and the Barlow Project Authors, https://github.com/jpt/barlow, version 1.408, by the file's own name table",
+      "licence": "OFL-1.1, by the file's licence field ('This Font Software is licensed under the SIL Open Font License, Version 1.1.'); the fork keeps the full text beside it as skymp5-front\\src\\fonts\\OFL.txt",
+      "attribution": "Keep the font's notice; named on the public credits page",
+      "approved": "Not needed: an open licence",
+      "evidence": "The font's name table, read 21 Oct (#421); records\\front-build.json; THIRD-PARTY.md, SkyMP's interface, built from the fork.",
+      "status": "cleared"
+    },
+    {
       "path": "Data\\Platform\\UI\\ (the other files build.js names by hash)",
       "what": "The skymp5-front build's sounds and pictures. 26 of build.js's files are byte for byte upstream's skymp5-front\\src; Ship parses the names from build.js at pack time (#1318).",
       "published": "Every pack and the installer",
-      "source": "Upstream SkyMP skymp5-front, build commit not recorded",
+      "source": "Since 20 Oct 2026 (#2931) the fork's skymp5-front at the pin, recorded in records\\front-build.json; main's releases from before then carry upstream SkyMP's skymp5-front, build commit not recorded",
       "creator": "Upstream SkyMP and the authors it bundles",
       "licence": "GPL-3.0, as build.js (skymp5-front's package.json)",
       "attribution": "The source offer, THIRD-PARTY.md Where the source is",
       "approved": "not recorded",
-      "evidence": "THIRD-PARTY.md, From upstream SkyMP and What is still missing (build.js has no recorded source commit).",
+      "evidence": "THIRD-PARTY.md, From upstream SkyMP, SkyMP's interface, built from the fork, and What is still missing (main's older build.js has no recorded source commit).",
       "status": "cleared"
     },
     {
