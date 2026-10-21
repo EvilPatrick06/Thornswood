@@ -558,8 +558,9 @@ public static class ThornswoodRestartManager {
   return $who
 }
 
-# Every handle on the box that names $Path or a path under it, as "pid name:
-# path (access 0x...)" groups, then the processes it could not look into
+# Every handle on the box that names $Path or a path under it, this
+# process's own among them, as "pid name: path (access 0x...)" groups, then
+# the processes it could not look into
 # (protected ones, Windows Defender among them, which even an administrator
 # cannot open). Read only: each handle is copied into this process, its path
 # read, and the copy closed. A handle whose path cannot be read without
@@ -611,12 +612,11 @@ public static class ThornswoodHandles {
       long count = Marshal.ReadIntPtr(buf).ToInt64();
       int size = Marshal.SizeOf(typeof(ENTRY));
       long first = buf.ToInt64() + IntPtr.Size * 2;
-      int self = System.Diagnostics.Process.GetCurrentProcess().Id;
       IntPtr me = GetCurrentProcess();
       for (long i = 0; i < count; i++) {
         ENTRY e = (ENTRY)Marshal.PtrToStructure(new IntPtr(first + i * size), typeof(ENTRY));
         int pid = (int)e.Pid.ToInt64();
-        if (pid == self || pid <= 4) continue;
+        if (pid <= 4) continue;
         // The masks a synchronous pipe is opened with: reading its path can wait for ever.
         if (e.Access == 0x0012019F || e.Access == 0x00120189 || e.Access == 0x00100000 || e.Access == 0x0016019F) continue;
         IntPtr p;
@@ -653,9 +653,11 @@ public static class ThornswoodHandles {
     }
     string text = said.Count > 0 ? string.Join("; ", said.ToArray()) : "none in any process it could look into";
     if (unopened.Count > 0) {
+      // As an administrator these are the protected few; run as anybody
+      // else it is nearly every process, and the count says so.
       List<string> names = new List<string>();
-      foreach (int u in unopened) names.Add(u + " " + Name(u));
-      text += "; could not look into " + string.Join(", ", names.ToArray());
+      for (int i = 0; i < unopened.Count && i < 12; i++) names.Add(unopened[i] + " " + Name(unopened[i]));
+      text += "; could not look into " + (unopened.Count > 12 ? unopened.Count + " processes, among them " : "") + string.Join(", ", names.ToArray());
     }
     return text;
   }

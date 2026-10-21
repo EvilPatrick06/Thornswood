@@ -247,8 +247,12 @@ try {
     $d = Join-Path $work 'cwd-here'
     $null = New-Item -ItemType Directory -Path $d
     [IO.File]::WriteAllText((Join-Path $d 'a.txt'), 'x')
-    $c = Start-Process -FilePath $node.Source -ArgumentList @('-e', '"setInterval(()=>{},1000)"') -WorkingDirectory $d -PassThru -WindowStyle Hidden
+    # It writes ready.txt once it is running, so its current directory is set;
+    # the file is closed again at once and holds nothing.
+    $c = Start-Process -FilePath $node.Source -ArgumentList @('-e', '"require(''fs'').writeFileSync(''ready.txt'',''1'');setInterval(()=>{},1000)"') -WorkingDirectory $d -PassThru -WindowStyle Hidden
     $started += $c
+    $until = (Get-Date).AddSeconds(20)
+    while (-not (Test-Path -LiteralPath (Join-Path $d 'ready.txt')) -and (Get-Date) -lt $until) { [Threading.Thread]::Sleep(50) }
     $ok = Move-ThornswoodPath $d ($d + '-moved')
     Yes 'a folder another process has as its current directory is refused, once' ((-not $ok) -and (Test-Path -LiteralPath $d))
     Yes ('  and the handle list names that process, where the Restart Manager names none: ' + $ThornswoodMoveWhy) (
