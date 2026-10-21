@@ -140,6 +140,11 @@ function New-PrivateFile([string]$Path) {
     }
     $item = Get-Item -LiteralPath $Path -Force
     if ($PSVersionTable.PSEdition -eq 'Core') { [IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl) } else { $item.SetAccessControl($acl) }
+    # Read back, not taken from the call: a FileSecurity already written once
+    # writes nothing the second time and says nothing (#3034, on the box).
+    $got = Get-Acl -LiteralPath $Path
+    $who = @($got.GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value } | Sort-Object -Unique)
+    if (-not $got.AreAccessRulesProtected -or ($who -join ',') -ne 'S-1-5-18,S-1-5-32-544') { throw ($Path + ' did not take SYSTEM and Administrators alone: ' + ($who -join ', ')) }
 }
 
 if ($Layer) { . $Layer }

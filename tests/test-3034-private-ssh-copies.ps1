@@ -13,7 +13,8 @@
   Authenticated Users and the real Windows PowerShell 5.1 the box runs:
     - New-PrivateFile, as vps-ssh-scope.ps1 and vps-harden.ps1 each carry
       it, leaves a file that takes nothing from the folder and has exactly
-      SYSTEM and Administrators, Full Control. This account is not an
+      SYSTEM and Administrators, Full Control, for two files in one run, and
+      stops when the rules it reads back are not those. This account is not an
       administrator on the build runner (Install-Runner.ps1 puts its account
       in Users), so it is also refused the file's content, the way every
       other account on the box is; run as an administrator, as on the box,
@@ -85,9 +86,17 @@ try {
         Yes ($box + ' has one New-PrivateFile') ([bool]$fn)
         if (-not $fn) { continue }
         $f = Join-Path $ssh ($box + '.before-test')
-        $out = Run51 ($fn + "`r`nNew-PrivateFile " + (Q $f) + "`r`n'MADE'")
-        Yes ('  run in Windows PowerShell 5.1 it makes the file' + $(if (-not ($out -contains 'MADE')) { ': ' + ($out -join ' ') })) (($out -contains 'MADE') -and (Test-Path -LiteralPath $f))
-        Yes '  empty, taking nothing from the folder, SYSTEM and Administrators Full Control and nobody else' ((Get-Item -LiteralPath $f).Length -eq 0 -and (OnlyTheTwo $f))
+        $f2 = Join-Path $ssh ($box + '.before-test-2')
+        # Two in one run: a security object reused across files writes
+        # nothing the second time, which is what the box step of 21 Oct did.
+        $out = Run51 ($fn + "`r`nNew-PrivateFile " + (Q $f) + "`r`nNew-PrivateFile " + (Q $f2) + "`r`n'MADE'")
+        Yes ('  run in Windows PowerShell 5.1 it makes two files in one run' + $(if (-not ($out -contains 'MADE')) { ': ' + ($out -join ' ') })) (($out -contains 'MADE') -and (Test-Path -LiteralPath $f) -and (Test-Path -LiteralPath $f2))
+        Yes '  each empty, taking nothing from the folder, SYSTEM and Administrators Full Control and nobody else' ((Get-Item -LiteralPath $f).Length -eq 0 -and (OnlyTheTwo $f) -and (OnlyTheTwo $f2))
+        # A copy whose rules did not take stops the run instead of carrying on.
+        $bad = $fn.Replace('$item.SetAccessControl($acl)', '$null = $acl').Replace('[IO.FileSystemAclExtensions]::SetAccessControl([IO.FileInfo]$item, $acl)', '$null = $acl')
+        $f3 = Join-Path $ssh ($box + '.not-taken')
+        $out = Run51 ($bad + "`r`ntry { New-PrivateFile " + (Q $f3) + "; 'CARRIED ON' } catch { 'STOPPED ' + `$_.Exception.Message }")
+        Yes '  and when the rules do not take, it reads that back and stops, naming who can still read it' ((($out -join ' ') -match '^STOPPED .*did not take SYSTEM and Administrators alone') -and -not ($out -contains 'CARRIED ON'))
         if ($isAdmin) {
             $w = Run51 ("[IO.File]::WriteAllText(" + (Q $f) + ", 'rollback stand-in')`r`n'WROTE'")
             Yes '  an administrator writes the copy into it, and the rules stay as they were' (($w -contains 'WROTE') -and [IO.File]::ReadAllText($f) -eq 'rollback stand-in' -and (OnlyTheTwo $f))
