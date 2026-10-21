@@ -994,7 +994,7 @@ try {
         # box's own C:\Thornswood-Deploys or C:\Thornswood-Docs, which on the
         # VPS are real.
         function MapFar([string]$s) {
-            foreach ($p in 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Server-Log.js', 'C:\Thornswood-Server\',
+            foreach ($p in 'C:\Windows\Temp\', 'C:\thornswood-server.zip', 'C:\Install-ThornswoodServer.ps1', 'C:\ServerSettings.ps1', 'C:\ServerBuild.ps1', 'C:\ServerReadyWait.ps1', 'C:\Read-JsonFile.ps1', 'C:\RecordShape.ps1', 'C:\Server-Log.js', 'C:\Thornswood-Server\',
                            'C:\Thornswood-Deploys', 'C:\Thornswood-Docs') {
                 $to = Join-Path $global:TsBox.Box $p.Substring(3)
                 $s = $s.Replace($p, $to).Replace($p.Replace('\', '/'), $to)
@@ -1009,9 +1009,11 @@ try {
             $body = ''
             $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
             if ($m.Success) { $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value)) }
-            # A long script comes on standard input under Send-Script.ps1's
-            # reader (#3027), so it is read from there.
-            if ($m.Success -and $in.Count -and $body.StartsWith('. ([scriptblock]::Create(')) { $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$in[0] -replace '[^A-Za-z0-9+/=]', ''))) }
+            # A long script goes by scp to a copy of its own, which
+            # Send-Script.ps1's runner takes off the box and runs (#3059), so
+            # it is read from there and taken off the same way.
+            $r = [regex]::Match($body, "^\`$ThornswoodRunFile = '(C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1)'")
+            if ($m.Success -and $r.Success) { $copy = MapFar $r.Groups[1].Value; $body = [IO.File]::ReadAllText($copy); Remove-Item -LiteralPath $copy -Force }
             else {
                 $m = [regex]::Match($cmd, '-File\s+(\S+)(.*)$')
                 if ($m.Success) {

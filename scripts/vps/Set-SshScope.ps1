@@ -15,10 +15,11 @@
     1. The box's own key. known_hosts here must hold the host key
        scripts\vps\vps.json pins.
     2. Key login, before anything else.
-    3. On the box: scripts\vps\vps-ssh-scope.ps1 runs there, sent on ssh's
-       standard input, so nothing of it is written on the box (#3035; until
-       21 Oct 2026 it was copied into C:\Windows\Temp, and a run cut short
-       left the copy there). It refuses a list that does not
+    3. On the box: scripts\vps\vps-ssh-scope.ps1 runs there, sent through
+       Send-Script.ps1, whose run deletes a long script's copy before it
+       runs (#3035, #3059; until 21 Oct 2026 it was copied into
+       C:\Windows\Temp and removed after, and a run cut short left the copy
+       there). It refuses a list that does not
        hold the address this session comes from, a rule for every port that
        would let 22 in anyway, and a rule for 22 shared with other ports.
        Then it saves the rules' remote addresses as they are, arms a task

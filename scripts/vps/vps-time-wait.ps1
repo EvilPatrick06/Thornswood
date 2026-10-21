@@ -67,11 +67,18 @@ function Say([string]$word, [string]$what) { Write-Output ($word + ' ' + $what) 
 # Everything that touches Windows goes through these, so the harness can put
 # stand-ins in their place with -Layer and run the rest of this for real.
 
-function Test-IsServer {
-    $pt = 0
-    try { $pt = [int](Get-CimInstance Win32_OperatingSystem).ProductType } catch { $pt = 0 }
-    return ($pt -ne 1)
+# Is this the box? scripts\vps\BoxGuard.ps1 (#3041).
+# ---- BoxGuard.ps1 (copy) ----
+function Get-ThornswoodBoxRefusal {
+    # scripts\vps\BoxGuard.ps1 says why this asks Windows rather than looking
+    # for the game, and why it refuses when it cannot tell (#3041).
+    try { $type = [int](Get-CimInstance -ClassName Win32_OperatingSystem -ErrorAction Stop).ProductType }
+    catch { return ('Windows did not say whether this is a server (' + $_.Exception.Message + '), so it is not taken for the box') }
+    if ($type -eq 2 -or $type -eq 3) { return '' }
+    if ($type -eq 1) { return 'this is a Windows workstation, a gaming PC or a developer''s machine, not the box' }
+    return ('Windows gives this machine product type ' + $type + ', which is not a server, so it is not taken for the box')
 }
+# ---- end BoxGuard.ps1 ----
 
 # The value as a number, or $null when it is not set.
 function Get-TimeWaitValue {
@@ -122,7 +129,10 @@ function Get-ServerRoom([string]$Root) {
 }
 
 function Invoke-TimeWait {
-    if (-not $Layer -and -not (Test-IsServer)) { Say 'STOP' 'this is a workstation, not the VPS. Run Set-TimeWait.ps1 on your machine; it sends this to the box.'; $script:code = 1; return }
+    if (-not $Layer) {
+        $notBox = Get-ThornswoodBoxRefusal
+        if ($notBox) { Say 'STOP' ($notBox + '. Run Set-TimeWait.ps1 on your machine; it sends this to the box.'); $script:code = 1; return }
+    }
 
     $now = Get-TimeWaitValue
     if ($null -eq $now) { Say 'NOW' "$Name is not set, so Windows holds TIME_WAIT for its default of 120 seconds" }

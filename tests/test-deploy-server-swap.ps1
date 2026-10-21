@@ -760,9 +760,11 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $m = [regex]::Match($cmd, 'EncodedCommand\s+(\S+)')
         if ($m.Success) {
             $body = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
-            # A long script comes on standard input under Send-Script.ps1's
-            # reader (#3027), so it is read from there.
-            if ($in.Count -and $body.StartsWith('. ([scriptblock]::Create(')) { $body = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(([string]$in[0] -replace '[^A-Za-z0-9+/=]', ''))) }
+            # A long script goes by scp to a copy of its own, which
+            # Send-Script.ps1's runner takes off the box and runs (#3059), so
+            # it is read from there and taken off the same way.
+            $r = [regex]::Match($body, "^\`$ThornswoodRunFile = '(C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1)'")
+            if ($r.Success) { $copy = TsGmMap $r.Groups[1].Value; $body = [IO.File]::ReadAllText($copy); Remove-Item -LiteralPath $copy -Force }
             $body = TsGmMap $body
         }
         else {
@@ -819,11 +821,12 @@ function Start-ScheduledTask { [CmdletBinding()] param([string]`$TaskName)
         $script:lastFar = @($lines) + @($threw)
         return [pscustomobject]@{ Ok = ((-not $threw) -and $global:LASTEXITCODE -eq 0); Said = ($script:lastFar -join "`n"); Threw = $threw
                                   Ssh = ($global:TsGm.Ssh.Count - $script:gmSshBefore); Scp = ($global:TsGm.Scp.Count - $script:gmScpBefore)
-                                  # What scp put anywhere. A read whose command line is past
-                                  # Send-Script.ps1's limit goes on standard input and copies
-                                  # nothing up (16 Oct: the -GamemodeOnly read is 7,020
-                                  # characters encoded, past the 6,000 limit; #3027).
-                                  Sent = @($global:TsGm.Scp | Select-Object -Skip $script:gmScpBefore).Count }
+                                  # What scp put anywhere but a script's own copy. A read whose
+                                  # command line is past Send-Script.ps1's limit goes by scp to
+                                  # a copy its runner takes off before it runs (16 Oct: the
+                                  # -GamemodeOnly read is 7,020 characters encoded, past the
+                                  # 6,000 limit; #3059), which sends nothing to the server.
+                                  Sent = @($global:TsGm.Scp | Select-Object -Skip $script:gmScpBefore | Where-Object { (Split-Path -Leaf $_) -notmatch '^thornswood-remote-[0-9a-f]{32}\.ps1$' }).Count }
     }
     function Text([string]$path) { if (Test-Path -LiteralPath $path) { return [IO.File]::ReadAllText($path) }; return $null }
     function Prevs { return @(Get-ChildItem -LiteralPath $root -Directory -Force | Where-Object { $_.Name -like '.prev-*' } | Sort-Object Name | ForEach-Object { $_.FullName }) }
