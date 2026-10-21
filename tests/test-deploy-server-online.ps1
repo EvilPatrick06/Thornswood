@@ -214,6 +214,9 @@ try {
         $standIns = "function Stop-ScheduledTask { }`r`n" +
                     "function Stop-Process { 'stand-in asked to stop ' + (`$args -join ' ') }`r`n" +
                     "function Get-NetUDPEndpoint { }`r`n" +
+                    "function Get-ThornswoodProcessHeld { }`r`n" +
+                    "function Stop-ThornswoodProcessHeld { }`r`n" +
+                    "`$ThornswoodNotHeld = @()`r`n" +
                     "function Start-Sleep { }`r`n" +
                     "function Held { `$false }`r`n"
 
