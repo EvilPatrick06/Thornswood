@@ -1218,6 +1218,46 @@ def build(data_dir):
         cells[g] = e
     floor_cells -= set(hold_cells)
 
+    # 6. Nothing is copied out of a plugin the policy says is never handed on
+    # (notCopiedFrom: Patrick, 17 Oct 2026, Immersive Armors is used as-is
+    # through the collection and nothing built from it is redistributed). A
+    # cell it wins is copied from the plugin that wins it below, and only when
+    # its own record says nothing more (compared below, after the numbering);
+    # any other record it wins stops the build.
+    blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
+    below = {}
+
+    def under(e, tag, gid):
+        """The record tag gid as the highest plugin below e's has it, or None."""
+        for i in range(e.pi - 1, -1, -1):
+            if plugins[i].name.lower() in blocked:
+                continue
+            if (i, tag) not in below:
+                below[(i, tag)] = {plugins[i].gid(x.fid): x for x in plugins[i].walk({tag})}
+            if gid in below[(i, tag)]:
+                return below[(i, tag)][gid]
+        return None
+
+    held = sorted('%s %s (won by %s)' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon), plugins[e.pi].name)
+                  for e in actors + gates + [e for _, e, _ in floor] + qentries +
+                  [e for e, _, _ in hold_locs]
+                  if plugins[e.pi].name.lower() in blocked)
+    swapped = []
+    for kind, table in ((b'CELL', cells), (b'WRLD', worlds)):
+        for g, e in list(table.items()):
+            if plugins[e.pi].name.lower() not in blocked:
+                continue
+            prev = under(e, kind, g)
+            if prev is None:
+                held.append('%s %s (only %s has it)' % (kind.decode(), desc_of(g, canon), plugins[e.pi].name))
+                continue
+            table[g] = prev
+            swapped.append((kind, g, e, prev))
+    if held:
+        raise SystemExit('STOP. %d record(s) the plugin would copy are won by a plugin the policy never '
+                         'copies from (notCopiedFrom):\n  %s\nDecide them on #3077. Nothing was written.'
+                         % (len(held), '\n  '.join(held[:60])))
+
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()
 
@@ -1304,6 +1344,24 @@ def build(data_dir):
     copies()
     rn.named.add('skyrim.esm')  # NEVER_TRUE names Gold001
     rn.masters = [n.lower() for n in order if n.lower() in rn.named]
+    # A swapped cell or world is right only if the never-copied plugin's own
+    # record says nothing the one below does not: then nothing of it is lost
+    # and nothing of it is handed on. Compared field by field in this plugin's
+    # numbering, names written out.
+    differs = []
+    for kind, g, e, prev in swapped:
+        what = '%s %s' % (kind.decode(), desc_of(g, canon))
+        try:
+            same = copy_record(plugins[e.pi], e, rn, strings, what) == \
+                copy_record(plugins[prev.pi], prev, rn, strings, what)
+        except (ValueError, SystemExit):
+            same = False
+        if not same:
+            differs.append('%s: %s changes it from %s' % (what, plugins[e.pi].name, plugins[prev.pi].name))
+    if differs:
+        raise SystemExit('STOP. %d record(s) are changed by a plugin the policy never copies from '
+                         '(notCopiedFrom), so neither its record nor the one below is right to copy:\n  %s\n'
+                         'Decide them on #3077. Nothing was written.' % (len(differs), '\n  '.join(sorted(differs)[:60])))
     made = copies()
     masters = [canon[m] for m in rn.masters]
     plugin = write_plugin(made, masters, plugins, rn)
@@ -1353,6 +1411,13 @@ def build(data_dir):
         },
     }
     manifest['counts']['floorItemsOff'] = len(floor)
+    # The cells and worlds a never-copied plugin wins, copied from the plugin
+    # below it, whose record that plugin does not change (step 6).
+    manifest['notCopiedFrom'] = {
+        'plugins': sorted(row['plugin'] for row in policy.get('notCopiedFrom', [])),
+        'takenFromBelow': sorted('%s %s from %s, not %s' % (k.decode(), desc_of(g, canon), plugins[p.pi].name,
+                                                            plugins[e.pi].name) for k, g, e, p in swapped),
+    }
     return plugin, manifest
 
 
@@ -1625,6 +1690,8 @@ def main():
                                                     row['parent'], row['hold']))
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
+    for row in manifest['notCopiedFrom']['takenFromBelow']:
+        print('  never copied from: %s' % row)
     fl = manifest['floorItems']
     print('  %d floor items off (%s); left as they are: %d deleted by a plugin, %d already off'
           % (fl['off'], ', '.join('%d %s' % (n, k) for k, n in fl['byType'].items()), fl['deleted'], fl['alreadyOff']))

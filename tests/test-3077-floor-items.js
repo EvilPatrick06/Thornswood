@@ -30,6 +30,8 @@
     C  Thornswood-Content.esp places no item of its own on the floor (a
        Thornswood plugin's floor item is Patrick's to decide; the builder stops
        on one with the game's records too)
+    N  no plugin the policy never copies from (notCopiedFrom: Immersive
+       Armors, Patrick, 17 Oct 2026) is a master of the plugin
     G  the gamemode refuses nothing off the floor: no "put here by the world"
        line, no coin purse rule, no jail key floor line
 
@@ -147,6 +149,17 @@ yes('P1 every placed reference but the ' + gates.size + ' town gates is switched
 yes('P2 there are as many as the manifest says (' + refs.length + ')', !!fl && refs.length === fl.off);
 const hash = crypto.createHash('sha256').update(refs.map((r) => r.desc).sort().join('\n'), 'utf8').digest('hex');
 yes('P3 and they are the ones it says: their ids hash to its refsSha256', !!fl && hash === fl.refsSha256);
+
+// ---------------------------------------------------------------- N
+// Nothing is copied out of a plugin Patrick rules is never handed on
+// (notCopiedFrom in the policy: Immersive Armors, 17 Oct 2026, #2454).
+const policy = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), 'utf8'));
+const never = (policy.notCopiedFrom || []).map((r) => r.plugin);
+yes('N1 the policy never copies from Immersive Armors', never.indexOf('Hothtrooper44_ArmorCompilation.esp') >= 0);
+yes('N2 and no plugin it names is a master of Thornswood-Last.esp, so no record of it is in there',
+    never.length > 0 && never.every((n) => last.masters.every((m) => m.toLowerCase() !== n.toLowerCase())));
+yes('N3 the manifest was built with the same list (rebuild the plugin after a policy change)',
+    !!manifest.notCopiedFrom && JSON.stringify(manifest.notCopiedFrom.plugins) === JSON.stringify(never.slice().sort()));
 
 // ---------------------------------------------------------------- C
 const content = readPlugin(CONTENT, 'Thornswood-Content.esp');
