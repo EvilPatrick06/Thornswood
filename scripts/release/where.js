@@ -65,6 +65,18 @@ function getPlace(layout, name) {
   if (name === 'EngineBuilds') {
     return path.join(machineData(), 'engine-build.json');
   }
+  // CI's engine build of this checkout's pin (#3047), the same answer as
+  // Where.ps1's EngineArtifact: engine-ci/<the fork commit
+  // records/server-build.json names, 12> in this machine's data.
+  if (name === 'EngineArtifact') {
+    const record = path.join(repo, 'records', 'server-build.json');
+    let commit = '';
+    try { commit = String(JSON.parse(fs.readFileSync(record, 'utf8').replace(/^\uFEFF/, '')).source.commit || '').toLowerCase(); } catch (e) { commit = ''; }
+    if (!/^[0-9a-f]{40}$/.test(commit)) {
+      throw new Error(record + ' names no fork commit (source.commit), so which CI engine build this checkout takes is not known.');
+    }
+    return path.join(machineData(), 'engine-ci', commit.slice(0, 12));
+  }
   if (name === 'EngineBuild') {
     const file = getPlace(layout, 'EngineBuilds');
     if (!fs.existsSync(file)) return getPlace(layout, 'Engine');
@@ -72,8 +84,9 @@ function getPlace(layout, name) {
     try { rec = JSON.parse(fs.readFileSync(file, 'utf8').replace(/^﻿/, '')); } catch (e) {
       throw new Error(file + ' does not read as JSON, so which engine build this machine uses is not known.');
     }
+    if (rec && rec.ci === true) return getPlace(layout, 'EngineArtifact');
     const fork = rec && typeof rec.fork === 'string' ? rec.fork : '';
-    if (!fork) throw new Error(file + ' names no fork folder.');
+    if (!fork) throw new Error(file + ' names no engine build.');
     if (!fs.existsSync(path.join(fork, 'build', 'dist'))) {
       throw new Error(file + ' names ' + fork + ' as this machine\'s engine build, and there is no build\\dist in it.');
     }
@@ -87,7 +100,7 @@ function getPlace(layout, name) {
 }
 
 const PLACE_NAMES = [
-  'Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
+  'Repo', 'Engine', 'EngineBuild', 'EngineBuilds', 'EngineArtifact', 'ServerDist', 'ClientDist', 'ServerSettings', 'ChangeForms',
   'Out', 'Dist', 'Package', 'Payload', 'ServerZip', 'Local', 'Backups',
   'Releases', 'ReleasesDev'
 ];
