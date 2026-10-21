@@ -264,26 +264,26 @@ jobs:
           # It began as six that sat red on main unseen (#875) and grew from
           # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
           # starts Windows PowerShell 5.1 itself to compare what the two write.
-          # On 21 Oct 2026 the 495 then on the gate took 23 minutes of a 26
-          # minute build, so the "not sorted yet" lines come on a few at a time.
+          # On 21 Oct 2026 the 550 then on the gate took 26 minutes of a 28
+          # minute build one at a time, in a foreach here (#3114). They run
+          # through scripts\dev\Nightly-Harnesses.ps1 now, -Throttle at once:
+          # each a process of its own with its output in files of its own,
+          # printed as it ends, on the nightly's clock, in a job object that
+          # counts its processor time. The summary says what the box's cores
+          # did meanwhile, which is what -Throttle is set from: four builds
+          # share six cores (#2994). A harness that writes where another
+          # reads says RUNS ALONE in its header and runs after the rest.
+          # 1800 s of the job's 40 minutes: a harness starts only when its
+          # whole clock still fits, so the list of what failed is printed
+          # before the job could be cancelled.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
           $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          $failed = @()
-          foreach ($n in $gate) {
-            $p = Join-Path 'tests' $n
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            Write-Host ("--- {0}" -f $n)
-            if ($n -like '*.js') { & node $p } else { & pwsh -NoProfile -File $p }
-            $code = $LASTEXITCODE
-            Write-Host ("--- {0}: exit {1}, {2}s" -f $n, $code, [Math]::Round($sw.Elapsed.TotalSeconds, 1))
-            if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
-          }
-          if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
-          Write-Host ('all {0} passed' -f $gate.Count)
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 3 -BudgetSeconds 1800
+          exit $LASTEXITCODE
 
       - name: Run the signer check
         shell: pwsh
