@@ -98,8 +98,9 @@ function Done {
 
 $App = Join-Path $Repo 'launcher\app'
 $SetupScript = Join-Path $Repo 'installer\Setup-Thornswood.ps1'
-$winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-Yes 'Windows PowerShell, which the setup window runs Setup-Thornswood.ps1 with, is here' (Test-Path -LiteralPath $winps)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  Setup-Thornswood.ps1 runs only on Windows, in the Windows PowerShell the setup window starts, over hard links into the game folder'; exit 0 }
+$winps = Get-WindowsPowerShell
 Yes 'installer\Setup-Thornswood.ps1 is there' (Test-Path -LiteralPath $SetupScript)
 if ($script:fail) { Done }
 

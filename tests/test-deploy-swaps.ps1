@@ -105,10 +105,14 @@ foreach ($n in 'Deploy-DevGamemode.ps1', 'Deploy-Docs.ps1', 'Install-Voice.ps1',
 
 $node = Get-Command node -CommandType Application -EA SilentlyContinue | Select-Object -First 1
 $python = Get-Command python -CommandType Application -EA SilentlyContinue | Select-Object -First 1
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $node -or -not $python -or -not (Test-Path -LiteralPath $ps51) -or
-    -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
-    Write-Host 'SKIP  the runs need node, python, Windows PowerShell 5.1 and Get-NetUDPEndpoint, and this machine lacks one'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1 and Get-NetUDPEndpoint, which only Windows has, and this is not Windows'
+    Done
+}
+$ps51 = Get-WindowsPowerShell
+if (-not $node -or -not $python -or -not (Get-Command Get-NetUDPEndpoint -EA SilentlyContinue)) {
+    Write-Host 'SKIP  the runs need node, python and Get-NetUDPEndpoint as well, and this machine lacks one'
     Done
 }
 
@@ -215,7 +219,7 @@ $script:ownTasks = @('Docs', 'Voice', 'Dev Server', 'Live Server') | ForEach-Obj
 function NoRealTask {
     # The task folder on disk, when this account can read it, because asking
     # the scheduler takes seconds and this is asked after every far call.
-    $folder = Join-Path $env:SystemRoot 'System32\Tasks'
+    $folder = Get-WindowsPath 'System32\Tasks'
     $readable = $false
     try { $null = [IO.Directory]::GetFiles($folder, 'x'); $readable = $true } catch { }
     if ($readable -and -not (Test-Path -Path (Join-Path $folder ($TaskPrefix + '*')))) { return $true }

@@ -3,7 +3,9 @@ $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $nightly = Join-Path $repo 'scripts\vps\vps-nightly-backup.ps1'
 $restore = Join-Path $repo 'scripts\vps\Restore-Backup.ps1'
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the nightly backup and its restore run only on the box, under Windows PowerShell 5.1, and this is not Windows'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 $root = Join-Path ([IO.Path]::GetTempPath()) ('tw-backup-stream-' + [Guid]::NewGuid().ToString('N'))
 [void][IO.Directory]::CreateDirectory($root)
 $utf8 = New-Object Text.UTF8Encoding($false)

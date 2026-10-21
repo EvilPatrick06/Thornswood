@@ -39,6 +39,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 . (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#498)
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
@@ -266,10 +267,10 @@ try {
 
     Write-Host ''
     Write-Host 'the launcher reads it'
-    $winps = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if (-not (Test-Path -LiteralPath $winps)) {
-        Yes 'Windows PowerShell is here to run the launcher half on the .NET Framework' $false
+    if (-not $OnWindows) {
+        Write-Host 'SKIP  the launcher half: it runs on the .NET Framework the launcher runs on, which only Windows has'
     } else {
+        $winps = Get-WindowsPowerShell
         $out = & $winps -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -Src $Src -ParseFeed $vf 2>&1
         $rc = $LASTEXITCODE
         $childPass = 0; $childFail = 0

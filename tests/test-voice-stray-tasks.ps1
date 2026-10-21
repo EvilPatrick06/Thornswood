@@ -78,7 +78,7 @@ Yes '  and StartIt runs it when it registers the task' ($start.Count -eq 1 -and 
 if ($fn.Count -ne 1) { Done }
 
 # ---- run, through Task Scheduler ----------------------------------------------
-$onWindows = [Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT
+. (Join-Path $PSScriptRoot 'Windows.ps1')   # $OnWindows (#2957)
 if (-not $onWindows) { Write-Host 'SKIP  the task part needs Windows and its Task Scheduler'; Done }
 Import-Module ScheduledTasks -ErrorAction SilentlyContinue
 if (-not (Get-Module ScheduledTasks)) { Write-Host 'SKIP  the ScheduledTasks module did not load'; Done }

@@ -86,11 +86,12 @@ $stop = Body "Head 'Stopping the servers'"
 $move = Body "Head 'Moving the old storage aside'"
 Yes 'the survey, the stop and the move are found in the script' ($survey -and $stop -and $move)
 
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 
 $T = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-2351-wipe-' + [Guid]::NewGuid().ToString('N'))
 $Root = Join-Path $T 'Thornswood-Server'

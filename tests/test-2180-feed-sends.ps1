@@ -26,7 +26,7 @@ function Yes([string]$what, [bool]$cond) {
 }
 function Put([string]$p, [string]$text) { [IO.File]::WriteAllText($p, $text, (New-Object Text.UTF8Encoding($false))) }
 function Threw([scriptblock]$b) { try { $null = & $b; return '' } catch { return $_.Exception.Message } }
-$onWindows = ($PSVersionTable.PSVersion.Major -lt 6) -or $IsWindows
+. (Join-Path $PSScriptRoot 'Windows.ps1')   # $OnWindows (#2957)
 
 $sample = Join-Path $repo 'tests\fixtures\feed-2180'
 $goodVersion = [IO.File]::ReadAllText((Join-Path $sample 'version.json'))

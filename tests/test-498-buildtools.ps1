@@ -67,27 +67,32 @@ Yes '  the header says why, with the decision and the 15 Oct measurement' ($boot
 
 # ---- the signature rule, run ---------------------------------------------------
 # The same two conditions as Bootstrap-VPS.ps1, against a file nobody signed.
-$plant = Join-Path ([IO.Path]::GetTempPath()) ('ts498-' + [guid]::NewGuid().ToString('N') + '.exe')
-try {
-    [IO.File]::WriteAllBytes($plant, [byte[]](0x4D, 0x5A, 0, 0))
-    $sig = Get-AuthenticodeSignature -LiteralPath $plant
-    $who = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' }
-    $refused = ("$($sig.Status)" -ne 'Valid' -or $who -notmatch '^CN=Microsoft Corporation,')
-    Yes "  an unsigned file is refused by that rule (status $($sig.Status))" $refused
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    if (Test-Path -LiteralPath $csc) {
-        # A Windows file is validly signed, but by "Microsoft Windows", not by
-        # "Microsoft Corporation" as the Visual Studio bootstrapper is. So a
-        # valid signature alone does not pass: the rule must read the signer.
-        $s2 = Get-AuthenticodeSignature -LiteralPath $csc
-        $w2 = if ($s2.SignerCertificate) { $s2.SignerCertificate.Subject } else { '' }
-        if ("$($s2.Status)" -eq 'Valid' -and $w2 -notmatch '^CN=Microsoft Corporation,') {
-            $r2 = ("$($s2.Status)" -ne 'Valid' -or $w2 -notmatch '^CN=Microsoft Corporation,')
-            Yes "  a validly signed file from another signer is refused too (csc.exe, '$($w2.Split(',')[0])')" $r2
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the signature rule, run: Authenticode signatures are read only on Windows'
+} else {
+    $plant = Join-Path ([IO.Path]::GetTempPath()) ('ts498-' + [guid]::NewGuid().ToString('N') + '.exe')
+    try {
+        [IO.File]::WriteAllBytes($plant, [byte[]](0x4D, 0x5A, 0, 0))
+        $sig = Get-AuthenticodeSignature -LiteralPath $plant
+        $who = if ($sig.SignerCertificate) { $sig.SignerCertificate.Subject } else { '' }
+        $refused = ("$($sig.Status)" -ne 'Valid' -or $who -notmatch '^CN=Microsoft Corporation,')
+        Yes "  an unsigned file is refused by that rule (status $($sig.Status))" $refused
+        $csc = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+        if (Test-Path -LiteralPath $csc) {
+            # A Windows file is validly signed, but by "Microsoft Windows", not by
+            # "Microsoft Corporation" as the Visual Studio bootstrapper is. So a
+            # valid signature alone does not pass: the rule must read the signer.
+            $s2 = Get-AuthenticodeSignature -LiteralPath $csc
+            $w2 = if ($s2.SignerCertificate) { $s2.SignerCertificate.Subject } else { '' }
+            if ("$($s2.Status)" -eq 'Valid' -and $w2 -notmatch '^CN=Microsoft Corporation,') {
+                $r2 = ("$($s2.Status)" -ne 'Valid' -or $w2 -notmatch '^CN=Microsoft Corporation,')
+                Yes "  a validly signed file from another signer is refused too (csc.exe, '$($w2.Split(',')[0])')" $r2
+            }
         }
+    } finally {
+        Remove-Item -LiteralPath $plant -Force -ErrorAction SilentlyContinue
     }
-} finally {
-    Remove-Item -LiteralPath $plant -Force -ErrorAction SilentlyContinue
 }
 
 # ---- 2. Install-Runner.ps1's needs check --------------------------------------

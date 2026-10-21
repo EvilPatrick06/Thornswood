@@ -43,8 +43,12 @@ if ($start -lt 0 -or $end -le $start) {
 }
 $lines = $text.Substring($start, $end + $endMark.Length - $start)
 
-$shell = (Get-Command powershell.exe -EA SilentlyContinue).Source
-if (-not $shell) { $shell = (Get-Process -Id $PID).Path }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $shell = Get-WindowsPowerShell }
+else {
+    $shell = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 
 $scratch = Join-Path ([System.IO.Path]::GetTempPath()) ('ts-docs-public-' + [guid]::NewGuid().ToString('N'))
 try {

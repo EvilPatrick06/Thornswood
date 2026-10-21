@@ -22,6 +22,8 @@
 $env:THORNSWOOD_HARNESS = '1'
 $ErrorActionPreference = 'Stop'
 $Repo = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the stand-in program is built with the .NET Framework csc, and what it proves is how Windows PowerShell 5.1 takes stderr, so this runs only on Windows'; exit 0 }
 $Shell = (Get-Process -Id $PID).Path
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -32,8 +34,8 @@ $T = Join-Path ([IO.Path]::GetTempPath()) ('ts-native-' + [Guid]::NewGuid().ToSt
 $keep = @{ OUT = $env:STUB_OUT; ERR = $env:STUB_ERR; CODE = $env:STUB_CODE; PATH = $env:Path }
 function Stub([string]$out, [string]$err, [int]$code) { $env:STUB_OUT = $out; $env:STUB_ERR = $err; $env:STUB_CODE = [string]$code }
 try {
-    $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
-    if (-not (Test-Path -LiteralPath $csc)) { $csc = Join-Path $env:WINDIR 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
+    $csc = Get-WindowsPath 'Microsoft.NET\Framework64\v4.0.30319\csc.exe'
+    if (-not (Test-Path -LiteralPath $csc)) { $csc = Get-WindowsPath 'Microsoft.NET\Framework\v4.0.30319\csc.exe' }
     $src = Join-Path $T 'stub.cs'
     [IO.File]::WriteAllText($src, @"
 using System;

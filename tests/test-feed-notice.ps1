@@ -53,17 +53,12 @@ $Here = Split-Path -Parent $Here
 if (-not $AppDir) { $AppDir = Join-Path $Here 'launcher\app' }
 if (-not $Xaml) { $Xaml = Join-Path $Here 'launcher\ui.xaml' }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  this runs the launcher''s code on the .NET Framework the launcher runs on, which only Windows has'; exit 0 }
 # The launcher's compiler and serializer are the .NET Framework's, so the
 # answer has to come from there and not from .NET under pwsh.
 if ($PSVersionTable.PSEdition -eq 'Core') {
-    $wp = $null
-    if ($env:WINDIR) { $wp = Join-Path $env:WINDIR 'System32\WindowsPowerShell\v1.0\powershell.exe' }
-    if (-not $wp -or -not (Test-Path -LiteralPath $wp)) {
-        Write-Host 'FAIL  Windows PowerShell is not on this machine, so the launcher''s own compiler cannot be asked'
-        Write-Host ''
-        Write-Host '0 passed, 1 failed'
-        exit 1
-    }
+    $wp = Get-WindowsPowerShell
     & $wp -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath -AppDir $AppDir -Xaml $Xaml
     exit $LASTEXITCODE
 }

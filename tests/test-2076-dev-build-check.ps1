@@ -68,8 +68,12 @@ Yes '  and the commit check runs before the record is read' ($built -gt 0 -and $
 # standing in for the server root.
 . (Join-Path $repo 'scripts\deploy\ServerContent.ps1')
 . (Join-Path $repo 'scripts\deploy\ServerSettings.ps1')
-$winPs = 'powershell'
-if (-not (Get-Command powershell -ErrorAction SilentlyContinue)) { $winPs = 'pwsh' }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $winPs = Get-WindowsPowerShell }
+else {
+    $winPs = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 function On-Box([string]$text) {
   $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
   return @(& $winPs -NoProfile -NonInteractive -EncodedCommand $e 2>&1 | ForEach-Object { "$_".Trim() })

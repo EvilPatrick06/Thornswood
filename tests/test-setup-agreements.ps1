@@ -40,10 +40,12 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root) { $Root = Split-Path -Parent $Here }
 
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the setup program''s agreement pages are WPF, which only Windows has'; exit 0 }
 if ([Threading.Thread]::CurrentThread.GetApartmentState() -ne 'STA' -or $PSVersionTable.PSEdition -eq 'Core') {
     $args2 = @('-NoProfile', '-STA', '-ExecutionPolicy', 'Bypass', '-File', $MyInvocation.MyCommand.Path, '-Root', $Root)
     if ($Live) { $args2 += '-Live' }
-    & powershell.exe @args2
+    & (Get-WindowsPowerShell) @args2
     exit $LASTEXITCODE
 }
 

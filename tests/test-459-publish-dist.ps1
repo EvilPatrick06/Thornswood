@@ -112,9 +112,13 @@ try {
 
     # ---- 1. no -Dist, from the fresh checkout -----------------------------------------------
     $shells = @([pscustomobject]@{ Name = 'PowerShell 7'; Path = (Get-Process -Id $PID).Path })
-    $ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-    if ($env:SystemRoot -and (Test-Path -LiteralPath $ps51) -and $shells[0].Path -ne $ps51) { $shells += [pscustomobject]@{ Name = 'Windows PowerShell 5.1'; Path = $ps51 } }
-    elseif ($shells[0].Path -eq $ps51) { $shells[0].Name = 'Windows PowerShell 5.1' }
+    . (Join-Path $PSScriptRoot 'Windows.ps1')
+    if (-not $OnWindows) { Write-Host 'SKIP  the same under Windows PowerShell 5.1: this is not Windows, which is the only place 5.1 runs' }
+    else {
+        $ps51 = Get-WindowsPowerShell
+        if ($shells[0].Path -ne $ps51) { $shells += [pscustomobject]@{ Name = 'Windows PowerShell 5.1'; Path = $ps51 } }
+        else { $shells[0].Name = 'Windows PowerShell 5.1' }
+    }
     foreach ($sh in $shells) {
         Write-Host ''; Write-Host ("no -Dist, from the fresh checkout, under {0}" -f $sh.Name)
         $r = Run $sh.Path @()
