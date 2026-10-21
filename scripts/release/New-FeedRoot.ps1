@@ -19,6 +19,12 @@
   ships, the same way. Nothing of the collection's is in the folder, so the
   publish carries the last release's plugin list (Publish-Update -FromFeed).
 
+  The six client files are then held to records\client-build.json rather
+  than to the last release (#2983): a file the release carried at another
+  build is taken from the site by the sha256 the record names, from this
+  channel's assets or else the other channel's, so main can carry the client
+  a dev Ship already put on the site without an engine build here.
+
   It also writes <Root>\config.json from the feed's own server, voice and site
   fields, so the publish writes them back as they are: only a Ship from One
   moves a server.
@@ -26,7 +32,8 @@
   WHAT IT REFUSES
     - a feed that names no record, or a record whose files are not all on the
       site (no :record:files): a collection Ship from One sends them first;
-    - any file that does not hash to the name the record gives it.
+    - any file that does not hash to the name the record gives it;
+    - a recorded client file that is on neither feed's assets.
   A file already in the folder with the right bytes is not fetched again, and
   anything in Game the record does not name is removed first, so the folder
   is the record and nothing older.
@@ -45,7 +52,9 @@ param(
     [string]$Root,
     [string]$SiteUrl = 'https://thornswood.net',
     # A folder standing in for the site's root on the VPS. Tests only.
-    [string]$SiteDir
+    [string]$SiteDir,
+    # The client record to stage. records\client-build.json unless given.
+    [string]$ClientRecord
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
@@ -73,10 +82,32 @@ if (-not $map.ContainsKey($RecordFilesKey)) {
 $files = @($map.Keys | Where-Object { -not $_.StartsWith(':') } | Sort-Object)
 Say ("{0} release {1}: {2} files" -f $Channel, [string]$ptr.id, $files.Count) 'Cyan'
 
+# ---- the client this checkout records (#2983)
+# Ship holds the six client files to records\client-build.json, which a
+# rebuild on One or the box moves ahead of the channel's last release: on
+# 21 Oct main's last release carried 20083278 while the record named bf2b3b40.
+# A machine with no engine build cannot make them, but the dev Ship that
+# first carried that client put each file on the site by its sha256. So these
+# six are held to the client record, not the release's: each is taken from
+# this channel's assets, else the other channel's, by the sha256 the record
+# names. A client on neither feed is refused: Build-Engine on One or the box
+# makes it, and the dev Ship from there puts it on the site.
+$clientFile = if ($ClientRecord) { $ClientRecord } else { Join-Path $PSScriptRoot '..\..\records\client-build.json' }
+$client = @{}
+$clientCommit = ''
+if (Test-Path -LiteralPath $clientFile -PathType Leaf) {
+    $cb = ConvertFrom-ThornswoodJson ([IO.File]::ReadAllText($clientFile)) $clientFile
+    $clientCommit = [string]$cb.forkCommit
+    foreach ($p in @($cb.files.PSObject.Properties)) {
+        $client[$p.Name] = [pscustomobject]@{ Bytes = [int64]$p.Value.bytes; Sha = ([string]$p.Value.sha256).ToLowerInvariant() }
+    }
+}
+
 # ---- nothing in Game the record does not name
 if (-not (Test-Path -LiteralPath $game)) { New-Item -ItemType Directory -Force -Path $game | Out-Null }
 $named = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
 foreach ($k in $files) { [void]$named.Add($k) }
+foreach ($k in $client.Keys) { [void]$named.Add($k) }
 $listed = (Get-Item -LiteralPath $game).FullName
 $sep = [string][IO.Path]::DirectorySeparatorChar
 $prefix = $listed.TrimEnd($sep) + $sep
@@ -91,6 +122,7 @@ if ($dropped) { Say "  $dropped file(s) in the folder that this release does not
 # ---- each file by its sha256
 $fetched = 0; $kept = 0; $bytes = [int64]0
 foreach ($k in $files) {
+    if ($client.ContainsKey($k)) { continue }
     $m = [regex]::Match([string]$map[$k], '^(\d+):([0-9a-fA-F]{64})$')
     if (-not $m.Success) { throw "The record names $k as '$([string]$map[$k])', not a size and a sha256, so it cannot be fetched." }
     $sha = $m.Groups[2].Value.ToLowerInvariant()
@@ -102,6 +134,35 @@ foreach ($k in $files) {
     $bytes += [int64]$m.Groups[1].Value
 }
 Say ("  {0} fetched ({1:N1} MB), {2} already here with the same bytes" -f $fetched, ($bytes / 1MB), $kept) 'Green'
+
+# ---- the recorded client, from the site
+if ($client.Count) {
+    $prefixes = @((Get-FeedStorePrefix $Channel), (Get-FeedStorePrefix $(if ($Channel -eq 'dev') { 'main' } else { 'dev' })))
+    $inPlace = 0; $taken = @()
+    foreach ($k in @($client.Keys | Sort-Object)) {
+        $c = $client[$k]
+        $dest = Join-Path $game $k
+        if ((Test-Path -LiteralPath $dest -PathType Leaf) -and (Get-BaselineEntry $dest) -eq ('{0}:{1}' -f $c.Bytes, $c.Sha)) { $inPlace++; continue }
+        $why = @()
+        foreach ($pre in $prefixes) {
+            try {
+                [void](Get-FeedAssetFile ("$SiteUrl/$pre/assets/" + $c.Sha) $c.Sha $dest $sd $SiteUrl)
+                $taken += "$k from /$pre"
+                $why = $null
+                break
+            } catch { $why += $_.Exception.Message }
+        }
+        if ($null -ne $why) {
+            throw ("The client this checkout records ($clientCommit) has $k on neither feed, so it cannot be staged: " + ($why -join ' ') + ' Build it with Build-Engine.ps1 on One or the box, and Ship dev from there.')
+        }
+    }
+    if ($taken.Count) {
+        Say ("  client {0}: {1} already the recorded build, {2} taken from the site" -f $clientCommit, $inPlace, $taken.Count) 'Green'
+        foreach ($t in $taken) { Say "    $t" 'DarkGray' }
+    } else {
+        Say ("  client {0}: all {1} files are the recorded build" -f $clientCommit, $inPlace) 'DarkGray'
+    }
+}
 
 # ---- the feed's own server, voice and site fields, as config.json names them
 $cfg = [ordered]@{}
