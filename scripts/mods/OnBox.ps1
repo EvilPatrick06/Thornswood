@@ -178,9 +178,10 @@ foreach (`$c in `$changed) { 'CHANGED ' + `$c }
 #     is a run still going, and is left alone. No age and no time limit decide
 #     it: only whether the process that owns the folder is still there.
 #
-# Removing takes the lock alone (FileShare None) and lets it go deleted
-# (DeleteOnClose), so the run and its keeper, and two runs sweeping at once,
-# never remove a folder another holds. Lines out: GONE <folder>, HELD
+# Removing takes the lock alone (shared for deleting only, so it can delete
+# the lock while it holds it; Windows lets the file go when the handle
+# closes), so the run and its keeper, and two runs sweeping at once, never
+# remove a folder another holds. Lines out: GONE <folder>, HELD
 # <folder>: why (still in use), LEFT <folder>: why (could not be removed),
 # and MADE <folder> once this run's own is there. Each is written and flushed
 # as it happens, because Run-OnBox.ps1 waits for MADE while this waits for
@@ -194,13 +195,11 @@ function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Ru
 `$top = Split-Path -Parent `$run
 function Say([string]`$l) { [Console]::Out.WriteLine(`$l); [Console]::Out.Flush() }
 function Drop([string]`$d) {
-  # Typed: as a bare string, 'DeleteOnClose' picks the overload whose last
-  # word is useAsync, and the lock is never deleted (measured on Windows
-  # PowerShell 5.1, 21 Oct 2026).
-  try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'None', 1, ([IO.FileOptions]::DeleteOnClose)) }
+  try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'Delete') }
   catch { Say ('HELD ' + `$d + ': ' + `$_.Exception.GetBaseException().Message); return }
   try {
     if (Test-Path -LiteralPath `$d) { Remove-Item -LiteralPath `$d -Recurse -Force }
+    [IO.File]::Delete(`$d + '.lock')
     Say ('GONE ' + `$d)
   } catch { Say ('LEFT ' + `$d + ': ' + `$_.Exception.Message) } finally { `$h.Dispose() }
 }

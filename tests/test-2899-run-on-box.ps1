@@ -214,6 +214,8 @@ function Start-Keeper([string]$Run) {
         $said += $l.Trim()
         if ($l.Trim() -like 'MADE *') { break }
     }
+    # What it said, so a red check here names its cause in the log.
+    foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
     return [pscustomobject]@{ P = $p; Said = $said }
 }
 function Stop-Keeper($k) {
@@ -221,6 +223,7 @@ function Stop-Keeper($k) {
     $said = @()
     while ($null -ne ($l = Read-KeeperLine $k.P)) { if ($l.Trim()) { $said += $l.Trim() } }
     $k.P.WaitForExit()
+    foreach ($l in $said) { Write-Host ('  keeper: ' + $l) }
     return $said
 }
 $py = Get-Command py -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
