@@ -66,8 +66,8 @@ function Die($m) {
 # answer to it joined every line into one (so ^FAILED never matched) and, with
 # no switches, replaced the logs folder with that text (issue #2061).
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes on ssh's standard input
-  # (nothing of it is left on the box), and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 

@@ -381,8 +381,8 @@ Send-ThornswoodArtifact -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh
 }
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes on ssh's standard input
-  # (nothing of it is left on the box), and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 
@@ -564,12 +564,12 @@ if ($LoadOrder) {
   # dev server's own order needs no list: it stays as it is.
   # The list goes inside the settings block below that reads it, as base64 of
   # its UTF-8 so no name can break the quoting, and so it reaches the box the
-  # way that block does: on ssh's standard input when it is long
-  # (Send-Script.ps1). Until 21 Oct 2026 (#3035) it went up as a file of its
-  # own in C:\Windows\Temp, because a block that long on a command line was
-  # cut short, and a deploy that stopped between the copy and the block that
-  # removed it left the file there for good. Nothing of it is written on the
-  # box now: the dev settings file is edited in place here rather than
+  # way that block does (Send-Script.ps1: when it is long, by scp, and its
+  # run deletes the copy before it runs, #3059). Until 21 Oct 2026 (#3035) it
+  # went up as a file of its own in C:\Windows\Temp, because a block that long
+  # on a command line was cut short, and a deploy that stopped between the
+  # copy and the block that removed it left the file there for good. Nothing
+  # of it stays on the box now: the dev settings file is edited in place here rather than
   # written from a local build, which is the rule this script is built on.
   if ($Dist -or $orderMoved) {
     $orderWire = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($pluginNames -join "`n"))

@@ -224,10 +224,15 @@ $in = @($input | ForEach-Object { [string]$_ })
 $all = $args -join ' '
 $text = $all
 if ($all -match '-EncodedCommand (\S+)') { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1])) }
-# A script over the command line's limit comes on standard input under a
-# short reader (Send-Script.ps1, #3027), so the stand-in reads it there.
-if ($text -match '\[Console\]::In\.ReadLine\(\)' -and $in.Count) { $text = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
-if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/)(server-.+)$') {
+# A script over the command line's limit goes by scp to a copy of its own,
+# which a short runner on the command line takes off the box and runs
+# (Send-Script.ps1, #3059), so the stand-in keeps the copy and reads it there.
+if ($text -match "^\`$ThornswoodRunFile = 'C:\\Windows\\Temp\\(thornswood-remote-[0-9a-f]{32}\.ps1)'") {
+    $copy = Join-Path $env:TS_PUB_STORE $Matches[1]
+    $text = [IO.File]::ReadAllText($copy)
+    Remove-Item -LiteralPath $copy -Force
+}
+if ('NAME' -eq 'scp' -and $args.Count -ge 2 -and [string]$args[-1] -match '(?:Thornswood-Deploys/server/|C:/Windows/Temp/)((server-|thornswood-remote-).+)$') {
     Copy-Item -LiteralPath ([string]$args[-2]) -Destination (Join-Path $env:TS_PUB_STORE $Matches[1]) -Force
 }
 'INSTALL OK'
