@@ -21,9 +21,14 @@
        (Get-CheckoutRows, lifted out of the script), with that line as the
        fix; and READY once it is closed.
     3. Update-Checkout.ps1 -Check says what it would move and moves nothing;
-       a run moves the clone and engine/skymp to the pin, sets
-       submodule.recurse, and leaves Ship nothing to refuse.
-    4. After that, the next pin move done by hand takes engine/skymp along.
+       a run moves the clone and engine/skymp to the pin, writes no git
+       config, and leaves Ship nothing to refuse.
+    4. Issue #3046: a worktree of that clone that never fetched engine/skymp
+       still moves across a pin move with a plain git checkout. #2987 set
+       submodule.recurse in the config every worktree reads, and on One that
+       checkout stopped half moved. Update-Checkout run in such a worktree
+       leaves the submodule alone. A move by hand in the clone itself leaves
+       engine/skymp behind, Ship names it, and Update-Checkout takes it on.
     5. A detached clone behind main is told Update-Checkout.ps1, not git pull,
        which has no branch to move there.
     6. It refuses, moving nothing, whenever a move would leave something
@@ -98,6 +103,13 @@ function Pin([string]$seed, [string]$sha, [string]$msg) {
     $null = G $seed push -q origin main
     return (Rev $seed)
 }
+# Whether any config git reads in that checkout sets submodule.recurse.
+function Recurse([string]$dir) {
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $null = & git -C $dir config --get-all submodule.recurse 2>&1
+    $c = $LASTEXITCODE; $ErrorActionPreference = $old
+    return ($c -eq 0)
+}
 function Status([string]$dir) { return @(G $dir status --porcelain --untracked-files=no | Where-Object { $_ }) }
 
 # Update-Checkout.ps1 run whole, as One runs it: Windows PowerShell 5.1 on
@@ -170,24 +182,44 @@ try {
     # ---- 3. Update-Checkout ----
     $r = Run $one @('-Check')
     Yes "3. -Check exits 2 when a run would move something (exit $($r.Code))" ($r.Code -eq 2)
-    Yes '3. and says engine/skymp would go to its pin, and the config' ($r.Out -match ('engine/skymp from ' + (Short $s1) + ' to the ' + (Short $s2)) -and $r.Out -match 'submodule\.recurse')
+    Yes '3. and says engine/skymp would go to its pin' ($r.Out -match ('engine/skymp from ' + (Short $s1) + ' to the ' + (Short $s2)))
     Yes '3. and moved nothing' ((Rev (Join-Path $one 'engine\skymp')) -eq $s1 -and @(Status $one).Count -eq 1)
     $r = Run $one
     Yes "3. a run exits 0 (exit $($r.Code))" ($r.Code -eq 0)
     if ($r.Code -ne 0) { Write-Host $r.Out }
     Yes '3. engine/skymp is at the pin and nothing is changed' ((Rev (Join-Path $one 'engine\skymp')) -eq $s2 -and @(Status $one).Count -eq 0 -and (Rev $one) -eq $t2)
-    Yes '3. submodule.recurse is true in the clone''s config' (([string]@(G $one config --local --get submodule.recurse)[0]).Trim() -eq 'true')
+    Yes '3. it writes no submodule.recurse, which every worktree would read (#3046)' (-not (Recurse $one))
     Yes '3. it ends on what Ship takes' ($r.Out -match 'checkout is origin/main at .*, clean, as Ship takes it')
     $d = DevRows $one
     Yes '3. and Check-ShipReady -Channel dev is READY' ($d.State.Ok -and $d.Verdict.Ready)
     $r = Run $one @('-Check')
     Yes "3. -Check then exits 0, nothing to move (exit $($r.Code))" ($r.Code -eq 0 -and $r.Out -match 'Nothing to move')
 
-    # ---- 4. the next pin move, by hand ----
+    # ---- 4. a worktree that never fetched engine/skymp, across a pin move ----
+    $wt = Join-Path $one 'worktrees\claude-releases'
+    $null = G $one worktree add -q --detach $wt $t2
+    Yes '4. the worktree has engine/skymp unfetched, as git worktree add leaves it' (-not (Test-Path -LiteralPath (Join-Path $wt 'engine\skymp\.git')))
     $t3 = Pin $seed $s3 'pin three'
+    $null = G $wt fetch -q origin
+    $o = ''; $c = 0
+    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    $o = & git -C $wt checkout -q --detach origin/main 2>&1 | Out-String; $c = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    $wtDir = ([string]@(G $wt rev-parse --absolute-git-dir)[0]).Trim()
+    Yes "4. a plain git checkout there moves across the pin move (exit $c) $($o.Trim())" ($c -eq 0 -and (Rev $wt) -eq $t3 -and @(Status $wt).Count -eq 0)
+    Yes '4. and leaves no modules folder or gitlink behind, as #3046 found on One' (
+        -not (Test-Path -LiteralPath (Join-Path $wtDir 'modules')) -and -not (Test-Path -LiteralPath (Join-Path $wt 'engine\skymp\.git')))
+    $r = Run $wt
+    Yes "4. Update-Checkout run in that worktree leaves engine/skymp unfetched (exit $($r.Code))" (
+        $r.Code -eq 0 -and $r.Out -match 'engine/skymp is not fetched in this checkout' -and -not (Test-Path -LiteralPath (Join-Path $wt 'engine\skymp\.git')) -and -not (Recurse $wt))
+    $null = G $one worktree remove --force $wt
+
     $null = G $one fetch -q origin
     $null = G $one checkout -q --detach origin/main
-    Yes '4. with the config set, a bare checkout by hand takes engine/skymp to the new pin' ((Rev $one) -eq $t3 -and (Rev (Join-Path $one 'engine\skymp')) -eq $s3 -and @(Status $one).Count -eq 0)
+    Yes '4. in the clone a move by hand leaves engine/skymp behind again' ((Rev $one) -eq $t3 -and (Rev (Join-Path $one 'engine\skymp')) -eq $s2 -and @(Status $one).Count -eq 1)
+    Yes '4. which Ship names, with Update-Checkout as the fix' ((DevRows $one).State.Fix -eq '.\scripts\release\Update-Checkout.ps1')
+    $r = Run $one
+    Yes "4. and Update-Checkout takes it to the new pin (exit $($r.Code))" ($r.Code -eq 0 -and (Rev (Join-Path $one 'engine\skymp')) -eq $s3 -and @(Status $one).Count -eq 0)
 
     # ---- 5. behind, detached ----
     $t4 = Commit $seed 'notes.txt'; $null = G $seed push -q origin main
