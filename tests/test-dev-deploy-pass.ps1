@@ -73,7 +73,7 @@ function Run-Block([string]$value, $settings) {
     $farOrder = ''
     $remotePlugins = 'C:/nowhere'
     $fullIndexDef = $script:fullIndexDef
-    $lightTable = ''
+    $lightDef = ''
     $devRecordLight = $false
     $VoicePort = 7789
     $maxOnline = 0

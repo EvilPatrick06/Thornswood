@@ -165,7 +165,7 @@ if ($dStart -ge 0 -and $dOpen -gt $dStart -and $dClose -gt $dOpen) {
     function Run-DevBlock {
         $rootWin = $box; $farOrder = ''; $remotePlugins = 'C:/nowhere'; $VoicePort = 7789
         $fullIndexDef = $script:fullIndexDef
-        $lightTable = ''
+        $lightDef = ''
         $devRecordLight = $false
         $maxOnline = 0; $LoadOrderRefuse = ''; $RequirePass = ''; $Npcs = ''
         $file = Join-Path $tmp 'dev-block.ps1'

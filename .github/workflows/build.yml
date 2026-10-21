@@ -816,7 +816,7 @@ jobs:
                  'test-dev-settings-keys.ps1', 'test-dev-start-point-light.ps1',
                  'test-dev-gamemode-notes.ps1',
                  'test-2076-dev-build-check.ps1',
-                 'test-2308-content-before-ship.ps1',
+                 'test-2308-content-before-ship.ps1', 'test-2947-chargen-box-light.ps1',
                  'test-1050-news-out.ps1',
                  'test-1050-feed-compact.ps1',
                  'test-1050-feed-split.ps1', 'test-1050-feed-split.js',

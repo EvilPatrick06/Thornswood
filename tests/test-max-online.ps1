@@ -289,7 +289,7 @@ if ($open -ge 0 -and $close -gt $marker) {
         $farOrder = ''
         $remotePlugins = 'C:/Thornswood-Server-Dev/plugins'
         $fullIndexDef = $script:fullIndexDef
-        $lightTable = ''
+        $lightDef = ''
         $devRecordLight = $false
         $VoicePort = 7789
         return & ([scriptblock]::Create('@"' + "`n" + $body + "`n" + '"@'))
