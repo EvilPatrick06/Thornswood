@@ -140,7 +140,7 @@ half minutes.
 
 ### Backups
 
-The nightly backup runs at 3:15 AM by the box's clock (`Install-Backup.ps1:$At = '03:15'`)
+The nightly backup runs at 08:15 UTC, 2:15 AM by the box's clock in summer and 1:15 AM in winter (`Install-Backup.ps1:$At = '08:15Z'`), 45 minutes before the nightly checks (#3187),
 and keeps seven daily and four weekly (`vps-nightly-backup.ps1:$KeepDaily = 7`, `vps-nightly-backup.ps1:$KeepWeekly = 4`). What it
 takes is in `docs/SYSTEM.md`. On One, `Thornswood Fetch Backups` brings each
 one down at 4:15 AM, checks each copy opens, and writes the name of the
