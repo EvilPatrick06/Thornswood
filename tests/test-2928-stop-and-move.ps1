@@ -153,15 +153,15 @@ foreach ($c in @(
         $plain.IndexOf('Stop-ThornswoodProcessHeld') -gt $plain.IndexOf('Stop-ScheduledTask'))
 }
 $voice = Text (P 'scripts', 'deploy', 'Install-Voice.ps1')
-Yes 'voice''s install sends its StopIt in front of the swap, which carries StopAndMove.ps1' ($voice.Contains('Remote ($vars + $voiceTools + $remote + $serviceSwapBlock)'))
-Yes 'voice''s -TaskOnly run sends StopAndMove.ps1 in front of its StopIt too' ($voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock)'))
+Yes 'voice''s install sends its StopIt in front of the swap, which carries StopAndMove.ps1' ($voice.Contains('Remote (@($vars, $voiceTools, $remote, $serviceSwapBlock) -join "`r`n")'))
+Yes 'voice''s -TaskOnly run sends StopAndMove.ps1 in front of its StopIt too' ($voice.Contains('Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $remote, $taskOnlyBlock) -join "`r`n")'))
 # Issue #2952: -Restart was Stop-ScheduledTask, a second's sleep and
 # Start-ScheduledTask, and -Remove took the folder away the same instant.
 # Stop-ScheduledTask returns before voice has exited (measured on dev voice,
 # 21 Oct: 63 ms, all four processes still running and node on the port).
 Yes 'voice''s -Restart and -Remove send StopAndMove.ps1 in front of its StopIt' (
-    $voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock)') -and
-    $voice.Contains('Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock)'))
+    $voice.Contains('Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $restartBlock) -join "`r`n")') -and
+    $voice.Contains('Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $removeBlock) -join "`r`n")'))
 foreach ($b in @(@{ Name = '-Restart'; Var = 'restartBlock'; Then = 'StartIt' }, @{ Name = '-Remove'; Var = 'removeBlock'; Then = 'Unregister-ScheduledTask' })) {
     $s = [regex]::Match($voice, '(?ms)^\$' + $b.Var + ' = @"\r?\n(.*?)^"@').Groups[1].Value.Replace('`', '')
     Yes ('voice''s ' + $b.Name + ' stops through StopIt, starts or takes away nothing until StoppedAll says it has all exited, and sleeps nowhere') (

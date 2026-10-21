@@ -910,7 +910,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$removeOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $removeBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$removeOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $removeBlock) -join \"`r`n\") | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "stops voice, waits for it to exit, and takes its task, firewall rule and folder away (-Remove)",
                       "class":  "admin",
                       "reason":  "task and firewall change"
@@ -919,7 +919,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$restartOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $restartBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$restartOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $restartBlock) -join \"`r`n\") | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "stops voice, waits for it to exit, and starts it again under the task it has (-Restart)",
                       "class":  "admin",
                       "reason":  "opens and ends voice\u0027s processes and waits for them to exit, which task rights alone cannot (#2952)"
@@ -973,7 +973,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$taskOut = @(Remote ($vars + $ThornswoodStopAndMoveText + $voiceTools + $remote + $taskOnlyBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$taskOut = @(Remote (@($vars, $ThornswoodStopAndMoveText, $voiceTools, $remote, $taskOnlyBlock) -join \"`r`n\") | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "registers the voice task again and restarts voice under it (-TaskOnly)",
                       "class":  "admin",
                       "reason":  "task registration is install-time work outside the gate verbs"
@@ -982,7 +982,7 @@
                       "script":  "scripts/deploy/Install-Voice.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$swapOut = @(Remote ($vars + $voiceTools + $remote + $serviceSwapBlock) | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
+                      "anchor":  "$swapOut = @(Remote (@($vars, $voiceTools, $remote, $serviceSwapBlock) -join \"`r`n\") | ForEach-Object { Say \"  $_\"; \"$_\".Trim() })",
                       "does":  "installs voice: task, firewall, process stop",
                       "class":  "admin",
                       "reason":  "Register-ScheduledTask and NetFirewall"
