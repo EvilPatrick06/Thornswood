@@ -192,8 +192,8 @@ try {
     $changed = @()
     $exit = $null
     foreach ($l in $lines) {
-        if ($l -match '^CHANGED (.+)$') { $changed += $Matches[1].Trim(); continue }
-        if ($l -match '^EXIT (-?\d+)\s*$') { $exit = [int]$Matches[1]; continue }
+        if ($l -cmatch '^CHANGED (.+)$') { $changed += $Matches[1].Trim(); continue }
+        if ($l -cmatch '^EXIT (-?\d+)\s*$') { $exit = [int]$Matches[1]; continue }
         Write-Host $l
     }
     if ($null -eq $exit) { throw 'the box did not say how the tool ended, so nothing was brought back.' }
