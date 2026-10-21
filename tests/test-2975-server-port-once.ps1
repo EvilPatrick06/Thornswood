@@ -90,7 +90,8 @@ function Lift([string]$file, [string]$fromText, [string]$toText) {
     $tokens = $null; $errors = $null
     $null = [System.Management.Automation.Language.Parser]::ParseFile($path, [ref]$tokens, [ref]$errors)
     Yes "$file parses" (-not $errors.Count)
-    $text = Get-Content -LiteralPath $path -Raw
+    # A Windows checkout has CRLF line ends, and the markers are written with LF.
+    $text = (Get-Content -LiteralPath $path -Raw).Replace("`r`n", "`n")
     $from = $text.IndexOf($fromText)
     $to = $text.IndexOf($toText, [Math]::Max($from, 0))
     Yes '  its check from here is there' ($from -gt 0 -and $to -gt $from)
