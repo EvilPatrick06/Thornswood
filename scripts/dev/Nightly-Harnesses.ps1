@@ -44,6 +44,17 @@
   the summary is always printed. The cure for that line is another share in
   nightly.yml, not a longer budget.
 
+  NAMED HARNESSES ON DEMAND (#2970). .github/workflows/harnesses.yml runs
+  the harnesses somebody names, on the same Windows runners and the same
+  way, so a harness that needs Windows PowerShell is run from a cloud
+  session by dispatching that workflow, with no login on the box:
+
+      .\scripts\dev\Nightly-Harnesses.ps1 -Only 'test-deploy-swaps.ps1 voice/test-most.js'
+
+  -Only takes the names as the nightly prints them, split by spaces or
+  commas, and runs those in place of a share. A name that is no harness here
+  is refused before anything runs (exit 2), so a typo is never a green run.
+
   tests\test-nightly-harnesses.ps1 runs this against stand-in harnesses.
 
 .PARAMETER Shard
@@ -56,6 +67,11 @@
   How long this may take in all. A harness starts only when the time used so
   far plus its clock is no more than this. nightly.yml gives 2400 seconds of a
   45 minute job.
+
+.PARAMETER Only
+  Harness names to run in place of a share, split by spaces or commas
+  (test-x.ps1, test-y.js, voice/test-z.js). Every one must be a harness
+  here, or nothing runs and the exit is 2.
 
 .PARAMETER Root
   The repository whose harnesses run. The one this script is in, unless a
@@ -70,6 +86,7 @@ param(
     [int]$Shard = 1,
     [int]$Of = 1,
     [int]$BudgetSeconds = 2400,
+    [string]$Only = '',
     [string]$Root = '',
     [string]$OutDir = ''
 )
@@ -148,8 +165,16 @@ if (Test-Path -LiteralPath $voice) {
     $every += @(Get-ChildItem -LiteralPath $voice -Filter 'test-*.js' -File | Sort-Object Name |
                 ForEach-Object { [pscustomobject]@{ Name = 'voice/' + $_.Name; File = $_ } })
 }
-$mine = @(for ($i = 0; $i -lt $every.Count; $i++) { if (($i % $Of) -eq ($Shard - 1)) { $every[$i] } })
-Write-Host ("share {0} of {1}: {2} of the {3} harnesses, {4} s to run them in" -f $Shard, $Of, $mine.Count, $every.Count, $BudgetSeconds)
+if ($Only.Trim()) {
+    $asked = @($Only -split '[\s,]+' | Where-Object { $_ } | Select-Object -Unique)
+    $unknown = @($asked | Where-Object { $n = $_; -not @($every | Where-Object { $_.Name -eq $n }).Count })
+    if ($unknown.Count) { Write-Host ("::error::no such harness here, so nothing was run: " + ($unknown -join ', ')); exit 2 }
+    $mine = @($every | Where-Object { $asked -contains $_.Name })
+    Write-Host ("the {0} harness(es) asked for, of the {1}, {2} s to run them in: {3}" -f $mine.Count, $every.Count, $BudgetSeconds, (@($mine | ForEach-Object { $_.Name }) -join ', '))
+} else {
+    $mine = @(for ($i = 0; $i -lt $every.Count; $i++) { if (($i % $Of) -eq ($Shard - 1)) { $every[$i] } })
+    Write-Host ("share {0} of {1}: {2} of the {3} harnesses, {4} s to run them in" -f $Shard, $Of, $mine.Count, $every.Count, $BudgetSeconds)
+}
 
 $clockAll = [Diagnostics.Stopwatch]::StartNew()
 $results = @()
@@ -171,7 +196,8 @@ Write-Host ('slowest: ' + ((@($results | Sort-Object Secs -Descending | Select-O
 Write-Host ('all of them, added up: {0}s, in {1}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum), [Math]::Round($clockAll.Elapsed.TotalSeconds))
 if ($notRun.Count) {
     Write-Host ''
-    Write-Host ("{0} harness(es) not run, out of this share's {1} s; nightly.yml needs another share: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', '))
+    if ($Only.Trim()) { Write-Host ("{0} harness(es) not run, out of the {1} s; name fewer in one run: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', ')) }
+    else { Write-Host ("{0} harness(es) not run, out of this share's {1} s; nightly.yml needs another share: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', ')) }
 }
 if ($failed.Count) {
     Write-Host ''

@@ -20,7 +20,13 @@
        and the summary is still printed;
     4. nightly.yml runs it once for each share in its matrix, tells it how
        many shares the matrix has, keeps one share's failure from cancelling
-       the other, and gives it a budget inside the job's minutes.
+       the other, and gives it a budget inside the job's minutes;
+    5. -Only (#2970) runs the harnesses named, split by commas or spaces, and
+       no others, refuses a name that is no harness before anything runs,
+       and is red when a named one fails;
+    6. harnesses.yml starts only by dispatch, reads the repository and
+       nothing more, runs on the VPS runners, and hands the names to -Only
+       through the environment, never pasted into a script it runs.
 
   Writes only into a scratch folder under TEMP, which it removes.
 #>
@@ -119,6 +125,26 @@ try {
     $budget = $(if ($calls.Count) { [int]$calls[0].Groups[2].Value } else { 0 })
     Yes ("  with a budget ($budget s) that leaves room inside the job's $minutes minutes for the rest of it") ($budget -gt 0 -and $minutes -gt 0 -and $budget -le ($minutes * 60 - 180))
     Yes '  and the old inline harness loop is gone from the workflow' ($y -notmatch 'function Run-One' -and $y -notmatch 'function Kill-Left')
+
+    # ---- 5. named harnesses (-Only, #2970) -----------------------------------
+    $r = Run $a @('-Only', 'test-b.js, voice/test-v.js test-f.ps1')
+    Yes ("-Only runs the named harnesses and no others (" + ((@(Ran $r.Said) | Sort-Object) -join ', ') + ")") (((@(Ran $r.Said) | Sort-Object) -join ',') -eq ((@('test-b.js', 'test-f.ps1', 'voice/test-v.js') | Sort-Object) -join ','))
+    Yes "  split by commas or spaces, and green when they pass (exit $($r.Code))" ($r.Code -eq 0 -and $r.Said -match 'every harness passed')
+    $r = Run $a @('-Only', 'test-b.js test-nope.js')
+    Yes "  a name that is no harness is refused and nothing runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count -and $r.Said -match 'no such harness here, so nothing was run: test-nope\.js')
+    $r = Run $a @('-Only', 'not-a-harness.js')
+    Yes "  a file that is not test-* cannot be named into a run (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
+    $r = Run $b @('-Only', 'test-2-fail.ps1')
+    Yes "  a named harness that fails turns the run red (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match '(?m)^1 harness\(es\) failed: test-2-fail\.ps1\s*$')
+
+    # ---- 6. the workflow that runs them on demand -----------------------------
+    $h = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\harnesses.yml'))
+    Yes 'harnesses.yml starts only when somebody dispatches it' ($h -match '(?m)^on:\s*\r?\n  workflow_dispatch:' -and $h -notmatch '(?m)^  (push|pull_request|pull_request_target|schedule):')
+    Yes '  reads the repository and nothing more' ($h -match '(?m)^permissions:\s*\r?\n  contents: read\s*\r?\n(?!  )')
+    Yes '  on the VPS runners, the same as the nightly' ($h -match '(?m)^\s+runs-on: \[self-hosted, Windows, thornswood-vps\]\s*$')
+    Yes '  hands the names to Nightly-Harnesses.ps1 -Only through the environment' ($h -match 'HARNESSES: \$\{\{ inputs\.harnesses \}\}' -and $h -match 'Nightly-Harnesses\.ps1 -Only \$env:HARNESSES')
+    $runs = @([regex]::Matches($h, '(?ms)^\s+run: \|\s*\r?\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
+    Yes '  and never pastes them into a script it runs' ($runs.Count -ge 1 -and -not @($runs | Where-Object { $_ -match '\$\{\{\s*inputs\.' }).Count)
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
