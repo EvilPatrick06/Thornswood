@@ -104,18 +104,41 @@ import typing
 import urllib.parse
 import urllib.request
 
+# The bot's own records, joins.json, open-tickets.json, heartbeat.json
+# and commands-synced.json, go in a folder of their own, data beside bot.py, and
+# so does bot.log, which the service writes (issue #1104). The service's
+# account may write there and nowhere else in the bot's folder: the code is
+# read only to it, so nothing that gets into the bot can rewrite bot.py or put
+# a module beside it for the next start to import. The service names the
+# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
+# box whose full install has not run since, the records stay beside bot.py
+# where they were, so a code only deploy never starts the join numbers again;
+# the full install moves them across while the bot is stopped (Bot-Service.ps1).
+HERE = os.path.dirname(os.path.abspath(__file__))
+DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
+    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
+
 # Windows Server ships with an empty root certificate store and the automatic
 # update for it switched off, so Python cannot verify discord.com and the
-# handshake dies with "unable to get local issuer certificate". Install-Bot
-# sets SSL_CERT_FILE for the service; a bot started any other way points it at
-# certifi's bundle here. certifi is in requirements.txt beside discord.py, so
-# a bot without it is missing its libraries and stops on this import, saying
-# so, rather than connecting without its roots (#2736). Each SSL context made
-# from here on reads the variable.
-if not os.environ.get('SSL_CERT_FILE'):
-    import certifi
-    os.environ['SSL_CERT_FILE'] = certifi.where()
-    os.environ.setdefault('REQUESTS_CA_BUNDLE', certifi.where())
+# handshake dies with "unable to get local issuer certificate". So the bot
+# carries its roots in a file of its own, roots.pem in its data folder: the
+# roots in certifi's bundle (requirements.txt, by hash) less those trust.py
+# leaves out, eMudhra's (#3111). It is written again at every start, before
+# discord.py or urllib makes a single connection, and SSL_CERT_FILE names it,
+# which each SSL context made from here on reads.
+#
+# Always this file, whatever the environment named before. Install-Bot used to
+# set SSL_CERT_FILE to certifi's bundle as the box's own Python found it, with
+# none of py-libs on its path, so it named the certifi that Python had
+# installed for itself, if any, and not the one requirements.txt pins.
+# certifi is in requirements.txt beside discord.py, so a bot without it is
+# missing its libraries and stops here, saying so, rather than connecting
+# without its roots (#2736).
+import trust
+ROOTS = os.path.join(DATA_DIR, 'roots.pem')
+_trusted, _left_out = trust.write_bundle(ROOTS)
+os.environ['SSL_CERT_FILE'] = ROOTS
+os.environ['REQUESTS_CA_BUNDLE'] = ROOTS
 
 import discord
 
@@ -348,20 +371,6 @@ WATCH_ID = _int_env('WATCH_CHANNEL_ID', _staff_channel_id())
 # and nothing is said in Discord. It used to look staff-general up by name
 # instead (#2940). TROUBLE_CHANNEL_ID in bot.env.json overrides it.
 TROUBLE_ID = _int_env('TROUBLE_CHANNEL_ID', _staff_channel_id())
-
-# The bot's own records, joins.json, open-tickets.json, heartbeat.json
-# and commands-synced.json, go in a folder of their own, data beside bot.py, and
-# so does bot.log, which the service writes (issue #1104). The service's
-# account may write there and nowhere else in the bot's folder: the code is
-# read only to it, so nothing that gets into the bot can rewrite bot.py or put
-# a module beside it for the next start to import. The service names the
-# folder in THORNSWOOD_BOT_DATA (BotService.cs). With no data folder yet, a
-# box whose full install has not run since, the records stay beside bot.py
-# where they were, so a code only deploy never starts the join numbers again;
-# the full install moves them across while the bot is stopped (Bot-Service.ps1).
-HERE = os.path.dirname(os.path.abspath(__file__))
-DATA_DIR = os.environ.get('THORNSWOOD_BOT_DATA') or (
-    os.path.join(HERE, 'data') if os.path.isdir(os.path.join(HERE, 'data')) else HERE)
 
 # Where the site writes the sessions that went wrong. The bot and the site run
 # on the same box, so this is a file rather than a request: no ticket, no port
@@ -5668,6 +5677,10 @@ if __name__ == '__main__':
     if ('--setup-channels' in sys.argv or '--post-task' in sys.argv
             or '--adopt-task' in sys.argv):
         raise SystemExit(run_cli(sys.argv[1:]))
+    # Said here and not where the roots are written, so a tool that imports
+    # bot.py reads nothing extra on its standard output.
+    log('trusting %d root certificates from %s, leaving out %s' % (
+        _trusted, ROOTS, ', '.join(_left_out) or 'none'))
     # One heartbeat before anything can hang, so a bot stuck logging in has
     # this run's pid in the file and the watchdog can say how long it has sat.
     beat_now()
