@@ -171,6 +171,31 @@ Start-Sleep -Seconds 2
     Yes 'no watcher: the run is not run' (-not $global:wasRun)
     Yes 'no watcher: says nothing is proved, exit code 2' ($r.Out -match 'did not start' -and $r.Code -eq 2)
 
+    # ---- 5b. the same, without the race (#2959). Whether the dead ssh above
+    # ends before the value is written or after is up to the machine; here it
+    # has ended for certain, so the write meets a pipe already closed. That is
+    # the watcher not starting, not an error that stops the script; anything
+    # else still throws.
+    $ast = [Management.Automation.Language.Parser]::ParseFile($prove, [ref]$null, [ref]$null)
+    $fn = $ast.Find({ param($n) $n -is [Management.Automation.Language.FunctionDefinitionAst] -and $n.Name -eq 'Send-ThornswoodProofValue' }, $true)
+    . ([scriptblock]::Create($fn.Extent.Text))
+    function Start-Ssh([bool]$redirect) {
+        $psi = New-Object Diagnostics.ProcessStartInfo
+        $psi.FileName = $deadSsh
+        $psi.UseShellExecute = $false
+        $psi.RedirectStandardInput = $redirect
+        $psi.CreateNoWindow = $true
+        $p = [Diagnostics.Process]::Start($psi)
+        $p.WaitForExit()
+        return $p
+    }
+    $sent = $null; $threw = ''
+    try { $sent = Send-ThornswoodProofValue (Start-Ssh $true) $wire } catch { $threw = $_.Exception.Message }
+    Yes 'an ssh that has already ended: the value is not sent, and nothing throws' ($sent -eq $false -and -not $threw)
+    $threw = ''
+    try { $null = Send-ThornswoodProofValue (Start-Ssh $false) $wire } catch { $threw = $_.Exception.Message }
+    Yes '  but any other failure to write still throws' ([bool]$threw)
+
     # ---- 6. the watcher ends with standard input still open (#451, #2912).
     # The fake ssh above passes the end of standard input on; the VPS's
     # OpenSSH passes on nothing written after the session starts, and the
