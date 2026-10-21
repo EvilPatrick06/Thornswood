@@ -279,6 +279,8 @@ exit `$LASTEXITCODE
     $BridgeRoot = Join-Path $tmp 'bridge'
     $PutBack = 'Thornswood box access put back'
     $SayStaff = 'C:\Thornswood-Watch\say-staff.ps1'
+    # The change script carries the folder lock from here, as Grant-BoxAccess.ps1 loads it (#3034).
+    . (P 'scripts', 'vps', 'Lock-Folder.ps1')
     foreach ($n in 'Get-BoxKeyLine', 'Read-BoxKeyLine', 'Get-BoxChangeScript') {
         $fn = @($gast.FindAll({ param($x) $x -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $x.Name -eq $n }, $true))
         Yes ("Grant-BoxAccess.ps1 has one $n") ($fn.Count -eq 1)
