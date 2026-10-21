@@ -205,17 +205,17 @@ function Invoke-ThornswoodRemote {
     return $out
 }
 
-# Starts $Script on the VPS and leaves it running, for a far side whose life
-# is the session's own (Run-OnBox.ps1's run folder, issue #2999). The far
-# side reads its standard input to the end: closing it here is how it is told
-# to finish, and a session that drops closes it too. Returns the ssh process,
-# its standard input and output redirected; what ssh itself says on standard
-# error goes to this console as it would for any ssh.
+# Starts $Script on the VPS and leaves it running, for a far side that keeps
+# going while the caller works (Run-OnBox.ps1's run folder, issue #2999).
+# Returns the ssh process, its standard input and output redirected; what ssh
+# itself says on standard error goes to this console as it would for any ssh.
+# Measured 21 Oct 2026 (#3059): the box passes on nothing written to or
+# closed on that input after the session starts, and a far process outlives
+# its session, so neither can tell the far side to finish. It is told over a
+# second session instead, the way Close-ThornswoodOnBoxFolder does (#3063).
 #
 # Only the command line form, and a script over the limit is refused, before
-# anything is sent. Measured 21 Oct 2026 (#3059): the box passes on no close
-# made after the session starts, and a far process outlives its session, so
-# neither tells this far side to finish there (#3063).
+# anything is sent.
 function Start-ThornswoodRemote {
     param(
         [Parameter(Mandatory = $true)][string]$Target,

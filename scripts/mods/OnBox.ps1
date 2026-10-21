@@ -172,7 +172,7 @@ foreach (`$c in `$changed) { 'CHANGED ' + `$c }
 "@
 }
 
-# The run's folder lives as long as one ssh session, the keeper's (#2999).
+# The run's folder lives as long as one far process, the keeper's (#2999).
 # Until 21 Oct 2026 the folder was made by one ssh call and removed by
 # another at the end, so a run cut before that call (a bridge reset, the
 # machine running it going away) left the folder on the box for good, with
@@ -181,33 +181,55 @@ foreach (`$c in `$changed) { 'CHANGED ' + `$c }
 #   - <run>.lock, beside the folder, is held for as long as the run is going:
 #     by this script from before the folder exists until it is removed, and by
 #     the run itself (above) while the tool runs. Windows lets go of a handle
-#     when its process ends however it ends, killed with its session included.
-#   - When this script's standard input closes, which is how Run-OnBox.ps1
-#     says it is finished and also what a dropped session does, it removes
-#     the folder itself and says GONE.
+#     when its process ends however it ends.
+#   - The keeper waits on a named event of its own, $End, made here (a name
+#     somebody made first is refused before anything else is done). When it
+#     is set, which Close-ThornswoodOnBoxFolder does from a second ssh
+#     session, it removes the folder itself and says GONE. Until 21 Oct it
+#     waited for its standard input to close, and on the box that never
+#     came: sshd passes on nothing written or closed after a session starts
+#     (#2912, #3059), so every Close waited for good (#3063). The named
+#     event is how the secret proof's watcher is stopped there (#2912).
 #   - A folder whose lock nobody holds belongs to a run that is over, so before
 #     it makes its own, this removes every such thornswood-onbox-* folder
-#     beside it: the ones a run killed with its session could not remove, and
-#     a folder from before the lock (it has none). A folder whose lock is held
+#     beside it: a folder whose keeper was ended (the box restarting), and
+#     one from before the lock (it has none). A folder whose lock is held
 #     is a run still going, and is left alone. No age and no time limit decide
 #     it: only whether the process that owns the folder is still there.
+#   - It also ends when its caller is gone without setting the event (the
+#     machine running it going away, a bridge reset). A far process outlives
+#     its ssh session on the box (#3059), so the session ending tells it
+#     nothing by itself; what does is a write to its standard output, which
+#     fails (Win32 error 232) from the moment its session is over (measured
+#     on the box 21 Oct 2026, #3063). So while it waits it writes a bare line
+#     end every five seconds with WriteFile itself, and when that write fails
+#     it removes the folder as if its event had been set. Not through .NET's
+#     console stream: that one swallows a broken pipe and reports the write
+#     as made. A bare line end is nothing to anybody reading what it says.
 #
 # Removing takes the lock alone (shared for deleting only, so it can delete
 # the lock while it holds it; Windows lets the file go when the handle
 # closes), so the run and its keeper, and two runs sweeping at once, never
 # remove a folder another holds. Lines out: GONE <folder>, HELD
 # <folder>: why (still in use), LEFT <folder>: why (could not be removed),
-# and MADE <folder> once this run's own is there. Each is written and flushed
-# as it happens, because Run-OnBox.ps1 waits for MADE while this waits for
-# its input to close. Short enough for the command line on purpose
+# MADE <folder> once this run's own is there, and TAKEN <name> when its event
+# was made by somebody else first. Each is written and flushed as it happens,
+# because Run-OnBox.ps1 waits for MADE while this waits for its end. Short
+# enough for the command line on purpose
 # (Start-ThornswoodRemote): a script sent as a file first would be one more
 # thing on the box a cut session leaves.
-function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Run) {
+function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Run, [Parameter(Mandatory = $true)][string]$End) {
+    if ($End -notmatch '^Global\\Thornswood-OnBoxEnd-[0-9a-f]{32}$') { throw ('not a keeper''s end event: ' + $End) }
     return @"
 `$ErrorActionPreference = 'Stop'
+`$ProgressPreference = 'SilentlyContinue'
 `$run = '$Run'
 `$top = Split-Path -Parent `$run
 function Say([string]`$l) { [Console]::Out.WriteLine(`$l); [Console]::Out.Flush() }
+`$made = `$false
+`$end = [Threading.EventWaitHandle]::new(`$false, [Threading.EventResetMode]::ManualReset, '$End', [ref]`$made)
+if (-not `$made) { Say ('TAKEN $End'); exit 2 }
+Add-Type -TypeDefinition 'using System;using System.Runtime.InteropServices;public static class ThornswoodKeeperOut{[DllImport("kernel32.dll")]static extern IntPtr GetStdHandle(int n);[DllImport("kernel32.dll",SetLastError=true)]static extern bool WriteFile(IntPtr h,byte[] b,int n,out int d,IntPtr o);public static int Beat(){byte[] b={10};int d;return WriteFile(GetStdHandle(-11),b,1,out d,IntPtr.Zero)?0:Marshal.GetLastWin32Error();}}'
 function Drop([string]`$d) {
   try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'Delete') }
   catch { Say ('HELD ' + `$d + ': ' + `$_.Exception.GetBaseException().Message); return }
@@ -228,27 +250,38 @@ foreach (`$f in @(Get-ChildItem -LiteralPath `$top -Filter 'thornswood-onbox-*' 
 `$own = New-Object IO.FileStream((`$run + '.lock'), 'CreateNew', 'ReadWrite', 'ReadWrite')
 New-Item -ItemType Directory -Path `$run | Out-Null
 Say ('MADE ' + `$run)
-[void][Console]::In.ReadToEnd()
+while (-not `$end.WaitOne(5000)) { if ([ThornswoodKeeperOut]::Beat()) { break } }
 `$own.Dispose()
 Drop `$run
+`$end.Dispose()
 "@
 }
 
-# A folder of its own on the box for one run, held by its keeper for as long
-# as the keeper's ssh session lives (above). Needs Send-Script.ps1 loaded.
+# What the second ssh session runs to end a keeper: sets its event. Says END
+# SET, or END GONE when no keeper holds that event any more.
+function Get-ThornswoodOnBoxEndScript([Parameter(Mandatory = $true)][string]$End) {
+    if ($End -notmatch '^Global\\Thornswood-OnBoxEnd-[0-9a-f]{32}$') { throw ('not a keeper''s end event: ' + $End) }
+    return "`$e = `$null; if ([Threading.EventWaitHandle]::TryOpenExisting('$End', [ref]`$e)) { [void]`$e.Set(); `$e.Dispose(); 'END SET' } else { 'END GONE' }"
+}
+
+# A folder of its own on the box for one run, held by its keeper until
+# Close-ThornswoodOnBoxFolder ends it (above). Needs Send-Script.ps1 loaded.
 # Hands back Run (the folder, Windows form), Far (with forward slashes, for
-# scp), Made, Keeper (the ssh process) and Said (what the keeper's sweep of
-# earlier folders said before MADE). Made false means there is no folder: the
-# caller stops, and still hands this to Close-ThornswoodOnBoxFolder.
+# scp), Made, Keeper (the ssh process), Said (what the keeper's sweep of
+# earlier folders said before MADE), Rest (the read of what it says after),
+# and End, Target and SshArgs for the close. Made false means there is no folder: the caller stops, and still
+# hands this to Close-ThornswoodOnBoxFolder.
 function Open-ThornswoodOnBoxFolder {
     param(
         [Parameter(Mandatory = $true)][string]$Target,
         [string[]]$SshArgs = @()
     )
     $run = 'C:\Windows\Temp\thornswood-onbox-' + [Guid]::NewGuid().ToString('N').Substring(0, 12)
+    # A name nobody can know ahead of the run, so nobody makes it first.
+    $end = 'Global\Thornswood-OnBoxEnd-' + [Guid]::NewGuid().ToString('N')
     # The keeper first: it removes what earlier runs left, then makes this
-    # run's folder and holds it until its input is closed.
-    $keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run)
+    # run's folder and holds it until its event is set.
+    $keeper = Start-ThornswoodRemote -Target $Target -SshArgs $SshArgs -Script (Get-ThornswoodOnBoxKeepScript -Run $run -End $end)
     $said = @()
     $made = $false
     while ($null -ne ($l = $keeper.StandardOutput.ReadLine())) {
@@ -256,17 +289,29 @@ function Open-ThornswoodOnBoxFolder {
         if ($l -eq ('MADE ' + $run)) { $made = $true; break }
         if ($l) { $said += $l }
     }
-    return [pscustomobject]@{ Run = $run; Far = $run.Replace('\', '/'); Made = $made; Keeper = $keeper; Said = $said }
+    # The rest is read as it comes, so the keeper's line ends while it waits
+    # never fill the pipe and stop it at a write.
+    $rest = $keeper.StandardOutput.ReadToEndAsync()
+    return [pscustomobject]@{ Run = $run; Far = $run.Replace('\', '/'); Made = $made; Keeper = $keeper; Said = $said; Rest = $rest; End = $end; Target = $Target; SshArgs = $SshArgs }
 }
 
-# Tells the keeper the run is over: closing its input is how it is told, and
-# it removes the folder and ends. One that has already ended (its session
-# dropped) has said what it did, and its output is read the same way. Hands
-# back Gone (the folder is not on the box) and Said (the keeper's last lines).
+# Tells the keeper the run is over: a second ssh session sets its event, and
+# it removes the folder, says GONE and ends, and its ssh with it. The event is
+# set even when the keeper's ssh here has already ended, since on the box the
+# keeper outlives its session (#3059). When it could not be set, nothing will
+# end that keeper's ssh here, so it is ended, and what the set said is handed
+# back with the rest. Hands back Gone (the keeper said its folder is gone, or
+# there was none), Told (the event was set, or no keeper holds it any more)
+# and Said (the keeper's last lines, then the set's).
 function Close-ThornswoodOnBoxFolder([Parameter(Mandatory = $true)]$Folder) {
     $k = $Folder.Keeper
-    if (-not $k.HasExited) { $k.StandardInput.Close() }
-    $said = @($k.StandardOutput.ReadToEnd() -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    $told = @(Invoke-ThornswoodRemote -Target $Folder.Target -SshArgs $Folder.SshArgs -Script (Get-ThornswoodOnBoxEndScript -End $Folder.End) 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+    if (-not $k.HasExited -and -not ($told -contains 'END SET')) {
+        # With the bridge's node under it on One: the whole tree where .NET
+        # can (PowerShell 7), the ssh alone where it cannot (5.1).
+        if ($PSVersionTable.PSVersion.Major -ge 6) { $k.Kill($true) } else { $k.Kill() }
+    }
+    $said = @($Folder.Rest.Result -split '\r?\n' | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     $k.WaitForExit()
-    return [pscustomobject]@{ Gone = ((-not $Folder.Made) -or ($said -contains ('GONE ' + $Folder.Run))); Said = $said }
+    return [pscustomobject]@{ Gone = ((-not $Folder.Made) -or ($said -contains ('GONE ' + $Folder.Run))); Told = (($told -contains 'END SET') -or ($told -contains 'END GONE')); Said = @($said + @($told | Where-Object { $_ -ne 'END SET' })) }
 }
