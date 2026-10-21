@@ -30,8 +30,8 @@
     3. Exit 255 (ssh could not connect) comes back as 255, still no throw,
        so the caller's exit code check is what decides.
     4. Standard input piped in reaches ssh (the secret channel's path).
-    5. Remote.ps1 end to end, short script and long (on ssh's standard
-       input, #3027), and called with 2>$null the way Install-Voice.ps1
+    5. Remote.ps1 end to end, short script and long (by scp and a runner,
+       #3059), and called with 2>$null the way Install-Voice.ps1
        calls it: exit 0 with the far end's output; 255 when ssh fails.
     6. Send-Secret.ps1's Invoke-ThornswoodSecretRemote with the warning:
        the value arrives on standard input and the output comes back.
@@ -119,14 +119,14 @@ if ($Child) {
     $long = "'" + ('y' * 4000) + "'"
     $threw = $false
     try { $text = (& $remote $long -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true; $text = [string]$_ }
-    Yes "$tag Remote.ps1 long script (on standard input): no throw, exit 0" ((-not $threw) -and $LASTEXITCODE -eq 0 -and $text -match 'far-end-said-hi')
+    Yes "$tag Remote.ps1 long script (by scp and its runner): no throw, exit 0" ((-not $threw) -and $LASTEXITCODE -eq 0 -and $text -match 'far-end-said-hi')
     $env:TS_FAKE_RC = '255'
     $threw = $false
     try { $null = (& $remote "'x'" -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true }
     Yes "$tag Remote.ps1 when ssh fails: exit 255, not 0" ((-not $threw) -and $LASTEXITCODE -eq 255)
     $threw = $false
     try { $null = (& $remote $long -VpsHost box.invalid -VpsUser tester 2>&1 | Out-String) } catch { $threw = $true }
-    Yes "$tag Remote.ps1 long script when ssh fails: exit 255, not 0" ((-not $threw) -and $LASTEXITCODE -eq 255)
+    Yes "$tag Remote.ps1 long script when scp fails: exit 255, not 0" ((-not $threw) -and $LASTEXITCODE -eq 255)
     $env:TS_FAKE_RC = '0'
 
     # 6. The secret channel.

@@ -63,8 +63,8 @@ function Head($m) { Write-Host ''; Write-Host $m -ForegroundColor Cyan; Write-Ho
 function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; if (-not $NoPause) { [void](Read-Host 'Enter to exit') }; exit 1 }
 
 function Remote($script) {
-  # Send-Script.ps1 (issue #1070): a long script goes on ssh's standard input
-  # (nothing of it is left on the box), and the far side's exit code comes back.
+  # Send-Script.ps1 (issue #1070): a long script goes by scp and its run takes
+  # it off the box before it runs, and the far side's exit code comes back.
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }
 

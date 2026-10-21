@@ -10,26 +10,27 @@
   Deploy-Docs.ps1 hit it on 17 September and Deploy-DevGamemode.ps1 on 20
   September, and sixteen scripts were given a guard that night that sends a
   long script as a file instead. Entry 197 on the To Do List asks for "the
-  remote helper survives a 10 KB script". Since 21 Oct 2026 (issue #3027) a
-  long script goes on ssh's standard input under a short reader instead of
-  as a file, so a run cut short leaves nothing on the box.
+  remote helper survives a 10 KB script". Since 21 Oct 2026 (issues #3027
+  and #3059) a long script goes up by scp to a copy of its own name, and the
+  short runner on the command line takes the copy off the box before it runs
+  it, so a run that starts leaves nothing there.
 
   test-remote-length.ps1 reads the scripts and measures their blocks. This
   one sends. Each Remote function is lifted out of its script by text and
   called with a 10 KB script, and Remote.ps1, the helper that takes any
   script at all, is run whole with one.
 
-  THE STAND-INS ARE A SMALL SSHD ON THIS MACHINE, NOT THE VPS. ssh hands the
-  command to this machine's cmd.exe, in a scratch folder that stands for
-  C:/Windows/Temp, with what the helper piped in on its standard input, the
-  way sshd carries a session's input to the command. The reader's line is
-  then run again under a Windows PowerShell outer shell. Windows sshd uses
+  THE STAND-INS ARE A SMALL SSHD ON THIS MACHINE, NOT THE VPS. scp puts the
+  copy in a scratch folder that stands for C:/Windows/Temp, and ssh hands the
+  command to this machine's cmd.exe in that folder, with the runner's paths
+  pointed at it. The runner's line is then run again under a Windows
+  PowerShell outer shell. Windows sshd uses
   cmd.exe unless it is set to another shell, and Windows PowerShell is the
-  usual other one. Which of the two the VPS uses has not been measured. So
-  what is proved is the helpers' mechanics: nothing is copied up, no command
-  line is longer than cmd.exe takes, the script arrives whole on standard
-  input and runs to its last line, what it printed comes back, nothing is
-  left in the far temp folder, and the exit code is the script's. What the
+  usual other one; the VPS's sshd started a command as powershell.exe -c on
+  21 Oct 2026 (#3059). So what is proved is the helpers' mechanics: no command
+  line is longer than cmd.exe takes, the script goes up whole in one copy and
+  runs to its last line, what it printed comes back, the runner leaves
+  nothing in the far temp folder, and the exit code is the script's. What the
   VPS itself does is not proved here.
 
   What the two shells showed on this machine on 24 September, when a long
@@ -40,8 +41,8 @@
   below for that shape, so none goes back to the quoted form.
 
   It runs only what this harness sent, in the exact shapes the helpers send:
-  its own two scripts inline, or the reader with one of them on its standard
-  input. Anything else is written down and not run, and fails the check that
+  its own two scripts inline, or the runner taking a copy that holds one of
+  them. Anything else is written down and not run, and fails the check that
   expected it to.
 
   NEVER CONNECTS. It checks that ssh and scp resolve to the stand-ins before
@@ -86,7 +87,7 @@ function Runs([string]$what, [bool]$cond) { if ($OnWindows) { Yes $what $cond } 
 if (-not $OnWindows) { Write-Host 'SKIP  the runs at the far end: it stands in with the box''s cmd.exe and Windows PowerShell 5.1, which only Windows has, so only what is sent is checked' }
 
 # What cmd.exe will carry. Where the VPS cuts a line has not been measured;
-# the helpers send anything over 6,000 characters on standard input.
+# the helpers send anything over 6,000 characters by scp, for the runner.
 $Limit = 8191
 
 # What the helpers read to know where to send. None of it resolves.
@@ -121,9 +122,12 @@ $global:TsFar = @{
     Scripts = @($big, $short)
 }
 $global:TsRemoteCalls = New-Object System.Collections.ArrayList
-# The reader Send-Script.ps1 puts on the command line for a long script.
+# Knows the runner Send-Script.ps1 puts on the command line for a long
+# script, and the copy it takes (#3059). What scp copied, by name, so a line
+# run again under the other shell finds its copy as the first run did.
 . (Join-Path $RepoPath 'scripts\vps\Send-Script.ps1')
-$global:TsFar.Reader = Get-ThornswoodStdinReader
+$global:TsFar.RunnerPath = ${function:Get-ThornswoodRemoteRunnerPath}
+$global:TsFar.Copied = @{}
 
 # The far paths go bare, so what stands in for C:/Windows/Temp on the line has
 # to be as bare as it is: a space or an & in it would fail a line for a reason
@@ -141,22 +145,30 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell, [string[]]$std
 
     # Only what this harness sent, in the exact shapes the helpers send, so
     # nothing can be chained on for either shell to run: one of its own
-    # scripts inline, or Send-Script.ps1's reader with one of them as the
-    # first line of its standard input.
+    # scripts inline, or Send-Script.ps1's runner taking a copy that holds
+    # one of them.
     $ok = $false
-    # -ExecutionPolicy Bypass as well: the reader's line always has it, and a
+    $line = ''
+    # -ExecutionPolicy Bypass as well: the runner's line always has it, and a
     # caller's -Bypass puts it on an inline one.
     $m = [regex]::Match($command, '^powershell -NoProfile (-ExecutionPolicy Bypass )?-EncodedCommand ([A-Za-z0-9+/=]+)$')
     if ($m.Success) {
         $text = ''
         try { $text = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[2].Value)) } catch { }
-        foreach ($s in $far.Scripts) { if ($text.EndsWith($s)) { $ok = $true } }
-        if ($text -eq $far.Reader -and $stdin.Count) {
-            $piped = ''
-            try { $piped = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($stdin[0])) } catch { }
+        foreach ($s in $far.Scripts) { if ($text.EndsWith($s)) { $ok = $true; $line = $command } }
+        $rp = & $far.RunnerPath $text
+        $leaf = ($rp -split '\\')[-1]
+        if ($rp -and $far.Copied.ContainsKey($leaf)) {
             # Contains, as for the file it once went as: Remote.ps1 -File
             # sends a file's text, which may end with a line break.
-            foreach ($s in $far.Scripts) { if ($piped.Contains($s)) { $ok = $true } }
+            foreach ($s in $far.Scripts) { if ($far.Copied[$leaf].Contains($s)) { $ok = $true } }
+            # The runner as sent, its copy and the folder it clears pointed
+            # at the stand-in folder. The path goes inside the encoded
+            # command, so no shell sees it.
+            $copy = Join-Path $far.Disk $leaf
+            if (-not (Test-Path -LiteralPath $copy)) { [IO.File]::WriteAllText($copy, $far.Copied[$leaf], (New-Object Text.UTF8Encoding($false))) }
+            $here = $text.Replace($rp, $copy).Replace("'C:\Windows\Temp'", ("'" + $far.Disk.Replace("'", "''") + "'"))
+            $line = 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($here))
         }
     }
     if (-not $ok) {
@@ -172,7 +184,7 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell, [string[]]$std
     # PowerShell inside builds its own, as a fresh one does, rather than
     # inheriting pwsh's.
     if (-not $OnWindows) { return [pscustomobject]@{ Out = @('not run: this is not Windows'); Code = 0 } }
-    $line = $command.Replace($far.Temp, $far.DiskFwd)
+    $line = $line.Replace($far.Temp, $far.DiskFwd)
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     if ($shell -eq 'powershell') {
         $psi.FileName = Get-WindowsPowerShell
@@ -215,10 +227,9 @@ function global:ssh {
     $global:LASTEXITCODE = $ran.Code
 }
 function global:scp {
-    # No helper copies a script up any more (#3027); a call here is written
-    # down so the checks below can say so. The local file is the argument
-    # that exists on disk. It lands in the stand-in folder only if it was
-    # bound for C:/Windows/Temp, by a plain name.
+    # A long script's copy (#3059). The local file is the argument that
+    # exists on disk. It lands in the stand-in folder only if it was bound
+    # for C:/Windows/Temp, by a plain name.
     $all = @($args | ForEach-Object { [string]$_ })
     $src = $null
     $far = ''
@@ -235,6 +246,7 @@ function global:scp {
     $temp = $global:TsFar.Temp
     if ($src -and $far.StartsWith($temp) -and $far.Substring($temp.Length) -match '^[A-Za-z0-9._-]+$') {
         [IO.File]::Copy($src, (Join-Path $global:TsFar.Disk $far.Substring($temp.Length)), $true)
+        $global:TsFar.Copied[$far.Substring($temp.Length)] = $sent
         $code = 0
     }
     [void]$global:TsRemoteCalls.Add([pscustomobject]@{ Tool = 'scp'; Line = ($all -join ' '); Command = ''; Sent = $sent; Out = ''; Code = $code })
@@ -244,12 +256,8 @@ Yes 'ssh is the stand-in here, so nothing can reach a server' ((Get-Command ssh)
 Yes 'and so is scp' ((Get-Command scp).CommandType -eq 'Function')
 if ($script:fail) { Done }
 
-# The script a call carried on standard input, as the reader decodes it.
-function Get-Piped($call) {
-    $first = @($call.Stdin) | Select-Object -First 1
-    if (-not $first) { return '' }
-    try { return [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String(($first -replace '[^A-Za-z0-9+/=]', ''))) } catch { return '' }
-}
+# The copy a runner on a call's line takes, or '' when the line is no runner.
+function Get-RunnerPath($call) { return (& $global:TsFar.RunnerPath (Get-Encoded $call.Command)) }
 function Get-Encoded([string]$line) {
     $m = [regex]::Match($line, 'EncodedCommand\s+(\S+)')
     if (-not $m.Success) { return '' }
@@ -292,18 +300,22 @@ function Show-Why($r) {
     }
 }
 
-# The reader's line a helper sent, run again under a Windows PowerShell outer
-# shell, with the same standard input. Its exit code is not compared:
+# The runner's line a helper sent, run again under a Windows PowerShell outer
+# shell, with the same copy put back for it. Its exit code is not compared:
 # powershell -Command hands back 1 for any program that failed, so the 7 the
 # script exits with cannot come through that way. Every helper sends the
-# very same line with the very same input, so that pair is run this way once
+# very same runner with the very same copy, so that pair is run this way once
 # and not again. Measured 24 September on a busy machine: run for every
 # helper, it took this from 136 seconds to 213; run once a pair, from 126 to
 # 152.
 $script:otherShellRan = @{}
 function Test-OtherShell($r) {
     if ($r.Ssh.Count -ne 1) { return $false }
+    # A runner's line names its own copy, so the pair is the runner with
+    # that name taken out and what the copy held.
     $key = $r.Ssh[0].Command + "`n" + (@($r.Ssh[0].Stdin) -join "`n")
+    $rp = Get-RunnerPath $r.Ssh[0]
+    if ($rp) { $key = (Get-Encoded $r.Ssh[0].Command).Replace($rp, '') + "`n" + $global:TsFar.Copied[($rp -split '\\')[-1]] }
     if (-not $script:otherShellRan.ContainsKey($key)) {
         $script:otherShellRan[$key] = (Invoke-OtherShell $r.Ssh[0].Command @($r.Ssh[0].Stdin))
     }
@@ -323,12 +335,12 @@ function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShor
     $r = Measure-Send $sendBig
     $ran = ($r.Ssh.Count -eq 1 -and $r.Ssh[0].Code -eq 7 -and $r.Ssh[0].Out.Contains($lastLine))
     Yes "$name sends a 10 KB script on no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
-    Yes '  in one ssh call, copying nothing up' ($r.Ssh.Count -eq 1 -and $r.Scp.Count -eq 0)
-    Yes '  the reader on the command line and the whole script on standard input' ($r.Ssh.Count -eq 1 -and (Get-Encoded $r.Ssh[0].Command) -eq $global:TsFar.Reader -and @($r.Ssh[0].Stdin).Count -ge 1 -and (Get-Piped $r.Ssh[0]).Contains($big))
+    Yes '  as one copy, holding the whole script, and one ssh call' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big) -and $r.Ssh.Count -eq 1)
+    Yes '  the runner on the command line, taking that copy, and nothing on standard input' ($r.Ssh.Count -eq 1 -and $r.Scp.Count -eq 1 -and (Get-RunnerPath $r.Ssh[0]) -and $r.Scp[0].Line.EndsWith(((Get-RunnerPath $r.Ssh[0]) -replace '\\', '/')) -and @($r.Ssh[0].Stdin).Count -eq 0)
     Runs '  runs it to its last line when cmd.exe on this machine hands the line on' $ran
     Runs '  and when Windows PowerShell on this machine hands the same line on instead' ($OnWindows -and (Test-OtherShell $r))
     Runs '  and what it printed comes back' ($r.Out.Contains($lastLine))
-    Yes '  and leaves nothing in the far temp folder, with no call to tidy it' (@($r.Ssh | Where-Object { $_.Command -match 'Remove-Item|-File' }).Count -eq 0 -and $r.Left -eq 0)
+    Yes '  and the runner leaves nothing in the far temp folder, with no call to tidy it' (@($r.Ssh | Where-Object { $_.Command -match 'Remove-Item|-File' }).Count -eq 0 -and ($r.Left -eq 0 -or -not $OnWindows))
     if ($handsBackCode) {
         Runs "  and hands back the script's own exit code" ($r.Code -eq 7)
     }
@@ -368,7 +380,7 @@ if (Test-Path -LiteralPath $remotePs1) {
         [IO.File]::WriteAllText($bigFile, $big)
         $r = Measure-Send { & $remotePs1 -File $bigFile -VpsHost $VpsHost -VpsUser $VpsUser }
         Yes "Remote.ps1 -File with a 10 KB script sends no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
-        Yes '  and sends the whole script on standard input, copying nothing up' ($r.Scp.Count -eq 0 -and $r.Ssh.Count -eq 1 -and (Get-Piped $r.Ssh[0]).Contains($big))
+        Yes '  and copies the whole script up once, for the runner on one ssh line' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big) -and $r.Ssh.Count -eq 1 -and (Get-RunnerPath $r.Ssh[0]))
         Runs '  and runs it to its last line' ($r.Out.Contains($lastLine))
         Runs "  and hands back the script's own exit code" ($r.Code -eq 7)
         if (-not $r.Out.Contains($lastLine)) { Show-Why $r }
@@ -411,8 +423,8 @@ foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps
     try { Invoke-Expression $fn } catch { Yes ("the Remote in {0} can be lifted" -f $f.Name) $false; continue }
     # Rotate-BotToken.ps1 (#902) refused a long script here until #3035, when
     # its writer went up as a file first; it sends through Send-Script.ps1
-    # now, the token on standard input after the script, so the loop above
-    # sends it a 10 KB script like any other.
+    # now, the token on standard input, so the loop above sends it a 10 KB
+    # script like any other.
     Test-Sends $f.Name { Remote $big } { Remote $short } $false
 }
 Yes 'the guarded helpers were found and sent to' ($helpers -ge 10)

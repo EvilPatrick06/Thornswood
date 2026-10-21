@@ -280,7 +280,7 @@ try {
     $global:H = @{
         KeyWorks = $true; HostFp = $pin; Calls = (New-Object System.Collections.Generic.List[string])
         Far = $far; Layer = $Layer; Cfg = ''; Cancelled = $false; Sent = ''
-        Box = $Box; BoxText = [IO.File]::ReadAllText($Box); Reader = (Get-ThornswoodStdinReader)
+        Box = $Box; BoxText = [IO.File]::ReadAllText($Box); RunnerPath = ${function:Get-ThornswoodRemoteRunnerPath}
     }
     function global:ssh-keygen {
         $a = @($args | ForEach-Object { [string]$_ })
@@ -303,11 +303,13 @@ try {
         $in = @($input | ForEach-Object { [string]$_ })
         $last = $a[-1]
         # The script as the box would run it: inline, or Send-Script.ps1's
-        # reader on the line with the script on standard input.
+        # runner on the line, which takes the copy scp put in the far folder
+        # off it and runs that (#3059).
         $s = ''
         if ($last -match 'EncodedCommand (\S+)') {
             $s = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($Matches[1]))
-            if ($s -eq $global:H.Reader -and $in.Count) { $s = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($in[0])) }
+            $rp = & $global:H.RunnerPath $s
+            if ($rp) { $rf = Join-Path $global:H.Far ($rp -split '\\')[-1]; $s = [IO.File]::ReadAllText($rf); Remove-Item -LiteralPath $rf -Force }
         }
         # vps-harden.ps1 whole, as a block with its arguments after it: the
         # file under test runs here with them, against the stand-in layer.
@@ -386,8 +388,9 @@ try {
     Yes '-WhatIf: exit 0 and says nothing was changed' ($r.Code -eq 0 -and $r.Text -match 'Nothing was changed\. Run it again without -WhatIf')
     Yes '  the box ran read only' (@($global:H.Calls | Where-Object { $_ -match ' BOX -DryRun$' }).Count -eq 1 -and $r.Text -match 'WOULD sshd_config')
     Yes '  and nothing changed there' ([IO.File]::ReadAllText($global:H.Cfg) -eq $defaultCfg -and $global:Fake.log.Count -eq 0 -and $global:Fake.fDeny -eq 0)
-    Yes '  vps-harden.ps1 went whole on ssh''s standard input, and nothing was copied to the box (#3035)' (
-        -not $global:H.Sent -and @($global:H.Calls | Where-Object { $_ -like 'scp *' -or $_ -match '-File ' }).Count -eq 0)
+    Yes '  vps-harden.ps1 went whole by scp to a copy its run took off the box, so nothing of it is left there (#3035, #3059)' (
+        $global:H.Sent -match 'thornswood-remote-[0-9a-f]{32}\.ps1$' -and @(Get-ChildItem -LiteralPath $global:H.Far -File).Count -eq 0 -and
+        @($global:H.Calls | Where-Object { $_ -like 'scp *' }).Count -ge 1 -and @($global:H.Calls | Where-Object { $_ -match '-File ' }).Count -eq 0)
     Yes '  it showed the login methods and the port before' ($r.Text -match 'login methods now\s+publickey, password, keyboard-interactive' -and $r.Text -match "port $closedPort now\s+does not answer")
 
     # ---- the real run ----------------------------------------------------------------------
@@ -399,7 +402,7 @@ try {
     Yes '  key login proven again before the rollback was cancelled' ($global:H.Cancelled -and
         (@($global:H.Calls | Select-Object -Skip 1 | ForEach-Object { $_ }) -join "`n") -match '(?s) BOX\n.*echo THORNSWOOD_KEY_OK.*\n.*EncodedCommand')
     Yes '  PASS for key login, password refused and the port closed' ($r.Text -match 'PASS  key login works' -and $r.Text -match 'PASS  password login refused \(the box offers publickey\)' -and $r.Text -match "PASS  port $closedPort closed from here")
-    Yes '  every ssh it ran checked the host key, and nothing went by scp' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' -or $_ -like 'scp *' }).Count -eq 0)
+    Yes '  every ssh and scp it ran checked the host key' (@($global:H.Calls | Where-Object { $_ -notmatch 'StrictHostKeyChecking=yes' }).Count -eq 0)
 
     # ---- the port still answers --------------------------------------------------------------
     Fresh

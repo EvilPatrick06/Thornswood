@@ -10,17 +10,18 @@
   their vps-*.ps1, Rotate-BotToken.ps1 a copy of Write-BotToken.ps1,
   Deploy-DevGamemode.ps1 the load order list, and Backup-Server.ps1 a copy of
   the world and the bot's data with its zip. Each now uses one of the two
-  shared ways: the script's text on ssh's standard input, so nothing is
-  written (Send-Script.ps1), or, where files must be made on the box to come
-  back, the run's folder whose life is its keeper's ssh session
-  (scripts\mods\OnBox.ps1).
+  shared ways: the script's text through Send-Script.ps1, whose run takes a
+  long one's copy off the box before it runs it (#3059), or, where files must
+  be made on the box to come back, the run's folder whose life is its
+  keeper's ssh session (scripts\mods\OnBox.ps1).
 
   This checks:
     1. Get-ThornswoodFileScript (Send-Script.ps1), the form a box script
        file is sent in, run the way the box runs it: Send-Script.ps1's
-       reader on the command line of a PowerShell of its own (Windows
+       runner on the command line of a PowerShell of its own (Windows
        PowerShell 5.1 on Windows, which is what the box runs; pwsh
-       elsewhere), the script as the first line of its standard input. The
+       elsewhere), taking the script from its copy in a scratch folder that
+       stands for C:\Windows\Temp, and leaving the copy gone. The
        file's param block takes the arguments, a quoted one whole; a
        function's $script: write reaches the file's own top level, as under
        -File; and the file's exit code is the process's. The same file sent
@@ -54,12 +55,17 @@ function Yes([string]$what, [bool]$cond) {
 # The PowerShell the far side runs under: the box's own on Windows.
 $shell = $(if ($OnWindows) { Get-WindowsPowerShell } else { (Get-Process -Id $PID).Path })
 
-# Runs $script as the box would run it from Send-Script.ps1: the reader on
-# the command line, the script on the first line of standard input.
+# Runs $script as the box would run it from Send-Script.ps1: the runner on
+# the command line, the script in its copy, which the runner takes off the
+# folder before it runs it. The runner's C:\Windows\Temp is $farTemp here.
 function Invoke-AsBox([string]$script) {
+    $id = [Guid]::NewGuid().ToString('N')
+    $copy = Join-Path $farTemp ('thornswood-remote-' + $id + '.ps1')
+    [IO.File]::WriteAllText($copy, "`$ProgressPreference = 'SilentlyContinue'`r`n" + $script, (New-Object Text.UTF8Encoding($false)))
+    $runner = (Get-ThornswoodRemoteRunner -Path ('C:\Windows\Temp\thornswood-remote-' + $id + '.ps1')).Replace(('C:\Windows\Temp\thornswood-remote-' + $id + '.ps1'), $copy).Replace("'C:\Windows\Temp'", ("'" + $farTemp + "'"))
     $psi = New-Object Diagnostics.ProcessStartInfo
     $psi.FileName = $shell
-    $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodStdinReader)))
+    $psi.Arguments = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))
     $psi.UseShellExecute = $false
     $psi.CreateNoWindow = $true
     $psi.RedirectStandardInput = $true
@@ -67,17 +73,18 @@ function Invoke-AsBox([string]$script) {
     $psi.RedirectStandardError = $true
     if ($psi.EnvironmentVariables.ContainsKey('PSModulePath')) { $psi.EnvironmentVariables.Remove('PSModulePath') }
     $p = [Diagnostics.Process]::Start($psi)
-    $p.StandardInput.WriteLine([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes("`$ProgressPreference = 'SilentlyContinue'`r`n" + $script)))
     $p.StandardInput.Close()
     $err = $p.StandardError.ReadToEndAsync()
     $out = $p.StandardOutput.ReadToEnd()
     $p.WaitForExit()
     $lines = @(($out + "`n" + $err.Result) -split '\r?\n' | Where-Object { $_.Trim() })
-    return [pscustomobject]@{ Code = $p.ExitCode; Lines = $lines; Text = ($lines -join "`n") }
+    return [pscustomobject]@{ Code = $p.ExitCode; Lines = $lines; Text = ($lines -join "`n"); CopyLeft = (Test-Path -LiteralPath $copy) }
 }
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-3035-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+$farTemp = Join-Path $tmp 'far-temp'
+New-Item -ItemType Directory -Force -Path $farTemp | Out-Null
 try {
     # ---- 1. the sent form, run ---------------------------------------------------
     # Shaped like vps-harden.ps1 and vps-ssh-scope.ps1: help, CmdletBinding, a
@@ -114,6 +121,7 @@ try {
         ($r.Lines -contains "FROM 203.0.113.7,it's") -and ($r.Lines -contains 'DRY True'))
     Yes '  a function''s $script: write reaches the file''s own top level, as under -File' ($r.Lines -contains 'DONE 2 change(s), stopped False')
     Yes '  and the exit code is the file''s' ($r.Code -eq 0)
+    Yes '  and the runner took its copy off the box''s temp folder (#3059)' (-not $r.CopyLeft)
     if ($r.Code -ne 0 -or -not ($r.Lines -contains 'DONE 2 change(s), stopped False')) { Write-Host ('      it said, exit ' + $r.Code + ': ' + $r.Text) }
 
     $r = Invoke-AsBox (Get-ThornswoodFileScript -Path $box -Arguments "-From 'stop'")
