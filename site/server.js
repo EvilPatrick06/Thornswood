@@ -30,6 +30,29 @@ const https  = require('https');
 const fs     = require('fs');
 const path   = require('path');
 const crypto = require('crypto');
+const tls    = require('tls');
+
+/* NO eMUDHRA ROOT (#3111). Every request this process makes, discord.com with
+   the bot token and the webhooks among them, verified against Node's bundled
+   roots, which are Mozilla's from when this Node was built and carry all four
+   of eMudhra's emSign roots. emSign ECC Root CA - G3 is the root of the eight
+   intermediates found on 17 Oct 2026 with keys anyone could recover (Mozilla
+   bug 2083449), and Node checks no revocation list, so a certificate made with
+   one of those keys was enough to sit between this site and Discord. Mozilla
+   still lists G1, and takes C1 and C3 out only in NSS 3.132, so a newer Node
+   does not end it either. Nothing this site talks to chains to eMudhra, so
+   its roots are what Node trusts by default less each one whose subject or
+   issuer is eMudhra's, set once here before any connection is made, and
+   bot\trust.py leaves out the same for the bot. Taking away is all this does:
+   a root Node drops leaves with the next Node. */
+const NOT_TRUSTED = /O=eMudhra/i;
+const LEFT_OUT = [];
+tls.setDefaultCACertificates(tls.getCACertificates('default').filter((pem) => {
+  const c = new crypto.X509Certificate(pem);
+  if (!NOT_TRUSTED.test(c.subject) && !NOT_TRUSTED.test(c.issuer)) return true;
+  LEFT_OUT.push((c.subject.match(/^CN=(.*)$/m) || [null, c.subject])[1]);
+  return false;
+}));
 
 const PORT   = Number(process.env.THORNSWOOD_DOCS_PORT || 3001);
 /* LOOPBACK UNLESS ASKED (#2185). Caddy holds 443 and hands everything on from
@@ -8336,6 +8359,8 @@ http.createServer((req, res) => {
   console.log('[thornswood-docs] writing this to ' + siteLog.file +
               ', rolled at 4 MB, five kept');
   console.log('[thornswood-docs] documents in ' + DATA);
+  console.log('[thornswood-docs] trusting ' + tls.getCACertificates('default').length +
+              ' root certificates, leaving out ' + (LEFT_OUT.join(', ') || 'none'));
   rereadTrouble();
   // The first retention pass, then every hour (#2350).
   retentionSweep();

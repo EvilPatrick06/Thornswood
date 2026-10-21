@@ -807,7 +807,7 @@ pin points and are not listed separately here.
 |---|---|---|---|
 | `discord.py` | 2.7.1 | MIT | https://pypi.org/project/discord.py/2.7.1/ |
 | `Pillow` | 13.0.0 | MIT-CMU | https://pypi.org/project/Pillow/13.0.0/ |
-| `certifi` | 2026.7.22 | MPL-2.0 | https://pypi.org/project/certifi/2026.7.22/ |
+| `certifi` | 2026.10.19 | MPL-2.0 | https://pypi.org/project/certifi/2026.10.19/ |
 
 discord.py is by Rapptz. Pillow is by Jeffrey A. Clark (Alex) and contributors
 (the Historical Permission Notice and Disclaimer / MIT-CMU text on PyPI).

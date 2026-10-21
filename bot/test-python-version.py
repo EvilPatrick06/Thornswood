@@ -95,7 +95,7 @@ install = open(os.path.join(HERE, '..', 'scripts', 'deploy', 'Install-Bot.ps1'),
 yes('Install-Bot.ps1 sends and checks _pyguard.py with bot.py',
     "'bot/_pyguard.py'" in install
     and "foreach ($f in 'bot.py', '_pyguard.py'," in install
-    and "@('bot.py', '_pyguard.py', 'card.py')" in install)
+    and "@('bot.py', '_pyguard.py', 'trust.py', 'card.py')" in install)
 
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
 sys.exit(1 if FAIL else 0)
