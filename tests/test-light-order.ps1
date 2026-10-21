@@ -305,7 +305,10 @@ function Get-CollectionState([string]$Url) { [pscustomobject]@{ Slug = 'tslight'
         return [pscustomobject]@{ Code = $code; Text = ($out -join "`n") }
     }
     function Settings([string]$t) { return ([IO.File]::ReadAllText((Join-Path $t 'dist\server-settings.json')) | ConvertFrom-Json) }
-    function Leaves($s) { return [string[]]@($s.loadOrder | ForEach-Object { [IO.Path]::GetFileName(([string]$_).Replace('/', '\')) }) }
+    # A load order entry names the plugin by a path written for the box; its
+    # file name is the part after the last separator of either kind, since
+    # GetFileName off Windows does not split on \ (#2989).
+    function Leaves($s) { return [string[]]@($s.loadOrder | ForEach-Object { @(([string]$_) -split '[\\/]')[-1] }) }
 
     # An engine that loads no light plugin: what the live server is today.
     $t = New-Tree 'no-light' '{"binary":"scam_native.node"}'
