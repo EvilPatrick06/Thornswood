@@ -48,6 +48,7 @@ param(
     [switch]   $NoInstall
 )
 
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 # Thornswood's own plugins are read from game\content, every other plugin
 # from -Data (#2923, OwnPlugins.ps1).
 . (Join-Path $PSScriptRoot 'OwnPlugins.ps1')
@@ -77,8 +78,6 @@ $LANGUAGE = 'english'
 # A name that needs 2 or 3 is printed and makes the run fail, so it gets read
 # by a person before it ships.
 $PICK_ORDER = @('tome', 'edid', 'only')
-
-$ErrorActionPreference = 'Stop'
 
 if (-not $Book) { $Book = Join-Path $PSScriptRoot '..\..\game\ui\thornswood-skills.js' }
 if (-not $Out)  { $Out  = Join-Path $PSScriptRoot '..\..\game\data\spells.json' }

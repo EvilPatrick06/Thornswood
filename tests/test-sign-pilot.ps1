@@ -4,6 +4,7 @@
 # and a missing folder must each be refused (exit 1), never accepted with a
 # warning. The signed run is the pilot on One, recorded in
 # records\signing\pilot-2163.json.
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if (-not $OnWindows) { Write-Host 'NOT RUN  the verify half reads Authenticode signatures, and its unsigned test exe is written with Windows PowerShell''s Add-Type, which only Windows has'; exit 0 }
 $ps51 = Get-WindowsPowerShell
@@ -12,7 +13,6 @@ if ($PSVersionTable.PSEdition -eq 'Core') {
     & $ps51 -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
     exit $LASTEXITCODE
 }
-$ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $pilot = Join-Path $repo 'scripts\release\Test-SignPilot.ps1'
 $pass = 0; $fail = 0

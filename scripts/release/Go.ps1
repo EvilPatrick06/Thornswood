@@ -85,7 +85,7 @@ if ($Vortex) {
 }
 
 Set-StrictMode -Off
-$ErrorActionPreference = 'Continue'
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 $ProgressPreference    = 'SilentlyContinue'
 
 $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -93,6 +93,8 @@ $Here    = Split-Path -Parent $MyInvocation.MyCommand.Path
 # Text from the repo goes in with CRLF line endings on every machine, as every
 # release has carried it (ShippedBytes.ps1, #2903).
 . (Join-Path $Here 'ShippedBytes.ps1')
+. (Join-Path $Here 'Front.ps1')   # the front zip against records\front-build.json, asked below
+$ErrorActionPreference = 'Continue'
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 $ui      = Join-Path $Game 'Data\Platform\UI'
@@ -186,7 +188,6 @@ Head 'Front'
 # fonts nobody may hand out, a month after the fork had taken them out
 # (#1317). So a zip that is not the recorded build is not unpacked: that fails
 # the run, as a missing file of ours does, and Ship stops.
-. (Join-Path $Here 'Front.ps1')
 $zip = Join-Path $Here '..\..\local\thornswood-front.zip'
 $frontWhy = @()
 if (-not (Test-Path -LiteralPath $zip)) {

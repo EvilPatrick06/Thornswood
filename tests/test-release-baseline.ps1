@@ -38,7 +38,9 @@
   in its own temp folder.
 #>
 # Scripts this runs whole go to a stand-in box, so the freshness guard lets them be (#2118).
+# Publish-Update names no box of its own, so the guard reads THORNSWOOD_VPS.
 $env:THORNSWOOD_HARNESS = '1'
+$env:THORNSWOOD_VPS = 'harness.invalid'
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
@@ -354,7 +356,9 @@ try {
     # ---- 6. the real Publish-Update.ps1 ---------------------------------------------
     Write-Host ''; Write-Host 'the real Publish-Update.ps1'
     $fake = Join-Path $T 'repo'
-    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
+    # Fresh-Checkout.ps1 too: Publish-Update loads its freshness guard under
+    # Stop since #3006, where before a tree without it walked past the guard.
+    foreach ($f in 'scripts\release\Publish-Update.ps1', 'scripts\deploy\Fresh-Checkout.ps1', 'scripts\release\Read-JsonFile.ps1', 'scripts\release\RecordShape.ps1', 'scripts\release\RepoPlugins.ps1', 'scripts\release\Ship-Rules.ps1', 'scripts\mods\LoadOrder.ps1',
                    'scripts\release\Feed-Store.ps1', 'scripts\release\Feed-Json.ps1', 'scripts\release\Release-Baseline.ps1', 'scripts\release\Release-Name.ps1', 'scripts\release\Source-Notice.ps1',
                    'scripts\release\Dev-News.ps1', 'scripts\deploy\ServerContent.ps1',
                    'scripts\release\Feed-News.ps1', 'scripts\release\Feed-Rules.ps1', 'scripts\release\Release-Manifest.ps1', 'scripts\release\Sign-OnGitHub.ps1', 'scripts\release\Assert-PublishSigned.ps1', 'scripts\release\ShippedBytes.ps1',

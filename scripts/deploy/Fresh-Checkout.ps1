@@ -26,6 +26,13 @@
 # THE ONE WAY PAST IT is -AllowStale, which each caller exposes as
 # -AllowStaleCheckout. It prints a banner nobody can miss and carries on.
 #
+# LOADED UNDER STOP (#3006). Every caller sets $ErrorActionPreference to
+# Stop before it dot-sources this file. Under Continue a missing or broken
+# copy is an error PowerShell prints and walks past, Assert-FreshCheckout is
+# then "not recognized", and the deploy or Ship goes on unchecked: Ship did
+# exactly that until #3006. tests\test-3006-loads-under-stop.ps1 holds every
+# script to it.
+#
 # ONCE PER RUN. A script that calls another (Ship calling Publish-Server)
 # would fetch twice. The first pass writes the commit it passed in
 # THORNSWOOD_FRESH_CHECKED, and a later call at the same commit in the same

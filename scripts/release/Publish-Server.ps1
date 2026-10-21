@@ -218,6 +218,7 @@ param(
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
+$ErrorActionPreference = 'Stop'   # before any file loads, so one that is missing stops here (#3006)
 . (Join-Path $PSScriptRoot 'Read-JsonFile.ps1')   # ConvertFrom-ThornswoodJson: a bad JSON file named
 
 # A stale or dirty checkout sends old or unlanded code; refuse it (#2118).
@@ -240,7 +241,6 @@ if ($IsDev) {
     $NoPush = $true
 }
 
-$ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 # Resolved here, not as the parameters' defaults: 5.1 leaves $PSScriptRoot
