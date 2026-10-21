@@ -28,6 +28,10 @@
   box saying only that there were technical difficulties. This check would
   have found it in ten seconds and could not be pointed at the file.
 
+  For a server, every check reads the server's own files (#2950): the plugin
+  its load order names and the gamemode.js it runs, on the box, in the same
+  call that reads its settings. Only the build reads -Data and -Dist.
+
   Read only, here and there. It changes nothing on either machine.
 #>
 param(
@@ -51,12 +55,67 @@ function Ok  ($m) { Write-Host "  ok    $m" -ForegroundColor Green }
 function Bad ($m) { Write-Host "  FAIL  $m" -ForegroundColor Red; $script:fail++ }
 function Note($m) { Write-Host "        $m" -ForegroundColor DarkGray }
 
+# What the plugin at $Path holds for the checks below, one line a record:
+# 'BOOK <form id> <has a name> <has a mesh>' and 'MESG <form id> <buttons>'.
+# It runs here for the build and on the box for a server, in Windows
+# PowerShell there, so it only reads and only writes text.
+function Read-ThornswoodChargenRecords([string]$Path) {
+    $bytes = [IO.File]::ReadAllBytes($Path)
+    # Walk the BOOK and MESG top groups rather than the whole file: the
+    # records are small, uncompressed, and all in one place.
+    $i = 0
+    while ($i + 24 -le $bytes.Length) {
+        $tag = [Text.Encoding]::ASCII.GetString($bytes, $i, 4)
+        if ($tag -eq 'GRUP') {
+            $gs = [BitConverter]::ToUInt32($bytes, $i + 4)
+            if ($gs -lt 24) { break }
+            $label = [Text.Encoding]::ASCII.GetString($bytes, $i + 8, 4)
+            if ($label -eq 'MESG' -or $label -eq 'BOOK') {
+                $j = $i + 24
+                while ($j + 24 -le $i + $gs) {
+                    $ds  = [BitConverter]::ToUInt32($bytes, $j + 4)
+                    $fid = [BitConverter]::ToUInt32($bytes, $j + 12)
+                    $body = [Text.Encoding]::GetEncoding(1252).GetString($bytes, $j + 24, $ds)
+                    if ($label -eq 'MESG') { 'MESG {0:X8} {1}' -f $fid, ([regex]::Matches($body, 'ITXT')).Count }
+                    else { 'BOOK {0:X8} {1} {2}' -f $fid, [int]$body.Contains('FULL'), [int]$body.Contains('MODL') }
+                    $j += 24 + $ds
+                }
+            }
+            $i += $gs
+            continue
+        }
+        $ds = [BitConverter]::ToUInt32($bytes, $i + 4)
+        $i += 24 + $ds
+    }
+}
+
+# Which of $Needles the gamemode at $Path mentions, one line each:
+# 'HAS 1 <needle>' or 'HAS 0 <needle>'. Runs here or on the box, like the above.
+function Find-ThornswoodGamemodeText([string]$Path, [string[]]$Needles) {
+    $js = [IO.File]::ReadAllText($Path)
+    foreach ($n in $Needles) { 'HAS ' + [int]$js.Contains($n) + ' ' + $n }
+}
+
+# What a gamemode.js that knows about the creation flow mentions.
+$gmNeedles = @(
+    @{ Text = "e8001f:Thornswood-Content.esp"; What = 'the trade writs' }
+    @{ Text = "e80039:Thornswood-Content.esp"; What = 'the town passages' }
+    @{ Text = "19bad4:Skyrim Unbound.esp";     What = 'the creation room' }
+    @{ Text = "thornswoodChargen";             What = 'the creation state property' }
+)
+
 if ($From -eq 'build') {
     $settingsPath = Join-Path $Dist 'server-settings.json'
     if (-not (Test-Path -LiteralPath $settingsPath)) { throw "not found: $settingsPath" }
     $s = Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Json
     Write-Host ''
     Write-Host "reading the build at $settingsPath" -ForegroundColor DarkGray
+    $espWhere = Join-Path $Data 'Thornswood-Content.esp'
+    $espLines = $null
+    if (Test-Path -LiteralPath $espWhere) { $espLines = @(Read-ThornswoodChargenRecords $espWhere) }
+    $gmWhere = Join-Path $Dist 'gamemode.js'
+    $gmLines = $null
+    if (Test-Path -LiteralPath $gmWhere) { $gmLines = @(Find-ThornswoodGamemodeText $gmWhere ([string[]]@($gmNeedles | ForEach-Object { $_.Text }))) }
 } else {
     # The files are read where they live and only text comes back. Nothing
     # is written on either machine.
@@ -69,20 +128,52 @@ if ($From -eq 'build') {
     # game folder (a cloud one) this stopped on the first plugin it could
     # not find, and a game folder with another copy of a plugin answered for
     # a file the server does not load.
+    #
+    # AND SO ARE THE PLUGIN AND THE GAMEMODE (#2950). The records were read
+    # from Thornswood-Content.esp in -Data and the gamemode from -Dist, the
+    # files on this machine, which the server never runs: our plugin goes to
+    # the box from the repo (game\content), not from a game folder, and its
+    # gamemode.js from whichever deploy last ran. Both are read there now, in
+    # this call: the plugin the load order names, and the gamemode by the
+    # engine's own rule (skymp5-server/ts/settings.ts: the settings'
+    # gamemodePath, else skymp5-gamemode\gamemode.js when that folder is
+    # there, else gamemode.js, from the server's folder, where it runs). A
+    # load order entry that is not a full path is under dataDir, as
+    # ScampServer.cpp reads it.
     $root = if ($From -eq 'dev') { 'C:\Thornswood-Server-Dev' } else { 'C:\Thornswood-Server' }
     $settingsPath = "$root\server-settings.json"
     $lightDef = 'function Test-ThornswoodPluginLight {' + "`n" + (Get-Command Test-ThornswoodPluginLight).Definition + "`n}"
+    $recordsDef = 'function Read-ThornswoodChargenRecords {' + "`n" + (Get-Command Read-ThornswoodChargenRecords).Definition + "`n}"
+    $gmDef = 'function Find-ThornswoodGamemodeText {' + "`n" + (Get-Command Find-ThornswoodGamemodeText).Definition + "`n}"
+    $needleList = (@($gmNeedles | ForEach-Object { "'" + $_.Text.Replace("'", "''") + "'" }) -join ', ')
     $remote = @"
 `$ProgressPreference = 'SilentlyContinue'
 $lightDef
+$recordsDef
+$gmDef
 `$raw = Get-Content -LiteralPath '$settingsPath' -Raw
+`$cfg = `$raw | ConvertFrom-Json
 `$rp = '$root\server-build.json'
 if (-not (Test-Path -LiteralPath `$rp)) { 'ENGINE none' }
 else { try { `$r = Get-Content -LiteralPath `$rp -Raw | ConvertFrom-Json; 'ENGINE ' + [string](`$r.lightPlugins -eq `$true) } catch { 'ENGINE unreadable' } }
-foreach (`$o in @((`$raw | ConvertFrom-Json).loadOrder)) {
+`$dataDir = [string]`$cfg.dataDir
+if (-not [IO.Path]::IsPathRooted(`$dataDir)) { `$dataDir = Join-Path '$root' `$dataDir }
+`$esp = `$null
+foreach (`$o in @(`$cfg.loadOrder)) {
   `$f = [string]`$o
+  if (-not [IO.Path]::IsPathRooted(`$f)) { `$f = Join-Path `$dataDir `$f }
+  if ([IO.Path]::GetFileName(`$f) -eq 'Thornswood-Content.esp') { `$esp = `$f }
   try { 'LIGHT ' + [int](Test-ThornswoodPluginLight `$f) + ' ' + [IO.Path]::GetFileName(`$f) } catch { 'UNREAD ' + [IO.Path]::GetFileName(`$f) }
 }
+if (-not `$esp) { 'PLUGIN NONE' }
+elseif (-not (Test-Path -LiteralPath `$esp)) { 'PLUGIN MISSING ' + `$esp }
+else { 'PLUGIN AT ' + `$esp; Read-ThornswoodChargenRecords `$esp }
+`$gm = 'gamemode.js'
+if (`$cfg.gamemodePath) { `$gm = [string]`$cfg.gamemodePath }
+elseif (Test-Path -LiteralPath '$root\skymp5-gamemode') { `$gm = 'skymp5-gamemode\gamemode.js' }
+if (-not [IO.Path]::IsPathRooted(`$gm)) { `$gm = Join-Path '$root' `$gm }
+if (-not (Test-Path -LiteralPath `$gm)) { 'GAMEMODE MISSING ' + `$gm }
+else { 'GAMEMODE AT ' + `$gm; Find-ThornswoodGamemodeText `$gm @($needleList) }
 'SETTINGS'
 `$raw
 "@
@@ -97,14 +188,23 @@ foreach (`$o in @((`$raw | ConvertFrom-Json).loadOrder)) {
     $boxEngine = @($lines | Where-Object { $_ -like 'ENGINE *' } | Select-Object -First 1)
     $boxLight = @{}
     $boxUnread = @()
-    foreach ($l in $lines) {
+    $espWhere = "Thornswood-Content.esp, which the $From server's load order does not name"
+    $espLines = $null
+    $gmWhere = ''
+    $gmLines = $null
+    foreach ($l in @($lines | Select-Object -First $at | ForEach-Object { $_.Trim() })) {
         if ($l -match '^LIGHT ([01]) (.+)$') { $boxLight[$Matches[2].Trim().ToLowerInvariant()] = ($Matches[1] -eq '1') }
         elseif ($l -match '^UNREAD (.+)$') { $boxUnread += $Matches[1].Trim() }
+        elseif ($l -match '^PLUGIN MISSING (.+)$') { $espWhere = "$($Matches[1]) on the $From server" }
+        elseif ($l -match '^PLUGIN AT (.+)$') { $espWhere = "$($Matches[1]) on the $From server"; $espLines = @() }
+        elseif ($l -match '^(BOOK|MESG) ' -and $null -ne $espLines) { $espLines += $l }
+        elseif ($l -match '^GAMEMODE MISSING (.+)$') { $gmWhere = "$($Matches[1]) on the $From server" }
+        elseif ($l -match '^GAMEMODE AT (.+)$') { $gmWhere = "$($Matches[1]) on the $From server"; $gmLines = @() }
+        elseif ($l -match '^HAS ' -and $null -ne $gmLines) { $gmLines += $l }
     }
     Write-Host ''
     Write-Host "reading the $From server at $Vps, $settingsPath" -ForegroundColor DarkGray
-    Write-Host '  and which of its plugins are light, from the files it loads there' -ForegroundColor DarkGray
-    Write-Host '  the plugin and gamemode checks below still read this machine' -ForegroundColor DarkGray
+    Write-Host '  and the plugins, plugin records and gamemode.js it loads, there' -ForegroundColor DarkGray
 }
 $order = @($s.loadOrder | ForEach-Object { @("$_".Trim() -split '[\\/]')[-1] })
 
@@ -141,52 +241,18 @@ if ($idxUnbound -lt 0) {
 
 Write-Host ''
 Write-Host 'plugin records' -ForegroundColor Cyan
-$esp = Join-Path $Data 'Thornswood-Content.esp'
-if (-not (Test-Path -LiteralPath $esp)) {
-    Bad "not found: $esp"
+if ($null -eq $espLines) {
+    Bad "not found: $espWhere"
 } else {
-    $bytes = [IO.File]::ReadAllBytes($esp)
-    # Walk the BOOK top group rather than the whole file: the records are small,
-    # uncompressed, and all in one place.
+    Note "read from $espWhere"
     $books = @{}
     $menus = @{}
-    $i = 0
-    while ($i + 24 -le $bytes.Length) {
-        $tag = [Text.Encoding]::ASCII.GetString($bytes, $i, 4)
-        if ($tag -eq 'GRUP') {
-            $gs = [BitConverter]::ToUInt32($bytes, $i + 4)
-            if ($gs -lt 24) { break }
-            $label = [Text.Encoding]::ASCII.GetString($bytes, $i + 8, 4)
-            if ($label -eq 'MESG') {
-                $j = $i + 24
-                while ($j + 24 -le $i + $gs) {
-                    $ds  = [BitConverter]::ToUInt32($bytes, $j + 4)
-                    $fid = [BitConverter]::ToUInt32($bytes, $j + 12)
-                    $body = [Text.Encoding]::GetEncoding(1252).GetString($bytes, $j + 24, $ds)
-                    $buttons = ([regex]::Matches($body, 'ITXT')).Count
-                    $menus[$fid] = $buttons
-                    $j += 24 + $ds
-                }
-            }
-            if ($label -eq 'BOOK') {
-                $j = $i + 24
-                while ($j + 24 -le $i + $gs) {
-                    $ds  = [BitConverter]::ToUInt32($bytes, $j + 4)
-                    $fid = [BitConverter]::ToUInt32($bytes, $j + 12)
-                    $body = [Text.Encoding]::GetEncoding(1252).GetString($bytes, $j + 24, $ds)
-                    $books[$fid] = @{
-                        HasName = $body.Contains('FULL')
-                        HasMesh = $body.Contains('MODL')
-                        Size    = $ds
-                    }
-                    $j += 24 + $ds
-                }
-            }
-            $i += $gs
-            continue
+    foreach ($l in $espLines) {
+        if ($l -match '^BOOK ([0-9A-F]{8}) ([01]) ([01])$') {
+            $books[[Convert]::ToUInt32($Matches[1], 16)] = @{ HasName = ($Matches[2] -eq '1'); HasMesh = ($Matches[3] -eq '1') }
+        } elseif ($l -match '^MESG ([0-9A-F]{8}) (\d+)$') {
+            $menus[[Convert]::ToUInt32($Matches[1], 16)] = [int]$Matches[2]
         }
-        $ds = [BitConverter]::ToUInt32($bytes, $i + 4)
-        $i += 24 + $ds
     }
 
     $writs    = 0x05E80010..0x05E8001F
@@ -232,18 +298,12 @@ if (-not (Test-Path -LiteralPath $esp)) {
 
 Write-Host ''
 Write-Host 'gamemode' -ForegroundColor Cyan
-$gm = Join-Path $Dist 'gamemode.js'
-if (-not (Test-Path -LiteralPath $gm)) {
-    Bad "not found: $gm"
+if ($null -eq $gmLines) {
+    Bad "not found: $gmWhere"
 } else {
-    $js = Get-Content -LiteralPath $gm -Raw
-    foreach ($needle in @(
-        @{ Text = "e8001f:Thornswood-Content.esp"; What = 'the trade writs' }
-        @{ Text = "e80039:Thornswood-Content.esp"; What = 'the town passages' }
-        @{ Text = "19bad4:Skyrim Unbound.esp";     What = 'the creation room' }
-        @{ Text = "thornswoodChargen";             What = 'the creation state property' }
-    )) {
-        if ($js.Contains($needle.Text)) { Ok ("gamemode.js knows {0}" -f $needle.What) }
+    Note "read from $gmWhere"
+    foreach ($needle in $gmNeedles) {
+        if ($gmLines -contains ('HAS 1 ' + $needle.Text)) { Ok ("gamemode.js knows {0}" -f $needle.What) }
         else { Bad ("gamemode.js does not mention {0} - it is the old build" -f $needle.What) }
     }
 }
