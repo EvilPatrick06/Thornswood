@@ -39,11 +39,6 @@ WHAT IT WRITES, between markers, the way the recipe table is written:
                     This is the join the server has never had.
     BENCH_ACCESS    bench keyword descriptor -> what can be made there:
                       name    the keyword's editor id, for the log and nothing else
-                      anyone  true when the bench holds a recipe nobody owns,
-                              which anybody may make, so anybody may use it. The
-                              smelter is the one this exists for and BENCH_OWNER
-                              says why in as many words. Never on a bench in
-                              TRADE_BENCHES below.
                       rows    every recipe at the bench that reaches the server,
                               by descriptor. The gate opens the bench for
                               somebody craftAnswer allows one of them, so the
@@ -54,7 +49,9 @@ WHAT IT WRITES, between markers, the way the recipe table is written:
                               menu stations, which hold no rows.
                       shut    only on a bench in SHUT_BENCHES below: the sentence
                               the gate says instead of opening it, for anybody.
-                              Such a bench has anyone false and no halves.
+                              Such a bench has no rows and no halves.
+
+No bench opens for everybody (#3080, NO BENCH IS OPEN FOR ITS OWN SAKE below).
 
 A bench with no owned recipes and no unowned ones is not in BENCH_ACCESS at all,
 and the gate refuses a base whose bench it cannot find. That is the "some benches
@@ -130,15 +127,13 @@ MENU_STATIONS = {
 # rest of the menu (handRecipesHidden). A race's own gear, a roll's gear and a
 # rank are all in that answer, so no door can be wider than the craft.
 #
-# A row nobody owns still opens its bench for everybody, since anybody may make
-# it, except at the benches below: they are trades' benches, and the rings,
-# fur plate, fishing nets and cloak nobody owns there are made by whoever the
-# bench is open to.
-TRADE_BENCHES = {
-    'CraftingSmithingForge': 'Smiths, Tailors and the Woodwright make things here',
-    'CraftingTanningRack': 'Smiths and Tailors make things here',
-    'MCE_CraftingLoom': 'Tailors make things here',
-}
+# No bench opens for everybody. Patrick, 21 October, asked whether the smelter
+# should close as well: "yes any bench or thing you can craft or do anything
+# Proffesion or Trade related", "Proffesion, Sub-Proffesion or class". A row
+# nobody owns (the forge's rings, the smelter's ores, the tanning rack's fur
+# plate) is made by whoever the bench opens for, and a bench that holds only
+# such rows (the Hearthfire building benches) opens for nobody: there is
+# nothing anybody can make there that is their trade.
 
 
 # THE BENCHES NOTHING CAN BE MADE AT, WHOEVER YOU ARE (#1384).
@@ -156,7 +151,7 @@ TRADE_BENCHES = {
 # premise "Tempering never reaches the server", which stopped being true when
 # the refusal went in. So Skyrim's crafting menu opened and listed every piece
 # you could temper, and only the pick was refused. A bench here is written shut,
-# whatever rows it holds: anyone false, no
+# whatever rows it holds: no rows, no
 # halves, and the sentence the gate says instead of opening it. It stays in
 # BENCH_BY_BASE, because recipelessCraft and TWO_HANDS still name it. The
 # sentence is the gamemode's temper refusal, word for word, and
@@ -304,7 +299,7 @@ def main():
         if not bench:
             continue
         by_name[bname] = bench
-        a = access.setdefault(bench, {'name': bname, 'anyone': False, 'halves': {}})
+        a = access.setdefault(bench, {'name': bname, 'halves': {}})
         # A row the engine throws out before a craft (a temper) is nothing
         # anybody makes, so it opens nothing.
         if row.get('fires') is not False:
@@ -342,8 +337,9 @@ def main():
     for name in order:
         scan(own_plugins.plugin_path(args.data, name), name, set(), keywords)
 
-    # An unowned recipe is one anybody may make, so its bench opens for everyone,
-    # unless it is a trade's bench (TRADE_BENCHES).
+    # A bench that holds only rows nobody owns is still a bench, so it is in
+    # the table and its furniture in BENCH_BY_BASE: with no rows and no halves
+    # the gate keeps it shut, rather than leaving it to Skyrim (#3080).
     no_desc = set()
     for row in unowned.values():
         bname = row.get('benchName')
@@ -353,9 +349,7 @@ def main():
         if not bench:
             no_desc.add(bname)
             continue
-        a = access.setdefault(bench, {'name': bname, 'anyone': False, 'halves': {}})
-        if bname not in TRADE_BENCHES:
-            a['anyone'] = True
+        access.setdefault(bench, {'name': bname, 'halves': {}})
 
     # The benches nothing can be made at are shut for everybody, last, so no row
     # can open one again (#1384).
@@ -365,13 +359,12 @@ def main():
         if not bench:
             shut_not_here.append(bname)
             continue
-        access[bench] = {'name': bname, 'anyone': False, 'halves': {},
+        access[bench] = {'name': bname, 'halves': {},
                          'shut': SHUT_BENCHES[bname]}
 
     # And the two stations whose work is a menu rather than a recipe.
     for spec in MENU_STATIONS.values():
-        a = access.setdefault(spec['key'], {'name': spec['name'], 'anyone': False,
-                                            'halves': {}})
+        a = access.setdefault(spec['key'], {'name': spec['name'], 'halves': {}})
         for half, rank in spec['halves'].items():
             a['halves'].setdefault(half, rank)
 
@@ -384,7 +377,7 @@ def main():
         a = access[bench]
         halves = ', '.join('%s %s' % (h, a['halves'][h]) for h in sorted(a['halves']))
         print('    %-32s %-27s %s%s' % (a['name'], bench,
-                                        'shut' if a.get('shut') else ('anyone' if a['anyone'] else ''),
+                                        'shut' if a.get('shut') else ('' if a.get('rows') or a['halves'] else 'nobody'),
                                         halves and ' | ' + halves))
     if shut_not_here:
         print('')
@@ -472,8 +465,6 @@ def main():
 
     lines = ['/* Bench keyword -> who can make anything at it. Generated by',
              '   scripts\\dev\\Build-BenchTable.py; do not hand edit.',
-             '     anyone  it holds a recipe nobody owns, which anybody may make, so it',
-             '             opens for everybody',
              '     rows    every recipe here that reaches the server; the gate opens the',
              '             bench for somebody craftAnswer allows one of them',
              '     halves  each half that owns something here, at the LOWEST rank it owns',

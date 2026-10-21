@@ -86,8 +86,9 @@ Until a profession is picked, nothing that belongs to a half is made.
 Smelting an ingot belongs to the smith halves. Tanning a hide into
 leather belongs to the Platewright. One row of each stays. The
 duplicate rows are in [Cut items](cut-items.md). House walls, roofs
-and furniture are still on the anybody list:
-[lists/anybody.md](lists/anybody.md). Nails, hinges, locks and iron
+and furniture are owned by nobody
+([lists/anybody.md](lists/anybody.md)), and the Hearthfire building
+benches they sit at open for nobody. Nails, hinges, locks and iron
 fittings are refused: [lists/refused.md](lists/refused.md).
 
 A recipe can also demand a race. [Races](races.md). The locked rows
@@ -113,10 +114,10 @@ race's own gear and a roll all count. The menu then lists only what you
 may make.
 
 Who each bench opens for. A half is one you can work at the rank named:
-your own half, or your sister half or a taught half at novice. The
-forge, the tanning rack and the loom are trades' benches: the few things
-there that nobody owns (rings, fur plate, a cloak) are made by whoever
-the bench opens for, not by anybody.
+your own half, or your sister half or a taught half at novice. No
+bench opens for everybody: the few things at a bench that nobody owns
+(rings at the forge, ores at the smelter, fur plate at the tanning rack)
+are made by whoever the bench opens for.
 
 | Bench | Who |
 | --- | --- |
@@ -135,6 +136,7 @@ the bench opens for, not by anybody.
 | Loom | Haberdasher or Liverywright, from novice |
 | Armour table | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
 | Aetherium forge | Shut for everybody. Nobody works it |
+| Smelter | Platewright, from novice |
 
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a

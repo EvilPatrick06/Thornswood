@@ -61,8 +61,8 @@ yes("no list of open furniture is left to call the armour table open (#3080)", p
 const iShut = py.indexOf("for bname in sorted(SHUT_BENCHES):");
 yes("the shut benches are written after the rows nobody owns, so none opens one again",
   iShut > py.indexOf("for row in unowned.values():"));
-yes("a shut bench is written with anyone false, no halves, and its sentence",
-  /access\[bench\] = \{'name': bname, 'anyone': False, 'halves': \{\},\s*'shut': SHUT_BENCHES\[bname\]\}/.test(py.slice(iShut)));
+yes("a shut bench is written with no rows, no halves, and its sentence",
+  /access\[bench\] = \{'name': bname, 'halves': \{\},\s*'shut': SHUT_BENCHES\[bname\]\}/.test(py.slice(iShut)));
 
 // ---- the table in the gamemode ------------------------------------------------
 let ACCESS = null, BY_BASE = null;
@@ -72,7 +72,7 @@ yes("BENCH_ACCESS and BENCH_BY_BASE parse", !!ACCESS && !!BY_BASE);
 [[WHEEL, "the sharpening wheel"], [TABLE, "the armour table"]].forEach(function (b) {
   const row = ACCESS && ACCESS[b[0]];
   yes(b[1] + " is in BENCH_ACCESS, shut, with nobody let in",
-    !!row && row.anyone === false && JSON.stringify(row.halves) === "{}" && row.shut === SAYS);
+    !!row && !row.rows && JSON.stringify(row.halves) === "{}" && row.shut === SAYS);
   const bases = Object.keys(BY_BASE || {}).filter(function (k) { return BY_BASE[k] === b[0]; });
   yes(b[1] + " is still in BENCH_BY_BASE, which recipelessCraft and TWO_HANDS read", bases.length > 0);
 });
@@ -88,7 +88,7 @@ const ge = gm.indexOf("\n}\n", gs);
 const gateSrc = gs < 0 || ge < 0 ? "" : gm.slice(gs, ge + 2);
 yes("benchGate answers a shut bench's sentence before it reads the character",
   gateSrc.indexOf("if (bench.shut) { return String(bench.shut); }") > 0 &&
-  gateSrc.indexOf("if (bench.shut)") < gateSrc.indexOf("if (bench.anyone)") &&
+  gateSrc.indexOf("if (bench.anyone)") < 0 &&
   gateSrc.indexOf("if (bench.shut)") < gateSrc.indexOf("__thornswoodCharacter"));
 function gateWith(character, progression) {
   const g = { __thornswoodCharacter: character, __thornswoodProgression: progression };
@@ -219,13 +219,13 @@ try {
     try { A = JSON.parse(/const BENCH_ACCESS = (\{.*\});/.exec(after)[1]); } catch (e) { A = null; }
     try { B = JSON.parse(/const BENCH_BY_BASE = (\{.*\});/.exec(after)[1]); } catch (e) { B = null; }
     yes("the wheel's temper rows no longer open it for the Edgewright or the Woodwright",
-      !!A && !!A[WHEEL] && A[WHEEL].anyone === false && JSON.stringify(A[WHEEL].halves) === "{}" && A[WHEEL].shut === SAYS);
+      !!A && !!A[WHEEL] && !A[WHEEL].rows && JSON.stringify(A[WHEEL].halves) === "{}" && A[WHEEL].shut === SAYS);
     yes("the armour table's owned temper row and the row nobody owns no longer open it",
-      !!A && !!A[TABLE] && A[TABLE].anyone === false && JSON.stringify(A[TABLE].halves) === "{}" && A[TABLE].shut === SAYS);
+      !!A && !!A[TABLE] && !A[TABLE].rows && JSON.stringify(A[TABLE].halves) === "{}" && A[TABLE].shut === SAYS);
     yes("both benches' furniture is still in BENCH_BY_BASE",
       !!B && B["900:Skyrim.esm"] === WHEEL && B["901:Skyrim.esm"] === TABLE);
-    yes("the forge is untouched: with no row nobody owns it opens for its owner alone (#3080)",
-      !!A && !!A["88105:Skyrim.esm"] && A["88105:Skyrim.esm"].anyone === false && !A["88105:Skyrim.esm"].shut &&
+    yes("the forge is untouched: it opens for whoever may make one of its rows (#3080)",
+      !!A && !!A["88105:Skyrim.esm"] && !("anyone" in A["88105:Skyrim.esm"]) && !A["88105:Skyrim.esm"].shut &&
       JSON.stringify(A["88105:Skyrim.esm"].halves) === '{"edgewright":"novice"}');
     yes("the run says both benches are shut", /CraftingSmithingArmorTable\s+adb78:Skyrim\.esm\s+shut/.test(r.out) &&
       /CraftingSmithingSharpeningWheel\s+88108:Skyrim\.esm\s+shut/.test(r.out));

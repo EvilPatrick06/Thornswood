@@ -20,10 +20,9 @@
 //
 // #3080 took the knob away. Patrick, 21 October: "An open bench opens only for
 // somebody with at least one recipe there that they may make." Each bench
-// carries its rows and benchGate asks craftAnswer of them. A bench opens for
-// anybody only when it holds a row nobody owns and is not a trade's bench
-// (the forge, the tanning rack, the loom), so the cookpot, which holds none
-// since #1391, is the Hearthcook's, and the page says so.
+// carries its rows and benchGate asks craftAnswer of them. No bench opens for
+// everybody: Patrick, asked about the smelter, "yes any bench or thing you can
+// craft or do anything Proffesion or Trade related".
 //
 // This holds the gamemode's markers, the table in the gamemode against the
 // page and against game/data/recipes.json, and runs the builder against a
@@ -73,13 +72,12 @@ yes("the BENCH_ACCESS block holds its comment and the table and nothing else",
 
 // ---- no knob: a bench opens for anybody only on a row nobody owns ---------
 yes("the builder has no OPEN_FURNITURE knob", py.indexOf("OPEN_FURNITURE") < 0);
-yes("anyone is set only from the rows nobody owns, never at a trade's bench",
-  (py.match(/a\['anyone'\] = True/g) || []).length === 1 &&
-  /for row in unowned\.values\(\):[\s\S]*?if bname not in TRADE_BENCHES:\s*a\['anyone'\] = True/.test(py));
-const trade = (/TRADE_BENCHES = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
-yes("TRADE_BENCHES is the forge, the tanning rack and the loom (Patrick, 21 October)",
-  ["CraftingSmithingForge", "CraftingTanningRack", "MCE_CraftingLoom"].every(function (n) { return trade.indexOf("'" + n + "'") >= 0; }) &&
-  (trade.match(/^\s+'[^']+': /gm) || []).length === 3);
+yes("no bench opens for everybody: the builder writes no anyone and has no list of trades' benches",
+  py.indexOf("'anyone'") < 0 && py.indexOf("TRADE_BENCHES") < 0);
+yes("benchGate has no door for everybody", gm.indexOf("bench.anyone") < 0);
+yes("a bench with no rows and no halves is shut for everybody before the character is read",
+  /if \(!\(Array\.isArray\(bench\.rows\) && bench\.rows\.length\) && !Object\.keys\(halves\)\.length\) \{\s*return 'There is nothing anybody can make here\.';/.test(gm) &&
+  gm.indexOf("There is nothing anybody can make here.") < gm.indexOf("const C = globalThis.__thornswoodCharacter;", gm.indexOf("function benchGate(")));
 yes("benchGate asks craftAnswer of the bench's rows",
   /if \(Array\.isArray\(bench\.rows\)\) \{[\s\S]{0,200}craftRow\(bench\.rows\[i\]\)[\s\S]{0,100}!craftAnswer\(actorId, row\)\.refusal\) \{ return null; \}/.test(gm));
 
@@ -106,18 +104,18 @@ const PAGE = {
   "Sharpening wheel": "CraftingSmithingSharpeningWheel", "Skyforge": "CraftingSmithingSkyforge",
   "Dawnguard bench": "DLC1CraftingDawnguard", "Forge": "CraftingSmithingForge",
   "Tanning rack": "CraftingTanningRack", "Loom": "MCE_CraftingLoom",
-  "Armour table": "CraftingSmithingArmorTable", "Aetherium forge": "DLC1LD_CraftingForgeAetherium"
+  "Armour table": "CraftingSmithingArmorTable", "Aetherium forge": "DLC1LD_CraftingForgeAetherium",
+  "Smelter": "CraftingSmelter"
 };
 yes("every bench on the page is named here", Object.keys(rows).length === Object.keys(PAGE).length &&
   Object.keys(rows).every(function (p) { return !!PAGE[p]; }));
 Object.keys(PAGE).forEach(function (p) {
   const b = byName(PAGE[p]);
-  const page_anybody = !!rows[p] && /^Anybody\./.test(rows[p]);
-  yes("the page and the table agree whether the " + p.toLowerCase() + " opens for anybody",
-    !!rows[p] && !!b && b.anyone === page_anybody);
+  yes("the page names who the " + p.toLowerCase() + " opens for, and it is not anybody",
+    !!rows[p] && !!b && !("anyone" in b) && !/^Anybody/.test(rows[p]));
 });
 yes("the cookpot is the Hearthcook's at novice and opens for nobody else",
-  !!byName("CraftingCookpot") && byName("CraftingCookpot").anyone === false &&
+  !!byName("CraftingCookpot") && !("anyone" in byName("CraftingCookpot")) &&
   JSON.stringify(byName("CraftingCookpot").halves) === '{"hearthcook":"novice"}' &&
   rows["Cookpot"] === "Hearthcook, from novice");
 
@@ -132,14 +130,16 @@ if (RECIPES && ACCESS) {
   Object.keys(RECIPES.unowned).forEach(function (k) { unownedAt[RECIPES.unowned[k].benchName] = true; });
   const owned = {};
   Object.keys(RECIPES.recipes).forEach(function (k) { if (RECIPES.recipes[k].benchName) { owned[RECIPES.recipes[k].benchName] = true; } });
-  const TRADE = { CraftingSmithingForge: 1, CraftingTanningRack: 1, MCE_CraftingLoom: 1 };
-  const wrong = Object.keys(ACCESS).filter(function (k) {
+  const everybody = Object.keys(ACCESS).filter(function (k) { return "anyone" in ACCESS[k]; });
+  yes("no bench in BENCH_ACCESS carries a door for everybody", everybody.length === 0);
+  const holdsOnlyUnowned = Object.keys(ACCESS).filter(function (k) {
     const a = ACCESS[k];
-    if (!owned[a.name] && !unownedAt[a.name]) { return false; }
-    return a.anyone !== (!!unownedAt[a.name] && !a.shut && !TRADE[a.name]);
-  }).map(function (k) { return ACCESS[k].name; });
-  yes("every bench in BENCH_ACCESS opens for anybody exactly when it holds a row nobody owns and is not a trade's" +
-    (wrong.length ? " (not: " + wrong.join(", ") + ")" : ""), wrong.length === 0);
+    return !a.shut && unownedAt[a.name] && !owned[a.name];
+  });
+  yes("a bench that holds only rows nobody owns has no rows and no halves, so it opens for nobody",
+    holdsOnlyUnowned.length > 0 && holdsOnlyUnowned.every(function (k) {
+      return !ACCESS[k].rows && JSON.stringify(ACCESS[k].halves) === "{}";
+    }));
   const rowsAt = {};
   Object.keys(RECIPES.recipes).forEach(function (d) {
     const r = RECIPES.recipes[d];
@@ -237,12 +237,12 @@ try {
     let A = null;
     try { A = JSON.parse(/const BENCH_ACCESS = (\{.*\});/.exec(after)[1]); } catch (e) { A = null; }
     yes("the cookpot holds no row nobody owns, so it opens only for its half",
-      !!A && !!A["800:Skyrim.esm"] && A["800:Skyrim.esm"].anyone === false &&
+      !!A && !!A["800:Skyrim.esm"] && !("anyone" in A["800:Skyrim.esm"]) &&
       JSON.stringify(A["800:Skyrim.esm"].halves) === '{"hearthcook":"novice"}');
     yes("the oven, which the page does not call open, stays shut",
-      !!A && !!A["801:Skyrim.esm"] && A["801:Skyrim.esm"].anyone === false &&
+      !!A && !!A["801:Skyrim.esm"] && !("anyone" in A["801:Skyrim.esm"]) &&
       JSON.stringify(A["801:Skyrim.esm"].halves) === '{"confectioner":"novice"}');
-    yes("the alchemy lab is placed by its workbench type", !!A && !!A.alchemy && A.alchemy.anyone === false);
+    yes("the alchemy lab is placed by its workbench type", !!A && !!A.alchemy && !("anyone" in A.alchemy));
     yes("no bench this plugin does not have is invented", !!A && Object.keys(A).length === 3);
     const r2 = build(lf);
     yes("a second run changes nothing", r2.code === 0 && fs.readFileSync(lf, "utf8") === after);
