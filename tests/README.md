@@ -7,7 +7,11 @@ launcher, the plugins, the gamemode or the site promise, by reading the files
 or by running a piece of them against a scratch copy. None of them talks to
 the VPS or to GitHub unless it says so at the top (`test-branch-rules.js
 --live` is one that does; `test-collection-revision-2.ps1` reads both
-servers' manifests over plain HTTP unless given `-Offline`). The nightly checks (`.github/workflows/nightly.yml`) run every one of them
+servers' manifests over plain HTTP unless given `-Offline`). One that asks a
+GitHub repository which commits a branch has asks git, through
+`tests\fork-git.js`, and not GitHub's REST API: signed out, that allows 60
+requests an hour per address, and a cloud thread's address is shared (#3052).
+The nightly checks (`.github/workflows/nightly.yml`) run every one of them
 on the VPS each night and open an issue when one fails; on a pull request,
 run the ones your change touches yourself.
 
