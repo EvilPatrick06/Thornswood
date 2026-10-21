@@ -90,6 +90,41 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # ALREADY TESTED (#3182, 21 Oct 2026). Main's build used to run every check
+  # again on the tree its pull request had just passed: 26 minutes of a build
+  # runner for #3125 (run 39690135051), and 905 box minutes on 21 Oct, most
+  # of it cancelled by the next merge. When the pull request's build ran
+  # against the main it lands on, a squash merge gives main that very tree.
+  # This job asks scripts\dev\Tested-Tree.js whether a green build-pr.yml run
+  # of this repository kept a note of HEAD's tree (the last step of the checks
+  # below), and when one did it names that run and the build stops green.
+  # Any other tree, an expired note, a fork's run or a GitHub answer it cannot
+  # read builds main in full, as before. A manual run always builds. It runs
+  # on any VPS runner, not a build one: it starts node and asks GitHub three
+  # questions. tests\test-3182-tested-tree.js holds what it accepts, and why a
+  # tree is enough is in the script's header.
+  tested:
+    name: Already tested in its pull request
+    if: ${{ github.event_name == 'push' }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.look.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Look for a green pull request build of this tree
+        id: look
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
+          node scripts\dev\Tested-Tree.js --tree $tree --repo $env:GITHUB_REPOSITORY
+          exit 0
+
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
   # at the end of this file. This job is the VPS FALLBACK. It runs only
@@ -107,8 +142,8 @@ jobs:
   # can never test different things.
   launcher-vps:
     name: Launcher builds (VPS fallback)
-    needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    needs: [tested, launcher]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
@@ -615,7 +650,34 @@ jobs:
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
-      # No artifact from this build (#2163, 19 Oct). It used to keep the exe
+      # The note main's build looks for (#3182, the job "tested" at the top
+      # of build.yml): the tree every step before this one passed on. Last,
+      # so it is kept only when they all did. A pull request's checkout is
+      # GitHub's merge of it into main, so this is the tree a squash merge
+      # gives main while main has not moved. A few hundred bytes for seven
+      # days, against the 2 GB below; nothing else reads it.
+      - name: Write down the tree these checks passed on
+        id: tree
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
+          if ($tree -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::git gave no tree for HEAD: $tree"; exit 1 }
+          $note = Join-Path $env:RUNNER_TEMP 'tested-tree.txt'
+          Set-Content -LiteralPath $note -Encoding utf8 -Value @(
+            "tree $tree", "commit $env:GITHUB_SHA", "pull request ${{ github.event.pull_request.number }}", "head ${{ github.event.pull_request.head.sha }}")
+          "tree=$tree" >> $env:GITHUB_OUTPUT
+          "note=$note" >> $env:GITHUB_OUTPUT
+      - name: Keep the tree these checks passed on
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: github.event_name == 'pull_request'
+        with:
+          name: tested-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ steps.tree.outputs.note }}
+          retention-days: 7
+          overwrite: true
+
+      # No other artifact from this build (#2163, 19 Oct). It used to keep the exe
       # for 7 days, and nothing read it: Ship takes the launcher from
       # release.yml's draft, and no script or test downloads a build's
       # artifacts. Measured 19 Oct: 488 copies, 1.30 GB of this account's 2 GB
@@ -628,7 +690,8 @@ jobs:
   # fallback above runs instead.
   launcher:
     name: Launcher builds
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.

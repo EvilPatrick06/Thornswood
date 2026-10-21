@@ -542,7 +542,34 @@ jobs:
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
-      # No artifact from this build (#2163, 19 Oct). It used to keep the exe
+      # The note main's build looks for (#3182, the job "tested" at the top
+      # of build.yml): the tree every step before this one passed on. Last,
+      # so it is kept only when they all did. A pull request's checkout is
+      # GitHub's merge of it into main, so this is the tree a squash merge
+      # gives main while main has not moved. A few hundred bytes for seven
+      # days, against the 2 GB below; nothing else reads it.
+      - name: Write down the tree these checks passed on
+        id: tree
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
+          if ($tree -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::git gave no tree for HEAD: $tree"; exit 1 }
+          $note = Join-Path $env:RUNNER_TEMP 'tested-tree.txt'
+          Set-Content -LiteralPath $note -Encoding utf8 -Value @(
+            "tree $tree", "commit $env:GITHUB_SHA", "pull request ${{ github.event.pull_request.number }}", "head ${{ github.event.pull_request.head.sha }}")
+          "tree=$tree" >> $env:GITHUB_OUTPUT
+          "note=$note" >> $env:GITHUB_OUTPUT
+      - name: Keep the tree these checks passed on
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: github.event_name == 'pull_request'
+        with:
+          name: tested-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ steps.tree.outputs.note }}
+          retention-days: 7
+          overwrite: true
+
+      # No other artifact from this build (#2163, 19 Oct). It used to keep the exe
       # for 7 days, and nothing read it: Ship takes the launcher from
       # release.yml's draft, and no script or test downloads a build's
       # artifacts. Measured 19 Oct: 488 copies, 1.30 GB of this account's 2 GB
