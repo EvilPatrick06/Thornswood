@@ -231,7 +231,7 @@ foreach ($f in (Get-ChildItem -LiteralPath (Join-Path $repo 'scripts') -Filter *
     }
     if ($uses -and $rel -ne 'scripts\vps\Vps.ps1') {
         $t = [IO.File]::ReadAllText($f.FullName)
-        if ($t -notmatch '(?i)(Vps|Send-Secret|Artifact|Feed-Store)\.ps1''\)') { $users += $rel }
+        if ($t -notmatch '(?i)(Vps|Send-Script|Send-Secret|Artifact|Feed-Store)\.ps1''\)') { $users += $rel }
     }
 }
 Yes ('no ssh, scp, sftp, ssh-keygen or ssh-keyscan under scripts\ runs outside Invoke-ThornswoodNative' + $(if ($bare.Count) { ': ' + ($bare -join ', ') } else { '' })) ($bare.Count -eq 0)
