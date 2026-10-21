@@ -30,6 +30,24 @@
   plugins.txt Vortex writes for the game (%LOCALAPPDATA%\Skyrim Special
   Edition\plugins.txt unless said otherwise).
 
+  WHAT -VORTEX TELLS APART (#2969). Its first run on One, 21 Oct, printed 15
+  differences as two kinds, different bytes and a moved plugin, and none was
+  a fault in the layout. So a difference is named by what it is:
+    - A file one machine writes for itself (Ship-Rules.ps1
+      Test-ShipOneMachine: a log, the display settings the launcher writes,
+      the sound volumes Engine Fixes saves) differs on every machine that has
+      run the game. Listed, not counted.
+    - A plugin that is the record's bytes but for the light flag (0x200 in its
+      TES4 header) is named as that, set or cleared on this machine, and
+      counted: the game loads it differently (#2979).
+    - The plugin order is held to the collection's plugin rules (layout.json
+      pluginRules), the plugins this machine enables: a broken rule counts.
+      Vortex sorts every install's order itself under those rules, so where
+      no rule binds the order may differ from the curator's list; the first
+      such place is listed, not counted.
+    - A plugins.txt line switched off, for a plugin with no file in Data,
+      loads nothing. Listed, not counted.
+
   Exit 0 when the files and the plugin order are the same, 1 when anything
   differs or cannot be read. Every difference is printed, the first 40 of
   each kind on screen and all of them in -Out when it is given.
@@ -73,6 +91,8 @@ function Die($m) {
   exit 1
 }
 function Join-Rel([string]$root, [string]$rel) { return (Join-Path $root ($rel.Replace('\', [IO.Path]::DirectorySeparatorChar))) }
+# Test-ShipOneMachine: the files one machine writes for itself.
+. (Join-Path $PSScriptRoot 'Ship-Rules.ps1')
 
 if ([bool]$With -eq [bool]$Vortex) { Die 'Give one of -With (another layout record) or -Vortex (a game folder Vortex deployed into).' }
 
@@ -110,6 +130,30 @@ function Read-Mods([string]$dir) {
   $lj = Join-Path $dir 'layout.json'
   if (Test-Path -LiteralPath $lj) { foreach ($m in @((Get-Content -Raw -LiteralPath $lj | ConvertFrom-Json).mods)) { $names[[string]$m.fileId] = [string]$m.name } }
   return $names
+}
+# The collection's plugin rules from layout.json: name, and the names it loads
+# after. A record written before layout.json carried them has none to give.
+function Read-Rules([string]$dir) {
+  $lj = Join-Path $dir 'layout.json'
+  if (-not (Test-Path -LiteralPath $lj)) { return $null }
+  $doc = Get-Content -Raw -LiteralPath $lj | ConvertFrom-Json
+  if (-not ($doc.PSObject.Properties.Name -contains 'pluginRules')) { return $null }
+  return @($doc.pluginRules | ForEach-Object { [pscustomobject]@{ Name = [string]$_.name; After = @($_.after | ForEach-Object { [string]$_ }) } })
+}
+# 'set' or 'cleared' when the plugin at $full is the record's bytes but for the
+# light flag, 0x200 of the TES4 record's flags at offset 8, and '' otherwise.
+function Light-Only([string]$full, $x) {
+  if ($x.Rel -notmatch '\.(esp|esm|esl)$' -or (Get-Item -LiteralPath $full).Length -ne $x.Size -or $x.Size -lt 12) { return '' }
+  $b = [IO.File]::ReadAllBytes($full)
+  if ([Text.Encoding]::ASCII.GetString($b, 0, 4) -ne 'TES4') { return '' }
+  $was = ($b[9] -band 2) -ne 0
+  $b[9] = $b[9] -bxor 2
+  $sha = [Security.Cryptography.SHA256]::Create()
+  $h = ([BitConverter]::ToString($sha.ComputeHash($b)) -replace '-', '').ToLowerInvariant()
+  $sha.Dispose()
+  if ($h -ne $x.Sha256) { return '' }
+  if ($was) { return 'set' }
+  return 'cleared'
 }
 
 $Record = [IO.Path]::GetFullPath($Record)
@@ -169,6 +213,8 @@ else {
   $deployed = New-Object 'System.Collections.Generic.Dictionary[string,object]' ([StringComparer]::OrdinalIgnoreCase)
   $recs = @(@((Join-Path (Join-Path $Vortex 'Data') 'vortex.deployment.json'), 'Data\'), @((Join-Path $Vortex 'vortex.deployment.dinput.json'), ''))
   if (-not (Test-Path -LiteralPath $recs[0][0])) { Die ('There is no ' + $recs[0][0] + ', so Vortex has not deployed into ' + $Vortex + '.') }
+  $rules = Read-Rules $Record
+  if ($null -eq $rules) { Die ('The record''s layout.json has no pluginRules, so the plugin order cannot be held to the collection''s rules. Write the record again with this checkout''s Install-NexusRevision.ps1 -Record ' + $Record + '.') }
   foreach ($r in $recs) {
     if (-not (Test-Path -LiteralPath $r[0])) { continue }
     $doc = ([IO.File]::ReadAllText($r[0]) -replace ('^' + [char]0xFEFF), '') | ConvertFrom-Json
@@ -180,7 +226,7 @@ else {
   }
   Head 'Files'
   Say ('  hashing the ' + $deployed.Count + ' files Vortex deployed') 'DarkGray'
-  $onlyA = @(); $onlyV = @{}; $differ = @(); $gone = @(); $same = 0
+  $onlyA = @(); $onlyV = @{}; $differ = @(); $gone = @(); $mine = @(); $light = @(); $same = 0
   foreach ($d in $deployed.Values) {
     $full = Join-Rel $Vortex $d.Rel
     if (-not $a.Map.ContainsKey($d.Rel)) {
@@ -190,8 +236,11 @@ else {
     if (-not (Test-Path -LiteralPath $full -PathType Leaf)) { $gone += ($d.Rel + '  (' + $d.Source + ')'); continue }
     $x = $a.Map[$d.Rel]
     $len = (Get-Item -LiteralPath $full).Length
-    if ($len -ne $x.Size -or (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant() -ne $x.Sha256) { $differ += ($d.Rel + '  layout: ' + (From $x.FileId) + ', Vortex: ' + $d.Source) }
-    else { $same++ }
+    if ($len -eq $x.Size -and (Get-FileHash -LiteralPath $full -Algorithm SHA256).Hash.ToLowerInvariant() -eq $x.Sha256) { $same++; continue }
+    if (Test-ShipOneMachine $d.Rel) { $mine += ($d.Rel + '  ' + (From $x.FileId) + ', written ' + (Get-Item -LiteralPath $full).LastWriteTimeUtc.ToString('yyyy-MM-dd HH:mm') + 'Z'); continue }
+    $flag = Light-Only $full $x
+    if ($flag) { $light += ($d.Rel + '  ' + $flag + ' here, ' + (From $x.FileId) + ', Vortex: ' + $d.Source); continue }
+    $differ += ($d.Rel + '  layout: ' + (From $x.FileId) + ', Vortex: ' + $d.Source)
   }
   foreach ($k in $a.Map.Keys) { if (-not $deployed.ContainsKey($k)) { $x = $a.Map[$k]; $onlyA += ($x.Rel + '  from ' + (From $x.FileId)) } }
   Say ('  ' + $same + ' files are the same in both') 'Green'
@@ -199,6 +248,8 @@ else {
   Show 'only in Vortex''s deployment, by the Vortex mod they came from' @($onlyV.Keys | Sort-Object | ForEach-Object { $_ + ': ' + $onlyV[$_].Count + ' files, ' + ((@($onlyV[$_]) | Sort-Object | Select-Object -First 3) -join ', ') + $(if ($onlyV[$_].Count -gt 3) { ', ...' } else { '' }) })
   Show 'in Vortex''s record but not in the game folder' @($gone | Sort-Object)
   Show 'different bytes' @($differ | Sort-Object)
+  Show 'the same bytes but for the light flag in the plugin''s header' @($light | Sort-Object)
+  Show 'written on this machine for itself (a log, a setting saved there)' @($mine | Sort-Object) -Note
   if ($onlyV.Count -and $Out) { $report.Add(''); $report.Add('every file only in Vortex''s deployment:'); foreach ($s in ($onlyV.Keys | Sort-Object)) { foreach ($f in ($onlyV[$s] | Sort-Object)) { $report.Add('  ' + $f + '  (' + $s + ')') } } }
   if (-not $Plugins) {
     if (-not $env:LOCALAPPDATA) { Die 'There is no %LOCALAPPDATA% here to find the game''s plugins.txt; give it with -Plugins.' }
@@ -222,10 +273,34 @@ for ($i = 0; $i -lt $onA.Count; $i++) {
   if ($onA[$i].Name -ine $onB[$i].Name) { $order += ('position ' + ($i + 1) + ' of the ' + $onA.Count + ' plugins both enable: ' + $onA[$i].Name + ' here, ' + $onB[$i].Name + ' there'); break }
 }
 $state = @($both | Where-Object { $_.Enabled -ne $pb[$ib[$_.Name.ToLowerInvariant()]].Enabled } | ForEach-Object { $_.Name + ' is ' + $(if ($_.Enabled) { 'enabled here and disabled there' } else { 'disabled here and enabled there' }) })
+$onlyOther = @($pb | Where-Object { -not $ia.ContainsKey($_.Name.ToLowerInvariant()) })
+$noFile = @()
+if ($Vortex) {
+  # A switched off line whose plugin is not in Data loads nothing.
+  $noFile = @($onlyOther | Where-Object { -not $_.Enabled -and -not (Test-Path -LiteralPath (Join-Rel $Vortex ('Data\' + $_.Name)) -PathType Leaf) })
+  $gonePlugins = @($noFile | ForEach-Object { $_.Name })
+  $onlyOther = @($onlyOther | Where-Object { $gonePlugins -notcontains $_.Name })
+}
 Say ('  ' + $pa.Count + ' plugins in the record, ' + $pb.Count + ' in the other, ' + $both.Count + ' in both')
 Show 'plugins only in the record' @($pa | Where-Object { -not $ib.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
-Show 'plugins only in the other' @($pb | Where-Object { -not $ia.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
-Show 'the first place the load order differs' $order
+Show 'plugins only in the other' @($onlyOther | ForEach-Object { $_.Name })
+Show 'switched off there and with no file in Data, so the game loads nothing for them' @($noFile | ForEach-Object { $_.Name }) -Note
+if ($Vortex) {
+  # The order this machine's game loads, held to the collection's rules.
+  $broken = @()
+  foreach ($r in $rules) {
+    $k = $r.Name.ToLowerInvariant()
+    if (-not $ib.ContainsKey($k) -or -not $pb[$ib[$k]].Enabled) { continue }
+    foreach ($after in $r.After) {
+      $ak = $after.ToLowerInvariant()
+      if ($ib.ContainsKey($ak) -and $pb[$ib[$ak]].Enabled -and $ib[$ak] -gt $ib[$k]) { $broken += ($pb[$ib[$k]].Name + ' is to load after ' + $pb[$ib[$ak]].Name + ', and loads before it there') }
+    }
+  }
+  Say ('  ' + @($rules).Count + ' plugin rules in the collection')
+  Show 'the collection''s plugin rules broken there' $broken
+  Show 'the first place the load order differs from the curator''s list' $order -Note
+}
+else { Show 'the first place the load order differs' $order }
 Show 'enabled in one and not the other' $state
 
 if ($Out) {
@@ -235,6 +310,7 @@ if ($Out) {
 }
 Write-Host ''
 if ($diffs) { Say ($diffs.ToString() + ' differences.') 'Yellow'; $code = 1 }
+elseif ($Vortex) { Say 'The same: every file, and the plugin order keeps the collection''s rules.' 'Green'; $code = 0 }
 else { Say 'The same: every file and the plugin order.' 'Green'; $code = 0 }
 if (-not $NoPause) { [void](Read-Host 'Enter to close') }
 exit $code
