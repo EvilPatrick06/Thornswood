@@ -40,7 +40,7 @@ Write-Host ("ssh: " + (& $ssh -V 2>&1) + "; node " + (& $node -v) + "; " + [Envi
 
 $tmp = Join-Path ([IO.Path]::GetTempPath()) ('ts-2932-ssh-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
 $null = New-Item -ItemType Directory -Force -Path $tmp
-$procs = @()
+$script:procs = @()
 try {
     & $keygen -q -t ed25519 -N '' -f (Join-Path $tmp 'host') | Out-Null
     & $keygen -q -t ed25519 -N '' -f (Join-Path $tmp 'user') | Out-Null
@@ -53,7 +53,7 @@ try {
         'LogLevel ERROR'
     ) | Set-Content -LiteralPath (Join-Path $tmp 'sshd_config') -Encoding ascii
     $so = Join-Path $tmp 'sshd.out'
-    $procs += Start-Process -FilePath $sshd -ArgumentList @('-D', '-e', '-f', "`"$tmp\sshd_config`"") -PassThru -RedirectStandardError $so
+    $script:procs += Start-Process -FilePath $sshd -ArgumentList @('-D', '-e', '-f', "`"$tmp\sshd_config`"") -PassThru -RedirectStandardError $so
     $up = $false
     for ($i = 0; $i -lt 50 -and -not $up; $i++) {
         try { $c = [Net.Sockets.TcpClient]::new('127.0.0.1', $port); $c.Close(); $up = $true } catch { Start-Sleep -Milliseconds 100 }
@@ -71,39 +71,73 @@ try {
     [IO.File]::WriteAllText((Join-Path $tokens 'speed'), (-join ($sha.ComputeHash([Text.Encoding]::UTF8.GetBytes($token)) | ForEach-Object { $_.ToString('x2') })))
     $l = [Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback, 0); $l.Start(); $bport = $l.LocalEndpoint.Port; $l.Stop()
     $env:THORNSWOOD_BRIDGE_PORT = "$bport"; $env:THORNSWOOD_BRIDGE_TOKENS = $tokens; $env:THORNSWOOD_BRIDGE_TARGET = "127.0.0.1:$port"
-    $procs += Start-Process -FilePath $node -ArgumentList @("`"$Repo\scripts\vps\bridge\bridge.js`"") -PassThru -RedirectStandardOutput (Join-Path $tmp 'bridge.out')
+    $script:procs += Start-Process -FilePath $node -ArgumentList @("`"$Repo\scripts\vps\bridge\bridge.js`"") -PassThru -RedirectStandardOutput (Join-Path $tmp 'bridge.out')
     Start-Sleep -Milliseconds 800
-    $env:THORNSWOOD_BOX_URL = "ws://127.0.0.1:$bport/box/"; $env:THORNSWOOD_BOX_TOKEN = $token
+    $env:THORNSWOOD_BOX_TOKEN = $token
     Remove-Item Env:\HTTPS_PROXY -ErrorAction SilentlyContinue; Remove-Item Env:\https_proxy -ErrorAction SilentlyContinue
 
-    $MB = 32
-    $file = Join-Path $tmp 'r.bin'
-    $b = New-Object byte[] ($MB * 1MB); (New-Object Random 2932).NextBytes($b); [IO.File]::WriteAllBytes($file, $b)
-    $want = (Get-FileHash -LiteralPath $file).Hash
-    $common = @('-F', 'NUL', '-o', 'BatchMode=yes', '-o', "IdentityFile=$tmp\user", '-o', 'IdentitiesOnly=yes',
-                '-o', "UserKnownHostsFile=$tmp\known_hosts", '-o', 'StrictHostKeyChecking=accept-new', '-o', 'LogLevel=ERROR')
-    $ways = [ordered]@{
-        'straight to the port'           = @('-P', "$port")
-        'through a plain pipe relay'     = @('-o', "ProxyCommand=`"$node`" `"$relay`" $port")
-        'through connect.js and bridge.js' = @('-o', "ProxyCommand=`"$node`" `"$Repo\scripts\vps\bridge\connect.js`"")
+    # A link with a round trip, as the internet has: lag.js listens on a port
+    # and joins each connection to another port, holding every piece LAG ms
+    # each way, in order, with no limit on how much is in flight.
+    $lag = Join-Path $tmp 'lag.js'
+    [IO.File]::WriteAllText($lag, @'
+const net=require('net');const [to,ms]=[Number(process.argv[2]),Number(process.argv[3])];
+const srv=net.createServer((a)=>{const b=net.connect(to,'127.0.0.1');a.setNoDelay(true);b.setNoDelay(true);
+for(const [x,y] of [[a,b],[b,a]]){x.on('data',(d)=>setTimeout(()=>y.write(d),ms));x.on('end',()=>setTimeout(()=>y.end(),ms));x.on('error',()=>y.destroy());}
+}).listen(0,'127.0.0.1',()=>console.log(srv.address().port));
+'@)
+    function Start-Lag([int]$to, [int]$ms) {
+        $out = Join-Path $tmp ("lag-$to.out")
+        $script:procs += Start-Process -FilePath $node -ArgumentList @("`"$lag`"", "$to", "$ms") -PassThru -RedirectStandardOutput $out
+        for ($i = 0; $i -lt 50; $i++) { $t = (Get-Content -LiteralPath $out -ErrorAction SilentlyContinue | Select-Object -First 1); if ($t) { return [int]$t }; Start-Sleep -Milliseconds 100 }
+        throw 'lag.js did not start'
     }
-    foreach ($w in $ways.Keys) {
-        $a = $common + $ways[$w]
-        $dst = "$tmp\up-$($ways.Keys.IndexOf($w)).bin"
+    $LAG = 20
+    $lagSshd = Start-Lag $port $LAG
+    $lagBridge = Start-Lag $bport $LAG
+    Write-Host "  a link with $LAG ms each way: sshd behind 127.0.0.1:$lagSshd, the bridge behind 127.0.0.1:$lagBridge"
+
+    $file = Join-Path $tmp 'r.bin'
+    $b = New-Object byte[] (32MB); (New-Object Random 2932).NextBytes($b); [IO.File]::WriteAllBytes($file, $b)
+    $want = (Get-FileHash -LiteralPath $file).Hash
+    $small = Join-Path $tmp 's.bin'
+    $s8 = New-Object byte[] (8MB); [Array]::Copy($b, $s8, $s8.Length); [IO.File]::WriteAllBytes($small, $s8)
+    $wantSmall = (Get-FileHash -LiteralPath $small).Hash
+    $common = @('-F', 'NUL', '-o', 'BatchMode=yes', '-o', "IdentityFile=$tmp\user", '-o', 'IdentitiesOnly=yes',
+                '-o', "UserKnownHostsFile=$tmp\known_hosts", '-o', 'StrictHostKeyChecking=accept-new', '-o', 'LogLevel=ERROR',
+                '-o', 'HostKeyAlias=throwaway')
+    $connect = "$Repo\scripts\vps\bridge\connect.js"
+    $ways = @(
+        @{ Name = 'straight to the port';                        Args = @('-P', "$port");                                             Big = $true }
+        @{ Name = 'through a plain pipe relay';                  Args = @('-o', "ProxyCommand=`"$node`" `"$relay`" $port");          Big = $true }
+        @{ Name = 'through connect.js and bridge.js';            Args = @('-o', "ProxyCommand=`"$node`" `"$connect`"");              Big = $true }
+        @{ Name = "$LAG ms each way, straight";                  Args = @('-P', "$lagSshd");                                          Big = $false }
+        @{ Name = "$LAG ms each way, straight, scp -O";          Args = @('-O', '-P', "$lagSshd");                                    Big = $false }
+        @{ Name = "$LAG ms each way, plain pipe relay";          Args = @('-o', "ProxyCommand=`"$node`" `"$relay`" $lagSshd");       Big = $false }
+        @{ Name = "$LAG ms each way, connect.js and bridge.js";  Args = @('-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
+        @{ Name = "$LAG ms each way, connect.js and bridge.js, scp -O"; Args = @('-O', '-o', "ProxyCommand=`"$node`" `"$connect`""); Url = "ws://127.0.0.1:$lagBridge/box/"; Big = $false }
+    )
+    $n = 0
+    foreach ($w in $ways) {
+        $n++
+        $env:THORNSWOOD_BOX_URL = $(if ($w.Url) { $w.Url } else { "ws://127.0.0.1:$bport/box/" })
+        $src = $(if ($w.Big) { $file } else { $small }); $h = $(if ($w.Big) { $want } else { $wantSmall }); $MB = $(if ($w.Big) { 32 } else { 8 })
+        $a = $common + $w.Args
+        $dst = "$tmp\up-$n.bin"
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        & $scp @a -q $file ("$env:USERNAME@127.0.0.1:" + $dst.Replace('\', '/')) 2>&1 | ForEach-Object { Write-Host "      $_" }
-        $upMs = $sw.ElapsedMilliseconds; $upOk = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $dst) -and (Get-FileHash -LiteralPath $dst).Hash -eq $want)
-        $back = "$tmp\down-$($ways.Keys.IndexOf($w)).bin"
+        & $scp @a -q $src ("$env:USERNAME@127.0.0.1:" + $dst.Replace('\', '/')) 2>&1 | ForEach-Object { Write-Host "      $_" }
+        $upMs = $sw.ElapsedMilliseconds; $upOk = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $dst) -and (Get-FileHash -LiteralPath $dst).Hash -eq $h)
+        $back = "$tmp\down-$n.bin"
         $sw = [Diagnostics.Stopwatch]::StartNew()
-        & $scp @a -q ("$env:USERNAME@127.0.0.1:" + $file.Replace('\', '/')) $back 2>&1 | ForEach-Object { Write-Host "      $_" }
-        $dnMs = $sw.ElapsedMilliseconds; $dnOk = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $back) -and (Get-FileHash -LiteralPath $back).Hash -eq $want)
-        Write-Host ("  {0}: up {1} ms, {2:N1} MB/s; down {3} ms, {4:N1} MB/s" -f $w, $upMs, ($MB * 1000 / [Math]::Max(1, $upMs)), $dnMs, ($MB * 1000 / [Math]::Max(1, $dnMs)))
-        Yes "$w`: the copy up arrived whole" $upOk
-        Yes "$w`: the copy down arrived whole" $dnOk
+        & $scp @a -q ("$env:USERNAME@127.0.0.1:" + $src.Replace('\', '/')) $back 2>&1 | ForEach-Object { Write-Host "      $_" }
+        $dnMs = $sw.ElapsedMilliseconds; $dnOk = ($LASTEXITCODE -eq 0 -and (Test-Path -LiteralPath $back) -and (Get-FileHash -LiteralPath $back).Hash -eq $h)
+        Write-Host ("  {0}: {1} MB up {2} ms, {3:N1} MB/s; down {4} ms, {5:N1} MB/s" -f $w.Name, $MB, $upMs, ($MB * 1000 / [Math]::Max(1, $upMs)), $dnMs, ($MB * 1000 / [Math]::Max(1, $dnMs)))
+        Yes "$($w.Name): the copy up arrived whole" $upOk
+        Yes "$($w.Name): the copy down arrived whole" $dnOk
         Remove-Item -LiteralPath $dst, $back -Force -ErrorAction SilentlyContinue
     }
 } finally {
-    foreach ($p in $procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { Write-Host "      could not stop $($p.Id): $($_.Exception.Message)" } }
+    foreach ($p in $script:procs) { try { Stop-Process -Id $p.Id -Force -ErrorAction SilentlyContinue } catch { Write-Host "      could not stop $($p.Id): $($_.Exception.Message)" } }
     Start-Sleep -Milliseconds 300
     Remove-Item -LiteralPath $tmp -Recurse -Force -ErrorAction SilentlyContinue
 }
