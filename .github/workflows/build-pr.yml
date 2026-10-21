@@ -271,8 +271,14 @@ jobs:
           # printed as it ends, on the nightly's clock, in a job object that
           # counts its processor time. The summary says what the box's cores
           # did meanwhile, which is what -Throttle is set from: four builds
-          # share six cores (#2994). A harness that writes where another
-          # reads says RUNS ALONE in its header and runs after the rest.
+          # share six cores (#2994). Beside four other builds on 21 Oct 2026
+          # the 550 took 2110 s one at a time, 1112 s two at a time, 887 s at
+          # three and 765 s at six, every one passing. A harness that writes
+          # where another reads says RUNS ALONE in its header and runs after
+          # the rest. tests\test-signer-check.ps1 and
+          # tests\test-build-generated.ps1 had steps of their own after this
+          # one (#2046, #1982), one after the other; they are on the gate
+          # list and run beside the rest.
           # 1800 s of the job's 40 minutes: a harness starts only when its
           # whole clock still fits, so the list of what failed is printed
           # before the job could be cancelled.
@@ -282,23 +288,8 @@ jobs:
           }
           $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 3 -BudgetSeconds 1800
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
-
-      - name: Run the signer check
-        shell: pwsh
-        run: |
-          # Issue #2046. tests\test-signer-check.ps1 sat 1 of 34 red every
-          # night from 5 Oct while this build stayed green, because it ran
-          # only at night. It compiles Signature.cs and points Refusal and
-          # MicrosoftRefusal at real files, about two seconds. The harness
-          # restarts itself in Windows PowerShell 5.1, the .NET Framework
-          # the launcher runs on.
-          & pwsh -NoProfile -File tests\test-signer-check.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=tests/test-signer-check.ps1::the signer check failed, the FAIL lines above say what'
-            exit 1
-          }
 
       - name: Run the voice service's /health harness
         shell: pwsh
@@ -311,20 +302,6 @@ jobs:
           & node voice\test-turn-key.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::error file=voice/test-turn-key.js::the voice /health harness failed, the FAIL lines above say what'
-            exit 1
-          }
-
-      - name: Run the generated-files build harness
-        shell: pwsh
-        run: |
-          # Issue #1982. tests\test-build-generated.ps1 failed cases C to K
-          # because case B overwrote the path to Build-Generated.ps1. It ran
-          # nowhere on push, so nothing caught it. It compiles stand-ins for
-          # Pandora and BodySlide with the .NET Framework csc and builds into
-          # a temp folder; it touches no real game folder.
-          & pwsh -NoProfile -File tests\test-build-generated.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=tests/test-build-generated.ps1::the generated-files build harness failed, the FAIL lines above say what'
             exit 1
           }
 
