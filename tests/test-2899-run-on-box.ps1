@@ -371,6 +371,7 @@ if (-not $OnWindows) {
         $still = Folder 'ffffffffffff'
         $k = Start-Keeper $still
         $keepers += $k
+        Yes 'the next keeper removes the killed keeper''s folder' (($k.Said -contains ('GONE ' + $cut)) -and -not (Test-Path -LiteralPath $cut) -and -not (Test-Path -LiteralPath ($cut + '.lock')))
         $runHold = New-Object IO.FileStream(($still + '.lock'), 'Open', 'ReadWrite', 'ReadWrite')
         $held += $runHold
         $m = @(Stop-Keeper $k)
@@ -381,8 +382,7 @@ if (-not $OnWindows) {
         $next = Folder '0123456789ab'
         $k = Start-Keeper $next
         $keepers += $k
-        Yes 'the next keeper removes the killed keeper''s folder' (($k.Said -contains ('GONE ' + $cut)) -and -not (Test-Path -LiteralPath $cut) -and -not (Test-Path -LiteralPath ($cut + '.lock')))
-        Yes 'and the ones whose runs have let go' (($k.Said -contains ('GONE ' + $still)) -and ($k.Said -contains ('GONE ' + $busy)) -and -not (Test-Path -LiteralPath $still) -and -not (Test-Path -LiteralPath $busy))
+        Yes 'the next keeper removes the ones whose runs have let go' (($k.Said -contains ('GONE ' + $still)) -and ($k.Said -contains ('GONE ' + $busy)) -and -not (Test-Path -LiteralPath $still) -and -not (Test-Path -LiteralPath $busy))
 
         # The run refuses a folder no keeper holds.
         $loose = Folder '123456789abc'
