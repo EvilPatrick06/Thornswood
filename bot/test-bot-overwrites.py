@@ -8,8 +8,8 @@ keeps it." Administrator overrides every channel overwrite, and nothing in
 Build-Discord.py ever named the bot, so the only reason it could see the staff
 channels, the channels behind Member and the holds, and post in the read only
 ones was Administrator. Untick it and the @everyone deny shuts the bot out
-along with everybody else: the trouble alerts in #staff-general and the site
-watcher in the staff #news go quiet, and so does the hold panel.
+along with everybody else: the trouble alerts and the watchdog's messages
+in #staff-updates go quiet, and so does the hold panel.
 
 Build-Discord.py is imported for real, under another name so its __main__
 block never runs. Its client is swapped for a stand-in, and every guild, role

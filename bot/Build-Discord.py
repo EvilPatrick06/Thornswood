@@ -548,7 +548,8 @@ PLAN = [
         topic='Nobody else can see this.'),
    dict(kind='voice', name='Staff Room',    mode='staff'),
    # Gone from the server. Named here so prune leaves them alone, never made
-   # again: #staff-general and #dev-test-results carry all three now.
+   # again: #staff-updates, #staff-general and #dev-test-results carry all
+   # three now.
    dict(kind='text',  name='dev-notes',     mode='staff', make=False,
         topic='What we\u2019re on, and what broke doing it.'),
    dict(kind='text',  name='deploys',       mode='staff', make=False,

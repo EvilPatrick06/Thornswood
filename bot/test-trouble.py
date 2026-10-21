@@ -14,9 +14,16 @@ _trouble_line is a pure function of the row, so this drives it directly: no
 Discord, no clock, no file. The real bot module is imported so a rename or a
 reword fails here rather than in the channel.
 
+Then where the line goes (#2940): #staff-updates by its id and nothing else.
+No id, or an id the bot cannot see, is a line in the bot log and silence in
+Discord, even with a channel called staff-general right there, which is
+where it used to fall back to. And the send has every mention off. The
+client and the channels are stand-ins that record what would have been sent.
+
 Read only. Never connects to anything.
 """
 import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
+import asyncio
 import datetime
 import os
 import sys
@@ -28,6 +35,7 @@ sys.path.insert(0, HERE)
 os.environ.setdefault('DISCORD_TOKEN', 'not-a-real-token')
 
 import bot  # noqa: E402
+import discord  # noqa: E402
 
 PASS = []
 FAIL = []
@@ -95,6 +103,82 @@ yes('T10 _clock reads a stamp as HH:MM on D Month',
     bot._clock(ms(2026, 9, 3, 8, 5)) == '08:05 on 3 September')
 yes('T11 _clock gives nothing for a missing, zero or nonsense stamp',
     bot._clock(None) == '' and bot._clock('nope') == '' and bot._clock(0) == '')
+
+
+# ----------------------------------------------------- where it is said --
+SAID = []
+bot.log = lambda *a: SAID.append(' '.join(str(x) for x in a))
+
+
+class Channel(object):
+    def __init__(self, cid, name):
+        self.id = cid
+        self.name = name
+        self.sent = []
+
+    async def send(self, text, **kw):
+        self.sent.append((text, kw))
+
+
+class Guild(object):
+    def __init__(self, channels):
+        self.text_channels = channels
+
+
+class Client(object):
+    def __init__(self, channels):
+        self.guilds = [Guild(channels)]
+        self.channels = channels
+
+    def get_channel(self, cid):
+        for c in self.channels:
+            if c.id == cid:
+                return c
+        return None
+
+
+def said_with(tid, text='A session went wrong.'):
+    """trouble_say against a server with #staff-updates and #staff-general,
+       with TROUBLE_ID set to tid. The two channels, and what was logged."""
+    updates = Channel(1549254991082946570, 'staff-updates')
+    general = Channel(1549254991082946571, 'staff-general')
+    keep = bot.client, bot.TROUBLE_ID
+    bot.client, bot.TROUBLE_ID = Client([updates, general]), tid
+    SAID[:] = []
+    try:
+        asyncio.run(bot.trouble_say(text))
+    finally:
+        bot.client, bot.TROUBLE_ID = keep
+    return updates, general, list(SAID)
+
+
+updates, general, said = said_with(1549254991082946570, '@everyone ' + 'x' * 3000)
+yes('C1 with the id it speaks in that channel, once',
+    len(updates.sent) == 1 and not general.sent)
+kw = updates.sent[0][1] if updates.sent else {}
+am = kw.get('allowed_mentions')
+yes('C2 and with every mention off, so an @everyone in the line pings nobody',
+    isinstance(am, discord.AllowedMentions) and not am.everyone
+    and not am.users and not am.roles)
+yes('C3 and inside Discord\'s length',
+    bool(updates.sent) and len(updates.sent[0][0]) <= 1900)
+
+updates, general, said = said_with(0)
+yes('C4 with no id nothing is said anywhere, staff-general included',
+    not updates.sent and not general.sent)
+yes('C5 and the bot log says the id is missing and what sends it',
+    any('no channel id' in s and 'staff-channel.txt' in s for s in said))
+
+updates, general, said = said_with(1234)
+yes('C6 with an id the bot cannot see nothing is said anywhere either',
+    not updates.sent and not general.sent)
+yes('C7 and the bot log names that id',
+    any('channel 1234 is not one this bot can see' in s for s in said))
+
+# The comments still tell the story; the code holds no such name to look for.
+src = open(os.path.join(HERE, 'bot.py'), encoding='utf-8').read()
+yes('C8 bot.py holds no channel name staff-general to fall back to',
+    "'staff-general'" not in src and '"staff-general"' not in src)
 
 print('')
 print('%d passed, %d failed' % (len(PASS), len(FAIL)))
