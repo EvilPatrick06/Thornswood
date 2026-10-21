@@ -34,9 +34,9 @@
        required-data in the game folder are notes (Ship's Go.ps1 step copies
        them in before it checks), and the main-only rows are asked only when
        the channel is main.
-    7. Uncommitted changes (issue #1254): on main the line says a main Ship
-       refuses while anything is uncommitted, and that row is a gap. On dev
-       the line says a dev Ship builds from those changes as they are.
+    7. The checkout (issues #1254, #2981): asked what Ship asks, through
+       Fresh-Checkout.ps1 with Ship's branch rule, on both channels, so an
+       uncommitted change or a clone behind main is a gap on dev too.
     8. The release folder is a ship root, not an install (issue #2603).
        Get-LauncherRows: on main a folder with no launcher passes, saying
        the Ship puts the one CI built there itself, and no fix says to
@@ -261,12 +261,19 @@ try {
     Yes '6. the main-only rows are asked only when the channel is not dev' ($text -match '(?s)if \(-not \$Dev\) \{\s*Head [^\n]*\n\s*foreach \(\$r in @\(Get-MainOnlyRows')
     Yes '6. the verdict is Get-ShipVerdict''s, and exit 1 follows it' ($text -match '\$verdict = Get-ShipVerdict \$script:rows' -and $text -match 'if \(-not \$verdict\.Ready\) \{ exit 1 \}')
 
-    # A main Ship has refused uncommitted work since 22 Sep (f917dd8). The
-    # map used to say the opposite, and a note would not have counted.
-    Yes '7. on main, uncommitted work is a gap and the line says a main Ship refuses while anything is uncommitted' (
-        $text -match "Ready 'nothing uncommitted'" -and $text -match 'A main Ship refuses while anything is uncommitted')
-    Yes '7. on dev, the line says a dev Ship builds from those changes as they are' (
-        $text -match 'A dev Ship builds from those changes as they are')
+    # A main Ship has refused uncommitted work since 22 Sep (f917dd8), and
+    # every Ship, dev too, since #2118 put Fresh-Checkout.ps1 in front of it.
+    # On 20 Oct this map still called it a note on dev and said READY two
+    # minutes before a dev Ship refused (#2981). So the checkout is asked
+    # what Ship asks, with the -AnyBranch Ship passes, on both channels.
+    # tests\test-2981-update-checkout.ps1 runs it against a scratch clone.
+    Yes '7. the checkout is asked Fresh-Checkout''s question, with the branch rule Ship uses' (
+        $text -match '\$fresh = Get-FreshCheckoutState -RepoDir \$RepoDir -AnyBranch:\(Test-FreshAnyBranch -RepoDir \$RepoDir -Channel \$Channel\)' -and
+        $text -match 'foreach \(\$r in @\(Get-CheckoutRows \$fresh\)\) \{ Show-Row \$r \}')
+    Yes '7. and not only on main: it is outside the channel test' (
+        $text -notmatch '(?s)if \(\$Dev\) \{[^}]*Get-FreshCheckoutState' -and $text -notmatch '(?s)\} else \{[^}]*Get-FreshCheckoutState')
+    Yes '7. it no longer says a dev Ship builds from uncommitted changes' (
+        $text -notmatch 'A dev Ship builds from those changes as they are')
     Yes '7. it no longer says a main Ship commits uncommitted changes' (
         $text -notmatch 'commits them when it is out')
 

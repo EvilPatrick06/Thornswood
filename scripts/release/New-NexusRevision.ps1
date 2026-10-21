@@ -8,6 +8,7 @@
 
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded> -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Mod 192762 -FileId <new file id> -Archive <the archive uploaded>
+      .\scripts\release\New-NexusRevision.ps1 -Add <mods to add>.json -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3 -WhatIf
       .\scripts\release\New-NexusRevision.ps1 -Publish 3
 
@@ -55,6 +56,24 @@
       name does not change in a revision made this way, so that write is left
       out.
 
+  ADDING A MOD (#2969). -Add names a JSON file of mods the revision does not
+  carry yet, each a Nexus file put in with Vortex's basic installer:
+      [{ "modId": 1932, "fileId": 8662, "archive": "<the downloaded archive>",
+         "plugins": [{ "name": "KS_Hairdo's_Lite_NoNPCs.esp",
+                       "after": ["Playable Rieklings.esp"] }] }]
+  The mod's name, author and category and the file's name and version are
+  read from Nexus, the md5 and size from the archive, and the archive's own
+  plugins have to be the ones "plugins" names. An archive with a FOMOD
+  installer is refused: its answers are Vortex's to work out. Each plugin goes
+  on the end of the plugin list after the plugins its "after" names
+  (docs\LIGHT-ORDER-DRIFT.md: a new plugin goes on the end of its own kind,
+  never mid-order). Install-NexusRevision.ps1 -CollectionArchive lays the new
+  archive out to check it, from One or a cloud session.
+
+  A DRAFT WAITING. Nexus keeps one draft at a time, so a real run refuses
+  while there is one. -WhatIf builds on the draft instead, so the revision
+  after it can be laid out and checked while the draft waits.
+
   Nothing in this checks the game. A new Client Runtime is checked on Dev
   before the draft is published (docs\COLLECTION-REVISION-2.md, steps 8 to
   14, and #2754 and #2903 for running those off One).
@@ -75,6 +94,9 @@
 
 .PARAMETER Archive
   Each mod's archive, the one that was uploaded as that file id.
+
+.PARAMETER Add
+  A JSON file of mods to add, as ADDING A MOD above says.
 
 .PARAMETER From
   The published revision to start from: its .7z, or a folder holding it
@@ -108,6 +130,7 @@ param(
   [string[]]$Mod = @(),
   [string[]]$FileId = @(),
   [string[]]$Archive = @(),
+  [string]$Add,
   [string]$From,
   [int]$BaseRevision = 0,
   [string]$Slug = '7essxf',
@@ -193,7 +216,7 @@ Say ('  "' + (Get-NexusField $col 'name') + '", id ' + $colId + ', revision ' + 
 
 # --------------------------------------------------------------- publish ---
 if ($Publish) {
-  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive or -From.' }
+  if ($Mod.Count -or $FileId.Count -or $Archive.Count -or $From -or $Add) { Die '-Publish publishes a draft that is already there, so it takes no -Mod, -FileId, -Archive, -Add or -From.' }
   $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $Publish + ', domainName: "' + $Game + '") { id revisionNumber status } }'
   $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $Publish) }) 'collectionRevision'
   $revId = [string](Get-NexusField $rev 'id')
@@ -222,7 +245,7 @@ if ($Publish) {
 }
 
 # ------------------------------------------------------- refused up front ---
-if (-not $Mod.Count) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, or publish a draft with -Publish.' }
+if (-not $Mod.Count -and -not $Add) { Die 'Say which mods move to a new file with -Mod, -FileId and -Archive, which are added with -Add, or publish a draft with -Publish.' }
 $Mod = @($Mod | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 $FileId = @($FileId | ForEach-Object { ([string]$_).Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
 if ($Mod.Count -ne $FileId.Count -or $Mod.Count -ne $Archive.Count) { Die ('-Mod, -FileId and -Archive go together, one of each for every mod: ' + $Mod.Count + ', ' + $FileId.Count + ' and ' + $Archive.Count + ' were given.') }
@@ -230,7 +253,26 @@ for ($i = 0; $i -lt $Mod.Count; $i++) {
   if ($Mod[$i] -notmatch '^\d+$') { Die ('-Mod ' + $Mod[$i] + ' is not a mod number.') }
   if ($FileId[$i] -notmatch '^\d+$') { Die ('-FileId ' + $FileId[$i] + ' is not a file id.') }
 }
-if ($draft) { Die ('Revision ' + $draft + ' is already a draft on Nexus. Publish it with -Publish ' + $draft + ', or discard it on the website, before making another.') }
+$adds = @()
+if ($Add) {
+  if (-not (Test-Path -LiteralPath $Add -PathType Leaf)) { Die ('There is no file at ' + $Add + '.') }
+  try { $adds = @(ConvertFrom-Json ([IO.File]::ReadAllText($Add) -replace ('^' + [char]0xFEFF), '')) }
+  catch { Die ($Add + ' is not JSON this can read: ' + $_.Exception.Message) }
+  if (-not $adds.Count) { Die ($Add + ' names no mods to add.') }
+  foreach ($a in $adds) {
+    if ([string]$a.modId -notmatch '^\d+$') { Die ('A mod to add in ' + $Add + ' has the mod number "' + $a.modId + '".') }
+    if ([string]$a.fileId -notmatch '^\d+$') { Die ('Mod ' + $a.modId + ' in ' + $Add + ' has the file id "' + $a.fileId + '".') }
+    if (-not $a.archive -or -not (Test-Path -LiteralPath ([string]$a.archive) -PathType Leaf)) { Die ('Mod ' + $a.modId + ' in ' + $Add + ' names no archive that is there: "' + $a.archive + '".') }
+  }
+}
+# The revision this starts from: the latest published, or the waiting draft
+# for a -WhatIf, as A DRAFT WAITING above says.
+$start = $latest; $startStatus = 'published'
+if ($draft) {
+  if (-not $WhatIf) { Die ('Revision ' + $draft + ' is already a draft on Nexus. Publish it with -Publish ' + $draft + ', or discard it on the website, before making another.') }
+  $start = [int]$draft; $startStatus = 'draft'
+  Say ('  Revision ' + $draft + ' is a draft, so this -WhatIf builds on it. A run that writes waits until it is published.') 'Yellow'
+}
 $node = Get-Command node -ErrorAction SilentlyContinue
 if (-not $node) { Die 'node is not on this machine, and nexus-collection.js writes collection.json the way Vortex does.' }
 $sz = Find-SevenZip
@@ -238,18 +280,18 @@ if (-not $sz) { Die '7-Zip is not on this machine (7z.exe in Program Files, or 7
 
 $scratch = & (Join-Path $Here 'Get-ScratchDir.ps1') ('nexus-revision-' + $Slug)
 if (-not $From) {
-  $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $latest + ', domainName: "' + $Game + '") { id status downloadLink } }'
-  $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $latest) }) 'collectionRevision'
+  $rq = '{ collectionRevision(slug: "' + $Slug + '", revision: ' + $start + ', domainName: "' + $Game + '") { id status downloadLink } }'
+  $rev = Get-NexusField (Step { Invoke-NexusGraph $rq $null ('Reading revision ' + $start) }) 'collectionRevision'
   $link = [string](Get-NexusField $rev 'downloadLink')
-  if ([string](Get-NexusField $rev 'status') -ne 'published' -or $link -notmatch '^/v2/collections/\d+/revisions/\d+/download_link$') { Die ('Nexus gave revision ' + $latest + ' as ' + [string](Get-NexusField $rev 'status') + ' with the download link "' + $link + '", not a published revision''s API path, so it was not downloaded.') }
-  $links = @(Get-NexusField (Step { Invoke-NexusApi 'GET' $link '' ('Asking for revision ' + $latest + '''s download') }) 'download_links')
+  if ([string](Get-NexusField $rev 'status') -ne $startStatus -or $link -notmatch '^/v2/collections/\d+/revisions/\d+/download_link$') { Die ('Nexus gave revision ' + $start + ' as ' + [string](Get-NexusField $rev 'status') + ' with the download link "' + $link + '", not a ' + $startStatus + ' revision''s API path, so it was not downloaded.') }
+  $links = @(Get-NexusField (Step { Invoke-NexusApi 'GET' $link '' ('Asking for revision ' + $start + '''s download') }) 'download_links')
   $uri = [string](Get-NexusField ($links | Select-Object -First 1) 'URI')
-  if (-not $uri) { Die ('Nexus gave no download address for revision ' + $latest + '.') }
+  if (-not $uri) { Die ('Nexus gave no download address for revision ' + $start + '.') }
   $pub = Join-Path $scratch 'published'
   if (Test-Path -LiteralPath $pub) { Remove-Item -LiteralPath $pub -Recurse -Force }
-  $got = Step { Receive-NexusPresigned $uri $pub ('Downloading revision ' + $latest) ('collection_' + $Slug + '_' + $latest + '_.7z') }
+  $got = Step { Receive-NexusPresigned $uri $pub ('Downloading revision ' + $start) ('collection_' + $Slug + '_' + $start + '_.7z') }
   $From = $got.Path
-  $BaseRevision = $latest
+  $BaseRevision = $start
 }
 if (-not (Test-Path -LiteralPath $From)) { Die ('There is nothing at ' + $From + '.') }
 if (-not $BaseRevision) {
@@ -259,8 +301,8 @@ if (-not $BaseRevision) {
 }
 Head 'The revision it starts from'
 Say ('  ' + $From)
-if ($BaseRevision -ne $latest) { Die ('That is revision ' + $BaseRevision + ', but Nexus''s latest published revision is ' + $latest + '. Start from revision ' + $latest + ' (leave -From off and it is downloaded from Nexus).') }
-Say ('  revision ' + $BaseRevision + ', the latest published') 'Green'
+if ($BaseRevision -ne $start) { Die ('That is revision ' + $BaseRevision + ', but this starts from revision ' + $start + ', ' + $(if ($startStatus -eq 'draft') { 'the draft' } else { 'the latest published' }) + '. Start from revision ' + $start + ' (leave -From off and it is downloaded from Nexus).') }
+Say ('  revision ' + $BaseRevision + ', ' + $(if ($startStatus -eq 'draft') { 'the draft' } else { 'the latest published' })) 'Green'
 
 $base = Join-Path $scratch 'base'; $build = Join-Path $scratch 'build'; $outDir = Join-Path $scratch 'out'
 foreach ($d in $base, $build, $outDir) {
@@ -282,7 +324,7 @@ if (-not (Test-Path -LiteralPath $baseJson)) { Die ($From + ' has no collection.
 Say ('  ' + $basePaths.Count + ' files and folders in it')
 
 # ------------------------------------------------------------- the swaps ---
-Head 'The new files'
+if ($Mod.Count) { Head 'The new files' }
 $swaps = New-Object System.Collections.Generic.List[object]
 for ($i = 0; $i -lt $Mod.Count; $i++) {
   $m = $Mod[$i]; $fid = $FileId[$i]
@@ -300,19 +342,65 @@ for ($i = 0; $i -lt $Mod.Count; $i++) {
   $swaps.Add([ordered]@{ modId = $m; fileId = $fid; version = [string](Get-NexusField $v 'version'); md5 = $facts.Md5Hex; fileSize = $facts.Size; logicalFilename = [string](Get-NexusField $v 'name') })
 }
 
+# ------------------------------------------------------------ the adds ---
+if ($adds.Count) { Head 'The mods added' }
+foreach ($a in $adds) {
+  $m = [string]$a.modId; $fid = [string]$a.fileId; $arc = [string]$a.archive
+  $lq = '{ legacyModsByDomain(ids: [{gameDomain: "' + $Game + '", modId: ' + $m + '}]) { nodes { modId name author modCategory { name } } } }'
+  $modNode = @(Get-NexusField (Get-NexusField (Step { Invoke-NexusGraph $lq $null ('Reading mod ' + $m) }) 'legacyModsByDomain') 'nodes') | Select-Object -First 1
+  if (-not $modNode) { Die ('Nexus has no mod ' + $m + ' on ' + $Game + '.') }
+  $modName = [string](Get-NexusField $modNode 'name')
+  $author = [string](Get-NexusField $modNode 'author')
+  $category = [string](Get-NexusField (Get-NexusField $modNode 'modCategory') 'name')
+  if (-not $author -or -not $category) { Die ('Nexus gave mod ' + $m + ' with no author or no category, which every entry Vortex writes carries.') }
+  $info = Step { Get-NexusField (Invoke-NexusApi 'GET' ('/v3/games/' + $Game + '/mods/' + $m) '' ('Reading mod ' + $m)) 'data' }
+  $uid = [string](Get-NexusField $info 'id')
+  $v = Step { Get-NexusField (Invoke-NexusApi 'GET' ('/v3/games/' + $Game + '/mod-file-versions/' + $fid) '' ('Reading file id ' + $fid)) 'data' }
+  $vFile = [string](Get-NexusField (Get-NexusField $v 'file') 'id')
+  $files = @(@(Get-NexusField (Get-NexusField (Step { Invoke-NexusApi 'GET' ('/v3/mods/' + $uid + '/files') '' ('Reading the files of mod ' + $m) }) 'data') 'mod_files') | Where-Object { $_ })
+  if (-not @($files | Where-Object { [string](Get-NexusField $_ 'id') -eq $vFile }).Count) { Die ('File id ' + $fid + ' is not a file of mod ' + $m + '.') }
+  $cat = [string](Get-NexusField $v 'category')
+  if (@('main', 'update', 'optional', 'miscellaneous') -notcontains $cat) { Die ('File id ' + $fid + ' of mod ' + $m + ' is ' + $cat + ', not a file people can download now.') }
+  $fileName = [string](Get-NexusField $v 'name')
+  # The name Vortex shows: the file's own name when it says which mod it is,
+  # else the mod's name before it.
+  $entryName = if ($fileName.IndexOf($modName, [StringComparison]::OrdinalIgnoreCase) -ge 0) { $fileName } else { $modName + ' - ' + $fileName }
+
+  # The plugins it carries, wherever they sit: where each lands is the basic
+  # installer's to work out, and Install-NexusRevision.ps1 does that as
+  # Vortex does when the new revision is laid out.
+  $paths = @(Step { Get-ArchivePaths $sz $arc })
+  if (@($paths | Where-Object { $_ -match '(^|\\)fomod\\moduleconfig\.xml$' }).Count) { Die ($arc + ' has a FOMOD installer, whose answers Vortex works out when it installs it. Add it in Vortex on One.') }
+  $found = @($paths | Where-Object { $_ -match '\.es[mpl]$' } | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) })
+  $named = @(@($a.plugins) | Where-Object { $_ } | ForEach-Object { [string]$_.name })
+  $missing = @($found | Where-Object { $named -inotcontains $_ })
+  $extraNamed = @($named | Where-Object { @($found) -inotcontains $_ })
+  if ($missing.Count -or $extraNamed.Count) { Die ('The plugins named for mod ' + $m + ' are not the ones its archive holds (in the archive only: ' + ($missing -join ', ') + '; named only: ' + ($extraNamed -join ', ') + ').') }
+
+  # Only its md5 and size: this archive is the mod author's, read and never
+  # uploaded, so its name is not held to what an upload header can carry.
+  $facts = Step { $it = Get-Item -LiteralPath $arc; [pscustomobject]@{ Name = $it.Name; Size = [long]$it.Length; Md5Hex = (Get-FileHash -LiteralPath $it.FullName -Algorithm MD5).Hash.ToLowerInvariant() } }
+  Say ('  mod ' + $m + ' (' + $modName + ' by ' + $author + ', ' + $category + '): file id ' + $fid + ', "' + $fileName + '" ' + (Get-NexusField $v 'version') + ', ' + $cat)
+  Say ('    ' + $facts.Name + ', ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', ' + @($found).Count + ' plugin(s)') 'DarkGray'
+  $plugins = @(@($a.plugins) | Where-Object { $_ } | ForEach-Object { [ordered]@{ name = [string]$_.name; after = @(@($_.after) | ForEach-Object { [string]$_ }) } })
+  $swaps.Add([ordered]@{ add = $true; modId = $m; fileId = $fid; version = [string](Get-NexusField $v 'version'); md5 = $facts.Md5Hex; fileSize = $facts.Size;
+    logicalFilename = $fileName; name = $entryName; author = $author; category = $category; plugins = $plugins })
+}
+
 # --------------------------------------------------------- the new archive ---
 Head 'The new revision'
 Copy-Item -Path (Join-Path $base '*') -Destination $build -Recurse -Force
 $swapsJson = Join-Path $scratch 'swaps.json'
 $payloadJson = Join-Path $scratch 'payload.json'
-[IO.File]::WriteAllText($swapsJson, (ConvertTo-Json -InputObject @($swaps.ToArray()) -Depth 4), (New-Object Text.UTF8Encoding($false)))
+[IO.File]::WriteAllText($swapsJson, (ConvertTo-Json -InputObject @($swaps.ToArray()) -Depth 6), (New-Object Text.UTF8Encoding($false)))
 $r = Invoke-Tool $node.Source @((Join-Path $Here 'nexus-collection.js'), $baseJson, $swapsJson, (Join-Path $build 'collection.json'), $payloadJson)
 if ($r.Code -ne 0) { Die ($r.Err.Trim() + ' Nothing was built.') }
 foreach ($line in ($r.Out -split "`r?`n" | Where-Object { $_ })) {
   $c = $line.Split("`t")
-  Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[2] + ' -> ' + $c[3])
+  if ($c[1] -eq 'added' -or $c[1] -eq 'plugin') { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[3]) }
+  else { Say ('  ' + $c[0] + ', ' + $c[1] + ': ' + $c[2] + ' -> ' + $c[3]) }
 }
-$newRev = $latest + 1
+$newRev = $start + 1
 $out = Join-Path $outDir ('collection_' + $newRev + '.7z')
 $tops = @(Get-ChildItem -LiteralPath $build -Force | ForEach-Object { $_.Name })
 $r = Invoke-Tool $sz (@('a', '-t7z', '-y', $out) + $tops) $build
@@ -320,10 +408,10 @@ if ($r.Code -ne 0) { Die ('7-Zip could not pack the new revision: ' + $r.Err.Tri
 $newPaths = @(Step { Get-ArchivePaths $sz $out })
 $gone = @($basePaths | Where-Object { $newPaths -notcontains $_ })
 $extra = @($newPaths | Where-Object { $basePaths -notcontains $_ })
-if ($gone.Count -or $extra.Count) { Die ('The new archive does not hold the same files and folders as revision ' + $latest + ' (missing: ' + ($gone -join ', ') + '; extra: ' + ($extra -join ', ') + '). Nothing was sent.') }
+if ($gone.Count -or $extra.Count) { Die ('The new archive does not hold the same files and folders as revision ' + $start + ' (missing: ' + ($gone -join ', ') + '; extra: ' + ($extra -join ', ') + '). Nothing was sent.') }
 $facts = Step { Get-NexusArchiveFacts $out }
 Say ('  ' + $out)
-Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + $newPaths.Count + ' files and folders as revision ' + $latest)
+Say ('  ' + $facts.Size.ToString('N0') + ' bytes, md5 ' + $facts.Md5Hex + ', the same ' + $newPaths.Count + ' files and folders as revision ' + $start)
 $payloadText = ([IO.File]::ReadAllText($payloadJson)).Trim()
 
 if ($WhatIf) {

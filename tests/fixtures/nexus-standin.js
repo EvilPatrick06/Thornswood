@@ -28,6 +28,10 @@
 // it changes on the way out, premium false answers download-link with the
 // 403 Nexus gives a free account, and addRevision adds a revision with the
 // local collection archive its download serves.
+//
+// For New-NexusRevision.ps1 -Add (#2969) it also knows a mod of somebody
+// else's, 1932, with an optional file 8662, and answers legacyModsByDomain
+// with each mod's author and category.
 
 'use strict';
 const http = require('http');
@@ -56,10 +60,12 @@ const violations = [];
 function storedOf(text) { return text.replace(/\\/g, '&#92;').replace(/\n/g, '\n<br />'); }
 
 const mods = {
-  '192762': { uid: 'mod-192762', name: 'Thornswood Client Runtime', files: ['file-runtime'],
+  '192762': { uid: 'mod-192762', name: 'Thornswood Client Runtime', files: ['file-runtime'], author: 'EvilPatrick06', category: 'Utilities',
     description: storedOf('[size=4][b]Thornswood Client Runtime[/b][/size]\n\nThe runtime, in Data\\Platform\\Distribution.\n\n[b]What is in it[/b]\nThe server\'s files.') },
-  '192001': { uid: 'mod-192001', name: 'Thornswood Content', files: ['file-content'],
+  '192001': { uid: 'mod-192001', name: 'Thornswood Content', files: ['file-content'], author: 'EvilPatrick06', category: 'Miscellaneous',
     description: storedOf('[size=4][b]Description[/b][/size]\nThornswood Content is the plugin for Thornswood.\n\n[size=4][b]Installation[/b][/size]\nThe collection installs it.') },
+  // Not Thornswood's: a mod a revision adds, which the team's list leaves out.
+  '1932': { uid: 'mod-1932', name: 'KS Hairdos Lite SE', files: ['file-hair'], author: 'Brataccas', category: 'Body, Face, and Hair', notTeam: true, description: '' },
 };
 const files = {
   'file-runtime': { id: 'file-runtime', name: 'Thornswood Client Runtime', mod: '192762', versions: [
@@ -67,6 +73,8 @@ const files = {
   'file-content': { id: 'file-content', name: 'Thornswood Content', mod: '192001', versions: [
     { id: 'ver-809365', game_scoped_id: '809365', name: 'Thornswood Content', version: '1.1', category: 'old_version', uploaded_at: '2026-09-22T22:11:00Z', is_primary: false, position: '1' },
     { id: 'ver-811029', game_scoped_id: '811029', name: 'Thornswood Content', version: '1.2', category: 'main', uploaded_at: '2026-09-26T22:15:00Z', is_primary: true, position: '2' }] },
+  'file-hair': { id: 'file-hair', name: 'KS Hairdos Lite SE NoNPCs', mod: '1932', versions: [
+    { id: 'ver-8662', game_scoped_id: '8662', name: 'KS Hairdos Lite SE NoNPCs', version: '1.3', category: 'optional', uploaded_at: '2016-11-17T08:37:45Z', is_primary: false, position: '1' }] },
 };
 let nextFileId = 812345;
 const collection = { id: 515846, slug: '7essxf', name: 'Thornswood', latest: 2, draft: null,
@@ -147,7 +155,7 @@ function api(req, res, url, body, json) {
     return send(res, 200, { data: versionView(hit.v, hit.f) });
   }
   if (req.method === 'GET' && p === '/v3/team-mods') {
-    return send(res, 200, { data: { mods: Object.keys(mods).map(k => ({ mod: { id: mods[k].uid, game_scoped_id: k, name: mods[k].name, game: { id: '1704', name: 'Skyrim Special Edition', domain_name: 'skyrimspecialedition' } }, affiliation: 'owner', bug_tracker: 'open', open_bug_count: 0 })) }, meta: { page: 1, page_size: 100, total_count: 2 } });
+    return send(res, 200, { data: { mods: Object.keys(mods).filter(k => !mods[k].notTeam).map(k => ({ mod: { id: mods[k].uid, game_scoped_id: k, name: mods[k].name, game: { id: '1704', name: 'Skyrim Special Edition', domain_name: 'skyrimspecialedition' } }, affiliation: 'owner', bug_tracker: 'open', open_bug_count: 0 })) }, meta: { page: 1, page_size: 100, total_count: 2 } });
   }
   if (req.method === 'POST' && (p === '/v3/uploads' || p === '/v3/uploads/multipart')) {
     if (!json || typeof json.size_bytes !== 'number' || typeof json.filename !== 'string') return problem(res, 422, 'size_bytes and filename');
@@ -238,7 +246,7 @@ function graph(req, res, json) {
   }
   if ((m = q.match(/legacyModsByDomain\(ids: \[\{gameDomain: "skyrimspecialedition", modId: (\d+)\}\]\)/))) {
     const mod = mods[m[1]];
-    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
+    return send(res, 200, { data: { legacyModsByDomain: { nodes: mod ? [{ modId: Number(m[1]), name: mod.name, author: mod.author, modCategory: { name: mod.category }, description: mod.cached !== undefined ? mod.cached : mod.description }] : [] } } });
   }
   if ((m = q.match(/(?:^|[{\s])mod\(modId: (\d+), gameId: (\d+)\)/))) {
     const mod = m[2] === '1704' ? mods[m[1]] : undefined;
