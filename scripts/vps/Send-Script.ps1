@@ -17,10 +17,10 @@
   that failed on the far side looked like one that worked.
 
   WHAT IT DOES. Under the limit the script goes on the command line, one
-  round trip. Over it, the script goes on ssh's standard input, also one round
-  trip: the command line holds only a short reader, which takes the first
-  line of its standard input, base64 of the script's UTF-8, and runs it.
-  $LASTEXITCODE afterwards is the far side's.
+  round trip. Over it, scp copies the script to the box as a file of its own
+  name, and one ssh call runs a short runner on the command line, which reads
+  the file, deletes it, and only then runs what it read. $LASTEXITCODE
+  afterwards is the far side's.
 
   Why not the command line: sshd on Windows hands the command to cmd.exe,
   which stops at 8,191 characters and says nothing, and base64 of UTF-16 is
@@ -28,19 +28,30 @@
   in half and the far side complained about a brace in a script nobody could
   see. Standard input has no such limit.
 
-  Why not a file (issue #3027). Until 21 Oct 2026 a long script went up as a
-  file of its own name (thornswood-remote-<guid>.ps1 in C:\Windows\Temp), was
-  run with a second ssh call and removed with a third. A run cut before the
-  third (a bridge reset, the machine running it going away) left the file on
-  the box, and nothing there ever removed it. Sent on standard input, the
-  script is never written on the box, so there is nothing to remove and no
-  call left to miss. The reader runs it the way -File ran the file: an exit
-  inside it is the far side's exit code, an error that stops it is 1, and
-  otherwise 0.
+  Why not standard input (issue #3059). From 21 Oct 2026 (#3036) a long
+  script went on ssh's standard input, and on the box it hung: measured that
+  day from One, the box's sshd hands a command its standard input whole only
+  up to about 8 KB. Over that, whether the rest and the end of input arrive
+  is chance, session by session, whichever way the far side reads (Install-
+  Runner's 135,700 byte firewall script never arrived; a 16 KB line arrived
+  for one reader and not for three others). Nothing written after the
+  session starts arrives at all (#2912). So standard input carries only a
+  short value now (-Stdin, at most 8,000 bytes, the size that arrived every
+  time), and a long script goes by scp, which carries any size.
 
-  The reader strips anything that is not base64 from the line before it
-  decodes it (a byte order mark, a stray CR), the same as Send-Secret.ps1's
-  prelude, so whichever PowerShell sends it, the box reads the same script.
+  Why the file is removed by the run that reads it (issues #3027 and #3059).
+  Until 21 Oct 2026 the file was run with -File by a second ssh call and
+  removed by a third, so a run cut before the third (a bridge reset, the
+  machine running it going away) left the file on the box. Now the runner
+  deletes it before it runs anything, so a run that starts leaves nothing,
+  however it ends. What is left is a run cut between its copy and its run, a
+  few seconds: the box gives no sign that the run is gone (the end of
+  standard input never arrives, and a far process outlives its ssh session,
+  measured 21 Oct, #3064). So each runner also deletes every such file older
+  than ten minutes, which no live run can still own, and a file a cut run
+  leaves goes with the next long run after that. The runner runs the script
+  the way -File ran the file: an exit inside it is the far side's exit code,
+  an error that stops it is 1, and otherwise 0.
 
   Host key checking is always on (issues #450 and #1078): a caller's own
   weaker StrictHostKeyChecking is refused before anything is sent, because
@@ -58,12 +69,41 @@
 
 . (Join-Path $PSScriptRoot 'Vps.ps1')
 
-# What a long script runs under on the box: the first line of standard input,
-# anything that is not base64 dropped, decoded as UTF-8 and run in the
-# reader's own scope, as -Command would run it. Kept apart so the harnesses
-# know it when they see it (tests\test-remote-big-script.ps1).
-function Get-ThornswoodStdinReader {
-    return ". ([scriptblock]::Create([Text.Encoding]::UTF8.GetString([Convert]::FromBase64String((('' + [Console]::In.ReadLine()) -replace '[^A-Za-z0-9+/=]', '')))))"
+# The most a far side here is sent on standard input, in bytes with its line
+# end (the header's Why not standard input).
+$ThornswoodStdinLimit = 8000
+
+# What a long script runs under on the box: reads the file at $Path (its
+# Windows form), deletes it, deletes every copy older than ten minutes that
+# a cut run left (the header says why), and runs what it read in its own
+# scope, as -Command would run it. A file it cannot read or delete is exit
+# 254, with nothing run; a script that does not parse is 1, as under -File. Kept apart so the harnesses know it when they see it
+# (Get-ThornswoodRemoteRunnerPath, tests\test-remote-big-script.ps1).
+function Get-ThornswoodRemoteRunner([Parameter(Mandatory = $true)][string]$Path) {
+    if ($Path -notmatch '^C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1$') { throw ('not a runner''s file: ' + $Path) }
+    return @"
+`$ThornswoodRunFile = '$Path'
+try { `$ThornswoodRunText = [IO.File]::ReadAllText(`$ThornswoodRunFile, [Text.Encoding]::UTF8); [IO.File]::Delete(`$ThornswoodRunFile) }
+catch { [Console]::Error.WriteLine('the script could not be taken from ' + `$ThornswoodRunFile + ': ' + `$_.Exception.Message + ' Nothing ran.'); exit 254 }
+foreach (`$ThornswoodRunOld in @(Get-ChildItem -LiteralPath 'C:\Windows\Temp' -Filter 'thornswood-remote-*.ps1' -File -ErrorAction SilentlyContinue)) {
+  if (`$ThornswoodRunOld.Name -match '^thornswood-remote-[0-9a-f]{32}\.ps1`$' -and `$ThornswoodRunOld.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddMinutes(-10)) {
+    try { [IO.File]::Delete(`$ThornswoodRunOld.FullName) } catch { [Console]::Error.WriteLine('could not remove ' + `$ThornswoodRunOld.FullName + ', left by a run cut short: ' + `$_.Exception.Message) }
+  }
+}
+try { `$ThornswoodRunBlock = [scriptblock]::Create(`$ThornswoodRunText) } catch { [Console]::Error.WriteLine('the script does not parse: ' + `$_.Exception.InnerException.Message); exit 1 }
+Remove-Variable -Name ThornswoodRunFile, ThornswoodRunOld, ThornswoodRunText -ErrorAction SilentlyContinue
+. `$ThornswoodRunBlock
+"@
+}
+
+# The file a runner from Get-ThornswoodRemoteRunner takes, from its text, or
+# '' when the text is no runner. For the harnesses' stand-in boxes, which
+# call it from their own scope (${function:Get-ThornswoodRemoteRunnerPath}),
+# so it calls nothing of this file's.
+function Get-ThornswoodRemoteRunnerPath([AllowEmptyString()][string]$Text) {
+    $m = [regex]::Match([string]$Text, "^\`$ThornswoodRunFile = '(C:\\Windows\\Temp\\thornswood-remote-[0-9a-f]{32}\.ps1)'\r?\n(?s:.*)\r?\n\. \`$ThornswoodRunBlock\r?\n?$")
+    if ($m.Success) { return $m.Groups[1].Value }
+    return ''
 }
 
 # A script file of the repository's, as the text that runs it on the box with
@@ -93,13 +133,13 @@ function Get-ThornswoodFileScript {
 #   -Target   user@host
 #   -SshArgs  the caller's ssh options (@ssh)
 #   -Bypass   -ExecutionPolicy Bypass on the command line as well, for a
-#             script that dot-sources a file (a long script always has it,
-#             as the file it once went as did)
-#   -Limit    the longest command line sent; over it the script goes on
-#             standard input
-#   -Stdin    one line for the far side's standard input (Send-Secret.ps1).
-#             For a long script it is the line after the script's own, so
-#             the script reads it as its first
+#             script that dot-sources a file (a long script's runner always
+#             has it, as -File had it)
+#   -Limit    the longest command line sent; over it the script goes by scp
+#   -Stdin    one line for the far side's standard input (Send-Secret.ps1),
+#             at most $ThornswoodStdinLimit bytes with its line end. A long
+#             script's runner reads none of it, so the script reads it as
+#             its first line either way
 function Invoke-ThornswoodRemote {
     param(
         [Parameter(Mandatory = $true)][string]$Target,
@@ -113,6 +153,7 @@ function Invoke-ThornswoodRemote {
     if ($weak.Count) { throw ('ssh options with host key checking turned down (' + ($weak -join ', ') + '). Only the box whose key is pinned is talked to. Nothing was sent.') }
     $ssh = @(@($SshArgs | Where-Object { $_ }) + @('-o', 'StrictHostKeyChecking=yes'))
     $piped = $PSBoundParameters.ContainsKey('Stdin')
+    if ($piped -and ([Text.Encoding]::UTF8.GetByteCount($Stdin) + 2) -gt $ThornswoodStdinLimit) { throw ('the line for standard input is ' + ([Text.Encoding]::UTF8.GetByteCount($Stdin) + 2) + ' bytes, over the ' + $ThornswoodStdinLimit + ' the box is measured to take whole (Send-Script.ps1, #3059). Nothing was sent.') }
     if ($piped) {
         # Plain ASCII on the pipe whichever PowerShell runs this, so no byte
         # order mark goes in front of the line.
@@ -128,14 +169,34 @@ function Invoke-ThornswoodRemote {
         return (Invoke-ThornswoodNative { & ssh @ssh $Target $cmd } 2>&1)
     }
 
-    # Over the limit: the reader on the command line, the script on standard
-    # input, and the caller's line after it. Plain ASCII on the pipe, so no
-    # byte order mark goes in front of the script's line.
-    $OutputEncoding = New-Object Text.ASCIIEncoding
-    $wire = @([Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Script)))
-    if ($piped) { $wire += $Stdin }
-    $run = 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodStdinReader)))
-    return ($wire | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $run } 2>&1)
+    # Over the limit: the script by scp to a name of its own, then the
+    # runner on the command line, which takes the file off the box before it
+    # runs it, with the caller's line on its standard input.
+    $id = [Guid]::NewGuid().ToString('N')
+    $far = 'C:\Windows\Temp\thornswood-remote-' + $id + '.ps1'
+    $run = 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes((Get-ThornswoodRemoteRunner -Path $far)))
+    $tmp = [IO.Path]::GetTempFileName()
+    $rc = 1
+    try {
+        [IO.File]::WriteAllText($tmp, $Script, (New-Object Text.UTF8Encoding($false)))
+        $sent = @(Invoke-ThornswoodNative { & scp @ssh $tmp ($Target + ':' + $far.Replace('\', '/')) } 2>&1)
+        if ($LASTEXITCODE -ne 0) {
+            # scp's own exit code and lines, as ssh's come back for a short
+            # script that cannot connect, for the caller's check to decide.
+            $rc = $LASTEXITCODE
+            return @($sent) + @(New-Object Management.Automation.ErrorRecord((New-Object Exception('could not copy the script to ' + $Target + ' (scp exit ' + $rc + '). Nothing was run.')), 'ThornswoodScriptNotCopied', 'ConnectionError', $Target))
+        }
+        if ($piped) { $out = @($Stdin | Invoke-ThornswoodNative { $input | & ssh @ssh $Target $run } 2>&1) }
+        else { $out = @(Invoke-ThornswoodNative { & ssh @ssh $Target $run } 2>&1) }
+        $rc = $LASTEXITCODE
+    }
+    finally {
+        Remove-Item -LiteralPath $tmp -Force -ErrorAction SilentlyContinue
+        # The far side's exit code, scp's when the copy failed, or 1 when
+        # nothing ran.
+        $global:LASTEXITCODE = $rc
+    }
+    return $out
 }
 
 # Starts $Script on the VPS and leaves it running, for a far side whose life
@@ -145,10 +206,10 @@ function Invoke-ThornswoodRemote {
 # its standard input and output redirected; what ssh itself says on standard
 # error goes to this console as it would for any ssh.
 #
-# Only the command line form: standard input is how the far side is told to
-# finish, so a long script cannot come that way as Invoke-ThornswoodRemote
-# sends one (#3027). A script over the limit is refused, before anything is
-# sent.
+# Only the command line form, and a script over the limit is refused, before
+# anything is sent. Measured 21 Oct 2026 (#3059): the box passes on no close
+# made after the session starts, and a far process outlives its session, so
+# neither tells this far side to finish there (#3063).
 function Start-ThornswoodRemote {
     param(
         [Parameter(Mandatory = $true)][string]$Target,

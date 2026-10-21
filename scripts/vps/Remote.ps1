@@ -113,8 +113,8 @@ if ($Show) {
 }
 
 # The sending is Send-Script.ps1's (issue #1070), the one helper every script
-# here uses: the command line when the script fits, otherwise ssh's standard
-# input, so nothing of it is left on the box (#3027), and the far side's exit
+# here uses: the command line when the script fits, otherwise scp to a copy
+# its run deletes before it runs (#3027, #3059), and the far side's exit
 # code handed back. Why a long script cannot go on the command line is in its
 # header; tests\test-remote-big-script.ps1 sends a 10 KB script through it.
 #

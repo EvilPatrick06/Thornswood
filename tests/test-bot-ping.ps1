@@ -91,6 +91,18 @@ function ssh {
     [void]$ScCalls.Add([pscustomobject]@{ Tool = 'ssh'; Args = $a; Sent = '' })
     # The box's C:/Windows/Temp is the scratch folder here, quoted for cmd.exe.
     $line = [regex]::Replace($a[-1], 'C:/Windows/Temp/(\S+)', { param($m) '"' + $ScFar + '\' + $m.Groups[1].Value + '"' })
+    $m = [regex]::Match($line, '-EncodedCommand (\S+)$')
+    if ($m.Success) {
+        # A long script's runner (Send-Script.ps1, #3059) takes its copy
+        # from the scratch folder too, and sweeps that folder, not the
+        # machine's own C:\Windows\Temp.
+        $said = [Text.Encoding]::Unicode.GetString([Convert]::FromBase64String($m.Groups[1].Value))
+        $copy = Get-ThornswoodRemoteRunnerPath $said
+        if ($copy) {
+            $said = $said.Replace($copy, (Join-Path $ScFar ($copy -split '\\')[-1])).Replace("'C:\Windows\Temp'", ("'" + $ScFar + "'"))
+            $line = $line.Substring(0, $m.Groups[1].Index) + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($said))
+        }
+    }
     $in = @($input)
     if ($in.Count) { $in | & $cmdExe /d /c $line }
     else { & $cmdExe /d /c $line }
@@ -158,10 +170,10 @@ try {
     Yes 'set: the address is in nothing printed' (-not $r.Text.Contains($key) -and -not $r.Text.Contains($wire))
     $all = AllSent
     Yes 'set: the address is in nothing handed to ssh or scp, plain or base64' (-not $all.Contains($key) -and -not $all.Contains($wire))
-    Yes 'set: the script went on standard input under the reader, nothing copied up (#3027)' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 0 -and @($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and $_.Args[-1] -match '^powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand \S+$' }).Count -eq 1)
+    $copied = @($ScCalls | Where-Object { $_.Tool -eq 'scp' })
+    Yes 'set: the script went by scp under Send-Script.ps1''s runner, and nothing else was copied up (#3059)' ($copied.Count -eq 1 -and $copied[0].Args[-1] -match ':C:/Windows/Temp/thornswood-remote-[0-9a-f]{32}\.ps1$' -and @($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and $_.Args[-1] -match '^powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand \S+$' }).Count -eq 1)
     Yes 'set: with host key checking on' (@($ScCalls | Where-Object { $_.Tool -eq 'ssh' -and ($_.Args -join ' ') -match 'StrictHostKeyChecking=yes' }).Count -ge 1)
-    Yes 'set: nothing else is sent: no artifact, no bot files' (@($ScCalls | Where-Object { $_.Tool -eq 'scp' }).Count -eq 0)
-    Yes 'set: nothing is written in the box''s temp folder' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
+    Yes 'set: nothing is left in the box''s temp folder' (@(Get-ChildItem -LiteralPath $farDir -File).Count -eq 0)
     Yes 'set: bot.env.json has no byte order mark' ([IO.File]::ReadAllBytes($envFile)[0] -eq 123)
 
     # ---- 2. the same again

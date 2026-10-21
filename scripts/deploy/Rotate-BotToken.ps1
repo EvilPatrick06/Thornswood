@@ -29,7 +29,7 @@
        never as a word on a command line, and checks it looks like a bot token
        before anything leaves this machine.
     2. Sends the writer's text inline with the script that calls it, and the
-       token on ssh's standard input after it, the same way Install-Bot.ps1
+       token on ssh's standard input, the same way Install-Bot.ps1
        and Set-DiscordLogin.ps1 do. Nothing is written on the box but the two
        files the token goes into (#3035: until 21 Oct 2026 the writer went up
        as a file of its own in C:\Windows\Temp first, and a run cut before
@@ -89,9 +89,10 @@ function Die($m) { Write-Host ''; Write-Host "STOP. $m" -ForegroundColor Red; Do
 
 # Every remote script here starts with the writer's own text, so the box
 # never holds a copy of it (#3035), and is sent the way every script here is
-# (Send-Script.ps1): too long for a command line, so on ssh's standard input.
-# The token goes on standard input too, after the script (Send-Secret.ps1,
-# issue #451), so it is on no command line and in no file on either machine.
+# (Send-Script.ps1): too long for a command line, so by scp, and its run
+# deletes the copy before it runs (#3059). The token goes on ssh's standard
+# input (Send-Secret.ps1, issue #451), so it is on no command line and in no
+# file on either machine.
 function Remote($script) {
   return Invoke-ThornswoodRemote -Target "$User@$Vps" -SshArgs $ssh -Script $script
 }

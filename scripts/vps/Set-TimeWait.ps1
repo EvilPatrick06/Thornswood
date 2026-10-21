@@ -19,10 +19,11 @@
     1. The box's own key. known_hosts here must hold the host key
        scripts\vps\vps.json pins.
     2. Key login, and when the box last started.
-    3. On the box: scripts\vps\vps-time-wait.ps1 runs there, sent on ssh's
-       standard input, so nothing of it is written on the box (#3035; until
-       21 Oct 2026 it was copied into C:\Windows\Temp, and a run cut short
-       left the copy there). It sets the value and reads it
+    3. On the box: scripts\vps\vps-time-wait.ps1 runs there, sent through
+       Send-Script.ps1, whose run deletes a long script's copy before it
+       runs (#3035, #3059; until 21 Oct 2026 it was copied into
+       C:\Windows\Temp and removed after, and a run cut short left the copy
+       there). It sets the value and reads it
        back. With -Restart it then reads who is on the live and the dev
        server, refuses while anybody is or while a count cannot be read, and
        restarts the box.
