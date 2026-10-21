@@ -26,6 +26,7 @@ param([string]$Tools)
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+. (Join-Path $Here 'Windows.ps1')
 $Here = Split-Path -Parent $Here
 if (-not $Tools) { $Tools = $Here }
 $realRepo = $Tools
@@ -55,7 +56,7 @@ try {
     New-Item -ItemType Directory -Force -Path $bin | Out-Null
     $calls = Join-Path $T 'ssh-calls.txt'
     foreach ($n in 'ssh', 'scp') {
-        if ($IsWindows -or $env:OS -eq 'Windows_NT') {
+        if ($OnWindows) {
             [IO.File]::WriteAllText((Join-Path $bin ($n + '.cmd')), ("@echo off`r`necho {0}>>`"{1}`"`r`nexit /b 0`r`n" -f $n, $calls))
         }
         else {
