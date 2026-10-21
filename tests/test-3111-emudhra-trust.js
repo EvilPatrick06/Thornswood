@@ -1,8 +1,8 @@
 'use strict';
 /*
-  test-3111-bot-trust.js
+  test-3111-emudhra-trust.js
 
-      node .\tests\test-3111-bot-trust.js
+      node .\tests\test-3111-emudhra-trust.js
 
   Issue #3111: eMudhra's emSign roots in the bot's trust. Eight eMudhra
   intermediates were found on 17 Oct 2026 with keys anyone could recover, and
@@ -29,6 +29,10 @@
        and no longer writes an SSL_CERT_FILE of its own into bot.env.json.
     E  certifi is pinned at one version in requirements.in and requirements.txt,
        and the written bundle stays out of git.
+    F  site\server.js, whose requests carry the bot token to discord.com,
+       sets Node's default roots to its own less eMudhra's before anything
+       else: the block, run on this Node, leaves out every emSign root and
+       nothing else, and comes before the first request in the file.
 
   bot\test-3111-trust.py, in the nightly, does A and C again with the real
   certifi the bot pins and the real bot.py import.
@@ -164,6 +168,34 @@ try {
   yes('E1 certifi is pinned at one version in requirements.in and requirements.txt', !!inPin && inPin === txtPin, inPin + ' / ' + txtPin);
   const gi = read('.gitignore');
   yes('E2 bot/roots.pem and its .tmp stay out of git', /^bot\/roots\.pem$/m.test(gi) && /^bot\/roots\.pem\.tmp$/m.test(gi));
+
+  // ---- F: the site
+  const site = read('site/server.js');
+  const from = site.indexOf('\nconst NOT_TRUSTED = ');
+  const to = from < 0 ? -1 : site.indexOf('\n}));\n', from);
+  const block = (from >= 0 && to > from) ? site.slice(from, to + 5) : '';
+  yes('F1 server.js has the block that sets its roots', !!block && site.indexOf("\nconst tls    = require('tls');\n") !== -1);
+  const firstCall = Math.min(...['https.request(', 'https.get(', 'fetch('].map((w) => {
+    const i = site.indexOf(w); return i < 0 ? Infinity : i;
+  }));
+  yes('F2 and sets them before the first request anywhere in the file', !!block && from < firstCall);
+  const probe = spawnSync(process.execPath, ['-e',
+    "const crypto = require('crypto'); const tls = require('tls');\n" +
+    "const fp = (p) => new crypto.X509Certificate(p).fingerprint256;\n" +
+    "const isE = (p) => { const c = new crypto.X509Certificate(p); return /O=eMudhra/i.test(c.subject) || /O=eMudhra/i.test(c.issuer); };\n" +
+    "const before = tls.getCACertificates('default');\n" + block + '\n' +
+    "const after = tls.getCACertificates('default');\n" +
+    "const want = new Set(before.filter((p) => !isE(p)).map(fp));\n" +
+    "const got = new Set(after.map(fp));\n" +
+    "console.log(JSON.stringify({ before: before.filter(isE).length, after: after.filter(isE).length, left: LEFT_OUT,\n" +
+    "  same: got.size === want.size && [...want].every((f) => got.has(f)) }));"], { encoding: 'utf8' });
+  let p = null;
+  try { p = JSON.parse(String(probe.stdout).trim()); } catch (e) { p = null; }
+  yes('F3 run on this Node (' + process.version + '), it leaves out every eMudhra root Node carries (' + (p ? p.before : '?') + ') and names them',
+    !!p && p.after === 0 && p.left.length === p.before && p.left.every((n) => /^emSign /.test(n)), probe.stdout + probe.stderr);
+  yes('F4 and keeps every other root Node trusts by default', !!p && p.same === true);
+  yes('F5 the site says at start how many it trusts and which it left out',
+    /console\.log\('\[thornswood-docs\] trusting ' \+ tls\.getCACertificates\('default'\)\.length/.test(site));
 } finally {
   fs.rmSync(scratch, { recursive: true, force: true });
 }

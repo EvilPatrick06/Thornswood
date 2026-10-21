@@ -2,7 +2,7 @@
 test-3111-trust.py
 
 #3111: the roots the bot trusts, with the certifi requirements.txt pins and
-the real bot.py import. tests\test-3111-bot-trust.js holds the same filter
+the real bot.py import. tests\test-3111-emudhra-trust.js holds the same filter
 on a fixture in the gate; this is the nightly half, with the bot's libraries.
 
   1. The certifi installed here is the one requirements.txt pins, so what is
