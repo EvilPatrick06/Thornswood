@@ -21,8 +21,9 @@
       script's output and error, and passes what Setup.bat passes (-File the
       script, -MovePayload, -Root the folder) from the payload's folder, with
       -NonInteractive to PowerShell and to the script. Compiled out of
-      Bootstrap.cs and run, against Setup.bat run by cmd, on a stand-in script
-      that writes down what it was given;
+      Bootstrap.cs with the compiler the build runs (Add-LauncherType,
+      tests\Launcher-Csc.ps1, #2821) and run, against Setup.bat run by cmd,
+      on a stand-in script that writes down what it was given;
     - it picks the PowerShell Setup.bat picks;
     - Work starts no Setup.bat any more, decides on the exit code, and names
       the log file when it fails; the ASK line gets a box;
@@ -35,7 +36,9 @@
     - Setup.bat still parses and calls the script, and Install.bat still
       runs it the interactive way.
 
-  Everything it makes is under a temp folder it removes.
+  Everything it makes is under a temp folder it removes. Off Windows it does
+  not run: the build's compiler, cmd.exe, Setup.bat and Windows PowerShell
+  are only there.
 #>
 [CmdletBinding()]
 param([string]$Root)
@@ -45,6 +48,8 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root) { $Root = Split-Path -Parent $Here }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
+if (-not $OnWindows) { Write-Host 'NOT RUN  the setup window starting PowerShell hidden happens only on Windows: Bootstrap.cs compiled with the Roslyn csc of Visual Studio''s Build Tools, Setup.bat under cmd.exe and the script under Windows PowerShell'; exit 0 }
 
 $script:pass = 0
 $script:fail = 0
@@ -111,13 +116,13 @@ try {
     $psExe = Get-Method $bs 'static string PowerShellExe('
     $start = Get-Method $bs 'static ProcessStartInfo SetupStartInfo('
     Yes 'Bootstrap has PowerShellExe and SetupStartInfo' ($psExe.Length -gt 0 -and $start.Length -gt 0)
-    Add-Type -TypeDefinition (@'
+    $null = Add-LauncherType -Source ((@'
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
 public static class Ts889 {
-'@ + "public $psExe`npublic $start`n}")
+'@ + "public $psExe`npublic $start`n}"))
 
     $payload = Join-Path $tmp 'Thornswood-setup'
     New-Item -ItemType Directory -Force -Path $payload | Out-Null

@@ -29,12 +29,15 @@
   The in-game side (the voice page making no WebRTC connection once the
   launcher has the audio) is tests\test-voice-relay-no-peers.js.
 
-  HOW. Compiles the shipped launcher\app\BrowserArgs.cs by itself and calls
-  it; reads the other files as text. Read only.
+  HOW. Compiles the shipped launcher\app\BrowserArgs.cs by itself, with the
+  compiler the build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821),
+  and calls it; reads the other files as text. Read only. Off Windows, 1 says
+  SKIP: the build's compiler is only there.
 #>
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $app = Join-Path $root 'launcher\app'
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0; $script:fail = 0
 function Yes([string]$what, [bool]$cond) {
@@ -43,26 +46,31 @@ function Yes([string]$what, [bool]$cond) {
 }
 
 # ------------------------------------------------------------ 1. the merge
-$cs = Get-Content -LiteralPath (Join-Path $app 'BrowserArgs.cs') -Raw
-$cs = $cs -replace 'namespace Thornswood', 'namespace ThornswoodBrowserArgsTest'
-Add-Type -TypeDefinition $cs -Language CSharp
-$T = [ThornswoodBrowserArgsTest.BrowserArgs]
-$f = $T::NoMdns
+if ($OnWindows) {
+    $cs = Get-Content -LiteralPath (Join-Path $app 'BrowserArgs.cs') -Raw
+    $cs = $cs -replace 'namespace Thornswood', 'namespace ThornswoodBrowserArgsTest'
+    $null = Add-LauncherType -Source $cs
+    $T = [ThornswoodBrowserArgsTest.BrowserArgs]
+    $f = $T::NoMdns
 
-Yes 'the feature is the one Chromium calls WebRtcHideLocalIpsWithMdns' ($f -eq 'WebRtcHideLocalIpsWithMdns')
-Yes 'nothing set yet: one switch' ($T::DisableFeature($null, $f) -eq "--disable-features=$f")
-Yes 'an empty value: one switch' ($T::DisableFeature('  ', $f) -eq "--disable-features=$f")
-Yes 'beside another switch, added after it' `
-    ($T::DisableFeature('--autoplay-policy=no-user-gesture-required', $f) -eq "--autoplay-policy=no-user-gesture-required --disable-features=$f")
-Yes 'an existing --disable-features gets it inside, not a second switch' `
-    ($T::DisableFeature('--disable-features=Foo --x=1', $f) -eq "--disable-features=Foo,$f --x=1")
-Yes 'at the end of the line too' `
-    ($T::DisableFeature('--x=1 --disable-features=Foo,Bar', $f) -eq "--x=1 --disable-features=Foo,Bar,$f")
-$once = $T::DisableFeature('--disable-features=Foo', $f)
-Yes 'already off: unchanged' ($T::DisableFeature($once, $f) -eq $once)
-Yes 'already off in another case: unchanged' ($T::DisableFeature('--disable-features=webrtchidelocalipswithmdns', $f) -eq '--disable-features=webrtchidelocalipswithmdns')
-$n = ([regex]::Matches($T::DisableFeature($T::DisableFeature('--disable-features=A', $f), 'B'), '--disable-features=')).Count
-Yes 'two features, still one switch' ($n -eq 1)
+    Yes 'the feature is the one Chromium calls WebRtcHideLocalIpsWithMdns' ($f -eq 'WebRtcHideLocalIpsWithMdns')
+    Yes 'nothing set yet: one switch' ($T::DisableFeature($null, $f) -eq "--disable-features=$f")
+    Yes 'an empty value: one switch' ($T::DisableFeature('  ', $f) -eq "--disable-features=$f")
+    Yes 'beside another switch, added after it' `
+        ($T::DisableFeature('--autoplay-policy=no-user-gesture-required', $f) -eq "--autoplay-policy=no-user-gesture-required --disable-features=$f")
+    Yes 'an existing --disable-features gets it inside, not a second switch' `
+        ($T::DisableFeature('--disable-features=Foo --x=1', $f) -eq "--disable-features=Foo,$f --x=1")
+    Yes 'at the end of the line too' `
+        ($T::DisableFeature('--x=1 --disable-features=Foo,Bar', $f) -eq "--x=1 --disable-features=Foo,Bar,$f")
+    $once = $T::DisableFeature('--disable-features=Foo', $f)
+    Yes 'already off: unchanged' ($T::DisableFeature($once, $f) -eq $once)
+    Yes 'already off in another case: unchanged' ($T::DisableFeature('--disable-features=webrtchidelocalipswithmdns', $f) -eq '--disable-features=webrtchidelocalipswithmdns')
+    $n = ([regex]::Matches($T::DisableFeature($T::DisableFeature('--disable-features=A', $f), 'B'), '--disable-features=')).Count
+    Yes 'two features, still one switch' ($n -eq 1)
+}
+else {
+    Write-Host 'SKIP  1, BrowserArgs.cs compiled and asked: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
+}
 
 # ------------------------------------------------ 2. the voice browser uses it
 $voice = Get-Content -LiteralPath (Join-Path $app 'Voice.cs') -Raw

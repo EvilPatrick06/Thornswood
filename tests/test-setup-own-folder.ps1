@@ -45,6 +45,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 if (-not $Root) { $Root = Split-Path -Parent $Here }
+. (Join-Path $PSScriptRoot 'Launcher-Csc.ps1')   # the build's compiler and C# version (#2821)
 
 $script:pass = 0
 $script:fail = 0
@@ -145,43 +146,48 @@ try {
     $start = Get-Method $bs 'static ProcessStartInfo SetupStartInfo('
     $probl = Get-Method $bs 'static string VortexFolderProblem('
     Yes 'Bootstrap has SetupStartInfo and VortexFolderProblem' ($start.Length -gt 0 -and $probl.Length -gt 0)
-    Add-Type -TypeDefinition (@'
+    if ($OnWindows) {
+        $null = Add-LauncherType -Source ((@'
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
 public static class Ts906 {
-'@ + "public $start`npublic $probl`n}")
+'@ + "public $start`npublic $probl`n}"))
 
-    $script = 'C:\payload\Setup-Thornswood.ps1'
-    $before = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $script + '" -MovePayload -Root "D:\Thornswood" -NonInteractive'
-    Yes 'untouched, the script gets exactly the arguments it had before' (
-        ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $false, '')).Arguments -eq $before)
-    Yes 'and a null folder is the same as none' (
-        ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $false, $null)).Arguments -eq $before)
-    Yes 'ticked, it adds -MakeOwnGame and nothing else' (
-        ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, '')).Arguments -eq ($before + ' -MakeOwnGame'))
-    $vf = 'S:\Steam Library\steamapps\common\Other Server Online'
-    Yes 'a chosen folder goes as -VortexGame, quoted' (
-        ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, $vf + '\')).Arguments -eq ($before + ' -MakeOwnGame -VortexGame "' + $vf + '"'))
+        $script = 'C:\payload\Setup-Thornswood.ps1'
+        $before = '-NoProfile -NonInteractive -ExecutionPolicy Bypass -File "' + $script + '" -MovePayload -Root "D:\Thornswood" -NonInteractive'
+        Yes 'untouched, the script gets exactly the arguments it had before' (
+            ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $false, '')).Arguments -eq $before)
+        Yes 'and a null folder is the same as none' (
+            ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $false, $null)).Arguments -eq $before)
+        Yes 'ticked, it adds -MakeOwnGame and nothing else' (
+            ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, '')).Arguments -eq ($before + ' -MakeOwnGame'))
+        $vf = 'S:\Steam Library\steamapps\common\Other Server Online'
+        Yes 'a chosen folder goes as -VortexGame, quoted' (
+            ([Ts906]::SetupStartInfo('powershell.exe', $script, 'D:\Thornswood', $true, $vf + '\')).Arguments -eq ($before + ' -MakeOwnGame -VortexGame "' + $vf + '"'))
 
-    $sky = Join-Path $tmp 'Other Skyrim'
-    New-Item -ItemType Directory -Force -Path (Join-Path $sky 'Data') | Out-Null
-    $full = ''
-    $why = [Ts906]::VortexFolderProblem($sky, [ref]$full)
-    Yes 'a folder with no SkyrimSE.exe is refused, in PointAt''s words' (
-        $null -ne $why -and $why.Contains('has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed.'))
-    [IO.File]::WriteAllText((Join-Path $sky 'SkyrimSE.exe'), 'x')
-    $why = [Ts906]::VortexFolderProblem($sky, [ref]$full)
-    Yes 'a Skyrim Vortex has not deployed into is refused, in PointAt''s words' (
-        $null -ne $why -and $why.Contains('it has no Data\vortex.deployment.json, the record Vortex leaves in every folder it deploys to'))
-    [IO.File]::WriteAllText((Join-Path $sky 'Data\vortex.deployment.json'), '{}')
-    $why = [Ts906]::VortexFolderProblem('"' + $sky + '\"', [ref]$full)
-    Yes 'a Skyrim with Vortex''s record is taken, quotes and trailing backslash and all' ($null -eq $why)
-    Yes 'and saved as its full path' ($full -eq $sky)
-    foreach ($s in @('has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed. Choose the folder that Open Game Folder opens in Vortex.',
-                     'the record Vortex leaves in every folder it deploys to, so nothing changed. Choose the folder that Open Game Folder opens in Vortex.')) {
-        Yes ('the launcher says the same: ' + $s.Substring(0, 40) + '...') ($own.Contains($s) -and $bs.Contains($s))
+        $sky = Join-Path $tmp 'Other Skyrim'
+        New-Item -ItemType Directory -Force -Path (Join-Path $sky 'Data') | Out-Null
+        $full = ''
+        $why = [Ts906]::VortexFolderProblem($sky, [ref]$full)
+        Yes 'a folder with no SkyrimSE.exe is refused, in PointAt''s words' (
+            $null -ne $why -and $why.Contains('has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed.'))
+        [IO.File]::WriteAllText((Join-Path $sky 'SkyrimSE.exe'), 'x')
+        $why = [Ts906]::VortexFolderProblem($sky, [ref]$full)
+        Yes 'a Skyrim Vortex has not deployed into is refused, in PointAt''s words' (
+            $null -ne $why -and $why.Contains('it has no Data\vortex.deployment.json, the record Vortex leaves in every folder it deploys to'))
+        [IO.File]::WriteAllText((Join-Path $sky 'Data\vortex.deployment.json'), '{}')
+        $why = [Ts906]::VortexFolderProblem('"' + $sky + '\"', [ref]$full)
+        Yes 'a Skyrim with Vortex''s record is taken, quotes and trailing backslash and all' ($null -eq $why)
+        Yes 'and saved as its full path' ($full -eq $sky)
+        foreach ($s in @('has no SkyrimSE.exe in it, so it is not a Skyrim folder and nothing changed. Choose the folder that Open Game Folder opens in Vortex.',
+                         'the record Vortex leaves in every folder it deploys to, so nothing changed. Choose the folder that Open Game Folder opens in Vortex.')) {
+            Yes ('the launcher says the same: ' + $s.Substring(0, 40) + '...') ($own.Contains($s) -and $bs.Contains($s))
+        }
+    }
+    else {
+        Write-Host 'SKIP  3. SetupStartInfo and the Vortex folder check, compiled the way the build compiles Bootstrap.cs: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'
     }
 
     # ---- 4. the script's config part, lifted and run -------------------------
@@ -204,79 +210,84 @@ public static class Ts906 {
     # the way the launcher reads it.
     $fields = @([regex]::Matches($cfgCs, '(?m)^\s*(\[DataMember\] public (?:string VortexGame = "";|bool MakeOwnGame;))\s*$') | ForEach-Object { $_.Groups[1].Value })
     Yes 'the launcher''s VortexGame and MakeOwnGame lines are in Config.cs' ($fields.Count -eq 2)
-    # The attributes live in a different assembly on each .NET.
-    $serRef = if ($PSVersionTable.PSEdition -eq 'Core') { 'System.Runtime.Serialization.Primitives' } else { 'System.Runtime.Serialization' }
-    Add-Type -ReferencedAssemblies $serRef -TypeDefinition (@'
+    if ($OnWindows) {
+        # The launcher's own field lines, compiled the way the build compiles
+        # Config.cs (#2821), and read by the serializer of this shell's .NET.
+        $null = Add-LauncherType -Source ((@'
 using System.Runtime.Serialization;
 [DataContract] public class Cfg906 {
-'@ + ($fields -join "`n") + "`n}")
-    function Read-AsLauncher([string]$path) {
-        $raw = [IO.File]::ReadAllBytes($path)
-        $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF) { 3 } else { 0 }
-        $ms = New-Object IO.MemoryStream(, $raw[$skip..($raw.Length - 1)])
-        return (New-Object Runtime.Serialization.Json.DataContractJsonSerializer([Cfg906])).ReadObject($ms)
-    }
-
-    $editions = @('powershell.exe')
-    if (Get-Command pwsh -ErrorAction SilentlyContinue) { $editions += 'pwsh' }
-    $n = 0
-    function Invoke-Config([string]$ps, [bool]$collection, [bool]$make, [string]$vortex, [string]$oldJson) {
-        $script:n++
-        $case = Join-Path $tmp ('case' + $script:n)
-        $pay = Join-Path $case 'payload'
-        $inst = Join-Path $case 'install'
-        New-Item -ItemType Directory -Force -Path $pay, $inst | Out-Null
-        [IO.File]::WriteAllText((Join-Path $pay 'config.json'), '{ "ServerAddress": "203.0.113.23", "VortexGame": "", "ServerPassword": "" }')
-        if ($oldJson) { [IO.File]::WriteAllText((Join-Path $inst 'config.json'), $oldJson) }
-        $pre = @(
-            'Set-StrictMode -Version Latest'
-            '$ErrorActionPreference = ''Stop'''
-            'function Say($m, $c = ''Gray'') { Write-Host $m }'
-            'function Head($m) { Write-Host $m }'
-            ('$Here = ''' + $pay + '''')
-            ('$Root = ''' + $inst + '''')
-            ('$Collection = $' + $collection)
-            ('$MakeOwnGame = [switch]$' + $make)
-            ('$VortexGame = ''' + $vortex + '''')
-        ) -join "`n"
-        $file = Join-Path $case 'run.ps1'
-        [IO.File]::WriteAllText($file, $pre + "`n" + $lifted, (New-Object Text.UTF8Encoding($false)))
-        $out = & $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $file 2>&1 | Out-String
-        $cfg = Join-Path $inst 'config.json'
-        $json = if (Test-Path -LiteralPath $cfg) { Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json } else { $null }
-        return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out; Json = $json; Path = $cfg }
-    }
-    function Has($o, [string]$name) { return ($null -ne $o) -and ($o.PSObject.Properties.Name -contains $name) }
-
-    foreach ($ps in $editions) {
-        $tag = if ($ps -eq 'pwsh') { ' (PowerShell 7)' } else { ' (Windows PowerShell)' }
-        $plain = Invoke-Config $ps $true $false '' ''
-        Yes ('untouched, the config is written and has no MakeOwnGame' + $tag) ($plain.Code -eq 0 -and $null -ne $plain.Json -and -not (Has $plain.Json 'MakeOwnGame'))
-        Yes ('and says nothing about the own folder' + $tag) (-not $plain.Out.Contains("Thornswood's own Skyrim folder"))
-        if ($plain.Json) {
-            $l = Read-AsLauncher $plain.Path
-            Yes ('which the launcher reads as asking first' + $tag) (-not $l.MakeOwnGame -and $l.VortexGame -eq '')
+'@ + ($fields -join "`n") + "`n}"))
+        function Read-AsLauncher([string]$path) {
+            $raw = [IO.File]::ReadAllBytes($path)
+            $skip = if ($raw.Length -ge 3 -and $raw[0] -eq 0xEF) { 3 } else { 0 }
+            $ms = New-Object IO.MemoryStream(, $raw[$skip..($raw.Length - 1)])
+            return (New-Object Runtime.Serialization.Json.DataContractJsonSerializer([Cfg906])).ReadObject($ms)
         }
 
-        $made = Invoke-Config $ps $true $true '' '{ "ServerPassword": "kept", "VortexGame": "" }'
-        Yes ('ticked, config.json says MakeOwnGame true' + $tag) ($made.Code -eq 0 -and (Has $made.Json 'MakeOwnGame') -and $made.Json.MakeOwnGame -eq $true)
-        Yes ('and what was already in it is kept' + $tag) ((Has $made.Json 'ServerPassword') -and $made.Json.ServerPassword -eq 'kept')
-        Yes ('and the window is told' + $tag) ($made.Out.Contains('On. The launcher makes it by itself once Vortex has deployed the Thornswood collection.'))
-        if ($made.Json) { Yes ('which the launcher reads as make it without asking' + $tag) ((Read-AsLauncher $made.Path).MakeOwnGame) }
+        $editions = @((Get-WindowsPowerShell))
+        if (Get-Command pwsh -ErrorAction SilentlyContinue) { $editions += 'pwsh' }
+        $n = 0
+        function Invoke-Config([string]$ps, [bool]$collection, [bool]$make, [string]$vortex, [string]$oldJson) {
+            $script:n++
+            $case = Join-Path $tmp ('case' + $script:n)
+            $pay = Join-Path $case 'payload'
+            $inst = Join-Path $case 'install'
+            New-Item -ItemType Directory -Force -Path $pay, $inst | Out-Null
+            [IO.File]::WriteAllText((Join-Path $pay 'config.json'), '{ "ServerAddress": "203.0.113.23", "VortexGame": "", "ServerPassword": "" }')
+            if ($oldJson) { [IO.File]::WriteAllText((Join-Path $inst 'config.json'), $oldJson) }
+            $pre = @(
+                'Set-StrictMode -Version Latest'
+                '$ErrorActionPreference = ''Stop'''
+                'function Say($m, $c = ''Gray'') { Write-Host $m }'
+                'function Head($m) { Write-Host $m }'
+                ('$Here = ''' + $pay + '''')
+                ('$Root = ''' + $inst + '''')
+                ('$Collection = $' + $collection)
+                ('$MakeOwnGame = [switch]$' + $make)
+                ('$VortexGame = ''' + $vortex + '''')
+            ) -join "`n"
+            $file = Join-Path $case 'run.ps1'
+            [IO.File]::WriteAllText($file, $pre + "`n" + $lifted, (New-Object Text.UTF8Encoding($false)))
+            $out = & $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $file 2>&1 | Out-String
+            $cfg = Join-Path $inst 'config.json'
+            $json = if (Test-Path -LiteralPath $cfg) { Get-Content -LiteralPath $cfg -Raw | ConvertFrom-Json } else { $null }
+            return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $out; Json = $json; Path = $cfg }
+        }
+        function Has($o, [string]$name) { return ($null -ne $o) -and ($o.PSObject.Properties.Name -contains $name) }
 
-        $vg = Invoke-Config $ps $true $false ($sky + '\') ''
-        Yes ('a chosen Vortex folder goes in as VortexGame' + $tag) ($vg.Code -eq 0 -and (Has $vg.Json 'VortexGame') -and $vg.Json.VortexGame -eq $sky)
-        Yes ('and alone it does not turn MakeOwnGame on' + $tag) (-not (Has $vg.Json 'MakeOwnGame'))
-        if ($vg.Json) { Yes ('the launcher reads the same folder' + $tag) ((Read-AsLauncher $vg.Path).VortexGame -eq $sky) }
+        foreach ($ps in $editions) {
+            $tag = if ($ps -eq 'pwsh') { ' (PowerShell 7)' } else { ' (Windows PowerShell)' }
+            $plain = Invoke-Config $ps $true $false '' ''
+            Yes ('untouched, the config is written and has no MakeOwnGame' + $tag) ($plain.Code -eq 0 -and $null -ne $plain.Json -and -not (Has $plain.Json 'MakeOwnGame'))
+            Yes ('and says nothing about the own folder' + $tag) (-not $plain.Out.Contains("Thornswood's own Skyrim folder"))
+            if ($plain.Json) {
+                $l = Read-AsLauncher $plain.Path
+                Yes ('which the launcher reads as asking first' + $tag) (-not $l.MakeOwnGame -and $l.VortexGame -eq '')
+            }
 
-        $bad = Invoke-Config $ps $true $true (Join-Path $tmp 'no such folder') ''
-        Yes ('a folder that is not a Skyrim is said and left out, not a stop' + $tag) (
-            $bad.Code -eq 0 -and $bad.Json.VortexGame -eq '' -and $bad.Out.Contains('is not a Skyrim folder') -and $bad.Json.MakeOwnGame -eq $true)
+            $made = Invoke-Config $ps $true $true '' '{ "ServerPassword": "kept", "VortexGame": "" }'
+            Yes ('ticked, config.json says MakeOwnGame true' + $tag) ($made.Code -eq 0 -and (Has $made.Json 'MakeOwnGame') -and $made.Json.MakeOwnGame -eq $true)
+            Yes ('and what was already in it is kept' + $tag) ((Has $made.Json 'ServerPassword') -and $made.Json.ServerPassword -eq 'kept')
+            Yes ('and the window is told' + $tag) ($made.Out.Contains('On. The launcher makes it by itself once Vortex has deployed the Thornswood collection.'))
+            if ($made.Json) { Yes ('which the launcher reads as make it without asking' + $tag) ((Read-AsLauncher $made.Path).MakeOwnGame) }
 
-        $alone = Invoke-Config $ps $false $true $sky ''
-        Yes ('a standalone install has nothing to make, and writes neither' + $tag) (
-            $alone.Code -eq 0 -and -not (Has $alone.Json 'MakeOwnGame') -and $alone.Json.VortexGame -eq '' -and
-            $alone.Out.Contains('already has a Game folder of its own'))
+            $vg = Invoke-Config $ps $true $false ($sky + '\') ''
+            Yes ('a chosen Vortex folder goes in as VortexGame' + $tag) ($vg.Code -eq 0 -and (Has $vg.Json 'VortexGame') -and $vg.Json.VortexGame -eq $sky)
+            Yes ('and alone it does not turn MakeOwnGame on' + $tag) (-not (Has $vg.Json 'MakeOwnGame'))
+            if ($vg.Json) { Yes ('the launcher reads the same folder' + $tag) ((Read-AsLauncher $vg.Path).VortexGame -eq $sky) }
+
+            $bad = Invoke-Config $ps $true $true (Join-Path $tmp 'no such folder') ''
+            Yes ('a folder that is not a Skyrim is said and left out, not a stop' + $tag) (
+                $bad.Code -eq 0 -and $bad.Json.VortexGame -eq '' -and $bad.Out.Contains('is not a Skyrim folder') -and $bad.Json.MakeOwnGame -eq $true)
+
+            $alone = Invoke-Config $ps $false $true $sky ''
+            Yes ('a standalone install has nothing to make, and writes neither' + $tag) (
+                $alone.Code -eq 0 -and -not (Has $alone.Json 'MakeOwnGame') -and $alone.Json.VortexGame -eq '' -and
+                $alone.Out.Contains('already has a Game folder of its own'))
+        }
+    }
+    else {
+        Write-Host 'SKIP  4. what the config part writes, run under Windows PowerShell 5.1 and read through Config.cs compiled the way the build compiles it: both only Windows has'
     }
 
     # ---- 5. the launcher takes it --------------------------------------------

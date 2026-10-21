@@ -1071,9 +1071,6 @@ Yes 'after the Downgrade, the folder is made from the download, and Steam''s upd
      ($shell -notmatch 'if \(ok\) AskToHoldSteamUpdates\(\);'))
 Yes 'the Downgrade question says the Steam copy is not changed' ($shell -match 'Your Steam copy of Skyrim is not changed and can stay on any build')
 $kinds = & $read 'OwnGameKinds.cs'
-# A $" after a regex quantifier is the end of a pattern (]+$"), not a string.
-Yes 'OwnGame.cs, OwnGameShare.cs and OwnGameKinds.cs are C# 5: no interpolated strings, no ?., no nameof' `
-    ((($own + $share + $kinds) -notmatch '(?<![\w\)\]\+\*\?\}])\$"') -and (($own + $share + $kinds) -notmatch '\?\.[A-Za-z]') -and (($own + $share + $kinds) -notmatch '\bnameof\s*\('))
 
 # ---- 6: only the three kinds, by a real list (#1232) ---------------------------
 $gather = $own.Substring($own.IndexOf('static List<Found> Gather('))
