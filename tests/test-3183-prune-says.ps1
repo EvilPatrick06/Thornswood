@@ -14,6 +14,8 @@
     3. a copy it cannot remove going unsaid: the line must start
        PRUNE FAILED and carry the folder and what Windows answered, and the
        rest must still be removed.
+    4. either of Swap.ps1's two in-root prunes (the .prev and .undone sets
+       a deploy keeps) throwing its errors away or not saying PRUNE FAILED.
   Prune is lifted out of the installer by its AST and run against a scratch
   folder, with Remove-Item stood in for so that one copy refuses the way a
   held file does. Needs nothing of Windows. Under a second.
@@ -77,5 +79,14 @@ try {
     Yes 'it names the folder and what Windows answered' ($line.Count -eq 1 -and $line[0] -like "*$held*" -and $line[0] -like '*being used by another process*')
 } finally {
     Microsoft.PowerShell.Management\Remove-Item -LiteralPath $scratch -Recurse -Force
+}
+
+# ---- 4. the swap's own prunes ---------------------------------------------------
+$swap = [IO.File]::ReadAllText([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'Swap.ps1'))
+$prunes = @([regex]::Matches($swap, "foreach \(\`$kind in '\.prev-\*', '\.undone-\*'\) \{[\s\S]*?\n    \}"))
+Yes 'Swap.ps1 has its two in-root prunes' ($prunes.Count -eq 2)
+foreach ($m in $prunes) {
+    Yes '  a swap prune throws away no error' ($m.Value -notmatch '(?i)SilentlyContinue|ErrorAction\s+Ignore|-EA\s+(0|Ignore)')
+    Yes '  and says PRUNE FAILED for a copy it could not remove' ($m.Value -match 'catch \{ ''PRUNE FAILED: ')
 }
 Done
