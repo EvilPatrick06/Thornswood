@@ -160,14 +160,15 @@ yes('no handler on the Papyrus family or an attempt event returns false (' +
     neverFalse.every(function (h) { return !/\breturn\s+false\b/.test(bodyOf(h)); }));
 
 if (handlersSrc !== null) {
-  // The drop watcher has no return at all, and the take watcher has exactly
-  // one, a false under the take limit's answer. A second return is the line
-  // somebody turns into a refusal for everybody.
+  // Bound quest items refuse before diagnostics. Other drops pass, and other
+  // takes retain the original take-limit refusal and otherwise pass.
   const dropSrc = handlersSrc.slice(handlersSrc.indexOf('mp.onDropItem = guard('));
   const takeSrc = handlersSrc.slice(0, handlersSrc.indexOf('mp.onDropItem = guard('));
-  yes('the drop watcher has no return statement in it', !/\breturn\b/.test(dropSrc));
-  yes('the take watcher has one return, a false on the take limit\'s refusal',
-      (takeSrc.match(/\breturn\b/g) || []).length === 1 &&
+  yes('the drop watcher only refuses bound or unverifiable quest-item identities',
+      (dropSrc.match(/\breturn\b/g)||[]).length===1 && /if\(questItemBlocked\(baseId\)\)return false;/.test(dropSrc));
+  yes('the take watcher refuses quest items and the original take limit',
+      (takeSrc.match(/\breturn\b/g) || []).length === 2 &&
+      /if\(questItemBlocked\(baseId\)\)return false;/.test(takeSrc) &&
       /if \(no\) \{[\s\S]*?return false;\s*\}/.test(takeSrc) &&
       takeSrc.indexOf('__thornswoodTakeLimit') !== -1);
 }
@@ -489,7 +490,7 @@ function world(opts) {
   if (opts.prop) { g.__thornswoodProperty = opts.prop; }
   if (opts.takeLimit) { g.__thornswoodTakeLimit = opts.takeLimit; }
   const make = new Function('mp', 'log', 'console', 'globalThis',
-                            guardSrc + '\n' + auditSrc + '\nreturn mp;');
+                            require('./fixtures/ordinary-quest-items') + guardSrc + '\n' + auditSrc + '\nreturn mp;');
   make(mp, fakeLog, fakeConsole, g);
   return {
     take: function () { return mp.onTakeItem.apply(null, arguments); },
@@ -607,9 +608,8 @@ if (guardSrc !== null && auditSrc !== null) {
   // T9: arguments that are not what the engine promises.
   {
     const w = world({ prop: whiterunBox });
-    yes('T9 no arguments at all still answers undefined', w.take() === undefined && w.drop() === undefined);
-    yes('T9 and a missing count is written as nought rather than NaN',
-        w.lines.length === 2 && w.lines[0].indexOf('NaN') === -1 && w.lines[0].indexOf('took 0') !== -1);
+    yes('T9 absent item identities refuse before diagnostics', w.take() === false && w.drop() === false);
+    yes('T9 no unverified transfer is logged as successful', w.lines.length === 0);
   }
 
   // T10: the take limit. Its reason refuses the take with one line; its

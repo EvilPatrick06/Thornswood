@@ -81,7 +81,12 @@ context.__thornswoodResourceStock = context.createSharedResourceStock(mp, () => 
 const stock = context.__thornswoodResourceStock;
 
 function firstOf(tbl, rank) { return Object.keys(tbl).find(k => tbl[k].rank === rank); }
-const noviceFish = firstOf(context.FISH_BY_BASE, 'novice'), masterFish = firstOf(context.FISH_BY_BASE, 'master');
+const noviceFish = firstOf(context.FISH_BY_BASE, 'novice');
+// Longfin markers require the quest controller. Use an ordinary master nest
+// for the stock-duration regression and separately prove the reserved water
+// cannot fall through when that controller is unavailable.
+const longfin = '154a5:Thornswood-Content.esp';
+const masterFish = Object.keys(context.FISH_BY_BASE).find(k => k !== longfin && context.FISH_BY_BASE[k].rank === 'master');
 const noviceRack = firstOf(context.GAME_BY_BASE, 'novice'), expertRack = firstOf(context.GAME_BY_BASE, 'expert');
 yes('the tables have a novice and a master water, a novice and an expert rack',
   !!noviceFish && !!masterFish && !!noviceRack && !!expertRack);
@@ -102,6 +107,8 @@ time = t0 + 600000;
 yes('at ten minutes the water gives again', /^You take /.test(context.fish(1, 71, noviceFish)));
 
 const t1 = time;
+yes('reserved longfin cannot give an ordinary catch without its quest controller',
+  context.fish(1, 72, longfin) === 'This longfin water is unavailable for now.' && stock.left(72, 14400000) === 0);
 yes('a master water gives a catch', /^You take /.test(context.fish(1, 72, masterFish)));
 time = t1 + 15 * 60000;
 line = context.fish(1, 72, masterFish);

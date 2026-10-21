@@ -809,8 +809,14 @@ const recipeless = between(code, 'function recipelessCraft(actorId, craftedItemB
 yes('a press reaches the durability block, and no container is remembered as a box any more (#2298)',
     /wear\.pressed\(casterRefrId, refrId, baseDesc\)/.test(onActivate) &&
     onActivate.indexOf('touchedBox') === -1);
-yes('a drop no longer reaches it, and the drop watcher still returns nothing',
-    onDrop !== '' && !/wear\.dropped\(/.test(onDrop) && !/\breturn\b/.test(onDrop));
+const dropContext = { mp: {}, guard: (name, fn) => fn, log() {},
+  auditPerson: () => '', auditItem: () => '', auditCell: () => '',
+  globalThis: { __thornswoodWear: new Proxy({}, { get() { throw Error('drop reached durability'); } }) } };
+vm.createContext(dropContext);
+vm.runInContext(require('./fixtures/ordinary-quest-items') + onDrop, dropContext);
+yes('ordinary drops return no override and never reach the durability block',
+    onDrop !== '' && !/wear\.dropped\(/.test(onDrop) &&
+    dropContext.mp.onDropItem(101, IRON_SWORD, 1) === undefined);
 const onHitLines = gm.split('\n').filter(function (l) { return /^mp\['onPapyrusEvent:OnHit'\] = guard\('onPapyrusEvent:OnHit', function/.test(l); });
 yes('a hit reaches it through the one OnHit handler, under guard(), beside the warrior maneuvers, with the blocked flag',
     onHitLines.length === 1 &&

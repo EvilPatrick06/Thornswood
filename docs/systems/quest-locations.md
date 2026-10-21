@@ -1,14 +1,14 @@
 # Custom quest places
 
 Patrick delegated the remaining place choices on 10 October 2026. These are
-the selected existing places, checked against the installed 102-plugin order,
+the selected existing places, checked against the installed 103-plugin order,
 the winning enabled reference records, `resource-locations.json`, and the kept
 cast in `npc-population.json`. Counts and rewards come from [Custom quests](quests.md).
 
 This is the binding specification. The four rare-mine offers have an
 implementation in PR2065. The six kill contracts have bindings in PR2130;
 their matching native and gamemode changes still need to be released by
-Claude. The [pearl bed](merchant-pearl-bed.md) and [crimson work](merchant-crimson-work.md) now have their source interactions in code. Three other scarce offers and seven retrieval offers still need their resource or scene interaction connected before they can be taken. A
+Claude. The [pearl bed](merchant-pearl-bed.md), [crimson work](merchant-crimson-work.md), [geode work](merchant-geode-work.md) and [longfin work](merchant-longfin-work.md) now have their source interactions in code. The [seven retrievals](merchant-retrieval-work.md) now use exact specialists, measured sources and atomic item returns. The [mammoth ground](merchant-mammoth-work.md) now uses its existing three native bodies. The [orchard](merchant-orchard-work.md) connects its ten existing trees through Farmer claims, sowing, seasonal growth and full harvest yields. A
 reference in this document does not mean the quest is deployed or playable.
 
 Descriptors are local hexadecimal IDs followed by their source plugin. They
@@ -38,11 +38,12 @@ normal rank and tool rules. Ordinary harvesting must not bypass a scarce gate.
 | Orchard | Chillfurrow Farm's orchard outside Whiterun | Red apple trees `141084`, `141083`, `141082`, `141080`, `1699d7`, `1831a6`, `1831a3`, `1699d6`, `1831a0`, `1831ad`, all `:JK's Whiterun's Outskirts.esp` | 4 / 10 apples | 12 hours |
 | Geode | Blackreach's soul-gem deposits | `10fc57`, `10eb24`, `10e994`, `10e955`, `10e8bb`, `10fc4c`; all use base `10e93b` | 2 / 6 empty petty soul gems | 12 hours |
 
-The longfin base `154a5:Thornswood-Content.esp` exists, but the installed order
-contains **zero placements** of it. The eight anchors above are existing clam
-positions in sea water. They are not longfin spots yet. Add eight distinct
-longfin markers, with their own final descriptors recorded here, before
-enabling this offer. Keep the original clam sources and their shared stock.
+Eight dedicated [longfin markers](merchant-quest-content.md) now have authored
+references `17200` through `17207:Thornswood-Content.esp`, using the existing
+base `154a5:Thornswood-Content.esp`. Each is48 units east of its listed clam
+anchor,32 units below the recorded sea surface and in the same CELL. Exact positions and authoring
+checks are in `quest-content.json`. The original clams remain independent.
+The runtime longfin interaction is connected in code; matching content delivery remains with Claude.
 The Fisher page requires master rank for longfin; the quest's broad Fisher
 label does not remove that rank gate.
 
@@ -68,7 +69,7 @@ organization, not a playable quest area.
 For stationary exterior sources, use a sphere of radius 128 game units
 around each winning source-record position, plus the exact reference and
 worldspace. This applies to the pearl, crimson, orchard and geode sources,
-the satchel sack, and the eventual longfin markers. These are per-source
+the satchel sack, and the dedicated longfin markers. These are per-source
 bounds, not a radius around the whole route. Keep the normal interaction
 reach check between the character and that source as well. Longfin, orchard
 and satchel use Tamriel `3c:Skyrim.esm`; pearls use Solstheim
