@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `57fd87d8` (in full, `57fd87d8e6f396249851a9dd94e56f9a34a4740e`). That
+commit `d39a9a93` (in full, `d39a9a935359a530c51f885f42e279e873aa2544`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -675,7 +675,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `57fd87d8e6f396249851a9dd94e56f9a34a4740e` on the public fork. The
+  name `d39a9a935359a530c51f885f42e279e873aa2544` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -713,11 +713,15 @@ with.
   menu's queued show and hide until the game handles it (#2384). Since
   `90591081` it also redraws a character's hair when the server changes its
   colour (#2867), since `3d2cb747` its front end is written with LF line
-  endings on every machine that builds it (#2754), and since `b9e16e8b` it
+  endings on every machine that builds it (#2754), since `57fd87d8` it
   lets the gamemode name what a craft gives, so a cook can come out burnt or
-  fine (#2906). The server module's SHA256
-  is `2f2c190dcebf6419d89dc6d34305718f78b5fda3e127f07b140b7315565d2307`, built
-  2026-10-21T10:42:49Z. This is the recorded next release, not a deployment
+  fine (#2906), since `049d4c26` the name the item is given with too, so a
+  Master Weaver's garment is made with its mark (#3026), since
+  `d9bee9ea` the engine's AddItems keeps every entry after one that joins a
+  stack (#3069), and since `d39a9a93` it refuses a stack past 4,294,967,295
+  before anything moves (#3074). The server module's SHA256
+  is `fc9f18973c9ab5ba8b0a655c0c87871376ae7963aea5cdc61a0ec32aa3d38e87`, built
+  2026-10-21T17:54:14Z. This is the recorded next release, not a deployment
   claim. Main remains on `3bdf3d3c9926a4dd241b1d1c09dadde808a788d5` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -752,7 +756,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/57fd87d8e6f396249851a9dd94e56f9a34a4740e
+https://github.com/EvilPatrick06/skymp/tree/d39a9a935359a530c51f885f42e279e873aa2544
 
 For the engine Main runs until then:
 
