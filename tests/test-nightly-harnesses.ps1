@@ -26,7 +26,12 @@
        and is red when a named one fails;
     6. harnesses.yml starts only by dispatch, reads the repository and
        nothing more, runs on the VPS runners, and hands the names to -Only
-       through the environment, never pasted into a script it runs.
+       through the environment, never pasted into a script it runs;
+    7. -Throttle (#3114) runs that many side by side and no more, in less
+       time than one at a time, prints each as it ends; a harness whose
+       header says RUNS ALONE runs after the rest with nothing beside it;
+       on Windows each line says the processor time and the processes the
+       harness used, which its job object counted, children included.
 
   Writes only into a scratch folder under TEMP, which it removes.
 #>
@@ -95,9 +100,9 @@ try {
             "c.unref();`nconsole.log('left one running');`nprocess.exit(0);`n")
         $r = Run $b @()
         Yes "a share with a failure is red (exit $($r.Code))" ($r.Code -eq 1)
-        Yes '  every harness is printed with its time and what it said' ($r.Said -match '(?m)^--- test-1-pass\.js  \([0-9.]+s\)' -and $r.Said -match 'PASS  one thing' -and $r.Said -match 'FAIL  one thing')
+        Yes '  every harness is printed with its time and what it said' ($r.Said -match '(?m)^--- test-1-pass\.js  \([0-9.]+s[,)]' -and $r.Said -match 'PASS  one thing' -and $r.Said -match 'FAIL  one thing')
         Yes '  the failed one is named where it failed' ($r.Said -match '::error file=.*?test-2-fail\.ps1::harness failed \(exit 1\)')
-        Yes '  the one past its clock is killed and named, on the clock its header gives' ($r.Said -match '::error file=.*?test-3-hang\.js::harness timed out after 3s and was killed' -and $r.Said -match '--- test-3-hang\.js  \([0-9.]+s, on a 3 s clock it names\)')
+        Yes '  the one past its clock is killed and named, on the clock its header gives' ($r.Said -match '::error file=.*?test-3-hang\.js::harness timed out after 3s and was killed' -and $r.Said -match '--- test-3-hang\.js  \([0-9.]+s, on a 3 s clock it names[,)]')
         Yes '  what one left running is killed and named' ($r.Said -match '::warning file=.*?test-4-leaves\.js::harness left 1 process\(es\) running when it ended, now killed: node')
         Yes '  the summary names both that failed, the one that timed out as such' ($r.Said -match '(?m)^2 harness\(es\) failed: test-2-fail\.ps1, test-3-hang\.js \(timed out\)\s*$')
         Yes '  and the slowest' ($r.Said -match '(?m)^slowest: test-3-hang\.js ' -and $r.Said -match '(?m)^all of them, added up: \d+s, in \d+s')
@@ -158,6 +163,37 @@ try {
     Yes '  hands the names to Nightly-Harnesses.ps1 -Only through the environment' ($h -match 'HARNESSES: \$\{\{ inputs\.harnesses \}\}' -and $h -match 'Nightly-Harnesses\.ps1 -Only \$env:HARNESSES')
     $runs = @([regex]::Matches($h, '(?ms)^\s+run: \|\s*\r?\n(.*?)(?=^\s+- |\z)') | ForEach-Object { $_.Groups[1].Value })
     Yes '  and never pastes them into a script it runs' ($runs.Count -ge 1 -and -not @($runs | Where-Object { $_ -match '\$\{\{\s*inputs\.' }).Count)
+
+    # ---- 7. side by side (-Throttle, #3114) -------------------------------
+    # Each stand-in leaves a mark in marks\ while it runs and counts the
+    # others' marks at its end; the one that runs alone fails if it sees one.
+    $d = Join-Path $work 'side'
+    $mk = "const fs=require('fs'),path=require('path');const dir=path.join(__dirname,'..','marks');fs.mkdirSync(dir,{recursive:true});"
+    foreach ($n in 'a', 'b', 'c', 'd', 'e', 'f') {
+        Put (Join-Path $d "tests\test-$n.js") ($mk + "const me=path.join(dir,'$n');fs.writeFileSync(me,'');" +
+            "setTimeout(()=>{console.log('SAW '+(fs.readdirSync(dir).length-1));fs.unlinkSync(me);process.exit(0);},1500);`n")
+    }
+    Put (Join-Path $d 'tests\test-0-alone.js') ("// RUNS ALONE: a stand-in that fails when another runs beside it.`n" + $mk +
+        "const n=fs.readdirSync(dir).length;setTimeout(()=>{const m=fs.readdirSync(dir).length;console.log('ALONE SAW '+(n+m));process.exit(n+m?1:0);},700);`n")
+    Put (Join-Path $d 'tests\test-g-children.js') ("const {execFileSync}=require('child_process');" +
+        "for(let i=0;i<3;i++)execFileSync(process.execPath,['-e','let x=0;for(let j=0;j<3e7;j++)x+=j']);process.exit(0);`n")
+    $r = Run $d @('-Throttle', '3')
+    $ran = @(Ran $r.Said)
+    $saw = @([regex]::Matches($r.Said, '(?m)^SAW (\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
+    $wall = [regex]::Match($r.Said, '(?m)^all of them, added up: (\d+)s, in (\d+)s')
+    Yes ("-Throttle 3 runs every one and is green (exit $($r.Code), " + $ran.Count + ' ran)') ($r.Code -eq 0 -and $ran.Count -eq 8 -and $r.Said -match 'every harness passed')
+    Yes ('  side by side: some saw another running (' + ($saw -join ' ') + ')') (@($saw | Where-Object { $_ -gt 0 }).Count -ge 2)
+    Yes '  and never more than three at once' ($saw.Count -eq 6 -and -not @($saw | Where-Object { $_ -gt 2 }).Count)
+    Yes ('  in less time than one at a time (' + $wall.Groups[2].Value + ' s for ' + $wall.Groups[1].Value + ' s of harnesses)') ($wall.Success -and [int]$wall.Groups[2].Value -lt [int]$wall.Groups[1].Value)
+    Yes '  the one whose header says RUNS ALONE ran last, with nothing beside it' ($ran.Count -and $ran[-1] -eq 'test-0-alone.js' -and $r.Said -match '(?m)^ALONE SAW 0')
+    Yes '  and the summary says how many at a time and what the cores did' ($r.Said -match '(?m)^3 at a time; 1 run alone, after the rest' -and $r.Said -match "(?m)^the machine's \d+ cores while they ran: [0-9.]+% busy on average")
+    if ($OnWindows) {
+        $g = [regex]::Match($r.Said, '(?m)^--- test-g-children\.js  \([0-9.]+s, ([0-9.]+)s of processor in (\d+) process\(es\)\)')
+        Yes ('  each harness says the processor its job counted, children included (' + $g.Value + ')') ($g.Success -and [int]$g.Groups[2].Value -eq 4 -and [double]$g.Groups[1].Value -gt 0)
+        Yes '  and the summary adds them up' ($r.Said -match '(?m)^processor used by all of them: \d+s in \d+ processes')
+    }
+    $r = Run $d @('-Throttle', '0')
+    Yes "  a throttle that is not 1 to 16 is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }
