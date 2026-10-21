@@ -1,10 +1,10 @@
 <#
   OnBox.ps1
 
-  The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the run, and
-  the clean-up of its folder. Kept apart so tests\test-2899-run-on-box.ps1
-  runs the same text under Windows PowerShell 5.1 against a stand-in folder.
-  Defines functions and nothing else.
+  The two scripts Run-OnBox.ps1 sends to the box (issue #2899): the keeper,
+  which makes the run's folder and removes it, and the run. Kept apart so
+  tests\test-2899-run-on-box.ps1 runs the same text under Windows PowerShell
+  5.1 against a stand-in folder. Defines functions and nothing else.
 
   The far side runs under Windows PowerShell 5.1: ASCII, and .NET for the
   hashes, not Get-FileHash (ServerContent.ps1 says why).
@@ -64,6 +64,12 @@ function Get-ThornswoodOnBoxScript {
 `$ErrorActionPreference = 'Stop'
 `$ProgressPreference = 'SilentlyContinue'
 `$run = '$run'
+# The run's folder is in use while its lock is held (the keeper, below), and
+# this holds it too for as long as the tool runs, so even with the keeper's
+# session gone no other run's sweep takes the folder from under the tool. The
+# handle goes when this process ends, however it ends.
+try { `$hold = New-Object IO.FileStream((`$run + '.lock'), 'Open', 'ReadWrite', 'ReadWrite') }
+catch { 'STOP. the run''s folder could not be held through its lock, so nothing ran: ' + `$_.Exception.GetBaseException().Message; exit 2 }
 `$repo = Join-Path `$run 'repo'
 `$data = Join-Path `$run 'data'
 `$plugins = '$serverRoot\plugins'
@@ -152,9 +158,62 @@ foreach (`$c in `$changed) { 'CHANGED ' + `$c }
 "@
 }
 
-function Get-ThornswoodOnBoxCleanScript([Parameter(Mandatory = $true)][string]$Run) {
+# The run's folder lives as long as one ssh session, the keeper's (#2999).
+# Until 21 Oct 2026 the folder was made by one ssh call and removed by
+# another at the end, so a run cut before that call (a bridge reset, the
+# machine running it going away) left the folder on the box for good, with
+# its 383 MB copy of the plugins, and nothing there ever removed it. Now:
+#
+#   - <run>.lock, beside the folder, is held for as long as the run is going:
+#     by this script from before the folder exists until it is removed, and by
+#     the run itself (above) while the tool runs. Windows lets go of a handle
+#     when its process ends however it ends, killed with its session included.
+#   - When this script's standard input closes, which is how Run-OnBox.ps1
+#     says it is finished and also what a dropped session does, it removes
+#     the folder itself and says GONE.
+#   - A folder whose lock nobody holds belongs to a run that is over, so before
+#     it makes its own, this removes every such thornswood-onbox-* folder
+#     beside it: the ones a run killed with its session could not remove, and
+#     a folder from before the lock (it has none). A folder whose lock is held
+#     is a run still going, and is left alone. No age and no time limit decide
+#     it: only whether the process that owns the folder is still there.
+#
+# Removing takes the lock alone (FileShare None) and lets it go deleted
+# (DeleteOnClose), so the run and its keeper, and two runs sweeping at once,
+# never remove a folder another holds. Lines out: GONE <folder>, HELD
+# <folder>: why (still in use), LEFT <folder>: why (could not be removed),
+# and MADE <folder> once this run's own is there. Each is written and flushed
+# as it happens, because Run-OnBox.ps1 waits for MADE while this waits for
+# its input to close. Short enough for the command line on purpose
+# (Start-ThornswoodRemote): a script sent as a file first would be one more
+# thing on the box a cut session leaves.
+function Get-ThornswoodOnBoxKeepScript([Parameter(Mandatory = $true)][string]$Run) {
     return @"
-Remove-Item -LiteralPath '$run' -Recurse -Force -EA SilentlyContinue
-if (Test-Path -LiteralPath '$run') { 'LEFT ' + '$run' } else { 'GONE' }
+`$ErrorActionPreference = 'Stop'
+`$run = '$Run'
+`$top = Split-Path -Parent `$run
+function Say([string]`$l) { [Console]::Out.WriteLine(`$l); [Console]::Out.Flush() }
+function Drop([string]`$d) {
+  try { `$h = New-Object IO.FileStream((`$d + '.lock'), 'OpenOrCreate', 'ReadWrite', 'None', 1, 'DeleteOnClose') }
+  catch { Say ('HELD ' + `$d + ': ' + `$_.Exception.GetBaseException().Message); return }
+  try {
+    if (Test-Path -LiteralPath `$d) { Remove-Item -LiteralPath `$d -Recurse -Force }
+    Say ('GONE ' + `$d)
+  } catch { Say ('LEFT ' + `$d + ': ' + `$_.Exception.Message) } finally { `$h.Dispose() }
+}
+`$seen = @{}
+foreach (`$f in @(Get-ChildItem -LiteralPath `$top -Filter 'thornswood-onbox-*' -Force)) {
+  if (`$f.Name -notmatch '^(thornswood-onbox-[0-9a-f]{12})(\.lock)?`$') { continue }
+  `$d = Join-Path `$top `$Matches[1]
+  if (`$d -eq `$run -or `$seen[`$d]) { continue }
+  `$seen[`$d] = 1
+  Drop `$d
+}
+`$own = New-Object IO.FileStream((`$run + '.lock'), 'CreateNew', 'ReadWrite', 'ReadWrite')
+New-Item -ItemType Directory -Path `$run | Out-Null
+Say ('MADE ' + `$run)
+[void][Console]::In.ReadToEnd()
+`$own.Dispose()
+Drop `$run
 "@
 }

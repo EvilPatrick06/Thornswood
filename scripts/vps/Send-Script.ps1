@@ -110,3 +110,39 @@ function Invoke-ThornswoodRemote {
         $global:LASTEXITCODE = $rc
     }
 }
+
+# Starts $Script on the VPS and leaves it running, for a far side whose life
+# is the session's own (Run-OnBox.ps1's run folder, issue #2999). The far
+# side reads its standard input to the end: closing it here is how it is told
+# to finish, and a session that drops closes it too. Returns the ssh process,
+# its standard input and output redirected; what ssh itself says on standard
+# error goes to this console as it would for any ssh.
+#
+# Only the command line form. The file form sends the script up first and
+# removes it with a call of its own afterwards, and a session cut between the
+# two leaves the file behind, which is what this is for avoiding. A script
+# over the limit is refused, before anything is sent.
+function Start-ThornswoodRemote {
+    param(
+        [Parameter(Mandatory = $true)][string]$Target,
+        [string[]]$SshArgs = @(),
+        [Parameter(Mandatory = $true)][string]$Script,
+        [int]$Limit = 6000
+    )
+    $weak = @($SshArgs | Where-Object { $_ -match '(?i)StrictHostKeyChecking\s*=\s*(?!yes\b)' })
+    if ($weak.Count) { throw ('ssh options with host key checking turned down (' + ($weak -join ', ') + '). Only the box whose key is pinned is talked to. Nothing was sent.') }
+    $cmd = 'powershell -NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($Script))
+    if ($cmd.Length -gt $Limit) { throw ('a held script goes on the command line, and this one is ' + $cmd.Length + ' characters there, over ' + $Limit + '. Nothing was sent.') }
+    $words = @(@($SshArgs | Where-Object { $_ }) + @('-o', 'StrictHostKeyChecking=yes', $Target, $cmd))
+    $bad = @($words | Where-Object { $_ -match '["\r\n]' })
+    if ($bad.Count) { throw ('an ssh word holds a double quote or a line break: ' + ($bad -join ' ') + '. Nothing was sent.') }
+    # Arguments as one string, which Windows PowerShell 5.1's .NET takes as
+    # well as 7's (Add-ThornswoodKnownHostThroughBridge, Vps.ps1).
+    $psi = New-Object Diagnostics.ProcessStartInfo
+    $psi.FileName = 'ssh'
+    $psi.Arguments = (@($words | ForEach-Object { '"' + $_ + '"' }) -join ' ')
+    $psi.UseShellExecute = $false
+    $psi.RedirectStandardInput = $true
+    $psi.RedirectStandardOutput = $true
+    return [Diagnostics.Process]::Start($psi)
+}
