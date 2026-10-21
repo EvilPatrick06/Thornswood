@@ -68,6 +68,15 @@ Since 21 September the task carries a trigger that repeats every five minutes,
 so a stopped Caddy starts itself within five. If it is down and staying down,
 that trigger is gone and `scripts\deploy\Setup-Domain.ps1 -TaskOnly` puts it back.
 
+About a hundred half-open connections on 443, most inbound connects failing
+and a retransmit share near 20% are not the site going down. They are a
+forged SYN flood that uses the box as a reflector (#2995), and it costs the
+box next to nothing. This measures it and says FLOOD or QUIET:
+
+```powershell
+.\scripts\vps\Remote.ps1 -File .\scripts\vps\vps-syn-flood.ps1
+```
+
 ## The game server
 
 ```powershell
