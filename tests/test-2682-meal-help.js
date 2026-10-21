@@ -48,13 +48,19 @@ const KEEP = ['12010f:WindhelmSSE.esp', '12f9c4:WindhelmSSE.esp', '17167b:Windhe
 yes('the kept records are the three whose Resist Frost rides with another effect',
   !!strip && !!strip.keep && JSON.stringify(Object.keys(strip.keep).sort()) === JSON.stringify(KEEP) &&
   KEEP.every(function (d) { return /Resist Frost/.test(strip.keep[d]) && !!GROUPS.items[d]; }));
-let stripCount = 0;
+// A fine dish (#2906) is in its plain dish's group, so it loses its own
+// magic with it; it is counted on its own.
+const FINE = new Set(Object.values((GROUPS && GROUPS.quality && GROUPS.quality.fine) || {}));
+let stripCount = 0, fineStripped = 0;
 if (strip && GROUPS) {
   for (const d in GROUPS.items) {
-    if ((strip.groups || []).indexOf(GROUPS.items[d]) !== -1 && !strip.keep[d]) { stripCount++; }
+    if ((strip.groups || []).indexOf(GROUPS.items[d]) !== -1 && !strip.keep[d]) {
+      if (FINE.has(d)) { fineStripped++; } else { stripCount++; }
+    }
   }
 }
 yes('118 records lose their own magic, the list in the design comment', stripCount === 118);
+yes('and so do the 63 fine dishes, which are in their plain dishes\' groups (#2906)', FINE.size === 63 && fineStripped === 63);
 yes('a soup warms by default, and nothing else does', !!season && JSON.stringify(season.plain) === JSON.stringify({ soup: 'warm' }));
 yes('garlic gives the guard and salt gives stamina',
   !!season && !!season.extras && season.extras['34d22:Skyrim.esm'] === 'guard' &&

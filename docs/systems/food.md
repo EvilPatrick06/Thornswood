@@ -63,9 +63,29 @@ Hearthcook and Confectioner own the recipes. The rows are
 makes two of a batch. A hunter is who brings the meat. This page does
 not move either verb.
 
-Burnt food is an item that already exists, eaten as burnt. A failed
-recipe does not yet become a burnt item. There is no timing minigame.
+## How a cook comes out
+
+Every cook at the pot or the oven comes out burnt, plain or fine
+(Patrick, 20 October 2026, #2906). The odds are by the cook's rank in
+the half the recipe is:
+
+| Rank | Burnt | Fine |
+| --- | --- | --- |
+| Novice | 1 in 5 | 1 in 20 |
+| Advanced | 1 in 10 | 1 in 10 |
+| Expert | 1 in 20 | 1 in 5 |
+| Master | never | 7 in 20 |
+
+The rest come out plain. A burnt cook is a Burnt Meal, the Burnt row
+above. A fine dish is the plain dish with its help lasting 30 real
+minutes instead of 20; it fills the same and its own magic goes the
+same way. A Grand Chef's second portion is the same quality as the
+first. A tea, the mill's flour and anything else that is not a dish
+comes out as it is. There is no timing minigame.
+
+The crafting menu shows the plain dish until it closes; the burnt or
+fine one is what is in the pack after.
 
 ## Where this is
 
-The table that marks food, drink, ale, potion and poison is in the server, and an unknown edible is 15 hunger. The 8 seconds and the full-stomach sickness are in it too. The groups are in the server too (#1382), by record in game/data/food-groups.json: raw meat or fish is 8 and can start food sickness, cooked is 25 (the Homecooked Meal is cooked), a soup, stew or chowder counts as cooked and is 25 hunger and 10 thirst, and ingredients (vegetables, fruit, honey, butter, flour), prepared food (bread, cheese, sweets, spiced beef) and the six drugs are 15. The six drugs also take the stimulant in [Exhaustion](exhaustion.md). The Bee and Barb's mixed drinks, the Battle-Brew meads and Red Eagle's Rye are ale, milk and snowberry juice are drink, and Goodberry is a potion. Tea is a group of its own: the three teas are drinks, 20 thirst, and take the tea stimulant in [Exhaustion](exhaustion.md). There is no feast group: no item is one. Burnt is a cooking quality level, not a group; a failed cook does not yet make burnt food. The cooked help and food's own magic are in the server too (#2682), in the same file: which groups lose their own magic and the three records kept whole (`strip`), which group warms on its own and which extra ingredient gives which help (`season`). The disease guard is the injury system's, from [Disease](disease.md). The seasoned dishes are not in the content plugin yet, so until they are, only the warmth and the taking away of food's own magic are live.
+The table that marks food, drink, ale, potion and poison is in the server, and an unknown edible is 15 hunger. The 8 seconds and the full-stomach sickness are in it too. The groups are in the server too (#1382), by record in game/data/food-groups.json: raw meat or fish is 8 and can start food sickness, cooked is 25 (the Homecooked Meal is cooked), a soup, stew or chowder counts as cooked and is 25 hunger and 10 thirst, and ingredients (vegetables, fruit, honey, butter, flour), prepared food (bread, cheese, sweets, spiced beef) and the six drugs are 15. The six drugs also take the stimulant in [Exhaustion](exhaustion.md). The Bee and Barb's mixed drinks, the Battle-Brew meads and Red Eagle's Rye are ale, milk and snowberry juice are drink, and Goodberry is a potion. Tea is a group of its own: the three teas are drinks, 20 thirst, and take the tea stimulant in [Exhaustion](exhaustion.md). There is no feast group: no item is one. Burnt is a cooking quality level, not a group: the Burnt Meal and a fine record of each of the 63 dishes are the content plugin's, named in the same file's `quality`, and the server rolls which one a cook gives in mp.onCraft and has the engine give it (#2906). The odds are in the server, `NEEDS.cookQuality`. The cooked help and food's own magic are in the server too (#2682), in the same file: which groups lose their own magic and the three records kept whole (`strip`), which group warms on its own and which extra ingredient gives which help (`season`). The disease guard is the injury system's, from [Disease](disease.md). The seasoned dishes are not in the content plugin yet, so until they are, only the warmth and the taking away of food's own magic are live.
