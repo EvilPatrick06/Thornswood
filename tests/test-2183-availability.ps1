@@ -140,8 +140,9 @@ try {
   T $threw 'a file that is not there is refused'
 
   # ---------------------------------------------------------- 6
+  . (Join-Path $PSScriptRoot 'Windows.ps1')
   $shells = @('pwsh')
-  if (Get-Command powershell.exe -EA SilentlyContinue) { $shells += 'powershell.exe' }
+  if ($OnWindows) { $shells += Get-WindowsPowerShell }
   foreach ($sh in $shells) {
     $out = & $sh -NoProfile -ExecutionPolicy Bypass -File $script -Path $f1 -From $W.From -To $W.To -NoPause 2>&1 | Out-String
     $code = $LASTEXITCODE

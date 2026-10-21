@@ -62,14 +62,19 @@ function ReadJson([string]$path) { if (-not (Test-Path -LiteralPath $path)) { re
 
 . (Join-Path $Repo 'scripts\deploy\Artifact.ps1')
 
-# The box's PowerShell where there is one: the text goes up as a file and runs
-# under Windows PowerShell 5.1, as Send-Script.ps1 has it run on the VPS.
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not (Test-Path -LiteralPath $ps51)) { $ps51 = (Get-Process -Id $PID).Path }
+# The box's PowerShell: the text goes up as a file and runs under Windows
+# PowerShell 5.1, as Send-Script.ps1 has it run on the VPS. Off Windows there
+# is none, and the far side runs in this shell, which is said.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if ($OnWindows) { $ps51 = Get-WindowsPowerShell }
+else {
+    $ps51 = (Get-Process -Id $PID).Path
+    Write-Host 'NOTE  the far side runs in this shell, not in Windows PowerShell 5.1 as on the box: this is not Windows'
+}
 $script:sent = @()
 function Invoke-ThornswoodArtifactRemote([string]$Target, [string[]]$SshArgs, [string]$Script) {
   $script:sent += , @($Target, $Script)
-  $f = Join-Path $env:TEMP ('ts-459-far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+  $f = Join-Path ([IO.Path]::GetTempPath()) ('ts-459-far-' + [Guid]::NewGuid().ToString('N') + '.ps1')
   [IO.File]::WriteAllText($f, $Script, (New-Object Text.UTF8Encoding($true)))
   # The machine's module path, as a service on the box has it: a shell that
   # PowerShell 7 started hands its own on, and 5.1 then finds 7's Utility

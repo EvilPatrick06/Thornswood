@@ -61,6 +61,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 # The tests are in tests\, the repository is one folder up.
 $Here = Split-Path -Parent $Here
 if (-not $RepoPath) { $RepoPath = $Here }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -79,6 +80,11 @@ function Done {
     if ($script:fail) { exit 1 }
     exit 0
 }
+# The far end runs what was sent in the box's own shells, cmd.exe and Windows
+# PowerShell 5.1. Off Windows neither is here, so what is sent is checked and
+# what it does when it runs is not (#2957).
+function Runs([string]$what, [bool]$cond) { if ($OnWindows) { Yes $what $cond } }
+if (-not $OnWindows) { Write-Host 'SKIP  the runs at the far end: it stands in with the box''s cmd.exe and Windows PowerShell 5.1, which only Windows has, so only what is sent is checked' }
 
 # What cmd.exe will carry. Where the VPS cuts a line has not been measured;
 # the helpers send anything over 6,000 characters as a file.
@@ -170,14 +176,15 @@ function global:Invoke-TsFarEnd([string]$command, [string]$shell) {
     # one round it. Either way PSModulePath is dropped so the Windows
     # PowerShell inside builds its own, as a fresh one does, rather than
     # inheriting pwsh's.
+    if (-not $OnWindows) { return [pscustomobject]@{ Out = @('not run: this is not Windows'); Code = 0 } }
     $line = $command.Replace($far.Temp, $far.DiskFwd)
     $psi = New-Object System.Diagnostics.ProcessStartInfo
     if ($shell -eq 'powershell') {
-        $psi.FileName = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
+        $psi.FileName = Get-WindowsPowerShell
         $psi.Arguments = '-NoProfile -NonInteractive -Command "' + $line + '"'
     }
     else {
-        $psi.FileName = Join-Path $env:SystemRoot 'System32\cmd.exe'
+        $psi.FileName = Get-WindowsPath 'System32\cmd.exe'
         $psi.Arguments = '/d /c ' + $line
     }
     $psi.WorkingDirectory = $far.Disk
@@ -267,6 +274,7 @@ function Measure-Send([scriptblock]$send) {
 # Says what came back when a run failed, because "FAIL runs that file" alone
 # sends the next person to guess.
 function Show-Why($r) {
+    if (-not $OnWindows) { return }
     if ($r.Stopped) { Write-Host ('      it stopped: ' + $r.Stopped) }
     foreach ($c in $r.Ssh) {
         if ($c.Code -ne 0 -and $c.Code -ne 7) {
@@ -320,19 +328,19 @@ function Test-Sends([string]$name, [scriptblock]$sendBig, [scriptblock]$sendShor
     Yes "$name sends a 10 KB script on no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
     Yes '  as a file it copies up once' ($r.Scp.Count -eq 1)
     Yes '  holding the whole script' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big))
-    Yes '  runs that file to its last line when cmd.exe on this machine hands the line on' $ran
-    Yes '  and when Windows PowerShell on this machine hands the same line on instead' (Test-OtherShell $r)
-    Yes '  and what it printed comes back' ($r.Out.Contains($lastLine))
-    Yes '  and removes it afterwards' (@($r.Ssh | Where-Object { $_.Command -match 'Remove-Item' }).Count -eq 1 -and $r.Left -eq 0)
+    Runs '  runs that file to its last line when cmd.exe on this machine hands the line on' $ran
+    Runs '  and when Windows PowerShell on this machine hands the same line on instead' ($OnWindows -and (Test-OtherShell $r))
+    Runs '  and what it printed comes back' ($r.Out.Contains($lastLine))
+    Yes '  and removes it afterwards' (@($r.Ssh | Where-Object { $_.Command -match 'Remove-Item' }).Count -eq 1 -and ($r.Left -eq 0 -or -not $OnWindows))
     if ($handsBackCode) {
-        Yes "  and hands back the script's own exit code, not the tidy up's" ($r.Code -eq 7)
+        Runs "  and hands back the script's own exit code, not the tidy up's" ($r.Code -eq 7)
     }
     if (-not $ran -or $r.Stopped) { Show-Why $r }
 
     $r = Measure-Send $sendShort
     Yes '  and a short one still goes inline, in one call' ($r.Scp.Count -eq 0 -and $r.Ssh.Count -eq 1)
     Yes '  whole' ($r.Ssh.Count -eq 1 -and (Get-Encoded $r.Ssh[0].Command).Contains($short))
-    Yes '  and runs' ($r.Out.Contains('short and sent inline'))
+    Runs '  and runs' ($r.Out.Contains('short and sent inline'))
     if (-not $r.Out.Contains('short and sent inline')) { Show-Why $r }
 }
 
@@ -364,8 +372,8 @@ if (Test-Path -LiteralPath $remotePs1) {
         $r = Measure-Send { & $remotePs1 -File $bigFile -VpsHost $VpsHost -VpsUser $VpsUser }
         Yes "Remote.ps1 -File with a 10 KB script sends no command line longer than cmd.exe's $Limit" ($r.Longest -gt 0 -and $r.Longest -le $Limit)
         Yes '  and copies up the whole script' ($r.Scp.Count -eq 1 -and $r.Scp[0].Sent.Contains($big))
-        Yes '  and runs it to its last line' ($r.Out.Contains($lastLine))
-        Yes "  and hands back the script's own exit code" ($r.Code -eq 7)
+        Runs '  and runs it to its last line' ($r.Out.Contains($lastLine))
+        Runs "  and hands back the script's own exit code" ($r.Code -eq 7)
         if (-not $r.Out.Contains($lastLine)) { Show-Why $r }
     }
     finally { Remove-Item -LiteralPath $bigFile -Force -ErrorAction SilentlyContinue }
@@ -417,7 +425,7 @@ foreach ($f in (Get-ChildItem -Path (Join-Path $RepoPath 'scripts') -Filter *.ps
         $r = Measure-Send { Remote $short }
         Yes '  and a short one goes inline, in one call' ($r.Scp.Count -eq 0 -and $r.Ssh.Count -eq 1)
         Yes '  whole' ($r.Ssh.Count -eq 1 -and (Get-Encoded $r.Ssh[0].Command).Contains($short))
-        Yes '  and runs' ($r.Out.Contains('short and sent inline'))
+        Runs '  and runs' ($r.Out.Contains('short and sent inline'))
         if (-not $r.Out.Contains('short and sent inline')) { Show-Why $r }
         continue
     }

@@ -1,0 +1,12 @@
+{
+  "part": "thornswood-server-dev",
+  "component": "gamemode",
+  "name": "gamemode-cccccccccccc-46ae5653b1221e22.zip",
+  "commit": "cccccccccccccccccccccccccccccccccccccccc",
+  "sha256": "46ae5653b1221e22f37ebc0e9e54fc46ba1847bada3851d24fc10429e14c36c3",
+  "size": 123,
+  "files": 1,
+  "root": "/tmp/ts-459-b62ade12/Thornswood-Server-Dev",
+  "deployedUtc": "2026-10-21T01:40:06Z",
+  "from": "vm"
+}

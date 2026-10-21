@@ -100,6 +100,7 @@ Yes 'the refresh that finds nothing to bring in still copies Vortex''s plugin li
 $settle = [regex]::Match($og, '(?s)static void SettleSettings\(bool first\)\s*\{(.*?)\n        \}')
 Yes 'a refresh that brings files in copies it too (SettleSettings)' ($settle.Success -and $settle.Groups[1].Value -match 'BakeVortexList\(\);')
 
+if (-not $OnWindows) { Write-Host 'SKIP  the launcher''s code, compiled and run: its compiler is the Roslyn csc that comes with Visual Studio''s Build Tools, which only Windows has'; Done }
 Yes 'the compiler the build runs is on this machine (the Roslyn csc beside MSBuild)' (Test-Path -LiteralPath $LauncherCsc)
 if (-not (Test-Path -LiteralPath $LauncherCsc)) { Done }
 # What the launcher compiles against, from the reference assemblies the

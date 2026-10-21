@@ -57,11 +57,12 @@ foreach ($f in $Nightly, $Fetch, $Watch) {
     Yes ((Split-Path -Leaf $f) + ' parses') ($errors.Count -eq 0)
 }
 
-$ps51 = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'
-if (-not $env:SystemRoot -or -not (Test-Path -LiteralPath $ps51)) {
-    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs need Windows PowerShell 5.1, which runs these on the VPS; this is not Windows'
     Done
 }
+$ps51 = Get-WindowsPowerShell
 
 $script:last = @()
 function Run([string]$file, [string[]]$argv) {

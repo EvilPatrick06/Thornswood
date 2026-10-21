@@ -58,10 +58,15 @@ foreach ($f in @($helper, $remotePs1)) {
 }
 . $helper
 
-if (-not (Get-Command powershell.exe -ErrorAction SilentlyContinue) -or -not (Get-Command cmd.exe -ErrorAction SilentlyContinue)) {
-    Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and cmd.exe, as on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the rest: it runs as the VPS does, through cmd.exe into Windows PowerShell 5.1, which only Windows has'
     Done
 }
+# The far line names powershell, which cmd.exe finds as the VPS does; it has
+# to be Windows PowerShell 5.1, where Windows keeps it.
+$null = Get-WindowsPowerShell
+$cmdExe = Get-WindowsPath 'System32\cmd.exe'
 
 # ---- the fakes -----------------------------------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-secret-channel-' + [Guid]::NewGuid().ToString('N'))
@@ -78,8 +83,8 @@ function ssh {
     # The box's C:/Windows/Temp is the scratch folder here.
     $line = $a[-1].Replace('C:/Windows/Temp/', ($ScFar.Replace('\', '/') + '/'))
     $in = @($input)
-    if ($in.Count) { $in | & cmd.exe /d /c $line }
-    else { & cmd.exe /d /c $line }
+    if ($in.Count) { $in | & $cmdExe /d /c $line }
+    else { & $cmdExe /d /c $line }
 }
 
 function scp {

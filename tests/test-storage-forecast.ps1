@@ -21,8 +21,9 @@ New-Item -ItemType Directory $tmp | Out-Null
 $fail = 0; $pass = 0
 $total = 100GB
 $t0 = [datetime]'2026-10-01T00:00:00Z'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 $shells = @('pwsh')
-if (Get-Command powershell.exe -EA SilentlyContinue) { $shells += 'powershell.exe' }
+if ($OnWindows) { $shells += Get-WindowsPowerShell }
 function Hist([string]$name, [int]$count, [double]$startFree, [double]$perDay, [double]$stepDays = 1) {
   $p = Join-Path $tmp $name
   $lines = for ($i = 0; $i -lt $count; $i++) {

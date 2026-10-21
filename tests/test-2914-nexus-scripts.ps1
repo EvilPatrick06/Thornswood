@@ -84,8 +84,8 @@ $node = Get-Command node -ErrorAction SilentlyContinue
 Yes 'node is on PATH, for the stand-in Nexus' ($null -ne $node)
 if ($null -eq $node) { Done }
 $pwsh = (Get-Process -Id $PID).Path
-$winps = ''
-if ($env:SystemRoot) { $w = Join-Path $env:SystemRoot 'System32\WindowsPowerShell\v1.0\powershell.exe'; if (Test-Path -LiteralPath $w) { $winps = $w } }
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+$winps = if ($OnWindows) { Get-WindowsPowerShell } else { '' }
 $sz = ''
 if ($env:ProgramFiles -and (Test-Path -LiteralPath (Join-Path $env:ProgramFiles '7-Zip\7z.exe'))) { $sz = Join-Path $env:ProgramFiles '7-Zip\7z.exe' }
 if (-not $sz) { foreach ($n in '7z', '7zz', '7za') { $g = Get-Command $n -ErrorAction SilentlyContinue; if ($g) { $sz = $g.Source; break } } }
@@ -216,7 +216,7 @@ Yes 'the stand-in has 1.0.0 archived and the changelog' (@($st.files.'file-runti
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = '100000'
 $n0 = Count
 if ($winps) { $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2') -Win51; $shell = 'Windows PowerShell 5.1' }
-else { Skip 'Windows PowerShell 5.1 is not on this machine, so the multipart run is under pwsh'; $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2'); $shell = 'pwsh' }
+else { Skip 'this is not Windows, which is the only place Windows PowerShell 5.1 runs, so the multipart run is under pwsh'; $r = Run 'Send-NexusFile.ps1' @('-Mod', '192762', '-Archive', $archive, '-Version', '1.0.2'); $shell = 'pwsh' }
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = $null
 $got = @(Since $n0)
 YesR ("many parts, under $shell" + ': the version is made and its file id printed') ($r.Code -eq 0 -and $r.Out -match 'File id\s+812346' -and $r.Out -match ('md5\s+' + $md5)) $r
@@ -234,7 +234,7 @@ if ($winps) {
     $put = @((Since $n0) | Where-Object { $_.path -like '/s3/single/*' }) | Select-Object -First 1
     Yes 'with the same Content-MD5 and Content-Disposition' ($null -ne $put -and $put.contentMd5 -eq $facts.Md5Base64 -and $put.contentDisposition -eq 'attachment; filename="Thornswood Client Runtime-1.0.1.7z"')
 }
-else { Skip 'one part under Windows PowerShell 5.1: it is not on this machine' }
+else { Skip 'one part under Windows PowerShell 5.1: this is not Windows' }
 
 Control @{ unboundComplete = $true }
 $env:THORNSWOOD_NEXUS_STANDIN_SINGLE_MAX = '100000'

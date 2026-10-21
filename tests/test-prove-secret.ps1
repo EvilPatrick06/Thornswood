@@ -52,10 +52,15 @@ foreach ($f in @($prove, $helper)) {
 }
 . $helper
 
-if (-not (Get-Command powershell.exe -ErrorAction SilentlyContinue) -or -not (Get-Command cmd.exe -ErrorAction SilentlyContinue)) {
-    Write-Host 'SKIP  the rest needs Windows PowerShell 5.1 and cmd.exe, as on the VPS'
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the rest: it runs as the VPS does, through cmd.exe into Windows PowerShell 5.1, which only Windows has'
     Done
 }
+$ps51 = Get-WindowsPowerShell
+# Global: the runs' ssh below is called from closures, which find only what
+# the global scope holds.
+$global:TsCmdExe = Get-WindowsPath 'System32\cmd.exe'
 
 # ---- the fakes -----------------------------------------------------------
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-prove-secret-' + [Guid]::NewGuid().ToString('N'))
@@ -87,8 +92,8 @@ $deadSsh = Join-Path $work 'dead.cmd'
 function global:ssh {
     $a = @($args | ForEach-Object { [string]$_ })
     $in = @($input)
-    if ($in.Count) { $in | & cmd.exe /d /c $a[-1] }
-    else { & cmd.exe /d /c $a[-1] }
+    if ($in.Count) { $in | & $global:TsCmdExe /d /c $a[-1] }
+    else { & $global:TsCmdExe /d /c $a[-1] }
 }
 
 $tick = [string][char]0x60
@@ -210,7 +215,7 @@ Start-Sleep -Seconds 2
     }
     function Run-Ps([string]$script, [bool]$keepOpen) {
         $psi = New-Object Diagnostics.ProcessStartInfo
-        $psi.FileName = 'powershell.exe'
+        $psi.FileName = $ps51
         $psi.Arguments = '-NoProfile -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
         $psi.UseShellExecute = $false
         $psi.RedirectStandardInput = $true

@@ -4,9 +4,12 @@
 # and a missing folder must each be refused (exit 1), never accepted with a
 # warning. The signed run is the pilot on One, recorded in
 # records\signing\pilot-2163.json.
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+if (-not $OnWindows) { Write-Host 'NOT RUN  the verify half reads Authenticode signatures, and its unsigned test exe is written with Windows PowerShell''s Add-Type, which only Windows has'; exit 0 }
+$ps51 = Get-WindowsPowerShell
 # PowerShell 7 cannot write an exe with Add-Type, so this runs under Windows PowerShell.
 if ($PSVersionTable.PSEdition -eq 'Core') {
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
+    & $ps51 -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath @args
     exit $LASTEXITCODE
 }
 $ErrorActionPreference = 'Stop'
@@ -15,7 +18,7 @@ $pilot = Join-Path $repo 'scripts\release\Test-SignPilot.ps1'
 $pass = 0; $fail = 0
 function T([bool]$ok, [string]$what) { if ($ok) { Write-Host "PASS  $what"; $script:pass++ } else { Write-Host "FAIL  $what"; $script:fail++ } }
 function Run([string]$dir) {
-    $o = & powershell -NoProfile -ExecutionPolicy Bypass -File $pilot -Verify -Out $dir 2>&1 | Out-String
+    $o = & $ps51 -NoProfile -ExecutionPolicy Bypass -File $pilot -Verify -Out $dir 2>&1 | Out-String
     return @{ Code = $LASTEXITCODE; Text = $o }
 }
 
