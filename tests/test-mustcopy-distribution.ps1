@@ -4,7 +4,8 @@
       pwsh -NoProfile -File .\tests\test-mustcopy-distribution.ps1
 
   OwnGame.MustCopy hard-links Vortex's Data\Platform\Distribution redistributables
-  (the 68 CEF and Node files the collection carries) and keeps copying the two
+  (the 67 CEF, Node and shader compiler files the collection's Client Runtime
+  1.0.1 carries) and keeps copying the two
   recorded client-build files under that folder, and everything else under
   Data\Platform. Issue #392 / rules 6.
 
@@ -15,11 +16,12 @@
        lifted from launcher\app\OwnGame.cs and compiled with the compiler the
        build runs (Add-LauncherType, tests\Launcher-Csc.ps1, #2821), over
        files.txt-shaped
-       inputs: the 68 Distribution rows marked V come out linked; the two
+       inputs: the 67 Distribution rows marked V come out linked; the two
        recorded Distribution paths come out copied whether or not they are in
        the deployed set; other Data\Platform paths stay copied.
-    3. On this machine, where Profile\OwnGame\files.txt exists, the real 68
-       Distribution V rows are asked the same way.
+    3. On this machine, where Profile\OwnGame\files.txt exists, the real
+       Distribution V rows are asked the same way, and there are as many as
+       THIRD-PARTY.md's Client Runtime section says the mod has.
 
   Read only apart from the compiled dll, under the temp folder and removed
   once loaded. Off Windows, 2 and 3 say SKIP: the build's compiler is only
@@ -192,9 +194,8 @@ $T = [type]("$ns.OwnGame")
 $impl = 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformImpl.dll'
 $cef  = 'Data\Platform\Distribution\RuntimeDependencies\SkyrimPlatformCEF.exe.hidden'
 
-# Synthetic files.txt-shaped set: 68 redistributables + 2 recorded + other Platform.
+# Synthetic files.txt-shaped set: 67 redistributables + 2 recorded + other Platform.
 $redis = @(
-    'Data\Platform\Distribution\___systemPolyfill.js',
     'Data\Platform\Distribution\RuntimeDependencies\chrome_elf.dll',
     'Data\Platform\Distribution\RuntimeDependencies\d3dcompiler_47.dll',
     'Data\Platform\Distribution\RuntimeDependencies\icudtl.dat',
@@ -205,8 +206,8 @@ $redis = @(
     'Data\Platform\Distribution\RuntimeDependencies\snapshot_blob.bin',
     'Data\Platform\Distribution\RuntimeDependencies\v8_context_snapshot.bin'
 )
-# Pad to 68 with distinct fake names under Distribution so the count matches the issue.
-while ($redis.Count -lt 68) {
+# Pad to 67 with distinct fake names under Distribution so the count is the mod's.
+while ($redis.Count -lt 67) {
     $redis += ('Data\Platform\Distribution\RuntimeDependencies\pad{0:d2}.dll' -f $redis.Count)
 }
 $otherPlatform = @(
@@ -220,7 +221,7 @@ $deployed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComp
 foreach ($r in $redis) { [void]$deployed.Add($r) }
 
 $linked = @($redis | Where-Object { -not $T::MustCopy($_, $deployed) })
-Yes ("the 68 Distribution redistributables from Vortex are linked ({0} of 68)" -f $linked.Count) ($linked.Count -eq 68)
+Yes ("the 67 Distribution redistributables from Vortex are linked ({0} of 67)" -f $linked.Count) ($linked.Count -eq 67)
 
 Yes 'SkyrimPlatformImpl.dll is copied when not in the deployed set' ($T::MustCopy($impl, $deployed))
 Yes 'SkyrimPlatformCEF.exe.hidden is copied when not in the deployed set' ($T::MustCopy($cef, $deployed))
@@ -254,7 +255,11 @@ if (Test-Path -LiteralPath $FilesList) {
         }
     })
     $realDist = @($rows | Where-Object { $_.Rel -like 'Data\Platform\Distribution\*' -and $_.Origin -eq 'V' })
-    Yes ("this machine's files.txt has 68 Distribution rows from Vortex (has {0})" -f $realDist.Count) ($realDist.Count -eq 68)
+    # As many as the Client Runtime the collection installs has, which
+    # THIRD-PARTY.md gives (tests\test-third-party.js holds it to the mod).
+    $notices = [IO.File]::ReadAllText((Join-Path $PSScriptRoot '..\THIRD-PARTY.md'))
+    $modCount = if ($notices -match '(?s)## Thornswood Client Runtime.*?It is the largest thing somebody else wrote that Thornswood hands out: (\d+)\s+files,') { [int]$Matches[1] } else { -1 }
+    Yes ("this machine's files.txt has the Client Runtime's {0} Distribution rows from Vortex (has {1})" -f $modCount, $realDist.Count) ($modCount -gt 0 -and $realDist.Count -eq $modCount)
     if ($realDist.Count -gt 0) {
         $realDeployed = New-Object 'System.Collections.Generic.HashSet[string]' ([StringComparer]::OrdinalIgnoreCase)
         foreach ($r in $realDist) { [void]$realDeployed.Add($r.Rel) }
@@ -270,7 +275,7 @@ if (Test-Path -LiteralPath $FilesList) {
         }
     }
 } else {
-    Write-Host "SKIP  no files.txt at $FilesList (synthetic 68 still checked)"
+    Write-Host "SKIP  no files.txt at $FilesList (synthetic 67 still checked)"
 }
 
 Done
