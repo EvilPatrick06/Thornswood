@@ -340,7 +340,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\deploy\Install-Runner.ps1 -Number 2` and up for as many as the
     old box had (the repository's Settings, Actions, Runners lists them). Each
     replaces the runner of that name the old box registered, so
-    `Launcher builds` runs on the new box from the next pull request.
+    `Launcher builds` runs on the new box from the next pull request. Then
+    `.\scripts\vps\Keep-RunnerLogs.ps1 -Install`, the daily task that removes
+    the runners' own logs once they are two weeks old (#3184).
 25. **Close it to all but ssh with a key**, once every machine that deploys
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
