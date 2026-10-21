@@ -487,6 +487,12 @@ jobs:
           # standard input held open as on the box, where only the stop event
           # ends it before its limit. It ran nowhere before, so the stop line
           # that never reached the box went out unseen. Under a minute.
+          # Issue #2938: tests\test-mod-menus.js builds a game folder byte by
+          # byte (plugins, compiled scripts, archives, MCM Helper files) and
+          # holds Audit-ModMenus.js to where each menu keeps its values, and
+          # to writing nothing there. It ran only in the nightly, and its
+          # fixture wrote Windows paths, so off Windows it failed 22 checks
+          # and nothing said so. Under a second.
           $six ='test-script-index.ps1', 'test-script-paths.ps1', 'test-architecture.js',
                  'test-collection-visible.js', 'test-play-collection-refresh.js',
                  'test-docs-index.js',
@@ -782,7 +788,8 @@ jobs:
                  'test-watch-outside.ps1',
                  'test-2914-nexus-scripts.ps1',
                  'test-say-staff.ps1',
-                 'test-prove-secret.ps1'
+                 'test-prove-secret.ps1',
+                 'test-mod-menus.js'
           $failed = @()
           foreach ($n in $six) {
             $p = Join-Path 'tests' $n
