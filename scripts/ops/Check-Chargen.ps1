@@ -7,9 +7,8 @@
 
   It checks, in order:
     - the server's load order holds both plugins the flow needs
-    - the plugin on disk really carries the fourteen new book records
-    - the fifteen salvaged manuals have a name and a mesh, which they did not
-      when they were first shipped
+    - the plugin carries the creation menus, the ten town passages and the
+      welcome book, each named and with a mesh
     - gamemode.js is the build that knows about all of it
     - the start point in server-settings.json is the creation room, computed
       from this load order rather than written down
@@ -98,7 +97,6 @@ function Find-ThornswoodGamemodeText([string]$Path, [string[]]$Needles) {
 
 # What a gamemode.js that knows about the creation flow mentions.
 $gmNeedles = @(
-    @{ Text = "e8001f:Thornswood-Content.esp"; What = 'the trade writs' }
     @{ Text = "e80039:Thornswood-Content.esp"; What = 'the town passages' }
     @{ Text = "19bad4:Skyrim Unbound.esp";     What = 'the creation room' }
     @{ Text = "thornswoodChargen";             What = 'the creation state property' }
@@ -255,13 +253,14 @@ if ($null -eq $espLines) {
         }
     }
 
-    $writs    = 0x05E80010..0x05E8001F
+    # The sixteen trade writs and the fifteen skill manuals this used to ask
+    # for were taken out of the plugin on 21 September, when rank came to be
+    # earned by work (d1418f5, 5d1f3f0), and the novice alchemy book with
+    # them; nothing in gamemode.js names any of them. The check went on
+    # asking for them, which only a copy of the plugin older than that could
+    # answer: it read a game folder's copy, never the server's (#2950).
     $passages = 0x05E80030..0x05E80039
-    $extra    = @(0x05E80000, 0x05E80001)
-    $manuals  = @(0x0500B276,0x0500B277,0x0500B278,0x0500B279,
-                  0x0500B27A,0x0500B27B,0x0500B27C,0x0500B27D,
-                  0x05015489,0x0501548A,0x0501548B,0x0501548C,
-                  0x05047F6C,0x05047F6D,0x05047F6E)
+    $welcome  = @(0x05E80000)
 
     function CheckSet($label, $ids) {
         $missing  = @($ids | Where-Object { -not $books.ContainsKey([uint32]$_) })
@@ -290,10 +289,8 @@ if ($null -eq $espLines) {
             Ok ("{0}: {1} buttons" -f $m.Name, $menus[[uint32]$m.Id])
         }
     }
-    CheckSet 'trade writs'     $writs
     CheckSet 'town passages'   $passages
-    CheckSet 'welcome + novice alchemy' $extra
-    CheckSet 'skill manuals'   $manuals
+    CheckSet 'welcome book'    $welcome
 }
 
 Write-Host ''
