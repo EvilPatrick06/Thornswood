@@ -235,7 +235,9 @@ Yes '  and nothing is left in the far temp folder' ((Left) -eq 0)
 Reset
 $out = @(Invoke-ThornswoodRemote -Target $target -SshArgs $sshArgs -Script ((Long 'four' 0) + "`r`n'unclosed {") 2>&1 | ForEach-Object { "$_" })
 $rc = $LASTEXITCODE
-Yes 'a long script that does not parse: nothing of it runs, and the exit code says so (1)' ($rc -eq 1 -and -not ($out -contains 'MARK four') -and (($out -join ' ') -match 'does not parse'))
+$ok = ($rc -eq 1 -and -not ($out -contains 'MARK four') -and (($out -join ' ') -match 'does not parse'))
+Yes 'a long script that does not parse: nothing of it runs, it says so, and the exit code says so (1)' $ok
+if (-not $ok) { Write-Host ('      it said, exit ' + $rc + ': ' + ((@($out) | Select-Object -Last 8) -join ' | ')) }
 Yes '  and its copy is gone all the same' ((Left) -eq 0)
 Reset
 $global:TsSs.ScpFails = $true
