@@ -219,6 +219,29 @@ function runClient(env, input, waitMs) {
     yes('through the proxy, what goes in comes back out (exit ' + r.code + ')' + (r.err ? ': ' + r.err.trim() : ''), r.code === 0 && r.out.equals(small));
     yes('  and the proxy was asked to CONNECT to the bridge\'s host and port', connects.indexOf('CONNECT localhost:' + port + ' HTTP/1.1') >= 0);
 
+    // #2961: ssh closes standard input and sends SIGHUP 2 ms later. The
+    // close frame has to reach the bridge all the same, so it lets the slot
+    // go at once instead of when the connection drops, which through the
+    // cloud proxy and Caddy was 11 s. Windows has no SIGHUP to send.
+    if (process.platform !== 'win32') {
+      const closedBefore = (log.match(/ended: the far end closed it/g) || []).length;
+      const hupEnv = Object.assign({}, process.env, { THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN });
+      delete hupEnv.HTTPS_PROXY; delete hupEnv.https_proxy;
+      hupEnv.HTTPS_PROXY = proxyUrl;
+      const hup = spawn(process.execPath, [path.join(DIR, 'connect.js')], { env: hupEnv });
+      let back = Buffer.alloc(0);
+      hup.stdin.on('error', () => {});
+      hup.stdout.on('data', (d) => {
+        back = Buffer.concat([back, d]);
+        if (back.length >= small.length && !hup.stdin.writableEnded) { hup.stdin.end(); hup.kill('SIGHUP'); }
+      });
+      hup.stdin.write(small);
+      yes('ended the way ssh ends it, standard input closed then SIGHUP, it exits', await waitFor(() => hup.exitCode !== null || hup.signalCode !== null, 5000));
+      yes('  with 0, not killed by the signal (exit ' + hup.exitCode + ', signal ' + hup.signalCode + ')', hup.exitCode === 0);
+      yes('  and the bridge got its close frame, so the slot went at once', await waitFor(() => (log.match(/ended: the far end closed it/g) || []).length > closedBefore, 3000));
+      if (hup.exitCode === null && hup.signalCode === null) hup.kill();
+    }
+
     const big = crypto.randomBytes(3 * 1024 * 1024);
     r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN, HTTPS_PROXY: proxyUrl }, big, 30000);
     yes('3 MB there and back arrives byte for byte (exit ' + r.code + ', ' + r.out.length + ' bytes)', r.code === 0 && r.out.equals(big));
