@@ -300,7 +300,15 @@ try {
     $at = [Diagnostics.Stopwatch]::GetTimestamp()
     $writer.Wait()
     $lat = [math]::Round(($at - $Api::WrittenAt) * 1000.0 / [Diagnostics.Stopwatch]::Frequency, 1)
-    Yes "#977 push to talk wakes it $lat ms after the game starts writing (the old poll: 0 to 100 ms)" ($woke -and $lat -lt 50)
+    # Woken by the write, not by its 2000 ms running out: the watcher's own
+    # count says the file woke it, and with a folder watched there is no poll
+    # to come back on. The time from the write to the wake is said, not held
+    # to a number: past the event itself it is how soon the runner gives the
+    # watcher's thread the CPU. On 21 Oct five gate runs of the same
+    # ChannelWait.cs on the VPS runners measured 1.6, 1.8, 1.8 and 3.1 ms, and
+    # one on thornswood-vps-3 161.9 ms, which failed the old 50 ms bound on a
+    # pull request that did not touch the launcher (#3039).
+    Yes "#977 push to talk wakes it through the watcher ($($wait.Wakes) wake(s), $lat ms after the game started writing; the old poll: 0 to 100 ms)" ($woke -and $wait.Wakes -ge 1)
     [IO.File]::WriteAllText((Join-Path $chan 'voice-muted.txt'), '123')
     Yes '#977 the mute list wakes it too' ($wait.Wait(2000))
     $wait.Dispose()
