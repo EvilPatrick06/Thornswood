@@ -731,6 +731,42 @@ TEAS = (
 )
 TEA_HERBS = 2
 
+# COOKING QUALITY (#2906). Patrick, 20 October 2026, B: a cook comes out
+# burnt, plain or fine, the odds by the cook's rank, and every dish needs a
+# fine record as well as the burnt one, because an item cannot carry per-copy
+# data and the eat event only names a record. The server rolls the quality in
+# mp.onCraft and names the record the craft gives (the engine's craftOutput,
+# fork #92); what each one does when eaten is the needs block's
+# (NEEDS.cookQuality in game\gamemode.js). Which dish has which fine record,
+# and which record is the burnt meal, is game\data\food-groups.json's
+# quality block, the table the server reads too.
+#
+# Each record carries one effect of this plugin's own, a script effect with no
+# script that says on the item what the server does, as the tea's does: a
+# dish's own magic is taken away by the server anyway (FOOD_GROUPS.strip).
+# A fine dish wears its plain dish's look, read from the plugin that made the
+# dish (its bounds, mesh, mesh textures, sounds, worth and weight), is named
+# "Fine " and the plain dish's name from game\data\recipes.json, and carries
+# VendorItemFood. The burnt meal wears Skyrim.esm's Cooked Beef. A record this
+# plugin already holds is kept as it is; one it does not is made from the
+# masters, which needs --masters the game's Data folder that first time.
+FOOD_GROUPS_TABLE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                                  'game', 'data', 'food-groups.json'))
+RECIPE_TABLE = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..',
+                                             'game', 'data', 'recipes.json'))
+BURNT_EFFECT = 0x5019001
+BURNT_EFFECT_WORDS = 'Burnt. Stamina recovers 10% slower for 10 minutes.'
+FINE_EFFECT = 0x5019002
+FINE_EFFECT_WORDS = 'A fine dish. The help a meal of it gives lasts 30 minutes, not 20.'
+BURNT_MEAL_EDID = 'ThornswoodFoodBurntMeal'
+BURNT_MEAL_NAME = 'Burnt Meal'
+BURNT_MEAL_LOOK = '721e8:Skyrim.esm'            # Cooked Beef
+# The subrecords of a dish's look this copies, and in each the offsets that
+# hold a form id. ENIT is worth, flags, addiction, addiction chance and the
+# eating sound; the addiction is not copied, a dish has none.
+LOOK_FIELDS = {b'OBND': (), b'MODL': (), b'MODT': (), b'YNAM': (0,), b'ZNAM': (0,),
+               b'DATA': (), b'ENIT': (16,)}
+
 # THE WELL BUCKET (#1382). Patrick, 12 October 2026: water is drawn at a well
 # by activating it, and the 30 placed wells in the load order are statics,
 # which raise no activation (game\data\wells.json). So the plugin stands a
@@ -985,6 +1021,7 @@ def needs_records():
         out.append(cobj(recipe, edid.replace('ThornswoodFood', 'ThornswoodRecipe'),
                         [(herb, TEA_HERBS)], item, COOKPOT_KEYWORD))
     out.append(drunk_imad())
+    out += quality_effects()
     # The verb on the crosshair says what activating it does.
     out.append(own_record(b'ACTI', WELL_BUCKET, [
         (b'EDID', zstr('ThornswoodActivatorWellBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
@@ -993,6 +1030,100 @@ def needs_records():
         (b'EDID', zstr('ThornswoodActivatorWaterBucket')), (b'OBND', bounds(WELL_BUCKET_BOUNDS)),
         (b'FULL', zstr('Water Bucket')), (b'MODL', zstr(WELL_BUCKET_MODEL)), (b'RNAM', zstr('Draw Water'))]))
     return out
+
+
+def quality_effects():
+    """The burnt meal's and the fine dish's effects (#2906), the tea's kind of
+    effect: a script effect with no script, which says what the server does."""
+    data = bytearray(TEA_EFFECT_DATA)
+    struct.pack_into('<I', data, 0, TEA_EFFECT_FLAGS)
+    return [own_record(b'MGEF', fid, [
+        (b'EDID', zstr(edid)), (b'FULL', zstr(name)),
+        (b'DATA', bytes(data)), (b'SNDD', b''), (b'DNAM', zstr(words))])
+        for fid, edid, name, words in (
+            (BURNT_EFFECT, 'ThornswoodBurntEffect', 'Burnt', BURNT_EFFECT_WORDS),
+            (FINE_EFFECT, 'ThornswoodFineEffect', 'Fine', FINE_EFFECT_WORDS))]
+
+
+def quality_wanted(plugin_masters, plugin_name):
+    """[(form id, editor id, name, the dish whose look it wears, effect)] for
+    the burnt meal and every fine dish in food-groups.json's quality block."""
+    table = json.load(open(FOOD_GROUPS_TABLE, encoding='utf-8'))
+    quality = table.get('quality') or {}
+    recipes = json.load(open(RECIPE_TABLE, encoding='utf-8'))['recipes']
+    names = {}
+    for row in recipes.values():
+        names.setdefault(row.get('out'), row.get('name'))
+    out = [(local_fid(quality['burnt'], plugin_masters, plugin_name), BURNT_MEAL_EDID, BURNT_MEAL_NAME,
+            BURNT_MEAL_LOOK, BURNT_EFFECT)]
+    for plain, fine in sorted(quality.get('fine', {}).items(), key=lambda kv: kv[1]):
+        name = names.get(plain)
+        if not name:
+            raise SystemExit('STOP. %s has a fine record and no recipe makes it (game\\data\\recipes.json). '
+                             'Nothing was written.' % plain)
+        edid = 'ThornswoodFoodFine' + ''.join(w[:1].upper() + w[1:] for w in
+                                               ''.join(c if c.isalnum() else ' ' for c in name).split())
+        out.append((local_fid(fine, plugin_masters, plugin_name), edid, 'Fine ' + name, plain, FINE_EFFECT))
+    return out
+
+
+def dish_look(masters_dir, desc, plugin_masters, problems):
+    """The look of a dish, as [(tag, bytes)] in this plugin's numbering, read
+    from the plugin that made it. A form id from a file this plugin does not
+    master is added to problems, and None comes back."""
+    local, _, master = desc.partition(':')
+    path = os.path.join(masters_dir, master)
+    if not os.path.isfile(path):
+        problems.append('%s is not in %s' % (master, masters_dir))
+        return None
+    buf = open(path, 'rb').read()
+    src_masters = masters_of(buf)
+    rec = record_in(buf, b'ALCH', (len(src_masters) << 24) | int(local, 16))
+    if rec is None:
+        problems.append('%s has no ALCH %s' % (master, local))
+        return None
+    data = rec.data
+    if rec.compressed:
+        data = zlib.decompress(data[4:])
+    names = [m.lower() for m in plugin_masters]
+    mapping = [names.index(m.lower()) if m.lower() in names else None for m in src_masters + [master]]
+    out = []
+    for t, b in subrecords(data):
+        if t not in LOOK_FIELDS:
+            continue
+        b = bytearray(b)
+        for o in LOOK_FIELDS[t]:
+            v = struct.unpack_from('<I', b, o)[0]
+            if not v:
+                continue
+            idx = v >> 24
+            if idx >= len(mapping) or mapping[idx] is None:
+                problems.append('%s %s names 0x%08X, from %s, which this plugin does not master'
+                                % (desc, t.decode(), v, (src_masters + [master])[idx]
+                                   if idx < len(mapping) else 'outside its masters'))
+                return None
+            struct.pack_into('<I', b, o, (mapping[idx] << 24) | (v & 0xFFFFFF))
+        if t == b'ENIT':
+            struct.pack_into('<If', b, 8, 0, 0.0)   # no addiction
+        out.append((t, bytes(b)))
+    got = [t for t, _ in out]
+    for t in (b'OBND', b'MODL', b'DATA', b'ENIT'):
+        if t not in got:
+            problems.append('%s carries no %s' % (desc, t.decode()))
+            return None
+    return out
+
+
+def quality_record(fid, edid, name, look, effect):
+    """A burnt meal or a fine dish (#2906): the look, this plugin's name and
+    keyword, and its one effect."""
+    def field(t):
+        return [(t2, b) for t2, b in look if t2 == t]
+    pairs = ([(b'EDID', zstr(edid))] + field(b'OBND') + [(b'FULL', zstr(name))] +
+             keywords((VENDOR_ITEM_FOOD,)) + field(b'MODL') + field(b'MODT') + field(b'YNAM') +
+             field(b'ZNAM') + field(b'DATA') + field(b'ENIT') +
+             [(b'EFID', struct.pack('<I', effect)), (b'EFIT', struct.pack('<fII', 0.0, 0, 0))])
+    return own_record(b'ALCH', fid, pairs)
 
 
 def thornswood_records(passage, clam):
@@ -1967,7 +2098,44 @@ def main():
     wood_bare = [r for r in wood_have
                  if not any(t == b'BNAM' and struct.unpack_from('<I', b, 0)[0] == WOODWORKING_KEYWORD
                             for t, b in subrecords(r.data))]
-    built += house_new + wood_new
+    # COOKING QUALITY (#2906): the burnt meal and a fine record of every dish.
+    # One already here is kept; one that is not is made from the masters, and
+    # every dish that cannot be is listed before anything stops.
+    quality_new, quality_have, problems = [], [], []
+    try:
+        quality = quality_wanted(plugin_masters, args.plugin)
+    except (KeyError, ValueError) as e:
+        print('')
+        print('STOP. game\\data\\food-groups.json has no quality block this can read (%s). '
+              'Nothing was written.' % e)
+        return 1
+    for fid, edid, name, dish, effect in quality:
+        have = by_fid.get(fid)
+        if have is not None:
+            if have.tag != b'ALCH' or have.compressed or have.editor_id() != edid:
+                print('')
+                print('STOP. 0x%07X in this plugin is not ALCH %s as it should be. Nothing was written.'
+                      % (fid, edid))
+                return 1
+            quality_have.append(have)
+            continue
+        other = by_edid.get(edid)
+        if other is not None:
+            print('')
+            print('STOP. %s is already in this plugin as 0x%07X and this writes it as 0x%07X. '
+                  'Nothing was written.' % (edid, other.fid, fid))
+            return 1
+        look = dish_look(args.masters, dish, plugin_masters, problems)
+        if look is not None:
+            quality_new.append(quality_record(fid, edid, name, look, effect))
+    if problems:
+        print('')
+        print('STOP. %d of the cooking quality records cannot be made from %s:' % (len(problems), args.masters))
+        for line in sorted(set(problems), key=problems.index):
+            print('  %s' % line)
+        print('Nothing was written.')
+        return 1
+    built += house_new + wood_new + quality_new
 
     # WHAT THE REGISTER SAYS GOES (#2553): the placements and switched-off
     # Skyrim objects nothing of Thornswood's asks for, the cells and worlds left
@@ -2103,6 +2271,11 @@ def main():
     for r in wood_new:
         print('  COBJ 0x%08X %-30s %s override, BNAM -> woodworking bench'
               % (r.fid, r.editor_id(), next(m for f, e, m in WOODWORKER_MASTER_RECIPES if f == r.fid)))
+    print('')
+    print('Cooking quality (#2906, game\\data\\food-groups.json quality)')
+    print('  %d already here, %d made now from the masters' % (len(quality_have), len(quality_new)))
+    for r in quality_new:
+        print('  ALCH 0x%08X %s' % (r.fid, r.editor_id()))
     if house_bare or wood_bare:
         print('')
         print('What changes')
@@ -2210,7 +2383,7 @@ def main():
     # from HearthFires.esm lands before the woodworking overrides, where it
     # was, so the same records always make the same file.
     order = ([r.fid for r in own] + [f for f, _ in HOUSE_PARTS] +
-             [f for f, _, _ in WOODWORKER_MASTER_RECIPES])
+             [f for f, _, _ in WOODWORKER_MASTER_RECIPES] + [q[0] for q in quality])
     rank = dict((f, i) for i, f in enumerate(order))
     for r in built:
         group = ensure_top_group(tree, r.tag)
