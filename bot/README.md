@@ -84,17 +84,18 @@ and a `<Hold> Court` voice room. A hold's Citizen role opens its category.
 ### The factions
 
 Each of the sixteen factions in `factions.json` has a category of its own
-(#3317, Patrick, 22 Oct; page card q-3317-faction-category, A):
-`#<faction>-announcements` (its members read; the Leader, Steward and Court
-post), the faction's chat, `#<faction>-court` (the Leader, Steward and
-Court), `#<faction>-seats` and a voice room. The faction's member role opens
-its category.
+(#3317, Patrick, 22 Oct; page card q-3317-faction-category, C):
+`#<faction>-announcements` (its members read; the Leader and Officers post),
+the faction's chat, `#<faction>-leadership` (the Leader and Officers),
+`#<faction>-seats` and a voice room. The faction's member role opens its
+category.
 
 `#<faction>-seats` is the Leader's panel, and only the Leader and the faction
-staff see it: Add and Remove for the faction's members, its Court
-(`<short> Court`) and its Steward (`Steward of <short>`), the way a Jarl names
-a hold's. The panel's faction is the channel's. A Court seat or the Steward
-goes only to a member, and taking somebody's membership takes those with it.
+staff see it: Add and Remove for the faction's members and its Officers
+(`<short> Officer`, one role per faction; Patrick picked it over a Court and
+a Steward, and named the channel leadership "since it's not a court"). The
+panel's faction is the channel's. The Officer role goes only to a member,
+and taking somebody's membership takes it with it.
 The shared `#seats` and its one panel, in the Factions category, are retired;
 until `-Prune` deletes it, the old panel says where the panels went.
 
