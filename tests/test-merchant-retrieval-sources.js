@@ -12,6 +12,10 @@ for(const key of ['reference','base','world','position','item','merchant','desti
 }
 {
  const bad=copy(population);bad.loadOrder[0].sha256='bad';assert.throws(()=>validateRetrievalSources(doc,bad,content,roster),/retrieval/i);
+ // A rebuilt own plugin is not a new measurement (#613): the pin names it and leaves its bytes out.
+ const rebuilt=copy(population);rebuilt.loadOrder.find(r=>r.name==='Thornswood-Last.esp').sha256='0'.repeat(64);
+ assert.equal(validateRetrievalSources(doc,rebuilt,content,roster).sources.length,7,'a rebuilt Last.esp keeps the evidence');
+ const moved=copy(population);moved.loadOrder.reverse();assert.throws(()=>validateRetrievalSources(doc,moved,content,roster),/retrieval/i,'a reordered load order is a new measurement');
  const bytes=Buffer.from(content);bytes[bytes.length-1]^=1;assert.throws(()=>validateRetrievalSources(doc,population,bytes,roster),/retrieval/i);
  const changed=copy(roster);changed.merchants.find(r=>r.reference===doc.sources[0].merchant).role='Cook';
  assert.throws(()=>validateRetrievalSources(doc,population,content,changed),/retrieval/i,'appointed role cannot drift');
