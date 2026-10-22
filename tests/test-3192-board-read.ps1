@@ -223,7 +223,7 @@ if (Test-Path -LiteralPath $Reader) {
     $rt = [IO.File]::ReadAllText($Reader)
     Yes '  it starts board-read.yml on main' ($rt -match [regex]::Escape("`$workflow = 'board-read.yml'") -and $rt -match [regex]::Escape("ref = 'main'") -and $rt -match [regex]::Escape('actions/workflows/$workflow/dispatches'))
     Yes '  and reads the artifact named board' ($rt -match [regex]::Escape("`$_.name -eq 'board'"))
-    Yes '  writing the zip through a file, not a PowerShell pipe, which would change its bytes' ($rt -match '-RedirectStandardOutput \$zip')
+    Yes '  fetching it with gh run download, which unpacks it, not through a PowerShell redirect, which changes its bytes' ($rt -match 'gh run download \$id -R \$GitHubRepo -n board -D' -and $rt -notmatch 'RedirectStandardOutput')
 }
 
 Done
