@@ -182,7 +182,8 @@ Yes 'Install-Bot sends StopAndMove.ps1 in front of Bot-Service.ps1 every time it
 foreach ($c in @(
         @{ Name = 'the site'; Path = @('scripts', 'deploy', 'Deploy-Docs.ps1') },
         @{ Name = 'voice'; Path = @('scripts', 'deploy', 'Install-Voice.ps1') },
-        @{ Name = 'the bridge'; Path = @('scripts', 'deploy', 'Install-Bridge.ps1') })) {
+        @{ Name = 'the bridge'; Path = @('scripts', 'deploy', 'Install-Bridge.ps1') },
+        @{ Name = 'the admin service'; Path = @('scripts', 'deploy', 'Install-AdminService.ps1') })) {
     $t = Text (P $c.Path)
     $s = [regex]::Match($t, '(?ms)^function StopIt \{.*?^\}$').Value
     $plain = $s.Replace('`', '')

@@ -10,19 +10,23 @@ the label `thornswood-sign`, has signtool, and its outbound rules let the
 signing hosts through. Until then the box fallback waits for a runner with
 the label, so a release only builds on GitHub's runner.
 
-## 1. Put the label on runner 3 (One, gh signed in as a repository admin)
+## 1. Put the label on runner 3 (anywhere, the cloud included)
 
-Touches GitHub's runner settings only. A cloud session cannot: its GitHub
-access refuses the runners API (measured on #3312).
-
-```
-.\scripts\deploy\Set-BuildRunners.ps1 -Record records\sign-runners.json
-```
-Prints `thornswood-vps-3: put on thornswood-sign`, then
-`GitHub matches the record: 1 runner(s) carry thornswood-sign.`
+Touches GitHub's runner settings only. Since #3107 (PR #3327) the box's
+admin service changes runner labels to match every `records/*-runners.json`
+on main, and a push to main that changes a runner record asks it by itself,
+so the merge of `records/sign-runners.json` may already have done this. It
+needs the #3107 run note done first (the service on the box and its App
+installed); until then this goes red saying there is no App yet.
 
 ```
-.\scripts\deploy\Set-BuildRunners.ps1 -Record records\sign-runners.json -Check
+pwsh scripts/deploy/Set-BuildRunners.ps1
+```
+Prints MATCHES, or CHANGED with `thornswood-vps-3` gaining
+`thornswood-sign`, and exits 0.
+
+```
+pwsh scripts/deploy/Set-BuildRunners.ps1 -Check
 ```
 Exits 0.
 

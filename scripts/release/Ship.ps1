@@ -1155,6 +1155,24 @@ if ($noteProblems.Count) {
     Say '  Say what somebody will notice in the game or the launcher, in plain words.' 'DarkGray'
     exit 1
 }
+
+# And only what is new on this channel (#3320, Note-Repeats.ps1 says why):
+# a title or line its feed or its Discord channel has already had stops here.
+. (Join-Path $PSScriptRoot 'Note-Repeats.ps1')
+$toldChannel = $(if ($Dev) { 'dev' } else { 'main' })
+try { $told = Get-ChannelPosts $toldChannel }
+catch { Die ("What the $toldChannel channel has already been told could not be read, so these notes cannot be checked for repeats. Nothing was built: " + $_.Exception.Message) }
+$repeats = @(Get-NoteRepeats $Notes $told.Posts $told.Newest)
+if ($repeats.Count) {
+    Write-Host ''
+    Say '  STOP. These notes say again what this channel has already been told.' 'Red'
+    Say '  Each post says only what is new since the last one. Nothing was built.' 'Red'
+    foreach ($r in $repeats) { Say "    $r" 'Yellow' }
+    Write-Host ''
+    Say '  Write only what this release adds. A gamemode deploy whose Ship follows' 'DarkGray'
+    Say '  takes -ShipFollows and posts nothing, so the Ship says it once.' 'DarkGray'
+    exit 1
+}
 Write-Host "  $Notes" -ForegroundColor DarkGray
 
 # The words in the files people read, not only the notes. Note-Rules above

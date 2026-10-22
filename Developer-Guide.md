@@ -1599,12 +1599,15 @@ The machine that runs `Ship.ps1` still has to sign the build. [Setting up a mach
 
 ### The content plugin goes to the server first
 
-The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship, with the note the dev updates channel gets:
+The server gets the content plugin first, then the Ship. When `game\content\Thornswood-Content.esp` or `game\content\Thornswood-Last.esp` changed since the last dev release, put it on the dev server before you Ship. The Ship right after it carries the same change to the launcher and says it, so the deploy posts nothing (`-ShipFollows`) and the note goes to the Ship alone:
 
 ```powershell
-.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -Note "The forge takes the new ores
+.\scripts\deploy\Deploy-DevGamemode.ps1 -LoadOrder -ShipFollows
+.\scripts\release\Ship.ps1 -Channel dev "The forge takes the new ores
 - Iron and silver ore smelt at every forge."
 ```
+
+Each post says only what is new on its channel (#3320, Patrick, 22 Oct). Ship and `Deploy-DevGamemode.ps1` refuse a note whose title or `- ` line the channel's News or its Discord channel has already had, and say where it was said. On 22 Oct a deploy and the Ship after it posted the same note twice, which is what `-ShipFollows` is for.
 
 `-LoadOrder` keeps the dev server's own load order and sends every plugin it names that the server does not hold at the same bytes: our two plugins from your checkout, the others from the collection. `Thornswood-Last.esp` is always the last plugin in that order: when the dev server's order does not end with it, `-LoadOrder` puts it there and sends the order (#2486). It needs no server build, so it runs from the fresh checkout the deploy asks for. `-Dist <a built dist\server folder>` also writes that build's load order over the dev one.
 

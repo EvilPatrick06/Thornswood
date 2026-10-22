@@ -1,0 +1,240 @@
+"""
+test-3317-audit.py
+
+Build-Discord.py --audit reads the live server, says where it differs from
+the plan, and changes nothing (#3317).
+
+Patrick, 22 Oct 2026: every role's permissions right globally, per category,
+per channel and for the bot, and nobody holding two ranks of one staff
+category. The plan only says what a channel the builder MAKES gets, and the
+live server was gated by hand, so the audit is the read that says what is
+really there.
+
+Build-Discord.py is imported for real, under another name so its __main__
+block never runs. The guild is a stand-in that matches the plan exactly, and
+then is put wrong one way at a time; every write a stand-in could be asked
+for is recorded, and none may happen.
+
+Read only. Never connects to anything.
+"""
+import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
+import asyncio
+import contextlib
+import importlib.util
+import io
+import os
+import sys
+
+HERE = os.path.dirname(os.path.abspath(__file__))
+sys.path.insert(0, HERE)
+
+PASS = []
+FAIL = []
+
+
+def yes(what, cond):
+    (PASS if cond else FAIL).append(what)
+    print(('PASS  ' if cond else 'FAIL  ') + what)
+
+
+try:
+    import discord
+except ImportError:
+    print('SKIP  discord.py is not installed here, so the builder cannot be imported')
+    print('')
+    print('0 passed, 0 failed')
+    sys.exit(0)
+
+spec = importlib.util.spec_from_file_location(
+    'build_discord', os.path.join(HERE, 'Build-Discord.py'))
+B = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(B)
+
+WRITES = []
+
+
+class Role(object):
+    def __init__(self, name, rid, perms):
+        self.name = name
+        self.id = rid
+        self.permissions = discord.Permissions(perms.value if hasattr(perms, 'value') else perms)
+        self.members = []
+        self.managed = False
+
+    async def edit(self, **kw):
+        WRITES.append(('role edit', self.name))
+
+    def __repr__(self):
+        return '<role %s>' % self.name
+
+
+class Member(object):
+    def __init__(self, mid, name, roles):
+        self.id = mid
+        self.display_name = name
+        self.roles = list(roles)
+        for r in roles:
+            r.members.append(self)
+
+
+class Place(object):
+    """A category or a channel. Any write is recorded."""
+
+    def __init__(self, name, category=None, ow=None):
+        self.name = name
+        self.category = category
+        self.overwrites = dict(ow or {})
+
+    def overwrites_for(self, target):
+        return self.overwrites.get(target, discord.PermissionOverwrite())
+
+    async def set_permissions(self, *a, **kw):
+        WRITES.append(('set_permissions', self.name))
+
+    async def edit(self, **kw):
+        WRITES.append(('edit', self.name))
+
+    async def delete(self, **kw):
+        WRITES.append(('delete', self.name))
+
+
+class Guild(object):
+    name = 'Thornswood stand-in'
+
+    async def create_role(self, *a, **kw):
+        WRITES.append(('create_role',))
+
+    async def create_category(self, *a, **kw):
+        WRITES.append(('create_category',))
+
+    async def create_text_channel(self, *a, **kw):
+        WRITES.append(('create_text_channel',))
+
+    async def edit(self, **kw):
+        WRITES.append(('guild edit',))
+
+
+def build():
+    """A guild exactly as the plan has it."""
+    g = Guild()
+    g.default_role = Role('@everyone', 1, B.PLAIN)
+    g.roles = [g.default_role]
+    rid = 100
+    for name, _, _, perms in B.ROLES:
+        rid += 1
+        g.roles.append(Role(name, rid, perms))
+    bot_role = Role('Thornswood Bot', 99, B.RUN_PERMISSIONS)
+    bot_role.managed = True   # Discord's own role for a bot, as on the live server
+    g.roles.append(bot_role)
+    g.me = Member(5, 'Thornswood', [bot_role])
+    g.me.guild_permissions = discord.Permissions(B.RUN_PERMISSIONS)
+    named = dict((r.name, r) for r in g.roles)
+    g.members = [g.me,
+                 Member(10, 'Patrick', [named['Owner'], named['Dev']]),
+                 Member(11, 'Djinn', [named['Lead Gamemaster']]),
+                 Member(12, 'A gamemaster', [named['Gamemaster']]),
+                 Member(13, 'A tester', [named['Playtester'], named['Member']])]
+    roles = dict((n, named[n]) for n, _, _, _ in B.ROLES)
+    g.categories, g.channels = [], []
+    for catname, specs in B.PLAN:
+        cat = Place(catname, None, B.overwrites(g, B.CATEGORY_MODE.get(catname, 'open'), roles))
+        g.categories.append(cat)
+        for s in specs:
+            if not s.get('make', True):
+                continue
+            want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
+            g.channels.append(Place(want, cat, B.overwrites(
+                g, s.get('mode', 'open'), roles, s.get('hold'), B.bot_needs(s),
+                s.get('extra_roles'))))
+    return g, named
+
+
+def run(g):
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        n = asyncio.run(B.audit(g))
+    return n, buf.getvalue()
+
+
+# --------------------------------------------------------- the clean guild --
+g, named = build()
+n, out = run(g)
+yes('a server that matches the plan has no difference', n == 0)
+yes('the audit says nothing was changed', 'Nothing was changed.' in out)
+yes('the audit asked Discord for nothing', WRITES == [])
+yes('who holds a staff rank is said', 'Lead Gamemaster: Djinn' in out)
+yes('a non-staff role is said as a count, not names', 'Playtester: 1 member(s)' in out
+    and 'A tester' not in out)
+
+# --------------------------------------------------------------- a double --
+g, named = build()
+g.members.append(Member(20, 'Two hats', [named['Gamemaster'], named['Trial Gamemaster']]))
+n, out = run(g)
+yes('two ranks of the Gamemasters are a double',
+    'Two hats holds Gamemaster and Trial Gamemaster, two ranks of Gamemasters' in out)
+yes('a double is one difference', n == 1)
+
+g, named = build()
+yes('ranks in two categories are not a double',
+    B.doubles([Member(21, 'x', [named['Dev'], named['Gamemaster']])]) == [])
+yes('Owner beside a rank is not a double',
+    B.doubles([Member(22, 'y', [named['Owner'], named['Lead Gamemaster']])]) == [])
+
+# ------------------------------------------------- a role with too much --
+g, named = build()
+named['Moderator'].permissions = discord.Permissions(B.MOD.value | discord.Permissions(administrator=True).value)
+n, out = run(g)
+yes('a role holding more than the plan is said',
+    'role Moderator holds more than the plan: administrator' in out)
+
+g, named = build()
+g.roles.append(Role('Hand made', 500, discord.Permissions(manage_guild=True)))
+n, out = run(g)
+yes('a role the plan does not name is said with what it holds',
+    'role Hand made is not in the plan, holds manage_guild' in out)
+
+# ----------------------------------------------------------------- the bot --
+g, named = build()
+g.me.guild_permissions = discord.Permissions(administrator=True)
+n, out = run(g)
+yes('the bot holding Administrator is said', 'the bot holds Administrator' in out)
+
+g, named = build()
+g.me.guild_permissions = discord.Permissions(B.RUN_PERMISSIONS & ~(1 << 28))
+n, out = run(g)
+yes('the bot missing one of its running set is said', 'the bot is missing manage_roles' in out)
+
+# --------------------------------------------------------------- channels --
+g, named = build()
+gm_chat = [c for c in g.channels if c.name == 'gm-chat'][0]
+gm_chat.overwrites[named['Playtester']] = discord.PermissionOverwrite(view_channel=True)
+n, out = run(g)
+yes('a role let into a channel the plan shuts it out of is said',
+    '#gm-chat, Playtester: not in the plan, has allow view_channel' in out)
+
+g, named = build()
+rules = [c for c in g.channels if c.name == 'staff-general'][0]
+rules.overwrites[g.default_role] = discord.PermissionOverwrite()
+n, out = run(g)
+yes('@everyone no longer shut out of a staff channel is said',
+    '#staff-general, @everyone: view_channel is unset, plan denied' in out)
+
+g, named = build()
+staff = [c for c in g.categories if c.name == 'Staff'][0]
+g.channels.append(Place('secret-room', staff, {}))
+g.channels.append(Place('staff-updates', staff, {}))
+n, out = run(g)
+yes('a channel the plan does not name is said', '#secret-room in Staff is not in the plan' in out)
+yes('#staff-updates is kept by name and not a difference',
+    '#staff-updates in Staff is kept by name' in out and n == 1)
+
+g, named = build()
+g.channels = [c for c in g.channels if c.name != 'gm-rules']
+n, out = run(g)
+yes('a planned channel that is missing is said', '#gm-rules is not in Gamemasters' in out)
+
+yes('nothing in any run asked Discord for anything', WRITES == [])
+
+print('')
+print('%d passed, %d failed' % (len(PASS), len(FAIL)))
+sys.exit(1 if FAIL else 0)

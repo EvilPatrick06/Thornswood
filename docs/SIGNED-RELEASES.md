@@ -333,7 +333,7 @@ carry a new launcher with no One in the chain:
   signing client as a workload identity file under RUNNER_TEMP for one
   signtool call (no `azure/login`, so no Azure CLI sign in stays in the
   runner account's profile). It runs on runner 3 only; runner 3 needs the
-  label (`Set-BuildRunners.ps1 -Record records\sign-runners.json`), the
+  label (`pwsh scripts/deploy/Set-BuildRunners.ps1`, #3107), the
   Windows SDK's signtool, and its outbound rules to let the signing hosts
   through (`ops\claude-queue\3312-sign-runner.md`).
 - The `verify` job runs after whichever job signed, on a build runner, so

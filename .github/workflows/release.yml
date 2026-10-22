@@ -35,11 +35,11 @@
 # THE BOX SIGNS ON RUNNER 3 ONLY (#3312, Patrick, 22 Oct: "for signing it
 # will use runner 3"). The fallback asks for the label thornswood-sign beside
 # thornswood-vps, and only the runners records\sign-runners.json lists carry
-# it (scripts\deploy\Set-BuildRunners.ps1 -Record records\sign-runners.json
-# puts GitHub right). Runner 3 is the light runner (docs\DECIDED.md), never a
-# build runner, so the job that can sign never shares a runner with pull
-# request code, and the "verify" job, on the build runners, never runs where
-# the launcher was signed.
+# it (a push that changes the record puts GitHub right by itself, and
+# scripts\deploy\Set-BuildRunners.ps1 asks again, #3107). Runner 3 is the
+# light runner (docs\DECIDED.md), never a build runner, so the job that can
+# sign never shares a runner with pull request code, and the "verify" job,
+# on the build runners, never runs where the launcher was signed.
 #
 # HOW IT BUILDS (#498, Patrick's option C, switched 15 Oct). On both runners
 # the launcher and setup program are built by MSBuild from
