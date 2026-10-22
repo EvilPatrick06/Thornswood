@@ -45,8 +45,6 @@
        six files checked against the record's sha256 before anything is put
        in the build folder. A build made here is never offered: a rebuild is
        not the same bytes, so it cannot match a record CI made (#3047).
-       -Rebuild still builds the fork when asked, for a record made from a
-       build on this machine.
     6. Then Check-ShipReady.ps1 for the channel, which asks every other
        question Ship asks (the dev build, its game folder, the Vortex profile,
        the VPS and the feed store) and gives the verdict.
@@ -128,12 +126,6 @@
 .PARAMETER Check
   Report only. Nothing is fetched or written; each step says what it would do.
 
-.PARAMETER Rebuild
-  When the recorded client is on neither feed, build the fork with
-  Build-Engine.ps1 (an hour or more the first time) instead of stopping. It
-  matches only a record made from a build on this machine, never one CI
-  made (#3047); -EngineBuild ci is the way for those.
-
 .PARAMETER NoVps
   Passed to Check-ShipReady.ps1, which then skips the two questions that ask
   the VPS over ssh.
@@ -182,7 +174,6 @@ param(
   [ValidateSet('dev', 'main')]
   [string]$Channel = 'dev',
   [switch]$Check,
-  [switch]$Rebuild,
   [switch]$NoVps,
   [switch]$NoPause,
   [string]$Site = 'https://thornswood.net',
@@ -688,13 +679,6 @@ if ($inGame -eq $total -or $inDist -eq $total) {
     Remove-Item -LiteralPath $zip -Force -EA SilentlyContinue
     Row 'the recorded client is here' (-not $why) $(if ($why) { $why } else { 'fetched from the ' + $cr.Feed + ' feed into ' + $dist + ', every file as recorded' }) `
       'The lines above say why. CI''s build of the pin holds the same files: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci'
-  } elseif ($Rebuild -and -not $Check) {
-    Say ('  client-runtime-' + $commit + ' is on neither feed; building the fork (-Rebuild)') 'Yellow'
-    $global:LASTEXITCODE = 0
-    & (Join-Path $Here 'Build-Engine.ps1') -NoPause
-    $inDist = Get-ClientMatch $record $dist
-    Row 'the recorded client is here' ($inDist -eq $total) ('the build folder holds ' + $inDist + ' of ' + $total) `
-      'A build made here is not the bytes a record CI made names: .\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci takes CI''s. Never write a new record for an engine nobody changed'
   } else {
     Row 'the recorded client is here' $false ('client-runtime-' + $commit + ' is on neither feed, and a build made here would not be the recorded bytes') `
       '.\scripts\release\Setup-ShipMachine.ps1 -EngineBuild ci   (CI''s build of the pin, the one the record names; engine\README.md, A Ship machine takes CI''s build)'
