@@ -10,7 +10,11 @@
       pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Taking the dev feed for the cooking fix, Ship at 4:30 PM."
                        queue it; prints its id
       pwsh scripts/ops/Say-Staff.ps1 -Check agent-claude-20261020214500-1a2b3c
-                       whether the bot has said it yet
+                       whether the bot has said it yet, or taken it back
+      pwsh scripts/ops/Say-Staff.ps1 -Unsay agent-claude-20261020214500-1a2b3c
+                       takes it back out of #staff-updates (#3328): the bot
+                       deletes its post within a minute, or never says it if
+                       it has not yet. Only the sender's own notices.
 
   HOW IT GETS THERE. The notice goes on ssh's standard input, base64, to
   C:\Thornswood-Watch\say-staff.ps1 on the box (scripts\vps\vps-say-staff.ps1,
@@ -55,8 +59,12 @@
     waiting   2, through GitHub: the run had not ended in -WaitMinutes, or
               GitHub started it and a read of its answer failed; the notice
               was sent either way, and -Run <its id> reads the answer
+    unsay     0, with the id, after the box wrote the ask down
+    taken back 0 (-Check): deleted, already gone, or withheld (never said)
+    waiting   2 (-Check), asked to be taken back, the bot not there yet
     refused, not found, expired, no watchdog, or the box not reached: 1,
-              with why. Nothing was posted.
+              with why. Nothing was posted. A notice the watchdog's webhook
+              said, or one the bot could not delete: 1, with why.
   In a GitHub Actions job it also writes the box's answer, or why it
   stopped, as an annotation titled Say-Staff, which is how the cloud half
   reads the runner's answer.
@@ -69,10 +77,13 @@
 param(
     [Parameter(ParameterSetName = 'Say', Mandatory = $true)]
     [string]$Text,
-    [Parameter(ParameterSetName = 'Say')]
+    # Who the notice is from, or whose notice is taken back (-Unsay).
     [string]$From = '',
     [Parameter(ParameterSetName = 'Check', Mandatory = $true)]
     [string]$Check,
+    # Takes a notice back (#3328).
+    [Parameter(ParameterSetName = 'Unsay', Mandatory = $true)]
+    [string]$Unsay,
     # Through GitHub: the answer of a staff-notice run that had not ended.
     [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
     [long]$Run,
@@ -133,6 +144,12 @@ if ($PSCmdlet.ParameterSetName -eq 'Run' -and $route -ne 'github') { Die '-Run r
 if ($PSCmdlet.ParameterSetName -eq 'Check') {
     if ($Check -notmatch '^agent-[a-z0-9-]{1,80}$') { Die "$Check is not a notice id; Say-Staff.ps1 printed one like agent-claude-20261020214500-1a2b3c." }
     $line = 'check ' + $Check
+} elseif ($PSCmdlet.ParameterSetName -eq 'Unsay') {
+    if ($Unsay -notmatch '^agent-[a-z0-9-]{1,80}$') { Die "$Unsay is not a notice id; Say-Staff.ps1 printed one like agent-claude-20261020214500-1a2b3c." }
+    $line = 'unsay ' + $Unsay
+    if ($route -eq 'ssh' -and $From -cnotmatch '^[a-z0-9][a-z0-9-]{0,31}$') {
+        Die '-From says whose notice it is: one lower case word (claude, codex, djinn). Only its own notices can be taken back. Nothing was changed.'
+    }
 } elseif ($PSCmdlet.ParameterSetName -eq 'Say') {
     $t = ($Text -replace '\r\n?', "`n").Trim()
     if (-not $t) { Die 'the notice is empty. Nothing was posted.' }
@@ -226,7 +243,7 @@ if ($route -eq 'github') {
         $answer = Read-RunAnswer $Run
     } else {
         # The body on gh's standard input, so the text is on no command line.
-        $inputs = if ($PSCmdlet.ParameterSetName -eq 'Check') { @{ check = $Check } } else { @{ text = $t } }
+        $inputs = if ($PSCmdlet.ParameterSetName -eq 'Check') { @{ check = $Check } } elseif ($PSCmdlet.ParameterSetName -eq 'Unsay') { @{ unsay = $Unsay } } else { @{ text = $t } }
         $body = @{ ref = 'main'; inputs = $inputs; return_run_details = $true } | ConvertTo-Json -Compress
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
         $o = @($body | & gh api -X POST "repos/$GitHubRepo/actions/workflows/$workflow/dispatches" --input - 2>&1 | ForEach-Object { "$_" })
@@ -307,7 +324,7 @@ if ($route -eq 'github') {
 }
 
 # ------------------------------------------------------------ the answer ---
-$answer = @($out | Where-Object { $_ -match '^(QUEUED|POSTED|WAITING|EXPIRED|NOT FOUND|NOWATCHER|REFUSED|READY)\b' }) | Select-Object -Last 1
+$answer = @($out | Where-Object { $_ -match '^(QUEUED|POSTED|WAITING|EXPIRED|NOT FOUND|NOWATCHER|REFUSED|READY|UNSAY|UNSAID)\b' }) | Select-Object -Last 1
 if ($answer -and $route -ne 'github') { Note 'notice' $answer }
 switch -Regex ("$answer") {
     '^QUEUED (\S+)$' {
@@ -315,6 +332,18 @@ switch -Regex ("$answer") {
         Say ('  to see it was said: pwsh scripts/ops/Say-Staff.ps1 -Check ' + $Matches[1]) 'DarkGray'
         exit 0
     }
+    '^UNSAY QUEUED (\S+)$' {
+        Say ('asked the bot to take ' + $Matches[1] + ' back. It deletes its post in #staff-updates within a minute, or never says it if it has not yet.') 'Green'
+        Say ('  to see it was done: pwsh scripts/ops/Say-Staff.ps1 -Check ' + $Matches[1]) 'DarkGray'
+        exit 0
+    }
+    '^UNSAY WAITING$' { Say 'asked to be taken back, and the bot has not done it yet. It reads every minute.' 'Yellow'; exit 2 }
+    '^UNSAID deleted$' { Say 'taken back: the bot deleted its post in #staff-updates.' 'Green'; exit 0 }
+    '^UNSAID gone$' { Say 'taken back: the post was not in #staff-updates any more, so there was nothing to delete.' 'Green'; exit 0 }
+    '^UNSAID withheld$' { Say 'taken back before it was said: it was never posted, and the watchdog''s webhook will not post it either.' 'Green'; exit 0 }
+    '^UNSAID webhook$' { Die 'the watchdog''s webhook said it, and the bot can delete only its own posts. Somebody with Manage Messages in #staff-updates deletes it by hand.' }
+    '^UNSAID unknown$' { Die 'the bot found no notice with that id in the outbox, so it took nothing back.' }
+    '^UNSAID (.*)$' { Die ('the bot could not take it back: ' + $Matches[1] + '. bot.log on the box says why.') }
     '^POSTED (bot|webhook)$' { Say ('posted in #staff-updates, by the ' + $Matches[1] + '.') 'Green'; exit 0 }
     '^WAITING$' { Say 'in the outbox, not said yet. The bot reads it every minute; the watchdog''s webhook takes over after two and a half.' 'Yellow'; exit 2 }
     '^EXPIRED$' { Die 'it was never said, and it is over a day old now, so it never will be. Post it again if it still matters.' }
