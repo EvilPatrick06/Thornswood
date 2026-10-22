@@ -153,6 +153,15 @@ function preparePicture(file) {
     });
   }).catch(function () { return file; });
 }
+/* A picture's smaller copies (#3218), made and sent by copies.js after the
+   picture. '' when they went or none was needed, or a sentence saying
+   which did not go. */
+function sendCopies(file, name) {
+  if (!/\.(png|jpe?g|webp)$/i.test(file.name || '')) return Promise.resolve('');
+  return window.galleryCopies.send(file, name).then(function (r) {
+    return r.bad ? r.bad + ', so it will show at full size until staff make them.' : '';
+  });
+}
 function show(html) {
   var headingSeen = false;
   html = html.replace(/<h1\b([^>]*)>([\s\S]*?)<\/h1>/gi, function (all, attrs, text) {
@@ -397,7 +406,11 @@ if (AGE_PATHS[here] && !ageOk()) {
         var recording = /\.(mp4|webm)$/i.test(g.name || '');
         var media = recording
           ? '<video controls preload="metadata" aria-label="' + description + '"><source src="' + esc(g.url) + '"></video>'
-          : '<img src="' + esc(g.url) + '" alt="' + description + '" loading="lazy">';
+          : '<img src="' + esc(g.url) + '"' +
+            // Its smaller copies (#3218). A card is a column of a grid at
+            // least 260 wide: one column up to 620, then about a third.
+            (g.srcset ? ' srcset="' + esc(g.srcset) + '" sizes="(max-width: 620px) calc(100vw - 48px), 34vw"' : '') +
+            ' alt="' + description + '" loading="lazy">';
         var card = '<div class="shot-card"><div class="shot">' + media + '</div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
         // Per-image report for live public shots only. No staff inbox here.
@@ -583,14 +596,15 @@ if (AGE_PATHS[here] && !ageOk()) {
         send.disabled = true; send.textContent = 'Sending';
         // One request per file, in order. The submit door writes gallery-pending.json
         // as read-modify-write, so parallel posts could drop an entry.
-        var i = 0, names = [], fail = null;
+        var i = 0, names = [], fail = null, copyBad = '';
         function next() {
           if (fail || i >= list.length) {
             if (fail) said(fail, true);
             else {
-              said(names.length === 1
+              said((names.length === 1
                 ? 'Sent. Staff will look at it before it goes up.'
-                : ('Sent ' + names.length + '. Staff will look at them before they go up.'));
+                : ('Sent ' + names.length + '. Staff will look at them before they go up.')) +
+                (copyBad ? ' ' + copyBad : ''));
               picked = [];
               if (f) f.value = '';
               showPicked();
@@ -598,7 +612,9 @@ if (AGE_PATHS[here] && !ageOk()) {
             send.disabled = false; send.textContent = 'Send pictures';
             return;
           }
+          var sent;
           preparePicture(list[i++]).then(function (file) {
+            sent = file;
             var q = '/api/gallery/submit?name=' + encodeURIComponent(file.name) +
             (by ? '&by=' + encodeURIComponent(by) : '') +
             (note ? '&note=' + encodeURIComponent(note) : '');
@@ -608,7 +624,15 @@ if (AGE_PATHS[here] && !ageOk()) {
           })
             .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, j: j }; }); })
             .then(function (x) {
-              if (x.ok && x.j && x.j.ok) { names.push(x.j.name); next(); }
+              if (x.ok && x.j && x.j.ok) {
+                names.push(x.j.name);
+                // Then its smaller copies; one that does not go is said, and
+                // the picture is still in.
+                return sendCopies(sent, x.j.name).then(function (bad) {
+                  if (bad && !copyBad) copyBad = bad;
+                  next();
+                });
+              }
               else {
                 fail = (x.j && (x.j.error || x.j.why)) || 'Could not send it.';
                 if (names.length) fail = 'Sent ' + names.length + ', then stopped: ' + fail;
@@ -1118,9 +1142,17 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
         show.appendChild(img);
         return img;
       });
+      // A picture's smaller copies (#3218) are set with its address, so
+      // neither is fetched early. The band is the page's width less its
+      // margins, at most 1480.
       function fetchFrame(n) {
         var img = frames[n];
-        if (img && !img.getAttribute('src')) img.src = shots[n].url;
+        if (!img || img.getAttribute('src')) return;
+        if (shots[n].srcset) {
+          img.sizes = '(max-width: 1528px) calc(100vw - 48px), 1480px';
+          img.srcset = shots[n].srcset;
+        }
+        img.src = shots[n].url;
       }
       fetchFrame(0);
       fetchFrame(1 % shots.length);

@@ -1028,7 +1028,9 @@ function publicPageBody(route) {
       const alt = g.alt || 'Skyrim scene shared by ' + (g.by || 'the Thornswood community');
       const media = /\.(mp4|webm)$/i.test(g.name || '')
         ? '<video controls preload="metadata" aria-label="' + escAttr(alt) + '"><source src="' + escAttr(g.url) + '"></video>'
-        : '<img src="' + escAttr(g.url) + '" alt="' + escAttr(alt) + '" loading="lazy">';
+        : '<img src="' + escAttr(g.url) + '"' +
+          (g.srcset ? ' srcset="' + escAttr(g.srcset) + '" sizes="(max-width: 620px) calc(100vw - 48px), 34vw"' : '') +
+          ' alt="' + escAttr(alt) + '" loading="lazy">';
       body += '<figure class="shot-card"><div class="shot">' + media + '</div><figcaption>' + escAttr(g.by || 'Thornswood community') + '</figcaption></figure>';
     }
     body += '</div>';
@@ -1859,25 +1861,186 @@ const KIND = {
 };
 
 /*
+  SMALLER COPIES OF A GALLERY PICTURE (#3218). Every picture went out as it
+  was uploaded: the first on the front page was 1.15 MB at 2563 by 1440 and
+  drawn at about 1229 by 514. The site cannot make a smaller copy, because
+  node reads and writes no pictures and the site installs nothing, so the
+  one that sends the picture makes them (Patrick's answer on the report
+  page, 22 Oct 2026, option B): the upload page and the launcher's gallery
+  button each send an 800 and a 1600 pixel wide copy after the picture, one
+  for each width the picture is wider than, over POST /api/gallery/copy.
+
+  WHAT GOES PUBLIC IS WHAT STAFF SAW. The site cannot look at a picture, so
+  it cannot tell that a copy shows the same thing as the picture it is a
+  copy of. What it can read is the width and height a file says it has
+  (pictureSize), and a copy is refused unless it is exactly its width and
+  the picture's shape. The rest is staff: the hub and the launcher show the
+  copies on the waiting card beside the picture, and Accept says which
+  copies it showed (copies on /api/gallery/approve). Only those go on the
+  gallery. A launcher from before this sends no copies on Accept, so a
+  picture it accepts goes out at full size, as every picture did.
+
+  The sender may send each copy once, and only while the picture waits, so
+  a copy cannot change between staff looking at it and accepting it. Staff
+  may send or replace one at any time from the hub, made in their own
+  browser from the picture they are looking at; that is how a picture
+  accepted at full size gets its copies.
+
+  A copy lives in uploads/small as <picture>.w<width>.webp or .jpg, is
+  served at /shot/<picture>?w=<width> once the picture is on the gallery and
+  at /up/<picture>?w=<width> to staff while it waits, and goes when the
+  picture's file goes: deleteUpload takes the copies with it, so every door
+  and sweep that deletes a picture deletes them too. gallery.json names the
+  copies in the item's srcset, so /api/public and /api/gallery hand them
+  out with nothing worked out per request.
+*/
+const SMALL_WIDTHS = [800, 1600];
+const SMALL_KINDS = ['.webp', '.jpg'];
+const SMALL_CAP = 8 * 1024 * 1024;
+const UP_SMALL = path.join(UP, 'small');
+function smallFile(name, width, ext) {
+  return path.join(UP_SMALL, String(name) + '.w' + width + ext);
+}
+// The copy at that width on disk, or '' when there is none.
+function smallCopy(name, width) {
+  for (const ext of SMALL_KINDS) {
+    const file = smallFile(name, width, ext);
+    if (file.startsWith(UP_SMALL + path.sep) && fs.existsSync(file)) return file;
+  }
+  return '';
+}
+/* The width and height a PNG, JPEG, GIF or WebP file is shown at, read off
+   its header, or null when the header cannot be read. A JPEG's size is in
+   its frame header, after any metadata, so the markers are walked; a camera
+   JPEG may say in its Exif that it is turned a quarter, and is then shown
+   with width and height the other way round, as browsers show it and as a
+   copy of it is made. */
+function pictureSize(file) {
+  let b;
+  try {
+    const fd = fs.openSync(file, 'r');
+    try {
+      b = Buffer.alloc(Math.min(fs.fstatSync(fd).size, 1048576));
+      fs.readSync(fd, b, 0, b.length, 0);
+    } finally { fs.closeSync(fd); }
+  } catch (e) {
+    console.error('[thornswood-docs] could not read the size of ' + path.basename(String(file)) + ' (' + (e.code || e.message) + ')');
+    return null;
+  }
+  const size = (w, h) => (w > 0 && h > 0 ? { w: w, h: h } : null);
+  if (b.length >= 24 && b.subarray(0, 8).equals(Buffer.from('89504e470d0a1a0a', 'hex'))) {
+    return size(b.readUInt32BE(16), b.readUInt32BE(20));
+  }
+  if (b.length >= 10 && /^GIF8[79]a$/.test(b.subarray(0, 6).toString('ascii'))) {
+    return size(b.readUInt16LE(6), b.readUInt16LE(8));
+  }
+  if (b.length >= 30 && b.subarray(0, 4).toString('ascii') === 'RIFF' && b.subarray(8, 12).toString('ascii') === 'WEBP') {
+    const chunk = b.subarray(12, 16).toString('ascii');
+    if (chunk === 'VP8 ') return size(b.readUInt16LE(26) & 0x3fff, b.readUInt16LE(28) & 0x3fff);
+    if (chunk === 'VP8L') {
+      const bits = b.readUInt32LE(21);
+      return size((bits & 0x3fff) + 1, ((bits >>> 14) & 0x3fff) + 1);
+    }
+    if (chunk === 'VP8X') return size(b.readUIntLE(24, 3) + 1, b.readUIntLE(27, 3) + 1);
+    return null;
+  }
+  if (b.length >= 4 && b[0] === 0xff && b[1] === 0xd8) {
+    let i = 2, turned = false;
+    while (i + 9 < b.length) {
+      if (b[i] !== 0xff) return null;
+      const m = b[i + 1];
+      if (m === 0xff) { i++; continue; }
+      // SOF0 to SOF15 hold the size; C4, C8 and CC are other tables.
+      if (m >= 0xc0 && m <= 0xcf && m !== 0xc4 && m !== 0xc8 && m !== 0xcc) {
+        const w = b.readUInt16BE(i + 7), h = b.readUInt16BE(i + 5);
+        return turned ? size(h, w) : size(w, h);
+      }
+      if (m === 0xe1 && i + 4 + 14 <= b.length && b.subarray(i + 4, i + 10).toString('latin1') === 'Exif\0\0') {
+        turned = exifTurned(b, i + 10, Math.min(b.length, i + 2 + b.readUInt16BE(i + 2)));
+      }
+      if (m === 0xd8 || m === 0x01 || (m >= 0xd0 && m <= 0xd7)) { i += 2; continue; }
+      i += 2 + b.readUInt16BE(i + 2);
+    }
+  }
+  return null;
+}
+// Whether the Exif block at start (its TIFF header) to end says the picture
+// is turned a quarter: orientation 5 to 8, tag 0x0112 in the first IFD.
+function exifTurned(b, start, end) {
+  const order = b.subarray(start, start + 2).toString('latin1');
+  if (order !== 'II' && order !== 'MM') return false;
+  const u16 = (at) => (order === 'II' ? b.readUInt16LE(at) : b.readUInt16BE(at));
+  const u32 = (at) => (order === 'II' ? b.readUInt32LE(at) : b.readUInt32BE(at));
+  const ifd = start + u32(start + 4);
+  if (ifd + 2 > end) return false;
+  const count = u16(ifd);
+  for (let k = 0; k < count; k++) {
+    const at = ifd + 2 + k * 12;
+    if (at + 12 > end) return false;
+    if (u16(at) === 0x0112) {
+      const turn = u16(at + 8);
+      return turn >= 5 && turn <= 8;
+    }
+  }
+  return false;
+}
+// The widths a waiting picture has copies of, as the queue lists them.
+function pendingCopies(entry) {
+  return (Array.isArray(entry && entry.copies) ? entry.copies : [])
+    .map(Number).filter((n) => SMALL_WIDTHS.indexOf(n) >= 0);
+}
+/* The srcset gallery.json keeps for a picture: each copy listed, then the
+   picture itself at its own width, which the site reads off its header. ''
+   with no copy, or when the picture's width cannot be read. */
+function shotSrcset(name, widths) {
+  const listed = SMALL_WIDTHS.filter((n) => widths.indexOf(n) >= 0 && smallCopy(name, n));
+  if (!listed.length) return '';
+  const full = pictureSize(path.join(UP, String(name)));
+  if (!full) return '';
+  // Escaped, because a srcset is split on spaces and a name may hold one.
+  const url = '/shot/' + encodeURIComponent(String(name));
+  return listed.map((n) => url + '?w=' + n + ' ' + n + 'w').concat(url + ' ' + full.w + 'w').join(', ');
+}
+// The copy widths a gallery item's srcset names.
+function srcsetWidths(srcset) {
+  const out = [];
+  for (const m of String(srcset || '').matchAll(/\?w=(\d+) /g)) {
+    if (SMALL_WIDTHS.indexOf(Number(m[1])) >= 0) out.push(Number(m[1]));
+  }
+  return out;
+}
+
+/*
   Deleting an upload, said truthfully (#2352, #2354). Both doors that delete a
   file used to catch the failure and answer ok, so a picture somebody asked
   to have removed could stay on disk with staff told it had gone. This
   answers { ok } or { ok: false, code } and writes one line to the site's
   log for a failure: the file's name and the error code, never what it holds.
   A file already gone is gone, which is what was asked.
+
+  A gallery picture's smaller copies go with it (#3218), first, so a copy is
+  never left behind a picture that went. One that will not go is said the
+  same way and the picture stays, so the next sweep asks again for both.
 */
 function deleteUpload(name) {
   const file = path.join(UP, String(name));
   if (!file.startsWith(UP + path.sep)) return { ok: false, code: 'BADNAME' };
-  try {
-    fs.unlinkSync(file);
-    return { ok: true };
-  } catch (e) {
-    const code = (e && e.code) || 'unknown';
-    if (code === 'ENOENT') return { ok: true };
-    retentionSay('gallery', { event: 'delete-failed', file: String(name), code: code });
-    return { ok: false, code: code };
+  const files = [];
+  for (const width of SMALL_WIDTHS) {
+    for (const ext of SMALL_KINDS) files.push(smallFile(name, width, ext));
   }
+  files.push(file);
+  for (const one of files) {
+    try {
+      fs.unlinkSync(one);
+    } catch (e) {
+      const code = (e && e.code) || 'unknown';
+      if (code === 'ENOENT') continue;
+      retentionSay('gallery', { event: 'delete-failed', file: path.relative(UP, one), code: code });
+      return { ok: false, code: code };
+    }
+  }
+  return { ok: true };
 }
 
 /* A gallery submission staff removed and whose file stayed on disk: marked
@@ -1964,7 +2127,10 @@ function listUploads() {
    is null for any kind or a list of lower case extensions (with the dot) when a
    route only wants some. It answers 413 or 415 itself and returns; on a good
    file it calls saved(name) and leaves the reply to the route, because /upload
-   and /gallery/submit write different things once the bytes are down. */
+   and /gallery/submit write different things once the bytes are down. A
+   smaller copy of a gallery picture (copy true, #3218) counts its bytes
+   against the hour and not its file, so sending a picture and its two
+   copies is one of the 40 files an hour, as the picture alone was. */
 // ==== thornswood upload guard ====
 const uploadBudgets = new Map();
 function mediaSignature(ext, bytes) {
@@ -1976,7 +2142,7 @@ function mediaSignature(ext, bytes) {
   if (ext === '.webm') return bytes.subarray(0,4).equals(Buffer.from('1a45dfa3','hex'));
   return false;
 }
-function receiveUpload(req, res, asked, cap, allow, saved) {
+function receiveUpload(req, res, asked, cap, allow, saved, copy) {
   if (Number(req.headers['content-length'] || 0) > cap) {
     return sendJson(res, 413, { error: 'that file is over ' + Math.round(cap / 1048576) + ' MB' });
   }
@@ -2002,7 +2168,8 @@ function receiveUpload(req, res, asked, cap, allow, saved) {
     return send(res, 429, JSON.stringify({error:'This connection has reached its upload limit. Try again later.'}),
       null, {'Retry-After':String(Math.max(1, Math.ceil((budget.start + 3600000 - now) / 1000))), Connection:'close'});
   }
-  budget.count++; budget.active++;
+  if (!copy) budget.count++;
+  budget.active++;
   const d = new Date();
   const two = (n) => String(n).padStart(2, '0');
   const stamp = d.getFullYear() + two(d.getMonth() + 1) + two(d.getDate()) + '-' +
@@ -2350,6 +2517,36 @@ const allowed = (key, w) =>
   neither cookie nor ticket the refusal is the 403 'staff only' these doors
   have always sent, so nothing about the hub page changes.
 */
+/* Who is sending something to the gallery: a picture, a report, or a
+   picture's smaller copies (#3218). A signed-in Discord account that may
+   play, or the hub member cookie (password bootstrap / staff). Hub "member"
+   alone used to be the only web door, and with Discord live that meant only
+   admins could submit from the site. Otherwise a launcher ticket verified
+   the way the door verifies it: read it, ask Discord for the standing, and
+   hold it to the same answers /api/play/join gives, so a banned or departed
+   account cannot put a picture in the queue. signIn is what a caller with
+   neither is told. dev is whether the account holds a staff role. */
+async function gallerySender(url, w, signIn) {
+  if (w.play || w.member) return { ok: true, from: 'web', discordId: w.id || '', dev: !!w.dev };
+  const t = readTicket(url.searchParams.get('ticket'));
+  // Signed in, and Discord did not answer in time (#467): say that.
+  if (!t && w.id && w.lookupFailed) return { ok: false, code: 503, body: { ok: false, why: 'could not ask Discord', error:
+    'Thornswood could not ask Discord about your account just now. Try again in a minute.' } };
+  if (!t) return { ok: false, code: 401, body: { ok: false, why: 'link', error: signIn } };
+  const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
+  standCache.delete(String(t.d));
+  if (st.lookupFailed && !st.admin) return { ok: false, code: 503, body: discordUnasked() };
+  // Banned before the guild check (#1022). standing() leaves inGuild false
+  // when bans.json already refused the account.
+  if (st.banned) return { ok: false, code: 403, body: { ok: false, why: 'banned', error:
+    'That Discord account is banned from Thornswood.' } };
+  if (!st.inGuild) return { ok: false, code: 403, body: { ok: false, why: 'guild', error:
+    'That Discord account is not in the Thornswood Discord.' } };
+  if (!st.play) return { ok: false, code: 403, body: { ok: false, why: 'role', error:
+    'That Discord account has no role that lets it in yet.' } };
+  return { ok: true, from: 'launcher', discordId: String(t.d), dev: !!st.dev };
+}
+
 async function galleryStaff(url, w) {
   if (w.dev) return { ok: true, from: 'web', discordId: w.id || '' };
   // Signed in, and Discord did not answer in time (#1164): say that, rather
@@ -6292,10 +6489,17 @@ async function handle(req, res) {
   }
   const shot = route.match(/^\/shot\/([a-z0-9._ -]+)$/);
   if (shot && req.method === 'GET') {
-    const ok = jsonFile(GALLERY, [])
-      .some((g) => String(g.name).toLowerCase() === shot[1]);
-    const file = path.join(UP, shot[1]);
-    if (!ok || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
+    const item = jsonFile(GALLERY, [])
+      .find((g) => String(g.name).toLowerCase() === shot[1]);
+    // ?w= is one of its smaller copies (#3218), and only one its srcset names.
+    // The file by the name gallery.json keeps, since the address is lower
+    // cased and a name may not be: the same file on the box's Windows, and
+    // none at all on a copy of the site on Linux.
+    const wide = url.searchParams.get('w');
+    const file = !item ? ''
+      : wide === null ? path.join(UP, String(item.name))
+      : srcsetWidths(item.srcset).indexOf(Number(wide)) >= 0 ? smallCopy(item.name, Number(wide)) : '';
+    if (!file || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such picture', 'text/plain');
     }
     const st = fs.statSync(file);
@@ -6577,8 +6781,11 @@ async function handle(req, res) {
                     String((gs.body && gs.body.error) || 'staff only'), 'text/plain');
       }
     }
-    const file = path.join(UP, up[1]);
-    if (!file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
+    // ?w= is a waiting picture's smaller copy (#3218), for the staff card.
+    const wide = url.searchParams.get('w');
+    const file = wide === null ? path.join(UP, up[1])
+      : SMALL_WIDTHS.indexOf(Number(wide)) >= 0 ? smallCopy(up[1], Number(wide)) : '';
+    if (!file || !file.startsWith(UP + path.sep) || !fs.existsSync(file)) {
       return send(res, 404, 'no such file', 'text/plain');
     }
     /* A gallery submission that staff removed is not served to anybody
@@ -6663,35 +6870,9 @@ async function handle(req, res) {
     // door verifies it: read it, ask Discord for the standing, and hold it to
     // the same answers /api/play/join gives, so a banned or departed account
     // cannot put a picture in the queue.
-    let from = '', discordId = '';
-    // A signed-in Discord account that may play, or the hub member cookie
-    // (password bootstrap / staff). Hub "member" alone used to be the only
-    // web door, and with Discord live that meant only admins could submit
-    // from the site. Play-capable signed-in people submit too.
-    if (w.play || w.member) {
-      from = 'web';
-      discordId = w.id || '';
-    } else {
-      const t = readTicket(url.searchParams.get('ticket'));
-      // Signed in, and Discord did not answer in time (#467): say that.
-      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
-      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
-        'Sign in to the hub, or send a valid launcher ticket.' });
-      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
-      standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      // Banned before the guild check (#1022). standing() leaves inGuild false
-      // when bans.json already refused the account.
-      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
-        'That Discord account is banned from Thornswood.' });
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
-      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
-        'That Discord account has no role that lets it in yet.' });
-      from = 'launcher';
-      discordId = String(t.d);
-    }
+    const who = await gallerySender(url, w, 'Sign in to the hub, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const from = who.from, discordId = who.discordId;
 
     const asked = (url.searchParams.get('name') || 'shot.png').split(/[\\/]/).pop();
     const by = (url.searchParams.get('by') || '').slice(0, 40);
@@ -6726,6 +6907,99 @@ async function handle(req, res) {
     });
   }
 
+  /*
+    A picture's smaller copies (#3218, SMALL_WIDTHS says why). The body IS
+    the copy, a WebP or a JPEG named by its Content-Type, the /api/upload
+    way; the picture's name and the copy's width ride in the query, with the
+    launcher's ticket as on submit. Whoever sent the picture may send each
+    width once while it waits; staff may send or replace one at any time.
+    The copy has to be exactly that width and the picture's shape, both read
+    off the files' own headers, and the picture has to be wider than it. A
+    copy staff send for a picture already on the gallery goes out at once,
+    since staff made it from the picture they were looking at; any other
+    copy waits for an Accept that showed it.
+  */
+  if (p === '/api/gallery/copy' && req.method === 'POST') {
+    const who = await gallerySender(url, w, 'Sign in to the hub, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const name = String(url.searchParams.get('name') || '');
+    const width = Number(url.searchParams.get('w'));
+    if (!/^[A-Za-z0-9._ -]+$/.test(name) || name === 'uploads.json') return sendJson(res, 400, { error: 'Say which picture this is a copy of.' });
+    if (SMALL_WIDTHS.indexOf(width) < 0) return sendJson(res, 400, { error: 'A copy is ' + SMALL_WIDTHS.join(' or ') + ' pixels wide.' });
+    const entry = jsonFile(GPENDING, []).find((x) => String(x.name) === name);
+    const shown = jsonFile(GALLERY, []).find((g) => String(g.name) === name);
+    if (!entry && !shown) return sendJson(res, 404, { error: 'That picture is not waiting for staff or on the gallery.' });
+    const owner = !!(entry && who.discordId && String(entry.discordId || '') === who.discordId);
+    if (!who.dev && !owner) return sendJson(res, 403, { error: 'Only whoever sent that picture, or staff, can send its smaller copies.' });
+    if (!who.dev && pendingCopies(entry).indexOf(width) >= 0) {
+      return sendJson(res, 409, { error: 'That copy is already in. Staff look at the copies before they Accept, so a copy is not changed once it is sent.' });
+    }
+    if (uploadRemoved(name)) return sendJson(res, 409, { error: 'That picture was removed from the gallery.' });
+    const full = pictureSize(path.join(UP, name));
+    if (!full) return sendJson(res, 422, { error: 'The site could not read the size of that picture, so it takes no copy of it.' });
+    if (full.w <= width) return sendJson(res, 400, { error: 'That picture is ' + full.w + ' pixels wide, so it needs no ' + width + ' copy.' });
+    const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+    const ext = type === 'image/webp' ? '.webp' : type === 'image/jpeg' ? '.jpg' : '';
+    if (!ext) return sendJson(res, 415, { error: 'A copy is a WebP or a JPEG.' });
+    const tall = Math.round(full.h * width / full.w);
+    return receiveUpload(req, res, 'copy' + ext, SMALL_CAP, SMALL_KINDS, (temp) => {
+      const sent = path.join(UP, temp);
+      const got = pictureSize(sent);
+      if (!got || got.w !== width || Math.abs(got.h - tall) > 1) {
+        // The file goes, and one that will not go is said by deleteUpload.
+        deleteUpload(temp);
+        return sendJson(res, 422, { error: 'That copy is ' + (got ? got.w + ' by ' + got.h : 'not a picture the site can read') +
+                                           ', and a ' + width + ' copy of this picture is ' + width + ' by ' + tall + '.' });
+      }
+      // Kept and noted in the queue's turn, so two copies at one width sent
+      // together cannot both get in: the second is told it is already in.
+      withGalleryPending(() => {
+        const pending = jsonFile(GPENDING, []);
+        const hit = pending.find((x) => String(x.name) === name);
+        if (!who.dev && (!hit || pendingCopies(hit).indexOf(width) >= 0)) {
+          deleteUpload(temp);
+          return sendJson(res, 409, { error: hit ? 'That copy is already in.' : 'That picture is no longer waiting for staff.' });
+        }
+        try {
+          fs.mkdirSync(UP_SMALL, { recursive: true });
+          fs.renameSync(sent, smallFile(name, width, ext));
+          // The other kind at this width, if one was sent before, goes, or
+          // smallCopy could go on finding it.
+          for (const other of SMALL_KINDS) {
+            if (other === ext) continue;
+            try { fs.unlinkSync(smallFile(name, width, other)); }
+            catch (e) { if (!e || e.code !== 'ENOENT') throw e; }
+          }
+        } catch (e) {
+          console.error('[thornswood-docs] could not keep the ' + width + ' copy of ' + name + ' (' + (e.code || e.message) + ')');
+          deleteUpload(temp);
+          return sendJson(res, 500, { error: 'The site could not keep that copy (' + (e.code || 'unknown') + '). Try again in a minute.' });
+        }
+        if (hit) {
+          const have = pendingCopies(hit).concat(width);
+          hit.copies = SMALL_WIDTHS.filter((n) => have.indexOf(n) >= 0);
+          if (!putJson(GPENDING, pending)) {
+            console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'pending-write-failed' }));
+            return sendJson(res, 500, { ok: false, error: 'The site kept the copy but could not note it on the queue. Send it again in a minute.' });
+          }
+        }
+        if (who.dev) {
+          const gallery = jsonFile(GALLERY, []);
+          const item = gallery.find((g) => String(g.name) === name);
+          if (item) {
+            const srcset = shotSrcset(name, srcsetWidths(item.srcset).concat(width));
+            if (srcset) item.srcset = srcset;
+            if (!putJson(GALLERY, gallery)) {
+              console.error('[thornswood-docs] gallery ' + JSON.stringify({ event: 'gallery-write-failed' }));
+              return sendJson(res, 500, { ok: false, error: 'The site kept the copy but could not put it on the gallery. Send it again in a minute.' });
+            }
+          }
+        }
+        sendJson(res, 200, { ok: true, name: name, w: width });
+      }).catch((e) => failed(req, res, e));
+    }, true);
+  }
+
   // The queue, for staff (access.dev) to look through. Never public, so it is
   // its own door rather than a field on /api/public. galleryStaff takes the hub
   // cookie or a launcher ticket for a staff account; everything below it does
@@ -6758,19 +7032,29 @@ async function handle(req, res) {
     const by = (o.by !== undefined && o.by !== null) ? String(o.by).slice(0, 40)
              : (hit ? String(hit.by || '') : '');
 
+    // The smaller copies the card showed (#3218): those go out with it and
+    // no others, so what is public is what staff saw. A caller that names
+    // none (a launcher from before the copies) puts it up at full size.
+    const showed = Array.isArray(o.copies) ? o.copies.map(Number) : [];
+    const copies = pendingCopies(hit).filter((n) => showed.indexOf(n) >= 0);
+    const srcset = copies.length ? shotSrcset(name, copies) : '';
+
     const gallery = jsonFile(GALLERY, []);
     const already = gallery.find((g) => String(g.name) === name);
     if (already) {
       already.url = '/shot/' + name;
       if (by) already.by = by;
+      if (srcset) already.srcset = srcset;
     } else {
-      gallery.push({ name: name, url: '/shot/' + name, by: by });
+      const item = { name: name, url: '/shot/' + name, by: by };
+      if (srcset) item.srcset = srcset;
+      gallery.push(item);
     }
     putJson(GALLERY, gallery);
 
     const left = pending.filter((x) => String(x.name) !== name);
     if (left.length !== pending.length) putJson(GPENDING, left);
-    return sendJson(res, 200, { ok: true, name: name, approved: true });
+    return sendJson(res, 200, { ok: true, name: name, approved: true, copies: srcsetWidths(srcset) });
   }
 
 
@@ -6892,30 +7176,9 @@ async function handle(req, res) {
   // launcher with the same ticket /api/gallery/submit takes. The report sits
   // in gallery-reports.json for staff; it does not take the shot down.
   if (p === '/api/gallery/report' && req.method === 'POST') {
-    let from = '', discordId = '';
-    if (w.play || w.member) {
-      from = 'web';
-      discordId = w.id || '';
-    } else {
-      const t = readTicket(url.searchParams.get('ticket'));
-      // Signed in, and Discord did not answer in time (#467): say that.
-      if (!t && w.id && w.lookupFailed) return sendJson(res, 503, { ok: false, why: 'could not ask Discord', error:
-        'Thornswood could not ask Discord about your account just now. Try again in a minute.' });
-      if (!t) return sendJson(res, 401, { ok: false, why: 'link', error:
-        'Sign in, or send a valid launcher ticket.' });
-      const st = await within(standing(t.d), PLAY_ANSWER_MS, () => standingLate(t.d));
-      standCache.delete(String(t.d));
-      if (st.lookupFailed && !st.admin) return sendJson(res, 503, discordUnasked());
-      // Same order as submit (#1022): a file ban is not "not in the Discord".
-      if (st.banned) return sendJson(res, 403, { ok: false, why: 'banned', error:
-        'That Discord account is banned from Thornswood.' });
-      if (!st.inGuild) return sendJson(res, 403, { ok: false, why: 'guild', error:
-        'That Discord account is not in the Thornswood Discord.' });
-      if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', error:
-        'That Discord account has no role that lets it in yet.' });
-      from = 'launcher';
-      discordId = String(t.d);
-    }
+    const who = await gallerySender(url, w, 'Sign in, or send a valid launcher ticket.');
+    if (!who.ok) return sendJson(res, who.code, who.body);
+    const from = who.from, discordId = who.discordId;
 
     let o = {};
     try { o = JSON.parse(await body(req, 8192)) || {}; } catch (e) { passBodyFailure(e); }
