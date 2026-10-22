@@ -15,15 +15,26 @@
   "access": {
     "admin": [
       "Owner",
+      "Co-Owner",
+      "Lead Dev",
       "Dev"
     ],
     "play": [
       "Owner",
+      "Co-Owner",
+      "Lead Dev",
+      "Lead Gamemaster",
+      "Lead Loremaster",
+      "Lead Moderator",
+      "Lead Content Creator",
+      "Lead Support",
       "Dev",
-      "Moderator",
       "Gamemaster",
+      "Trial Gamemaster",
       "Loremaster",
+      "Moderator",
       "Content Creator",
+      "Support",
       "Playtester"
     ],
     "banned": [
@@ -31,10 +42,25 @@
     ],
     "dev": [
       "Owner",
+      "Co-Owner",
+      "Lead Dev",
       "Dev",
+      "Lead Gamemaster",
       "Gamemaster",
-      "Moderator",
+      "Trial Gamemaster",
+      "Lead Loremaster",
       "Loremaster"
+    ],
+    "devBuild": [
+      "Owner",
+      "Co-Owner",
+      "Lead Dev",
+      "Lead Gamemaster",
+      "Lead Loremaster",
+      "Lead Moderator",
+      "Lead Content Creator",
+      "Lead Support",
+      "Dev"
     ],
     "slots3": [
       "Thalmor Boot-Licker",
@@ -43,7 +69,7 @@
       "Gamemaster"
     ],
     "company": [
-      "Trading Company"
+      "Free Skyrim Trading Company"
     ]
   },
   "botKey": "",

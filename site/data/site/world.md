@@ -258,8 +258,10 @@ Fourth Era.*
   as fast as a Nord will. Play it as what it is: a hunted thing with a long
   memory.
 - **You can play a Jarl or a steward.** Those are positions, not characters,
-  and they are given rather than chosen. How one comes free, and who decides, is
-  something you find out in character.
+  and they are given rather than chosen. A Jarl's seat is asked for on the Jarl
+  application in Discord, which lists only the holds that have no Jarl, and
+  nobody on staff may hold one. A hold's Jarl names its steward, its court and
+  its guards.
 - **Arguing about the Accord in character is encouraged.** Half of Skyrim
   thinks Article the Fourth gave away too much. The other half says thirty
   winters of Cyrodiilic grain were worth it.

@@ -399,6 +399,16 @@ def _factions():
 
 FACTIONS = _factions()
 FACTION_LEADERS = tuple(FACTION_SHORT.get(f, f) + ' Leader' for f in FACTIONS)
+# Each faction's member role is its short name, given and taken by its Leader
+# from the bot's panel (#3317, page card q-3317-faction-member-give, A).
+FACTION_MEMBERS = tuple(FACTION_SHORT.get(f, f) for f in FACTIONS)
+
+
+def faction_slug(faction):
+    """A faction's channel name: its short name, lower case, hyphens."""
+    return FACTION_SHORT.get(faction, faction).lower().replace(' ', '-')
+
+
 for _name in FACTION_LEADERS:
     ROLES.append((_name, 0xD9B45A, True, NONE))
 # The seats of the world: who nobody on staff may also be.
@@ -451,12 +461,23 @@ for _h in OFFICE_HOLDS:
 for _name in OFFICE_ROLES:
     ROLES.append((_name, 0xA8977A, False, NONE))
 
-# The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
-# Applied for in Discord, the same shape as a Jarl, and given by a person.
-# The site's access.company names it, and the game lets a character on an
-# account that holds it buy for the company. Made here because a role the
-# site reads and nothing creates is the Banned mistake below.
-ROLES.append(('Trading Company', 0xB08D57, False, NONE))
+# THE FACTIONS' MEMBERS (#3317, Patrick, 22 Oct: 16 factions, page card
+# q-3317-faction-roster B, each with its 4E 252 entry in lore/factions.md,
+# approved by him the same day). One role per faction, its short name, given
+# and taken by that faction's Leader. Not shown on their own.
+#
+# The Free Skyrim Trading Company's (#1393, docs/systems/trading-company.md)
+# was the role called Trading Company, renamed to the faction's name
+# (ROLE_WAS) so everybody holding it keeps it. The site's access.company
+# names it, and the game lets a character on an account that holds it buy for
+# the company.
+for _name in FACTION_MEMBERS:
+    ROLES.append((_name, 0xB08D57, False, NONE))
+
+# Owns a business book in the game (site\server.js, businessOwner). Support
+# gives it (#3317). It was made by hand; made here because a role the site
+# reads and nothing creates is the Banned mistake below.
+ROLES.append(('Business Owner', 0xA08C6A, False, NONE))
 
 # Joined, and answered the rules and age questions (#3317). Member sees the
 # front door and Information, read only; Playtester opens the rest.
@@ -492,6 +513,10 @@ NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 HOLD_STAFF = COUNCIL_ROLES + ('Dev', 'Gamemaster', 'Trial Gamemaster',
                               'Loremaster', 'Moderator')
 
+# Who sees every faction's channel (#3317): the council, the gamemaster ranks
+# and the Loremasters, who run and watch the stories the factions are in.
+FACTION_STAFF = COUNCIL_ROLES + ('Gamemaster', 'Trial Gamemaster', 'Loremaster')
+
 # --------------------------------------------------------------- channels --
 # mode:  public       anybody talks, including somebody who has no role yet
 #        read         everybody reads, the council posts
@@ -503,6 +528,8 @@ HOLD_STAFF = COUNCIL_ROLES + ('Dev', 'Gamemaster', 'Trial Gamemaster',
 #        holdread     its announcements: those read, the Jarl, Steward, Court post
 #        holdcourt    its Jarl, Steward and Court, and HOLD_STAFF
 #        holdguard    its Jarl and Guards, and HOLD_STAFF
+#        faction      a faction's channel: its members, its Leader, FACTION_STAFF
+#        seats        every Jarl and faction Leader, and the council
 #        staff        every staff rank talks, invisible to everybody else
 #        staffread    every staff rank reads, the council posts
 #        council      Owner, Co-Owner and the leads, nobody else
@@ -680,6 +707,19 @@ PLAN = [
  ])
  for _h in HOLDS
 ] + [
+ # THE FACTIONS (#3317, Patrick, 22 Oct: page cards q-3317-faction-channels
+ # and q-3317-faction-roster). In character. #seats is every Jarl and faction
+ # Leader with the council, where the seats of the world talk to each other;
+ # then one channel per faction for its members and its Leader. FACTION_STAFF
+ # sees every one.
+ ('Factions', [
+   dict(kind='text', name='seats', mode='seats',
+        topic='Every Jarl and faction leader, and the council. In character.'),
+ ] + [
+   dict(kind='text', name=faction_slug(_f), mode='faction', faction=_f,
+        topic='%s: its members and its Leader. In character.' % _f)
+   for _f in FACTIONS
+ ]),
  # Somewhere to talk and somewhere to be idle. Proximity voice is in the
  # launcher, so these are for before, after, and whoever is not in the world.
  # Help Voice was the Support voice in Help, renamed so it is not taken for
@@ -842,6 +882,7 @@ CATEGORY_MODE = {
     'In Character': 'open',
     'Voice': 'open',
     'Playtesters': 'pathfind',
+    'Factions': 'faction',
     'Staff': 'staff',
 }
 
@@ -1129,7 +1170,7 @@ def _also(guild, roles, out, extra, talk):
 # read only channel posts and tidies. A name in more than one list ends with
 # the last one's overwrite, and Discord lets any allowing role of a person win
 # over a denying one, so somebody who is both a reader and a poster posts.
-def mode_audience(mode, hold=None, space=None):
+def mode_audience(mode, hold=None, space=None, faction=None):
     tester = ('Playtester',) + STAFF
     if mode == 'read':
         return (), (), COUNCIL_ROLES
@@ -1151,6 +1192,15 @@ def mode_audience(mode, hold=None, space=None):
         if mode == 'holdcourt':
             return (), HOLD_STAFF + (jarl, steward, court), ()
         return (), HOLD_STAFF + (jarl, guard), ()
+    if mode == 'faction':
+        if faction is None:
+            return (), FACTION_STAFF, ()
+        if faction not in FACTIONS:
+            raise ValueError('mode faction needs faction= one of %s' % ', '.join(FACTIONS))
+        i = FACTIONS.index(faction)
+        return (), FACTION_STAFF + (FACTION_MEMBERS[i], FACTION_LEADERS[i]), ()
+    if mode == 'seats':
+        return (), COUNCIL_ROLES + SEATS, ()
     if mode == 'staff':
         return (), STAFF, ()
     if mode == 'staffread':
@@ -1174,7 +1224,7 @@ def mode_audience(mode, hold=None, space=None):
 
 
 def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None,
-               space=None, read_extra=None):
+               space=None, read_extra=None, faction=None):
     """Every overwrite a category or channel of this mode gets: @everyone
        shut out (or read only), each role the mode names, extra_roles talking
        and read_extra reading on that one channel, and the bot."""
@@ -1200,7 +1250,7 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None,
     # the bot or anybody else to get around.
     if mode == 'public':
         return {}
-    readers, talkers, posters = mode_audience(mode, hold, space)
+    readers, talkers, posters = mode_audience(mode, hold, space, faction)
     readers = tuple(readers) + tuple(read_extra or ())
     out = {ev: read_only if mode == 'read' else deny_all}
     for names, ow in ((readers, reader), (talkers, talk), (posters, poster)):
@@ -1217,7 +1267,7 @@ def spec_overwrites(guild, spec, roles):
     """overwrites() for one line of PLAN."""
     return overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
                       bot_needs(spec), spec.get('extra_roles'),
-                      spec.get('space'), spec.get('read_extra'))
+                      spec.get('space'), spec.get('read_extra'), spec.get('faction'))
 
 
 def hold_roles(hold):
@@ -1299,6 +1349,7 @@ async def keep_role(role, hoist, perms):
 # by hand once (the Live smoke lock of 1 October named both).
 ROLE_WAS = {
     'Lead Gamemaster': ('Lead GM',),
+    'Free Skyrim Trading Company': ('Trading Company',),
 }
 
 
@@ -2195,6 +2246,9 @@ for _h in OFFICE_HOLDS:
     ROLE_DOES['Jarl of ' + _h] = 'The seat of %s. Applied for on its own application.' % _h
 for _f, _n in zip(FACTIONS, FACTION_LEADERS):
     ROLE_DOES[_n] = 'Leads %s. Applied for as Faction Leader.' % _f
+for _f, _n in zip(FACTIONS, FACTION_MEMBERS):
+    ROLE_DOES[_n] = 'A member of %s. Its Leader gives and takes it.' % _f
+ROLE_DOES['Business Owner'] = 'Owns a business book in the game. Support gives it.'
 
 # The named permission sets, so a role's line says which and the sets are
 # spelled out once.
@@ -2239,11 +2293,11 @@ def _spec_name(spec):
     return spec['name'] if spec['kind'] == 'voice' else '#' + spec['name'].lower().replace(' ', '-')
 
 
-def _audience_words(mode, hold=None, space=None, read_extra=(), extra=()):
+def _audience_words(mode, hold=None, space=None, read_extra=(), extra=(), faction=None):
     """(reads, talks, posts) of one place, in words."""
     if mode == 'public':
         return 'everybody', 'everybody', 'everybody'
-    readers, talkers, posters = mode_audience(mode, hold, space)
+    readers, talkers, posters = mode_audience(mode, hold, space, faction)
     readers = tuple(readers) + tuple(read_extra or ())
     talkers = tuple(talkers) + tuple(extra or ())
     see = readers + talkers + posters
@@ -2319,11 +2373,13 @@ def layout():
     w('| Mode | Sees | Talks | Posts |')
     w('|---|---|---|---|')
     for mode in ('public', 'read', 'membersread', 'open', 'pathfind', 'testersread',
-                 'staff', 'staffread', 'council'):
+                 'staff', 'staffread', 'council', 'seats'):
         r, t, p = _audience_words(mode)
         w('| %s | %s | %s | %s |' % (mode, r, t, p or '-'))
     r, t, p = _audience_words('hold', 'Whiterun')
     w('| hold (Whiterun) | %s | %s | %s |' % (r, t, p or '-'))
+    r, t, p = _audience_words('faction', faction='The Companions')
+    w('| faction (The Companions) | %s | %s | %s |' % (r, t, p or '-'))
     for mode in ('space', 'spaceread', 'spacerules'):
         r, t, p = _audience_words(mode, space='Lore')
         w('| %s (Lore) | %s | %s | %s |' % (mode, r, t, p or '-'))
@@ -2344,7 +2400,8 @@ def layout():
         for spec in specs:
             mode = spec.get('mode', 'open')
             r, t, p = _audience_words(mode, spec.get('hold'), spec.get('space'),
-                                      spec.get('read_extra'), spec.get('extra_roles'))
+                                      spec.get('read_extra'), spec.get('extra_roles'),
+                                      spec.get('faction'))
             notes = []
             if p:
                 notes.append('posts: ' + p)
@@ -2360,7 +2417,9 @@ def layout():
             if spec.get('topic'):
                 notes.append('topic: ' + spec['topic'].replace('|', '/'))
             w('| %s | %s | %s | %s | %s | %s |' % (
-                _spec_name(spec), spec['kind'], mode + (' (%s)' % spec['hold'] if spec.get('hold') else ''),
+                _spec_name(spec), spec['kind'],
+                mode + (' (%s)' % (spec.get('hold') or spec.get('faction'))
+                        if spec.get('hold') or spec.get('faction') else ''),
                 r, t, '; '.join(notes)))
         w('')
     if RETIRED_CATEGORIES:

@@ -264,7 +264,8 @@ def live_server(other_between=False):
                 continue
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
             ow = B.with_bot(g, B.overwrites(bare, s.get('mode', 'open'), roles, s.get('hold'),
-                                            space=s.get('space'), read_extra=s.get('read_extra')),
+                                            space=s.get('space'), read_extra=s.get('read_extra'),
+                                            faction=s.get('faction')),
                             B.bot_needs(s)) if s.get('key') != 'JOIN' else {}
             ch = Channel(g, want, s['kind'], category=cat, topic=s.get('topic'), ow=ow)
             g.channels.append(ch)

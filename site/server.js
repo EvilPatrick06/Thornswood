@@ -341,9 +341,13 @@ let cfg = {
   */
   open: false,
   access: {
-    admin:  ['Owner', 'Dev'],
-    play:   ['Owner', 'Dev', 'Moderator', 'Gamemaster', 'Loremaster',
-             'Content Creator', 'Playtester'],
+    // #3317 (Patrick, 22 Oct): every staff role plays the main build, with
+    // Playtester; the site's admin pages are Owner, Co-Owner and the Dev rank.
+    admin:  ['Owner', 'Co-Owner', 'Lead Dev', 'Dev'],
+    play:   ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster', 'Lead Loremaster',
+             'Lead Moderator', 'Lead Content Creator', 'Lead Support', 'Dev',
+             'Gamemaster', 'Trial Gamemaster', 'Loremaster', 'Moderator',
+             'Content Creator', 'Support', 'Playtester'],
     banned: ['Banned']
   },
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
@@ -384,21 +388,31 @@ cfg.access  = Object.assign({ admin:[], play:[], banned:[] }, cfg.access || {});
 // The one switch (#428). Only a real true opens it: "true", 1 or a typo does not.
 cfg.open = cfg.open === true;
 cfg.access.play = playRoles(cfg.access.play, cfg.open);
-// Who may use the dev build and join the dev server. Left out of config.json
-// it is the Discord staff roles, the same set the bot's STAFF_ROLES names
-// (Owner, Dev, Gamemaster, Moderator, Loremaster; Content Creator is not
-// staff, bot.py). Patrick's call on 27 September for the dev-build install gate
-// (#605): the dev build is for staff, not the admin pair alone. It folds
-// access.admin in through out.dev below, so widening admin still widens dev.
-// Add role names here to widen it further.
+// Who is staff in the game: the staff seats over the most the world holds,
+// the game's staff powers (devProfiles), and the uploads queue. Since #3317
+// (Patrick, 22 Oct) it is the staff who work in the world: Owner and
+// Co-Owner, and the Dev, Gamemaster and Loremaster ranks with their leads.
+// Moderators moderate the Discord only, and Content Creator and Support work
+// in the Discord, so none of them is staff in the game. It folds access.admin
+// in through out.dev below, so widening admin still widens it.
 if (!Array.isArray(cfg.access.dev)) {
-  cfg.access.dev = ['Owner', 'Dev', 'Gamemaster', 'Moderator', 'Loremaster'];
+  cfg.access.dev = ['Owner', 'Co-Owner', 'Lead Dev', 'Dev', 'Lead Gamemaster',
+                    'Gamemaster', 'Trial Gamemaster', 'Lead Loremaster', 'Loremaster'];
+}
+// Who may use the dev build and join the dev server (#605, the install gate).
+// Patrick, 22 Oct (#3317): "Dev build: Owner, Co-Owner, Dev and the leads
+// only". Every lead of the council is in it, a lead whose rank is not staff
+// in the game included. It folds access.admin in through out.devBuild below.
+if (!Array.isArray(cfg.access.devBuild)) {
+  cfg.access.devBuild = ['Owner', 'Co-Owner', 'Lead Dev', 'Lead Gamemaster',
+                         'Lead Loremaster', 'Lead Moderator', 'Lead Content Creator',
+                         'Lead Support', 'Dev'];
 }
 // Who the Free Skyrim Trading Company has taken on (#1393): an application in
 // Discord, the same shape as a Jarl's, and a person gives the role. The game
 // lets them handle a company sale.
 if (!Array.isArray(cfg.access.company)) {
-  cfg.access.company = ['Trading Company'];
+  cfg.access.company = ['Free Skyrim Trading Company'];
 }
 // Who gets a third character slot at the game's main menu. Everybody gets
 // two; a Patreon tier or a Gamemaster gets three, and so do the admin roles.
@@ -2507,9 +2521,9 @@ async function who(req, waitMs, staleOk) {
   return {
     // "member" is now "may use the hub", and only staff may. Being allowed
     // into the GAME is st.play, and that is asked separately by the launcher.
-    // "dev" is staff (access.dev: Owner, Dev, Gamemaster, Moderator,
-    // Loremaster), used by the gallery queue and reports. Not the Owner/Dev
-    // admin pair alone.
+    // "dev" is staff in the game (access.dev: Owner, Co-Owner, and the Dev,
+    // Gamemaster and Loremaster ranks with their leads, #3317), used by the
+    // gallery queue and reports. Not the admin pair alone.
     member: st.admin || isMember(req),
     admin: st.admin,
     dev: !!st.dev,
@@ -5039,7 +5053,7 @@ async function standing(discordId) {
      having a bad morning, so it cannot be gated behind a guild lookup that
      needs all three of those to be fine. */
   if (cfg.admins.indexOf(String(discordId)) >= 0) {
-    out.admin = true; out.play = true; out.inGuild = true; out.dev = true;
+    out.admin = true; out.play = true; out.inGuild = true; out.dev = true; out.devBuild = true;
     if (cfg.discord.botToken && cfg.discord.guildId) {
       const r = await memberOf(discordId);
       if (r.ok) {
@@ -5089,6 +5103,7 @@ async function standing(discordId) {
   if (has(cfg.access.admin)) out.admin = true;
   out.play = out.admin || has(cfg.access.play);
   out.dev = out.admin || has(cfg.access.dev);
+  out.devBuild = out.admin || has(cfg.access.devBuild);
   out.company = has(cfg.access.company);
   out.staffRole = holdsStaffRole(out.roles);
   out.businessOwner = holdsNamedRole(out.roles, 'Business Owner');
@@ -7389,12 +7404,12 @@ async function handle(req, res) {
       notAcceptedYet(),
       invite: cfg.discord.invite || '' });
     // The dev build checks in as channel dev. It is for the roles in
-    // access.dev (the staff roles by default, Patrick 27 Sep #605, unless
+    // access.devBuild (Owner, Co-Owner, Dev and the leads, #3317, unless
     // config.json says otherwise); anyone else is sent back to the main build
     // with a plain reason.
     const wantsDev = String(o.channel || '') === 'dev';
-    if (wantsDev && !st.dev) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (wantsDev && !st.devBuild) return sendJson(res, 403, { ok:false, why:'dev', dev: false, message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
     /*
       The world is full (#481). Not a no any more: Patrick, 29 Sep, a full
       world lets people into the game's menu to wait in line. The yes below
@@ -7551,6 +7566,9 @@ async function handle(req, res) {
       avatar: st.avatar || '',
       admin: st.admin,
       dev: !!st.dev,
+      // Whether this account may install and play the dev build
+      // (access.devBuild, #3317). dev above is staff in the game.
+      devBuild: !!st.devBuild,
       roles: st.roles,
       slots: slotsFor(st),
       // Whether the profile id sent is now against this account. False when
@@ -7952,7 +7970,7 @@ async function handle(req, res) {
         continue;
       }
       if (!st.play || st.banned) continue;
-      if (devDoor && !st.dev) continue;
+      if (devDoor && !st.devBuild) continue;
       for (const n of profiles) if (!seen.has(n)) { seen.add(n); out.profiles.push(n); }
       if (st.dev) {
         for (const n of profiles) if (!seenDev.has(n)) { seenDev.add(n); out.devProfiles.push(n); }
@@ -8187,8 +8205,8 @@ async function handle(req, res) {
       'That Discord account is not in the Thornswood Discord.' });
     if (!st.play) return sendJson(res, 403, { ok: false, why: 'role', message:
       notAcceptedYet() });
-    if (server === 'dev' && !st.dev) return sendJson(res, 403, { ok: false, why: 'dev', message:
-      'The dev build is for the ' + andList(cfg.access.dev) + ' roles. Play on the main build.' });
+    if (server === 'dev' && !st.devBuild) return sendJson(res, 403, { ok: false, why: 'dev', message:
+      'The dev build is for the ' + andList(cfg.access.devBuild) + ' roles. Play on the main build.' });
 
     const linked = jsonFile(LINKED, {});
     const mine = (linked[t.d] && Array.isArray(linked[t.d].profiles))

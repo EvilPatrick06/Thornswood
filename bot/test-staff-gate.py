@@ -93,6 +93,11 @@ BUTTONS = [
     # hold, and nobody while two accounts hold that Jarl role: office_press
     # and office_change. bot/test-2551-hold-offices.py presses them.
     ('thornswood:office:', ANYBODY),
+    # A faction Leader's member buttons (#3317): only the Leader of a
+    # faction, for their own faction, and nobody while two accounts hold
+    # that Leader role: faction_press and faction_change.
+    # bot/test-3317-faction-panel.py presses them.
+    ('thornswood:faction:', ANYBODY),
 ]
 
 # Staff: the council (Owner, Co-Owner and every lead, #3317, Patrick, 22 Oct)
@@ -312,8 +317,9 @@ yes('and every command written down here is still registered%s'
 hook = inspect.getsource(bot.Thornswood.setup_hook)
 VIEWS = re.findall(r'add_view\((\w+)\(\)\)', hook)
 yes('setup_hook registers the ticket panel, the ticket tools, the hold panel, '
-    'the office panel (#2551) and no other panel (the Live smoke rows are gone)',
-    sorted(VIEWS) == ['HoldPanel', 'OfficePanel', 'TicketPanel', 'TicketTools']
+    'the office panel (#2551), the faction panel (#3317) and no other panel '
+    '(the Live smoke rows are gone)',
+    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'TicketPanel', 'TicketTools']
     and 'live_smoke' not in hook
     and hook.count('add_view(') == len(VIEWS))
 

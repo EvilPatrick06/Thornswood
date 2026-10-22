@@ -134,11 +134,11 @@ async function ask(o) {
     readTicket: function (s) { return s ? { d: String(s), n: 'name-' + s } : null; },
     standingCached: async function (d) {
       return Object.assign({ id: String(d), name: 'n', inGuild: true, banned: false, play: true,
-                             dev: false, admin: false, roles: ['Playtester'] },
+                             dev: false, devBuild: false, admin: false, roles: ['Playtester'] },
                            (o.standing && o.standing[String(d)]) || {});
     },
     discordGet: async function () { return { ok: false, status: 404, body: null, why: 'not found' }; },
-    cfg: { passKey: o.key === undefined ? KEY : o.key, access: { dev: ['Owner', 'Dev'] },
+    cfg: { passKey: o.key === undefined ? KEY : o.key, access: { dev: ['Owner', 'Dev'], devBuild: ['Owner', 'Dev'] },
            discord: { botToken: 'x', guildId: 'g' } },
     andList: function (a) { return (a || []).join(' and '); },
     jsonFile: function (f, fallback) {
@@ -183,7 +183,7 @@ async function main() {
   feed('feed-dev', { launcherVersion: '1.1.102.3', minLauncher: '1.1.102.3' });
 
   let r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.3' }, linked: MINE,
-                      standing: { '111': { dev: true } } });
+                      standing: { '111': { dev: true, devBuild: true } } });
   yes('a current dev launcher, a dev account, its own character: 200 with a pass', r.code === 200 && !!r.obj.pass);
   const got = r.obj && readPass(r.obj.pass);
   yes('the pass is signed with the key and names the profile, the server, the launcher and the account',
@@ -202,7 +202,7 @@ async function main() {
       /1\.1\.101/.test(r.obj.message) && /1\.1\.102 or newer/.test(r.obj.message) && /Update the launcher/.test(r.obj.message));
 
   r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.2' }, linked: MINE,
-                  standing: { '111': { dev: true } } });
+                  standing: { '111': { dev: true, devBuild: true } } });
   yes('the dev feed has its own minimum: 1.1.102.2 is refused there', r.code === 403 && r.obj.why === 'update');
 
   r = await ask({ body: { ticket: '111', profileId: 700 }, linked: MINE });
@@ -264,6 +264,12 @@ async function main() {
 
   r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.3' }, linked: MINE });
   yes('a dev pass for an account without the dev roles is refused', r.code === 403 && r.obj.why === 'dev');
+  // #3317: staff in the game (access.dev, a Gamemaster say) is not the dev
+  // build (access.devBuild: Owner, Co-Owner, Dev and the leads).
+  r = await ask({ body: { ticket: '111', profileId: 700, channel: 'dev', version: '1.1.102.3' }, linked: MINE,
+                  standing: { '111': { dev: true, devBuild: false } } });
+  yes('a dev pass for staff in the game who are not on the dev build list is refused',
+      r.code === 403 && r.obj.why === 'dev');
 
   r = await ask({ body: { ticket: '111', profileId: 900, version: '1.1.102' }, linked: MINE });
   yes('somebody else\'s character is refused', r.code === 403 && r.obj.why === 'somebody else' && !r.obj.pass);

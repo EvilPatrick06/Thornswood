@@ -64,9 +64,20 @@ Holders of Moderator also talk in the Gamemasters space.
 | Jarl of Raven Rock | #E0C56A | yes | nothing of its own | the build | The seat of Raven Rock. Applied for on its own application. |
 | Imperial Embassy Leader | #D9B45A | yes | nothing of its own | the build | Leads Imperial Embassy. Applied for as Faction Leader. |
 | Thalmor Leader | #D9B45A | yes | nothing of its own | the build | Leads Thalmor Remnant. Applied for as Faction Leader. |
-| Dark Brotherhood Leader | #D9B45A | yes | nothing of its own | the build | Leads Dark Brotherhood. Applied for as Faction Leader. |
-| Companions Leader | #D9B45A | yes | nothing of its own | the build | Leads The Companions. Applied for as Faction Leader. |
 | Free Skyrim Trading Company Leader | #D9B45A | yes | nothing of its own | the build | Leads Free Skyrim Trading Company. Applied for as Faction Leader. |
+| Companions Leader | #D9B45A | yes | nothing of its own | the build | Leads The Companions. Applied for as Faction Leader. |
+| College of Winterhold Leader | #D9B45A | yes | nothing of its own | the build | Leads College of Winterhold. Applied for as Faction Leader. |
+| Bards College Leader | #D9B45A | yes | nothing of its own | the build | Leads Bards College. Applied for as Faction Leader. |
+| Thieves Guild Leader | #D9B45A | yes | nothing of its own | the build | Leads Thieves Guild. Applied for as Faction Leader. |
+| Dark Brotherhood Leader | #D9B45A | yes | nothing of its own | the build | Leads Dark Brotherhood. Applied for as Faction Leader. |
+| Vigilants of Stendarr Leader | #D9B45A | yes | nothing of its own | the build | Leads Vigilants of Stendarr. Applied for as Faction Leader. |
+| Dawnguard Leader | #D9B45A | yes | nothing of its own | the build | Leads Dawnguard. Applied for as Faction Leader. |
+| Silver Hand Leader | #D9B45A | yes | nothing of its own | the build | Leads Silver Hand. Applied for as Faction Leader. |
+| Forsworn Leader | #D9B45A | yes | nothing of its own | the build | Leads Forsworn. Applied for as Faction Leader. |
+| Orc Strongholds Leader | #D9B45A | yes | nothing of its own | the build | Leads Orc Strongholds. Applied for as Faction Leader. |
+| Khajiit Caravans Leader | #D9B45A | yes | nothing of its own | the build | Leads Khajiit Caravans. Applied for as Faction Leader. |
+| Blades Leader | #D9B45A | yes | nothing of its own | the build | Leads Blades. Applied for as Faction Leader. |
+| Volkihar Clan Leader | #D9B45A | yes | nothing of its own | the build | Leads Volkihar Clan. Applied for as Faction Leader. |
 | Server Booster | #D98FB0 | yes | left to what makes it | Discord | Boosted the server. |
 | Patreon | #F96854 | yes | left to what makes it | Patreon | Supports Thornswood on Patreon; Patreon gives and takes it. |
 | Playtester | #C07A4E | yes | nothing of its own | the build | Plays the main build. Opens the Discord past Information. |
@@ -113,7 +124,23 @@ Holders of Moderator also talk in the Gamemasters space.
 | Raven Rock Court | #A8977A | no | nothing of its own | the build |  |
 | Steward of Raven Rock | #A8977A | no | nothing of its own | the build |  |
 | Guard of Raven Rock | #A8977A | no | nothing of its own | the build |  |
-| Trading Company | #B08D57 | no | nothing of its own | the build |  |
+| Imperial Embassy | #B08D57 | no | nothing of its own | the build | A member of Imperial Embassy. Its Leader gives and takes it. |
+| Thalmor | #B08D57 | no | nothing of its own | the build | A member of Thalmor Remnant. Its Leader gives and takes it. |
+| Free Skyrim Trading Company | #B08D57 | no | nothing of its own | the build | A member of Free Skyrim Trading Company. Its Leader gives and takes it. |
+| Companions | #B08D57 | no | nothing of its own | the build | A member of The Companions. Its Leader gives and takes it. |
+| College of Winterhold | #B08D57 | no | nothing of its own | the build | A member of College of Winterhold. Its Leader gives and takes it. |
+| Bards College | #B08D57 | no | nothing of its own | the build | A member of Bards College. Its Leader gives and takes it. |
+| Thieves Guild | #B08D57 | no | nothing of its own | the build | A member of Thieves Guild. Its Leader gives and takes it. |
+| Dark Brotherhood | #B08D57 | no | nothing of its own | the build | A member of Dark Brotherhood. Its Leader gives and takes it. |
+| Vigilants of Stendarr | #B08D57 | no | nothing of its own | the build | A member of Vigilants of Stendarr. Its Leader gives and takes it. |
+| Dawnguard | #B08D57 | no | nothing of its own | the build | A member of Dawnguard. Its Leader gives and takes it. |
+| Silver Hand | #B08D57 | no | nothing of its own | the build | A member of Silver Hand. Its Leader gives and takes it. |
+| Forsworn | #B08D57 | no | nothing of its own | the build | A member of Forsworn. Its Leader gives and takes it. |
+| Orc Strongholds | #B08D57 | no | nothing of its own | the build | A member of Orc Strongholds. Its Leader gives and takes it. |
+| Khajiit Caravans | #B08D57 | no | nothing of its own | the build | A member of Khajiit Caravans. Its Leader gives and takes it. |
+| Blades | #B08D57 | no | nothing of its own | the build | A member of Blades. Its Leader gives and takes it. |
+| Volkihar Clan | #B08D57 | no | nothing of its own | the build | A member of Volkihar Clan. Its Leader gives and takes it. |
+| Business Owner | #A08C6A | no | nothing of its own | the build | Owns a business book in the game. Support gives it. |
 | Member | #8D9682 | no | nothing of its own | the build | Joined and answered the rules and age questions. Sees Start Here, Applications and Information. |
 | Banned | #4A4A4A | no | nothing of its own | the build | Takes the site and the game away (site/server.js, access.banned). |
 | News Pings | #8D9682 | no | left to what makes it | bot.py |  |
@@ -148,7 +175,9 @@ tidies there. A staff space mode is said for the space it names.
 | staff | everybody on staff | everybody on staff | - |
 | staffread | everybody on staff | the council | the council |
 | council | the council | the council | - |
+| seats | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | - |
 | hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | - |
+| faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | - |
 | space (Lore) | the council, Loremaster | the council, Loremaster | - |
 | spaceread (Lore) | the council, Loremaster | the council | the council |
 | spacerules (Lore) | the council, Loremaster | Owner and Co-Owner, Lead Loremaster | Owner and Co-Owner, Lead Loremaster |
@@ -328,6 +357,30 @@ Category mode: hold (Raven Rock).
 | #raven-rock | text | hold (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | was #raven-rock in The Holds; topic: On Solstheim, across the water. The ash still falls. |
 | #raven-rock-court | text | holdcourt (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | topic: The Jarl, the Steward and the court of Raven Rock. In character. |
 | #raven-rock-guard | text | holdguard (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | topic: The Jarl and the guards of Raven Rock. In character. |
+
+### Factions
+
+Category mode: faction.
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #seats | text | seats | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | the council, Jarl of Whiterun, Jarl of Solitude, Jarl of Windhelm, Jarl of Riften, Jarl of Markarth, Jarl of Dawnstar, Jarl of Morthal, Jarl of Falkreath, Jarl of Winterhold, Jarl of Raven Rock, Imperial Embassy Leader, Thalmor Leader, Free Skyrim Trading Company Leader, Companions Leader, College of Winterhold Leader, Bards College Leader, Thieves Guild Leader, Dark Brotherhood Leader, Vigilants of Stendarr Leader, Dawnguard Leader, Silver Hand Leader, Forsworn Leader, Orc Strongholds Leader, Khajiit Caravans Leader, Blades Leader, Volkihar Clan Leader | topic: Every Jarl and faction leader, and the council. In character. |
+| #imperial-embassy | text | faction (Imperial Embassy) | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Imperial Embassy, Imperial Embassy Leader | topic: Imperial Embassy: its members and its Leader. In character. |
+| #thalmor | text | faction (Thalmor Remnant) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Thalmor, Thalmor Leader | topic: Thalmor Remnant: its members and its Leader. In character. |
+| #free-skyrim-trading-company | text | faction (Free Skyrim Trading Company) | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Free Skyrim Trading Company, Free Skyrim Trading Company Leader | topic: Free Skyrim Trading Company: its members and its Leader. In character. |
+| #companions | text | faction (The Companions) | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Companions, Companions Leader | topic: The Companions: its members and its Leader. In character. |
+| #college-of-winterhold | text | faction (College of Winterhold) | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, College of Winterhold, College of Winterhold Leader | topic: College of Winterhold: its members and its Leader. In character. |
+| #bards-college | text | faction (Bards College) | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Bards College, Bards College Leader | topic: Bards College: its members and its Leader. In character. |
+| #thieves-guild | text | faction (Thieves Guild) | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Thieves Guild, Thieves Guild Leader | topic: Thieves Guild: its members and its Leader. In character. |
+| #dark-brotherhood | text | faction (Dark Brotherhood) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Dark Brotherhood, Dark Brotherhood Leader | topic: Dark Brotherhood: its members and its Leader. In character. |
+| #vigilants-of-stendarr | text | faction (Vigilants of Stendarr) | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Vigilants of Stendarr, Vigilants of Stendarr Leader | topic: Vigilants of Stendarr: its members and its Leader. In character. |
+| #dawnguard | text | faction (Dawnguard) | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Dawnguard, Dawnguard Leader | topic: Dawnguard: its members and its Leader. In character. |
+| #silver-hand | text | faction (Silver Hand) | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Silver Hand, Silver Hand Leader | topic: Silver Hand: its members and its Leader. In character. |
+| #forsworn | text | faction (Forsworn) | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Forsworn, Forsworn Leader | topic: Forsworn: its members and its Leader. In character. |
+| #orc-strongholds | text | faction (Orc Strongholds) | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Orc Strongholds, Orc Strongholds Leader | topic: Orc Strongholds: its members and its Leader. In character. |
+| #khajiit-caravans | text | faction (Khajiit Caravans) | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Khajiit Caravans, Khajiit Caravans Leader | topic: Khajiit Caravans: its members and its Leader. In character. |
+| #blades | text | faction (Blades) | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Blades, Blades Leader | topic: Blades: its members and its Leader. In character. |
+| #volkihar-clan | text | faction (Volkihar Clan) | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader | the council, Gamemaster, Trial Gamemaster, Loremaster, Volkihar Clan, Volkihar Clan Leader | topic: Volkihar Clan: its members and its Leader. In character. |
 
 ### Voice
 
