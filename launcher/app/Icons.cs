@@ -36,6 +36,7 @@ namespace Thornswood
     {
         const int SHCNE_ASSOCCHANGED = 0x08000000;
         const int SHCNE_UPDATEITEM = 0x00002000;
+        const int SHCNE_DELETE = 0x00000004;
         const uint SHCNF_IDLIST = 0x0000;
         const uint SHCNF_PATHW = 0x0005;
         const uint SHCNF_FLUSH = 0x1000;
@@ -530,14 +531,89 @@ namespace Thornswood
         static string Name  { get { return BuildName + ".lnk"; } }
         static string Label { get { return BuildName == "Thornswood" ? "ThornsWood" : BuildName; } }
 
-        /// <summary>Where a shortcut of that name would be: the desktop and the Start menu.</summary>
-        public static List<string> ShortcutPaths(string buildName)
+        /// <summary>
+        /// Every shortcut that runs this exe, whatever it is called: the
+        /// desktop (the person's and the shared one), the install folder, the
+        /// Start menu and the pinned taskbar copy. What an uninstall or a dev
+        /// build removal deletes.
+        ///
+        /// Issue #3205: removal used to delete Thornswood.lnk on the desktop
+        /// and in the Start menu by name and nothing else. The pinned copy
+        /// stayed behind pointing at an exe that was gone, still holding the
+        /// name, and the next time the launcher was pinned Windows found
+        /// Thornswood.lnk taken and called the new pin "Thornswood (2)", which
+        /// is the name the taskbar shows on hover. Asking by name also took
+        /// the main build's shortcuts when it was the dev build being removed.
+        /// So this asks each shortcut what it runs, the same whole-path match
+        /// Ensure makes. Never throws.
+        /// </summary>
+        public static List<string> ShortcutsTo(string exe)
         {
             var l = new List<string>();
-            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), buildName + ".lnk")); } catch (Exception ex) { Swallow.Note("Icons.ShortcutPaths, desktop", ex); }
-            try { l.Add(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "Microsoft\\Windows\\Start Menu\\Programs\\" + buildName + ".lnk")); } catch (Exception ex) { Swallow.Note("Icons.ShortcutPaths, start menu", ex); }
+            if (string.IsNullOrEmpty(exe)) return l;
+            var dirs = new List<string>();
+            foreach (Place spot in Places()) dirs.Add(spot.Dir);
+            try { dirs.Add(Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory)); } catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo, shared desktop", ex); }
+
+            object shell = null;
+            try
+            {
+                Type shellType = Type.GetTypeFromProgID("WScript.Shell");
+                if (shellType == null) return l;
+                shell = Activator.CreateInstance(shellType);
+                foreach (string place in dirs)
+                {
+                    if (string.IsNullOrEmpty(place) || !Directory.Exists(place)) continue;
+                    string[] links;
+                    try { links = Directory.GetFiles(place, "*.lnk"); }
+                    catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo, listing " + place, ex); continue; }
+                    foreach (string lnk in links)
+                    {
+                        object sc = null;
+                        try
+                        {
+                            sc = shellType.InvokeMember("CreateShortcut", BindingFlags.InvokeMethod, null, shell, new object[] { lnk });
+                            if (sc == null) continue;
+                            string target = sc.GetType().InvokeMember("TargetPath", BindingFlags.GetProperty, null, sc, null) as string;
+                            if (!string.IsNullOrEmpty(target) && string.Equals(Full(target), Full(exe), StringComparison.OrdinalIgnoreCase)
+                                && !l.Contains(lnk))
+                                l.Add(lnk);
+                        }
+                        catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo, shortcut", ex); }
+                        finally
+                        {
+                            if (sc != null) try { Marshal.ReleaseComObject(sc); } catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo, release shortcut", ex); }
+                        }
+                    }
+                }
+            }
+            catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo", ex); }
+            finally
+            {
+                if (shell != null) try { Marshal.ReleaseComObject(shell); } catch (Exception ex) { Swallow.Note("Icons.ShortcutsTo, release shell", ex); }
+            }
             return l;
         }
+
+        /// <summary>
+        /// Deletes every shortcut that runs this exe (ShortcutsTo) and tells
+        /// Explorer each one is gone, so a pin leaves the taskbar with its
+        /// file. Returns how many went.
+        /// </summary>
+        public static int Drop(string exe)
+        {
+            int gone = 0;
+            foreach (string lnk in ShortcutsTo(exe))
+            {
+                try { File.Delete(lnk); gone++; }
+                catch (Exception ex) { Swallow.Note("Icons.Drop, delete", ex); continue; }
+                try { SHChangeNotify(SHCNE_DELETE, SHCNF_PATHW | SHCNF_FLUSH, lnk, null); } catch (Exception ex) { Swallow.Note("Icons.Drop, notify", ex); }
+            }
+            return gone;
+        }
+
+        /// <summary>The launcher this one is, for Uninstall.</summary>
+        public static string Exe { get { return LauncherExe; } }
 
         static string Full(string p)
         {
