@@ -150,7 +150,7 @@ namespace Thornswood
         static Button btnVoiceTest;
         static TextBlock txtVoiceState;
         static Button btnUninstall, btnServerStart, btnServerStop;
-        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics;
+        static Button btnServerMain, btnServerDev, btnServerPick, btnCheckDiagnostics, btnOpenSteam;
         static Popup serverPickPopup;
         static Border serverPickPanel;
         static TextBlock txtBrandSmall, txtBrandBig, txtServerPick, txtServerPickMeta;
@@ -752,6 +752,7 @@ namespace Thornswood
             dotServerMain = F<Ellipse>("DotServerMain");
             dotServerDev = F<Ellipse>("DotServerDev");
             btnCheckDiagnostics = F<Button>("BtnCheckDiagnostics");
+            btnOpenSteam = F<Button>("BtnOpenSteam");
             txtBrandSmall = F<TextBlock>("TxtBrandSmall"); txtBrandBig = F<TextBlock>("TxtBrandBig");
             btnUninstall = F<Button>("BtnUninstall"); chkKeepSaves = F<CheckBox>("ChkKeepSaves");
             chkDeleteMods = F<CheckBox>("ChkDeleteMods");
@@ -2319,6 +2320,7 @@ namespace Thornswood
             if (btnServerDev != null) btnServerDev.Click += delegate { CloseServerPick(); SwitchToDev(); };
             if (btnServerMain != null) btnServerMain.Click += delegate { CloseServerPick(); SwitchToMain(); };
             if (btnCheckDiagnostics != null) btnCheckDiagnostics.Click += delegate { ShowPage(PageDiag); };
+            if (btnOpenSteam != null) btnOpenSteam.Click += delegate { OpenSteam(); };
 
             btnOpenSaveFolder.Click += delegate { Open(Files.SaveDir); };
             btnOpenLogFolder.Click += delegate { Open(Files.SkseLogDir); };
@@ -2524,7 +2526,15 @@ namespace Thornswood
                 // history to draw rather than one lonely bar.
                 if (++pingTicks >= 15) { pingTicks = 0; StartPing(); }
 
-                if (!playing) return;
+                // Steam starting or closing redraws the Ready card, so it never
+                // says "running" about a Steam that has closed or keeps "Steam
+                // not running" up after Open Steam has started it (#3204).
+                // Nothing else redraws the rows between page changes and scans.
+                if (!playing)
+                {
+                    if (Checks.SteamStillRunning() != steamShown) DrawStatus();
+                    return;
+                }
                 // Asks the game processes the last look found whether they are
                 // still up, and lists the machine's processes only when none is
                 // (#978). Same answer as GameRunning, on the same tick.
@@ -2752,6 +2762,8 @@ namespace Thornswood
                 // An advisory row that fails is drawn amber and leaves Play
                 // alone. See Check.Advisory.
                 if (c.Blocks) { all = false; blocking.Add(c); }
+                // What the rows now say about Steam, for the tick to compare.
+                if (c.Name == Checks.SteamRow) steamShown = c.Ok;
             }
 
             if (statusList != null)
@@ -3068,6 +3080,38 @@ namespace Thornswood
             }
             if (btnCheckDiagnostics != null)
                 btnCheckDiagnostics.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
+            if (btnOpenSteam != null)
+            {
+                // Whenever the Steam row is one of the problems, not only when
+                // it is the first, so "Wrong Skyrim build and 1 more" with Steam
+                // closed still has the button.
+                bool steamDown = false;
+                foreach (Check c in blocking) if (c.Name == Checks.SteamRow) steamDown = true;
+                Visibility want = steamDown ? Visibility.Visible : Visibility.Collapsed;
+                if (btnOpenSteam.Visibility != want) btnOpenSteam.Visibility = want;
+            }
+        }
+
+        /// <summary>
+        /// What the Steam row said when the rows were last drawn. The two
+        /// second tick redraws when Steam's answer differs from it.
+        /// </summary>
+        static bool steamShown;
+
+        /// <summary>
+        /// The Open Steam button on the Ready card, shown while Steam is not
+        /// running (#3204). Opens Steam's own window through its
+        /// steam://open/main link, rather than the tray start Fix makes,
+        /// because whoever presses it wants Steam in front of them to sign
+        /// in. The card turns green by itself once steam.exe is up (the two
+        /// second tick, above).
+        /// </summary>
+        static void OpenSteam()
+        {
+            if (Downgrade.AskSteam("steam://open/main", Log))
+                Log("Opening Steam. Sign in if it asks; the Ready card turns green once Steam is running.");
+            else
+                Log("Steam could not be opened from here. Start Steam yourself, signed in to the account that owns Skyrim.");
         }
 
         /// <summary>
