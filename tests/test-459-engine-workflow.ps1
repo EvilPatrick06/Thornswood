@@ -92,7 +92,7 @@ Yes 'each job has its own limit: the box 30 minutes (it only takes the fork''s b
 # ---- 3. what it runs, in order ------------------------------------------------
 $order = @('uses: actions/checkout@', '- name: Which fork commit', '- name: Fetch the fork at that commit', '- name: Look for the fork''s build',
            '- name: Where vcpkg keeps', 'uses: actions/cache/restore@', '- name: Build the engine', 'uses: actions/cache/save@', '- name: Build every server file again',
-           '- name: Record the fork''s server build', '- name: Record the client', '- name: Check the records name this commit', '- name: Gather what this run made',
+           '- name: Measure the client files'' libraries', '- name: Record the fork''s server build', '- name: Record the client', '- name: Check the records name this commit', '- name: Gather what this run made',
            'uses: actions/upload-artifact@', '- name: Free the box''s disk')
 $at = -1; $inOrder = $true
 foreach ($o in $order) { $i = $vps.IndexOf($o); if ($i -le $at) { $inOrder = $false; Write-Host "  out of order or missing: $o" }; $at = $i }
@@ -126,11 +126,18 @@ Yes 'a build of a new commit (exit 2, the client is not the recorded one) goes o
 $srv = Get-Step $vps 'Build every server file again'
 Yes 'the server is built again and recorded (Build-Server.ps1 without -NoRecord)' ($srv -match '\.\\scripts\\release\\Build-Server\.ps1 -NoPause' -and $srv -notmatch 'NoRecord')
 Yes 'the client is recorded from the same fork' ((Get-Step $vps 'Record the client') -match 'New-ClientBuildRecord\.ps1 -Dist engine\\skymp\\build\\dist\\client -Clone engine\\skymp')
+$meas = Get-Step $vps 'Measure the client files'' libraries'
+Yes 'a build made here measures its client files'' libraries with the fork''s own script, skipped for the fork''s build, which did (#3099)' (
+    $meas -match "if: steps\.fork\.outputs\.found != 'true'" -and $meas -match '\.\\engine\\skymp\\misc\\thornswood\\Write-ClientLicences\.ps1 -Build engine\\skymp\\build')
+$rcl = Get-Step $vps 'Record the client'
+Yes 'the libraries in the client and their texts are recorded after the client, from the same build (#3099)' (
+    $rcl -match 'New-ClientLicenceRecord\.ps1 -Licences engine\\skymp\\build\\licences -Clone engine\\skymp' -and $rcl.IndexOf('New-ClientLicenceRecord') -gt $rcl.IndexOf('New-ClientBuildRecord'))
 $check = Get-Step $vps 'Check the records name this commit'
 Yes 'both records are held to their shape and to the commit built' ($check -match 'Check-Records\.ps1' -and $check -match 'source\.commit' -and $check -match 'forkCommit')
 $gather = Get-Step $vps 'Gather what this run made'
 Yes 'the server build is made the artifact the store keeps (ServerArtifact.ps1)' ($gather -match 'New-ThornswoodServerBuildArtifact -From engine\\skymp\\build\\dist\\server -Record records\\server-build\.json')
 Yes 'the six client files go in, each held to the client record' ($gather -match 'client-build\.json' -and $gather -match 'is not the file the client record names')
+Yes 'the licence record and its texts go in beside the other two records (#3099)' ($gather -match "'client-licences\.json'" -and $gather -match 'Copy-Item -LiteralPath records\\client-licences -Destination')
 Yes 'SHA256SUMS lists every file' ($gather -match 'SHA256SUMS')
 Yes 'the artifact is engine-<fork commit 12>, kept 30 days, and none is an error' ($gather -match 'name=engine-' -and $vps -match 'if-no-files-found: error' -and $vps -match 'retention-days: 30')
 $free = Get-Step $vps 'Free the box''s disk'
