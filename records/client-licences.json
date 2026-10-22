@@ -1,0 +1,280 @@
+{
+  "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, and each one's licence text in client-licences\\<port>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099).",
+  "forkCommit": "d6dc5535",
+  "readWith": "LLVM version 20.1.8",
+  "files": {
+    "Data\\SKSE\\Plugins\\MpClientPlugin.dll": [
+      "fmt",
+      "nlohmann-json",
+      "prometheus-cpp-lite",
+      "simdjson",
+      "slikenet",
+      "spdlog"
+    ],
+    "Data\\SKSE\\Plugins\\SkyrimPlatform.dll": [
+      "commonlibsse-ng-flatrim"
+    ],
+    "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll": [
+      "asio",
+      "bshoshany-thread-pool",
+      "cef-prebuilt",
+      "commonlibsse-ng-flatrim",
+      "cpp-httplib",
+      "directxmath",
+      "directxtk",
+      "fmt",
+      "frida-gum",
+      "makeid",
+      "mhook",
+      "nirnlab-ui-platform-headers",
+      "nlohmann-json",
+      "node-addon-api",
+      "node-embedder-api-prebuilt",
+      "openssl",
+      "robin-hood-hashing",
+      "simpleini",
+      "spdlog",
+      "zlib"
+    ],
+    "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden": [
+      "cef-prebuilt"
+    ]
+  },
+  "ports": {
+    "asio": {
+      "version": "1.32.0",
+      "portVersion": 0,
+      "licence": "BSL-1.0",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "c9bff75738922193e67fa726fa225535870d2aa1059f91452c411736284ad566",
+      "bytes": 1338
+    },
+    "bshoshany-thread-pool": {
+      "version": "5.1.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "712a867cc12ebfcdecf6cea097f5aa7ec5acaa435a8f818c9f370960df35acbf",
+      "bytes": 1076
+    },
+    "cef-prebuilt": {
+      "version": "108.4.13",
+      "portVersion": 0,
+      "licence": null,
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformCEF.exe.hidden"
+      ],
+      "sha256": "058c3827ffb827ff3edda471ae7e1bb1d1aa5931985f0126043ccd33409e792f",
+      "bytes": 1662
+    },
+    "commonlibsse-ng-flatrim": {
+      "version": "3.7.0-unstable-2024-09-03-b93280e8",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\SKSE\\Plugins\\SkyrimPlatform.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "f8f983d0d1e2bb361f117487465f21f5f4047acca3610f7aba3482d524c83ce4",
+      "bytes": 1074
+    },
+    "cpp-httplib": {
+      "version": "0.40.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "4b45cbe16d7b71b89ae6127e26e0d90a029198ca5e958ad8e3d0b8bbed364d8b",
+      "bytes": 1075
+    },
+    "directxmath": {
+      "version": "2026-03-12",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "bytes": 1141
+    },
+    "directxtk": {
+      "version": "2026-03-31",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "c2cfccb812fe482101a8f04597dfc5a9991a6b2748266c47ac91b6a5aae15383",
+      "bytes": 1141
+    },
+    "fmt": {
+      "version": "11.2.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "07580f2a3b35709ce703d523f447b242f6dfec7582a8c0df102c7fa2849375f8",
+      "bytes": 1431
+    },
+    "frida-gum": {
+      "version": "16.0.19",
+      "portVersion": 1,
+      "licence": "BSD-3-Clause AND LGPL-2.0-or-later AND LGPL-2.0-or-later WITH WxWindows-exception-3.1 AND LGPL-2.1-or-later AND MIT AND NCSA",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "19699d730807ff64c7396a818618d4ad0d0df51b7209a7df933988727fd6c339",
+      "bytes": 68114
+    },
+    "makeid": {
+      "version": "1.0.3",
+      "portVersion": 0,
+      "licence": null,
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "2d6c3a410c38875c899c2dcf1083bdbe186121ca9c90a8d552a176a2fe75e477",
+      "bytes": 306
+    },
+    "mhook": {
+      "version": "2.5.1",
+      "portVersion": 3,
+      "licence": null,
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "c3b7e4acc215a9c8a41d6801d68dcaea62fdb84d05d419c2013afcaf7ea969a2",
+      "bytes": 1150
+    },
+    "nirnlab-ui-platform-headers": {
+      "version": "3.1",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "98215a3b35fa9c7b80d9b10e4d325862f644a3146a0b1ae98a6d628d3327768f",
+      "bytes": 1065
+    },
+    "nlohmann-json": {
+      "version": "3.12.0",
+      "portVersion": 2,
+      "licence": "MIT",
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "46a65cffd1ea955132d95a8dd921640714a8d6b537d2e4e482d31145ae95b603",
+      "bytes": 1076
+    },
+    "node-addon-api": {
+      "version": "8.7.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "89024017b88a9f2b763f79b941a4f2db3b4428edfcacdc0b23866b2da633ad0c",
+      "bytes": 1150
+    },
+    "node-embedder-api-prebuilt": {
+      "version": "2",
+      "portVersion": 1,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "f0cb1ad806ba5d681f378a8cc2e539fe4b54839290eda3c814ec8994af2b8422",
+      "bytes": 139053
+    },
+    "openssl": {
+      "version": "3.6.1",
+      "portVersion": 3,
+      "licence": "Apache-2.0",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
+      "bytes": 10175
+    },
+    "prometheus-cpp-lite": {
+      "version": "2.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll"
+      ],
+      "sha256": "5cf0bf33df0a90d55ab967c08f58e5cf8414d4b33edf9b806583c2f392d1bf9a",
+      "bytes": 1082
+    },
+    "robin-hood-hashing": {
+      "version": "3.11.5",
+      "portVersion": 2,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "686cf8d62cc44fecff4be967238aba89665f9b6acf8a728987801ffc3a626bc7",
+      "bytes": 1075
+    },
+    "simdjson": {
+      "version": "4.6.0",
+      "portVersion": 0,
+      "licence": "(Apache-2.0 OR MIT)",
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll"
+      ],
+      "sha256": "8bba4c86681e778878ad5bbff33baa524d450b2a42e256f3b931fc58a5ec2bfd",
+      "bytes": 12675
+    },
+    "simpleini": {
+      "version": "4.25",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "1f8d19cba3d929f45f74b8e7cdf84b2fee5b96be69d08d0084ed728316f9f2c2",
+      "bytes": 1089
+    },
+    "slikenet": {
+      "version": "2021-06-07",
+      "portVersion": 2,
+      "licence": null,
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll"
+      ],
+      "sha256": "0bc9800a2dc2d2b01fce0632006da853c14d924d64f40bd0de978ab883bb9037",
+      "bytes": 4260
+    },
+    "spdlog": {
+      "version": "1.17.0",
+      "portVersion": 0,
+      "licence": "MIT",
+      "in": [
+        "Data\\SKSE\\Plugins\\MpClientPlugin.dll",
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "d678c20826e1392578508e1c78649a1e3c31bda05ef4388d967dbd654461b140",
+      "bytes": 1323
+    },
+    "zlib": {
+      "version": "1.3.1",
+      "portVersion": 0,
+      "licence": "Zlib",
+      "in": [
+        "Data\\Platform\\Distribution\\RuntimeDependencies\\SkyrimPlatformImpl.dll"
+      ],
+      "sha256": "845efc77857d485d91fb3e0b884aaa929368c717ae8186b66fe1ed2495753243",
+      "bytes": 1002
+    }
+  }
+}
