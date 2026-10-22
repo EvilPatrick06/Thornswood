@@ -523,9 +523,11 @@ function Get-ThornswoodPathHolders([string]$Path) {
   }
   $who = @()
   $lines = @{}
+  $noLines = ''
   $named = @($ids + $recent | Sort-Object -Unique)
   if ($named.Count) {
-    try { foreach ($w in @(Get-CimInstance Win32_Process -ErrorAction Stop)) { if ($named -contains [int]$w.ProcessId) { $lines[[int]$w.ProcessId] = $w.CommandLine } } } catch { }
+    try { foreach ($w in @(Get-CimInstance Win32_Process -ErrorAction Stop)) { if ($named -contains [int]$w.ProcessId) { $lines[[int]$w.ProcessId] = $w.CommandLine } } }
+    catch { $noLines = '; the command lines could not be read: ' + $_.Exception.Message }
   }
   foreach ($id in $named) {
     $line = 'pid ' + $id + ' ' + (Get-ThornswoodProcessWords $snap.Procs $id)
@@ -535,7 +537,7 @@ function Get-ThornswoodPathHolders([string]$Path) {
   }
   if ($ids.Count) { $said += '; who they are: ' + ((@($who | Where-Object { $ids -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })) -join '; ') }
   $new = @($who | Where-Object { $recent -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })
-  $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' })
+  $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' }) + $noLines
   return $said + '; Restart Manager: ' + (Get-ThornswoodFileHolders $Path)
 }
 
