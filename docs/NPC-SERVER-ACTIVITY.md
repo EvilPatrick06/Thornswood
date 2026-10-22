@@ -53,6 +53,16 @@ spatial index across overlapping regions, yields after bounded work, and creates
 reciprocal portal links only when a route needs them. Background activity continues
 with no connections. Nearby activity uses the same authority and state.
 
+An NPC nobody can see that only wanders takes one step every 4 seconds, the
+longest step the runtime takes, and its first step at once (#3181, Patrick's C
+on 22 Oct 2026: NPCs nobody can see are updated less often, never paused).
+Before, every pass over the cast stepped each of them, up to 64 steps every
+20 ms: with nobody on, dev's 4,821 reported about 57,000 moving steps a minute
+on 22 Oct, and that was nearly all of the 0.187 of a core dev's JavaScript
+thread was busy on 21 Oct. An NPC in a fight or a flight keeps its pace
+whoever can see it, and one within 4,096 units of somebody is stepped as
+before. The minute report counts the background steps.
+
 Movement follows walkable triangles in the local region. It retains the saved
 height above the navigation surface and crosses only verified reciprocal edges.
 Missing or corrupt geometry, an unsuitable saved position, or a displacement

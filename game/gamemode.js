@@ -73615,9 +73615,19 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // Placed off walkable ground, waiting to be set down on it (#2067): out of
   // everybody's sight, or for an ambush once somebody comes near.
   const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
+  // An NPC nobody can see that only wanders is stepped once in this long
+  // (a.due, the first time at once), the longest step update() takes (#3181, Patrick's C on 22 Oct 2026: NPCs
+  // nobody can see are updated less often, never paused). Before, every pass
+  // over the cast stepped each of them (up to 64 steps every 20 ms): with
+  // nobody on, dev's 4,821 reported about 57,000 moving steps a minute on
+  // 22 Oct, and that runtime was nearly all of the 0.187 of a core dev's
+  // JavaScript thread was busy on 21 Oct.
+  // A fight or a flight keeps its pace, and an NPC somebody can see is
+  // stepped by nearTick as before.
+  const UNSEEN_EVERY = 4000;
   let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0;
   const ready=[];
-  let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,failed=0,lastReport=now();
+  let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,background=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
     if (stopped) return;
     const callback=()=>{
@@ -73952,7 +73962,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
   }
   function update(a) {
-    const at=now(),elapsed=Math.min(4000,Math.max(0,at-a.last));a.last=at;
+    const at=now(),elapsed=Math.min(UNSEEN_EVERY,Math.max(0,at-a.last));a.last=at;
     const s=swimming(factionData(nativeCall('getNpcAIState',a.id)),a.policy);
     if(!validState(s)) throw new Error('Invalid live state');
     a.state=s;
@@ -74121,18 +74131,19 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       if(!actors.has(id) || near.has(id)) continue;
       // A newly connected observer might precede the next spatial refresh.
       const a=actors.get(id);
+      if(a.mode==='ambient' && a.due>now()) continue;
       if(Array.from(humans.values()).some(s=>s.cellOrWorld===a.cell && distance(s.pos,a.pos)<=4096)) continue;
-      step(id);moves++;
+      step(id);moves++;background++;a.due=now()+UNSEEN_EVERY;
       if(scanned>=order.length) break;
     }
     if(now()-lastReport>=60000) {
       report('Shared NPC activity: '+owned.size+' server owned, '+actors.size+' active, '+loaded+' loaded, '+failed+' stationary, '+(held.size+searching.length)+' waiting off walkable ground; '+
-        moved+' movement steps, '+attacks+' accepted attacks, '+navigation.pending()+' mesh jobs pending; '+
+        moved+' movement steps, '+background+' background steps, '+attacks+' accepted attacks, '+navigation.pending()+' mesh jobs pending; '+
         'background work continues without connections');
       const merchantStatus=population && population.merchantStats && population.merchantStats();
       if(merchantStatus) report('NPC merchant purses: '+merchantStatus.verified+'/'+merchantStatus.catalogue+
         ' verified; '+merchantStatus.initialized+' first-time purses; '+((globalThis.__thornswoodMerchantTrade&&globalThis.__thornswoodMerchantTrade.nativeReady())?'native transfer present':'native transfer absent'));
-      moved=0;attacks=0;lastReport=now();
+      moved=0;background=0;attacks=0;lastReport=now();
     }
     schedule(backgroundTick,20);
   }
