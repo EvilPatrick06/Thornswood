@@ -38,7 +38,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
-. (Join-Path $Here 'Windows.ps1')
+. (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
