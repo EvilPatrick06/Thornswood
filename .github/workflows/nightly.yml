@@ -275,6 +275,20 @@ jobs:
           # script says what to do.
           .\scripts\dev\Check-Swallow.ps1
 
+      - name: Lint the whole tree (warnings only)
+        if: ${{ !cancelled() }}
+        # #3185 (from #1343): a pull request's build lints only the files it
+        # changed, so the report over every file is made here, once a night.
+        # Warnings only: continue-on-error, and scripts\dev\Lint.ps1 always
+        # ends 0. The pinned tools are kept in this runner account's own
+        # folder by version, so a night fetches nothing it already has.
+        continue-on-error: true
+        timeout-minutes: 10
+        shell: pwsh
+        run: |
+          .\scripts\dev\Lint.ps1 -All
+          exit 0
+
       - name: Build the launcher
         if: ${{ !cancelled() }}
         shell: pwsh

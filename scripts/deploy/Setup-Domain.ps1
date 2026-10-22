@@ -3,10 +3,11 @@
 
   Puts thornswood.net in front of the docs site, with a real certificate.
 
-  Run this AFTER the domain is bought and its DNS A record points at the VPS.
-  It checks that first and stops if it does not, because a certificate request
-  against a name that does not resolve here gets you rate limited by Let's
-  Encrypt rather than a certificate.
+  Run this AFTER the domain is bought and its DNS A record points at the VPS,
+  or at Cloudflare's proxy in front of it (#2995). It checks that first and
+  stops if it does not, because a certificate request against a name that
+  does not resolve here gets you rate limited by Let's Encrypt rather than a
+  certificate.
 
     .\Setup-Domain.ps1
     .\Setup-Domain.ps1 -Domain thornswood.net -Email you@example.com
@@ -19,6 +20,15 @@
 
   The docs site is also moved onto loopback by this, so port 3001 stops being
   a way around the certificate.
+
+  BEHIND CLOUDFLARE (#2995, Patrick's A, 21 Oct 2026). The live name is
+  proxied by Cloudflare, and the box takes 80 and 443 only from Cloudflare's
+  ranges (Set-WebFirewall.ps1). This opens the two rules to any address only
+  when it makes them, on a fresh box, where the name still points straight
+  at the box until its proxy goes on; an existing rule is left as it is, so
+  running this again never undoes the scope. Caddy still gets its own
+  certificate: Let's Encrypt asks through Cloudflare, and Cloudflare, set to
+  Full (strict), reaches Caddy on 443, where Caddy answers the challenge.
 #>
 [CmdletBinding()]
 param(
@@ -76,6 +86,7 @@ if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition 
 . (Join-Path $Here '..\vps\Send-Script.ps1')
 . (Join-Path $Here '..\vps\Lock-Folder.ps1')
 . (Join-Path $Here 'ServiceAccount.ps1')
+. (Join-Path $Here 'CloudflareRanges.ps1')
 if (-not $User) { $User = Get-ThornswoodVpsUser }
 if (-not $Vps) { $Vps = Get-ThornswoodVpsAddress }
 
@@ -97,10 +108,17 @@ if (-not $SkipDnsCheck -and -not $TaskOnly) {
     throw ("$Domain does not resolve yet" + $(if ($dnsSaid.Count) { " (" + ($dnsSaid -join ' | ') + ")" } else { "" }) + ". Add an A record for @ and www pointing at $Vps, then wait for it to spread. Minutes usually, up to an hour.")
   }
   foreach ($d in $dnsSaid) { Write-Host ("  " + $d) -ForegroundColor Yellow }
-  if ($ips -notcontains $Vps) {
-    throw "$Domain resolves to $($ips -join ', ') and not $Vps. Fix the A record first."
+  # Straight at the box, or only into Cloudflare's ranges with its proxy on
+  # (#2995). Anything else is a record pointing somewhere this is not.
+  $front = Read-ThornswoodCloudflareRanges
+  $behind = @($ips | Where-Object { Test-ThornswoodInRanges $_ $front })
+  if ($ips -contains $Vps) {
+    Write-Host "  points at $Vps" -ForegroundColor Green
+  } elseif ($behind.Count -eq @($ips).Count) {
+    Write-Host ("  points at Cloudflare's proxy (" + ($ips -join ', ') + ')') -ForegroundColor Green
+  } else {
+    throw "$Domain resolves to $($ips -join ', '), which is neither $Vps nor Cloudflare's proxy. Fix the A record first."
   }
-  Write-Host "  points at $Vps" -ForegroundColor Green
 }
 
 # ----------------------------------------------------------------- caddy --
@@ -186,7 +204,7 @@ foreach (`$p in 80,443) {
   if (-not (Get-NetFirewallRule -DisplayName `$n -EA SilentlyContinue)) {
     New-NetFirewallRule -DisplayName `$n -Direction Inbound -Protocol TCP ``
       -LocalPort `$p -Action Allow | Out-Null
-    'opened ' + `$p
+    'opened ' + `$p + ' to any address. Once the name is behind Cloudflare, Set-WebFirewall.ps1 takes it to Cloudflare''s ranges only (#2995)'
   }
 }
 "@ | ForEach-Object { "  $_" }
@@ -219,7 +237,15 @@ Start-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
 
 Write-Host ''
 Write-Host 'Starting Caddy...'
-Remote @"
+# What the box runs to move Caddy onto its task and restart it. It is not
+# run inside an ssh session (#3193): from One, ssh to the box goes through
+# the bridge, the bridge goes through Caddy, and this stops Caddy, so the
+# session it ran in was cut halfway, everything it said after that was lost
+# and the run ended as ssh's exit 255 whether or not the box finished
+# (measured 21 Oct 2026, #2995's step A2). It runs on the box on its own
+# instead, writing what it says to a report there, and the report is read
+# over a fresh session once Caddy, and with it the bridge, is back.
+$restart = @"
 `$ErrorActionPreference = 'Continue'
 `$dir = '$caddyWin'
 `$exe = Join-Path `$dir 'caddy.exe'
@@ -351,8 +377,45 @@ Start-ScheduledTask -TaskName 'Thornswood Web'
 # The first start asks Let's Encrypt for a certificate, which takes a moment.
 Start-Sleep -Seconds 12
 `$p = Get-Process caddy -EA SilentlyContinue
-if (`$p) { 'caddy up, pid ' + `$p.Id } else { 'CADDY DID NOT START' }
-"@ | ForEach-Object { "  $_" }
+if (`$p) { 'caddy up, pid ' + `$p.Id } else { 'CADDY DID NOT START'; exit 1 }
+"@
+
+# Get-ThornswoodDetachedRun (Send-Script.ps1) writes it on the box and
+# starts it there through WMI. The start says STARTED, and nothing has been
+# stopped by then.
+$run = Get-ThornswoodDetachedRun -Script $restart
+$started = @(Remote $run.Start)
+$startedRc = $LASTEXITCODE
+$started | Where-Object { $_ -is [string] -and $_ -notmatch '^STARTED \d+$' } | ForEach-Object { "  $_" }
+if ($startedRc -ne 0 -or -not @($started | Where-Object { $_ -is [string] -and $_ -match '^STARTED \d+$' }).Count) {
+  $started | Where-Object { $_ -isnot [string] } | ForEach-Object { "  $_" }
+  throw "The box did not start the Caddy run (exit $startedRc). The lines above say why; nothing on the box was stopped."
+}
+
+# The report, read until it ends. While Caddy is down a session from One
+# cannot connect at all, which is waited out the same as a report not yet
+# finished. Each line is shown once, as it arrives.
+$shown = 0
+$endRc = $null
+$until = (Get-Date).AddMinutes(4)
+while ($null -eq $endRc -and (Get-Date) -lt $until) {
+  Start-Sleep -Seconds 5
+  $was = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $read = @(Remote $run.Read | Where-Object { $_ -is [string] })
+  $readRc = $LASTEXITCODE
+  $ErrorActionPreference = $was
+  if ($readRc -ne 0 -or -not $read.Count -or $read[0] -notmatch '^REPORT \d+$') { continue }
+  $lines = @($read | Select-Object -Skip 1)
+  for ($i = $shown; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^END (-?\d+)$') { $endRc = [int]$Matches[1] } else { "  " + $lines[$i] }
+  }
+  $shown = $lines.Count
+}
+if ($null -eq $endRc) {
+  throw ("The Caddy run on the box has not finished after four minutes, or the box cannot be reached since it stopped Caddy. From One the way in is the bridge, which needs Caddy up; the task starts it again within five minutes. Run this again with -TaskOnly once the box answers, or read " + $run.Log + " on the box (BisectHosting's console when nothing else answers).")
+}
+if ($endRc -ne 0) { throw "The Caddy run on the box ended with exit $endRc. The lines above say why." }
 
 Write-Host ''
 Write-Host "  https://$Domain" -ForegroundColor Green

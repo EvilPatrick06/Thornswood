@@ -43,7 +43,7 @@ flowchart LR
     VD["Dev voice :7789"]
     B["Discord bot"]
     WD["Watchdog, every 5 min"]
-    BK["Nightly backup 03:15"]
+    BK["Nightly backup 08:15 UTC"]
     C --> W
     C -->|/voice| VO
     C -->|/voice-dev| VD
@@ -167,8 +167,8 @@ when its check fails, three times an hour at most
 | Site | `C:\Thornswood-Docs` | 127.0.0.1:3001 | `Thornswood Docs` | `Deploy-Docs.ps1`, `-Site` for the public pages | `Deploy-Docs.ps1:$Root = 'C:/Thornswood-Docs'`, `Deploy-Docs.ps1:$Task = 'Thornswood Docs'`, `Deploy-Docs.ps1:$Port = 3001`, `site/server.js:PORT`, `site/server.js:BIND` |
 | Caddy | `C:\Thornswood-Caddy` | 80, 443 | `Thornswood Web` (at startup and every five minutes) | `Setup-Domain.ps1`, which sends `scripts\deploy\Caddyfile` as the live one on every run without `-TaskOnly` (issue #543) | `Setup-Domain.ps1:$CaddyDir = 'C:/Thornswood-Caddy'`, `Setup-Domain.ps1:Caddyfile written, from scripts\deploy\Caddyfile`, `Setup-Domain.ps1:Register-ScheduledTask -TaskName 'Thornswood Web'`, `Setup-Domain.ps1:New-ScheduledTaskTrigger -AtStartup`, `Setup-Domain.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `scripts/deploy/Caddyfile:an edit made on the box by hand is lost the next time it runs` |
 | Discord bot | `C:\Thornswood-Bot` | none | none: the Windows service `ThornswoodBot`, as `NT SERVICE\ThornswoodBot` (issue #465) | `Install-Bot.ps1`, `-CodeOnly` for the code and the card art | `Install-Bot.ps1`, `Bot-Service.ps1`, `BotService.cs` |
-| Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:$Root = 'C:\Thornswood-Watch'`, `Watch-Services.ps1:$Task = 'Thornswood Watch'`, `Watch-Services.ps1:schtasks /create /tn '$Task' /sc minute /mo 5 /ru SYSTEM` |
-| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 03:15 | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:$Root = 'C:\Thornswood-Backup'`, `Install-Backup.ps1:$keyFile = Join-Path $Root 'key.txt'`, `Install-Backup.ps1:$TaskName = 'Thornswood Backup'`, `Install-Backup.ps1:$At = '03:15'`, `Install-Backup.ps1:New-ScheduledTaskTrigger -Daily`, `vps-nightly-backup.ps1:$KeyFile = 'C:\Thornswood-Backup\key.txt'` |
+| Watchdog | `C:\Thornswood-Watch` (`watch.ps1`, `watch.log`) | none | `Thornswood Watch`, every five minutes as SYSTEM | `Watch-Services.ps1 -Install` | `Watch-Services.ps1:$Root = 'C:\Thornswood-Watch'`, `Watch-Services.ps1:$Task = 'Thornswood Watch'`, `Watch-Services.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, `Watch-Services.ps1:New-ScheduledTaskPrincipal -UserId 'SYSTEM'` |
+| Nightly backup | `C:\Thornswood-Backup` (passphrase in `key.txt`) | none | `Thornswood Backup`, daily at 08:15 UTC | `Install-Backup.ps1`; `Fetch-Backups.ps1` brings them down | `Install-Backup.ps1:$Root = 'C:\Thornswood-Backup'`, `Install-Backup.ps1:$keyFile = Join-Path $Root 'key.txt'`, `Install-Backup.ps1:$TaskName = 'Thornswood Backup'`, `Install-Backup.ps1:$At = '08:15Z'`, `Install-Backup.ps1:New-ScheduledTaskTrigger -Daily`, `vps-nightly-backup.ps1:$KeyFile = 'C:\Thornswood-Backup\key.txt'` |
 
 What the watchdog checks: `https://thornswood.net/` for Caddy, then TCP 3001,
 3000, 7778, 7788 and 7789, and a python process with `Thornswood-Bot` in its
@@ -214,14 +214,19 @@ a server folder, `Restore-Box.ps1` puts all of it onto a new box, and
 `tests\test-backup-restore.ps1` and `tests\test-new-box-runbook.ps1` prove the
 round trip.
 
-03:15 is a quiet hour, not the hour after a restart: no script under `scripts`
+08:15 UTC is a quiet hour, nobody on and 45 minutes before the nightly
+checks' harness shares start at 09:00 UTC (#3187), and it is said in UTC so
+the two keep that distance across daylight saving. It is not the hour after a restart: no script under `scripts`
 registers a nightly restart task. Measured on 5 Oct over every
 `Register-ScheduledTask`, `New-ScheduledTaskTrigger` and `schtasks /create` in
-`scripts`: the only daily triggers are this backup's and the one
+`scripts`: the only daily triggers were this backup's and the one
 `Fetch-Backups.ps1 -Schedule` makes on Patrick's machine, and every other task
 those scripts register starts at boot, every few minutes, at sign in or once.
-`Install-Backup.ps1` says the same
-(`Install-Backup.ps1:well clear of when anybody is playing`).
+Since then the disk forecast (`Forecast-Storage.ps1 -Install`, 4:00 AM box
+time) and the runner log keeper (`Keep-RunnerLogs.ps1 -Install`, 4:30 AM, #3184)
+are daily too, both after the backup and the nightly checks.
+`Install-Backup.ps1` says why it is when it is
+(`Install-Backup.ps1:45 minutes before the shares start`).
 
 A deploy sends a commit or nothing (issue #1121): `Deploy-Docs.ps1`,
 `Install-Voice.ps1`, `Install-Bot.ps1`, `Deploy-DevGamemode.ps1`,

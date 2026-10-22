@@ -7,8 +7,9 @@
       .\scripts\deploy\Set-BuildRunners.ps1           put the label on the listed runners, take it off the rest
       .\scripts\deploy\Set-BuildRunners.ps1 -Check    change nothing; exit 1 when GitHub differs from the record
 
-  WHY (#2994). The VPS has six cores and, since 20 October, eight runners
-  (#2929). Every heavy job asked for thornswood-vps, which all eight carry,
+  WHY (#2994). The VPS has six cores and, from 20 October, eight runners
+  (#2929; three since the evening of 21 October, #3108, #3219). Every
+  heavy job asked for thornswood-vps, which all eight carried,
   so on the night of 20 to 21 October seven builds ran at once, each one's
   harness step stretched from about 15 minutes to 34 to 39, and the job's
   40-minute limit cancelled three pull requests' builds that were passing.
@@ -33,8 +34,8 @@
   because every heavy job would then wait for a runner that never comes.
 
   #2161 (one runner at a time). The outbound rules go on one runner and a
-  build through it proves them. Runners 1 to 4 carry the label, so their
-  builds prove them as before. A runner outside the list runs only the
+  build through it proves them. The runners the record lists carry the
+  label (1 and 2 since 22 Oct 2026, #3114), so their builds prove them. A runner outside the list runs only the
   light jobs; to prove one, add its number to the record in the same pull
   request that moves the rollout to it, and run this.
 

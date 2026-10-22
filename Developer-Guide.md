@@ -653,6 +653,15 @@ A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two bes
 
 It runs every builder in `scripts\mods\content-tables.json`, in order, and writes each plugin's new sha256 into `records\asset-provenance.json`. It ends with `All <n> builders ran.` and a list of every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it.
 
+One builder needs no game: commit first, then run it on the VPS box against the dev server's plugins, its load order and Skyrim's archives there, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first). What it writes under `game`, `records` and `docs\systems` comes back into your checkout:
+
+```powershell
+pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
+pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{settings}' --strings-dir '{data}'
+```
+
+`{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), but its tables are not yet the ones a game PC writes: #3105 says why.
+
 #### Switch between branches
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar. Every other local branch stays on this PC with its own commits.
@@ -985,9 +994,11 @@ How to use it:
   second issue. Write down what was measured and what is left.
 - Uncommitted changes sitting in the repo are outstanding work and belong on
   the board too.
-- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
-  or what it waits on, and `anyone can start` marks what needs nobody in
-  particular. Assign yourself when you start one.
+- Labels: `area:` is the part of the project, `needs: patrick` marks what
+  waits on him, and `anyone can start` marks what needs nobody in
+  particular. Assign yourself when you start one. The stage is Order and
+  Status: the `wave:` labels and `needs: the live server` were retired on
+  22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
   needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
   Progress and Done; never add one through the API, which rewrites every
@@ -999,6 +1010,10 @@ How to use it:
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  `.github\workflows\board-read.yml`, which reads every card's Status and
+  Order on a VPS runner and changes nothing, and writes them to board.json
+  (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-updates,
   which issues moved.
@@ -1020,9 +1035,16 @@ How to use it:
   leave the issue open. That one is for developers, so write it in developer
   terms: the files, log lines and commands to run, and what each should
   print, with a `Build:` line naming the dev release or gamemode commit it
-  needs. The bot posts it at once in #dev-test-tasks, a forum in the Staff
-  category that only staff see, whole, with links to the issue, its pull
-  requests and commits, and its labels. It takes the post down when the
+  needs. A fix that has reached dev and not yet main is not one: checking
+  that a fix works is its Main test task, written when it reaches main,
+  however soon that is (#613: Patrick found one in #dev-test-tasks, 22
+  Oct). `Server: Dev` is for a measurement the work needs before it can
+  finish, such as a log line, a screenshot or a timing. An issue has one
+  dev post, showing its last `Test task:` comment, so a newer `Server: Dev`
+  comment replaces the one before it: put every measurement the issue still
+  needs in the newest. The bot posts it at once in #dev-test-tasks, a forum
+  in the Staff category that only staff see, whole, with links to the issue,
+  its pull requests and commits, and its labels. It takes the post down when the
   issue closes or a newer `Test task:` comment does not say `Server: Dev`.
   Put what was measured on the issue: the post is deleted when it goes. When
   the fix reaches main, write the Main test task in plain words and close

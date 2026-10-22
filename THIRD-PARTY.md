@@ -691,6 +691,15 @@ address: https://scripts.sil.org/OFL in Cinzel and https://openfontlicense.org
 in the five Spectral files. The name tables give no version. `fonts.css`, beside
 them, names the SIL Open Font License, Version 1.1.
 
+The licence texts are served beside them, since 21 October 2026 (#421), each
+the copy the project's own Google Fonts folder keeps with its copyright line:
+
+| File | What it is | sha256 |
+|---|---|---|
+| `marked-LICENSE.txt` | marked's `LICENSE.md` at its tag `v12.0.2`: the MIT licence for marked, and the BSD-style licence of the original Markdown it names | `8e3a3f82f59a60958f56ca08f445647c32a4733dc7ca6c2c46f6eb898471ab9c` |
+| `cinzel-OFL.txt` | `ofl/cinzel/OFL.txt` in https://github.com/google/fonts, the OFL 1.1 under Cinzel's copyright line | `f2b3029aba64c378bf0963b62945eee15e564fe4330b934c8f2eb058282b5e83` |
+| `spectral-OFL.txt` | `ofl/spectral/OFL.txt` there, the OFL 1.1 under Spectral's copyright line | `501d6ceca8e552630fe3aa9442b9a818565680a1a2f79f3fb8c13d6f309a9e98` |
+
 ## Not shipped by Thornswood
 
 - The rest of the collection. Each person installs every mod from Nexus Mods
@@ -802,7 +811,7 @@ pin points and are not listed separately here.
 |---|---|---|---|
 | `discord.py` | 2.7.1 | MIT | https://pypi.org/project/discord.py/2.7.1/ |
 | `Pillow` | 13.0.0 | MIT-CMU | https://pypi.org/project/Pillow/13.0.0/ |
-| `certifi` | 2026.7.22 | MPL-2.0 | https://pypi.org/project/certifi/2026.7.22/ |
+| `certifi` | 2026.10.19 | MPL-2.0 | https://pypi.org/project/certifi/2026.10.19/ |
 
 discord.py is by Rapptz. Pillow is by Jeffrey A. Clark (Alex) and contributors
 (the Historical Permission Notice and Disclaimer / MIT-CMU text on PyPI).
@@ -900,9 +909,6 @@ beside its `___systemPolyfill.js`.
   and the MIT and BSD ones ask for their notice to go with a binary. The two
   that are not permissive ask nothing of what ships today (antigo and
   frida-gum, under "The SkyMP client runtime, built from the fork").
-- The MIT and OFL texts are not on the site beside marked and the fonts. The
-  files keep their copyright lines and name their licences, as the copies
-  from npm and Google Fonts did.
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
 - The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro

@@ -56,7 +56,7 @@
       .\scripts\vps\Forecast-Storage.ps1 -Remove    take the task off, leaving the history
   -Install writes this file to C:\Thornswood-Watch\forecast-storage.ps1 and a
   task, "Thornswood Disk History", that runs it as SYSTEM every day at -At
-  (04:00 box time, after the 03:15 backup, so every sample is taken at the
+  (04:00 box time, after the 08:15 UTC backup, so every sample is taken at the
   same point in the day) with -Record, the history in
   C:\Thornswood-Watch\disk-history.jsonl and -Alerts on the watchdog's
   outbox. It then runs the task once and shows the first sample. Its own

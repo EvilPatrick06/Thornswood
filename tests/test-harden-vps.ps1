@@ -107,6 +107,13 @@ function Get-TermService {
 }
 function Stop-TermService { $global:Fake.term.Status = 'Stopped'; $global:Fake.log.Add('Stop-TermService') }
 function Disable-TermService { $global:Fake.term.StartType = 'Disabled'; $global:Fake.log.Add('Disable-TermService') }
+function Get-IdleService([string]$Name) {
+    $s = $global:Fake.svcs[$Name]
+    if (-not $s) { return $null }
+    return [pscustomobject]@{ Status = $s.Status; StartType = $s.StartType }
+}
+function Stop-IdleService([string]$Name) { $global:Fake.svcs[$Name].Status = 'Stopped'; $global:Fake.log.Add('Stop-IdleService ' + $Name) }
+function Disable-IdleService([string]$Name) { $global:Fake.svcs[$Name].StartType = 'Disabled'; $global:Fake.log.Add('Disable-IdleService ' + $Name) }
 function Test-SshdFile([string]$Path) {
     $global:Fake.checked.Add([IO.File]::ReadAllText($Path))
     return [pscustomobject]@{ Ok = [bool]$global:Fake.sshdOk; Said = 'line 12: Bad configuration option: KbdInteractiveAuthentication' }
@@ -135,6 +142,16 @@ function New-Fake {
             @{ Name = 'Thornswood-Game'; DisplayName = 'Thornswood game'; Action = 'Allow'; Group = ''; Ports = @('7777'); Enabled = $true }
         )
         term = @{ Status = 'Running'; StartType = 'Manual' }
+        # As the box had them on 21 Oct 2026 (#3186), less ShellHWDetection,
+        # which stands for one a box may not have installed, and Themes
+        # already stopped by hand but still set to start.
+        svcs = @{
+            Spooler = @{ Status = 'Running'; StartType = 'Automatic' }; DiagTrack = @{ Status = 'Running'; StartType = 'Automatic' }
+            SysMain = @{ Status = 'Running'; StartType = 'Automatic' }; Themes = @{ Status = 'Stopped'; StartType = 'Automatic' }
+            CDPSvc = @{ Status = 'Running'; StartType = 'Automatic' }; WpnService = @{ Status = 'Running'; StartType = 'Automatic' }
+            TrkWks = @{ Status = 'Running'; StartType = 'Automatic' }
+            sshd = @{ Status = 'Running'; StartType = 'Automatic' }; ThornswoodBot = @{ Status = 'Running'; StartType = 'Automatic' }
+        }
         sshdOk = $true
         restarts = 0
         rollback = ''
@@ -164,7 +181,7 @@ try {
     Yes 'vps-harden.ps1 parses' (-not $errs -or $errs.Count -eq 0)
     Yes '  and is plain ASCII, which Windows PowerShell on the box reads right without a byte order mark' (-not ($boxText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -203,6 +220,9 @@ try {
     Yes '  but does have sshd -t check the file it would write' ($global:Fake.checked.Count -eq 1 -and $global:Fake.checked[0] -match '(?m)^PasswordAuthentication no')
     Yes '  and has nothing of its own to delete, since it is never written on the box (#3035)' ($boxText -notmatch 'PSCommandPath|KeepSelf')
     Yes '  and its last line says nothing was changed' ($r.Lines[-1] -match '^DONE \d+ change\(s\) would be made\. Nothing was changed\.')
+    Yes '  says WOULD stop and disable each service the box never uses, with why (#3186)' ((Has $r.Lines '^WOULD Spooler stopped \(was Running\): print spooler') -and
+        (Has $r.Lines '^WOULD DiagTrack set to Disabled \(was Automatic\)') -and (Has $r.Lines '^WOULD TrkWks stopped'))
+    Yes '  and touches none of them' (@($global:Fake.svcs.Values | Where-Object { $_.StartType -eq 'Disabled' }).Count -eq 0 -and $global:Fake.svcs.Spooler.Status -eq 'Running')
 
     # ---- a real run -------------------------------------------------------------------
     $r = Invoke-BoxHere $cfg
@@ -229,6 +249,13 @@ try {
     Yes '  the rollback armed with the old file, then the restart, in that order' ($global:Fake.rollback -eq $backups[0].FullName -and
         $global:Fake.restarts -eq 1 -and $global:Fake.log.IndexOf('Register-Rollback') -lt $global:Fake.log.IndexOf('Start-SshdRestart'))
     Yes '  Remote Desktop before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Disable-TermService') -lt $global:Fake.log.IndexOf('Register-Rollback'))
+    $idle = 'Spooler', 'DiagTrack', 'SysMain', 'Themes', 'CDPSvc', 'WpnService', 'TrkWks'
+    Yes '  each service the box never uses stopped and Disabled (#3186)' (@($idle | Where-Object { $global:Fake.svcs[$_].Status -ne 'Stopped' -or $global:Fake.svcs[$_].StartType -ne 'Disabled' }).Count -eq 0)
+    Yes '  Themes, already stopped, only set to Disabled' (-not $global:Fake.log.Contains('Stop-IdleService Themes') -and $global:Fake.log.Contains('Disable-IdleService Themes') -and (Has $r.Lines '^ALREADY Themes stopped'))
+    Yes '  one not installed said and left' ((Has $r.Lines '^ALREADY ShellHWDetection is not installed') -and -not $global:Fake.svcs.ContainsKey('ShellHWDetection'))
+    Yes '  and nothing else touched: sshd and the bot still run and start' ($global:Fake.svcs.sshd.Status -eq 'Running' -and $global:Fake.svcs.sshd.StartType -eq 'Automatic' -and
+        $global:Fake.svcs.ThornswoodBot.Status -eq 'Running' -and @($global:Fake.log | Where-Object { $_ -match 'IdleService (sshd|ThornswoodBot)' }).Count -eq 0)
+    Yes '  the services before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Disable-IdleService TrkWks') -lt $global:Fake.log.IndexOf('Register-Rollback'))
     Yes '  every change printed as CHANGED' (@($r.Lines | Where-Object { $_ -match '^CHANGED ' }).Count -ge 7)
     Yes '  and the count is in the last line' ($r.Lines[-1] -match '^DONE \d+ change\(s\) made\.$')
 

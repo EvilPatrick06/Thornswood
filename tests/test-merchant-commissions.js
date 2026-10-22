@@ -36,6 +36,10 @@ const rows=allRows.filter(row=>row.deliveryVersion!==2),ranked=allRows.filter(ro
 const roles=Object.fromEntries(Object.entries(tables.tables).map(([name,table])=>[name,
  Object.fromEntries(Object.entries(table).map(([direction,descs])=>[direction,descs.map(id)]))]));
 const itemNames=new Map(allRows.flatMap(row=>(row.goods||[row]).map(good=>[good.itemId,'Goods '+good.itemId])));
+// The stand-in resolver looks a name up in this, built once. It spread the whole
+// map into an array and searched it on every call, which was 65 of the 100 s
+// this harness took (#3114).
+const itemByName=new Map();for(const [baseId,name] of itemNames)if(!itemByName.has(name))itemByName.set(name,{baseId,name});
 const merchants=[...new Map(allRows.map(row=>[row.merchantId,row])).values()];
 const legacyMerchants=[...new Map(rows.map(row=>[row.merchantId,row])).values()];
 function world(startingPurse=250) {
@@ -49,7 +53,7 @@ function world(startingPurse=250) {
   .concat([{merchantId:999,reference:'f:Skyrim.esm',state:null}]);
  const deps={purses,world:box,transfer:box.transfer,places:catalog.byRef,roleTables:roles,commissions:allRows,
   isTrader:merchant=>merchants.some(row=>row.merchantId===merchant),now:()=>time,
-  resolve:name=>{const found=[...itemNames].find(([,label])=>label===name);return found?{baseId:found[0],name:found[1]}:null;},
+  resolve:name=>{const found=itemByName.get(name);return found?{baseId:found.baseId,name:found.name}:null;},
   prices:{catalog:()=>[...itemNames.values()].map(name=>({name,buy:unit,sell:unit+1})),quote:()=>({buy:unit,sell:unit+1})},
   commissionEligible:(actor,gate)=>{if(deps.onRankRead)deps.onRankRead();return rules.allows(gate,standing);}};
  let api=bundle.createMerchantTrading(deps);

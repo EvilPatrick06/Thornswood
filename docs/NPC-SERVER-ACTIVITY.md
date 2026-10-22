@@ -112,7 +112,13 @@ reach, cooldown, damage, block, health, and death pipeline. Health, death, attac
 and terminal stop messages are reliable. Ordinary movement is unreliable, with
 one message per directly connected observer.
 
-Authority and private activity progress survive world saves. A gamemode reload
+Authority and private activity progress survive world saves. An NPC's
+activity record is written when it is taken on and when a fight or a flight
+starts or ends, never as it only wanders (#3180): each write saves the actor's
+whole record to disk, and until 22 Oct 2026 every NPC was written every 30
+seconds, about 5,000 files every 32 seconds on each server with nobody on.
+So after a server restart a wandering NPC starts where it was last written,
+inside its home, rather than where it had walked to. A gamemode reload
 cancels the old controller's timers and reconstructs routes from current saved
 positions. Temporary combat targets are not persisted. Saved faction removals,
 including an empty faction list, remain removed after reconstruction.
@@ -137,8 +143,8 @@ capabilities. Exact guild relocation is deferred.
 Verification uses the native suite, the shared runtime fixtures, and an offline
 run against the installed 48-plugin load order. The offline acceptance fixture
 requires all retained identities owned and accounted for within five simulated
-minutes, actual activity before and after a gamemode reload, saved sequence
-recovery, stationary position preservation, and less than 2 GiB RSS. Scheduled
+minutes, actual activity before and after a gamemode reload, no record
+rewritten while its mode stays the same, saved sequence recovery, stationary position preservation, and less than 2 GiB RSS. Scheduled
 activity callbacks must finish within 50 ms. A single cold native record load is
 indivisible and has a separate 100 ms ceiling; it cannot accumulate into a batch.
 No game or launcher is started by these checks. A real dev restart and a later

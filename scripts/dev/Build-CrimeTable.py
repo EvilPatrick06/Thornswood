@@ -47,7 +47,11 @@ quest, scene or dialogue fragment, and no Papyrus quest runs under SkyMP
 WHAT IT READS. Nothing but the plugins and their scripts: the five masters,
 then the plugins plugins.txt marks active (a line starting with *), in load
 order, last one wins. A line without * is a plugin that is installed and
-switched off, which the game does not load, so it is not read either.
+switched off, which the game does not load, so it is not read either. A
+folder with no script in it at all stops it (#3105): the scripts are in the
+archives, and a folder without them would say none of them can run. So
+does a folder that lacks a script the load order attaches, unless
+records\\papyrus-missing.json lists it as missing on a game PC too.
 
 WHAT IT WRITES. game\\data\\crime-factions.json, every faction that tracks
 crime with its flags, its amounts and the plugin whose record won, and the
@@ -89,6 +93,8 @@ def _load(name, file):
 # Build-DoorTable.py already reads a plugin: the header, the master list, a
 # form id as <hex>:<plugin>, compressed records.
 dt = _load('door_table', 'Build-DoorTable.py')
+# Audit-PapyrusEvents.py reads the scripts and says which can run.
+ape = _load('papyrus_audit', 'Audit-PapyrusEvents.py')
 
 # FACT DATA flags, as the record and SKSE's SetFactionFlag both number them.
 TRACK_CRIME = 0x40
@@ -217,7 +223,6 @@ def charges(row, defaults):
 def read_scripts(data, plugins_txt):
     """Every script that calls a native touching a bounty, and whether it can
     run under Thornswood, by Audit-PapyrusEvents.py's own reading."""
-    ape = _load('papyrus_audit', 'Audit-PapyrusEvents.py')
     rule = ape.load_rule(ape.RECORD)
     stats = defaultdict(int)
     stats['unreadable archives'] = []
@@ -267,8 +272,17 @@ def read_scripts(data, plugins_txt):
         else:
             row['why'] = 'no record in the load order carries it'
         rows[c['name']] = row
+    missing = set((p['plugin'], n) for p in result['plugins'] for n in p.get('missingScripts', []))
     return {'read': len(parsed.parsed), 'unreadable': len(parsed.bad),
-            'rule': 'records/papyrus-events.json at ' + str(rule.read_at), 'scripts': rows}
+            'rule': 'records/papyrus-events.json at ' + str(rule.read_at), 'scripts': rows}, missing
+
+
+def known_missing(path):
+    """(plugin, script) pairs, in lower case, that records/papyrus-missing.json
+    says the load order attaches and no archive or loose file carries."""
+    with io.open(path, encoding='utf-8') as fh:
+        rec = json.load(fh)
+    return set((p.lower(), n.lower()) for p, names in rec['missing'].items() for n in names)
 
 
 def main():
@@ -280,6 +294,8 @@ def main():
     ap.add_argument('--check', action='store_true', help='say what it found, write nothing')
     ap.add_argument('--json', help='with --check: write the reading here instead')
     ap.add_argument('--no-scripts', action='store_true', help='read the factions only')
+    ap.add_argument('--known-missing', default=os.path.join(HERE, '..', '..', 'records', 'papyrus-missing.json'),
+                    help='the scripts the load order attaches and does not carry, as measured on a game PC')
     args = ap.parse_args()
 
     if not os.path.isfile(args.plugins) or not os.path.isdir(args.data):
@@ -326,7 +342,25 @@ def main():
     if not args.no_scripts:
         print('')
         print('Scripts (Audit-PapyrusEvents.py reads every script; this takes a minute)')
-        scripts = read_scripts(args.data, args.plugins)
+        try:
+            scripts, missing = read_scripts(args.data, args.plugins)
+        except ape.NoScripts as exc:
+            print('STOP. %s' % exc)
+            return 1
+        known = known_missing(args.known_missing)
+        lacks = sorted((p, n) for p, n in missing if (p.lower(), n.lower()) not in known)
+        if lacks:
+            # A folder that carries some scripts and not others (the box with
+            # Skyrim - Misc.bsa and none of the mods' archives, #3105) would
+            # call every script it lacks one that cannot run.
+            print('STOP. %d script(s) the load order attaches are not in %s, and %s does not list them: %s'
+                  % (len(lacks), args.data, os.path.basename(args.known_missing),
+                     ', '.join('%s %s' % pn for pn in lacks[:12]) + (' and %d more' % (len(lacks) - 12) if len(lacks) > 12 else '')))
+            return 1
+        found = len(known) - len(set((p.lower(), n.lower()) for p, n in missing) & known)
+        if found:
+            print('  %d script(s) %s lists as missing are here now; take them out of it'
+                  % (found, os.path.basename(args.known_missing)))
         rows = scripts['scripts']
         adds = [n for n in rows if set(rows[n]['natives']) & ADDS]
         live_adds = [n for n in adds if rows[n]['canFire']]
