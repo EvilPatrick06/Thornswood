@@ -1,13 +1,13 @@
 {
   "_note": "What the server in this release is, and the source it was built from: every file the fork builds into it, by hash, and the one fork commit (scripts\\deploy\\ServerBuild.ps1 says which files). sha256 is the binary's. Export-ServerPayload, Publish-Server, Deploy-Server and the installer refuse any server file that is not this. Regenerate with scripts\\release\\New-ServerBuildRecord.ps1 after every rebuild.",
   "binary": "scam_native.node",
-  "sha256": "77765e98919769a994dc853dc9ee04a1689f05ad44646040aa61fb4ab12e5475",
-  "bytes": 5852160,
-  "builtUtc": "2026-10-22T09:44:43Z",
+  "sha256": "d8eed55049231e9d76fc7ee1da9a2976a2ce7dc8b3ee9c638bdb297bf77259c3",
+  "bytes": 5859328,
+  "builtUtc": "2026-10-22T10:51:04Z",
   "source": {
     "repo": "https://github.com/EvilPatrick06/skymp.git",
     "branch": "thornswood/engine-changes",
-    "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83",
+    "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54",
     "upstream": "https://github.com/skyrim-multiplayer/skymp.git",
     "upstreamBase": "2849e676fe008925384b26f34476e382a30bd877"
   },
@@ -15,37 +15,37 @@
     "data/scripts/ActiveMagicEffect.pex": {
       "sha256": "64786095c2c41dee014fb49f8d757319f359cfcdcc5ea2a5ff8a525fa7c22a80",
       "bytes": 614,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "dist_back/skymp5-server.js": {
       "sha256": "01f1481e31d0ef921b18593267181051c832705192e591d42c771851f155bee1",
       "bytes": 3152270,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "dist_back/skymp5-server.js.map": {
       "sha256": "46dfa95efd55b81dc3a703936fd40f085697a42867f4f1612d5c3aa32df31b95",
       "bytes": 10299527,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "launch_server.bat": {
       "sha256": "a8d8bb765faec67716588faf11d3b5f8770168f97f0d9dfd7cdfd703b9324d0c",
       "bytes": 40,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "package.json": {
       "sha256": "7d320f14b25542c6292af76bb05d87a5d2d09f8f9b4db5d77c5f932e58d98c2f",
       "bytes": 1613,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "scam_native.node": {
-      "sha256": "77765e98919769a994dc853dc9ee04a1689f05ad44646040aa61fb4ab12e5475",
-      "bytes": 5852160,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "sha256": "d8eed55049231e9d76fc7ee1da9a2976a2ce7dc8b3ee9c638bdb297bf77259c3",
+      "bytes": 5859328,
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     },
     "yarn.lock": {
       "sha256": "5396e465622bef1594e82b362464319aef520b7248761d2daa4352b88ad6a65e",
       "bytes": 90322,
-      "commit": "44ad40da310cbd612653133c8cbcba67bbcc0d83"
+      "commit": "fdc21f331c2970ab13d4326435247b144b8f3a54"
     }
   },
   "recorded": "2026-10-22",

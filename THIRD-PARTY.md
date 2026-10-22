@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `44ad40da` (in full, `44ad40da310cbd612653133c8cbcba67bbcc0d83`). That
+commit `fdc21f33` (in full, `fdc21f331c2970ab13d4326435247b144b8f3a54`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -258,7 +258,7 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`44ad40da`, the commit the client record names (the same 68 files, byte for
+`fdc21f33`, the commit the client record names (the same 68 files, byte for
 byte, as at `445ded38`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
@@ -767,7 +767,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `44ad40da310cbd612653133c8cbcba67bbcc0d83` on the public fork. The
+  name `fdc21f331c2970ab13d4326435247b144b8f3a54` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -817,10 +817,13 @@ with.
   or a crafting bench goes through the server before the game starts it
   (#3080), since `fd2be02b` the server's own NPC movement never saves
   on a timer (#3180), since `baf0aae3` the client logs the head parts
-  it puts on a record (#2025), and since `44ad40da` a native crash of the
-  server is recorded by Windows (#1267). The server module's SHA256
-  is `77765e98919769a994dc853dc9ee04a1689f05ad44646040aa61fb4ab12e5475`, built
-  2026-10-22T09:44:43Z. This is the recorded next release, not a deployment
+  it puts on a record (#2025), since `44ad40da` a native crash of the
+  server is recorded by Windows (#1267), and since `fdc21f33` the server
+  asks the gamemode before a health write kills (#1626) and an inventory
+  difference with a client closes instead of being left alone (#2146).
+  The server module's SHA256
+  is `d8eed55049231e9d76fc7ee1da9a2976a2ce7dc8b3ee9c638bdb297bf77259c3`, built
+  2026-10-22T10:51:04Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -855,7 +858,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/44ad40da310cbd612653133c8cbcba67bbcc0d83
+https://github.com/EvilPatrick06/skymp/tree/fdc21f331c2970ab13d4326435247b144b8f3a54
 
 For the engine Main runs until then:
 

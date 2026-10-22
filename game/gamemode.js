@@ -6210,6 +6210,30 @@ function killPieces(actorId) {
 }
 
 /**
+ * ASKED BEFORE A DEATH (#1626). The engine raises onDying when a write is about
+ * to take somebody's health to nothing (a blow, a spell, a bleed, or a write of
+ * this file's own), before the zero or the death is sent to any machine
+ * (MpActor::NetSetPercentages and SetPercentage in the fork, skymp #101).
+ * false refuses the death: nothing of it is sent, mp.onDeath is not raised, and
+ * the engine keeps them alive at dyingHealth, a share of their most like
+ * percentages, which only this handler can write. Anything else lets the death
+ * go on to mp.onDeath below.
+ *
+ * Cheat Death answers first (#1385). Going down (#2681, docs/systems/injury.md)
+ * is the second answer and is not built yet. Nothing here may ask
+ * cheatDeath() about anything but this death: it spends its day when it says
+ * yes.
+ */
+mp.onDying = guard('onDying', function (actorId) {
+  const perks = globalThis.__thornswoodPerks;
+  if (!perks || !perks.cheatDeath) { return undefined; }
+  const kept = perks.cheatDeath(actorId);
+  if (!(kept > 0)) { return undefined; }
+  mp.set(actorId, 'dyingHealth', kept);
+  return false;
+});
+
+/**
  * Set the arrival point at the moment of death, while we still know where the
  * body fell. The engine reads spawnPoint when the respawn timer expires.
  *
@@ -51660,17 +51684,12 @@ return module.exports;
   is when a perk that waits may fire again, and that is this block's.
 
   WHAT EACH ONE DOES HERE, AND WHAT THE SERVER CANNOT DO.
-    Cheat Death        NOT IN THE GAME YET. The engine ends somebody the
-                       moment a write takes health to nothing
-                       (MpActor::SetPercentages calls Kill), and Kill sends
-                       the death to every machine before mp.onDeath is asked
-                       (SendAndSetDeathState, then DeathEvent). So by the time
-                       the server hears of it you are already dead, and
-                       standing the body back up would be a death undone,
-                       which is a band-aid (Developer-Guide.md, "Fix the
-                       cause"). The engine has to ask before it kills.
-                       cheatDeath() is the answer it will get, and the clock
-                       is kept now, so that engine change is all that is left.
+    Cheat Death        The engine asks mp.onDying before a write that takes
+                       health to nothing kills, before anything is sent
+                       (#1626, skymp #101). cheatDeath() is the answer: once a
+                       day it refuses the death and names the share of the
+                       most that is 1 health, and the engine keeps them there.
+                       Nobody sees a death, because none was sent.
     Troll's Blood      During a fight, 2 health a second, through the engine's
                        own Actor.RestoreActorValue, so in the engine's own
                        units, the ones every blow is dealt in. A fight is a hit
@@ -51793,9 +51812,8 @@ return module.exports;
     none marks a perk of which nothing is in the game yet.
   */
   var PERKS = {
-    cheatdeath:        { name: 'Cheat Death', skill: 'vitality', every: DAY, health: 1, none: true,
-                         say: 'Once a day, the blow that would kill you leaves you at 1 health.',
-                         not: 'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.' },
+    cheatdeath:        { name: 'Cheat Death', skill: 'vitality', every: DAY, health: 1,
+                         say: 'Once a day, the blow that would kill you leaves you at 1 health.' },
     trollsblood:       { name: 'Troll\'s Blood', skill: 'fortitude', perSecond: 2,
                          say: 'During a fight, health returns at 2 a second.' },
     devastatingblow:   { name: 'Devastating Blow', skill: 'might', more: 0.25,
@@ -51989,21 +52007,50 @@ return module.exports;
 
   // ------------------------------------------------------------ Cheat Death --
   /*
-    THE ONE CHECK THE ENGINE'S DEATH WILL ASK, once the engine asks before it
-    kills (see Cheat Death at the top of this block). True when Cheat Death
-    takes this death: the clock is written first and the person is told, and
-    the engine is to leave them at 1 health instead of killing them. False is
-    an ordinary death. Nothing calls it yet, and mp.onDeath must not: by then
-    the death has been sent.
+    THE ONE CHECK mp.onDying ASKS (#1626), for a death the engine is about to
+    make and has sent nothing of. When Cheat Death takes it: the clock is
+    written first, the person is told, and the answer is the share of their
+    most that is 1 health, which the engine keeps them at. 0 is an ordinary
+    death. mp.onDeath must never ask it: by then the death has been sent.
+
+    THE MOST IS THE ONE THEIR BAR IS DRAWN AGAINST: the engine's own, from the
+    race and the base (engineMost in the maneuvers block, as
+    GetBaseActorValues works it out), plus the health the client's map adds,
+    Vitality's 10 a point among it (effectsOf in the character block). A share
+    is of that, the way the client sets it (setActorValuePercentage). Health
+    from gear or a potion the server cannot see is not in it, so with a
+    Fortify Health running 1 health comes out a little over 1. It is read
+    before the clock is touched, so a most that cannot be read spends no day:
+    the death goes ahead and the log says why.
   */
+  function mostHealth(actorId) {
+    var M = g.__thornswoodManeuvers;
+    var ch = g.__thornswoodCharacter;
+    if (!M || !M.engineMost || !ch || !ch.effectsOf) { return NaN; }
+    var base = Number(M.engineMost(actorId, 'health')) || 0;
+    if (!(base > 0)) { return NaN; }
+    var map = ch.effectsOf(actorId);
+    return base + ((map && typeof map.health === 'number') ? map.health : 0);
+  }
+
   function cheatDeath(actorId) {
-    if (!actorId || !personOf(actorId)) { return false; }
-    if (!heldIn(stateOf(actorId)).cheatdeath) { return false; }
-    if (!take(actorId, 'cheatdeath', now())) { return false; }
+    if (!actorId || !personOf(actorId)) { return 0; }
+    if (!heldIn(stateOf(actorId)).cheatdeath) { return 0; }
+    var most = NaN;
+    try {
+      most = mostHealth(actorId);
+    } catch (e) {
+      plog('reading the most health of', hex(actorId), 'threw:', e);
+    }
+    if (!(most > 0)) {
+      plog('Cheat Death could not read the most health of', hex(actorId) + ', so it does not fire');
+      return 0;
+    }
+    if (!take(actorId, 'cheatdeath', now())) { return 0; }
     fired(actorId, 'cheatdeath');
     tell(actorId, 'Cheat Death. The blow that would have killed you leaves you at ' +
                   PERKS.cheatdeath.health + ' health. It comes back in 24 hours.');
-    return true;
+    return Math.min(1, PERKS.cheatdeath.health / most);
   }
 
   // -------------------------------------------------------------- the hits --
@@ -52304,7 +52351,8 @@ return module.exports;
     if (next > 1) { next = 1; }
     if (next <= 0) {
       next = 0;
-      // The engine kills on this write with nobody named; mp.onDeath asks.
+      // The engine asks mp.onDying on this write with nobody named, and
+      // mp.onDeath asks this block who it was.
       if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
@@ -52519,15 +52567,15 @@ return module.exports;
     that wait between firings: { <key>: { ready: <ms> } }, and until: <ms> on
     Font of Magic while it runs. ready is when it may fire again, 0 for never
     fired. Times, not time left, so the view is the same until a perk fires
-    and the panel counts down against its own clock. Cheat Death is left out:
-    nothing in the game fires it yet. null when there is nothing to show.
+    and the panel counts down against its own clock. null when there is
+    nothing to show.
   */
   function clocks(actorId, s) {
     var mine = heldIn(s);
     var out = null;
     for (var i = 0; i < ORDER.length; i++) {
       var k = ORDER[i];
-      if (!mine[k] || !PERKS[k].every || PERKS[k].none) { continue; }
+      if (!mine[k] || !PERKS[k].every) { continue; }
       out = out || {};
       out[k] = { ready: readyAt(actorId, k) };
       if (k === 'fontofmagic' && has(ST.font, actorId) && ST.font[actorId].until > now()) {
@@ -53405,7 +53453,8 @@ mp.onSpellCast = guard('onSpellCast', function (casterId, spell, asked) {
     if (next > 1) { next = 1; }
     if (next <= 0) {
       next = 0;
-      // The engine kills on this write with nobody named; mp.onDeath asks.
+      // The engine asks mp.onDying on this write with nobody named, and
+      // mp.onDeath asks this block who it was.
       if (killer) { ST.blow[target] = { by: killer.by, identity: killer.identity, at: now() }; }
     }
     if (has(ST.blow, target) && next <= 0) { ST.blow[target].target = targetLife(target); }
@@ -59412,13 +59461,13 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
   undefined and true let it through, false refuses it (except in the Papyrus
   family, where it refuses nothing), and a throw is logged and lets it
   through. So a handler with no opinion returns nothing at all.
-  Twelve events have a fixed name, and they come first. Two families build
+  Thirteen events have a fixed name, and they come first. Two families build
   their name when they fire: the Papyrus family, onPapyrusEvent:<Name>, which
   is the one that hears hits and spells and has its own heading below, and
   custom events, whose name is whatever the client sent (CUSTOM EVENTS AND
   PACKETS).
 
-  THE TWELVE WITH A FIXED NAME.
+  THE THIRTEEN WITH A FIXED NAME.
 
     onActivate    Pressing E on anything. mp.onActivate refuses on named paths
                   only: a bench that is not theirs, a locked door whose client
@@ -59449,6 +59498,10 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
                   and unverified item identities are refused. MpActor::DropItem stops before RemoveItems on a
                   false. Gold cannot be dropped at all: DropItem returns before
                   the event is raised for Gold001.
+    onDying       Health about to reach nothing, asked before the engine
+                  kills and before anything is sent (#1626). mp.onDying
+                  refuses only for Cheat Death, and then writes dyingHealth,
+                  the health the engine keeps them at.
     onDeath       Anything dying. mp.onDeath never refuses. It logs a person's
                   death with the killer's id, and that line is the only record
                   of a fight this file keeps. The hits before it raise
@@ -59499,7 +59552,7 @@ mp.onPutItem = guard('onPutItem', function (containerRefrId, actorId, baseId, co
 
   THE PAPYRUS FAMILY, mp['onPapyrusEvent:<Name>']. Every Papyrus event the
   engine sends goes through MpForm::SendPapyrusEvent, which wraps it in a
-  PapyrusEventEvent and fires it the way the twelve above are fired, under
+  PapyrusEventEvent and fires it the way the thirteen above are fired, under
   the name "onPapyrusEvent:" followed by the Papyrus name. A handler is called
   with the id of the form the event is sent on, then the Papyrus arguments
   (PapyrusUtils::GetJsValueFromPapyrusValue): a form as { type: 'form', desc },
@@ -65835,13 +65888,13 @@ module.exports = {
   a physicker setting a bone. Yours from the inventory, somebody else's from
   the look prompt, both through one panel (game/ui/thornswood-treat.js).
 
-  GOING DOWN IS NOT HERE, AND WHY. Health reaching zero is the engine's death.
-  MpActor::Kill applies the death, sends it to every client and starts the
-  respawn timer before mp.onDeath is told anything, so there is no moment in
-  which this file could say "down, not dead". Faking one by standing the body
-  back up afterwards would be the band-aid the guide bans. What the fork has
-  to expose is written on #1383. Until then a bleed that empties your health
-  is a death with no killer, the world's, and the temple keeps your wounds.
+  GOING DOWN IS NOT HERE YET. The engine now asks mp.onDying before health
+  reaching zero kills, before anything is sent (#1626), so that is the moment
+  this file can say "down, not dead": refuse the death and keep them at a
+  health of its own. The rest of going down (the downed flag the clients are
+  sent, no fighting or casting while down, being stabilized, the wake) is
+  #2681. Until it is built a bleed that empties your health is a death with
+  no killer, the world's, and the temple keeps your wounds.
   ============================================================================
 */
 (function () {
