@@ -197,7 +197,7 @@ try { `$h = Invoke-RestMethod 'http://127.0.0.1:$Port/health' -TimeoutSec 5; `$t
   and this says so.
 
   Dev voice, C:\Thornswood-Voice-Dev (the folder every dev install names,
-  docs\SYSTEM.md), takes the dev server's numbers, the record's dev object;
+  docs\SERVER.md), takes the dev server's numbers, the record's dev object;
   any other folder is the live service and takes main's (Patrick, 12 Oct:
   dev voice at most 5).
 #>

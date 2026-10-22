@@ -6,10 +6,10 @@
 // says>`: the script, a colon, and the thing in it that holds what the
 // sentence says, in the script's own words. Never a line number.
 //
-// WHY THIS EXISTS. Issue #1075: docs\SYSTEM.md, GAMEMODE.md and FEED.md cited
+// WHY THIS EXISTS. Issue #1075: docs\SERVER.md, GAMEMODE.md and FEED.md cited
 // script lines (`Deploy-Server.ps1:39`, `Publish-Server.ps1:415-520`) that
 // held something else by the time anybody followed them, and #1067 found the
-// Watchdog row on SYSTEM.md pointing at a header sentence and the inside of
+// Watchdog row on SERVER.md pointing at a header sentence and the inside of
 // BackupProblem. Every edit above a cited line moves it, so a page that cites
 // line numbers is wrong after the next merge into that script, and nothing
 // said so. A name moves with its line. It goes wrong only when the thing
@@ -90,7 +90,7 @@ yes('there are scripts to read them against, ' + scripts.length + ' of them', sc
 // what follows it.
 const CITE = /^((?:[\w.-]+[\\/])*)([\w.-]+\.(?:ps1|cs|js|py|md)|Caddyfile):([\s\S]+)$/i;
 const LINES = /^\s*\d[\d\s,-]*$/;
-const WIDE = ['docs/SYSTEM.md', 'docs/FEED.md', 'docs/GAMEMODE.md', 'docs/GLOSSARY.md',
+const WIDE = ['docs/SERVER.md', 'docs/FEED.md', 'docs/GAMEMODE.md', 'docs/GLOSSARY.md',
   'docs/VIRUSTOTAL-FALSE-POSITIVE.md', 'docs/systems/commands.md'];
 function isScript(file) { return /\.ps1$/i.test(file); }
 

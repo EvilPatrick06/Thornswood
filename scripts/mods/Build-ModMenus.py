@@ -15,7 +15,7 @@ mods (#3113), the way it makes the main menu from the game's (#2827).
 WHY
 
 An item on Thornswood has no gold price: "What it sells for is the price a
-person posts" (docs\\systems\\professions.md, docs\\SYSTEMS.md). Patrick, 21 Oct
+person posts" (docs\\systems\\professions.md, docs\\GAME-SYSTEMS.md). Patrick, 21 Oct
 2026, on the report page: "this is an RP server and the gold prices listed dont
 even matter also one of the things was supposed to remove the listed prices
 entirly". Measured 21 Oct from the collection's own archives (revision 4: SkyUI

@@ -45752,7 +45752,7 @@ module.exports = {
   on it.
 
   /embassy AND /remnant ARE STAFF COMMANDS. Only an admin uses them, and
-  nobody else is told to type anything (docs/SYSTEMS.md, "Buttons, not
+  nobody else is told to type anything (docs/GAME-SYSTEMS.md, "Buttons, not
   commands"). The person a change is about is told in their own chat when
   they are put on a roll, marked armed or not, or taken off.
 

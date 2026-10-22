@@ -104,7 +104,7 @@ link, and the old line goes.
 ## Items and coin
 
 - **An item has no gold price.** What it sells for is the price a person
-  posts. Nothing is balanced against an item's gold worth. docs/SYSTEMS.md
+  posts. Nothing is balanced against an item's gold worth. docs/GAME-SYSTEMS.md
   (Work) and docs/systems/professions.md; re-cost against gold dropped
   21 Oct 2026,
   [#613](https://github.com/EvilPatrick06/Thornswood/issues/613#issuecomment-6326847193).
@@ -162,7 +162,7 @@ link, and the old line goes.
 
 - **Nothing people do in the world is a chat command**; commands are for
   staff and dev. The few that stay commands are listed in
-  docs/SYSTEMS.md, "Buttons, not commands". 4 Oct 2026.
+  docs/GAME-SYSTEMS.md, "Buttons, not commands". 4 Oct 2026.
 - **A problem report has both doors**: the Discord button and an in-game
   button. 21 Oct 2026,
   [#3155](https://github.com/EvilPatrick06/Thornswood/issues/3155#issuecomment-6333339922).

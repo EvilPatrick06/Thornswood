@@ -3,7 +3,7 @@
 Every line starting with a slash that the game answers, who may use it,
 what it does, where it is read, and where people are told about it.
 
-The rule is on [Thornswood systems](../SYSTEMS.md), "Buttons, not
+The rule is on [Thornswood systems](../GAME-SYSTEMS.md), "Buttons, not
 commands". Decided by Patrick on 4 Oct: anything a person does in the
 world is a key, a prompt, a panel, or the thing itself activated. Staff
 and dev commands stay commands. Each command for people below has an

@@ -180,7 +180,7 @@ if (block && RECIPES && ADMIN_ITEMS) {
     const remRefused = run(env, STEWARD, 0x16, '/remnant add Person1');
     yes('R3 nor the remnant roll, which is an application', env.E.rolls().remnant.length === 0 && /application/.test(remRefused));
     run(env, ADMIN, 0x14, '/embassy add Person1 armed');
-    // docs/SYSTEMS.md, "Buttons, not commands": nothing here is for people to type.
+    // docs/GAME-SYSTEMS.md, "Buttons, not commands": nothing here is for people to type.
     const own = run(env, NOBODY, 0xff001001, '/embassy');
     yes('R3 /embassy is a staff command: somebody on the roll who types it is told only that an admin writes it',
         own === 'Only an admin writes the embassy roll.');
