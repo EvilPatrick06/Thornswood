@@ -52,10 +52,20 @@ $calls = @($ast.FindAll({
 Yes 'it sends the keys with Invoke-ThornswoodSecretRemote, once' ($calls.Count -eq 1)
 if ($calls.Count -ne 1) { Done }
 $call = $calls[0].Extent.Text
+# What the box does with the secret is built once, as $farTail, for this call
+# and -FromCloudflare's alike; it is lifted the same way.
+$tails = @($ast.FindAll({
+    param($n)
+    $n -is [System.Management.Automation.Language.AssignmentStatementAst] -and $n.Left.Extent.Text -eq '$farTail'
+}, $true))
+Yes 'the far side''s writing and restart are built once, as $farTail' ($tails.Count -eq 1)
+if ($tails.Count -ne 1) { Done }
+$tail = $tails[0].Extent.Text
 $text = Get-Content -LiteralPath $ScriptPath -Raw
 Yes 'it loads the block Deploy-Docs -Password uses' ($text.Contains(". (Join-Path `$Here 'SiteConfigSet.ps1')"))
 Yes 'its far side sets both keys through that block, the site key first' (
-    $call.IndexOf("-Key 'turnstileSiteKey'") -gt 0 -and $call.IndexOf("-Key 'turnstileSecret'") -gt $call.IndexOf("-Key 'turnstileSiteKey'"))
+    $tail.IndexOf("-Key 'turnstileSiteKey'") -gt 0 -and $tail.IndexOf("-Key 'turnstileSecret'") -gt $tail.IndexOf("-Key 'turnstileSiteKey'"))
+Yes 'and the call sends that far side' ($call.Contains('$farTail'))
 Yes 'it asks for the secret hidden, never as a parameter' (
     $text.Contains('Read-ThornswoodSecret') -and -not ($ast.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -match 'Secret' }))
 . (Join-Path $Root 'scripts\deploy\SiteConfigSet.ps1')
@@ -124,6 +134,7 @@ function Run-Call([string]$docsWin, [string]$siteKey, [string]$secretValue, [boo
     $PublicSiteKey = $siteKey; $secret = $secretValue
     $want = if ($isOff) { 'off' } else { 'on' }
     $env:TW_CFG = Join-Path $docsWin 'config.json'
+    . ([ScriptBlock]::Create($tail))
     try { return @(. ([ScriptBlock]::Create($call)) | ForEach-Object { [string]$_ }) }
     finally { Remove-Item Env:\TW_CFG -ErrorAction SilentlyContinue }
 }
