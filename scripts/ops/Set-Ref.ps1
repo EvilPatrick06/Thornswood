@@ -239,89 +239,47 @@ if ($PSCmdlet.ParameterSetName -eq 'Delete') {
     if (-not (Test-RefName $DeleteBranch)) { Die "'$DeleteBranch' is not a branch name this deletes. Nothing was changed." }
 }
 
-# The run the dispatch started, once GitHub has named it. From then on the
-# change is GitHub's to make, so a read that fails is said as that, with the
-# line that reads the answer later, and never as nothing having been asked.
-$sentRun = 0
-
-# One GET, its answer as an object; a refusal stops the script with why.
-# -NotYet: GitHub's Not Found means not served yet, and comes back as $null.
-function Get-GitHub([string]$path, [switch]$NotYet) {
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $o = @(& gh api $path 2>&1 | ForEach-Object { "$_" })
-    $c = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($c -ne 0) {
-        if ($NotYet -and ($o -join ' ') -match '\(HTTP 404\)') { return $null }
-        $why = "GitHub answered GET $path with: " + (($o | Select-Object -Last 2) -join ' ')
-        if ($sentRun) { Unread $why }
-        Die $why
-    }
-    return (($o -join "`n") | ConvertFrom-Json)
-}
-
-# Asked, and the answer not read: exit 2, as for a run that has not ended.
-function Unread([string]$why) {
-    Say ("GitHub started run $sentRun with it, and the run makes the change. Its answer was not read here: $why") 'Yellow'
-    Say ('  its answer: pwsh scripts/ops/Set-Ref.ps1 ' + $(if ($Fork) { '-Fork ' } else { '' }) + '-Run ' + $sentRun) 'DarkGray'
-    exit 2
-}
+. (Join-Path $PSScriptRoot 'WorkflowRun.ps1')
+$again = 'pwsh scripts/ops/Set-Ref.ps1 ' + $(if ($Fork) { '-Fork ' } else { '' }) + '-Run '
 
 # Waits for the run to end, then reads what the runner said: the Set-Ref
-# annotation on its job. A run GitHub has only just named can be Not Found
-# for a moment (#3081), which is one more state of the wait, as Say-Staff
-# reads it.
-function Read-RunAnswer([long]$id, [switch]$Started) {
-    $runPath = "repos/$GitHubRepo/actions/runs/$id"
-    $deadline = [DateTime]::UtcNow.AddMinutes($WaitMinutes)
-    $run = Get-GitHub $runPath -NotYet:$Started
-    $told = ''
-    while (-not $run -or $run.status -ne 'completed') {
-        $state = if ($run) { $run.status } else { 'not served by GitHub yet' }
-        if ([DateTime]::UtcNow -gt $deadline) {
-            Say ("the run has not ended after $WaitMinutes minutes (it was " + $state + '), so every runner is busy. It still makes the change when one takes it.') 'Yellow'
-            Say ('  its answer then: pwsh scripts/ops/Set-Ref.ps1 ' + $(if ($Fork) { '-Fork ' } else { '' }) + '-Run ' + $id) 'DarkGray'
-            if ($run) { Say ('  ' + $run.html_url) 'DarkGray' }
+# annotation on its job. -Started: this session started it, so from then on
+# the change is GitHub's to make, and a read that fails is said as that, with
+# the line that reads the answer later, never as nothing having been asked.
+function Read-Answer([long]$id, [switch]$Started) {
+    $a = Read-ThornswoodRunAnswer -Repo $GitHubRepo -Workflow $workflow -Run $id -Title 'Set-Ref' -WaitMinutes $WaitMinutes -Started:$Started -Say { param($m) Say $m 'DarkGray' }
+    switch ($a.State) {
+        'answer' { return $a.Text }
+        'waiting' {
+            Say ("the run has not ended after $WaitMinutes minutes (it was " + $a.Text + '), so every runner is busy. It still makes the change when one takes it.') 'Yellow'
+            Say ('  its answer then: ' + $again + $id) 'DarkGray'
+            if ($a.Url) { Say ('  ' + $a.Url) 'DarkGray' }
             exit 2
         }
-        if ($told -ne $state -and $state -ne 'in_progress') {
-            if ($run) { Say ('  waiting for a runner (' + $state + ')') 'DarkGray' } else { Say '  started; GitHub does not serve the new run yet' 'DarkGray' }
-            $told = $state
+        'unread' {
+            if (-not $Started) { Die $a.Text }
+            Say ("GitHub started run $id with it, and the run makes the change. Its answer was not read here: " + $a.Text) 'Yellow'
+            Say ('  its answer: ' + $again + $id) 'DarkGray'
+            exit 2
         }
-        Start-Sleep -Seconds 5
-        $run = Get-GitHub $runPath -NotYet:($Started -and -not $run)
+        'stopped' { Die ('the runner stopped: ' + $a.Text + ' (' + $a.Url + ')') }
+        'other' { Die ($a.Text + '.') }
     }
-    if ($run.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a $workflow run (it is " + $run.path + ').') }
-    $notes = @()
-    foreach ($job in @((Get-GitHub "$runPath/jobs").jobs)) {
-        $notes += @(Get-GitHub ("repos/$GitHubRepo/check-runs/" + $job.id + '/annotations') | Where-Object { $_.title -eq 'Set-Ref' })
-    }
-    $done = @($notes | Where-Object { $_.annotation_level -eq 'notice' }) | Select-Object -Last 1
-    if ($done) { return ([string]$done.message).Trim() }
-    $why = @($notes | Where-Object { $_.annotation_level -eq 'failure' }) | Select-Object -Last 1
-    if ($why) { Die ('the runner stopped: ' + ([string]$why.message).Trim() + ' (' + $run.html_url + ')') }
-    Die ('the run ended ' + $run.conclusion + ' without an answer, so nothing it knows of was changed. Its log says why: ' + $run.html_url)
+    Die ($a.Text + ', so nothing it knows of was changed. Its log says why: ' + $a.Url)
 }
 
 if ($PSCmdlet.ParameterSetName -eq 'Run') {
-    $answer = Read-RunAnswer $Run
+    $answer = Read-Answer $Run
 } else {
     $inputs = if ($PSCmdlet.ParameterSetName -eq 'Tag') { [ordered]@{ tag = $Tag; commit = $Commit; message = $Message } } else { [ordered]@{ delete_branch = $DeleteBranch; commit = $Commit } }
-    # The body on gh's standard input, so the message is on no command line.
-    $body = [ordered]@{ ref = 'main'; inputs = $inputs; return_run_details = $true } | ConvertTo-Json -Compress
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    $o = @($body | & gh api -X POST "repos/$GitHubRepo/actions/workflows/$workflow/dispatches" --input - 2>&1 | ForEach-Object { "$_" })
-    $c = $LASTEXITCODE
-    $ErrorActionPreference = $old
-    if ($c -ne 0) { Die ("GitHub did not start $workflow in ${GitHubRepo}: " + (($o | Select-Object -Last 2) -join ' ') + '. Nothing was changed.') }
-    $started = ($o -join "`n") | ConvertFrom-Json
-    if (-not $started.PSObject.Properties['workflow_run_id'] -or -not $started.workflow_run_id) {
-        Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow) 'Yellow'
+    try { $started = Start-ThornswoodWorkflow -Repo $GitHubRepo -Workflow $workflow -Inputs $inputs }
+    catch { Die ($_.Exception.Message + '. Nothing was changed.') }
+    if (-not $started.Run) {
+        Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: ' + $started.Url) 'Yellow'
         exit 2
     }
-    Say ("sent to $workflow" + ': ' + $started.html_url) 'DarkGray'
-    $sentRun = [long]$started.workflow_run_id
-    $answer = Read-RunAnswer $sentRun -Started
+    Say ("sent to $workflow" + ': ' + $started.Url) 'DarkGray'
+    $answer = Read-Answer $started.Run -Started
 }
 
 switch -Regex ("$answer") {

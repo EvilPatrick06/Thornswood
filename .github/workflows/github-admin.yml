@@ -1,0 +1,80 @@
+# Makes GitHub's admin settings match what main records, through the box's
+# GitHub App (#3107, Patrick's A of 22 Oct 2026).
+#
+# WHY. A runner's labels can be changed only by somebody who administers the
+# repository. A cloud Claude thread cannot: the cloud environment's proxy
+# refuses every actions/runners path (measured 22 Oct 2026, 10:20 AM, #3107),
+# and a workflow's own token has no administration permission to give. So a
+# GitHub App made for Thornswood holds that right, its key is kept on the box
+# by scripts\vps\admin\admin.js and nowhere else, and this run is the only
+# thing that service listens to.
+#
+# HOW. scripts/deploy/Set-BuildRunners.ps1 starts it by hand from anywhere,
+# One or a cloud thread, and reads its answer; a push to main that changes a
+# records/*-runners.json starts it by itself, so a merged record is on GitHub
+# a minute later. Here Set-BuildRunners.ps1 -OnGitHub asks GitHub for this
+# run's OIDC token for the audience thornswood-admin and hands it to the
+# service on 127.0.0.1:7791. The service checks the token against GitHub's
+# published keys and that it is this workflow on main, reads the records from
+# main itself, and makes the runners' labels match them. Nothing the run
+# sends says what to change, so the most anybody who can start it can do is
+# make GitHub match main.
+#
+# NO SECRET. The run holds none and the service needs none from it: the OIDC
+# token is GitHub's own word for which run is asking, good for minutes, and
+# for this audience only.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: GitHub admin
+run-name: GitHub admin by ${{ github.actor }}
+on:
+  workflow_dispatch:
+    inputs:
+      check:
+        description: 'Change nothing; say only what differs from main'
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'records/*-runners.json'
+permissions:
+  contents: read
+  id-token: write
+# One at a time, and never one cancelled half way.
+concurrency:
+  group: github-admin
+  cancel-in-progress: false
+jobs:
+  admin:
+    name: Match GitHub to main
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # A handful of calls to GitHub through the box. Past this it is stuck.
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+
+      # A runner keeps its folder from one job to the next, and a checkout
+      # there rewrites only the files that differ from the last job's commit,
+      # so every other file keeps the line endings the last job's
+      # .gitattributes gave it (#3029). Every tracked file is written again,
+      # the way this commit checks it out.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Ask the box
+        shell: pwsh -NoProfile -NonInteractive -Command ". '{0}'"
+        env:
+          ADMIN_CHECK: ${{ inputs.check && 'true' || 'false' }}
+        run: |
+          & (Join-Path $env:GITHUB_WORKSPACE 'scripts/deploy/Set-BuildRunners.ps1') -OnGitHub
+          exit $LASTEXITCODE
