@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  70,
-    "callCount":  282,
+    "scriptCount":  71,
+    "callCount":  283,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1175,6 +1175,15 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "sends ThornswoodSecret"
+                  },
+                  {
+                      "script":  "scripts/deploy/Set-Turnstile.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodSecretRemote",
+                      "anchor":  "Invoke-ThornswoodSecretRemote -Target \"$User@$Vps\" -SshArgs $ssh -Secret $secret -Script @\"",
+                      "does":  "writes the report form's Turnstile keys into config.json and restarts the site",
+                      "class":  "admin",
+                      "reason":  "writes a secret; no gate verb covers secrets"
                   },
                   {
                       "script":  "scripts/deploy/Setup-Domain.ps1",

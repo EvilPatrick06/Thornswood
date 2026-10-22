@@ -69,6 +69,8 @@ const TYPES = { '.mp4': 'video/mp4' };
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
 eval(sendSrc);
+// send() and rangeReply() put each answer's nonce into the CSP (#3216).
+eval(grab('function cspFor('));
 
 // The static route asks the file's hash (versionAssets, #3218) for how long
 // it may be kept, so those come with it.
