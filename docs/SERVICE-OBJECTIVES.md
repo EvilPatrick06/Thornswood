@@ -22,7 +22,7 @@ Three things watch the services, and one bot posts what they find.
 
 - **The watchdog on the VPS**, `scripts/vps/Watch-Services.ps1`, installed as
   the task `Thornswood Watch`, every five minutes as SYSTEM
-  (`Watch-Services.ps1:schtasks /create /tn '$Task' /sc minute /mo 5 /ru SYSTEM`). It checks each service in its list
+  (`Watch-Services.ps1:-RepetitionInterval (New-TimeSpan -Minutes 5)`, at normal priority, `Watch-Services.ps1:-MultipleInstances IgnoreNew -Priority 4`). It checks each service in its list
   (`Watch-Services.ps1:$checks`) and restarts one that does not answer, at
   most three times an hour (`Watch-Services.ps1:restarts this hour. Leaving it.`). A failed HTTP health
   answer counts after two runs in a row (`Watch-Services.ps1:$healthMisses = 2`), and a service is said to be back after two good
