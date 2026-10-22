@@ -772,6 +772,8 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
 # and the removal threw their errors away, and eleven dev copies (about
 # 0.4 GB each) piled up over nine days with nothing saying why.
 function Prune([string]$kind, [int]$n) {
+    # A first install into a folder not made yet has nothing beside it.
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) { return }
     $old = @(Get-ChildItem -LiteralPath $parent -Directory -Force -ErrorAction Stop |
         Where-Object { $_.Name -like ($leaf + $kind) } | Sort-Object Name -Descending | Select-Object -Skip $n)
     foreach ($d in $old) {
