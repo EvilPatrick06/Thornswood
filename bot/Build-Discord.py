@@ -721,6 +721,12 @@ PLAN = [
    # under and is answered to as well.
    dict(kind='forum', name='dev-test-findings', mode='space', space='Dev',
         was=(('Staff', 'dev-test-findings'), ('Staff', 'dev-test-results'))),
+   # The developers' lines to each other: an edit to one of the six shared
+   # files coming, the dev feed taken. They moved out of #staff-updates,
+   # which is for what every staff member must act on (Patrick, 22 Oct).
+   dict(kind='text',  name='dev-coordination', mode='space', space='Dev',
+        topic='Developers only: a shared file being edited, the dev feed '
+              'taken. Say it here before you do it.'),
  ])),
  ('Lore', _space('Lore')),
  ('Moderation', _space('Moderation')),
