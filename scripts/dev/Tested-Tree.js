@@ -13,7 +13,9 @@
 // WHAT A PULL REQUEST BUILD LEAVES. The last step of build-pr.yml's checks
 // keeps an artifact named tested-tree-<tree> holding the tree, the commit
 // and the pull request. It is the last step, so it is only there when every
-// check before it passed.
+// check before it passed, and it runs only when the gate step ran every gate
+// harness (#3114: a pull request built on the VPS may run only those its
+// change can reach, and then main builds in full and is traced).
 //
 // WHAT COUNTS AS TESTED. An artifact of that name, not expired, from a run of
 // .github/workflows/build-pr.yml for a pull_request whose head is this

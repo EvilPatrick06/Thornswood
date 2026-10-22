@@ -22,11 +22,13 @@
        twice, lines out of name order, and nothing left to run;
     2. the real repository: it lists without a fault, test-page-changed.js
        and this harness among them;
-    3. build.yml's gate step, parsed with the PowerShell parser the runner
-       uses: it calls Gate-Harnesses.ps1, stops when that fails, runs what it
-       returns through Nightly-Harnesses.ps1 and fails when that does, and
-       names no harness itself, since a name there is a second
-       list that grows by appending.
+    3. build.yml's gate step and scripts\dev\Run-Gate.ps1, which it runs
+       (#3114), parsed with the PowerShell parser the runner uses: the
+       script calls Gate-Harnesses.ps1, stops when that fails, runs what it
+       returns through Nightly-Harnesses.ps1 (all of it unless a pull
+       request's map chose fewer) and fails when that does, and neither
+       names a harness itself, since a name there is a second list that
+       grows by appending.
 
   Read only, apart from the planted folders under TEMP, which it removes.
 #>
@@ -120,14 +122,14 @@ Yes ('and has harnesses in it ({0})' -f $r.Out.Count) ($r.Out.Count -gt 10)
 Yes 'test-page-changed.js is on the gate (#1589)' ($r.Out -contains 'test-page-changed.js')
 Yes 'and so is this harness' ($r.Out -contains 'test-gate-list.ps1')
 
-# --- 3. build.yml's gate step
-# The script of the step that calls Gate-Harnesses.ps1, as the runner gets it:
+# --- 3. build.yml's gate step, and scripts\dev\Run-Gate.ps1, which it runs
+# The script of the step that runs Run-Gate.ps1, as the runner gets it:
 # the lines under its "run: |", with the block's indentation taken off. A YAML
 # block scalar ends at the first line indented less than its first line.
 function Get-GateScript([string]$yaml) {
     $lines = $yaml -split "`r?`n"
     $at = -1
-    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[^#\s].*Gate-Harnesses\.ps1') { $at = $i; break } }
+    for ($i = 0; $i -lt $lines.Count; $i++) { if ($lines[$i] -match '^\s*[^#\s].*Run-Gate\.ps1') { $at = $i; break } }
     if ($at -lt 0) { return $null }
     $run = -1
     for ($i = $at; $i -ge 0; $i--) { if ($lines[$i] -match '^\s*run:\s*\|') { $run = $i; break } }
@@ -143,23 +145,39 @@ function Get-GateScript([string]$yaml) {
     }
     return ($body -join "`n")
 }
+# Every string in a script that names a harness, and every word outside a
+# comment or a string that does.
+function Get-Named([string]$text) {
+    $tokens = $null; $errors = $null
+    $ast = [System.Management.Automation.Language.Parser]::ParseInput($text, [ref]$tokens, [ref]$errors)
+    $named = @($ast.FindAll({
+        param($n)
+        $n -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $n.Value -match 'test-[\w.-]+\.(js|ps1)'
+    }, $true) | ForEach-Object { $_.Value })
+    $named += @($tokens | Where-Object { $_.Kind -ne 'Comment' -and $_.Text -match 'test-[\w.-]+\.(js|ps1)' -and $_.Kind -ne 'StringLiteral' -and $_.Kind -ne 'StringExpandable' } | ForEach-Object { $_.Text })
+    [pscustomobject]@{ Errors = @($errors).Count; Named = $named }
+}
 
 if (-not (Test-Path -LiteralPath $Workflow)) { Yes "build.yml is at $Workflow" $false; Done }
 $gate = Get-GateScript ([IO.File]::ReadAllText($Workflow))
-Yes 'build.yml has a step that calls Gate-Harnesses.ps1' ($null -ne $gate)
+Yes 'build.yml has a step that runs Run-Gate.ps1 (#3114)' ($null -ne $gate)
 if ($null -eq $gate) { Done }
-$tokens = $null; $errors = $null
-$ast = [System.Management.Automation.Language.Parser]::ParseInput($gate, [ref]$tokens, [ref]$errors)
-Yes 'the gate step parses' (@($errors).Count -eq 0)
-Yes 'it takes its list from Gate-Harnesses.ps1' ($gate -match '(?m)^\$gate = @\(& \.\\scripts\\dev\\Gate-Harnesses\.ps1\)\s*$')
-Yes 'and stops when that fails, before running any' ($gate -match '(?m)^\$gate = @\(.*\r?\nif \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}')
-Yes 'and runs each one it returns, through Nightly-Harnesses.ps1 (#3114)' ($gate -match "(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only \(\`$gate -join ' '\) -Throttle [1-9]\d* -Share \`$share -BudgetSeconds \d+\s*$" -and $gate -match '(?m)^\$share = .*\[Environment\]::ProcessorCount / .*\$builds' -and $gate -match 'records\\build-runners\.json')
-Yes '  and fails when that does' ($gate -match '(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 .*\r?\nexit \$LASTEXITCODE\s*$')
-$named = @($ast.FindAll({
-    param($n)
-    $n -is [System.Management.Automation.Language.StringConstantExpressionAst] -and $n.Value -match 'test-[\w.-]+\.(js|ps1)'
-}, $true) | ForEach-Object { $_.Value })
-$commentNames = @($tokens | Where-Object { $_.Kind -ne 'Comment' -and $_.Text -match 'test-[\w.-]+\.(js|ps1)' -and $_.Kind -ne 'StringLiteral' -and $_.Kind -ne 'StringExpandable' })
-Yes ('the step names no harness itself' + $(if ($named.Count) { ' (' + ($named -join ', ') + ')' } else { '' })) ($named.Count -eq 0 -and $commentNames.Count -eq 0)
+$g = Get-Named $gate
+Yes 'the gate step parses' ($g.Errors -eq 0)
+Yes 'it runs Run-Gate.ps1 with a throttle and a budget and fails when that does' ($gate -match "(?m)^\.\\scripts\\dev\\Run-Gate\.ps1 -Throttle [1-9]\d* -BudgetSeconds \d+\s*\r?\nexit \`$LASTEXITCODE\s*$")
+Yes ('the step names no harness itself' + $(if ($g.Named.Count) { ' (' + ($g.Named -join ', ') + ')' } else { '' })) ($g.Named.Count -eq 0)
+
+$runGate = Join-Path (Join-Path (Join-Path $Repo 'scripts') 'dev') 'Run-Gate.ps1'
+$rg = [IO.File]::ReadAllText($runGate)
+$r = Get-Named $rg
+Yes 'Run-Gate.ps1 parses' ($r.Errors -eq 0)
+Yes 'it takes its list from Gate-Harnesses.ps1' ($rg -match "(?m)^\`$gate = @\(& \(Join-Path \`$Here 'Gate-Harnesses\.ps1'\)\)\s*$")
+Yes 'and stops when that fails, before running any' ($rg -match '(?m)^\$gate = @\(.*\r?\nif \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}')
+Yes 'its share of the cores is the cores over the build runners' ($rg -match '(?m)^\$share = .*\[Environment\]::ProcessorCount / .*\$builds' -and $rg -match "records\\build-runners\.json")
+Yes 'it runs what it chose through Nightly-Harnesses.ps1, the whole gate unless a pull request''s map chose fewer (#3114)' (
+    $rg -match '(?m)^\$run = \$gate\s*$' -and $rg -match "(?m)^\s+\`$with = @\{ Only = \(\`$run -join ' '\); Throttle = \`$Throttle; Share = \`$share; BudgetSeconds = \`$BudgetSeconds \}\s*$" -and
+    $rg -match "(?m)^\s+& \(Join-Path \`$Here 'Nightly-Harnesses\.ps1'\) @with\s*\r?\n\s+\`$code = \`$LASTEXITCODE\s*$")
+Yes '  and fails when that does' ($rg -match '(?m)^exit \$code\s*$')
+Yes ('Run-Gate.ps1 names no harness either' + $(if ($r.Named.Count) { ' (' + ($r.Named -join ', ') + ')' } else { '' })) ($r.Named.Count -eq 0)
 
 Done
