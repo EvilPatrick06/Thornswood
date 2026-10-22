@@ -15,20 +15,28 @@
   What it checks, with Vps.ps1 and Send-Script.ps1 replaced by stand-ins that
   write down the script instead of sending it, in a throwaway git repository:
     1. -OnBox -Check asks for no token, sends one script and passes;
-    2. the script carries Build-Discord.py, content.py and staff-channel.txt
-       byte for byte as the commit holds them, sets DISCORD_CHECK and the
-       site's open switch, and sets no -Posts or -Prune it was not given;
+    2. the script carries Build-Discord.py, content.py, staff-channel.txt and
+       the two site pages content.py reads (join.md, rules.md) byte for byte
+       as the commit holds them, each under its path in the repository, sets
+       DISCORD_CHECK and the site's open switch, and sets no -Posts or -Prune
+       it was not given;
     3. it reads the token from bot.env.json on the box, never carries one,
        and clears it and removes its folder in a finally;
     4. the script itself, run with a stand-in Python and the box's paths
        pointed at a temp folder, under Windows PowerShell where there is one,
        because the box runs 5.1: the files are there when the build runs,
-       the token is in its environment, and the folder is gone afterwards;
-       a bot.env.json with no token stops it before the build;
+       laid out as in the repository, and the real Python imports content.py
+       from that folder (a run on 22 Oct 2026 sent only the bot's files and
+       content.py stopped on the box with FileNotFoundError for join.md);
+       the token is in its environment, and the folder is gone afterwards,
+       after a build that fails too; a bot.env.json with no token stops it
+       before the build;
     5. an uncommitted change to one of the three files stops the run before
        anything is sent.
 
   It never reaches the VPS or Discord. Files under its own temp folder only.
+  It needs Python (python3 or python), which every runner has for the bot's
+  harnesses.
 #>
 [CmdletBinding()]
 param()
@@ -62,9 +70,11 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-setup-onbox-' + [Guid]::NewGui
 try {
     $tree = Join-Path $work 'repo'
     $dep = Join-Path $tree 'scripts\deploy'; $vps = Join-Path $tree 'scripts\vps'; $bot = Join-Path $tree 'bot'
-    New-Item -ItemType Directory -Force -Path $dep, $vps, $bot | Out-Null
+    $pages = Join-Path $tree 'site\data\site'
+    New-Item -ItemType Directory -Force -Path $dep, $vps, $bot, $pages | Out-Null
     Copy-Item -LiteralPath (Join-Path $Repo 'scripts\deploy\Setup-Discord.ps1') -Destination $dep
     foreach ($f in 'Build-Discord.py', 'content.py', 'staff-channel.txt') { Copy-Item -LiteralPath (Join-Path $Repo ('bot\' + $f)) -Destination $bot }
+    foreach ($f in 'join.md', 'rules.md') { Copy-Item -LiteralPath (Join-Path $Repo ('site\data\site\' + $f)) -Destination $pages }
     $sent = Join-Path $work 'sent.ps1'
     [IO.File]::WriteAllText((Join-Path $vps 'Vps.ps1'), "function Get-ThornswoodVpsUser { 'Administrator' }`nfunction Get-ThornswoodVpsAddress { '192.0.2.1' }`n")
     [IO.File]::WriteAllText((Join-Path $vps 'Send-Script.ps1'), @"
@@ -111,10 +121,10 @@ exit `$LASTEXITCODE
     $errs = $null
     [void][System.Management.Automation.Language.Parser]::ParseInput($s, [ref]$null, [ref]$errs)
     Yes 'the script it sends parses' (@($errs).Count -eq 0)
-    foreach ($f in 'Build-Discord.py', 'content.py', 'staff-channel.txt') {
+    foreach ($f in 'bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt', 'site/data/site/join.md', 'site/data/site/rules.md') {
         $m = [regex]::Match($s, "(?m)^\s*'" + [regex]::Escape($f) + "' = '([A-Za-z0-9+/=]+)'")
-        $same = $m.Success -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $bot $f))) -eq $m.Groups[1].Value)
-        Yes "  it carries $f byte for byte" $same
+        $same = $m.Success -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $tree $f))) -eq $m.Groups[1].Value)
+        Yes "  it carries $f byte for byte, under that path" $same
     }
     Yes '  it sets DISCORD_CHECK and the open switch (alpha, 0)' ($s -match "(?m)^\s*\`$env:DISCORD_CHECK = '1'" -and $s -match "(?m)^\s*\`$env:THORNSWOOD_OPEN = '0'")
     Yes '  and no -Posts or -Prune it was not given' ($s -notmatch 'DISCORD_POSTS' -and $s -notmatch 'DISCORD_PRUNE')
@@ -130,21 +140,31 @@ exit `$LASTEXITCODE
     # ---- 4. the script itself, with a stand-in Python ------------------------
     $box = Join-Path $work 'box'; $win = Join-Path $work 'win'
     New-Item -ItemType Directory -Force -Path $box, $win | Out-Null
+    # The stand-in for the box's python lists the folder it was given and has
+    # the real Python import content.py from it, which reads the site pages
+    # through its own folder exactly as the build does on the box.
+    $py = Get-Command python3, python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+    Yes 'Python is on this machine' ($null -ne $py)
+    if (-not $py) { Done }
     $standIn = @'
 function python {
     param($f)
     'RAN ' + (Split-Path -Leaf $f)
     'TOKEN ' + $env:DISCORD_TOKEN
     'CHECK ' + $env:DISCORD_CHECK
-    'FILES ' + ((Get-ChildItem -LiteralPath (Split-Path $f) | Sort-Object Name | ForEach-Object { $_.Name }) -join ',')
-    'DIR ' + (Split-Path $f)
-    $global:LASTEXITCODE = 0
+    $top = Split-Path -Parent (Split-Path -Parent $f)
+    'FILES ' + ((Get-ChildItem -LiteralPath $top -Recurse -File | ForEach-Object { $_.FullName.Substring($top.Length + 1).Replace('\', '/') } | Sort-Object) -join ',')
+    $env:PYTHONPATH = ''
+    $code = "import sys; sys.path.insert(0, sys.argv[1]); import content; print('CONTENT IMPORTS')"
+    & 'REAL_PYTHON' -c $code (Split-Path -Parent $f) 2>&1 | ForEach-Object { "$_" }
+    $global:LASTEXITCODE = EXIT_CODE
 }
 
 '@
-    $local = $standIn + $s.Replace("'C:\Thornswood-Bot'", "'" + $box.Replace("'", "''") + "'").Replace("'C:\Windows\Temp'", "'" + $win.Replace("'", "''") + "'")
+    $standIn = $standIn.Replace('REAL_PYTHON', $py.Source.Replace("'", "''"))
+    $far = $s.Replace("'C:\Thornswood-Bot'", "'" + $box.Replace("'", "''") + "'").Replace("'C:\Windows\Temp'", "'" + $win.Replace("'", "''") + "'")
     $farPath = Join-Path $work 'far.ps1'
-    [IO.File]::WriteAllText($farPath, $local)
+    [IO.File]::WriteAllText($farPath, $standIn.Replace('EXIT_CODE', '0') + $far)
     # The box runs Windows PowerShell 5.1, so the script runs under it wherever
     # it is here (the Windows runners); elsewhere under pwsh.
     $farPs = if ($OnWindows) { Get-WindowsPowerShell } else { $pwsh.Source }
@@ -158,9 +178,16 @@ function python {
     [IO.File]::WriteAllText((Join-Path $box 'bot.env.json'), '{"DISCORD_TOKEN":"stand-in-token","PING_URL":"x"}')
     $f = Run-Far
     Yes ("run on the box, the build runs and passes (exit {0})" -f $f.Code) ($f.Code -eq 0 -and $f.Out -match 'RAN Build-Discord\.py')
-    Yes '  with the three files beside it' ($f.Out -match 'FILES Build-Discord\.py,content\.py,staff-channel\.txt')
+    Yes '  with the five files laid out as in the repository' ($f.Out -match 'FILES bot/Build-Discord\.py,bot/content\.py,bot/staff-channel\.txt,site/data/site/join\.md,site/data/site/rules\.md')
+    Yes '  and content.py imports there, reading the site pages through its own folder' ($f.Out -match 'CONTENT IMPORTS' -and $f.Out -notmatch 'FileNotFoundError')
     Yes '  with the bot''s token in its environment, and -Check' ($f.Out -match 'TOKEN stand-in-token' -and $f.Out -match 'CHECK 1')
     Yes '  and its folder is gone afterwards' (@(Get-ChildItem -LiteralPath $win -Directory -Filter 'thornswood-discord-*').Count -eq 0)
+
+    [IO.File]::WriteAllText($farPath, $standIn.Replace('EXIT_CODE', '1') + $far)
+    $f = Run-Far
+    Yes ("a build that fails on the box gives its exit back (exit {0})" -f $f.Code) ($f.Code -eq 1 -and $f.Out -match 'RAN Build-Discord\.py')
+    Yes '  and its folder is gone afterwards too' (@(Get-ChildItem -LiteralPath $win -Directory -Filter 'thornswood-discord-*').Count -eq 0 -and $f.Out -notmatch 'LEFT BEHIND')
+    [IO.File]::WriteAllText($farPath, $standIn.Replace('EXIT_CODE', '0') + $far)
 
     [IO.File]::WriteAllText((Join-Path $box 'bot.env.json'), '{"PING_URL":"x"}')
     $f = Run-Far

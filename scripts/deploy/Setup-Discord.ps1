@@ -50,9 +50,12 @@
   C:\Thornswood-Bot\bot.env.json on the VPS, so a machine with the VPS key
   and no token, or a run with nobody at a prompt, can still build, and the
   token never leaves the box. Build-Discord.py, content.py and
-  staff-channel.txt go up inside the run's script as the commit holds them
-  (an uncommitted change to any of them stops the run before the box is
-  asked anything), into a folder of the run's own under C:\Windows\Temp.
+  staff-channel.txt go up inside the run's script as the commit holds them,
+  with the two site pages content.py reads its words from (join.md and
+  rules.md), each at its place in the repository, because content.py finds
+  them by its own folder (..\site\data\site). An uncommitted change to any
+  of them stops the run before the box is asked anything. They go into a
+  folder of the run's own under C:\Windows\Temp.
   There the box's Python runs the build with the bot's own libraries
   (py-libs), the token is read from bot.env.json into that one process's
   environment, and the folder is removed when the build ends. The build may
@@ -105,7 +108,13 @@ if ($OnBox) {
   . (Join-Path $Here '..\vps\Vps.ps1')
   . (Join-Path $Here '..\vps\Send-Script.ps1')
   $Repo = Split-Path -Parent (Split-Path -Parent $Here)
-  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt')
+  # Every file the build reads, at its place in the repository: content.py
+  # reads join.md and rules.md through ..\site\data\site from its own folder,
+  # and a run that sent only the bot's files stopped on the box with
+  # FileNotFoundError for join.md (22 Oct 2026). tests\test-2519-setup-discord-onbox.ps1
+  # imports content.py from a folder holding only these.
+  $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt',
+    'site/data/site/join.md', 'site/data/site/rules.md')
   # The commit, never the working tree, so what ran is a commit anyone can name.
   $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
   if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
@@ -114,7 +123,7 @@ if ($OnBox) {
   $files = ''
   foreach ($rel in $send) {
     $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $Repo $rel)))
-    $files += "  '" + (Split-Path -Leaf $rel) + "' = '" + $b64 + "'`r`n"
+    $files += "  '" + $rel + "' = '" + $b64 + "'`r`n"
   }
   $flags = "`$env:THORNSWOOD_OPEN = '" + $(if ($open) { '1' } else { '0' }) + "'`r`n"
   if ($Guild) { $flags += "`$env:DISCORD_GUILD = '" + ($Guild -replace '[^0-9]', '') + "'`r`n" }
@@ -137,7 +146,12 @@ New-Item -ItemType Directory -Force -Path `$dir | Out-Null
 try {
   `$files = @{
 $files  }
-  foreach (`$k in `$files.Keys) { [IO.File]::WriteAllBytes((Join-Path `$dir `$k), [Convert]::FromBase64String(`$files[`$k])) }
+  # Each at its place in the repository, so content.py finds the site pages.
+  foreach (`$k in `$files.Keys) {
+    `$p = Join-Path `$dir `$k
+    New-Item -ItemType Directory -Force -Path (Split-Path -Parent `$p) | Out-Null
+    [IO.File]::WriteAllBytes(`$p, [Convert]::FromBase64String(`$files[`$k]))
+  }
   `$cfg = Get-Content -LiteralPath (Join-Path `$botRoot 'bot.env.json') -Raw | ConvertFrom-Json
   if (-not `$cfg.DISCORD_TOKEN) { 'NO TOKEN: C:\Thornswood-Bot\bot.env.json holds no DISCORD_TOKEN. Nothing was built.'; exit 3 }
   `$env:DISCORD_TOKEN = [string]`$cfg.DISCORD_TOKEN
@@ -145,7 +159,7 @@ $files  }
   `$env:PYTHONPATH = Join-Path `$botRoot 'py-libs'
   `$env:PYTHONIOENCODING = 'utf-8'
 $flags  `$ErrorActionPreference = 'Continue'
-  & python (Join-Path `$dir 'Build-Discord.py') 2>&1 | ForEach-Object { "`$_" }
+  & python (Join-Path `$dir 'bot/Build-Discord.py') 2>&1 | ForEach-Object { "`$_" }
   `$code = `$LASTEXITCODE
 } finally {
   `$env:DISCORD_TOKEN = `$null

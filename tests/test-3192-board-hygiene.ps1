@@ -1,0 +1,254 @@
+<#
+  test-3192-board-hygiene.ps1
+
+  The three workflows that keep the board true without anybody remembering to:
+  expire-claims.yml (#2797), done-on-merge.yml (#2796) and area-label.yml
+  (#2798).
+
+  WHY THIS EXISTS. Issue #3192, the board review of 21 Oct 2026, found the
+  board drifting in three ways nothing stopped: claims nobody was working,
+  Refs fixes left in In Progress after they merged, and issues with no area
+  at all. Patrick approved a cause fix for each on the review page.
+
+  What it checks, for each workflow:
+    1. what starts it, its token's grants, the VPS runners, a timeout, no
+       action and nothing checked out, and no ${{ }} inside its script;
+    2. its script, lifted out and run in a child PowerShell with a stand-in
+       Invoke-RestMethod that answers from a table and writes down every call:
+       expire-claims takes off a claim with nothing for three days and
+       comments first, keeps one with a fresh comment, a fresh claim or an
+       open pull request moved today, and passes over a label already off;
+       done-on-merge moves an issue whose test task the merged pull request
+       carries, with the board token, writes the test task on it in a fenced
+       block, and leaves alone a Refs with no test task, a closed issue and a
+       pull request number; area-label puts on the one area a title names,
+       "area: triage" for none or two, and makes that label when it is missing.
+
+  It never reaches GitHub. Files under its own temp folder only.
+#>
+[CmdletBinding()]
+param()
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = 'Stop'
+$Here = $PSScriptRoot
+if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
+$Repo = Split-Path -Parent $Here
+$Flows = Join-Path $Repo '.github\workflows'
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+function Read-Flow([string]$name) {
+    $p = Join-Path $Flows $name
+    if (-not (Test-Path -LiteralPath $p)) { return $null }
+    $text = [IO.File]::ReadAllText($p) -replace "`r`n", "`n"
+    $run = [regex]::Match($text, '(?ms)^(\s+)run: \|\n(.*)$')
+    $script = ''
+    if ($run.Success) {
+        $lines = $run.Groups[2].Value -split "`n"
+        $indent = [regex]::Match($lines[0], '^\s*').Value
+        $body = @()
+        foreach ($l in $lines) {
+            if ($l.Trim().Length -and -not $l.StartsWith($indent)) { break }
+            $body += $(if ($l.Length -ge $indent.Length) { $l.Substring($indent.Length) } else { '' })
+        }
+        $script = ($body -join "`n").TrimEnd() + "`n"
+    }
+    $perm = [regex]::Match($text, '(?ms)^permissions:\n(.*?)^\S').Groups[1].Value
+    $grants = @([regex]::Matches($perm, '(?m)^\s+([a-z-]+):\s*(\S+)') | ForEach-Object { $_.Groups[1].Value + ': ' + $_.Groups[2].Value } | Sort-Object)
+    return [pscustomobject]@{
+        Text = $text; Script = $script; Grants = ($grants -join ', ')
+        On = [regex]::Match($text, '(?ms)^on:\n(.*?)^\S').Groups[1].Value
+        RunsOn = [regex]::Match($text, '(?m)^\s*runs-on:\s*(.+)$').Groups[1].Value.Trim()
+        Runs = @([regex]::Matches($text, '(?m)^\s+run:')).Count
+    }
+}
+function Shape([string]$name, $f, [string]$grants) {
+    Yes "$name is there" ($null -ne $f)
+    if ($null -eq $f) { return }
+    Yes ("  its token can do only what it needs ({0})" -f $f.Grants) ($f.Grants -eq $grants)
+    Yes '  and no job widens it' (@([regex]::Matches($f.Text, '(?m)^\s{2,}permissions:')).Count -eq 0)
+    Yes ("  it runs on the VPS runners, any of them ({0})" -f $f.RunsOn) ($f.RunsOn -eq '[self-hosted, Windows, thornswood-vps]')
+    Yes '  with a timeout' ($f.Text -match '(?m)^\s+timeout-minutes:\s*\d+\s*$')
+    Yes '  it checks out nothing and runs no action' ($f.Text -notmatch '(?m)^\s*(-\s+)?uses:')
+    Yes '  it has one script, under pwsh, with no ${{ }} inside it' ($f.Runs -eq 1 -and $f.Script.Length -gt 0 -and $f.Script -notmatch '\$\{\{' -and $f.Text -match '(?m)^\s+shell:\s*pwsh\s*$')
+    Yes '  it runs on no pull request event' ($f.On -notmatch 'pull_request')
+}
+
+$pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue)
+Yes 'pwsh is on this machine to run the scripts with' ($null -ne $pwsh)
+if (-not $pwsh) { Done }
+
+$work = Join-Path ([IO.Path]::GetTempPath()) ('ts-board-hygiene-' + [Guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force -Path $work | Out-Null
+$calls = Join-Path $work 'calls.txt'
+$routes = Join-Path $work 'routes.json'
+# Defined before the script, so the script's Invoke-RestMethod is this one.
+# It answers a GET from the table by its address (everything after the
+# repository), 404 for an address the table marks so, and an empty list for
+# anything else; it writes down every call, with its token and body.
+$standIn = @'
+function Invoke-RestMethod {
+    param([string]$Method = 'Get', [string]$Uri, [hashtable]$Headers, $Body, [string]$ContentType)
+    $tail = $Uri -replace '^https://api\.github\.com/repos/[^/]+/[^/]+', ''
+    [IO.File]::AppendAllText($env:TS_CALLS, ($Method.ToUpperInvariant() + ' ' + $tail + ' ' + $Headers['Authorization'] + ' ' + [string]$Body) + "`n")
+    $t = Get-Content -LiteralPath $env:TS_ROUTES -Raw | ConvertFrom-Json
+    $key = $Method.ToUpperInvariant() + ' ' + $tail
+    if ($t.PSObject.Properties['404'] -and @($t.'404') -contains $key) {
+        $res = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]::NotFound)
+        throw [Microsoft.PowerShell.Commands.HttpResponseException]::new('Response status code does not indicate success.', $res)
+    }
+    if ($t.PSObject.Properties[$key]) { return $t.$key }
+    if ($Method -eq 'Get') { return ,@() }
+    return [pscustomobject]@{}
+}
+
+'@
+function Run-Flow($f, [hashtable]$table, [hashtable]$envs) {
+    Remove-Item -LiteralPath $calls -Force -ErrorAction SilentlyContinue
+    [IO.File]::WriteAllText($routes, ($table | ConvertTo-Json -Depth 12))
+    $runner = Join-Path $work 'flow.ps1'
+    [IO.File]::WriteAllText($runner, $standIn + $f.Script)
+    $keep = @{}
+    $all = @{ GITHUB_REPOSITORY = 'EvilPatrick06/Thornswood'; GH_TOKEN = 'run-token'; TS_CALLS = $calls; TS_ROUTES = $routes } + $envs
+    foreach ($k in $all.Keys) { $keep[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, [string]$all[$k]) }
+    try {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner 2>&1 | Out-String; $code = $LASTEXITCODE }
+        finally { $ErrorActionPreference = $old }
+    } finally {
+        foreach ($k in $keep.Keys) { [Environment]::SetEnvironmentVariable($k, $keep[$k]) }
+    }
+    $made = @()
+    if (Test-Path -LiteralPath $calls) { $made = @(Get-Content -LiteralPath $calls | Where-Object { $_ -and $_ -notmatch '^GET ' }) }
+    return [pscustomobject]@{ Code = $code; Out = $out; Writes = $made }
+}
+function Ago([double]$days) { return [DateTime]::UtcNow.AddDays(-$days).ToString('yyyy-MM-ddTHH:mm:ssZ') }
+
+try {
+    # ---- expire-claims.yml ---------------------------------------------------
+    $f = Read-Flow 'expire-claims.yml'
+    Shape 'expire-claims.yml' $f 'issues: write'
+    if ($f) {
+        Yes '  it runs once a night and by hand, and on nothing else' ($f.On -match '(?m)^\s+schedule:' -and $f.On -match "cron: '\d+ \d+ \* \* \*'" -and $f.On -match '(?m)^\s+workflow_dispatch:' -and @([regex]::Matches($f.On, '(?m)^  [a-z_]+:')).Count -eq 2)
+        $claim = @(@{ name = 'claimed: Claude' }, @{ name = 'area: Launcher' })
+        $table = @{
+            'GET /issues?state=open&per_page=100&page=1' = @(
+                @{ number = 11; created_at = (Ago 30); labels = $claim },
+                @{ number = 12; created_at = (Ago 30); labels = $claim },
+                @{ number = 13; created_at = (Ago 30); labels = @(@{ name = 'claimed: Codex' }) },
+                @{ number = 14; created_at = (Ago 30); labels = $claim },
+                @{ number = 15; created_at = (Ago 30); labels = @(@{ name = 'area: Site' }) },
+                @{ number = 16; created_at = (Ago 30); labels = $claim; pull_request = @{ url = 'x' } },
+                @{ number = 17; created_at = (Ago 30); labels = @(@{ name = 'claimed: Claude' }, @{ name = 'claimed:GitHub' }) })
+            'GET /issues/11/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 9); label = @{ name = 'claimed: Claude' } },
+                @{ event = 'commented'; created_at = (Ago 5) })
+            'GET /issues/12/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 9); label = @{ name = 'claimed: Claude' } },
+                @{ event = 'commented'; created_at = (Ago 1) })
+            'GET /issues/13/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 10); label = @{ name = 'area: x' } },
+                @{ event = 'labeled'; created_at = (Ago 2); label = @{ name = 'claimed: Codex' } })
+            'GET /issues/14/timeline?per_page=100&page=1' = @(
+                @{ event = 'labeled'; created_at = (Ago 9); label = @{ name = 'claimed: Claude' } },
+                @{ event = 'cross-referenced'; created_at = (Ago 8); source = @{ issue = @{ number = 99; state = 'open'; updated_at = (Ago 0.2); pull_request = @{ url = 'x' } } } })
+            'GET /issues/17/timeline?per_page=100&page=1' = @(
+                @{ event = 'referenced'; created_at = (Ago 4) })
+            '404' = @('DELETE /issues/17/labels/claimed%3AGitHub')
+        }
+        $r = Run-Flow $f $table @{ CLAIM_DAYS = '3' }
+        $w = $r.Writes
+        Yes ("the run passes (exit {0})" -f $r.Code) ($r.Code -eq 0)
+        Yes '  #11, a comment 5 days ago: a comment, then its claim comes off' (
+            @($w | Where-Object { $_ -like 'POST /issues/11/comments *' }).Count -eq 1 -and @($w | Where-Object { $_ -like 'DELETE /issues/11/labels/claimed%3A%20Claude *' }).Count -eq 1 -and
+            [array]::IndexOf($w, @($w | Where-Object { $_ -like 'POST /issues/11/comments *' })[0]) -lt [array]::IndexOf($w, @($w | Where-Object { $_ -like 'DELETE /issues/11/*' })[0]))
+        Yes '  the comment names the claim, the date and the rule' (@($w | Where-Object { $_ -like 'POST /issues/11/comments *' -and $_ -match 'claimed: Claude' -and $_ -match '#2797' -and $_ -match 'a comment' }).Count -eq 1)
+        Yes '  #12, a comment yesterday: kept' (@($w | Where-Object { $_ -match '/issues/12/' }).Count -eq 0 -and $r.Out -match '#12: kept')
+        Yes '  #13, claimed two days ago: kept' (@($w | Where-Object { $_ -match '/issues/13/' }).Count -eq 0)
+        Yes '  #14, an open pull request naming it moved today: kept' (@($w | Where-Object { $_ -match '/issues/14/' }).Count -eq 0 -and $r.Out -match '#14: kept .*open pull request #99')
+        Yes '  #15, no claim: not read at all, and #16, a pull request: passed over' (@($w | Where-Object { $_ -match '/issues/1[56]/' }).Count -eq 0)
+        Yes '  #17, two claims: both asked off, one already off said and passed over' (
+            @($w | Where-Object { $_ -like 'DELETE /issues/17/labels/*' }).Count -eq 2 -and $r.Out -match 'claimed:GitHub was already off')
+        Yes '  every write uses the run''s own token' (@($w | Where-Object { $_ -notmatch 'Bearer run-token' }).Count -eq 0)
+    }
+
+    # ---- done-on-merge.yml ---------------------------------------------------
+    $f = Read-Flow 'done-on-merge.yml'
+    Shape 'done-on-merge.yml' $f 'contents: read, issues: write, pull-requests: read'
+    if ($f) {
+        Yes '  it runs on a push to main and on nothing else' ($f.On -match '(?m)^\s+push:\s*$' -and $f.On -match 'branches:\s*\[\s*main\s*\]' -and @([regex]::Matches($f.On, '(?m)^  [a-z_]+:')).Count -eq 1)
+        Yes '  in the board environment, with BOARD_TOKEN and the commits through the environment' ($f.Text -match '(?m)^\s+environment:\s*board\s*$' -and $f.Text -match [regex]::Escape('BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}') -and $f.Text -match [regex]::Escape('COMMITS: ${{ toJSON(github.event.commits.*.id) }}'))
+        $body = "## What changed`n`nThe forge lists only what you can make. Refs #613, Refs #700.`n`nTest task for #613: Forge lists only what you can make`nServer: Main`n`n1. Open a forge.`n2. Look.`n`nWhat should happen: nothing a smith makes.`n`nTest task for #614: Closed one`n1. x`nTest task for #615: A pull request`n1. y`n`n## Checked`n`nharness`n`n" + [char]0xD83E + [char]0xDD16 + ' Generated with Claude Code'
+        $table = @{
+            'GET /commits/aaa/pulls' = @(@{ number = 3300; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = '0123456789abcdef'; body = $body })
+            'GET /commits/bbb/pulls' = @(@{ number = 3300; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = '0123456789abcdef'; body = $body })
+            'GET /commits/ccc/pulls' = @(@{ number = 3301; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = 'fedcba9876543210'; body = "Refs #613 only, no test task." })
+            'GET /issues/613' = @{ number = 613; state = 'open' }
+            'GET /issues/614' = @{ number = 614; state = 'closed' }
+            'GET /issues/615' = @{ number = 615; state = 'open'; pull_request = @{ url = 'x' } }
+        }
+        $r = Run-Flow $f $table @{ BOARD_TOKEN = 'board-token'; COMMITS = '["aaa","bbb","ccc"]' }
+        $w = $r.Writes
+        Yes ("the run passes (exit {0})" -f $r.Code) ($r.Code -eq 0)
+        Yes '  #613 gets board: Done, put on with the board token so board-status.yml runs' (@($w | Where-Object { $_ -like 'POST /issues/613/labels Bearer board-token *' -and $_ -match 'board: Done' }).Count -eq 1)
+        $c = @($w | Where-Object { $_ -like 'POST /issues/613/comments *' })
+        Yes '  and one comment, with the run''s token, holding the test task in a fenced block' ($c.Count -eq 1 -and $c[0] -match 'Bearer run-token' -and $c[0] -match '```\\nTest task: Forge lists only what you can make\\nServer: Main' -and $c[0] -match 'What should happen: nothing a smith makes\.\\n```')
+        Yes '  the block stops at the next test task, a heading and the footer' ($c.Count -eq 1 -and $c[0] -notmatch 'Closed one' -and $c[0] -notmatch 'harness' -and $c[0] -notmatch 'Generated')
+        Yes '  two commits of one pull request move it once' ($c.Count -eq 1)
+        Yes '  a closed issue and a pull request number are passed over, said' (@($w | Where-Object { $_ -match '/issues/61[45]/' }).Count -eq 0 -and $r.Out -match '#614, which is closed' -and $r.Out -match '#615, which is a pull request')
+        Yes '  Refs with no test task moves nothing' ($r.Out -match '#3301: no test task')
+        Yes '  #700, named only by Refs, is not touched' (@($w | Where-Object { $_ -match '/issues/700/' }).Count -eq 0)
+
+        $r = Run-Flow $f @{ 'GET /commits/ddd/pulls' = @() } @{ BOARD_TOKEN = ''; COMMITS = '["ddd"]' }
+        Yes ("a push with no merged pull request behind it does nothing and passes (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Writes.Count -eq 0)
+        $r = Run-Flow $f $table @{ BOARD_TOKEN = ''; COMMITS = '["aaa"]' }
+        Yes ("a test task with no BOARD_TOKEN fails the run and moves nothing (exit {0})" -f $r.Code) ($r.Code -ne 0 -and $r.Writes.Count -eq 0 -and $r.Out -match 'BOARD_TOKEN is not set')
+    }
+
+    # ---- area-label.yml ------------------------------------------------------
+    $f = Read-Flow 'area-label.yml'
+    Shape 'area-label.yml' $f 'issues: write'
+    if ($f) {
+        Yes '  it runs when an issue is opened and by hand, and on nothing else' ($f.On -match 'types:\s*\[\s*opened\s*\]' -and $f.On -match '(?m)^\s+workflow_dispatch:' -and @([regex]::Matches($f.On, '(?m)^  [a-z_]+:')).Count -eq 2)
+        Yes '  only for an issue with no area label' ($f.Text -match [regex]::Escape("!contains(join(github.event.issue.labels.*.name, '|'), 'area:')"))
+        Yes '  the title comes in through the environment' ($f.Text -match [regex]::Escape('TITLE: ${{ github.event.issue.title }}'))
+        $cases = @(
+            @{ t = 'Launcher says Steam is running when it is not'; want = 'area: Launcher' },
+            @{ t = 'Turn on DNSSEC for thornswood.net'; want = 'area: triage' },
+            @{ t = 'Organize the crafting tables into better categories'; want = 'area: In-game' },
+            @{ t = 'Courier parcels at an inn'; want = 'area: triage' },
+            @{ t = 'The bot cannot post the join card'; want = 'area: Discord' })
+        foreach ($k in $cases) {
+            $r = Run-Flow $f @{ 'GET /labels/area%3A%20triage' = @{ name = 'area: triage' } } @{ EVENT = 'issues'; ISSUE = '900'; TITLE = $k.t }
+            Yes ("'{0}' gets {1}" -f $k.t, $k.want) ($r.Code -eq 0 -and @($r.Writes | Where-Object { $_ -like 'POST /issues/900/labels *' -and $_ -match [regex]::Escape('"' + $k.want + '"') }).Count -eq 1 -and @($r.Writes).Count -eq 1)
+        }
+        $r = Run-Flow $f @{ '404' = @('GET /labels/area%3A%20triage') } @{ EVENT = 'issues'; ISSUE = '901'; TITLE = 'Something nobody can place' }
+        Yes 'area: triage is made when it is missing, then put on' ($r.Code -eq 0 -and $r.Writes.Count -eq 2 -and $r.Writes[0] -like 'POST /labels *' -and $r.Writes[0] -match 'area: triage' -and $r.Writes[1] -like 'POST /issues/901/labels *')
+        $table = @{ 'GET /issues?state=open&per_page=100&page=1' = @(
+            @{ number = 1; title = 'Voice position feed runs five times a second'; labels = @() },
+            @{ number = 2; title = 'Launcher thing'; labels = @(@{ name = 'area: Launcher' }) },
+            @{ number = 3; title = 'Unplaceable'; labels = @(@{ name = 'Dev Findings' }) },
+            @{ number = 4; title = 'Launcher PR'; labels = @(); pull_request = @{ url = 'x' } })
+            'GET /labels/area%3A%20triage' = @{ name = 'area: triage' } }
+        $r = Run-Flow $f $table @{ EVENT = 'workflow_dispatch'; ISSUE = ''; TITLE = '' }
+        Yes 'started by hand, every open issue with no area gets one, and the others are left alone' (
+            $r.Code -eq 0 -and $r.Writes.Count -eq 2 -and @($r.Writes | Where-Object { $_ -like 'POST /issues/1/labels *' -and $_ -match 'area: Voice' }).Count -eq 1 -and @($r.Writes | Where-Object { $_ -like 'POST /issues/3/labels *' -and $_ -match 'area: triage' }).Count -eq 1)
+    }
+}
+finally {
+    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
+}
+
+Done
