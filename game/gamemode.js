@@ -73567,6 +73567,26 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     try {handle = timers.setTimeout(callback,delay);} catch(error) {stop();throw error;}
     handles.add(handle);
   }
+  // meshTick, searchTick, prepareTick and nearTick run only while they have
+  // work, and wake() starts whichever of them has some again (#3181). Each
+  // used to set its next turn whatever it found, so on dev with nobody on and
+  // 0 mesh jobs waiting, meshTick still woke every 2 ms and the other three
+  // every 10 or 100 ms; in the 6:35 AM profile on 22 Oct 2026 that waking,
+  // its timers and the minute line's count of each run were about 2.5 s of
+  // the JavaScript thread's 15.5 s busy in 120 s. Everything that hands one
+  // of them work calls wake(), and a task about to finish calls it too, so
+  // work it found for another starts that one.
+  const armed=new Set();
+  function arm(fn,delay) {
+    if(armed.has(fn)) return;
+    armed.add(fn);schedule(fn,delay);
+  }
+  function wake() {
+    if(navigation.pending()) arm(meshTick,2);
+    if(searching.length) arm(searchTick,10);
+    if(preparing.length) arm(prepareTick,10);
+    if(nearOrder.length) arm(nearTick,100);
+  }
   function stop() {
     stopped=true;ready.length=0;
     const ownedHandles=Array.from(handles);
@@ -73643,6 +73663,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // tiles at a time on their own tick (#2067). The actor waits for its search.
   const searching=[];
   function searchTick() {
+    armed.delete(searchTick);
     const begin=now();
     while(searching.length && now()-begin<4) {
       const job=searching[0];
@@ -73650,7 +73671,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       searching.shift();
       try { job.finish(job.search.result()); } catch(e) { reject(job.id,e); }
     }
-    schedule(searchTick,10);
+    wake();
   }
   // An actor set down further from its placement than its leash would never
   // move again, so its home becomes the walkable point nearest the placement:
@@ -73710,10 +73731,12 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         }
       } catch(e) {reject(id,e);}
     }
+    wake();
   }
   function meshTick() {
+    armed.delete(meshTick);
     navigation.work();
-    schedule(meshTick,2);
+    wake();
   }
   function reject(id,error) {
     if(stopped) return;
@@ -73725,6 +73748,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     report('NPC '+id.toString(16)+' remains loaded; activity unavailable: '+error);
   }
   function prepareTick() {
+    armed.delete(prepareTick);
     const begin=now();
     for(let i=0;i<4 && preparing.length && now()-begin<4;i++) {
       const entry=preparing.shift(),id=typeof entry==='number' ? entry : entry.id;
@@ -73761,7 +73785,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
     }
-    schedule(prepareTick,10);
+    wake();
   }
   function preload() {
     try {
@@ -73776,7 +73800,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   }
   function enroll(id) {
     if(enrolled.has(id) || excluded.has(id)) return;
-    enrolled.add(id);preparing.push(id);
+    enrolled.add(id);preparing.push(id);wake();
   }
   function discover() {
     try {
@@ -73818,7 +73842,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         }
       }
     }
-    nearOrder=Array.from(near);nearCursor%=Math.max(1,nearOrder.length);
+    nearOrder=Array.from(near);nearCursor%=Math.max(1,nearOrder.length);wake();
     schedule(humanTick,1000);
   }
   function pathTo(a,targetNode,targetPos) {
@@ -73915,7 +73939,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       return;
     }
     if(s.cellOrWorld!==a.cell || distance(s.pos,a.pos)>2) {
-      const bank=ensureBank(s.cellOrWorld,s.pos);
+      const bank=ensureBank(s.cellOrWorld,s.pos);wake();
       const node=bank.ready && locate(bank,s.pos,s);
       if(!node) throw new Error('Displaced outside prepared local navigation');
       a.cell=s.cellOrWorld;a.bank=bank;a.node=node;a.pos=s.pos.slice();
@@ -74077,12 +74101,13 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     schedule(backgroundTick,20);
   }
   function nearTick() {
+    armed.delete(nearTick);
     const begin=now();
     for(let i=0;i<Math.min(32,nearOrder.length) && now()-begin<4;i++) step(nearOrder[nearCursor++%nearOrder.length]);
-    schedule(nearTick,100);
+    wake();
   }
-  schedule(preload,0);schedule(prepareTick,10);schedule(meshTick,10);
-  schedule(humanTick,0);schedule(backgroundTick,20);schedule(nearTick,100);schedule(searchTick,10);
+  schedule(preload,0);arm(prepareTick,10);arm(meshTick,10);
+  schedule(humanTick,0);schedule(backgroundTick,20);arm(nearTick,100);arm(searchTick,10);
   if(population) schedule(discover,5000);
   /*
     LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
