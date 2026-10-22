@@ -15,7 +15,20 @@
 //   2. every .md file directly under docs/ other than README.md itself
 //      appears as a link target in that table (systems/ and archive/ are
 //      covered by their own directory rows; nested pages stay under those);
-//   3. COLLECTION-REBUILD-7ESSXF.md specifically has a row (#1103).
+//   3. COLLECTION-REBUILD-7ESSXF.md specifically has a row (#1103);
+//   4. every page outside archive/ is reached from docs/README.md by
+//      following links, and every page directly under systems/ has a link
+//      in docs/GAME-SYSTEMS.md, the index of that folder;
+//   5. every other file outside archive/ (a picture, a table) is linked from
+//      a page that uses it, here or in Developer-Guide.md;
+//   6. no two names in one folder are a letter apart;
+//   7. no folder outside archive/ holds a single file.
+//
+// Issue #2801 added 4 to 7. The rows above stopped at docs/ itself, so
+// systems/ pages landed linked from nowhere (seven of them, and five more
+// by the time it was fixed), SYSTEM.md sat beside SYSTEMS.md with a
+// different job, and docs/guide/ held one picture. Those names are now
+// SERVER.md and GAME-SYSTEMS.md.
 //
 // Read only.
 //
@@ -66,6 +79,107 @@ topPages.forEach(function (name) {
 yes('COLLECTION-REBUILD-7ESSXF.md is in the index (#1103)', targets.has('COLLECTION-REBUILD-7ESSXF.md'));
 yes('docs/README.md has a systems/ row', targets.has('systems/') || targets.has('systems'));
 yes('docs/README.md has an archive row', targets.has('archive') || targets.has('archive/'));
+
+// ------------------------------------------------- every file is found (#2801)
+// Every file under docs/ outside archive/, as a path from the repository.
+function walk(dir, out) {
+  fs.readdirSync(path.join(ROOT, dir), { withFileTypes: true }).forEach(function (e) {
+    const rel = dir + '/' + e.name;
+    if (e.isDirectory()) { if (rel !== 'docs/archive') walk(rel, out); }
+    else out.push(rel);
+  });
+  return out;
+}
+const files = walk('docs', []).sort();
+
+// The repository paths a page links to, without anchors, and only those that
+// are files of the repository.
+function linksOf(page) {
+  const text = read(path.join(ROOT, page)) || '';
+  const out = [];
+  const re = /\]\(([^)\s]+)/g;
+  let m;
+  while ((m = re.exec(text)) !== null) {
+    const target = m[1].replace(/#.*$/, '');
+    if (!target || /^[a-z]+:/i.test(target)) continue;
+    out.push(path.posix.normalize(path.posix.join(path.posix.dirname(page), decodeURI(target))));
+  }
+  return out;
+}
+
+const reached = new Set();
+const todo = ['docs/README.md'];
+while (todo.length) {
+  const page = todo.pop();
+  if (reached.has(page)) continue;
+  reached.add(page);
+  if (!/\.md$/i.test(page) || !fs.existsSync(path.join(ROOT, page))) continue;
+  linksOf(page).forEach(function (t) { if (t.startsWith('docs/') && !t.startsWith('docs/archive/')) todo.push(t); });
+}
+
+const used = new Set(linksOf('Developer-Guide.md'));
+files.filter(function (f) { return /\.md$/i.test(f); }).forEach(function (f) {
+  linksOf(f).forEach(function (t) { used.add(t); });
+});
+
+files.forEach(function (f) {
+  if (/\.md$/i.test(f)) yes(f + ' is reached from docs/README.md', reached.has(f));
+  else yes(f + ' is linked from a page that uses it', reached.has(f) || used.has(f));
+});
+
+const systemsIndex = new Set(linksOf('docs/GAME-SYSTEMS.md'));
+files.filter(function (f) { return /^docs\/systems\/[^/]+\.md$/i.test(f) && !/\/README\.md$/i.test(f); })
+  .forEach(function (f) {
+    yes(f + ' has a link in docs/GAME-SYSTEMS.md', systemsIndex.has(f));
+  });
+
+// ------------------------------------------------- names a letter apart (#2801)
+// One letter added, taken out or changed. A number that differs (COLLECTION-
+// REVISION-2 and -3) is a series, not a near miss.
+function letterApart(a, b) {
+  if (a === b) return false;
+  if (a.length === b.length) {
+    let diff = -1;
+    for (let i = 0; i < a.length; i++) {
+      if (a[i] !== b[i]) { if (diff >= 0) return false; diff = i; }
+    }
+    return /[a-z]/.test(a[diff]) || /[a-z]/.test(b[diff]);
+  }
+  if (Math.abs(a.length - b.length) !== 1) return false;
+  const long = a.length > b.length ? a : b, short = a.length > b.length ? b : a;
+  for (let i = 0; i < long.length; i++) {
+    if (long.slice(0, i) + long.slice(i + 1) === short) return /[a-z]/.test(long[i]);
+  }
+  return false;
+}
+const byFolder = {};
+files.forEach(function (f) {
+  const dir = path.posix.dirname(f);
+  (byFolder[dir] = byFolder[dir] || []).push(path.posix.basename(f).replace(/\.[^.]+$/, '').toLowerCase());
+});
+Object.keys(byFolder).sort().forEach(function (dir) {
+  const names = byFolder[dir];
+  const near = [];
+  for (let i = 0; i < names.length; i++) {
+    for (let j = i + 1; j < names.length; j++) {
+      if (letterApart(names[i], names[j])) near.push(names[i] + ' and ' + names[j]);
+    }
+  }
+  yes(dir + ' has no two names a letter apart' + (near.length ? ' (' + near.join('; ') + ')' : ''), near.length === 0);
+});
+
+// ------------------------------------------------- a folder of one (#2801)
+const folders = {};
+files.forEach(function (f) {
+  let dir = path.posix.dirname(f);
+  while (dir !== 'docs' && dir.startsWith('docs/')) {
+    folders[dir] = (folders[dir] || 0) + 1;
+    dir = path.posix.dirname(dir);
+  }
+});
+Object.keys(folders).sort().forEach(function (dir) {
+  yes(dir + ' holds more than one file (' + folders[dir] + ')', folders[dir] > 1);
+});
 
 console.log('');
 console.log(pass + ' passed, ' + fail + ' failed');

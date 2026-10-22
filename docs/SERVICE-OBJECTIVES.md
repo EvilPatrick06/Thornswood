@@ -127,7 +127,7 @@ decision is made from.
 ### Voice
 
 Checked like the game servers, on its own port and `/health`. Voice binds to
-127.0.0.1 only and reaches people through Caddy (`docs/SYSTEM.md`, the service
+127.0.0.1 only and reaches people through Caddy (`docs/SERVER.md`, the service
 table), so the site being down also takes voice down for everybody.
 
 ### Bot
@@ -142,7 +142,7 @@ half minutes.
 
 The nightly backup runs at 08:15 UTC, 2:15 AM by the box's clock in summer and 1:15 AM in winter (`Install-Backup.ps1:$At = '08:15Z'`), 45 minutes before the nightly checks (#3187),
 and keeps seven daily and four weekly (`vps-nightly-backup.ps1:$KeepDaily = 7`, `vps-nightly-backup.ps1:$KeepWeekly = 4`). What it
-takes is in `docs/SYSTEM.md`. On One, `Thornswood Fetch Backups` brings each
+takes is in `docs/SERVER.md`. On One, `Thornswood Fetch Backups` brings each
 one down at 4:15 AM, checks each copy opens, and writes the name of the
 newest into `offbox.txt` on the box. Since #2755 the watchdog there tells the
 staff channel when that copy is over 26 hours old (`Watch-Services.ps1:function OffBoxProblem`);

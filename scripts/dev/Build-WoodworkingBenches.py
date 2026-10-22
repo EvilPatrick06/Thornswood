@@ -14,9 +14,9 @@ recipes moved onto it from the forge: the bows, arrows and bolts of Skyrim,
 Dawnguard and Dragonborn, our three fishing poles and the fish trap. No
 plugin places that bench anywhere. Patrick, 12 October: our own bench, at
 least one in every major hold and in some minor towns. The placement brief
-(docs\\systems\\woodworker-bench-placement.md) asks for one beside the
-public forge in each hold's capital and in towns with an open-air forge,
-never at the charcoal kiln.
+(docs\\systems\\station-placement.md, "Woodworking benches") asks for one
+beside the public forge in each hold's capital and in towns with an
+open-air forge, never at the charcoal kiln.
 
 NO COORDINATE IN HERE IS TYPED FROM THE GAME. Each site in SITES names a
 forge reference and an offset in that forge's own frame: so many units to

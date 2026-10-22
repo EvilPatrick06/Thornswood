@@ -1,13 +1,14 @@
 # docs
 
-Pages about how Thornswood works, for everybody on the team. The rules are
-Developer-Guide.md at the root; the long form is Developer-Guide.md.
+Pages about how Thornswood works, for everybody on the team. The rules,
+and the long form of each, are in [Developer-Guide.md](../Developer-Guide.md)
+at the root.
 
 | Page | What it answers |
 | --- | --- |
 | [WEBSITE-AUDIT.md](WEBSITE-AUDIT.md) | Public website discovery, accessibility, privacy and reliability checks, with verification and remaining operator risks. |
 | [WEBSITE-OPERATIONS.md](WEBSITE-OPERATIONS.md) | Confirmed operator facts, legal applicability questions, public asset permission evidence and recovery procedures. |
-| [SYSTEM.md](SYSTEM.md) | What runs where, what talks to what, and which script puts each piece in place: every VPS service with its folder, port and task. |
+| [SERVER.md](SERVER.md) | What runs where, what talks to what, and which script puts each piece in place: every VPS service with its folder, port and task. |
 | [FEED.md](FEED.md) | The update feed launchers read: every field of version.json, who writes it, who reads it, and what happens when it is wrong. |
 | [JSON-STATE-INVENTORY.md](JSON-STATE-INVENTORY.md) | Every critical JSON file, who writes and reads it, how it is checked, and the four records held to a version and shape (#2180). |
 | [ICONS.md](ICONS.md) | Which icon file is which: Main launcher badge, Dev launcher monogram, site favicon. |
@@ -15,7 +16,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) | How gamemode.js becomes sources, data and a bundled artifact (#2181, Patrick decision D): measurements, loader limits, stages, and Build-Gamemode. |
 | [GAMEMODE-COVERAGE.md](GAMEMODE-COVERAGE.md) | Which test drives each gamemode event handler, plugin, money function and chat word, and the gaps that were filled. |
 | [DECIDED.md](DECIDED.md) | What was decided against and the settled rules of the game, each with the link where it was decided. Read before filing an idea. |
-| [SYSTEMS.md](SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
+| [GAME-SYSTEMS.md](GAME-SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
 | [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md). |
 | [GLOSSARY.md](GLOSSARY.md) | The words used everywhere here, Keep, Hold, pack, baseline, door and the rest, one line each. |
 | [../engine/README.md](../engine/README.md) | Building the SkyMP fork: the submodule, the configure line, the build and the records. |

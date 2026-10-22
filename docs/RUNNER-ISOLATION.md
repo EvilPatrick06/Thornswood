@@ -14,7 +14,7 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | --- | --- |
 | Runners | Four, `thornswood-vps`, `-2`, `-3`, `-4`, all online, labels `self-hosted, Windows, X64, thornswood-vps` |
 | Runners, 22 Oct 2026 | Three, `thornswood-vps`, `-2` and `-3`, from the `runner_name` on their jobs since 9 PM on 21 Oct (eight from 20 Oct, #2929; 6, 7 and 8 removed on 21 Oct at Patrick's ask, #3108; 4 and 5 off at the box restart of 8:45 PM that evening, #3219). 1 and 2 also carry `thornswood-build` and take the heavy jobs (records\build-runners.json, #2994; 1 to 4 until the side-by-side gate, #3114); 3 takes only the light ones (board cards, dropped claims, the nightly's board job, the release jobs, harnesses.yml). 3 is the old 5 installed again clean under that number, with its outbound limits (`-NetworkOnly`) |
-| Where | The same Windows VPS that runs both game servers, both voice services, the site, Caddy, the bot, the watchdog and the nightly backup (docs\SYSTEM.md) |
+| Where | The same Windows VPS that runs both game servers, both voice services, the site, Caddy, the bot, the watchdog and the nightly backup (docs\SERVER.md) |
 | Accounts | `thornswood-runner`, `-runner2` and `-runner3`: local users in Users and their GitHub runner groups, not in Administrators. Each runs its `actions.runner.*` service |
 | Runner folders | Locked by `scripts\deploy\Install-Runner.ps1` to SYSTEM, Administrators and the runner's account, with nothing inherited from C:\ |
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
