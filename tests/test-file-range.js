@@ -70,6 +70,13 @@ const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
 eval(sendSrc);
 
+// The static route asks the file's hash (versionAssets, #3218) for how long
+// it may be kept, so those come with it.
+const crypto = require('crypto');
+eval(src.split('\n').filter((l) => /^const (publicAssetVersions|ASSET_NAME|ASSET_ATTR|ASSET_SRCSET|ASSET_URL) /.test(l)).join('\n') + '\n' +
+     ['function publicAssetVersion(', 'function publicAssetBody(', 'function assetRefs(', 'function versionAssets(']
+       .map(grab).join('\n'));
+
 const rangeSrc = grab('function rangeReply(');
 yes('server.js has one range function, rangeReply()', !!rangeSrc);
 if (rangeSrc) eval(rangeSrc);
@@ -83,7 +90,7 @@ yes('the /file/ route answers ranges through rangeReply', /rangeReply\(/.test(fi
 yes('and so does the static route, so the two cannot drift apart again', /rangeReply\(/.test(staticSrc));
 
 const fileRoute = eval('(function (p, req, res, head) {\n' + fileSrc + '\n})');
-const staticRoute = eval('(function (p, req, res, head) {\n' + staticSrc + '\n})');
+const staticRoute = eval('(function (p, req, res, head, url) {\n' + staticSrc + '\n})');
 
 // A payload whose every byte depends on where it sits, so an offset that is
 // out by one shows as a mismatch rather than as a run of identical bytes.
@@ -102,7 +109,7 @@ const server = http.createServer((req, res) => {
   const head = req.method === 'HEAD';
   if (head) req.method = 'GET';
   try {
-    staticRoute(p, req, res, head);
+    staticRoute(p, req, res, head, url);
     if (!res.headersSent) fileRoute(p, req, res, head);
   } catch (e) {
     if (!res.headersSent) { res.writeHead(500); res.end(String(e && e.message)); }
@@ -215,11 +222,20 @@ async function main() {
   yes('a video range is still 206', vid.code === 206 && vid.body.equals(clip.subarray(0, 100)));
   yes('served as video', vid.h['content-type'] === 'video/mp4');
   yes('with Content-Range', vid.h['content-range'] === 'bytes 0-99/5000');
-  yes('and no-store, as before', vid.h['cache-control'] === 'no-store');
+  // It went out no-store, so the banner video was never kept (#3218). A range
+  // carries the line the whole file does.
+  yes('and the hour the whole file is kept for', vid.h['cache-control'] === 'public, max-age=3600');
   const vidAll = await ask('GET', '/clip.mp4');
   yes('a video with no range is still the cached 200',
       vidAll.code === 200 && vidAll.body.equals(clip) &&
       vidAll.h['cache-control'] === 'public, max-age=3600' && vidAll.h['accept-ranges'] === 'bytes');
+  const v = crypto.createHash('sha256').update(clip).digest('hex').slice(0, 16);
+  const vidTagged = await ask('GET', '/clip.mp4?v=' + v, { Range: 'bytes=0-99' });
+  yes('asked for with its hash, a range of it is kept a year, immutable',
+      vidTagged.code === 206 && vidTagged.h['cache-control'] === 'public, max-age=31536000, immutable');
+  const vidOld = await ask('GET', '/clip.mp4?v=0000000000000000');
+  yes('asked for with a hash it no longer has, it is the hour',
+      vidOld.code === 200 && vidOld.h['cache-control'] === 'public, max-age=3600');
   const vidBad = await ask('GET', '/clip.mp4', { Range: 'bytes=9000-' });
   yes('a video range past the end is 416', vidBad.code === 416 &&
       vidBad.h['content-range'] === 'bytes */5000');

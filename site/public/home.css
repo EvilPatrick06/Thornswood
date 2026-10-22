@@ -30,6 +30,14 @@ body{margin:0;background:var(--night);color:var(--page);
 img{max-width:100%;height:auto;display:block}
 a{color:var(--gold);text-decoration:none}
 a:hover{color:var(--gold-hot)}
+/* A link inside a sentence is underlined as well as gold (#3218). Gold on the
+   grey of running text is told apart by colour alone, which is not enough for
+   somebody who cannot see the difference (WCAG 1.4.1); Lighthouse flagged the
+   known issues and professions links on the front page. One rule for every
+   sentence, so a link written into a new paragraph is underlined without
+   anybody remembering to. A .btn is a link with a box of its own. */
+p a:not(.btn),li a:not(.btn),td a:not(.btn),blockquote a:not(.btn){
+  border-bottom:1px solid rgba(201,162,75,.45)}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 /* Skip link: first focusable, off-screen until Tab. Gold on night ground. */
 .skip{position:absolute;left:12px;top:12px;z-index:100;padding:10px 14px;
@@ -114,7 +122,7 @@ nav.top a:hover{color:var(--page)}
   ridge.svg is still in this folder. Putting it back is one line here.
 
   The loop ships at 1600 by 900, 24 frames a second, 3.1 MB, with its first
-  frame beside it as the poster. Three times the launcher strip it replaced
+  frame beside it as the still under it (banner-*.webp, #3218). Three times the launcher strip it replaced
   and two hundred times the ridgeline, which is the price of the picture
   moving at the size the hero actually is. It is worth not adding a second
   one.
@@ -147,7 +155,7 @@ nav.top a:hover{color:var(--page)}
 .hero > *{position:relative;z-index:1}
 @media(max-width:640px){ .hero{min-height:auto;padding:72px 0 88px} }
 /* A video ignores prefers-reduced-motion on its own, so it is stopped in
-   script below and the poster is what stays on screen. This only covers the
+   script below and the still under it is what stays on screen. This only covers the
    slow drift on top of it. */
 @media(prefers-reduced-motion:no-preference){
   .hero .art{animation:drift 60s ease-in-out infinite alternate}
@@ -378,10 +386,15 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   .gal-show .gal-prev{left:8px}
   .gal-show .gal-next{right:8px}
 }
-.gal-dots{display:flex;gap:8px;justify-content:center;margin-top:16px}
-.gal-dots button{width:9px;height:9px;padding:0;border-radius:50%;
-  border:1px solid var(--edge2);background:transparent;cursor:pointer}
-.gal-dots button.on{background:var(--gold);border-color:var(--gold)}
+/* Each dot is a 24 pixel button with the 9 pixel dot drawn in the middle of
+   it (#3218). The buttons were the 9 pixel dots themselves, 8 apart, under
+   the 24 by 24 a finger or a shaky hand needs (WCAG 2.5.8). */
+.gal-dots{display:flex;gap:2px;justify-content:center;margin-top:12px}
+.gal-dots button{width:24px;height:24px;padding:0;border:0;background:transparent;
+  cursor:pointer;display:grid;place-items:center}
+.gal-dots button::before{content:"";width:9px;height:9px;border-radius:50%;
+  border:1px solid var(--edge2)}
+.gal-dots button.on::before{background:var(--gold);border-color:var(--gold)}
 .gal-more{margin-top:22px}
 
 .release{display:flex;gap:22px;align-items:baseline;flex-wrap:wrap;

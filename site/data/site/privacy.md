@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 21 October 2026.
+Last changed: 22 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -21,7 +21,8 @@ support tickets.
   what you type in chat.
 - Voice is carried between people and is not recorded.
 - Ask for deletion in the Discord and it is done.
-- There is no advertising tag and no analytics on this site.
+- There is no advertising tag on this site. Cloudflare counts how often each
+  page is opened and how fast it loads, with no cookie (below).
 
 ## What is stored, and why
 
@@ -93,8 +94,10 @@ submission removed. Removing one deletes its file from the site. See
   payment side and Thornswood never sees a card.
 - No voice recording. Voice is passed between the people in the room and
   nothing keeps a copy.
-- No advertising or analytics tag on this site. There was a Google Ads tag
-  until 23 September 2026 and it was removed.
+- No advertising tag on this site. There was a Google Ads tag until 23
+  September 2026 and it was removed.
+- No cookie or anything else kept on your machine for counting visits.
+  Cloudflare's page counts, below, need none.
 
 ## What leaves this site anyway
 
@@ -108,11 +111,19 @@ Honesty about the things a page does by existing:
   between you and us it sees your address and what you ask for, and it
   keeps its own records under
   [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
-  It adds nothing to the pages.
+- **Cloudflare Web Analytics.** Since 22 October 2026 Cloudflare adds one
+  small script to each page on its way to you, from
+  static.cloudflareinsights.com. It reports that the page was opened, which
+  page, the page that sent you there, the kind of browser and device, and
+  how long the page took to load. It sets no cookie and keeps nothing on
+  your machine, and Cloudflare does not use it to follow anybody from site
+  to site. Thornswood sees only totals: how many visits each page had, from
+  which countries, and how fast it loaded. Blocking cloudflareinsights.com
+  in your browser stops it and changes nothing else on the site.
 
-Opening a page on this site loads nothing from anybody else. The fonts came
-from Google and a markdown renderer from cdnjs until 24 September 2026, and
-both are served from here now.
+Apart from that script, opening a page on this site loads nothing from
+anybody else. The fonts came from Google and a markdown renderer from cdnjs
+until 24 September 2026, and both are served from here now.
 
 ## How long it is kept
 
@@ -243,7 +254,7 @@ These cookies make the site and the age gate work. They are not advertising and 
 Sign-in cookies use SameSite=Lax and Secure when served over HTTPS. See the
 [cookie policy](/cookies) for their purposes and how to clear them.
 
-There is no advertising cookie and no analytics cookie on this site. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
+There is no advertising cookie and no analytics cookie on this site; Cloudflare's page counts set none. A longer list of what is stored about play (Discord id, character, chat, launcher logs) is in the sections above.
 
 ## Asking about any of this
 
