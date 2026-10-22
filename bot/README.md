@@ -433,6 +433,17 @@ can run it and the token never leaves the box (#2519, #2341). The running bot
 has the smaller permission set, so a change that needs Administrator is named
 under "did not manage" until the bot's role has it again.
 
+## Reading what the live server really allows
+
+The plan only says what a channel the build makes gets, and much of the live
+server was gated by hand. `Setup-Discord.ps1 -OnBox -Audit` reads the live
+server and changes nothing (#3317). It says the bot's own permissions against
+the running set, each role's permissions against the plan, who holds each
+staff rank, anybody holding two ranks of one staff category, every planned
+category and channel whose overwrites differ from what its mode gives, and the
+channels the plan does not name. Each difference starts `DIFFERS`, and the
+last line counts them. Run it before and after any change to roles or access.
+
 ## Running the bot's tests
 
 The bot and its tests need Python 3.11 or newer (Pillow 13 needs it, #1401),
