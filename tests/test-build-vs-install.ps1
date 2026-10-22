@@ -16,10 +16,12 @@
   two scripts are copied into a temp folder beside a stand-in Close-Launcher.ps1
   that writes down what it was asked to close and closes nothing. The build
   compiles a two line program with the real csc, so it is quick; the real
-  launcher compile is the CI step that runs after this one.
+  launcher compile is tests\test-498-msbuild.ps1, which the build check runs.
 
   The callers, each shown:
-    .github/workflows/build.yml   its own step's lines, run the way GitHub runs them
+    .github/workflows/nightly.yml its "Build the launcher" step's lines, run the way
+                                  GitHub runs them (build.yml's copy went with #3114:
+                                  tests\test-498-msbuild.ps1 builds there)
     Ship.ps1                      its build block lifted out and run against stand-ins
     Install-Thornswood.ps1        a copy run with -Only launcher, against the same stand-ins
 #>
@@ -208,7 +210,7 @@ try {
     $explorerBefore = Get-ExplorerState
 
     # ---- 1. the build, exactly as the CI step calls it --------------------------
-    $yml = @(Get-Content -LiteralPath (Join-Path $RepoDir '.github\workflows\build.yml'))
+    $yml = @(Get-Content -LiteralPath (Join-Path $RepoDir '.github\workflows\nightly.yml'))
     $at = -1
     for ($i = 0; $i -lt $yml.Count; $i++) { if ($yml[$i] -match '^\s*- name: Build the launcher\s*$') { $at = $i; break } }
     $stepLines = @()
@@ -227,7 +229,7 @@ try {
         }
     }
     $stepText = $stepLines -join "`n"
-    Yes 'the CI step that builds the launcher is in build.yml' ($stepLines.Count -gt 0)
+    Yes 'the CI step that builds the launcher is in nightly.yml' ($stepLines.Count -gt 0)
     Yes 'CI still calls Build-Launcher.ps1 with -Root and -NoPause, and nothing else' ($stepText -match '(?m)^\.\\scripts\\release\\Build-Launcher\.ps1 -Root \$root -NoPause\s*$')
     Yes 'CI does not install anything' ($stepText -notmatch 'Install-Launcher')
     Yes 'CI still looks for the exe in <root>\Launcher' ($stepText -match "Launcher\\Thornswood\.exe")

@@ -72,6 +72,26 @@ $grantPath = P 'scripts', 'vps', 'Grant-BoxAccess.ps1'
 $watchPath = P 'scripts', 'vps', 'Watch-Services.ps1'
 $shell = (Get-Process -Id $PID).Path
 $enc = New-Object Text.UTF8Encoding($false)
+# The stand-ins for ssh, ssh-keyscan, ssh-keygen and gh are node, not
+# PowerShell (#3168): the runs below start them 51 times, and a PowerShell
+# start costs the box about ten times a node start. What they stand in for
+# (the box half, Say-Staff.ps1, the workflow's step) still runs in PowerShell.
+$node = (Get-Command node -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1)
+if (-not $node) { Write-Host 'FAIL  node is not on PATH, and the stand-ins for ssh and gh are node'; exit 1 }
+$node = $node.Source
+# A path as a JavaScript string, for the stand-ins' own text.
+function Js([string]$s) { return (ConvertTo-Json -InputObject $s -Compress) }
+# Each stand-in is started through a .cmd on Windows; elsewhere through a
+# shell script, since only Windows runs a .cmd (#2989).
+function Put-StandIn([string]$dir, [string]$name, [string]$js) {
+    if ($env:OS -eq 'Windows_NT') {
+        [IO.File]::WriteAllText((Join-Path $dir ($name + '.cmd')), ('@"' + $node + '" "' + $js + '" %*' + "`r`n"), $enc)
+    } else {
+        $sh = Join-Path $dir $name
+        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $node + "' '" + $js + "' `"`$@`"`n"), $enc)
+        & chmod 755 $sh
+    }
+}
 
 # ---- 1. they parse ---------------------------------------------------------
 $asts = @{}
@@ -230,25 +250,26 @@ for aid, text in due:
     # came on its input, the way sshd would.
     $bin = Join-Path $tmp 'bin'
     New-Item -ItemType Directory -Path $bin -Force | Out-Null
-    $standIn = Join-Path $tmp 'ssh-stand-in.ps1'
+    $standIn = Join-Path $tmp 'ssh-stand-in.js'
     $argsFile = Join-Path $tmp 'ssh-args.txt'
-    [IO.File]::WriteAllText($standIn, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-[IO.File]::WriteAllLines('$argsFile', [string[]]`$all)
-`$cmd = `$all[-1]
-`$from = if (`$cmd -match '-From ([a-z0-9-]+)`$') { `$Matches[1] } else { '' }
-`$in = @([Console]::In.ReadToEnd() -split '\r?\n' | Where-Object { `$_ })
-[IO.File]::WriteAllLines('$argsFile.in', [string[]]`$in)
-`$in | & '$shell' -NoProfile -NonInteractive -File '$box' -From `$from -Root '$root'
-exit `$LASTEXITCODE
-"@, $enc)
-    if ($env:OS -eq 'Windows_NT') {
-        [IO.File]::WriteAllText((Join-Path $bin 'ssh.cmd'), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $standIn + '" %*' + "`r`n"), $enc)
-    } else {
-        $sh = Join-Path $bin 'ssh'
-        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $standIn + "' `"`$@`"`n"), $enc)
-        & chmod 755 $sh
-    }
+    $sshHead = @"
+const fs = require('fs'), os = require('os'), cp = require('child_process');
+const all = process.argv.slice(2).map(String);
+
+"@
+    $sshBody = @"
+fs.writeFileSync($(Js $argsFile), all.map(a => a + os.EOL).join(''));
+const cmd = all[all.length - 1];
+const m = /-From ([a-z0-9-]+)`$/i.exec(cmd);
+const from = m ? m[1] : '';
+const lines = fs.readFileSync(0, 'utf8').split(/\r?\n/).filter(l => l);
+fs.writeFileSync($(Js "$argsFile.in"), lines.map(l => l + os.EOL).join(''));
+const r = cp.spawnSync($(Js $shell), ['-NoProfile', '-NonInteractive', '-File', $(Js $box), '-From', from, '-Root', $(Js $root)],
+  { input: lines.map(l => l + os.EOL).join(''), stdio: ['pipe', 'inherit', 'inherit'] });
+process.exit(r.status === null ? 1 : r.status);
+"@
+    [IO.File]::WriteAllText($standIn, ($sshHead + $sshBody), $enc)
+    Put-StandIn $bin 'ssh' $standIn
     Remove-Item Env:THORNSWOOD_NOTICE_KEY_B64, Env:THORNSWOOD_NOTICE_TOKEN -ErrorAction SilentlyContinue
     function SayStaff([string[]]$a) {
         $path = $env:PATH
@@ -300,36 +321,30 @@ exit `$LASTEXITCODE
     # pins from there alone, never from a machine's own override file.
     $pin = [string]@((Get-Content -LiteralPath (P 'scripts', 'vps', 'vps.json') -Raw | ConvertFrom-Json).hostKeys)[0]
     $fpFile = Join-Path $tmp 'fingerprint.txt'
-    $keyscanIn = Join-Path $tmp 'ssh-keyscan-stand-in.ps1'
-    $keygenIn = Join-Path $tmp 'ssh-keygen-stand-in.ps1'
-    [IO.File]::WriteAllText($keyscanIn, "'127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBoxhostkeystandin'`n", $enc)
+    $keyscanIn = Join-Path $tmp 'ssh-keyscan-stand-in.js'
+    $keygenIn = Join-Path $tmp 'ssh-keygen-stand-in.js'
+    [IO.File]::WriteAllText($keyscanIn, "process.stdout.write('127.0.0.1 ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBoxhostkeystandin\n');`n", $enc)
     [IO.File]::WriteAllText($keygenIn, @"
-if (`$args -ccontains '-F') { exit 1 }
-if (`$args -ccontains '-l') { '256 ' + [IO.File]::ReadAllText('$fpFile').Trim() + ' 127.0.0.1 (ED25519)'; exit 0 }
-exit 1
+const a = process.argv.slice(2);
+if (a.includes('-F')) { process.exit(1); }
+if (a.includes('-l')) { const fs = require('fs'); fs.writeSync(1, '256 ' + fs.readFileSync($(Js $fpFile), 'utf8').trim() + ' 127.0.0.1 (ED25519)\n'); process.exit(0); }
+process.exit(1);
 "@, $enc)
-    foreach ($pair in @(@('ssh-keyscan', $keyscanIn), @('ssh-keygen', $keygenIn))) {
-        if ($env:OS -eq 'Windows_NT') {
-            [IO.File]::WriteAllText((Join-Path $bin ($pair[0] + '.cmd')), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $pair[1] + '" %*' + "`r`n"), $enc)
-        } else {
-            $sh = Join-Path $bin $pair[0]
-            [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $pair[1] + "' `"`$@`"`n"), $enc)
-            & chmod 755 $sh
-        }
-    }
+    Put-StandIn $bin 'ssh-keyscan' $keyscanIn
+    Put-StandIn $bin 'ssh-keygen' $keygenIn
     # The ssh stand-in also keeps what the key and known_hosts files held
     # while it ran, since they are gone once Say-Staff.ps1 ends.
     $seenKey = Join-Path $tmp 'seen-key'
     $seenHosts = Join-Path $tmp 'seen-known-hosts'
-    $peek = Join-Path $tmp 'peek.ps1'
-    [IO.File]::WriteAllText($peek, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-`$i = [array]::IndexOf(`$all, '-i')
-if (`$i -ge 0) { Copy-Item -LiteralPath `$all[`$i + 1] -Destination '$seenKey' }
-`$k = @(`$all | Where-Object { `$_ -like 'UserKnownHostsFile=*' }) | Select-Object -First 1
-if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
-"@, $enc)
-    [IO.File]::WriteAllText($standIn, ('. ''' + $peek + "' @args`n" + [IO.File]::ReadAllText($standIn)), $enc)
+    $peek = @"
+const copy = (from, to) => { try { fs.copyFileSync(from, to); } catch (e) { fs.writeSync(2, e.message + '\n'); } };
+const ki = all.indexOf('-i');
+if (ki >= 0) { copy(all[ki + 1], $(Js $seenKey)); }
+const kh = all.find(a => /^UserKnownHostsFile=/i.test(a));
+if (kh) { copy(kh.substring(19), $(Js $seenHosts)); }
+
+"@
+    [IO.File]::WriteAllText($standIn, ($sshHead + $peek + $sshBody), $enc)
     # A machine's own vps.json pinning something else, as an earlier job on
     # the runner account could leave: -OnTheBox goes by the repository's.
     $localVps = Join-Path $tmp 'local-vps.json'
@@ -381,7 +396,7 @@ if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
     # writes down each call. The run's annotations come from a file per case.
     $bin2 = Join-Path $tmp 'bin2'
     New-Item -ItemType Directory -Path $bin2 -Force | Out-Null
-    $ghIn = Join-Path $tmp 'gh-stand-in.ps1'
+    $ghIn = Join-Path $tmp 'gh-stand-in.js'
     $ghCalls = Join-Path $tmp 'gh-calls.txt'
     $ghBody = Join-Path $tmp 'gh-body.json'
     $ghRun = Join-Path $tmp 'gh-run.json'
@@ -393,39 +408,34 @@ if (`$k) { Copy-Item -LiteralPath `$k.Substring(19) -Destination '$seenHosts' }
     $ghJobsRefused = Join-Path $tmp 'gh-jobs-refused.txt'
     $ghNoRun = Join-Path $tmp 'gh-no-run.txt'
     [IO.File]::WriteAllText($ghIn, @"
-`$all = @(`$args | ForEach-Object { [string]`$_ })
-[IO.File]::AppendAllText('$ghCalls', ((`$all -join ' ') + "``n"))
-`$p = @(`$all | Where-Object { `$_ -like 'repos/*' }) | Select-Object -First 1
-if (`$all -contains '--input') { [IO.File]::WriteAllText('$ghBody', [Console]::In.ReadToEnd()) }
-switch -Regex (`$p) {
-    'actions/workflows/staff-notice\.yml/dispatches$' {
-        if (Test-Path -LiteralPath '$ghNoRun') { exit 0 }
-        '{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}'; exit 0
-    }
-    'actions/runs/77$' {
-        `$miss = [int][IO.File]::ReadAllText('$ghMiss')
-        if (`$miss -ne 0) {
-            if (`$miss -gt 0) { [IO.File]::WriteAllText('$ghMiss', [string](`$miss - 1)) }
-            [Console]::Error.WriteLine('gh: Not Found (HTTP 404)'); exit 1
-        }
-        [IO.File]::ReadAllText('$ghRun'); exit 0
-    }
-    'actions/runs/77/jobs$' {
-        if (Test-Path -LiteralPath '$ghJobsRefused') { [Console]::Error.WriteLine('gh: Server Error (HTTP 502)'); exit 1 }
-        '{"total_count":1,"jobs":[{"id":555}]}'; exit 0
-    }
-    'check-runs/555/annotations$' { [IO.File]::ReadAllText('$ghNotes'); exit 0 }
+const fs = require('fs');
+const all = process.argv.slice(2).map(String);
+fs.appendFileSync($(Js $ghCalls), all.join(' ') + '\n');
+const p = all.find(a => /^repos\//i.test(a)) || '';
+if (all.some(a => a.toLowerCase() === '--input')) { fs.writeFileSync($(Js $ghBody), fs.readFileSync(0, 'utf8')); }
+// writeSync, so nothing is still unwritten when it exits.
+const say = s => { fs.writeSync(1, s + '\n'); process.exit(0); };
+const no = s => { fs.writeSync(2, s + '\n'); process.exit(1); };
+if (/actions\/workflows\/staff-notice\.yml\/dispatches`$/i.test(p)) {
+  if (fs.existsSync($(Js $ghNoRun))) { process.exit(0); }
+  say('{"workflow_run_id":77,"run_url":"https://api.github.com/x/runs/77","html_url":"https://github.com/x/actions/runs/77"}');
 }
-[Console]::Error.WriteLine('gh: Not Found (HTTP 404)')
-exit 1
+if (/actions\/runs\/77`$/i.test(p)) {
+  const miss = parseInt(fs.readFileSync($(Js $ghMiss), 'utf8'), 10);
+  if (miss !== 0) {
+    if (miss > 0) { fs.writeFileSync($(Js $ghMiss), String(miss - 1)); }
+    no('gh: Not Found (HTTP 404)');
+  }
+  say(fs.readFileSync($(Js $ghRun), 'utf8'));
+}
+if (/actions\/runs\/77\/jobs`$/i.test(p)) {
+  if (fs.existsSync($(Js $ghJobsRefused))) { no('gh: Server Error (HTTP 502)'); }
+  say('{"total_count":1,"jobs":[{"id":555}]}');
+}
+if (/check-runs\/555\/annotations`$/i.test(p)) { say(fs.readFileSync($(Js $ghNotes), 'utf8')); }
+no('gh: Not Found (HTTP 404)');
 "@, $enc)
-    if ($env:OS -eq 'Windows_NT') {
-        [IO.File]::WriteAllText((Join-Path $bin2 'gh.cmd'), ('@"' + $shell + '" -NoProfile -NonInteractive -File "' + $ghIn + '" %*' + "`r`n"), $enc)
-    } else {
-        $sh = Join-Path $bin2 'gh'
-        [IO.File]::WriteAllText($sh, ("#!/bin/sh`nexec '" + $shell + "' -NoProfile -NonInteractive -File '" + $ghIn + "' `"`$@`"`n"), $enc)
-        & chmod 755 $sh
-    }
+    Put-StandIn $bin2 'gh' $ghIn
     $done = '{"status":"completed","conclusion":"success","path":".github/workflows/staff-notice.yml","html_url":"https://github.com/x/actions/runs/77"}'
     function Note([string]$level, [string]$title, [string]$message) { return @{ annotation_level = $level; title = $title; message = $message } }
     function ThroughGitHub([string[]]$a, [string]$run, [object[]]$notes, [int]$miss = 0, [switch]$jobsRefused, [switch]$noRun) {
