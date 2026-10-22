@@ -1002,8 +1002,15 @@ How to use it:
 - Labels: `area:` is the part of the project, `needs: patrick` marks what
   waits on him, and `anyone can start` marks what needs nobody in
   particular. `Main Findings` and `Dev Findings` mark what testers found on
-  main and on dev, and the bot keeps #known-issues from them. Assign yourself
-  when you start one. The stage is Order and
+  main and on dev, and the bot keeps #known-issues from them. `area: triage`
+  marks an issue whose title did not say which part it is:
+  `.github\workflows\area-label.yml` gives a new issue with no `area:` label
+  the one its title names, or this one, and a person swaps it for the right
+  area. `weekly-review` marks what the weekly project review found,
+  `Suggestion` an idea somebody asked for, and `bug` something broken;
+  nothing reads these three, they are for people sorting the board.
+  `claimed: <name>` marks who is on an issue ("What this is" says how the
+  lanes use it). Assign yourself when you start one. The stage is Order and
   Status: the `wave:` labels and `needs: the live server` were retired on
   22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
