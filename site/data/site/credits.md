@@ -36,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`dcf6e699`](https://github.com/EvilPatrick06/skymp/tree/dcf6e699ffd1316d10189898ab6c460f412fc4ef).
+[`47be3d85`](https://github.com/EvilPatrick06/skymp/tree/47be3d8553025923850242c3d94dd5c59d8178ee).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...dcf6e699)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...47be3d85)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -128,6 +128,16 @@ makes them on your computer from your own copy of the game.
 preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
 installs. SkyHUD's author lets anybody share a preset that says which version
 it is for, and nothing else of SkyHUD's comes with it.
+
+**QuickLoot IE's settings**, `Data\SKSE\Plugins\QuickLootIE.json`, are
+QuickLoot IE 4.1.3's own settings file with one line added by Thornswood, so
+its loot menu shows weight and no gold value. QuickLoot IE is under the GNU
+General Public License version 3, and so is this file.
+
+**SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
+value to weight** show no gold value on Thornswood, because an item here has
+no gold price. Thornswood ships none of those files: the launcher makes them
+on your computer from your own copy of each mod.
 
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes

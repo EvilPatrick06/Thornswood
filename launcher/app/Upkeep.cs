@@ -240,10 +240,11 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// The main menu and the notice board's meshes, which Thornswood makes
-        /// from the person's own game (MadeFromGame, #2827): missing or not the
-        /// bytes it makes. Made here without writing, so the line says whether
-        /// Fix can make them or which of the game's files stops it.
+        /// The main menu, the notice board's meshes and the mods' menus with no
+        /// gold values, which Thornswood makes from the person's own game
+        /// (MadeFromGame, #2827, #3113): missing or not the bytes it makes.
+        /// Made here without writing, so the line says whether Fix can make
+        /// them or which of the game's or the mods' files stops it.
         /// </summary>
         static void Made(List<Issue> l)
         {
@@ -252,15 +253,17 @@ namespace Thornswood
             var names = new List<string>();
             foreach (string rel in off) names.Add(Path.GetFileName(rel));
             string why = null;
+            bool mod = false;
             foreach (FromGameFile f in MadeFromGame.Make())
-                if (off.Contains(f.Rel) && f.Problem != null) { why = f.Problem.TrimEnd('.'); break; }
+                if (off.Contains(f.Rel) && f.Problem != null) { why = f.Problem.TrimEnd('.'); mod = MadeFromGame.FromMod(f.Rel); break; }
             string what = Count(names.Count, "of the files Thornswood makes from your game") + " missing or changed: " + Some(names) +
-                          ". Until " + (names.Count == 1 ? "it is" : "they are") + " made, the game shows its own main menu, and the notice boards have no mesh.";
+                          ". Until " + (names.Count == 1 ? "it is" : "they are") + " made, " + MadeFromGame.Shows(off) + ".";
             if (why == null)
                 l.Add(Issue.Of(IssueKind.MadeFromGame, what, "Fix makes them again from your game's own files.", CloseAndRetry, false));
             else
                 l.Add(Issue.Of(IssueKind.MadeFromGame, what + " They cannot be made from this game: " + why + ".", null,
-                    "Put the game back on the Skyrim build Thornswood pins (the Downgrade on the Play page does that), then press Scan.", false));
+                    mod ? "Install the collection revision Thornswood pins in Vortex, so its SkyUI, SkyHUD and moreHUD are the ones these are made from, then press Scan."
+                        : "Put the game back on the Skyrim build Thornswood pins (the Downgrade on the Play page does that), then press Scan.", false));
         }
 
         /// <summary>Windows' Skyrim folders still pointed at Thornswood while Skyrim is not running.</summary>
@@ -347,7 +350,7 @@ namespace Thornswood
                 if (kinds.Contains(IssueKind.MadeFromGame))
                 {
                     try { string made = MadeFromGame.Ensure(); if (!string.IsNullOrEmpty(made)) say(made); }
-                    catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the files made from the game", ex); say("The main menu and the notice board's meshes could not be written (" + ex.Message.TrimEnd('.') + ")."); }
+                    catch (Exception ex) { Swallow.Note("Upkeep.FixOnDisk, the files made from the game", ex); say("The files made from your game could not be written (" + ex.Message.TrimEnd('.') + ")."); }
                 }
                 if (kinds.Contains(IssueKind.Client))
                 {

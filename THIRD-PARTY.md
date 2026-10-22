@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `dcf6e699` (in full, `dcf6e699ffd1316d10189898ab6c460f412fc4ef`). That
+commit `47be3d85` (in full, `47be3d8553025923850242c3d94dd5c59d8178ee`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -258,7 +258,7 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`dcf6e699`, the commit the client record names (the same 68 files, byte for
+`47be3d85`, the commit the client record names (the same 68 files, byte for
 byte, as at `d39a9a93`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
@@ -652,6 +652,34 @@ a wallpaper replacer's plate whose maker was never found, `logo01ae.nif`
 made from it, and `Data\music\special\mus_maintheme.xwm`, made new as
 silence.
 
+## The collection's menus, with no gold values
+
+An item on Thornswood has no gold price (#3113), and five files of three of
+the collection's mods draw one: SkyUI's item lists and item card
+(`interface\skyui\config.txt` and `itemcard.swf` in `SkyUI_SE.bsa`, Nexus
+Mods mod 12604, file 749043), SkyHUD 0.90B's line under an item somebody
+looks at (`interface\hudmenu.swf` in `SkyHUD.bsa`, mod 463, file 61422), and
+moreHUD 5.4.5's value to weight beside it (`interface\ahzhudinfo.swf` and its
+copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483). They are their authors' work, and nothing on
+those mods' pages lets Thornswood hand them on, so none of them ships: the
+launcher makes the five before every Play from the person's own copy of each
+mod, out of its archive, the same way as Bethesda's files above
+(`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and `scripts\release\Go.ps1`
+does the same for a hand-run install. What the repository holds is the edit,
+as the bytes that change, each pinned to the sha256 of the collection's
+version of the file (`launcher\app\FromGameModMenus.cs`, written by
+`scripts\mods\Build-ModMenus.py`), not the files. `Ship-Rules.ps1`
+`$ShipMadeFromMods` keeps the five out of every pack, release record and
+installer.
+
+`Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
+settings file (Nexus Mods mod 120075, file 806802) with one line added, which
+sets its loot menu's columns to weight only. QuickLoot IE is under the GNU
+General Public License version 3, which lets a changed copy go out under the
+same licence when it says what was changed and when; the file says both in
+its first lines, and the collection installs the licence beside it as
+`Data\QLIE-LICENSE.md`.
+
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
@@ -739,7 +767,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `dcf6e699ffd1316d10189898ab6c460f412fc4ef` on the public fork. The
+  name `47be3d8553025923850242c3d94dd5c59d8178ee` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -787,10 +815,12 @@ with.
   none of its plugin record's contents when the server settings name its
   type in `forbiddenBaseContainer` (#3078), since `c214eea1` a plant, a tree
   or a crafting bench goes through the server before the game starts it
-  (#3080), and since `dcf6e699` the server's own NPC movement never saves
-  on a timer (#3180). The server module's SHA256
-  is `c2411a7e8179cc5e2ac4fac3eb90289234987e1fc0ba5329213695167470d89d`, built
-  2026-10-22T05:43:28Z. This is the recorded next release, not a deployment
+  (#3080), since `dcf6e699` the server's own NPC movement never saves
+  on a timer (#3180), since `54c7736f` the client logs the head parts
+  it puts on a record (#2025), and since `47be3d85` a native crash of the
+  server is recorded by Windows (#1267). The server module's SHA256
+  is `77765e98919769a994dc853dc9ee04a1689f05ad44646040aa61fb4ab12e5475`, built
+  2026-10-22T09:44:43Z. This is the recorded next release, not a deployment
   claim. Main remains on `3bdf3d3c9926a4dd241b1d1c09dadde808a788d5` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -825,7 +855,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/dcf6e699ffd1316d10189898ab6c460f412fc4ef
+https://github.com/EvilPatrick06/skymp/tree/47be3d8553025923850242c3d94dd5c59d8178ee
 
 For the engine Main runs until then:
 

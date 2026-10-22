@@ -59,9 +59,16 @@ on 22 Oct 2026: NPCs nobody can see are updated less often, never paused).
 Before, every pass over the cast stepped each of them, up to 64 steps every
 20 ms: with nobody on, dev's 4,821 reported about 57,000 moving steps a minute
 on 22 Oct, and that was nearly all of the 0.187 of a core dev's JavaScript
-thread was busy on 21 Oct. An NPC in a fight or a flight keeps its pace
-whoever can see it, and one within 4,096 units of somebody is stepped as
-before. The minute report counts the background steps.
+thread was busy on 21 Oct. An NPC in a fight or a flight nobody can see is
+stepped every 100 ms, as often as one somebody can see, and one within 4,096
+units of somebody is stepped as before. The minute report counts the
+background steps.
+
+Each NPC waits its turn in a queue ordered by when it is due, and a pass takes
+only the ones that are due. The first version walked the whole cast in order
+and skipped whoever was not due yet. Dev's second profile on 22 Oct, with
+4,820 NPCs and nobody on, found that walk cost more than the steps it saved:
+`backgroundTick` took 1,984 ms in 120 s, against 593 ms before the change.
 
 Movement follows walkable triangles in the local region. It retains the saved
 height above the navigation surface and crosses only verified reciprocal edges.
