@@ -279,10 +279,10 @@ try:
     yes('the panel kind is faction, labelled Apply: Faction Leader',
         any(k == 'faction' and lab == 'Apply: Faction Leader' for k, lab, _ in bot.KINDS)
         and not any(k == 'company' for k, _, _ in bot.KINDS))
-    yes('factions.json names the five seats, Other last is added in code',
-        bot.faction_names() == [
-            'Imperial Embassy', 'Thalmor Remnant', 'Dark Brotherhood',
-            'The Companions', 'Free Skyrim Trading Company']
+    # The 16 of lore/factions.md (#3317, Patrick, 22 Oct, page card
+    # q-3317-faction-roster B, the lore approved the same day).
+    yes('factions.json names the sixteen seats, Other last is added in code',
+        bot.faction_names() == ['Imperial Embassy', 'Thalmor Remnant', 'Free Skyrim Trading Company', 'The Companions', 'College of Winterhold', 'Bards College', 'Thieves Guild', 'Dark Brotherhood', 'Vigilants of Stendarr', 'Dawnguard', 'Silver Hand', 'Forsworn', 'Orc Strongholds', 'Khajiit Caravans', 'Blades', 'Volkihar Clan']
         and bot.FACTION_OTHER == 'Other')
 
     lab = dict((a, b) for a, b, _ in bot.KINDS)['faction']

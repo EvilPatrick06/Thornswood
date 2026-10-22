@@ -78,7 +78,7 @@ ATTACH_FILES = 1 << 15
 # not, and a public channel needs nothing for the bot.
 RESTRICTED = ('read', 'open', 'membersread', 'testersread', 'hold', 'holdread',
               'holdcourt', 'holdguard', 'staff', 'staffread', 'council',
-              'pathfind', 'space', 'spaceread', 'spacerules')
+              'pathfind', 'space', 'spaceread', 'spacerules', 'faction', 'seats')
 # The hold a hold mode is asked about, where one is needed, and the staff
 # space a space mode is asked about (#3317).
 HOLD = 'Whiterun'
@@ -341,7 +341,8 @@ def live_server():
             ch = Channel(g, want, s['kind'], category=cat, topic=s.get('topic'),
                          ow=B.overwrites(bare, s.get('mode', 'open'), roles,
                                          s.get('hold'), space=s.get('space'),
-                                         read_extra=s.get('read_extra')))
+                                         read_extra=s.get('read_extra'),
+                                         faction=s.get('faction')))
             ch.mode = s.get('mode', 'open')
             g.channels.append(ch)
             if cat is not None:
@@ -431,7 +432,8 @@ try:
             ch = Channel(g, s['name'], s['kind'],
                          ow=B.overwrites(g, mode, roles, s.get('hold'),
                                          space=s.get('space'),
-                                         read_extra=s.get('read_extra')))
+                                         read_extra=s.get('read_extra'),
+                                         faction=s.get('faction')))
             yes('without Administrator the bot sees, posts and reads in a new #%s' % s['name'],
                 gets_in(resolve(g, me, ch)))
 
