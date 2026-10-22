@@ -59,6 +59,9 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $repo = Split-Path -Parent $Here
+# The feed below holds a runtime the server already serves, so it carries the note
+# version Publish-Update writes today (Source-Notice.ps1), not a number that goes stale.
+$noticeV = [int]([regex]::Match((Get-Content -LiteralPath (Join-Path $repo 'scripts\release\Source-Notice.ps1') -Raw), '\$SourceNoticeVersion = (\d+)').Groups[1].Value)
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 
 $script:pass = 0; $script:fail = 0
@@ -406,7 +409,7 @@ try {
         # already has that client runtime, as a real dev feed does, so this run does
         # not stage the six runtime files the stand-in game folder never had.
         $pFork = [string](((Get-Content -LiteralPath (Join-Path $fake 'records\client-build.json') -Raw) -replace '^\uFEFF', '') | ConvertFrom-Json).forkCommit
-        Put (Join-Path $pSite 'feed-dev\version\00000001.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":1}}')
+        Put (Join-Path $pSite 'feed-dev\version\00000001.json') ('{"launcherVersion":"1.2.0","packs":[],"news":[],"mainVersion":"1.1.106","clientRuntime":{"forkCommit":"' + $pFork + '","url":"https://example.invalid/client-runtime-' + $pFork + '.zip","sha256":"' + ('c' * 64) + '","bytes":4096,"notice":' + $noticeV + '}}')
         Put (Join-Path $pSite 'feed-dev\published.json') '{"Data\\Platform\\UI\\thornswood-ours.esp":"5:0000000000000000000000000000000000000000000000000000000000000000"}'
         function Publish([string[]]$extra) {
             $pu = Join-Path $fake 'scripts\release\Publish-Update.ps1'
