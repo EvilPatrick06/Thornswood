@@ -41,7 +41,7 @@ folder locks from `Lock-VpsFolders.ps1`).
 
 | Operation | Scripts | Needs admin? |
 | --- | --- | --- |
-| Copy a build to a stage folder, check hashes, swap, put back | Deploy-Docs, Deploy-Server, Deploy-DevGamemode, Install-Voice, Install-Bot (files), Publish-Server, `Swap.ps1` | No, if the identity has Modify on those service folders |
+| Copy a build to a stage folder, check hashes, swap, put back | Deploy-Docs, Deploy-Server, Deploy-DevGamemode, Install-Voice, Install-Bot (files), Publish-Server, `Swap.ps1` | No, if the identity has Modify on those service folders, and on `C:\Thornswood-Backup\server-folders.turn*` for the game servers' turn with the nightly backup (#3247) |
 | Stop and start one named Thornswood task | the swap blocks, Request-Restart, runbooks | No, if each task's security descriptor grants the identity start and stop |
 | Write the feed store and history | Feed-Store, Publish-Update, Publish-Discord `-Record` | No, Modify on `C:\Thornswood-Docs\feed*` |
 | Read logs, status, ACLs | Check-*, Watch, IT-IS-DOWN | No |
