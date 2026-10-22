@@ -143,7 +143,7 @@ function Invoke-RestMethod {
 $runner = Join-Path $work 'read.ps1'
 [IO.File]::WriteAllText($runner, $standIn + $script)
 
-$names = 'BOARD_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'RUNNER_TEMP', 'GITHUB_RUN_ID', 'GITHUB_OUTPUT', 'TS_CALLS', 'TS_BOARD_ERROR', 'TS_NO_STATUS'
+$names = 'BOARD_TOKEN', 'BOARD_OWNER', 'BOARD_NUMBER', 'RUNNER_TEMP', 'GITHUB_OUTPUT', 'TS_CALLS', 'TS_BOARD_ERROR', 'TS_NO_STATUS'
 function Invoke-Read([hashtable]$extra = @{}) {
     foreach ($f in $calls, (Join-Path $work 'out.txt')) { if (Test-Path -LiteralPath $f) { Remove-Item -LiteralPath $f -Force } }
     $temp = Join-Path $work 'runner-temp'
@@ -156,7 +156,6 @@ function Invoke-Read([hashtable]$extra = @{}) {
         $env:BOARD_OWNER = 'EvilPatrick06'
         $env:BOARD_NUMBER = '1'
         $env:RUNNER_TEMP = $temp
-        $env:GITHUB_RUN_ID = '42'
         $env:GITHUB_OUTPUT = Join-Path $work 'out.txt'
         $env:TS_CALLS = $calls
         $env:TS_BOARD_ERROR = ''
@@ -170,10 +169,10 @@ function Invoke-Read([hashtable]$extra = @{}) {
     }
     $made = @()
     if (Test-Path -LiteralPath $calls) { $made = @(Get-Content -LiteralPath $calls | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
-    $file = Join-Path (Join-Path $temp 'board-read-42') 'board.json'
+    $file = Join-Path (Join-Path $temp 'board-read') 'board.json'
     $board = if (Test-Path -LiteralPath $file) { [IO.File]::ReadAllText($file) | ConvertFrom-Json } else { $null }
     $said = if (Test-Path -LiteralPath (Join-Path $work 'out.txt')) { [IO.File]::ReadAllText((Join-Path $work 'out.txt')) } else { '' }
-    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Board = $board; Output = $said; Dir = (Join-Path $temp 'board-read-42') }
+    return [pscustomobject]@{ Code = $code; Out = $out; Calls = $made; Board = $board; Output = $said; Dir = (Join-Path $temp 'board-read') }
 }
 
 try {

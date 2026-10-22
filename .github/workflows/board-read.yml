@@ -101,7 +101,7 @@ jobs:
             workflows = @(@($project.workflows.nodes) | ForEach-Object { [ordered]@{ name = $_.name; enabled = [bool]$_.enabled } })
             items     = $items.ToArray()
           }
-          $dir = Join-Path $env:RUNNER_TEMP ('board-read-' + $env:GITHUB_RUN_ID)
+          $dir = Join-Path $env:RUNNER_TEMP 'board-read'
           New-Item -ItemType Directory -Force -Path $dir | Out-Null
           [IO.File]::WriteAllText((Join-Path $dir 'board.json'), ($out | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding $false))
           Write-Host ("read {0} cards from {1}" -f $items.Count, $project.url)
