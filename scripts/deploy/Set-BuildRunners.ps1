@@ -8,7 +8,7 @@
       .\scripts\deploy\Set-BuildRunners.ps1 -Check    change nothing; exit 1 when GitHub differs from the record
 
   WHY (#2994). The VPS has six cores and, from 20 October, eight runners
-  (#2929; five since 21 October, when 6, 7 and 8 were removed, #3108). Every
+  (#2929; three since the evening of 21 October, #3108, #3219). Every
   heavy job asked for thornswood-vps, which all eight carried,
   so on the night of 20 to 21 October seven builds ran at once, each one's
   harness step stretched from about 15 minutes to 34 to 39, and the job's
