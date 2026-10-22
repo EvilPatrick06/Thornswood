@@ -41,6 +41,9 @@ namespace Thornswood
         public string Name = "";
         public string Password = "";
         public string Why = "";        // link, guild, banned, role, offline
+        // With offline: what the request ran into and how long it waited
+        // (Discord.LastFailure), for the log line that reports it.
+        public string NetFailure = "";
         public string Message = "";
         public string Invite = "";
         public bool Admin;
@@ -494,6 +497,7 @@ namespace Thornswood
                 // implying the person is banned.
                 st.Why = "offline";
                 st.Message = "Could not reach thornswood.net to check you in.";
+                st.NetFailure = LastFailure ?? "";
                 return st;
             }
 
@@ -1098,6 +1102,17 @@ namespace Thornswood
         }
 
         /// <summary>
+        /// Why the last Send on this thread got no answer at all, and how long
+        /// it waited, or empty when it got one. Send returns 0 for every such
+        /// failure, so until 22 October a timeout, a refused connection and a
+        /// name that would not resolve all reached the log as the same "not
+        /// answering", and a check in that failed while the game was starting
+        /// (launcher.log, 22 Oct, 13:16:06 and 13:17:44) could not say which.
+        /// Per thread, because check ins run on pool threads side by side.
+        /// </summary>
+        [ThreadStatic] public static string LastFailure;
+
+        /// <summary>
         /// One call to the site and whatever it answered: the status code, and
         /// the body in reply, refusals included. 0 is the site not reached at
         /// all, which is not a refusal and is never read as one.
@@ -1111,6 +1126,8 @@ namespace Thornswood
         public static int Send(string method, string url, string json, out string reply)
         {
             reply = "";
+            LastFailure = "";
+            var took = System.Diagnostics.Stopwatch.StartNew();
             try
             {
                 ServicePointManager.SecurityProtocol |= SecurityProtocolType.Tls12; // added, never replaced (#1360)
@@ -1146,11 +1163,15 @@ namespace Thornswood
                     catch (Exception ex) { Swallow.Note("Discord.Send, reading refusal body", ex); }
                     return (int)res.StatusCode;
                 }
+                // WebExceptionStatus names the kind: Timeout, ConnectFailure,
+                // NameResolutionFailure, SecureChannelFailure and the like.
+                LastFailure = we.Status + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
             catch (Exception ex)
             {
                 Swallow.Note("Discord.Send", ex);
+                LastFailure = ex.GetType().Name + " after " + took.ElapsedMilliseconds + " ms";
                 return 0;
             }
         }
