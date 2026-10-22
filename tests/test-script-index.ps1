@@ -120,7 +120,7 @@ $channel = ''
 try { $channel = (Get-Help $Ship -Parameter Channel -ErrorAction Stop | Out-String) } catch { $channel = '' }
 Yes 'Get-Help -Parameter Channel names both channels' ($channel -match '\bmain\b' -and $channel -match '\bdev\b')
 Yes 'and says the last dev Ship wins' ($channel -match '(?i)last dev ship wins')
-Yes 'and says to say so in #staff-updates' ($channel -match '#staff-updates')
+Yes 'and says to check with the team before taking it, not to post in #staff-updates' ($channel -match '(?i)check with the team' -and $channel -notmatch '#staff-updates')
 $examples = (@($h.examples.example) | ForEach-Object { $_.code }) -join "`n"
 Yes 'there is an example of a dev release' ($examples -match '-Channel dev')
 
