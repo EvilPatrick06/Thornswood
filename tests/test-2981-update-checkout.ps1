@@ -72,10 +72,17 @@ if ($script:fail) { Done }
 
 # Commits made here need a name, and a submodule from a folder needs the file
 # protocol, which git refuses by default. Both only for this process.
+# Nor does any git here start a maintenance or gc run of its own after a
+# fetch, commit or push, or a signing program for a commit nobody checks the
+# signature of: the runs were 44 of the 627 git processes this harness
+# started, on a box whose processors are what PR builds wait on (#3168).
+# None of them changes what a checkout or Update-Checkout.ps1 does.
 $keep = @{}
 $envs = @{
     GIT_AUTHOR_NAME = 't'; GIT_AUTHOR_EMAIL = 't@t'; GIT_COMMITTER_NAME = 't'; GIT_COMMITTER_EMAIL = 't@t'
-    GIT_CONFIG_COUNT = '1'; GIT_CONFIG_KEY_0 = 'protocol.file.allow'; GIT_CONFIG_VALUE_0 = 'always'
+    GIT_CONFIG_COUNT = '4'; GIT_CONFIG_KEY_0 = 'protocol.file.allow'; GIT_CONFIG_VALUE_0 = 'always'
+    GIT_CONFIG_KEY_1 = 'maintenance.auto'; GIT_CONFIG_VALUE_1 = 'false'; GIT_CONFIG_KEY_2 = 'gc.auto'; GIT_CONFIG_VALUE_2 = '0'
+    GIT_CONFIG_KEY_3 = 'commit.gpgsign'; GIT_CONFIG_VALUE_3 = 'false'
     GIT_CONFIG_NOSYSTEM = '1'; THORNSWOOD_FRESH_CHECKED = ''
 }
 foreach ($k in $envs.Keys) { $keep[$k] = [Environment]::GetEnvironmentVariable($k); [Environment]::SetEnvironmentVariable($k, $envs[$k]) }
@@ -95,14 +102,43 @@ function Commit([string]$dir, [string]$name) {
     $null = G $dir commit -q -m $name
     return (Rev $dir)
 }
-function Pin([string]$seed, [string]$sha, [string]$msg) {
-    $null = G (Join-Path $seed 'engine\skymp') fetch -q origin
-    $null = G (Join-Path $seed 'engine\skymp') checkout -q $sha
-    $null = G $seed add engine/skymp
-    $null = G $seed commit -q -m $msg
-    $null = G $seed push -q origin main
-    return (Rev $seed)
+# The commits the fork and Thornswood's main get, written straight into the
+# bare repository by one git fast-import (#3168). A seed clone took an add, a
+# commit and a push for each, and the push a receive-pack, an upload-pack and
+# a pack-objects of its own: about 25 processes a pin, where this is one.
+# The history is the same shape: one commit each, with the same files and
+# pins, each on top of the one before, and main moves only when a scene
+# moves it. Each commit is its message and then its fast-import M lines;
+# it returns their shas in order.
+function Import([string]$bare, [string]$from, [object[]]$commits) {
+    $s = New-Object Text.StringBuilder
+    for ($i = 1; $i -le $commits.Count; $i++) {
+        $c = @($commits[$i - 1])
+        [void]$s.Append("commit refs/heads/main`nmark :$i`ncommitter t <t@t> now`ndata <<EOT`n$($c[0])`nEOT`n")
+        if ($i -gt 1) { [void]$s.Append("from :$($i - 1)`n") } elseif ($from) { [void]$s.Append("from $from`n") }
+        foreach ($m in @($c | Select-Object -Skip 1)) { [void]$s.Append("$m`n") }
+    }
+    # Fed through a stream of its own: a pipe from PowerShell to git would end
+    # each line as the machine does, and fast-import reads LF only. It keeps
+    # what it wrote as a pack, where under 100 objects it would start
+    # unpack-objects to spread them out loose.
+    $marks = Join-Path $tmp 'marks.txt'
+    $si = New-Object Diagnostics.ProcessStartInfo 'git'
+    $si.Arguments = "--git-dir=`"$bare`" -c fastimport.unpackLimit=0 fast-import --quiet --date-format=now --export-marks=`"$marks`""
+    $si.UseShellExecute = $false; $si.RedirectStandardInput = $true; $si.RedirectStandardError = $true
+    $p = [Diagnostics.Process]::Start($si)
+    $b = [Text.Encoding]::UTF8.GetBytes($s.ToString())
+    $p.StandardInput.BaseStream.Write($b, 0, $b.Length); $p.StandardInput.Close()
+    $err = $p.StandardError.ReadToEnd(); $p.WaitForExit()
+    if ($p.ExitCode -ne 0) { throw "git fast-import failed in $bare ($($p.ExitCode)): $err" }
+    $shas = @{}
+    foreach ($l in [IO.File]::ReadAllLines($marks)) { $k, $v = $l -split ' ', 2; $shas[$k] = $v.Trim() }
+    return @(for ($i = 1; $i -le $commits.Count; $i++) { $shas[":$i"] })
 }
+# A file, its content its own name as Commit writes it unless said, and the pin.
+function File([string]$name, [string]$text = $name) { return "M 100644 inline $name`ndata <<EOT`n$text`nEOT" }
+function Link([string]$sha) { return "M 160000 $sha engine/skymp" }
+function Pin([string]$on, [string]$sha, [string]$msg) { return @(Import $top $on @(, @($msg, (Link $sha))))[0] }
 # Whether any config git reads in that checkout sets submodule.recurse.
 function Recurse([string]$dir) {
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -133,23 +169,13 @@ try {
     # The fork, with three commits for main to pin in turn.
     $sub = Join-Path $tmp 'skymp.git'
     $null = G $tmp init -q --bare -b main $sub
-    $fs = Join-Path $tmp 'forkseed'
-    $null = G $tmp clone -q $sub $fs
-    $null = G $fs checkout -q -b main
-    $s1 = Commit $fs 'one.txt'; $s2 = Commit $fs 'two.txt'; $s3 = Commit $fs 'three.txt'
-    $null = G $fs push -q origin main
+    $s1, $s2, $s3 = Import $sub '' @(@('one.txt', (File 'one.txt')), @('two.txt', (File 'two.txt')), @('three.txt', (File 'three.txt')))
 
-    # Thornswood, pinning the fork's first commit.
+    # Thornswood, pinning the fork's first commit, with the .gitmodules git
+    # submodule add writes for it.
     $top = Join-Path $tmp 'Thornswood.git'
     $null = G $tmp init -q --bare -b main $top
-    $seed = Join-Path $tmp 'seed'
-    $null = G $tmp clone -q $top $seed
-    $null = G $seed checkout -q -b main
-    $null = G $seed submodule add -q ../skymp.git engine/skymp
-    $null = G (Join-Path $seed 'engine\skymp') checkout -q $s1
-    $null = G $seed add -A
-    $null = G $seed commit -q -m 'pin one'
-    $null = G $seed push -q origin main
+    $t1 = @(Import $top '' @(, @('pin one', (File '.gitmodules' "[submodule `"engine/skymp`"]`n`tpath = engine/skymp`n`turl = ../skymp.git"), (Link $s1))))[0]
 
     # The shared clone: detached at origin/main, engine/skymp fetched.
     $one = Join-Path $tmp 'Thornswood-Repo'
@@ -159,7 +185,7 @@ try {
     Yes '0. the shared clone starts clean, engine/skymp at the first pin' (@(Status $one).Count -eq 0 -and (Rev (Join-Path $one 'engine\skymp')) -eq $s1)
 
     # ---- 1. the incident: the pin moves, the clone is moved by hand ----
-    $t2 = Pin $seed $s2 'pin two'
+    $t2 = Pin $t1 $s2 'pin two'
     $null = G $one fetch -q origin
     $null = G $one checkout -q --detach origin/main
     $stat = @(Status $one)
@@ -199,7 +225,7 @@ try {
     $wt = Join-Path $one 'worktrees\claude-releases'
     $null = G $one worktree add -q --detach $wt $t2
     Yes '4. the worktree has engine/skymp unfetched, as git worktree add leaves it' (-not (Test-Path -LiteralPath (Join-Path $wt 'engine\skymp\.git')))
-    $t3 = Pin $seed $s3 'pin three'
+    $t3 = Pin $t2 $s3 'pin three'
     $null = G $wt fetch -q origin
     $o = ''; $c = 0
     $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
@@ -220,9 +246,15 @@ try {
     Yes '4. which Ship names, with Update-Checkout as the fix' ((DevRows $one).State.Fix -eq '.\scripts\release\Update-Checkout.ps1')
     $r = Run $one
     Yes "4. and Update-Checkout takes it to the new pin (exit $($r.Code))" ($r.Code -eq 0 -and (Rev (Join-Path $one 'engine\skymp')) -eq $s3 -and @(Status $one).Count -eq 0)
+    # The checkout 7 puts on a branch: this clone as it stands now, at the
+    # third pin with engine/skymp fetched and at it. A copy of the folder, where
+    # a clone and a git submodule update --init were 20 processes, most of them
+    # the shell git submodule is (#3168).
+    $two = Join-Path $tmp 'mine'
+    Copy-Item -Recurse -Force -LiteralPath $one -Destination $two
 
     # ---- 5. behind, detached ----
-    $t4 = Commit $seed 'notes.txt'; $null = G $seed push -q origin main
+    $t4 = @(Import $top $t3 @(, @('notes.txt', (File 'notes.txt'))))[0]
     $d = DevRows $one
     Yes "5. a detached clone behind main is told Update-Checkout, not git pull: $($d.State.Message)" (
         $d.State.Problem -eq 'behind' -and $d.State.Fix -eq '.\scripts\release\Update-Checkout.ps1' -and $d.State.Message -notmatch 'git pull' -and -not $d.Verdict.Ready)
@@ -230,7 +262,7 @@ try {
     Yes "5. and Update-Checkout moves it there (exit $($r.Code))" ($r.Code -eq 0 -and (Rev $one) -eq $t4 -and (DevRows $one).Verdict.Ready)
 
     # ---- 6. it refuses, and moves nothing ----
-    $t5 = Pin $seed $s2 'pin two again'
+    $t5 = Pin $t4 $s2 'pin two again'
     $null = G $one fetch -q origin
     $h = Rev $one; $subDir = Join-Path $one 'engine\skymp'; $sh = Rev $subDir
 
@@ -263,10 +295,7 @@ try {
     Yes "6. with all of that put back it moves (exit $($r.Code))" ($r.Code -eq 0 -and (Rev $one) -eq $t5 -and (Rev $subDir) -eq $s2 -and @(Status $one).Count -eq 0)
 
     # ---- 7. a branch, and a checkout that never fetched the submodule ----
-    $two = Join-Path $tmp 'mine'
-    $null = G $tmp clone -q $top $two
     $null = G $two -c submodule.recurse=false checkout -q -B main $t3
-    $null = G $two submodule update -q --init
     $null = G $two branch -q --set-upstream-to origin/main
     $null = G $two -c submodule.recurse=false pull -q --ff-only origin main
     Yes '7. git pull on a branch leaves engine/skymp behind too' (@(Status $two).Count -eq 1 -and (Rev (Join-Path $two 'engine\skymp')) -eq $s3)

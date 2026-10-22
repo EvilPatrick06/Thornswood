@@ -503,32 +503,21 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host ("{0} game script(s) parse" -f $files.Count)
 
-      - name: Parse every bot file
-        shell: pwsh
-        run: |
-          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
-          $bad = 0
-          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
-            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              $bad++
-              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
-            }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every bot file parses'
-
       - name: Check the Python names what exists
         shell: pwsh
         run: |
-          # Issue #1343. Parsing (the step above) passes a name that does not
-          # exist, and Python only finds out when that line runs: in the bot,
-          # on the VPS, in front of people. ruff with four rule groups and
+          # Issue #1343. A file that parses can still name something that does
+          # not exist, and Python only finds out when that line runs: in the
+          # bot, on the VPS, in front of people. ruff with four rule groups and
           # nothing else: E9 a file that will not compile, F63 a comparison
           # or assert that is always true or false, F7 a break, continue,
           # return or yield where none can be, F82 a name never defined.
           # No style rules, so no line here is red for how it looks. All 48
           # Python files passed on main on 5 October with nothing changed.
+          # ruff also stops on a file that does not parse, whatever --select
+          # says (a planted "def f(:" gave invalid-syntax, exit 1, on 22 Oct
+          # 2026), so the step that parsed each bot file with Python's ast,
+          # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
           # By hand, from the repository folder, in any venv:
@@ -569,14 +558,6 @@ jobs:
           # waiting for somebody to notice. The script says what to do.
           .\scripts\dev\Check-Swallow.ps1
 
-      - name: Build the launcher
-        shell: pwsh
-        run: |
-          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
-          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
-          if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
-
       - name: Build the ship root tool
         shell: pwsh
         run: |
@@ -590,29 +571,8 @@ jobs:
           $msb = & .\scripts\release\Find-MSBuild.ps1
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::MSBuild is not on this runner, so the ship root tool cannot be built'; exit 1 }
           $out = Join-Path $env:RUNNER_TEMP 'shiproot'
-          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
+          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:UseSharedCompilation=false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
-
-      - name: Check the manifests in the built exes
-        shell: pwsh
-        run: |
-          # Issue #463. Reads the manifest embedded in the launcher and the
-          # setup program this build made: per-monitor DPI, asInvoker (neither
-          # ever asks for administrator), and an identity version equal to
-          # Updater.cs. Also runs the window fit at 100 to 200 percent.
-          & pwsh -NoProfile -File tests\test-app-manifest.ps1 -Exe (Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe') -Scratch (Join-Path $env:RUNNER_TEMP 'app-manifest')
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-app-manifest.ps1::the built exes do not carry the manifest they should, see the lines above'; exit 1 }
-
-      - name: Scan the built launcher for secrets
-        shell: pwsh
-        run: |
-          # The secrets that shipped were in built artefacts, not in the source,
-          # so what this build made is read too, byte by byte: the launcher with
-          # everything Build-Launcher embeds in it, and the setup stub.
-          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
-          if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
-          .\scripts\dev\Check-Secrets.ps1 -Binary $built
-          exit $LASTEXITCODE
 
       - name: Check the MSBuild launcher against its sources
         shell: pwsh
@@ -625,6 +585,10 @@ jobs:
           # file details and the manifest, the icon, nothing beside the exe.
           # GitHub's image has Visual Studio; the VPS runners have the Build
           # Tools from Bootstrap-VPS.ps1 -IncludeBuildTools (option A, 12 Oct).
+          # It builds both exes with Build-Launcher.ps1, then runs
+          # tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
+          # the pair, so this build has no build, manifest or secrets step of
+          # its own for them: until 22 Oct 2026 it did each twice (#3114).
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 

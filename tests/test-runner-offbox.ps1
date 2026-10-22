@@ -42,7 +42,18 @@ try {
     [IO.File]::WriteAllText((Join-Path $fakeBin 'gh.cmd'), "@echo called>>`"$ghCalled`"`r`n@exit /b 1`r`n")
     $env:PATH = $fakeBin + ';' + $env:PATH
 
+    # A dry run writes the same scripts for the same switches and changes
+    # nothing the next one reads, so each set of switches runs once and a
+    # later check of the same set reads that run: 22 PowerShell starts, not
+    # 30, where one costs the gate box about ten times a node start (#3168).
+    $dryRuns = @{}
     function Dry([string[]]$more) {
+        $key = @($more) -join "`n"
+        if ($dryRuns.ContainsKey($key)) { return $dryRuns[$key] }
+        $dryRuns[$key] = Dry-Run $more
+        return $dryRuns[$key]
+    }
+    function Dry-Run([string[]]$more) {
         $f = Join-Path $work ('dry-' + [Guid]::NewGuid().ToString('N') + '.txt')
         $ErrorActionPreference = 'Continue'
         $said = @(& $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @more -DryRunTo $f -NoPause 2>&1 | ForEach-Object { "$_" })
