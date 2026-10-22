@@ -288,8 +288,9 @@ foreach ($pair in $menuPairs) {
 }
 
 # ------------------------------------------------ our own menu files --
-# The empty loading spinner, the silent stand-in for the game's theme and
-# SkyHUD's settings as Thornswood set them. From game\ours, beside
+# The empty loading spinner, the silent stand-in for the game's theme,
+# SkyHUD's settings as Thornswood set them and QuickLoot IE's with no gold
+# value column (#3113). From game\ours, beside
 # game\menu. Each path is
 # the path in the game folder, so the destination is the name itself
 # (Ship-Rules $ShipOursFiles; change the two together). The destination
@@ -301,7 +302,8 @@ $oursSrc = Join-Path $Here '..\..\game\ours'
 $oursMenuFiles = @(
   'Data\Interface\loadwaitspinner.swf',
   'Data\music\special\mus_maintheme.xwm',
-  'Data\Interface\skyhud\skyhud.txt'
+  'Data\Interface\skyhud\skyhud.txt',
+  'Data\SKSE\Plugins\QuickLootIE.json'
 )
 foreach ($rel in $oursMenuFiles) {
   $src = Join-Path $oursSrc $rel
@@ -323,6 +325,10 @@ foreach ($rel in $oursMenuFiles) {
 # the line says which of the game's files differs. Not a failed run: nothing
 # here ships, and the launcher says the same thing at Play. The destination is
 # removed first, for the hard link reason above.
+# The collection's item menus and HUD with no gold values are made the same
+# way from the mods' own archives in this game (#3113, Ship-Rules
+# $ShipMadeFromMods): SkyUI's config.txt and itemcard.swf, SkyHUD's
+# hudmenu.swf and moreHUD's AHZHudInfo.swf, two copies.
 Head 'Made from the game'
 if (-not ('Thornswood.FromGame' -as [type])) {
   $fromGameCs = @(Get-ChildItem -LiteralPath (Join-Path $Here '..\..\launcher\app') -Filter 'FromGame*.cs' -File |

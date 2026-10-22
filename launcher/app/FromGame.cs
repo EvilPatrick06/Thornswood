@@ -37,6 +37,18 @@ namespace Thornswood
     /// this to those tools on made-up archives; scripts\mods\Check-FromGame.ps1
     /// checks it against a real game.
     ///
+    /// THE COLLECTION'S MENUS, the same way (#3113). An item on Thornswood has
+    /// no gold price, and five files of three of the collection's mods draw
+    /// one: SkyUI's item lists (interface\skyui\config.txt) and item card
+    /// (itemcard.swf), SkyHUD's line under an item somebody looks at
+    /// (hudmenu.swf), and moreHUD's value to weight beside it (AHZHudInfo.swf
+    /// and its copy under exported). Those are their authors' files, so they
+    /// are not handed on either: the edits (MenuRecipe.Mods, FromGameModMenus.cs,
+    /// written by scripts\mods\Build-ModMenus.py) are made here against the
+    /// person's own copy of each mod, out of its archive. A loose file at the
+    /// same path wins over the archive in the game, which is what puts the
+    /// edited one in front.
+    ///
     /// Who runs it: the launcher before every Play and from Scan and Fix
     /// (MadeFromGame.cs), and scripts\release\Go.ps1 for a ship root. It reads
     /// the archives and writes nothing itself.
@@ -47,15 +59,24 @@ namespace Thornswood
         public const string BoardFile = "Data\\meshes\\thornswood\\noticeboard01.nif";
         public const string BoxFile = "Data\\meshes\\thornswood\\dropbox01.nif";
 
-        /// <summary>The three paths, under the game folder.</summary>
-        public static readonly string[] Files = { MenuFile, BoardFile, BoxFile };
+        /// <summary>Every path this makes, under the game folder: the three of the game's, then the mods' menus.</summary>
+        public static readonly string[] Files = AllFiles();
 
-        /// <summary>The sha256 each of the three must have.</summary>
+        static string[] AllFiles()
+        {
+            var l = new List<string> { MenuFile, BoardFile, BoxFile };
+            foreach (MenuRecipe m in MenuRecipe.Mods) l.Add(m.Path);
+            return l.ToArray();
+        }
+
+        /// <summary>The sha256 each one must have.</summary>
         public static string Expected(string rel)
         {
             if (rel.Equals(MenuFile, StringComparison.OrdinalIgnoreCase)) return MenuRecipe.Shipped.Sha256;
             if (rel.Equals(BoardFile, StringComparison.OrdinalIgnoreCase)) return BoardRecipe.Shipped.BoardSha256;
             if (rel.Equals(BoxFile, StringComparison.OrdinalIgnoreCase)) return BoardRecipe.Shipped.BoxSha256;
+            foreach (MenuRecipe m in MenuRecipe.Mods)
+                if (rel.Equals(m.Path, StringComparison.OrdinalIgnoreCase)) return m.Sha256;
             return null;
         }
 
@@ -78,13 +99,15 @@ namespace Thornswood
         }
 
         /// <summary>
-        /// Makes the three files from the archives in <paramref name="data"/>
+        /// Makes every file in Files from the archives in <paramref name="data"/>
         /// (a game's Data folder). Each result carries its bytes, or the reason
         /// it could not be made; nothing is written.
         /// </summary>
         public static List<FromGameFile> Build(string data)
         {
-            return Build(data, MenuRecipe.Shipped, BoardRecipe.Shipped);
+            List<FromGameFile> l = Build(data, MenuRecipe.Shipped, BoardRecipe.Shipped);
+            foreach (MenuRecipe m in MenuRecipe.Mods) l.Add(BuildMenu(data, m));
+            return l;
         }
 
         public static List<FromGameFile> Build(string data, MenuRecipe menu, BoardRecipe board)
@@ -106,10 +129,13 @@ namespace Thornswood
             string have = Sha256(src);
             if (have != r.SourceSha256)
             {
-                f.Problem = "the game's " + r.Source + " (" + src.Length + " bytes, sha256 " + have + ") is not the one Thornswood's menu is made from (" +
-                            r.SourceSize + " bytes, sha256 " + r.SourceSha256 + "), so the game is not on the build Thornswood pins";
+                f.Problem = (r.Mod == null ? "the game's " : r.Mod + "'s ") + r.Source + " (" + src.Length + " bytes, sha256 " + have +
+                            ") is not the one Thornswood's file is made from (" + r.SourceSize + " bytes, sha256 " + r.SourceSha256 + "), so " +
+                            (r.Mod == null ? "the game is not on the build Thornswood pins" : r.Mod + " is not the version the collection pins");
                 return f;
             }
+            // A text file (SkyUI's config.txt) takes its edits as it is.
+            if (!r.Path.EndsWith(".swf", StringComparison.OrdinalIgnoreCase)) return Checked(f, Edited(src, r.Edits));
             if (src.Length < 8 || src[0] != 'C' || src[1] != 'W' || src[2] != 'S')
             {
                 f.Problem = "the game's " + r.Source + " is not a compressed SWF";
@@ -119,10 +145,20 @@ namespace Thornswood
             full.Write(src, 0, 8);
             using (var z = new DeflateStream(new MemoryStream(src, 10, src.Length - 10 - 4), CompressionMode.Decompress))
                 z.CopyTo(full);
-            byte[] plain = full.ToArray();
+            byte[] swf = Edited(full.ToArray(), r.Edits);
+            byte[] packed = ZlibLevel6.Compress(Slice(swf, 8, swf.Length - 8));
+            var outp = new byte[8 + packed.Length];
+            Buffer.BlockCopy(swf, 0, outp, 0, 8);
+            Buffer.BlockCopy(packed, 0, outp, 8, packed.Length);
+            return Checked(f, outp);
+        }
+
+        /// <summary>The bytes with the edits made, in order.</summary>
+        static byte[] Edited(byte[] plain, MenuEdit[] edits)
+        {
             var edited = new MemoryStream();
             int at = 0;
-            foreach (MenuEdit e in r.Edits)
+            foreach (MenuEdit e in edits)
             {
                 edited.Write(plain, at, e.At - at);
                 byte[] ins = Hex(e.Insert);
@@ -130,12 +166,7 @@ namespace Thornswood
                 at = e.At + e.Remove;
             }
             edited.Write(plain, at, plain.Length - at);
-            byte[] swf = edited.ToArray();
-            byte[] packed = ZlibLevel6.Compress(Slice(swf, 8, swf.Length - 8));
-            var outp = new byte[8 + packed.Length];
-            Buffer.BlockCopy(swf, 0, outp, 0, 8);
-            Buffer.BlockCopy(packed, 0, outp, 8, packed.Length);
-            return Checked(f, outp);
+            return edited.ToArray();
         }
 
         static FromGameFile Checked(FromGameFile f, byte[] b)
@@ -362,10 +393,14 @@ namespace Thornswood
         public MenuEdit(int at, int remove, string insert) { At = at; Remove = remove; Insert = insert; }
     }
 
-    /// <summary>Thornswood's edit to Skyrim's main menu. The one in use is MenuRecipe.Shipped, in FromGameMenu.cs.</summary>
+    /// <summary>
+    /// Thornswood's edit to one menu file: Skyrim's main menu (MenuRecipe.Shipped,
+    /// FromGameMenu.cs), or one of the collection's mods' menus (MenuRecipe.Mods,
+    /// FromGameModMenus.cs). Mod is the mod's name for the latter, null for the game.
+    /// </summary>
     public sealed partial class MenuRecipe
     {
-        public string Archive, Source, SourceSha256, Path, Sha256;
+        public string Archive, Source, SourceSha256, Path, Sha256, Mod;
         public int SourceSize, Size;
         public MenuEdit[] Edits;
     }

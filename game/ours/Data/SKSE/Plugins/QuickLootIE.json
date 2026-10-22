@@ -1,0 +1,48 @@
+{
+	// QuickLoot IE 4.1.3's settings file (Nexus Mods, Skyrim Special Edition
+	// mod 120075), changed for Thornswood on 22 Oct 2026: the loot menu's
+	// columns are weight only, with no gold value, because an item on
+	// Thornswood has no gold price (#3113). QuickLoot IE is under the GNU
+	// General Public License version 3 (Data\QLIE-LICENSE.md); so is
+	// this file. Nothing else here is changed.
+	"logLevel": "trace",
+	"logFlush": "trace",
+	"logEvents": false,
+	"skipOldSwfCheck": false,
+	"enableProfiler": false,
+	"profilerFlushInterval": 1000,
+	"enableMenuCaching": true,
+	"suppressActivationPrompt": true,
+	// Use this to whitelist menus so they won't block
+	// the loot menu from opening. The list must contain
+	// the internal menu names as they appear in the log,
+	// not the name of the swf file.
+	"menuWhitelist": [
+		"Durability Menu",
+		"UIHS_WidgetMenu",
+		"WidgetMenu",
+		"CombatAlertOverlayMenu",
+		"AchievementWidget"
+	],
+	// Use this to exclude certain containers from being
+	// searchable by QuickLoot IE. Both BaseIDs and RefIDs
+	// can be used.
+	"containerBlacklist": [
+		// Gunjar (must be interacted with directly to
+		// progress the intro quest)
+		"Skyrim.esm|09B0AD",
+		"alternate start - live another life.esp|3DC4DB"
+	],
+	"swfConfig": {
+		// This can be used to modify internal values of the menu without building a new swf.
+		// Leave it alone unless you understand what you're doing.
+		"overrides": {
+			//"_root.lootMenu.nonTransparentElements": ["title"],
+			//"QuickLoot.Button.WHITE": 255,
+			//"QuickLoot.Button.RED": 65280,
+			//"QuickLoot.ListItemRenderer.DEFAULT_TEXT_COLOR": 255,
+			//"QuickLoot.ListItemRenderer.STEALING_TEXT_COLOR": 65280
+			"_root.lootMenu.infoColumns": ["weight"]
+		}
+	}
+}
