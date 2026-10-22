@@ -28,21 +28,22 @@ body{margin:0;background:var(--night);color:var(--page);
   font:400 17px/1.7 var(--serif);overflow-x:hidden;
   -webkit-font-smoothing:antialiased}
 img{max-width:100%;height:auto;display:block}
-a{color:var(--gold);text-decoration:none}
-a:hover{color:var(--gold-hot)}
-/* A link inside a sentence is underlined as well as gold (#3218). Gold on the
+/* A link is underlined (#2768, Patrick's answer on 22 Oct 2026). Gold on the
    grey of running text is told apart by colour alone, which is not enough for
-   somebody who cannot see the difference (WCAG 1.4.1); Lighthouse flagged the
-   known issues and professions links on the front page. One rule for every
-   sentence, so a link written into a new paragraph is underlined without
-   anybody remembering to. A .btn is a link with a box of its own. */
-p a:not(.btn),li a:not(.btn),td a:not(.btn),blockquote a:not(.btn){
-  border-bottom:1px solid rgba(201,162,75,.45)}
+   somebody who cannot see the difference (WCAG 1.4.1, Lighthouse
+   link-in-text-block). The underline is on every link here, so a link written
+   into any sentence anywhere on the site has one without anybody remembering
+   to add it. Menus and buttons are links that do not sit in a sentence, and
+   they opt out in the one list below. */
+a{color:var(--gold);text-decoration-line:underline;text-decoration-thickness:1px;
+  text-decoration-color:rgba(201,162,75,.45);text-underline-offset:3px}
+a:hover{color:var(--gold-hot);text-decoration-color:currentColor}
+nav.top a,footer .cols a,.mark,.mobile-cta,.btn,.skip{text-decoration-line:none}
 :focus-visible{outline:2px solid var(--gold);outline-offset:3px}
 /* Skip link: first focusable, off-screen until Tab. Gold on night ground. */
 .skip{position:absolute;left:12px;top:12px;z-index:100;padding:10px 14px;
   background:var(--gold);color:var(--night);font:600 14px/1 var(--sans);
-  letter-spacing:.04em;text-decoration:none;
+  letter-spacing:.04em;
   clip:rect(0 0 0 0);clip-path:inset(50%);width:1px;height:1px;overflow:hidden;
   white-space:nowrap}
 .skip:focus,.skip:focus-visible{clip:auto;clip-path:none;width:auto;height:auto;overflow:visible;
@@ -76,7 +77,6 @@ nav.top a:hover{color:var(--page)}
 .breadcrumbs{padding-top:24px;font:14px/1.6 var(--sans);color:var(--quiet)}
 .breadcrumbs ol{display:flex;flex-wrap:wrap;gap:12px;list-style:none;margin:0;padding:0}
 .breadcrumbs li+li::before{content:'/';margin-right:12px}
-.breadcrumbs a{text-decoration:underline;text-underline-offset:3px}
 @media(max-width:900px){
   header .bar{gap:12px}
   .mark{font-size:15px;letter-spacing:.04em;gap:7px}
@@ -104,7 +104,7 @@ nav.top a:hover{color:var(--page)}
   color:var(--page)}
 .notice .wrap{padding:13px 0}
 .notice b{color:var(--gold-hot);font-weight:600}
-.notice a{margin-left:8px;white-space:nowrap;border-bottom:1px solid rgba(201,162,75,.4)}
+.notice a{margin-left:8px;white-space:nowrap}
 @media(max-width:560px){ .notice{font-size:13.5px} }
 
 /* ----------------------------------------------------------------- hero -- */
@@ -184,7 +184,7 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
 .live{margin-top:30px;font:400 13px/1 var(--sans);letter-spacing:.1em;
   text-transform:uppercase;color:rgba(240,230,206,.7);display:flex;gap:9px;
   align-items:center;justify-content:center;text-shadow:0 1px 8px rgba(0,0,0,.8)}
-.live a{color:inherit;text-decoration:underline;text-underline-offset:3px}
+.live a{color:inherit;text-decoration-color:currentColor}
 .live a:hover{color:var(--gold)}
 .dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}
 .dot.on{background:#79B05F;box-shadow:0 0 0 4px rgba(121,176,95,.16)}
@@ -241,8 +241,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .being-built .eyebrow{margin-bottom:10px}
 .being-built h3.built-title{margin:0 0 8px;font:500 22px/1.25 var(--carve);color:var(--page)}
 .being-built .built-lead{margin:0 0 22px;max-width:62ch;color:var(--quiet);font-size:15.5px;line-height:1.65}
-.being-built .built-lead a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
-.being-built .built-lead a:hover{border-bottom-color:var(--gold)}
 
 .steps{counter-reset:s;margin-top:48px;border-top:1px solid var(--edge)}
 /* 34px of top margin was right when this sat on its own above the steps.
@@ -251,8 +249,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .grab .btn{margin:0}
 .grab .also{margin:16px 0 0;max-width:56ch;font:400 15px/1.65 var(--serif,var(--carve));
   color:var(--page)}
-.grab .also a{color:var(--gold);text-decoration:none;border-bottom:1px solid var(--edge2)}
-.grab .also a:hover{border-bottom-color:var(--gold)}
 .grab .faintly{margin-top:6px;font-size:13px;color:var(--faint)}
 .step{counter-increment:s;display:grid;grid-template-columns:70px 1fr;gap:26px;
   padding:30px 0;border-bottom:1px solid var(--edge);align-items:start}
@@ -371,7 +367,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
 .gal-show .gal-cap{position:absolute;left:0;right:0;bottom:0;padding:18px 22px;
   background:linear-gradient(180deg,transparent,rgba(11,14,10,.88));
   color:var(--page);font:400 15px/1.4 var(--serif);z-index:2}
-.gal-show .gal-cap a{border-bottom:1px solid rgba(201,162,75,.45)}
 .gal-show .gal-nav{position:absolute;top:50%;transform:translateY(-50%);
   z-index:3;width:44px;height:44px;padding:0;border-radius:2px;
   border:1px solid var(--gold);background:rgba(11,14,10,.82);
@@ -438,7 +433,6 @@ blockquote.chron cite{display:block;margin-top:14px;font:400 12px/1 var(--sans);
   border-bottom:1px solid var(--edge);white-space:nowrap}
 .page td{padding:11px 14px;border-bottom:1px solid var(--edge);vertical-align:top;
   color:#CFD6C3;font-size:16px}
-.page a{border-bottom:1px solid rgba(201,162,75,.35)}
 
 /* roadmap and releases */
 .lane{margin:44px 0}
