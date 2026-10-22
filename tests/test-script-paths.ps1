@@ -59,7 +59,6 @@ $notInGit = @{
     'scripts/dev/seen.txt'             = 'the runs the trace task has traced, beside its copy on the box in C:\Thornswood-Trace\task (#3114), never in this repository'
     'scripts/vps/watch-outside.json'   = 'what Watch-Outside.ps1 -Export writes beside its copy in the public repository it runs from (#2755), never in this one'
     'launcher/app/app.ico'             = 'the second place the icon lookups try; the icon is launcher/app.ico'
-    'records/client-licences.json'     = 'what New-ClientLicenceRecord.ps1 writes in engine.yml''s run (#3099); the pin pull request that first takes it commits it, and this line goes then'
 }
 # Setup-Thornswood.ps1 runs inside an unpacked installer, where its own folder
 # is the installer's, so its paths are the installer's layout.

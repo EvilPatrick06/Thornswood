@@ -25,6 +25,17 @@
   a note and two texts at the top of either zip travel with the download and
   change nothing a launcher does.
 
+  THE LIBRARIES INSIDE THEM (#3099). The four native files of the six link
+  the fork's vcpkg libraries statically, so each library's code is inside
+  the file that uses it, and the MIT and BSD ones ask for their notice to go
+  with every binary copy. records\client-licences.json, beside the client
+  record, says which library is in which file (the fork's build reads each
+  file's program database; New-ClientLicenceRecord.ps1 records it), and
+  records\client-licences\<port>.txt is each one's text as vcpkg installed
+  it. A download that carries one of those files carries, in licences\
+  beside the note, the text of every library in the files it carries, and
+  the note lists them. Version 2 of the note is the first that does.
+
   $SourceNoticeVersion goes into the feed's clientRuntime entry. A client
   runtime already on the feed without it (or with an older one) is published
   again even though its commit did not move, so the zip that carries the note
@@ -35,7 +46,7 @@
   tests\test-source-offer.ps1 holds the two to each other.
 #>
 
-$SourceNoticeVersion = 1
+$SourceNoticeVersion = 2
 
 # Each SkyMP file the feed can carry, by its path in the game folder. Built:
 # from the fork at the commit client-build.json names. Front: build.js, which
@@ -53,6 +64,101 @@ $SourceNoticeFiles = [ordered]@{
     'Data\Platform\UI\build.js'                                                = @('skymp5-front',    'GNU GPL version 3',  'front')
     'Data\Platform\Modules\skyrimPlatform.ts'                                  = @('skyrim-platform', 'GNU GPL version 3',  'upstream')
     'Data\Scripts\MpClientPlugin.pex'                                          = @('client-deps',     'no LICENSE file in that folder', 'upstream')
+}
+
+# Libraries inside a port's own prebuilt library, by port, with where their
+# source is. frida-gum's port installs Frida's devkit, and its frida-gum.lib
+# holds gum and the libraries Frida 16.0.19's releng/deps.mk builds it with
+# (#3287). glib, gobject and proxy-libintl are the LGPL, which a copy under the
+# GPL turns into a duty to say where their source is. Each is Thornswood's own
+# fork of Frida's repository, tagged thornswood-frida-16.0.19 at the commit
+# the fork's overlay_ports/frida-gum/portfile.cmake fetches its licence from
+# (Patrick, A on #3287, 22 Oct), so the directions do not depend on Frida
+# keeping that commit.
+$SourceNoticeBundled = [ordered]@{
+    'frida-gum' = @{ Maker = 'Frida'; Parts = @(
+        @('gum',                            'frida-gum',           '698b356fef0ecfc3ac2818f0b387be90e93deeda'),
+        @('glib, gobject, gnulib, libcharset', 'frida-glib',       'f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f'),
+        @('proxy-libintl',                  'frida-proxy-libintl', 'c03e1a74b17fa7ec467e110130775409e4828a4c'),
+        @('pcre2',                          'frida-pcre2',         'b47486922fdc3486499b310dc9cf903449700474'),
+        @('capstone',                       'frida-capstone',      '22d317042ee4d251280d2960f5cf294433977db4'),
+        @('libffi',                         'frida-libffi',        '938b07aa8280bcc4f92f08a0fdbb4ad81024bde0')
+    ) }
+}
+
+<#
+  The vcpkg libraries inside the files of $Carried, from client-licences.json
+  beside $ClientRecord, in name order, each @{ Port; Version; Licence; Files
+  (the carried files it is in, by leaf name); Bytes (its text, held to the
+  record's sha256 and size) }. Empty when $Carried holds none of those files.
+  Throws a sentence when the record is missing, is of another commit than the
+  client record, or a text is missing or not the one it names: those texts
+  are owed with the files (#3099), so the release stops.
+#>
+function Get-ClientLicences([string]$ClientRecord, [string[]]$Carried) {
+    $dir = Split-Path -Parent $ClientRecord
+    $path = Join-Path $dir 'client-licences.json'
+    if (-not (Test-Path -LiteralPath $path)) { throw "$path is missing. The licence texts of the libraries inside the SkyMP files have to go with them (#3099)." }
+    $raw = "$(Get-Content -LiteralPath $path -Raw)"
+    if (-not $raw.Trim([char]0xFEFF, ' ', [char]9, [char]13, [char]10)) { throw "$path is empty" }
+    $l = $raw.TrimStart([char]0xFEFF) | ConvertFrom-Json
+    $c = "$(Get-Content -LiteralPath $ClientRecord -Raw)".TrimStart([char]0xFEFF) | ConvertFrom-Json
+    if ([string]$l.forkCommit -ne [string]$c.forkCommit) { throw "$path is the build of $($l.forkCommit) and client-build.json of $($c.forkCommit). The texts go with the files they were measured in." }
+    $carriedFiles = @{}
+    foreach ($p in @($l.files.PSObject.Properties)) {
+        foreach ($x in @($Carried)) { if ($x -and $x.Equals([string]$p.Name, [StringComparison]::OrdinalIgnoreCase)) { $carriedFiles[[string]$p.Name] = @($p.Value); break } }
+    }
+    $out = @()
+    foreach ($p in @($l.ports.PSObject.Properties | Sort-Object Name)) {
+        $n = [string]$p.Name
+        $in = @($carriedFiles.Keys | Where-Object { $carriedFiles[$_] -contains $n } | Sort-Object)
+        if (-not $in.Count) { continue }
+        $text = Join-Path $dir ('client-licences\' + $n + '.txt')
+        if (-not (Test-Path -LiteralPath $text -PathType Leaf)) { throw "$text is missing. client-licences.json names it, and it has to go with the files $n is in (#3099)." }
+        $bytes = [IO.File]::ReadAllBytes($text)
+        $sha = [BitConverter]::ToString([Security.Cryptography.SHA256]::Create().ComputeHash($bytes)).Replace('-', '').ToLowerInvariant()
+        if ($sha -ne ([string]$p.Value.sha256).ToLowerInvariant() -or $bytes.Length -ne [long]$p.Value.bytes) { throw "$text is not the text client-licences.json names for $n" }
+        $out += [pscustomobject]@{
+            Port = $n; Version = [string]$p.Value.version; Licence = [string]$p.Value.licence
+            Files = @($in | ForEach-Object { $_.Substring($_.LastIndexOf('\') + 1) } | Sort-Object); Bytes = $bytes
+        }
+    }
+    return $out
+}
+
+<#
+  The lines a note says about those libraries, or none for none.
+#>
+function Get-ClientLicenceLines($Licences) {
+    $Licences = @(@($Licences) | Where-Object { $_ })
+    if (-not $Licences.Count) { return @() }
+    $lines = @(
+        'The SkyMP files are built with these libraries, and code from each is',
+        'inside the files named. Each library''s copyright notice and licence, as',
+        'it gives them, is in the licences folder beside this note, named for it:',
+        ''
+    )
+    foreach ($x in @($Licences)) {
+        $lic = if ($x.Licence) { $x.Licence } else { 'its own terms' }
+        $lines += ('  {0,-31} {1,-15} {2}' -f ($x.Port + '.txt'), $x.Version, $lic)
+        $lines += ('    in ' + ($x.Files -join ', '))
+    }
+    $lines += @('')
+    foreach ($x in @($Licences)) {
+        if (-not $SourceNoticeBundled.Contains($x.Port)) { continue }
+        $by = $SourceNoticeBundled[$x.Port]
+        $lines += @(
+            ($x.Port + ' is ' + $by.Maker + '''s own build, and it holds other libraries too.'),
+            ('Their licences are in licences\' + $x.Port + '.txt as well. Their source,'),
+            ('at the commits ' + $by.Maker + ' built them from, is:')
+        )
+        foreach ($b in $by.Parts) {
+            $lines += ('  ' + $b[0])
+            $lines += ('    https://github.com/EvilPatrick06/' + $b[1] + '/tree/' + $b[2])
+        }
+        $lines += @('')
+    }
+    return $lines
 }
 
 <#
@@ -169,13 +275,15 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
             ''
         ) + $upstream + @('')
     }
+    $libs = @(Get-ClientLicences $ClientRecord $Carried)
     $lines += @(
         'SkyMP itself is https://github.com/skyrim-multiplayer/skymp',
         '',
         'The full licence texts are beside this note:',
         '  GPL-3.0.txt     GNU GPL version 3 (skymp5-client, skyrim-platform, skymp5-front)',
         '  AGPL-3.0.txt    GNU AGPL version 3 (skymp5-server, which MpClientPlugin.dll is built from)',
-        '',
+        ''
+    ) + (Get-ClientLicenceLines $libs) + @(
         'https://thornswood.net/credits#source says where the source of everything',
         'Thornswood hands out is.',
         ''
@@ -188,7 +296,19 @@ function Get-SourceNoticeEntries([string]$ClientRecord, [string[]]$Carried, [str
         if (-not (Test-Path -LiteralPath $p)) { throw "$p is missing. The GPL and AGPL texts have to go with the SkyMP files (#421)." }
         $out += @{ Name = $lic; Bytes = [IO.File]::ReadAllBytes($p) }
     }
+    foreach ($x in $libs) { $out += @{ Name = ('licences/' + $x.Port + '.txt'); Bytes = $x.Bytes } }
     return $out
+}
+
+# Writes those entries into the folder $Dir, the client runtime's stage
+# before it is zipped: an entry under licences/ goes in that folder.
+function Write-SourceNoticeToFolder([string]$Dir, $Entries) {
+    foreach ($n in @($Entries)) {
+        if ($null -eq $n) { continue }
+        $to = Join-Path $Dir ($n.Name.Replace('/', '\'))
+        $null = New-Item -ItemType Directory -Force -Path (Split-Path -Parent $to)
+        [IO.File]::WriteAllBytes($to, $n.Bytes)
+    }
 }
 
 # Writes those entries at the top of an open ZipArchive.

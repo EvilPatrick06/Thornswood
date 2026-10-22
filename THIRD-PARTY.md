@@ -33,7 +33,9 @@ or the build check goes red.
   in game packs and the installer. The zip carries a `README.txt` saying where
   their source is, with `GPL-3.0.txt` and `AGPL-3.0.txt` beside it, and so
   does every pack that carries a SkyMP file, as `SOURCE CODE.txt`
-  (Source-Notice.ps1). The launcher takes only the game files out of either.
+  (Source-Notice.ps1). Each also carries a `licences` folder with the licence
+  text of every library inside the files it carries, which the note lists
+  (#3099). The launcher takes only the game files out of either.
 - **Game packs and the installer payload**: every file in the game folder that
   the collection did not provide and Ship-Rules.ps1 does not hold back.
 - **Nexus Mods**, through the collection
@@ -103,15 +105,15 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `fdc21f33` (in full, `fdc21f331c2970ab13d4326435247b144b8f3a54`). That
+commit `4712e3eb` (in full, `4712e3ebe85cafd73f4eb4962aa13a8ca3f43766`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
 recorded build.
 
 The six client files and the native server were built by the fork's own
-Windows build (fork run 39224220993) and recorded by Thornswood's engine.yml
-(run 39227946118, #459). The native server and its
+Windows build (fork run 39799147483) and recorded by Thornswood's engine.yml
+(run 39804963065, #459). The native server and its
 JavaScript bundle were built from the same merged source, including the
 atomic quest inventory and state transaction. The generated client and
 server records give each file's hash and source commit. The older reuse
@@ -152,10 +154,58 @@ What is compiled into them:
   files do not go out with these six: they are the Thornswood Client Runtime
   mod on Nexus Mods, below. vcpkg copies each
   port's licence text to `build\vcpkg_installed\x64-windows-sp\share\<port>\copyright`
-  in the fork's build folder. Read on 24 September, two of them are not
-  permissive, antigo and frida-gum, below. The others are permissive texts
-  such as MIT, BSD, Boost, Apache 2.0 and zlib. None of those texts travels
-  with the client runtime today.
+  in the fork's build folder. Which of them are inside each client file, and
+  their texts, are under "The libraries inside the client files", below.
+
+### The libraries inside the client files
+
+The fork's triplet links every vcpkg library statically, so a library's code
+is inside the file that uses it, and most of these licences (MIT, BSD, Boost,
+Apache 2.0, zlib) ask for their notice and text to go with every copy of
+that file. Since #3099 the fork's build measures which they are: its
+`misc\thornswood\Write-ClientLicences.ps1` reads each native client file's own
+program database for the libraries the linker took code from and the source
+files with code in the file, and keeps each such port's vcpkg licence text.
+engine.yml records it as `records\client-licences.json`, with each text in
+`records\client-licences\<port>.txt` byte for byte, from the same build as
+`records\client-build.json` (`New-ClientLicenceRecord.ps1`; Check-Records.ps1
+holds the two to each other). The client runtime zip, every pack that carries
+one of the files, and the installer carry those texts in a `licences` folder
+beside the note, which lists each one with the files it is in; Setup puts the
+folder in the install folder. `tests\test-third-party.js` holds this table to
+the record.
+
+| Library | Version | Licence, as its port declares it | In |
+|---|---|---|---|
+| asio | 1.32.0 | BSL-1.0 | `SkyrimPlatformImpl.dll` |
+| bshoshany-thread-pool | 5.1.0 | MIT | `SkyrimPlatformImpl.dll` |
+| cef-prebuilt | 108.4.13 | not declared; its text is in `cef-prebuilt.txt` | `SkyrimPlatformCEF.exe.hidden`, `SkyrimPlatformImpl.dll` |
+| commonlibsse-ng-flatrim | 3.7.0-unstable-2024-09-03-b93280e8 | MIT | `SkyrimPlatform.dll`, `SkyrimPlatformImpl.dll` |
+| cpp-httplib | 0.40.0 | MIT | `SkyrimPlatformImpl.dll` |
+| directxmath | 2026-03-12 | MIT | `SkyrimPlatformImpl.dll` |
+| directxtk | 2026-03-31 | MIT | `SkyrimPlatformImpl.dll` |
+| fmt | 11.2.0 | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+| frida-gum | 16.0.19 | BSD-3-Clause AND LGPL-2.0-or-later AND LGPL-2.0-or-later WITH WxWindows-exception-3.1 AND LGPL-2.1-or-later AND MIT AND NCSA | `SkyrimPlatformImpl.dll` |
+| makeid | 1.0.3 | not declared; its text is in `makeid.txt` | `SkyrimPlatformImpl.dll` |
+| mhook | 2.5.1 | not declared; its text is in `mhook.txt` | `SkyrimPlatformImpl.dll` |
+| nirnlab-ui-platform-headers | 3.1 | MIT | `SkyrimPlatformImpl.dll` |
+| nlohmann-json | 3.12.0 | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+| node-addon-api | 8.7.0 | MIT | `SkyrimPlatformImpl.dll` |
+| node-embedder-api-prebuilt | 2 | MIT | `SkyrimPlatformImpl.dll` |
+| openssl | 3.6.1 | Apache-2.0 | `SkyrimPlatformImpl.dll` |
+| prometheus-cpp-lite | 2.0 | MIT | `MpClientPlugin.dll` |
+| robin-hood-hashing | 3.11.5 | MIT | `SkyrimPlatformImpl.dll` |
+| simdjson | 4.6.0 | (Apache-2.0 OR MIT) | `MpClientPlugin.dll` |
+| simpleini | 4.25 | MIT | `SkyrimPlatformImpl.dll` |
+| slikenet | 2021-06-07 | not declared; its text is in `slikenet.txt` | `MpClientPlugin.dll` |
+| spdlog | 1.17.0 | MIT | `MpClientPlugin.dll`, `SkyrimPlatformImpl.dll` |
+| zlib | 1.3.1 | Zlib | `SkyrimPlatformImpl.dll` |
+
+A port that declares no licence still has its text, and the text is what
+goes out: cef-prebuilt's is the Chromium Embedded Framework's BSD licence,
+mhook's and slikenet's are MIT, and makeid's says it is public domain.
+`skymp5-client.js` and `TESModPlatform.pex` are not native files and link no
+vcpkg library.
 
 The two libraries whose licences are not permissive, measured on 5 October
 against the fork at `5328e5c1` and the recorded files (#1332). The fork's
@@ -166,7 +216,7 @@ file or it is not there at all.
 | Library | Licence | Where its code is |
 |---|---|---|
 | antigo, https://github.com/nic11/antigo at `da15297955935da32e455fc1ca2a12faf564caae` (`overlay_ports\antigo`) | LGPL-3.0, by its `LICENSE` and the port's `vcpkg.json` | Only in `scam_native.node`, the game server's module |
-| frida-gum 16.0.19 (`overlay_ports\frida-gum`), Frida's own built devkit, from https://github.com/frida/frida-gum at `698b356fef0ecfc3ac2818f0b387be90e93deeda`, the commit Frida 16.0.19 names for it | wxWindows Library Licence 3.1 | In `SkyrimPlatformImpl.dll` |
+| frida-gum 16.0.19 (`overlay_ports\frida-gum`), Frida's own built devkit, from https://github.com/frida/frida-gum at `698b356fef0ecfc3ac2818f0b387be90e93deeda`, the commit Frida 16.0.19 names for it | wxWindows Library Licence 3.1 for gum itself. The devkit's `frida-gum.lib` also holds glib, gobject, gnulib and libcharset (LGPL-2.1-or-later), proxy-libintl (LGPL-2.0-or-later), pcre2 and capstone (BSD-3-Clause) and libffi (MIT), below | In `SkyrimPlatformImpl.dll` |
 
 antigo is a trace logging library. The build links it into
 `MpClientPlugin.dll` as well (`skymp5-server\cpp\CMakeLists.txt` adds it to
@@ -177,7 +227,10 @@ linker leaves it out. The only fork files that use it are the server's
 `misc\tests\node\test_save_completion_addon.cpp`, a test fixture (fork #77)
 that writes stand-ins of its own for antigo's names so the server's addon
 code compiles without it, and that only the fork's own node test builds.
-Nothing under `misc\tests` goes into a file anybody receives.
+Nothing under `misc\tests` goes into a file anybody receives, and nor do
+the fork's build scripts under `misc\thornswood`. Since #3099 the fork's
+build measures it: `records\client-licences.json`, read from each client
+file's program database, names antigo in none of them.
 `MpClientPlugin.dll` takes `server_guest_lib` for its
 inventory code only, and none of the messages in those two files is in the
 recorded `MpClientPlugin.dll`. Nor is any of antigo's own (`resolved context
@@ -192,12 +245,23 @@ file outside those three and the fork's tests starts using it.
 
 frida-gum is Skyrim Platform's function hooking (`FridaHooks.cpp`,
 `FridaHookHandler.cpp`), and `GumInterceptor` is in the recorded
-`SkyrimPlatformImpl.dll`, so it goes to everybody. Its licence, the `COPYING`
-file at that commit, which the port fetches as its copyright file, is the GNU
-Library General Public Licence with an exception that lets a binary built with
-it go out under the distributor's own terms. So it asks nothing more of
-`SkyrimPlatformImpl.dll`, which goes out under the GPL with its source offered
-below.
+`SkyrimPlatformImpl.dll`, so it goes to everybody. Gum's own licence, the
+`COPYING` file at that commit, is the GNU Library General Public Licence with
+an exception that lets a binary built with it go out under the distributor's
+own terms. But the devkit's `frida-gum.lib` is not gum alone. Read on 22
+October with `llvm-ar t`, 175 of its 243 objects are the libraries Frida
+16.0.19's `releng/deps.mk` builds it with: glib (96), its gnulib (8) and
+libcharset (1), gobject (21), proxy-libintl (1), pcre2 (27), capstone (13)
+and libffi (8). The fork's build keeps 161 of the lib's objects in
+`SkyrimPlatformImpl.dll`, and gum has only 68, so code from them is in the
+file too. glib, gobject and proxy-libintl are the LGPL with no such
+exception. Since #3099 the port's copyright file carries each one's licence
+at the commit Frida pins, so their texts go with the file. The LGPL lets a
+copy go out under the GPL instead, which `SkyrimPlatformImpl.dll` does, and
+the GPL then asks for their source too. Thornswood keeps its own fork of each
+of Frida's six repositories, tagged `thornswood-frida-16.0.19` at the commit
+Frida built from (Patrick, A on #3287), and the note beside the files names
+them; "Where the source is", below, has the list.
 
 ## From upstream SkyMP, not built here
 
@@ -258,7 +322,7 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`fdc21f33`, the commit the client record names (the same 68 files, byte for
+`4712e3eb`, the commit the client record names (the same 68 files, byte for
 byte, as at `445ded38`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
@@ -767,7 +831,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `fdc21f331c2970ab13d4326435247b144b8f3a54` on the public fork. The
+  name `4712e3ebe85cafd73f4eb4962aa13a8ca3f43766` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -818,12 +882,17 @@ with.
   (#3080), since `fd2be02b` the server's own NPC movement never saves
   on a timer (#3180), since `baf0aae3` the client logs the head parts
   it puts on a record (#2025), since `44ad40da` a native crash of the
-  server is recorded by Windows (#1267), and since `fdc21f33` the server
+  server is recorded by Windows (#1267), since `fdc21f33` the server
   asks the gamemode before a health write kills (#1626) and an inventory
-  difference with a client closes instead of being left alone (#2146).
+  difference with a client closes instead of being left alone (#2146), and
+  since `9acd02c1` the server times its ticks only when /metrics can serve
+  them (#3181) and the build keeps the licence text of every library in a
+  client file (#3099), and since `4712e3eb` the server says after each
+  gamemode load whether it worked and whether a reload changed what
+  connected games run (#3196).
   The server module's SHA256
-  is `d8eed55049231e9d76fc7ee1da9a2976a2ce7dc8b3ee9c638bdb297bf77259c3`, built
-  2026-10-22T10:51:04Z. This is the recorded next release, not a deployment
+  is `f33f1fb2fe80b7ec05e2d2019a2c1caf41ab4f476ed0ccf7c8dc5f1f290fa637`, built
+  2026-10-22T15:07:44Z. This is the recorded next release, not a deployment
   claim. Main remains on `2008327879e6cad6369ec3afe1d6d1b8ecf37724` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -858,7 +927,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/fdc21f331c2970ab13d4326435247b144b8f3a54
+https://github.com/EvilPatrick06/skymp/tree/4712e3ebe85cafd73f4eb4962aa13a8ca3f43766
 
 For the engine Main runs until then:
 
@@ -868,6 +937,21 @@ It is on the branch `thornswood/engine-changes`, it is public, and the branch
 answered an anonymous request on 24 September. It builds with CMake and
 vcpkg from the fork's `vcpkg.json`. The licence texts are in that tree:
 `skymp5-client/LICENSE`, `skyrim-platform/LICENSE` and `skymp5-server/LICENSE`.
+
+What Frida built and the fork links in is not in that tree: frida-gum's
+devkit, with the libraries inside its `frida-gum.lib` ("The SkyMP client
+runtime, built from the fork"). Their source is Thornswood's fork of each
+of Frida's repositories, at the commit Frida 16.0.19 built from, tagged
+`thornswood-frida-16.0.19` there (#3287):
+
+| Inside `frida-gum.lib` | Source |
+|---|---|
+| gum | https://github.com/EvilPatrick06/frida-gum/tree/698b356fef0ecfc3ac2818f0b387be90e93deeda |
+| glib, gobject, gnulib, libcharset | https://github.com/EvilPatrick06/frida-glib/tree/f3af6c29d39eb7590425d1b22bae29ff6a0ebb6f |
+| proxy-libintl | https://github.com/EvilPatrick06/frida-proxy-libintl/tree/c03e1a74b17fa7ec467e110130775409e4828a4c |
+| pcre2 | https://github.com/EvilPatrick06/frida-pcre2/tree/b47486922fdc3486499b310dc9cf903449700474 |
+| capstone | https://github.com/EvilPatrick06/frida-capstone/tree/22d317042ee4d251280d2960f5cf294433977db4 |
+| libffi | https://github.com/EvilPatrick06/frida-libffi/tree/938b07aa8280bcc4f92f08a0fdbb4ad81024bde0 |
 
 That covers what Thornswood built, and since 20 October that includes
 `Data\Platform\UI\build.js` and the files beside it: `records\front-build.json`
@@ -940,10 +1024,6 @@ beside its `___systemPolyfill.js`.
 
 ## What is still missing
 
-- The permissive vcpkg licence texts do not travel with the client runtime,
-  and the MIT and BSD ones ask for their notice to go with a binary. The two
-  that are not permissive ask nothing of what ships today (antigo and
-  frida-gum, under "The SkyMP client runtime, built from the fork").
 - Main's releases carry the older build.js, with no recorded source commit,
   until main's next release carries the fork's own (#2754).
 - The Futura PT and DIN Pro fonts in main's older build.js, the Bankir-Retro
