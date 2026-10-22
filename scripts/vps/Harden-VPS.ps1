@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off.
+  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services the box never uses.
 
 .DESCRIPTION
   Issue #450. Patrick, 28 September: yes to password login off once key login
@@ -23,7 +23,10 @@
        C:\Windows\Temp and removed after, and a run cut short left the copy
        there). Remote Desktop refused, its
        firewall rules turned off, its service stopped and set to Disabled;
-       ssh's own rules on port 22 are never touched. Then PasswordAuthentication
+       ssh's own rules on port 22 are never touched. Then the Windows
+       services the box never uses (the print spooler, telemetry and six
+       more, vps-harden.ps1 lists each and why, #3186) stopped and set to
+       Disabled. Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
        sshd -t first, the old file kept beside it, and sshd restarted. Every
        line it prints says CHANGED, WOULD, ALREADY, KEPT, WARN or STOP.
@@ -32,7 +35,8 @@
        Remote Desktop's port does not answer.
 
   -WhatIf does steps 1 to 3 and runs step 4 read only: it prints what WOULD
-  change and changes nothing.
+  change and changes nothing. It is also the check: run on a box already
+  hardened, every line says ALREADY, and a WOULD names what has come back on.
 
   THE SAFETY NET. When sshd_config changes, the box also registers a task,
   "Thornswood harden rollback", that puts the old sshd_config back and
@@ -51,6 +55,10 @@
       Get-ChildItem C:\ProgramData\ssh\sshd_config.before-harden-*
       Copy-Item <the newest of those> C:\ProgramData\ssh\sshd_config -Force
       Restart-Service sshd
+
+    A service back (vps-harden.ps1 $IdleServices names them), for example:
+      Set-Service Spooler -StartupType Automatic
+      Start-Service Spooler
 
     Remote Desktop back:
       Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
@@ -227,7 +235,7 @@ Head '3. From outside, before'
 $before = Show-Outside 'now'
 
 # ----------------------------------------------------------------- 4. box ---
-$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login and Remote Desktop off')
+$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login, Remote Desktop and the services the box never uses off')
 Head $(if ($doIt) { '4. On the box' } else { '4. On the box, read only' })
 $box = Invoke-Box (-not $doIt)
 if ($box.Code -ne 0 -or @($box.Lines | Where-Object { $_ -match '^STOP ' }).Count) {
