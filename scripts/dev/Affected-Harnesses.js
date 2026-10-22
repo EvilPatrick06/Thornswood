@@ -1,12 +1,14 @@
 #!/usr/bin/env node
 // scripts/dev/Affected-Harnesses.js
 //
-// Issue #3114, not wired into any workflow yet. Says which gate harnesses a
-// change can affect, from a read map: for each harness, every path inside
-// the checkout it opened, looked at, failed to find or listed when it ran on
-// the base commit. scripts/dev/Trace-Gate.ps1 traces that on the VPS, where
-// the gate runs (traces.jsonl.gz, one line a harness);
-// scripts/dev/Trace-HarnessReads.js on Linux (one file a harness).
+// Issue #3114. Says which gate harnesses a change can affect, from a read
+// map: for each harness, every path inside the checkout it opened, looked
+// at, failed to find or listed when it ran on the base commit. On the VPS
+// an administrator task traces every main build's gate
+// (scripts/dev/Trace-Gate-Task.ps1) and scripts/dev/Run-Gate.ps1 picks a
+// pull request's harnesses with "pick" below; scripts/dev/Trace-Gate.ps1
+// traces one run by hand (traces.jsonl.gz, one line a harness), and
+// scripts/dev/Trace-HarnessReads.js traces on Linux (one file a harness).
 //
 // WHY THAT IS ENOUGH. A harness's result here can only differ between two
 // trees through what its system calls return. When no path it touched is
@@ -25,6 +27,14 @@
 //           <traces> a folder of Linux traces with its _commit.txt, or a
 //           Windows traces.jsonl.gz and the commit it traced
 //   select: node scripts/dev/Affected-Harnesses.js select <map.json> <head> [gate.txt]
+//   tree:   node scripts/dev/Affected-Harnesses.js tree <rev> <tree.gz>
+//           every path in <rev>'s tree with its mode and object, gzipped
+//           (git ls-tree -r -z), so a change can be measured from that tree
+//           where the commit itself is not fetched
+//   pick:   node scripts/dev/Affected-Harnesses.js pick <traces.jsonl.gz> <tree.gz> <commit> <gate.txt> <out.txt>
+//           build and select in one, measuring the change from the traced
+//           tree's listing to HEAD's tree; writes the harnesses to run to
+//           <out.txt> and prints why each one runs
 //
 // The change is every difference between the tree the map was traced on
 // (its commit) and <head>; on a pull request <head> is GitHub's merge
@@ -48,7 +58,7 @@ const FORCE = [
   // Only the workflow that runs the gate. Any other workflow is a file like
   // any other: a harness that reads it has it in its map.
   [/^\.github\/workflows\/(build|build-pr)\.yml$/, 'the workflow that runs the gate, its steps and its environment'],
-  [/^scripts\/dev\/(Nightly-Harnesses\.ps1|Gate-Harnesses\.ps1|Affected-Harnesses\.js|Trace-HarnessReads\.js)$/, 'the scripts that list, choose and run the harnesses'],
+  [/^scripts\/dev\/(Run-Gate\.ps1|Nightly-Harnesses\.ps1|Gate-Harnesses\.ps1|Affected-Harnesses\.js|Trace-HarnessReads\.js)$/, 'the scripts that list, choose and run the harnesses'],
   [/^tests\/gate-excluded\.txt$/, 'the gate list'],
   // Belt and braces: a helper is read by the harnesses that use it, so it is
   // in their maps already. The rule costs little (measured) and covers a
@@ -257,19 +267,68 @@ function select(opts) {
   return out;
 }
 
+// ---- trees -------------------------------------------------------------------
+
+// git ls-tree -r -z: "<mode> <type> <object>\t<path>" entries, NUL ended, to
+// a Map of path to "<mode> <object>".
+function parseTree(buf) {
+  const out = new Map();
+  for (const e of buf.toString('utf8').split('\0')) {
+    if (!e) { continue; }
+    const tab = e.indexOf('\t');
+    const f = e.slice(0, tab).split(' ');
+    if (tab < 0 || f.length !== 3) { throw new Error('a tree listing line is not "<mode> <type> <object>\\t<path>": ' + JSON.stringify(e.slice(0, 80))); }
+    out.set(e.slice(tab + 1), f[0] + ' ' + f[2]);
+  }
+  return out;
+}
+
+// The change from one tree's listing to another's, the way git diff
+// --name-status --no-renames gives it: A added, D removed, M its object or
+// its executable bit changed, T a file became a link or a submodule or the
+// other way round.
+function changesBetween(base, head) {
+  const out = [];
+  const kind = m => m.slice(0, 3);
+  for (const [p, b] of base) {
+    const h = head.get(p);
+    if (h === undefined) { out.push({ status: 'D', path: p }); continue; }
+    if (h === b) { continue; }
+    out.push({ status: kind(h) === kind(b) ? 'M' : 'T', path: p });
+  }
+  for (const p of head.keys()) { if (!base.has(p)) { out.push({ status: 'A', path: p }); } }
+  return out.sort((x, y) => (x.path < y.path ? -1 : x.path > y.path ? 1 : 0));
+}
+
 // ---- command line ------------------------------------------------------------
 
-function git(args) { return cp.execFileSync('git', ['-C', REPO].concat(args), { maxBuffer: 1 << 28 }).toString(); }
-function treeFiles(sha) { return git(['ls-tree', '-r', '-z', '--name-only', sha]).split('\0').filter(Boolean); }
+function git(args) { return cp.execFileSync('git', ['-C', REPO].concat(args), { maxBuffer: 1 << 28 }); }
+function treeFiles(sha) { return git(['ls-tree', '-r', '-z', '--name-only', sha]).toString().split('\0').filter(Boolean); }
 function diff(base, head) {
-  const parts = git(['diff', '--name-status', '--no-renames', '-z', base, head]).split('\0').filter(Boolean);
+  const parts = git(['diff', '--name-status', '--no-renames', '-z', base, head]).toString().split('\0').filter(Boolean);
   const out = [];
   for (let i = 0; i + 1 < parts.length; i += 2) { out.push({ status: parts[i][0], path: parts[i + 1] }); }
   return out;
 }
+function readGate(file) {
+  const text = file ? fs.readFileSync(file, 'utf8') : cp.execFileSync('pwsh', ['-NoProfile', '-File', path.join(REPO, 'scripts', 'dev', 'Gate-Harnesses.ps1')]).toString();
+  return text.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+}
+
+// pick: what scripts/dev/Run-Gate.ps1 runs on a pull request. The map is
+// built from the traces here, by this checkout's own build, and the change
+// is measured from the traced tree's listing, so nothing is fetched.
+function pick(tracesFile, treeFile, commit, gate) {
+  const map = build(tracesFile, REPO, commit);
+  const base = parseTree(require('zlib').gunzipSync(fs.readFileSync(treeFile)));
+  const head = parseTree(git(['ls-tree', '-r', '-z', '--full-tree', 'HEAD']));
+  const r = select({ map: map, gate: gate, base: map.commit, changes: changesBetween(base, head), baseFiles: [...base.keys()], headFiles: [...head.keys()] });
+  r.map = map;
+  return r;
+}
 
 if (require.main === module) {
-  const [cmd, a, b, c] = process.argv.slice(2);
+  const [cmd, a, b, c, d, e] = process.argv.slice(2);
   if (cmd === 'build' && a && b) {
     const map = build(a, REPO, c);
     fs.writeFileSync(b, JSON.stringify(map, null, 1) + '\n');
@@ -277,16 +336,25 @@ if (require.main === module) {
     console.log(`wrote ${b}: ${all.length} harnesses, ${all.filter(h => !h.always).length} mapped, ${all.filter(h => h.always).length} always run`);
   } else if (cmd === 'select' && a && b) {
     const map = JSON.parse(fs.readFileSync(a, 'utf8'));
-    const base = git(['rev-parse', map.commit]).trim(), head = git(['rev-parse', b]).trim();
-    const gate = (c ? fs.readFileSync(c, 'utf8') : cp.execFileSync('pwsh', ['-NoProfile', '-File', path.join(REPO, 'scripts', 'dev', 'Gate-Harnesses.ps1')]).toString())
-      .split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    const base = git(['rev-parse', map.commit]).toString().trim(), head = git(['rev-parse', b]).toString().trim();
+    const gate = readGate(c);
     const r = select({ map: map, gate: gate, base: base, changes: diff(base, head), baseFiles: treeFiles(base), headFiles: treeFiles(head) });
     if (r.full) { console.error('FULL ' + r.reasons.join('; ')); }
     console.error(`${r.run.length} of ${gate.length} gate harnesses to run`);
     for (const n of r.run) { console.log(n); }
+  } else if (cmd === 'tree' && a && b) {
+    fs.writeFileSync(b, require('zlib').gzipSync(git(['ls-tree', '-r', '-z', '--full-tree', a])));
+  } else if (cmd === 'pick' && a && b && c && d && e) {
+    const gate = readGate(d);
+    const r = pick(a, b, c, gate);
+    fs.writeFileSync(e, r.run.map(n => n + '\n').join(''));
+    if (r.full) { console.log('The whole gate runs: ' + r.reasons.join('; ')); } else {
+      console.log(`${r.run.length} of ${gate.length} gate harnesses can be affected by this change, measured from the gate traced on ${c.slice(0, 8)}; ${r.skipped.length} cannot and do not run.`);
+      for (const n of r.run) { console.log('  runs ' + n + ': ' + r.why[n]); }
+    }
   } else {
-    console.error('usage: Affected-Harnesses.js build <traces> <map.json> [commit] | select <map.json> <head> [gate.txt]');
+    console.error('usage: Affected-Harnesses.js build <traces> <map.json> [commit] | select <map.json> <head> [gate.txt] | tree <rev> <tree.gz> | pick <traces.jsonl.gz> <tree.gz> <commit> <gate.txt> <out.txt>');
     process.exit(2);
   }
 }
-module.exports = { build: build, readTraces: readTraces, select: select, FORCE: FORCE, PLATFORM: PLATFORM };
+module.exports = { build: build, readTraces: readTraces, select: select, parseTree: parseTree, changesBetween: changesBetween, pick: pick, FORCE: FORCE, PLATFORM: PLATFORM };

@@ -17,12 +17,15 @@ running on main and nightly. The parts are:
   tracer and picks the harnesses.
 - `tests/test-3114-affected-harnesses.js` and `tests/test-3114-trace-gate.ps1`.
 
-Nothing is wired into build.yml yet. Sections 1 to 9 are the Linux study as
-it was measured. A Windows map drops the Linux-only rules in section 5 and
-keeps the git rule and the rule for a harness that did not pass. It adds
-two more: a harness runs when anything outside the harnesses opened the
-checkout while it ran, and when a file changes in place in a folder it
-opened, because a Windows listing gives every entry's size and times.
+Section 10 is how it is wired, after Patrick chose option A on
+q-3114-map-refresh at 7:49 AM on 22 Oct: every main build's gate is traced
+on the box, and a pull request built there runs only what its change can
+reach. Sections 1 to 9 are the Linux study as it was measured. A Windows
+map drops the Linux-only rules in section 5 and keeps the git rule and the
+rule for a harness that did not pass. It adds two more: a harness runs when
+anything outside the harnesses opened the checkout while it ran, and when a
+file changes in place in a folder it listed, because a Windows listing
+gives every entry's size and times.
 
 ## The answer first
 
@@ -314,7 +317,7 @@ What drives these numbers:
    first run is not used. A tracer is code, and its own test is what it
    leans on.
 
-## 8. Wiring, when it is chosen (not done)
+## 8. Wiring, as first sketched for the Linux map (superseded by section 10)
 
 1. Add a workflow `harness-reads.yml` that runs on push to main, on
    ubuntu-latest. It fetches the previous map, retraces what the merge hits,
@@ -344,3 +347,55 @@ What drives these numbers:
    recommendation is to wait. Linux-only saves about 2.3 minutes on an
    average pull request, and it adds a Linux job on every merge plus the new
    failure points in risk 5. Item 1 decides whether the bigger saving is real.
+
+## 10. How it is wired (option A, 22 Oct 2026)
+
+The gate trace on the box (run 39753666522, 3:12 AM on 22 Oct) mapped 548
+of 570 gate harnesses. Replayed over the last 40 merges, a fresh map ran
+32.7% of the gate's harness time; one 2 merges old 48%, 3 old 57%, 5 old
+71%, 10 old 89%. So the map is refreshed on every merge to main:
+
+1. **Main builds are traced.** build.yml's gate step is
+   `scripts/dev/Run-Gate.ps1`. On a push to main on a box runner it asks the
+   trace task, `scripts/dev/Trace-Gate-Task.ps1`, through the runner's own
+   `<runner>\trace` folder, and runs the whole gate with
+   `Nightly-Harnesses.ps1 -StartLog` while the task traces it. The task runs
+   as SYSTEM, the only way to start the session without making the runner
+   account an administrator. It takes one trace at a time and refuses any
+   ask it cannot check: a run asked for before, a checkout outside that
+   runner's `_work`, a link, a process that is not running. It drops a trace
+   whose build was cancelled, ran past 45 minutes, or lost an event. A main
+   build never waits on it: with no answer in a minute it runs untraced.
+2. **The read is done at below normal priority** in a process of its own,
+   about ten minutes of one core, the newest trace first. It keeps only
+   paths inside the checkout and writes the traces and the commit's tree
+   listing to every build runner's `<runner>\gate-map`. That folder is
+   owned by Administrators and the runner accounts may only read it, so no
+   job can change the map another pull request is held to. The trace itself
+   stays in `C:\Thornswood-Trace` until it is read, then it is deleted.
+3. **A pull request on a box runner runs what its change can reach.**
+   `Affected-Harnesses.js pick` builds the map from the newest traces and
+   measures the change from the traced tree's listing to the pull request's
+   merge commit. Nothing is fetched. It prints why each chosen harness runs.
+   It runs the whole gate when there is no map, when the map does not read,
+   when the change touches a forcing rule (section 4, now with
+   `Run-Gate.ps1`), and on a GitHub-hosted runner, which has no map.
+4. **Only a whole gate keeps the note.** Run-Gate.ps1 writes `whole=true`
+   only when every gate harness ran, and build.yml keeps the
+   `tested-tree-<tree>` note (#3182) only then. So after a pull request that
+   ran less, main builds in full, and that build is the one traced. Main and
+   the nightly run the whole gate every time.
+5. **Install.** `.\scripts\dev\Trace-Gate.ps1 -Install` from the shipping
+   machine, by somebody with the box's administrator key, runs the self-test
+   and installs the task for the runners `records/build-runners.json` lists.
+   Run it again when that list changes. `-Status` shows the task, the map
+   each runner has and the end of its log. `-Uninstall` takes it all off,
+   and pull requests run the whole gate again.
+6. **What it does not cover.** A main build on GitHub's hosted runner is not
+   traced, so once hosted minutes are back (about 1 Nov) the map refreshes
+   only when main builds on the box. A pull request built on the hosted
+   runner runs the whole gate.
+
+`tests/test-3114-run-gate.ps1` runs Run-Gate.ps1 for real in a scratch
+repository for each of those cases, and on Windows runs the task's check of
+an ask against real folders, a junction among them.
