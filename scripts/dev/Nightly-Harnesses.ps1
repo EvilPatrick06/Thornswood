@@ -320,10 +320,14 @@ function Start-One($t) {
             if (-not $p.HasExited) { throw ("could not put {0} in a job of its own (Windows error {1})" -f $t.Name, $err) }
         }
     }
-    # Windows' own start time, which a trace's process events carry; the time
-    # just before Start-Process if it ended too soon to be asked.
+    # On Windows, Windows' own start time, which a trace's process events
+    # carry (Trace-Gate-Box.ps1 knows the harness by it). The handle taken
+    # above keeps it readable after the process ends. No trace is read
+    # anywhere else, and there a process that has ended and been reaped has
+    # no start time left to ask for, so it is the time just before
+    # Start-Process.
     $began = $before
-    try { $began = $p.StartTime.ToUniversalTime() } catch { }
+    if ($onWindows) { $began = $p.StartTime.ToUniversalTime() }
     Write-StartLog ([ordered]@{ name = $t.Name; pid = $p.Id; start = $began.ToString('o') })
     [pscustomobject]@{ T = $t; P = $p; Job = $job; Mark = $mark; Sw = $sw; Out = $o; Err = $e; Ended = $p.WaitForExitAsync() }
 }

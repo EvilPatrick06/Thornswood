@@ -231,7 +231,9 @@ try {
     if (Test-Path -LiteralPath $log) { $lines = @(Get-Content -LiteralPath $log | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
     $starts = @($lines | Where-Object { $null -ne $_.pid }); $ends = @($lines | Where-Object { $null -ne $_.code })
     Yes ("-StartLog has a start line for each harness, with its process id (" + (@($starts | ForEach-Object { $_.name + ' ' + $_.pid }) -join ', ') + ')') ($starts.Count -eq 3 -and -not @($starts | Where-Object { [int]$_.pid -le 0 }).Count -and ((@($starts.name | Sort-Object) -join ',') -eq 'test-1-ok.js,test-2-skip.js,test-3-red.ps1'))
-    $when = @($starts | ForEach-Object { [DateTime]::Parse([string]$_.start, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime() })
+    # pwsh's ConvertFrom-Json makes the time a DateTime already, and its text
+    # would be read back as local time.
+    $when = @($starts | ForEach-Object { if ($_.start -is [DateTime]) { $_.start.ToUniversalTime() } else { [DateTime]::Parse([string]$_.start, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime() } })
     Yes '  and when it started, in UTC, during the run' ($when.Count -eq 3 -and -not @($when | Where-Object { $_ -lt $t0 -or $_ -gt [DateTime]::UtcNow }).Count)
     $byName = @{}; foreach ($e in $ends) { $byName[$e.name] = $e }
     Yes '  and an end line for each, with its exit code and whether it said SKIP' ($ends.Count -eq 3 -and $byName['test-1-ok.js'].code -eq 0 -and -not $byName['test-1-ok.js'].skipped -and

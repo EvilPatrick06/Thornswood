@@ -1,15 +1,28 @@
 # Affected harnesses on pull requests (#3114): design and measurements
 
-This is on branch `claude/3114-affected`, which is local only and has not been
-pushed. It is two commits on top of origin/main 2be7fbc, and the newest is
-2135559d. The prototype is three files:
+The study below was measured in a 4-core Linux container on 22 Oct 2026,
+with a Linux tracer. On 22 Oct Patrick chose option C on his page
+(q-3114-affected): trace the gate where it really runs, on the VPS, and
+build the affected-only gate from that trace, with the whole gate still
+running on main and nightly. The parts are:
 
-- `scripts/dev/Trace-HarnessReads.js` is the tracer.
-- `scripts/dev/Affected-Harnesses.js` builds the map and picks the harnesses.
-- `tests/test-3114-affected-harnesses.js` tests both. It has 32 checks and they pass.
+- `scripts/dev/Trace-HarnessReads.js`, the Linux tracer the study used.
+- `scripts/dev/Trace-Gate.ps1` and `scripts/dev/Trace-Gate-Box.ps1`, the
+  Windows tracer. An administrator runs it on the shipping machine. It
+  starts an ETW session on the box, runs the gate through
+  `.github/workflows/trace-gate.yml`, and reads each harness's opens from
+  the trace against `Nightly-Harnesses.ps1 -StartLog`. Its self-test passed
+  on the box at 9:40 PM on 21 Oct (Patrick's time) with no events lost.
+- `scripts/dev/Affected-Harnesses.js`, which builds the map from either
+  tracer and picks the harnesses.
+- `tests/test-3114-affected-harnesses.js` and `tests/test-3114-trace-gate.ps1`.
 
-Nothing is wired into build.yml. Every number here was measured in this
-4-core Linux container on 22 Oct 2026.
+Nothing is wired into build.yml yet. Sections 1 to 9 are the Linux study as
+it was measured. A Windows map drops the Linux-only rules in section 5 and
+keeps the git rule and the rule for a harness that did not pass. It adds
+two more: a harness runs when anything outside the harnesses opened the
+checkout while it ran, and when a file changes in place in a folder it
+opened, because a Windows listing gives every entry's size and times.
 
 ## The answer first
 
