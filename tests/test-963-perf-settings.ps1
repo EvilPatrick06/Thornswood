@@ -246,7 +246,9 @@ try {
     # The code, not the comments, which name the old call to say why it went.
     $gpCode = if ($gp.Success) { [regex]::Replace($gp.Groups[1].Value, '(?m)^\s*//.*$', '') } else { '' }
     Yes '#978 GameProcesses lists the processes once (GetProcesses), not once per name' ($gp.Success -and ([regex]::Matches($gpCode, 'Process\.GetProcesses\(\)')).Count -eq 1 -and $gpCode -notmatch 'GetProcessesByName')
-    Yes '#978 the in-play tick asks GameStillRunning' ($shell -match '(?s)if \(!playing\) return;.{0,400}if \(Checks\.GameStillRunning\(\)\)')
+    # Out of play the tick returns before it, after redrawing the rows when
+    # Steam has started or closed (#3204), so either shape of the return counts.
+    Yes '#978 the in-play tick asks GameStillRunning' ($shell -match '(?s)if \(!playing\)(?: return;|\s*\{[^{}]*return;\s*\}).{0,400}if \(Checks\.GameStillRunning\(\)\)')
 
     # A pretend game: SkyrimSE and a browser helper, up for a minute of two
     # second ticks, then SkyrimSE closes and the helper goes with it.
