@@ -403,6 +403,13 @@ accepted. Discord has no default-role setting. Then the person picks a hold.
 again, and the posts are rewritten in place. It deletes what the bot wrote last
 time rather than adding a second copy, so the rules never end up posted twice.
 
+`Setup-Discord.ps1` asks for the bot token at a hidden prompt. With `-OnBox`
+it asks for nothing: the build runs on the VPS with the token the running bot
+already holds in `C:\Thornswood-Bot\bot.env.json`, so anybody with the VPS key
+can run it and the token never leaves the box (#2519, #2341). The running bot
+has the smaller permission set, so a change that needs Administrator is named
+under "did not manage" until the bot's role has it again.
+
 ## Running the bot's tests
 
 The bot and its tests need Python 3.11 or newer (Pillow 13 needs it, #1401),
