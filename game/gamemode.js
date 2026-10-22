@@ -36355,37 +36355,20 @@ log('gamemode loaded:',
 
   // ------------------------------------------------------------- the claims --
 
-  var claimsMoved = false;
   function claimsPath() {
     // In the private folder, not data. Issue #541, 25 September: the
     // resources server hands anything under data to anybody who asks, and
     // every record here carries the profile id of the person it belongs to,
     // which is what the door checks. Measured the same day: the live
     // farm-claims.json answered 200 on port 3000. The door list moved for the
-    // same reason (privDir, above). A copy left in data by the code before
-    // this one is carried across the first time, so nothing anybody owns is
-    // lost, and the public copy is removed either way.
-    var fs = require('fs');
-    var path = require('path');
-    var dataDir = 'data';
+    // same reason (privDir, above). Nothing is read from data: the alpha
+    // carries no data over a change (#3094).
     var privDir = 'private';
     try {
-      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    var to = path.join(privDir, 'farm-claims.json');
-    if (claimsMoved) { return to; }
-    try {
-      if (!fs.existsSync(privDir)) { fs.mkdirSync(privDir, { recursive: true }); }
-      var from = path.join(dataDir, 'farm-claims.json');
-      if (fs.existsSync(from)) {
-        if (!fs.existsSync(to)) { fs.renameSync(from, to); }
-        else { fs.unlinkSync(from); }
-      }
-      claimsMoved = true;
-    } catch (e) { }
-    return to;
+    return require('path').join(privDir, 'farm-claims.json');
   }
 
   /*
@@ -36474,6 +36457,7 @@ log('gamemode loaded:',
 
   function saveClaims() {
     try {
+      require('fs').mkdirSync(require('path').dirname(claimsPath()), { recursive: true });
       require('fs').writeFileSync(claimsPath(),
                                   JSON.stringify({ at: Date.now(), claims: claims, seeded: seeded }));
       return true;
@@ -38233,37 +38217,20 @@ module.exports = {
 
   // ----------------------------------------------------------- the register --
 
-  var registerMoved = false;
   function registerPath() {
     // In the private folder, not data. Issue #541, 25 September: the
     // resources server hands anything under data to anybody who asks, and
     // every record here carries the profile id of the person it belongs to,
     // which is what the door checks. Measured the same day: the live
     // property.json answered 200 on port 3000. The door list moved for the
-    // same reason (privDir, above). A copy left in data by the code before
-    // this one is carried across the first time, so nothing anybody owns is
-    // lost, and the public copy is removed either way.
-    var fs = require('fs');
-    var path = require('path');
-    var dataDir = 'data';
+    // same reason (privDir, above). Nothing is read from data: the alpha
+    // carries no data over a change (#3094).
     var privDir = 'private';
     try {
-      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
+      var cfg = JSON.parse(require('fs').readFileSync('server-settings.json', 'utf8'));
       if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    var to = path.join(privDir, 'property.json');
-    if (registerMoved) { return to; }
-    try {
-      if (!fs.existsSync(privDir)) { fs.mkdirSync(privDir, { recursive: true }); }
-      var from = path.join(dataDir, 'property.json');
-      if (fs.existsSync(from)) {
-        if (!fs.existsSync(to)) { fs.renameSync(from, to); }
-        else { fs.unlinkSync(from); }
-      }
-      registerMoved = true;
-    } catch (e) { }
-    return to;
+    return require('path').join(privDir, 'property.json');
   }
 
   /*
@@ -56164,28 +56131,11 @@ function thornswoodBooks(env) {
   try {
     var fs = require('fs');
     var path = require('path');
-    var dataDir = 'data';
     var privDir = 'private';
     try {
       var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.dataDir) { dataDir = String(cfg.dataDir); }
       if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
     } catch (e) { }
-    /*
-      The copies the gamemode before #2582 wrote into data are served to
-      anybody until they are gone, so they are removed, not carried across:
-      the alpha keeps no data over a change (Patrick, 15 Oct). One that
-      cannot be removed stops the books here with the reason in the log,
-      the same as saved books that cannot be verified.
-    */
-    var served = ['books.json', 'last-left.json'];
-    for (var si = 0; si < served.length; si++) {
-      var old = path.join(dataDir, served[si]);
-      if (fs.existsSync(old)) {
-        fs.unlinkSync(old);
-        log('books: removed ' + old + ', which the resources port served to anybody');
-      }
-    }
     var api = thornswoodBooks({ fs: fs, path: path, privDir: privDir });
     g.__thornswoodBooks = api;
     if (typeof g.__thornswoodRelease === 'function') { g.__thornswoodRelease('books', api.release); }
