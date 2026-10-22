@@ -31,11 +31,16 @@ is not going to get done.
   the issue and moves the card to Done.
 - A fix people would notice says `Refs #N` instead, and its issue stays open
   until the fix is on main, where testers test. Then it is closed with a
-  comment that starts `Test task:`, which the bot posts to #test-tasks.
-  A test task with `Server: Dev` under its first line is a measurement
-  someone on dev has to take: the bot posts it, open issue or closed, in the
-  staff-only #dev-test-tasks. A fix that is on dev and not yet on main is
-  not one; its test task is the Main one, written when it reaches main.
+  comment that starts `Test task:` and `Server: Main`, plain steps any
+  playtester can do, which the bot posts to #test-tasks.
+- A check only a dev can do (staff or dev commands, the dev server, logs,
+  the box, a setup testers cannot make) is a `Test task:` with `Server: Dev`,
+  in developer terms with a `Build:` line: the bot posts it at once in the
+  staff-only #dev-test-tasks, and it stays while the fix is on main.
+- #known-issues holds only findings nothing has been done about: an issue
+  with a merged change or a test task leaves it by itself.
+- One post per issue per forum: change the comment, never post again by
+  hand. Developer-Guide.md, "Test tasks and known issues", has both shapes.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).
