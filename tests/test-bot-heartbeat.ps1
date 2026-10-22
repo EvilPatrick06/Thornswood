@@ -131,7 +131,7 @@ $bad = @($words | Where-Object { -not $_ -or $_ -match '[^\x00-\x7F]' -or $_ -ma
 Yes 'every reason is plain ASCII, never says player, and leaves the full stop to the message' ($bad.Count -eq 0)
 
 # ---- the whole watcher, on a fake clock ---------------------------------------
-$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'CertProblem', 'PostWebhook', 'DiskNow')
+$fake = @('Answers', 'SiteAnswers', 'BotAlive', 'BotProcs', 'HealthProblem', 'HowItEnded', 'ServiceProblem', 'BackupProblem', 'OffBoxProblem', 'CertProblem', 'PostWebhook', 'DiskNow')
 $body = @()
 foreach ($s in $inner.EndBlock.Statements) {
     if ($s -is [System.Management.Automation.Language.FunctionDefinitionAst] -and $fake -contains $s.Name) { continue }
@@ -183,6 +183,7 @@ function SiteAnswers($url) { return $true }
 function BotAlive() { return $script:alive }
 function BotProcs() { if ($script:alive) { return @(@{ Id = 4242; Started = $script:procStart }) } return @() }
 function HealthProblem($url) { return '' }
+function HowItEnded($task) { return '' }
 function ServiceProblem($name) { return '' }
 function BackupProblem($task, $folder, $hours) { return '' }
 # The off-box copy (#2936), which test-watch-alerts.ps1 holds; here it is fine.
