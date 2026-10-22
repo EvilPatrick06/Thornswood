@@ -4,8 +4,9 @@
 # WHY. Patrick, 19 Oct 2026: Done is "merged and only needs testing". A pull
 # request that finishes an issue says Closes #N, and the board's own "Pull
 # request merged" workflow moves the card. A fix people would notice says
-# Refs #N instead, because its issue stays open until the fix is on main
-# (Developer-Guide.md, the board), and nothing moved its card: the board
+# Refs #N instead, because its issue stays open until a main Ship puts the
+# fix on the main server (Developer-Guide.md, the board), and nothing moved
+# its card: the board
 # review of 21 Oct (#3192) found Refs fixes sitting in In Progress for days
 # after they merged, and the weekly review of 19 Oct found 72 issues closed
 # with no Test task at all. Refs alone cannot say done, because it is also
@@ -97,7 +98,7 @@ jobs:
               $bh = @{ Authorization = "Bearer $env:BOARD_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               $steps = (($t.rest -join "`n").Trim())
-              $body = ('Pull request #{0} merged ({1}), so this is in Done and waits for the fix to reach main. When it is on main, close this issue with a comment holding exactly this:' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12)) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
+              $body = ('Pull request #{0} merged ({1}), so this is in Done and stays open: the merge puts the fix on the main branch, not on the main server testers play. When a main Ship carries it, close this issue with a comment holding exactly this:' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12)) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/comments') -Headers $h -Body (@{ body = $body } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               Write-Host ("#{0} finishes #{1}: board: Done put on, test task written on the issue" -f $num, $t.issue)
             }
