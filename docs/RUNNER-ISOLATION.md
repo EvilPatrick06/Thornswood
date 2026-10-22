@@ -55,7 +55,8 @@ queued for Claude. The one decision only Patrick can make is in section 6.
    limited to `v*` tags (docs\SIGNED-RELEASES.md section 8).
 7. CI to the engine: engine.yml (#459) builds the fork at one commit and
    records it, on GitHub's runner first and on these runners when that is
-   refused, started only by hand, with contents read. It sends nothing and
+   refused (from the fork's own build alone, #3014), started only by hand,
+   with contents read. It sends nothing and
    commits nothing; its records reach main through a pull request.
 
 ## 3. Findings
@@ -126,10 +127,13 @@ outbound limit as residual risk.
    node-embedder-api-prebuilt-vcpkg-port-v2.b-cdn.net. Two of those pass
    each download on to a mirror they pick and two are CDNs, so no address
    list taken in advance holds them, and the limits block a compile on the
-   box. engine.yml compiles there only when the fork has no build of the
-   commit; its usual path takes the fork's own build, from GitHub alone.
-   #3014 takes the compile off third-party hosts; the limits stay as they
-   are.
+   box. On 22 Oct, with the limits on, run 39727871475 stopped before any of
+   them, at vcpkg's own cmake from GitHub: Windows' TLS checks each
+   certificate with its authority's servers (Let's Encrypt's lencr.org for
+   GitHub's release downloads), and the limits block those too. So since
+   #3014 (Patrick's A, 22 Oct) engine.yml never compiles on the box: it takes
+   the fork's own build, from GitHub alone, or stops before compiling, and a
+   pin names a commit the fork built. The limits stay as they are.
 
    The rollout, one runner account at a time, because a block that misses a
    host turns every build on that runner red: runner 4 first (20 Oct), then
