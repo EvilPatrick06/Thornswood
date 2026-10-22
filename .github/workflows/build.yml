@@ -367,6 +367,7 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
       - name: Run the gate harnesses
+        id: gate
         shell: pwsh
         run: |
           # Issue #3009. The gate is every tests\test-*.js and tests\test-*.ps1
@@ -376,8 +377,9 @@ jobs:
           # appended to its end, so any two of them conflicted in this file and
           # in build-pr.yml. A new harness is on the gate by being in tests\;
           # one comes off by a line in gate-excluded.txt with its reason; why
-          # each one exists is in its own header. Name no harness in this step:
-          # a name here is a second list (test-gate-list.ps1 fails on one).
+          # each one exists is in its own header. Name no harness in this step
+          # or in Run-Gate.ps1: a name there is a second list
+          # (test-gate-list.ps1 fails on one).
           # It began as six that sat red on main unseen (#875) and grew from
           # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
           # starts Windows PowerShell 5.1 itself to compare what the two write.
@@ -404,17 +406,20 @@ jobs:
           # 1800 s of the job's 40 minutes: a harness starts only when its
           # whole clock still fits, so the list of what failed is printed
           # before the job could be cancelled.
+          # ONLY WHAT A CHANGE CAN REACH (#3114, Patrick's option A on
+          # q-3114-map-refresh, 22 Oct 2026). scripts\dev\Run-Gate.ps1 runs
+          # all of that. On main, on the VPS, the trace task on the box
+          # traces the gate as it runs (scripts\dev\Trace-Gate-Task.ps1);
+          # on a pull request built on the VPS, the newest traced map says
+          # which harnesses its change can reach, and only those run, each
+          # with why. It writes whole=true only when every one ran, and the
+          # note below is kept only then, so main builds in full, and is
+          # traced, after any pull request that ran less.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
-          $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
-          if ($LASTEXITCODE -ne 0) { exit 1 }
-          # This build's share: the machine's cores over the builds the box
-          # runs at once, the runners records\build-runners.json lists.
-          $builds = @((Get-Content -LiteralPath records\build-runners.json -Raw | ConvertFrom-Json).runners).Count
-          $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -Share $share -BudgetSeconds 1800
+          .\scripts\dev\Run-Gate.ps1 -Throttle 6 -BudgetSeconds 1800
           exit $LASTEXITCODE
 
       - name: Run the voice service's /health harness
@@ -620,13 +625,15 @@ jobs:
 
       # The note main's build looks for (#3182, the job "tested" at the top
       # of build.yml): the tree every step before this one passed on. Last,
-      # so it is kept only when they all did. A pull request's checkout is
-      # GitHub's merge of it into main, so this is the tree a squash merge
-      # gives main while main has not moved. A few hundred bytes for seven
+      # so it is kept only when they all did, and only when the gate step
+      # ran every gate harness (#3114): a pull request that ran only what
+      # its change can reach leaves main to build in full. A pull request's
+      # checkout is GitHub's merge of it into main, so this is the tree a
+      # squash merge gives main while main has not moved. A few hundred bytes for seven
       # days, against the 2 GB below; nothing else reads it.
       - name: Write down the tree these checks passed on
         id: tree
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
         shell: pwsh
         run: |
           $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
@@ -638,7 +645,7 @@ jobs:
           "note=$note" >> $env:GITHUB_OUTPUT
       - name: Keep the tree these checks passed on
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
-        if: github.event_name == 'pull_request'
+        if: github.event_name == 'pull_request' && steps.gate.outputs.whole == 'true'
         with:
           name: tested-tree-${{ steps.tree.outputs.tree }}
           path: ${{ steps.tree.outputs.note }}
