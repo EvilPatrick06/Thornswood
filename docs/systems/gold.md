@@ -20,10 +20,11 @@ The record is the base game's gold, form `0xF`.
 The world does not mint the rest by leaving coin where it grew. A
 chest, a barrel, a sack, or any other container starts empty: the
 world puts nothing in it, coin or anything else. A draugr's gold is
-stripped. The six coin purses the world can hand you are refused and
-put back. Weapons and armour left by the world are refused the same
-way. What a person made, traded, or was given by another person
-stays, in a pack or in a container.
+stripped. Nothing lies on the floor at all: no coin, no coin purse,
+no weapon or armour, nothing a person could pick up that the world
+put there. What a person made, traded, or was given by another
+person stays, in a pack or in a container, and what they drop stays
+where they dropped it.
 
 A chest in a dungeon, a cave, or a sewer is a different door. Opening
 one creates a small sum, on that place's tier, and the same chest
@@ -36,8 +37,6 @@ much less than a chest, and most bodies create none. See [Dungeon loot](dungeon-
 
 Loose gold in a pack is gold. A coin purse a person was handed by
 another person counts as gold when a fee or a trade looks at the pack.
-A coin purse still sitting in the world does not, because that coin
-was never theirs.
 
 ## What it pays
 
@@ -107,9 +106,10 @@ See [Property](property.md) for the box, and
 
 ## Where this is
 
-The 40, the mark that stops a second purse, the stripping of spawned
-gold, the six refused purses, and trade between two people are in the
-server. A dungeon chest pays its tier's gold on that place's rest.
+The 40, the mark that stops a second purse, and trade between two
+people are in the server. The containers that start empty are in the
+server settings, and the coin and purses that no longer lie on the
+floor are switched off in Thornswood-Last.esp. A dungeon chest pays its tier's gold on that place's rest.
 A guild trader's 250 is not. A scene quest creates its gold when it is finished, and that
 gold is not taken from a trader's purse. Rank is not for sale. A weapon, armour or clothing in a chest or
 container in a claimed building loses 5% a day, written when the chest

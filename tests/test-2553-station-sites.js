@@ -174,10 +174,14 @@ function placements(file) {
 }
 // Thornswood-Last.esp places nothing new: its only placed references are the
 // three town gates it overrides where they stand, without their lock (#2484),
-// and a gate is not a station, so the table need not read them.
-const lastGates = (JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {}).gatesUnlocked;
-yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and Thornswood-WoodworkerTrail.esp nothing, so the table need not read them',
-    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) === lastGates &&
+// and the floor items it switches off (#3077, each one initially disabled:
+// tests/test-3077-floor-items.js P1). Neither is a station, so the table need
+// not read them.
+const lastCounts = JSON.parse(fs.readFileSync(LAST, 'utf8')).counts || {};
+const lastGates = lastCounts.gatesUnlocked;
+yes('B3 Thornswood-Last.esp places only the town gates it unlocks (' + lastGates + ') and the floor items it switches off (' +
+    lastCounts.floorItemsOff + '), and Thornswood-WoodworkerTrail.esp nothing, so the table need not read them',
+    lastGates === 3 && placements(path.join(ROOT, 'game', 'content', 'Thornswood-Last.esp')) === lastGates + (lastCounts.floorItemsOff || 0) &&
     placements(path.join(ROOT, 'game', 'content', 'Thornswood-WoodworkerTrail.esp')) === 0);
 
 // ---------------------------------------------------------------- P

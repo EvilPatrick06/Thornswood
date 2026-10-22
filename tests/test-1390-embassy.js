@@ -475,8 +475,12 @@ if (block && RECIPES && ADMIN_ITEMS) {
   {
     const spoils = slice(gm, '// ==== thornswood spoils ====', '// ==== end thornswood spoils ====');
     const loot = slice(gm, '// ==== thornswood dungeon loot ====', '// ==== end thornswood dungeon loot ====');
-    yes('S1 the spoils block takes every weapon, armour and arrow the world placed',
-        !!spoils && /var SPOIL_TYPES = \{ WEAP: true, ARMO: true, AMMO: true \};/.test(spoils));
+    // Nothing the world placed is handed over (#3077, #3078): the floor's
+    // weapons, armour and arrows are switched off in Thornswood-Last.esp.
+    const builder = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
+    const types = (/FLOOR_TYPES = \(([^)]*)\)/.exec(builder) || ['', ''])[1];
+    yes('S1 no weapon, armour or arrow the world placed lies on the floor',
+        !!spoils && ['WEAP', 'ARMO', 'AMMO'].every(function (t) { return types.indexOf("b'" + t + "'") >= 0; }));
     const outs = Object.keys(RECIPES).filter(function (k) { return RECIPES[k].roll; }).map(function (k) { return RECIPES[k].out; })
       .concat(['65bbf:Skyrim.esm', '10c698:Skyrim.esm']);
     yes('S2 no dungeon chest or body hands out an embassy or remnant piece',
