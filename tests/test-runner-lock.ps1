@@ -131,6 +131,17 @@ Yes ('no other folder deny in the script: Close-RunnerAccount''s and the off-box
     @($denies | Where-Object { $_ -eq '$null = & icacls.exe $d.FullName /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' -or $_ -eq '$null = & icacls.exe $p /deny ($acct + '':(OI)(CI)F'') /C /Q 2>&1' }).Count -eq 2)
 if ($all) { Yes '  and -Lock says what Dumps is, once for the box' ($all.Contains("Show-LeftFolders 'C:\' `$leave")) }
 
+# ---- -Remove takes the deny off where the install put it (#3112) ---------------------
+# On 21 Oct 2026 removing runner 8 sat over ten minutes in icacls /T, which
+# rewrote every file under C:\Users\Administrator to take off a deny that is
+# only on its root. -Remove now runs Open-RunnerAccount over the folders
+# Close-RunnerAccount denies, and nothing in the script walks a tree to do it.
+$opens = @([regex]::Matches($text, '(?m)^[ \t]*Open-RunnerAccount [^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('-Remove takes the denies off with Open-RunnerAccount, over the install''s folders (' + ($opens -join ' | ') + ')') ($opens.Count -eq 1 -and $opens[0] -eq "Open-RunnerAccount '`$Account' '`$Root' 'C:\' '`$liveFilter' `$alsoDenyList" -and
+    @($calls | Where-Object { $_.Contains("'C:\' '`$liveFilter' `$alsoDenyList") }).Count -eq 1)
+$removeAll = @([regex]::Matches($text, '(?m)^[^\r\n#]*/remove:d[^\r\n]*') | ForEach-Object { $_.Value.Trim() })
+Yes ('  no deny is taken off with /T, folder by folder below it (' + $removeAll.Count + ' /remove:d found)') ($removeAll.Count -ge 3 -and -not @($removeAll | Where-Object { $_ -match '\s/T\b' }).Count)
+
 if ($lib) {
     Yes 'a runner''s folder takes nothing from C:\' ($lib.Contains('/inheritance:r'))
     Yes '  SYSTEM and Administrators Full Control, its own account Modify' ($lib.Contains("'*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' (`$acct + ':(OI)(CI)M')"))
@@ -207,6 +218,22 @@ if (-not $icacls -or -not $lib) {
         Yes '  and counts the one that was closed anyway' (@($said | Where-Object { $_ -like '*: already shut out of 0 folder(s), and a deny added on 1 that were closed to it anyway' }).Count -eq 1)
         $said = @(Close-RunnerAccount '*S-1-5-7' $own $scratch)
         Yes '  a second run finds both already shut and names nothing' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: already shut out of 2 folder(s)')
+
+        # #3112: the deny comes off the folder it was put on, and so off
+        # everything below it, with no walk of the tree.
+        $deep = Join-Path $shut 'a\b\c'
+        New-Item -ItemType Directory -Path $deep -Force | Out-Null
+        Set-Content -LiteralPath (Join-Path $deep 'file.txt') -Value 'stand-in'
+        Yes '  the deny reaches a file three folders down (the control)' ((& $deny (Join-Path $deep 'file.txt')) -ge 1)
+        $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
+        Yes 'Open-RunnerAccount: the deny is off both folders' ((& $deny $open) -eq 0 -and (& $deny $shut) -eq 0)
+        Yes '  and off what is below, which it never walked' ((& $deny $deep) -eq 0 -and (& $deny (Join-Path $deep 'file.txt')) -eq 0)
+        Yes '  and it says how many it took it off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 2 folder(s)')
+        $said = @(Open-RunnerAccount '*S-1-5-7' $own $scratch)
+        Yes '  a second run has none to take off' ($said.Count -eq 1 -and $said[0] -eq '*S-1-5-7: deny taken off 0 folder(s)')
+        $said = @(Open-RunnerAccount ('no-such-runner-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) $own $scratch)
+        Yes '  an account Windows does not know is said, and nothing stops' ($said.Count -eq 1 -and $said[0] -match '^no-such-runner-\w+: no account of that name on this box, so it has no deny to take off: \S')
+        $null = Close-RunnerAccount '*S-1-5-7' $own $scratch
 
         # #2711: an account name Windows does not know was looked up in a try
         # with an empty catch; now the stop says what the lookup said. And the
