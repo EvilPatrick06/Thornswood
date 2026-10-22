@@ -962,7 +962,7 @@ Copy-Item -LiteralPath '$rootWin\server-settings.json' -Destination '$stageWin\s
     'npcAllowCrimeFaction', 'npcAllowEssential', 'thornswoodLoadOrderRefuse',
     'thornswoodRequirePass', 'thornswoodServer', 'npcEnabled', 'thornswoodVoicePort',
     'equipmentSlotCheckEnabled', 'equipmentSpellCheckEnabled', 'equipmentInventoryCheckEnabled',
-    'forbiddenReloot'
+    'forbiddenReloot', 'forbiddenBaseContainer'
   )
   # The counting function (#2011) and the light rule (#2947) the block below
   # takes up, both from ServerOrder.ps1.
@@ -1117,6 +1117,9 @@ if (`$have -eq $VoicePort -and -not `$bom -and -not `$wantEquip -and -not `$want
       'WEAP', 'ARMO', 'AMMO', 'MISC', 'ALCH', 'INGR', 'BOOK', 'SLGM', 'SCRL',
       'LIGH', 'KEYM', 'NOTE'
   ) -Force
+  # A container starts with none of its record's contents (#3078): the
+  # argument is written out in Deploy-Gamemode.ps1, and dev carries the same.
+  `$s | Add-Member -NotePropertyName forbiddenBaseContainer -NotePropertyValue @('CONT') -Force
   # NOT Set-Content -Encoding UTF8. At the far end of ssh this is Windows
   # PowerShell 5.1, where that means UTF-8 WITH a byte order mark, and the
   # server reads this file with JSON.parse, which refuses one:

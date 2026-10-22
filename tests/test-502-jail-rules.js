@@ -368,10 +368,13 @@ yes('K2 a jail key lying where the game put it is left there, and the person is 
     floor === 'That key belonged to the old jail. The cells answer to the hold\'s guards now, so it stays where it lies.');
 yes('K3 so is one somebody dropped', !!spoils.activate(PRISONER.a, 0xff00a001, '5aec4:Skyrim.esm'));
 yes('K4 any other key comes up off the floor as before', spoils.activate(PRISONER.a, 0x000f2000, '1234:Skyrim.esm') === null);
-spoils.strip(CHEST);
+// #3078: the engine puts nothing of a container's record in it
+// (forbiddenBaseContainer), so a jail key in a chest is one a person put
+// there, and the press leaves the chest as it is.
+spoils.activate(PRISONER.a, CHEST, 'c2cdb:Skyrim.esm');
 const left = refs[CHEST].inventory.entries.map(function (e) { return e.baseId; });
-yes('K5 a chest gives up its jail key with the sword, and keeps the other key',
-    left.length === 1 && left[0] === KEY_HOUSE);
+yes('K5 a press takes nothing out of a chest, jail key, sword or other key',
+    left.length === 3 && left[0] === KEY_W && left[1] === SWORD && left[2] === KEY_HOUSE);
 const onAct = slice(gm, '  const spoils = globalThis.__thornswoodSpoils;', '\n  }\n');
 yes('K6 onActivate asks the spoils block before anything else answers a press, so the refusal ends it',
     !!onAct && /return false;/.test(onAct) && gm.indexOf(onAct) < gm.indexOf('const quests = globalThis.__thornswoodQuests;'));

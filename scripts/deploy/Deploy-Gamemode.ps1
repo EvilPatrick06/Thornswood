@@ -778,8 +778,9 @@ $s | Add-Member -NotePropertyName npcAllowEssential -NotePropertyValue $true -Fo
   etc.)".
 
   The gamemode already refuses to hand over a weapon, a piece of armour, a tool
-  or a coin that the world placed, and empties a container of those once. What it
-  cannot do from inside is stop the ENGINE putting everything back an hour later.
+  or a coin that the world placed, and a container starts empty
+  (forbiddenBaseContainer, below). What the gamemode cannot do from inside is
+  stop the ENGINE putting everything back an hour later.
   MpObjectReference::GetRelootTime returns an hour for CONT, an hour for anything
   espm::utils::IsItem calls an item, and an hour for FLOR and TREE. So a chest
   emptied of its bread refills with bread at teatime, for ever, and that is an
@@ -811,6 +812,21 @@ $s | Add-Member -NotePropertyName forbiddenReloot -NotePropertyValue @(
     'WEAP', 'ARMO', 'AMMO', 'MISC', 'ALCH', 'INGR', 'BOOK', 'SLGM', 'SCRL',
     'LIGH', 'KEYM', 'NOTE'
 ) -Force
+<#
+  A CONTAINER STARTS EMPTY (#3078). Patrick, 21 October 2026: "not fill them
+  with anything vannilla onky our speacil ones for the caves with our items abd
+  refill times, and dont fill any storages that shouldnt be filled".
+
+  MpObjectReference::EnsureBaseContainerAdded copied a container's plugin
+  contents (CNTO, leveled lists rolled) in on the first press. With CONT named
+  here it returns before reading the record, so every chest, barrel, sack and
+  cupboard in the world holds only what a person put in it, or the pile the
+  dungeon loot block pays. CONT only: an actor's base is NPC_, so what an NPC
+  carries and wears is the engine's as before. Needs the fork at
+  thornswood/engine-changes with skymp#96 or later; an older server ignores
+  the key and fills containers again.
+#>
+$s | Add-Member -NotePropertyName forbiddenBaseContainer -NotePropertyValue @('CONT') -Force
 $s | Add-Member -NotePropertyName equipmentSlotCheckEnabled  -NotePropertyValue $false -Force
 $s | Add-Member -NotePropertyName equipmentSpellCheckEnabled -NotePropertyValue $false -Force
 # The third one, and the one the live log actually shows firing. Measured on
