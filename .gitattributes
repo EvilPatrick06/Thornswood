@@ -11,3 +11,9 @@ game/gamemode.js text eol=lf
 game/plugins/thornswood-front.js text eol=lf
 docs/systems/** text eol=lf
 tests/fixtures/merchant-retrieval-records.json text eol=lf
+
+# The licence texts of the vcpkg libraries in the client files (#3099), byte
+# for byte as vcpkg installed them: records\client-licences.json holds each
+# by sha256, and the downloads carry them as they are, so no checkout may
+# turn their line ends.
+records/client-licences/** -text
