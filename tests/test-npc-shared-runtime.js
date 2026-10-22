@@ -64,7 +64,7 @@ function fixture(options = {}) {
   assert.equal(typeof context.startSharedNpcServerRuntime, 'function',
     'A shared production entry must replace the single-actor deployed entry');
   let time = 0, sequence = 0, callback = null;
-  const pending = new Map(), states = new Map(), persisted = new Map();
+  const pending = new Map(), states = new Map(), persisted = new Map(), writes = [];
   // A spawn made in this run of the server (#2623); kept and temporary are
   // checked in test-npc-population-runtime.js.
   for(const id of options.commanded || []) persisted.set(id+':thornswoodNpcCommanded',{run:'run-now'});
@@ -130,6 +130,7 @@ function fixture(options = {}) {
     },
     set(id, prop, value) {
       persisted.set(id + ':' + prop, plain(value));
+      writes.push({id, prop, at:time, value:plain(value)});
       // The engine teleports an actor whose locationalData is written.
       if (prop === 'locationalData') {
         const state = states.get(id);
@@ -247,7 +248,7 @@ function fixture(options = {}) {
     assert.deepEqual([...states.keys()], originalIds, 'The current cast is preserved');
   }
   function stop() { runtime.stop(); assert.equal(pending.size, 0, 'Stop cancels every timer'); }
-  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,
+  return {api, states, ids, moved, controlled, moves, attacks,attackAttempts,logs,controlEvents,mappingCalls,snapshots,teleports,writes,
     timers, policyEvents, loadedLookups:() => loadedLookups,
     addNpc(id, overrides = {}) {
       assert.ok(!states.has(id)); ids.push(id); states.set(id,actor(overrides));
@@ -974,6 +975,31 @@ test('A raised NPC near the edge of its leash only steps where it would stand in
   for (let i = 0; i < 4; i++) f.advance(15000);
   assert.ok(!f.logs.some(l => /activity unavailable/.test(l)),'Never stopped: '+f.logs.filter(l => /unavailable/.test(l)).join(' | '));
   checkLeash(f.moves,home,80); f.stop();
+});
+
+// #3180: each write of the activity record saves the actor's whole record
+// durably on the server. Every NPC used to be written every 30 seconds as it
+// wandered, about 5,000 files every 32 seconds on each server with nobody on.
+test('An NPC that only wanders is written once, when it is taken on, not as it walks', () => {
+  const f = fixture({ids:[11,42,103]});
+  for (let i = 0; i < 10; i++) f.advance(30000);
+  for (const id of f.ids) {
+    const own = f.writes.filter(w => w.id === id && w.prop === 'thornswoodNpcActivity');
+    assert.ok(f.moves.some(m => m.id === id && m.speed > 0), 'It walks for the five minutes');
+    assert.equal(own.length, 1, id + ' is written once in five minutes, not every 30 seconds: ' + own.length);
+    assert.equal(own[0].value.mode, 'ambient');
+  }
+  f.stop();
+});
+test('A fight starting is written, with its mode, and the walk around it is not', () => {
+  const f = fixture({count:1,humans:[100],npc:{1:{combatTarget:100}},
+    human:{100:{pos:[500,500,0]}}});
+  for (let i = 0; i < 4; i++) f.advance(30000);
+  assert.ok(f.attacks.length > 0, 'It fights');
+  const own = f.writes.filter(w => w.id === 1 && w.prop === 'thornswoodNpcActivity');
+  assert.ok(own.some(w => w.value.mode === 'combat'), 'The fight starting is written');
+  for (let i = 1; i < own.length; i++) assert.notEqual(own[i].value.mode, own[i-1].value.mode, 'Each write is a change of mode');
+  f.stop();
 });
 
 console.log(JSON.stringify({passed,failed}));
