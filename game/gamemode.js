@@ -9050,19 +9050,15 @@ mp.onActivate = guard('onActivate', function (refrId, casterRefrId) {
     NOTHING IS SPAWNED IN THE WORLD. See the spoils block.
 
     Before every branch below it, because a container is emptied on the press
-    that opens it and a weapon on the floor is refused before anything else gets
-    a chance to answer for it. It says nothing at all for the other million
-    presses in the world, which is why it is one lookup and a memo.
+    that opens it, before anything else gets a chance to answer for it. It
+    refuses nothing: nothing a plugin placed lies on the floor any more
+    (#3077). It does nothing at all for the other million presses in the
+    world, which is why it is one lookup and a memo.
   */
   const spoils = globalThis.__thornswoodSpoils;
   if (spoils && spoils.activate) {
     try {
-      const no = spoils.activate(casterRefrId, refrId, baseDesc);
-      if (no) {
-        notify(casterRefrId, no);
-        say(casterRefrId, no);
-        return false;
-      }
+      spoils.activate(casterRefrId, refrId, baseDesc);
     } catch (e) {
       log('the spoils rule threw, so the press goes on:', e);
     }
@@ -46838,11 +46834,12 @@ module.exports = {
   in. Every chest, barrel, sack and cupboard starts empty and holds only what a
   person put in it, or the pile the dungeon loot block pays a dungeon chest.
 
-  AND THE GROUND IS TOLD APART FROM A DROPPED THING BY ITS FORM ID. MpForm's
-  IsEspmForm is id < 0xff000000, so a reference below that line was placed by a
-  plugin and one above it was made at runtime, which is what a person dropping
-  something makes. A sword Bethesda left on a table cannot be picked up; a sword
-  somebody put down can.
+  THE FLOOR IS NOT IN HERE AT ALL (#3077). Patrick, 21 October 2026: "don't
+  spawn floor items anymore at all no matter what they are". Every item and
+  coin purse a plugin placed is switched off in Thornswood-Last.esp
+  (scripts/mods/Build-LastPlugin.py, step 5), so no machine draws it and the
+  server never makes it, and there is nothing on the floor to refuse. What a
+  person drops is made at runtime, in no plugin, and picks up as it always did.
 
   WHAT IS DELIBERATELY NOT HERE. A body cannot be opened by anybody at all,
   which gamemode.js has written out at length above, so nothing has to be done
@@ -46858,20 +46855,6 @@ module.exports = {
     a.unshift('[spoils]');
     console.log(a.join(' '));
   }
-
-  /*
-    The record types the world may not hand over.
-
-    WEAP is every weapon. ARMO is every piece of armour and every shield, because
-    a shield is an ARMO with a keyword rather than a type of its own. AMMO is
-    arrows and bolts, which are the ammunition half of a weapon and would be a
-    strange thing to leave lying about when the bow is not.
-
-    Everything else stays. Food, ingredients, ore, potions, books, clutter and
-    keys are all things the world is meant to have in it, and stripping them
-    would empty Skyrim rather than close the economy.
-  */
-  var SPOIL_TYPES = { WEAP: true, ARMO: true, AMMO: true };
 
   /* Gold001. The one form id in this file that is not a descriptor, because it
      is the same number in every load order there has ever been. */
@@ -46915,8 +46898,8 @@ module.exports = {
     TOOLS in the outer file already lists them, accept lists and all, because the
     tool gate had to know that Skyrim has two shovels and six pickaxes. This is
     the same six and the same two, read off that table rather than written down
-    again, so a tool added there is a tool taken out of the world here without
-    anybody remembering to do both.
+    again, so a tool added there is known here without anybody remembering to
+    do both.
   */
   var toolIds = null;
   function isTool(baseId) {
@@ -46935,123 +46918,11 @@ module.exports = {
   }
 
   /*
-    COIN PURSES ARE GOLD, THOUGH NOT ONE OF THEM IS A COIN.
-
-    Patrick, 24 September, after a playtest: "people can pick up coin pocuhes
-    off the ground that was supposed to be included in no gold lol".
-
-    A purse is a FLOR, flora, whose produce is a leveled list of Gold001. The
-    press goes to the engine, and MpObjectReference::ProcessActivateNormal in
-    the fork treats a FLOR as something to pick: GivePickupItemsToActivationSource
-    rolls the list and AddItems the coin straight into the pack. No gold ever
-    lies on the ground and nothing in here is asked what it is, so isSpoil
-    looked at a FLOR, said no, and the purse paid out. And again an hour later,
-    since the fork puts flora back after an hour.
-
-    These six are every FLOR in the load order whose produce is coin, read off
-    tools\harvests.json 'unranked', which Build-HarvestTable.ps1 fills from all
-    of the collection's plugins: the three purses and the three the Thieves
-    Guild's jobs use. The other leveled-list produce there is fish and horker
-    meat. test-spoils.js fails if a rebuilt table has a coin purse that is not
-    on this list.
-  */
-  var PURSES = [
-    'd790c:Skyrim.esm',    // CoinPurseSmall
-    'd8e7f:Skyrim.esm',    // CoinPurseMedium
-    'd8e80:Skyrim.esm',    // CoinPurseLarge
-    'd8e8a:Skyrim.esm',    // TGCoinPurseLargeNEW
-    'd8e8b:Skyrim.esm',    // TGCoinPurseMediumNEW
-    'd8e8c:Skyrim.esm'     // TGCoinPurseSmallNEW
-  ];
-  /*
-    Resolve the six form ids lazily, and KEEP TRYING until they all land.
-
-    idOf answers 0 while the load order is still coming up. The old memo
-    built an empty map on the first press and then never looked again, so
-    every purse after that first empty resolve paid out (and on one machine
-    the client's own roll of the leveled gold list then crashed the client).
-    Retry until all six descriptors have a non-zero id, then freeze.
-  */
-  var purseIds = {};
-  var pursesAllIn = false;
-  function isPurse(baseId) {
-    if (!baseId) { return false; }
-    if (!pursesAllIn) {
-      var n = 0;
-      for (var i = 0; i < PURSES.length; i++) {
-        var id = idOf(PURSES[i]);
-        if (id) {
-          purseIds[id] = true;
-          n++;
-        }
-      }
-      if (n >= PURSES.length) { pursesAllIn = true; }
-    }
-    return Object.prototype.hasOwnProperty.call(purseIds, baseId);
-  }
-
-  /** True when the world must not hand this over. */
-  var CUT_OUTS = ["3ada4:Skyrim.esm","bff20:Playable Rieklings.esp","bff21:Playable Rieklings.esp"];
-  var cutOutIds = null;
-  function isCutOut(baseId) {
-    if (!cutOutIds) {
-      cutOutIds = {};
-      var pending = false;
-      for (var i = 0; i < CUT_OUTS.length; i++) {
-        var id = idOf(CUT_OUTS[i]);
-        if (id) { cutOutIds[id] = true; }
-        else { pending = true; }
-      }
-      if (pending) { cutOutIds = null; return false; }
-    }
-    return !!cutOutIds[baseId];
-  }
-
-  /*
-    THE GAME'S JAIL KEYS (#502). Patrick, 12 October: the game's jail keys
-    open nothing. A key in somebody's pack opens its cell door in their own
-    game whoever locked it, so the world does not hand one out: the property
-    block's JAIL_KEY, read out of the world with the cells, is every key the
-    game made for a cell door. Resolved once every one of them has an id,
-    the way isCutOut waits for the load order.
-  */
-  var jailKeyIds = null;
-  function isJailKey(baseId) {
-    if (!baseId) { return false; }
-    if (!jailKeyIds) {
-      var prop = g.__thornswoodProperty;
-      var table = (prop && prop.JAIL_KEY) || null;
-      if (!table) { return false; }
-      var found = {}, pending = false;
-      for (var k in table) {
-        if (!Object.prototype.hasOwnProperty.call(table, k)) { continue; }
-        var id = idOf(k);
-        if (id) { found[id] = true; } else { pending = true; }
-      }
-      if (pending) { return !!found[baseId]; }
-      jailKeyIds = found;
-    }
-    return !!jailKeyIds[baseId];
-  }
-
-  function isSpoil(baseId) {
-    if (!baseId) { return false; }
-    if (baseId === GOLD) { return true; }
-    if (isPurse(baseId)) { return true; }
-    if (isTool(baseId)) { return true; }
-    // #2479: the cut rows (#1511) are held back the way a sword is.
-    if (isCutOut(baseId)) { return true; }
-    return Object.prototype.hasOwnProperty.call(SPOIL_TYPES, kindOf(baseId));
-  }
-
-  /*
-    The answer to a press, or null when this block has nothing to say.
-
-    Three cases and only the third refuses. A container opens as it always did,
-    empty of anything the world put there (the block comment), and a dungeon
-    chest pays its pile. A dropped thing is somebody's and is left alone. A
-    thing a plugin placed, that is a weapon, a piece of armour, ammunition, a
-    tool or a coin, does not come up off the floor.
+    A press. It refuses nothing and always answers null. A container opens
+    as it always did, empty of anything the world put there (the block
+    comment), and a dungeon chest pays its pile. Anything else is left to the
+    engine: nothing a plugin placed lies on the floor any more (#3077, the
+    block comment), and a thing a person dropped is theirs to pick up.
   */
   function activate(actorId, refrId, baseDesc) {
     var baseId = idOf(baseDesc);
@@ -47063,39 +46934,8 @@ module.exports = {
       } catch (eLoot) {
         slog('dungeon loot threw:', eLoot);
       }
-      return null;
     }
-    /*
-      A purse before the dropped-thing test, since nobody can drop a purse:
-      it is a piece of the world, and the coin in it is never somebody's.
-      And it is put back, the way a refused plant is (PUT THAT PLANT BACK),
-      because the person's own game empties a FLOR before this answers and
-      would otherwise show every refused purse as taken.
-    */
-    if (isPurse(baseId)) {
-      slog('purse: refused world purse', baseDesc, 'at', refrId.toString(16), 'by', actorId.toString(16));
-      if (typeof putBack === 'function') {
-        try { putBack(actorId, refrId); } catch (e) { slog('could not put purse', refrId.toString(16), 'back:', e); }
-      }
-      // #627: say plainly the world put it there and no person left it (the
-      // old 'by nobody' line was read as flavour rather than as the rule).
-      return 'That coin purse was put here by the world, not left by a person. Coin comes from ' +
-             'people in this world, not off the ground.';
-    }
-    /*
-      A jail key, before the dropped-thing test too (#502): a key somebody
-      had and put down still opens a cell in whoever's pack it reaches.
-    */
-    if (isJailKey(baseId)) {
-      slog('jail key: refused', baseDesc, 'at', refrId.toString(16), 'to', actorId.toString(16));
-      return 'That key belonged to the old jail. The cells answer to the hold\'s guards now, ' +
-             'so it stays where it lies.';
-    }
-    // Made at runtime rather than placed by a plugin, so somebody put it there.
-    if (refrId >= 0xff000000) { return null; }
-    if (!isSpoil(baseId)) { return null; }
-    return 'That was put here by the world, not left by a person. Weapons, armour and coin come ' +
-           'from people in this world, not off the ground.';
+    return null;
   }
 
   // ------------------------------------------------- where gold comes from --
@@ -47173,9 +47013,7 @@ module.exports = {
   ready();
   g.__thornswoodSpoils = {
     purse: purse, PURSE: PURSE, PURSE_PROPERTY: PURSE_PROPERTY,
-    activate: activate, isSpoil: isSpoil, isJailKey: isJailKey, kindOf: kindOf,
-    isTool: isTool, isPurse: isPurse, PURSES: PURSES,
-    SPOIL_TYPES: SPOIL_TYPES, GOLD: GOLD
+    activate: activate, kindOf: kindOf, isTool: isTool, GOLD: GOLD
   };
   slog('ready');
 })();
@@ -77297,10 +77135,10 @@ module.exports.orchardPlots = ORCHARD_PLOTS;
 module.exports.orchardSources = function () { return {"version":1,"quest":"orchard","sources":[{"reference":"141084:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32734.08984375,-10301.1953125,-4197.89208984375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141083:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32458.767578125,-10103.2978515625,-4139.51171875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141082:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32243.041015625,-11261.99609375,-4217.8154296875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"141080:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32016.349609375,-11102.0615234375,-4172.181640625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d7:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9618:Skyrim.esm","world":"3c:Skyrim.esm","position":[32340.267578125,-12131.546875,-4276.1220703125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29450.37890625,-12450.99609375,-4248.1787109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a3:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30332.349609375,-12917.0849609375,-4313.6650390625],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1699d6:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[32620.939453125,-12295.2822265625,-4265.97998046875],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831a0:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[30051.677734375,-12753.349609375,-4311.63037109375],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0},{"reference":"1831ad:JK's Whiterun's Outskirts.esp","base":"141081:JK's Whiterun's Outskirts.esp","cell":"9637:Skyrim.esm","world":"3c:Skyrim.esm","position":[29923.47265625,-13003.6845703125,-4364.17578125],"item":"64b2e:Skyrim.esm","itemType":"ALCH","rank":"expert","returnMinutes":0}]}; };
 module.exports.createQuestOrchardSources = QUEST_FISHING_SOURCES.createQuestOrchardSources;
 module.exports.huntBundles = QUEST_HUNT_BUNDLES;
-module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","contentSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
+module.exports.retrievalSources = function () { return {"version":1,"loadOrderSha256":"289c8f0dc29b98bb72f89e6bd5a3a95f6bdc5cb6949015adad1f24a2c4819581","contentSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","sources":[{"quest":"satchel","reference":"17dfdc:JK's Whiterun's Outskirts.esp","base":"97f54:Skyrim.esm","baseType":"CONT","cell":"961b:Skyrim.esm","world":"3c:Skyrim.esm","spaceType":"WRLD","position":[17712.54296875,-9893.69921875,-4385.83154296875],"item":"17000:Thornswood-Content.esp","itemType":"MISC","merchant":"1a681:Skyrim.esm","destination":"1a681:Skyrim.esm","role":"Woodworker","hold":"Whiterun","destinationHold":"whiterun","gold":20,"hours":3,"provenance":{"fileIndex":23,"plugin":"JK's Whiterun's Outskirts.esp","pluginSha256":"c5cf1d6649be524627917fa5ebdcb64a082a16da150605e6387dd478f1512c04","recordSha256":"a311f2019f6136c9ce29a1092545f9d4bd54ad2211d0708249e0b5670e04f164","rawId":85450716}},{"quest":"ledger","reference":"17208:Thornswood-Content.esp","base":"17100:Thornswood-Content.esp","baseType":"ACTI","cell":"133c9:Skyrim.esm","world":"133c9:Skyrim.esm","spaceType":"CELL","position":[173.47137451171875,-99.40931701660156,329.3854064941406],"item":"17001:Thornswood-Content.esp","itemType":"MISC","merchant":"1a672:Skyrim.esm","destination":"1a672:Skyrim.esm","role":"Enchanter","hold":"Whiterun","destinationHold":"whiterun","gold":30,"hours":6,"provenance":{"fileIndex":51,"plugin":"Thornswood-Content.esp","pluginSha256":"fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf","recordSha256":"c5ac0bc9fba89a9ac07e7c2622993cc6e105658e82544f201268c56c2fa0870a","rawId":83980808}},{"quest":"signet","reference":"c2a35:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15224:Skyrim.esm","world":"15224:Skyrim.esm","spaceType":"CELL","position":[557.8475341796875,2999.47119140625,-48.614261627197266],"item":"17002:Thornswood-Content.esp","itemType":"MISC","merchant":"1a67c:Skyrim.esm","destination":"1a67c:Skyrim.esm","role":"Smith","hold":"Whiterun","destinationHold":"whiterun","gold":40,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ab3c0c3a3f2e1c4092eae7ba559fde2ebacc1fa9d09b7e5fb7ee20f9e2501439","rawId":797237}},{"quest":"locket","reference":"3906d:Skyrim.esm","base":"1c4ac:Skyrim.esm","baseType":"CONT","cell":"371de:Skyrim.esm","world":"371de:Skyrim.esm","spaceType":"CELL","position":[1996.83251953125,-3406.302001953125,-1791.9287109375],"item":"17003:Thornswood-Content.esp","itemType":"MISC","merchant":"1939ba:aaaGraniteHill.esp","destination":"1939ba:aaaGraniteHill.esp","role":"Tailor","hold":"Falkreath","destinationHold":"falkreath","gold":45,"hours":10,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"ba7c8317b892d3c59ad19624377802f95f9eb7b7b3ded3e6562ab798d9a1679d","rawId":233581}},{"quest":"case","reference":"ea73b:Skyrim.esm","base":"ea722:Skyrim.esm","baseType":"CONT","cell":"165a0:Skyrim.esm","world":"165a0:Skyrim.esm","spaceType":"CELL","position":[-47.07603073120117,575.0079345703125,84.99999237060547],"item":"17004:Thornswood-Content.esp","itemType":"MISC","merchant":"1a684:Skyrim.esm","destination":"1a684:Skyrim.esm","role":"Tailor","hold":"Whiterun","destinationHold":"whiterun","gold":50,"hours":8,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"c3639954bd7aa4372ef9ecd715f466d5e19d31e074563d32be0b5cf5c516a681","rawId":960315}},{"quest":"dispatch","reference":"547e8:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"43fab:Skyrim.esm","world":"43fab:Skyrim.esm","spaceType":"CELL","position":[1555.78857421875,643.3175659179688,-715.6051635742188],"item":"17005:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66e:Skyrim.esm","destination":"1b11a:Skyrim.esm","role":"Cook","hold":"Whiterun","destinationHold":"windhelm","gold":60,"hours":12,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"7d3da1377ca635164f431cc9e31220472ab68a30066c62d81144b5a7afcc2a0f","rawId":346088}},{"quest":"seal","reference":"53ff6:Skyrim.esm","base":"3ac21:Skyrim.esm","baseType":"CONT","cell":"15211:Skyrim.esm","world":"15211:Skyrim.esm","spaceType":"CELL","position":[1207.1614990234375,-1561.430419921875,64.8089828491211],"item":"17006:Thornswood-Content.esp","itemType":"MISC","merchant":"1a66d:Skyrim.esm","destination":"1a66d:Skyrim.esm","role":"Alchemist","hold":"Whiterun","destinationHold":"whiterun","gold":70,"hours":14,"provenance":{"fileIndex":0,"plugin":"Skyrim.esm","pluginSha256":"2bbc77fdec35a70ef96b710f8c525e50a1db9e63e11a391a0eb9ee8f56d36107","recordSha256":"17d7ec3629d485d898445318a98003736ecfae5743e2da886b3e52a6bea0424d","rawId":344054}}]}; };
 module.exports.scarceLongfin = function () { return {"version":1,"quest":"longfin","label":"Haafingar northern sea","sources":[{"reference":"17200:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143811.796875,143993.71875,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17201:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143934.40625,143937.03125,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17202:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-143814.453125,143875.390625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17203:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-144130,143301.265625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17204:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150180.328125,141408.5625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17205:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-150292.5,141505.890625,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17206:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-128727.5390625,141360.34375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240},{"reference":"17207:Thornswood-Content.esp","base":"154a5:Thornswood-Content.esp","world":"3c:Skyrim.esm","position":[-124530.8671875,145979.84375,-14032],"item":"106e1b:Skyrim.esm","itemType":"INGR","rank":"master","returnMinutes":240}]}; };
-module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
-module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"4162ff9b21cd7b28e369bce448a7d10ad6e97fc9402eb8edf7989d06ef39900d","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
+module.exports.scarceGeodes = function () { return {"version":1,"quest":"geode","label":"Blackreach geodes","loadOrderSha256":"289c8f0dc29b98bb72f89e6bd5a3a95f6bdc5cb6949015adad1f24a2c4819581","sources":[{"reference":"10fc57:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[10850.224609375,6743.7685546875,1174.552734375],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10eb24:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[4929.0908203125,18396.95703125,1021.5740966796875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e994:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[7638.52783203125,17578.05078125,1624.3555908203125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e955:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6554.4755859375,17093.744140625,1441.29345703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10e8bb:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6002.3837890625,17703.9375,1296.7362060546875],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30},{"reference":"10fc4c:Skyrim.esm","base":"10e93b:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[14032.8125,-3727.707763671875,-1492.2423095703125],"item":"2e4e2:Skyrim.esm","itemType":"SLGM","rank":"novice","returnMinutes":30}]}; };
+module.exports.scarceHarvest = function () { return {"version":1,"quest":"crimson","label":"Blackreach","loadOrderSha256":"289c8f0dc29b98bb72f89e6bd5a3a95f6bdc5cb6949015adad1f24a2c4819581","sources":[{"reference":"f3b51:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[6737.6865234375,7109.41552734375,985.5054321289062],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b54:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[1864.7017822265625,1518.39697265625,992.927490234375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b5d:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22377.798828125,13522.2265625,1997.456787109375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffac:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22487.3359375,11976.064453125,2067.111572265625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffaf:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20627.134765625,7700.14599609375,1233.974609375],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffb0:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[17847.103515625,6733.818359375,1515.8726806640625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"f3b56:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[20210.73828125,5823.5986328125,970.6233520507812],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10},{"reference":"10ffa9:Skyrim.esm","base":"b6fb9:Skyrim.esm","world":"1ee62:Skyrim.esm","position":[22159.330078125,16684.431640625,1486.5172119140625],"item":"b701a:Skyrim.esm","itemType":"INGR","rank":"novice","returnMinutes":10}]}; };
 module.exports.scarceFishing = function () { return {"version":1,"quest":"pearl","label":"Raven Rock coast","sources":[{"reference":"3828e:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27197.439453125,33044.234375,-82.0891342163086],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"38894:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[27077.59765625,28003.259765625,-167.68028259277344],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60},{"reference":"3919c:Dragonborn.esm","base":"3828c:Dragonborn.esm","world":"800:Dragonborn.esm","position":[25586.798828125,33730.1015625,280.6593017578125],"item":"854fe:Skyrim.esm","itemType":"INGR","rank":"expert","returnMinutes":60}]}; };
 module.exports.createKillContracts = KILL_CONTRACTS.createKillContracts;
 module.exports.sceneBudget = SCENE_BUDGET;
