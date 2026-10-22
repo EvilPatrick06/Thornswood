@@ -73,6 +73,7 @@ $calls = 0
 $secretCalls = 0
 $helperCalls = 0
 $contentCalls = 0
+$onBoxCalls = 0
 foreach ($f in $files) {
     $tokens = $null; $errors = $null
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($f.FullName, [ref]$tokens, [ref]$errors)
@@ -111,10 +112,11 @@ foreach ($f in $files) {
                 -not $first.Splatted -and $toolVars.ContainsKey($first.VariablePath.UserPath.ToLowerInvariant())) { $name = 'ssh' }
             else { continue }
         }
-        if ($name -eq 'Invoke-ThornswoodSecretRemote' -or $name -eq 'Invoke-ThornswoodRemote') {
-            # Send-Secret.ps1 and Send-Script.ps1 (#1070) add the option
-            # themselves and refuse a weaker one, but a caller still hands them
-            # the script's strict array.
+        if ($name -eq 'Invoke-ThornswoodSecretRemote' -or $name -eq 'Invoke-ThornswoodRemote' -or $name -eq 'Start-ThornswoodRemote') {
+            # Send-Secret.ps1 and Send-Script.ps1 (#1070, and its held run
+            # Start-ThornswoodRemote, #3059) add the option themselves and
+            # refuse a weaker one, but a caller still hands them the script's
+            # strict array.
             if ($name -eq 'Invoke-ThornswoodSecretRemote') { $secretCalls++ } else { $helperCalls++ }
             $okS = $false
             for ($i = 0; $i -lt $c.CommandElements.Count - 1; $i++) {
@@ -125,9 +127,27 @@ foreach ($f in $files) {
                         ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant()))) { $okS = $true }
                 }
             }
-            # ServerContent.ps1 (#2334) passes its caller's array through, the
-            # way Artifact.ps1 does; its callers are checked just below.
-            if (-not $okS -and $f.Name -notin @('Send-Script.ps1', 'Send-Secret.ps1', 'Artifact.ps1', 'ServerContent.ps1')) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
+            # ServerContent.ps1 (#2334) and OnBox.ps1 (#3035) pass their
+            # caller's array through, the way Artifact.ps1 does; their callers
+            # are checked just below.
+            if (-not $okS -and $f.Name -notin @('Send-Script.ps1', 'Send-Secret.ps1', 'Artifact.ps1', 'ServerContent.ps1', 'OnBox.ps1')) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
+            continue
+        }
+        if ($name -eq 'Open-ThornswoodOnBoxFolder') {
+            # Its -SshArgs defaults to none, and the folder it hands back
+            # carries the array to Close-ThornswoodOnBoxFolder, so a caller
+            # always hands it a strict one.
+            $onBoxCalls++
+            $okS = $false
+            for ($i = 0; $i -lt $c.CommandElements.Count - 1; $i++) {
+                $e = $c.CommandElements[$i]
+                if ($e -is [System.Management.Automation.Language.CommandParameterAst] -and $e.ParameterName -eq 'SshArgs') {
+                    $v = $c.CommandElements[$i + 1]
+                    if ($v.Extent.Text -match 'StrictHostKeyChecking=yes' -or
+                        ($v -is [System.Management.Automation.Language.VariableExpressionAst] -and $strictVars.ContainsKey($v.VariablePath.UserPath.ToLowerInvariant()))) { $okS = $true }
+                }
+            }
+            if (-not $okS) { $bare += ('{0}:{1} ({2})' -f (Rel $f.FullName), $c.Extent.StartLineNumber, $name) }
             continue
         }
         if ($name -eq 'Read-ThornswoodServerContent') {
@@ -167,6 +187,7 @@ Yes ("  every Invoke-ThornswoodRemote caller hands it a strict array ($helperCal
 Yes ("  every Invoke-ThornswoodSecretRemote caller hands it a strict array ($secretCalls found)") ($secretCalls -ge 8)
 $contentDefault = [IO.File]::ReadAllText((Join-Path $repo 'scripts\deploy\ServerContent.ps1')) -match "\[string\[\]\]\`$SshArgs = @\('-o', 'BatchMode=yes', '-o', 'StrictHostKeyChecking=yes'\)"
 Yes ("  Read-ThornswoodServerContent defaults to the strict array, and its callers ($contentCalls found) hand it one") ($contentDefault -and $contentCalls -ge 3)
+Yes ("  every Open-ThornswoodOnBoxFolder caller hands it a strict array ($onBoxCalls found)") ($onBoxCalls -ge 2)
 
 # ---- 2b: Send-Secret.ps1 keeps its own guard ----------------------------------------
 # Whatever a caller passes, the secret goes only over a host-key-checked
