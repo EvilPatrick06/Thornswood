@@ -7,13 +7,15 @@ Clothes, robes, and the dress of a faction.
 - [Haberdasher](tailor/haberdasher.md). 231 recipes, 227 reach the
   server. Common and fine clothing. 4 are an armour table and do not.
 
-The loom is open furniture. The garment's recipe is what refuses you.
-The tanning rack is open, and leather from a hide is anybody's work.
-The forge is open furniture too. A few tailor rows are made there.
+The loom opens for a Tailor, either half, from novice. The tanning rack
+opens for a Haberdasher from novice and a Liverywright at advanced. The
+forge opens for a Tailor too: a few tailor rows are made there. None of
+the three opens for somebody who can make nothing at it.
 Hair dye is a Tailor's work as well, either half, steeped at a cooking
 spot: [Hair dye](../hair-dye.md).
-The forge table names Liverywright at master and then marks the forge
-open, so that master line is not a door. The recipe rank is the door.
+At any bench the door is whether you may make one of its recipes, so
+a master line in the forge table does not keep a novice out of the
+forge; the recipe's rank refuses them that row.
 
 ## Master Weaver
 

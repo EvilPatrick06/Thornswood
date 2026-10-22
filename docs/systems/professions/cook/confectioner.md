@@ -43,8 +43,8 @@ The half places 1 in Fortitude. The profession already placed 1 in
 Fortitude, so a Confectioner starts at 2: +20% health recovery.
 
 The oven is your bench from novice. The mill is not. The cookpot is
-open furniture and the meals on it are Hearthcook, so you stop at
-that half's novice list.
+the Hearthcook's, and it opens for you as your sister half, so you
+stop at that half's novice list.
 
 ## What you cannot do
 
