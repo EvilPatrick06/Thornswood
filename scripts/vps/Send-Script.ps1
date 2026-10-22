@@ -303,10 +303,15 @@ if (`$r.ReturnValue -ne 0) {
 }
 'STARTED ' + `$r.ProcessId
 "@
+    # The report is read with the run still writing it (#3233): opened so the
+    # run's next AppendAllText may write, which ReadAllLines does not allow,
+    # and that append failing ended the run as ERROR and END 1.
     $read = @"
 `$l = '$log'
 if (-not (Test-Path -LiteralPath `$l)) { 'REPORT NONE'; exit 0 }
-`$lines = @([IO.File]::ReadAllLines(`$l))
+`$lines = @()
+`$fs = New-Object IO.FileStream(`$l, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+try { `$sr = New-Object IO.StreamReader(`$fs, [Text.Encoding]::UTF8); while (`$null -ne (`$x = `$sr.ReadLine())) { `$lines += `$x } } finally { `$fs.Dispose() }
 'REPORT ' + `$lines.Count
 `$lines
 if (`$lines.Count -and `$lines[-1] -match '^END ') { Remove-Item -LiteralPath `$l -Force -EA SilentlyContinue }
