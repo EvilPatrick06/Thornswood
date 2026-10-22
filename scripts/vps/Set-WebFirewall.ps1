@@ -111,9 +111,6 @@ function Clean($lines) {
 
 function Invoke-Box([string]$mode) {
     if (-not (Test-Path -LiteralPath $BoxScript)) { Die "There is no $BoxScript. Nothing was sent." }
-    # -WhatIf is the box's -DryRun by now. Here it would only stop the local
-    # copy of the script being removed after it is sent.
-    $WhatIfPreference = $false
     $script = Get-ThornswoodFileScript -Path $BoxScript -Arguments $mode
     $old = $ErrorActionPreference
     $ErrorActionPreference = 'Continue'
