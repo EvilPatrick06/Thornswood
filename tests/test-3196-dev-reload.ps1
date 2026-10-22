@@ -141,6 +141,13 @@ $newGm = "'use strict';`r`n// the gamemode this deploy sends`r`nmp.x = 2;`r`n"
 $script:case = 0
 # A server folder running $oldGm, a stage holding what $send names, and the
 # engine started on it. Returns what the case needs.
+# server.log as Reload.ps1 reads it: shared with the engine, which appends to
+# it while this reads. [IO.File]::ReadAllText shares for reading only, so on
+# Windows it failed whenever an append had the file open (#3320's gate run).
+function Read-Log([string]$path) {
+  $h = New-Object IO.FileStream($path, [IO.FileMode]::Open, [IO.FileAccess]::Read, ([IO.FileShare]::ReadWrite -bor [IO.FileShare]::Delete))
+  try { return (New-Object IO.StreamReader($h)).ReadToEnd() } finally { $h.Dispose() }
+}
 function New-Server([hashtable]$send, [string[]]$marks = @(), [string]$engineSays = '[thornswood] gamemode did not load; the error is above', [bool]$running = $true, [string]$stageSettings = '') {
   $script:case++
   $root = Join-Path $scratch ('root' + $script:case)
@@ -170,7 +177,7 @@ function New-Server([hashtable]$send, [string[]]$marks = @(), [string]$engineSay
   $proc = Start-Process @how
   # The engine's first load, as at a start.
   $until = (Get-Date).AddSeconds(10)
-  while ((Get-Date) -lt $until -and -not ([IO.File]::ReadAllText((Join-Path $root 'server.log')).Contains('first load'))) { Start-Sleep -Milliseconds 100 }
+  while ((Get-Date) -lt $until -and -not ((Test-Path -LiteralPath (Join-Path $root 'server.log')) -and (Read-Log (Join-Path $root 'server.log')).Contains('first load'))) { Start-Sleep -Milliseconds 100 }
   return @{ Root = $root; Stage = $stage; StageName = ('.stage-' + $stamp); PrevName = ('.prev-' + $stamp); Sums = $sums; Engine = $proc }
 }
 function Invoke-Reload($srv, [int]$wait = 6) {
@@ -189,7 +196,7 @@ function Invoke-Reload($srv, [int]$wait = 6) {
 }
 function Stop-Server($srv) { try { Stop-Process -Id $srv.Engine.Id -Force -EA SilentlyContinue } catch { } }
 function Read-At($srv, [string]$rel) { $p = Join-Path $srv.Root $rel; if (Test-Path -LiteralPath $p) { [IO.File]::ReadAllText($p) } else { $null } }
-function Logs($srv) { (@(Get-ChildItem -LiteralPath $srv.Root -File -Force -Filter 'server.log*') | ForEach-Object { [IO.File]::ReadAllText($_.FullName) }) -join '' }
+function Logs($srv) { (@(Get-ChildItem -LiteralPath $srv.Root -File -Force -Filter 'server.log*') | ForEach-Object { Read-Log $_.FullName }) -join '' }
 
 try {
   # ---- a good reload ---------------------------------------------------------
