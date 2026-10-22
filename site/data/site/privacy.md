@@ -2,7 +2,7 @@
 
 What Thornswood keeps about you, why, and how to have it deleted.
 
-Last changed: 19 October 2026.
+Last changed: 21 October 2026.
 
 Thornswood is a free fan project run by two people. It is not a company. This
 page is written plainly rather than legally, and it is meant to be the whole
@@ -103,6 +103,12 @@ Honesty about the things a page does by existing:
 - **Discord** is where sign-in happens, so signing in tells Discord that you
   signed in here.
 - **Launcher updates** are fetched from Thornswood's own site.
+- **Cloudflare** carries every connection to this site, and to voice, on
+  its way to our server, which answers nobody else. Like any network
+  between you and us it sees your address and what you ask for, and it
+  keeps its own records under
+  [Cloudflare's privacy policy](https://www.cloudflare.com/privacypolicy/).
+  It adds nothing to the pages.
 
 Opening a page on this site loads nothing from anybody else. The fonts came
 from Google and a markdown renderer from cdnjs until 24 September 2026, and
@@ -113,8 +119,10 @@ both are served from here now.
 - **Sign-in records**, the only thing on the site holding your address, are
   deleted after 30 days. The address is the one your connection reached the
   site from, as our own front door saw it, not anything your browser claims
-  about itself. That is enforced by the site rather than promised:
-  old rows go whenever the log is written or read.
+  about itself. Cloudflare carries the connection the last step, and the
+  front door takes the address from Cloudflare only when the connection
+  really comes from Cloudflare. That is enforced by the site rather than
+  promised: old rows go whenever the log is written or read.
 
 - **The game server's log** records the address each connection to the game
   came from, beside the Discord account it signed in as. It keeps nothing

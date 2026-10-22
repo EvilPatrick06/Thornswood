@@ -305,14 +305,22 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     `.\scripts\release\Publish-Installer.ps1` puts the installer from the last
     package build back on the site.
 18. **The name:** in Patrick's Cloudflare login, point the A records for
-    `thornswood.net` and `www` at the new address, not proxied (Watch-Outside's
-    dns check expects them straight at the box). When the name resolves there,
-    `.\scripts\deploy\Setup-Domain.ps1`. It refuses until it does, then
-    installs Caddy and the `Thornswood Web` task, sends
-    `scripts\deploy\Caddyfile` (the restored one is kept beside it as
-    `Caddyfile.before-<date>`), moves the site onto loopback and asks for the
-    certificate. Discord sign in needs nothing: the site builds its redirect
-    from the name, not the address.
+    `thornswood.net` and `www` at the new address. Leave them Proxied when
+    Caddy's certificate came back with the restore (`C:\Thornswood-Caddy\data`
+    holds `certificates`); otherwise set them to DNS only for now, because with
+    SSL/TLS on Full (strict) Cloudflare refuses a box with no certificate yet,
+    and Let's Encrypt asks through Cloudflare. Then
+    `.\scripts\deploy\Setup-Domain.ps1`. It refuses until the name resolves
+    to the box or to Cloudflare, then installs Caddy and the `Thornswood Web`
+    task, sends `scripts\deploy\Caddyfile` (the restored one is kept beside
+    it as `Caddyfile.before-<date>`), opens 80 and 443, moves the site onto
+    loopback and asks for the certificate. Once the certificate is there, set
+    the records back to Proxied, wait five minutes for the old answer to run
+    out, and `.\scripts\vps\Set-WebFirewall.ps1`: the box then takes 80 and
+    443 only from Cloudflare (#2995), so forged SYNs from anywhere else get no
+    answer. It refuses while the name still points straight at the box.
+    Discord sign in needs nothing: the site builds its redirect from the
+    name, not the address.
 19. **Check it from outside:** `.\scripts\vps\Check-Site.ps1 -NoSsh -NoPause`,
     and `https://thornswood.net/voice/health` and `/voice-dev/health` answer.
     Wait for the certificate before telling anybody, or the site shows a
