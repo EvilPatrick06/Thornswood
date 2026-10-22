@@ -74,6 +74,17 @@
   Publish-Discord.ps1 -Dev -GamemodeDeploy, the same embed style as a dev
   Ship, with footer "dev server". Issue #594.
 
+    .\Deploy-DevGamemode.ps1 -ShipFollows
+                                   posts nothing, because the dev Ship run
+                                   next carries the same change to the
+                                   launcher and says it, once (#3320)
+
+  A note that says again a title or line the dev feed or the dev updates
+  channel has already had is refused before anything is sent
+  (Note-Repeats.ps1, #3320). On 22 Oct a deploy and the Ship after it posted
+  the same note twice, and that is what -ShipFollows is for: one change, one
+  post, from the Ship.
+
   STAGED, CHECKED, THEN SWAPPED (issue #446). Nothing is copied over the
   running dev server any more. The new files and an edited copy of the dev
   settings go into $Root\.stage-<stamp> while it runs, the box checks them
@@ -270,6 +281,9 @@ param(
   # the order above, so a bare note bound to -Vps: on 5 Oct the refusal's own
   # example became the VPS address and the script refused again.
   [Parameter(Position = 0)][string]$Note = '',
+    # The dev Ship that follows says this change, so this posts nothing and
+    # takes no -Note (#3320).
+    [switch]$ShipFollows,
     # Go ahead from a checkout that is not exactly origin/main and clean (#2118). Loud.
     [switch]$AllowStaleCheckout
 )
@@ -293,7 +307,9 @@ if (-not $PSBoundParameters.ContainsKey('Wait')) {
 }
 if ($PutBack -and $LoadOrder) { throw '-PutBack puts the last files back and sends nothing, so it does not take -LoadOrder.' }
 if (@($DropPlugins).Count -and -not $LoadOrder) { throw '-DropPlugins goes with -LoadOrder -Dist, the one run here that writes a load order over the dev server''s. Nothing was sent.' }
-if (-not $PutBack) {
+if ($ShipFollows -and $Note.Trim()) { throw '-ShipFollows posts nothing, so it takes no -Note: give the note to the Ship that follows. Nothing was sent.' }
+if ($ShipFollows -and $PutBack) { throw '-PutBack posts nothing already, so it does not take -ShipFollows. Nothing was sent.' }
+if (-not $PutBack -and -not $ShipFollows) {
   if (-not $Note.Trim()) {
     Write-Host ''
     Write-Host '  STOP. A dev gamemode deploy needs -Note so the dev updates channel' -ForegroundColor Red
@@ -315,6 +331,20 @@ if (-not $PutBack) {
     foreach ($p in $noteProblems) { Write-Host "    $p" -ForegroundColor Yellow }
     Write-Host ''
     Write-Host '  Say what somebody will notice in the game, in plain words.' -ForegroundColor DarkGray
+    exit 1
+  }
+  # And only what the dev channel has not had yet (#3320).
+  . (Join-Path $Here '..\release\Note-Repeats.ps1')
+  try { $told = Get-ChannelPosts 'dev' }
+  catch { throw ('What the dev channel has already been told could not be read, so this note cannot be checked for repeats. Nothing was sent: ' + $_.Exception.Message) }
+  $repeats = @(Get-NoteRepeats $Note $told.Posts $null)
+  if ($repeats.Count) {
+    Write-Host ''
+    Write-Host '  STOP. This note says again what the dev channel has already been told.' -ForegroundColor Red
+    Write-Host '  Nothing was sent. Write only what this deploy adds:' -ForegroundColor Red
+    foreach ($r in $repeats) { Write-Host "    $r" -ForegroundColor Yellow }
+    Write-Host ''
+    Write-Host '  When a dev Ship follows with this change, deploy with -ShipFollows and give the note to the Ship.' -ForegroundColor DarkGray
     exit 1
   }
   Write-Host "  $Note" -ForegroundColor DarkGray
@@ -1316,7 +1346,11 @@ else {
   $null = Set-ThornswoodArtifactCurrent -Artifact $artifact -Target "$User@$Vps" -SshArgs $ssh -Root $Root -Beside "$Root/data/thornswood-deploy.json"
 }
 
-if ($deployed -and -not $PutBack) {
+if ($deployed -and $ShipFollows) {
+  Write-Host ''
+  Write-Host '  -ShipFollows: nothing posted, the dev Ship that follows says this change.' -ForegroundColor DarkGray
+}
+elseif ($deployed -and -not $PutBack) {
   $discord = Join-Path $Here '..\ops\Publish-Discord.ps1'
   if (Test-Path -LiteralPath $discord) {
     Write-Host ''
