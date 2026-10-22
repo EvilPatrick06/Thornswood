@@ -214,6 +214,9 @@ try {
     $probe = ''
     if ($py) {
         $env:DISCORD_TOKEN = 'not-a-real-token'
+        # bot.py writes roots.pem into its data folder when it is imported,
+        # which is bot\ itself in a checkout with no bot\data (#3220).
+        $env:THORNSWOOD_BOT_DATA = $tmp
         $code = @"
 import json, sys, time
 sys.path.insert(0, sys.argv[1])
@@ -235,7 +238,7 @@ for aid, text in due:
         $probe = @($said | Where-Object { $_ -match '^(SKIP|DUE) ' }) | Select-Object -Last 1
         $dueId = @($said | Where-Object { $_ -like 'ID *' } | ForEach-Object { $_.Substring(3) })
         $dueText = @($said | Where-Object { $_ -like 'TEXT *' } | ForEach-Object { ConvertFrom-Json $_.Substring(5) })
-        Remove-Item Env:DISCORD_TOKEN -ErrorAction SilentlyContinue
+        Remove-Item Env:DISCORD_TOKEN, Env:THORNSWOOD_BOT_DATA -ErrorAction SilentlyContinue
     }
     if ($probe -like 'DUE *') {
         Yes 'bot.py watch_alerts_due takes the line the box half wrote, with its text' (
