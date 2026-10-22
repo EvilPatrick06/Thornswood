@@ -325,8 +325,9 @@ link, and the old line goes.
 - **Main Findings and Dev Findings stay**, and go into the Developer Guide's
   label scheme. 22 Oct 2026,
   [#2798](https://github.com/EvilPatrick06/Thornswood/issues/2798#issuecomment-6335266529).
-- **An issue is never closed while its fix is unmerged.** The 38 closed on
-  "Needs playtest." with open pull requests are reopened. 22 Oct 2026,
+- **An issue is never closed while its fix is unmerged or not yet on main.**
+  Every issue closed on "Needs playtest." with no Test task is reopened (44 on
+  22 Oct). 22 Oct 2026,
   [#2795](https://github.com/EvilPatrick06/Thornswood/issues/2795#issuecomment-6335266791).
 - **The dev test room is Skyrim's own QASmoke test cell**, reached by staff
   teleport, dev only. 22 Oct 2026,
