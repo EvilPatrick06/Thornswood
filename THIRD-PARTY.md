@@ -103,7 +103,7 @@ none, the launcher downloads Microsoft's own bootstrapper from Microsoft's link
 
 The six files recorded in `records\client-build.json` correspond to
 https://github.com/EvilPatrick06/skymp, branch `thornswood/engine-changes`,
-commit `c214eea1` (in full, `c214eea1883230bbc19c763da4e12a725d800b79`). That
+commit `dcf6e699` (in full, `dcf6e699ffd1316d10189898ab6c460f412fc4ef`). That
 is upstream skyrim-multiplayer/skymp at `2849e676` with Thornswood's changes on
 top. Check-Secrets.ps1 stops a release whose copy of any of the six is not the
 recorded sha256 (client-not-recorded-build), and Sync-Client.ps1 puts in the
@@ -258,8 +258,8 @@ Since 20 October 2026 (#2754, #2931) every Ship builds `Data\Platform\UI\build.j
 and the fonts, sounds and pictures beside it from the fork's `skymp5-front`
 at the engine pin, with webpack, and holds what it built to
 `records\front-build.json`: 68 files, 8,434,780 bytes, from commit
-`c214eea1`, the commit the client record names (the same 68 files, byte for
-byte, as at `d39a9a93`, which changed nothing in `skymp5-front`). Read on 21 October (#421):
+`dcf6e699`, the commit the client record names (the same 68 files, byte for
+byte, as at `d39a9a93`, since nothing after it changed `skymp5-front`). Read on 21 October (#421):
 the dev feed's release `20261021-104809-dev` carries that build.js, 2,448,900
 bytes, sha256
 `d35838544dd8c65704db86171f46d7ef7b788ec61ba6f2e0da0535db1ddc91ae`, and every
@@ -739,7 +739,7 @@ with.
 
 - The game server's native module, `scam_native.node`, recorded in
   `records\server-build.json`, is AGPL-3.0. That record and the client record
-  name `c214eea1883230bbc19c763da4e12a725d800b79` on the public fork. The
+  name `dcf6e699ffd1316d10189898ab6c460f412fc4ef` on the public fork. The
   server module and the six client files were built from that commit, which
   adds the 5 October security fixes (the RPC route, request bodies, metrics,
   the login line, the settings files), the server's equipment write for a new
@@ -785,11 +785,12 @@ with.
   stack (#3069), since `d39a9a93` it refuses a stack past 4,294,967,295
   before anything moves (#3074), since `e1127af4` a container starts with
   none of its plugin record's contents when the server settings name its
-  type in `forbiddenBaseContainer` (#3078), and since `c214eea1` a plant, a tree
+  type in `forbiddenBaseContainer` (#3078), since `c214eea1` a plant, a tree
   or a crafting bench goes through the server before the game starts it
-  (#3080). The server module's SHA256
-  is `be81dca0510508e0288fd21fe91e455d1504e81f1a521815c8f372cc589952e5`, built
-  2026-10-21T20:59:13Z. This is the recorded next release, not a deployment
+  (#3080), and since `dcf6e699` the server's own NPC movement never saves
+  on a timer (#3180). The server module's SHA256
+  is `c2411a7e8179cc5e2ac4fac3eb90289234987e1fc0ba5329213695167470d89d`, built
+  2026-10-22T05:43:28Z. This is the recorded next release, not a deployment
   claim. Main remains on `3bdf3d3c9926a4dd241b1d1c09dadde808a788d5` until this goes
   out.
   It goes to the dev server (Publish-Server -Channel dev) and to the dev
@@ -824,7 +825,7 @@ For the six recorded client files and the recorded game server module, the
 Corresponding Source is the fork at the commit each record names. The six
 client files and the game server module, at the one commit both records name:
 
-https://github.com/EvilPatrick06/skymp/tree/c214eea1883230bbc19c763da4e12a725d800b79
+https://github.com/EvilPatrick06/skymp/tree/dcf6e699ffd1316d10189898ab6c460f412fc4ef
 
 For the engine Main runs until then:
 
