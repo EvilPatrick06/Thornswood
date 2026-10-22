@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  65,
-    "callCount":  264,
+    "callCount":  265,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1126,10 +1126,19 @@
                       "script":  "scripts/deploy/Setup-Domain.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "`$exe = Join-Path `$dir \u0027caddy.exe\u0027",
+                      "anchor":  "$started = @(Remote $run.Start)",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
-                      "reason":  "sends caddy"
+                      "reason":  "starts the Caddy task change and restart on the box on its own, through WMI (#3193)"
+                  },
+                  {
+                      "script":  "scripts/deploy/Setup-Domain.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$read = @(Remote $run.Read",
+                      "does":  "reads the report of that run, and deletes it once it holds END (#3193)",
+                      "class":  "read-status",
+                      "reason":  "reads a report file"
                   },
                   {
                       "script":  "scripts/deploy/Swap.ps1",
