@@ -3,7 +3,7 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const seed=require('./fixtures/merchant-ledger');
 const source=fs.readFileSync(path.join(__dirname,'../game/gamemode.js'),'utf8'),ctx={require};
 vm.createContext(ctx);vm.runInContext(source.slice(source.indexOf('// NPC MERCHANT PURSES BEGIN'),source.indexOf('// NPC MERCHANT PURSES END')),ctx);
-const workspace=path.resolve(__dirname,'..'),root=fs.mkdtempSync(path.join(workspace,'.merchant-evidence-'));
+const os=require('node:os'),scratch=fs.realpathSync(os.tmpdir()),root=fs.mkdtempSync(path.join(scratch,'merchant-evidence-'));
 try {
  for(const missing of ['both','ledger','marker'])for(const native of [false,true]) {
   const settings={privDir:path.join(root,missing+native,'private'),dataDir:path.join(root,'served')};
@@ -53,5 +53,5 @@ try {
  assert.equal(fs.readFileSync(path.join(settings.privDir,'merchant-ledger.initialized'),'utf8'),'1','legacy marker is not migrated');
  console.log('PASS missing merchant world evidence refuses every writer and preserves legacy balances');
 } finally {
- assert.ok(root.startsWith(workspace+path.sep));fs.rmSync(root,{recursive:true,force:true});
+ assert.ok(root.startsWith(scratch+path.sep));fs.rmSync(root,{recursive:true,force:true});
 }

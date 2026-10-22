@@ -122,7 +122,11 @@ if (Test-Path -LiteralPath $exe) {
 Head 'Compiling'
 # -nr:false: without it MSBuild leaves its worker processes running after the
 # build, holding files under out\obj, and a runner names them as left behind.
-$msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:Configuration=Release')
+# UseSharedCompilation=false for the same reason (#3169): otherwise the Csc
+# task hands each compile to the Roslyn compiler server, VBCSCompiler, which
+# stays up about ten minutes after the last one. A build here compiles each
+# project once, so the server never serves a second compile; it only lingers.
+$msbArgs = @('-nologo', '-v:minimal', '-nr:false', '-p:UseSharedCompilation=false', '-p:Configuration=Release')
 $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
 & $found.MSBuild (Resolve-Path -LiteralPath $proj).Path @msbArgs ('-p:OutDir=' + $outDir.TrimEnd('\') + '\')
 $rc = $LASTEXITCODE
