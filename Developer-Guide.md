@@ -988,6 +988,11 @@ entry, with no step telling anybody to deploy it.
 
 How to use it:
 
+- Before filing a new idea or feature, read `docs/DECIDED.md` (what was
+  decided against, and the settled rules) and the `docs/systems` page for
+  that part of the game, and name that page in the issue. An idea that
+  goes against a decision there says so and asks for the decision to be
+  changed, instead of quietly reopening it (#3192).
 - Order is the do-order. A new issue gets the Order of where it belongs, not
   the end; a number between two others (52.5) is fine.
 - Work that fits an existing issue is an edit or a comment on it, not a

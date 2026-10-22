@@ -18,13 +18,6 @@ it belongs to, before the session ends (Developer-Guide.md says where the board
 is and how its order works). Saying it in a reply is not recording it: a
 reply is gone when the window closes. Say in the reply which issues moved.
 
-Before filing a new idea or feature, read `docs/DECIDED.md` (what was
-decided against, and the settled rules) and the `docs/systems` page for that
-part of the game, and name that page in the issue. An idea that goes against
-a decision there says so and asks for the decision to be changed, instead of
-quietly reopening it (#3192: #3174 asked for bounties after #502 ruled them
-out).
-
 ## Picking issues to work
 
 Decided by Patrick on 11 Oct: needing his decision, needing the VPS, and
