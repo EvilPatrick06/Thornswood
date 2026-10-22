@@ -22,7 +22,10 @@
        does not hold, stays open, and so does one whose last done-on-merge
        comment names the later merge;
     3. one with a person's newer "Test task:" for main is closed with no
-       second comment, and one whose newer one says Server: Dev stays open;
+       second comment; a newer Server: Dev one keeps nothing open and the
+       Main block is still written; a Dev block is written unless a newer
+       Dev one stands, whatever Main one is beside it (Patrick, 22 Oct: the
+       two are for different people, and a Dev one may stay while on main);
     4. one with no done-on-merge comment, or one only a person wrote with the
        same footer, stays open, listed;
     5. a card not in Done, a closed issue and another repository's are not
@@ -141,7 +144,7 @@ try {
     function Card([int]$n, [string]$status = 'Done', [string]$state = 'OPEN', [string]$repo = $Slug) {
         return [ordered]@{ repo = $repo; number = $n; kind = 'Issue'; title = "issue $n"; state = $state; status = $status; order = $null; archived = $false }
     }
-    $items = @((Card 1), (Card 2), (Card 3), (Card 4 'In Progress'), (Card 5 'Done' 'CLOSED'), (Card 6), (Card 7), (Card 8), (Card 9), (Card 11 'Done' 'OPEN' 'EvilPatrick06/other'), (Card 12), (Card 13))
+    $items = @((Card 1), (Card 2), (Card 3), (Card 4 'In Progress'), (Card 5 'Done' 'CLOSED'), (Card 6), (Card 7), (Card 8), (Card 9), (Card 10), (Card 11 'Done' 'OPEN' 'EvilPatrick06/other'), (Card 12), (Card 13), (Card 15))
     $items += [ordered]@{ repo = $Slug; number = 14; kind = 'PullRequest'; title = 'a pull request'; state = 'OPEN'; status = 'Done'; order = $null; archived = $false }
     $script:boardFile = Join-Path $work 'board.json'
     [IO.File]::WriteAllText($script:boardFile, ([ordered]@{ read_at = '2026-10-22T13:41:52Z'; items = $items } | ConvertTo-Json -Depth 6))
@@ -153,6 +156,7 @@ try {
             "`n`n" + '```' + "`n" + $t + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
         return [ordered]@{ user = @{ login = $who }; body = $b; created_at = '2026-10-22T12:00:00Z' }
     }
+    $devBlock = "Test task: Measure the anvil`nServer: Dev`nBuild: 20261022-063057-dev`n1. Read the log for activate: lines."
     function Person([string]$body) { return [ordered]@{ user = @{ login = 'EvilPatrick06' }; body = $body; created_at = '2026-10-22T13:00:00Z' } }
     function Page([int]$n, [int]$p = 1) { return "GET repos/$Slug/issues/$n/comments?per_page=100&page=$p" }
 
@@ -167,6 +171,8 @@ try {
         (Page 7)  = @((Robot $mergeA), (Person "Test task: Measure the forge`nServer: Dev`n1. Read the log."))
         (Page 8)  = @((Robot $mergeA 3300 'EvilPatrick06'))
         (Page 9)  = @((Robot 'deadbeefdeadbeefdeadbeefdeadbeefdeadbeef'))
+        (Page 10) = @((Robot $mergeA 3304 'github-actions[bot]' $devBlock), (Person "Test task: The anvil works`nServer: Main`n1. Use the anvil."))
+        (Page 15) = @((Robot $mergeA 3304 'github-actions[bot]' $devBlock), (Person ($devBlock + "`n2. And the timing.")))
         (Page 11) = @((Robot $mergeA))
         (Page 12) = @((Robot $mergeA), (Person 'it broke again'), (Robot $mergeB 3302))
         (Page 13) = $filler
@@ -188,21 +194,30 @@ try {
     Yes '#12, its last done-on-merge comment names the later merge: stays open' (@($w | Where-Object { $_ -match '/issues/12[ /]' }).Count -eq 0 -and $r.Out -match "#12: stays open, pull request #3302's merge")
     Yes '#6, a person''s newer test task for main: closed with no second comment' (
         @($w | Where-Object { $_ -like "POST repos/$Slug/issues/6/comments *" }).Count -eq 0 -and @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/6 *" -and $_ -match '"state":"closed"' }).Count -eq 1)
-    Yes '#7, a newer test task saying Server: Dev: stays open, said' (@($w | Where-Object { $_ -match '/issues/7[ /]' }).Count -eq 0 -and $r.Out -match '#7: stays open, its newest test task says Server: Dev')
+    $c7 = @($w | Where-Object { $_ -like "POST repos/$Slug/issues/7/comments *" })
+    Yes '#7, a newer test task saying Server: Dev: closed all the same, with the Main block written' (
+        $c7.Count -eq 1 -and ($c7[0].Substring($c7[0].IndexOf('{')) | ConvertFrom-Json).body -ceq $task -and
+        @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/7 *" -and $_ -match '"state":"closed"' }).Count -eq 1)
+    $c10 = @($w | Where-Object { $_ -like "POST repos/$Slug/issues/10/comments *" })
+    Yes '#10, a Dev block with only a newer Main test task beside it: the Dev block is written, then closed' (
+        $c10.Count -eq 1 -and ($c10[0].Substring($c10[0].IndexOf('{')) | ConvertFrom-Json).body -ceq $devBlock -and
+        @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/10 *" -and $_ -match '"state":"closed"' }).Count -eq 1)
+    Yes '#15, a Dev block with a newer Dev test task: closed with no second comment' (
+        @($w | Where-Object { $_ -like "POST repos/$Slug/issues/15/comments *" }).Count -eq 0 -and @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/15 *" -and $_ -match '"state":"closed"' }).Count -eq 1)
     Yes '#3, no done-on-merge comment, and #8, the footer written by a person: stay open, listed' (
         @($w | Where-Object { $_ -match '/issues/[38][ /]' }).Count -eq 0 -and $r.Out -match 'no test task from a merge to close them with \(2\): #3 #8')
     Yes '#4 in progress, #5 closed, #11 another repository''s and #14 a pull request: not read at all' (
         @($r.Calls | Where-Object { $_ -match '/issues/(4|5|11|14)/' }).Count -eq 0)
     Yes '#13, the done-on-merge comment on the second page: found and closed' (
         @($r.Calls | Where-Object { $_ -like ((Page 13 2) + '*') }).Count -eq 1 -and @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/13 *" }).Count -eq 1)
-    Yes '  and nothing else was written' ($w.Count -eq 5)
+    Yes '  and nothing else was written' ($w.Count -eq 10)
     Yes '  every call carries the token gh is signed in with' ($r.Calls.Count -gt 0 -and @($r.Calls | Where-Object { $_ -notmatch ' Bearer test-token' }).Count -eq 0)
-    Yes '  the summary names what closed' ($r.Out -match 'Closed \(3\): #1 #6 #13')
+    Yes '  the summary names what closed' ($r.Out -match 'Closed \(6\): #1 #6 #7 #10 #13 #15')
 
     # ---- 6: -Check -----------------------------------------------------------
     $r = Run @('-Check') $answers
     Yes ("-Check writes nothing and passes (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Writes.Count -eq 0)
-    Yes '  and says what it would close' ($r.Out -match 'Would close \(3\): #1 #6 #13' -and $r.Out -match '#1: would close')
+    Yes '  and says what it would close' ($r.Out -match 'Would close \(6\): #1 #6 #7 #10 #13 #15' -and $r.Out -match '#1: would close')
 
     # ---- 7: a refused close ----------------------------------------------------
     $r = Run @() $answers @("PATCH repos/$Slug/issues/6")

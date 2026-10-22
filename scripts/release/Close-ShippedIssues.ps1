@@ -29,15 +29,18 @@
   WHAT STAYS OPEN, each said by number:
     - an issue whose merge the shipped commit does not contain: its fix is not
       on the main server yet, so the next main Ship that carries it closes it;
-    - an issue whose newest "Test task:" comment, written after the merge,
-      says Server: Dev: someone on dev still has a measurement to take
-      (Developer-Guide.md, the board), so it is not finished;
     - an issue in Done with no done-on-merge comment: nothing says which merge
       finishes it, so this cannot tell whether the release carries it, and
       whoever moved it there closes it.
-  An issue whose newest "Test task:" comment was written by a person after the
-  merge, for main, is closed with that comment as its test task, and no second
-  one is written.
+
+  DEV AND MAIN. A test task is Main, for any playtester, or Dev, with
+  "Server: Dev" under its first line, for what only a developer can check;
+  the bot keeps the two apart, in #test-tasks and #dev-test-tasks, and a Dev
+  one stays up after the fix is on main (Patrick, 22 Oct; Developer-Guide.md,
+  "Test tasks and known issues"). So a Dev test task never keeps an issue
+  open, and the block is written unless a person wrote a "Test task:" comment
+  of the same kind after the merge, which stands instead: the bot reads the
+  issue's last one of each kind.
 
   Whether the release carries a merge is asked of git in -RepoDir, the checkout
   the Ship built from, so a shallow checkout, which cannot answer, is refused.
@@ -107,6 +110,11 @@ $Footer = '_Done on merge, .github/workflows/done-on-merge.yml_'
 $MergedLine = '^Pull request #(\d+) merged \(([0-9a-fA-F]{7,40})\)'
 $Robot = 'github-actions[bot]'
 $TaskMark = '^\s*test task\s*:'
+# Dev when "Server: Dev" is the line under the title, as the bot reads it.
+function Kind-Of([string[]]$Lines) {
+    if ($Lines.Count -gt 1 -and $Lines[1] -match '^\s*server\s*:\s*dev\s*$') { return 'Dev' }
+    return 'Main'
+}
 
 if (-not (Get-Command gh -ErrorAction SilentlyContinue)) { Stop-Here 'there is no gh here to read and close the issues with.' }
 if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Stop-Here 'there is no git here to ask which merges the release carries.' }
@@ -198,7 +206,6 @@ Say ("  {0} open issue(s) in Done, read at {1}" -f $done.Count, $board.read_at) 
 Head 'Each issue'
 $closed = New-Object System.Collections.Generic.List[string]
 $notCarried = New-Object System.Collections.Generic.List[string]
-$devTask = New-Object System.Collections.Generic.List[string]
 $noTask = New-Object System.Collections.Generic.List[string]
 $trouble = New-Object System.Collections.Generic.List[string]
 
@@ -226,16 +233,14 @@ foreach ($card in $done) {
         $trouble.Add("#$n"); continue
     }
 
-    # A "Test task:" comment written after the merge's is the one that
-    # stands: the bot reads the issue's last one.
-    $later = $null
+    # A "Test task:" comment of the block's own kind, Dev or Main, written
+    # after the merge's is the one that stands: the bot reads the issue's
+    # last one of each kind. One of the other kind changes nothing here.
+    $kind = Kind-Of (@($task -split "`n"))
+    $own = $false
     for ($i = $comments.Count - 1; $i -gt $mark; $i--) {
         $lines = @((([string]$comments[$i].body) -replace "`r`n", "`n").Trim() -split "`n")
-        if ($lines.Count -and $lines[0] -match $TaskMark) { $later = $lines; break }
-    }
-    if ($null -ne $later -and $later.Count -gt 1 -and $later[1] -match '^\s*server\s*:\s*dev\s*$') {
-        Say "  #${n}: stays open, its newest test task says Server: Dev, so a measurement on dev is still owed" 'Yellow'
-        $devTask.Add("#$n"); continue
+        if ($lines.Count -and $lines[0] -match $TaskMark -and (Kind-Of $lines) -eq $kind) { $own = $true; break }
     }
 
     $a = Invoke-Git @('merge-base', '--is-ancestor', $merge, $shipped)
@@ -250,7 +255,6 @@ foreach ($card in $done) {
         $trouble.Add("#$n"); continue
     }
 
-    $own = ($null -ne $later)
     if ($Check) {
         Say ("  #{0}: would close, pull request #{1}'s merge {2} is in this release{3}" -f $n, $pr, $merge, $(if ($own) { ', with the test task written on it after the merge' } else { '' })) 'Green'
         $closed.Add("#$n"); continue
@@ -275,7 +279,6 @@ function Line([string]$label, $list, $colour) {
 if (-not $closed.Count) { Say '  Nothing in Done is carried by this release.' 'DarkGray' }
 Line $verb $closed 'Green'
 Line 'Stay open, their merge is not in this release' $notCarried 'DarkGray'
-Line 'Stay open, a measurement on dev is still owed' $devTask 'Yellow'
 Line 'Stay open, in Done with no test task from a merge to close them with' $noTask 'DarkGray'
 if ($trouble.Count) {
     Line 'Stopped, the lines above say why' $trouble 'Red'
