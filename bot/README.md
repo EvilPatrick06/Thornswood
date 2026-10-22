@@ -173,16 +173,16 @@ log.
   back to `#known-issues` if it is still a finding. Staff close a test task
   in Discord once it is confirmed.
 - `#dev-test-tasks`, in Staff and seen only by staff (Patrick, 12 Oct): one
-  post per issue whose last `Test task:` comment has `Server: Dev` straight
-  under its first line, tagged Dev. That is a check only a dev can do: it
+  post per issue from its last `Test task:` comment that has `Server: Dev`
+  straight under its first line, tagged Dev. That is a check only a dev can do: it
   needs staff or dev commands, the dev server, logs, the box, or a setup
   testers cannot make (Patrick, 22 Oct). The post is made as soon as the
   comment is there, open issue or closed, and it stays when the issue
   closes, because a dev check can still be wanted while the fix is on main.
-  It goes when a newer `Test task:` comment does not say `Server: Dev`, or
-  when the comment is taken back; staff close it once it is done. An issue
-  can have both: its Dev post here and its Main one in `#test-tasks` once
-  it closes. The post is deleted when it goes, so what was measured belongs
+  A newer Main `Test task:` comment beside it, such as the one the main Ship
+  writes when it closes the issue, leaves it up. It goes when the comment is
+  taken back; staff close it once it is done. An issue can have both: its
+  Dev post here and its Main one in `#test-tasks` once it closes. The post is deleted when it goes, so what was measured belongs
   on the issue.
 
   A dev post is written for developers, who have GitHub (Patrick, 12 Oct):

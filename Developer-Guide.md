@@ -732,7 +732,7 @@ Closes #123
 gh pr create --title "Short title" --body $body
 ```
 
-The title says what changed. The body says how you tested it. If the work finishes an issue and nobody would notice it in the game, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, with its test task under it as `Test task for #123: <title>`, because its issue is closed with a `Test task:` comment when a main Ship puts the fix on the main server, not when the pull request merges ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
+The title says what changed. The body says how you tested it. If the work finishes an issue and nobody would notice it in the game, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, with its test task under it as `Test task for #123: <title>`, because its issue is closed with that test task when a main Ship puts the fix on the main server, not when the pull request merges: the Ship closes it itself (`scripts\release\Close-ShippedIssues.ps1`, #3279) ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
 
 Run the test that covers your change before you open the pull request.
 
@@ -1039,10 +1039,28 @@ How to use it:
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
   is where the team checks that nothing breaks the game, and main is where
-  testers test, since we are in alpha). Its test task goes in the pull
-  request as `Test task for #N: <title>`, and the merge moves the issue to
-  Done. When a main Ship carries the fix, whoever ships it closes the issue
-  with that test task as a `Test task:` comment (below).
+  testers test, since we are in alpha). The pull request carries the test
+  task as `Test task for #N: <a title of at most 45 characters>`, then
+  numbered steps in plain English and what should happen, with no issue
+  numbers, links or code. At the merge, `.github\workflows\done-on-merge.yml`
+  moves the issue to Done and writes the test task on it. The main Ship that
+  carries the merge closes it (#3279): after it tags the release,
+  `scripts\release\Close-ShippedIssues.ps1` reads the board and closes every
+  open issue in Done whose done-on-merge comment names a merge the release was
+  built from, with a comment whose first line is `Test task: <title>` and the
+  steps under it, and names the ones that stay open. Nobody closes these by
+  hand. The bot turns that comment into a post in the #test-tasks forum the
+  moment the issue closes, tagged Main, so closing it when it merges or when
+  it reaches dev sends testers to look for a fix that main does not have.
+  The test task in the pull request is Main, in the shape below, unless
+  only a developer can make the check (Dev, below). To better the test task
+  after the merge, write a newer `Test task:` comment of the same kind on
+  the issue and leave it open: the Ship closes it with yours instead. A
+  Dev test task never keeps the issue open. An issue moved to Done by hand, with no done-on-merge comment, is
+  one the Ship cannot tell it carries, so whoever moved it closes it, with
+  its `Test task:` comment, when its fix is on main. To see what a main Ship
+  would close, without closing anything:
+  `.\scripts\release\Close-ShippedIssues.ps1 -Commit origin/main -Check`.
 
 #### Test tasks and known issues
 
@@ -1055,9 +1073,10 @@ yet. Test tasks never go on the report page; they go in Discord.
 
 - **#test-tasks, Main test tasks.** An ordinary check any playtester can do
   with the normal game. If a playtester could do it once it is on main, it
-  is Main, even when a dev command would make it quicker. Written only once
-  a main Ship carries the fix, as a comment on the issue, and the issue is
-  closed with it; the bot posts it the moment the issue closes. The shape:
+  is Main, even when a dev command would make it quicker. Its comment is
+  written only once a main Ship carries the fix, and the issue is closed
+  with it: the main Ship does both from the pull request's test task
+  (above), and the bot posts it the moment the issue closes. The shape:
 
       Test task: <what to try, 45 characters at most>
       Server: Main
@@ -1072,10 +1091,16 @@ yet. Test tasks never go on the report page; they go in Discord.
 - **#dev-test-tasks, Dev test tasks.** A check only a dev can do: it needs
   staff or dev commands, the dev server, logs, the box, or a setup testers
   cannot make (a planted record or a hand-edited file counts; owning two
-  screens does not). Staff only. Written as soon as a build carries
-  the work, open issue or closed, and posted at once. It stays up while
-  the fix is on main and after the issue closes, until a newer Main test
-  task replaces it or staff close the post. The shape:
+  screens does not). A fix that has reached dev and not yet main is not
+  one: checking that a fix works is its Main test task, written when it
+  reaches main, however soon that is (#613: Patrick found one in
+  #dev-test-tasks, 22 Oct). Staff only. Written as soon as a build carries
+  the work, open issue or closed, and posted at once, whole, with links to
+  the issue, its pull requests and commits. It does not hold the issue
+  open: the main Ship that carries the fix closes it all the same. It stays
+  up while the fix is on main and after the issue closes, beside the Main
+  one, until its comment is taken back, a newer Dev one replaces it, or
+  staff close the post. The shape:
 
       Test task: <what to check, 45 characters at most>
       Server: Dev
