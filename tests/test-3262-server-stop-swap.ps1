@@ -105,14 +105,21 @@ for ($n = 0; $n -lt $Runs; $n++) {
   Copy-Item -LiteralPath $Writer -Destination (Join-Path $root 'server-log.js')
   $log = Join-Path $root 'server.log'
   $c = Start-Process -FilePath (Join-Path ([Environment]::SystemDirectory) 'cmd.exe') -ArgumentList ($fmt -f $Node, (Join-Path $root 'server-log.js'), $log) -WorkingDirectory $root -WindowStyle Hidden -PassThru
-  $until = (Get-Date).AddSeconds(30)
+  $until = (Get-Date).AddSeconds(15)
   $ready = $false
   while (-not $ready -and (Get-Date) -lt $until) {
-    try { $ready = [IO.File]::ReadAllText($log).Contains('stand-in ready') } catch { }
+    # server-log.js has it open for writing, so it is read sharing that.
+    try {
+      $fs = New-Object IO.FileStream($log, 'Open', 'Read', 'ReadWrite, Delete')
+      try { $ready = (New-Object IO.StreamReader($fs)).ReadToEnd().Contains('stand-in ready') } finally { $fs.Close() }
+    } catch { }
     if (-not $ready) { [Threading.Thread]::Sleep(100) }
   }
   $found = @(ServerProcesses $root | ForEach-Object { $_.Name })
   [Console]::Out.WriteLine('RUN ' + $n + ' READY ' + $ready + ' FOUND ' + ($found -join ','))
+  if (-not $ready) {
+    [Console]::Out.WriteLine('RUN ' + $n + ' cmd.exe ' + $(if ($c.HasExited) { 'exited ' + $c.ExitCode } else { 'running' }) + '; ' + $log + ' ' + $(if (Test-Path -LiteralPath $log) { 'is there' } else { 'is not there' }))
+  }
   StopServer $root
   if (Move-ThornswoodPath $root ($root + '-moved')) { [Console]::Out.WriteLine('RUN ' + $n + ' MOVED') }
   else { [Console]::Out.WriteLine('RUN ' + $n + ' REFUSED ' + $ThornswoodMoveWhy) }
@@ -122,8 +129,10 @@ for ($n = 0; $n -lt $Runs; $n++) {
     $childPath = Join-Path $work 'child.ps1'
     [IO.File]::WriteAllText($childPath, $child)
     Write-Host ('runs in ' + $ps51 + ', under ' + $work)
-    $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -File $childPath -Lib $libPath -Work $work -Node $node.Source -Writer $writerPath -Runs $Runs 2>&1 | ForEach-Object { "$_" })
-    foreach ($l in $out) { Write-Host ('    ' + $l) }
+    # Said as it goes, so a run that hangs shows how far it got.
+    $out = New-Object System.Collections.Generic.List[string]
+    & $ps51 -NoProfile -ExecutionPolicy Bypass -File $childPath -Lib $libPath -Work $work -Node $node.Source -Writer $writerPath -Runs $Runs 2>&1 | ForEach-Object { $l = "$_"; Write-Host ('    ' + $l); $out.Add($l) }
+    $out = @($out)
     $ready = @($out | Where-Object { $_ -match '^RUN \d+ READY True FOUND ' })
     $three = @($ready | Where-Object { $_ -match 'FOUND (cmd\.exe|node\.exe),(cmd\.exe|node\.exe),(cmd\.exe|node\.exe)$' -and $_ -match 'cmd\.exe' -and ([regex]::Matches($_, 'node\.exe')).Count -eq 2 })
     Yes ('the stand-in came up under cmd.exe and server-log.js every time: ' + $ready.Count + ' of ' + $Runs) ($ready.Count -eq $Runs)

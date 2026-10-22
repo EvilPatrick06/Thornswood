@@ -124,7 +124,7 @@ function Get-ThornswoodPathHolders([string]$Path) {
   $handles = Get-ThornswoodPathHandles $Path
   $said = 'open itself in: ' + $snap.Said + '; handles: ' + $handles
   $ids = @()
-  foreach ($m in [regex]::Matches($snap.Said + ' ' + $handles, '(?:pid |into |, |among them )(\d+) ')) { $ids += [int]$m.Groups[1].Value }
+  foreach ($m in [regex]::Matches($snap.Said + ' ' + $handles, '(?:pid |into |, |among them )(\d+) (?!processes)')) { $ids += [int]$m.Groups[1].Value }
   $now = Get-Date
   $recent = @()
   foreach ($k in @($snap.Procs.Keys)) {
