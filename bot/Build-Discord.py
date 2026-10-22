@@ -1391,6 +1391,14 @@ def category_mode(catname):
     return CATEGORY_MODE.get(catname, 'open'), None
 
 
+def rank(r):
+    """How high a role sits, the way Discord sorts them: by position, and
+       where two share a position the older one (the lower id) above
+       (#3317). Positions need not be unique: Discord made the 16 Officer
+       roles of 22 Oct all at position 1 and moved nothing up for them."""
+    return (r.position, -r.id)
+
+
 def role_order(guild, out, new=()):
     """Every role under the bot's own, top first, the way the plan wants the
        list (#3317), or None when it already is.
@@ -1398,20 +1406,22 @@ def role_order(guild, out, new=()):
        The plan's roles go in the plan's order into the places the plan's
        roles hold between them, so a role the plan does not name keeps its
        place among them; one made this run (new) first goes straight under
-       the plan role above it. Roles Discord or Patreon manage (Server
-       Booster, Patreon) are placed like the rest: the audit said Patreon
-       sat below Playtester after every build while they were left out.
-       The bot's own role is never in it."""
+       the plan role above it. Roles something else manages (Server Booster,
+       and Patreon and Jockie Music, which their own bots manage) are in the
+       list like the rest: the audit said Patreon sat below Playtester after
+       every build while they were left out, and a role left out keeps a
+       number that the numbers around it can collide with. The bot's own
+       highest role is never in it."""
     me = getattr(guild, 'me', None)
-    top = getattr(getattr(me, 'top_role', None), 'position', None)
+    top = getattr(me, 'top_role', None)
     def below_bot(r):
         return (r is not guild.default_role and r.name != '@everyone'
-                and (top is None or r.position < top) and not _bots_role(r))
+                and (top is None or (r is not top and rank(r) < rank(top))))
     pool = dict((r.id, r) for r in guild.roles if below_bot(r))
     for r in out.values():
         if below_bot(r):
             pool.setdefault(r.id, r)
-    have = sorted(pool.values(), key=lambda r: (r.position, r.id), reverse=True)
+    have = sorted(pool.values(), key=rank, reverse=True)
     plan = [out[n] for n, _, _, _ in ROLES if n in out and out[n].id in pool]
     made = [r for r in plan if r.name in new]
     order = [r for r in have if r not in made]
@@ -1426,6 +1436,36 @@ def role_order(guild, out, new=()):
     if [r.id for r in order] == [r.id for r in have]:
         return None
     return order
+
+
+def role_positions(order, room):
+    """{role: position} that puts order (top first) in that order using only
+       positions 1 to room, or None when it cannot be done (#3317).
+
+       Discord turns down a request that asks for a position at or above the
+       bot's own role, and the build of 22 Oct asked for 1 to 123 under a
+       bot at 110: the 16 Officer roles were made at position 1 beside
+       Updates Pings, so 125 roles sat in 109 numbers. A role may share its
+       position with the one under it when it is the older of the two (the
+       lower id), since Discord sorts a shared position by id, older above
+       (rank). Every role takes a position of its own while there is room
+       for the rest above it, so a server with room gets 1 to N, and roles
+       share only as many positions as the room makes them."""
+    up = list(reversed(order))
+    n = len(up)
+    share = [False] + [up[i].id < up[i - 1].id for i in range(1, n)]
+    need = [0] * (n + 1)
+    for i in range(n - 1, -1, -1):
+        need[i] = need[i + 1] + (0 if share[i] else 1)
+    if need[0] > room:
+        return None
+    at = {}
+    p = 0
+    for i, r in enumerate(up):
+        if not (share[i] and p + 1 + need[i + 1] > room):
+            p += 1
+        at[r] = p
+    return at
 
 
 def _manager(r):
@@ -1456,25 +1496,28 @@ def role_numbers(guild):
     top = getattr(me, 'top_role', None)
     pos = getattr(top, 'position', None)
     out = ['the bot\'s highest role is %s, at position %s' % (getattr(top, 'name', '?'), pos)]
-    roles = sorted(guild.roles, key=lambda r: (r.position, r.id), reverse=True)
+    roles = sorted(guild.roles, key=rank, reverse=True)
     for r in roles:
         out.append('%4d  %s  (%s%s)' % (r.position, r.name, _manager(r),
-                                        ', above the bot' if pos is not None and r.position >= pos
-                                        and r is not top else ''))
+                                        ', above the bot' if top is not None and rank(r) > rank(top)
+                                        else ''))
     seen = {}
     for r in roles:
         seen.setdefault(r.position, []).append(r.name)
     for p, names in sorted(seen.items(), reverse=True):
         if len(names) > 1:
             out.append('position %d is held by %d roles: %s' % (p, len(names), ', '.join(names)))
-    below = [r for r in roles if pos is not None and r.position < pos and r is not guild.default_role]
-    out.append('%d roles sit under the bot\'s highest role, %d of them a bot\'s own'
-               % (len(below), sum(1 for r in below if _bots_role(r))))
+    below = [r for r in roles if top is not None and r is not top and rank(r) < rank(top)
+             and r is not guild.default_role]
+    out.append('%d roles sit under the bot\'s highest role, %d of them another bot\'s, '
+               'in the %s positions under it'
+               % (len(below), sum(1 for r in below if _bots_role(r)),
+                  max(0, pos - 1) if pos is not None else '?'))
     return out
 
 
 def _bots_role(r):
-    """Discord's own role for a bot, this one or another: never moved."""
+    """Discord's own role for a bot, this one or another."""
     try:
         return bool(r.is_bot_managed())
     except AttributeError:
@@ -1585,21 +1628,48 @@ async def ensure_roles(guild):
     # worked out by discord.py from the cache of before the last, which the
     # gateway had not yet caught up with: the live build of 22 Oct left seven
     # roles out of place. role_order puts a role made this run under the plan
-    # role above it as well.
+    # role above it as well. role_positions numbers them under the bot's own
+    # role: the 22 Oct run asked for 1 to 123 under a bot at 110 and Discord
+    # turned the whole request down (400 Missing Permissions).
     order = role_order(guild, out, new)
     if order is not None:
         what = 'the %d roles under the bot into the plan\'s order' % len(order)
-        if CHECK:
+        top = getattr(getattr(guild, 'me', None), 'top_role', None)
+        room = (top.position - 1) if top is not None else len(order)
+        at = role_positions(order, room)
+        if at is None:
+            failed.append('the roles were not put in order: %d roles sit under the '
+                          'bot\'s role and they do not fit in the %d positions under it, '
+                          'even sharing them (-Audit lists the numbers)' % (len(order), room))
+        elif CHECK:
             say('would move', what)
         else:
             try:
-                await guild.edit_role_positions(
-                    positions=dict((r, len(order) - i) for i, r in enumerate(order)),
-                    reason='Thornswood setup, the order in the plan')
+                got = await guild.edit_role_positions(
+                    positions=at, reason='Thornswood setup, the order in the plan')
                 say('moved', what)
+                wrong = order_after(order, got)
+                if wrong:
+                    failed.append('Discord took the role order but put %s' % wrong)
             except discord.HTTPException as e:
                 failed.append('the roles were not put in order (%s)' % refused(e))
     return out
+
+
+def order_after(order, roles):
+    """What Discord's answer to the order request has out of place, in words,
+       or '' when it has every role of order where order put it. Discord
+       answers with every role and its new position; this is what says the
+       shared positions sorted the way rank says (#3317)."""
+    if not roles:
+        return ''
+    ids = dict((r.id, i) for i, r in enumerate(order))
+    names = dict((r.id, r.name) for r in order)
+    live = [r for r in sorted(roles, key=rank, reverse=True) if r.id in ids]
+    for a, b in zip(live, live[1:]):
+        if ids[a.id] > ids[b.id]:
+            return '%s above %s' % (names[a.id], names[b.id])
+    return ''
 
 
 def with_members(live, want):
@@ -2230,7 +2300,7 @@ def order_slips(roles_by_name):
        where they are."""
     present = [roles_by_name[n] for n, _, _, _ in ROLES if n in roles_by_name]
     return [(a.name, b.name) for a, b in zip(present, present[1:])
-            if a.position < b.position]
+            if rank(a) < rank(b)]
 
 
 def _who(m):
@@ -2706,11 +2776,21 @@ async def audit(guild):
     for w in role_numbers(guild):
         line(w)
     order = role_order(guild, roles)
+    top = getattr(getattr(guild, 'me', None), 'top_role', None)
     if order is None:
         line('a build would ask for no role to move')
+    elif top is None:
+        line('a build would ask for %d roles, but the bot\'s own role is not known' % len(order))
     else:
-        line('a build would ask for positions 1 to %d, top first: %s'
-             % (len(order), ', '.join(r.name for r in order)))
+        at = role_positions(order, top.position - 1)
+        if at is None:
+            off('the %d roles under the bot do not fit in the %d positions under '
+                'its role, even sharing them' % (len(order), top.position - 1))
+        else:
+            line('a build would ask for positions 1 to %d under the bot\'s %d, '
+                 '%d roles sharing a position, top first: %s'
+                 % (max(at.values()), top.position, len(order) - len(set(at.values())),
+                    ', '.join('%s %d' % (r.name, at[r]) for r in order)))
 
     print('\n  Categories and channels against the plan', flush=True)
     ours = set()
