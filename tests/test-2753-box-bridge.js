@@ -18,7 +18,14 @@
 //      back on standard output, with the token from the environment or from
 //      the file THORNSWOOD_BOX_TOKEN_FILE names, and a wrong token, a named
 //      file that is not there or a proxy that refuses the tunnel exits 1
-//      saying which.
+//      saying which;
+//   4. connect.js against a front that takes the upgrade and never answers,
+//      as something between One and the bridge did on 22 Oct 2026 (#3297):
+//      once the opening is slow it says which stage it is waiting at before
+//      anything can end it, ended by SIGHUP it says the stage, its own
+//      deadline says the stage, and an answer that is not the WebSocket
+//      carries its cf-ray.
+//      The bridge's open line says how long sshd took.
 //
 // Read only. Nothing outside the temp folder is touched, and nothing leaves
 // loopback.
@@ -192,6 +199,7 @@ function runClient(env, input, waitMs) {
     yes('an upgrade with the token but no WebSocket key is a 400', /^HTTP\/1\.1 400/.test(await upgrade(port, ['Upgrade: websocket', 'Connection: Upgrade', 'Sec-WebSocket-Version: 13', 'Authorization: Bearer ' + TOKEN])));
     yes('with the token it switches protocols', /^HTTP\/1\.1 101/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + TOKEN]))));
     yes('  and the log names whose token opened it', await waitFor(() => /session \d+ opened for cloud \(/.test(log), 3000));
+    yes('  and says how long sshd took to take it', /session \d+ opened for cloud \(\d+ open\), sshd took \d+ ms/.test(log));
     yes('  and names no address and no token', log.indexOf(TOKEN) < 0 && log.indexOf(digest(TOKEN)) < 0 && !/127\.0\.0\.1:\d+\)/.test(log.split('\n').filter((l) => /session|refused/.test(l)).join('\n')));
     yes('a second holder\'s token switches protocols too', /^HTTP\/1\.1 101/.test(await upgrade(port, WS_HEADERS.concat(['Authorization: Bearer ' + OTHER]))));
     yes('  and is logged as theirs', await waitFor(() => /session \d+ opened for djinn \(/.test(log), 3000));
@@ -302,6 +310,58 @@ function runClient(env, input, waitMs) {
       yes('  and it stops when its standard input closes', ended);
     } finally {
       if (lis.exitCode === null) lis.kill();
+    }
+
+    // ---- 4. which hop (#3297) -----------------------------------------------
+    // A front that takes the connection and the upgrade and never answers,
+    // and one that answers with Cloudflare's own 502 and its ray id.
+    const silent = net.createServer((s) => { s.on('error', () => {}); s.resume(); });
+    await new Promise((r) => silent.listen(0, '127.0.0.1', r));
+    const cf502 = net.createServer((s) => {
+      s.on('error', () => {});
+      s.once('data', () => s.end('HTTP/1.1 502 Bad Gateway\r\nServer: cloudflare\r\nCF-RAY: 8d1f2e3a4b5c6d7e-DFW\r\nContent-Length: 0\r\n\r\n'));
+    });
+    await new Promise((r) => cf502.listen(0, '127.0.0.1', r));
+    try {
+      const silentUrl = 'ws://localhost:' + silent.address().port + '/box/';
+      // Ended the way Windows' ssh ends it, with nothing it can catch, so
+      // what it said before then is all there is.
+      const env = { THORNSWOOD_BOX_URL: silentUrl, THORNSWOOD_BOX_TOKEN: TOKEN, HTTPS_PROXY: proxyUrl, THORNSWOOD_BOX_SLOW_MS: '300' };
+      const e = Object.assign({}, process.env, env);
+      delete e.https_proxy;
+      e.HTTPS_PROXY = proxyUrl;
+      const c = spawn(process.execPath, [path.join(DIR, 'connect.js')], { env: e });
+      let err = '';
+      c.stderr.on('data', (d) => { err += d; });
+      c.stdin.on('error', () => {});
+      const said = await waitFor(() => /still opening/.test(err), 3000);
+      c.kill('SIGKILL');
+      yes('a slow opening says so before anything ends it', said);
+      yes('  naming the upgrade as the stage it waits at', /box bridge: still opening ws:\/\/localhost:\d+\/box\/ after 0\.\d s, waiting 0\.\d s for the answer to the upgrade; before that /.test(err));
+      yes('  and how long the proxy\'s tunnel took before it', /the proxy's tunnel to localhost:\d+ \d+ ms/.test(err));
+
+      if (process.platform !== 'win32') {
+        const h = spawn(process.execPath, [path.join(DIR, 'connect.js')], { env: Object.assign({}, e, { THORNSWOOD_BOX_SLOW_MS: '60000' }) });
+        let herr = '';
+        h.stderr.on('data', (d) => { herr += d; });
+        h.stdin.on('error', () => {});
+        await new Promise((r) => setTimeout(r, 400));
+        h.kill('SIGHUP');
+        yes('ended by SIGHUP before it opened, it exits 1', await waitFor(() => h.exitCode !== null, 3000) && h.exitCode === 1);
+        yes('  saying ssh ended it and at which stage', /box bridge: ssh ended this \(SIGHUP\) before the WebSocket to ws:\/\/localhost:\d+\/box\/ opened, waiting \d+\.\d s for the answer to the upgrade/.test(herr));
+      }
+
+      r = await runClient(Object.assign({}, env, { THORNSWOOD_BOX_SLOW_MS: '60000', THORNSWOOD_BOX_OPEN_MS: '500' }), Buffer.alloc(0));
+      yes('its own deadline says the stage too', r.code === 1 && /box bridge: no WebSocket to ws:\/\/localhost:\d+\/box\/ after 500 ms, waiting 0\.\d s for the answer to the upgrade/.test(r.err));
+
+      r = await runClient({ THORNSWOOD_BOX_URL: 'ws://localhost:' + cf502.address().port + '/box/', THORNSWOOD_BOX_TOKEN: TOKEN }, Buffer.alloc(0));
+      yes('an answer that is not the WebSocket names its status and cf-ray', r.code === 1 && /box bridge: the bridge did not open a WebSocket \(HTTP\/1\.1 502 Bad Gateway; cf-ray 8d1f2e3a4b5c6d7e-DFW\)/.test(r.err));
+
+      r = await runClient({ THORNSWOOD_BOX_URL: url, THORNSWOOD_BOX_TOKEN: TOKEN, HTTPS_PROXY: proxyUrl }, small);
+      yes('a normal opening says nothing on standard error', r.code === 0 && r.err === '');
+    } finally {
+      silent.close();
+      cf502.close();
     }
 
     // Taking one holder off refuses them at once and leaves the other in.
