@@ -25,6 +25,11 @@
                                     running bot already holds, and asks for
                                     nothing. Goes with -Check, -Audit, -Posts,
                                     -Prune and -Only
+    .\Setup-Discord.ps1 -Give 'Co-Owner=WiccanDjinn','Lead Dev=Patrick Thornwood'
+                                   gives each staff rank to the one member
+                                    named exactly, and does nothing else. Never
+                                    a second rank of one category, never to a
+                                    seat holder; with -Check only says it (#3317)
     .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
                                    touches only those categories and channels
                                     of the plan: no role made or moved, no
@@ -101,7 +106,11 @@ param(
   # Only these categories and channels of the plan, and nothing else in the
   # Discord (#2519). Build-Discord.py's ONLY says what that leaves out, and
   # refuses a name its plan does not have before Discord is asked anything.
-  [string[]]$Only = @()
+  [string[]]$Only = @(),
+  # Staff ranks to give, each 'rank=member' (#3317). Build-Discord.py's GIVE
+  # says which ranks and how a member is matched. Nothing else in the run
+  # happens.
+  [string[]]$Give = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -109,6 +118,12 @@ $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $app = Join-Path $Here '..\..\bot\Build-Discord.py'
 if (-not (Test-Path -LiteralPath $app)) { throw "not found: $app" }
+# One 'rank=member' each. A quote, a semicolon or anything else that could
+# leave the line it is written into stops here, before anything is sent.
+$gives = @($Give | ForEach-Object { "$_".Trim() } | Where-Object { $_ })
+foreach ($g in $gives) {
+  if ($g -notmatch '^[A-Za-z -]+=[\p{L}\p{N} _.-]+$') { throw ("-Give takes 'staff rank=member', not: " + $g) }
+}
 
 # The one switch (#428): the site's "open", read off its public page so the
 # posts say the same as the site. Anything that goes wrong is the alpha
@@ -160,6 +175,9 @@ if ($OnBox) {
     $names = @($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     foreach ($n in $names) { if ($n -notmatch '^[A-Za-z0-9 _-]+$') { throw ('-Only takes category and channel names from the plan, not: ' + $n) } }
     $flags += "`$env:DISCORD_ONLY = '" + ($names -join ',') + "'`r`n"
+  }
+  if ($gives.Count) {
+    $flags += "`$env:DISCORD_GIVE = '" + ($gives -join ';') + "'`r`n"
   }
   # What runs on the box. The token is read there and set for the one Python
   # process; the folder goes when the build ends, however it ends.
@@ -254,6 +272,7 @@ if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
 if ($Audit) { $env:DISCORD_AUDIT = '1' }
 if ($Only.Count) { $env:DISCORD_ONLY = (@($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ',') }
+if ($gives.Count) { $env:DISCORD_GIVE = ($gives -join ';') }
 $tok = $null
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
 
@@ -267,10 +286,12 @@ try {
   $env:DISCORD_CHECK = $null
   $env:DISCORD_AUDIT = $null
   $env:DISCORD_ONLY = $null
+  $env:DISCORD_GIVE = $null
   $env:THORNSWOOD_OPEN = $null
 }
-# An audit reads and builds nothing, so there is no webhook to hand on.
-if ($Audit) { exit $code }
+# An audit reads and builds nothing, and a give only gives, so there is no
+# webhook to hand on.
+if ($Audit -or $gives.Count) { exit $code }
 
 # It used to say the webhook was ready whatever happened, including on the run
 # that stopped on a missing intent and built nothing at all. A script that

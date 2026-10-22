@@ -24,6 +24,7 @@ import importlib.util
 import io
 import os
 import sys
+import types
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
@@ -113,6 +114,14 @@ class Guild(object):
 
     async def edit(self, **kw):
         WRITES.append(('guild edit',))
+
+    onboarding_enabled = False
+
+    async def onboarding(self):
+        return types.SimpleNamespace(enabled=self.onboarding_enabled)
+
+    async def edit_onboarding(self, **kw):
+        WRITES.append(('edit_onboarding',))
 
 
 def build():

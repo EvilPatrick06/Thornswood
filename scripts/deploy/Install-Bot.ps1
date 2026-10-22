@@ -75,8 +75,11 @@ param(
   # Where join cards go. The channel called general was renamed, and the bot
   # said so in its log for a day before anybody read it.
   [string]$JoinChannel   = 'welcome-travelers',
-  # Pulled into every ticket thread.
-  [string]$StaffRoles    = 'Owner,Gamemaster,Dev,Loremaster,Moderator',
+  # Pulled into every ticket thread: the council and the ranks that answer
+  # tickets, the same names as bot.py's STAFF_ROLES default and Build-Discord.py's
+  # TICKET_STAFF (#3317). A run that wrote the old list left the council out of
+  # every ticket; bot\test-3317-give.py holds the three together.
+  [string]$StaffRoles    = 'Owner,Co-Owner,Lead Dev,Lead Gamemaster,Lead Loremaster,Lead Moderator,Lead Content Creator,Lead Support,Gamemaster,Dev,Loremaster,Moderator',
   # Pulled into applications to join them and nothing else. Content Creator is
   # social media rather than staff, so it has no business reading a report
   # about somebody or another person's playtest application.
