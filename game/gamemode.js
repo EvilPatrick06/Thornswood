@@ -73479,7 +73479,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   const invoke=Reflect.apply;
   const property = 'thornswoodNpcActivity';
   api.makeProperty(property, {isVisibleByOwner:false,isVisibleByNeighbors:false,updateOwner:'',updateNeighbor:''});
-  const handles = new Set(), actors = new Map(), order = [], preparing = [], owned = new Set(), unavailable = new Set();
+  const handles = new Set(), actors = new Map(), preparing = [], owned = new Set(), unavailable = new Set();
   const reactions = new Map(), knownFactions = new Set();
   const navigation = createNpcNavigation({
     getNavmeshRecords:(...args)=>nativeCall('getNavmeshRecords',...args),
@@ -73492,16 +73492,44 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   // everybody's sight, or for an ambush once somebody comes near.
   const held = new Map(), AMBUSH_RANGE = 1024, AMBUSH_STEP = 256;
   // An NPC nobody can see that only wanders is stepped once in this long
-  // (a.due, the first time at once), the longest step update() takes (#3181, Patrick's C on 22 Oct 2026: NPCs
+  // (the first time at once), the longest step update() takes (#3181, Patrick's C on 22 Oct 2026: NPCs
   // nobody can see are updated less often, never paused). Before, every pass
   // over the cast stepped each of them (up to 64 steps every 20 ms): with
   // nobody on, dev's 4,821 reported about 57,000 moving steps a minute on
   // 22 Oct, and that runtime was nearly all of the 0.187 of a core dev's
   // JavaScript thread was busy on 21 Oct.
-  // A fight or a flight keeps its pace, and an NPC somebody can see is
-  // stepped by nearTick as before.
-  const UNSEEN_EVERY = 4000;
-  let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,backgroundCursor=0,nearCursor=0;
+  // A fight or a flight nobody can see is stepped every BUSY_EVERY, as often
+  // as nearTick steps one somebody can see. An NPC somebody can see is
+  // stepped by nearTick, and looked at here again NEAR_RECHECK later.
+  //
+  // Each actor waits its turn in `due`, a heap ordered by when it is due, and
+  // backgroundTick takes only the entries that are due. Until the second
+  // dev profile on 22 Oct, a pass walked the whole cast in order and skipped
+  // whoever was not due, so with 4,820 NPCs most of backgroundTick's 1,984
+  // ms in 120 s went on looking at NPCs it then passed over.
+  const UNSEEN_EVERY = 4000, BUSY_EVERY = 100, NEAR_RECHECK = 1000;
+  const due = [];
+  function queue(a,at) {
+    let i=due.length;due.push(null);
+    while(i>0) { const p=(i-1)>>1; if(due[p].at<=at) break; due[i]=due[p];i=p; }
+    due[i]={a,at};
+  }
+  function unqueue() {
+    const top=due[0],last=due.pop();
+    if(due.length) {
+      let i=0;
+      for(;;) {
+        const l=2*i+1,r=l+1;
+        let c=l<due.length && due[l].at<last.at ? l : -1;
+        if(r<due.length && due[r].at<(c<0 ? last.at : due[l].at)) c=r;
+        if(c<0) break;
+        due[i]=due[c];i=c;
+      }
+      due[i]=last;
+    }
+    return top;
+  }
+  let stopped=false,running=!options || options.suspended!==true,cursor=0,total=0,loaded=0,nearCursor=0;
   const ready=[];
   let humans=new Map(),near=new Set(),nearOrder=[],moved=0,attacks=0,background=0,failed=0,lastReport=now();
   function schedule(fn, delay) {
@@ -73639,7 +73667,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       lift:near.pos[2]-npcSurface(near.node,near.pos),bank,approach:near.pos.slice(),
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
       mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
-    actors.set(id,a);order.push(id);indexActor(a);
+    actors.set(id,a);queue(a,now());indexActor(a);
     nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
   // Runs right after humanTick has read where everybody is.
@@ -73707,7 +73735,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         const a={id,cell:state.cellOrWorld,pos:state.pos.slice(),state,node,lift,bank,
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
           mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
-        actors.set(id,a);order.push(id);indexActor(a);
+        actors.set(id,a);queue(a,now());indexActor(a);
         nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
     }
@@ -74001,16 +74029,19 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     }
   }
   function backgroundTick() {
-    const begin=now();let scanned=0,moves=0;
-    while(order.length && scanned<256 && moves<64 && now()-begin<4) {
-      const id=order[backgroundCursor++%order.length];scanned++;
-      if(!actors.has(id) || near.has(id)) continue;
+    const begin=now();let taken=0,moves=0;
+    while(due.length && taken<256 && moves<64) {
+      const at=now();
+      if(at-begin>=4 || due[0].at>at) break;
+      const {a}=unqueue(),id=a.id;taken++;
+      // Let go by its last step (step's catch): its turn goes with it.
+      if(actors.get(id)!==a) continue;
       // A newly connected observer might precede the next spatial refresh.
-      const a=actors.get(id);
-      if(a.mode==='ambient' && a.due>now()) continue;
-      if(Array.from(humans.values()).some(s=>s.cellOrWorld===a.cell && distance(s.pos,a.pos)<=4096)) continue;
-      step(id);moves++;background++;a.due=now()+UNSEEN_EVERY;
-      if(scanned>=order.length) break;
+      if(near.has(id) || Array.from(humans.values()).some(s=>s.cellOrWorld===a.cell && distance(s.pos,a.pos)<=4096)) {
+        queue(a,at+NEAR_RECHECK);continue;
+      }
+      step(id);moves++;background++;
+      if(actors.get(id)===a) queue(a,now()+(a.mode==='ambient' ? UNSEEN_EVERY : BUSY_EVERY));
     }
     if(now()-lastReport>=60000) {
       report('Shared NPC activity: '+owned.size+' server owned, '+actors.size+' active, '+loaded+' loaded, '+failed+' stationary, '+(held.size+searching.length)+' waiting off walkable ground; '+
@@ -74033,7 +74064,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
   if(population) schedule(discover,5000);
   /*
     LETS GO OF AN ACTOR THAT IS ABOUT TO BE DESTROYED (#2623). Nothing about
-    it may stay here: not its activity, its place in the walk order or on the
+    it may stay here: not its activity, its turn in `due` or its place on the
     map tiles, its policy, or the excluded and enrolled marks, so the runtime
     never steps or reports on an actor that is gone.
   */
@@ -74046,7 +74077,12 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
       const entry=list[i],entryId=typeof entry==='number' ? entry : entry && entry.id;
       if(entryId===id) list.splice(i,1);
     }};
-    without(order);without(nearOrder);without(preparing);without(searching);
+    // The rest of the heap, sorted by when each is due, is a heap again.
+    if(due.some(e=>e.a.id===id)) {
+      const rest=due.filter(e=>e.a.id!==id).sort((x,y)=>x.at-y.at);
+      due.length=0;for(const e of rest) due.push(e);
+    }
+    without(nearOrder);without(preparing);without(searching);
     for(const bank of banks.values()) if(bank && Array.isArray(bank.waiting)) without(bank.waiting);
     failed=unavailable.size;
   }
