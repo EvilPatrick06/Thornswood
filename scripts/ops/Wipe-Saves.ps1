@@ -59,10 +59,6 @@
                              The pieces are references in the world, so the
                              register goes aside with it, or a fresh world
                              would stand last world's furniture again.
-    data\property.json and data\farm-claims.json, where both were until
-                             25 September (issue #541: data is served to
-                             anybody), so a wipe on a server still running
-                             the older gamemode takes them too.
 
   The first two were here from the start. property.json and farm-claims.json
   were added on 21 September: without them a fresh world would have come up
@@ -178,8 +174,7 @@ $Moves = @('world', 'private\characters.json', 'private\property.json', 'private
            'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
            'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json',
            'private\dungeon-rewards-ledger.json', 'private\dungeon-rewards-ledger.initialized',
-           'private\deleted-characters.json',
-           'data\property.json', 'data\farm-claims.json')
+           'private\deleted-characters.json')
 # The release parts (game\gamemode.js PARTS) whose registers are all in
 # $Moves, so a fresh start has nothing of anybody's in them: the new release
 # list marks them done and only 'merchants', the ledger a wipe keeps, waits.
