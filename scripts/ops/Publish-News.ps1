@@ -51,8 +51,8 @@ $ErrorActionPreference = 'Stop'   # before any file loads, so one that is missin
 # ConvertFrom-Json gives back an object with only the properties the file
 # actually had. Reaching for one that is not there throws under strict mode,
 # which is what quietly stopped the whole hand written history from ever
-# reaching the site: news-public.json has date, title and details, and no
-# body, so the first entry killed the loop and the catch swallowed it.
+# reaching the site: a hand-written entry with date, title and details and no
+# body killed the loop, and the catch swallowed it.
 # These two read a property that may simply not exist.
 function Prop($obj, $name) {
   if ($null -eq $obj) { return '' }
@@ -216,59 +216,11 @@ foreach ($n in $all) {
 
 # --------------------------------------------------------------- the past --
 #
-# Everything before the cutoff was written as a changelog for one person and
-# reads like one, so filtering it was never going to work: the words needed
-# changing, not choosing between. news-public.json is that history rewritten by
-# hand, and it goes underneath whatever has shipped since.
-$oldFile = Join-Path $Here 'news-public.json'
-if (Test-Path -LiteralPath $oldFile) {
-  try {
-    # Same byte order mark trap as above. This is the likeliest reason this file
-    # has been quietly skipped on every run: it is here, it looks fine in an
-    # editor, and ConvertFrom-Json refuses the first character.
-    $raw = (Get-Content $oldFile -Raw) -replace '^\uFEFF', ''
-    $curated = $raw | ConvertFrom-Json
-    $added = 0
-    $swapped = 0
-    foreach ($c in @($curated)) {
-      $ct = (Prop $c 'title')
-      $entry = [ordered]@{
-        date    = (Prop $c 'date')
-        title   = $ct
-        body    = (Prop $c 'body')
-        details = @(PropList $c 'details')
-      }
-      $i = SameIndex $news $ct
-      if ($i -ge 0) {
-        # Ship writes a release as a title and whatever it can work out. The
-        # copy in here was written for people to read, so when they are the
-        # same release the written one wins and takes its place in the order.
-        if (@($entry.details).Count -gt @(@($news)[$i].details).Count) {
-          $news[$i] = $entry
-          $swapped++
-        }
-        continue
-      }
-      $news += $entry
-      $added++
-    }
-    if (-not $Quiet) {
-      Write-Host ("  news-public.json added $added older entr" + $(if ($added -eq 1) { 'y' } else { 'ies' })) -ForegroundColor DarkGray
-      if ($swapped) {
-        Write-Host ("  and replaced $swapped entr" + $(if ($swapped -eq 1) { 'y' } else { 'ies' }) + " that shipped with only a title") -ForegroundColor DarkGray
-      }
-    }
-  } catch {
-    # Saying "skipping it" and nothing else meant this went unnoticed for weeks.
-    Write-Host ''
-    Write-Host "  news-public.json is there but could not be read:" -ForegroundColor Red
-    Write-Host ("    " + $_.Exception.Message) -ForegroundColor Red
-    Write-Host "  The hand written history is NOT on the site. Fix the file and run this again." -ForegroundColor Yellow
-    Write-Host ''
-  }
-} else {
-  Write-Host "  no news-public.json next to this script, so no older history is published." -ForegroundColor DarkGray
-}
+# news-public.json, the history before the cutoff rewritten by hand, went
+# under whatever had shipped since on every run. Patrick cleared every note on
+# 22 Oct 2026 to start clean under the rules written since
+# (Clear-News.ps1), and it was deleted with that, so the page is the feed's
+# notes and nothing else.
 
 # The collection address rides along because the downloads page has to link
 # it and version.json is the only place it is ever set. Hardcoding it on the
