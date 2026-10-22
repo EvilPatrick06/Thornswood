@@ -1,0 +1,104 @@
+# A merged pull request that carries an issue's test task moves that issue to
+# Done (#2796).
+#
+# WHY. Patrick, 19 Oct 2026: Done is "merged and only needs testing". A pull
+# request that finishes an issue says Closes #N, and the board's own "Pull
+# request merged" workflow moves the card. A fix people would notice says
+# Refs #N instead, because its issue stays open until the fix is on main
+# (Developer-Guide.md, the board), and nothing moved its card: the board
+# review of 21 Oct (#3192) found Refs fixes sitting in In Progress for days
+# after they merged, and the weekly review of 19 Oct found 72 issues closed
+# with no Test task at all. Refs alone cannot say done, because it is also
+# how a pull request names work it only touches. So the pull request says it:
+#
+#     Test task for #123: Forge lists only what you can make
+#     Server: Main
+#
+#     1. ...
+#
+# A line "Test task for #N: <title>" in the pull request's body, with the
+# steps under it, marks it as the fix for #N. The block runs to the next such
+# line, a heading, a --- rule, a line that starts with an emoji (the
+# "Generated with" footer) or the end. Patrick approved this on the board
+# review page, 21 Oct.
+#
+# WHAT IT DOES. On each push to main, for every commit in it, it asks GitHub
+# which merged pull request the commit came from, and reads its body. For each
+# "Test task for #N" naming an open issue of this repository: it puts the
+# board: Done label on the issue with the board token, so board-status.yml
+# moves the card (a label put on with the run's own token starts no other
+# workflow, so that one would never run), and it writes a comment on the
+# issue with the test task ready to paste when the fix reaches main, in a
+# fenced block so the bot never reads it as a test task to post. A closed
+# issue or a pull request number is said and passed over. It checks out
+# nothing and runs no action.
+#
+# THE TOKEN. BOARD_TOKEN, in the board environment, which only main may use,
+# the same as board-status.yml; GITHUB_TOKEN for the reads and the comment.
+#
+# WHERE IT RUNS. On the VPS runners, like board-status.yml. Every push to main
+# takes a few seconds of one; a push with no test task in its pull request
+# makes one call per commit and stops.
+name: Done on merge
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+  pull-requests: read
+  issues: write
+jobs:
+  done:
+    name: Move test-tasked issues to Done
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    environment: board
+    # A call per commit and two per issue. Past this it is stuck, not slow.
+    timeout-minutes: 3
+    steps:
+      - name: Read the merged pull request and move what it finishes
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}
+          COMMITS: ${{ toJSON(github.event.commits.*.id) }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
+          function Has($o, [string]$n) { return ($null -ne $o -and $o.PSObject.Properties[$n] -and $null -ne $o.$n) }
+          $shas = @($env:COMMITS | ConvertFrom-Json)
+          $prs = @{}
+          foreach ($sha in $shas) {
+            foreach ($p in @(Invoke-RestMethod -Method Get -Uri "$api/commits/$sha/pulls" -Headers $h)) {
+              if ((Has $p 'merged_at') -and [string]$p.base.ref -eq 'main') { $prs[[int]$p.number] = $p }
+            }
+          }
+          if ($prs.Count -eq 0) { Write-Host ("no merged pull request behind {0} commit(s)" -f $shas.Count); return }
+          foreach ($num in @($prs.Keys | Sort-Object)) {
+            $p = $prs[$num]
+            $lines = @((([string]$p.body) -replace "`r`n", "`n") -split "`n")
+            $tasks = New-Object System.Collections.Generic.List[object]
+            $cur = $null
+            foreach ($l in $lines) {
+              $m = [regex]::Match($l, '^\s*Test task for #(\d+)\s*:\s*(.+?)\s*$')
+              if ($m.Success) {
+                $cur = [ordered]@{ issue = [int]$m.Groups[1].Value; title = $m.Groups[2].Value; rest = New-Object System.Collections.Generic.List[string] }
+                $tasks.Add($cur); continue
+              }
+              if ($cur -and ($l -match '^\s*#{1,6}\s' -or $l -match '^\s*---\s*$' -or $l -match '^\s*[\uD800-\uDBFF]')) { $cur = $null; continue }
+              if ($cur) { $cur.rest.Add($l) }
+            }
+            if ($tasks.Count -eq 0) { Write-Host ("#{0}: no test task in the body, nothing to move" -f $num); continue }
+            if (-not $env:BOARD_TOKEN) { throw 'BOARD_TOKEN is not set in the board environment, so no card can be moved (#2863 says how to make it)' }
+            foreach ($t in $tasks) {
+              $i = Invoke-RestMethod -Method Get -Uri ("$api/issues/" + $t.issue) -Headers $h
+              if (Has $i 'pull_request') { Write-Host ("#{0} names #{1}, which is a pull request; passed over" -f $num, $t.issue); continue }
+              if ([string]$i.state -ne 'open') { Write-Host ("#{0} names #{1}, which is closed; passed over" -f $num, $t.issue); continue }
+              $bh = @{ Authorization = "Bearer $env:BOARD_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+              Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
+              $steps = (($t.rest -join "`n").Trim())
+              $body = ('Pull request #{0} merged ({1}), so this is in Done and waits for the fix to reach main. When it is on main, close this issue with a comment holding exactly this:' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12)) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
+              Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/comments') -Headers $h -Body (@{ body = $body } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
+              Write-Host ("#{0} finishes #{1}: board: Done put on, test task written on the issue" -f $num, $t.issue)
+            }
+          }

@@ -1,7 +1,12 @@
 ## What changed
 
 <!-- One fix per pull request. Say what a person will notice, not the branch name.
-Then what caused it and how that was measured: the log line, the file, the steps. -->
+Then what caused it and how that was measured: the log line, the file, the steps.
+Closes #N when it finishes an issue nobody would notice. A fix people would notice
+says Refs #N and carries its test task, which moves the issue to Done on merge:
+Test task for #N: <title, at most 45 characters>
+Server: Main
+1. Plain steps, then what should happen. -->
 
 ## Which parts it touches, and what runs after the merge
 

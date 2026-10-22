@@ -732,7 +732,7 @@ Closes #123
 gh pr create --title "Short title" --body $body
 ```
 
-The title says what changed. The body says how you tested it. If the work finishes an issue, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, because its issue is closed with a `Test task:` comment when the fix reaches main ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
+The title says what changed. The body says how you tested it. If the work finishes an issue and nobody would notice it in the game, put `Closes #123` in the body. A fix people would notice says `Refs #123` instead, with its test task under it as `Test task for #123: <title>`, because its issue is closed with a `Test task:` comment when the fix reaches main ([Everything we need to do goes on the board](#everything-we-need-to-do-goes-on-the-board)). The pull request targets `main`.
 
 Run the test that covers your change before you open the pull request.
 
@@ -1001,7 +1001,9 @@ How to use it:
   the board too.
 - Labels: `area:` is the part of the project, `needs: patrick` marks what
   waits on him, and `anyone can start` marks what needs nobody in
-  particular. Assign yourself when you start one. The stage is Order and
+  particular. `Main Findings` and `Dev Findings` mark what testers found on
+  main and on dev, and the bot keeps #known-issues from them. Assign yourself
+  when you start one. The stage is Order and
   Status: the `wave:` labels and `needs: the live server` were retired on
   22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
