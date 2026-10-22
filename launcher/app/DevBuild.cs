@@ -180,11 +180,9 @@ namespace Thornswood
             {
                 return "Could not remove the dev build: " + ex.Message;
             }
-            // Its Start menu and desktop entries, if it made them.
-            foreach (string lnk in Icons.ShortcutPaths("Thornswood Dev"))
-            {
-                try { if (File.Exists(lnk)) File.Delete(lnk); } catch (Exception ex) { Swallow.Note("DevBuild.Remove, deleting shortcut", ex); }
-            }
+            // Every shortcut that ran it, the pinned taskbar copy among them,
+            // asked by what it runs rather than by name (#3205).
+            try { Icons.Drop(Exe); } catch (Exception ex) { Swallow.Note("DevBuild.Remove, deleting shortcuts", ex); }
             return "Removed the dev build" + (closed > 0 ? " (closed it first)" : "") + ". Your characters on the dev server are still on the server.";
         }
 
@@ -207,7 +205,9 @@ namespace Thornswood
             sb.Append("chcp 65001 >nul\r\n");
             sb.Append("ping 127.0.0.1 -n 4 >nul\r\n");
             sb.Append("rmdir /s /q \"" + root + "\"\r\n");
-            foreach (string lnk in Icons.ShortcutPaths("Thornswood Dev"))
+            // Found now, while this exe is still here to match against: every
+            // shortcut that runs it, the pinned taskbar copy among them (#3205).
+            foreach (string lnk in Icons.ShortcutsTo(Icons.Exe))
                 sb.Append("del /q \"" + lnk + "\" 2>nul\r\n");
             sb.Append("del \"%~f0\"\r\n");
             File.WriteAllText(bat, sb.ToString());

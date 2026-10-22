@@ -394,6 +394,16 @@ yes('the Uninstall button still runs DoUninstall on the main build',
       restore >= 0 && firsts.every(function (i) { return i > restore; }));
   yes('and refuses to go on while a Windows Skyrim folder is still redirected',
       !!raw && /still redirected at this build/.test(raw));
+  // #3205: shortcuts go by what they run, the pinned taskbar copy among them.
+  // Deleting Thornswood.lnk by name left the pin, and the next pin was
+  // "Thornswood (2)".
+  const ds = u.DropShortcuts ? u.DropShortcuts.code : '';
+  yes('Uninstall.DropShortcuts deletes every shortcut that runs this launcher (Icons.Drop), not one name',
+      /Icons\s*\.\s*Drop\s*\(\s*Icons\s*\.\s*Exe\s*\)/.test(ds) && !/"Thornswood\.lnk"/.test(ds));
+  const dev = read('DevBuild.cs') || '';
+  yes('removing the dev build does the same, from the main build and from inside it',
+      /Icons\s*\.\s*Drop\s*\(\s*Exe\s*\)/.test(dev) && /Icons\s*\.\s*ShortcutsTo\s*\(\s*Icons\s*\.\s*Exe\s*\)/.test(dev) &&
+      !/ShortcutPaths/.test(dev));
 })();
 
 // ---- what Windows runs -------------------------------------------------------
