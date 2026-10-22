@@ -161,11 +161,14 @@ yes('A5 a cut Whiterun guard is among them' + (guard ? ' (' + guard.ref + ')' : 
 // ---------------------------------------------------------------- Q
 const qrecs = Object.keys(recs).filter((k) => k.startsWith('QUST:')).map((k) => recs[k]);
 const stopped = manifest.quests.stopped, kept = manifest.quests.kept, modStopped = manifest.quests.modStopped;
-yes('Q1 every quest in the plugin is one the manifest stops (' + qrecs.length + ')',
-    qrecs.length === stopped.length + modStopped.length &&
-    stopped.concat(modStopped).every((q) => recs['QUST:' + fidOf(q.quest)]));
+const propped = manifest.questScriptProperties || [];
+yes('Q1 every quest in the plugin is one the manifest stops (' + (qrecs.length - propped.length) + '), or one whose ' +
+    'script properties the policy sets (' + propped.length + ', tests/test-3101-unbound-start-gear.js)',
+    qrecs.length === stopped.length + modStopped.length + propped.length &&
+    stopped.concat(modStopped, propped).every((q) => recs['QUST:' + fidOf(q.quest)]));
+const proppedFids = new Set(propped.map((q) => fidOf(q.quest)));
 let qbad = [];
-for (const r of qrecs) {
+for (const r of qrecs.filter((x) => !proppedFids.has(x.fid))) {
   const t = r.subs.map((s) => s.t);
   const dnam = r.subs.find((s) => s.t === 'DNAM').b;
   const n = t.indexOf('NEXT');

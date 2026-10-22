@@ -29,6 +29,18 @@
   {"quest": "301e05:WindhelmSSE.esp", "edid": "OWindhelmDecorationMurder"},
   {"quest": "3ec170:WindhelmSSE.esp", "edid": "0WHQuestArenaFightRepeating"}
  ],
+ "questScriptProperties": {
+  "why": "Script properties set on a mod quest, each the winning record with only these values added or changed on its script. Skyrim Unbound's start (SkyrimUnboundQuestScript.PrepareForStart, then the inventory module's GivePlayerStuff) runs in each person's own game and hands the new character a random weapon, equipped, and can hand out random spells. The server never gives them, so the weapon hangs on the hip with nothing in the inventory, invisible, and can still be drawn and swung (issue 3101; read by Djinn on 16 Oct 2026 out of the compiled scripts, issue 2039). Patrick, 21 Oct 2026, on the board review (issue 3192): the fix goes in this plugin. It has to be here, not in Thornswood-Content.esp, because Skyrim Unbound.esp loads after the content plugin and its own record would win there.",
+  "quests": [
+   {"quest": "bdfb6a:Skyrim Unbound.esp", "edid": "SkyrimUnboundInventory", "script": "SkyrimUnboundModuleInventory",
+    "properties": [
+     {"name": "ChoiceRandomWeapons", "type": "bool", "value": false,
+      "why": "True (the script's default) picks a random weapon and equips it. False takes the weapon only from ChoiceOneHanded, ChoiceOneHandedCombination, ChoiceTwoHanded, ChoiceRanged and ChoiceStaff, which all default to 0, and 0 gives none."},
+     {"name": "ChoiceSpellsMode", "type": "int", "value": 1,
+      "why": "0 (the default) can hand out random spells, more likely when no weapon was given, which would leave the same kind of spell in a hand that only that game knows. 1 returns before any spell is given."}
+    ]}
+  ]
+ },
  "placeHolds": {
   "why": "Patrick, 17 Oct 2026, decision 2 = B on issue 2551: the places on Tamriel's ground that Skyrim and the collection's mods put in no hold get one, so the Steward and Jarl of that hold settle their buildings and the main menu's last location names the hold. Apocrypha, the Soul Cairn, Sovngarde, the Forgotten Vale, Misty Grove and the test and Creation Club cells stay in no hold. A location is given its hold, or the place of Patrick's list it lies in, as its parent; a room with no location of its own is given the location of the place it belongs to, or the hold's own when no location covers it.",
   "locations": [
