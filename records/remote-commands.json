@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  66,
-    "callCount":  269,
+    "scriptCount":  67,
+    "callCount":  270,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -1868,6 +1868,15 @@
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "hand tool: runs whatever PowerShell it is given"
+                  },
+                  {
+                      "script":  "scripts/vps/Profile-GameServer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$said = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script @\"",
+                      "does":  "drops a CPU profile request json into the server data folder and reads the summary the gamemode writes",
+                      "class":  "stage",
+                      "reason":  "file write in a Thornswood folder; the gamemode reads it, profiles itself, writes profiles\\newest.txt and deletes it"
                   },
                   {
                       "script":  "scripts/vps/Request-Restart.ps1",
