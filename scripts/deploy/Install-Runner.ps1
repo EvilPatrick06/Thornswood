@@ -525,6 +525,39 @@ function Close-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\
   foreach ($w in $wasOpen) { $acct + ' COULD READ ' + $w + ' until now; shut out of it' }
   $acct + ': already shut out of ' + $had + ' folder(s)' + $(if ($shut) { ', and a deny added on ' + $shut + ' that were closed to it anyway' } else { '' })
 }
+# What -Remove runs: takes the account's deny off the same folders
+# Close-RunnerAccount puts it on, its own folder aside, and reads each one
+# back. The deny sits on each folder only, (OI)(CI) and inherited below, so
+# taking it off there takes it off what is below too. Until #3112 -Remove
+# took it off with icacls /T, which rewrote every file under each folder one
+# by one: on 21 Oct 2026 removing runner 8 sat over ten minutes on
+# C:\Users\Administrator alone. Read on the box on 22 Oct 2026: 13,987
+# folders under the 27 that are denied, and not one deny by name for a runner
+# account below them, so there was nothing below for /T to find. A line that
+# starts COULD NOT names a folder the deny is still on.
+function Open-RunnerAccount([string]$acct, [string]$own, [string]$parent = 'C:\', [string]$filter = 'Thornswood-*', [string[]]$also = @()) {
+  $ErrorActionPreference = 'Continue'
+  $sid = ''
+  if ($acct.StartsWith('*')) { $sid = $acct.Substring(1) }
+  else {
+    try { $sid = (New-Object Security.Principal.NTAccount($acct)).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch { return ($acct + ': no account of that name on this box, so it has no deny to take off: ' + $_.Exception.Message) }
+  }
+  $off = 0
+  $dirs = @(@(Get-ChildItem -LiteralPath $parent -Directory -Filter $filter -EA SilentlyContinue) +
+            @($also | Where-Object { $_ -and (Test-Path -LiteralPath $_ -PathType Container) } | ForEach-Object { Get-Item -LiteralPath $_ }))
+  foreach ($d in $dirs) {
+    if ($d.FullName -eq $own) { continue }
+    $mine = { @((Get-Acl -LiteralPath $d.FullName -ErrorAction Stop).GetAccessRules($true, $true, [Security.Principal.SecurityIdentifier]) | Where-Object { "$($_.AccessControlType)" -eq 'Deny' -and $_.IdentityReference.Value -eq $sid }) }
+    try {
+      if (-not (& $mine).Count) { continue }
+      $null = & icacls.exe $d.FullName /remove:d ('*' + $sid) /C /Q 2>&1
+      if ($LASTEXITCODE -ne 0 -or (& $mine).Count) { 'COULD NOT take ' + $acct + '''s deny off ' + $d.FullName; continue }
+      $off++
+    } catch { 'COULD NOT read the rules on ' + $d.FullName + ', so ' + $acct + '''s deny may still be on it: ' + $_.Exception.Message }
+  }
+  $acct + ': deny taken off ' + $off + ' folder(s)'
+}
 # Says, once for the box, what each $leave folder is: Lock-VpsFolders.ps1's,
 # and whether Users, Everyone or Authenticated Users still reach it, which
 # means that script has not been run on it, and every runner may read it.
@@ -842,9 +875,7 @@ if ((Test-Path '$Root\config.cmd') -and `$t) {
 Stop-Service -Name '$service' -Force -EA SilentlyContinue
 & sc.exe delete '$service' 2>&1 | Out-Null
 Remove-RunnerWatchers
-foreach (`$d in @(@(Get-ChildItem 'C:\' -Directory -Filter '$liveFilter' -EA SilentlyContinue | ForEach-Object { `$_.FullName }) + $alsoDenyList)) {
-  if (Test-Path -LiteralPath `$d) { & icacls.exe `$d /remove:d '$Account' /T /C /Q 2>&1 | Out-Null }
-}
+Open-RunnerAccount '$Account' '$Root' 'C:\' '$liveFilter' $alsoDenyList
 $(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remove' })
 # What the install put outside the folder goes too: the Defender skip, which
 # would leave a later folder at this path unscanned, and the account's
