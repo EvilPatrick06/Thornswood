@@ -53,6 +53,28 @@ What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.
 
    It should remove what step 5 listed and say "left" for any channel with an open thread in it, which stays until its tickets are closed.
 
+## The role order again, once the pull request that numbers the roles under the bot is merged
+
+Steps 1 to 5 ran on 22 Oct; step 2's role order was refused ("400 Missing Permissions") and the audit kept 8 role-order differences. The read-only audit of 3:30 PM (#3317 comment 6351722611) measured why: the bot's role is at position 110 and 125 roles sit under it, because Discord made the 16 Officer roles all at position 1, so the build's 1 to 123 asked for positions at or above the bot's role. The build now numbers the roles only under the bot's role, lets an older role share a position with a younger one under it where it has to, puts Patreon and Jockie Music in the request at their places, and reads Discord's answer back. Run these from the repository root at main after that merge, before step 6:
+
+R1. **Say what the build would ask for, changing nothing.**
+
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Audit
+
+   Under "How Discord numbers the roles" its last line should read "a build would ask for positions 1 to M under the bot's 110", with M under 110, and no "do not fit" line.
+
+R2. **Put the roles in order.**
+
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox
+
+   It should print "moved the 125 roles under the bot into the plan's order" (the count is what the audit counted) and nothing under "did not manage". A "Discord took the role order but put X above Y" line means Discord sorted a shared position the other way from the build, which is a finding for #3317 with the line.
+
+R3. **The audit again.**
+
+       pwsh scripts/deploy/Setup-Discord.ps1 -OnBox -Audit
+
+   It should list no role-order difference and say "a build would ask for no role to move". Put the R2 and R3 outputs on #3317.
+
 ## Check afterwards
 
 - As somebody with only a faction's member role: the faction's category shows announcements (read only), its chat and its voice, and not its leadership or seats channel. Another faction's category does not show.
@@ -64,7 +86,7 @@ What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.
 
 - Setup-Discord -Posts rewrites #welcome, #rules, #start-here, #faq and #factions with their changelog lines; the words are the approved ones, only the links and channel mentions changed.
 - A ticket open in #tickets-and-applications stays open there. -Prune leaves a channel with an open thread in it.
-- Discord could refuse moving the Patreon or Server Booster role in the one order request; the run then lists it under "did not manage", and the audit says which roles are out of place.
+- Discord could refuse moving the Patreon, Jockie Music or Server Booster role in the one order request; the run then lists it under "did not manage" with Discord's own words, and the audit says which roles are out of place.
 
 ## Release notes (draft)
 
