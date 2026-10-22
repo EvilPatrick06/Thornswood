@@ -292,9 +292,10 @@ def load_build_discord():
 
 
 def plan_shape():
-    # The server as Build-Discord.py's PLAN builds it since 24 September: the
-    # panel in #tickets-and-applications, which anybody can read, and #tickets
-    # beside it with mode='staff'. Every role the PLAN makes is here with the
+    # The server as Build-Discord.py's PLAN builds it since #3317: the panel
+    # in #tickets-and-applications in Applications, which anybody can read,
+    # and #ticket-log in Staff with mode='staff' (it was #tickets beside the
+    # panel from 24 September). Every role the PLAN makes is here with the
     # permissions it gives it, and both channels carry the PLAN's own
     # overwrites, so a change to either shows up here.
     bd = load_build_discord()
@@ -302,13 +303,13 @@ def plan_shape():
     for cat, specs in bd.PLAN:
         for spec in specs:
             where[spec['name']] = (cat, spec.get('mode'))
-    tickets = where.get('tickets', (None, None))
+    tickets = where.get('ticket-log', (None, None))
     panel_at = where.get('tickets-and-applications', (None, None))
-    yes("the PLAN makes #tickets, TICKET_LOG's first name, with mode='staff'",
-        bot.TICKET_LOG[0] == 'tickets' and tickets[1] == 'staff')
-    yes("and the panel channel, TICKET_CHANNEL's first name, beside it",
+    yes("the PLAN makes #ticket-log, TICKET_LOG's first name, in Staff, for the council",
+        bot.TICKET_LOG[0] == 'ticket-log' and tickets == ('Staff', 'council'))
+    yes("and the panel channel, TICKET_CHANNEL's first name, in the public Applications",
         bot.TICKETS[0] == 'tickets-and-applications'
-        and panel_at[0] is not None and panel_at[0] == tickets[0])
+        and panel_at[0] == 'Applications')
 
     g = Guild()
     roles = {}
@@ -319,15 +320,15 @@ def plan_shape():
     # the same default Build-Discord.py uses.
     panel = g.channel('tickets-and-applications',
                       overwrites=bd.overwrites(g, panel_at[1] or 'open', roles))
-    book = g.channel('tickets', overwrites=bd.overwrites(g, tickets[1] or 'open', roles))
+    book = g.channel('ticket-log', overwrites=bd.overwrites(g, tickets[1] or 'open', roles))
     who, ix = report(g)
 
-    yes("A REPORT WHOSE THREAD FAILS LANDS IN THE PLAN'S STAFF ONLY #tickets",
+    yes("A REPORT WHOSE THREAD FAILS LANDS IN THE PLAN'S STAFF ONLY #ticket-log",
         SECRET in book.text())
     nowhere_public('and not in the panel channel', [panel])
     yes('nothing new is made, so a -Prune run has nothing of the bot\'s to delete',
         not g.made)
-    yes("the PLAN's #tickets passes the staff only check", bot.private_channel_ok(g, book))
+    yes("the PLAN's #ticket-log passes the staff only check", bot.private_channel_ok(g, book))
     yes('closed tickets are written down there too',
         asyncio.run(bot.log_channel(g)) is book)
 

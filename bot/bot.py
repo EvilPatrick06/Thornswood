@@ -213,14 +213,22 @@ TICKETS_SAID = ' or #'.join(TICKETS)
 # not there. A ticket whose private thread will not open goes here too, so a
 # report about somebody is never posted where that somebody can read it.
 # log_channel checks that by the channel's permissions, not by these names.
+# #ticket-log first since #3317, which moved the staff only #tickets out of the
+# public Applications category into Staff under that name; #tickets is still
+# answered to, so a server not yet built again keeps working.
 TICKET_LOG = [n.strip().lower() for n in
-              os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
+              os.environ.get('TICKET_LOG', 'ticket-log,tickets').split(',')
               if n.strip()]
 # Who gets pulled into every ticket thread.
 # Tokens may be Discord role snowflake IDs (digits) or names. IDs survive a
 # rename; names are kept so an unmigrated bot.env.json still works.
+# The council (Owner, Co-Owner and every lead, #3317) reads every ticket, so
+# it is in the default; a bot.env.json that lists ids needs their ids added.
 _STAFF_RAW = [r.strip() for r in
-              os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
+              os.environ.get('STAFF_ROLES',
+                             'Owner,Co-Owner,Lead Dev,Lead Gamemaster,Lead Loremaster,'
+                             'Lead Moderator,Lead Content Creator,Lead Support,'
+                             'Gamemaster,Dev,Loremaster,Moderator').split(',')
               if r.strip()]
 
 # Roles that see one kind of ticket and not the rest.
@@ -2435,10 +2443,19 @@ class HoldButton(discord.ui.Button):
         await pick_hold(interaction, self.hold)
 
 
+# THE PANEL'S ROWS (#3317, Patrick, 22 Oct: "These button layouts also need
+# fixed"). Five holds to a row wrapped on a phone, four and then Markarth on
+# its own, three and then Winterhold on its own. Three to a row fits a phone
+# and reads as a block on a desktop: nine holds in three rows of three, and
+# the two pings in a row of their own under them.
+HOLDS_PER_ROW = 3
+
+
 class PingButton(discord.ui.Button):
     def __init__(self, key, name, label):
         super().__init__(label=label, style=discord.ButtonStyle.primary,
-                         custom_id='thornswood:ping:' + key, row=2)
+                         custom_id='thornswood:ping:' + key,
+                         row=-(-len(HOLDS) // HOLDS_PER_ROW))
         self.role_name = name
 
     async def callback(self, interaction):
@@ -2450,7 +2467,7 @@ class HoldPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         for i, hold in enumerate(HOLDS):
-            self.add_item(HoldButton(hold, 0 if i < 5 else 1))
+            self.add_item(HoldButton(hold, i // HOLDS_PER_ROW))
         for key, name, label in PINGS:
             self.add_item(PingButton(key, name, label))
 
@@ -2458,6 +2475,23 @@ class HoldPanel(discord.ui.View):
 def _hold_ids_wanted():
     return (['thornswood:hold:' + h.lower() for h in HOLDS] +
             ['thornswood:ping:' + k for k, _, _ in PINGS])
+
+
+def _hold_rows_wanted():
+    """The panel's buttons by row, as Discord gives a posted message back."""
+    ids = ['thornswood:hold:' + h.lower() for h in HOLDS]
+    return ([ids[i:i + HOLDS_PER_ROW] for i in range(0, len(ids), HOLDS_PER_ROW)] +
+            [['thornswood:ping:' + k for k, _, _ in PINGS]])
+
+
+def _rows(msg):
+    """A posted message's buttons by row, so a panel laid out differently
+       is not taken for current because its buttons are the same."""
+    try:
+        return [[getattr(item, 'custom_id', '') for item in getattr(row, 'children', None) or []]
+                for row in getattr(msg, 'components', None) or []]
+    except Exception:
+        return []
 
 
 def _hold_ids(msg):
@@ -2473,7 +2507,7 @@ def _hold_ids(msg):
 
 def hold_panel_is_current(msg):
     return (getattr(msg, 'content', None) == HOLD_PANEL and
-            _hold_ids(msg) == _hold_ids_wanted())
+            _rows(msg) == _hold_rows_wanted())
 
 
 async def ensure_hold_panel(guild):

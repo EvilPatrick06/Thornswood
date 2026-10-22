@@ -223,6 +223,15 @@ WEBHOOK_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
 #
 # Names are Thornswood's rather than Skyrim's job titles, because "Moderator"
 # beside "Jarl of Whiterun" reads like two different servers.
+#
+# THE STAFF COUNCIL (#3317, Patrick, 22 Oct 2026). Each staff category has a
+# lead, the leads are the council and decide together, and Owner and Co-Owner
+# make the final call. Administrator is for Owner and Co-Owner only; every lead
+# gets COUNCIL, which is moderation and nothing that could break the server by
+# a misclick. Dev held Administrator until then and holds none now. Every
+# other role carries nothing of its own: @everyone holds the everyday set, and
+# what a role opens is exactly the channels that name it, so the audit reads
+# plainly.
 ADMIN = discord.Permissions(administrator=True)
 MOD   = discord.Permissions(
     manage_messages=True, kick_members=True, ban_members=True,
@@ -235,6 +244,25 @@ GM    = discord.Permissions(
     read_message_history=True, view_channel=True, send_messages=True,
     embed_links=True, attach_files=True, connect=True, speak=True,
     mute_members=True, move_members=True)
+# A lead: everything a Moderator and a Gamemaster can do, plus mentioning a
+# whole role in an announcement, the server's events, reading who did what,
+# and giving roles. Not Manage Channels or Manage Server.
+#
+# MANAGE ROLES FOR THE LEADS AND SUPPORT (#3317, Patrick, 22 Oct, page card
+# q-3317-who-gives-roles, B): they give the role of an accepted application
+# by hand. Discord lets a holder give any role below their own highest and
+# edit those roles, so the written rule is that each gives only their own
+# category's roles (Support: Playtester), and the audit names every role
+# given. Every staff role sits above every other role for this reason.
+COUNCIL = discord.Permissions(
+    MOD.value | GM.value |
+    discord.Permissions(mention_everyone=True, manage_events=True,
+                        create_events=True, view_audit_log=True,
+                        manage_nicknames=True, manage_roles=True).value)
+# Support handles tickets: it closes and archives the private ticket threads
+# it is added to, and gives Playtester to an accepted playtest application.
+SUPPORT = discord.Permissions(manage_threads=True, manage_roles=True)
+NONE  = discord.Permissions.none()
 PLAIN = discord.Permissions(
     view_channel=True, send_messages=True, read_message_history=True,
     embed_links=True, attach_files=True, add_reactions=True,
@@ -245,41 +273,75 @@ PLAIN = discord.Permissions(
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
          'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
 
-# Staff roles are JOB TITLES, not lore titles, and that is deliberate. Thane,
-# Steward, Warden and Housecarl are all things somebody should be able to play,
-# and a moderator wearing one of them makes every in-world use of the word
-# ambiguous. another server splits it the same way.
+# THE STAFF, one place (#3317). Each category's ranks, highest first. One
+# person holds at most one rank of a category (Patrick: "people dont have
+# double roles like dev and lead dev, they can have Owner and Lead Dev as those
+# are separate"); ranks of two categories are fine. Owner and Co-Owner are a
+# category of their own for that rule. The audit reports a double, and the
+# rule is written in every staff space's rules.
 #
-# The order is the order the live server has them in, read off the role list
-# on 2 October, because this list is what puts them back in order on every
-# run: a role in the wrong place here drags the real one with it.
-ROLES = [
-    # name                  colour    hoist  permissions
-    ('Owner',               0xC9A24B, True,  ADMIN),
-    ('Lead Gamemaster',     0x3E8FBF, True,  GM),
-    ('Dev',                 0x9B7BD4, True,  ADMIN),
-    ('Gamemaster',          0x4F9BC7, True,  GM),
-    ('Loremaster',          0x57B8A0, True,  PLAIN),   # writes the world
-    ('Trial Gamemaster',    0x79BCDB, True,  GM),
-    ('Moderator',           0x6FA05A, True,  MOD),
-    ('Content Creator',     0xD2603F, True,  PLAIN),
-    ('Server Booster',      0xD98FB0, True,  PLAIN),   # boosted the server itself
-    ('Playtester',          0xC07A4E, True,  PLAIN),
+# space is the category of channels that rank works in; prefix names them.
+OWNERS = ('Owner', 'Co-Owner')
+STAFF_CATEGORIES = (
+    # name          space          prefix     lead                   ranks under the lead
+    ('Dev',         'Dev',         'dev',     'Lead Dev',            ('Dev',)),
+    ('Gamemasters', 'Gamemasters', 'gm',      'Lead Gamemaster',     ('Gamemaster', 'Trial Gamemaster')),
+    ('Lore',        'Lore',        'lore',    'Lead Loremaster',     ('Loremaster',)),
+    ('Moderation',  'Moderation',  'mod',     'Lead Moderator',      ('Moderator',)),
+    ('Content',     'Content',     'content', 'Lead Content Creator', ('Content Creator',)),
+    ('Support',     'Support',     'support', 'Lead Support',        ('Support',)),
+)
+LEADS = tuple(c[3] for c in STAFF_CATEGORIES)
+# The council: who decides, reads every staff space and posts every
+# announcement.
+COUNCIL_ROLES = OWNERS + LEADS
+STAFF_RANKS = (('Owner', OWNERS),) + tuple(
+    (c[0], (c[3],) + c[4]) for c in STAFF_CATEGORIES)
+# Everybody on staff, whatever their category.
+STAFF = OWNERS + tuple(n for c in STAFF_CATEGORIES for n in (c[3],) + c[4])
 
-    # The three Patreon tiers, worst name at the top. Patreon hands these out
-    # itself once the Discord is connected in its settings, so nothing here
-    # ever assigns them.
-    ('Thalmor Boot-Licker', 0x9FBE6B, True, PLAIN),
-    ('Talos Worshiper',     0xD8B24C, True, PLAIN),
-    ('Milk Drinker',        0xBFD3DE, True, PLAIN),
+
+def space_of(name):
+    """The staff category whose space is called name, or None."""
+    for c in STAFF_CATEGORIES:
+        if c[1] == name:
+            return c
+    return None
+
+
+# THE ORDER (#3317, Patrick, 22 Oct, page card q-3317-member-list): every
+# staff role above every other role ("Staff roles are higher than any roles
+# from Patreon, in game positions, holds, server booster etc."), then the
+# seats of the world, Jarls and then faction leaders, then Server Booster and
+# Patreon, then Playtester. Each of those shows in its own group in the
+# member list; everything under Playtester keeps its colour and shows under
+# the highest group a person holds. This list is what puts the roles in
+# order on every run: a role in the wrong place here drags the real one
+# with it.
+ROLES = [
+    # name                   colour    hoist  permissions
+    ('Owner',                0xC9A24B, True,  ADMIN),
+    ('Co-Owner',             0xC9A24B, True,  ADMIN),
+    ('Lead Dev',             0x9B7BD4, True,  COUNCIL),
+    ('Lead Gamemaster',      0x3E8FBF, True,  COUNCIL),
+    ('Lead Loremaster',      0x57B8A0, True,  COUNCIL),
+    ('Lead Moderator',       0x6FA05A, True,  COUNCIL),
+    ('Lead Content Creator', 0xD2603F, True,  COUNCIL),
+    ('Lead Support',         0xB8A04E, True,  COUNCIL),
+    ('Dev',                  0x9B7BD4, True,  NONE),
+    ('Gamemaster',           0x4F9BC7, True,  GM),
+    ('Loremaster',           0x57B8A0, True,  NONE),    # writes the world
+    ('Trial Gamemaster',     0x79BCDB, True,  GM),
+    ('Moderator',            0x6FA05A, True,  MOD),
+    ('Content Creator',      0xD2603F, True,  NONE),    # Thornswood's own content
+    ('Support',              0xC9B46A, True,  SUPPORT),
 ]
 
 # In world. One Jarl per hold, and a hold for everybody else to belong to.
+# The Jarls are shown in their own group, the seats of the world; a Citizen
+# role keeps its colour and shows under Playtester (#3317, page card
+# q-3317-member-list).
 #
-# Eighteen roles sounds like a lot for a small server, but Discord only shows a
-# hoisted group in the member list when somebody in it is online, so the empty
-# ones are invisible until they are not. A Jarl outranks their own citizens in
-# the list because Jarl sits higher here.
 # RAVEN ROCK HAS ITS OFFICES TOO (#2551, Patrick, 16 Oct, B): its Jarl, Court,
 # Steward and Guards, like the nine, because the game has its board, its drop
 # box and its jail. Its Jarl is "Jarl of Raven Rock", the name the site and the
@@ -288,9 +350,51 @@ ROLES = [
 OFFICE_HOLDS = HOLDS + ['Raven Rock']
 
 for _h in OFFICE_HOLDS:
-    ROLES.append(('Jarl of ' + _h, 0xE0C56A, True, PLAIN))
+    ROLES.append(('Jarl of ' + _h, 0xE0C56A, True, NONE))
+
+# THE FACTION LEADERS (#3317, Patrick, 22 Oct, page card q-3317-faction-roles,
+# A): one "<faction> Leader" role per named faction, shown in its own group
+# under the Jarls, given from an accepted Faction Leader application. The
+# factions are bot/factions.json, the list the application already offers;
+# a faction's role uses its short name, the way Patrick wrote them
+# ("Thalmor Leader, Free Skyrim Trading Company Leader"). A Jarl is a faction
+# leader too, with its own application. Nobody on staff holds either seat
+# (#3317, Patrick, 22 Oct, 11:03 AM), and the audit says so when one does.
+FACTION_SHORT = {'Thalmor Remnant': 'Thalmor', 'The Companions': 'Companions'}
+
+
+def _factions():
+    import json as _json
+    with open(os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                           'factions.json'), encoding='utf-8') as f:
+        return [str(n) for n in _json.load(f)]
+
+
+FACTIONS = _factions()
+FACTION_LEADERS = tuple(FACTION_SHORT.get(f, f) + ' Leader' for f in FACTIONS)
+for _name in FACTION_LEADERS:
+    ROLES.append((_name, 0xD9B45A, True, NONE))
+# The seats of the world: who nobody on staff may also be.
+SEATS = tuple('Jarl of ' + _h for _h in OFFICE_HOLDS) + FACTION_LEADERS
+
+# Made by Discord and by Patreon, so only placed and grouped here (NOT_MADE
+# below): the build sets their member-list group and nothing else of theirs.
+# Patreon's own role is the one group for every supporter, the tiers keep
+# their colours (page card q-3317-patreon-group, recommended A, waiting).
+ROLES.append(('Server Booster', 0xD98FB0, True,  NONE))   # boosted the server
+ROLES.append(('Patreon',        0xF96854, True,  NONE))
+
+ROLES.append(('Playtester',     0xC07A4E, True,  NONE))
+
+# The three Patreon tiers, worst name at the top. Patreon hands these out
+# itself once the Discord is connected in its settings, so nothing here
+# ever assigns them.
+ROLES.append(('Thalmor Boot-Licker', 0x9FBE6B, False, NONE))
+ROLES.append(('Talos Worshiper',     0xD8B24C, False, NONE))
+ROLES.append(('Milk Drinker',        0xBFD3DE, False, NONE))
+
 for _h in HOLDS:
-    ROLES.append(('Citizen of ' + _h, 0x8FA9B8, True, PLAIN))
+    ROLES.append(('Citizen of ' + _h, 0x8FA9B8, False, NONE))
 
 # THE OFFICES A JARL GIVES (#2551). Patrick, 15 Oct: each hold has a Court, a
 # Steward and its Guards, and they are Discord roles, so the role is the one
@@ -306,9 +410,8 @@ for _h in HOLDS:
 # a build; a build then puts them in this order.
 #
 # NOT HOISTED (Patrick, 15 Oct: "they must not be shown separately in the
-# member list"). The only in-world roles shown in their own group are the
-# Jarl and Citizen roles above. They sit under the Citizen roles, so a
-# citizen who also holds one keeps their Citizen colour.
+# member list"). They sit under the Citizen roles, so a citizen who also holds
+# one keeps their Citizen colour.
 #
 # The site reads them by these exact names (site\server.js, OFFICE_ROLE), and
 # so does the bot's panel (bot.py, office_role). A name changed here and not
@@ -319,37 +422,31 @@ for _h in OFFICE_HOLDS:
     OFFICE_ROLES.append('Steward of ' + _h)
     OFFICE_ROLES.append('Guard of ' + _h)
 for _name in OFFICE_ROLES:
-    ROLES.append((_name, 0xA8977A, False, PLAIN))
+    ROLES.append((_name, 0xA8977A, False, NONE))
 
 # The Free Skyrim Trading Company (#1393, docs/systems/trading-company.md).
 # Applied for in Discord, the same shape as a Jarl, and given by a person.
 # The site's access.company names it, and the game lets a character on an
 # account that holds it buy for the company. Made here because a role the
 # site reads and nothing creates is the Banned mistake below.
-ROLES.append(('Trading Company', 0xB08D57, True, PLAIN))
+ROLES.append(('Trading Company', 0xB08D57, False, NONE))
 
-ROLES.append(('Member', 0x8D9682, False, PLAIN))   # everybody, on the way in
+# Joined, and answered the rules and age questions (#3317). Member sees the
+# front door and Information, read only; Playtester opens the rest.
+ROLES.append(('Member', 0x8D9682, False, NONE))
 
 # THE ONE A BAN DEPENDS ON, and it was never created.
 #
 # site/server.js has keyed access off a role called Banned since it was
 # written: cfg.access.banned is ['Banned'] and standing() takes everything away
-# from anybody holding it. This builder makes eighteen roles and that was not
-# one of them, so the thing being enforced did not exist and a ban was a role
-# somebody had to remember to make by hand, spelled exactly right.
-#
-# Not hoisted and grey on purpose: a ban is not a badge, and a hoisted role
-# would put banned people in their own group at the top of the member list.
-# No permissions at all, because the site is what a ban acts on. The site also
-# reads a bans.json now, so a typo here stops being a security control rather
-# than being one.
-ROLES.append(('Banned', 0x4A4A4A, False, PLAIN))
+# from anybody holding it. Not hoisted and grey on purpose: a ban is not a
+# badge. No permissions at all, because the site is what a ban acts on.
+ROLES.append(('Banned', 0x4A4A4A, False, NONE))
 
-# The bottom three, under Banned on the live server. Something else makes all
-# of them, so they are here for their place in the order and nothing else.
-ROLES.append(('Patreon',      0xF96854, False, PLAIN))
-ROLES.append(('News Pings',   0x8D9682, False, PLAIN))
-ROLES.append(('Updates Pings', 0x8D9682, False, PLAIN))
+# The bottom two, under Banned on the live server. The bot makes both, so
+# they are here for their place in the order and nothing else.
+ROLES.append(('News Pings',   0x8D9682, False, NONE))
+ROLES.append(('Updates Pings', 0x8D9682, False, NONE))
 
 # ROLES THIS NEVER MAKES, only puts in order.
 #
@@ -357,82 +454,61 @@ ROLES.append(('Updates Pings', 0x8D9682, False, PLAIN))
 # makes its own when the shop is connected in its settings, and bot.py makes
 # the two ping roles the hold panel's buttons hand out. Creating any of them
 # here would leave a second role of the same name that nothing hands out, and
-# whichever of the two Discord shows is a coin toss.
+# whichever of the two Discord shows is a coin toss. Nor are their
+# permissions changed: the build leaves those to whatever made them. Their
+# member-list group is the plan's (#3317, keep_role).
 NOT_MADE = ('Server Booster', 'Patreon', 'News Pings', 'Updates Pings')
 
-# Staff for the channel modes below: who sees a staff channel, who can post in
-# a read only one.
-#
-# LEAD GAMEMASTER AND TRIAL GAMEMASTER ARE DELIBERATELY NOT IN HERE, even
-# though both are in ROLES since 2 October and Lead Gamemaster sits above Dev
-# on the live role list. Decided on 1 October with the Live smoke session
-# (#1407): widening a mode widens every channel that uses it, so the lead
-# gamemaster role gets the one channel it needs by name, on that channel's own
-# line, through extra_roles. Both still see every hold through HOLD_STAFF.
-# Moving either of them in here is a line in #staff-updates first, because it
-# opens #reports and every other staff channel.
-STAFF = ('Owner', 'Dev', 'Moderator', 'Gamemaster')
-
-# Who sees the Gamemasters category (#2519). Djinn's layout of 15 Oct 2026,
-# confirmed by him on 17 Oct: the gamemaster ranks and Moderator, nobody
-# else, and nothing public in it ("there should be NO public channel inside
-# the GM channel area", 14 Oct). So no Member, no Loremaster, no Playtester.
-# Moderator is in since 15 Oct; the 14 Oct list #2547 built left them out.
-# Owner and Dev hold Administrator, which Discord lets through every overwrite,
-# so they see it anyway; nothing here grants it to them. Both spellings of the
-# lead role are named, the same as the Test-Tasks line, because the role has
-# been written both ways; _named passes over the one that is not there.
-GM_AREA = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster',
-           'Moderator')
-
-# Who may post in #gm-rules, which everybody in GM_AREA reads (Djinn, 15 Oct:
-# "only Lead Gamemaster, Owner and Dev post"). Owner and Dev are named even
-# though Administrator lets them through, so the rule is in the code and not
-# in who happens to hold Administrator. Read only in code, not by a hand
-# change on the live guild.
-GM_RULES_POST = ('Lead Gamemaster', 'Lead GM', 'Owner', 'Dev')
-
-# The ranks of each staff category, highest first (#3317). Patrick, 22 Oct:
-# "people dont have double roles like dev and lead dev, they can have Owner and
-# Lead Dev as those are separate". So one person holds at most one rank in each
-# of these, and ranks in two different categories are not a double. The audit
-# reads it; only roles on the server today are named, both spellings of the
-# lead gamemaster role included, and the lead roles #3317 makes join their
-# category when they are made.
-STAFF_RANKS = (
-    ('Gamemasters', ('Lead Gamemaster', 'Lead GM', 'Gamemaster',
-                     'Trial Gamemaster')),
-)
+# Who sees every hold. The gamemaster ranks and the Loremasters run things in
+# the holds, Moderators keep the talk there civil, and the council sees
+# everything.
+HOLD_STAFF = COUNCIL_ROLES + ('Dev', 'Gamemaster', 'Trial Gamemaster',
+                              'Loremaster', 'Moderator')
 
 # --------------------------------------------------------------- channels --
-# mode:  public       anybody talks, including somebody not yet approved
-#        read         staff post, everybody reads, including the unapproved
-#        open         Members talk, invisible to anybody without Member
-#        membersread  staff post, Members read
-#        hold         one hold's Citizen and Jarl, and hold staff
-#        staff        staff only, invisible to everybody else
-#        pathfind     testers and staff only
-#        gm           the gamemaster ranks and Moderator (GM_AREA),
-#                     invisible to everybody else
-#        gmrules      GM_AREA reads, only GM_RULES_POST posts, invisible to
-#                     everybody else
+# mode:  public       anybody talks, including somebody who has no role yet
+#        read         everybody reads, the council posts
+#        membersread  Member, Playtester and staff read, the council posts
+#        open         Playtester and staff talk, invisible to everybody else
+#        testersread  Playtester and staff read, the council posts
+#        pathfind     the same people as open; the Playtesters category's own
+#        hold         one hold's Citizen and Jarl, and HOLD_STAFF
+#        staff        every staff rank talks, invisible to everybody else
+#        staffread    every staff rank reads, the council posts
+#        council      Owner, Co-Owner and the leads, nobody else
+#        space        one staff category's ranks and the council talk
+#        spaceread    that category reads, the council posts (announcements)
+#        spacerules   that category reads, its lead, Owner and Co-Owner post
 #
-# THE GATE, set up by hand on 23 and 24 September. Somebody who joins sees the
-# Start Here category (#rules, #welcome, #start-here, #say-hello) and the
-# Applications category, and nothing else until staff give them Member. A
-# hold's channel opens to its own Citizen and Jarl roles, picked in
-# #choose-your-hold. These modes only apply to a channel this makes, never to
-# one already there, so they are what keeps a channel made by a later run
-# behind that gate instead of in front of it.
+# A space mode names its category with space='Gamemasters' (STAFF_CATEGORIES).
+# read_extra on a channel's line lets more roles read that one channel and no
+# other (the Loremasters reading the GM event plans, #3317).
+#
+# THE GATE (#3317, Patrick, 22 Oct 2026). Somebody who joins sees Start Here
+# and Applications. Member, given when they answer the rules and age questions,
+# adds Information, read only. Playtester, given when a playtest application
+# is accepted, opens everything else that is not staff. Staff see their own
+# space and Staff, and the council sees every space. Until #3317 the gate was
+# Member, set by hand on 23 and 24 September, and Playtester opened only
+# Testing.
+#
+# THE BUILD SETS EVERY PLANNED CHANNEL'S OVERWRITES TO ITS MODE (#3317). Until
+# #3317 a mode reached only a channel the build made, so the live server
+# drifted from the plan wherever a channel was gated by hand, and nothing said
+# so. Now every category and channel named here gets exactly the overwrites its
+# mode gives, on every run; an overwrite for one member that is not the bot is
+# kept as it is. -Check says which would change, and -Audit says how.
 #
 # key is what the words in content.py point at, so a channel can be renamed
 # without every mention of it going stale.
 #
-# extra_roles is for one channel wanting somebody its mode does not give it.
-# Looked up by name on the server, so a role that is not in ROLES still counts
-# and a role that is not there is passed over. It widens that channel and
-# nothing else: changing a mode would widen every channel using it. keep_extra
-# applies it to a channel that is already there.
+# post is the words the build writes in a read only channel, and makes that
+# channel a doc: it keeps a changelog (DOCS in content.py, check_docs below).
+#
+# was lists (category, name) pairs the channel used to be. A channel missing
+# from its place is looked for there first and renamed or moved, never made a
+# second time, so its id, history, pins and posts go with it (#3317: the bot
+# finds #dev-test-tasks by id, and the Testing forums by name).
 #
 # make=False means the channel is in the plan and is never created: the plan
 # is what prune keeps, so this is how a channel that has been deleted on
@@ -441,45 +517,89 @@ STAFF_RANKS = (
 #
 # THE CATEGORY A CHANNEL IS IN IS PART OF ITS NAME HERE. A channel is matched
 # by name inside the category this names, so a channel dragged into another
-# category looks missing and the next run makes a second one. That is how the
-# live server ended up with two #game-rules, and why this list follows where
-# the channels actually are rather than where they were first put.
+# category by hand looks missing and the next run brings it back by its was
+# line, or makes a second one when it has none. That is how the live server
+# ended up with two #game-rules once.
+
+
+def _space(cat, extra=()):
+    """The four channels every staff space has (#3317): its announcements,
+       which that category reads and the council posts in; its rules; its
+       chat; and its voice room. extra goes between the rules and the chat."""
+    c = space_of(cat)
+    name, prefix = c[1], c[2]
+    return ([
+        dict(kind='text', name=prefix + '-announcements', mode='spaceread', space=name,
+             topic='Announcements for %s. The council posts here.' % name),
+        dict(kind='text', name=prefix + '-rules', mode='spacerules', space=name,
+             key=prefix.upper() + 'RULES', post=True,
+             topic='How %s works. %s, Owner and Co-Owner post here.' % (name, c[3])),
+    ] + list(extra) + [
+        dict(kind='text', name=prefix + '-chat', mode='space', space=name,
+             topic='Talk between %s.' % name),
+        dict(kind='voice', name=('GM' if prefix == 'gm' else name) + ' Voice',
+             mode='space', space=name),
+    ])
+
+
+# Every Loremaster reads these three (#3317, 10b): the plans before an event
+# and the summaries after it, so a scene stays inside the lore.
+LORE_READS = ('Loremaster',)
+
 PLAN = [
  ('Start Here', [
    dict(kind='text',  name='rules',       key='RULES',    mode='read',
-        topic='Seven rules. Read them.', post=C.RULES),
+        topic='Seven rules. Read them.', post=True),
    dict(kind='text',  name='welcome',     key='WELCOME',  mode='read',
-        topic="Start here.", post=C.WELCOME),
+        topic="Start here.", post=True),
    dict(kind='text',  name='start-here',  key='START',    mode='read',
-        topic="How to actually get in and play.",
-        post=C.START),
+        topic="How to actually get in and play.", post=True),
    dict(kind='text',  name='say-hello',   key='HELLO',    mode='public',
         topic='New here? Say hi and tell us a little about yourself. Slowmode is on.'),
  ]),
- # Where somebody applies, before they have Member. The ticket panel lives in
- # #tickets-and-applications, which is what <#TICKETS> in content.py points
- # at. #tickets is staff only, where the bot writes closed tickets, and where
- # it puts a whole ticket, reports included, when the private thread will not
- # open. So it stays staff only: open it to anybody else and a report about
- # somebody can land in front of them. The bot checks its permissions and
- # passes over a #tickets that is not staff only.
+ # Where somebody applies, before they have anything. The ticket panel lives
+ # in #tickets-and-applications, which is what <#TICKETS> in content.py points
+ # at. The closed tickets are written in #ticket-log in Staff (#3317: it was
+ # #tickets, a staff only channel inside this public category).
  ('Applications', [
    dict(kind='text',  name='tickets-and-applications', key='TICKETS', mode='read'),
-   dict(kind='text',  name='tickets',     mode='staff'),
  ]),
  ('Information', [
    dict(kind='announce', name='news',     key='NEWS',     mode='membersread',
-        topic='What changed, every time it changes.',
-        post=C.NEWS_FIRST),
+        topic='What changed, every time it changes.', post=True),
    dict(kind='text',  name='updates',     key='UPDATES',  mode='membersread',
         topic="Restarts and outages. Check here before asking why you can't connect."),
    dict(kind='text',  name='faq',         key='FAQ',      mode='membersread',
-        topic='Read this before you ask.', post=C.FAQ),
+        topic='Read this before you ask.', post=True),
  ]),
- ('Help', [
+ # The rules of play and the world, read only, each with its changelog
+ # (#3317). Both were in the talk categories before.
+ ('Roleplay Guide', [
+   dict(kind='text',  name='game-rules',  key='GAMERULES', mode='testersread',
+        topic='How roleplay works here. Nine rules, and what we let slide.',
+        post=True, was=(('Thornswood', 'game-rules'),)),
+   dict(kind='text',  name='lore',        key='LORE',     mode='testersread',
+        topic='4E 252. What happened and who you can be.', post=True,
+        was=(('In Character', 'lore'),)),
+ ]),
+ # Out of character. It was the Thornswood category. #general-chat is the one
+ # general: it was #general until Patrick renamed it, and the topic on it was
+ # written by hand, so nothing here sets one.
+ ('Out of Character', [
+   dict(kind='text',  name='general-chat', key='GENERAL', mode='open',
+        was=(('Thornswood', 'general-chat'),)),
+   dict(kind='text',  name='media',       key='MEDIA',    mode='open',
+        topic='Screenshots and clips. Talk about one in a thread under it.',
+        was=(('Thornswood', 'media'),)),
+   # Where the join cards go, and what the server's system channel points at.
+   # JOIN gives the bot Attach Files here as well (JOIN_BOT_NEEDS, #2341).
+   # The bot finds it by this name (JOIN_CHANNEL), so it keeps it.
+   dict(kind='text',  name='welcome-travelers', key='JOIN', mode='open',
+        was=(('Thornswood', 'welcome-travelers'),)),
+   dict(kind='text',  name='server-progression-and-economy', mode='open',
+        was=(('Thornswood', 'server-progression-and-economy'),)),
    dict(kind='forum', name='suggestions', key='SUGGESTIONS', mode='open',
-        topic=C.SUGGEST_TOPIC),
-   dict(kind='voice', name='Support',      mode='open'),
+        topic=C.SUGGEST_TOPIC, was=(('Help', 'suggestions'),)),
    # Both gone from the server, and still named here so prune leaves anything
    # of either name alone. content.py points at them, and post() turns a
    # mention of a channel that is not there into plain words.
@@ -488,29 +608,11 @@ PLAN = [
    dict(kind='text',  name='logs-and-crashes', key='LOGS', mode='open',
         topic='Drag the log in. Explain it after.', make=False),
  ]),
- # Out of character. #general-chat is the one general: it was #general until
- # Patrick renamed it, and the topic on it was written by hand, so nothing
- # here sets one.
- ('Thornswood', [
-   dict(kind='text',  name='general-chat', key='GENERAL', mode='open'),
-   dict(kind='text',  name='media',       key='MEDIA',    mode='open',
-        topic='Screenshots and clips. Talk about one in a thread under it.'),
-   # Where the join cards go, and what the server's system channel points at.
-   # JOIN gives the bot Attach Files here as well (JOIN_BOT_NEEDS, #2341).
-   dict(kind='text',  name='welcome-travelers', key='JOIN', mode='open'),
-   dict(kind='text',  name='game-rules',  key='GAMERULES', mode='membersread',
-        topic='How roleplay works here. Nine rules, and what we let slide.',
-        post=C.GAME_RULES),
-   dict(kind='text',  name='server-progression-and-economy', mode='open'),
- ]),
  ('In Character', [
    dict(kind='forum', name='character-introductions', key='CHARS', mode='open',
         topic='Who are you playing? One post each.'),
    dict(kind='forum', name='tales',       key='TALES',    mode='open',
         topic='What happened out there. One post per story.'),
-   dict(kind='text',  name='lore',        key='LORE',     mode='membersread',
-        topic='4E 252. What happened and who you can be.',
-        post=C.LORE),
    dict(kind='text',  name='rp-appreciation', key='APPREC', mode='open',
         topic='Somebody played a blinder. Say so.'),
    dict(kind='text',  name='graveyard',   key='GRAVE',    mode='open',
@@ -520,9 +622,9 @@ PLAN = [
  # One channel per hold, because a hold with nowhere to talk is a line on a
  # map. These are in character: what is said here is said in the hold.
  ('The Holds', [
-   # Where a Member picks their hold, at the top of the category. The bot
+   # Where a playtester picks their hold, at the top of the category. The bot
    # posts the buttons.
-   dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='membersread'),
+   dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='testersread'),
  ] + [
    dict(kind='text', name=_h.lower(), key='HOLD_' + _h.upper(), mode='hold',
         hold=_h, topic=C.HOLD_TOPICS[_h.lower()])
@@ -530,90 +632,161 @@ PLAN = [
  ]),
  # Somewhere to talk and somewhere to be idle. Proximity voice is in the
  # launcher, so these are for before, after, and whoever is not in the world.
+ # Help Voice was the Support voice in Help, renamed so it is not taken for
+ # the Support staff's own room.
  ('Voice', [
-   dict(kind='voice', name='AFK',               key='AFK', mode='open'),
    dict(kind='voice', name='General',           mode='open'),
+   dict(kind='voice', name='Help Voice',        mode='open',
+        was=(('Help', 'Support'),)),
+   dict(kind='voice', name='AFK',               key='AFK', mode='open'),
  ]),
- # #test-these was deleted in the channel cleanup and is NOT renamed into this
- # one: it is in RETIRED below so a re-run does not bring it back. Test-Tasks
- # was a text channel from 1 October holding the Live smoke checklist. Since
- # Patrick's card of 11 October it is a forum of test tasks, one thread each,
- # tagged Main since #2276 (bot.py, the testing channels section), #test-results is
- # #test-findings, and #known-issues is new. The bot's one-time
- # `python bot.py --setup-channels --apply` moves an existing server across;
- # these lines are what a fresh server is made with. The old text channel is
- # kept as test-tasks-archive, never made and never pruned.
- #
-# WHY THAT ONE HAS extra_roles AND THE OTHER TWO DO NOT.
-# Patrick locked who may start, reset and refresh a Live smoke session on
-# 1 October: Owner, Dev and Lead GM. pathfind grants the STAFF roles and
-# Playtester, and the lead gamemaster role is in neither list, so somebody
-# holding only that one passed the bot's admin check and could not see the
-# channel they were meant to run it in. Both spellings are named because the
-# role has been written both ways and the scrub is not finished; _named looks
-# each up on the server and passes over the one that is not there. Only this
-# channel gets them: test-results and play-testing are pathfind for the same
-# people they always were, and nothing else moves.
- ('Testing', [
+ # The playtesters' own space (#3317, Patrick: "a category for playtester
+ # following the same pattern as the staff ones just rembering playtesters
+ # arent staff"). It was Testing, renamed with its channels so nothing is made
+ # twice. The bot finds #test-tasks, #test-findings and #known-issues by these
+ # names (bot.py, the testing channels section), so they keep them; Test-Tasks
+ # was the forum's name with capitals, since 11 Oct a forum of test tasks, one
+ # thread each, tagged Main since #2276.
+ ('Playtesters', [
+   dict(kind='text',  name='playtester-announcements', mode='testersread',
+        topic='Announcements for playtesters. The council posts here.'),
+   dict(kind='text',  name='playtester-rules', key='TESTERRULES', mode='testersread',
+        topic='How playtesting works here.', post=True),
+   dict(kind='text',  name='playtest-sessions', mode='pathfind',
+        topic='Call a session and say you are coming.'),
+   dict(kind='forum', name='test-tasks',   key='TESTS',   mode='pathfind',
+        topic='One thread per test task, tagged Main.',
+        was=(('Testing', 'Test-Tasks'), ('Testing', 'test-tasks'))),
    dict(kind='forum', name='test-findings', key='RESULTS', mode='pathfind',
-        topic='Pass, fail, and what went wrong.'),
-   dict(kind='forum', name='Test-Tasks',   key='TESTS',   mode='pathfind',
-        extra_roles=('Lead Gamemaster', 'Lead GM'),
-        topic='One thread per test task, tagged Main.'),
+        topic='Pass, fail, and what went wrong.',
+        was=(('Testing', 'test-findings'),)),
    dict(kind='text',  name='known-issues', key='KNOWN',   mode='pathfind',
-        topic='Known issues the team is working on. Kept by the bot.'),
-   dict(kind='text',  name='test-tasks-archive', mode='pathfind', make=False),
-   dict(kind='voice', name='play-testing', mode='pathfind'),
+        topic='Known issues the team is working on. Kept by the bot.',
+        was=(('Testing', 'known-issues'),)),
+   dict(kind='text',  name='playtester-chat', mode='pathfind',
+        topic='Talk about testing: what you are trying and what you found.'),
+   dict(kind='voice', name='Playtester Voice', mode='pathfind',
+        was=(('Testing', 'play-testing'),)),
  ]),
- # The gamemasters' own room (#2519). Djinn's layout of 15 Oct, confirmed on
- # 17 Oct, with #gm-discipline kept from the 14 Oct list as a sixth channel.
- # Every channel in it is gm or gmrules, and nothing public goes in here: a
- # public scene listing goes in the Discord's Events channel later, not here.
- # GM Rules v1.0 is pinned in #gm-rules by hand; its text is not in this
- # repository. #gm from the 14 Oct list is named with make=False, so prune
- # leaves it alone if a run of #2547 ever made it, and nothing makes it again.
+ # The staff spaces (#3317), one per category, each the same shape: its
+ # announcements, its rules, its chat and its voice room, and the working
+ # channels that category needs.
+ #
+ # Gamemasters is the first of them (#2519): Djinn's layout of 15 Oct,
+ # confirmed on 17 Oct, with #gm-discipline kept from the 14 Oct list. Nothing
+ # public goes in here: a public scene listing goes in the Discord's Events
+ # channel. Moderators are in it by that layout (SPACE_GUESTS). GM Rules v1.0
+ # is pinned in #gm-rules by hand and its text is not in this repository yet
+ # (#2519), so #gm-rules has no post here. #gm from the 14 Oct list is named
+ # with make=False, so prune leaves it alone and nothing makes it again.
  ('Gamemasters', [
-   dict(kind='text',  name='gm-rules',           mode='gmrules',
-        topic='The GM Rules. Lead Gamemaster, Owner and Dev post here.'),
-   dict(kind='text',  name='gm-scene-summaries', mode='gm',
+   dict(kind='text',  name='gm-announcements',   mode='spaceread', space='Gamemasters',
+        read_extra=LORE_READS,
+        topic='Announcements for Gamemasters. The council posts here.'),
+   dict(kind='text',  name='gm-rules',           mode='spacerules', space='Gamemasters',
+        topic='The GM Rules. Lead Gamemaster, Owner and Co-Owner post here.'),
+   dict(kind='text',  name='gm-event-plans',     mode='space', space='Gamemasters',
+        read_extra=LORE_READS,
+        topic='What an event will be, before it runs. Loremasters read it.'),
+   dict(kind='text',  name='gm-scene-summaries', mode='space', space='Gamemasters',
+        read_extra=LORE_READS,
         topic='What happened in a scene you ran, after it ends.'),
-   dict(kind='text',  name='gm-chat',            mode='gm',
+   dict(kind='text',  name='gm-chat',            mode='space', space='Gamemasters',
         topic='Planning, handoffs and questions between gamemasters.'),
-   dict(kind='text',  name='gm-suggestions',     mode='gm',
+   dict(kind='text',  name='gm-suggestions',     mode='space', space='Gamemasters',
         topic='Ideas for scenes, events and how we run them.'),
-   dict(kind='text',  name='gm-discipline',      mode='gm',
+   dict(kind='text',  name='gm-discipline',      mode='space', space='Gamemasters',
         topic='Reprimands, punishments and bans only. Nothing else.'),
-   dict(kind='voice', name='GM Voice',           mode='gm'),
-   dict(kind='text',  name='gm',                 mode='gm', make=False),
+   dict(kind='voice', name='GM Voice',           mode='space', space='Gamemasters'),
+   dict(kind='text',  name='gm',                 mode='space', space='Gamemasters',
+        make=False),
  ]),
- ('Staff', [
-   # The staff #news. Not the public #news in Information: that one carries
-   # the key, and the release webhook with it. The watchdog does not speak
-   # here; it speaks in #staff-updates (bot.py, staff-channel.txt, #2501).
-   dict(kind='announce', name='news',      mode='staff'),
-   dict(kind='forum', name='dev-test-results', mode='staff'),
-   # The test tasks someone on dev has to measure (Patrick, 12 Oct). Made by
-   # the bot's one-time `python bot.py --setup-channels --apply`, which finds
-   # it by id from then on, never by this: named here so -Prune leaves it and
-   # a run does not make a second one. The topic is the bot's DEV_TOPIC.
-   dict(kind='forum', name='dev-test-tasks', mode='staff', make=False,
+ # Dev holds the dev test tasks and results, moved out of Staff by id
+ # (Patrick, 22 Oct: "the tasks and finings under staff will go under the new
+ # dev category and the others stay"). #dev-test-tasks is made by the bot's
+ # one-time `python bot.py --setup-channels --apply`, which finds it by id
+ # from then on, never by this: named here so a run moves it, -Prune leaves
+ # it, and no run makes a second one. The topic is the bot's DEV_TOPIC.
+ ('Dev', _space('Dev', [
+   dict(kind='forum', name='dev-test-tasks', mode='space', space='Dev', make=False,
+        was=(('Staff', 'dev-test-tasks'),),
         topic='Test tasks someone on dev has to measure, from the board. Kept '
               'by the bot: a post goes when its issue closes as fixed or its '
               'test task no longer says Server: Dev.'),
+   dict(kind='forum', name='dev-test-results', mode='space', space='Dev',
+        was=(('Staff', 'dev-test-results'),)),
+ ])),
+ ('Lore', _space('Lore')),
+ ('Moderation', _space('Moderation')),
+ ('Content', _space('Content')),
+ ('Support', _space('Support')),
+ # What every staff member shares, and the council's own two channels.
+ ('Staff', [
+   # The staff #news, renamed so it is not taken for the public #news in
+   # Information, which carries the key and the release webhook.
+   dict(kind='announce', name='staff-announcements', mode='staffread',
+        topic='Announcements for every staff member. The council posts here.',
+        was=(('Staff', 'news'),)),
    dict(kind='text',  name='staff-general', mode='staff',
         topic='Nobody else can see this.'),
+   # Where staff status updates go (Patrick, 11 Oct), and where the bot says
+   # the watchdog's messages and the sessions that went wrong, by the id in
+   # staff-channel.txt (#2501). Made by hand, so never made here.
+   dict(kind='text',  name='staff-updates', mode='staff', make=False),
+   dict(kind='text',  name='council',       mode='council',
+        topic='The council: Owner, Co-Owner and the leads.'),
+   dict(kind='text',  name='council-decisions', mode='staffread',
+        topic='Every council decision, with its date. The council posts here.'),
+   # Where the bot writes closed tickets, and where it puts a whole ticket,
+   # reports included, when the private thread will not open. Every kind of
+   # ticket lands here, so it is the council's: the people who read every
+   # kind (#3317; page card q-3317-ticket-log). Never all staff, so a report
+   # about somebody never lands in front of them, and Content Creator never
+   # reads an application (bot.py, private_channel_ok). bot.py's TICKET_LOG
+   # answers to ticket-log and tickets, and checks the permissions.
+   dict(kind='text',  name='ticket-log',    mode='council',
+        was=(('Applications', 'tickets'),)),
    dict(kind='voice', name='Staff Room',    mode='staff'),
    # Gone from the server. Named here so prune leaves them alone, never made
    # again: #staff-updates, #staff-general and #dev-test-results carry all
    # three now.
    dict(kind='text',  name='dev-notes',     mode='staff', make=False,
-        topic='What we\u2019re on, and what broke doing it.'),
+        topic='What we’re on, and what broke doing it.'),
    dict(kind='text',  name='deploys',       mode='staff', make=False,
         topic='Every ship and restart lands here.'),
    dict(kind='text',  name='reports',       mode='staff', make=False,
         topic='Reports about people. Staff only.'),
  ]),
 ]
+
+# Categories renamed in place (#3317), so a run renames the old one instead of
+# making a second. Help was emptied into Out of Character and Voice: an empty
+# category named in RETIRED_CATEGORIES goes under -Prune and only then.
+CATEGORY_WAS = {
+    'Out of Character': ('Thornswood',),
+    'Playtesters': ('Testing',),
+}
+RETIRED_CATEGORIES = ('Help',)
+
+# The gate each category has. A category's channels carry their own modes;
+# this is the category's own, which the build sets and the audit reads. A
+# staff space's category is gated as its space (category_mode).
+CATEGORY_MODE = {
+    'Start Here': 'public',
+    'Applications': 'public',
+    'Information': 'membersread',
+    'Roleplay Guide': 'testersread',
+    'Out of Character': 'open',
+    'In Character': 'open',
+    'The Holds': 'hold',
+    'Voice': 'open',
+    'Playtesters': 'pathfind',
+    'Staff': 'staff',
+}
+
+# Who else talks in one staff space. Moderators are in the Gamemasters space by
+# Djinn's layout of 15 Oct (#2519).
+SPACE_GUESTS = {'Gamemasters': ('Moderator',)}
 
 # ----------------------------------------------------------------- engine --
 # Only what is actually used. Asking for message_content as well made Discord
@@ -639,6 +812,11 @@ RETIRED = [
     # new channel rather than this one renamed. Here so a re-run of this
     # script does not make it again.
     'test-these',
+    # The text channel Test-Tasks was until 11 Oct, with the Live smoke
+    # checklist of early October. Deleted by Patrick's choice (#3317, page
+    # card q-3317-old-archives, B): the board and the #test-tasks forum have
+    # what is still open.
+    'test-tasks-archive',
 ]
 
 # NEVER DELETED, by prune or by anything else in here.
@@ -653,8 +831,8 @@ RETIRED = [
 # renamed, and -Prune was one keystroke from taking the originals with it.
 KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
-    'play-testing', 'dev-test-results', 'test-results', 'test-tasks',
-    'test-findings', 'test-tasks-archive', 'known-issues', 'dev-test-tasks',
+    'play-testing', 'suggestions', 'dev-test-results', 'test-results', 'test-tasks',
+    'test-findings', 'known-issues', 'dev-test-tasks',
     # Where staff status updates go (Patrick, 11 Oct), and where the bot says
     # the watchdog's messages and the sessions that went wrong, by the id in
     # staff-channel.txt. Not in PLAN, so without this a run would list it as
@@ -663,6 +841,10 @@ KEEP = (
     # Gamemasters category (#2519). Named so -Prune cannot take them.
     'gm-rules', 'gm-scene-summaries', 'gm-chat', 'gm-suggestions',
     'gm-discipline', 'gm voice', 'gm',
+    # Their names from before #3317, and the channels #3317 renamed them to,
+    # including #tickets, the closed ticket log.
+    'tickets', 'ticket-log', 'staff-announcements', 'playtester voice',
+    'news', 'help voice', 'support', 'council', 'council-decisions',
 ) + tuple(
     # The in-world roles (#2551, Patrick, 15 Oct: the office roles go in the
     # never-delete list). Nothing in this script deletes a role today; these
@@ -733,8 +915,17 @@ TALK_NEEDS = ('view_channel', 'send_messages', 'read_message_history')
 JOIN_BOT_NEEDS = BOT_NEEDS + ('attach_files',)
 
 
+# And in every channel the build writes (#3317): it opens that channel's
+# Changelog thread, locks it, and posts the changes in it. A read only
+# channel's @everyone overwrite denies threads, so these are named.
+DOC_BOT_NEEDS = BOT_NEEDS + ('create_public_threads', 'send_messages_in_threads',
+                             'manage_threads')
+
+
 def bot_needs(spec):
     key = spec.get('key')
+    if spec.get('post'):
+        return DOC_BOT_NEEDS
     if key == 'TICKETS':
         return TICKET_BOT_NEEDS
     if key == 'JOIN':
@@ -846,13 +1037,6 @@ async def keep_extra(ch, spec, roles):
             failed.append(what + ' (Discord refused it)')
 
 
-# Who can see every hold. Wider than STAFF: the gamemaster ranks and the
-# Loremaster run things in the holds too. Looked up by name, so one that is
-# not on the server yet is passed over rather than stopping the build.
-HOLD_STAFF = ('Owner', 'Dev', 'Lead Gamemaster', 'Moderator',
-              'Trial Gamemaster', 'Gamemaster', 'Loremaster')
-
-
 def _named(guild, roles, name):
     return roles.get(name) or discord.utils.get(guild.roles, name=name)
 
@@ -878,83 +1062,99 @@ def _also(guild, roles, out, extra, talk):
     return out
 
 
-def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None):
+# Who each mode lets in, by role name: (readers, talkers, posters). A reader
+# sees and reads back and cannot post; a talker sees and posts; a poster in a
+# read only channel posts and tidies. A name in more than one list ends with
+# the last one's overwrite, and Discord lets any allowing role of a person win
+# over a denying one, so somebody who is both a reader and a poster posts.
+def mode_audience(mode, hold=None, space=None):
+    tester = ('Playtester',) + STAFF
+    if mode == 'read':
+        return (), (), COUNCIL_ROLES
+    if mode == 'membersread':
+        return ('Member',) + tester, (), COUNCIL_ROLES
+    if mode in ('open', 'pathfind'):
+        return (), tester, ()
+    if mode == 'testersread':
+        return tester, (), COUNCIL_ROLES
+    if mode == 'hold':
+        return (), HOLD_STAFF + (('Jarl of ' + hold, 'Citizen of ' + hold)
+                                 if hold else ()), ()
+    if mode == 'staff':
+        return (), STAFF, ()
+    if mode == 'staffread':
+        return STAFF, (), COUNCIL_ROLES
+    if mode == 'council':
+        return (), COUNCIL_ROLES, ()
+    if mode in ('space', 'spaceread', 'spacerules'):
+        c = space_of(space)
+        if c is None:
+            raise ValueError('mode %s needs space= one of %s'
+                             % (mode, ', '.join(x[1] for x in STAFF_CATEGORIES)))
+        ranks = (c[3],) + c[4] + SPACE_GUESTS.get(c[1], ())
+        if mode == 'space':
+            return (), ranks + COUNCIL_ROLES, ()
+        if mode == 'spaceread':
+            return ranks, (), COUNCIL_ROLES
+        return ranks + COUNCIL_ROLES, (), OWNERS + (c[3],)
+    if mode == 'public':
+        return (), (), ()
+    raise ValueError('no such mode: %s' % mode)
+
+
+def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None,
+               space=None, read_extra=None):
+    """Every overwrite a category or channel of this mode gets: @everyone
+       shut out (or read only), each role the mode names, extra_roles talking
+       and read_extra reading on that one channel, and the bot."""
     ev = guild.default_role
     deny_all  = discord.PermissionOverwrite(view_channel=False)
     read_only = discord.PermissionOverwrite(send_messages=False,
                                             add_reactions=True,
                                             create_public_threads=False,
                                             send_messages_in_threads=False)
+    reader    = discord.PermissionOverwrite(view_channel=True,
+                                            read_message_history=True,
+                                            send_messages=False,
+                                            create_public_threads=False,
+                                            send_messages_in_threads=False)
     talk      = discord.PermissionOverwrite(view_channel=True,
                                             send_messages=True,
                                             read_message_history=True)
-    # Every mode but public shuts @everyone out of something the bot needs,
-    # so every one of them names the bot as well.
+    poster    = discord.PermissionOverwrite(view_channel=True,
+                                            send_messages=True,
+                                            read_message_history=True,
+                                            manage_messages=True)
+    # Public has no overwrites at all, so there is nothing being denied for
+    # the bot or anybody else to get around.
     if mode == 'public':
         return {}
-    if mode in ('open', 'membersread'):
-        out = {ev: deny_all}
-        member = _named(guild, roles, 'Member')
-        if member is not None:
-            out[member] = talk if mode == 'open' else discord.PermissionOverwrite(
-                view_channel=True, read_message_history=True, send_messages=False)
-        for r in STAFF:
-            if roles.get(r):
-                out[roles[r]] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'hold':
-        out = {ev: deny_all}
-        names = list(HOLD_STAFF)
-        if hold:
-            names += ['Jarl of ' + hold, 'Citizen of ' + hold]
+    readers, talkers, posters = mode_audience(mode, hold, space)
+    readers = tuple(readers) + tuple(read_extra or ())
+    out = {ev: read_only if mode == 'read' else deny_all}
+    for names, ow in ((readers, reader), (talkers, talk), (posters, poster)):
         for n in names:
             r = _named(guild, roles, n)
             if r is not None:
-                out[r] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'read':
-        out = {ev: read_only}
-        for r in STAFF:
-            if roles.get(r):
-                out[roles[r]] = discord.PermissionOverwrite(send_messages=True,
-                                                            manage_messages=True)
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'staff':
-        out = {ev: deny_all}
-        for r in STAFF:
-            if roles.get(r):
-                out[roles[r]] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'pathfind':
-        out = {ev: deny_all}
-        for r in list(STAFF) + ['Playtester']:
-            if roles.get(r):
-                out[roles[r]] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'gm':
-        out = {ev: deny_all}
-        for n in GM_AREA:
-            r = _named(guild, roles, n)
-            if r is not None:
-                out[r] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    if mode == 'gmrules':
-        out = {ev: deny_all}
-        reader = discord.PermissionOverwrite(view_channel=True,
-                                             read_message_history=True,
-                                             send_messages=False,
-                                             create_public_threads=False,
-                                             send_messages_in_threads=False)
-        for n in GM_AREA:
-            r = _named(guild, roles, n)
-            if r is not None:
-                out[r] = reader
-        for n in GM_RULES_POST:
-            r = _named(guild, roles, n)
-            if r is not None:
-                out[r] = talk
-        return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
-    return {}
+                out[r] = ow
+    # Every mode but public shuts @everyone out of something the bot needs,
+    # so every one of them names the bot as well.
+    return with_bot(guild, _also(guild, roles, out, extra, talk), needs)
+
+
+def spec_overwrites(guild, spec, roles):
+    """overwrites() for one line of PLAN."""
+    return overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
+                      bot_needs(spec), spec.get('extra_roles'),
+                      spec.get('space'), spec.get('read_extra'))
+
+
+def category_mode(catname):
+    """The mode a category of the plan is gated by, and its space: a staff
+       space's category is its space; any other is CATEGORY_MODE's."""
+    if space_of(catname) is not None:
+        return 'space', catname
+    return CATEGORY_MODE.get(catname, 'open'), None
 
 
 def role_moves(order):
@@ -973,14 +1173,81 @@ def role_moves(order):
     return [(r, p) for r, p in zip(movable, slots) if r.position != p]
 
 
+async def keep_role(role, hoist, perms):
+    """Give a role that is already there the permissions and the member-list
+       group the plan has for it (#3317). Until then a role kept whatever it
+       was made with or given by hand, so the plan said one thing and the
+       server another. A role Discord, Patreon or the bot makes keeps its
+       own permissions and only takes its group from here (#3317: Server
+       Booster and Patreon show in their own group), and one already right is
+       left alone, so a second run asks for nothing. Discord's own role for
+       a bot is never touched."""
+    outside = role.name in NOT_MADE
+    if getattr(role, 'managed', False) and not outside:
+        return
+    change = {}
+    if not outside and role.permissions.value != perms.value:
+        change['permissions'] = perms
+    if bool(getattr(role, 'hoist', hoist)) != bool(hoist):
+        change['hoist'] = hoist
+    if not change:
+        return
+    what = 'role %s gets the plan\'s %s' % (role.name, ' and '.join(
+        'permissions' if k == 'permissions' else 'member-list group' for k in change))
+    if CHECK:
+        say('would change', what)
+        return
+    try:
+        await role.edit(reason='Thornswood setup, the role as the plan has it', **change)
+        say('role', what)
+    except discord.HTTPException as e:
+        failed.append('%s (%s)' % (what, refused(e)))
+
+
+# Roles renamed in place (#3317): a plan role that is missing is looked for
+# under these names and renamed, so everybody holding it keeps it and the
+# server never has two. Lead GM is how the lead gamemaster role was spelled
+# by hand once (the Live smoke lock of 1 October named both).
+ROLE_WAS = {
+    'Lead Gamemaster': ('Lead GM',),
+}
+
+
+async def rename_role(have, name):
+    """The role name used to be (ROLE_WAS), renamed to name, or None.
+       Under -Check it is only said, and the old role is handed back so the
+       rest of the check reads it."""
+    for old in ROLE_WAS.get(name, ()):
+        role = have.get(old)
+        if role is None:
+            continue
+        what = 'role %s becomes %s' % (old, name)
+        if CHECK:
+            say('would rename', what)
+            return role
+        try:
+            await role.edit(name=name, reason='Thornswood setup, renamed by the plan')
+            say('renamed', what)
+        except discord.HTTPException as e:
+            failed.append('%s (%s)' % (what, refused(e)))
+        return role
+    return None
+
+
 async def ensure_roles(guild):
     have = {r.name: r for r in guild.roles}
     out = {}
     new = set()
     for name, colour, hoist, perms in ROLES:
+        if name not in have and not ONLY:
+            old = await rename_role(have, name)
+            if old is not None:
+                have[name] = old
         if name in have:
             out[name] = have[name]
             kept.append('role ' + name)
+            if not ONLY:
+                await keep_role(have[name], hoist, perms)
             continue
         if ONLY:
             continue
@@ -1032,6 +1299,72 @@ async def ensure_roles(guild):
     return out
 
 
+def with_members(live, want):
+    """want, plus every overwrite live has for one member who is not the
+       bot. Those are somebody's own (a moderator's mute, a person let into
+       one channel), set by hand on purpose, and the plan never names people."""
+    out = dict(want)
+    names = set(id(t) for t in want)
+    for t, o in (live or {}).items():
+        if id(t) in names or hasattr(t, 'permissions'):
+            continue
+        guild = getattr(t, 'guild', None)
+        if getattr(t, 'id', None) == getattr(getattr(guild, 'me', None), 'id', -2):
+            continue
+        out[t] = o
+    return out
+
+
+async def keep_overwrites(place, want, what):
+    """Set a category's or channel's overwrites to exactly what its mode
+       gives (#3317), keeping each member's own. Nothing is asked of Discord
+       when they already match."""
+    guild = getattr(place, 'guild', None)
+    live = getattr(place, 'overwrites', {}) or {}
+    full = with_members(live, want)
+    if not overwrite_diff(guild, live, full):
+        return
+    if CHECK:
+        say('would change', what + ' gets the overwrites of its mode')
+        return
+    try:
+        await place.edit(overwrites=full,
+                         reason='Thornswood setup, the overwrites of its mode')
+        say('access', what + ' has the overwrites of its mode')
+    except discord.HTTPException as e:
+        failed.append('%s kept its old overwrites (%s)' % (what, refused(e)))
+
+
+async def bring_back(guild, cat, spec, want):
+    """A planned channel that is not in its place, found under a name and
+       category it had before (spec['was']) and renamed or moved here, so its
+       id, history and posts go with it. None when there is none; False under
+       -Check, which only says it would."""
+    for old_cat, old_name in spec.get('was') or ():
+        for ch in guild.channels:
+            if isinstance(ch, discord.CategoryChannel):
+                continue
+            where = getattr(getattr(ch, 'category', None), 'name', None)
+            # The old category may have been renamed already this run.
+            cats = (old_cat,) + tuple(n for n, olds in CATEGORY_WAS.items()
+                                      if old_cat in olds)
+            if ch.name == old_name and where in cats:
+                what = '#%s in %s becomes #%s in %s' % (old_name, where, want,
+                                                        getattr(cat, 'name', 'no category'))
+                if CHECK:
+                    say('would move', what)
+                    return False
+                try:
+                    await ch.edit(name=want, category=cat,
+                                  reason='Thornswood setup, renamed or moved by the plan')
+                    say('moved', what)
+                    return ch
+                except discord.HTTPException as e:
+                    failed.append('%s (%s)' % (what, refused(e)))
+                    return None
+    return None
+
+
 async def ensure_channel(guild, cat, spec, roles, found):
     name = spec['name']
     kind = spec['kind']
@@ -1042,8 +1375,13 @@ async def ensure_channel(guild, cat, spec, roles, found):
         if ch.name == want and getattr(ch, 'category', None) == cat:
             existing = ch
             break
-    ow = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
-                    bot_needs(spec), spec.get('extra_roles'))
+    ow = spec_overwrites(guild, spec, roles)
+
+    if existing is None:
+        existing = await bring_back(guild, cat, spec, want)
+        if existing is False:
+            # -Check: it would be renamed or moved here, and said so.
+            return None
 
     if existing is None and not spec.get('make', True):
         # In the plan so prune leaves the name alone, gone on purpose, and not
@@ -1113,8 +1451,7 @@ async def ensure_channel(guild, cat, spec, roles, found):
                     await existing.edit(topic=spec['topic'])
                 except discord.HTTPException as e:
                     failed.append('#%s kept its old topic (%s)' % (want, refused(e)))
-        await keep_bot(existing, bot_needs(spec))
-        await keep_extra(existing, spec, roles)
+        await keep_overwrites(existing, ow, '#' + want)
 
     if kind == 'announce' and isinstance(existing, discord.TextChannel):
         try:
@@ -1130,6 +1467,134 @@ async def ensure_channel(guild, cat, spec, roles, found):
     if spec.get('key'):
         found[spec['key']] = existing
     return existing
+
+
+# ------------------------------------------------------------ changelogs --
+# Every channel the build writes is a doc, and every doc keeps a changelog
+# (#3317). Its words are fingerprinted as both the alpha and the open wording
+# say them (content.py's one switch), so flipping the switch is a change that
+# needs its line as well.
+
+def doc_texts(key):
+    """(alpha words, open words) of one doc, each from a fresh read of
+       content.py with the switch set, so neither depends on how this run
+       was started."""
+    import importlib.util
+    out = []
+    old = os.environ.get('THORNSWOOD_OPEN')
+    try:
+        for flag in ('0', '1'):
+            os.environ['THORNSWOOD_OPEN'] = flag
+            spec = importlib.util.spec_from_file_location(
+                'content_' + flag, os.path.join(os.path.dirname(os.path.abspath(C.__file__)), 'content.py'))
+            mod = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(mod)
+            out.append(mod.DOCS[key])
+    finally:
+        if old is None:
+            os.environ.pop('THORNSWOOD_OPEN', None)
+        else:
+            os.environ['THORNSWOOD_OPEN'] = old
+    return tuple(out)
+
+
+def doc_print(key):
+    """The fingerprint of a doc's words: twelve hex digits of their sha256."""
+    import hashlib
+    a, b = doc_texts(key)
+    return hashlib.sha256((a + '\0' + b).encode('utf-8')).hexdigest()[:12]
+
+
+def doc_keys():
+    """Every PLAN key whose channel the build writes."""
+    return [s['key'] for _, specs in PLAN for s in specs if s.get('post')]
+
+
+def check_docs():
+    """What stops a build: a written channel with no words, or whose words
+       have no change line. [] when every doc is in order."""
+    bad = []
+    for key in doc_keys():
+        if key not in C.DOCS:
+            bad.append('%s is written by the build and content.py DOCS has no words for it' % key)
+            continue
+        if key in C.DRAFTS:
+            continue
+        lines = C.CHANGES.get(key) or []
+        fp = doc_print(key)
+        if not lines or lines[-1][2] != fp:
+            bad.append('%s: its words have no change line. Add (\'<YYYY-MM-DD>\', '
+                       '\'<what changed and why>\', \'%s\') to the end of '
+                       'CHANGES[\'%s\'] in content.py' % (key, fp, key))
+    return bad
+
+
+def nice_date(iso):
+    import datetime
+    d = datetime.date.fromisoformat(iso)
+    return '%d %s %d' % (d.day, d.strftime('%b'), d.year)
+
+
+def change_lines(key):
+    """The changelog of a doc as the thread says it, oldest first."""
+    return ['**%s**: %s' % (nice_date(d), line) for d, line, _ in C.CHANGES.get(key) or []]
+
+
+def doc_with_footer(key):
+    """A doc's words, ending on its newest change."""
+    lines = C.CHANGES.get(key) or []
+    text = C.DOCS[key]
+    if lines:
+        d, line, _ = lines[-1]
+        text = text.rstrip() + '\n\n*Last changed %s: %s Every change is in the Changelog thread.*\n' % (
+            nice_date(d), line)
+    return text
+
+
+CHANGELOG = 'Changelog'
+
+
+async def keep_changelog(channel, key):
+    """The channel's Changelog thread, made and locked if missing, with
+       every change line of its doc posted once, in order. Nothing in it is
+       ever deleted or rewritten, so it is the record of what changed."""
+    if channel is None or not hasattr(channel, 'create_thread'):
+        return
+    thread = None
+    for t in getattr(channel, 'threads', None) or []:
+        if t.name == CHANGELOG:
+            thread = t
+    if thread is None:
+        try:
+            async for t in channel.archived_threads(limit=100):
+                if t.name == CHANGELOG:
+                    thread = t
+                    break
+        except discord.HTTPException as e:
+            failed.append('#%s: its Changelog thread could not be looked for (%s)' % (channel.name, refused(e)))
+            return
+    if thread is None:
+        try:
+            kind = (discord.ChannelType.news_thread
+                    if getattr(channel, 'type', None) is discord.ChannelType.news
+                    else discord.ChannelType.public_thread)
+            thread = await channel.create_thread(name=CHANGELOG, type=kind,
+                                                 reason='Thornswood setup, the changelog')
+            await thread.edit(locked=True)
+            say('changelog', '#' + channel.name + ' has its Changelog thread')
+        except discord.HTTPException as e:
+            failed.append('#%s: its Changelog thread could not be made (%s)' % (channel.name, refused(e)))
+            return
+    have = set()
+    try:
+        async for m in thread.history(limit=500):
+            if m.author.id == client.user.id:
+                have.add(m.content)
+        for line in change_lines(key):
+            if line not in have:
+                await thread.send(line)
+    except discord.HTTPException as e:
+        failed.append('#%s: its changelog was not brought up to date (%s)' % (channel.name, refused(e)))
 
 
 async def post(channel, text, found):
@@ -1346,15 +1811,6 @@ def plan_for(only):
     return out
 
 
-# The gate a category this makes is given. A category's channels carry their
-# own modes; this is the category's own, which the audit reads as well.
-CATEGORY_MODE = {'Staff': 'staff', 'Testing': 'pathfind',
-                 'Gamemasters': 'gm',
-                 'The Holds': 'hold',
-                 'Start Here': 'public',
-                 'Applications': 'public'}
-
-
 # discord.py hands View Channel back under its old name, read_messages. The
 # audit says it the way Discord's own permissions page and this file do.
 SAID = {'read_messages': 'view_channel'}
@@ -1444,8 +1900,266 @@ def doubles(members, ranks=None):
     return out
 
 
+def seat_clashes(members):
+    """[(member, [staff role, ...], [seat, ...])] for everybody on staff who
+       also holds a Jarl or faction leader seat (#3317, Patrick, 22 Oct: no
+       staff role may also be a faction leader, and Jarls are faction
+       leaders)."""
+    out = []
+    for m in members:
+        mine = [r.name for r in getattr(m, 'roles', ()) or ()]
+        staff = [n for n in mine if n in STAFF]
+        seats = [n for n in mine if n in SEATS]
+        if staff and seats:
+            out.append((m, staff, seats))
+    return out
+
+
+def order_slips(roles_by_name):
+    """[(higher, lower)] for each pair of neighbouring plan roles the live
+       list has the wrong way round: higher is above lower in the plan and
+       below it on the server. Roles something else manages are counted too,
+       because the run never moves those (role_moves) and only this says
+       where they are."""
+    present = [roles_by_name[n] for n, _, _, _ in ROLES if n in roles_by_name]
+    return [(a.name, b.name) for a, b in zip(present, present[1:])
+            if a.position < b.position]
+
+
 def _who(m):
     return getattr(m, 'display_name', None) or getattr(m, 'name', None) or str(getattr(m, 'id', '?'))
+
+
+# --------------------------------------------------------------- layout --
+# THE LAYOUT, WRITTEN OUT (#3317, Patrick, 22 Oct: "we also need to document
+# the discord layout somewhere ... so that we dont accidentally drift using
+# the script and we can quickly ask an agent a question about it").
+# docs/systems/discord.md is made from ROLES and PLAN by
+#
+#     python3.12 bot/Build-Discord.py --layout
+#
+# and bot/test-3317-layout.py fails when the file and the plan differ, so the
+# page is the plan in words and never a second copy that drifts. -Audit says
+# where the live server differs from both.
+LAYOUT_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..',
+                           'docs', 'systems', 'discord.md')
+
+# What each staff rank does, in Patrick's words of 22 Oct (#3317).
+ROLE_DOES = {
+    'Owner': 'Final decision with Co-Owner. Administrator.',
+    'Co-Owner': 'Final decision with Owner. Administrator.',
+    'Lead Dev': 'Leads the developers; on the council.',
+    'Lead Gamemaster': 'Leads the gamemasters; on the council.',
+    'Lead Loremaster': 'Leads the loremasters; on the council.',
+    'Lead Moderator': 'Leads the moderators; on the council.',
+    'Lead Content Creator': 'Leads Thornswood\'s own content; on the council.',
+    'Lead Support': 'Leads support; on the council.',
+    'Dev': 'Builds the game, the launcher, the site and the bot. Plays the dev build.',
+    'Gamemaster': 'Runs scenes and events in the world.',
+    'Trial Gamemaster': 'A gamemaster on trial; where every accepted GM starts.',
+    'Loremaster': 'Makes and watches the lore, helps with events, and checks '
+                  'that gamemasters keep to the lore.',
+    'Moderator': 'Moderates the Discord only. No staff powers in the game.',
+    'Content Creator': 'Thornswood\'s own social media and content, not '
+                       'community creators.',
+    'Support': 'Answers help tickets and playtest applications, and gives Playtester.',
+    'Playtester': 'Plays the main build. Opens the Discord past Information.',
+    'Member': 'Joined and answered the rules and age questions. Sees Start '
+              'Here, Applications and Information.',
+    'Banned': 'Takes the site and the game away (site/server.js, access.banned).',
+    'Thalmor Boot-Licker': 'A Patreon tier; Patreon gives and takes it.',
+    'Talos Worshiper': 'A Patreon tier; Patreon gives and takes it.',
+    'Milk Drinker': 'A Patreon tier; Patreon gives and takes it.',
+    'Server Booster': 'Boosted the server.',
+    'Patreon': 'Supports Thornswood on Patreon; Patreon gives and takes it.',
+}
+for _h in OFFICE_HOLDS:
+    ROLE_DOES['Jarl of ' + _h] = 'The seat of %s. Applied for on its own application.' % _h
+for _f, _n in zip(FACTIONS, FACTION_LEADERS):
+    ROLE_DOES[_n] = 'Leads %s. Applied for as Faction Leader.' % _f
+
+# The named permission sets, so a role's line says which and the sets are
+# spelled out once.
+PERMISSION_SETS = (('Administrator', ADMIN), ('council set', COUNCIL),
+                   ('moderator set', MOD), ('gamemaster set', GM),
+                   ('support set', SUPPORT), ('nothing of its own', NONE))
+
+# Groups a list of role names is said in, largest first.
+_GROUPS = (('everybody on staff', STAFF), ('the council', COUNCIL_ROLES),
+           ('Owner and Co-Owner', OWNERS))
+
+
+def _set_name(p):
+    for name, q in PERMISSION_SETS:
+        if p.value == q.value:
+            return name
+    return ', '.join(perm_names(p))
+
+
+def _names_words(names):
+    """A list of role names, with whole groups said by the group's name."""
+    left = list(dict.fromkeys(names))
+    out = []
+    for label, group in _GROUPS:
+        if group and all(n in left for n in group):
+            out.append(label)
+            left = [n for n in left if n not in group]
+    return ', '.join(out + left) or 'nobody'
+
+
+def _made_by(name):
+    if name == 'Server Booster':
+        return 'Discord'
+    if name == 'Patreon':
+        return 'Patreon'
+    if name in ('News Pings', 'Updates Pings'):
+        return 'bot.py'
+    return 'the build'
+
+
+def _spec_name(spec):
+    return spec['name'] if spec['kind'] == 'voice' else '#' + spec['name'].lower().replace(' ', '-')
+
+
+def _audience_words(mode, hold=None, space=None, read_extra=(), extra=()):
+    """(reads, talks, posts) of one place, in words."""
+    if mode == 'public':
+        return 'everybody', 'everybody', 'everybody'
+    readers, talkers, posters = mode_audience(mode, hold, space)
+    readers = tuple(readers) + tuple(read_extra or ())
+    talkers = tuple(talkers) + tuple(extra or ())
+    see = readers + talkers + posters
+    if mode == 'read':
+        return 'everybody', _names_words(talkers + posters), _names_words(posters)
+    return (_names_words(see), _names_words(talkers + posters) if talkers or posters else 'nobody',
+            _names_words(posters) if posters else '')
+
+
+def layout():
+    """docs/systems/discord.md, from ROLES and PLAN."""
+    L = []
+    w = L.append
+    w('# The Discord layout')
+    w('')
+    w('Made from `bot/Build-Discord.py` (ROLES and PLAN) by')
+    w('`python3.12 bot/Build-Discord.py --layout`. Do not edit it by hand:')
+    w('change the plan and run that, and `bot/test-3317-layout.py` fails when')
+    w('the two differ. `Setup-Discord.ps1 -OnBox -Audit` says where the live')
+    w('server differs from this page. Issue #3317 is where it was set out.')
+    w('')
+    w('## The staff council')
+    w('')
+    w('Each staff category has a lead, and the leads are the council: they')
+    w('decide together, and Owner and Co-Owner make the final call. A person')
+    w('holds at most one rank in a category (Lead Dev and Dev is a double);')
+    w('ranks of two categories are fine, and Owner or Co-Owner with a lead is')
+    w('fine. The audit reports every double.')
+    w('')
+    w('Nobody on staff holds a seat of the world: a Jarl or a faction leader.')
+    w('A Jarl is a faction leader with its own application, which lists only')
+    w('the holds with no Jarl. The audit reports anybody holding both.')
+    w('')
+    w('Leads and Support hold Manage Roles and give only their own')
+    w('category\'s roles (Support gives Playtester). Every staff role sits')
+    w('above every other role.')
+    w('')
+    w('| Category | Its space | Lead | Ranks under the lead |')
+    w('|---|---|---|---|')
+    for c in STAFF_CATEGORIES:
+        w('| %s | %s | %s | %s |' % (c[0], c[1], c[3], ', '.join(c[4])))
+    w('')
+    if SPACE_GUESTS:
+        for sp, guests in SPACE_GUESTS.items():
+            w('Holders of %s also talk in the %s space.' % (' and '.join(guests), sp))
+        w('')
+    w('## Roles, top of the list first')
+    w('')
+    w('| Role | Colour | Shown on its own | Permissions | Made by | What it is |')
+    w('|---|---|---|---|---|---|')
+    for name, colour, hoist, perms in ROLES:
+        w('| %s | #%06X | %s | %s | %s | %s |' % (
+            name, colour, 'yes' if hoist else 'no',
+            'left to what makes it' if name in NOT_MADE else _set_name(perms),
+            _made_by(name), ROLE_DOES.get(name, '')))
+    w('')
+    w('@everyone keeps what the server gives it; the build does not change it,')
+    w('and the audit prints it. Every other role opens exactly the channels')
+    w('below that name it.')
+    w('')
+    w('### The permission sets')
+    w('')
+    for name, p in PERMISSION_SETS:
+        if p.value:
+            w('- **%s**: %s' % (name, ', '.join(perm_names(p))))
+    w('')
+    w('## Who a mode lets in')
+    w('')
+    w('Every category and channel has a mode. Reads means sees and reads back;')
+    w('talks means posts as well; posts in a read only place means writes and')
+    w('tidies there. A staff space mode is said for the space it names.')
+    w('')
+    w('| Mode | Sees | Talks | Posts |')
+    w('|---|---|---|---|')
+    for mode in ('public', 'read', 'membersread', 'open', 'pathfind', 'testersread',
+                 'staff', 'staffread', 'council'):
+        r, t, p = _audience_words(mode)
+        w('| %s | %s | %s | %s |' % (mode, r, t, p or '-'))
+    r, t, p = _audience_words('hold', 'Whiterun')
+    w('| hold (Whiterun) | %s | %s | %s |' % (r, t, p or '-'))
+    for mode in ('space', 'spaceread', 'spacerules'):
+        r, t, p = _audience_words(mode, space='Lore')
+        w('| %s (Lore) | %s | %s | %s |' % (mode, r, t, p or '-'))
+    w('')
+    w('## Categories and channels, in order')
+    w('')
+    for catname, specs in PLAN:
+        cmode, cspace = category_mode(catname)
+        was = CATEGORY_WAS.get(catname)
+        w('### %s' % catname)
+        w('')
+        w('Category mode: %s%s.%s' % (cmode, ' (%s)' % cspace if cspace else '',
+                                      ' It was %s.' % ', '.join(was) if was else ''))
+        w('')
+        w('| Channel | Kind | Mode | Sees | Talks | Notes |')
+        w('|---|---|---|---|---|---|')
+        for spec in specs:
+            mode = spec.get('mode', 'open')
+            r, t, p = _audience_words(mode, spec.get('hold'), spec.get('space'),
+                                      spec.get('read_extra'), spec.get('extra_roles'))
+            notes = []
+            if p:
+                notes.append('posts: ' + p)
+            if spec.get('post'):
+                notes.append('written by the build from content.py %s%s' % (
+                    spec['key'], ', a draft waiting on approval' if spec['key'] in C.DRAFTS
+                    else ', with its Changelog thread'))
+            if spec.get('make', True) is False:
+                notes.append('never made by the build')
+            for oc, on in spec.get('was') or ():
+                notes.append('was #%s in %s' % (on, oc) if spec['kind'] != 'voice'
+                             else 'was %s in %s' % (on, oc))
+            if spec.get('topic'):
+                notes.append('topic: ' + spec['topic'].replace('|', '/'))
+            w('| %s | %s | %s | %s | %s | %s |' % (
+                _spec_name(spec), spec['kind'], mode + (' (%s)' % spec['hold'] if spec.get('hold') else ''),
+                r, t, '; '.join(notes)))
+        w('')
+    if RETIRED_CATEGORIES:
+        w('## Retired')
+        w('')
+        w('Categories retired by the plan, removed by `-Prune` once empty: %s.'
+          % ', '.join(RETIRED_CATEGORIES))
+        w('')
+        w('Channel names the build no longer wants, removed by `-Prune`: %s.'
+          % ', '.join(RETIRED))
+        w('')
+    roles = set(n for n, _, _, _ in ROLES)
+    w('Channels never deleted by anything in the build: %s.'
+      % ', '.join(sorted(set(k for k in KEEP if k not in roles))))
+    w('')
+    w('Roles never deleted: every Jarl, Citizen and office role.')
+    w('')
+    return '\n'.join(L)
 
 
 async def audit(guild):
@@ -1505,9 +2219,6 @@ async def audit(guild):
     staff_names = []
     for _, names in STAFF_RANKS:
         staff_names += list(names)
-    for n in list(STAFF) + list(GM_AREA) + ['Loremaster', 'Content Creator']:
-        if n not in staff_names:
-            staff_names.append(n)
     for n in staff_names:
         r = have.get(n)
         if r is not None:
@@ -1518,6 +2229,13 @@ async def audit(guild):
             line('%s: %d member(s)' % (n, len(r.members)))
     for m, cat, held in doubles(guild.members):
         off('%s holds %s, two ranks of %s' % (_who(m), ' and '.join(held), cat))
+    for m, staff, seats in seat_clashes(guild.members):
+        off('%s is on staff (%s) and holds %s; staff hold no seat'
+            % (_who(m), ', '.join(staff), ', '.join(seats)))
+
+    print('\n  Role order against the plan', flush=True)
+    for hi, lo in order_slips(have):
+        off('role %s sits below %s; the plan has it above' % (hi, lo))
 
     print('\n  Categories and channels against the plan', flush=True)
     ours = set()
@@ -1527,8 +2245,10 @@ async def audit(guild):
             off('category %s is not on the server' % catname)
             continue
         if cat is not None:
+            cmode, cspace = category_mode(catname)
+            want_ow = overwrites(guild, cmode, roles, space=cspace)
             for d in overwrite_diff(guild, cat.overwrites,
-                                    overwrites(guild, CATEGORY_MODE.get(catname, 'open'), roles)):
+                                    with_members(cat.overwrites, want_ow)):
                 off('category %s, %s' % (catname, d))
         for spec in specs:
             kind = spec['kind']
@@ -1543,8 +2263,9 @@ async def audit(guild):
                 if spec.get('make', True):
                     off('#%s is not in %s' % (want, catname))
                 continue
-            plan = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
-                              bot_needs(spec), spec.get('extra_roles'))
+            # A member's own overwrite is kept by the build, so it is not a
+            # difference either.
+            plan = with_members(ch.overwrites, spec_overwrites(guild, spec, roles))
             for d in overwrite_diff(guild, ch.overwrites, plan):
                 off('#%s, %s' % (want, d))
     for c in guild.channels:
@@ -1562,6 +2283,29 @@ async def audit(guild):
 
     print('\n  %d difference(s). Nothing was changed.\n' % bad[0], flush=True)
     return bad[0]
+
+
+async def rename_category(guild, catname):
+    """The category catname used to be (CATEGORY_WAS), renamed to it, so its
+       channels and their ids stay where they are (#3317). Under -Check it is
+       only said, and the old category is handed back so the rest of the
+       check reads the channels in it."""
+    for old in CATEGORY_WAS.get(catname, ()):
+        cat = discord.utils.get(guild.categories, name=old)
+        if cat is None:
+            continue
+        what = 'category %s becomes %s' % (old, catname)
+        if CHECK:
+            say('would rename', what)
+            return cat
+        try:
+            await cat.edit(name=catname, reason='Thornswood setup, renamed by the plan')
+            say('renamed', what)
+            return cat
+        except discord.HTTPException as e:
+            failed.append('%s (%s)' % (what, refused(e)))
+            return cat
+    return None
 
 
 @client.event
@@ -1603,7 +2347,11 @@ async def on_ready():
         for catname, specs in plan_for(ONLY):
             cat = None
             if catname:
+                cmode, cspace = category_mode(catname)
+                cat_ow = overwrites(guild, cmode, roles, space=cspace)
                 cat = discord.utils.get(guild.categories, name=catname)
+                if cat is None:
+                    cat = await rename_category(guild, catname)
                 if cat is None and ONLY and catname not in ONLY:
                     # Under ONLY a category is made only when it is named
                     # itself, never for a channel named inside it.
@@ -1621,22 +2369,20 @@ async def on_ready():
                                  spec['name'].lower().replace(' ', '-')))
                     continue
                 if cat is None:
-                    mode = CATEGORY_MODE.get(catname, 'open')
                     cat = await guild.create_category(
-                        catname, overwrites=overwrites(guild, mode, roles),
-                        reason='Thornswood setup')
+                        catname, overwrites=cat_ow, reason='Thornswood setup')
                     made.append(catname)
                     say('category', catname)
                 else:
                     kept.append(catname)
                     if not ONLY or catname in ONLY:
-                        await keep_bot(cat)
+                        await keep_overwrites(cat, cat_ow, 'category ' + catname)
             done = []
             for spec in specs:
                 ch = await ensure_channel(guild, cat, spec, roles, found)
                 done.append(ch)
                 if spec.get('post'):
-                    posts.append((ch, spec['post']))
+                    posts.append((ch, spec['key']))
             # A channel somebody made by hand inside one of these categories
             # is shut to @everyone like the gate around it, and the bot only
             # saw it because of Administrator. The staff #news the site
@@ -1705,19 +2451,49 @@ async def on_ready():
                 print('             somebody is using belongs in the plan')
                 print('             instead. Ask in #staff-updates first.')
 
+        # A category the plan emptied (RETIRED_CATEGORIES), once nothing is
+        # left in it. One that still holds a channel is said and left, so
+        # nothing in it goes with it.
+        for name in RETIRED_CATEGORIES:
+            cat = discord.utils.get(guild.categories, name=name)
+            if cat is None:
+                continue
+            inside = [c for c in guild.channels
+                      if getattr(c, 'category', None) == cat]
+            if inside:
+                say('note', 'category %s is retired and still holds %s; '
+                    'it goes once it is empty' % (name, ', '.join('#' + c.name for c in inside)))
+            elif not PRUNE:
+                say('note', 'category %s is empty and retired. -Prune removes it' % name)
+            elif CHECK:
+                say('would remove', 'category ' + name)
+            else:
+                try:
+                    await cat.delete(reason='Thornswood setup, retired by the plan')
+                    say('removed', 'category ' + name)
+                except discord.HTTPException as e:
+                    failed.append('could not remove category %s (%s)' % (name, refused(e)))
+
         print('')
+        # A draft waits for its lead and Patrick (#3317) and is never written.
+        drafts = [(ch, k) for ch, k in posts if k in C.DRAFTS]
+        posts = [(ch, k) for ch, k in posts if k not in C.DRAFTS]
+        for ch, k in drafts:
+            say('left alone', '#%s: its words are a draft waiting on approval'
+                % getattr(ch, 'name', k.lower()))
         if CHECK and POSTS:
-            for ch, text in posts:
+            for ch, key in posts:
                 if ch is not None:
-                    say('would write', '#' + ch.name)
+                    say('would write', '#' + ch.name + ' and its changelog')
         elif CHECK and posts:
             # What the same run without -Check does: it leaves them alone.
             # This said would write for all seven whether or not -Posts was
             # given (#2519, 22 Oct).
             say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
         elif POSTS:
-            for ch, text in posts:
-                await post(ch, text, found)
+            for ch, key in posts:
+                await post(ch, doc_with_footer(key), found)
+                await keep_changelog(ch, key)
         elif posts:
             say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
 
@@ -1784,7 +2560,17 @@ async def on_ready():
         await client.close()
 
 
+if __name__ == '__main__' and '--layout' in sys.argv:
+    with open(LAYOUT_FILE, 'w', encoding='utf-8', newline='\n') as f:
+        f.write(layout())
+    print('wrote ' + os.path.normpath(LAYOUT_FILE))
+    sys.exit(0)
+
 if __name__ == '__main__':
+    _bad = check_docs()
+    if _bad and not AUDIT:
+        sys.exit('A doc has words with no change line, so nothing was asked of '
+                 'Discord (#3317):\n  ' + '\n  '.join(_bad))
     try:
         plan_for(ONLY)
     except ValueError as e:
