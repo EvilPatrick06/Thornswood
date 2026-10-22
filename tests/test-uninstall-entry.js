@@ -286,7 +286,6 @@ const MUST_NOT = [
   ['ThornIni.UndoShippedFov', 'the field of view fix'],
   ['SteamUpdates.Report', 'Steam\'s Updates setting for Skyrim read and reported'],
   ['Display.MatchScreen', 'the game set to the screen'],
-  ['Display.ScaleMenus', 'the menus sized'],
   ['Icons.Ensure', 'the shortcut icon'],
   ['Uninstall.DropScratch', 'the installer leftovers cleared at startup (the uninstall does it itself)'],
   ['Voice.Prepare', 'voice'],

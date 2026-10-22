@@ -129,6 +129,16 @@ preset for SkyHUD 0.90B, by the SkyHUD Team, the version the collection
 installs. SkyHUD's author lets anybody share a preset that says which version
 it is for, and nothing else of SkyHUD's comes with it.
 
+**QuickLoot IE's settings**, `Data\SKSE\Plugins\QuickLootIE.json`, are
+QuickLoot IE 4.1.3's own settings file with one line added by Thornswood, so
+its loot menu shows weight and no gold value. QuickLoot IE is under the GNU
+General Public License version 3, and so is this file.
+
+**SkyUI's item lists and item card, SkyHUD's line under an item and moreHUD's
+value to weight** show no gold value on Thornswood, because an item here has
+no gold price. Thornswood ships none of those files: the launcher makes them
+on your computer from your own copy of each mod.
+
 **Tavern**, the font Skyrim Platform draws its text in, is Typey McTypeface by
 Paul J. Miller and Dieter Steffmann, under the SIL Open Font License. It comes
 with SkyMP.

@@ -10,6 +10,7 @@
     "no-licence-found": "Somebody else's, and nothing found gives Thornswood the right to hand it on. Ships today. Its issue carries the decision.",
     "withheld": "Never ships: packs and the installer leave it out and delete it from installs.",
     "made-from-game": "Bethesda's own file, edited, or put together from Bethesda's: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own game archives (#2827), so nobody is handed the game's files. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
+    "made-from-mods": "One of the collection's mods' own files, edited: it never ships. The launcher, and Go.ps1, make it on each machine from that machine's own copy of the mod, out of its archive (#3113), so nobody is handed the mod's file. Its record is the Ship-Rules.ps1 list that keeps it out of every pack and the installer. Nothing to ask.",
     "not-published": "In this private repository only; nobody outside the team receives it."
   },
   "assets": [
@@ -459,6 +460,19 @@
       "status": "cleared"
     },
     {
+      "path": "game/ours/Data/SKSE/Plugins/QuickLootIE.json",
+      "sha256": "41fdc7a0d5b38c5b91b0032843db71c06073e56a9d704ab170c9817908323627",
+      "what": "QuickLoot IE 4.1.3's settings file with one override added, \"_root.lootMenu.infoColumns\": [\"weight\"], so the loot menu shows weight and no gold value column (#3113), and a comment at the top saying what Thornswood changed and when. Hash as git stores it, with LF line endings.",
+      "published": "Every pack and the installer (Data\\SKSE\\Plugins)",
+      "source": "QuickLoot IE's own SKSE\\Plugins\\QuickLootIE.json (1,333 bytes, sha256 113760ff7a3fa6f31dfcef43ba82682e867bf4ea1751468bc879fbeaef119c4a), from QuickLoot IE 4.1.3 (Nexus Mods, Skyrim Special Edition mod 120075, file 806802, the file collection 7essxf revision 4 installs), with one line added",
+      "creator": "QuickLoot IE's authors: the file's settings and comments; the added line and the comment at the top are Thornswood's, 22 Oct 2026",
+      "licence": "GNU General Public License version 3: QuickLoot IE carries it as QLIE-LICENSE.md (Data\\QLIE-LICENSE.md, installed by the collection beside the file). A changed copy may go out under the same licence when it says what was changed and when, which the file's first lines do",
+      "attribution": "The credits page names it as QuickLoot IE 4.1.3's settings file with Thornswood's line, under the GPL 3 (#3113)",
+      "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
+      "evidence": "The collection's revision 4 file list (/mnt/project-files/handoff/2979, layout-4 files.txt) and the file itself, downloaded 21 Oct 2026 through the Nexus Mods API; QuickLoot IE's LootMenuIE.swf (infoColumns defaults to value, weight, valuePerWeight; applyOverrides sets swfConfig.overrides after the settings); scripts\\release\\Ship-Rules.ps1 $ShipOursFiles; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "status": "cleared"
+    },
+    {
       "path": "game/content/Thornswood-Content.esp",
       "sha256": "fecfb82344aaf049461ef0e18aaa44fa5c73a00083ef76e71c8c36041a208bdf",
       "what": "Thornswood's own plugin, 272,393 bytes on 21 Oct (#2993, its header's description built from the records it holds; #1373, seven inert retrieval items, eight authored longfin markers, a non-skill ledger and its activation reference, with their required Bethesda cell parents; #2906, the Burnt Meal, a fine dish beside each of the 63 cooked dishes wearing its plain dish's look, and the burnt and fine effects; #2790, Dawnstar's western mine cell, identical to Bethesda's and holding none of its placements, taken out; #2962, the four creation menus nothing showed, the trade menu and the town menu, taken out; #2487, the key recipe carries a condition that is never true, so no forge lists it; #2679, the furniture items and their woodworking recipes, written from game/data/furniture.json; #1382, three teas, their cooking pot recipes and their effect, and the drunk screen's image space modifier; the well bucket and its 18 placements beside the wells, and the water bucket on the bank at Riverwood and Lake Honrich, with the cells and worldspaces they stand in copied from the winning masters). Every record in it is written by scripts/mods/Add-ContentRecords.py from its own numbers, or is Bethesda's own record it overrides: the cells and the worldspace its placements stand in, copied from the winning master, and the house part and woodworking recipe overrides. Its placements of the kiln, the salt quarry, the hive and the alchemy lab stand where scripts/dev/Build-StationSites.py measured Thornswood's own spots (game/data/station-sites.json). Until #400 its header said its crafting and gathering content was salvaged from another server's plugin; scripts/mods/content-salvaged.json lists every salvaged record and that none is left.",
@@ -892,6 +906,27 @@
         "Data\\meshes\\thornswood\\dropbox01.nif"
       ],
       "issue": 2827
+    },
+    {
+      "path": "Data\\Interface\\ (skyui\\config.txt, skyui\\itemcard.swf, hudmenu.swf, AHZHudInfo.swf and exported\\AHZHudInfo.swf)",
+      "what": "The collection's item menus and HUD with no gold values (#3113): SkyUI's item list layout with no value or value to weight column in any of its twelve views (37,907 bytes, sha256 13a963540cb6b2d3d3f3de633ec517fb5c7ebe988cce8616b4173445ed3450c3); SkyUI's item card with no VALUE label or value field on any card (55,440 bytes, sha256 e08c8cc1e97c237e0cf241c5fbd421345bf1a30c7fc55122dc2b0b66b9e87aa9); SkyHUD's HUD with no VALUE under an item somebody looks at (438,631 bytes, sha256 3a9fb686511a56ec4949387d3843821b64d91b7ee4a0017cc3cfeeff7cb574f5); and moreHUD's HUD info with its value to weight off, both copies (36,077 bytes, sha256 486ac4d42a1c0b409b27412ed0471bdc57bd211eaa024bf0f816608b6bfd3c9b).",
+      "published": "Never: the launcher makes them before every Play from the person's own SkyUI_SE.bsa, SkyHUD.bsa and AHZmoreHUD.bsa (launcher\\app\\MadeFromGame.cs), and Go.ps1 does the same for a hand-run install",
+      "source": "SkyUI's interface\\skyui\\config.txt and itemcard.swf (SkyUI_SE.bsa, Nexus Mods mod 12604, file 749043), SkyHUD 0.90B's interface\\hudmenu.swf (SkyHUD.bsa, mod 463, file 61422) and moreHUD 5.4.5's interface\\ahzhudinfo.swf and interface\\exported\\ahzhudinfo.swf (AHZmoreHUD.bsa, mod 12688, file 803483), the files collection 7essxf revision 4 installs, edited. What the repository holds is the edits, as the bytes that change, each pinned to the sha256 of the mod's own file (launcher\\app\\FromGameModMenus.cs, written by scripts\\mods\\Build-ModMenus.py), not the files",
+      "creator": "SkyUI's, SkyHUD's and moreHUD's authors; edited for Thornswood on 21 and 22 Oct 2026 by scripts\\mods\\Build-ModMenus.py",
+      "licence": "Each mod's own terms on its Nexus Mods page; none of them lets Thornswood hand these files on, edited or not, so they are made on each machine from the person's own copy",
+      "attribution": "The site's credits page says Thornswood ships none of them and makes them from the person's own copy of each mod (#3113)",
+      "approved": "Patrick, 21 Oct 2026: items have no gold price on Thornswood, and #3113 asks for the gold value display gone",
+      "evidence": "The measurement on #3113, 21 Oct 2026; launcher\\app\\FromGame.cs, FromGameModMenus.cs and MadeFromGame.cs; scripts\\mods\\Build-ModMenus.py; scripts\\release\\Ship-Rules.ps1 $ShipMadeFromMods; tests\\test-2827-from-game.ps1; THIRD-PARTY.md, The collection's menus, with no gold values.",
+      "status": "made-from-mods",
+      "record": "scripts/release/Ship-Rules.ps1#ShipMadeFromMods",
+      "paths": [
+        "Data\\Interface\\skyui\\config.txt",
+        "Data\\Interface\\skyui\\itemcard.swf",
+        "Data\\Interface\\hudmenu.swf",
+        "Data\\Interface\\AHZHudInfo.swf",
+        "Data\\Interface\\exported\\AHZHudInfo.swf"
+      ],
+      "issue": 3113
     }
   ],
   "dispositions": [

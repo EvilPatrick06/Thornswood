@@ -652,6 +652,34 @@ a wallpaper replacer's plate whose maker was never found, `logo01ae.nif`
 made from it, and `Data\music\special\mus_maintheme.xwm`, made new as
 silence.
 
+## The collection's menus, with no gold values
+
+An item on Thornswood has no gold price (#3113), and five files of three of
+the collection's mods draw one: SkyUI's item lists and item card
+(`interface\skyui\config.txt` and `itemcard.swf` in `SkyUI_SE.bsa`, Nexus
+Mods mod 12604, file 749043), SkyHUD 0.90B's line under an item somebody
+looks at (`interface\hudmenu.swf` in `SkyHUD.bsa`, mod 463, file 61422), and
+moreHUD 5.4.5's value to weight beside it (`interface\ahzhudinfo.swf` and its
+copy under `exported` in `AHZmoreHUD.bsa`, mod 12688, file 803483). They are their authors' work, and nothing on
+those mods' pages lets Thornswood hand them on, so none of them ships: the
+launcher makes the five before every Play from the person's own copy of each
+mod, out of its archive, the same way as Bethesda's files above
+(`launcher\app\FromGame.cs`, `MadeFromGame.cs`), and `scripts\release\Go.ps1`
+does the same for a hand-run install. What the repository holds is the edit,
+as the bytes that change, each pinned to the sha256 of the collection's
+version of the file (`launcher\app\FromGameModMenus.cs`, written by
+`scripts\mods\Build-ModMenus.py`), not the files. `Ship-Rules.ps1`
+`$ShipMadeFromMods` keeps the five out of every pack, release record and
+installer.
+
+`Data\SKSE\Plugins\QuickLootIE.json` does ship: QuickLoot IE 4.1.3's own
+settings file (Nexus Mods mod 120075, file 806802) with one line added, which
+sets its loot menu's columns to weight only. QuickLoot IE is under the GNU
+General Public License version 3, which lets a changed copy go out under the
+same licence when it says what was changed and when; the file says both in
+its first lines, and the collection installs the licence beside it as
+`Data\QLIE-LICENSE.md`.
+
 ## Made for Thornswood by somebody else
 
 - `Data\Platform\UI\thornswood-theme.mp3` (in the repo as
