@@ -1056,9 +1056,10 @@ How to use it:
   only a developer can make the check (Dev, below). To better the test task
   after the merge, write a newer `Test task:` comment of the same kind on
   the issue and leave it open: the Ship closes it with yours instead. A
-  Dev test task never keeps the issue open. An issue moved to Done by hand, with no done-on-merge comment, is
-  one the Ship cannot tell it carries, so whoever moved it closes it, with
-  its `Test task:` comment, when its fix is on main. To see what a main Ship
+  Dev test task never keeps the issue open. An issue moved to Done by hand,
+  with no done-on-merge comment, is one the Ship cannot tell it carries, so
+  whoever moved it closes it, with its `Test task:` comment, when its fix is
+  on main. To see what a main Ship
   would close, without closing anything:
   `.\scripts\release\Close-ShippedIssues.ps1 -Commit origin/main -Check`.
 
