@@ -36,9 +36,9 @@
        named by Windows's list for each file, which took the Restart
        Manager's place (#3274: its one lock for the whole box was not had in
        time with two builds on it). A folder's refusal says whether the
-       folder itself would not open to be renamed or the folder it goes
-       into would not take it, the second named by who has that open
-       without write sharing (#3262).
+       folder itself would not open to be renamed, or it opened and the
+       rename was refused; the folder it goes into, held by another process
+       sharing neither write nor delete, does not refuse it (#3262).
     5. This process, and an id with nothing running, are never opened.
 
   It also prints, without failing on it, how many of ten folders were refused
@@ -285,9 +285,10 @@ try {
     $held = @(Get-ThornswoodProcessHeld @($p.Id))
     $null = @(Stop-ThornswoodProcessHeld $held)
 
-    # 4d. #3262: the folder it goes into, held by another process without
-    # write sharing. The folder itself opens; the rename is refused, and
-    # says so, naming who has the folder it goes into open.
+    # 4d. #3262: the folder it goes into, held by another process sharing
+    # neither write nor delete. Windows renames into it all the same: what a
+    # sharing violation on a folder rename is about is the folder itself, so
+    # that is where a refusal looks.
     $par = Join-Path $work 'parent-held'
     $kid = Join-Path $par 'kid'
     $null = New-Item -ItemType Directory -Path $kid
@@ -305,15 +306,13 @@ while ($true) { [Threading.Thread]::Sleep(1000) }
     $started += $hp
     $until = (Get-Date).AddSeconds(30)
     while (-not (Test-Path -LiteralPath $readyAt) -and (Get-Date) -lt $until) { [Threading.Thread]::Sleep(50) }
+    $holding = ''
+    if (Test-Path -LiteralPath $readyAt) { $holding = [IO.File]::ReadAllText($readyAt).Trim() }
+    Yes ('a second process holds the folder a rename goes into, sharing neither write nor delete (its handle: ' + $holding + ')') ($holding -match '^\d+$' -and $holding -ne '0')
     $ok = Move-ThornswoodPath $kid (Join-Path $par 'kid-moved')
-    Yes ('a folder whose parent another process holds without write sharing is refused, once: ' + $ThornswoodMoveWhy) ((-not $ok) -and (Test-Path -LiteralPath $kid))
-    Yes '  and the refusal says it was the folder it goes into, and names who has that open' (
-        $ThornswoodMoveWhy -match ('^the folder opened, and ' + [regex]::Escape($par) + ' would not take it: .*\(0x80070020\)') -and
-        $ThornswoodMoveWhy -match ('; ' + [regex]::Escape($par) + ' itself open in: (pid \d+ \S+, )*pid ' + $hp.Id + ' powershell\.exe') -and
-        $ThornswoodMoveWhy -match ('handles on ' + [regex]::Escape($par) + ' itself: (.*; )?pid ' + $hp.Id + ' powershell: '))
+    Yes ('  and a folder in it is renamed all the same' + $(if (-not $ok) { ': ' + $ThornswoodMoveWhy })) ($ok)
     Stop-Process -Id $hp.Id -Force
     $null = $hp.WaitForExit(30000)
-    Yes '  and once that has exited, the same move goes through' (Move-ThornswoodPath $kid (Join-Path $par 'kid-moved'))
 
     # 4b. #3131: a folder another process has as its current directory. The
     # Restart Manager is asked about files and names nothing; the handle list
