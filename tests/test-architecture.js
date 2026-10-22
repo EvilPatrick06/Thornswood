@@ -472,9 +472,9 @@ yes('the steps the page lists inside each method are in the order the code runs 
 // The six shared files, as Developer-Guide.md names them today.
 {
   const claude = (read(path.join(ROOT, 'Developer-Guide.md')) || '').replace(/\s+/g, ' ');
-  const m = claude.match(/Do not edit (.+?) without a line in #staff-updates/);
+  const m = claude.match(/An edit to (.+?) that blocks others' work gets a line in #staff-updates/);
   const s4 = page.slice(Math.max(0, page.indexOf('## 4. The six shared files')));
-  if (!m) note('Developer-Guide.md no longer words its #dev rule as "Do not edit ... without a line in #staff-updates", so section 4 was not compared with it');
+  if (!m) note('Developer-Guide.md no longer words its #dev rule as "An edit to ... that blocks others\' work gets a line in #staff-updates", so section 4 was not compared with it');
   else {
     const named = m[1].match(/[\w-]+\.(?:cs|ps1)/g) || [];
     yes('Developer-Guide.md\'s #dev rule names files, ' + named.length + ' of them', named.length > 0);
