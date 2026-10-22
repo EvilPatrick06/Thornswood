@@ -98,7 +98,11 @@ function makeParser(root, extraRoots) {
     if (!cwdOf.has(pid)) { cwdOf.set(pid, { path: root }); }
     return cwdOf.get(pid);
   }
+  // A path written the Windows way, wherever it was looked for: on the box
+  // it can name something real, and the run can go another way there.
+  const windowsPaths = new Set();
   function resolve(pid, base, p) {
+    if (/^[A-Za-z]:[\\/]|\\/.test(p)) { windowsPaths.add(p); }
     if (p.startsWith('/')) { return p; }
     let b = cwd(pid).path;
     if (base) {
@@ -210,7 +214,7 @@ function makeParser(root, extraRoots) {
       note(p, kind);
     }
   }
-  return { line: line, end: end, touched: touched, execs: execs, blind: blind };
+  return { line: line, end: end, touched: touched, execs: execs, blind: blind, windowsPaths: windowsPaths };
 }
 
 // ---- running one harness ---------------------------------------------------
@@ -257,6 +261,7 @@ function runOne(name, pristine, work, outDir, clockSeconds) {
           seconds: Math.round(seconds * 10) / 10,
           skipped: /^\s*(SKIP|NOT RUN)\b/m.test(output),
           blind: parser.blind.length > 0,
+          windowsPaths: [...parser.windowsPaths].sort().slice(0, 20),
           execs: [...new Set(execs)].sort(),
           paths: paths,
           tail: output.split('\n').slice(-6).join('\n'),

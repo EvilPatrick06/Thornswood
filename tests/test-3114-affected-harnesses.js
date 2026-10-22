@@ -98,6 +98,7 @@ const P = T.makeParser('/r', []);
   '101 openat(AT_FDCWD, "/etc/hosts", O_RDONLY) = 3</etc/hosts>',
   '100 <... openat resumed>) = 6</r/site/index.html>',
   '100 openat(AT_FDCWD, "out/log.txt", O_WRONLY|O_CREAT|O_TRUNC, 0666) = 7</r/out/log.txt>',
+  '101 newfstatat(AT_FDCWD, "C:\\\\Thornswood\\\\Game", 0x7ffd, 0) = -1 ENOENT (No such file or directory)',
   '100 io_uring_setup(256, {flags=IORING_SETUP_NO_SQARRAY}) = -1 ENOSYS (Function not implemented) (INJECTED)',
   // a child whose first calls are printed before its parent's clone returns
   '102 chdir("/r/docs") = 0',
@@ -116,6 +117,7 @@ yes('readlink\'s answer is not a path', !P.touched.has('100'));
 yes('a path outside the checkout is not kept', ![...P.touched.keys()].some(p => p.indexOf('etc') >= 0));
 yes('a file opened for writing is a write', k('out/log.txt') === 'write');
 yes('a child seen before its parent\'s clone returns keeps the folder it moved to', k('docs/c.md') === 'read' && k('docs/d.md') === 'read' && !P.touched.has('c.md'));
+yes('a Windows path is kept wherever it was looked for', P.windowsPaths.has('C:\\Thornswood\\Game'));
 yes('a refused io_uring leaves the trace trusted', P.blind.length === 0);
 const Q = T.makeParser('/r', []);
 Q.line('100 io_uring_setup(256, {flags=0}) = 3');

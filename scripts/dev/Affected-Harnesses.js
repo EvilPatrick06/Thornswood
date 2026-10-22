@@ -105,6 +105,7 @@ function build(traceDir, root) {
       if (kinds.indexOf('list') >= 0) { lists.push(p); }
       reads.push(p);
     }
+    if ((t.windowsPaths || []).length && !why) { why = 'looks for a Windows path (' + t.windowsPaths[0] + ')'; }
     if (t.exit !== 0 && !why) { why = 'does not pass on Linux (exit ' + t.exit + ')'; }
     if (t.blind && !why) { why = 'set up an io_uring, whose file work strace does not see'; }
     if (t.skipped && !why) { why = 'says SKIP or NOT RUN on Linux, so part of it was not traced'; }
