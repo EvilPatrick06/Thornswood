@@ -16,6 +16,12 @@
        rest must still be removed.
     4. either of Swap.ps1's two in-root prunes (the .prev and .undone sets
        a deploy keeps) throwing its errors away or not saying PRUNE FAILED.
+    5. the root's name and folder that Prune reads ($leaf, $parent) being set
+       anywhere in the installer's own scope but where they are made. The
+       -FromStore plugin loop used $leaf for each plugin's file name, so a
+       -FromStore install pruned against "<plugin>.prev-*", matched nothing
+       and said nothing: on 21 Oct 2026, after the new Prune was on the box,
+       the dev publish left all ten old dev copies with no PRUNE FAILED line.
   Prune is lifted out of the installer by its AST and run against a scratch
   folder, with Remove-Item stood in for so that one copy refuses the way a
   held file does. Needs nothing of Windows. Under a second.
@@ -88,5 +94,20 @@ Yes 'Swap.ps1 has its two in-root prunes' ($prunes.Count -eq 2)
 foreach ($m in $prunes) {
     Yes '  a swap prune throws away no error' ($m.Value -notmatch '(?i)SilentlyContinue|ErrorAction\s+Ignore|-EA\s+(0|Ignore)')
     Yes '  and says PRUNE FAILED for a copy it could not remove' ($m.Value -match 'catch \{ ''PRUNE FAILED: ')
+}
+
+# ---- 5. what Prune reads is set once ---------------------------------------------
+# An assignment inside a function is that function's own; one anywhere else is
+# the script's, the scope Prune reads $leaf and $parent from.
+foreach ($name in 'leaf', 'parent') {
+    $sets = @($ast.FindAll({ param($a)
+        $a -is [System.Management.Automation.Language.AssignmentStatementAst] -and
+        $a.Left -is [System.Management.Automation.Language.VariableExpressionAst] -and
+        $a.Left.VariablePath.UserPath -eq $name }, $true) | Where-Object {
+        $up = $_.Parent; $inFn = $false
+        while ($up) { if ($up -is [System.Management.Automation.Language.FunctionDefinitionAst]) { $inFn = $true; break }; $up = $up.Parent }
+        -not $inFn })
+    $where = ($sets | ForEach-Object { $_.Extent.StartLineNumber }) -join ', '
+    Yes ("`$$name, which Prune reads, is set once in the installer's scope (line(s) $where)") ($sets.Count -eq 1)
 }
 Done
