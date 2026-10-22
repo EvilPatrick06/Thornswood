@@ -33,7 +33,10 @@
        still every one; a harness whose
        header says RUNS ALONE runs after the rest with nothing beside it;
        on Windows each line says the processor time and the processes the
-       harness used, which its job object counted, children included.
+       harness used, which its job object counted, children included;
+    8. -StartLog (#3114) adds a line of JSON as each harness starts, with
+       its process id and start time, and as it ends, with its exit code and
+       whether it said SKIP, for scripts\dev\Trace-Gate.ps1 to read.
 
   Writes only into a scratch folder under TEMP, which it removes.
 #>
@@ -215,6 +218,26 @@ try {
     }
     $r = Run $d @('-Throttle', '0')
     Yes "  a throttle that is not 1 to 16 is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
+
+    # ---- 8. the start log (-StartLog, #3114) --------------------------------
+    $s = Join-Path $work 'startlog'
+    Put (Join-Path $s 'tests\test-1-ok.js') "console.log('PASS  fine');`nprocess.exit(0);`n"
+    Put (Join-Path $s 'tests\test-2-skip.js') "console.log('SKIP  not here');`nprocess.exit(0);`n"
+    Put (Join-Path $s 'tests\test-3-red.ps1') "Write-Host 'FAIL  no'`nexit 3`n"
+    $log = Join-Path $work 'starts.jsonl'
+    $t0 = [DateTime]::UtcNow.AddSeconds(-1)
+    $r = Run $s @('-Throttle', '2', '-StartLog', $log)
+    $lines = @()
+    if (Test-Path -LiteralPath $log) { $lines = @(Get-Content -LiteralPath $log | Where-Object { $_ } | ForEach-Object { $_ | ConvertFrom-Json }) }
+    $starts = @($lines | Where-Object { $null -ne $_.pid }); $ends = @($lines | Where-Object { $null -ne $_.code })
+    Yes ("-StartLog has a start line for each harness, with its process id (" + (@($starts | ForEach-Object { $_.name + ' ' + $_.pid }) -join ', ') + ')') ($starts.Count -eq 3 -and -not @($starts | Where-Object { [int]$_.pid -le 0 }).Count -and ((@($starts.name | Sort-Object) -join ',') -eq 'test-1-ok.js,test-2-skip.js,test-3-red.ps1'))
+    # pwsh's ConvertFrom-Json makes the time a DateTime already, and its text
+    # would be read back as local time.
+    $when = @($starts | ForEach-Object { if ($_.start -is [DateTime]) { $_.start.ToUniversalTime() } else { [DateTime]::Parse([string]$_.start, [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::RoundtripKind).ToUniversalTime() } })
+    Yes '  and when it started, in UTC, during the run' ($when.Count -eq 3 -and -not @($when | Where-Object { $_ -lt $t0 -or $_ -gt [DateTime]::UtcNow }).Count)
+    $byName = @{}; foreach ($e in $ends) { $byName[$e.name] = $e }
+    Yes '  and an end line for each, with its exit code and whether it said SKIP' ($ends.Count -eq 3 -and $byName['test-1-ok.js'].code -eq 0 -and -not $byName['test-1-ok.js'].skipped -and
+        $byName['test-2-skip.js'].code -eq 0 -and $byName['test-2-skip.js'].skipped -and $byName['test-3-red.ps1'].code -eq 3 -and -not $byName['test-3-red.ps1'].skipped)
 } finally {
     Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
 }

@@ -46,6 +46,8 @@ $heavy = @{
     'build-pr.yml' = @('launcher-vps')
     'engine.yml'   = @('engine-vps')
     'nightly.yml'  = @('harnesses')
+    # The gate, run as build.yml runs it, under a trace (#3114).
+    'trace-gate.yml' = @('trace')
 }
 function Get-Jobs([string]$text) {
     $text = $text -replace "`r`n", "`n"
