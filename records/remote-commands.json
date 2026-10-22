@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  69,
-    "callCount":  272,
+    "callCount":  273,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -194,6 +194,15 @@
                       "does":  "swaps the stage in, or puts back with -PutBack",
                       "class":  "swap",
                       "reason":  "swap block; StopOurs kills the server pid with Stop-Process"
+                  },
+                  {
+                      "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$reloadOut = @(Remote ((ReloadVars $Root $Task $stageName $prevName $Wait $hashes $newBlob) + $reloadBlock) |",
+                      "does":  "puts a gamemode-only stage in while the dev server runs and confirms the load from server.log, or puts the old one back (#3196)",
+                      "class":  "swap",
+                      "reason":  "reload block; replaces gamemode.js and the stamp in the server folder, stops nothing"
                   },
                   {
                       "script":  "scripts/deploy/Deploy-DevGamemode.ps1",
@@ -2450,9 +2459,9 @@
                       "scope":  "Invoke-Box",
                       "via":  "Invoke-ThornswoodRemote",
                       "anchor":  "$out = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Bypass -Script ($pre + [IO.File]::ReadAllText($BoxScript)) |",
-                      "does":  "runs scripts/dev/Trace-Gate-Box.ps1 in one of its modes: the self-test, starting and stopping the gate\u0027s ETW trace session, reading the trace against the run\u0027s start log, or emptying C:\\Thornswood-Trace (#3114)",
+                      "does":  "runs scripts/dev/Trace-Gate-Box.ps1 in one of its modes: the self-test, starting and stopping the gate\u0027s ETW trace session, reading the trace against the run\u0027s start log, emptying C:\\Thornswood-Trace, or installing, reporting on or removing the trace task that traces every main build (scripts/dev/Trace-Gate-Task.ps1, a SYSTEM scheduled task, and the trace and gate-map folders in each build runner\u0027s folder) (#3114)",
                       "class":  "admin",
-                      "reason":  "only an administrator can start a kernel trace session and set the trace folder\u0027s ACL"
+                      "reason":  "only an administrator can start a kernel trace session, set the trace folders\u0027 ACLs and register a SYSTEM task"
                   },
                   {
                       "script":  "scripts/deploy/Setup-Discord.ps1",

@@ -9,6 +9,9 @@
       .\scripts\dev\Trace-Gate.ps1 -SelfTest     # the trace's own check, a minute
       .\scripts\dev\Trace-Gate.ps1               # the whole gate, about fifteen minutes
       .\scripts\dev\Trace-Gate.ps1 -PushRun <run> # step 5 again, from temp\trace-gate-<run>
+      .\scripts\dev\Trace-Gate.ps1 -Install       # the trace task that traces every main build
+      .\scripts\dev\Trace-Gate.ps1 -Status        # what the trace task is doing
+      .\scripts\dev\Trace-Gate.ps1 -Uninstall     # the trace task taken off again
 
   WHY. A pull request should run only the gate harnesses its change can
   affect (scripts\dev\Affected-Harnesses.js), and which those are is
@@ -37,7 +40,20 @@
 
   The session and the trace are in C:\Thornswood-Trace on the box, which only
   administrators can read: a trace sees the name of every file anything on
-  the box opens. -Clean stops any session a run left and empties it.
+  the box opens. -Clean stops any session a run left and empties it, but
+  for the trace task's own folders.
+
+  THE TRACE TASK (-Install). What pull requests are held to day to day:
+  Patrick chose on 22 Oct 2026 (option A on q-3114-map-refresh) to trace
+  every main build, and scripts\dev\Trace-Gate-Task.ps1 does, as SYSTEM, at
+  the build's asking (scripts\dev\Run-Gate.ps1). -Install sends it and
+  Trace-Gate-Box.ps1 to C:\Thornswood-Trace\task, makes each build runner's
+  trace and gate-map folders (the runners records\build-runners.json lists,
+  so run it again when that list changes), and registers and starts the
+  scheduled task Thornswood Gate Trace. Run again, it replaces the scripts
+  and starts the task again; a trace it was taking is dropped. -Uninstall
+  takes the task and those folders off, and then main builds run untraced
+  and pull requests run the whole gate.
 
 .PARAMETER SelfTest
   Only the self-test.
@@ -50,6 +66,16 @@
   what temp\trace-gate-<run> in this checkout kept. Nothing is traced or
   run, and nothing touches the box.
 
+.PARAMETER Install
+  Install the trace task, or put this checkout's copy in its place.
+
+.PARAMETER Status
+  What the trace task is doing: its state, the map each build runner has
+  and the end of its log.
+
+.PARAMETER Uninstall
+  Take the trace task and its folders off the box.
+
 .PARAMETER Ref
   The branch trace-gate.yml runs on, and so the commit traced. main.
 
@@ -61,6 +87,9 @@
 param(
     [switch]$SelfTest,
     [switch]$Clean,
+    [switch]$Install,
+    [switch]$Status,
+    [switch]$Uninstall,
     [string]$PushRun = '',
     [string]$Ref = 'main',
     [int]$WaitMinutes = 50,
@@ -174,6 +203,44 @@ if ($Clean) {
     Head 'Emptying the trace folder on the box'
     $b = Invoke-Box 'clean'; Show $b
     exit $b.Code
+}
+
+if ($Status) {
+    Head 'The trace task on the box'
+    $b = Invoke-Box 'status'; Show $b
+    exit $b.Code
+}
+
+if ($Uninstall) {
+    Head 'Taking the trace task off the box'
+    $b = Invoke-Box 'uninstall'; Show $b
+    exit $b.Code
+}
+
+if ($Install) {
+    # The build runners, by records\build-runners.json, with the names
+    # Install-Runner.ps1 gives the nth: the first has no number on its own.
+    $numbers = @((Get-Content -LiteralPath (Join-Path $RepoRoot 'records\build-runners.json') -Raw | ConvertFrom-Json).runners)
+    $runners = @($numbers | ForEach-Object {
+        $n = [int]$_
+        if ($n -le 1) { [ordered]@{ root = 'C:\Thornswood-Runner'; account = 'thornswood-runner' } }
+        else { [ordered]@{ root = 'C:\Thornswood-Runner' + $n; account = 'thornswood-runner' + $n } }
+    })
+    if (-not $runners.Count) { Die 'records\build-runners.json lists no build runner.' }
+    Head '1. The self-test on the box'
+    $b = Invoke-Box 'selftest'
+    Show $b
+    if ($b.Code -ne 0) { Die ('the self-test did not pass (exit ' + $b.Code + '), so the task would trace nothing worth reading. Nothing was installed.') }
+    Head ('2. The trace task, for runners ' + (@($numbers) -join ', '))
+    $b = Invoke-Box 'install' @{
+        TraceBoxText = [IO.File]::ReadAllText($BoxScript)
+        TraceTaskText = [IO.File]::ReadAllText((Join-Path $Here 'Trace-Gate-Task.ps1'))
+        TraceRunners = (ConvertTo-Json -InputObject @{ runners = @($runners) } -Compress -Depth 3)
+    }
+    Show $b
+    if ($b.Code -ne 0) { Die ('the install did not finish (exit ' + $b.Code + '); the lines above say where it stopped.') }
+    Say '  installed. The next main build built on a build runner is traced; its log says "Traced:", and -Status shows the map once it is read.' 'Green'
+    exit 0
 }
 
 Head '1. The self-test on the box'

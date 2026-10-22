@@ -130,8 +130,8 @@ const cut = catalogue.npcs.filter((r) => !r.keep && r.ref !== '14:Skyrim.esm');
 const lists = manifest.refs;
 const listed = {};
 let twice = 0;
-for (const k of ['disabled', 'deleted', 'alreadyOff', 'corpseKept']) {
-  for (const d of lists[k]) { if (listed[d]) { twice++; } listed[d] = k; }
+for (const k of ['disabled', 'deleted', 'alreadyOff', 'corpseKept', 'heldByServer']) {
+  for (const d of (lists[k] || [])) { if (listed[d]) { twice++; } listed[d] = k; }
 }
 yes('A1 the catalogue cuts ' + cut.length + ' placed actors, and each is in exactly one of the manifest\'s lists',
     twice === 0 && cut.every((r) => listed[r.ref]) && Object.keys(listed).length === cut.length);

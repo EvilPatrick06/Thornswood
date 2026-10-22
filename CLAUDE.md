@@ -32,12 +32,16 @@ before it is trusted.
 
 Decided by Patrick on 11 Oct: the lanes only commit, push and merge, and a
 Claude runs every Ship, deploy, install, live server and Vortex step for them.
-Each lane writes one note per change in the vault's `wiki/claude-queue/`
-(Developer-Guide.md, the lanes paragraph). At the start of a session on the
-shipping machine, list that folder and run each note: dev ones when they are
-ready, a Main Ship or a live server run when Patrick says so. Afterwards put
-what ran, when, what it printed and the health check on the issue and in
-`wiki/status.md`, and delete the note. A note that cannot run keeps the
+Each lane writes one note per change in `ops/claude-queue/` in the
+repository, in the pull request of the change (Developer-Guide.md, the lanes
+paragraph; ops/README.md has the template). At the start of a session, on
+the shipping machine or in the cloud, list that folder on main and run each
+note: dev ones when they are ready, a Main Ship or a live server run when
+Patrick says so. Afterwards put what ran, when, what it printed and the
+health check on the issue and in `ops/status.md`, and delete the note, the
+status rewrite and the deletions in one pull request for the batch. Status
+and run notes moved there from the vault on 22 Oct (Patrick), so the Desk
+can run in the cloud. A note that cannot run keeps the
 reason written into it. The run that finishes an issue also closes it, with
 its `Test task:` comment when people would notice the fix, or moves it to
 Done (`board: Done`) when its fix still waits on main (#3192: issues sat
@@ -247,10 +251,11 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   not"). A line that reads wrong may be the compression: read the file itself
   before acting on a rule that seems to say something odd, and never quote
   compressed output back as what a file says.
-- The lanes' shared notes are the vault at `C:\Thornswood Vault\Thornswood`
-  (`wiki/status.md` for what is true now, rewritten in place). Anything a
-  session changes about tips, standing orders or what waits on Patrick goes
-  there as well as on the board.
+- What is true now is `ops/status.md` in the repository, rewritten in place.
+  The lanes' other shared notes are the vault at
+  `C:\Thornswood Vault\Thornswood`. Anything a session changes about tips,
+  standing orders or what waits on Patrick goes in one of those as well as
+  on the board.
 - Merge only once the build check passes, `Launcher builds` or `Launcher
   builds (VPS fallback)`, and you are confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
 
