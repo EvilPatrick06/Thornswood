@@ -467,6 +467,7 @@ class Thornswood(TrustedClient):
         self.add_view(TicketTools())          # and so does Close on every old ticket
         self.add_view(HoldPanel())            # and the hold and ping buttons
         self.add_view(OfficePanel())          # and a Jarl's office buttons (#2551)
+        self.add_view(FactionPanel())         # and a faction Leader's member buttons (#3317)
 
 
 client = Thornswood(intents=intents)
@@ -3088,6 +3089,253 @@ async def ensure_office_panel(guild):
         log('office panel posted in #%s' % ch.name)
     except Exception:
         log('office panel failed:\n' + traceback.format_exc())
+
+
+# ------------------------------------------------------ faction members --
+#
+# #3317. Patrick, 22 Oct, page card q-3317-faction-member-give, A: a
+# faction's Leader gives and takes its member role from a bot panel. The
+# member role is the faction's short name ("Thalmor", "Companions"), made by
+# Build-Discord.py with its "<short name> Leader" role, and the Leader is
+# whoever holds that role. Like a Jarl's offices: their own faction only, and
+# when two accounts hold one Leader role neither acts until staff take it
+# from all but one. The panel is in #seats, which every Jarl and faction
+# Leader reads. A change goes in bot.log and in Discord's audit log with its
+# reason; it is not said to staff, because staff have nothing to do about it
+# (Patrick, 22 Oct: #staff-updates only when staff must act).
+FACTION_PANEL = ('**Faction members**\n\n'
+                 'The Leader of a faction gives and takes its member role '
+                 'here, for their own faction only. Press Add member or '
+                 'Remove member, then pick the person.')
+FACTION_PANEL_CHANNEL = [n.strip().lower() for n in
+                         os.environ.get('FACTION_PANEL_CHANNEL', 'seats').split(',')
+                         if n.strip()]
+
+
+def faction_member_role(faction):
+    """The member role of a named faction: "Thalmor"."""
+    return FACTION_SHORT.get(faction, faction)
+
+
+def led_factions(member):
+    """The named factions this member leads, by their own Leader roles."""
+    held = set(getattr(r, 'name', '') for r in list(getattr(member, 'roles', None) or []))
+    return [f for f in faction_names() if faction_leader_role(f) in held]
+
+
+def leader_held_twice(guild, faction):
+    """True when more than one account holds this faction's Leader role."""
+    lead = _role(guild, faction_leader_role(faction))
+    return lead is not None and len(list(getattr(lead, 'members', None) or [])) > 1
+
+
+LEADER_TWICE = ('Two accounts hold the %s role, so neither acts as its Leader '
+                'until staff take it from all but one.')
+
+
+async def faction_press(interaction, add):
+    """Add member or Remove member: works out the presser's faction first."""
+    guild, who = interaction.guild, interaction.user
+    led = led_factions(who) if guild is not None else []
+    if not led:
+        await _say(interaction, 'Only the Leader of a faction gives its member '
+                                'role. A Leader is whoever holds that faction\'s '
+                                'Leader role.')
+        return
+    if len(led) > 1:
+        await interaction.response.send_message(
+            'You lead more than one faction. Which one?',
+            view=FactionPick(add, led), ephemeral=True)
+        return
+    await faction_for(interaction, led[0], add)
+
+
+async def faction_for(interaction, faction, add):
+    """The picker for one faction: a member to give the role, or a holder to take it from."""
+    guild = interaction.guild
+    if leader_held_twice(guild, faction):
+        await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
+        return
+    name = faction_member_role(faction)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        log('cannot give %s: the role is missing, or the bot has no Manage '
+            'Roles, or its own role is not above it.' % name)
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if add:
+        await interaction.response.send_message(
+            'Who joins %s?' % faction, view=FactionGive(faction), ephemeral=True)
+        return
+    holders = [m for m in list(getattr(role, 'members', None) or [])
+               if not getattr(m, 'bot', False)]
+    if not holders:
+        await _say(interaction, 'Nobody holds the %s role.' % name)
+        return
+    await interaction.response.send_message(
+        'Take the %s role from whom?' % name,
+        view=FactionTake(faction, holders[:25]), ephemeral=True)
+
+
+async def faction_change(interaction, faction, member, add):
+    """
+    Give or take the member role, with every rule asked again at the moment
+    of the change: the presser still holds the faction's Leader role, nobody
+    else does, and the role is one the bot may give.
+    """
+    guild, who = interaction.guild, interaction.user
+    if guild is None or faction not in led_factions(who):
+        await _say(interaction, 'Only the Leader of %s gives its member role.' % faction)
+        return
+    if leader_held_twice(guild, faction):
+        await _say(interaction, LEADER_TWICE % faction_leader_role(faction))
+        return
+    name = faction_member_role(faction)
+    role = _role(guild, name)
+    if role is None or not _can_give(guild, role):
+        await _say(interaction, 'The %s role cannot be given out right now. Ask '
+                                'staff.' % name)
+        return
+    if member is None or not hasattr(member, 'roles'):
+        await _say(interaction, 'That person is not in this Discord.')
+        return
+    if getattr(member, 'bot', False):
+        await _say(interaction, 'A bot joins no faction.')
+        return
+    shown = getattr(member, 'display_name', None) or str(member)
+    has = role in member.roles
+    if add and has:
+        await _say(interaction, '%s already holds the %s role.' % (shown, name))
+        return
+    if not add and not has:
+        await _say(interaction, '%s does not hold the %s role.' % (shown, name))
+        return
+    by = getattr(who, 'display_name', None) or str(who)
+    reason = '%s by %s, Leader of %s, on the faction panel' % (
+        'Given' if add else 'Taken', by, faction)
+    try:
+        if add:
+            await member.add_roles(role, reason=reason)
+        else:
+            await member.remove_roles(role, reason=reason)
+    except Exception:
+        log('faction change failed:\n' + traceback.format_exc())
+        await _say(interaction, 'That did not go through. Try again, or ask staff.')
+        return
+    log('faction: %s (%s), Leader of %s, %s %s (%s) the %s role'
+        % (by, who.id, faction, 'gave' if add else 'took from', shown, member.id, name))
+    await _say(interaction, ('%s holds the %s role now.' if add
+                             else '%s no longer holds the %s role.') % (shown, name))
+
+
+class FactionButton(discord.ui.Button):
+    def __init__(self, add):
+        super().__init__(label='Add member' if add else 'Remove member',
+                         style=(discord.ButtonStyle.primary if add
+                                else discord.ButtonStyle.secondary),
+                         custom_id='thornswood:faction:%s' % ('add' if add else 'remove'))
+        self.add = add
+
+    async def callback(self, interaction):
+        await faction_press(interaction, self.add)
+
+
+class FactionPanel(discord.ui.View):
+    """Persistent, like the office panel: Add member and Remove member."""
+    def __init__(self):
+        super().__init__(timeout=None)
+        self.add_item(FactionButton(True))
+        self.add_item(FactionButton(False))
+
+
+class FactionPickSelect(discord.ui.Select):
+    def __init__(self, add, factions):
+        super().__init__(placeholder='The faction',
+                         options=[discord.SelectOption(label=f[:100], value=f) for f in factions[:25]])
+        self.add = add
+
+    async def callback(self, interaction):
+        await faction_for(interaction, self.values[0], self.add)
+
+
+class FactionPick(discord.ui.View):
+    def __init__(self, add, factions):
+        super().__init__(timeout=180)
+        self.add_item(FactionPickSelect(add, factions))
+
+
+class FactionGiveSelect(discord.ui.UserSelect):
+    def __init__(self, faction):
+        super().__init__(placeholder='The person', min_values=1, max_values=1)
+        self.faction = faction
+
+    async def callback(self, interaction):
+        picked = self.values[0] if self.values else None
+        member = picked if hasattr(picked, 'roles') else (
+            interaction.guild.get_member(getattr(picked, 'id', 0)) if interaction.guild else None)
+        await faction_change(interaction, self.faction, member, True)
+
+
+class FactionGive(discord.ui.View):
+    def __init__(self, faction):
+        super().__init__(timeout=180)
+        self.add_item(FactionGiveSelect(faction))
+
+
+class FactionTakeSelect(discord.ui.Select):
+    def __init__(self, faction, holders):
+        super().__init__(placeholder='The person', options=[
+            discord.SelectOption(label=(getattr(m, 'display_name', None) or str(m))[:100],
+                                 value=str(m.id)) for m in holders])
+        self.faction = faction
+
+    async def callback(self, interaction):
+        try:
+            mid = int(self.values[0])
+        except (TypeError, ValueError, IndexError):
+            mid = 0
+        member = interaction.guild.get_member(mid) if interaction.guild else None
+        await faction_change(interaction, self.faction, member, False)
+
+
+class FactionTake(discord.ui.View):
+    def __init__(self, faction, holders):
+        super().__init__(timeout=180)
+        self.add_item(FactionTakeSelect(faction, holders))
+
+
+def faction_panel_is_current(msg):
+    return (getattr(msg, 'content', None) == FACTION_PANEL and
+            _hold_ids(msg) == ['thornswood:faction:add', 'thornswood:faction:remove'])
+
+
+async def ensure_faction_panel(guild):
+    """The faction member panel in #seats, found again by its own buttons."""
+    ch = by_name(guild, FACTION_PANEL_CHANNEL)
+    if ch is None:
+        log('no #%s yet, so the faction member panel waits for Build-Discord.py '
+            'to make it' % FACTION_PANEL_CHANNEL[0])
+        return
+    missing = [faction_member_role(f) for f in faction_names()
+               if _role(guild, faction_member_role(f)) is None]
+    if missing:
+        log('these faction member roles are missing, so they cannot be given '
+            'until Build-Discord.py makes them: %s' % ', '.join(missing))
+    try:
+        async for m in ch.history(limit=30):
+            if (m.author.id == client.user.id and m.components and
+                    any(i.startswith('thornswood:faction:') for i in _hold_ids(m))):
+                if faction_panel_is_current(m):
+                    log('faction panel is already current in #%s' % ch.name)
+                    return
+                await m.edit(content=FACTION_PANEL, view=FactionPanel())
+                log('faction panel updated in #%s' % ch.name)
+                return
+        await ch.send(FACTION_PANEL, view=FactionPanel())
+        log('faction panel posted in #%s' % ch.name)
+    except Exception:
+        log('faction panel failed:\n' + traceback.format_exc())
 
 
 # ------------------------------------------------------- testing channels --
@@ -6202,6 +6450,7 @@ async def on_ready():
         await ensure_hold_panel(g)
         await ensure_office_roles(g)
         await ensure_office_panel(g)
+        await ensure_faction_panel(g)
     log('watching %d server(s)' % len(client.guilds))
     # Guilds are known here. Empty was already said in setup_hook. IDs
     # that match no role can only be seen once the guild's roles are in.

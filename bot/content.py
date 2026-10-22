@@ -591,6 +591,7 @@ CHANGES = {
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),
+        ('2026-10-22', 'Titles: a Jarl seat is asked for on the Jarl application, which lists only the holds with no Jarl, and a Jarl names their hold\'s steward, court and guards.', '859039c7cdd4'),
     ],
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),

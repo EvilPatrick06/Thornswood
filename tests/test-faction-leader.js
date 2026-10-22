@@ -75,9 +75,20 @@ yes('F2 factions.json is names only, in this order, and Other is not in it',
     names.join('|') === [
       'Imperial Embassy',
       'Thalmor Remnant',
-      'Dark Brotherhood',
+      'Free Skyrim Trading Company',
       'The Companions',
-      'Free Skyrim Trading Company'
+      'College of Winterhold',
+      'Bards College',
+      'Thieves Guild',
+      'Dark Brotherhood',
+      'Vigilants of Stendarr',
+      'Dawnguard',
+      'Silver Hand',
+      'Forsworn',
+      'Orc Strongholds',
+      'Khajiit Caravans',
+      'Blades',
+      'Volkihar Clan'
     ].join('|') &&
     names.indexOf('Other') === -1 &&
     !JSON.stringify(names).includes('token') &&
@@ -103,9 +114,13 @@ yes('F5 Install-Bot sends factions.json on the artifact list and in the copy loo
     install.indexOf("foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json')") !== -1);
 
 // #3317 (Patrick, 22 Oct, page card q-3317-faction-roles, A): one
-// "<faction> Leader" role per named faction, from factions.json, short names.
-yes('F6 Build-Discord still makes Trading Company, and a Leader role for each faction in factions.json',
-    build.indexOf("ROLES.append(('Trading Company'") !== -1 &&
+// "<faction> Leader" role per named faction, from factions.json, short names,
+// and its member role, the short name; Trading Company is renamed to the
+// company's member role so its holders keep it (lore/factions.md, 22 Oct).
+yes('F6 Build-Discord makes a member and a Leader role for each faction in factions.json, Trading Company renamed',
+    build.indexOf("ROLES.append(('Trading Company'") === -1 &&
+    /FACTION_MEMBERS = tuple\(FACTION_SHORT\.get\(f, f\) for f in FACTIONS\)/.test(build) &&
+    /'Free Skyrim Trading Company': \('Trading Company',\)/.test(build) &&
     /FACTION_LEADERS = tuple\(FACTION_SHORT\.get\(f, f\) \+ ' Leader' for f in FACTIONS\)/.test(build) &&
     /'factions\.json'/.test(build));
 
