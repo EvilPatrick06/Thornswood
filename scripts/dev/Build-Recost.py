@@ -58,6 +58,15 @@ THE RULE, every number of it a knob below
   counts come out the same after rounding is listed under unreachable, with
   why, and gets no override.
 
+  A recipe of a plugin Thornswood-Last.esp never copies a record of
+  (last-plugin-policy.json notCopiedFrom: Immersive Armors, the Hothtrooper
+  compilation, Patrick 17 Oct, #2454, used as-is and nothing built from it
+  handed on) is listed under notCopied with whyNot and gets no override,
+  coins or not, because an override is a copy of its record; it still
+  counts as a peer, because the game still asks it. Measured 22 October:
+  17 of them, 10 of those charging coins. One the policy carries by
+  'COBJ <id>' is re-costed like any other.
+
 WHY IT IS STABLE
 
   Once Thornswood-Last.esp carries the new counts, a recipes.json built from
@@ -84,6 +93,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.normpath(os.path.join(HERE, '..', '..'))
 RECIPES = os.path.join(ROOT, 'game', 'data', 'recipes.json')
 OUT = os.path.join(ROOT, 'game', 'data', 'recost.json')
+POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 
 OWNER = 'Smith'
 BENCHES = ('CraftingSmithingForge', 'CraftingSmithingSkyforge')
@@ -142,10 +152,20 @@ def entry_for(desc, row, inputs, to):
     }
 
 
-def build(recipes, previous):
+def never_copied(policy):
+    """The plugins game/data/last-plugin-policy.json says Thornswood-Last.esp
+    never copies a record of (notCopiedFrom), and the records it carries from
+    them anyway, both lower case."""
+    rows = (policy or {}).get('notCopiedFrom', [])
+    return ({r['plugin'].lower() for r in rows},
+            {c.lower() for r in rows for c in r.get('carried', [])})
+
+
+def build(recipes, previous, policy=None):
     metal = metals(recipes)
     kept = {r['recipe']: r for r in (previous or {}).get('recipes', [])}
-    kept.update({r['recipe']: r for r in (previous or {}).get('unreachable', [])})
+    for section in ('unreachable', 'notCopied'):
+        kept.update({r['recipe']: r for r in (previous or {}).get(section, [])})
     rows = candidates(recipes, metal, kept)
     groups = collections.defaultdict(list)
     for desc, row, inputs, group in rows:
@@ -185,6 +205,17 @@ def build(recipes, previous):
         entry['why'] = ['coins']
         recost.append(entry)
     recost.sort(key=lambda r: r['recipe'])
+    # A recipe of a plugin Thornswood-Last.esp never copies from stays as
+    # its mod has it: an override is a copy of its record (Patrick, 17 Oct
+    # 2026, #2454: Immersive Armors is used as-is and nothing built from it
+    # is handed on). It is still a peer, because the game still asks it.
+    blocked, carried = never_copied(policy)
+    held = [r for r in recost if r['recipe'].split(':', 1)[1].lower() in blocked
+            and ('COBJ ' + r['recipe']).lower() not in carried]
+    for r in held:
+        r['whyNot'] = ('%s is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its '
+                       'recipe is not overridden' % r['recipe'].split(':', 1)[1])
+    recost = [r for r in recost if r not in held]
     coins = sum(1 for r in recost if 'coins' in r['why'])
     return {
         'version': 2,
@@ -193,7 +224,8 @@ def build(recipes, previous):
         'decision': 'Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against '
                     'the same kind of piece at the same rank and metal; a steel cuirass should cost about what '
                     'other steel cuirasses cost. No gold worth. And q-3115-forge-coins, B: a forge recipe that '
-                    'charges gold coins costs only its materials.',
+                    'charges gold coins costs only its materials. A recipe of a plugin the last plugin never copies from '
+                    '(Immersive Armors, #2454) is listed under notCopied and left as its mod has it.',
         'readFrom': 'game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked '
                     'about, their family and rank, and the inputs of the tempering recipe for the same item',
         'rule': {
@@ -207,9 +239,10 @@ def build(recipes, previous):
         },
         'counts': {'measured': len(rows), 'inGroups': sum(len(groups[g]) for g in usual),
                    'groups': len(usual), 'recosted': len(recost), 'coinsTakenOut': coins,
-                   'unreachable': len(unreachable)},
+                   'unreachable': len(unreachable), 'notCopied': len(held)},
         'recipes': recost,
         'unreachable': unreachable,
+        'notCopied': held,
     }
 
 
@@ -223,12 +256,13 @@ def main():
     args = ap.parse_args()
     recipes = json.load(io.open(RECIPES, encoding='utf-8'))
     previous = json.load(io.open(OUT, encoding='utf-8')) if os.path.isfile(OUT) else None
-    data = build(recipes, previous)
+    data = build(recipes, previous, json.load(io.open(POLICY, encoding='utf-8')))
     text = dump(data)
     c = data['counts']
     print('%d smith recipes measured, %d in %d groups of %d or more peers; %d re-costed (%d with gold coins taken out), '
-          '%d no count can fix' % (c['measured'], c['inGroups'], c['groups'], PEERS, c['recosted'], c['coinsTakenOut'],
-                                   c['unreachable']))
+          '%d no count can fix, %d left as a never-copied plugin has them'
+          % (c['measured'], c['inGroups'], c['groups'], PEERS, c['recosted'], c['coinsTakenOut'],
+             c['unreachable'], c['notCopied']))
     if args.check:
         have = io.open(OUT, encoding='utf-8').read() if os.path.isfile(OUT) else ''
         if have != text:

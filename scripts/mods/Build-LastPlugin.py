@@ -106,7 +106,10 @@ WHAT IT PUTS IN THE PLUGIN
      conditions. scripts/dev/Build-Recost.py writes the table from
      game/data/recipes.json; a winning record whose inputs are not the ones
      the table measured stops the build, because the counts were worked out
-     for those inputs and no others.
+     for those inputs and no others. A recipe of a plugin the policy never
+     copies from (notCopiedFrom) is not in the table's recipes but its
+     notCopied, and one that reached the recipes stops the build like any
+     other record of such a plugin (6).
 
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
@@ -1290,14 +1293,25 @@ def build(data_dir):
         cells[g] = e
     floor_cells -= set(hold_cells)
 
+    # 5. The re-costed smith recipes (#613).
+    recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
+
     # 6. Nothing is copied out of a plugin the policy never copies from
     # (notCopiedFrom, above) but what it carries; anything else it would
     # contribute stops the build, and so does a carried record not needed.
+    # A re-costed recipe is a copy of its record too, so one that is a
+    # never-copied plugin's own, or won by one, stops it unless carried
+    # (Build-Recost.py lists those under notCopied instead).
     held = sorted('%s %s (won by %s)%s' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon),
                                            plugins[e.pi].name, placed(e))
                   for e in actors + gates + qentries +
                   [e for e, _, _ in hold_locs]
                   if plugins[e.pi].name.lower() in blocked)
+    for e, row in recipes:
+        g = plugins[e.pi].gid(e.fid)
+        if (plugins[e.pi].name.lower() in blocked or row['recipe'].split(':', 1)[1].lower() in blocked) \
+                and not carries(b'COBJ', g):
+            held.append('COBJ %s (re-costed by recost.json, won by %s)' % (desc_of(g, canon), plugins[e.pi].name))
     swapped = []
     for kind, table in ((b'CELL', cells), (b'WRLD', worlds)):
         for g, e in list(table.items()):
@@ -1311,9 +1325,6 @@ def build(data_dir):
             swapped.append((kind, g, e, prev))
     held += held_floor
     stale = [carried[k] for k in sorted(set(carried) - used)]
-
-    # 5. The re-costed smith recipes (#613).
-    recipes = recost_entries(json.load(open(RECOST, encoding='utf-8')), plugins, win)
 
     # Two passes over the same copies: names first, then numbers.
     rn = Renumber()

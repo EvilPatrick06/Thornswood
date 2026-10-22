@@ -96,14 +96,26 @@ yes('T6 no gold worth is read: the item has no gold price here (docs/systems/pro
 const coinRows = Object.keys(recipes).filter((k) => rule.benches.indexOf(recipes[k].benchName) >= 0 &&
   recipes[k].inputItems.some((i) => i.item === 'f:Skyrim.esm'));
 const coinTable = table.recipes.filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
+const coinHeld = (table.notCopied || []).filter((r) => r.inputs.some((i) => i.item === 'f:Skyrim.esm'));
 yes('T7 every forge recipe that charges gold coins has them taken out, and nothing else of it changes unless ' +
-    'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ')',
+    'its peers say so (q-3115 B; ' + coinTable.length + ' of ' + coinRows.length + ', ' + coinHeld.length +
+    ' a never-copied plugin\'s)',
     (rule.notMaterial || []).join() === 'f:Skyrim.esm' && coinRows.length > 0 &&
-    coinRows.length === coinTable.length && table.counts.coinsTakenOut === coinTable.length &&
+    coinRows.length === coinTable.length + coinHeld.length && table.counts.coinsTakenOut === coinTable.length &&
     coinTable.every((r) => r.why.indexOf('coins') >= 0 && r.inputs.every((i) => i.item === 'f:Skyrim.esm' ? i.to === 0
       : (r.why.indexOf('peers') >= 0 || i.to === i.count))));
 yes('T8 a recipe that takes a finished piece is a conversion and is not re-costed',
     table.recipes.every((r) => recipes[r.recipe].inputItems.every((i) => i.type !== 'ARMO' && i.type !== 'WEAP')));
+
+const policy = JSON.parse(fs.readFileSync(path.join(ROOT, 'game', 'data', 'last-plugin-policy.json'), 'utf8'));
+const blocked = new Set((policy.notCopiedFrom || []).map((r) => r.plugin.toLowerCase()));
+const carriedCobj = new Set((policy.notCopiedFrom || []).flatMap((r) => r.carried || []).map((c) => c.toLowerCase()));
+const ownerOf = (r) => r.recipe.split(':').slice(1).join(':').toLowerCase();
+yes('T9 no re-costed recipe is a plugin\'s the last plugin never copies from (#2454) unless the policy carries it; ' +
+    'those are under notCopied, each with why (' + (table.notCopied || []).length + ')',
+    blocked.size > 0 && table.recipes.every((r) => !blocked.has(ownerOf(r)) || carriedCobj.has(('COBJ ' + r.recipe).toLowerCase())) &&
+    (table.notCopied || []).length === table.counts.notCopied &&
+    (table.notCopied || []).every((r) => blocked.has(ownerOf(r)) && /notCopiedFrom/.test(r.whyNot || '')));
 
 // ------------------------------------------------------------------ the builder
 const RIG = String.raw`
@@ -196,6 +208,7 @@ yes('L7 a recipe the table would leave with no input stops the build',
     !!r && /takes every input out/.test(r.empty));
 yes('W1 the builder reads game/data/recost.json, puts COBJ first among its groups, and checks the re-costed counts win',
     /RECOST = os\.path\.join\(ROOT, 'game', 'data', 'recost\.json'\)/.test(tool) &&
-    /GROUP_ORDER = \[b'COBJ', b'CELL'/.test(tool) && /does not ask the re-costed counts/.test(tool));
+    /GROUP_ORDER = \[b'COBJ', b'CELL'/.test(tool) && /does not ask the re-costed counts/.test(tool) &&
+    /re-costed by recost\.json, won by/.test(tool));
 
 done();

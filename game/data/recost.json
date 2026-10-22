@@ -2,7 +2,7 @@
  "version": 2,
  "builtBy": "scripts/dev/Build-Recost.py",
  "issue": 613,
- "decision": "Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against the same kind of piece at the same rank and metal; a steel cuirass should cost about what other steel cuirasses cost. No gold worth. And q-3115-forge-coins, B: a forge recipe that charges gold coins costs only its materials.",
+ "decision": "Patrick, 21 October 2026, report page q-613-recost-basis, A: measure a forge recipe against the same kind of piece at the same rank and metal; a steel cuirass should cost about what other steel cuirasses cost. No gold worth. And q-3115-forge-coins, B: a forge recipe that charges gold coins costs only its materials. A recipe of a plugin the last plugin never copies from (Immersive Armors, #2454) is listed under notCopied and left as its mod has it.",
  "readFrom": "game/data/recipes.json: the smith rows at the forge and the Skyforge that the server is asked about, their family and rank, and the inputs of the tempering recipe for the same item",
  "rule": {
   "owner": "Smith",
@@ -26,9 +26,10 @@
   "measured": 1112,
   "inGroups": 882,
   "groups": 105,
-  "recosted": 60,
-  "coinsTakenOut": 21,
-  "unreachable": 0
+  "recosted": 43,
+  "coinsTakenOut": 11,
+  "unreachable": 0,
+  "notCopied": 17
  },
  "recipes": [
   {
@@ -134,156 +135,6 @@
    ]
   },
   {
-   "recipe": "21474:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBucklerGlass",
-   "name": "Glass Buckler",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Shields",
-   "rank": "expert",
-   "costWas": 2,
-   "inputs": [
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 1,
-     "to": 4
-    },
-    {
-     "item": "5ada1:Skyrim.esm",
-     "name": "Refined Malachite",
-     "count": 1,
-     "to": 4
-    }
-   ],
-   "costNow": 8,
-   "metal": "Refined Malachite",
-   "peers": 3,
-   "usual": 7,
-   "why": [
-    "peers"
-   ]
-  },
-  {
-   "recipe": "21478:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBucklerOrcish",
-   "name": "Orcish Buckler",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Shields",
-   "rank": "advanced",
-   "costWas": 2,
-   "inputs": [
-    {
-     "item": "5ace4:Skyrim.esm",
-     "name": "Iron Ingot",
-     "count": 1,
-     "to": 2
-    },
-    {
-     "item": "5ad99:Skyrim.esm",
-     "name": "Orichalcum Ingot",
-     "count": 1,
-     "to": 2
-    }
-   ],
-   "costNow": 4,
-   "metal": "Orichalcum Ingot",
-   "peers": 6,
-   "usual": 5.0,
-   "why": [
-    "peers"
-   ]
-  },
-  {
-   "recipe": "2147a:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBucklerSteel",
-   "name": "Steel Buckler",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Shields",
-   "rank": "advanced",
-   "costWas": 2,
-   "inputs": [
-    {
-     "item": "5ace4:Skyrim.esm",
-     "name": "Iron Ingot",
-     "count": 1,
-     "to": 2
-    },
-    {
-     "item": "5ace5:Skyrim.esm",
-     "name": "Steel Ingot",
-     "count": 1,
-     "to": 2
-    }
-   ],
-   "costNow": 4,
-   "metal": "Steel Ingot",
-   "peers": 19,
-   "usual": 5,
-   "why": [
-    "peers"
-   ]
-  },
-  {
-   "recipe": "2147b:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBucklerWinterhold",
-   "name": "Winterhold Battlemage Buckler",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Shields",
-   "rank": "master",
-   "costWas": 2,
-   "inputs": [
-    {
-     "item": "5ad9d:Skyrim.esm",
-     "name": "Ebony Ingot",
-     "count": 1,
-     "to": 2
-    },
-    {
-     "item": "5ada0:Skyrim.esm",
-     "name": "Quicksilver Ingot",
-     "count": 1,
-     "to": 2
-    }
-   ],
-   "costNow": 4,
-   "metal": "Ebony Ingot",
-   "peers": 10,
-   "usual": 5.0,
-   "why": [
-    "peers"
-   ]
-  },
-  {
-   "recipe": "2147c:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBucklerYsgramor",
-   "name": "Buckler of Ysgramor",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Shields",
-   "rank": "advanced",
-   "costWas": 2,
-   "inputs": [
-    {
-     "item": "5ace5:Skyrim.esm",
-     "name": "Steel Ingot",
-     "count": 1,
-     "to": 2
-    },
-    {
-     "item": "5ad99:Skyrim.esm",
-     "name": "Orichalcum Ingot",
-     "count": 1,
-     "to": 2
-    }
-   ],
-   "costNow": 4,
-   "metal": "Orichalcum Ingot",
-   "peers": 6,
-   "usual": 5.0,
-   "why": [
-    "peers"
-   ]
-  },
-  {
    "recipe": "216ea:Immersive Weapons.esp",
    "editorId": "IWRecipeWeaponOrnateMaulWarhammer",
    "name": "Ornate Maul",
@@ -320,255 +171,6 @@
    "costNow": 8,
    "why": [
     "coins"
-   ]
-  },
-  {
-   "recipe": "22f7:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARPaladinBoots",
-   "name": "Paladin Boots",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Armoured boots",
-   "rank": "master",
-   "costWas": 5,
-   "inputs": [
-    {
-     "item": "f:Skyrim.esm",
-     "name": "Gold",
-     "count": 50,
-     "to": 0
-    },
-    {
-     "item": "5ad9d:Skyrim.esm",
-     "name": "Ebony Ingot",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    }
-   ],
-   "costNow": 5,
-   "why": [
-    "coins"
-   ]
-  },
-  {
-   "recipe": "22f9:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARPaladinGauntlets",
-   "name": "Paladin Gauntlets",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Gauntlets",
-   "rank": "master",
-   "costWas": 4,
-   "inputs": [
-    {
-     "item": "f:Skyrim.esm",
-     "name": "Gold",
-     "count": 50,
-     "to": 0
-    },
-    {
-     "item": "5ad9d:Skyrim.esm",
-     "name": "Ebony Ingot",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    }
-   ],
-   "costNow": 4,
-   "why": [
-    "coins"
-   ]
-  },
-  {
-   "recipe": "22fa:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARPaladinHelmet",
-   "name": "Paladin Barbut",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Helmets",
-   "rank": "master",
-   "costWas": 7,
-   "inputs": [
-    {
-     "item": "f:Skyrim.esm",
-     "name": "Gold",
-     "count": 50,
-     "to": 0
-    },
-    {
-     "item": "5ad9d:Skyrim.esm",
-     "name": "Ebony Ingot",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "e7ed0:Skyrim.esm",
-     "name": "Hawk Feathers",
-     "count": 2,
-     "to": 2
-    }
-   ],
-   "costNow": 7,
-   "why": [
-    "coins"
-   ]
-  },
-  {
-   "recipe": "238ff:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBosmerCoif",
-   "name": "Bosmer Coif",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Helmets",
-   "rank": "expert",
-   "costWas": 12,
-   "inputs": [
-    {
-     "item": "57f91:Skyrim.esm",
-     "name": "Hanging Moss",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "5ace5:Skyrim.esm",
-     "name": "Steel Ingot",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "800e4:Skyrim.esm",
-     "name": "Leather Strips",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "9151b:Skyrim.esm",
-     "name": "Spider Egg",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "da0bf1:Update.esm",
-     "name": "Fur Plate",
-     "count": 2,
-     "to": 1
-    }
-   ],
-   "costNow": 7,
-   "metal": "Refined Moonstone",
-   "peers": 3,
-   "usual": 5,
-   "why": [
-    "peers"
-   ]
-  },
-  {
-   "recipe": "2390a:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARBosmerHeavyCoif",
-   "name": "Bosmer Reinforced Coif",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Helmets",
-   "rank": "expert",
-   "costWas": 12,
-   "inputs": [
-    {
-     "item": "57f91:Skyrim.esm",
-     "name": "Hanging Moss",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "5ace5:Skyrim.esm",
-     "name": "Steel Ingot",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "5ad93:Skyrim.esm",
-     "name": "Corundum Ingot",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "800e4:Skyrim.esm",
-     "name": "Leather Strips",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "9151b:Skyrim.esm",
-     "name": "Spider Egg",
-     "count": 2,
-     "to": 1
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "da0bf1:Update.esm",
-     "name": "Fur Plate",
-     "count": 2,
-     "to": 1
-    }
-   ],
-   "costNow": 8,
-   "metal": "Corundum Ingot",
-   "peers": 4,
-   "usual": 5.0,
-   "why": [
-    "peers"
    ]
   },
   {
@@ -656,33 +258,6 @@
    ]
   },
   {
-   "recipe": "286a:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARSeadogEyepatch",
-   "name": "Eyepatch",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Hats and hoods",
-   "rank": "advanced",
-   "costWas": 1,
-   "inputs": [
-    {
-     "item": "f:Skyrim.esm",
-     "name": "Gold",
-     "count": 1,
-     "to": 0
-    },
-    {
-     "item": "800e4:Skyrim.esm",
-     "name": "Leather Strips",
-     "count": 1,
-     "to": 1
-    }
-   ],
-   "costNow": 1,
-   "why": [
-    "coins"
-   ]
-  },
-  {
    "recipe": "2ad2:Immersive Weapons.esp",
    "editorId": "IWRecipeWeaponValenwoodWarBow",
    "name": "Valenwood War Bow",
@@ -711,51 +286,6 @@
     }
    ],
    "costNow": 2,
-   "why": [
-    "coins"
-   ]
-  },
-  {
-   "recipe": "3dee:Hothtrooper44_ArmorCompilation.esp",
-   "editorId": "IARPaladinGreatHelm",
-   "name": "Paladin Great Helm",
-   "plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "kind": "Helmets",
-   "rank": "master",
-   "costWas": 7,
-   "inputs": [
-    {
-     "item": "f:Skyrim.esm",
-     "name": "Gold",
-     "count": 50,
-     "to": 0
-    },
-    {
-     "item": "5ad9d:Skyrim.esm",
-     "name": "Ebony Ingot",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "5ad9f:Skyrim.esm",
-     "name": "Refined Moonstone",
-     "count": 2,
-     "to": 2
-    },
-    {
-     "item": "db5d2:Skyrim.esm",
-     "name": "Leather",
-     "count": 1,
-     "to": 1
-    },
-    {
-     "item": "e7ed0:Skyrim.esm",
-     "name": "Hawk Feathers",
-     "count": 2,
-     "to": 2
-    }
-   ],
-   "costNow": 7,
    "why": [
     "coins"
    ]
@@ -1782,6 +1312,492 @@
    "why": [
     "coins"
    ]
+  }
+ ],
+ "unreachable": [],
+ "notCopied": [
+  {
+   "recipe": "21474:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerGlass",
+   "name": "Glass Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "expert",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 4
+    },
+    {
+     "item": "5ada1:Skyrim.esm",
+     "name": "Refined Malachite",
+     "count": 1,
+     "to": 4
+    }
+   ],
+   "costNow": 8,
+   "metal": "Refined Malachite",
+   "peers": 3,
+   "usual": 7,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "21478:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerOrcish",
+   "name": "Orcish Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4,
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "2147a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerSteel",
+   "name": "Steel Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace4:Skyrim.esm",
+     "name": "Iron Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4,
+   "metal": "Steel Ingot",
+   "peers": 19,
+   "usual": 5,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "2147b:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerWinterhold",
+   "name": "Winterhold Battlemage Buckler",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "master",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ada0:Skyrim.esm",
+     "name": "Quicksilver Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4,
+   "metal": "Ebony Ingot",
+   "peers": 10,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "2147c:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBucklerYsgramor",
+   "name": "Buckler of Ysgramor",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Shields",
+   "rank": "advanced",
+   "costWas": 2,
+   "inputs": [
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 2
+    },
+    {
+     "item": "5ad99:Skyrim.esm",
+     "name": "Orichalcum Ingot",
+     "count": 1,
+     "to": 2
+    }
+   ],
+   "costNow": 4,
+   "metal": "Orichalcum Ingot",
+   "peers": 6,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "22f7:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinBoots",
+   "name": "Paladin Boots",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Armoured boots",
+   "rank": "master",
+   "costWas": 5,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 5,
+   "why": [
+    "coins"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "22f9:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinGauntlets",
+   "name": "Paladin Gauntlets",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Gauntlets",
+   "rank": "master",
+   "costWas": 4,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 4,
+   "why": [
+    "coins"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "22fa:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinHelmet",
+   "name": "Paladin Barbut",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "master",
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "e7ed0:Skyrim.esm",
+     "name": "Hawk Feathers",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 7,
+   "why": [
+    "coins"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "238ff:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerCoif",
+   "name": "Bosmer Coif",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "expert",
+   "costWas": 12,
+   "inputs": [
+    {
+     "item": "57f91:Skyrim.esm",
+     "name": "Hanging Moss",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "9151b:Skyrim.esm",
+     "name": "Spider Egg",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 2,
+     "to": 1
+    }
+   ],
+   "costNow": 7,
+   "metal": "Refined Moonstone",
+   "peers": 3,
+   "usual": 5,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "2390a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARBosmerHeavyCoif",
+   "name": "Bosmer Reinforced Coif",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "expert",
+   "costWas": 12,
+   "inputs": [
+    {
+     "item": "57f91:Skyrim.esm",
+     "name": "Hanging Moss",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "5ace5:Skyrim.esm",
+     "name": "Steel Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad93:Skyrim.esm",
+     "name": "Corundum Ingot",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "9151b:Skyrim.esm",
+     "name": "Spider Egg",
+     "count": 2,
+     "to": 1
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "da0bf1:Update.esm",
+     "name": "Fur Plate",
+     "count": 2,
+     "to": 1
+    }
+   ],
+   "costNow": 8,
+   "metal": "Corundum Ingot",
+   "peers": 4,
+   "usual": 5.0,
+   "why": [
+    "peers"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "286a:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARSeadogEyepatch",
+   "name": "Eyepatch",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Hats and hoods",
+   "rank": "advanced",
+   "costWas": 1,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 1,
+     "to": 0
+    },
+    {
+     "item": "800e4:Skyrim.esm",
+     "name": "Leather Strips",
+     "count": 1,
+     "to": 1
+    }
+   ],
+   "costNow": 1,
+   "why": [
+    "coins"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
+  },
+  {
+   "recipe": "3dee:Hothtrooper44_ArmorCompilation.esp",
+   "editorId": "IARPaladinGreatHelm",
+   "name": "Paladin Great Helm",
+   "plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "kind": "Helmets",
+   "rank": "master",
+   "costWas": 7,
+   "inputs": [
+    {
+     "item": "f:Skyrim.esm",
+     "name": "Gold",
+     "count": 50,
+     "to": 0
+    },
+    {
+     "item": "5ad9d:Skyrim.esm",
+     "name": "Ebony Ingot",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "5ad9f:Skyrim.esm",
+     "name": "Refined Moonstone",
+     "count": 2,
+     "to": 2
+    },
+    {
+     "item": "db5d2:Skyrim.esm",
+     "name": "Leather",
+     "count": 1,
+     "to": 1
+    },
+    {
+     "item": "e7ed0:Skyrim.esm",
+     "name": "Hawk Feathers",
+     "count": 2,
+     "to": 2
+    }
+   ],
+   "costNow": 7,
+   "why": [
+    "coins"
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   },
   {
    "recipe": "d9a:Hothtrooper44_ArmorCompilation.esp",
@@ -1826,7 +1842,8 @@
    "costNow": 5,
    "why": [
     "coins"
-   ]
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   },
   {
    "recipe": "d9e:Hothtrooper44_ArmorCompilation.esp",
@@ -1871,7 +1888,8 @@
    "costNow": 5,
    "why": [
     "coins"
-   ]
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   },
   {
    "recipe": "d9f:Hothtrooper44_ArmorCompilation.esp",
@@ -1916,7 +1934,8 @@
    "costNow": 6,
    "why": [
     "coins"
-   ]
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   },
   {
    "recipe": "da1:Hothtrooper44_ArmorCompilation.esp",
@@ -1955,7 +1974,8 @@
    "costNow": 6,
    "why": [
     "coins"
-   ]
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   },
   {
    "recipe": "da3:Hothtrooper44_ArmorCompilation.esp",
@@ -1994,8 +2014,8 @@
    "costNow": 6,
    "why": [
     "coins"
-   ]
+   ],
+   "whyNot": "Hothtrooper44_ArmorCompilation.esp is a plugin last-plugin-policy.json never copies from (notCopiedFrom), so its recipe is not overridden"
   }
- ],
- "unreachable": []
+ ]
 }
