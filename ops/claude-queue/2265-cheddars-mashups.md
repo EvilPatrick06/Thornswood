@@ -7,7 +7,7 @@
 - **Needs first:** Patrick's approval of 12 Oct (on the issue). Can ride in the same revision as #2264 + #2454 (`2264-improved-eyes.md`, `2454-ccaa-3ba-mce-bodyslide.md`), or the next one.
 
 ## Run
-1. In Vortex, add Cheddar's Mashups (Nexus SE 182534). Take TWO files: the main "Cheddar's Mashups V1.8.8" (meshes and textures, about 337 MB) and "Cheddars Mashups ESL" (v1.8.9). NOT the ESP (download only one), and NOT "Cheddars Mashups Keizaal" (another server's patch). Xavbio's Retextures is optional, so leave it out.
+1. In Vortex, add Cheddar's Mashups (Nexus SE 182534). Take TWO files: the main "Cheddar's Mashups V1.8.8" (meshes and textures, about 337 MB) and "Cheddars Mashups ESL" (v1.8.9). NOT the ESP (download only one), and NOT the file that patches for another server. Xavbio's Retextures is optional, so leave it out.
 2. Load order: anywhere late. As an ESL it takes no full slot and renumbers nothing. Put it after Immersive Weapons, Hothtrooper44 and ZIA so its vendor leveled-list entries win. This doesn't affect #2264's rule (IES after every current full plugin).
 3. Pin this version. 1.9.0 is due at the end of October, so take it in a later revision on purpose, not by auto-update.
 4. Publish. Run .\scripts\mods\New-CollectionPluginRecord.ps1 and commit records\collection-plugins.json (Refs #2265).
