@@ -41,7 +41,7 @@ if (-not (Test-Path -LiteralPath (Join-Path $EslintCache 'node_modules\eslint\bi
 
 function RunFrom([string]$base, [string]$label) {
     $repo = Join-Path $base 'repo'
-    $tools = Join-Path $base 'tools'
+    $tools = Join-Path $base 'lint-tools'
     $eslint = Join-Path $tools 'eslint-9.39.5'
     New-Item -ItemType Directory -Force -Path (Join-Path $repo '.github\lint'), (Join-Path $repo 'scripts\dev'), $eslint | Out-Null
     Copy-Item -LiteralPath (Join-Path $root '.github\lint\eslint.config.mjs') -Destination (Join-Path $repo '.github\lint')
