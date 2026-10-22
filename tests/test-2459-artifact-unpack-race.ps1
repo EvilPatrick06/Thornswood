@@ -154,7 +154,9 @@ try {
     Run-Git -C $src init -q
     Run-Git -C $src config core.autocrlf false
     Run-Git -C $src add -A
-    Run-Git -C $src -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false commit -q -m one
+    # No auto maintenance after the commit: a git start of its own, and
+    # nothing this harness reads (#3168).
+    Run-Git -C $src -c user.name=test -c user.email=test@example.invalid -c commit.gpgsign=false -c maintenance.auto=false commit -q -m one
 
     # ---- 1. second call while a reader holds a file in the shared folder ----
     $a1 = Build $out

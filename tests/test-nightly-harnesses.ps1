@@ -28,7 +28,9 @@
        nothing more, runs on the VPS runners, and hands the names to -Only
        through the environment, never pasted into a script it runs;
     7. -Throttle (#3114) runs that many side by side and no more, in less
-       time than one at a time, prints each as it ends; a harness whose
+       time than one at a time, prints each as it ends; with -Share, past
+       the share only into free cores, so a full machine runs its share and
+       still every one; a harness whose
        header says RUNS ALONE runs after the rest with nothing beside it;
        on Windows each line says the processor time and the processes the
        harness used, which its job object counted, children included.
@@ -177,7 +179,11 @@ try {
         "const n=fs.readdirSync(dir).length;setTimeout(()=>{const m=fs.readdirSync(dir).length;console.log('ALONE SAW '+(n+m));process.exit(n+m?1:0);},700);`n")
     Put (Join-Path $d 'tests\test-g-children.js') ("const {execFileSync}=require('child_process');" +
         "for(let i=0;i<3;i++)execFileSync(process.execPath,['-e','let x=0;for(let j=0;j<3e7;j++)x+=j']);process.exit(0);`n")
-    $r = Run $d @('-Throttle', '3')
+    # The machine the throttle sees is a file here (-BusyFrom): idle first.
+    $busy = Join-Path $work 'busy.txt'
+    [IO.File]::WriteAllText($busy, '0')
+    $r = Run $d @('-Throttle', '3', '-BusyFrom', $busy)
+    $side = $r
     $ran = @(Ran $r.Said)
     $saw = @([regex]::Matches($r.Said, '(?m)^SAW (\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
     $wall = [regex]::Match($r.Said, '(?m)^all of them, added up: (\d+)s, in (\d+)s')
@@ -186,11 +192,26 @@ try {
     Yes '  and never more than three at once' ($saw.Count -eq 6 -and -not @($saw | Where-Object { $_ -gt 2 }).Count)
     Yes ('  in less time than one at a time (' + $wall.Groups[2].Value + ' s for ' + $wall.Groups[1].Value + ' s of harnesses)') ($wall.Success -and [int]$wall.Groups[2].Value -lt [int]$wall.Groups[1].Value)
     Yes '  the one whose header says RUNS ALONE ran last, with nothing beside it' ($ran.Count -and $ran[-1] -eq 'test-0-alone.js' -and $r.Said -match '(?m)^ALONE SAW 0')
-    Yes '  and the summary says how many at a time and what the cores did' ($r.Said -match '(?m)^3 at a time; 1 run alone, after the rest' -and $r.Said -match "(?m)^the machine's \d+ cores while they ran: [0-9.]+% busy on average")
+    Yes '  and the summary says how many at a time and what the cores did' ($r.Said -match '(?m)^3 at a time; 1 run alone, after the rest' -and $r.Said -match "(?m)^the machine's \d+ cores while they ran: [0-9.]+% busy on average" -and
+        $r.Said -match '(?m)^at once: [0-9.]+ on average, 3 at most; 3 always, up to 3 into free cores')
+    # -Share 1 (#3114, after #3106's build on 22 Oct): on a machine with no
+    # core free, one at a time, every one still run, and green; on an idle
+    # one, more than one, up to -Throttle.
+    [IO.File]::WriteAllText($busy, '100')
+    $r = Run $d @('-Throttle', '3', '-Share', '1', '-BusyFrom', $busy)
+    $saw = @([regex]::Matches($r.Said, '(?m)^SAW (\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
+    Yes ("  -Share 1 on a machine with no core free: one at a time, every one, and green (exit $($r.Code), saw " + ($saw -join ' ') + ')') ($r.Code -eq 0 -and (Ran $r.Said).Count -eq 8 -and $saw.Count -eq 6 -and -not @($saw | Where-Object { $_ -gt 0 }).Count -and
+        $r.Said -match '(?m)^at once: [0-9.]+ on average, 1 at most; 1 always, up to 3 into free cores')
+    [IO.File]::WriteAllText($busy, '0')
+    $r = Run $d @('-Throttle', '3', '-Share', '1', '-BusyFrom', $busy)
+    $saw = @([regex]::Matches($r.Said, '(?m)^SAW (\d+)') | ForEach-Object { [int]$_.Groups[1].Value })
+    Yes ("  and on an idle one, past its share into the free cores, never past -Throttle (saw " + ($saw -join ' ') + ')') ($r.Code -eq 0 -and $saw.Count -eq 6 -and @($saw | Where-Object { $_ -gt 0 }).Count -ge 2 -and -not @($saw | Where-Object { $_ -gt 2 }).Count)
+    $r = Run $d @('-Throttle', '3', '-Share', '4')
+    Yes "  a share past -Throttle is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)
     if ($OnWindows) {
-        $g = [regex]::Match($r.Said, '(?m)^--- test-g-children\.js  \([0-9.]+s, ([0-9.]+)s of processor in (\d+) process\(es\)\)')
+        $g = [regex]::Match($side.Said, '(?m)^--- test-g-children\.js  \([0-9.]+s, ([0-9.]+)s of processor in (\d+) process\(es\)\)')
         Yes ('  each harness says the processor its job counted, children included (' + $g.Value + ')') ($g.Success -and [int]$g.Groups[2].Value -eq 4 -and [double]$g.Groups[1].Value -gt 0)
-        Yes '  and the summary adds them up' ($r.Said -match '(?m)^processor used by all of them: \d+s in \d+ processes')
+        Yes '  and the summary adds them up' ($side.Said -match '(?m)^processor used by all of them: \d+s in \d+ processes')
     }
     $r = Run $d @('-Throttle', '0')
     Yes "  a throttle that is not 1 to 16 is refused before anything runs (exit $($r.Code))" ($r.Code -eq 2 -and -not (Ran $r.Said).Count)

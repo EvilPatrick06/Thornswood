@@ -19,8 +19,8 @@
        the other workflows use (#437), with a timeout;
     2. it checks out nothing and runs no action, and the label and issue reach
        the script through the environment: no ${{ }} inside the script;
-    3. the script itself, lifted out of the workflow and run in a child
-       PowerShell with a stand-in Invoke-RestMethod that answers as GitHub
+    3. the script itself, lifted out of the workflow and run in a fresh
+       runspace of its own with a stand-in Invoke-RestMethod that answers as GitHub
        would and writes down each call instead of making it: the Status named
        on the label is set on the issue's card, whatever its case, spaces or
        hyphens; every board: label on the issue comes off and no other label
@@ -116,9 +116,18 @@ Yes '  with the run''s own token beside them for the labels' ($text -match [rege
 Yes 'the script runs under pwsh' ($text -match '(?m)^\s+shell:\s*pwsh\s*$')
 
 # ---- 3. the script, run against a stand-in for GitHub -----------------------
-$pwsh = (Get-Command pwsh -ErrorAction SilentlyContinue)
-Yes 'pwsh is on this machine to run the script with' ($null -ne $pwsh)
-if (-not $pwsh -or -not $script) { Done }
+# Each case runs the script in a fresh runspace of this PowerShell, not a
+# child pwsh: a runspace starts with nothing of this harness in it (no
+# variable, function, StrictMode or ErrorActionPreference), as a new process
+# does, and a PowerShell start costs the gate box about ten times a node
+# start, thirty of them here (#3168). The environment is the process's either
+# way. Its exit code is read the way pwsh -File gives it: the number exit
+# gave, 1 for an error that ended it, else 0.
+$parseErrors = $null
+$null = [System.Management.Automation.Language.Parser]::ParseInput($script, [ref]$null, [ref]$parseErrors)
+Yes 'the script parses, so it can be run' ($script -and @($parseErrors).Count -eq 0)
+if (-not $script -or @($parseErrors).Count) { Done }
+$iss = [Management.Automation.Runspaces.InitialSessionState]::CreateDefault2()
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-board-status-' + [Guid]::NewGuid().ToString('N'))
 New-Item -ItemType Directory -Force -Path $work | Out-Null
@@ -194,9 +203,29 @@ function Invoke-Status([string]$label, [string[]]$onIssue, [hashtable]$extra = @
         $env:TS_NO_ORDER = ''
         $env:TS_AUTOCLOSE = 'off'
         foreach ($k in $extra.Keys) { [Environment]::SetEnvironmentVariable($k, $extra[$k]) }
-        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner 2>&1 | Out-String; $code = $LASTEXITCODE }
-        finally { $ErrorActionPreference = $old }
+        $rs = [runspacefactory]::CreateRunspace($iss)
+        $ps = [powershell]::Create()
+        try {
+            $rs.Open()
+            $ps.Runspace = $rs
+            $null = $ps.AddCommand($runner)
+            $ended = $null
+            $res = @()
+            try { $res = @($ps.Invoke()) } catch { $ended = $_.Exception }
+            # What pwsh -File would have printed: Write-Host, output, warnings
+            # and errors, and the error that ended it, by its own message.
+            $said = @($ps.Streams.Information | ForEach-Object { [string]$_.MessageData })
+            if ($res.Count) { $said += ($res | Out-String) }
+            $said += @($ps.Streams.Warning | ForEach-Object { 'WARNING: ' + $_.Message })
+            $said += @($ps.Streams.Error | ForEach-Object { [string]$_ })
+            if ($ended) {
+                while ($ended -is [System.Management.Automation.MethodInvocationException] -and $ended.InnerException) { $ended = $ended.InnerException }
+                $said += $ended.Message
+            }
+            $out = ($said -join "`n") + "`n"
+            $exited = $rs.SessionStateProxy.GetVariable('LASTEXITCODE')
+            $code = if ($ended) { 1 } elseif ($null -ne $exited) { [int]$exited } else { 0 }
+        } finally { $ps.Dispose(); $rs.Dispose() }
     } finally {
         foreach ($k in $keep.Keys) { [Environment]::SetEnvironmentVariable($k, $keep[$k]) }
     }
