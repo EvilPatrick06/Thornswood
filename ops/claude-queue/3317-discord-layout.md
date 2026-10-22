@@ -2,7 +2,7 @@
 
 - **Issue / PR:** #3317, the pull request this note came in with.
 - **Where:** the live Discord (Setup-Discord -OnBox), then the bot on the box (Install-Bot -CodeOnly). No Ship, no game, no site.
-- **Needs first:** nothing for steps 1 to 5. Step 6 (-Prune) waits on Patrick's yes on the page, after step 5 says what it would delete.
+- **Needs first:** Patrick's answer on page card q-3317-faction-category. A is what this note builds; if he picks another, the #3317 thread changes the plan first and rewrites this note, so no faction channel or role is made twice. Step 6 (-Prune) also waits on his yes on the page, after step 5 says what it would delete.
 - **Staff notice:** yes, after step 4, because where staff answer tickets changes (step 4 has the line).
 
 What it does, all from the plan in `bot/Build-Discord.py` (docs/systems/discord.md is the plan in words):
