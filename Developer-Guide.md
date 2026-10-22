@@ -453,7 +453,7 @@ by hand, and no secret is written into the repository.
 | Signing: `records\signing\signing.json` | written from the template like any other machine's since 5 Oct, when `C:\tools` (an older copy of `metadata.json`) was removed. Never copy one machine's to another | `.\scripts\release\Setup-ShipMachine.ps1` writes one from `records\signing\signing.template.json` (paths and "enabled": true, no key or password) |
 | Signing: Microsoft's signing client | `records\signing\client`, ignored by git | The same script fetches `Microsoft.ArtifactSigning.Client` 1.0.128 from nuget.org and refuses it unless its sha256 is the pinned one, which is the package One has |
 | Signing: the Azure sign in | `az login` on One, as Patrick | `az login` on the new machine, as the person who ships from it, with an account of their own in the signing tenant that holds the Certificate Profile Signer role on the ThornswoodSigning account's profile ThornswoodRelease (Patrick, 4 Oct; #1740). Patrick makes the account and gives the role once: [Your own signing sign in](#your-own-signing-sign-in). The script asks the signing service with that sign in and checks the profile answers with the identity the launcher pins |
-| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | The script fetches the zip of the recorded commit from the site's feed (`clientRuntime` in `/feed-dev/version.json` or `/feed/version.json`), checks it against the feed's sha256 and every file against the record, and puts the six files in the build folder. A commit on neither feed is built: `.\scripts\release\Setup-ShipMachine.ps1 -Rebuild`, or `.\scripts\release\Build-Engine.ps1` |
+| The client runtime `records\client-build.json` names | only in the dev game folder, `C:\Thornswood-DevBuild\Game`. The build copies in `Downloads\Thornswood-ClientBuild-<commit>` are older builds, and the shared clone's `engine\skymp\build` does not match the record | Setup-ShipMachine records CI's build of the pin as the machine's engine build (`-EngineBuild ci`, which it does by itself on a machine with no engine build), and `Get-EngineArtifact.ps1` fetches engine.yml's artifact `engine-<fork commit 12>` and holds every file to both records. A build made on the machine is not the recorded bytes (engine\README.md, "A Ship machine takes CI's build") |
 | The game folder the Ship packs, `<root>-DevBuild\Game` | built by the dev launcher from what Vortex deployed | Skyrim Special Edition on Steam, Vortex with a profile named Thornswood and the Thornswood collection installed and deployed, the launcher from thornswood.net, then the dev build and its own game folder (Setting up a machine, above). A person does this; it needs a Nexus account, not Patrick's |
 | The collection itself | Nexus collection `7essxf`, curated from Patrick's Nexus account in his Vortex | Any machine installs it. Only publishing a new revision needs his account (`docs\OWNERSHIP.md`) |
 | Backups | the originals on the VPS, `C:\Thornswood-Backup`, and copies fetched to `local\backups` in One's repository folder (`.\scripts\release\Where.ps1 Backups`); the passphrase on the VPS and in One's Documents | Not needed to Ship. `.\scripts\vps\Fetch-Backups.ps1` brings them down to any machine the VPS knows |
@@ -1376,19 +1376,37 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `Package -NoPublish` may still print "not signing" and leave an unsigned
   intermediate; that soft skip must not reach the site or the feed. The live main launcher,
   1.1.101, predates signing; the next main Ship is the first signed one.
-- Every pull request gets the build check (.github/workflows/build.yml, about
-  two minutes: the secret scan, every script and file parses, the Python
-  names only what exists (ruff, issue #1343), the writing
-  rules and the two harnesses that prove the writing checks (see Words), the ownership page (`tests\test-ownership.js`, added by issue #752),
-  seven more harnesses that are just as quick (the script index, the script
-  paths, the architecture page and three launcher harnesses, issue #875, and
-  the new-box runbook read against its scripts, issue #454),
-  the launcher window, the count of
-  silent catches in the launcher, the scripts, the site, voice and the bot, the launcher builds
-  with MSBuild from its project files, and that build is held to its sources
-  (`tests\test-498-msbuild.ps1`, issue #498). Red means the branch would stop Ship at the build step;
-  fix that, and merge once it is green, you are confident in the change, and you have said so in
-  #staff-updates. Run the test harnesses your change touches yourself. All
+- Every pull request gets the build check, `.github/workflows/build-pr.yml`,
+  and every push to main gets the same steps from
+  `.github/workflows/build.yml`. build-pr.yml is generated from build.yml:
+  change build.yml, then run `node scripts/dev/Build-PrWorkflow.js`
+  (`tests\test-1306-pr-workflow.js` fails while the two differ). It is one job
+  of named steps, and it builds only; nothing is published. It scans for
+  secrets, parses every PowerShell script and game script, checks the
+  writing rules (see Words), the ownership page (`tests\test-ownership.js`,
+  issue #752), the names that must stay out, that the engine is one commit and
+  the high-risk records, runs the gate harnesses (every `tests\test-*.js` and
+  `tests\test-*.ps1` that `tests\gate-excluded.txt` does not name, side by side
+  through `scripts\dev\Nightly-Harnesses.ps1`, issues #3009 and #3114) and the
+  voice service's health harness, checks our plugins are clean, the launcher
+  window and its UI thread, that the Python names only what exists (ruff,
+  issue #1343) and the count of silent catches, and builds the launcher with
+  MSBuild from its project files, held to its sources
+  (`tests\test-498-msbuild.ps1`, issue #498).
+- The check has two names, and either one passing is the merge bar.
+  **Launcher builds** is the job on GitHub's hosted Windows runner, tried
+  first. **Launcher builds (VPS fallback)** runs the same steps on a build
+  runner on the VPS, when the hosted job did not succeed, when the repository
+  variable `BUILD_RUNNER` is `vps` (then Launcher builds shows skipped), or
+  when a manual run of build.yml asks for `runner: vps`. A pull request from a
+  fork never gets the fallback. While the month's hosted minutes are used up,
+  `BUILD_RUNNER` is `vps` and the fallback is the one that goes green. A push
+  to main whose tree a green pull request build already passed stops green at
+  "Already tested in its pull request" instead of building again (#3182).
+  Red means the branch would stop Ship at the build step; fix that, and merge
+  once one of the two is green, you are confident in the change, and you have
+  said so in #staff-updates. Nothing in GitHub's settings is required. Run the
+  test harnesses your change touches yourself. All
   ~410 of them (tests/, bot, and voice), and a look for stray pull requests
   and branches run every night on the VPS (.github/workflows/nightly.yml,
   03:00 Mountain); a failure there opens an issue on the board, "Nightly

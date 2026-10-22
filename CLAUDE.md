@@ -235,8 +235,8 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   (`wiki/status.md` for what is true now, rewritten in place). Anything a
   session changes about tips, standing orders or what waits on Patrick goes
   there as well as on the board.
-- Merge only once `Launcher builds` (the VPS runner) says pass and you are
-  confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
+- Merge only once the build check passes, `Launcher builds` or `Launcher
+  builds (VPS fallback)`, and you are confident in the change. Nothing on GitHub enforces it; see Developer-Guide.md.
 
 ## Where things are
 
