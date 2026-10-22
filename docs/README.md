@@ -14,6 +14,7 @@ Developer-Guide.md at the root; the long form is Developer-Guide.md.
 | [GAMEMODE.md](GAMEMODE.md) | How game/gamemode.js is laid out, where its data lives, how it is deployed and which tests cover it. |
 | [GAMEMODE-SOURCE.md](GAMEMODE-SOURCE.md) | How gamemode.js becomes sources, data and a bundled artifact (#2181, Patrick decision D): measurements, loader limits, stages, and Build-Gamemode. |
 | [GAMEMODE-COVERAGE.md](GAMEMODE-COVERAGE.md) | Which test drives each gamemode event handler, plugin, money function and chat word, and the gaps that were filled. |
+| [DECIDED.md](DECIDED.md) | What was decided against and the settled rules of the game, each with the link where it was decided. Read before filing an idea. |
 | [SYSTEMS.md](SYSTEMS.md) | Thornswood systems. The summary of every system, and a link from each section to the full plan. |
 | [systems/](systems/) | The finished plan for each system, one page each. Where the server is now is the last section of the page. The item lists are [systems/lists](systems/lists/README.md). |
 | [GLOSSARY.md](GLOSSARY.md) | The words used everywhere here, Keep, Hold, pack, baseline, door and the rest, one line each. |

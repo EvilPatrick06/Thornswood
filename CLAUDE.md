@@ -18,6 +18,13 @@ it belongs to, before the session ends (Developer-Guide.md says where the board
 is and how its order works). Saying it in a reply is not recording it: a
 reply is gone when the window closes. Say in the reply which issues moved.
 
+Before filing a new idea or feature, read `docs/DECIDED.md` (what was
+decided against, and the settled rules) and the `docs/systems` page for that
+part of the game, and name that page in the issue. An idea that goes against
+a decision there says so and asks for the decision to be changed, instead of
+quietly reopening it (#3192: #3174 asked for bounties after #502 ruled them
+out).
+
 ## Picking issues to work
 
 Decided by Patrick on 11 Oct: needing his decision, needing the VPS, and
@@ -38,7 +45,10 @@ shipping machine, list that folder and run each note: dev ones when they are
 ready, a Main Ship or a live server run when Patrick says so. Afterwards put
 what ran, when, what it printed and the health check on the issue and in
 `wiki/status.md`, and delete the note. A note that cannot run keeps the
-reason written into it.
+reason written into it. The run that finishes an issue also closes it, with
+its `Test task:` comment when people would notice the fix, or moves it to
+Done (`board: Done`) when its fix still waits on main (#3192: issues sat
+open after their runs finished because nobody owned the close).
 
 ## What a Claude here does itself and what the person does
 
