@@ -89,6 +89,10 @@ if the pick needs one.
 A material named for a people is a smithing tier and is open to every race.
 A people's own dress is locked to that race. The locked recipes are listed.
 
+[Hair dye](systems/hair-dye.md). Made at a cooking spot from things people
+already gather. It changes the colour of somebody's hair, and only with
+their own press.
+
 [Death](systems/death.md). The world can kill you. Another person cannot
 end your character without agreement. You wake in a temple. Wounds are a
 separate page.
@@ -148,6 +152,11 @@ Worn gear loses 1% a hit. At 0%, a worn piece can break.
 [Cut items](systems/cut-items.md). What leaves the open book, and the
 references kept so a row can come back. The recipe file is not
 deleted.
+
+[Where the stations stand](systems/station-placement.md). Every
+woodworking bench, charcoal kiln, salt quarry, beehive, alchemy lab and
+water bucket Thornswood places, the rule that chose each spot, and the
+towns left without one.
 
 | Profession | Halves |
 | --- | --- |
@@ -246,6 +255,9 @@ courier, paid by the sender. The newest ten show.
 People cannot join it. Traders start with 250 and buy and
 sell at the average of the price lists submitted there. It does not
 mint coin after that purse, and it is not a profession.
+[Six trades in each hold](systems/merchant-expansion.md) is what the
+guild must hold, and [Merchant trader counts](systems/merchant-traders.md)
+names every trader and where they stand.
 
 [Custom quests](systems/quests.md). Guild traders ask for goods. A supply
 quest pays from the trader's purse. A scarce quest opens a place that
@@ -253,6 +265,29 @@ holds more than the turn-in, for a class, a profession, or a race. A
 scene quest pays a set amount, usually for a retrieval, and that
 gold does not run out. It does not buy goods. A letter is on the
 notice board, and the sender pays.
+
+The quest pages behind it:
+
+- [Custom quest places](systems/quest-locations.md): the ground each
+  quest sends you to.
+- [Merchant quest catalogue](systems/merchant-quest-catalogue.md): every
+  quest a guild trader gives, by trader and rank. Its deliveries are
+  [Regional guild delivery parcels](systems/merchant-regional-deliveries.md)
+  and [Deliveries in the remaining six holds](systems/merchant-all-hold-deliveries.md).
+- [Appointed specialists for original work](systems/merchant-legacy-offers.md)
+  and [Merchant retrieval work](systems/merchant-retrieval-work.md): the
+  one trader who gives each of the original contracts and retrievals.
+- [Crimson work in Blackreach](systems/merchant-crimson-work.md),
+  [Blackreach geode work](systems/merchant-geode-work.md),
+  [Longfin work](systems/merchant-longfin-work.md),
+  [The mammoth ground](systems/merchant-mammoth-work.md),
+  [Orchard work](systems/merchant-orchard-work.md) and
+  [Pearl-bed work](systems/merchant-pearl-bed.md): the gathering and
+  hunting quests, each at one trader.
+- [Dedicated merchant quest objects](systems/merchant-quest-content.md):
+  the quest items and markers the content plugin carries for them.
+- [Expanded scene reward accounting](systems/scene-reward-budget.md): how
+  the gold of a kill scene is counted.
 
 [Free Skyrim Trading Company](systems/trading-company.md). Hauls between
 holds. The hauler is paid out of the box. The company keeps 10%. It is not

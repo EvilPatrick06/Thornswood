@@ -23,7 +23,7 @@ Patrick's split, and how this PR fits it:
   the step that reaches every launcher.
 - The slug and URL are swapped everywhere else they were hardcoded: the
   `LoadOrder.ps1` and `Check-CollectionRules.ps1` tooling, the collection-slug
-  and revision tests, and the docs (`SYSTEM.md`, `FEED.md`, `CLEAN-INSTALL-RUN.md`,
+  and revision tests, and the docs (`SERVER.md`, `FEED.md`, `CLEAN-INSTALL-RUN.md`,
   `OWNERSHIP.md`, `THIRD-PARTY.md`).
 - `THIRD-PARTY.md` now records Thornswood Content 1.2 (was 1.1.0), with a note
   to re-measure its files on the ship PC once 7essxf is installed.

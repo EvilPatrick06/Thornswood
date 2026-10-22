@@ -7,7 +7,7 @@
 // Settings, "Show the needs bars on screen") and want a quick text version of
 // them. It is another view of something with a button already, the Body page
 // on K, so it is his exception to "buttons, not chat commands", like the
-// commands that rule already lists, and docs/SYSTEMS.md "Buttons, not
+// commands that rule already lists, and docs/GAME-SYSTEMS.md "Buttons, not
 // commands" says so.
 //
 // The needs block is run as it stands, over a stand-in mp and a clock turned
@@ -209,9 +209,9 @@ function typed(N, word, actorId) {
   const xaml = read('launcher', 'ui.xaml');
   yes('D3 the Settings line under "Show the needs bars on screen" names it',
       /x:Name="ChkNeedsBars"[^>]*\/>\s*<TextBlock[^>]*Text="[^"]*\/needs in the chat says them as a line of text\."/.test(xaml));
-  const systems = read('docs', 'SYSTEMS.md');
+  const systems = read('docs', 'GAME-SYSTEMS.md');
   const buttons = slice(systems, '## Buttons, not commands', '\n## ') || '';
-  yes('D4 docs/SYSTEMS.md "Buttons, not commands" says /needs stays a command, and why',
+  yes('D4 docs/GAME-SYSTEMS.md "Buttons, not commands" says /needs stays a command, and why',
       /`\/needs`/.test(buttons) && /11 Oct/.test(buttons) && /#2267/.test(buttons) && /hid the bars/.test(buttons));
   const guide = read('Developer-Guide.md');
   const rule = slice(guide, '#### Buttons, not chat commands', '\n#### ') || '';

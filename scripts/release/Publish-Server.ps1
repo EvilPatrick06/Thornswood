@@ -959,7 +959,7 @@ Save-ServerRecords
   which belong to the dev world, and a door.json with the live address, which
   gives the dev door the live list. The dev door asks
   https://thornswood.net/dev, whose list is only the people the dev build is
-  for (docs\SYSTEM.md, "The door"); on 28 Sep that took the dev list from 46
+  for (docs\SERVER.md, "The door"); on 28 Sep that took the dev list from 46
   to 28, which is right.
 
   So now: door.json is live's key and join pass key with the address ending

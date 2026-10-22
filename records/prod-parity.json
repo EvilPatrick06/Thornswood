@@ -1,5 +1,5 @@
 {
-  "about": "What the VPS should look like, read off the repository (docs/SYSTEM.md, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
+  "about": "What the VPS should look like, read off the repository (docs/SERVER.md, scripts/deploy/Caddyfile, site/server.js, voice/README.md, the Install scripts). scripts/vps/Check-ProdParity.ps1 compares Get-ProdFacts.ps1 output against it. Issue #2165. No secret belongs here.",
   "listeners": [
     {
       "proto": "tcp",

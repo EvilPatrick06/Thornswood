@@ -548,7 +548,7 @@ person(BRYN, 'Bryn', 209, 'smith', 'edgewright');
   const doc = function (p) { return read('docs', 'systems', p); };
   const pages = { appr: doc('apprenticeship.md'), prof: doc('professions.md'), warrior: doc(path.join('professions', 'warrior.md')),
                   magic: doc('magic.md'), livery: doc(path.join('professions', 'tailor', 'liverywright.md')),
-                  systems: read('docs', 'SYSTEMS.md'), site: read('site', 'data', 'site', 'classes.md') };
+                  systems: read('docs', 'GAME-SYSTEMS.md'), site: read('site', 'data', 'site', 'classes.md') };
   yes('F2: no page about it tells anybody to type /apprentice or /study',
       Object.keys(pages).every(function (k) { return !/`\/apprentice|`\/study/.test(pages[k]); }));
   yes('F2: apprenticeship.md says how it is done: the prompt row, K, Take on, End from either side',

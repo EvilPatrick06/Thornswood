@@ -960,7 +960,7 @@ from GMs"). So do the ways of saying a line, `/me`, `/do`, `/w`, `/s`,
 "Allow those commands and don't do buttons"). So does `/needs`, the
 needs bars as a line of text for somebody who hid them (Patrick,
 11 Oct, #2267). Never add another chat command for people. A panel
-may send the server a line, but no person is told to type it and help text never lists it. [docs/SYSTEMS.md](docs/SYSTEMS.md), "Buttons, not
+may send the server a line, but no person is told to type it and help text never lists it. [docs/GAME-SYSTEMS.md](docs/GAME-SYSTEMS.md), "Buttons, not
 commands", is the rule and what counts as a button;
 [docs/systems/commands.md](docs/systems/commands.md) lists every command
 there is today and the issue that converts each one that does not stay.
@@ -2283,7 +2283,7 @@ Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that 
 | `scripts\deploy` | Put a build on the server | `Get-ChildItem scripts\deploy` |
 | `scripts\vps` | The server key and log reads | `Get-ChildItem scripts\vps` |
 | `tests` | The test files | `Get-ChildItem tests` |
-| `docs` | The system notes | `code .\docs\SYSTEM.md` |
+| `docs` | The system notes | `code .\docs\SERVER.md` |
 
 `engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
 
@@ -2396,7 +2396,7 @@ That says whether the dev build and its game folder are in place, and ships noth
 
 On the Play page, the server list is at the lower right, under the Play button. Main is the live server. Dev is the row under it. Choose Dev.
 
-![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/guide/launcher-play-dev.png)
+![The Play page. The server list at the lower right shows Main and Dev, and Dev is circled.](docs/launcher-play-dev.png)
 
 #### Learn more about Dev Build
 
@@ -2557,7 +2557,7 @@ Thornswood
 | `voice` | The proximity voice service | [voice/voice-server.js](voice/voice-server.js) |
 | `scripts` | Commands you run from the repository folder | [scripts/README.md](scripts/README.md) |
 | `tests` | One file per check. `node tests\the-name.js` runs it | the `tests` folder |
-| `docs` | How the feed, the gamemode, and the server fit | [docs/SYSTEM.md](docs/SYSTEM.md) |
+| `docs` | How the feed, the gamemode, and the server fit | [docs/SERVER.md](docs/SERVER.md) |
 | `records` | What a Ship compares the build to, and signing | [records/README.md](records/README.md) |
 | `installer` | The small setup program people download first | [installer/setup/README.md](installer/setup/README.md) |
 | `engine` | SkyMP source. Leave it until you are building the server | [engine/README.md](engine/README.md) |
