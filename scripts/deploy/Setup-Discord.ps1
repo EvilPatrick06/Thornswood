@@ -129,7 +129,9 @@ if ($OnBox) {
 # sshd's sessions carry the PATH from before Python was installed (Install-Bot.ps1).
 `$env:PATH = [Environment]::GetEnvironmentVariable('PATH','Machine') + ';' + [Environment]::GetEnvironmentVariable('PATH','User')
 `$botRoot = 'C:\Thornswood-Bot'
-`$dir = Join-Path `$env:WINDIR ('Temp\thornswood-discord-' + [Guid]::NewGuid().ToString('N'))
+# The box's own temp folder, where OnBox.ps1 keeps its runs too.
+`$top = 'C:\Windows\Temp'
+`$dir = Join-Path `$top ('thornswood-discord-' + [Guid]::NewGuid().ToString('N'))
 `$code = 1
 New-Item -ItemType Directory -Force -Path `$dir | Out-Null
 try {

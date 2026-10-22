@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  68,
-    "callCount":  271,
+    "scriptCount":  69,
+    "callCount":  272,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2453,6 +2453,15 @@
                       "does":  "runs scripts/dev/Trace-Gate-Box.ps1 in one of its modes: the self-test, starting and stopping the gate\u0027s ETW trace session, reading the trace against the run\u0027s start log, or emptying C:\\Thornswood-Trace (#3114)",
                       "class":  "admin",
                       "reason":  "only an administrator can start a kernel trace session and set the trace folder\u0027s ACL"
+                  },
+                  {
+                      "script":  "scripts/deploy/Setup-Discord.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $far",
+                      "does":  "-OnBox: writes Build-Discord.py, content.py and staff-channel.txt to a new folder in C:\\Windows\\Temp, runs Build-Discord.py there with the token from C:\\Thornswood-Bot\\bot.env.json and the bot\u0027s own Python libraries, then removes the folder (#2519)",
+                      "class":  "admin",
+                      "reason":  "reads the bot token from the bot\u0027s settings, which only an administrator may read, and works outside the gate verbs"
                   }
               ]
 }

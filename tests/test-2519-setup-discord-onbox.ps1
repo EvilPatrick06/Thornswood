@@ -38,6 +38,7 @@ $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
+. (Join-Path $Here 'Windows.ps1')
 
 $script:pass = 0
 $script:fail = 0
@@ -141,17 +142,16 @@ function python {
 }
 
 '@
-    $local = $standIn + $s.Replace("'C:\Thornswood-Bot'", "'" + $box.Replace("'", "''") + "'").Replace('$env:WINDIR', "'" + $win.Replace("'", "''") + "'")
+    $local = $standIn + $s.Replace("'C:\Thornswood-Bot'", "'" + $box.Replace("'", "''") + "'").Replace("'C:\Windows\Temp'", "'" + $win.Replace("'", "''") + "'")
     $farPath = Join-Path $work 'far.ps1'
     [IO.File]::WriteAllText($farPath, $local)
     # The box runs Windows PowerShell 5.1, so the script runs under it wherever
     # it is here (the Windows runners); elsewhere under pwsh.
-    $farPs = (Get-Command powershell.exe -ErrorAction SilentlyContinue)
-    if (-not $farPs) { $farPs = $pwsh }
-    Write-Host ('      the box''s script runs under ' + $farPs.Source)
+    $farPs = if ($OnWindows) { Get-WindowsPowerShell } else { $pwsh.Source }
+    Write-Host ('      the box''s script runs under ' + $farPs)
     function Run-Far {
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $o = & $farPs.Source -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $farPath 2>&1 | Out-String; $c = $LASTEXITCODE }
+        try { $o = & $farPs -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $farPath 2>&1 | Out-String; $c = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }
         return [pscustomobject]@{ Code = $c; Out = $o }
     }
@@ -160,12 +160,12 @@ function python {
     Yes ("run on the box, the build runs and passes (exit {0})" -f $f.Code) ($f.Code -eq 0 -and $f.Out -match 'RAN Build-Discord\.py')
     Yes '  with the three files beside it' ($f.Out -match 'FILES Build-Discord\.py,content\.py,staff-channel\.txt')
     Yes '  with the bot''s token in its environment, and -Check' ($f.Out -match 'TOKEN stand-in-token' -and $f.Out -match 'CHECK 1')
-    Yes '  and its folder is gone afterwards' (@(Get-ChildItem -LiteralPath $win -Recurse -Directory -Filter 'thornswood-discord-*').Count -eq 0)
+    Yes '  and its folder is gone afterwards' (@(Get-ChildItem -LiteralPath $win -Directory -Filter 'thornswood-discord-*').Count -eq 0)
 
     [IO.File]::WriteAllText((Join-Path $box 'bot.env.json'), '{"PING_URL":"x"}')
     $f = Run-Far
     Yes ("a bot.env.json with no token stops it before the build (exit {0})" -f $f.Code) ($f.Code -eq 3 -and $f.Out -match 'NO TOKEN' -and $f.Out -notmatch 'RAN ')
-    Yes '  and leaves no folder either' (@(Get-ChildItem -LiteralPath $win -Recurse -Directory -Filter 'thornswood-discord-*').Count -eq 0)
+    Yes '  and leaves no folder either' (@(Get-ChildItem -LiteralPath $win -Directory -Filter 'thornswood-discord-*').Count -eq 0)
 
     # ---- 5. an uncommitted change stops it -----------------------------------
     Add-Content -LiteralPath (Join-Path $bot 'content.py') -Value '# changed'
