@@ -22,8 +22,9 @@
        nothing put in the fork: a download whose sha256 is not GitHub's
        digest, another commit, another run, a pull request's build, a file
        that is not the one named, a file named and missing, a file not
-       named, a path outside build/, a time with no zone, and a fork whose
-       build folder is there already.
+       named, a path outside build/, a time with no zone, a build with no
+       build/licences/licences.json (#3099), and a fork whose build folder is
+       there already.
     3. -BuiltBy, on a made up fork whose files were written after the build
        (as a checkout made after it is): both records are written and hold
        the build to the commit's time, not the checkout's dates; without it
@@ -124,7 +125,8 @@ try {
     # ---- 2. the build put in the fork --------------------------------------------
     Write-Host ''; Write-Host 'Expand-ForkEngineBuild'
     $times = @{ 'build/dist/server/scam_native.node' = '2026-10-16T13:07:48.1234567Z'; 'build/dist/server/dist_back/skymp5-server.js' = '2026-10-16T12:56:56.0000000Z'
-                'build/dist/client/Data/Platform/Plugins/skymp5-client.js' = '2026-10-16T12:50:00.5000000Z'; 'build/skymp5-server/launch_server.bat.tmp' = '2026-10-16T12:40:00.0000000Z' }
+                'build/dist/client/Data/Platform/Plugins/skymp5-client.js' = '2026-10-16T12:50:00.5000000Z'; 'build/skymp5-server/launch_server.bat.tmp' = '2026-10-16T12:40:00.0000000Z'
+                'build/licences/licences.json' = '2026-10-16T13:08:00.0000000Z'; 'build/licences/zlib.txt' = '2026-10-16T13:08:00.0000000Z' }
     # An artifact as the fork's build keeps it; $edit changes the folder or
     # the manifest before it is zipped. Returns @{ Zip; Digest }.
     function New-Artifact([string]$tag, [scriptblock]$edit) {
@@ -194,6 +196,9 @@ try {
     $a = New-Artifact 'nobin' { param($d, $m) Remove-Item -LiteralPath (Join-Path $d 'build/skymp5-server/launch_server.bat.tmp'); $m.files.Remove('build/skymp5-server/launch_server.bat.tmp') }
     $r = Try-Expand $a 'nobin'
     Yes 'a build with no launch_server.bat.tmp (the record holds launch_server.bat to it) is refused' ($r.Error -match 'does not name build/skymp5-server/launch_server\.bat\.tmp' -and -not $r.Put)
+    $a = New-Artifact 'nolicences' { param($d, $m) Remove-Item -LiteralPath (Join-Path $d 'build/licences') -Recurse; $m.files.Remove('build/licences/licences.json'); $m.files.Remove('build/licences/zlib.txt') }
+    $r = Try-Expand $a 'nolicences'
+    Yes 'a build that did not measure its client files'' libraries (no build/licences/licences.json, #3099) is refused' ($r.Error -match 'does not name build/licences/licences\.json' -and -not $r.Put)
     $fork = New-Fork 'there'
     Put (Join-Path $fork 'build\CMakeCache.txt') 'another build'
     $e = Threw { $null = Expand-ForkEngineBuild -Zip $good.Zip -Commit $C -RunId 42 -Digest $good.Digest -Fork $fork -Scratch (Join-Path $T 'x-there') }
