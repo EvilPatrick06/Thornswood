@@ -98,7 +98,7 @@ try {
     [void](Receive-FeedStore $Channel $Dir -SiteDir $SiteDir)
     $file = Join-Path $Dir 'version.json'
     if (-not (Test-Path -LiteralPath $file -PathType Leaf)) { throw "The VPS has no version.json for the $Channel channel, so there are no notes." }
-    $doc = (([IO.File]::ReadAllText($file)) -replace '^﻿', '') | ConvertFrom-Json
+    $doc = (([IO.File]::ReadAllText($file)) -replace "^$([char]0xFEFF)", '') | ConvertFrom-Json
     $news = @(Open-FeedNewsList $doc (Get-FeedStoreSiteDir $SiteDir) $SiteUrl)
     $gone = @(Remove-NoteRepeats $news)
     foreach ($g in $gone) { Say "  $(if ($Check) { 'would take out' } else { 'took out' }) $g" 'Yellow' }

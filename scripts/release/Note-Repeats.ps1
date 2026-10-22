@@ -158,7 +158,7 @@ function Get-ChannelPosts([string]$Channel, [string]$SiteDir, [string]$SiteUrl =
         $got = Receive-FeedStore $key -Dir $dir -Files @('announced.json') -SiteDir $SiteDir
         $f = Join-Path $dir 'announced.json'
         if ($got['announced.json'] -and (Test-Path -LiteralPath $f)) {
-            $raw = ([IO.File]::ReadAllText($f) -replace '^﻿', '') | ConvertFrom-Json
+            $raw = ([IO.File]::ReadAllText($f) -replace "^$([char]0xFEFF)", '') | ConvertFrom-Json
             $p = $raw.PSObject.Properties['posts-' + $key]
             $where = if ($key -eq 'dev') { 'the dev updates channel' } else { '#news' }
             if ($null -ne $p) {
