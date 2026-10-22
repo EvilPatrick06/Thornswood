@@ -153,7 +153,7 @@ $ast = [System.Management.Automation.Language.Parser]::ParseInput($gate, [ref]$t
 Yes 'the gate step parses' (@($errors).Count -eq 0)
 Yes 'it takes its list from Gate-Harnesses.ps1' ($gate -match '(?m)^\$gate = @\(& \.\\scripts\\dev\\Gate-Harnesses\.ps1\)\s*$')
 Yes 'and stops when that fails, before running any' ($gate -match '(?m)^\$gate = @\(.*\r?\nif \(\$LASTEXITCODE -ne 0\) \{ exit 1 \}')
-Yes 'and runs each one it returns, through Nightly-Harnesses.ps1 (#3114)' ($gate -match "(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only \(\`$gate -join ' '\) -Throttle [1-9]\d* -BudgetSeconds \d+\s*$")
+Yes 'and runs each one it returns, through Nightly-Harnesses.ps1 (#3114)' ($gate -match "(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 -Only \(\`$gate -join ' '\) -Throttle [1-9]\d* -Share \`$share -BudgetSeconds \d+\s*$" -and $gate -match '(?m)^\$share = .*\[Environment\]::ProcessorCount / .*\$builds' -and $gate -match 'records\\build-runners\.json')
 Yes '  and fails when that does' ($gate -match '(?m)^\.\\scripts\\dev\\Nightly-Harnesses\.ps1 .*\r?\nexit \$LASTEXITCODE\s*$')
 $named = @($ast.FindAll({
     param($n)

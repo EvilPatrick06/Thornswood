@@ -92,7 +92,7 @@
 # checkout: on GitHub's runner that folder goes into the Actions cache, keyed
 # on the fork's vcpkg commit and its manifest and overlays; on the box it
 # simply stays, one per runner. On the box the fork's checkout and its build
-# folder are then removed, whatever the run did, because four runners each
+# folder are then removed, whatever the run did, because every runner
 # keeping a build folder of their own would take most of the disk the game
 # servers write to. So a build on the box compiles the engine itself every
 # time, and the libraries only the first time on each runner.

@@ -345,10 +345,15 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     machine's passphrase from step 13; on a box without one, Install-Backup
     sends this machine's copy up rather than making a new one.
 24. **The build runners:** `.\scripts\deploy\Install-Runner.ps1`, then
-    `.\scripts\deploy\Install-Runner.ps1 -Number 2` and up for as many as the
-    old box had (the repository's Settings, Actions, Runners lists them). Each
-    replaces the runner of that name the old box registered, so
-    `Launcher builds` runs on the new box from the next pull request. Then
+    `.\scripts\deploy\Install-Runner.ps1 -Number 2` and `-Number 3`. Since 22
+    Oct 2026 the box has three (Patrick, #3114): 1 and 2 take the builds, as
+    records\build-runners.json lists them, and 3 takes the light jobs (board
+    cards, dropped claims, staff notices, the release jobs), so its install
+    gives it the VPS label alone. Each replaces the runner of that name the
+    old box registered, so `Launcher builds` runs on the new box from the next
+    pull request. Then `.\scripts\deploy\Install-Runner.ps1 -NetworkOnly -Number N
+    -AllowHost pypi.org,files.pythonhosted.org,registry.npmjs.org` for each
+    of the three (docs\RUNNER-ISOLATION.md section 6). Then
     `.\scripts\vps\Keep-RunnerLogs.ps1 -Install`, the daily task that removes
     the runners' own logs once they are two weeks old (#3184).
 25. **Close it to all but ssh with a key**, once every machine that deploys
