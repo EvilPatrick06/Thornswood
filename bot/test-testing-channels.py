@@ -62,6 +62,7 @@ for _k in ('TEST_TASK_ROLES', 'LIVE_SMOKE_ADMIN_ROLES', 'GITHUB_TOKEN'):
 
 import discord  # noqa: E402
 import bot  # noqa: E402
+bot.POST_RULES = False   # these fixtures predate the post rules; test-post-rules.py checks them
 
 PASS = []
 FAIL = []
