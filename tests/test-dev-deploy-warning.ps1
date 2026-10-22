@@ -109,12 +109,26 @@ Yes '-Why is there for the restart wording' ($params.ContainsKey('Why'))
 
 # ---- and the warning comes before anything stops ------------------------------
 $top = @($ast.EndBlock.Statements)
-$iLoad = -1; $iWarn = -1; $iStop = -1; $iFirstStopTask = -1
+# Since #3196 the warning, the stop and the swap are the body of the one if a
+# restart takes, after the reload that needs none of them, so their order is
+# read inside it, and nothing before it may stop the server.
+$iLoad = -1; $iSwapIf = -1; $iEarlyStop = -1
 for ($i = 0; $i -lt $top.Count; $i++) {
     $s = $top[$i]
-    $text = $s.Extent.Text
     if ($iLoad -lt 0 -and $s -is [System.Management.Automation.Language.IfStatementAst] -and
         $s.Clauses[0].Item1.Extent.Text -eq '$LoadOrder') { $iLoad = $i }
+    if ($iSwapIf -lt 0 -and $s -is [System.Management.Automation.Language.IfStatementAst] -and
+        $s.Clauses[0].Item1.Extent.Text -eq "`$outcome -eq 'swap' -or `$outcome -eq 'recover'") { $iSwapIf = $i }
+    if ($iSwapIf -lt 0 -and $iEarlyStop -lt 0 -and $s -isnot [System.Management.Automation.Language.FunctionDefinitionAst] -and
+        $s.Extent.Text -match 'Stop-ScheduledTask|\$swapBlock') { $iEarlyStop = $i }
+}
+Yes 'the warning and the swap are what a restart does, after the reload (#3196)' ($iSwapIf -ge 0)
+$inner = @()
+if ($iSwapIf -ge 0) { $inner = @($top[$iSwapIf].Clauses[0].Item2.Statements) }
+$iWarn = -1; $iStop = -1; $iFirstStopTask = -1
+for ($i = 0; $i -lt $inner.Count; $i++) {
+    $s = $inner[$i]
+    $text = $s.Extent.Text
     if ($s -is [System.Management.Automation.Language.PipelineAst] -and $s.PipelineElements.Count -eq 1 -and
         $s.PipelineElements[0] -is [System.Management.Automation.Language.CommandAst] -and
         $s.PipelineElements[0].GetCommandName() -eq 'Warn-DevRoom') { $iWarn = $i }
@@ -125,7 +139,8 @@ for ($i = 0; $i -lt $top.Count; $i++) {
 }
 Yes 'the deploy calls the warning' ($iWarn -ge 0)
 Yes 'after the load order is worked out, so a missing plugin still stops it before anybody is told' (
-    $iLoad -ge 0 -and $iWarn -gt $iLoad)
+    $iLoad -ge 0 -and $iSwapIf -gt $iLoad)
+Yes 'and nothing before it stops the dev server' ($iEarlyStop -lt 0)
 Yes "before 'Stopping the dev server...'" ($iStop -ge 0 -and $iWarn -lt $iStop)
 Yes 'and before the first thing that stops the scheduled task' ($iFirstStopTask -gt $iWarn)
 

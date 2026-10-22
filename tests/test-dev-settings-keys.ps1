@@ -83,9 +83,10 @@ $notWritten = @($listed | Where-Object { $written -notcontains $_ })
 Yes ('every key the edit block writes is on the list' + $(if ($notListed.Count) { ' (not: ' + ($notListed -join ', ') + ')' } else { '' })) ($notListed.Count -eq 0)
 Yes ('and nothing on the list is a key it never writes' + $(if ($notWritten.Count) { ' (' + ($notWritten -join ', ') + ')' } else { '' })) ($notWritten.Count -eq 0)
 
+# A deploy's swap, not the put-back after a reload that did not take (#3196).
 Yes 'the swap is handed the list on a deploy and nothing on a put-back' (
     ($text -match '(?m)^\s*\$readBackKeys = \$null\s*$') -and
-    ($text -match '(?m)^\s*if \(-not \$PutBack\) \{ \$readBackKeys = \$DevSettingsKeys \}\s*$') -and
+    ($text -match '(?m)^\s*if \(-not \$PutBack -and \$outcome -eq ''swap''\) \{ \$readBackKeys = \$DevSettingsKeys \}\s*$') -and
     ($text -match 'SwapVars \$Root \$Task \$stageName \$prevName \$Wait \$hashes \$readBackKeys\)'))
 
 # ---- 2. the read-back itself, over two folders ---------------------------------
