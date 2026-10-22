@@ -243,7 +243,7 @@ try {
         Yes '  #613 gets board: Done, put on with the board token so board-status.yml runs' (@($w | Where-Object { $_ -like 'POST /issues/613/labels Bearer board-token *' -and $_ -match 'board: Done' }).Count -eq 1)
         $c = @($w | Where-Object { $_ -like 'POST /issues/613/comments *' })
         Yes '  and one comment, with the run''s token, holding the test task in a fenced block' ($c.Count -eq 1 -and $c[0] -match 'Bearer run-token' -and $c[0] -match '```\\nTest task: Forge lists only what you can make\\nServer: Main' -and $c[0] -match 'What should happen: nothing a smith makes\.\\n```')
-        Yes '  the comment says the issue stays open until a main Ship, not the merge (#2796)' ($c.Count -eq 1 -and $c[0] -match 'stays open' -and $c[0] -match 'When a main Ship carries it, close this issue' -and $c[0] -notmatch 'When it is on main')
+        Yes '  the comment says the issue stays open until a main Ship, not the merge (#2796)' ($c.Count -eq 1 -and $c[0] -match 'stays open' -and $c[0] -match 'The main Ship that carries it closes this issue' -and $c[0] -match 'Close-ShippedIssues\.ps1' -and $c[0] -notmatch 'When it is on main')
         Yes '  the block stops at the next test task, a heading and the footer' ($c.Count -eq 1 -and $c[0] -notmatch 'Closed one' -and $c[0] -notmatch 'harness' -and $c[0] -notmatch 'Generated')
         Yes '  two commits of one pull request move it once' ($c.Count -eq 1)
         Yes '  a closed issue and a pull request number are passed over, said' (@($w | Where-Object { $_ -match '/issues/61[45]/' }).Count -eq 0 -and $r.Out -match '#614, which is closed' -and $r.Out -match '#615, which is a pull request')
@@ -253,7 +253,7 @@ try {
         $dev = "Refs #616.`n`nTest task for #616: A forged number is refused`nServer: Dev`nBuild: dev release 20261022-070758-dev`n1. Edit the number.`nWhat should happen: refused."
         $r = Run-Flow $f @{ 'GET /commits/eee/pulls' = @(@{ number = 3302; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = 'abcdef0123456789'; body = $dev }); 'GET /issues/616' = @{ number = 616; state = 'open' } } @{ BOARD_TOKEN = 'board-token'; COMMITS = '["eee"]' }
         $c = @($r.Writes | Where-Object { $_ -like 'POST /issues/616/comments *' })
-        Yes '  a Dev test task''s comment says to post it when a dev release carries it, not to close at a main Ship' ($c.Count -eq 1 -and $c[0] -match 'When a dev release carries it' -and $c[0] -match 'dev-test-tasks' -and $c[0] -notmatch 'When a main Ship carries it' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
+        Yes '  a Dev test task''s comment says to post it when a dev release carries it, and that the main Ship closes the issue' ($c.Count -eq 1 -and $c[0] -match 'When a dev release carries it' -and $c[0] -match 'dev-test-tasks' -and $c[0] -match 'The main Ship that carries it closes this issue \(scripts/release/Close-ShippedIssues\.ps1\), and writes this on it if nobody has' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
 
         $r = Run-Flow $f @{ 'GET /commits/ddd/pulls' = @() } @{ BOARD_TOKEN = ''; COMMITS = '["ddd"]' }
         Yes ("a push with no merged pull request behind it does nothing and passes (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Writes.Count -eq 0)
