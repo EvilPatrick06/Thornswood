@@ -53,7 +53,13 @@ function Sha([string]$p) { (Get-FileHash -LiteralPath $p -Algorithm SHA256).Hash
 $shell = (Get-Process -Id $PID).Path
 function Run([string[]]$a) {
     $eap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try { $o = @(& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @a 2>&1 | ForEach-Object { "$_" }); return [pscustomobject]@{ Code = $LASTEXITCODE; Out = ($o -join "`n") } }
+    # The error as one line: pwsh wraps a thrown sentence to the console's
+    # width, with colour and a gutter, and a Windows runner's is narrow.
+    try {
+        $o = @(& $shell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @a 2>&1 | ForEach-Object { "$_" })
+        $one = (($o -join "`n") -replace '\x1b\[[0-9;]*m', '') -replace '\s*\r?\n\s*(\|\s*)?', ' '
+        return [pscustomobject]@{ Code = $LASTEXITCODE; Out = $one }
+    }
     finally { $ErrorActionPreference = $eap }
 }
 
