@@ -116,9 +116,12 @@ $nameRule = '^(Thornswood-(Server|Server-Dev|Voice|Voice-Dev)(\.(prev|undone|fai
 #   Deploys  the deploy store, written as Administrator over scp (Artifact.ps1);
 #            the site reads current\ by the rule Deploy-Docs.ps1 gives it, so
 #            the site must have one there first.
-#   Caddy    caddy.exe runs as SYSTEM ('Thornswood Web', Setup-Domain.ps1);
+#   Caddy    caddy.exe runs as LOCAL SERVICE with the SID of 'Thornswood
+#            Web' (Setup-Domain.ps1, #2578), by the rules it gives that SID;
 #            nothing else reads it.
-#   Maint    update.ps1 and dev-instance.ps1 run as SYSTEM; nothing else.
+#   Maint    update.ps1 and dev-instance.ps1 run as SYSTEM, by design
+#            (docs\DEPLOY-IDENTITIES.md section 8); nothing here makes
+#            the Maint Update task or update.ps1 (#3288). Nothing else.
 #   Dumps    WER LocalDumps writes node.exe's crash dumps there as the crashing
 #            account: SYSTEM's and Administrators' like the backups, plus write
 #            (no read) for LOCAL SERVICE and the thornswood-runner* accounts.
