@@ -15,8 +15,8 @@
   What it checks, with Vps.ps1 and Send-Script.ps1 replaced by stand-ins that
   write down the script instead of sending it, in a throwaway git repository:
     1. -OnBox -Check asks for no token, sends one script and passes;
-    2. the script carries Build-Discord.py, content.py, staff-channel.txt and
-       the two site pages content.py reads (join.md, rules.md) byte for byte
+    2. the script carries Build-Discord.py, content.py, staff-channel.txt,
+       factions.json and the two site pages content.py reads (join.md, rules.md) byte for byte
        as the commit holds them, each under its path in the repository, sets
        DISCORD_CHECK and the site's open switch, and sets no -Posts or -Prune
        it was not given;
@@ -27,7 +27,10 @@
        because the box runs 5.1: the files are there when the build runs,
        laid out as in the repository, and the real Python imports content.py
        from that folder (a run on 22 Oct 2026 sent only the bot's files and
-       content.py stopped on the box with FileNotFoundError for join.md);
+       content.py stopped on the box with FileNotFoundError for join.md),
+       and, where a python with discord.py is, imports Build-Discord.py
+       there too (the first -OnBox run after #3317 stopped on the box with
+       FileNotFoundError for factions.json, which it reads as it loads);
        the token is in its environment, and the folder is gone afterwards,
        after a build that fails too; a bot.env.json with no token stops it
        before the build;
@@ -73,7 +76,7 @@ try {
     $pages = Join-Path $tree 'site\data\site'
     New-Item -ItemType Directory -Force -Path $dep, $vps, $bot, $pages | Out-Null
     Copy-Item -LiteralPath (Join-Path $Repo 'scripts\deploy\Setup-Discord.ps1') -Destination $dep
-    foreach ($f in 'Build-Discord.py', 'content.py', 'staff-channel.txt') { Copy-Item -LiteralPath (Join-Path $Repo ('bot\' + $f)) -Destination $bot }
+    foreach ($f in 'Build-Discord.py', 'content.py', 'staff-channel.txt', 'factions.json') { Copy-Item -LiteralPath (Join-Path $Repo ('bot\' + $f)) -Destination $bot }
     foreach ($f in 'join.md', 'rules.md') { Copy-Item -LiteralPath (Join-Path $Repo ('site\data\site\' + $f)) -Destination $pages }
     $sent = Join-Path $work 'sent.ps1'
     [IO.File]::WriteAllText((Join-Path $vps 'Vps.ps1'), "function Get-ThornswoodVpsUser { 'Administrator' }`nfunction Get-ThornswoodVpsAddress { '192.0.2.1' }`n")
@@ -122,7 +125,7 @@ exit `$LASTEXITCODE
     $errs = $null
     [void][System.Management.Automation.Language.Parser]::ParseInput($s, [ref]$null, [ref]$errs)
     Yes 'the script it sends parses' (@($errs).Count -eq 0)
-    foreach ($f in 'bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt', 'site/data/site/join.md', 'site/data/site/rules.md') {
+    foreach ($f in 'bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt', 'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md') {
         $m = [regex]::Match($s, "(?m)^\s*'" + [regex]::Escape($f) + "' = '([A-Za-z0-9+/=]+)'")
         $same = $m.Success -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $tree $f))) -eq $m.Groups[1].Value)
         Yes "  it carries $f byte for byte, under that path" $same
@@ -155,6 +158,21 @@ exit `$LASTEXITCODE
     $py = Get-Command python3, python -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
     Yes 'Python is on this machine' ($null -ne $py)
     if (-not $py) { Done }
+    # Build-Discord.py imports discord.py before anything else, so only a
+    # python that has it loads the rest of the module, where it reads its
+    # files. The VPS runner and a developer's machine have one; anywhere
+    # else that one check is skipped, and says so (as test-bot-heartbeat.ps1).
+    $bpy = $null
+    $oldEap = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+    try {
+        foreach ($c in @(@('py', '-3.12'), @('python3.12'), @('python'), @('python3'))) {
+            $exe = Get-Command $c[0] -CommandType Application -ErrorAction SilentlyContinue | Select-Object -First 1
+            if (-not $exe) { continue }
+            $pre = @(); if ($c.Count -gt 1) { $pre = @($c[1]) }
+            $null = & $exe.Source @pre -c 'import sys; assert sys.version_info >= (3, 10); import discord' 2>&1
+            if ($LASTEXITCODE -eq 0) { $bpy = @($exe.Source) + $pre; break }
+        }
+    } finally { $ErrorActionPreference = $oldEap }
     $standIn = @'
 function python {
     param($f)
@@ -166,11 +184,15 @@ function python {
     $env:PYTHONPATH = ''
     $code = "import sys; sys.path.insert(0, sys.argv[1]); import content; print('CONTENT IMPORTS')"
     & 'REAL_PYTHON' -c $code (Split-Path -Parent $f) 2>&1 | ForEach-Object { "$_" }
+    $build = "import sys, importlib.util; sys.path.insert(0, sys.argv[1]); s = importlib.util.spec_from_file_location('build_discord', sys.argv[2]); m = importlib.util.module_from_spec(s); s.loader.exec_module(m); print('BUILD IMPORTS')"
+    $bpy = @(BUILD_PYTHON)
+    if ($bpy.Count) { & $bpy[0] @($bpy | Select-Object -Skip 1) -c $build (Split-Path -Parent $f) $f 2>&1 | ForEach-Object { "$_" } }
     $global:LASTEXITCODE = EXIT_CODE
 }
 
 '@
     $standIn = $standIn.Replace('REAL_PYTHON', $py.Source.Replace("'", "''"))
+    $standIn = $standIn.Replace('BUILD_PYTHON', ((@($bpy) | Where-Object { $_ } | ForEach-Object { "'" + $_.Replace("'", "''") + "'" }) -join ', '))
     $far = $s.Replace("'C:\Thornswood-Bot'", "'" + $box.Replace("'", "''") + "'").Replace("'C:\Windows\Temp'", "'" + $win.Replace("'", "''") + "'")
     $farPath = Join-Path $work 'far.ps1'
     [IO.File]::WriteAllText($farPath, $standIn.Replace('EXIT_CODE', '0') + $far)
@@ -187,8 +209,13 @@ function python {
     [IO.File]::WriteAllText((Join-Path $box 'bot.env.json'), '{"DISCORD_TOKEN":"stand-in-token","PING_URL":"x"}')
     $f = Run-Far
     Yes ("run on the box, the build runs and passes (exit {0})" -f $f.Code) ($f.Code -eq 0 -and $f.Out -match 'RAN Build-Discord\.py')
-    Yes '  with the five files laid out as in the repository' ($f.Out -match 'FILES bot/Build-Discord\.py,bot/content\.py,bot/staff-channel\.txt,site/data/site/join\.md,site/data/site/rules\.md')
+    Yes '  with the six files laid out as in the repository' ($f.Out -match 'FILES bot/Build-Discord\.py,bot/content\.py,bot/factions\.json,bot/staff-channel\.txt,site/data/site/join\.md,site/data/site/rules\.md')
     Yes '  and content.py imports there, reading the site pages through its own folder' ($f.Out -match 'CONTENT IMPORTS' -and $f.Out -notmatch 'FileNotFoundError')
+    if ($bpy) {
+        Yes '  and Build-Discord.py loads there, reading factions.json from its own folder' ($f.Out -match 'BUILD IMPORTS' -and $f.Out -notmatch 'FileNotFoundError')
+    } else {
+        Write-Host 'SKIP  Build-Discord.py loading on the box: no python 3.10 or newer with discord.py on this machine'
+    }
     Yes '  with the bot''s token in its environment, and -Check' ($f.Out -match 'TOKEN stand-in-token' -and $f.Out -match 'CHECK 1')
     Yes '  and its folder is gone afterwards' (@(Get-ChildItem -LiteralPath $win -Directory -Filter 'thornswood-discord-*').Count -eq 0)
 
