@@ -136,6 +136,21 @@
        PRIORITY TASK, below).
     6. Tells Windows Defender to skip the runner's own folder, so the few
        hundred processes a check starts are not each scanned on the way in.
+    7. Writes the runner's .env so its jobs keep their temp files in its own
+       folder (TEMP IN ITS OWN FOLDER, below).
+
+  TEMP IN ITS OWN FOLDER (#3117). A job's TEMP and TMP were the runner
+  account's own, C:\Users\thornswood-runnerN\AppData\Local\Temp, outside the
+  folder step 6 has Defender skip and outside the job temp folder
+  (_work\_temp) actions/runner empties for every job. Measured on the box on
+  21 October 2026 with four builds running: the box at 80% CPU on average and
+  99.7% at the top, Defender 15 to 31% of it, and 26,214 to 28,472 entries
+  left in each build runner's temp folder, the oldest from 4 October. Each
+  runner's .env (actions/runner reads it when its service starts) now sets
+  TEMP and TMP to its _work\_temp, so what the tests write there is not
+  scanned and is gone after the job. The install writes it before the
+  service first starts; -Lock writes it for every runner on the box and says
+  which runners take it only at their next start.
 
   It needs gh on this machine, signed in as somebody who can administer the
   repository (Patrick): the registration token comes from
@@ -157,8 +172,9 @@
   every runner service there, it locks the runner's folder, and shuts its
   account out of every C:\Thornswood-* folder but its own and Dumps, saying
   which it had to close, takes off a deny an earlier install put on Dumps
-  for it, and it takes off every priority watcher task left on the box. No
-  service is stopped and no job is touched. An install ends by doing the
+  for it, it takes off every priority watcher task left on the box, and it
+  writes each runner's .env (TEMP IN ITS OWN FOLDER). No service is stopped
+  and no job is touched. An install ends by doing the
   same for every runner, so adding one leaves all of them locked.
 
   CRASH DUMPS (#2127, #2488). Patrick decided on 11 October 2026 (#2127)
@@ -416,6 +432,26 @@ $service = 'actions.runner.' + $Repo.Replace('/', '-') + '.' + $RunnerName
 # icacls by its exit code (#941).
 $lockLib = @'
 $broadSids = @('S-1-5-32-545', 'S-1-1-0', 'S-1-5-11', 'S-1-3-0')
+# The header's TEMP IN ITS OWN FOLDER (#3117): the runner's .env sends its
+# jobs' TEMP and TMP to the job temp folder actions/runner empties for every
+# job, inside the folder Defender skips. Lines of the runner's own are kept.
+# It is read when the runner's service starts, so one written while the
+# runner runs is said, and waits for its next start.
+function Set-RunnerTemp([string]$root, [string]$svcName) {
+  $file = Join-Path $root '.env'
+  $temp = Join-Path $root '_work\_temp'
+  $want = @(('TEMP=' + $temp), ('TMP=' + $temp))
+  $had = @()
+  if (Test-Path -LiteralPath $file) { $had = @(Get-Content -LiteralPath $file -EA Stop) }
+  $keep = @($had | Where-Object { $_ -notmatch '^(TEMP|TMP)=' })
+  $new = @($keep) + $want
+  if (($had -join "`n") -eq ($new -join "`n")) { return ($root + ' sends its jobs'' temp files to ' + $temp + ' already') }
+  [IO.File]::WriteAllText($file, (($new -join "`r`n") + "`r`n"), (New-Object Text.UTF8Encoding($false)))
+  $line = $root + ' now sends its jobs'' temp files to ' + $temp
+  $svc = Get-CimInstance Win32_Service -Filter ("Name='" + $svcName + "'") -EA SilentlyContinue
+  if ($svc -and $svc.State -eq 'Running') { $line += '; its runner is running, so this takes effect when ' + $svcName + ' next starts' }
+  return $line
+}
 function Lock-RunnerRoot([string]$root, [string]$acct) {
   $ErrorActionPreference = 'Continue'
   $out = & icacls.exe $root /grant:r '*S-1-5-18:(OI)(CI)F' '*S-1-5-32-544:(OI)(CI)F' ($acct + ':(OI)(CI)M') /C /Q 2>&1
@@ -719,6 +755,7 @@ foreach ($svc in $services) {
     Lock-RunnerRoot $root $acct
     Close-RunnerAccount $acct $root 'C:\' $liveFilter $alsoDeny $leave
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
+  try { Set-RunnerTemp $root $svc.Name } catch { 'TEMP NOT SET: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
 Show-LeftFolders 'C:\' $leave
 # A removed runner's profile is not a lock, so one still left is said and
@@ -964,6 +1001,8 @@ if (Test-Path (Join-Path `$root '.runner')) {
 if (-not (Test-Path `$root)) { New-Item -ItemType Directory -Path `$root -Force | Out-Null }
 # Locked before config.cmd writes GitHub's credentials into it.
 Lock-RunnerRoot `$root `$acct
+# Before the service first starts, so its first job already has it (#3117).
+Set-RunnerTemp `$root '$service'
 
 # The runner itself, checked before it is unpacked.
 if (-not (Test-Path (Join-Path `$root 'bin\Runner.Listener.exe')) -or -not (Test-Path (Join-Path `$root 'version-$version.txt'))) {
