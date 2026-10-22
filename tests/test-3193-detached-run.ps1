@@ -31,7 +31,10 @@
          - a script that ends without exit is END 0 even when a program it
            ran last exited 5;
          - the script's file is gone once the run is over, and the read that
-           sees END deletes the report.
+           sees END deletes the report;
+         - a read while the run has its report open for appending reads it
+           and leaves the run able to write (#3233: ReadAllLines did not, so
+           a read mid-run made the run's next line fail and end it as END 1).
   Setup-Domain.ps1's use of it is in tests\test-setup-domain-taskonly.ps1.
   Starts only the Windows PowerShell processes it waits for, in the scratch
   folder it removes; nothing leaves this machine.
@@ -68,6 +71,10 @@ Yes 'the read says REPORT NONE before there is a report' ($r.Read.Contains("'REP
 $threw = $false
 try { [void](Get-ThornswoodDetachedRun -Script 'x' -Folder "C:\it's") } catch { $threw = $true }
 Yes 'a folder with a quote in it is refused' $threw
+# #3233: ReadAllLines lets nobody write while it reads, so a read mid-run made
+# the run's next AppendAllText fail and the run end as ERROR and END 1.
+Yes 'the read opens the report so the run can go on writing it (#3233)' (
+    -not $r.Read.Contains('ReadAllLines') -and $r.Read.Contains('[IO.FileShare]::ReadWrite'))
 
 if (-not $OnWindows) {
     Write-Host 'SKIP  the runs: they need Windows PowerShell 5.1 and WMI, which only Windows has'
@@ -123,6 +130,18 @@ try {
     Yes '  the report holds what it said, its error too, in order, then END 3' (($a.Lines -join '|') -eq ($want -join '|'))
     Yes '  the script''s file is gone' (-not (Test-Path -LiteralPath $a.Run.File))
     Yes '  and the read that saw END deleted the report' (-not (Test-Path -LiteralPath $a.Run.Log))
+
+    Write-Host ''
+    Write-Host 'A read while the run holds its report open, appending:'
+    $h = Get-ThornswoodDetachedRun -Script "'x'" -Folder $scratch
+    [IO.File]::WriteAllText($h.Log, "one`r`ntwo`r`n")
+    # As AppendAllText opens it in Windows PowerShell 5.1: append, write, others may read.
+    $held = New-Object IO.FileStream($h.Log, [IO.FileMode]::Append, [IO.FileAccess]::Write, [IO.FileShare]::Read)
+    try { $rd = Invoke-51 $h.Read } finally { $held.Dispose() }
+    $rd.Out | ForEach-Object { Write-Host ('      ' + $_) }
+    Yes '  it reads the report, and does not fail for the run having it open (#3233)' (
+        $rd.Code -eq 0 -and ($rd.Out -join '|') -eq 'REPORT 2|one|two')
+    Remove-Item -LiteralPath $h.Log -Force -ErrorAction SilentlyContinue
 
     Write-Host ''
     Write-Host 'A run stopped by an error:'
