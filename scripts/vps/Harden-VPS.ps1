@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services the box never uses.
+  Closes the VPS to everything but ssh with a key: proves key login works, then turns ssh password login off and turns Remote Desktop off, and the Windows services and telemetry the box never uses, and moves Windows Update and its maintenance to 4 AM.
 
 .DESCRIPTION
   Issue #450. Patrick, 28 September: yes to password login off once key login
@@ -26,7 +26,13 @@
        ssh's own rules on port 22 are never touched. Then the Windows
        services the box never uses (the print spooler, telemetry and six
        more, vps-harden.ps1 lists each and why, #3186) stopped and set to
-       Disabled. Then PasswordAuthentication
+       Disabled. Then telemetry off: DiskSnapshot.exe's, CompatTelRunner.exe's
+       and the Customer Experience Improvement Program's tasks set to
+       Disabled, and AllowTelemetry 0. Then Windows Update, which stays on,
+       installs every day at 4 AM box time, never restarts the box for an
+       update between 6 AM and midnight, and its automatic maintenance
+       starts at 4 AM, after the 2:15 AM backup and the nightly checks
+       (Patrick, 22 Oct 2026, #3213). Then PasswordAuthentication
        no and KbdInteractiveAuthentication no in sshd_config, checked with
        sshd -t first, the old file kept beside it, and sshd restarted. Every
        line it prints says CHANGED, WOULD, ALREADY, KEPT, WARN or STOP.
@@ -59,6 +65,13 @@
     A service back (vps-harden.ps1 $IdleServices names them), for example:
       Set-Service Spooler -StartupType Automatic
       Start-Service Spooler
+
+    A telemetry task back (vps-harden.ps1 $TelemetryTasks names them):
+      Enable-ScheduledTask -TaskPath '\Microsoft\Windows\DiskFootprint\' -TaskName Diagnostics
+
+    Windows Update as it was before (vps-harden.ps1 $UpdatePolicies names
+    each value), for example:
+      Set-ItemProperty 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU' AUOptions 7
 
     Remote Desktop back:
       Set-ItemProperty 'HKLM:\System\CurrentControlSet\Control\Terminal Server' fDenyTSConnections 0
@@ -235,7 +248,7 @@ Head '3. From outside, before'
 $before = Show-Outside 'now'
 
 # ----------------------------------------------------------------- 4. box ---
-$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login, Remote Desktop and the services the box never uses off')
+$doIt = $PSCmdlet.ShouldProcess("$User@$Vps", 'turn ssh password login, Remote Desktop, telemetry and the services the box never uses off, and move Windows Update to 4 AM')
 Head $(if ($doIt) { '4. On the box' } else { '4. On the box, read only' })
 $box = Invoke-Box (-not $doIt)
 if ($box.Code -ne 0 -or @($box.Lines | Where-Object { $_ -match '^STOP ' }).Count) {

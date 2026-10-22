@@ -24,7 +24,13 @@
   and KbdInteractiveAuthentication no above the Match block, keeps the old
   file, turns the Remote Desktop rules and service off, leaves every rule for
   port 22 on, and arms the rollback and the restart; a second run changes
-  nothing; a file sshd -t refuses is never put in place. And that every
+  nothing; a file sshd -t refuses is never put in place. Since #3213 also:
+  the telemetry tasks end up Disabled and AllowTelemetry 0; Windows Update
+  is not turned off (its services untouched) and installs every day at
+  4 AM; automatic maintenance starts at 4 AM with no random delay; 4 AM is
+  clear of the backup (Install-Backup.ps1 -At) and the nightly checks
+  (nightly.yml's cron) in summer and in winter; active hours leave 4 to 6 AM
+  out and nothing forces a restart. And that every
   command in it that changes Windows sits inside a layer function, so the
   stand-in covers all of them.
 
@@ -114,6 +120,21 @@ function Get-IdleService([string]$Name) {
 }
 function Stop-IdleService([string]$Name) { $global:Fake.svcs[$Name].Status = 'Stopped'; $global:Fake.log.Add('Stop-IdleService ' + $Name) }
 function Disable-IdleService([string]$Name) { $global:Fake.svcs[$Name].StartType = 'Disabled'; $global:Fake.log.Add('Disable-IdleService ' + $Name) }
+function Get-WindowsTask([string]$Path, [string]$Name) {
+    $t = $global:Fake.tasks[$Path + $Name]
+    if (-not $t) { return $null }
+    return $t.State
+}
+function Disable-WindowsTask([string]$Path, [string]$Name) { $global:Fake.tasks[$Path + $Name].State = 'Disabled'; $global:Fake.log.Add('Disable-WindowsTask ' + $Path + $Name) }
+function Get-PolicyValue([string]$Key, [string]$Name) {
+    if (-not $global:Fake.reg.ContainsKey($Key + '|' + $Name)) { return $null }
+    return $global:Fake.reg[$Key + '|' + $Name].Value
+}
+function Set-PolicyValue([string]$Key, [string]$Name, $Value, [string]$Type) {
+    $global:Fake.reg[$Key + '|' + $Name] = @{ Value = $Value; Type = $Type }
+    $global:Fake.log.Add('Set-PolicyValue ' + $Name)
+}
+function Get-BoxTimeZone { return $global:Fake.tz }
 function Test-SshdFile([string]$Path) {
     $global:Fake.checked.Add([IO.File]::ReadAllText($Path))
     return [pscustomobject]@{ Ok = [bool]$global:Fake.sshdOk; Said = 'line 12: Bad configuration option: KbdInteractiveAuthentication' }
@@ -151,7 +172,26 @@ function New-Fake {
             CDPSvc = @{ Status = 'Running'; StartType = 'Automatic' }; WpnService = @{ Status = 'Running'; StartType = 'Automatic' }
             TrkWks = @{ Status = 'Running'; StartType = 'Automatic' }
             sshd = @{ Status = 'Running'; StartType = 'Automatic' }; ThornswoodBot = @{ Status = 'Running'; StartType = 'Automatic' }
+            wuauserv = @{ Status = 'Running'; StartType = 'Manual' }; UsoSvc = @{ Status = 'Running'; StartType = 'Automatic' }
         }
+        # As the box had them at 4:40 AM on 22 Oct 2026 (#3213): the five
+        # telemetry tasks Ready, beside three that are not telemetry and
+        # Windows' own restart task, which must all be left alone.
+        tasks = @{
+            '\Microsoft\Windows\DiskFootprint\Diagnostics' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Application Experience\ProgramDataUpdater' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Application Experience\PcaPatchDbTask' = @{ State = 'Ready' }
+            '\Microsoft\Windows\Application Experience\StartupAppTask' = @{ State = 'Ready' }
+            '\Microsoft\Windows\DiskFootprint\StorageSense' = @{ State = 'Ready' }
+            '\Microsoft\Windows\UpdateOrchestrator\Reboot_AC' = @{ State = 'Ready' }
+        }
+        # Only AUOptions 7 was set, and nothing under DataCollection,
+        # active hours or maintenance.
+        reg = @{ 'HKLM:\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU|AUOptions' = @{ Value = 7; Type = 'DWord' } }
+        tz = 'Mountain Standard Time'
         sshdOk = $true
         restarts = 0
         rollback = ''
@@ -172,6 +212,29 @@ function Invoke-BoxHere([string]$cfg, [switch]$Dry) {
 }
 function Has($lines, [string]$rx) { return (@($lines | Where-Object { $_ -match $rx }).Count -gt 0) }
 
+# #3213: the telemetry tasks, the policy values as the stand-in holds them,
+# and the tasks and services that must be left as they were.
+$Pol = 'HKLM:\SOFTWARE\Policies\Microsoft\Windows'
+$telemetry = '\Microsoft\Windows\DiskFootprint\Diagnostics', '\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser',
+    '\Microsoft\Windows\Application Experience\ProgramDataUpdater', '\Microsoft\Windows\Customer Experience Improvement Program\Consolidator',
+    '\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip'
+$leftTasks = '\Microsoft\Windows\Application Experience\PcaPatchDbTask', '\Microsoft\Windows\Application Experience\StartupAppTask',
+    '\Microsoft\Windows\DiskFootprint\StorageSense', '\Microsoft\Windows\UpdateOrchestrator\Reboot_AC'
+function Reg([string]$key, [string]$name) {
+    $e = $global:Fake.reg[$Pol + $key + '|' + $name]
+    if (-not $e) { return $null }
+    return $e.Value
+}
+function RegType([string]$key, [string]$name) { $e = $global:Fake.reg[$Pol + $key + '|' + $name]; if ($e) { return $e.Type }; return '' }
+
+# Minutes past midnight, box time, of a UTC hh:mm on a summer and a winter day.
+$mountain = [TimeZoneInfo]::FindSystemTimeZoneById('Mountain Standard Time')
+function BoxMinutes([int]$utcMin, [int]$month) {
+    $u = New-Object DateTime(2026, $month, 15, [math]::Floor($utcMin / 60), ($utcMin % 60), 0, ([DateTimeKind]::Utc))
+    $l = [TimeZoneInfo]::ConvertTimeFromUtc($u, $mountain)
+    return $l.Hour * 60 + $l.Minute
+}
+
 try {
     # =================================================================== the box ===
     # ---- the file itself --------------------------------------------------------
@@ -181,7 +244,7 @@ try {
     Yes 'vps-harden.ps1 parses' (-not $errs -or $errs.Count -eq 0)
     Yes '  and is plain ASCII, which Windows PowerShell on the box reads right without a byte order mark' (-not ($boxText.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
 
-    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
+    $layerNames = @('Get-RdpDeny', 'Set-RdpDeny', 'Get-InboundRules', 'Disable-InboundRule', 'Get-TermService', 'Stop-TermService', 'Disable-TermService', 'Get-IdleService', 'Stop-IdleService', 'Disable-IdleService', 'Get-WindowsTask', 'Disable-WindowsTask', 'Get-PolicyValue', 'Set-PolicyValue', 'Get-BoxTimeZone', 'Test-SshdFile', 'Start-SshdRestart', 'Register-Rollback', 'New-PrivateFile')
     $defined = @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.FunctionDefinitionAst] }, $true) | ForEach-Object { $_.Name })
     Yes 'every layer function the stand-in replaces is defined in it' (@($layerNames | Where-Object { $defined -notcontains $_ }).Count -eq 0)
     $fakeAst = [System.Management.Automation.Language.Parser]::ParseInput($layerText, [ref]$null, [ref]$null)
@@ -189,7 +252,8 @@ try {
     Yes '  and the stand-in replaces every one of them' (@($layerNames | Where-Object { $fakeNames -notcontains $_ }).Count -eq 0)
 
     $touchers = 'Set-ItemProperty', 'Get-ItemProperty', 'Get-NetFirewallRule', 'Get-NetFirewallPortFilter', 'Disable-NetFirewallRule', 'Enable-NetFirewallRule',
-                'Get-Service', 'Stop-Service', 'Set-Service', 'Restart-Service', 'Register-ScheduledTask', 'Start-ScheduledTask', 'Unregister-ScheduledTask', 'New-ItemProperty', 'Remove-NetFirewallRule'
+                'Get-Service', 'Stop-Service', 'Set-Service', 'Restart-Service', 'Register-ScheduledTask', 'Start-ScheduledTask', 'Unregister-ScheduledTask', 'New-ItemProperty', 'Remove-NetFirewallRule',
+                'Get-ScheduledTask', 'Disable-ScheduledTask', 'Enable-ScheduledTask', 'Stop-ScheduledTask', 'New-Item', 'Remove-ItemProperty', 'Get-TimeZone', 'Set-TimeZone', 'Restart-Computer'
     $loose = @()
     foreach ($c in $ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] }, $true)) {
         $name = $c.GetCommandName()
@@ -223,6 +287,10 @@ try {
     Yes '  says WOULD stop and disable each service the box never uses, with why (#3186)' ((Has $r.Lines '^WOULD Spooler stopped \(was Running\): print spooler') -and
         (Has $r.Lines '^WOULD DiagTrack set to Disabled \(was Automatic\)') -and (Has $r.Lines '^WOULD TrkWks stopped'))
     Yes '  and touches none of them' (@($global:Fake.svcs.Values | Where-Object { $_.StartType -eq 'Disabled' }).Count -eq 0 -and $global:Fake.svcs.Spooler.Status -eq 'Running')
+    Yes '  says WOULD disable each telemetry task and set the update values, with why (#3213)' ((Has $r.Lines '^WOULD \\Microsoft\\Windows\\DiskFootprint\\Diagnostics set to Disabled \(was Ready\): DiskSnapshot') -and
+        (Has $r.Lines '^WOULD AllowTelemetry set to 0 \(was not set\)') -and (Has $r.Lines '^WOULD AUOptions set to 4 \(was 7\)') -and (Has $r.Lines '^WOULD Activation Boundary set to 2000-01-01T04:00:00'))
+    Yes '  and changes none of them' (@($telemetry | Where-Object { $global:Fake.tasks[$_].State -ne 'Ready' }).Count -eq 0 -and
+        $global:Fake.reg.Count -eq 1 -and (Reg '\WindowsUpdate\AU' 'AUOptions') -eq 7)
 
     # ---- a real run -------------------------------------------------------------------
     $r = Invoke-BoxHere $cfg
@@ -256,6 +324,54 @@ try {
     Yes '  and nothing else touched: sshd and the bot still run and start' ($global:Fake.svcs.sshd.Status -eq 'Running' -and $global:Fake.svcs.sshd.StartType -eq 'Automatic' -and
         $global:Fake.svcs.ThornswoodBot.Status -eq 'Running' -and @($global:Fake.log | Where-Object { $_ -match 'IdleService (sshd|ThornswoodBot)' }).Count -eq 0)
     Yes '  the services before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Disable-IdleService TrkWks') -lt $global:Fake.log.IndexOf('Register-Rollback'))
+
+    # ---- telemetry off, Windows Update moved to 4 AM (#3213) -------------------------
+    Yes '  each telemetry task Disabled, DiskSnapshot, CompatTelRunner and CEIP (#3213)' (@($telemetry | Where-Object { $global:Fake.tasks[$_].State -ne 'Disabled' }).Count -eq 0)
+    Yes '  and the tasks that are not telemetry left Ready, StorageSense and Reboot_AC among them' (@($leftTasks | Where-Object { $global:Fake.tasks[$_].State -ne 'Ready' }).Count -eq 0 -and
+        @($global:Fake.log | Where-Object { $_ -match 'PcaPatchDbTask|StartupAppTask|StorageSense|UpdateOrchestrator' }).Count -eq 0)
+    Yes '  AllowTelemetry 0, a DWord under DataCollection' ((Reg '\DataCollection' 'AllowTelemetry') -eq 0 -and (RegType '\DataCollection' 'AllowTelemetry') -eq 'DWord')
+    Yes '  Windows Update not turned off: wuauserv and UsoSvc untouched, said KEPT, and NoAutoUpdate 0' (
+        $global:Fake.svcs.wuauserv.Status -eq 'Running' -and $global:Fake.svcs.wuauserv.StartType -eq 'Manual' -and
+        $global:Fake.svcs.UsoSvc.Status -eq 'Running' -and $global:Fake.svcs.UsoSvc.StartType -eq 'Automatic' -and
+        @($global:Fake.log | Where-Object { $_ -match 'wuauserv|UsoSvc' }).Count -eq 0 -and
+        (Has $r.Lines '^KEPT wuauserv .* left as it is: Running, Manual') -and (Has $r.Lines '^KEPT UsoSvc ') -and (Reg '\WindowsUpdate\AU' 'NoAutoUpdate') -eq 0)
+    Yes '  and it is installed on a schedule, every day at 4 AM' ((Reg '\WindowsUpdate\AU' 'AUOptions') -eq 4 -and (Reg '\WindowsUpdate\AU' 'ScheduledInstallDay') -eq 0 -and
+        (Reg '\WindowsUpdate\AU' 'ScheduledInstallTime') -eq 4 -and (Reg '\WindowsUpdate\AU' 'ScheduledInstallEveryWeek') -eq 1)
+    $boundary = [string](Reg '\Task Scheduler\Maintenance' 'Activation Boundary')
+    $maint = [datetime]::MinValue
+    $maintOk = [datetime]::TryParseExact($boundary, 'yyyy-MM-ddTHH:mm:ss', [Globalization.CultureInfo]::InvariantCulture, [Globalization.DateTimeStyles]::None, [ref]$maint)
+    Yes '  automatic maintenance starts at 4 AM, as a string in the form Windows reads, with no random delay' ($maintOk -and $maint.Hour -eq 4 -and $maint.Minute -eq 0 -and
+        (RegType '\Task Scheduler\Maintenance' 'Activation Boundary') -eq 'String' -and (Reg '\Task Scheduler\Maintenance' 'Randomized') -eq 0)
+
+    # The window, from the files that set the other two, all year.
+    $bAst = [System.Management.Automation.Language.Parser]::ParseFile((Join-Path $repo 'scripts\deploy\Install-Backup.ps1'), [ref]$null, [ref]$null)
+    $bAt = [string]($bAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'At' }).DefaultValue.Value
+    $bUtc = [int]$bAt.Substring(0, 2) * 60 + [int]$bAt.Substring(3, 2)
+    $yml = [IO.File]::ReadAllText((Join-Path $repo '.github\workflows\nightly.yml'))
+    $crons = @([regex]::Matches($yml, "cron:\s*'(\d+)\s+(\d+)\s+\*\s+\*\s+\*'") | ForEach-Object { [int]$_.Groups[2].Value * 60 + [int]$_.Groups[1].Value })
+    $install = [int](Reg '\WindowsUpdate\AU' 'ScheduledInstallTime') * 60
+    $start = [math]::Min($install, $maint.Hour * 60 + $maint.Minute)
+    $clear = ($bAt -match '^\d{2}:\d{2}Z$') -and $crons.Count -ge 1
+    $said = @()
+    foreach ($month in 7, 1) {
+        $b = BoxMinutes $bUtc $month
+        $said += ('{0}: backup {1:00}:{2:00}' -f $(if ($month -eq 7) { 'summer' } else { 'winter' }), [math]::Floor($b / 60), ($b % 60))
+        # The backup has 30 minutes (three times its slowest run, #3187) and
+        # the nightly shares 45 each, both before the window opens.
+        if ($start - $b -lt 30) { $clear = $false }
+        foreach ($c in $crons) { $n = BoxMinutes $c $month; $said += ('nightly {0:00}:{1:00}' -f [math]::Floor($n / 60), ($n % 60)); if ($start - $n -lt 45) { $clear = $false } }
+    }
+    Yes ('  the window opens at 4 AM clear of the backup and the nightly checks (' + ($said -join ', ') + ')') ($clear -and $start -eq 240)
+    $from = [int](Reg '\WindowsUpdate' 'ActiveHoursStart'); $to = [int](Reg '\WindowsUpdate' 'ActiveHoursEnd')
+    $active = @(0..23 | Where-Object { if ($from -le $to) { $_ -ge $from -and $_ -lt $to } else { $_ -ge $from -or $_ -lt $to } })
+    Yes ('  active hours on, ' + $from + ' to ' + $to + ', 18 hours at most, leaving 4 to 6 AM out and on from 6 AM, before anybody is on at 7') (
+        (Reg '\WindowsUpdate' 'SetActiveHours') -eq 1 -and $active.Count -le 18 -and $active -notcontains 4 -and $active -notcontains 5 -and $active -contains 6 -and $active -contains 7)
+    Yes '  no restart forced at the install time, and nothing in vps-harden.ps1 restarts the box' ((Reg '\WindowsUpdate\AU' 'AlwaysAutoRebootAtScheduledTime') -eq 0 -and
+        -not @($ast.FindAll({ param($n) $n -is [System.Management.Automation.Language.CommandAst] -and @('Restart-Computer', 'shutdown', 'shutdown.exe') -contains $n.GetCommandName() }, $true)).Count)
+    Yes '  every value written with the type Windows reads it as' (@($global:Fake.reg.Keys | Where-Object { $_ -notmatch 'Activation Boundary$' -and $global:Fake.reg[$_].Type -ne 'DWord' }).Count -eq 0)
+    Yes '  the box''s clock said, Mountain' (Has $r.Lines "^ALREADY the box's clock is Mountain Standard Time")
+    Yes '  all of it before sshd, so a restart that cut the session off would come last' ($global:Fake.log.IndexOf('Set-PolicyValue Randomized') -ge 0 -and
+        $global:Fake.log.IndexOf('Set-PolicyValue Randomized') -lt $global:Fake.log.IndexOf('Register-Rollback'))
     Yes '  every change printed as CHANGED' (@($r.Lines | Where-Object { $_ -match '^CHANGED ' }).Count -ge 7)
     Yes '  and the count is in the last line' ($r.Lines[-1] -match '^DONE \d+ change\(s\) made\.$')
 
@@ -263,6 +379,9 @@ try {
     $r2 = Invoke-BoxHere $cfg
     Yes 'second run: nothing to change' ($r2.Code -eq 0 -and $r2.Lines[-1] -eq 'DONE 0 change(s) made.' -and -not (Has $r2.Lines '^(CHANGED|WOULD) '))
     Yes '  no second backup and no second restart' (@(Get-ChildItem -LiteralPath $tmp -Filter 'sshd_config.before-harden-*').Count -eq 1 -and $global:Fake.restarts -eq 1 -and $global:Fake.private.Count -eq 1)
+    Yes '  says ALREADY for the telemetry tasks and the update values (#3213)' ((Has $r2.Lines '^ALREADY \\Microsoft\\Windows\\DiskFootprint\\Diagnostics Disabled') -and
+        (Has $r2.Lines '^ALREADY AllowTelemetry is 0') -and (Has $r2.Lines '^ALREADY AUOptions is 4') -and (Has $r2.Lines '^ALREADY Activation Boundary is 2000-01-01T04:00:00') -and
+        -not @($global:Fake.log | Select-Object -Skip $global:Fake.log.IndexOf('Start-SshdRestart') | Where-Object { $_ -match 'WindowsTask|PolicyValue' }).Count)
 
     # ---- sshd -t refuses the new file ---------------------------------------------------
     New-Fake
@@ -294,6 +413,16 @@ try {
     $r = Invoke-BoxHere $cfg -Dry
     Yes 'no Remote Desktop service: said, not an error' ($r.Code -eq 0 -and (Has $r.Lines '^ALREADY the Remote Desktop service is not installed'))
     Yes 'no rule naming port 22: a WARN, and nothing about ssh changed' (Has $r.Lines '^WARN no enabled firewall rule names port 22')
+
+    # ---- a task not on the box, Windows Update off, a clock not Mountain (#3213) --------------
+    New-Fake
+    $global:Fake.tasks.Remove('\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip')
+    $global:Fake.svcs.wuauserv.StartType = 'Disabled'
+    $global:Fake.tz = 'UTC'
+    $r = Invoke-BoxHere $cfg -Dry
+    Yes 'a telemetry task not on the box: said and left' ($r.Code -eq 0 -and (Has $r.Lines '^ALREADY \\Microsoft\\Windows\\Customer Experience Improvement Program\\UsbCeip is not on the box'))
+    Yes 'Windows Update Disabled: a WARN, and left as it is' ((Has $r.Lines '^WARN wuauserv .* is Disabled, so nothing installs at 4 AM') -and $global:Fake.svcs.wuauserv.StartType -eq 'Disabled' -and $global:Fake.log.Count -eq 0)
+    Yes 'a clock that is not Mountain: a WARN, and the clock not touched' ((Has $r.Lines "^WARN the box's clock is UTC, not Mountain Standard Time") -and $global:Fake.tz -eq 'UTC')
 
     # ============================================================= the machine ===
     $vpsJson = Get-Content -LiteralPath (Join-Path $repo 'scripts\vps\vps.json') -Raw | ConvertFrom-Json

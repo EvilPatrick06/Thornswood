@@ -360,7 +360,9 @@ repository folder, as docs\RESTORING.md "The box is gone" says.
     has passed `.\scripts\vps\Setup-SshKey.ps1 -Test` against it:
     `.\scripts\vps\Harden-VPS.ps1`. It proves key login first, then turns ssh
     password login and Remote Desktop off (issue #450), and the Windows
-    services the box never uses, the print spooler among them (#3186). The provider's console
+    services the box never uses, the print spooler among them (#3186), and
+    telemetry, and has Windows Update install at 4 AM box time, after the
+    backup and the nightly checks (#3213). The provider's console
     and the Administrator password stay the way back. If the old box had port
     22 limited to a list of addresses, set the same list on the new one:
     `.\scripts\vps\Set-SshScope.ps1 -From <the list>` (issue #2182).
