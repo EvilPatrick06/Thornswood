@@ -1,23 +1,28 @@
 #!/usr/bin/env node
 // scripts/dev/Affected-Harnesses.js
 //
-// Issue #3114, prototype, not wired into any workflow. Says which gate
-// harnesses a change can affect, from a read map: for each harness, every
-// path inside the checkout it opened, looked at, failed to find or listed
-// when it ran on the base commit (scripts/dev/Trace-HarnessReads.js writes
-// those, one file a harness).
+// Issue #3114, not wired into any workflow yet. Says which gate harnesses a
+// change can affect, from a read map: for each harness, every path inside
+// the checkout it opened, looked at, failed to find or listed when it ran on
+// the base commit. scripts/dev/Trace-Gate.ps1 traces that on the VPS, where
+// the gate runs (traces.jsonl.gz, one line a harness);
+// scripts/dev/Trace-HarnessReads.js on Linux (one file a harness).
 //
 // WHY THAT IS ENOUGH. A harness's result here can only differ between two
 // trees through what its system calls return. When no path it touched is
 // changed, added or removed, and no folder it listed gains or loses an
 // entry, every one of those calls returns what it returned on the base, so
 // it touches the same paths again and ends the same way. That holds for the
-// run that was traced: Linux, pwsh 7 and node. A harness whose run on
-// Windows can go another way (it asks which system it is on, names a Windows
-// path, fails or skips on Linux, or asks git) has no map it can be held to,
-// and it always runs. So does a harness the map does not name.
+// run that was traced. A Windows trace is of the gate's own run, so it holds
+// there; a harness that asks git, or did not pass, or that something outside
+// the harnesses opened the checkout beside, always runs. A Linux trace holds
+// only for Linux, so a harness whose run on Windows can go another way (it
+// asks which system it is on, names a Windows path, or fails or skips on
+// Linux) always runs as well. So does a harness the map does not name.
 //
-//   build:  node scripts/dev/Affected-Harnesses.js build <traces> <map.json>
+//   build:  node scripts/dev/Affected-Harnesses.js build <traces> <map.json> [commit]
+//           <traces> a folder of Linux traces with its _commit.txt, or a
+//           Windows traces.jsonl.gz and the commit it traced
 //   select: node scripts/dev/Affected-Harnesses.js select <map.json> <head> [gate.txt]
 //
 // The change is every difference between the tree the map was traced on
@@ -72,9 +77,28 @@ function lower(p) { return p.toLowerCase(); }
 
 // ---- build: traces to one map ----------------------------------------------
 
-function build(traceDir, root) {
-  const commit = fs.readFileSync(path.join(traceDir, '_commit.txt'), 'utf8').trim();
+// The traces in a folder (Linux, one file each, with _commit.txt) or in one
+// traces.jsonl.gz (Windows, one line each).
+function readTraces(from, commit) {
+  if (fs.statSync(from).isDirectory()) {
+    return {
+      commit: fs.readFileSync(path.join(from, '_commit.txt'), 'utf8').trim(),
+      traces: fs.readdirSync(from).filter(x => x.endsWith('.json')).sort().map(f => JSON.parse(fs.readFileSync(path.join(from, f), 'utf8'))),
+    };
+  }
+  let text = fs.readFileSync(from);
+  if (from.endsWith('.gz')) { text = require('zlib').gunzipSync(text); }
+  const traces = text.toString('utf8').split('\n').filter(l => l.trim()).map(l => JSON.parse(l));
+  traces.sort((a, b) => (a.harness < b.harness ? -1 : a.harness > b.harness ? 1 : 0));
+  return { commit: commit, traces: traces };
+}
+
+function build(from, root, commitArg) {
+  const got = readTraces(from, commitArg);
+  const commit = got.commit;
+  if (!/^[0-9a-f]{40}$/.test(commit || '')) { throw new Error('the traces name no full commit (' + commit + ')'); }
   const harnesses = {};
+  let windows = false;
   const codeCache = new Map();
   function platformLine(rel) {
     if (codeCache.has(rel)) { return codeCache.get(rel); }
@@ -90,10 +114,11 @@ function build(traceDir, root) {
     codeCache.set(rel, hit);
     return hit;
   }
-  for (const f of fs.readdirSync(traceDir).filter(x => x.endsWith('.json')).sort()) {
-    const t = JSON.parse(fs.readFileSync(path.join(traceDir, f), 'utf8'));
+  for (const t of got.traces) {
+    const onWindows = t.platform === 'windows';
+    if (onWindows) { windows = true; }
     const reads = [], lists = [];
-    let why = '';
+    let why = onWindows && t.always ? t.always : '';
     for (const [p, kinds] of Object.entries(t.paths)) {
       if (p === '.git' || p.startsWith('.git/')) {
         // Finding the repository is a look at .git and its HEAD and config;
@@ -101,15 +126,17 @@ function build(traceDir, root) {
         if (!/^\.git(\/(HEAD|config|commondir|gitdir))?$/.test(p) && !why) { why = 'asks git about the tree (' + p + ')'; }
         continue;
       }
-      if (/\\|^[A-Za-z]:/.test(p) && !why) { why = 'looks for a Windows path (' + p + ')'; }
+      if (!onWindows && /\\|^[A-Za-z]:/.test(p) && !why) { why = 'looks for a Windows path (' + p + ')'; }
       if (kinds.indexOf('list') >= 0) { lists.push(p); }
       reads.push(p);
     }
-    if ((t.windowsPaths || []).length && !why) { why = 'looks for a Windows path (' + t.windowsPaths[0] + ')'; }
-    if (t.exit !== 0 && !why) { why = 'does not pass on Linux (exit ' + t.exit + ')'; }
-    if (t.blind && !why) { why = 'set up an io_uring, whose file work strace does not see'; }
-    if (t.skipped && !why) { why = 'says SKIP or NOT RUN on Linux, so part of it was not traced'; }
-    if (!why) {
+    if (t.exit !== 0 && !why) { why = 'did not pass when traced (exit ' + t.exit + ')'; }
+    if (!onWindows) {
+      if ((t.windowsPaths || []).length && !why) { why = 'looks for a Windows path (' + t.windowsPaths[0] + ')'; }
+      if (t.blind && !why) { why = 'set up an io_uring, whose file work strace does not see'; }
+      if (t.skipped && !why) { why = 'says SKIP or NOT RUN on Linux, so part of it was not traced'; }
+    }
+    if (!why && !onWindows) {
       // A code file can run only when its language's program ran: a .js
       // harness that greps a .ps1 and starts no pwsh runs none of it. The
       // programs are the harness's own and every one it started.
@@ -126,7 +153,7 @@ function build(traceDir, root) {
       ? { always: why, seconds: t.seconds }
       : { seconds: t.seconds, reads: reads.sort(), lists: lists.sort() };
   }
-  return { format: 1, commit: commit, tracer: 'strace on Linux, scripts/dev/Trace-HarnessReads.js', harnesses: harnesses };
+  return { format: 1, commit: commit, tracer: windows ? 'ETW on the VPS, scripts/dev/Trace-Gate.ps1' : 'strace on Linux, scripts/dev/Trace-HarnessReads.js', harnesses: harnesses };
 }
 
 // ---- select: a change to the harnesses it can affect -------------------------
@@ -216,7 +243,7 @@ function diff(base, head) {
 if (require.main === module) {
   const [cmd, a, b, c] = process.argv.slice(2);
   if (cmd === 'build' && a && b) {
-    const map = build(a, REPO);
+    const map = build(a, REPO, c);
     fs.writeFileSync(b, JSON.stringify(map, null, 1) + '\n');
     const all = Object.values(map.harnesses);
     console.log(`wrote ${b}: ${all.length} harnesses, ${all.filter(h => !h.always).length} mapped, ${all.filter(h => h.always).length} always run`);
@@ -230,8 +257,8 @@ if (require.main === module) {
     console.error(`${r.run.length} of ${gate.length} gate harnesses to run`);
     for (const n of r.run) { console.log(n); }
   } else {
-    console.error('usage: Affected-Harnesses.js build <traces> <map.json> | select <map.json> <head> [gate.txt]');
+    console.error('usage: Affected-Harnesses.js build <traces> <map.json> [commit] | select <map.json> <head> [gate.txt]');
     process.exit(2);
   }
 }
-module.exports = { build: build, select: select, FORCE: FORCE, PLATFORM: PLATFORM };
+module.exports = { build: build, readTraces: readTraces, select: select, FORCE: FORCE, PLATFORM: PLATFORM };

@@ -17,6 +17,10 @@
 //      parent's clone returns, joins a call strace split in two, counts a
 //      folder listing, does not take readlink's answer for a path, and
 //      marks a trace blind when an io_uring was set up.
+//   5. a map built from a Windows trace (scripts/dev/Trace-Gate.ps1) holds
+//      a harness to what it opened on the box, whatever its code says about
+//      Windows, and always runs one that asked git, did not pass, or that
+//      the box script marked (something else opened the checkout beside it).
 'use strict';
 const path = require('path');
 const REPO = path.join(__dirname, '..');
@@ -122,6 +126,32 @@ yes('a refused io_uring leaves the trace trusted', P.blind.length === 0);
 const Q = T.makeParser('/r', []);
 Q.line('100 io_uring_setup(256, {flags=0}) = 3');
 yes('a ring that was set up marks the trace blind', Q.blind.length === 1);
+
+// 5. a map from a Windows trace
+const fs = require('fs'), os = require('os'), zlib = require('zlib');
+const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'affected-win-'));
+try {
+  const line = (o) => JSON.stringify(Object.assign({ platform: 'windows', exit: 0, seconds: 1, skipped: false, execs: ['pwsh.exe'], paths: {} }, o));
+  const gz = path.join(dir, 'traces.jsonl.gz');
+  fs.writeFileSync(gz, zlib.gzipSync([
+    line({ harness: 'test-b.ps1', paths: { 'tests/test-b.ps1': 'read', 'scripts/vps/Vps.ps1': 'read', 'C:\\x': 'read' } }),
+    line({ harness: 'test-a.js', skipped: true, paths: { 'tests/test-a.js': 'read' } }),
+    line({ harness: 'test-git.ps1', paths: { '.git/objects/pack': 'read', 'tests/test-git.ps1': 'read' } }),
+    line({ harness: 'test-red.js', exit: 1, paths: { 'tests/test-red.js': 'read' } }),
+    line({ harness: 'test-stray.js', always: 'another process (svchost.exe) opened docs/x.md in the checkout while it ran', paths: { 'tests/test-stray.js': 'read' } }),
+  ].join('\n') + '\n'));
+  const m = A.build(gz, REPO, 'c'.repeat(40));
+  const h = m.harnesses;
+  yes('a Windows map names its commit and its tracer', m.commit === 'c'.repeat(40) && /ETW/.test(m.tracer));
+  yes('  holds a harness to what it opened, in name order', h['test-b.ps1'] && !h['test-b.ps1'].always && h['test-b.ps1'].reads.join(' ') === 'C:\\x scripts/vps/Vps.ps1 tests/test-b.ps1' && Object.keys(h)[0] === 'test-a.js');
+  yes('  a harness that said SKIP on the box is held to what it opened there', h['test-a.js'] && !h['test-a.js'].always);
+  yes('  one that asked git always runs', h['test-git.ps1'] && /asks git/.test(h['test-git.ps1'].always));
+  yes('  so does one that did not pass when traced', h['test-red.js'] && /did not pass when traced/.test(h['test-red.js'].always));
+  yes('  and one the box marked, with the box\'s reason', h['test-stray.js'] && /svchost/.test(h['test-stray.js'].always));
+  let threw = '';
+  try { A.build(gz, REPO, ''); } catch (e) { threw = e.message; }
+  yes('  traces that name no full commit build no map', /no full commit/.test(threw));
+} finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 console.log(pass + ' passed, ' + fail + ' failed');
 process.exit(fail ? 1 : 0);

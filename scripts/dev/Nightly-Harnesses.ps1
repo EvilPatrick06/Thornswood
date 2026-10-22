@@ -113,6 +113,13 @@
   unless asked. build.yml gives the box's cores over the builds it runs at
   once.
 
+.PARAMETER StartLog
+  A file to which a line of JSON is added as each harness starts (its name,
+  its process id and when Windows says it started, in UTC) and as it ends
+  (its exit code, its seconds and whether it said SKIP or NOT RUN). A trace
+  of the gate (scripts\dev\Trace-Gate.ps1, #3114) reads it to know which
+  process tree was which harness's.
+
 .PARAMETER BusyFrom
   A file holding how busy the machine is, 0 to 100, read in place of its
   processor. Only tests\test-nightly-harnesses.ps1 sets it, to run the
@@ -136,7 +143,8 @@ param(
     [string]$Root = '',
     [string]$OutDir = '',
     [int]$Share = 0,
-    [string]$BusyFrom = ''
+    [string]$BusyFrom = '',
+    [string]$StartLog = ''
 )
 
 $ErrorActionPreference = 'Stop'
@@ -144,6 +152,7 @@ if ($Of -lt 1 -or $Shard -lt 1 -or $Shard -gt $Of) { Write-Host "::error::-Shard
 if ($Throttle -lt 1 -or $Throttle -gt 16) { Write-Host "::error::-Throttle $Throttle is not 1 to 16"; exit 2 }
 if ($Share -eq 0) { $Share = $Throttle }
 if ($Share -lt 1 -or $Share -gt $Throttle) { Write-Host "::error::-Share $Share is not 1 to -Throttle ($Throttle)"; exit 2 }
+if ($StartLog) { $StartLog = [IO.Path]::GetFullPath($StartLog) }
 if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 $Root = [IO.Path]::GetFullPath($Root)
 if (-not $OutDir) {
@@ -163,6 +172,11 @@ function Clock-Of($head) {
     if ($m.Success) { [Math]::Min([int]$m.Groups[1].Value, $MAX_CLOCK) } else { $PER_HARNESS }
 }
 function Alone-Of($head) { [regex]::IsMatch($head, '(?im)^[\s#/*<]*RUNS ALONE:\s*\S') }
+# -StartLog: one line of JSON a start or an end, added as it happens.
+function Write-StartLog($fields) {
+    if (-not $StartLog) { return }
+    [IO.File]::AppendAllText($StartLog, ((New-Object psobject -Property $fields) | ConvertTo-Json -Compress) + "`n")
+}
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 # An empty file for stdin: no harness reads it, and one that tried would
@@ -287,6 +301,7 @@ function Start-One($t) {
     else { $exe = 'pwsh'; $argList = @('-NoProfile', '-File', ('"' + $t.File.FullName + '"')) }
     if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
     $sw = [Diagnostics.Stopwatch]::StartNew()
+    $before = [DateTime]::UtcNow
     try {
         $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
                -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
@@ -305,6 +320,11 @@ function Start-One($t) {
             if (-not $p.HasExited) { throw ("could not put {0} in a job of its own (Windows error {1})" -f $t.Name, $err) }
         }
     }
+    # Windows' own start time, which a trace's process events carry; the time
+    # just before Start-Process if it ended too soon to be asked.
+    $began = $before
+    try { $began = $p.StartTime.ToUniversalTime() } catch { }
+    Write-StartLog ([ordered]@{ name = $t.Name; pid = $p.Id; start = $began.ToString('o') })
     [pscustomobject]@{ T = $t; P = $p; Job = $job; Mark = $mark; Sw = $sw; Out = $o; Err = $e; Ended = $p.WaitForExitAsync() }
 }
 
@@ -338,7 +358,9 @@ function Finish-One($r, [bool]$timedOut) {
     if ($t.Clock -ne $PER_HARNESS) { $said += 'on a ' + $t.Clock + ' s clock it names' }
     if ($null -ne $cpu) { $said += ('{0}s of processor in {1} process(es)' -f $cpu, $procs) }
     Write-Host ("--- {0}  ({1}s{2})" -f $t.Name, $secs, $(if ($said.Count) { ', ' + ($said -join ', ') } else { '' }))
-    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
+    $skipped = $false
+    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd(); if ($txt -match '(?m)^\s*(SKIP|NOT RUN)\b') { $skipped = $true } } } }
+    Write-StartLog ([ordered]@{ name = $t.Name; end = [DateTime]::UtcNow.ToString('o'); code = $code; secs = $secs; skipped = $skipped })
     $path = $t.File.FullName
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $t.Clock) }
     elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
