@@ -30,7 +30,9 @@
     4. A rename Windows refuses is tried once, returns false, and says the
        Windows error and the process holding the file (this one); a folder
        another process has as its current directory, which the Restart
-       Manager cannot see, is named by the handle list (#3131).
+       Manager cannot see, is named by the handle list (#3131), and before
+       that by Windows's own list of who has the folder open, with its
+       parent and start time, the Restart Manager asked last (#3262).
     5. This process, and an id with nothing running, are never opened.
 
   It also prints, without failing on it, how many of ten folders were refused
@@ -80,7 +82,7 @@ $e = $null
 [void][System.Management.Automation.Language.Parser]::ParseInput($lib, [ref]$null, [ref]$e)
 Yes 'it parses, and is plain ASCII, which Windows PowerShell 5.1 on the box reads right' (@($e).Count -eq 0 -and $lib -notmatch '[^\x00-\x7F]')
 Yes 'it has no sleep, and no loop that tries a rename again' ($lib -notmatch 'Start-Sleep|Thread\]::Sleep' -and $lib -notmatch 'for \(\$i')
-foreach ($fn in 'Get-ThornswoodProcessHeld', 'Stop-ThornswoodProcessHeld', 'Get-ThornswoodPathHolders', 'Get-ThornswoodFileHolders', 'Get-ThornswoodPathHandles', 'Move-ThornswoodPath') {
+foreach ($fn in 'Get-ThornswoodProcessHeld', 'Stop-ThornswoodProcessHeld', 'Get-ThornswoodPathHolders', 'Get-ThornswoodPathOpeners', 'Get-ThornswoodProcessWords', 'Get-ThornswoodFileHolders', 'Get-ThornswoodPathHandles', 'Move-ThornswoodPath') {
     Yes "  and defines $fn" ([bool](FunctionText $lib $fn))
 }
 Yes 'each process is opened before it is ended, and waited for by its own handle' (
@@ -92,6 +94,18 @@ Yes 'a refusal says what the Restart Manager names and every handle under the pa
     (FunctionText $lib 'Get-ThornswoodPathHolders') -match 'Get-ThornswoodPathHandles \$Path' -and
     (FunctionText $lib 'Get-ThornswoodPathHandles') -match 'NtQuerySystemInformation\(64' -and
     (FunctionText $lib 'Get-ThornswoodPathHandles') -match 't\.Join\(20000\)')
+# #3262: the Restart Manager took 41 s over the dev server's 12,424 files and
+# was asked first, so a holder that had exited by then was named by nothing.
+$holders = FunctionText $lib 'Get-ThornswoodPathHolders'
+$iOpen = $holders.IndexOf('Get-ThornswoodPathOpeners $Path')
+$iHandles = $holders.IndexOf('Get-ThornswoodPathHandles $Path')
+$iCim = $holders.IndexOf('Get-CimInstance Win32_Process')
+$iRm = $holders.IndexOf('Get-ThornswoodFileHolders $Path')
+Yes 'a refusal asks quickest first: who has the path itself open with every running process, then the handles, then command lines, the Restart Manager last (#3262)' (
+    $iOpen -ge 0 -and $iOpen -lt $iHandles -and $iHandles -lt $iCim -and $iCim -lt $iRm)
+Yes '  and the first look is Windows''s own list of who has the path open, beside a list of every process, both in one call' (
+    (FunctionText $lib 'Get-ThornswoodPathOpeners') -match 'NtQueryInformationFile\(h, out io, buf, len, 47\)' -and
+    (FunctionText $lib 'Get-ThornswoodPathOpeners') -match 'NtQuerySystemInformation\(5,')
 $move = FunctionText $lib 'Move-ThornswoodPath'
 Yes 'a move is tried once and says why when it is refused' (
     ([regex]::Matches($move, '::Move\(')).Count -eq 2 -and $move -match '\$script:ThornswoodMoveWhy = \(' -and $move -match 'Get-ThornswoodPathHolders \$From')
@@ -258,6 +272,12 @@ try {
     Yes ('  and the handle list names that process, where the Restart Manager names none: ' + $ThornswoodMoveWhy) (
         $ThornswoodMoveWhy -match '\(0x8007[0-9A-F]{4}\)' -and $ThornswoodMoveWhy -match 'no process the Restart Manager can see' -and
         $ThornswoodMoveWhy -match ('handles: .*pid ' + $c.Id + ' node: ' + [regex]::Escape($d)))
+    Yes ('  and Windows''s own list of who has the folder open names it first, with its parent and start time (#3262)') (
+        $ThornswoodMoveWhy -match ('^.*?open itself in: (pid \d+ \S+, )*pid ' + $c.Id + ' node\b') -and
+        $ThornswoodMoveWhy -match ('who they are: (.*; )?pid ' + $c.Id + ' node(\.exe)? \(parent ' + $PID + ' [^,]+, started \d{4}-\d\d-\d\d \d{1,2}:\d\d:\d\d\.\d{3} [AP]M\), command line ') -and
+        $ThornswoodMoveWhy -match ('started in the 2 minutes before: (.*; )?pid ' + $c.Id + ' ') -and
+        $ThornswoodMoveWhy.IndexOf('open itself in:') -lt $ThornswoodMoveWhy.IndexOf('handles:') -and
+        $ThornswoodMoveWhy.IndexOf('handles:') -lt $ThornswoodMoveWhy.IndexOf('Restart Manager:'))
     $held = @(Get-ThornswoodProcessHeld @($c.Id))
     $null = @(Stop-ThornswoodProcessHeld $held)
     Yes '  and once it has exited, the same move goes through' (Move-ThornswoodPath $d ($d + '-moved'))
