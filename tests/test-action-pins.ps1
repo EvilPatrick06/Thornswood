@@ -127,7 +127,7 @@ foreach ($want in 'build.yml', 'nightly.yml', 'release.yml', 'drop-claims.yml', 
 # is the same shape, held by tests\test-2863-board-status.ps1, and so are
 # expire-claims.yml, done-on-merge.yml and area-label.yml (#3192), held by
 # tests\test-3192-board-hygiene.ps1.
-$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml')
+$noActions = @('drop-claims.yml', 'board-status.yml', 'expire-claims.yml', 'done-on-merge.yml', 'area-label.yml', 'release-tag.yml')
 
 $all = @()
 foreach ($f in $files) {

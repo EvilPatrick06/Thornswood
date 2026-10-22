@@ -1,0 +1,5 @@
+{
+  "about": "Which VPS runner may sign a release launcher: release.yml's VPS fallback asks for this label beside thornswood-vps, so it runs on these runners and no other (#3312, Patrick, 22 Oct 2026: \"for signing it will use runner 3\"). Runner 3 is the light runner (docs/DECIDED.md) and carries no build label, so the job that can sign never shares a runner with pull request code, and release.yml's verify job, on the build runners, never runs on the runner that signed. tests/test-release-workflow.ps1 holds that this list and records/build-runners.json share no runner. scripts/deploy/Set-BuildRunners.ps1 -Record records/sign-runners.json makes GitHub's runner labels match this file.",
+  "label": "thornswood-sign",
+  "runners": [3]
+}

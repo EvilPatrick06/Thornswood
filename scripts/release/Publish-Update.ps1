@@ -2429,7 +2429,9 @@ if (-not $NoUpload) {
     try { $sm = New-ReleaseManifestFiles $doc $Id $Channel (Join-Path $DistDir ('signed-' + $Id)) -NoCatalog:$FromFeed }
     catch { $smWhy = $_.Exception.Message }
     if ($FromFeed) {
-        if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSignOnGitHub -Json $sm.Json -Catalog $sm.Catalog -RepoDir $RepoDir -Request ($Id + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) }
+        # The fork checks the launcher the feed names, from where the site
+        # serves it, before it signs (#3312): it may have been signed on the box.
+        if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSignOnGitHub -Json $sm.Json -Catalog $sm.Catalog -RepoDir $RepoDir -Request ($Id + '-' + [Guid]::NewGuid().ToString('N').Substring(0, 8)) -LauncherUrl (Val $doc 'launcherUrl') }
         if (-not $smWhy) { $smWhy = Get-ReleaseManifestRefusal $sm $doc -CatalogChecked }
     } else {
         if (-not $smWhy) { $smWhy = Invoke-ReleaseCatalogSign $sm.Catalog $RepoDir }
