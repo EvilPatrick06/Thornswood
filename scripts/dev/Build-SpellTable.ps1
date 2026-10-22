@@ -301,6 +301,15 @@ foreach ($pl in $Plugins) {
         $tables[$pl] = @{ Table = (Read-StringTable ([System.IO.File]::ReadAllBytes($loose))); Where = 'Data\Strings' }
         continue
     }
+    # only a plugin flagged localised keeps its names in a string table, so
+    # only its archives are opened
+    $path = Get-PluginPath $Data $pl
+    if (-not (Test-Path -LiteralPath $path)) { continue }
+    $head = New-Object byte[] 12
+    $fs = [System.IO.File]::OpenRead($path)
+    [void]$fs.Read($head, 0, 12)
+    $fs.Dispose()
+    if (-not ([BitConverter]::ToUInt32($head, 8) -band 0x80)) { continue }
     $stem = [System.IO.Path]::GetFileNameWithoutExtension($pl)
     foreach ($cand in @(($stem + '.bsa'), ($stem + ' - Interface.bsa'), 'Skyrim - Interface.bsa')) {
         $files = Get-BsaCached $cand
@@ -308,8 +317,6 @@ foreach ($pl in $Plugins) {
             $tables[$pl] = @{ Table = (Read-StringTable $files[$want]); Where = $cand }
             break
         }
-    }
-    if ($tables.ContainsKey($pl)) {
     }
 }
 foreach ($pl in $Plugins) {
