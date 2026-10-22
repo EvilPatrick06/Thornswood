@@ -34,7 +34,9 @@ from the vault's `wiki/status.md` and moved the run notes here.
   board was replaced from main at 10:16 AM (#2560: the #502 row without
   bounties, #507's free claim row); the known board is still as typed on the
   site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
-  Cloudflare's addresses (#2995).
+  Cloudflare's addresses (#2995). thornswood.net has a DMARC record at
+  p=none reporting to Cloudflare's DMARC Management, set 11:17 AM 22 Oct
+  through the connector (#3216).
 
 ## The box
 
@@ -62,6 +64,13 @@ from the vault's `wiki/status.md` and moved the run notes here.
 
 ## Waiting
 
+- **#3216:** PR #3332 (security.txt, Turnstile on the report form, the CSP
+  nonce Bot Fight Mode needs), then Deploy-Docs -Site. Bot Fight Mode, AI
+  Labyrinth, the Turnstile widget (then Set-Turnstile.ps1) and requiring
+  two-factor wait on Patrick's page to-do: two-factor on his own Cloudflare
+  login and five more connector scopes. The box's address gets an IP Access
+  allow rule before Bot Fight Mode goes on, so the game door, bot and voice,
+  which ask https://thornswood.net from the box, are never challenged.
 - **#3297**, then Harden-VPS for #3213 (Patrick's standing rule lets the Desk
   run it).
 - **#2519:** the Gamemasters channels are made (7:51 AM 22 Oct). GM Rules v1.0
