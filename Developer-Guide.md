@@ -818,9 +818,9 @@ Thornswood's own work is all rights reserved (Patrick, 12 Oct, #1331).
 Patrick's Grok Bot lanes (Smeagle, Launcher, Installer, Website, GitHub,
 Vortex) also work here, on the shipping machine, under his GitHub account.
 Every rule in this file binds them the same as a person. They share notes
-through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine
-(`wiki/status.md` is what is true now); the vault is for coordinating, and
-the board is still the one record of work. They mark what they are on with a
+through an Obsidian vault at `C:\Thornswood Vault\Thornswood` on that machine;
+what is true now is `ops\status.md` in the repository (since 22 Oct). The
+vault is for coordinating, and the board is still the one record of work. They mark what they are on with a
 `claimed: <lane>` label and the board card moved to In Progress. When the
 issue closes, `.github\workflows\drop-claims.yml` takes every `claimed:`
 label off it (#1863), so a lane's finish step need not. Their
@@ -833,10 +833,10 @@ with its branch once the pull request merges.
 One rule binds the lanes and not a person (Patrick, 11 Oct): a lane only
 commits, pushes and merges. It never runs a Ship, a Deploy-*, Publish-* or
 Install-* script, a step on the live or dev server, or a Vortex step. For each
-change that needs a run, the lane writes one note in the vault's
-`wiki/claude-queue/` folder with the exact command, its risks, draft release
-notes, and a news post when people would notice; the README in that folder
-has the template. A Claude on the shipping machine runs those notes. A lane
+change that needs a run, the lane writes one note in the repository's
+`ops\claude-queue\` folder, in the pull request of the change, with the exact
+command, its risks, draft release notes, and a news post when people would
+notice; `ops\README.md` has the template. A Claude on the shipping machine runs those notes. A lane
 does not ask anybody to approve a deploy; the note is the hand-off.
 
 #### Words
