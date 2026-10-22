@@ -13,9 +13,9 @@ queued for Claude. The one decision only Patrick can make is in section 6.
 | What | Read |
 | --- | --- |
 | Runners | Four, `thornswood-vps`, `-2`, `-3`, `-4`, all online, labels `self-hosted, Windows, X64, thornswood-vps` |
-| Runners, 21 Oct 2026 | Eight, `thornswood-vps` and `-2` to `-8`, from the `runner_name` on their jobs. 1 to 4 also carry `thornswood-build` and take the heavy jobs (records\build-runners.json, #2994); 5 to 8 are temporary while hosted minutes are out (#2929) and take only the light ones (board cards, dropped claims, the nightly's board job, the release jobs, harnesses.yml) |
+| Runners, 22 Oct 2026 | Three, `thornswood-vps`, `-2` and `-3`, from the `runner_name` on their jobs since 9 PM on 21 Oct (eight from 20 Oct, #2929; 6, 7 and 8 removed on 21 Oct at Patrick's ask, #3108; 4 and 5 off at the box restart of 8:45 PM that evening, #3219). 1 and 2 also carry `thornswood-build` and take the heavy jobs (records\build-runners.json, #2994; 1 to 4 until the side-by-side gate, #3114); 3 takes only the light ones (board cards, dropped claims, the nightly's board job, the release jobs, harnesses.yml). 3 is the old 5 installed again clean under that number, with its outbound limits (`-NetworkOnly`) |
 | Where | The same Windows VPS that runs both game servers, both voice services, the site, Caddy, the bot, the watchdog and the nightly backup (docs\SYSTEM.md) |
-| Accounts | `thornswood-runner`, `-runner2`, `-runner3`, `-runner4`: local users in Users and their GitHub runner groups, not in Administrators. Each runs its `actions.runner.*` service |
+| Accounts | `thornswood-runner`, `-runner2` and `-runner3`: local users in Users and their GitHub runner groups, not in Administrators. Each runs its `actions.runner.*` service |
 | Runner folders | Locked by `scripts\deploy\Install-Runner.ps1` to SYSTEM, Administrators and the runner's account, with nothing inherited from C:\ |
 | Production folders | Locked by `scripts\vps\Lock-VpsFolders.ps1`; the runner accounts may write crash dumps to `C:\Thornswood-Dumps` but not read them |
 | Repository | Private. Three collaborators can push |
@@ -32,8 +32,8 @@ queued for Claude. The one decision only Patrick can make is in section 6.
    A pull request runs the workflow files on its own branch, so its code
    can ask for any label, `thornswood-build` or not. The label split
    decides where jobs go, not what a pusher's branch can reach, which is
-   why every runner account gets the outbound limits, the light ones (5
-   to 8) as well as the build ones.
+   why every runner account gets the outbound limits, the light one (3)
+   as well as the build ones.
 2. A job to its runner: none. A job runs as the runner's account and can read
    the runner's own `.credentials` (GitHub's design, Install-Runner.ps1 says
    so). A job can affect the next job on the same runner through anything it
@@ -134,7 +134,10 @@ outbound limit as residual risk.
    The rollout, one runner account at a time, because a block that misses a
    host turns every build on that runner red: runner 4 first (20 Oct), then
    3, 2 and 1, each proven by a build it then runs green, then 5 to 8, each
-   proven by any job it then runs green. `scripts\vps\Get-RunnerJobs.ps1`
+   proven by any job it then runs green. 6, 7 and 8 were removed on 21 Oct
+   2026 (#3108) with their limits, by `Install-Runner.ps1 -Remove`, and 4
+   and 5 at the box restart that evening (#3219); runner 3 today is the old
+   5 installed again with `-NetworkOnly`. `scripts\vps\Get-RunnerJobs.ps1`
    reads that off GitHub (every runner carries the same labels, so a build
    cannot be sent to one of them); `-NetworkOnly -Remove` for that one
    account is the way back.

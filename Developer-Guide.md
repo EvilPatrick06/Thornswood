@@ -653,6 +653,15 @@ A change to a plugin in `game\content` (`Thornswood-Content.esp` and the two bes
 
 It runs every builder in `scripts\mods\content-tables.json`, in order, and writes each plugin's new sha256 into `records\asset-provenance.json`. It ends with `All <n> builders ran.` and a list of every file that changed: commit those with the plugin, and write in the plugin's entry in `records\asset-provenance.json` what your change put in it. When a builder fails it prints `STOP.`, names the builder, and runs nothing after it.
 
+One builder needs no game: commit first, then run it on the VPS box against the dev server's plugins, its load order and Skyrim's archives there, from any machine with box access (a cloud thread runs `pwsh scripts/vps/Setup-CloudSsh.ps1` first). What it writes under `game`, `records` and `docs\systems` comes back into your checkout:
+
+```powershell
+pwsh scripts/mods/Run-OnBox.ps1 scripts/mods/Build-LastPlugin.py --data '{data}'
+pwsh scripts/mods/Run-OnBox.ps1 scripts/dev/Build-NpcPopulation.py --settings '{settings}' --strings-dir '{data}'
+```
+
+`{data}` is the run's copy of the plugins with this commit's own in their place, `{plugins}` the server's load order as a plugins.txt and `{settings}` as a server-settings.json. The whole rebuild runs the same way (`Run-OnBox.ps1 scripts/mods/Rebuild-ContentTables.ps1 -Data '{data}' -PluginsTxt '{plugins}'`), but its tables are not yet the ones a game PC writes: #3105 says why.
+
 #### Switch between branches
 
 The folder shows one branch at a time. The files in Visual Studio Code are the branch named in the status bar. Every other local branch stays on this PC with its own commits.
@@ -999,6 +1008,10 @@ How to use it:
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  `.github\workflows\board-read.yml`, which reads every card's Status and
+  Order on a VPS runner and changes nothing, and writes them to board.json
+  (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-updates,
   which issues moved.
