@@ -188,7 +188,7 @@ off SYSTEM onto accounts of their own.
 | Read the site's secrets (`C:\Thornswood-Docs\config.json`) | Yes | Yes | Yes, through SYSTEM above, or by swapping the site's `server.js`, which runs as LOCAL SERVICE and reads that file | Yes, through a site swap. The site needs those secrets to run |
 | Read every other secret, the backups and the backup passphrase | Yes | Yes | Yes, through SYSTEM above | No |
 | Change accounts, keys, the firewall or sshd | Yes | Yes | Through SYSTEM above only | No |
-| Read the four runners' `.credentials` and take their jobs, release builds included (docs\RUNNER-ISOLATION.md F4) | Yes | Yes | Through SYSTEM above only | No |
+| Read every runner's `.credentials` and take their jobs, release builds included (docs\RUNNER-ISOLATION.md F4) | Yes | Yes | Through SYSTEM above only | No |
 | Write the feed, and through it the packs and the client runtime every launcher installs | Yes | Yes | Yes: feed-send is a deploy verb | Yes. Only #2163's signed manifest (docs\SIGNED-RELEASES.md, phases C and D) closes this |
 | Put a launcher exe on testers' machines | No. A launcher installs only a launcher signed by ThornswoodRelease (`Signature.cs`), and nothing on the box can sign | No | No | No |
 

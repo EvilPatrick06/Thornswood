@@ -26,6 +26,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | Script | What it is for |
 | --- | --- |
 | [deploy/Artifact.ps1](deploy/Artifact.ps1) | What a deploy sends, built from a commit rather than copied off a working tree, and what the box keeps to say which commit each part runs. |
+| [deploy/CloudflareRanges.ps1](deploy/CloudflareRanges.ps1) | Dot-sourced. Reads scripts\deploy\cloudflare-ranges.txt, the addresses Cloudflare's proxy reaches the box from, and says whether an address is inside them (#2995). |
 | [deploy/CollectionPlugins.ps1](deploy/CollectionPlugins.ps1) | Holds the plugins a deploy sends to the collection's own bytes (#2019). |
 | [deploy/Deploy-DevGamemode.ps1](deploy/Deploy-DevGamemode.ps1) | Sends game\gamemode.js to the dev server on the VPS and restarts only that server. |
 | [deploy/Deploy-Docs.ps1](deploy/Deploy-Docs.ps1) | Puts the Thornswood docs site on the VPS and keeps it running. |
@@ -79,6 +80,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [dev/Gate-Harnesses.ps1](dev/Gate-Harnesses.ps1) | Prints the harnesses the build check runs on every pull request: every tests\test-*.js and tests\test-*.ps1 that tests\gate-excluded.txt does not name, one a line, in name order. |
 | [dev/Install-Serena.ps1](dev/Install-Serena.ps1) | Installs Serena once, at the version in scripts\dev\serena-version.txt, and points Claude Code on this machine at the installed program, so a session start runs Serena straight away instead of resolving it first. |
 | [dev/Install-Thornswood.ps1](dev/Install-Thornswood.ps1) | Everything the client needs, in one run, in the order it has to happen in. |
+| [dev/Lint.ps1](dev/Lint.ps1) | Reports ruff, eslint and PSScriptAnalyzer findings, warnings only, over the files it is given or the whole tree, with each pinned tool fetched once per machine. |
 | [dev/Measure-Reclaim.ps1](dev/Measure-Reclaim.ps1) | How much disk deleting a folder would ACTUALLY free. |
 | [dev/New-ScriptIndex.ps1](dev/New-ScriptIndex.ps1) | Writes scripts\README.md, the list of every PowerShell script under scripts\ and the one line that says what each one is for. |
 | [dev/Nightly-Harnesses.ps1](dev/Nightly-Harnesses.ps1) | Runs one share of the test harnesses for the nightly checks, or the ones it is named, one at a time or a few side by side, each on a clock, and always ends by naming every harness that failed and the ten slowest, inside the time it is given. |
@@ -251,6 +253,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/Set-SshScope.ps1](vps/Set-SshScope.ps1) | Limits which addresses may reach ssh on the VPS (port 22), after proving key login, refusing a list that leaves this machine out, and with a put back the box runs by itself if the new login fails. |
 | [vps/Set-TimeWait.ps1](vps/Set-TimeWait.ps1) | Sets TcpTimedWaitDelay to 30 seconds on the VPS, so the box stops dropping connections from the cloud before TLS (#2946), and restarts the box for it when asked and nobody is on either server. |
 | [vps/Set-Vps.ps1](vps/Set-Vps.ps1) | Points everything at a different server box. |
+| [vps/Set-WebFirewall.ps1](vps/Set-WebFirewall.ps1) | Lets the box take TCP 80 and 443 only from Cloudflare's ranges, so a forged SYN from anywhere else gets no SYN-ACK back (#2995). -Open puts both back to any address. |
 | [vps/Setup-CloudSsh.ps1](vps/Setup-CloudSsh.ps1) | Sets up ssh to the box from a cloud Claude thread (#2753). |
 | [vps/Setup-SshKey.ps1](vps/Setup-SshKey.ps1) | Sets a PC up to reach the box over ssh, through the bridge, with a key and a token of its own (#2891). |
 | [vps/Show-BotLog.ps1](vps/Show-BotLog.ps1) | What the bot has been saying, without redeploying it to find out. |
@@ -265,6 +268,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [vps/vps-ssh-scope.ps1](vps/vps-ssh-scope.ps1) | Runs ON THE VPS, sent there by Set-SshScope.ps1: limits who may reach ssh on port 22 to a list of addresses, refusing a list that leaves out the machine running it, and arms a ten minute put back. |
 | [vps/vps-syn-flood.ps1](vps/vps-syn-flood.ps1) | Measures the forged SYN flood on the box's port 443 (#2995) and what it costs the box, over a short window. |
 | [vps/vps-time-wait.ps1](vps/vps-time-wait.ps1) | Runs ON the VPS, sent there by Set-TimeWait.ps1: holds a connection the box closed in TIME_WAIT for 30 seconds instead of Windows' 120, and restarts the box for it when asked and nobody is on either server. |
+| [vps/vps-web-firewall.ps1](vps/vps-web-firewall.ps1) | Runs ON THE VPS, sent there by Set-WebFirewall.ps1: lets TCP 80 and 443 in only from Cloudflare's ranges, so a forged SYN from anywhere else gets no answer (#2995). -Open puts both back to any address. |
 | [vps/Vps.ps1](vps/Vps.ps1) | The one place every script gets the VPS address, user, and ports from. |
 | [vps/Watch-Load.ps1](vps/Watch-Load.ps1) | The website, the game server, the voice service and the bot share one five core box, and nothing kept a number for any of them. |
 | [vps/Watch-Outside.ps1](vps/Watch-Outside.ps1) | Watches, from outside the VPS, the things the project needs that the VPS cannot watch for itself, and tells staff in Discord when one breaks and again when it is fixed. |

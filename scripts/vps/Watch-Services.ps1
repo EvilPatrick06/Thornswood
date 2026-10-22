@@ -57,10 +57,13 @@
 
   What it checks:
     caddy     https://thornswood.net answers, which is the only one of these
-              a visitor actually touches. Asked over the public name and the
+              a visitor actually touches. Asked with the public name and its
               certificate on purpose: on 21 September Caddy was stopped for
               hours while node sat there answering 3001 perfectly, and a
               check of 3001 says everything is fine right through that.
+              Asked of this box's own 443, not through the name, since the
+              name is Cloudflare's (#2995) and Cloudflare answers 521 itself
+              when Caddy is gone
     website   answers on 3001, which is what Caddy puts on 443
     game      answers on 3000, which is the resources the client pulls
     voice     answers on 7778
@@ -97,6 +100,12 @@
     runner    every build runner's Windows service is running: the first,
               thornswood-vps, and the numbered ones Install-Runner.ps1
               -Number puts beside it (4 October)
+    cert      the certificate Caddy holds for thornswood.net is accepted
+              and has more than 14 days left. Caddy renews it about 30 days
+              before the end, so under 14 is a renewal failing for two weeks.
+              Watch-Outside.ps1 asked this until #2995; from outside it now
+              sees Cloudflare's own certificate, and only this box can still
+              reach Caddy's
 
   The two dev ones are here because the box has been watching them since 16
   September and this file did not know. vps-dev-instance.ps1, which runs ON
@@ -185,21 +194,71 @@ function Answers($port) {
 }
 
 # Caddy holds 443 and is the only thing here a visitor touches. It is asked
-# over the public name rather than over a loopback port, because the failure
-# this is for looks perfect from inside: on 21 September Caddy was stopped and
-# staying stopped while node answered 3001 all night.
+# with the public name and its certificate rather than over a plain loopback
+# port, because the failure this is for looks perfect from inside: on 21
+# September Caddy was stopped and staying stopped while node answered 3001
+# all night.
 #
+# STRAIGHT AT THIS BOX'S 443, NOT THROUGH THE NAME (#2995). The name is
+# Cloudflare's, and with Caddy gone Cloudflare itself answers 521, which
+# counted as an answer, so asked through the name a dead Caddy looked up
+# and was never started again. So this connects to 127.0.0.1:443, asks for
+# the name's certificate by SNI and checks it the way a browser does, and
+# asks for the page with the name as Host.
+#
+# Status is the HTTP status (0 for none), NotAfter when the certificate runs
+# out (local time), Problems what the trust store says of it ('None' when it
+# takes it) and Error, in words, why there was no answer.
+function AskCaddy($url) {
+  $r = @{ Status = 0; NotAfter = $null; Problems = ''; Error = '' }
+  $u = [uri]$url
+  $c = $null; $s = $null
+  $seen = @{ E = 'None' }
+  try {
+    $c = New-Object Net.Sockets.TcpClient
+    if (-not $c.BeginConnect('127.0.0.1', 443, $null, $null).AsyncWaitHandle.WaitOne(5000) -or -not $c.Connected) { $r.Error = 'nothing took a connection on 443'; return $r }
+    $cb = { param($a, $b, $d, $e) $seen.E = '' + $e; return $true }.GetNewClosure()
+    $s = New-Object Net.Security.SslStream($c.GetStream(), $false, [Net.Security.RemoteCertificateValidationCallback]$cb)
+    $s.ReadTimeout = 10000; $s.WriteTimeout = 10000
+    $s.AuthenticateAsClient($u.Host)
+    $r.NotAfter = (New-Object Security.Cryptography.X509Certificates.X509Certificate2($s.RemoteCertificate)).NotAfter
+    $r.Problems = $seen.E
+    $q = [Text.Encoding]::ASCII.GetBytes('HEAD ' + $u.PathAndQuery + " HTTP/1.1`r`nHost: " + $u.Host + "`r`nUser-Agent: Thornswood-Watch`r`nConnection: close`r`n`r`n")
+    $s.Write($q, 0, $q.Length)
+    $s.Flush()
+    $line = (New-Object IO.StreamReader($s, [Text.Encoding]::ASCII)).ReadLine()
+    if ("$line" -match '^HTTP/\d(\.\d)? (\d{3})') { $r.Status = [int]$Matches[2] }
+    else { $r.Error = 'it answered on 443 without an HTTP status' }
+  } catch { $r.Error = 'no TLS handshake or no answer on 443' }
+  finally {
+    if ($s) { $s.Dispose() }
+    if ($c) { $c.Close() }
+  }
+  return $r
+}
+
 # ANY HTTP ANSWER COUNTS, including a 502. A 502 is Caddy up and something
 # behind it down, and what is behind it has its own check on the line below.
-# Treating a 502 as Caddy being down would restart the wrong thing.
+# Treating a 502 as Caddy being down would restart the wrong thing. A
+# certificate a browser would refuse does not count, as it did not when this
+# was Invoke-WebRequest.
 function SiteAnswers($url) {
-  try {
-    $null = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 10 -MaximumRedirection 5
-    return $true
-  } catch {
-    try { if ($_.Exception.Response) { return $true } } catch { }
-    return $false
-  }
+  $a = AskCaddy $url
+  return ($a.Status -gt 0 -and $a.Problems -eq 'None')
+}
+
+# '' when the certificate Caddy holds for the name is accepted and has more
+# than $days left, else why not. Caddy not answering at all is the caddy
+# check's to tell, so that is '' here.
+function CertProblem($url, $days) {
+  $a = AskCaddy $url
+  if (-not $a.NotAfter) { return '' }
+  $when = $a.NotAfter.ToString('d MMMM yyyy HH:mm', [Globalization.CultureInfo]::InvariantCulture)
+  if ($a.Problems -ne 'None') { return ('it is not accepted (' + $a.Problems + '). It runs out ' + $when) }
+  $left = ($a.NotAfter - $now).TotalDays
+  if ($left -le 0) { return ('it ran out on ' + $when + ', so Cloudflare refuses the site to everybody (526)') }
+  if ($left -le $days) { $d = [math]::Floor($left); return ('it runs out on ' + $when + ', in ' + $d + ' day' + $(if ($d -eq 1) { '' } else { 's' }) + ', and the line is ' + $days) }
+  return ''
 }
 
 function BotAlive() {
@@ -648,7 +707,10 @@ $tellOnly = @(
   @{ Name = 'backup'; Say = 'The nightly backup'; Fails = 'is failing'; Recovers = 'is working again'; Backup = 'Thornswood Backup'; Folder = 'C:\Thornswood-Backup'; Hours = 26 },
   @{ Name = 'offbox'; Say = 'The copy of the backups off the VPS'; Fails = 'is out of date'; Recovers = 'is up to date again'; OffBox = (Join-Path $root 'offbox.txt'); Hours = 26
      Fix = 'Fetch-Backups.ps1 on One brings the nightly backup down at 04:15 while One is on and signed in. Run .\scripts\vps\Fetch-Backups.ps1 there, and -Schedule again if its task is gone. Until then a VPS lost is everything since that copy lost too.' },
-  @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' }
+  @{ Name = 'runner'; Say = 'The build runner (Launcher builds on thornswood-vps and every numbered one)'; Service = 'actions.runner.*.thornswood-vps*' },
+  # Caddy's own certificate (#2995), which only this box can reach now.
+  @{ Name = 'cert'; Say = 'The certificate Caddy holds for thornswood.net'; Fails = 'needs a look'; Recovers = 'is fine again'; Cert = 'https://thornswood.net/'; Days = 14
+     Fix = 'Caddy renews it by itself about 30 days before the end, so a renewal has been failing: read Caddy''s log in C:\Thornswood-Caddy. Cloudflare reaches it over port 443 for the renewal, so Set-WebFirewall.ps1 -Check says whether 443 still takes Cloudflare.' }
 )
 
 # What is wrong with one of $checks when it does not answer, in words.
@@ -729,6 +791,7 @@ foreach ($c in $tellOnly) {
   $why = ''
   if ($c.ContainsKey('Backup')) { $why = BackupProblem $c.Backup $c.Folder $c.Hours }
   elseif ($c.ContainsKey('OffBox')) { $why = OffBoxProblem $c.OffBox $c.Hours }
+  elseif ($c.ContainsKey('Cert')) { $why = CertProblem $c.Cert $c.Days }
   else { $why = ServiceProblem $c.Service }
   if ($why) { Observe $told $c $true $false ($why.Substring(0, 1).ToUpper() + $why.Substring(1)) 'nobody' }
   else { Observe $told $c $false $false '' '' }
@@ -994,16 +1057,30 @@ function Answers(`$port) {
     return `$up
   } catch { return `$false }
 }
-# Asked the way a visitor asks, for the reason in the header. Any HTTP
-# answer counts, a 502 included: that is Caddy up with something behind it
-# down, and the line under it says which.
+# Asked the way the watcher asks, for the reasons in the header: the name
+# and its certificate, at this box's own 443 and not through Cloudflare
+# (#2995). Any HTTP answer counts, a 502 included: that is Caddy up with
+# something behind it down, and the line under it says which.
 function SiteAnswers(`$url) {
+  `$u = [uri]`$url
+  `$c = `$null; `$s = `$null
+  `$seen = @{ E = 'None' }
   try {
-    `$null = Invoke-WebRequest -Uri `$url -UseBasicParsing -TimeoutSec 10 -MaximumRedirection 5
-    return `$true
-  } catch {
-    try { if (`$_.Exception.Response) { return `$true } } catch { }
-    return `$false
+    `$c = New-Object Net.Sockets.TcpClient
+    if (-not `$c.BeginConnect('127.0.0.1', 443, `$null, `$null).AsyncWaitHandle.WaitOne(5000) -or -not `$c.Connected) { return `$false }
+    `$cb = { param(`$a, `$b, `$d, `$e) `$seen.E = '' + `$e; return `$true }.GetNewClosure()
+    `$s = New-Object Net.Security.SslStream(`$c.GetStream(), `$false, [Net.Security.RemoteCertificateValidationCallback]`$cb)
+    `$s.ReadTimeout = 10000; `$s.WriteTimeout = 10000
+    `$s.AuthenticateAsClient(`$u.Host)
+    `$q = [Text.Encoding]::ASCII.GetBytes('HEAD ' + `$u.PathAndQuery + " HTTP/1.1``r``nHost: " + `$u.Host + "``r``nUser-Agent: Thornswood-Watch``r``nConnection: close``r``n``r``n")
+    `$s.Write(`$q, 0, `$q.Length)
+    `$s.Flush()
+    `$line = (New-Object IO.StreamReader(`$s, [Text.Encoding]::ASCII)).ReadLine()
+    return (`$seen.E -eq 'None' -and "`$line" -match '^HTTP/\d(\.\d)? \d{3}')
+  } catch { return `$false }
+  finally {
+    if (`$s) { `$s.Dispose() }
+    if (`$c) { `$c.Close() }
   }
 }
 `$bot = `$false

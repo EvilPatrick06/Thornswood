@@ -55,6 +55,8 @@ try {
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'Caddyfile')) -Destination (Join-Path $deploy 'Caddyfile')
     # Setup-Domain.ps1 dot-sources the service account functions (#2578).
     Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'ServiceAccount.ps1')) -Destination (Join-Path $deploy 'ServiceAccount.ps1')
+    Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'CloudflareRanges.ps1')) -Destination (Join-Path $deploy 'CloudflareRanges.ps1')
+    Copy-Item -LiteralPath ([IO.Path]::Combine($Repo, 'scripts', 'deploy', 'cloudflare-ranges.txt')) -Destination (Join-Path $deploy 'cloudflare-ranges.txt')
 
     # The box, as far as the script can tell: ssh runs what it is given and
     # says it went well, scp takes the file. A long script goes by scp

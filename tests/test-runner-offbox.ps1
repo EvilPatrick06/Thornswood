@@ -42,7 +42,18 @@ try {
     [IO.File]::WriteAllText((Join-Path $fakeBin 'gh.cmd'), "@echo called>>`"$ghCalled`"`r`n@exit /b 1`r`n")
     $env:PATH = $fakeBin + ';' + $env:PATH
 
+    # A dry run writes the same scripts for the same switches and changes
+    # nothing the next one reads, so each set of switches runs once and a
+    # later check of the same set reads that run: 22 PowerShell starts, not
+    # 30, where one costs the gate box about ten times a node start (#3168).
+    $dryRuns = @{}
     function Dry([string[]]$more) {
+        $key = @($more) -join "`n"
+        if ($dryRuns.ContainsKey($key)) { return $dryRuns[$key] }
+        $dryRuns[$key] = Dry-Run $more
+        return $dryRuns[$key]
+    }
+    function Dry-Run([string[]]$more) {
         $f = Join-Path $work ('dry-' + [Guid]::NewGuid().ToString('N') + '.txt')
         $ErrorActionPreference = 'Continue'
         $said = @(& $ps -NoProfile -NonInteractive -ExecutionPolicy Bypass -File $script @more -DryRunTo $f -NoPause 2>&1 | ForEach-Object { "$_" })
@@ -181,7 +192,7 @@ try {
     $r = Dry @('-OffBox', '-Label', 'thornswood-vps')
     Yes "  while full -OffBox with the VPS label is still refused (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'never takes the VPS label' -and -not $r.Text)
     $r = Dry @('-Number', '5', '-Remove')
-    Yes '-Remove on the VPS takes off the outbound rules, the Defender skip and the account''s profile too' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner5'") -and $r.Text -match [regex]::Escape("Remove-MpPreference -ExclusionPath 'C:\Thornswood-Runner5'") -and $r.Text -match 'Win32_UserProfile -Filter "SID=' -and $r.Text -match 'Remove-CimInstance' -and $r.Text.IndexOf('$u.SID.Value') -lt $r.Text.IndexOf("Remove-LocalUser -Name 'thornswood-runner5'"))
+    Yes '-Remove on the VPS takes off the outbound rules, the Defender skip and, once the account is gone, its profile too (#3119)' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -match [regex]::Escape("`$grdGroup = 'Thornswood PR runner thornswood-runner5'") -and $r.Text -match [regex]::Escape("Remove-MpPreference -ExclusionPath 'C:\Thornswood-Runner5'") -and $r.Text -match 'Remove-CimInstance' -and $r.Text.IndexOf("Remove-LocalUser -Name 'thornswood-runner5'") -gt 0 -and $r.Text.IndexOf("Remove-LocalUser -Name 'thornswood-runner5'") -lt $r.Text.IndexOf("Remove-LeftProfiles @('thornswood-runner5', 'thornswood-runner5.*')"))
     $r = Dry @('-NetworkOnly', '-Number', '4', '-Remove')
     Yes '-NetworkOnly -Remove takes the firewall group off and nothing else' ($r.Code -eq 0 -and $r.Text -match [regex]::Escape('Remove-RunnerFirewall $grdGroup') -and $r.Text -notmatch $noLock)
     $r = Dry @('-NetworkOnly', '-Number', '4', '-Status')
