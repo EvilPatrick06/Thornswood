@@ -167,6 +167,33 @@ function ConvertTo-Range([string]$Text) {
     return [pscustomobject]@{ Bytes = $bytes; Bits = $bits; Text = $Text.Trim() }
 }
 
+# A rule's remote address as text that compares with the list's. Windows keeps
+# an IPv4 range given as 104.16.0.0/13 and reads it back as
+# 104.16.0.0/255.248.0.0, and a single address with no prefix at all, while
+# IPv6 keeps its prefix length (measured on the box, 21 Oct 2026: the first
+# -Apply set rule 80 to the 22 ranges and then stopped, reading them back in
+# that form). So each becomes network/prefix length, the same for both sides,
+# and a keyword such as Any stays as it is.
+function ConvertTo-AddressText([string]$Text) {
+    $t = $Text.Trim()
+    $parts = $t.Split('/')
+    $ip = $null
+    if ($parts.Count -gt 2 -or -not [Net.IPAddress]::TryParse($parts[0], [ref]$ip)) { return $t }
+    if ($parts.Count -eq 1) { return ($ip.ToString() + '/' + ($ip.GetAddressBytes().Length * 8)) }
+    if ($parts[1] -match '^\d{1,3}$') { return ($ip.ToString() + '/' + [int]$parts[1]) }
+    $mask = $null
+    if (-not [Net.IPAddress]::TryParse($parts[1], [ref]$mask) -or $mask.AddressFamily -ne $ip.AddressFamily) { return $t }
+    $bits = 0
+    $ended = $false
+    foreach ($b in $mask.GetAddressBytes()) {
+        for ($i = 7; $i -ge 0; $i--) {
+            if ($b -band (1 -shl $i)) { if ($ended) { return $t }; $bits++ } else { $ended = $true }
+        }
+    }
+    return ($ip.ToString() + '/' + $bits)
+}
+function Get-AddressKey($Remote) { return ((@($Remote | ForEach-Object { ConvertTo-AddressText ([string]$_) }) | Sort-Object) -join ',') }
+
 function Test-Inside([string]$Address, $List) {
     $ip = $null
     if (-not [Net.IPAddress]::TryParse($Address, [ref]$ip)) { return $false }
@@ -242,7 +269,7 @@ function Invoke-WebFirewall {
         $web[$port] = $r
         $now = @($r.Remote | Sort-Object)
         if ($now -contains 'Any') { Say 'RULE' ($port + ' OPEN to any address') }
-        elseif ($want.Count -and ($now -join ',') -eq ($want -join ',')) { Say 'RULE' ($port + ' SCOPED to the ' + $now.Count + ' ranges given') }
+        elseif ($want.Count -and (Get-AddressKey $now) -eq (Get-AddressKey $want)) { Say 'RULE' ($port + ' SCOPED to the ' + $now.Count + ' ranges given') }
         else { Say 'RULE' ($port + ' SCOPED to ' + $now.Count + ' addresses, not the list given: ' + ($now -join ' ')) }
     }
     $also = @()
@@ -292,11 +319,11 @@ function Invoke-WebFirewall {
     foreach ($port in $WebRules.Keys) {
         $r = $web[$port]
         $now = @($r.Remote | Sort-Object)
-        if (($now -join ',') -eq ($target -join ',')) { Say 'ALREADY' ("rule '" + $WebRules[$port] + "' takes " + $port + ' from ' + $what); continue }
+        if ((Get-AddressKey $now) -eq (Get-AddressKey $target)) { Say 'ALREADY' ("rule '" + $WebRules[$port] + "' takes " + $port + ' from ' + $what); continue }
         if (-not $DryRun) {
             Set-RuleRemote $r.Name $target
             $back = @((Get-WebRule $WebRules[$port]).Remote | Sort-Object)
-            if (($back -join ',') -ne ($target -join ',')) { $script:stopped = $true; Say 'STOP' ("rule '" + $WebRules[$port] + "' reads back as " + ($back -join ' ') + ', not ' + $what + '. Run Set-WebFirewall.ps1 -Open to put both back.'); return }
+            if ((Get-AddressKey $back) -ne (Get-AddressKey $target)) { $script:stopped = $true; Say 'STOP' ("rule '" + $WebRules[$port] + "' reads back as " + ($back -join ' ') + ', not ' + $what + '. Run Set-WebFirewall.ps1 -Open to put both back.'); return }
         }
         Change ("rule '" + $WebRules[$port] + "' takes " + $port + ' from ' + $what)
     }
