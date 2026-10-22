@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  69,
-    "callCount":  273,
+    "scriptCount":  70,
+    "callCount":  281,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -804,6 +804,78 @@
                       "via":  "Remote",
                       "anchor":  "\u0027BRIDGE OK\u0027; exit 0",
                       "does":  "checks the stage, swaps it in and registers and starts the bridge task, or puts the old one back",
+                      "class":  "admin",
+                      "reason":  "sends Register-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target $target -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$t = Get-ScheduledTask -TaskName \u0027$TaskName\u0027",
+                      "does":  "reads the admin task, which App it holds (never the key), whether a setup is armed, the port and admin.log",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027ARMED \u0027 + `$s",
+                      "does":  "writes the App\u0027s one-time setup state into the service\u0027s state folder",
+                      "class":  "admin",
+                      "reason":  "writes the folder that holds the App\u0027s key"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027FORGOTTEN \u0027 + `$slug",
+                      "does":  "deletes the App\u0027s key, id and any armed setup",
+                      "class":  "admin",
+                      "reason":  "deletes the App\u0027s key"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "Remove-Item -LiteralPath \u0027$Root\u0027 -Recurse -Force -EA SilentlyContinue",
+                      "does":  "stops the admin service, unregisters its task and deletes its folder, the key with it",
+                      "class":  "admin",
+                      "reason":  "sends Unregister-ScheduledTask"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "New-Item -ItemType Directory -Force -Path \u0027$Root\\$stage\u0027 | Out-Null",
+                      "does":  "locks the admin folder, makes its state folder and its stage folder",
+                      "class":  "admin",
+                      "reason":  "sends SetAccessRule"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "scp",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $send[$k] \"${target}:$rootFar/$stage/$k\" }",
+                      "does":  "uploads admin.js and server-log.js to the stage folder",
+                      "class":  "stage",
+                      "reason":  "writes a stage folder the deploy owns"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-AdminService.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "\u0027ADMIN OK\u0027; exit 0",
+                      "does":  "checks the stage, swaps it in and registers and starts the admin task, or puts the old one back",
                       "class":  "admin",
                       "reason":  "sends Register-ScheduledTask"
                   },
