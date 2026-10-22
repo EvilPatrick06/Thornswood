@@ -1,0 +1,61 @@
+# Runs the pull request gate on a build runner exactly the way build.yml's
+# "Run the gate harnesses" step does, and keeps the start log that says which
+# process was which harness's (#3114).
+#
+# Why. A pull request should run only the gate harnesses its change can
+# affect, and which those are is measured, not guessed: while this runs, an
+# ETW session on the box sees every file each harness opens. Only an
+# administrator can start that session, so scripts\dev\Trace-Gate.ps1 does,
+# on the shipping machine, then dispatches this and reads the trace once it
+# is done. This workflow itself starts nothing but the harnesses and can see
+# no trace.
+#
+#   .\scripts\dev\Trace-Gate.ps1
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Trace the gate
+on:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  trace:
+    name: Gate harnesses, traced
+    runs-on: [self-hosted, Windows, thornswood-vps, thornswood-build]
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      # The same as build.yml's step of this name (#3029).
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+
+      - name: Run the gate harnesses, saying which process is which
+        shell: pwsh
+        run: |
+          # build.yml's gate step, with -StartLog: the gate's list, its share
+          # of the cores and its budget.
+          $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          $builds = @((Get-Content -LiteralPath records\build-runners.json -Raw | ConvertFrom-Json).runners).Count
+          $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+          $keep = Join-Path $env:RUNNER_TEMP 'gate-trace'
+          $null = New-Item -ItemType Directory -Force -Path $keep
+          [ordered]@{ commit = $env:GITHUB_SHA; workspace = (Get-Location).Path } | ConvertTo-Json -Compress | Set-Content -LiteralPath (Join-Path $keep 'run.json')
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -Share $share -BudgetSeconds 1800 -StartLog (Join-Path $keep 'starts.jsonl')
+          exit $LASTEXITCODE
+
+      - name: Keep the start log
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: gate-trace
+          path: ${{ runner.temp }}/gate-trace
+          retention-days: 3
