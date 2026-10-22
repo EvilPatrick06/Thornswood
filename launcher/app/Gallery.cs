@@ -4,6 +4,7 @@ using System.IO;
 using System.Net;
 using System.Text;
 using System.Text.RegularExpressions;
+using System.Windows.Media;
 using System.Windows.Media.Imaging;
 
 namespace Thornswood
@@ -103,7 +104,19 @@ namespace Thornswood
             public DateTime When = DateTime.MinValue;
             /// <summary>Loaded image once FetchPending has got it, or null.</summary>
             public BitmapImage Image;
+            /// <summary>
+            /// The widths of the smaller copies that came with it (#3218),
+            /// which the card shows beside it and Accept names.
+            /// </summary>
+            public int[] Copies = new int[0];
         }
+
+        /// <summary>
+        /// The widths of a picture's smaller copies (#3218), the site's
+        /// SMALL_WIDTHS: the site shows these in its place on screens that
+        /// draw it smaller, and cannot make them itself.
+        /// </summary>
+        public static readonly int[] CopyWidths = new int[] { 800, 1600 };
 
         /// <summary>
         /// Blocking. Call it off the UI thread. The pictures the site is
@@ -184,11 +197,29 @@ namespace Thornswood
         {
             if (item == null || item.Name == null || item.Name.Length == 0) return null;
             if (item.Image != null) return item.Image;
+            item.Image = LoadUp(item.Name, 0);
+            return item.Image;
+        }
+
+        /// <summary>
+        /// Blocking. Call it off the UI thread. One smaller copy of a waiting
+        /// picture (#3218), from /up/&lt;name&gt;?w=&lt;width&gt; the same
+        /// way, for the card to show beside it. Null when it will not load.
+        /// </summary>
+        public static BitmapImage FetchCopy(Pending item, int width)
+        {
+            if (item == null || item.Name == null || item.Name.Length == 0) return null;
+            return LoadUp(item.Name, width);
+        }
+
+        static BitmapImage LoadUp(string name, int width)
+        {
             if (Discord.Ticket == null) return null;
             try
             {
-                string url = Discord.Site + "/up/" + Uri.EscapeDataString(item.Name) +
-                             "?ticket=" + Uri.EscapeDataString(Discord.Ticket);
+                string url = Discord.Site + "/up/" + Uri.EscapeDataString(name) +
+                             "?ticket=" + Uri.EscapeDataString(Discord.Ticket) +
+                             (width > 0 ? "&w=" + width : "");
                 byte[] raw = GetBytes(url, 8000);
                 if (raw == null || raw.Length == 0) return null;
 
@@ -198,12 +229,11 @@ namespace Thornswood
                 bi.StreamSource = new MemoryStream(raw);
                 bi.EndInit();
                 bi.Freeze();
-                item.Image = bi;
                 return bi;
             }
             catch (Exception ex)
             {
-                Swallow.Note("Gallery.FetchPending", ex);
+                Swallow.Note(width > 0 ? "Gallery.FetchCopy" : "Gallery.FetchPending", ex);
                 return null;
             }
         }
@@ -290,9 +320,14 @@ namespace Thornswood
         /// "" when the site took it, and a sentence to show the person when it
         /// did not. Allowed kinds match the site's GALLERY_ALLOW: png, jpg,
         /// jpeg, webp, gif, mp4, webm. Cap is 100 MB to match the site.
+        ///
+        /// Then its smaller copies (SendCopies, #3218). copies is "" when they
+        /// went or none was needed, and a sentence when one did not; the
+        /// picture is in either way.
         /// </summary>
-        public static string Submit(string path, string by, string note)
+        public static string Submit(string path, string by, string note, out string copies)
         {
+            copies = "";
             if (path == null || path.Trim().Length == 0)
                 return "Choose a picture to send first.";
             if (!Discord.Linked)
@@ -346,7 +381,11 @@ namespace Thornswood
                 return "Could not reach thornswood.net to send that picture.";
             }
 
-            if (code == 200) return "";
+            if (code == 200)
+            {
+                copies = SendCopies(data, ext, Str(reply, "name"));
+                return "";
+            }
             if (code == 0) return "Could not reach thornswood.net to send that picture.";
 
             string said = Str(reply, "error");
@@ -372,6 +411,163 @@ namespace Thornswood
             if (ext == ".mp4") return "video/mp4";
             if (ext == ".webm") return "video/webm";
             return "application/octet-stream";
+        }
+
+        /// <summary>
+        /// Blocking. A picture's smaller copies (#3218), sent after it to
+        /// /api/gallery/copy, because the site cannot make a picture smaller:
+        /// one for each of CopyWidths the picture is wider than, as it is shown
+        /// (a camera JPEG turned a quarter by its Exif is turned here too, as
+        /// the site reads it), at the picture's shape. JPEG, because WPF
+        /// writes no WebP. The site checks each against the picture's own
+        /// size, and staff see them beside it before Accept.
+        ///
+        /// "" when they went or none was needed (a gif, a recording, a picture
+        /// 800 wide or less), or a sentence saying the first that did not go.
+        /// A picture with see-through parts gets none, since a JPEG cannot keep
+        /// them; staff make WebP copies of it on the hub.
+        /// </summary>
+        static string SendCopies(byte[] data, string ext, string name)
+        {
+            if (ext != ".png" && ext != ".jpg" && ext != ".jpeg" && ext != ".webp") return "";
+            const string Full = ", so it will show at full size until staff make them.";
+            if (name.Length == 0) return "The site took it but did not say its name, so its smaller copies were not sent" + Full;
+
+            BitmapFrame head;
+            int turn;
+            try
+            {
+                head = BitmapFrame.Create(new MemoryStream(data), BitmapCreateOptions.DelayCreation, BitmapCacheOption.None);
+                turn = Orientation(head);
+            }
+            catch (Exception ex)
+            {
+                Swallow.Note("Gallery.SendCopies read", ex);
+                return "This copy of Windows could not read it to make its smaller copies" + Full;
+            }
+            bool quarter = turn >= 5 && turn <= 8;
+            int shownWide = quarter ? head.PixelHeight : head.PixelWidth;
+
+            foreach (int width in CopyWidths)
+            {
+                if (width >= shownWide) continue;
+                byte[] jpg;
+                try
+                {
+                    var bi = new BitmapImage();
+                    bi.BeginInit();
+                    bi.CacheOption = BitmapCacheOption.OnLoad;
+                    bi.StreamSource = new MemoryStream(data);
+                    // Turned a quarter, its height on disk is its width shown.
+                    if (quarter) bi.DecodePixelHeight = width; else bi.DecodePixelWidth = width;
+                    bi.EndInit();
+                    bi.Freeze();
+                    if (SeeThrough(bi)) return "It has see-through parts, which a JPEG copy cannot keep" + Full;
+
+                    BitmapSource shown = bi;
+                    Transform t = TurnFor(turn);
+                    if (t != null)
+                    {
+                        var tb = new TransformedBitmap(bi, t);
+                        tb.Freeze();
+                        shown = tb;
+                    }
+                    var flat = new FormatConvertedBitmap(shown, PixelFormats.Bgr24, null, 0);
+                    flat.Freeze();
+                    var enc = new JpegBitmapEncoder();
+                    enc.QualityLevel = 85;
+                    enc.Frames.Add(BitmapFrame.Create(flat));
+                    using (var ms = new MemoryStream())
+                    {
+                        enc.Save(ms);
+                        jpg = ms.ToArray();
+                    }
+                }
+                catch (Exception ex)
+                {
+                    Swallow.Note("Gallery.SendCopies make " + width, ex);
+                    return "Its " + width + " pixel copy could not be made here" + Full;
+                }
+
+                string url = Discord.Site + "/api/gallery/copy?ticket=" +
+                             Uri.EscapeDataString(Discord.Ticket) +
+                             "&name=" + Uri.EscapeDataString(name) +
+                             "&w=" + width;
+                string reply = "";
+                int code;
+                try { code = Discord.PostBytes(url, jpg, "image/jpeg", 60000, out reply); }
+                catch (Exception ex)
+                {
+                    Swallow.Note("Gallery.SendCopies send " + width, ex);
+                    code = 0;
+                }
+                if (code == 200) continue;
+                string said = Str(reply, "error");
+                if (said.Length == 0) said = code == 0 ? "thornswood.net could not be reached" : "the site answered " + code;
+                return "Its " + width + " pixel copy did not go (" + said.TrimEnd('.') + ")" + Full;
+            }
+            return "";
+        }
+
+        /// <summary>
+        /// The Exif orientation of a picture, 1 to 8, or 1 when it says none.
+        /// A PNG or WebP keeps no Exif here, so a format whose metadata WPF
+        /// cannot query is 1.
+        /// </summary>
+        static int Orientation(BitmapFrame frame)
+        {
+            BitmapMetadata md;
+            try { md = frame.Metadata as BitmapMetadata; }
+            catch (NotSupportedException) { return 1; }
+            if (md == null) return 1;
+            object v;
+            try
+            {
+                if (!md.ContainsQuery("System.Photo.Orientation")) return 1;
+                v = md.GetQuery("System.Photo.Orientation");
+            }
+            catch (NotSupportedException) { return 1; }
+            int n;
+            if (v == null || !int.TryParse(v.ToString(), out n) || n < 1 || n > 8) return 1;
+            return n;
+        }
+
+        /// <summary>
+        /// What turns a picture stored with that Exif orientation the way it is
+        /// shown: a mirror, a quarter turn clockwise, or both, in that order.
+        /// Null for 1, which is shown as it is stored.
+        /// </summary>
+        static Transform TurnFor(int turn)
+        {
+            if (turn <= 1 || turn > 8) return null;
+            var g = new TransformGroup();
+            if (turn == 3) g.Children.Add(new RotateTransform(180));
+            if (turn == 5 || turn == 6) g.Children.Add(new RotateTransform(90));
+            if (turn == 7 || turn == 8) g.Children.Add(new RotateTransform(270));
+            if (turn == 2 || turn == 5 || turn == 7) g.Children.Add(new ScaleTransform(-1, 1));
+            if (turn == 4) g.Children.Add(new ScaleTransform(1, -1));
+            g.Freeze();
+            return g;
+        }
+
+        /// <summary>
+        /// Whether any pixel of a picture is less than solid. A picture saved
+        /// with an alpha channel that is solid throughout, as many screenshots
+        /// are, is not.
+        /// </summary>
+        static bool SeeThrough(BitmapSource bi)
+        {
+            PixelFormat f = bi.Format;
+            if (f != PixelFormats.Bgra32 && f != PixelFormats.Pbgra32 && f != PixelFormats.Prgba64 &&
+                f != PixelFormats.Rgba64 && f != PixelFormats.Prgba128Float && f != PixelFormats.Rgba128Float)
+                return false;
+            var solid = new FormatConvertedBitmap(bi, PixelFormats.Bgra32, null, 0);
+            int stride = solid.PixelWidth * 4;
+            var px = new byte[stride * solid.PixelHeight];
+            solid.CopyPixels(px, stride, 0);
+            for (int i = 3; i < px.Length; i += 4)
+                if (px[i] != 255) return true;
+            return false;
         }
 
         /// <summary>
@@ -407,6 +603,7 @@ namespace Thornswood
                 p.Note = Str(body, "note");
                 p.From = Str(body, "from");
                 p.When = Moment(Num(body, "at"));
+                p.Copies = Widths(body, "copies");
                 waiting.Add(p);
             }
             return waiting;
@@ -419,10 +616,19 @@ namespace Thornswood
         ///
         /// Doing it twice is not an error: the site leaves a name that is
         /// already on the gallery where it is and answers 200 either way.
+        ///
+        /// shown is the widths of the smaller copies the card showed beside it
+        /// (#3218). The site puts only those on the gallery with it, so what
+        /// goes out is what staff saw.
         /// </summary>
-        public static string Approve(string name)
+        public static string Approve(string name, int[] shown)
         {
-            return Staff("POST", "/api/gallery/approve", name, "approve that picture");
+            var list = new List<string>();
+            if (shown != null)
+                foreach (int n in shown)
+                    if (Array.IndexOf(CopyWidths, n) >= 0) list.Add(n.ToString());
+            return Staff("POST", "/api/gallery/approve", name, "approve that picture",
+                         ",\"copies\":[" + string.Join(",", list.ToArray()) + "]");
         }
 
         /// <summary>
@@ -462,12 +668,18 @@ namespace Thornswood
         /// </summary>
         static string Staff(string method, string door, string name, string what)
         {
+            return Staff(method, door, name, what, "");
+        }
+
+        /// <summary>The same, with more fields after the name (more starts with a comma).</summary>
+        static string Staff(string method, string door, string name, string what, string more)
+        {
             if (name == null || name.Trim().Length == 0)
                 return "There is no picture on the card to work on.";
             if (!Discord.Linked) return NotLinked;
 
             string reply;
-            string body = "{\"name\":\"" + Discord.Escape(name.Trim()) + "\"}";
+            string body = "{\"name\":\"" + Discord.Escape(name.Trim()) + "\"" + more + "}";
             int code = Ask(method, door, body, out reply);
             if (code == 200) return "";
             return Trouble(code, reply, what);
@@ -619,6 +831,24 @@ namespace Thornswood
         /// targets the .NET Framework that ships in Windows, and its only
         /// serializer cannot read a shape it is not told in advance.
         /// </summary>
+        /// <summary>
+        /// A list of copy widths out of an object body, such as
+        /// "copies":[800,1600], keeping only the widths in CopyWidths. Empty
+        /// when it is not there.
+        /// </summary>
+        static int[] Widths(string body, string key)
+        {
+            var m = Regex.Match(body, "\"" + key + "\"\\s*:\\s*\\[([0-9,\\s]*)\\]");
+            var list = new List<int>();
+            if (!m.Success) return list.ToArray();
+            foreach (string part in m.Groups[1].Value.Split(','))
+            {
+                int n;
+                if (int.TryParse(part.Trim(), out n) && Array.IndexOf(CopyWidths, n) >= 0 && !list.Contains(n)) list.Add(n);
+            }
+            return list.ToArray();
+        }
+
         static string Str(string body, string key)
         {
             var m = Regex.Match(body, "\"" + key + "\"\\s*:\\s*\"((?:[^\"\\\\]|\\\\.)*)\"");

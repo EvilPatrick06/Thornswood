@@ -649,9 +649,11 @@ rule for moving a character's slot), Art.cs (the art inside the exe),
 Themes.cs (every colour; the setup program is drawn in its Forge too, #2851), Help.cs (the Help page's text), Links.cs (the Nexus page behind
 each mod name), Gallery.cs (the pictures the site shows from the world, read
 from `/api/public` for Play's rotating spotlight and the Gallery page; the
-Gallery page uploads via `/api/gallery/submit`, reports via
-`/api/gallery/report`, and for staff Approves, Rejects and takes an approved
-shot down over the same Discord ticket, with a clear message when an older
+Gallery page uploads via `/api/gallery/submit` and then sends the picture's
+800 and 1600 pixel JPEG copies to `/api/gallery/copy` (#3218), reports via
+`/api/gallery/report`, and for staff Approves (naming the copies the card
+showed beside the picture), Rejects and takes an approved shot down over the
+same Discord ticket, with a clear message when an older
 site still answers those doors 403 without why), Swallow.cs
 (a caught exception written to `launcher.log` instead of dropped, section 1).
 
