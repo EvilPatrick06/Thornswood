@@ -171,6 +171,28 @@ ROLES_ONLY = ('--roles-only' in sys.argv) or os.environ.get('DISCORD_ROLES_ONLY'
 # channel change look like the server being rebuilt, so it is opt in now.
 POSTS = os.environ.get('DISCORD_POSTS', '') == '1'
 CHECK = os.environ.get('DISCORD_CHECK', '') == '1'
+
+# ONE PART OF THE PLAN AND NOTHING ELSE (#2519).
+#
+# A whole run does more than the part a change was approved for: it puts
+# every role back in its place, lets the bot into every gated channel it is
+# not in yet, sets topics and the server's join, AFK and notice settings, and
+# lists or prunes what left the plan. On 22 Oct the Gamemasters category, the
+# Attach Files overwrite on #welcome-travelers and the GM Rules pin were
+# approved, and a whole -Check also planned role moves, #jukebox and two
+# server or channel settings. ONLY names the categories and channels a run
+# may touch, comma separated:
+#
+#     $env:DISCORD_ONLY = 'Gamemasters,welcome-travelers'
+#     python Build-Discord.py
+#
+# A category named here is made if missing, with every channel PLAN puts in
+# it; a channel named here is made or kept in its own category, which is not
+# made for it. No role is made or moved, nothing is listed for pruning or
+# pruned, no post is written, no webhook is made, and no server setting is
+# changed. A name PLAN does not have stops the run before Discord is asked
+# anything.
+ONLY = [n.strip() for n in os.environ.get('DISCORD_ONLY', '').split(',') if n.strip()]
 GUILD  = os.environ.get('DISCORD_GUILD', '').strip()   # optional server id
 WEBHOOK_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'news-webhook.txt')
@@ -903,13 +925,32 @@ def overwrites(guild, mode, roles, hold=None, needs=BOT_NEEDS, extra=None):
     return {}
 
 
+def role_moves(order):
+    """(role, position) for each role in order that is not where the plan
+       wants it, highest first.
+
+       The roles keep the positions they hold between them and are only put
+       in the plan's order among those, so a role the plan does not name
+       stays where it is, and so does one something else manages (Server
+       Booster, Patreon's), which Discord never moves. Counting from the
+       bot's own role down instead put every role after Server Booster one
+       place off on the live server, and a -Check on 22 Oct planned 50 moves
+       for roles already in order (#2519)."""
+    movable = [r for r in order if not getattr(r, 'managed', False)]
+    slots = sorted((r.position for r in movable), reverse=True)
+    return [(r, p) for r, p in zip(movable, slots) if r.position != p]
+
+
 async def ensure_roles(guild):
     have = {r.name: r for r in guild.roles}
     out = {}
+    new = set()
     for name, colour, hoist, perms in ROLES:
         if name in have:
             out[name] = have[name]
             kept.append('role ' + name)
+            continue
+        if ONLY:
             continue
         if name in NOT_MADE:
             say('note', 'there is no ' + name + ' role, and Discord, Patreon '
@@ -923,24 +964,32 @@ async def ensure_roles(guild):
                 name=name, colour=discord.Colour(colour), hoist=hoist,
                 mentionable=True, permissions=perms,
                 reason='Thornswood setup')
+            new.add(name)
             made.append('role ' + name)
             say('role', name)
         except discord.Forbidden:
             failed.append('role ' + name + ' (the bot needs to be higher up '
                           'the role list than the roles it makes)')
-    # Highest first, under whatever the bot's own role is. One at a time, and
-    # a refusal on one is not allowed to leave the rest of the list unsorted:
-    # each is asked, and one Discord will not move is named under "did not
-    # manage" with Discord's answer (#2736; it used to be dropped unsaid, and
-    # -Check moved roles it only meant to look at). A role something else
-    # manages, as Server Booster and Patreon are, Discord never moves, so it
-    # is not asked.
-    top = guild.me.top_role.position
+    if ONLY:
+        return out
+    # A role made just now is at the bottom. It goes straight under the one
+    # the plan puts above it, so it has a place among the others before they
+    # are put in order.
     order = [out[n] for n, _, _, _ in ROLES if n in out]
     for i, role in enumerate(order):
-        want = max(1, top - 1 - i)
-        if role.position == want or getattr(role, 'managed', False):
-            continue
+        if i and role.name in new:
+            above = order[i - 1]
+            try:
+                await role.edit(position=max(1, above.position - 1))
+            except discord.HTTPException as e:
+                failed.append('role %s could not be put under %s (%s)' % (role.name, above.name, refused(e)))
+    # Highest first, among the positions the plan's roles already hold
+    # (role_moves). One at a time, and a refusal on one is not allowed to
+    # leave the rest of the list unsorted: each is asked, and one Discord will
+    # not move is named under "did not manage" with Discord's answer (#2736;
+    # it used to be dropped unsaid, and -Check moved roles it only meant to
+    # look at).
+    for role, want in role_moves(order):
         if CHECK:
             say('would move', 'role ' + role.name)
             continue
@@ -1240,6 +1289,31 @@ async def apply_notice_channels(guild):
     say('set', '%s go to #%s' % (what, want.name))
 
 
+def plan_for(only):
+    """PLAN, or the part of it ONLY names (#2519): a named category with
+       all its channels, and a named channel in its own category. A name
+       PLAN does not have is a ValueError naming it."""
+    if not only:
+        return PLAN
+    def key(spec):
+        return spec['name'] if spec['kind'] == 'voice' else spec['name'].lower().replace(' ', '-')
+    cats = set(c for c, _ in PLAN if c)
+    chans = set(key(s) for _, specs in PLAN for s in specs)
+    unknown = [n for n in only if n not in cats and n not in chans]
+    if unknown:
+        raise ValueError('not in the plan: ' + ', '.join(unknown) +
+                         '. ONLY takes category names and channel names from PLAN')
+    out = []
+    for catname, specs in PLAN:
+        if catname and catname in only:
+            out.append((catname, specs))
+            continue
+        picked = [s for s in specs if key(s) in only]
+        if picked:
+            out.append((catname, picked))
+    return out
+
+
 @client.event
 async def on_ready():
     try:
@@ -1272,10 +1346,26 @@ async def on_ready():
         found = {}
         posts = []
 
-        for catname, specs in PLAN:
+        for catname, specs in plan_for(ONLY):
             cat = None
             if catname:
                 cat = discord.utils.get(guild.categories, name=catname)
+                if cat is None and ONLY and catname not in ONLY:
+                    # Under ONLY a category is made only when it is named
+                    # itself, never for a channel named inside it.
+                    say('note', 'there is no ' + catname + ' category, and '
+                        'only ' + catname + ' itself would make it')
+                    continue
+                if cat is None and CHECK:
+                    # -Check makes nothing, a category included (#2519: the
+                    # -Check of 22 Oct, 3:59 AM, made Gamemasters).
+                    say('would make', 'category ' + catname)
+                    for spec in specs:
+                        if spec.get('make', True):
+                            say('would make', ('voice ' if spec['kind'] == 'voice' else '#') +
+                                (spec['name'] if spec['kind'] == 'voice' else
+                                 spec['name'].lower().replace(' ', '-')))
+                    continue
                 if cat is None:
                     mode = {'Staff': 'staff', 'Testing': 'pathfind',
                             'Gamemasters': 'gm',
@@ -1289,7 +1379,8 @@ async def on_ready():
                     say('category', catname)
                 else:
                     kept.append(catname)
-                    await keep_bot(cat)
+                    if not ONLY or catname in ONLY:
+                        await keep_bot(cat)
             done = []
             for spec in specs:
                 ch = await ensure_channel(guild, cat, spec, roles, found)
@@ -1303,10 +1394,22 @@ async def on_ready():
             # plan does not name it. keep_bot only writes where @everyone is
             # shut out, so this keeps what the bot can see today and widens
             # nothing, and a channel open to everybody is left alone.
-            if cat is not None:
+            if cat is not None and (not ONLY or catname in ONLY):
                 for ch in list(getattr(cat, 'channels', None) or []):
                     if ch not in done:
                         await keep_bot(ch)
+
+        if ONLY:
+            # Nothing past the parts named: no prune list, no post, no
+            # webhook, no server setting.
+            say('only', ', '.join(ONLY) + '. Nothing else was touched')
+            print('\n  made %d, already there %d' % (len(made), len(kept)))
+            if failed:
+                print('\n  did not manage:')
+                for f in failed:
+                    print('    ' + f)
+            print('')
+            return
 
         # ------------------------------------------------------- pruning --
         # Only inside the categories this script manages, and only names it
@@ -1353,10 +1456,15 @@ async def on_ready():
                 print('             instead. Ask in #staff-updates first.')
 
         print('')
-        if CHECK:
+        if CHECK and POSTS:
             for ch, text in posts:
                 if ch is not None:
                     say('would write', '#' + ch.name)
+        elif CHECK and posts:
+            # What the same run without -Check does: it leaves them alone.
+            # This said would write for all seven whether or not -Posts was
+            # given (#2519, 22 Oct).
+            say('left alone', '%d read only post(s). -Posts rewrites them.' % len(posts))
         elif POSTS:
             for ch, text in posts:
                 await post(ch, text, found)
@@ -1370,12 +1478,20 @@ async def on_ready():
             try:
                 hooks = await news.webhooks()
                 hook = discord.utils.get(hooks, name='Thornswood')
-                if hook is None:
-                    hook = await news.create_webhook(name='Thornswood')
-                    say('webhook', 'made one in #' + news.name)
-                with open(WEBHOOK_OUT, 'w', encoding='utf-8') as f:
-                    f.write(hook.url)
-                say('webhook', 'saved to ' + os.path.basename(WEBHOOK_OUT))
+                if CHECK:
+                    # Neither made nor written down: -Check changes nothing,
+                    # a file beside the code included (#2519).
+                    if hook is None:
+                        say('would make', 'the news webhook in #' + news.name)
+                    else:
+                        say('left alone', 'the news webhook in #' + news.name)
+                else:
+                    if hook is None:
+                        hook = await news.create_webhook(name='Thornswood')
+                        say('webhook', 'made one in #' + news.name)
+                    with open(WEBHOOK_OUT, 'w', encoding='utf-8') as f:
+                        f.write(hook.url)
+                    say('webhook', 'saved to ' + os.path.basename(WEBHOOK_OUT))
             except discord.Forbidden:
                 failed.append('the news webhook (no permission)')
 
@@ -1419,6 +1535,10 @@ async def on_ready():
 
 
 if __name__ == '__main__':
+    try:
+        plan_for(ONLY)
+    except ValueError as e:
+        sys.exit('DISCORD_ONLY: ' + str(e) + '. Nothing was asked of Discord.')
     if not TOKEN:
         sys.exit('No token. Set DISCORD_TOKEN first, or run Setup-Discord.ps1.')
     try:
