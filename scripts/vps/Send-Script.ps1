@@ -240,3 +240,76 @@ function Start-ThornswoodRemote {
     $psi.RedirectStandardOutput = $true
     return [Diagnostics.Process]::Start($psi)
 }
+
+# A script that runs on the box on its own, for one that cuts the session
+# it would run in (issue #3193: Setup-Domain.ps1 stops Caddy, and from One
+# ssh to the box goes through the bridge, which goes through Caddy, so the
+# session was cut halfway, what the script said after that was lost and the
+# run ended as ssh's exit 255 whether or not the box finished). Builds the
+# texts and sends nothing:
+#   Start  what to send with Invoke-ThornswoodRemote. It writes $Script to a
+#          file of its own name in $Folder and starts it through WMI, so its
+#          parent is the WMI service and nothing about the session ending
+#          can reach it, and says STARTED and the run's process id. Nothing
+#          of $Script has run by then. Files earlier runs left that are a
+#          day old go first; a run still going is minutes old.
+#   Read   what to send, any number of times, to read the run's report:
+#          REPORT NONE before there is one, else REPORT <n> and its n lines.
+#          The last is END <exit code> once the run is over, and the read
+#          that sees it deletes the report. An exit in $Script ends it with
+#          that code; an error that stops it is END 1, after an ERROR line.
+#   File, Log  the two files on the box, for a message that names them.
+# $Folder is for the harnesses, which run both texts on Windows themselves.
+function Get-ThornswoodDetachedRun {
+    param(
+        [Parameter(Mandatory = $true)][string]$Script,
+        [string]$Folder = 'C:\Windows\Temp'
+    )
+    if ($Folder -match "['`r`n]") { throw ('not a folder for a run: ' + $Folder) }
+    $id = [Guid]::NewGuid().ToString('N')
+    $file = $Folder.TrimEnd('\') + '\thornswood-run-' + $id + '.ps1'
+    $log = $Folder.TrimEnd('\') + '\thornswood-run-' + $id + '.log'
+    # Run with &, so an exit in it ends it and not this, and its code is
+    # $LASTEXITCODE; it ends with exit 0, so a code a program it ran left
+    # behind is never taken for its own.
+    $runner = @"
+`$ProgressPreference = 'SilentlyContinue'
+`$log = '$log'
+function Put([string]`$l) { [IO.File]::AppendAllText(`$log, `$l + "``r``n") }
+`$rc = 1
+try {
+  `$global:LASTEXITCODE = 0
+  & '$file' *>&1 | ForEach-Object { Put ([string]`$_) }
+  `$rc = `$LASTEXITCODE
+} catch { Put ('ERROR ' + `$_.Exception.Message) }
+finally {
+  Remove-Item -LiteralPath '$file' -Force -EA SilentlyContinue
+  Put ('END ' + `$rc)
+}
+"@
+    $cmd = 'powershell -NoProfile -ExecutionPolicy Bypass -EncodedCommand ' + [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))
+    $body = [Convert]::ToBase64String([Text.Encoding]::UTF8.GetBytes($Script + "`r`nexit 0`r`n"))
+    $start = @"
+`$ErrorActionPreference = 'Stop'
+Get-ChildItem -LiteralPath '$Folder' -Filter 'thornswood-run-*' -File -EA SilentlyContinue |
+  Where-Object { `$_.Name -match '^thornswood-run-[0-9a-f]{32}\.(ps1|log)`$' -and `$_.LastWriteTimeUtc -lt [DateTime]::UtcNow.AddDays(-1) } |
+  Remove-Item -Force -EA SilentlyContinue
+[IO.File]::WriteAllText('$file', [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('$body')), (New-Object Text.UTF8Encoding(`$true)))
+`$r = Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = '$cmd' }
+if (`$r.ReturnValue -ne 0) {
+  Remove-Item -LiteralPath '$file' -Force -EA SilentlyContinue
+  'the run could not be started (Win32_Process Create said ' + `$r.ReturnValue + '). Nothing of it ran.'
+  exit 1
+}
+'STARTED ' + `$r.ProcessId
+"@
+    $read = @"
+`$l = '$log'
+if (-not (Test-Path -LiteralPath `$l)) { 'REPORT NONE'; exit 0 }
+`$lines = @([IO.File]::ReadAllLines(`$l))
+'REPORT ' + `$lines.Count
+`$lines
+if (`$lines.Count -and `$lines[-1] -match '^END ') { Remove-Item -LiteralPath `$l -Force -EA SilentlyContinue }
+"@
+    return [pscustomobject]@{ Start = $start; Read = $read; File = $file; Log = $log }
+}

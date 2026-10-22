@@ -176,10 +176,20 @@ function Get-WebRule([string]$DisplayName) {
     if (-not $r) { return $null }
     return [pscustomobject]@{ Name = $r.Name; Enabled = 'True'; Count = $r.Count; Remote = @($r.Remote) }
 }
+# Windows keeps an IPv4 range given as 104.16.0.0/13 as 104.16.0.0/255.248.0.0
+# and reads it back that way; IPv6 keeps its prefix length (the box, 21 Oct).
+function ConvertTo-WindowsForm([string]$t) {
+    $p = $t.Split('/')
+    if ($p.Count -ne 2 -or $p[0] -notmatch '^\d{1,3}(\.\d{1,3}){3}$') { return $t }
+    $m = [uint64]0
+    if ([int]$p[1] -gt 0) { $m = ([uint64]4294967295 -shl (32 - [int]$p[1])) -band [uint64]4294967295 }
+    $b = [BitConverter]::GetBytes([uint32]$m); [Array]::Reverse($b)
+    return ($p[0] + '/' + (New-Object Net.IPAddress (, $b)).ToString())
+}
 function Set-RuleRemote([string]$Name, [string[]]$Remote) {
     $global:Fake.log.Add('Set ' + $Name + ' ' + ($Remote -join ','))
     if (-not $global:Fake.sticks) { return }
-    foreach ($k in @($global:Fake.web.Keys)) { if ($global:Fake.web[$k].Name -eq $Name) { $global:Fake.web[$k].Remote = @($Remote) } }
+    foreach ($k in @($global:Fake.web.Keys)) { if ($global:Fake.web[$k].Name -eq $Name) { $global:Fake.web[$k].Remote = @($Remote | ForEach-Object { ConvertTo-WindowsForm $_ }) } }
 }
 function Get-Profiles { return @($global:Fake.profiles) }
 function Resolve-Name([string]$Name, [string]$Server) {
@@ -222,7 +232,15 @@ function Resolve-Name([string]$Name, [string]$Server) {
         return [pscustomobject]@{ Code = $LASTEXITCODE; Lines = $out; Text = ($out -join "`n") }
     }
     function Has($lines, [string]$rx) { return (@($lines | Where-Object { $_ -match $rx }).Count -gt 0) }
-    function Remote([string]$name) { return (@($global:Fake.web[$name].Remote | Sort-Object) -join ',') }
+    # A rule's addresses with Windows' address/mask form back as a prefix length.
+    function Cidr([string]$t) {
+        $p = $t.Split('/')
+        if ($p.Count -ne 2 -or $p[1] -notmatch '\.') { return $t }
+        $bits = 0
+        foreach ($x in ([Net.IPAddress]::Parse($p[1])).GetAddressBytes()) { $bits += [Convert]::ToString($x, 2).Replace('0', '').Length }
+        return ($p[0] + '/' + $bits)
+    }
+    function Remote([string]$name) { return (@($global:Fake.web[$name].Remote | ForEach-Object { Cidr $_ } | Sort-Object) -join ',') }
 
     New-Fake
     $r = Invoke-BoxHere ("-Check -Ranges '" + $list + "'")
@@ -287,6 +305,7 @@ function Resolve-Name([string]$Name, [string]$Server) {
     Yes '-Apply: exit 0, both rules take only the list' ($r.Code -eq 0 -and (Remote 'Thornswood Web 80') -eq $sorted -and (Remote 'Thornswood Web 443') -eq $sorted -and
         @($r.Lines | Where-Object { $_ -match '^CHANGED ' }).Count -eq 2 -and (Has $r.Lines '^DONE 2 change\(s\) made\.$'))
     Yes '  set by each rule''s own name' ($global:Fake.log.Count -eq 2 -and $global:Fake.log[0] -like 'Set {web-80} *' -and $global:Fake.log[1] -like 'Set {web-443} *')
+    Yes '  and read back the way Windows keeps them, IPv4 as address/mask, which still counts as the list' (@($global:Fake.web['Thornswood Web 80'].Remote | Where-Object { $_ -match '^104\.16\.0\.0/255\.248\.0\.0$' }).Count -eq 1)
     $global:Fake.log.Clear()
     $r = Invoke-BoxHere ("-Check -Ranges '" + $list + "'")
     Yes '  -Check then says both are scoped to the list given' ((Has $r.Lines ('^RULE 80 SCOPED to the ' + $ranges.Count + ' ranges given$')) -and (Has $r.Lines ('^RULE 443 SCOPED to the ' + $ranges.Count + ' ranges given$')))

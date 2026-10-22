@@ -894,11 +894,19 @@ function Carry([string]$from, [string]$to, [bool]$skipWorld) {
     if ($moved -gt 0) { Say 'logs carried across, to be rolled rather than deleted' 'Cyan' }
 }
 
-# The newest few of each kind of folder beside the root.
+# The newest few of each kind of folder beside the root. One it cannot
+# remove is said, with what Windows answered: until #3183 both the listing
+# and the removal threw their errors away, and eleven dev copies (about
+# 0.4 GB each) piled up over nine days with nothing saying why.
 function Prune([string]$kind, [int]$n) {
-    Get-ChildItem -LiteralPath $parent -Directory -Force -ErrorAction SilentlyContinue |
-        Where-Object { $_.Name -like ($leaf + $kind) } | Sort-Object Name -Descending | Select-Object -Skip $n |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -ErrorAction SilentlyContinue }
+    # A first install into a folder not made yet has nothing beside it.
+    if (-not (Test-Path -LiteralPath $parent -PathType Container)) { return }
+    $old = @(Get-ChildItem -LiteralPath $parent -Directory -Force -ErrorAction Stop |
+        Where-Object { $_.Name -like ($leaf + $kind) } | Sort-Object Name -Descending | Select-Object -Skip $n)
+    foreach ($d in $old) {
+        try { Remove-Item -LiteralPath $d.FullName -Recurse -Force -ErrorAction Stop }
+        catch { Say ("PRUNE FAILED: could not remove {0}, one of the old copies past the newest {1}: {2}" -f $d.FullName, $n, $_.Exception.Message) 'Yellow' }
+    }
 }
 
 # ---- the task --------------------------------------------------------------
