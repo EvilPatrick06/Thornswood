@@ -67,9 +67,18 @@ yes('the generated blocks and the functions that use them are in the gamemode', 
 if (!ok) { done(); }
 
 // ------------------------------------------------------------ the table --
-const check = spawnSync('python3', [path.join(REPO, 'scripts', 'dev', 'Build-Recost.py'), '--check'], { encoding: 'utf8' });
+// The runner's Python is `python` or `py`, not `python3`; ask each in turn.
+function python(args) {
+  for (const exe of ['python', 'py', 'python3']) {
+    const p = spawnSync(exe, args, { encoding: 'utf8', maxBuffer: 1 << 26,
+                                     env: Object.assign({}, process.env, { PYTHONDONTWRITEBYTECODE: '1' }) });
+    if (!p.error) { return p; }
+  }
+  return null;
+}
+const check = python([path.join(REPO, 'scripts', 'dev', 'Build-Recost.py'), '--check']);
 yes('T1 Build-Recost.py --check: recost.json and the RECIPES_SET_IN_GAME block are what the rule gives (' +
-    String(check.stdout || check.stderr).trim().split('\n').pop() + ')', check.status === 0);
+    (check ? String(check.stdout || check.stderr).trim().split('\n').pop() : 'no python') + ')', !!check && check.status === 0);
 
 const box = {};
 vm.createContext(box);
