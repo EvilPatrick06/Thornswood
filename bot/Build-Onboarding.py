@@ -88,11 +88,11 @@ HOLD_WORDS = {
     'Whiterun': 'The middle of everything',
     'Solitude': 'Court, trade, and the embassy',
     'Windhelm': "The High King's seat",
-    'Riften': 'Ask no questions',
+    'Riften': 'Fish, mead, and the Ratway',
     'Markarth': 'Stone, silver and old grudges',
     'Dawnstar': 'Cold, and the ships come in',
-    'Morthal': 'Quiet. Too quiet',
-    'Falkreath': 'More graves than people',
+    'Morthal': "A swamp and the Jarl's hall",
+    'Falkreath': 'Pines, and a graveyard bigger than the town',
     'Winterhold': 'What is left of it',
 }
 

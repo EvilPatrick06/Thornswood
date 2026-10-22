@@ -259,12 +259,12 @@ LORE = """\
 **Fourth Era, 252.** Fifty years since the war.
 
 The Stormcloaks won it. The Legion marched out in the first thaw of 203 and the
-Moot put the crown on Ulfric. He wore it twenty-six years and died in bed,
-which surprised him as much as anyone.
+Moot put the crown on Ulfric. He wore it twenty-six years and died in his
+bed.
 
 The Moot sat eleven days and didn't pick his kin. It picked **Eirik
 Ravensgard** of the Rift, who's had it twenty-two years and is neither loved
-nor hated. In Skyrim that's a long reign.
+nor hated.
 
 There's a High King of Skyrim and nothing above him. Every hold keeps its own
 Jarl, its own court, and its own opinion of everyone else's.
@@ -279,12 +279,11 @@ home, no cause left, nobody to answer to. That's what makes them dangerous.
 
 ## The Empire
 
-Came back in 221 the way empires do when they can't come back with soldiers.
-With a ledger.
+Came back in 221 with trade, because it couldn't come back with soldiers.
 
 The White Harbour Accord traded grain for ore and got them one embassy in
-Solitude and nothing else. The staff there are polite to a degree that fools
-nobody.
+Solitude and nothing else. The staff there are polite, and few in Skyrim
+trust them.
 
 ## What you can play
 
@@ -397,12 +396,12 @@ SUGGEST_TOPIC = ("Mods and features you want. Nexus link if it's a mod, "
 HOLD_TOPICS = {
     'whiterun':   "Everybody passes through eventually.",
     'solitude':   "Court, trade, and the one Imperial embassy left in Skyrim.",
-    'windhelm':   "The High King sits here. Dress warm.",
-    'riften':     "Ask no questions.",
+    'windhelm':   "The High King sits here.",
+    'riften':     "Fish, mead, and the Ratway under the canal.",
     'markarth':   "Stone, silver, and grudges older than the war.",
     'dawnstar':   "Cold. The ships still come in.",
-    'morthal':    "Quiet. Too quiet, most would say.",
-    'falkreath':  "More graves than people. Always has been.",
+    'morthal':    "A swamp, a few houses, and the Jarl's hall.",
+    'falkreath':  "Pines, and a graveyard bigger than the town.",
     'winterhold': "What's left of it.",
     'raven-rock': "On Solstheim, across the water. The ash still falls.",
 }
@@ -595,5 +594,6 @@ CHANGES = {
     ],
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
+        ('2026-10-22', 'Rewritten without the narrator asides, so it reads as plain lore. No event in it has changed.', 'fb95f2f38532'),
     ],
 }
