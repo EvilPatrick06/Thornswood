@@ -164,6 +164,10 @@ try:
     # needs it beside join.md to load at all. test-game-rules.py edits it.
     shutil.copy(os.path.join(HERE, '..', 'site', 'data', 'site', 'rules.md'),
                 os.path.join(TMP, 'site', 'data', 'site', 'rules.md'))
+    # And #factions out of lore/factions.md since #3317.
+    os.makedirs(os.path.join(TMP, 'lore'))
+    shutil.copy(os.path.join(HERE, '..', 'lore', 'factions.md'),
+                os.path.join(TMP, 'lore', 'factions.md'))
 
     def load_with(md, tag):
         with open(os.path.join(TMP, 'site', 'data', 'site', 'join.md'), 'w',
@@ -228,7 +232,7 @@ else:
 
     class Channel(object):
         """Keeps what it is sent. A channel id is up to 19 digits, so a
-           mention grows from <#TICKETS> to 22 characters and the longest
+           mention grows from <#PLAYTEST> to 22 characters and the longest
            ids are used here."""
         n = 0
 

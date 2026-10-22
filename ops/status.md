@@ -94,10 +94,12 @@ moved the run notes here.
   staff records, and the read-only posts were rewritten. Onboarding is off;
   Member comes from the button in #start-here. The Factions category and its
   roles are made. The bot runs with the council's staff and upper staff roles,
-  and still holds Administrator until someone unticks it on its role. Seven
-  role-order differences and a stray #game-rules in In Character remain
-  (Setup-Discord -OnBox -Audit). The dev updates webhook posts into
-  #staff-announcements.
+  and keeps Administrator for good (Patrick, 22 Oct: "the bot will keep
+  admin"); nothing is to untick it. Seven role-order differences and a stray
+  #game-rules in In Character remain (Setup-Discord -OnBox -Audit) until the
+  layout run (ops/claude-queue/3317-discord-layout.md: a category per
+  faction, the ticket split, the role order in one request). The dev updates
+  webhook posts into #staff-announcements.
 - **#2519:** the Gamemasters channels are made (7:51 AM 22 Oct). GM Rules v1.0
   is to be posted and pinned in #gm-rules by the bot, but its text is in none
   of the repository, the vault or Drive; it waits on Djinn or Patrick for the

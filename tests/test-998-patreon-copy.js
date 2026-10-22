@@ -39,8 +39,12 @@ yes('B it has the line for the day the switch is on', OPEN.test(text));
 yes('B and says which line goes in for which state', /open switch/i.test(text));
 
 const bot = read('bot/bot.py').replace(/'\s*\n\s*'/g, '');
-yes('C the bot says the same while the alpha is open by application', /PANEL_ALPHA[\s\S]{0,200}in alpha, and the world is open by application/.test(bot));
-yes('C the bot says the same once it is open', /PANEL_OPEN[\s\S]{0,200}Thornswood is open: anyone in the Discord can play/.test(bot));
+// The words are _PANEL_PLAY_ALPHA and _PANEL_PLAY_OPEN since #3317, shared by
+// the one panel of before and the #apply-to-playtest desk's.
+yes('C the bot says the same while the alpha is open by application', /_PANEL_PLAY_ALPHA = [\s\S]{0,200}in alpha, and the world is open by application/.test(bot)
+    && /PANEL_ALPHA = _PANEL_TOP \+ _PANEL_PLAY_ALPHA/.test(bot));
+yes('C the bot says the same once it is open', /_PANEL_PLAY_OPEN = [\s\S]{0,200}Thornswood is open: anyone in the Discord can play/.test(bot)
+    && /PANEL_OPEN = _PANEL_TOP \+ _PANEL_PLAY_OPEN/.test(bot));
 
 const terms = read('site/data/site/terms.md').replace(/\s+/g, ' ');
 const classes = read('site/data/site/classes.md').replace(/\s+/g, ' ');

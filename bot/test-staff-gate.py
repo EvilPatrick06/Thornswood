@@ -87,6 +87,7 @@ COMMANDS = {
 BUTTONS = [
     ('thornswood:close', STAFF),       # Close ticket, on every ticket
     ('thornswood:ticket', ANYBODY),    # the ticket panel: one open, a cooldown
+    ('thornswood:ticket:', ANYBODY),   # each ticket desk's panel (#3317), the same
     ('thornswood:hold:', ANYBODY),     # pick a hold: Member or staff, pick_hold
     ('thornswood:ping:', ANYBODY),     # ping roles: Member or staff, toggle_ping
     # A Jarl's office buttons (#2551): only the Jarl of a hold, for their own
@@ -315,11 +316,12 @@ yes('and every command written down here is still registered%s'
     not gone)
 
 hook = inspect.getsource(bot.Thornswood.setup_hook)
-VIEWS = re.findall(r'add_view\((\w+)\(\)\)', hook)
-yes('setup_hook registers the ticket panel, the ticket tools, the hold panel, '
-    'the office panel (#2551), the faction panel (#3317) and no other panel '
-    '(the Live smoke rows are gone)',
-    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'TicketPanel', 'TicketTools']
+VIEWS = re.findall(r'add_view\((\w+)\((?:desk)?\)\)', hook)
+yes('setup_hook registers the ticket panel and each ticket desk\'s (#3317), the '
+    'ticket tools, the hold panel, the office panel (#2551), the faction panel '
+    '(#3317) and no other panel (the Live smoke rows are gone)',
+    sorted(VIEWS) == ['FactionPanel', 'HoldPanel', 'OfficePanel', 'TicketPanel',
+                      'TicketPanel', 'TicketTools']
     and 'live_smoke' not in hook
     and hook.count('add_view(') == len(VIEWS))
 

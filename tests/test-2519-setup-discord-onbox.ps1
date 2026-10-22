@@ -16,7 +16,8 @@
   write down the script instead of sending it, in a throwaway git repository:
     1. -OnBox -Check asks for no token, sends one script and passes;
     2. the script carries Build-Discord.py, content.py, staff-channel.txt,
-       factions.json and the two site pages content.py reads (join.md, rules.md) byte for byte
+       factions.json, the two site pages content.py reads (join.md, rules.md)
+       and lore/factions.md, which it reads for #factions (#3317), byte for byte
        as the commit holds them, each under its path in the repository, sets
        DISCORD_CHECK and the site's open switch, and sets no -Posts or -Prune
        it was not given;
@@ -73,11 +74,12 @@ $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-setup-onbox-' + [Guid]::NewGui
 try {
     $tree = Join-Path $work 'repo'
     $dep = Join-Path $tree 'scripts\deploy'; $vps = Join-Path $tree 'scripts\vps'; $bot = Join-Path $tree 'bot'
-    $pages = Join-Path $tree 'site\data\site'
-    New-Item -ItemType Directory -Force -Path $dep, $vps, $bot, $pages | Out-Null
+    $pages = Join-Path $tree 'site\data\site'; $lore = Join-Path $tree 'lore'
+    New-Item -ItemType Directory -Force -Path $dep, $vps, $bot, $pages, $lore | Out-Null
     Copy-Item -LiteralPath (Join-Path $Repo 'scripts\deploy\Setup-Discord.ps1') -Destination $dep
     foreach ($f in 'Build-Discord.py', 'content.py', 'staff-channel.txt', 'factions.json') { Copy-Item -LiteralPath (Join-Path $Repo ('bot\' + $f)) -Destination $bot }
     foreach ($f in 'join.md', 'rules.md') { Copy-Item -LiteralPath (Join-Path $Repo ('site\data\site\' + $f)) -Destination $pages }
+    Copy-Item -LiteralPath (Join-Path $Repo 'lore\factions.md') -Destination $lore
     $sent = Join-Path $work 'sent.ps1'
     [IO.File]::WriteAllText((Join-Path $vps 'Vps.ps1'), "function Get-ThornswoodVpsUser { 'Administrator' }`nfunction Get-ThornswoodVpsAddress { '192.0.2.1' }`n")
     [IO.File]::WriteAllText((Join-Path $vps 'Send-Script.ps1'), @"
@@ -126,7 +128,7 @@ exit `$LASTEXITCODE
     $errs = $null
     [void][System.Management.Automation.Language.Parser]::ParseInput($s, [ref]$null, [ref]$errs)
     Yes 'the script it sends parses' (@($errs).Count -eq 0)
-    foreach ($f in 'bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt', 'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md') {
+    foreach ($f in 'bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt', 'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md', 'lore/factions.md') {
         $m = [regex]::Match($s, "(?m)^\s*'" + [regex]::Escape($f) + "' = '([A-Za-z0-9+/=]+)'")
         $same = $m.Success -and ([Convert]::ToBase64String([IO.File]::ReadAllBytes((Join-Path $tree $f))) -eq $m.Groups[1].Value)
         Yes "  it carries $f byte for byte, under that path" $same
@@ -215,7 +217,7 @@ function python {
     [IO.File]::WriteAllText((Join-Path $box 'bot.env.json'), '{"DISCORD_TOKEN":"stand-in-token","PING_URL":"x"}')
     $f = Run-Far
     Yes ("run on the box, the build runs and passes (exit {0})" -f $f.Code) ($f.Code -eq 0 -and $f.Out -match 'RAN Build-Discord\.py')
-    Yes '  with the six files laid out as in the repository' ($f.Out -match 'FILES bot/Build-Discord\.py,bot/content\.py,bot/factions\.json,bot/staff-channel\.txt,site/data/site/join\.md,site/data/site/rules\.md')
+    Yes '  with the seven files laid out as in the repository' ($f.Out -match 'FILES bot/Build-Discord\.py,bot/content\.py,bot/factions\.json,bot/staff-channel\.txt,lore/factions\.md,site/data/site/join\.md,site/data/site/rules\.md')
     Yes '  and content.py imports there, reading the site pages through its own folder' ($f.Out -match 'CONTENT IMPORTS' -and $f.Out -notmatch 'FileNotFoundError')
     if ($bpy) {
         Yes '  and Build-Discord.py loads there, reading factions.json from its own folder' ($f.Out -match 'BUILD IMPORTS' -and $f.Out -notmatch 'FileNotFoundError')
