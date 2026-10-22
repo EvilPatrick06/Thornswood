@@ -21,6 +21,14 @@
 // bell or a NUL in source is always one of these accidents: nothing in this
 // repository needs one on purpose.
 //
+// Except the licence texts under records/client-licences (#3099). Those are
+// other people's files kept byte for byte, and the old licence texts break
+// their pages with a form feed (proxy-libintl's GNU LGPL 2.0, inside
+// frida-gum.txt). Nothing written here goes in them: each is held by sha256
+// and size to records/client-licences.json, which the fork's build wrote, by
+// Check-Records.ps1 and tests/test-third-party.js, so an accident there fails
+// those instead.
+//
 // Read only.
 const REPO_DIR = require('path').join(__dirname, '..'); // the tests are in tests\, the repository is one folder up
 const fs = require('fs');
@@ -44,7 +52,8 @@ try {
   console.log('SKIP  git ls-files did not answer, so there is nothing to read: ' + e.message);
   process.exit(0);
 }
-const text = files.filter(function (f) { return TEXT.test(f); });
+const KEPT_AS_THEY_CAME = 'records/client-licences/';
+const text = files.filter(function (f) { return TEXT.test(f) && f.indexOf(KEPT_AS_THEY_CAME) !== 0; });
 yes('there are tracked text files to read, ' + text.length + ' of them', text.length > 50);
 
 const bad = [];

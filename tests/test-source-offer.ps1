@@ -131,6 +131,8 @@ Yes 'Package-Thornswood.ps1 has a Get-SourceNotice' ($null -ne $fn)
 $note = ''
 $rows = @()
 if ($fn) {
+    # Get-ClientLicenceLines, which Package-Thornswood.ps1 dot-sources (#3099).
+    . (Join-Path $Here 'scripts\release\Source-Notice.ps1')
     . ([ScriptBlock]::Create($fn))
     $note = Get-SourceNotice $clientPath $serverPath
 
@@ -306,6 +308,22 @@ Yes 'Setup-Thornswood.ps1 copies SOURCE CODE.txt into the install folder' `
 $uninstall = Get-Content -LiteralPath (Join-Path $Here 'launcher\app\Uninstall.cs') -Raw
 Yes 'Uninstall.cs removes SOURCE CODE.txt from the install folder' `
     ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "SOURCE CODE\.txt"\)\)')
+
+# The libraries inside the client files, with their texts beside the note (#3099).
+if ($fn) {
+    $libs = @(Get-ClientLicences $clientPath $files)
+    $ln = Get-SourceNotice $clientPath $serverPath -Licences $libs
+    $notListed = @($libs | Where-Object { -not ($ln -match ('(?m)^\s{2}' + [regex]::Escape($_.Port + '.txt') + '\s+' + [regex]::Escape($_.Version) + '\s')) } | ForEach-Object { $_.Port })
+    Yes ('given the client''s libraries, the note lists all ' + $libs.Count + ' with their versions' + $(if ($notListed.Count) { ', not: ' + ($notListed -join ', ') } else { '' })) ($libs.Count -gt 0 -and $notListed.Count -eq 0)
+    Yes '  and says their texts are in the licences folder beside it' ($ln.Contains('in the licences folder beside this note'))
+    Yes '  in plain ASCII' (-not ($ln -match '[^\x09\x0A\x0D\x20-\x7E]'))
+}
+Yes 'Package-Thornswood.ps1 hands Get-SourceNotice the libraries of the client it packs and stages their texts in licences\' `
+    ($package -match 'Get-ClientLicences \$clientRecordPath' -and $package -match '-Licences \$clientLicences' -and $package -match "Join-Path \`$stage 'licences'" -and $package -match 'Save-PackageClientLicences')
+Yes 'Setup-Thornswood.ps1 replaces the licences folder in the install folder whole' `
+    ($setup -match "Join-Path \`$Here 'licences'" -and $setup -match "Join-Path \`$Root 'licences'" -and $setup -match 'Remove-Item -LiteralPath \$libTo -Recurse')
+Yes 'Uninstall.cs removes the licences folder from the install folder' `
+    ($uninstall -match 'leave\.Add\(Path\.Combine\(Paths\.Root, "licences"\)\)')
 
 # Full GPL / AGPL / WebView2 texts beside the note (issue #421).
 $licenceDir = Join-Path $Here 'installer\licences'

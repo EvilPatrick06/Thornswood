@@ -456,15 +456,24 @@ if (!haveFork) {
 // for the LGPL text and a notice to go with it. Measured on 5 October: the
 // build links antigo into MpClientPlugin.dll, but nothing in the client calls
 // it, so its code is only in scam_native.node, which nobody receives, and the
-// LGPL asks nothing of what ships. frida-gum is in SkyrimPlatformImpl.dll,
-// under an exception that asks nothing more of a binary. THIRD-PARTY.md says
+// LGPL asks nothing of what ships. frida-gum is in SkyrimPlatformImpl.dll;
+// gum's own licence has an exception for binaries, and the libraries its
+// devkit carries are held below (#3099, #3287). THIRD-PARTY.md says
 // so, and this holds it there: the day a client file calls antigo, the fork
 // files that use it stop being the three server ones and this fails, because
 // then its notice and the LGPL text have to go with that file.
+function cl0() {
+  try { return JSON.parse(read(path.join(REPO, 'records', 'client-licences.json')).replace(/^\uFEFF/, '')); } catch (e) { return null; }
+}
 const libRows = N.split('\n').filter(function (l) { return l.charAt(0) === '|'; });
 const antigoRow = libRows.filter(function (l) { return /^\| antigo, https:\/\/github\.com\/nic11\/antigo /.test(l); })[0] || '';
 const fridaRow = libRows.filter(function (l) { return /^\| frida-gum \d/.test(l); })[0] || '';
 const antigoAt = (/`([0-9a-f]{40})`/.exec(antigoRow) || [])[1] || '';
+// The fork's build measures it since #3099: the record names no antigo in any client file.
+if (cl0()) {
+  const withAntigo = Object.keys(cl0().files || {}).filter(function (f) { return (cl0().files[f] || []).indexOf('antigo') >= 0; });
+  yes('records\\client-licences.json names antigo in no client file' + (withAntigo.length ? ', but: ' + withAntigo.join(', ') : ''), withAntigo.length === 0);
+}
 const fridaAt = (/`([0-9a-f]{40})`/.exec(fridaRow) || [])[1] || '';
 const fridaVer = (/^\| frida-gum (\d+\.\d+\.\d+)/.exec(fridaRow) || [])[1] || '';
 yes('THIRD-PARTY.md has a row for antigo naming its commit (' + (antigoAt.slice(0, 8) || 'none') + ')', antigoAt.length === 40);
@@ -472,7 +481,7 @@ yes('the antigo row gives LGPL-3.0', /\| LGPL-3\.0\b/.test(antigoRow));
 yes('the antigo row says its code is only in scam_native.node', /\| Only in `scam_native\.node`/.test(antigoRow));
 yes('THIRD-PARTY.md has a row for frida-gum naming its version and commit (' + (fridaVer || 'none') + ')',
     fridaVer.length > 0 && fridaAt.length === 40);
-yes('the frida-gum row gives the wxWindows Library Licence 3.1 and SkyrimPlatformImpl.dll',
+yes('the frida-gum row gives gum\'s wxWindows Library Licence 3.1 and SkyrimPlatformImpl.dll',
     fridaRow.indexOf('wxWindows Library Licence 3.1') >= 0 && fridaRow.indexOf('`SkyrimPlatformImpl.dll`') >= 0);
 yes('THIRD-PARTY.md no longer says this repository has an LGPL-3.0.txt to ship',
     !fs.existsSync(path.join(ROOT, 'LGPL-3.0.txt')) && /It has none, and none is owed/.test(flat(N)));
@@ -489,6 +498,10 @@ const ANTIGO_LINKS = ['vcpkg.json', 'skymp5-server/cpp/CMakeLists.txt'];
 // fork #77, test_save_completion_addon.cpp there writes stand-ins for antigo's
 // names so the addon compiles without it; THIRD-PARTY.md says so.
 const ANTIGO_TESTS = 'misc/tests/';
+// The fork's Thornswood build scripts go into no file anybody receives either.
+// Write-ClientLicences.ps1 (#3099) names antigo as the library its measurement
+// finds linked into MpClientPlugin.dll with no code kept.
+const ANTIGO_TOOLS = 'misc/thornswood/';
 if (!haveFork) {
   skip('no fork here, so the antigo and frida-gum ports and antigo\'s users were not read');
 } else {
@@ -513,7 +526,7 @@ if (!haveFork) {
     yes('THIRD-PARTY.md names ' + p.split('/').pop() + ', a fork test that names antigo, as going into no shipped file',
         N.indexOf(p.split('/').pop()) >= 0 && /Nothing under `misc\\tests` goes into a file anybody receives/.test(flat(N)));
   });
-  users = users.filter(function (p) { return p.indexOf(ANTIGO_TESTS) !== 0; });
+  users = users.filter(function (p) { return p.indexOf(ANTIGO_TESTS) !== 0 && p.indexOf(ANTIGO_TOOLS) !== 0; });
   const newUsers = users.filter(function (p) { return ANTIGO_USERS.indexOf(p) < 0; });
   newUsers.forEach(function (p) { console.log('      uses antigo, and may put it into a client file: ' + p); });
   yes('the only fork files that use antigo are the three server ones THIRD-PARTY.md names (' + users.length + ')',
@@ -559,6 +572,70 @@ if (!spi) {
 } else {
   yes('the recorded SkyrimPlatformImpl.dll carries frida-gum (GumInterceptor), as the row says',
       spi.indexOf(Buffer.from('GumInterceptor', 'latin1')) >= 0);
+}
+
+// ------------------------------------------- the libraries inside them (#3099)
+//
+// The client files link the fork's vcpkg libraries statically, and their
+// licence texts went nowhere until #3099: THIRD-PARTY.md said "None of those
+// texts travels with the client runtime today". records\client-licences.json
+// is what the fork's build measured in each native file. Its table here is the
+// record, row for row, every text it names is beside it, and the frida row
+// says what is inside frida-gum.lib (#3287).
+let cl = null;
+try { cl = JSON.parse(read(path.join(REPO, 'records', 'client-licences.json')).replace(/^﻿/, '')); } catch (e) { cl = null; }
+yes('records\\client-licences.json reads', !!(cl && cl.forkCommit && cl.files && cl.ports));
+if (cl) {
+  yes('records\\client-licences.json is of the client record\'s commit (' + cl.forkCommit + ')', !!cb && String(cl.forkCommit) === String(cb.forkCommit));
+  const HEAD = '| Library | Version | Licence, as its port declares it | In |';
+  const lines = N.split('\n');
+  const at = lines.indexOf(HEAD);
+  const have = [];
+  for (let i = at + 2; at >= 0 && i < lines.length && lines[i].charAt(0) === '|'; i++) have.push(lines[i]);
+  const want = Object.keys(cl.ports).sort().map(function (n) {
+    const p = cl.ports[n];
+    const lic = p.licence ? p.licence : 'not declared; its text is in `' + n + '.txt`';
+    const files = (p.in || []).map(function (f) { return String(f).split('\\').pop(); }).sort().map(function (f) { return '`' + f + '`'; }).join(', ');
+    return '| ' + n + ' | ' + p.version + ' | ' + lic + ' | ' + files + ' |';
+  });
+  const wrong = want.filter(function (r) { return have.indexOf(r) < 0; });
+  const extra = have.filter(function (r) { return want.indexOf(r) < 0; });
+  wrong.forEach(function (r) { console.log('      not in THIRD-PARTY.md: ' + r); });
+  extra.forEach(function (r) { console.log('      not in the record: ' + r); });
+  yes('THIRD-PARTY.md\'s table of the libraries inside the client files is the record, row for row (' + want.length + ')',
+      at >= 0 && want.length > 0 && wrong.length === 0 && extra.length === 0);
+  const noText = Object.keys(cl.ports).filter(function (n) {
+    let b = null;
+    try { b = fs.readFileSync(path.join(REPO, 'records', 'client-licences', n + '.txt')); } catch (e) { return true; }
+    return crypto.createHash('sha256').update(b).digest('hex') !== String(cl.ports[n].sha256) || b.length !== Number(cl.ports[n].bytes);
+  });
+  yes('every port in it has its text in records\\client-licences, byte for byte' + (noText.length ? ', not: ' + noText.join(', ') : ''), noText.length === 0);
+}
+yes('THIRD-PARTY.md no longer says the vcpkg texts travel nowhere',
+    !/None of those texts travels/.test(N) && !/vcpkg licence texts do not travel/.test(flat(section('What is still missing'))));
+yes('the frida-gum row says what else frida-gum.lib holds, under the LGPL',
+    /glib, gobject, gnulib and libcharset \(LGPL-2\.1-or-later\)/.test(fridaRow));
+// The source of what is inside frida-gum.lib, by Thornswood's forks of
+// Frida's repositories (Patrick, A on #3287): the same six, at the same
+// commits, in Source-Notice.ps1's $SourceNoticeBundled and in "Where the
+// source is", and with the fork here, the commits its portfile fetches from.
+const sn = read(path.join(REPO, 'scripts', 'release', 'Source-Notice.ps1')) || '';
+const bundled = [];
+(sn.match(/@\('[^']+',\s*'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'\)/g) || []).forEach(function (m) {
+  const r = /'(frida-[a-z0-9-]+)',\s*'([0-9a-f]{40})'/.exec(m);
+  bundled.push({ fork: r[1], commit: r[2] });
+});
+yes('Source-Notice.ps1 names the source of six libraries inside frida-gum.lib (' + bundled.length + ')', bundled.length === 6);
+const whereSec = section('Where the source is');
+const unnamed = bundled.filter(function (b) { return whereSec.indexOf('https://github.com/EvilPatrick06/' + b.fork + '/tree/' + b.commit) < 0; });
+yes('"Where the source is" names each of them by our fork and the same commit' + (unnamed.length ? ', not: ' + unnamed.map(function (b) { return b.fork; }).join(', ') : ''), bundled.length > 0 && unnamed.length === 0);
+if (haveFork) {
+  let fp = '';
+  try { fp = git(['show', commit + ':overlay_ports/frida-gum/portfile.cmake']); } catch (e) { fp = ''; }
+  const off = bundled.filter(function (b) { return fp.indexOf('/' + b.commit + '/') < 0; });
+  yes('each is a commit overlay_ports/frida-gum at ' + commit.slice(0, 8) + ' fetches its licence from' + (off.length ? ', not: ' + off.map(function (b) { return b.fork; }).join(', ') : ''), !!fp && off.length === 0);
+} else {
+  skip('no fork here, so the frida commits were not held to its portfile');
 }
 
 // ---------------------------------------------------------------- the front

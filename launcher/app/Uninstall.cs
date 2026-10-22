@@ -500,6 +500,8 @@ namespace Thornswood
             leave.Add(Path.Combine(Paths.Root, "GPL-3.0.txt"));
             leave.Add(Path.Combine(Paths.Root, "AGPL-3.0.txt"));
             leave.Add(Path.Combine(Paths.Root, "WebView2-LICENSE.txt"));
+            // The libraries' licence texts SOURCE CODE.txt lists (issue #3099).
+            leave.Add(Path.Combine(Paths.Root, "licences"));
 
             leave.Add(Paths.LauncherDir);
             return leave.ToArray();

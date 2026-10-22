@@ -32,7 +32,10 @@ foreach ($kind in $fileKinds) {
     Yes "the committed $kind record reads at a known version with its fields" ((Refusal { Read-ThornswoodRecord -Path $p -Kind $kind }) -eq '')
 }
 $out = & $winPs -NoProfile -ExecutionPolicy Bypass -File (Join-Path $repo 'scripts\release\Check-Records.ps1') 2>&1
-Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 1))
+# One OK line per record, and two for records held to each other: the Skyrim
+# pin with its files, and the client's licences with its build (#3099).
+Yes 'Check-Records passes this checkout (exit 0), one OK line per record' ($LASTEXITCODE -eq 0 -and @($out | Where-Object { "$_" -match '^\s+OK ' }).Count -eq ($fileKinds.Count + 2))
+Yes 'Check-Records holds the client licences to the client build and their texts' (@($out | Where-Object { "$_" -match '^\s+OK\s+client licences\s+\d+ texts, of [0-9a-f]{8}' }).Count -eq 1)
 Yes 'docs\JSON-STATE-INVENTORY.md lists each of these records' ((Test-Path -LiteralPath (Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')) -and -not @($script:ThornswoodRecordKinds.Values | Where-Object { $_.File } | Where-Object { -not ([IO.File]::ReadAllText((Join-Path $repo 'docs\JSON-STATE-INVENTORY.md')).Contains($_.File.Replace('\', '/'))) }).Count)
 
 # ---- bad copies are refused, naming the file and the reason
@@ -71,6 +74,16 @@ try {
     Yes 'front-build: a short forkCommit is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'forkCommit is missing or not a full commit SHA')
     $d = $real['front-build'] | ConvertFrom-Json; $d.files = [pscustomobject]@{}
     Yes 'front-build: an empty files map is refused' ((Bad 'front-build' ($d | ConvertTo-Json -Depth 10)).Why -match 'files is missing, empty')
+    # The client's libraries and their texts (#3099).
+    $d = $real['client-licences'] | ConvertFrom-Json
+    $first = @($d.ports.PSObject.Properties)[0].Name
+    $d.ports.$first.sha256 = 'abc'
+    Yes 'client-licences: a port with no whole sha256 is refused, named' ((Bad 'client-licences' ($d | ConvertTo-Json -Depth 10)).Why -match ('ports\.' + [regex]::Escape($first) + ' has no sha256'))
+    $d = $real['client-licences'] | ConvertFrom-Json
+    $d.ports.PSObject.Properties.Remove($first)
+    Yes 'client-licences: a file naming a port the record does not list is refused' ((Bad 'client-licences' ($d | ConvertTo-Json -Depth 10)).Why -match ('names ' + [regex]::Escape($first) + ', which ports does not list'))
+    $d = $real['client-licences'] | ConvertFrom-Json; $d.files = [pscustomobject]@{}
+    Yes 'client-licences: an empty files map is refused' ((Bad 'client-licences' ($d | ConvertTo-Json -Depth 10)).Why -match 'files is missing, empty')
     $d = $real['server-build'] | ConvertFrom-Json; $d | Add-Member -NotePropertyName lightPlugins -NotePropertyValue 'yes' -Force
     $b = Bad 'server-build' ($d | ConvertTo-Json -Depth 10)
     Yes 'server-build: lightPlugins that is not true or false is refused' ($b.Why -match 'lightPlugins is there and not true or false')

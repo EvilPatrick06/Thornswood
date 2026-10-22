@@ -25,8 +25,13 @@
     - A pack of only our own files gets nothing; a SkyMP file taken from
       upstream is named apart with no commit; a recorded file with no known
       folder stops it.
+    - A download carrying a native file carries, in licences\, the text of
+      every vcpkg library inside the files it carries, byte for byte as
+      records\client-licences\ holds it, and the note lists each with its
+      version, licence and files (#3099). A record of another commit, or a
+      text that is not the one recorded, stops it.
     - A zip written the way Publish-Update writes it holds the three at its
-      top level, and Check-Secrets passes it.
+      top level and the texts under licences/, and Check-Secrets passes it.
     - Publish-Update.ps1 calls it for every pack part and for the client
       runtime, and a client runtime already on the feed without the note is
       published again.
@@ -70,6 +75,8 @@ function Get-FunctionText([string]$text, [string]$name) {
 }
 
 $record   = Join-Path $Repo 'records\client-build.json'
+$libRecord = Join-Path $Repo 'records\client-licences.json'
+$libTexts = Join-Path $Repo 'records\client-licences'
 $server   = Join-Path $Repo 'records\server-build.json'
 $licences = Join-Path $Repo 'installer\licences'
 $notice   = Join-Path $Repo 'scripts\release\Source-Notice.ps1'
@@ -87,8 +94,11 @@ function Leaf([string]$p) { return $p.Substring($p.LastIndexOf('\') + 1) }
 
 # ---- the client runtime zip's README ---------------------------------------
 $rt = @(Get-SourceNoticeEntries $record $six 'runtime' $licences)
-Yes ('the client runtime gets README.txt, GPL-3.0.txt and AGPL-3.0.txt: ' + ((Names $rt) -join ', ')) `
-    (((Names $rt) -join '|') -eq 'README.txt|GPL-3.0.txt|AGPL-3.0.txt')
+$lr = Read-Json $libRecord
+$ports = @($lr.ports.PSObject.Properties.Name | Sort-Object)
+$wantNames = @('README.txt', 'GPL-3.0.txt', 'AGPL-3.0.txt') + @($ports | ForEach-Object { 'licences/' + $_ + '.txt' })
+Yes ('the client runtime gets README.txt, GPL-3.0.txt, AGPL-3.0.txt and the ' + $ports.Count + ' library texts: ' + ((Names $rt) -join ', ')) `
+    (((Names $rt) -join '|') -eq ($wantNames -join '|'))
 $readme = Text $rt 'README.txt'
 Yes ('it names the recorded commit ' + $commit + ' and links its tree') ($readme.Contains($fork + '/tree/' + $commit))
 Yes 'it names the branch' ($readme.Contains([string]$c.forkBranch))
@@ -110,6 +120,41 @@ $gplOut  = @($rt | Where-Object { $_.Name -eq 'GPL-3.0.txt' })[0].Bytes
 $agplOut = @($rt | Where-Object { $_.Name -eq 'AGPL-3.0.txt' })[0].Bytes
 Yes 'GPL-3.0.txt is installer\licences\GPL-3.0.txt, byte for byte' ([Convert]::ToBase64String($gplOut) -eq [Convert]::ToBase64String($gplBytes))
 Yes 'AGPL-3.0.txt is installer\licences\AGPL-3.0.txt, byte for byte' ([Convert]::ToBase64String($agplOut) -eq [Convert]::ToBase64String($agplBytes))
+
+# ---- the libraries inside them (#3099) ----------------------------------------
+Yes ('records\client-licences.json is of the client record''s commit ' + $commit) ([string]$lr.forkCommit -eq $commit)
+$badText = @()
+foreach ($n in $ports) {
+    $out = @($rt | Where-Object { $_.Name -eq ('licences/' + $n + '.txt') })[0].Bytes
+    $want = [IO.File]::ReadAllBytes((Join-Path $libTexts ($n + '.txt')))
+    if ([Convert]::ToBase64String($out) -ne [Convert]::ToBase64String($want)) { $badText += $n }
+}
+Yes ('every licences\<port>.txt is records\client-licences\<port>.txt, byte for byte' + $(if ($badText.Count) { ', differ: ' + ($badText -join ', ') } else { '' })) ($badText.Count -eq 0)
+$unlisted = @()
+foreach ($n in $ports) {
+    $r = $lr.ports.$n
+    $lic = if ($r.licence) { [string]$r.licence } else { 'its own terms' }
+    $row = '(?m)^\s{2}' + [regex]::Escape($n + '.txt') + '\s+' + [regex]::Escape([string]$r.version) + '\s+' + [regex]::Escape($lic) + '\s*$'
+    $files = (@($r.in | ForEach-Object { Leaf ([string]$_) }) | Sort-Object) -join ', '
+    $inRow = '(?m)^\s{4}in ' + [regex]::Escape($files) + '\s*$'
+    if (-not ($readme -match $row) -or -not ($readme -match ($row.Replace('\s*$', '\s*\r?\n') + $inRow.Substring(4)))) { $unlisted += $n }
+}
+Yes ('the README lists every library with its version, licence and the files it is in' + $(if ($unlisted.Count) { ', not: ' + ($unlisted -join ', ') } else { '' })) ($unlisted.Count -eq 0)
+$impl = @($six | Where-Object { $_ -match 'SkyrimPlatformImpl\.dll$' })
+$implPorts = @($lr.files.($impl[0]) | Sort-Object)
+$ie = @(Get-SourceNoticeEntries $record $impl 'pack' $licences)
+Yes ('a pack carrying only SkyrimPlatformImpl.dll carries the texts of its ' + $implPorts.Count + ' libraries and no others') `
+    (((@(Names $ie) | Where-Object { $_ -like 'licences/*' }) -join '|') -eq ((@($implPorts | ForEach-Object { 'licences/' + $_ + '.txt' })) -join '|'))
+# The libraries inside frida-gum's own build, by our forks at Frida's commits (#3287).
+$implNote = Text $ie 'SOURCE CODE.txt'
+$bundled = @($SourceNoticeBundled['frida-gum'].Parts)
+$noTree = @($bundled | Where-Object { -not $implNote.Contains('https://github.com/EvilPatrick06/' + $_[1] + '/tree/' + $_[2]) } | ForEach-Object { $_[1] })
+Yes ('a pack carrying SkyrimPlatformImpl.dll names the source of the ' + $bundled.Count + ' libraries inside frida-gum''s build, by our forks and Frida''s commits' + $(if ($noTree.Count) { ', not: ' + ($noTree -join ', ') } else { '' })) `
+    ($bundled.Count -eq 6 -and $noTree.Count -eq 0 -and $readme.Contains('https://github.com/EvilPatrick06/frida-glib/tree/'))
+Yes '  and a pack carrying only MpClientPlugin.dll names none of them' `
+    (-not (Text (Get-SourceNoticeEntries $record @('Data\SKSE\Plugins\MpClientPlugin.dll') 'pack' $licences) 'SOURCE CODE.txt').Contains('frida-glib'))
+Yes '  and its note names none of the libraries only the other files have' `
+    (-not ((Text $ie 'SOURCE CODE.txt') -match '(?m)^\s{2}slikenet\.txt\s'))
 
 # ---- the same folders and licences as the installer's note -----------------
 $pkgText = Get-Content -LiteralPath $package -Raw
@@ -157,6 +202,8 @@ try {
     $bare = Join-Path $tmp 'bare'
     $null = New-Item -ItemType Directory -Force -Path $bare
     [IO.File]::Copy($record, (Join-Path $bare 'client-build.json'))
+    [IO.File]::Copy($libRecord, (Join-Path $bare 'client-licences.json'))
+    Copy-Item -LiteralPath $libTexts -Destination (Join-Path $bare 'client-licences') -Recurse
     $up = @(Get-SourceNoticeEntries (Join-Path $bare 'client-build.json') @('Data\Platform\UI\build.js') 'pack' $licences)
     $upText = Text $up 'SOURCE CODE.txt'
     Yes 'with no front record, a pack carrying only build.js names it as SkyMP''s skymp5-front, GNU GPL version 3' ($upText -match '(?m)^\s{2}build\.js\s{2,}skymp5-front\s{2,}GNU GPL version 3\s*$')
@@ -174,9 +221,43 @@ try {
     $c3.files | Add-Member -NotePropertyName 'Data\SKSE\Plugins\Unheard.dll' -NotePropertyValue ([pscustomobject]@{ sha256 = '00'; bytes = 1 })
     $cp = Join-Path $tmp 'client-build.json'
     [IO.File]::WriteAllText($cp, ($c3 | ConvertTo-Json -Depth 6))
+    [IO.File]::Copy($libRecord, (Join-Path $tmp 'client-licences.json'))
+    Copy-Item -LiteralPath $libTexts -Destination (Join-Path $tmp 'client-licences') -Recurse
     $threw = $false
-    try { $null = Get-SourceNoticeEntries $cp $six 'runtime' $licences } catch { $threw = $true }
+    try { $null = Get-SourceNoticeEntries $cp $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'Unheard' }
     Yes 'a recorded file with no known source folder stops it' $threw
+
+    # The library texts are held to their record (#3099).
+    $lb = Join-Path $tmp 'libs'
+    $null = New-Item -ItemType Directory -Force -Path $lb
+    [IO.File]::Copy($record, (Join-Path $lb 'client-build.json'))
+    $lbRecord = Join-Path $lb 'client-build.json'
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries $lbRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'client-licences\.json is missing' }
+    Yes 'no client-licences.json beside the client record stops it' $threw
+    Copy-Item -LiteralPath $libTexts -Destination (Join-Path $lb 'client-licences') -Recurse
+    $l2 = Read-Json $libRecord
+    $l2.forkCommit = 'abcdef12'
+    [IO.File]::WriteAllText((Join-Path $lb 'client-licences.json'), ($l2 | ConvertTo-Json -Depth 6))
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries $lbRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'is the build of abcdef12' }
+    Yes 'a client-licences.json of another commit than the client record stops it' $threw
+    [IO.File]::Copy($libRecord, (Join-Path $lb 'client-licences.json'), $true)
+    $first = $ports[0]
+    [IO.File]::AppendAllText((Join-Path $lb ('client-licences\' + $first + '.txt')), 'changed')
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries $lbRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match ('not the text client-licences\.json names for ' + [regex]::Escape($first)) }
+    Yes 'a library text that is not the one recorded stops it' $threw
+    Remove-Item -LiteralPath (Join-Path $lb ('client-licences\' + $first + '.txt'))
+    $threw = $false
+    try { $null = Get-SourceNoticeEntries $lbRecord $six 'runtime' $licences } catch { $threw = $_.Exception.Message -match 'missing' }
+    Yes 'a missing library text stops it' $threw
+    $own2 = Join-Path $tmp 'own'
+    $null = New-Item -ItemType Directory -Force -Path $own2
+    Write-SourceNoticeToFolder $own2 $rt
+    $onDisk = @(Get-ChildItem -LiteralPath $own2 -Recurse -File | ForEach-Object { $_.FullName.Substring($own2.Length + 1).Replace('\', '/') } | Sort-Object)
+    Yes 'Write-SourceNoticeToFolder puts the texts in a licences folder beside the note, as the runtime stage has them' `
+        (($onDisk -join '|') -eq (@($wantNames | Sort-Object) -join '|'))
     $threw = $false
     try { $null = Get-SourceNoticeEntries $record $six 'runtime' (Join-Path $tmp 'nolicences') } catch { $threw = $true }
     Yes 'a missing licence text stops it' $threw
@@ -196,6 +277,17 @@ try {
     try { $names = @($z.Entries | ForEach-Object { $_.FullName }) } finally { $z.Dispose() }
     Yes ('the pack zip holds the note and both texts at its top: ' + ($names -join ', ')) `
         ($names -contains 'SOURCE CODE.txt' -and $names -contains 'GPL-3.0.txt' -and $names -contains 'AGPL-3.0.txt' -and $names.Count -eq 4)
+    # A pack carrying all six, so every library text is in it for the scan.
+    $zp6 = Join-Path $tmp 'pack-six.zip'
+    $z = [IO.Compression.ZipFile]::Open($zp6, 'Create')
+    try { Add-SourceNoticeToZip $z (Get-SourceNoticeEntries $record $six 'pack' $licences) } finally { $z.Dispose() }
+    $z = [IO.Compression.ZipFile]::OpenRead($zp6)
+    try { $names6 = @($z.Entries | ForEach-Object { $_.FullName }) } finally { $z.Dispose() }
+    Yes ('a pack carrying the six holds every library text under licences/: ' + @($names6 | Where-Object { $_ -like 'licences/*' }).Count) `
+        (@($names6 | Where-Object { $_ -like 'licences/*' }).Count -eq $ports.Count)
+    $out6 = (@(& (Join-Path $Repo 'scripts\dev\Check-Secrets.ps1') -Zip $zp6 *>&1 | ForEach-Object { [string]$_ }) -join "`n")
+    Yes ('Check-Secrets passes a zip carrying every library text (exit ' + $LASTEXITCODE + ')') ($LASTEXITCODE -eq 0)
+    if ($LASTEXITCODE -ne 0) { Write-Host $out6 }
     $scan = Join-Path $Repo 'scripts\dev\Check-Secrets.ps1'
     $out = (@(& $scan -Zip $zp *>&1 | ForEach-Object { [string]$_ }) -join "`n")
     Yes ('Check-Secrets passes a zip carrying them (exit ' + $LASTEXITCODE + ')') ($LASTEXITCODE -eq 0)
