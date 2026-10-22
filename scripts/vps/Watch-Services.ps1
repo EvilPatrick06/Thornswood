@@ -426,6 +426,36 @@ function StillStarting($svc) {
   $up = ((Get-Date) - (Get-CimInstance Win32_OperatingSystem).LastBootUpTime).TotalSeconds
   return ($up -lt $delayedGrace)
 }
+# How the last run of a task that is not running ended, in words, or ''
+# while it runs (267009), before its first run (267011) or after a clean
+# exit (#1267). An exit code of 0xC0000000 and up is a Windows exception
+# code: the game server's node died of a native crash, and since scam_native
+# turns Windows Error Reporting back on (the fork's CrashReporting.h) Windows
+# writes its dump into C:\Thornswood-Dumps, which LocalDumps names for
+# node.exe. The newest dump written since the run started is named (any
+# node.exe's, so with two crashes at once it may be the other's), so
+# watch.log and staff read crash and where to look, not only "not answering".
+$dumps = 'C:\Thornswood-Dumps'
+function HowItEnded($task) {
+  $i = Get-ScheduledTaskInfo -TaskName $task -EA SilentlyContinue
+  if (-not $i) { return '' }
+  # LastTaskResult can come back signed. Decimal throughout: PowerShell reads
+  # 0xC0000000 as a negative Int32.
+  $code = [int64]$i.LastTaskResult
+  if ($code -lt 0) { $code += 4294967296 }
+  if (@(0, 267009, 267011) -contains $code) { return '' }
+  $hex = '0x' + $code.ToString('X8')
+  if ($code -lt 3221225472) { return ('its last run ended with code ' + $code + ' (' + $hex + ')') }
+  $names = @{ [int64]3221225477 = 'an access violation'; [int64]3221225725 = 'a stack overflow'; [int64]3221226356 = 'heap corruption'; [int64]3221226505 = 'a fail fast' }
+  $what = 'an exception'
+  if ($names.ContainsKey($code)) { $what = $names[$code] }
+  $say = 'its last run crashed with ' + $hex + ' (' + $what + ')'
+  $dump = Get-ChildItem -LiteralPath $dumps -Filter '*.dmp' -File -EA SilentlyContinue |
+          Where-Object { $_.LastWriteTime -ge $i.LastRunTime } |
+          Sort-Object LastWriteTime -Descending | Select-Object -First 1
+  if ($dump) { return ($say + '; the newest dump since it started is ' + $dump.FullName) }
+  return ($say + '; there is no dump since it started in ' + $dumps)
+}
 function ServiceProblem($name) {
   $s = @(Get-Service -Name $name -EA SilentlyContinue)
   if ($s.Count -eq 0) { return 'its Windows service is not installed' }
@@ -790,7 +820,9 @@ foreach ($c in $checks) {
       continue
     }
   } else {
-    Note ($c.Name + ' is not answering. Starting ' + $c.Task)
+    $ended = HowItEnded $c.Task
+    if ($ended) { $why = $why + ', and ' + $ended }
+    Note ($c.Name + ' is not answering' + $(if ($ended) { ': ' + $ended } else { '' }) + '. Starting ' + $c.Task)
     $null = & schtasks /run /tn $c.Task 2>&1
     $rc = $LASTEXITCODE
     if ($rc -ne 0) {
