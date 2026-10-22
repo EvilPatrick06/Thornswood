@@ -18,7 +18,8 @@
   here-string does, and runs them against a scratch file that already has the
   service's read rule. Then checks the rule is there afterward, that
   Protect-ThornswoodBotEnv in Write-BotToken.ps1 gives it on a file that never
-  had it, that the SID agrees with Get-ThornswoodServiceSid in
+  had it, that the nightly backup's own task account gets read when the box
+  has that task (#2836), that the SID agrees with Get-ThornswoodServiceSid in
   Bot-Service.ps1, and that the later writes of the token (WriteAllText and
   WriteAllBytes on the same file) keep the rules. On the code before #2158 the
   rule is gone after the settings lines, so it fails.
@@ -105,7 +106,7 @@ try {
     $acl = Get-Acl -LiteralPath $f
     Yes 'bot.env.json takes nothing from its folder' $acl.AreAccessRulesProtected
     $who = @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value })
-    Yes 'SYSTEM keeps it, for the nightly backup' ($who -contains 'S-1-5-18')
+    Yes 'SYSTEM keeps it' ($who -contains 'S-1-5-18')
     Yes 'Administrators keep it' ($who -contains 'S-1-5-32-544')
     Yes 'no Users, Authenticated Users or Everyone rule on it' (-not ($who | Where-Object { $_ -in @('S-1-5-32-545', 'S-1-5-11', 'S-1-1-0') }))
     $bot = @($acl.GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | Where-Object { $_.IdentityReference.Value -eq $sid })
@@ -154,6 +155,33 @@ try {
     [IO.File]::WriteAllText($g, '{}')
     if (Get-Command Protect-ThornswoodBotEnv -EA SilentlyContinue) { Protect-ThornswoodBotEnv -Path $g -Service 'ThornswoodBot' }
     Yes 'Protect-ThornswoodBotEnv gives the service read on a file that never had it' ($null -ne (Get-SidReadRule $g $sid))
+
+    # The nightly backup's own task account (#2836): read on the file while
+    # NT TASK\Thornswood Backup resolves, and nothing for a task that is not
+    # there. The VPS runners have the real task on its own SID.
+    $h = Join-Path $Scratch 'nobackup.env.json'
+    [IO.File]::WriteAllText($h, '{}')
+    $threw = ''
+    try { Protect-ThornswoodBotEnv -Path $h -Service 'ThornswoodBot' -BackupTask ('No Such Task ' + [guid]::NewGuid().ToString('N')) } catch { $threw = $_.Exception.Message }
+    $whoH = @((Get-Acl -LiteralPath $h).GetAccessRules($true, $false, [Security.Principal.SecurityIdentifier]) | ForEach-Object { $_.IdentityReference.Value })
+    Yes ('with no backup task of that name it gives nobody else anything, and does not fail' + $(if ($threw) { ': ' + $threw })) (
+        -not $threw -and @($whoH | Where-Object { @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value, $sid) -notcontains $_ }).Count -eq 0)
+    $backupSid = ''
+    try { $backupSid = (New-Object Security.Principal.NTAccount('NT TASK', 'Thornswood Backup')).Translate([Security.Principal.SecurityIdentifier]).Value }
+    catch [Security.Principal.IdentityNotMappedException] { $backupSid = '' }
+    if ($backupSid) {
+        $rule = Get-SidReadRule $g $backupSid
+        Yes ('the nightly backup''s own task account, ' + $backupSid + ', may read it (#2836)') ($null -ne $rule)
+        Yes '  and only read, not write' ($null -ne $rule -and ($rule.FileSystemRights -band [Security.AccessControl.FileSystemRights]::WriteData) -eq 0)
+        $f2 = Join-Path $Scratch 'settings.env.json'
+        [IO.File]::WriteAllText($f2, '{"THORNSWOOD_SITE":"https://thornswood.net"}', (New-Object Text.UTF8Encoding($false)))
+        $f = $f2
+        $code2 = $ExecutionContext.InvokeCommand.ExpandString($frag)
+        $null = @(& ([scriptblock]::Create($code2)))
+        Yes '  and keeps it through the settings step of Install-Bot.ps1' ($null -ne (Get-SidReadRule $f2 $backupSid))
+    } else {
+        Write-Host 'SKIP  the nightly backup''s read: no Thornswood Backup task on a SID of its own here (the VPS runners have one, #2836)'
+    }
 }
 finally {
     Remove-Item -LiteralPath $Scratch -Recurse -Force -EA SilentlyContinue

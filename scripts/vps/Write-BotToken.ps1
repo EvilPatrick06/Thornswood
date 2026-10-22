@@ -106,7 +106,15 @@ function Get-ThornswoodBotEnvServiceSid([string]$Service) {
   return ('S-1-5-80-' + ($parts -join '-'))
 }
 
-function Protect-ThornswoodBotEnv([string]$Path, [string]$Service = 'ThornswoodBot') {
+# And read for the nightly backup's own task account, NT TASK\Thornswood
+# Backup, which takes this file into the encrypted backup a new box is
+# rebuilt from (#2836). Since the backup moved off SYSTEM to LOCAL SERVICE
+# with a SID of its own (#2612), no other rule lets it in: on 22 Oct 2026 the
+# 2:15 AM run said NO ACCESS on this file and ended with code 1. Given here,
+# in the same write, so every writer of this file keeps it, and only while
+# that SID resolves: on a box whose backup still runs as SYSTEM, or has none,
+# there is nobody to give it to, and SYSTEM already reads it.
+function Protect-ThornswoodBotEnv([string]$Path, [string]$Service = 'ThornswoodBot', [string]$BackupTask = 'Thornswood Backup') {
   $acl = Get-Acl -LiteralPath $Path
   $acl.SetAccessRuleProtection($true, $false)
   foreach ($r in @($acl.Access)) { [void]$acl.RemoveAccessRule($r) }
@@ -117,6 +125,13 @@ function Protect-ThornswoodBotEnv([string]$Path, [string]$Service = 'ThornswoodB
   }
   $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
     (New-Object Security.Principal.SecurityIdentifier((Get-ThornswoodBotEnvServiceSid $Service))), 'Read', 'Allow')))
+  $backupSid = ''
+  try { $backupSid = (New-Object Security.Principal.NTAccount('NT TASK', $BackupTask)).Translate([Security.Principal.SecurityIdentifier]).Value }
+  catch [Security.Principal.IdentityNotMappedException] { $backupSid = '' }
+  if ($backupSid) {
+    $acl.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(
+      (New-Object Security.Principal.SecurityIdentifier($backupSid)), 'Read', 'Allow')))
+  }
   # Only the access rules are written back, as Set-ThornswoodAclAccess does,
   # so an account without SeSecurityPrivilege can run it (issue #1120).
   $item = Get-Item -LiteralPath $Path -Force

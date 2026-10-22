@@ -517,7 +517,7 @@ new Function('fs', 'path', 'putJson', 'DATA', 'UP', 'LINKED', 'RULES_OK', 'ATTEM
             $read.Count -eq 1 -and $read[0].AccessControlType -eq 'Allow' -and
             ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::ReadAndExecute) -eq [Security.AccessControl.FileSystemRights]::ReadAndExecute -and
             ($read[0].FileSystemRights -band [Security.AccessControl.FileSystemRights]::Write) -eq 0)
-    } else { Write-Host ('SKIP  the nightly backup''s read on the folder: no Thornswood Backup task here (the VPS runners have one)') }
+    } else { Write-Host ('SKIP  the nightly backup''s read on the folder: no Thornswood Backup task on a SID of its own here (the VPS runners have one since #2836)') }
 
     # ---- a restore, and the reapply -------------------------------------------------
     Build

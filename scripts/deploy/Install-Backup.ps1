@@ -242,7 +242,21 @@ else {
           `$r.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'ReadAndExecute', `$tree, 'None', 'Allow')))
           Set-ThornswoodServiceAcl `$d.FullName `$r
         }
-        'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule)'
+        # And each file in those folders that takes no rules from above, which
+        # no folder rule reaches: bot.env.json, locked to the bot and the
+        # admins because it holds the bot's token. On 22 Oct 2026 the night
+        # said NO ACCESS on it and ended with code 1 (#2836). Read, on that
+        # file alone; Protect-ThornswoodBotEnv keeps it when the file is
+        # written again. One locked deeper than these is named NO ACCESS by
+        # the night, which then fails, and this run again gives it the rule.
+        `$locked = @(foreach (`$d in `$dirs) { Get-ChildItem -LiteralPath `$d.FullName -File -Force -EA SilentlyContinue |
+                      Where-Object { (Get-Acl -LiteralPath `$_.FullName).AreAccessRulesProtected } })
+        foreach (`$f in `$locked) {
+          `$r = Get-Acl -LiteralPath `$f.FullName
+          `$r.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule(`$who, 'Read', 'Allow')))
+          Set-ThornswoodServiceAcl `$f.FullName `$r
+        }
+        'read ' + `$src + ' (' + `$dirs.Count + ' folder(s) given the rule' + `$(if (`$locked.Count) { ', and ' + (@(`$locked | ForEach-Object { `$_.Name }) -join ', ') }) + ')'
       }
       'on LOCAL SERVICE, Limited, as ' + `$sid
     } catch {
