@@ -158,7 +158,7 @@
   account out of every C:\Thornswood-* folder but its own and Dumps, saying
   which it had to close, takes off a deny an earlier install put on Dumps
   for it, and it takes off every priority watcher task left on the box. No
-  runner's service is stopped and no job is touched. An install ends by doing the
+  service is stopped and no job is touched. An install ends by doing the
   same for every runner, so adding one leaves all of them locked.
 
   CRASH DUMPS (#2127, #2488). Patrick decided on 11 October 2026 (#2127)
@@ -204,22 +204,6 @@
   12 Oct 2026 the game servers and voice run High, above every build:
   Patrick's decision, "we need to fix it so the servers run on high
   priority" (#2491, Install-ThornswoodServer.ps1 and Install-Voice.ps1).
-
-  A REMOVED ACCOUNT'S PROFILE (#3119). Removing an account leaves its
-  profile, C:\Users\<account>, and Windows gives a later account of the same
-  name C:\Users\<account>.<computer> beside it. So -Remove takes the profile
-  off once the account is gone, and when it cannot, -Lock and the next
-  install of that name try again: for each profile under a runner account's
-  name whose account is gone they unload its registry if Windows still has it
-  loaded, take the profile off, and say LEFT for one still there and why.
-  An install makes no new account while a profile of its name is LEFT, so it
-  never makes a second one. Measured on the VPS on 22 Oct 2026: removed
-  runners 4, 6, 7 and 8 still had their registry loaded hours later, with no
-  logon session and nothing running as them, and reg unload was refused.
-  Besides the User Profile Service's own hold on each hive, the one handle
-  into them was the Program Compatibility Assistant's (PcaSvc), on each
-  one's Software\Microsoft\Windows\CurrentVersion\Uninstall key. So on the
-  VPS the install, -Lock and -Remove turn PcaSvc off first, and say so.
 
   Safe to run again. An existing runner is replaced, the account keeps its
   name and gets a new password, and the folder denials are made again.
@@ -501,66 +485,6 @@ function Show-LeftFolders([string]$parent = 'C:\', [string[]]$leave = @()) {
     else { $p + ' is left to Lock-VpsFolders.ps1 (#2127): no deny from here, and Users do not reach it' }
   }
 }
-# The profile a removed runner account leaves (#3119, the header's A REMOVED
-# ACCOUNT'S PROFILE). $like is the folder names under C:\Users to look at
-# ('thornswood-runner3' and 'thornswood-runner3.*' for one account,
-# 'thornswood-runner*' for the box). A profile whose SID still names an
-# account is that account's and is left alone. One whose account is gone has
-# its two hives unloaded, if Windows still has them loaded, and is then taken
-# off; a folder of that name no profile owns goes too. Each line it says that
-# starts LEFT names one still there and why. Test-RunnerSidAlive and
-# Dismount-RunnerHive are their own functions so tests\test-runner-lock.ps1
-# can stand in for them off Windows.
-# The Program Compatibility Assistant keeps every user's
-# Software\Microsoft\Windows\CurrentVersion\Uninstall key open, a removed
-# runner account's too, and while it does Windows cannot unload that
-# account's registry, so the profile cannot go (A REMOVED ACCOUNT'S PROFILE).
-# It watches for programs a person installs; nobody installs anything on the
-# box at a desktop, and Microsoft's service guidance for Windows Server says
-# it may be disabled. On the VPS only: a developer's machine keeps it.
-function Disable-RunnerPca {
-  $ErrorActionPreference = 'Continue'
-  $s = Get-Service -Name PcaSvc -EA SilentlyContinue
-  if (-not $s) { 'no Program Compatibility Assistant (PcaSvc) on this box'; return }
-  if ("$($s.StartType)" -eq 'Disabled' -and "$($s.Status)" -eq 'Stopped') { 'the Program Compatibility Assistant (PcaSvc) is off, as it should be (#3119)'; return }
-  try {
-    Set-Service -Name PcaSvc -StartupType Disabled -EA Stop
-    Stop-Service -Name PcaSvc -Force -EA Stop
-    'turned the Program Compatibility Assistant (PcaSvc) off: it held every removed runner account''s registry open (#3119)'
-  } catch { 'COULD NOT turn the Program Compatibility Assistant (PcaSvc) off: ' + $_.Exception.Message }
-}
-function Test-RunnerSidAlive([string]$sid) {
-  if (Get-LocalUser -SID $sid -EA SilentlyContinue) { return $true }
-  try { $null = (New-Object Security.Principal.SecurityIdentifier($sid)).Translate([Security.Principal.NTAccount]); $true } catch { $false }
-}
-function Dismount-RunnerHive([string]$key) {
-  $ErrorActionPreference = 'Continue'
-  $said = (& reg.exe unload $key 2>&1 | ForEach-Object { "$_".Trim() } | Where-Object { $_ }) -join ' '
-  if ($LASTEXITCODE -ne 0) { throw ('reg unload ' + $key + ': ' + $said) }
-}
-function Remove-LeftProfiles([string[]]$like, [string]$users = 'C:\Users') {
-  $ErrorActionPreference = 'Continue'
-  $owned = @{}
-  foreach ($p in @(Get-CimInstance Win32_UserProfile -EA SilentlyContinue)) {
-    $path = '' + $p.LocalPath
-    $leaf = Split-Path -Leaf $path
-    if (-not @($like | Where-Object { $leaf -like $_ }).Count) { continue }
-    $owned[$leaf.ToLowerInvariant()] = $true
-    if (Test-RunnerSidAlive $p.SID) { continue }
-    if ($p.Loaded) {
-      try { Dismount-RunnerHive ('HKU\' + $p.SID + '_Classes'); Dismount-RunnerHive ('HKU\' + $p.SID) }
-      catch { 'LEFT ' + $path + ': its account is gone and its registry is still loaded, which Windows would not let go of: ' + $_.Exception.Message; continue }
-    }
-    try { $p | Remove-CimInstance -EA Stop; 'took off ' + $path + ', the profile of a removed account (#3119)' }
-    catch { 'LEFT ' + $path + ': its account is gone and it could not be taken off: ' + $_.Exception.Message }
-  }
-  foreach ($d in @(Get-ChildItem -LiteralPath $users -Directory -EA SilentlyContinue)) {
-    if ($owned.ContainsKey($d.Name.ToLowerInvariant()) -or -not @($like | Where-Object { $d.Name -like $_ }).Count) { continue }
-    Remove-Item -LiteralPath $d.FullName -Recurse -Force -EA SilentlyContinue
-    if (Test-Path -LiteralPath $d.FullName) { 'LEFT ' + $d.FullName + ': no profile owns it and something holds a file in it' }
-    else { 'took off ' + $d.FullName + ', a profile folder no account owned (#3119)' }
-  }
-}
 '@
 
 # ------------------------------------------------------ the old watchers --
@@ -727,9 +651,7 @@ function Get-GuardBlocks {
 # Every runner service on the box, by what Windows says it is: its folder is
 # the one its RunnerService.exe is in, its account the one it runs as. Then
 # the old priority watchers, which belong to no one runner.
-$profileLike = $(if ($OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })
-$pcaOff = $(if ($OffBox) { '' } else { 'Disable-RunnerPca' })
-$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n`$profileLike = '" + $profileLike + "'`n" + $pcaOff + "`n" + @'
+$lockAll = $lockLib + $watcherLib + "`n`$liveFilter = '" + $liveFilter + "'`n`$alsoDeny = " + $alsoDenyList + "`n`$leave = " + $leaveList + "`n" + @'
 
 $ErrorActionPreference = 'Continue'
 $bad = 0
@@ -748,9 +670,6 @@ foreach ($svc in $services) {
   } catch { 'NOT LOCKED: ' + $svc.Name + ': ' + $_.Exception.Message; $bad++ }
 }
 Show-LeftFolders 'C:\' $leave
-# A removed runner's profile is not a lock, so one still left is said and
-# does not fail the lock (A REMOVED ACCOUNT'S PROFILE).
-Remove-LeftProfiles @($profileLike)
 if ($bad) { exit 1 }
 '@
 
@@ -819,7 +738,7 @@ if ($Remove) {
   try { $tok = (Invoke-Gh api -X POST "repos/$Repo/actions/runners/remove-token" --jq .token | Out-String).Trim() } catch { Say '  could not get a removal token; the box is cleaned and GitHub is left to forget it' 'Yellow' }
   # The removal token goes on ssh's standard input and reaches config.cmd in
   # its environment, never on a command line (Send-Secret.ps1, issue #451).
-  Send-WithSecret ([string]$tok) ($lockLib + $watcherLib + "`n" + @"
+  Send-WithSecret ([string]$tok) ($watcherLib + "`n" + @"
 `$ErrorActionPreference = 'Continue'
 `$t = `$ThornswoodSecret; `$ThornswoodSecret = `$null
 if ((Test-Path '$Root\config.cmd') -and `$t) {
@@ -841,13 +760,18 @@ $(if ($OffBox) { Get-GuardScript 'remove' } else { Get-GuardScript 'network-remo
 # profile, which Remove-LocalUser leaves (a later account of the same name
 # then gets a <name>.<computer> profile beside it). Measured on the VPS on
 # 20 Oct 2026: C:\Users\thornswood-runner5 and 6 left from removed runners.
-# The profile goes once the account has (A REMOVED ACCOUNT'S PROFILE).
 if (@((Get-MpPreference -EA SilentlyContinue).ExclusionPath) -contains '$Root') {
   try { Remove-MpPreference -ExclusionPath '$Root' -EA Stop; 'Defender scans $Root again' } catch { 'COULD NOT take off the Defender skip for $Root' + ': ' + `$_.Exception.Message }
 }
+`$sid = ''
+`$u = Get-LocalUser -Name '$Account' -EA SilentlyContinue
+if (`$u) { `$sid = `$u.SID.Value }
 Remove-LocalUser -Name '$Account' -EA SilentlyContinue
-$pcaOff
-Remove-LeftProfiles @('$Account', '$Account.*')
+if (`$sid) {
+  foreach (`$p in @(Get-CimInstance Win32_UserProfile -Filter "SID='`$sid'" -EA SilentlyContinue)) {
+    try { `$p | Remove-CimInstance -EA Stop; 'profile ' + `$p.LocalPath + ' removed' } catch { 'COULD NOT remove the profile ' + `$p.LocalPath + ': ' + `$_.Exception.Message }
+  }
+}
 Remove-Item -LiteralPath '$Root' -Recurse -Force -EA SilentlyContinue
 if (Test-Path '$Root') { 'the folder is still there, something holds a file in it' } else { 'runner, account and folder removed' }
 "@) | ForEach-Object { Say "  $_" }
@@ -959,13 +883,6 @@ if (Get-LocalUser -Name `$acct -EA SilentlyContinue) {
   Set-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires `$true
   'account ' + `$acct + ' was there, new password set'
 } else {
-  # A profile an earlier account of this name left would make Windows give
-  # this one <name>.<computer> (A REMOVED ACCOUNT'S PROFILE), so it goes
-  # first, and the account is not made while one is still there.
-  $pcaOff
-  `$left = @(Remove-LeftProfiles @(`$acct, (`$acct + '.*')))
-  `$left
-  if (@(`$left | Where-Object { "`$_" -like 'LEFT *' }).Count) { throw ('Nothing was installed: a new ' + `$acct + ' would get a second profile beside the one above. -Lock takes it off once Windows lets go of it.') }
   New-LocalUser -Name `$acct -Password `$sec -PasswordNeverExpires -UserMayNotChangePassword -Description 'Thornswood build check runner' | Out-Null
   Add-LocalGroupMember -Group 'Users' -Member `$acct -EA SilentlyContinue
   'account ' + `$acct + ' made'
