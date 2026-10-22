@@ -8,6 +8,7 @@
 
       .\scripts\dev\Trace-Gate.ps1 -SelfTest     # the trace's own check, a minute
       .\scripts\dev\Trace-Gate.ps1               # the whole gate, about fifteen minutes
+      .\scripts\dev\Trace-Gate.ps1 -PushRun <run> # step 5 again, from temp\trace-gate-<run>
 
   WHY. A pull request should run only the gate harnesses its change can
   affect (scripts\dev\Affected-Harnesses.js), and which those are is
@@ -44,6 +45,11 @@
 .PARAMETER Clean
   Stop any trace session and empty C:\Thornswood-Trace on the box.
 
+.PARAMETER PushRun
+  Only step 5, for a run whose read finished and whose push did not: pushes
+  what temp\trace-gate-<run> in this checkout kept. Nothing is traced or
+  run, and nothing touches the box.
+
 .PARAMETER Ref
   The branch trace-gate.yml runs on, and so the commit traced. main.
 
@@ -55,6 +61,7 @@
 param(
     [switch]$SelfTest,
     [switch]$Clean,
+    [string]$PushRun = '',
     [string]$Ref = 'main',
     [int]$WaitMinutes = 50,
     [string]$Repo = 'EvilPatrick06/Thornswood',
@@ -108,6 +115,57 @@ function Invoke-Gh {
     $ErrorActionPreference = $old
     if ($rc -ne 0) { throw ('gh ' + ($args -join ' ') + ' failed (exit ' + $rc + '): ' + ($out -join ' ')) }
     return $out
+}
+
+# Step 5: the files of a read pushed to claude/3114-trace-<run>. The tree is
+# made in an index of its own (GIT_INDEX_FILE), with every file named on the
+# command line, so nothing goes through a pipe into git, whose bytes depend on
+# the PowerShell: pwsh ends what it pipes with a line break of its own, so the
+# list that ended in one reached git mktree with a blank line after it, which
+# git refuses outside --batch ("input format error", run 39731778532, and
+# reproduced with pwsh 7.6.7). This checkout's own index and files are not
+# touched.
+function Push-Trace([string]$runId, [string]$work) {
+    $meta = [IO.File]::ReadAllText((Join-Path $work 'run.json')) | ConvertFrom-Json
+    $branch = 'claude/3114-trace-' + $runId
+    $index = Join-Path $work 'index'
+    Remove-Item -LiteralPath $index -Force -ErrorAction SilentlyContinue
+    $old = $ErrorActionPreference
+    $ErrorActionPreference = 'Continue'
+    $env:GIT_INDEX_FILE = $index
+    try {
+        foreach ($f in 'traces.jsonl.gz', 'starts.jsonl', 'run.json', 'summary.txt') {
+            $sha = & git -C $RepoRoot hash-object -w (Join-Path $work $f)
+            if ($LASTEXITCODE -ne 0) { Die "git could not store $f" }
+            $sha = ([string]$sha).Trim()
+            & git -C $RepoRoot update-index --add --cacheinfo ('100644,' + $sha + ',' + $f)
+            if ($LASTEXITCODE -ne 0) { Die "git could not put $f in the tree" }
+        }
+        $tree = & git -C $RepoRoot write-tree
+        if ($LASTEXITCODE -ne 0) { Die 'git could not make the tree' }
+        $tree = ([string]$tree).Trim()
+    } finally { Remove-Item Env:\GIT_INDEX_FILE -ErrorAction SilentlyContinue }
+    $commit = & git -C $RepoRoot commit-tree $tree -m ("Gate trace of " + ([string]$meta.commit).Substring(0, 8) + ", run " + $runId + " (#3114)")
+    if ($LASTEXITCODE -ne 0) { Die 'git could not make the commit (git says why above; a checkout with no user.name and user.email cannot)' }
+    $commit = ([string]$commit).Trim()
+    & git -C $RepoRoot push origin ($commit + ':refs/heads/' + $branch)
+    $pushed = $LASTEXITCODE
+    $ErrorActionPreference = $old
+    if ($pushed -ne 0) { Die ("the push did not go (exit $pushed). The files are in $work.") }
+    Remove-Item -LiteralPath $work -Recurse -Force
+    Say "  $branch, commit $commit" 'Green'
+}
+
+if ($PushRun) {
+    if ($PushRun -notmatch '^\d+$') { Die "-PushRun takes a run's number, not '$PushRun'." }
+    if (-not (Get-Command git -ErrorAction SilentlyContinue)) { Die 'git is not on PATH.' }
+    $work = Join-Path $RepoRoot ('temp\trace-gate-' + $PushRun)
+    foreach ($f in 'traces.jsonl.gz', 'starts.jsonl', 'run.json', 'summary.txt') {
+        if (-not (Test-Path -LiteralPath (Join-Path $work $f))) { Die "$work has no $f, so that run's read did not finish here. Trace again." }
+    }
+    Head ('5. Pushed for the read map, from run ' + $PushRun + "'s kept read")
+    Push-Trace $PushRun $work
+    exit 0
 }
 
 if (-not (Get-Command ssh -ErrorAction SilentlyContinue)) { Die 'ssh is not on PATH.' }
@@ -181,22 +239,5 @@ $summary = @(
 Say ('  ' + $gz.Length + ' bytes of traces, gzipped')
 
 Head '5. Pushed for the read map'
-$branch = 'claude/3114-trace-' + $run.databaseId
-$old = $ErrorActionPreference
-$ErrorActionPreference = 'Continue'
-$lines = foreach ($f in 'traces.jsonl.gz', 'starts.jsonl', 'run.json', 'summary.txt') {
-    $sha = (& git -C $RepoRoot hash-object -w (Join-Path $work $f)).Trim()
-    if ($LASTEXITCODE -ne 0) { Die "git could not store $f" }
-    "100644 blob $sha`t$f"
-}
-$tree = (($lines -join "`n") + "`n" | & git -C $RepoRoot mktree).Trim()
-if ($LASTEXITCODE -ne 0) { Die 'git could not make the tree' }
-$commit = (& git -C $RepoRoot commit-tree $tree -m ("Gate trace of " + $meta.commit.Substring(0, 8) + ", run " + $run.databaseId + " (#3114)")).Trim()
-if ($LASTEXITCODE -ne 0) { Die 'git could not make the commit' }
-& git -C $RepoRoot push origin ($commit + ':refs/heads/' + $branch)
-$pushed = $LASTEXITCODE
-$ErrorActionPreference = $old
-if ($pushed -ne 0) { Die ("the push did not go (exit $pushed). The files are in $work.") }
-Remove-Item -LiteralPath $work -Recurse -Force
-Say "  $branch, commit $commit" 'Green'
+Push-Trace $run.databaseId $work
 exit 0
