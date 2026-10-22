@@ -175,7 +175,10 @@ $(Get-ThornswoodUnsealBlock)
 try { `$w = Invoke-RestMethod -Uri 'https://api.cloudflare.com/client/v4/accounts/$CloudflareAccount/challenges/widgets/$PublicSiteKey' -Headers @{ Authorization = 'Bearer ' + `$cfToken } -UseBasicParsing -TimeoutSec 30 }
 catch {
   `$code = ''
-  try { `$code = [string][int]`$_.Exception.Response.StatusCode } catch { }
+  try { `$code = [string][int]`$_.Exception.Response.StatusCode } catch {
+    # No answer from Cloudflare at all, so no status: the line below says so with an empty code.
+    `$code = ''
+  }
   'CLOUDFLARE DID NOT HAND OVER THE WIDGET (HTTP ' + `$code + '). A 403 is a token without Account > Turnstile > Read. Nothing was changed.'
   return
 } finally { `$cfToken = `$null }

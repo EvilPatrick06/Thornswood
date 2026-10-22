@@ -79,6 +79,10 @@ function Run-Box([string]$t, [string]$stdin = '') {
     $psi.RedirectStandardInput = $true
     $psi.RedirectStandardOutput = $true
     $psi.RedirectStandardError = $true
+    # Windows PowerShell 5.1 started from PowerShell 7 inherits 7's module
+    # path, and then cannot load its own Get-Acl (measured on runner 1,
+    # 22 Oct). The box's ssh session has 5.1's own.
+    if ([IO.Path]::GetFileNameWithoutExtension($boxShell) -eq 'powershell') { $psi.EnvironmentVariables.Remove('PSModulePath') }
     $p = [Diagnostics.Process]::Start($psi)
     $p.StandardInput.Write($stdin)
     $p.StandardInput.Close()
@@ -100,7 +104,8 @@ try {
     Yes 'the second ask keeps the same key' ($second -notcontains 'seal key made' -and $pub2 -eq $pub1)
     Yes 'the private half is never printed' (-not (($first + $second) -join ' ').Contains('<D>') -and -not (($first + $second) -join ' ').Contains('<P>'))
     Yes 'it is kept as one file in the seal folder' (Test-Path -LiteralPath (Join-Path $sealDir 'seal-key.xml'))
-    $publicKey = if ($pub1) { $pub1.Substring('SEAL KEY '.Length) } else { '' }
+    if (-not $pub1) { Done }
+    $publicKey = $pub1.Substring('SEAL KEY '.Length)
 
     # ---- sealing and opening -------------------------------------------------
     $value = 'harness-token-' + [Guid]::NewGuid().ToString('N')
