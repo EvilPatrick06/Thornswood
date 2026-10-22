@@ -202,7 +202,13 @@ function makeBox() {
     setTimeout: function (fn, ms) { world.timers.push({ fn: fn, at: clock.t + (ms || 0) }); return world.timers.length; },
     setInterval: function () { return 1; },
     clearInterval: function () {},
-    __thornswoodCharacter: { stateOf: function (id) { return states.get(id) || null; } }
+    __thornswoodCharacter: {
+      stateOf: function (id) { return states.get(id) || null; },
+      // The map the client applies: the tree is enough for Vitality's health.
+      effectsOf: function (id) { return box.__thornswoodProgression.treeApplies(states.get(id) || null); }
+    },
+    // The engine's own most, as the maneuvers block reads it off the records.
+    __thornswoodManeuvers: { engineMost: function (id, which) { return world.noMost ? 0 : (which === 'health' ? 100 : 0); } }
   };
   box.globalThis = box;
   vm.createContext(box);
@@ -283,35 +289,41 @@ yes('the numbers are the page\'s: 2 a second, 25% more, a tenth to half, one in 
 }
 
 // ---------------------------------------------------------- Cheat Death --
-// The engine kills before the server is asked, so nothing calls cheatDeath()
-// yet. What is here is the check the engine's death will ask, and its clock.
+// mp.onDying asks cheatDeath() before the engine kills (#1626). Its answer is
+// the share of the most that is 1 health, or 0 for an ordinary death. A
+// filled Vitality is 50 health on the engine's 100 here, so 1 in 150.
 const VIT = actor(0xff000001), NONE = actor(0xff000002), WOLF = actor(0xff002101, { pid: -1 });
 states.set(VIT, filled(['vitality']));
 states.set(NONE, P.fresh());
-yes('somebody without Cheat Death is not spared', K.cheatDeath(NONE) === false);
-yes('an animal is never asked about', K.cheatDeath(WOLF) === false);
-yes('Cheat Death spares a filled Vitality', K.cheatDeath(VIT) === true);
+yes('somebody without Cheat Death is not spared', K.cheatDeath(NONE) === 0);
+yes('an animal is never asked about', K.cheatDeath(WOLF) === 0);
+world.noMost = true;
+yes('a most health that cannot be read spends no day and is said in the log', K.cheatDeath(VIT) === 0 &&
+  !(world.props.get(VIT) || {}).thornswoodPerks &&
+  world.logs.some(function (l) { return /^perks: Cheat Death could not read the most health of ff000001/.test(l); }));
+world.noMost = false;
+yes('Cheat Death spares a filled Vitality, at 1 health of the 150 their bar shows', near(K.cheatDeath(VIT), 1 / 150));
 const clockRec = JSON.parse(world.props.get(VIT).thornswoodPerks);
 yes('and its clock is written on the character, 24 hours on', clockRec.ready.cheatdeath === clock.t + DAY);
 yes('they are told, and the log records it', world.told.some(function (x) { return x.id === VIT && /^Cheat Death\. .*1 health/.test(x.text); }) &&
   logged('Cheat Death') === 1);
 yes('nothing is stood back up and no timer is left to do it', world.calls.length === 0 && world.timers.length === 0);
 later(60 * 60 * 1000);
-yes('asked again the same day, it does not fire twice', K.cheatDeath(VIT) === false && logged('Cheat Death') === 1);
+yes('asked again the same day, it does not fire twice', K.cheatDeath(VIT) === 0 && logged('Cheat Death') === 1);
 // A restart: the block is loaded fresh, and the clock is still on the character.
 const KBefore = K;
 box = makeBox();
 K = box.__thornswoodPerks;
-yes('after a restart the day is still spent, because the clock is on the character', K !== KBefore && K.cheatDeath(VIT) === false);
+yes('after a restart the day is still spent, because the clock is on the character', K !== KBefore && K.cheatDeath(VIT) === 0);
 later(DAY);
-yes('24 hours after it fired, it fires again', K.cheatDeath(VIT) === true && logged('Cheat Death') === 2);
+yes('24 hours after it fired, it fires again', near(K.cheatDeath(VIT), 1 / 150) && logged('Cheat Death') === 2);
 later(DAY + 1000);
 world.failProp = true;
-yes('a clock that cannot be written does not fire', K.cheatDeath(VIT) === false);
+yes('a clock that cannot be written does not fire', K.cheatDeath(VIT) === 0);
 world.failProp = false;
 world.failGet = true;
 yes('nor one that cannot be read: an empty clock in its place would hand the day back',
-  K.cheatDeath(VIT) === false && world.logs.some(function (l) { return /^perks: could not read the clocks of ff000001/.test(l); }));
+  K.cheatDeath(VIT) === 0 && world.logs.some(function (l) { return /^perks: could not read the clocks of ff000001/.test(l); }));
 world.failGet = false;
 later(DAY + 1000);
 
@@ -334,7 +346,30 @@ later(DAY + 1000);
   dbox.mp.onDeath(VIT, 0);
   yes('mp.onDeath never asks Cheat Death, and a death goes on to the wake', deaths.join(',') === 'wake' &&
     onDeath.indexOf('cheatDeath') === -1);
-  yes('the K panel is sent no clock for Cheat Death, since nothing fires it yet', K.clocks(VIT, states.get(VIT)) === null);
+  const shown = K.clocks(VIT, states.get(VIT));
+  yes('the K panel is sent the clock of Cheat Death', !!shown && !!shown.cheatdeath && shown.cheatdeath.ready > 0);
+}
+
+// mp.onDying is where it is asked: before the engine kills, with nothing sent.
+{
+  const onDying = slice(gm, "mp.onDying = guard('onDying', function (actorId) {", '\n});');
+  yes('mp.onDying is in the gamemode', !!onDying);
+  const asked = [], written = [];
+  const ybox = {
+    guard: function (n, fn) { return fn; },
+    mp: { set: function (id, prop, v) { written.push(prop + ' ' + id.toString(16) + ' ' + v); } },
+    __thornswoodPerks: { cheatDeath: function (id) { asked.push(id.toString(16)); return id === VIT ? 0.25 : 0; } }
+  };
+  ybox.globalThis = ybox;
+  vm.createContext(ybox);
+  vm.runInContext(onDying || '', ybox);
+  const spared = ybox.mp.onDying(VIT, 0, 0.3);
+  yes('Cheat Death refuses the death and writes the health the engine keeps them at',
+    spared === false && written.join('|') === 'dyingHealth ff000001 0.25');
+  const died = ybox.mp.onDying(NONE, VIT, 0.3);
+  yes('an ordinary death is let through with nothing written', died === undefined && written.length === 1 &&
+    asked.join(',') === 'ff000001,ff000002');
+  yes('mp.onDying asks nothing but Cheat Death', (onDying || '').split('__thornswood').length === 2);
 }
 
 // -------------------------------------------------------- Troll's Blood --
@@ -695,10 +730,9 @@ yes('the log says it once a cast', logged('Leyline Attunement') === 1);
   yes('the point that fills Precision names Lethal Aim, and still says the game ignores critical chance',
     K.spendLine(full, 'precision').indexOf('Precision is full. Lethal Aim: An arrow ignores half the armour it hits.') === 0 &&
     K.spendLine(full, 'precision').indexOf(crit) > 0);
-  yes('the point that fills Vitality names Cheat Death, and says it is not in the game yet',
+  yes('the point that fills Vitality names Cheat Death as the page says it, and no longer says it is not in the game',
     K.spendLine(filled(['vitality']), 'vitality') ===
-    'Vitality is full. Cheat Death: Once a day, the blow that would kill you leaves you at 1 health. ' +
-    'That is not in the game yet: the engine ends you the moment health reaches nothing, before the server is asked.');
+    'Vitality is full. Cheat Death: Once a day, the blow that would kill you leaves you at 1 health.');
   yes('the point that fills Resilience names Unshakeable as the page says it, and no longer says it is not in the game',
     K.spendLine(filled(['resilience']), 'resilience') === 'Resilience is full. Unshakeable: Nothing staggers you while you block.');
   yes('so do Endurance and Agility: Tireless and the whole of Windwalker are in, on the person\'s own machine',

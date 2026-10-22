@@ -36,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`958866b7`](https://github.com/EvilPatrick06/skymp/tree/958866b7810bff8cafc0f3827b049cc68e253c69).
+[`670ae74f`](https://github.com/EvilPatrick06/skymp/tree/670ae74faca5539f5c006c73243e597a21736fcf).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...958866b7)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...670ae74f)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
