@@ -14,11 +14,17 @@
                                     content.py. Use this when the wording moved.
     .\Setup-Discord.ps1 -Check     changes nothing at all, just says what it
                                     would do
+    .\Setup-Discord.ps1 -Audit     changes nothing at all, reads the live
+                                    server and says where it differs from
+                                    the plan: the bot's permissions, each
+                                    role's, who holds each staff rank and
+                                    every double rank, and every channel's
+                                    overwrites (#3317)
     .\Setup-Discord.ps1 -Prune     also deletes channels this no longer wants
     .\Setup-Discord.ps1 -OnBox     runs the build on the VPS with the token the
                                     running bot already holds, and asks for
-                                    nothing. Goes with -Check, -Posts, -Prune
-                                    and -Only
+                                    nothing. Goes with -Check, -Audit, -Posts,
+                                    -Prune and -Only
     .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
                                    touches only those categories and channels
                                     of the plan: no role made or moved, no
@@ -86,6 +92,9 @@ param(
   [switch]$Posts,
   # Touches nothing. Says what it would make, remove and rewrite, then stops.
   [switch]$Check,
+  # Touches nothing. Reads the live server and says where it differs from the
+  # plan (#3317). Nothing else in the run happens.
+  [switch]$Audit,
   # Builds on the VPS with the token the bot holds there. Asks for nothing.
   [switch]$OnBox,
   # Only these categories and channels of the plan, and nothing else in the
@@ -141,6 +150,7 @@ if ($OnBox) {
   if ($Prune) { $flags += "`$env:DISCORD_PRUNE = '1'`r`n" }
   if ($Posts) { $flags += "`$env:DISCORD_POSTS = '1'`r`n" }
   if ($Check) { $flags += "`$env:DISCORD_CHECK = '1'`r`n" }
+  if ($Audit) { $flags += "`$env:DISCORD_AUDIT = '1'`r`n" }
   if ($Only.Count) {
     $names = @($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
     foreach ($n in $names) { if ($n -notmatch '^[A-Za-z0-9 _-]+$') { throw ('-Only takes category and channel names from the plan, not: ' + $n) } }
@@ -237,6 +247,7 @@ if ($Guild) { $env:DISCORD_GUILD = $Guild }
 if ($Prune) { $env:DISCORD_PRUNE = '1' }
 if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
+if ($Audit) { $env:DISCORD_AUDIT = '1' }
 if ($Only.Count) { $env:DISCORD_ONLY = (@($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ',') }
 $tok = $null
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
@@ -249,9 +260,12 @@ try {
   $env:DISCORD_PRUNE = $null
   $env:DISCORD_POSTS = $null
   $env:DISCORD_CHECK = $null
+  $env:DISCORD_AUDIT = $null
   $env:DISCORD_ONLY = $null
   $env:THORNSWOOD_OPEN = $null
 }
+# An audit reads and builds nothing, so there is no webhook to hand on.
+if ($Audit) { exit $code }
 
 # It used to say the webhook was ready whatever happened, including on the run
 # that stopped on a missing intent and built nothing at all. A script that

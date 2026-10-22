@@ -35,7 +35,6 @@ block never runs. Read only. Never connects to anything.
 import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import importlib.util
 import os
-import re
 import sys
 import types
 
@@ -63,8 +62,6 @@ spec = importlib.util.spec_from_file_location(
     'build_discord_gm', os.path.join(HERE, 'Build-Discord.py'))
 B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
-
-SRC = open(os.path.join(HERE, 'Build-Discord.py'), encoding='utf-8').read()
 
 
 class Role(object):
@@ -116,10 +113,10 @@ yes('G2 no other category carries a gm channel',
             for cat, specs in B.PLAN if cat != 'Gamemasters' for s in specs))
 
 # ------------------------------------------------------------------ G3 --
-m = re.search(r"mode = \{'Staff': 'staff', 'Testing': 'pathfind',(.*?)\}\.get\(catname, 'open'\)",
-              SRC, re.S)
+# Read off the builder's own table (CATEGORY_MODE, #3317), which both the build
+# and the audit use, rather than off its source.
 yes('G3 a Gamemasters category this makes is gm, not the open default',
-    m is not None and "'Gamemasters': 'gm'" in m.group(1))
+    B.CATEGORY_MODE.get('Gamemasters') == 'gm')
 
 # ------------------------------------------------------------- G4 to G7 --
 NAMES = ['Owner', 'Lead Gamemaster', 'Dev', 'Gamemaster', 'Loremaster',
