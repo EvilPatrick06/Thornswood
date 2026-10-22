@@ -71,9 +71,9 @@ function subs(d) {
   }
   return out;
 }
-/* The scripts at the head of a VMAD, each with its properties. Only the
-   simple types are read; this quest's script is not expected to hold any
-   other, and one that does is reported rather than skipped. */
+/* The scripts at the head of a VMAD, each with its properties, every type
+   Skyrim writes (an object, a string, an int, a float, a bool and a list of
+   each). One of another type is reported rather than skipped. */
 function scriptsOf(v) {
   let p = 0;
   const u8 = () => v.readUInt8(p++);
@@ -88,13 +88,21 @@ function scriptsOf(v) {
     for (let m = u16(); m > 0; m--) {
       const name = str(), type = u8();
       const status = ver >= 4 ? u8() : null;
+      const one = (t) => {
+        let x;
+        if (t === 1) { x = fmt === 1 ? v.readUInt32LE(p) : v.readUInt32LE(p + 4); p += 8; }
+        else if (t === 2) { x = str(); }
+        else if (t === 3) { x = v.readInt32LE(p); p += 4; }
+        else if (t === 4) { x = v.readFloatLE(p); p += 4; }
+        else if (t === 5) { x = v.readUInt8(p) !== 0; p += 1; }
+        return x;
+      };
       let value;
-      if (type === 1) { value = fmt === 1 ? v.readUInt32LE(p) : v.readUInt32LE(p + 4); p += 8; }
-      else if (type === 2) { value = str(); }
-      else if (type === 3) { value = v.readInt32LE(p); p += 4; }
-      else if (type === 4) { value = v.readFloatLE(p); p += 4; }
-      else if (type === 5) { value = v.readUInt8(p) !== 0; p += 1; }
-      else { return { error: 'property ' + name + ' of type ' + type }; }
+      if (type >= 1 && type <= 5) { value = one(type); }
+      else if (type >= 11 && type <= 15) {
+        value = [];
+        for (let k = v.readUInt32LE((p += 4) - 4); k > 0; k--) { value.push(one(type - 10)); }
+      } else if (type !== 0) { return { error: 'property ' + name + ' of type ' + type }; }
       s.props[name.toLowerCase()] = { type: type, status: status, value: value };
     }
     out.push(s);
