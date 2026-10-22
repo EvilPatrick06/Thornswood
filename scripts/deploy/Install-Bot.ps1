@@ -960,7 +960,8 @@ foreach (`$k in 'SSL_CERT_FILE', 'REQUESTS_CA_BUNDLE') { if (`$env2.Contains(`$k
 # Locked down, but not so far that the thing meant to read it cannot: SYSTEM,
 # Administrators and this account, plus read for NT SERVICE\ThornswoodBot,
 # given in the same write (Protect-ThornswoodBotEnv in Write-BotToken.ps1,
-# issue #2158). SYSTEM stays for the nightly backup. A file its reader cannot
+# issue #2158), and for the nightly backup's own task account, NT TASK\
+# Thornswood Backup, when the box has it (#2836). A file its reader cannot
 # open is how the swap once failed and left the bot stopped.
 try { Protect-ThornswoodBotEnv -Path `$f -Service '$Service' }
 catch { 'could not tighten bot.env.json: ' + `$_.Exception.Message }

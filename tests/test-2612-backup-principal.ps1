@@ -49,6 +49,12 @@ foreach ($src in 'C:\Thornswood-Server', 'C:\Thornswood-Server-Dev', 'C:\Thornsw
     Yes "the task is given read on $src" ($inst.Contains("'$src'"))
 }
 Yes 'the read rule reaches folders that take no rules from above (a server''s private)' ($inst.Contains('AreAccessRulesProtected'))
+Yes '  and files in those folders that take no rules from above, read on the file alone (bot.env.json, #2836)' (
+    $inst.Contains('Where-Object { (Get-Acl -LiteralPath `$_.FullName).AreAccessRulesProtected }') -and
+    $inst.Contains('FileSystemAccessRule(`$who, ''Read'', ''Allow'')'))
+$writerText = Text 'scripts\vps\Write-BotToken.ps1'
+Yes '  and every writer of bot.env.json gives the backup''s own task account read on it again (Protect-ThornswoodBotEnv)' (
+    $writerText.Contains("[string]`$BackupTask = 'Thornswood Backup'") -and $writerText.Contains("NTAccount('NT TASK', `$BackupTask)"))
 $err = $null
 [void][Management.Automation.Language.Parser]::ParseInput($inst, [ref]$null, [ref]$err)
 Yes 'Install-Backup.ps1 parses' (-not $err -or $err.Count -eq 0)
