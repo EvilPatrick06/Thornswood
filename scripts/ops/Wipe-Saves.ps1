@@ -89,7 +89,10 @@
   deletes it. The fresh world hands those form ids to new characters, which
   is why it is written before that start and not left to chance. A server
   whose move did not finish gets no list. Season, the benches and the door
-  are the server's, not anybody's.
+  are the server's, not anybody's, and so are the world stage
+  (private\war.json, #513) and the company's terms
+  (private\company-terms.json, #2695): both name nobody, because who moved
+  or changed them is in the staff log (#2860, #2687).
 
   It does NOT delete anything. It stops the server, renames the storage out of
   the way with today's date on it, and starts the server again on an empty one.
