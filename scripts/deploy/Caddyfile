@@ -39,6 +39,20 @@
 # gets the bridge's 404, so the site's pages are untouched. Take it out and
 # cloud threads lose the box; One's own ssh on port 22 does not go through it.
 # ---------------------------------------------------------------------------
+# THE BOX LOG IS WHERE A LOST /box/ REQUEST SHOWS (#3297).
+#
+# On 22 Oct 2026 an ssh from One gave up after ten seconds and neither sshd
+# nor the bridge had seen it, and nothing recorded whether it reached Caddy.
+# Every /box/ request now leaves one JSON line in data\logs\box.log, with
+# its status, how long it took and its Cf-Ray, the id Cloudflare's own
+# records of it go by, and connect.js says which stage it was waiting at. A
+# line is written when the request ends, a WebSocket's when its session does.
+# Nothing else the site serves is logged here (log_skip). No address: the
+# visitor's (client_ip and the headers that carry it) and the token are taken
+# out of each line, the way the bridge's own log keeps none. Caddy runs as
+# LOCAL SERVICE and may write only under data, so it lives there. 1 MiB a
+# file, five kept, the oldest dropped.
+# ---------------------------------------------------------------------------
 # THE GITHUB-APP BLOCK IS THE BOX ADMIN APP'S ONE-TIME SETUP (#3107).
 #
 # /github-app/ goes to the box's GitHub admin service on 127.0.0.1:7791
@@ -66,7 +80,6 @@
 # whatever headers it sends. The list is scripts\deploy\cloudflare-ranges.txt,
 # kept equal to this line by tests\test-2995-cloudflare-front.ps1.
 # ---------------------------------------------------------------------------
-
 {
 	email datdude365d@gmail.com
 	storage file_system C:/Thornswood-Caddy/data
@@ -78,6 +91,26 @@
 
 thornswood.net, www.thornswood.net {
 	encode gzip
+
+	log {
+		output file C:/Thornswood-Caddy/data/logs/box.log {
+			roll_size 1MiB
+			roll_keep 5
+		}
+		format filter {
+			wrap json
+			fields {
+				request>client_ip delete
+				request>headers>Cf-Connecting-Ip delete
+				request>headers>X-Forwarded-For delete
+				request>headers>True-Client-Ip delete
+				request>headers>Cf-Ipcountry delete
+				request>headers>Authorization delete
+			}
+		}
+	}
+	@notbox not path /box/*
+	log_skip @notbox
 
 	handle_path /voice/* {
 		reverse_proxy 127.0.0.1:7778 {
