@@ -204,7 +204,7 @@ rules.forEach(function (r) {
 badOwner.forEach(function (b) { console.log('      ' + b); });
 yes('every CODEOWNERS owner is one of the owners on the six shared files', badOwner.length === 0);
 
-const shared = /An edit to ([\s\S]*?) that blocks others' work gets a line in #staff-updates/.exec(claudeRaw);
+const shared = /An edit to ([\s\S]*?) that blocks others' work gets a line in #dev-coordination/.exec(claudeRaw);
 const sharedNames = shared ? shared[1].replace(/\s+/g, ' ').split(/,\s*|\s+or\s+/).map(function (s) { return s.trim(); }).filter(Boolean) : [];
 yes('Developer-Guide.md lists the six shared files (' + sharedNames.join(', ') + ')', sharedNames.length === 6);
 const uncovered = sharedNames.filter(function (n) {

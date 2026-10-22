@@ -1367,8 +1367,9 @@ The short form of the rules. The same decisions, with the dates they were made, 
   says which.
 - The dev channel (`.\scripts\release\Ship.ps1 -Channel dev "what changed"`) may be
   run from any branch, from any developer's machine, to try work on the dev server.
-  There is one dev feed and the last dev Ship wins; a release gets no
-  #staff-updates line (Patrick, 22 Oct). A main Ship leaves the Dev feed and baseline unchanged, apart
+  There is one dev feed and the last dev Ship wins, so a Dev says in
+  #dev-coordination before taking it; the Lead Dev does not have to. A release
+  gets no #staff-updates line (Patrick, 22 Oct). A main Ship leaves the Dev feed and baseline unchanged, apart
   from which dev notes are marked DEV (see Mark the dev notes again).
 - Every release note has a title and details, dev included. Patrick, 25 Sep,
   after two dev posts went out as "The scroll glows" and "Dev build: ...":
@@ -1511,7 +1512,7 @@ The short form of the rules. The same decisions, with the dates they were made, 
   `-Number` for the others) says whether GitHub sees one, and `-Lock` locks
   every runner's folder again without stopping a job.
 - An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or
-  Publish-Update.ps1 that blocks others' work gets a line in #staff-updates first; every machine touches those.
+  Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev; every machine touches those.
 
 #### How work moves, the long form
 
@@ -1550,14 +1551,14 @@ this is the long form.
   push means pull first; never `--force`.
 - **The dev channel is for trying.** `.\scripts\release\Ship.ps1 -Channel dev "..."`
   runs from any branch on any machine and puts that build on the dev
-  server. There is one dev feed and the last dev Ship wins. A main Ship preserves the Dev feed and baseline.
+  server. There is one dev feed and the last dev Ship wins, so a Dev says in #dev-coordination before taking it. A main Ship preserves the Dev feed and baseline.
 - **Settled design is a proposal first.** Where the game runs from (its own
   folder, see One Skyrim of its own), Keep and Hold for Data\Platform, the
   client built from the fork and recorded, the launcher build (MSBuild from
   the project files, C# 13, #498), one complete release at a time: changing any of these starts as a few lines in #staff-updates, agreed by the
   team before code. Editing `Shell.cs`, `Checks.cs`, `Keep.cs`, `Hold.cs`,
   `Updater.cs` or `Publish-Update.ps1` in a way that blocks others' work gets a
-  line in #staff-updates; every machine touches them.
+  line in #dev-coordination from a Dev; every machine touches them.
 - **The publisher receives the feed and the baseline from the VPS** at the
   start and asks again before `version.json` is edited: a feed somebody changed
   meanwhile is received again and the release goes on top of it, and a
@@ -1590,7 +1591,7 @@ this is the long form.
 
 ## 3. How to release to dev
 
-Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins.
+Everything goes to the dev build first, including a small change. A dev release can run from any branch on any developer's machine. There is one dev feed and one dev server, and the last dev Ship wins, so a Dev says in #dev-coordination before taking the dev feed. The Lead Dev does not have to.
 
 The machine that runs `Ship.ps1` still has to sign the build. [Setting up a machine](#setting-up-a-machine) and [Shipping from another machine](#shipping-from-another-machine) are how a PC gets there.
 
@@ -1759,7 +1760,7 @@ dev feed and the dev baseline (`feed-dev` in the VPS store), the dev ports,
 and the dev server told. It runs from
 any branch on any developer's machine. There is no installer for it, and it
 posts to the dev updates channel in Discord and the dev launcher's News tab,
-never #news. There is one dev feed and the last dev Ship wins. Main and Dev have independent feeds and baselines. A Main
+never #news. There is one dev feed and the last dev Ship wins, so a Dev says in #dev-coordination before taking it. Main and Dev have independent feeds and baselines. A Main
 Ship leaves Dev's release unchanged; advance Dev through its own Ship. What a
 Main Ship does change on the dev feed is which notes are marked DEV and its
 `mainVersion`, right after main's feed is out (`Refresh-DevNews.ps1`, which
@@ -2375,7 +2376,7 @@ Stay in `C:\Dev\Thornswood`. Each big folder has its own `README.md`. Open that 
 
 `engine` is the SkyMP source. Leave it until a task tells you to build the server. `out` and `local` appear after a build. Git keeps them off GitHub.
 
-An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 that blocks others' work gets a line in #staff-updates first. Those files sit in `launcher\app` and `scripts\release`.
+An edit to Shell.cs, Checks.cs, Keep.cs, Hold.cs, Updater.cs or Publish-Update.ps1 that blocks others' work gets a line in #dev-coordination first, from a Dev. Those files sit in `launcher\app` and `scripts\release`.
 
 Search one file from PowerShell:
 
@@ -2677,7 +2678,7 @@ Click a name to open the file. The line under it says what the file is for.
 | [scripts/deploy/Deploy-Gamemode.ps1](scripts/deploy/Deploy-Gamemode.ps1) | Puts the gamemode on the live server. The server deploy is the next script in that folder |
 | [docs/GLOSSARY.md](docs/GLOSSARY.md) | The long list of Thornswood words |
 
-Six files are shared by every machine. A line in #staff-updates comes before an edit that blocks others' work:
+Six files are shared by every machine. A Dev posts a line in #dev-coordination before an edit that blocks others' work. #dev-coordination is the Dev space's channel, which only the Dev ranks and the council see. The Lead Dev does not have to post these lines, and neither does a Claude working for the Lead Dev (Patrick, 22 Oct). They are for coordinating the work, so they never go in #staff-updates:
 
 | File | Where |
 | --- | --- |
@@ -2688,7 +2689,7 @@ Six files are shared by every machine. A line in #staff-updates comes before an 
 | [launcher/app/Updater.cs](launcher/app/Updater.cs) | The feed, the version, and applying a pack |
 | [scripts/release/Publish-Update.ps1](scripts/release/Publish-Update.ps1) | Builds the pack a Ship publishes |
 
-An edit to one of them that blocks others' work gets a line in #staff-updates first; any other edit gets none.
+An edit to one of them that blocks others' work gets a line in #dev-coordination first, from a Dev; any other edit gets none.
 
 #### Learn more about the repository
 
