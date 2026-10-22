@@ -1288,7 +1288,7 @@
                       "script":  "scripts/ops/Reset-Character.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "scp",
-                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp \"${target}:C:/thornswood-reset.ps1\" }",
+                      "anchor":  "Invoke-ThornswoodNative { \u0026 scp @ssh $tmp $tmpRun \"${target}:C:/\" }",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
                       "reason":  "destructive or install-time work outside the gate verbs"
