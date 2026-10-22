@@ -1,5 +1,6 @@
 'use strict';
 const crypto=require('node:crypto');
+const {loadOrderSha256}=require('./MerchantLoadOrderPin.js');
 const hash=value=>crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex');
 // The pin covers what was measured, not the Content plugin's bytes: those are
 // checked against the file itself below, so a change to Content (a header, a
@@ -11,8 +12,8 @@ const measured=doc=>{
 };
 function validateRetrievalSources(doc,population,content,roster) {
  const fail=()=>{throw new Error('Invalid retrieval source evidence');};
- if(!doc||hash(measured(doc))!=='272a4441787e836f82fe978a751922b721edecb84e25e994007350f639531b6e'||
-   !population||hash(population.loadOrder)!==doc.loadOrderSha256||
+ if(!doc||hash(measured(doc))!=='bf81b78390d00bfffbdab7125f80cd7e989a546e150777fb2d2f974e879e3d32'||
+   !population||loadOrderSha256(population)!==doc.loadOrderSha256||
    !Buffer.isBuffer(content)||crypto.createHash('sha256').update(content).digest('hex')!==doc.contentSha256||
    !roster||!Array.isArray(roster.merchants))fail();
  for(const row of doc.sources) {

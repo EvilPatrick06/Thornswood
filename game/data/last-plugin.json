@@ -4,8 +4,8 @@
  "issue": 2468,
  "plugin": {
   "name": "Thornswood-Last.esp",
-  "size": 12937919,
-  "sha256": "d00d360e9260627aad1edeab599f476677e0721f1e5662ce97cf6bb3dc144c08"
+  "size": 12944237,
+  "sha256": "e5eb71c8e6643116f029d3047ca7972879deb899f383a4ee3be00bac270a3d77"
  },
  "loadOrder": [
   "Skyrim.esm",
@@ -661,7 +661,8 @@
   "YokuWeapons.esp",
   "McmRecorder.esp",
   "Skyrim Unbound.esp",
-  "Water for ENB (Shades of Skyrim).esp"
+  "Water for ENB (Shades of Skyrim).esp",
+  "Playable Rieklings.esp"
  ],
  "counts": {
   "actorsOff": 6946,
@@ -673,6 +674,7 @@
   "gatesUnlocked": 3,
   "placeLocations": 8,
   "placeRooms": 3,
+  "recipesRecosted": 43,
   "floorItemsOff": 92072
  },
  "refs": {
@@ -23790,6 +23792,716 @@
    "vanilla": false,
    "why": [
     "a trigger names it"
+   ]
+  }
+ ],
+ "recost": [
+  {
+   "recipe": "1246:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyScimitar",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "f:Skyrim.esm",
+     25,
+     0
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "12c6:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponCaptainsCutlass",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ]
+   ]
+  },
+  {
+   "recipe": "19f9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorRieklingHelmet2Alt",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     2,
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "216ea:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponOrnateMaulWarhammer",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     4,
+     4
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     3
+    ],
+    [
+     "5ad9f:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ]
+   ]
+  },
+  {
+   "recipe": "2414:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyDadao",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     5,
+     5
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     3
+    ]
+   ]
+  },
+  {
+   "recipe": "25d24:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponDragonguardKatana",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ],
+    [
+     "800e4:Skyrim.esm",
+     3,
+     3
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "2ad2:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponValenwoodWarBow",
+   "inputs": [
+    [
+     "f:Skyrim.esm",
+     25,
+     0
+    ],
+    [
+     "5ad9f:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "6f993:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "4341:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponBlackMammothRecurveBow",
+   "inputs": [
+    [
+     "3ad6c:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ad9d:Skyrim.esm",
+     3,
+     3
+    ],
+    [
+     "f:Skyrim.esm",
+     25,
+     0
+    ],
+    [
+     "d4be7:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "4e8b:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponWhiteMammothRecurveBow",
+   "inputs": [
+    [
+     "3ad6c:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "f:Skyrim.esm",
+     25,
+     0
+    ],
+    [
+     "5ada0:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ada1:Skyrim.esm",
+     3,
+     3
+    ],
+    [
+     "d4be7:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "58d0:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponColovianDarkCompositeBow",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ],
+    [
+     "6f993:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "58d4:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponColovianCompositeBow",
+   "inputs": [
+    [
+     "5ace4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "f:Skyrim.esm",
+     25,
+     0
+    ],
+    [
+     "6f993:Skyrim.esm",
+     3,
+     3
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "89a:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiGau",
+   "inputs": [
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     2
+    ],
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "89b:YokuWeapons.esp",
+   "editorId": "0_RecipeArmorMahayiBoot",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     1,
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     1,
+     2
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     1,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "8de:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     4,
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "8e2:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildKarliahGauntlets",
+   "inputs": [
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     4,
+     2
+    ]
+   ]
+  },
+  {
+   "recipe": "8eb:MoreCraftableEquipment.esp",
+   "editorId": "MCERecipeArmorThievesGuildVariantGauntlets",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     4,
+     2
+    ],
+    [
+     "db5d2:Skyrim.esm",
+     3,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "906:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponDragonsteelTanto",
+   "inputs": [
+    [
+     "3ada4:Skyrim.esm",
+     1,
+     1
+    ],
+    [
+     "5ace5:Skyrim.esm",
+     2,
+     1
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     1
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6b:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditKilt",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6d:Playable Rieklings.esp",
+   "editorId": "RecipeArmor1RieklingBanditCuirass02",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe6e:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassFalkreath",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe70:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassHjaalmarch",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe72:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassMarkarth",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe74:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassRiften",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe76:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassSolitude",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe78:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassThePale",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe7a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWhiterun",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe7c:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorGuardCuirassWinterhold",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe98:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirass",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfe9a:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorScaledCuirassB",
+   "inputs": [
+    [
+     "5ad93:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeae:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeb2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildLeaderCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeb6:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorThievesGuildVariantCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfeba:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorTsunCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     8
+    ]
+   ]
+  },
+  {
+   "recipe": "bfebc:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDA05SaviorsHide",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     2,
+     5
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfebe:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmor",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmet",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfec2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDBArmorHelmetMaskLess",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed0:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1ArmorHunterCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     3,
+     7
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed2:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirass",
+   "inputs": [
+    [
+     "5ad9f:Skyrim.esm",
+     2,
+     4
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "bfed4:Playable Rieklings.esp",
+   "editorId": "RecipeArmorDLC1IvoryCuirassAlternate",
+   "inputs": [
+    [
+     "5ad9f:Skyrim.esm",
+     2,
+     4
+    ],
+    [
+     "800e4:Skyrim.esm",
+     2,
+     4
+    ]
+   ]
+  },
+  {
+   "recipe": "bff32:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "bff34:Playable Rieklings.esp",
+   "editorId": "RecipeArmorArmorBanditCuirass2",
+   "inputs": [
+    [
+     "800e4:Skyrim.esm",
+     2,
+     5
+    ]
+   ]
+  },
+  {
+   "recipe": "c7472c:Immersive Weapons.esp",
+   "editorId": "IWRecipeWeaponEbonyCutlass",
+   "inputs": [
+    [
+     "5ad9d:Skyrim.esm",
+     2,
+     2
+    ],
+    [
+     "f:Skyrim.esm",
+     50,
+     0
+    ],
+    [
+     "800e4:Skyrim.esm",
+     1,
+     1
+    ]
    ]
   }
  ],
