@@ -111,6 +111,22 @@ WHAT IT PUTS IN THE PLUGIN
      notCopied, and one that reached the recipes stops the build like any
      other record of such a plugin (6).
 
+  7. The script properties the policy sets on a mod quest
+     (questScriptProperties), each the winning record with only those values
+     added or changed on the script the policy names. Skyrim Unbound's start
+     (SkyrimUnboundQuestScript.PrepareForStart, then the inventory module's
+     GivePlayerStuff) runs in each person's own game and hands the new
+     character a random weapon, equipped, which the server never gave: it
+     hangs on the hip, invisible, in no inventory, and can still be drawn and
+     swung (#3101; Djinn read the compiled scripts on 16 Oct 2026, #2039).
+     SkyrimUnboundInventory's ChoiceRandomWeapons False gives no weapon, and
+     its ChoiceSpellsMode 1 gives no spell, which would leave the same kind of
+     thing in a hand. Patrick, 21 Oct 2026, on the board review (#3192): the
+     fix is here. Skyrim Unbound.esp loads after Thornswood-Content.esp, so
+     its own record would win over a change there. A property the script
+     does not carry is added, one it carries is changed, one of another type
+     stops the build, and so does a script the quest does not have.
+
   A placed actor's or item's override needs the cell it stands in, and the worldspace
   for an exterior, so those are copied too, EXACTLY as the winning plugin has
   them, form ids moved into this plugin's numbering. A quest and a location
@@ -1150,6 +1166,26 @@ def build(data_dir):
                              % (q['quest'], q['edid'], edid))
         mod_stopped.append({'quest': desc_of(gid, canon), 'edid': edid})
         qentries.append(e)
+    # 7. The script properties set on mod quests (#3101).
+    stopped_here = {plugins[e.pi].gid(e.fid) for e in qentries}
+    qprops, qprop_rows = [], []
+    for row in (policy.get('questScriptProperties') or {}).get('quests', []):
+        gid = ref_key(row['quest'])
+        e = win.get((b'QUST', gid))
+        if gid[0] in VANILLA or e is None:
+            raise SystemExit('STOP. the policy sets script properties on %s as a mod quest, and no mod has it. '
+                             'Nothing was written.' % row['quest'])
+        edid = edid_of(plugins, e)
+        if edid != row['edid']:
+            raise SystemExit('STOP. the policy sets script properties on %s as %s, and it is %s. '
+                             'Nothing was written.' % (row['quest'], row['edid'], edid))
+        if gid in stopped_here or gid in {plugins[x.pi].gid(x.fid) for x, _ in qprops}:
+            raise SystemExit('STOP. the policy stops %s and sets its script properties too, or sets them twice. '
+                             'Decide which. Nothing was written.' % row['quest'])
+        qprops.append((e, row))
+        qprop_rows.append({'quest': desc_of(gid, canon), 'edid': edid, 'script': row['script'],
+                           'winner': plugins[e.pi].name,
+                           'set': {p['name']: p['value'] for p in row['properties']}})
 
     # 3. The town gates (#2484), each the winning record, unlocked.
     gates = []
@@ -1304,7 +1340,7 @@ def build(data_dir):
     # (Build-Recost.py lists those under notCopied instead).
     held = sorted('%s %s (won by %s)%s' % (e.tag.decode(), desc_of(plugins[e.pi].gid(e.fid), canon),
                                            plugins[e.pi].name, placed(e))
-                  for e in actors + gates + qentries +
+                  for e in actors + gates + qentries + [e for e, _ in qprops] +
                   [e for e, _, _ in hold_locs]
                   if plugins[e.pi].name.lower() in blocked)
     for e, row in recipes:
@@ -1407,6 +1443,12 @@ def build(data_dir):
             pairs = stop_quest(pairs, what)
             out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
                                 pack_subrecords(pairs), e))
+        for e, row in qprops:
+            src = plugins[e.pi]
+            what = '%s QUST 0x%08X' % (src.name, e.fid)
+            pairs = set_properties(copy_record(src, e, rn, strings, what), row, what)
+            out['qust'].append((rn.one(src, e.fid, what), e.flags & ~COMPRESSED,
+                                pack_subrecords(pairs), e))
         for e, row in recipes:
             src = plugins[e.pi]
             what = '%s COBJ 0x%08X' % (src.name, e.fid)
@@ -1467,10 +1509,13 @@ def build(data_dir):
                    'modQuestsStopped': len(mod_stopped),
                    'questsKept': len(quests_kept), 'gatesUnlocked': len(gates),
                    'placeLocations': len(made['lctn']), 'placeRooms': len(hold_cells),
-                   'recipesRecosted': len(made['cobj'])},
+                   'recipesRecosted': len(made['cobj']), 'questScriptProperties': len(qprops)},
         'refs': {k: sorted(v, key=ref_key) for k, v in refs.items()},
         'gatesUnlocked': [desc_of(g, canon) for g in GATES],
         'quests': {'stopped': quests_cut, 'kept': quests_kept, 'modStopped': mod_stopped},
+        # The mod quests whose script properties are set here (#3101), each
+        # with the plugin whose record it is a copy of.
+        'questScriptProperties': qprop_rows,
         # The places given a hold (#2551): each location's parent before and
         # after, and each room's location.
         'placeHolds': {'locations': [row for _, _, row in hold_locs],
@@ -1582,6 +1627,62 @@ def stop_quest(pairs, what):
     if not done or nexts != 1:
         raise SystemExit('STOP. %s does not have one DNAM and one NEXT. Nothing was written.' % what)
     return out
+
+
+# A script property's type in a VMAD, by the policy's name for it, and the
+# status a property set here carries (edited).
+PROPERTY_TYPES = {'int': 3, 'float': 4, 'bool': 5}
+PROPERTY_EDITED = 1
+
+
+def property_bytes(prop, what):
+    """The policy's value for one script property, as a VMAD holds it."""
+    kind, v = prop.get('type'), prop.get('value')
+    if kind == 'bool' and isinstance(v, bool):
+        return bytes([1 if v else 0])
+    if kind == 'int' and isinstance(v, int) and not isinstance(v, bool):
+        return struct.pack('<i', v)
+    if kind == 'float' and isinstance(v, (int, float)) and not isinstance(v, bool):
+        return struct.pack('<f', v)
+    raise SystemExit('STOP. the policy sets %s on %s to %r as a %s, which this does not know how to write. '
+                     'Nothing was written.' % (prop.get('name'), what, v, kind))
+
+
+def quest_script(pairs, script, what):
+    """The quest's scripts as a tree, and the one named script in it.
+    Papyrus names are not case sensitive."""
+    vmads = [b for t, b in pairs if t == b'VMAD']
+    if len(vmads) != 1:
+        raise SystemExit('STOP. %s has no scripts, so it has no %s to set. Nothing was written.' % (what, script))
+    tree = vmad_parse(vmads[0], True)
+    named = [s for s in tree['scripts'] if s['name'].decode('latin1').lower() == script.lower()]
+    if len(named) != 1:
+        raise SystemExit('STOP. %s does not carry the script %s once. Nothing was written.' % (what, script))
+    return tree, named[0]
+
+
+def set_properties(pairs, row, what):
+    """The quest with the policy row's properties set on its script: a
+    property the script carries is changed, one it does not is added. Every
+    other byte of the scripts is the winning record's own."""
+    tree, script = quest_script(pairs, row['script'], what)
+    for prop in row['properties']:
+        kind = PROPERTY_TYPES.get(prop.get('type'))
+        value = property_bytes(prop, what)
+        have = [p for p in script['props'] if p['name'].decode('latin1').lower() == prop['name'].lower()]
+        if len(have) > 1:
+            raise SystemExit('STOP. %s carries %s more than once. Nothing was written.' % (what, prop['name']))
+        if have and have[0]['type'] != kind:
+            raise SystemExit('STOP. %s carries %s as type %d, and the policy sets it as a %s. Nothing was written.'
+                             % (what, prop['name'], have[0]['type'], prop['type']))
+        status = PROPERTY_EDITED if tree['ver'] >= 4 else None
+        if have:
+            have[0]['value'], have[0]['status'] = value, status
+        else:
+            script['props'].append({'name': prop['name'].encode('latin1'), 'type': kind,
+                                    'status': status, 'value': value})
+    body = vmad_write(tree)
+    return [(t, body if t == b'VMAD' else b) for t, b in pairs]
 
 
 def grup(label, gtype, body):
@@ -1723,6 +1824,21 @@ def verify(data_dir, plugin_bytes, manifest):
                 for t, b in pairs if t == b'CNTO'] if e else []
         if e is None or e.pi != last.index or have != [(ref_key(i[0]), i[2]) for i in row['inputs'] if i[2]]:
             fails.append('recipe %s %s does not ask the re-costed counts' % (row['recipe'], row['editorId']))
+    # Every script property the policy sets (#3101) is on the winning quest,
+    # with the policy's value.
+    for row in (json.load(open(POLICY, encoding='utf-8')).get('questScriptProperties') or {}).get('quests', []):
+        e = win.get((b'QUST', ref_key(row['quest'])))
+        what = 'quest %s %s' % (row['quest'], row['edid'])
+        if e is None or e.pi != last.index:
+            fails.append('%s does not carry the script properties the policy sets' % what)
+            continue
+        _, script = quest_script(subrecords(plugins[e.pi].data(e)), row['script'], what)
+        have = {p['name'].decode('latin1').lower(): p for p in script['props']}
+        for prop in row['properties']:
+            p = have.get(prop['name'].lower())
+            if p is None or p['type'] != PROPERTY_TYPES.get(prop['type']) or \
+                    p['value'] != property_bytes(prop, what):
+                fails.append('%s does not set %s to %r' % (what, prop['name'], prop['value']))
     for desc in manifest.get('gatesUnlocked', []):
         e = win.get((b'REFR', ref_key(desc)))
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))] if e else []
@@ -1829,6 +1945,8 @@ def main():
               % (c.get('placeLocations', 0), c.get('placeRooms', 0)))
         print('  ok    %d smith recipes ask the counts recost.json gives' % c.get('recipesRecosted', 0))
         print('  ok    %d floor items are off and nothing can switch them on' % c.get('floorItemsOff', 0))
+        print('  ok    %d mod quests carry the script properties the policy sets'
+              % c.get('questScriptProperties', 0))
         return 0
 
     committed = {m.lower() for m in json.load(open(MANIFEST, encoding='utf-8'))['masters']} \
@@ -1848,6 +1966,9 @@ def main():
     for row in manifest['placeHolds']['rooms']:
         print('  %s (%s): no location -> %s, in %s' % (row['place'], row['edid'], row['location'], row['hold']))
     print('  %d smith recipes re-costed (recost.json, #613)' % c['recipesRecosted'])
+    for row in manifest['questScriptProperties']:
+        print('  %s (%s, from %s): %s' % (row['quest'], row['edid'], row['winner'],
+                                         ', '.join('%s %s' % (k, json.dumps(v)) for k, v in row['set'].items())))
     for row in manifest['notCopiedFrom']['takenFromBelow']:
         print('  never copied from: %s' % row)
     for row in manifest['notCopiedFrom']['carried']:
