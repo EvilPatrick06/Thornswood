@@ -126,8 +126,8 @@ to be put in staff updates"). Every post from a cloud thread runs
 staff-notice.yml on a VPS runner, takes time and uses his limits. A post is
 for one of these three, and nothing else:
 
-- something staff must act on (for example an edit to one of the six shared
-  files that blocks others' work);
+- something staff must act on (for example a new step every staff member
+  takes before a shift);
 - a server restart or outage that staff will see;
 - a change to how staff do their job.
 
@@ -136,6 +136,12 @@ prompt, the app's and the site's News tabs and GitHub already say it), a
 merge, progress, a pull request opened, an issue filed, a test task or a
 routine deploy (Deploy-Docs, Install-Bot -CodeOnly and the like).
 Those live in the pull request and on the board. When unsure, do not post.
+
+A Dev's line before an edit to one of the six shared files that blocks
+others' work, or before taking the dev feed, is not a staff notice: it goes
+in #dev-coordination, the Dev space's channel, and the Dev writes it there.
+The Lead Dev does not post these, and neither does a Claude working for him
+(Patrick, 22 Oct; Developer-Guide.md has the rule).
 
 Where one is due it goes in #staff-updates, channel 1549254991082946570, and
 "the agents should do this themselves using the bot" (Patrick, 20 Oct, #2934). A Claude posts its own. It never hands one to Patrick, never puts one
