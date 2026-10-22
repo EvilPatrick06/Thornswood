@@ -116,7 +116,7 @@ yes('collectEgg logs the nest press for the #628 measurement',
     !!parts.collectEgg && /egg: chicken nest press/.test(parts.collectEgg));
 yes('a non-farmer gets a refusal string, not null (FLOR must not fall through)',
     !!parts.collectEgg && /if \(refusal\) return refusal;/.test(parts.collectEgg));
-yes('success toast starts with You take so putBack leaves the nest empty',
+yes('the success toast says the egg was taken',
     !!parts.collectEgg && /You take 1 Chicken's Egg/.test(parts.collectEgg));
 // The generated plant table, lifted whole, so plantAt below runs against what
 // the server really carries rather than a stub.
@@ -144,9 +144,11 @@ yes('plantAt carries no nest special case: the table is the fix, not a guard ove
 yes('the activate handler calls collectEgg before the plants',
     !!parts.handler && /isChickenNest\(baseDesc\)/.test(parts.handler) &&
     parts.handler.indexOf('collectEgg(') < parts.handler.indexOf('isPlant(baseDesc)'));
-yes('and puts the nest back only when floraHanded says no',
+// #3080: the fork blocks the press, so a refused one empties nothing and
+// nothing is put back (test-3080-flora-blocked.js has the look).
+yes('and puts nothing back: the press never emptied the nest',
     !!parts.handler && /collectEgg\(/.test(parts.handler) &&
-    /!floraHanded\(message\)/.test(parts.handler.slice(parts.handler.indexOf('collectEgg('),
+    !/putBack\(/.test(parts.handler.slice(parts.handler.indexOf('collectEgg('),
       parts.handler.indexOf('isChurn(baseDesc)'))));
 
 const FARMER = 0x14a, GATHERER = 0x14b, NOCLASS = 0x14c, FARMER2 = 0x14d;
@@ -289,7 +291,7 @@ function world(opts) {
   }
 }
 
-// onActivate: farmer nest success empties (no putBack); gatherer putBack
+// onActivate: a farmer takes the egg; a gatherer is refused and nothing is put back
 {
   const REF = 0xC010;
   const w = world({ bases: { [REF]: NEST } });
@@ -308,8 +310,8 @@ function world(opts) {
   const w = world({ bases: { [REF]: NEST } });
   if (w.api && w.api.onActivate) {
     w.api.onActivate(REF, GATHERER);
-    yes('onActivate on a nest for a gatherer puts the nest back',
-        w.rec.putBack.length === 1 && w.rec.putBack[0].refrId === REF);
+    yes('onActivate on a nest for a gatherer puts nothing back (#3080: the press never emptied it)',
+        w.rec.putBack.length === 0);
     yes('and hands them nothing', w.rec.given.length === 0);
     yes('and tells them the farm gate sentence', w.rec.told.indexOf(FARM_NO) >= 0);
   }
