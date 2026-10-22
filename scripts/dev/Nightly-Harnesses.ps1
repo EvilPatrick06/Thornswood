@@ -59,8 +59,21 @@
   On Windows each harness is in a job object of its own, so the summary also
   says how much processor time the harnesses and all their children used and
   how many processes they started, and the machine's processor is read over
-  the whole run. Those are the numbers -Throttle is set from: the box's six
-  cores are shared by four builds at once (#2994).
+  the whole run.
+
+  A SHARE, AND MORE ONLY INTO FREE CORES (#3114, 22 Oct 2026). Up to -Share
+  run at once whatever the machine is doing: that is this run's part of the
+  cores beside the other builds the box runs at once. Past it, up to
+  -Throttle, another starts only into a core the machine has free: the
+  processor is read every half second, and after each reading no more of
+  those start than it had cores idle. So a build alone on the box uses the
+  cores the others would have, and once another build arrives and the cores
+  fill, this one is back to its share as its extra harnesses end, and
+  neither takes the other's. #3106's build at 519b986 on 21 Oct ran 3 at a
+  time beside #3190's at 6 and others, with the box 99.9% busy: #3106's
+  harnesses got 1472 s of processor in 1592 s, under one core, #3190's 1475 s
+  in 737 s, and 30 of #3106's never started inside its 1800 s. The summary
+  says how many ran at once, at most and on average.
 
   NAMED HARNESSES ON DEMAND (#2970). .github/workflows/harnesses.yml runs
   the harnesses somebody names, on the same Windows runners and the same
@@ -92,7 +105,25 @@
   here, or nothing runs and the exit is 2.
 
 .PARAMETER Throttle
-  How many harnesses run at once, 1 to 16. 1, one at a time, unless asked.
+  The most harnesses at once, 1 to 16. 1, one at a time, unless asked.
+
+.PARAMETER Share
+  How many of those run at once whatever the machine is doing, 1 to
+  -Throttle; the rest start only into free cores. -Throttle, all of them,
+  unless asked. build.yml gives the box's cores over the builds it runs at
+  once.
+
+.PARAMETER StartLog
+  A file to which a line of JSON is added as each harness starts (its name,
+  its process id and when Windows says it started, in UTC) and as it ends
+  (its exit code, its seconds and whether it said SKIP or NOT RUN). A trace
+  of the gate (scripts\dev\Trace-Gate.ps1, #3114) reads it to know which
+  process tree was which harness's.
+
+.PARAMETER BusyFrom
+  A file holding how busy the machine is, 0 to 100, read in place of its
+  processor. Only tests\test-nightly-harnesses.ps1 sets it, to run the
+  throttle against a machine it decides.
 
 .PARAMETER Root
   The repository whose harnesses run. The one this script is in, unless a
@@ -110,12 +141,18 @@ param(
     [string]$Only = '',
     [int]$Throttle = 1,
     [string]$Root = '',
-    [string]$OutDir = ''
+    [string]$OutDir = '',
+    [int]$Share = 0,
+    [string]$BusyFrom = '',
+    [string]$StartLog = ''
 )
 
 $ErrorActionPreference = 'Stop'
 if ($Of -lt 1 -or $Shard -lt 1 -or $Shard -gt $Of) { Write-Host "::error::-Shard $Shard -Of $Of names no share"; exit 2 }
 if ($Throttle -lt 1 -or $Throttle -gt 16) { Write-Host "::error::-Throttle $Throttle is not 1 to 16"; exit 2 }
+if ($Share -eq 0) { $Share = $Throttle }
+if ($Share -lt 1 -or $Share -gt $Throttle) { Write-Host "::error::-Share $Share is not 1 to -Throttle ($Throttle)"; exit 2 }
+if ($StartLog) { $StartLog = [IO.Path]::GetFullPath($StartLog) }
 if (-not $Root) { $Root = Split-Path -Parent (Split-Path -Parent $PSScriptRoot) }
 $Root = [IO.Path]::GetFullPath($Root)
 if (-not $OutDir) {
@@ -135,6 +172,11 @@ function Clock-Of($head) {
     if ($m.Success) { [Math]::Min([int]$m.Groups[1].Value, $MAX_CLOCK) } else { $PER_HARNESS }
 }
 function Alone-Of($head) { [regex]::IsMatch($head, '(?im)^[\s#/*<]*RUNS ALONE:\s*\S') }
+# -StartLog: one line of JSON a start or an end, added as it happens.
+function Write-StartLog($fields) {
+    if (-not $StartLog) { return }
+    [IO.File]::AppendAllText($StartLog, ((New-Object psobject -Property $fields) | ConvertTo-Json -Compress) + "`n")
+}
 
 New-Item -ItemType Directory -Path $OutDir -Force | Out-Null
 # An empty file for stdin: no harness reads it, and one that tried would
@@ -240,6 +282,13 @@ function Busy-Between($a, $b) {
     if ($d -le 0) { return 0 }
     [Math]::Round(100.0 * (1 - ($b.Idle - $a.Idle) / $d), 1)
 }
+# How many cores were idle over the last half second or more: what another
+# harness may start into. -BusyFrom stands in for the processor in a test.
+$cores = [Environment]::ProcessorCount
+function Idle-Cores($a, $b) {
+    if ($BusyFrom) { $busy = [double]([IO.File]::ReadAllText($BusyFrom).Trim()) } else { $busy = Busy-Between $a $b }
+    [Math]::Floor($cores * (100 - [Math]::Min(100, [Math]::Max(0, $busy))) / 100 + 1e-9)
+}
 
 # Start-Process joins -ArgumentList with spaces and quotes nothing, so a path
 # is quoted here. $p.Handle is read at once because without it ExitCode comes
@@ -252,6 +301,7 @@ function Start-One($t) {
     else { $exe = 'pwsh'; $argList = @('-NoProfile', '-File', ('"' + $t.File.FullName + '"')) }
     if (-not $onWindows) { $env:THORNSWOOD_NIGHTLY_RUN = $mark }
     $sw = [Diagnostics.Stopwatch]::StartNew()
+    $before = [DateTime]::UtcNow
     try {
         $p = Start-Process -FilePath $exe -ArgumentList $argList -NoNewWindow -PassThru -WorkingDirectory $Root `
                -RedirectStandardInput $nothing -RedirectStandardOutput $o -RedirectStandardError $e
@@ -270,6 +320,15 @@ function Start-One($t) {
             if (-not $p.HasExited) { throw ("could not put {0} in a job of its own (Windows error {1})" -f $t.Name, $err) }
         }
     }
+    # On Windows, Windows' own start time, which a trace's process events
+    # carry (Trace-Gate-Box.ps1 knows the harness by it). The handle taken
+    # above keeps it readable after the process ends. No trace is read
+    # anywhere else, and there a process that has ended and been reaped has
+    # no start time left to ask for, so it is the time just before
+    # Start-Process.
+    $began = $before
+    if ($onWindows) { $began = $p.StartTime.ToUniversalTime() }
+    Write-StartLog ([ordered]@{ name = $t.Name; pid = $p.Id; start = $began.ToString('o') })
     [pscustomobject]@{ T = $t; P = $p; Job = $job; Mark = $mark; Sw = $sw; Out = $o; Err = $e; Ended = $p.WaitForExitAsync() }
 }
 
@@ -303,7 +362,9 @@ function Finish-One($r, [bool]$timedOut) {
     if ($t.Clock -ne $PER_HARNESS) { $said += 'on a ' + $t.Clock + ' s clock it names' }
     if ($null -ne $cpu) { $said += ('{0}s of processor in {1} process(es)' -f $cpu, $procs) }
     Write-Host ("--- {0}  ({1}s{2})" -f $t.Name, $secs, $(if ($said.Count) { ', ' + ($said -join ', ') } else { '' }))
-    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd() } } }
+    $skipped = $false
+    foreach ($f in $r.Out, $r.Err) { if (Test-Path $f) { $txt = Get-Content -Raw $f; if ($txt) { Write-Host $txt.TrimEnd(); if ($txt -match '(?m)^\s*(SKIP|NOT RUN)\b') { $skipped = $true } } } }
+    Write-StartLog ([ordered]@{ name = $t.Name; end = [DateTime]::UtcNow.ToString('o'); code = $code; secs = $secs; skipped = $skipped })
     $path = $t.File.FullName
     if ($timedOut) { Write-Host ("::error file={0}::harness timed out after {1}s and was killed" -f $path, $t.Clock) }
     elseif ($code -ne 0) { Write-Host ("::error file={0}::harness failed (exit {1})" -f $path, $code) }
@@ -351,14 +412,26 @@ if ($Throttle -gt 1) {
 
 $clockAll = [Diagnostics.Stopwatch]::StartNew()
 $cpuFirst = Read-Cpu; $cpuLast = $cpuFirst; $cpuAt = 0.0; $cpuPeak = 0.0
+# The half-second reading that harnesses past -Share start from: $room is
+# how many more of those may start before the next one.
+$tickCpu = $cpuFirst; $tickAt = 0.0; $room = 0
+$mostAtOnce = 0; $runningTime = 0.0
 $results = @()
 $notRun = @()
 $running = New-Object System.Collections.ArrayList
 $next = 0
 while ($next -lt $order.Count -or $running.Count) {
+    $now = $clockAll.Elapsed.TotalSeconds
+    if ($now - $tickAt -ge 0.5) {
+        $read = Read-Cpu
+        $room = Idle-Cores $tickCpu $read
+        $tickCpu = $read; $tickAt = $now
+    }
     while ($next -lt $order.Count -and $running.Count -lt $Throttle) {
         $t = $order[$next]
         if ($running.Count -and ($t.Alone -or $running[0].T.Alone)) { break }
+        $extra = $running.Count -ge $Share
+        if ($extra -and $room -lt 1) { break }
         $next++
         if ($clockAll.Elapsed.TotalSeconds + $t.Clock -gt $BudgetSeconds) {
             $notRun += $t.Name
@@ -366,15 +439,23 @@ while ($next -lt $order.Count -or $running.Count) {
             continue
         }
         [void]$running.Add((Start-One $t))
+        if ($extra) { $room-- }
+        $mostAtOnce = [Math]::Max($mostAtOnce, $running.Count)
         if ($t.Alone) { break }
     }
     if (-not $running.Count) { continue }
 
-    # Sleep until one of them ends or the nearest clock is up, whichever is first.
+    # Sleep until one of them ends or the nearest clock is up, whichever is
+    # first, or the next reading when one more is waiting for a free core.
     $soonest = [double]::MaxValue
     foreach ($r in $running) { $soonest = [Math]::Min($soonest, $r.T.Clock * 1000 - $r.Sw.Elapsed.TotalMilliseconds) }
+    if ($next -lt $order.Count -and $running.Count -lt $Throttle -and $running.Count -ge $Share) {
+        $soonest = [Math]::Min($soonest, [Math]::Max(50, ($tickAt + 0.5 - $clockAll.Elapsed.TotalSeconds) * 1000))
+    }
+    $runningSince = $clockAll.Elapsed.TotalSeconds; $runningCount = $running.Count
     $tasks = [Threading.Tasks.Task[]]@($running | ForEach-Object { $_.Ended })
     $null = [Threading.Tasks.Task]::WaitAny($tasks, [int][Math]::Max(0, [Math]::Ceiling($soonest)))
+    $runningTime += $runningCount * ($clockAll.Elapsed.TotalSeconds - $runningSince)
 
     foreach ($r in @($running)) {
         if ($r.P.HasExited) { $results += Finish-One $r $false; $running.Remove($r) }
@@ -399,6 +480,10 @@ if ($onWindows) {
 }
 Write-Host ('all of them, added up: {0}s, in {1}s' -f [Math]::Round(($results | Measure-Object Secs -Sum).Sum), [Math]::Round($clockAll.Elapsed.TotalSeconds))
 Write-Host ('the machine''s {0} cores while they ran: {1}% busy on average, {2}% at most over 10 s' -f [Environment]::ProcessorCount, $cpuAll, $cpuPeak)
+if ($Throttle -gt 1) {
+    $avg = if ($clockAll.Elapsed.TotalSeconds -gt 0) { [Math]::Round($runningTime / $clockAll.Elapsed.TotalSeconds, 1) } else { 0 }
+    Write-Host ('at once: {0} on average, {1} at most; {2} always, up to {3} into free cores' -f $avg, $mostAtOnce, $Share, $Throttle)
+}
 if ($notRun.Count) {
     Write-Host ''
     if ($Only.Trim()) { Write-Host ("{0} harness(es) not run, out of the {1} s; name fewer in one run: {2}" -f $notRun.Count, $BudgetSeconds, ($notRun -join ', ')) }

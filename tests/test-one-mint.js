@@ -337,7 +337,6 @@ const WRITERS = {
   'property/takeBlankMold': [1, 'only takes a mold away'],
   'property/takeGold': [1, 'takes a notice, job or letter fee or a fare out and never puts any in (checked below)'],
   'property/payOut': [1, 'a letter\'s held 15 back out of the ledger it was counted on, to its courier or its sender; payHeld is its one caller and takes the same off that ledger (#1374, checked below)'],
-  'spoils/strip': [1, 'only takes things out of a container the world stocked'],
   'spoils/purse': [1, 'THE MINT: forty gold, once per character'],
   'trade/moveById': [2, 'moves a pile from one pack to the other, one write each (section 4)'],
   'trade/saleById': [2, 'a company sale (#1393): the things out of the seller\'s pack and out of the world with the seller\'s share in, and the price less the worker\'s cut out of the worker\'s pack, which is never less than the share; one write each (section 4)'],
@@ -992,9 +991,15 @@ if (tradeBlock !== null) {
 yes('the gamemode never asks Papyrus to AddItem', !/(['"])AddItem\1/.test(code));
 
 {
-  const spoil = bodyOf('spoils/isSpoil');
-  yes('and the world does not hand gold over: it is the first thing isSpoil refuses',
-      spoil !== null && /if \(baseId === GOLD\) \{ return true; \}/.test(spoil));
+  // The world hands no gold over, and nothing in the gamemode has to refuse
+  // it: no container holds what the world put there (forbiddenBaseContainer,
+  // #3078), and Thornswood-Last.esp switches off every placed MISC, which
+  // Gold001 is, and every coin purse (#3077).
+  const builder = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'mods', 'Build-LastPlugin.py'), 'utf8');
+  const deploy = fs.readFileSync(path.join(REPO_DIR, 'scripts', 'deploy', 'Deploy-Gamemode.ps1'), 'utf8');
+  yes('and the world does not hand gold over: no container is filled, and no coin or coin purse lies on the floor',
+      /forbiddenBaseContainer -NotePropertyValue @\('CONT'\)/.test(deploy) &&
+      /FLOOR_TYPES = \([^)]*b'MISC'/.test(builder) && /COIN_PURSES = \(/.test(builder));
 }
 
 console.log('');

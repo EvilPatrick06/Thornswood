@@ -16,6 +16,7 @@ import pathlib
 import re
 import struct
 from MerchantRoster import apply_roster, BOOK_HOLDS, ROLES
+import own_plugins
 
 HERE = pathlib.Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('npc_cast', HERE / 'Build-CastTable.py')
@@ -464,13 +465,24 @@ def activate_guild(payload):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument('--settings', required=True)
+    where = parser.add_mutually_exclusive_group(required=True)
+    where.add_argument('--settings', help='A server-settings file; its loadOrder paths are read')
+    # The catalogue's own load order, every plugin read out of one folder:
+    # how it is rebuilt off One, by scripts/mods/Run-OnBox.ps1 with
+    # --data '{data}', after Build-LastPlugin.py has rebuilt the plugin it
+    # lists last (#3077). The order itself moves only with the collection,
+    # and then from a server-settings file.
+    where.add_argument('--data', help='A folder holding every plugin of the catalogue\'s own load order')
     parser.add_argument('--out', default=str(HERE.parent.parent / 'game/data/npc-population.json'))
     parser.add_argument('--write-runtime', action='store_true')
     parser.add_argument('--strings-dir', help='Installed archive directory for localized record names')
     args = parser.parse_args()
-    with open(args.settings, encoding='utf-8-sig') as source:
-        paths = json.load(source)['loadOrder']
+    if args.settings:
+        with open(args.settings, encoding='utf-8-sig') as source:
+            paths = json.load(source)['loadOrder']
+    else:
+        with open(args.out, encoding='utf-8') as source:
+            paths = [own_plugins.plugin_path(args.data, row['name']) for row in json.load(source)['loadOrder']]
     payload = activate_guild(build(paths, args.strings_dir))
     with open(args.out, 'w', encoding='utf-8', newline='\n') as output:
         json.dump(payload, output, ensure_ascii=False, separators=(',', ':'))

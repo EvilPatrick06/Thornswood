@@ -86,8 +86,9 @@ Until a profession is picked, nothing that belongs to a half is made.
 Smelting an ingot belongs to the smith halves. Tanning a hide into
 leather belongs to the Platewright. One row of each stays. The
 duplicate rows are in [Cut items](cut-items.md). House walls, roofs
-and furniture are still on the anybody list:
-[lists/anybody.md](lists/anybody.md). Nails, hinges, locks and iron
+and furniture are owned by nobody
+([lists/anybody.md](lists/anybody.md)), and the Hearthfire building
+benches they sit at open for nobody. Nails, hinges, locks and iron
 fittings are refused: [lists/refused.md](lists/refused.md).
 
 A recipe can also demand a race. [Races](races.md). The locked rows
@@ -106,15 +107,22 @@ in a life, and it never climbs.
 
 ## Benches, in one picture
 
-Some furniture turns you away before a recipe is even read. Some
-furniture is open, and the recipe is what refuses you.
+A bench opens only for somebody with at least one recipe there that
+they may make, so the crafting menu never opens on nothing. The bench
+asks the same question the craft does, recipe by recipe, so a rank, a
+race's own gear and a roll all count. The menu then lists only what you
+may make.
 
-Closed, and the half must be one you can work at the rank named:
+Who each bench opens for. A half is one you can work at the rank named:
+your own half, or your sister half or a taught half at novice. No
+bench opens for everybody: the few things at a bench that nobody owns
+(rings at the forge, ores at the smelter, fur plate at the tanning rack)
+are made by whoever the bench opens for.
 
 | Bench | Who |
 | --- | --- |
 | Oven | Hearthcook or Confectioner, from novice |
-| Cookpot | Open furniture. The recipe is still Hearthcook's |
+| Cookpot | Hearthcook, from novice |
 | Grain mill | Hearthcook, from novice |
 | Charcoal kiln | Charburner, from novice |
 | Alchemy lab | Blightbrewer or Physicker, from novice |
@@ -123,11 +131,12 @@ Closed, and the half must be one you can work at the rank named:
 | Sharpening wheel | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
 | Skyforge | Edgewright, Platewright, or Woodwright, at advanced |
 | Dawnguard bench | Woodwright, at advanced |
-| Forge | Open furniture. A forge recipe still has an owner and a rank |
-| Tanning rack | Open furniture. A hide into leather is the Platewright's |
-| Loom | Open furniture. The garment still has an owner and a rank |
+| Forge | Smiths and Tailors, and the Woodwright for bows and arrows, from novice |
+| Tanning rack | Platewright or Haberdasher, from novice. Liverywright at advanced |
+| Loom | Haberdasher or Liverywright, from novice |
 | Armour table | Shut for everybody. Tempering is cut, and a piece is mended with a repair kit |
-| Aetherium forge | Open furniture. The staff and the plate made there are master recipes |
+| Aetherium forge | Shut for everybody. Nobody works it |
+| Smelter | Platewright, from novice |
 
 A forge or a skyforge burns one charcoal, cheapest grade in the pack
 first. No charcoal, nothing is made. A war axe, a battleaxe, a

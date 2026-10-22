@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  64,
-    "callCount":  263,
+    "scriptCount":  69,
+    "callCount":  272,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -676,7 +676,7 @@
                       "script":  "scripts/deploy/Install-Bot.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @(\u0027bot.py\u0027, \u0027_pyguard.py\u0027, \u0027card.py\u0027)) + $serviceCheckBlock) |",
+                      "anchor":  "$checkOut = @(Remote ((ServiceSwapVars $Root $stageName $prevName $Wait $hashes @(\u0027bot.py\u0027, \u0027_pyguard.py\u0027, \u0027trust.py\u0027, \u0027card.py\u0027)) + $serviceCheckBlock) |",
                       "does":  "writes or checks a stage folder",
                       "class":  "stage",
                       "reason":  "writes or checks a stage folder or file"
@@ -1126,10 +1126,19 @@
                       "script":  "scripts/deploy/Setup-Domain.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "Remote",
-                      "anchor":  "`$exe = Join-Path `$dir \u0027caddy.exe\u0027",
+                      "anchor":  "$started = @(Remote $run.Start)",
                       "does":  "install-time or outside-the-gate work",
                       "class":  "admin",
-                      "reason":  "sends caddy"
+                      "reason":  "starts the Caddy task change and restart on the box on its own, through WMI (#3193)"
+                  },
+                  {
+                      "script":  "scripts/deploy/Setup-Domain.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$read = @(Remote $run.Read",
+                      "does":  "reads the report of that run, and deletes it once it holds END (#3193)",
+                      "class":  "read-status",
+                      "reason":  "reads a report file"
                   },
                   {
                       "script":  "scripts/deploy/Swap.ps1",
@@ -1861,6 +1870,15 @@
                       "reason":  "hand tool: runs whatever PowerShell it is given"
                   },
                   {
+                      "script":  "scripts/vps/Profile-GameServer.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$said = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script @\"",
+                      "does":  "drops a CPU profile request json into the server data folder and reads the summary the gamemode writes",
+                      "class":  "stage",
+                      "reason":  "file write in a Thornswood folder; the gamemode reads it, profiles itself, writes profiles\\newest.txt and deletes it"
+                  },
+                  {
                       "script":  "scripts/vps/Request-Restart.ps1",
                       "scope":  "\u003ctop\u003e",
                       "via":  "ssh",
@@ -2095,6 +2113,15 @@
                       "reason":  "sets a TCP/IP registry value and restarts the box (#2946)"
                   },
                   {
+                      "script":  "scripts/vps/Set-WebFirewall.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Clean @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script (\"`$ProgressPreference = \u0027SilentlyContinue\u0027`r`n\" + $script))",
+                      "does":  "runs vps-web-firewall.ps1, sent on standard input (#3035), which reads or sets the remote addresses of the Thornswood Web 80 and 443 rules",
+                      "class":  "admin",
+                      "reason":  "firewall change for ports 80 and 443 (#2995)"
+                  },
+                  {
                       "script":  "scripts/vps/Setup-CloudSsh.ps1",
                       "scope":  "Works",
                       "via":  "ssh",
@@ -2154,6 +2181,42 @@
                       "via":  "ssh",
                       "anchor":  "\u0026 ssh -o StrictHostKeyChecking=yes -G $Address",
                       "does":  "prints what ssh makes of this machine\u0027s config; connects to nothing",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$null = \u0026 schtasks /delete /tn \u0027$Task\u0027 /f 2\u003e\u00261",
+                      "does":  "install-time or outside-the-gate work",
+                      "class":  "admin",
+                      "reason":  "sends schtasks /delete"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$(Get-ThornswoodLockedFolderScript $Root)",
+                      "does":  "install-time or outside-the-gate work",
+                      "class":  "admin",
+                      "reason":  "sends LockedFolderScript and schtasks /create"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$t = Get-ScheduledTask -TaskName \u0027$Task\u0027 -EA SilentlyContinue",
+                      "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },
@@ -2381,6 +2444,24 @@
                       "does":  "logs in from this machine, the way every script does, and echoes a word",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/dev/Trace-Gate.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Bypass -Script ($pre + [IO.File]::ReadAllText($BoxScript)) |",
+                      "does":  "runs scripts/dev/Trace-Gate-Box.ps1 in one of its modes: the self-test, starting and stopping the gate\u0027s ETW trace session, reading the trace against the run\u0027s start log, or emptying C:\\Thornswood-Trace (#3114)",
+                      "class":  "admin",
+                      "reason":  "only an administrator can start a kernel trace session and set the trace folder\u0027s ACL"
+                  },
+                  {
+                      "script":  "scripts/deploy/Setup-Discord.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $far",
+                      "does":  "-OnBox: writes Build-Discord.py, content.py and staff-channel.txt to a new folder in C:\\Windows\\Temp, runs Build-Discord.py there with the token from C:\\Thornswood-Bot\\bot.env.json and the bot\u0027s own Python libraries, then removes the folder (#2519)",
+                      "class":  "admin",
+                      "reason":  "reads the bot token from the bot\u0027s settings, which only an administrator may read, and works outside the gate verbs"
                   }
               ]
 }

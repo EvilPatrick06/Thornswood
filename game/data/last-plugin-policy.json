@@ -46,5 +46,23 @@
    {"cell": "660d:Solitude Arena.esp", "edid": "aamaisonchamp", "place": "the Lost Hut", "location": "16769:Skyrim.esm", "locationEdid": "ReachHoldLocation", "holdEdid": "ReachHoldLocation", "why": "The hut has no location of its own and no location of Solitude Arena.esp covers it, so it takes the Reach's own."},
    {"cell": "8e52:Dawnguard.esm", "edid": "DLC1HunterValleyCave01", "place": "Mossy Glen Cave, a cave of Fort Dawnguard's valley", "location": "4c1f:Dawnguard.esm", "locationEdid": "DLC1HunterHQLocation", "holdEdid": "RiftHoldLocation", "why": "The cave has no location of its own. Its doors open onto the valley, so it takes the valley's."}
   ]
- }
+ },
+ "notCopiedFrom": [
+  {"plugin": "Hothtrooper44_ArmorCompilation.esp",
+   "why": "Immersive Armors. Patrick, 17 Oct 2026 (issue 2454): it is used as-is through the collection and nothing built from it is redistributed. So no record of it is copied here but the ones in carried; a cell it wins is copied from the plugin below it when it changes nothing there (issue 3077).",
+   "carriedWhy": "Patrick, 21 Oct 2026, on the report page (issue 3077, option A): carry these 11 records so no floor item is left: the 6 floor items it places, switched off (their id, base and place only), and the 5 cell and world headers they stand under, as it has them. No other record of it, and none of its armour, meshes or textures, is copied.",
+   "carried": [
+    "REFR 4be1b:Hothtrooper44_ArmorCompilation.esp",
+    "REFR 7ad7:Hothtrooper44_ArmorCompilation.esp",
+    "REFR 7ad8:Hothtrooper44_ArmorCompilation.esp",
+    "REFR 7ad9:Hothtrooper44_ArmorCompilation.esp",
+    "REFR 7ada:Hothtrooper44_ArmorCompilation.esp",
+    "REFR 8398b:Hothtrooper44_ArmorCompilation.esp",
+    "CELL 161eb:Skyrim.esm",
+    "CELL 1a272:Skyrim.esm",
+    "CELL 3a9e3:Skyrim.esm",
+    "CELL b4f6:Skyrim.esm",
+    "WRLD 3a9d6:Skyrim.esm"
+   ]}
+ ]
 }

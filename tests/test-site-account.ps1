@@ -398,6 +398,25 @@ if (-not (Get-Command New-ScheduledTaskPrincipal -ErrorAction SilentlyContinue))
     Done
 }
 try {
+    # The scratch box stands in for C:\, so it takes nothing from the folder
+    # it was made in and has what C:\ has on the box: SYSTEM, Administrators,
+    # whoever runs this, and BUILTIN\Users reading (#913). The runner's temp
+    # folder is inside its own locked runner folder since #3117, whose denies
+    # for the other runner accounts would otherwise be inherited a level above
+    # the Users rule; the site folder's copy of them is then out of order, and
+    # Windows refuses to change it, which the real site folder never meets.
+    New-Item -ItemType Directory -Force -Path $tmp | Out-Null
+    $usersSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
+    $top = Get-Acl -LiteralPath $tmp
+    $top.SetAccessRuleProtection($true, $false)
+    $inherit = [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit'
+    foreach ($s in @('S-1-5-18', 'S-1-5-32-544', [Security.Principal.WindowsIdentity]::GetCurrent().User.Value)) {
+        $top.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule((New-Object Security.Principal.SecurityIdentifier($s)), 'FullControl',
+            $inherit, [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    }
+    $top.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($usersSid, 'ReadAndExecute',
+        $inherit, [Security.AccessControl.PropagationFlags]::None, 'Allow')))
+    Set-Acl -LiteralPath $tmp -AclObject $top
     $docs   = Join-Path $tmp 'Thornswood-Docs'
     $server = Join-Path $tmp 'Thornswood-Server'
     $dev    = Join-Path $tmp 'Thornswood-Server-Dev'
@@ -418,13 +437,7 @@ try {
     Put (Join-Path $docs 'feed\assets\0000000000000000000000000000000000000000000000000000000000000000') 'x'
     Put (Join-Path $docs 'feed-dev\version.json') '{}'
     # BUILTIN\Users reaches the real site folder by inheriting from C:\. The
-    # scratch one gets the same, from the scratch folder above it.
-    $usersSid = New-Object Security.Principal.SecurityIdentifier('S-1-5-32-545')
-    $top = Get-Acl -LiteralPath $tmp
-    $top.AddAccessRule((New-Object Security.AccessControl.FileSystemAccessRule($usersSid, 'ReadAndExecute',
-        [Security.AccessControl.InheritanceFlags]'ContainerInherit, ObjectInherit',
-        [Security.AccessControl.PropagationFlags]::None, 'Allow')))
-    Set-Acl -LiteralPath $tmp -AclObject $top
+    # scratch one gets the same, from the scratch box above it (set up first).
     # The folders outside the site's own that the block grants. The site's
     # folder is in the scratch box, so the block names these in it and not on
     # C: (#1273). $dev is left out on purpose: a box with no dev server has no
@@ -447,7 +460,9 @@ try {
 
     # -- LOCAL SERVICE, with the real icacls on the scratch folders -------------
     $block = BlockOf (Build 'LOCAL SERVICE' $docs)
-    Yes 'LOCAL SERVICE: every folder in the block was swapped for a scratch one' ($block -notmatch "'C:\\Thornswood-")
+    # The scratch box itself can be under C:\Thornswood-RunnerN (#3117), so
+    # its own paths are taken out before looking for a real folder.
+    Yes 'LOCAL SERVICE: every folder in the block was swapped for a scratch one' ($block.Replace("'" + $tmp, "'<scratch>") -notmatch "'C:\\Thornswood-")
     $r = Run $block
     $said = $r.said -join "`n"
     Yes 'LOCAL SERVICE: the task runs as LOCAL SERVICE' ($r.principal -and $r.principal.UserId -match 'LOCAL SERVICE$')

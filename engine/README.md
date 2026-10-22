@@ -373,9 +373,22 @@ anything is compiled, `engine.yml` looks for that build of the commit
 (`scripts\release\ForkEngineBuild.ps1`), holds it to the commit, the run and
 every file, puts it in the fork's build folder, and makes both records from
 it with `-BuiltBy` naming the fork's run. The engine is compiled here, on
-GitHub's runner and then the VPS, only when the fork has no build of the
-commit (one from before fork #79, or one whose 90 days are over). A fork
-build still running, or one that ended red, stops the run with its link.
+GitHub's runner alone, only when the fork has no build of the commit (one
+from before fork #79, one whose 90 days are over, or one that was never a
+head of `thornswood/engine-changes`). A fork build still running, or one that
+ended red, stops the run with its link.
+
+The VPS compiles nothing (#3014, Patrick's A on 22 October). Its runner
+accounts reach GitHub's addresses and nothing else (#2161), and a compile
+needs more: the fork's libraries come from eight other hosts (mirror.msys2.org,
+the CEF CDN and more), and Windows checks each download's certificate with
+its authority's servers, which even GitHub's own downloads need. Run
+39727871475 stopped at vcpkg's first download that way. So on the
+box `engine.yml` takes the fork's build or stops before anything is compiled,
+saying so. A pin therefore names a commit the fork built: a head of
+`thornswood/engine-changes`, built by the push that made it the head. A
+commit the fork never built goes to GitHub's runner when there are minutes
+(`-f runner=hosted`), or is built on One.
 Both check the fork out as committed, LF, as One does: the image's git turns
 text to CR LF, and the records hold the server's `package.json`, `yarn.lock`
 and bundle to the fork's bytes.
@@ -464,11 +477,10 @@ engine.yml --ref main` makes it again: it takes the fork's own build of the
 commit, which the fork keeps 90 days, so the files are the same bytes and
 still match the records. `tests\test-3047-ci-engine-build.ps1` holds all of it.
 
-On the VPS the fallback needs the C++ half of the Build Tools, CMake and
-yarn, which the box did not have on 16 October:
+On the VPS the fallback needs yarn, for the fork build's server packages:
 `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'`
-puts them there. Until it has run, the fallback stops at Build-Engine's tool
-check and says what is missing. `tests\test-459-engine-workflow.ps1` holds the
+puts it there, with the C++ half of the Build Tools and CMake, which the box
+no longer uses (#3014). `tests\test-459-engine-workflow.ps1` holds the
 workflow's shape and these two scripts' part in it, and
 `tests\test-459-fork-build.ps1` which fork build is taken, what it is held
 to, and the records' `-BuiltBy`.

@@ -411,9 +411,14 @@ if ($moved) {
     # The last two sets of replaced files stay, newest first by their stamp,
     # and the last two a -PutBack took out.
     foreach ($kind in '.prev-*', '.undone-*') {
-      Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
+      # Said, not thrown away: a copy that will not go stays, and the line
+      # says which and what Windows answered (#3183).
+      $pastTwo = @(Get-ChildItem -LiteralPath $Root -Directory -Force |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2)
+      foreach ($pd in $pastTwo) {
+        try { Remove-Item -LiteralPath $pd.FullName -Recurse -Force -ErrorAction Stop }
+        catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
+      }
     }
     'SWAP OK'
     exit 0
@@ -732,9 +737,14 @@ if ($moved) {
     Remove-Item -LiteralPath $stageDir -Recurse -Force -EA SilentlyContinue
     # The newest two of each, by their stamp.
     foreach ($kind in '.prev-*', '.undone-*') {
-      Get-ChildItem -LiteralPath $Root -Directory -Force -EA SilentlyContinue |
-        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2 |
-        ForEach-Object { Remove-Item -LiteralPath $_.FullName -Recurse -Force -EA SilentlyContinue }
+      # Said, not thrown away: a copy that will not go stays, and the line
+      # says which and what Windows answered (#3183).
+      $pastTwo = @(Get-ChildItem -LiteralPath $Root -Directory -Force |
+        Where-Object { $_.Name -like $kind } | Sort-Object Name -Descending | Select-Object -Skip 2)
+      foreach ($pd in $pastTwo) {
+        try { Remove-Item -LiteralPath $pd.FullName -Recurse -Force -ErrorAction Stop }
+        catch { 'PRUNE FAILED: could not remove ' + $pd.FullName + ', one of the old copies past the newest 2: ' + $_.Exception.Message }
+      }
     }
     'SWAP OK'
     exit 0

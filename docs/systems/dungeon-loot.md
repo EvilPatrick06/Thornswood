@@ -6,9 +6,12 @@ stronger character does not raise it. Camps are not on the chest
 table. A bandit camp and a giant camp have no tier. A camp enemy
 carries a little on the body instead.
 
-The world's own coin, weapons, and armour are still taken out of
-containers and off the world. What this pays is created by the server,
-the same way a scene quest creates its reward. See [Gold](gold.md).
+No container in the world holds anything the world put there. A
+chest, a barrel, a sack, or a cupboard starts empty, and holds only
+what a person puts in it. Nothing the world placed lies on the floor
+of a dungeon or anywhere else. What this pays is created by the
+server, the same way a scene quest creates its reward, and goes into
+the pack of the person who opened the chest. See [Gold](gold.md).
 
 ## What opens
 
@@ -81,8 +84,8 @@ company keeps its own goods the same way, from its own source. See
 - Ancient Nord Bow, Ancient Nord Helmet, Ancient Nord Armor, Ancient Nord Boots, Ancient Nord Gauntlets, from tier 3
 - Ancient Nord Greatsword, Ancient Nord Battleaxe, Black Soul Gem, from tier 4
 
-One of them, when the exclusive roll hits. The world's own spawned
-weapons and armour are still stripped. Ordinary iron, steel, and the
+One of them, when the exclusive roll hits. The world puts nothing
+in a container of its own. Ordinary iron, steel, and the
 rest of the gear list above are created by the chest, and the burial
 set is created only from this list.
 
@@ -95,6 +98,16 @@ dungeon tier stays off. A mine that is only a bandit camp is not a
 dungeon chest. Those enemies use the body pile.
 
 ## Bodies
+
+An NPC gives only the loot Thornswood assigns: the body pile below,
+the Hunter carcass table, or goods deliberately handed to that NPC by
+a server system. Its plugin's pockets and death-item list do not add
+gold, potions or other loot. Its inherited clothes and weapons remain
+owned inside the engine so it can dress and fight, but cannot be taken,
+traded or dropped. An assigned copy of the same weapon is separate and
+can still be handed over. This applies alive, dead and after returning.
+Nothing strips a corpse after death; the native initialization and
+transfer rules prevent the extra loot at its source.
 
 Every dead body that is not a person, and not a hunter carcass, can
 be searched. The pile is rolled when that actor dies and stays on
