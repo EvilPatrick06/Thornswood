@@ -695,6 +695,61 @@ function Move-ThornswoodPath([string]$From, [string]$To) {
 }
 # ---- end StopAndMove.ps1 ----
 
+# The server folders' turn, which the nightly backup takes too (#3247). A copy
+# of scripts\deploy\ServerFolderTurn.ps1 below its header, for the reason the
+# StopAndMove.ps1 copy above is; tests\test-3247-server-folder-turn.ps1 fails
+# when the two differ.
+# ---- ServerFolderTurn.ps1 (copy) ----
+
+# The server folders' turn (#3247). The nightly backup reads each game
+# server's folder while it runs, and a server install or deploy stops that
+# server and renames its folder or its files. On 22 Oct 2026 at 2:21 AM a dev
+# publish stopped dev and was refused the folder swap ("Access to the path is
+# denied"), because the backup, started 2:15 AM, still had files open under
+# it: its log has game-dev\world taken from 2:19:33 to 2:22:00 AM, and the
+# dev folders done at 2:27:01 AM. Nothing made the two take turns.
+#
+# So each takes the turn first: the backup for as long as it reads the server
+# folders, an install or a deploy before it stops a server, held until the
+# script ends. The turn is server-folders.turn in the backup's own folder
+# (C:\Thornswood-Backup on the box, beside the server folders), opened with
+# no sharing, so only one process at a time has it open, and Windows gives
+# it back when that process ends however it ends: no turn is ever left taken
+# by a run that died. Whoever has it writes who and since when beside it, in
+# server-folders.turn.who, for the one waiting to say. With no backup folder
+# beside the server folders (a scratch root in a harness, a box the backup
+# was never installed on) there is nothing to take turns with, and it hands
+# back $null.
+#
+# Hands back the open file, which the caller keeps until it is done; throws
+# when the turn has not come in $WaitSeconds, naming who has it, so the
+# caller refuses with nothing stopped. $Tell says the one line about waiting.
+function Enter-ThornswoodServerFolderTurn([string]$Folder, [string]$Who, [int]$WaitSeconds, [scriptblock]$Tell) {
+  if (-not (Test-Path -LiteralPath $Folder -PathType Container)) { return $null }
+  $turn = Join-Path $Folder 'server-folders.turn'
+  $note = Join-Path $Folder 'server-folders.turn.who'
+  $until = (Get-Date).AddSeconds($WaitSeconds)
+  $told = $false
+  while ($true) {
+    try {
+      $held = [IO.File]::Open($turn, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+      [IO.File]::WriteAllText($note, ($Who + ', pid ' + $PID + ', since ' + (Get-Date).ToString('h:mm:ss tt')))
+      return $held
+    } catch [IO.IOException] {
+      # Only "another process has it open" is a wait: 0x80070020 or 21 on
+      # Windows, 11 where .NET locks with flock. Anything else is thrown.
+      $e = $_.Exception
+      if ($e.GetType() -ne [IO.IOException] -or @(0x80070020, 0x80070021, 11) -notcontains $e.HResult) { throw }
+      $who = ''
+      try { $who = [IO.File]::ReadAllText($note).Trim() } catch { $who = 'a run that has not said who it is (' + $_.Exception.Message + ')' }
+      if ((Get-Date) -ge $until) { throw ('the server folders are still taken after ' + $WaitSeconds + ' s, by ' + $who) }
+      if (-not $told) { [void](& $Tell ('waiting for the server folders, which ' + $who + ' has')); $told = $true }
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+# ---- end ServerFolderTurn.ps1 ----
+
 # A folder rename on one volume, once (Move-ThornswoodPath above), saying why
 # when it is refused.
 function MoveDir([string]$from, [string]$to) {
@@ -1347,6 +1402,16 @@ if (-not $PutBack) {
 $hadRoot = Test-Path -LiteralPath $Root
 $script:carryFailed = $false
 if ($hadRoot) {
+    # The nightly backup reads this folder; one of the two at a time (#3247,
+    # Enter-ThornswoodServerFolderTurn above). Held until this script ends.
+    $turnWhy = ''
+    try { $script:serverTurn = Enter-ThornswoodServerFolderTurn (Join-Path $parent 'Thornswood-Backup') ('the server install into ' + $Root) 1200 { param($m) Say $m 'Yellow' } }
+    catch { $turnWhy = $_.Exception.Message }
+    if ($turnWhy) {
+        Say ($turnWhy + ', so nothing was stopped or swapped.') 'Red'
+        if (-not $PutBack) { Remove-Item -LiteralPath $stageDir -Recurse -Force -ErrorAction SilentlyContinue }
+        Finish 'INSTALL REFUSED' 1
+    }
     Say 'stopping the server' 'Cyan'
     StopServer $Root
     if (-not (MoveDir $Root $aside)) {
