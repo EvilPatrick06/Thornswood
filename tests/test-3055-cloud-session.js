@@ -162,9 +162,13 @@ else {
     const ecalls = path.join(tmp, 'ecalls.txt');
     // Every command the setup script runs that would install, download or
     // touch the image: a stand-in that writes down its name and arguments.
+    // sha256sum reads the line piped to it, as the real one does: one that
+    // exits without reading can end before echo writes, and under
+    // set -o pipefail echo's SIGPIPE then ends the script 141 (seen on a busy
+    // machine on 22 Oct 2026, #3114).
     ['pwsh', 'curl', 'dpkg', 'apt-get', 'npm', 'sha256sum', 'install', 'ln', 'ls',
       'chromium', 'lighthouse', 'linkinator', 'osv-scanner'].forEach(function (n) {
-      fs.writeFileSync(path.join(ebin, n), '#!/bin/sh\necho "' + n + ' $*" >> \'' + ecalls + '\'\nexit 0\n');
+      fs.writeFileSync(path.join(ebin, n), '#!/bin/sh\n' + (n === 'sha256sum' ? 'cat > /dev/null\n' : '') + 'echo "' + n + ' $*" >> \'' + ecalls + '\'\nexit 0\n');
       fs.chmodSync(path.join(ebin, n), 0o755);
     });
     function setup(clone) {
