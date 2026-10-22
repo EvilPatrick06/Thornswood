@@ -193,6 +193,26 @@ CHECK = os.environ.get('DISCORD_CHECK', '') == '1'
 # changed. A name PLAN does not have stops the run before Discord is asked
 # anything.
 ONLY = [n.strip() for n in os.environ.get('DISCORD_ONLY', '').split(',') if n.strip()]
+
+# THE AUDIT (#3317). Reads the live server and says where it differs from this
+# plan, and changes nothing: no role, channel, post, webhook or setting is
+# touched, and nothing is written beside the code.
+#
+# Patrick asked on 22 Oct for every role's permissions to be right globally,
+# per category, per channel and for the bot, and for nobody to hold two ranks
+# of one staff category. The plan below only says what a channel this MAKES
+# gets, and the live server was gated by hand, so the only way to know what
+# people can really do is to read it. This is that read, as a tool anybody can
+# run again, rather than a one-off look:
+#
+#     python Build-Discord.py --audit
+#     .\Setup-Discord.ps1 -OnBox -Audit
+#
+# It says: the bot's own permissions against the running set, each role's
+# permissions against ROLES, who holds each staff rank and every double rank
+# (STAFF_RANKS), every planned category and channel whose overwrites differ
+# from what its mode gives, and the channels the plan does not name.
+AUDIT = ('--audit' in sys.argv) or os.environ.get('DISCORD_AUDIT', '') == '1'
 GUILD  = os.environ.get('DISCORD_GUILD', '').strip()   # optional server id
 WEBHOOK_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'news-webhook.txt')
@@ -371,6 +391,18 @@ GM_AREA = ('Lead Gamemaster', 'Lead GM', 'Gamemaster', 'Trial Gamemaster',
 # in who happens to hold Administrator. Read only in code, not by a hand
 # change on the live guild.
 GM_RULES_POST = ('Lead Gamemaster', 'Lead GM', 'Owner', 'Dev')
+
+# The ranks of each staff category, highest first (#3317). Patrick, 22 Oct:
+# "people dont have double roles like dev and lead dev, they can have Owner and
+# Lead Dev as those are separate". So one person holds at most one rank in each
+# of these, and ranks in two different categories are not a double. The audit
+# reads it; only roles on the server today are named, both spellings of the
+# lead gamemaster role included, and the lead roles #3317 makes join their
+# category when they are made.
+STAFF_RANKS = (
+    ('Gamemasters', ('Lead Gamemaster', 'Lead GM', 'Gamemaster',
+                     'Trial Gamemaster')),
+)
 
 # --------------------------------------------------------------- channels --
 # mode:  public       anybody talks, including somebody not yet approved
@@ -1314,6 +1346,224 @@ def plan_for(only):
     return out
 
 
+# The gate a category this makes is given. A category's channels carry their
+# own modes; this is the category's own, which the audit reads as well.
+CATEGORY_MODE = {'Staff': 'staff', 'Testing': 'pathfind',
+                 'Gamemasters': 'gm',
+                 'The Holds': 'hold',
+                 'Start Here': 'public',
+                 'Applications': 'public'}
+
+
+# discord.py hands View Channel back under its old name, read_messages. The
+# audit says it the way Discord's own permissions page and this file do.
+SAID = {'read_messages': 'view_channel'}
+
+
+def perm_names(p):
+    """The permissions a Permissions holds, by discord.py's names, sorted."""
+    return sorted(SAID.get(n, n) for n, v in p if v)
+
+
+def _ow_dict(o):
+    """A PermissionOverwrite as {name: True or False}, the unset left out."""
+    return dict((SAID.get(n, n), v) for n, v in o if v is not None)
+
+
+def perm_diff(have, want):
+    """(extra, missing): what have holds that want does not, and the other
+       way round, by name."""
+    h, w = set(perm_names(have)), set(perm_names(want))
+    return sorted(h - w), sorted(w - h)
+
+
+def target_name(guild, t):
+    """Who an overwrite is for, in words: a role's name, the bot, or a
+       member by id. A member is never named, so the audit's channel lines
+       say nothing about people."""
+    if getattr(t, 'id', None) == getattr(getattr(guild, 'me', None), 'id', -1):
+        return 'the bot'
+    if hasattr(t, 'permissions'):
+        return t.name
+    return 'member %s' % getattr(t, 'id', '?')
+
+
+def overwrite_diff(guild, live, want):
+    """What differs between two {target: PermissionOverwrite} maps, as one
+       line per target that differs, by the target's name. A target only in
+       live is said with everything it sets; one only in want is said as
+       missing."""
+    a = dict((target_name(guild, t), o) for t, o in (live or {}).items())
+    b = dict((target_name(guild, t), o) for t, o in (want or {}).items())
+    out = []
+    for name in sorted(set(a) | set(b)):
+        la = _ow_dict(a[name]) if name in a else {}
+        wb = _ow_dict(b[name]) if name in b else {}
+        if name not in a:
+            out.append('%s: no overwrite, the plan gives %s'
+                       % (name, _ow_words(wb)))
+            continue
+        if name not in b:
+            out.append('%s: not in the plan, has %s' % (name, _ow_words(la)))
+            continue
+        diff = []
+        for perm in sorted(set(la) | set(wb)):
+            if la.get(perm) != wb.get(perm):
+                diff.append('%s is %s, plan %s' % (perm, _tri(la.get(perm)),
+                                                    _tri(wb.get(perm))))
+        if diff:
+            out.append('%s: %s' % (name, '; '.join(diff)))
+    return out
+
+
+def _tri(v):
+    return 'allowed' if v is True else 'denied' if v is False else 'unset'
+
+
+def _ow_words(d):
+    allow = sorted(k for k, v in d.items() if v is True)
+    deny = sorted(k for k, v in d.items() if v is False)
+    parts = []
+    if allow:
+        parts.append('allow ' + ', '.join(allow))
+    if deny:
+        parts.append('deny ' + ', '.join(deny))
+    return '; '.join(parts) or 'nothing'
+
+
+def doubles(members, ranks=None):
+    """[(member, category, [rank, ...])] for everybody holding two or more
+       ranks of one staff category (STAFF_RANKS)."""
+    out = []
+    for m in members:
+        mine = set(r.name for r in getattr(m, 'roles', ()) or ())
+        for cat, names in (ranks or STAFF_RANKS):
+            held = [n for n in names if n in mine]
+            if len(held) > 1:
+                out.append((m, cat, held))
+    return out
+
+
+def _who(m):
+    return getattr(m, 'display_name', None) or getattr(m, 'name', None) or str(getattr(m, 'id', '?'))
+
+
+async def audit(guild):
+    """Says, and changes nothing. See AUDIT at the top."""
+    have = dict((r.name, r) for r in guild.roles)
+    roles = dict((n, have[n]) for n, _, _, _ in ROLES if n in have)
+    planned = dict((n, p) for n, _, _, p in ROLES)
+    bad = [0]
+
+    def line(what):
+        print('  ' + what, flush=True)
+
+    def off(what):
+        bad[0] += 1
+        line('DIFFERS  ' + what)
+
+    print('\n  Audit of %s, read only\n' % guild.name, flush=True)
+
+    print('  The bot', flush=True)
+    me = guild.me
+    mine = me.guild_permissions
+    if mine.administrator:
+        off('the bot holds Administrator; running, it needs only the set in '
+            'RUN_BITS (untick Administrator on its role after a build)')
+    extra, missing = perm_diff(mine, discord.Permissions(RUN_PERMISSIONS))
+    if missing:
+        off('the bot is missing ' + ', '.join(missing))
+    if extra and not mine.administrator:
+        off('the bot holds more than it needs: ' + ', '.join(extra))
+    line('its roles: ' + ', '.join(r.name for r in me.roles if r != guild.default_role))
+
+    print('\n  @everyone', flush=True)
+    line('server wide: ' + (', '.join(perm_names(guild.default_role.permissions)) or 'nothing'))
+
+    print('\n  Roles against the plan', flush=True)
+    for name, _, _, want in ROLES:
+        r = roles.get(name)
+        if r is None:
+            if name not in NOT_MADE:
+                off('role %s is not on the server' % name)
+            continue
+        if name in NOT_MADE or getattr(r, 'managed', False):
+            continue
+        extra, missing = perm_diff(r.permissions, want)
+        if extra:
+            off('role %s holds more than the plan: %s' % (name, ', '.join(extra)))
+        if missing:
+            off('role %s is missing %s' % (name, ', '.join(missing)))
+    for r in guild.roles:
+        if (r.name not in planned and r != guild.default_role
+                and not getattr(r, 'managed', False)):
+            off('role %s is not in the plan, holds %s, %d member(s)'
+                % (r.name, ', '.join(perm_names(r.permissions)) or 'nothing',
+                   len(r.members)))
+
+    print('\n  Who holds each staff rank', flush=True)
+    staff_names = []
+    for _, names in STAFF_RANKS:
+        staff_names += list(names)
+    for n in list(STAFF) + list(GM_AREA) + ['Loremaster', 'Content Creator']:
+        if n not in staff_names:
+            staff_names.append(n)
+    for n in staff_names:
+        r = have.get(n)
+        if r is not None:
+            line('%s: %s' % (n, ', '.join(sorted(_who(m) for m in r.members)) or 'nobody'))
+    for n in ('Playtester', 'Member', 'Banned'):
+        r = have.get(n)
+        if r is not None:
+            line('%s: %d member(s)' % (n, len(r.members)))
+    for m, cat, held in doubles(guild.members):
+        off('%s holds %s, two ranks of %s' % (_who(m), ' and '.join(held), cat))
+
+    print('\n  Categories and channels against the plan', flush=True)
+    ours = set()
+    for catname, specs in PLAN:
+        cat = discord.utils.get(guild.categories, name=catname) if catname else None
+        if catname and cat is None:
+            off('category %s is not on the server' % catname)
+            continue
+        if cat is not None:
+            for d in overwrite_diff(guild, cat.overwrites,
+                                    overwrites(guild, CATEGORY_MODE.get(catname, 'open'), roles)):
+                off('category %s, %s' % (catname, d))
+        for spec in specs:
+            kind = spec['kind']
+            want = spec['name'].lower().replace(' ', '-') if kind != 'voice' else spec['name']
+            ours.add((catname, want.lower()))
+            ch = None
+            for c in guild.channels:
+                if c.name == want and getattr(c, 'category', None) == cat:
+                    ch = c
+                    break
+            if ch is None:
+                if spec.get('make', True):
+                    off('#%s is not in %s' % (want, catname))
+                continue
+            plan = overwrites(guild, spec.get('mode', 'open'), roles, spec.get('hold'),
+                              bot_needs(spec), spec.get('extra_roles'))
+            for d in overwrite_diff(guild, ch.overwrites, plan):
+                off('#%s, %s' % (want, d))
+    for c in guild.channels:
+        if isinstance(c, discord.CategoryChannel):
+            continue
+        cat = getattr(c, 'category', None)
+        if (getattr(cat, 'name', None), c.name.lower()) in ours:
+            continue
+        where = getattr(cat, 'name', 'no category')
+        if c.name.lower() in KEEP:
+            # #staff-updates and the like: kept by name, never made by PLAN.
+            line('#%s in %s is kept by name and not made by the plan' % (c.name, where))
+        else:
+            off('#%s in %s is not in the plan' % (c.name, where))
+
+    print('\n  %d difference(s). Nothing was changed.\n' % bad[0], flush=True)
+    return bad[0]
+
+
 @client.event
 async def on_ready():
     try:
@@ -1328,6 +1578,10 @@ async def on_ready():
                 print('  %-40s %s' % (g.name, g.id))
             print('\n  $env:DISCORD_GUILD = "<that number>"')
             return await client.close()
+
+        if AUDIT:
+            await audit(guild)
+            return
 
         print('\n  Building %s\n' % guild.name)
 
@@ -1367,11 +1621,7 @@ async def on_ready():
                                  spec['name'].lower().replace(' ', '-')))
                     continue
                 if cat is None:
-                    mode = {'Staff': 'staff', 'Testing': 'pathfind',
-                            'Gamemasters': 'gm',
-                            'The Holds': 'hold',
-                            'Start Here': 'public',
-                            'Applications': 'public'}.get(catname, 'open')
+                    mode = CATEGORY_MODE.get(catname, 'open')
                     cat = await guild.create_category(
                         catname, overwrites=overwrites(guild, mode, roles),
                         reason='Thornswood setup')
