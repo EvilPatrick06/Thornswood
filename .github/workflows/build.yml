@@ -90,6 +90,50 @@ concurrency:
   group: build-${{ github.ref }}
   cancel-in-progress: true
 jobs:
+  # ALREADY TESTED (#3182, 21 Oct 2026). Main's build used to run every check
+  # again on the tree its pull request had just passed: 26 minutes of a build
+  # runner for #3125 (run 39690135051), and 905 box minutes on 21 Oct, most
+  # of it cancelled by the next merge. When the pull request's build ran
+  # against the main it lands on, a squash merge gives main that very tree.
+  # This job asks scripts\dev\Tested-Tree.js whether a green build-pr.yml run
+  # of this repository kept a note of HEAD's tree (the last step of the checks
+  # below), and when one did it names that run and the build stops green.
+  # Any other tree, an expired note, a fork's run or a GitHub answer it cannot
+  # read builds main in full, as before. A manual run always builds. It runs
+  # on any VPS runner, not a build one: it starts node and asks GitHub three
+  # questions. tests\test-3182-tested-tree.js holds what it accepts, and why a
+  # tree is enough is in the script's header.
+  tested:
+    name: Already tested in its pull request
+    if: ${{ github.event_name == 'push' }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    timeout-minutes: 5
+    permissions:
+      actions: read
+      contents: read
+    outputs:
+      run: ${{ steps.look.outputs.run }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      # Every self-hosted checkout is written again (#3029), as below.
+      - name: Check every tracked file out again
+        if: runner.environment == 'self-hosted'
+        shell: pwsh
+        run: |
+          git rm -r -q --cached .
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+          git reset -q --hard HEAD
+          if ($LASTEXITCODE -ne 0) { exit 1 }
+      - name: Look for a green pull request build of this tree
+        id: look
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
+          node scripts\dev\Tested-Tree.js --tree $tree --repo $env:GITHUB_REPOSITORY
+          exit 0
+
   # WHERE IT RUNS, since 11 October (#1306, Patrick's final call on #2161):
   # GitHub's hosted windows-latest is the default, in the job "launcher"
   # at the end of this file. This job is the VPS FALLBACK. It runs only
@@ -107,8 +151,8 @@ jobs:
   # can never test different things.
   launcher-vps:
     name: Launcher builds (VPS fallback)
-    needs: launcher
-    if: ${{ !cancelled() && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
+    needs: [tested, launcher]
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && needs.launcher.result != 'success' && needs.launcher.result != 'cancelled' }}
     # thornswood-build (#2994): only the runners records/build-runners.json
     # lists carry it, so no more builds run on the box at once than its six
     # cores finish fastest. Seven at once on 21 Oct took 34 to 39 minutes for
@@ -337,41 +381,41 @@ jobs:
           # It began as six that sat red on main unseen (#875) and grew from
           # there (#1088, #1273, #2513). pwsh on purpose: test-script-index.ps1
           # starts Windows PowerShell 5.1 itself to compare what the two write.
-          # On 21 Oct 2026 the 495 then on the gate took 23 minutes of a 26
-          # minute build, so the "not sorted yet" lines come on a few at a time.
+          # On 21 Oct 2026 the 550 then on the gate took 26 minutes of a 28
+          # minute build one at a time, in a foreach here (#3114). They run
+          # through scripts\dev\Nightly-Harnesses.ps1 now, -Throttle at once:
+          # each a process of its own with its output in files of its own,
+          # printed as it ends, on the nightly's clock, in a job object that
+          # counts its processor time. The summary says what the box's cores
+          # did meanwhile. Beside four other builds on 21 Oct 2026 the 550
+          # took 2110 s one at a time, 1112 s two at a time, 887 s at three and
+          # 765 s at six, every one passing. Since 22 Oct two builds run at
+          # once, not four (records\build-runners.json says why), and each
+          # runs its share of the cores, three of six, whatever the box is
+          # doing; past that, up to six, only into cores the box has free, so
+          # a build alone uses the idle ones and two side by side share them
+          # rather than one grabbing them (#3106's build got under one core
+          # beside one at six, and ran out of time). A harness that writes
+          # where another reads says RUNS ALONE in its header and runs after
+          # the rest. tests\test-signer-check.ps1 and
+          # tests\test-build-generated.ps1 had steps of their own after this
+          # one (#2046, #1982), one after the other; they are on the gate
+          # list and run beside the rest.
+          # 1800 s of the job's 40 minutes: a harness starts only when its
+          # whole clock still fits, so the list of what failed is printed
+          # before the job could be cancelled.
           if (-not (Get-Command node -ErrorAction SilentlyContinue)) {
             Write-Host '::error::no node on this runner, so the .js gate harnesses were not run'
             exit 1
           }
           $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          $failed = @()
-          foreach ($n in $gate) {
-            $p = Join-Path 'tests' $n
-            $sw = [Diagnostics.Stopwatch]::StartNew()
-            Write-Host ("--- {0}" -f $n)
-            if ($n -like '*.js') { & node $p } else { & pwsh -NoProfile -File $p }
-            $code = $LASTEXITCODE
-            Write-Host ("--- {0}: exit {1}, {2}s" -f $n, $code, [Math]::Round($sw.Elapsed.TotalSeconds, 1))
-            if ($code -ne 0) { $failed += $n; Write-Host ("::error file=tests/{0}::harness failed, the FAIL lines above say what" -f $n) }
-          }
-          if ($failed.Count) { Write-Host ("{0} harness(es) failed: {1}" -f $failed.Count, ($failed -join ', ')); exit 1 }
-          Write-Host ('all {0} passed' -f $gate.Count)
-
-      - name: Run the signer check
-        shell: pwsh
-        run: |
-          # Issue #2046. tests\test-signer-check.ps1 sat 1 of 34 red every
-          # night from 5 Oct while this build stayed green, because it ran
-          # only at night. It compiles Signature.cs and points Refusal and
-          # MicrosoftRefusal at real files, about two seconds. The harness
-          # restarts itself in Windows PowerShell 5.1, the .NET Framework
-          # the launcher runs on.
-          & pwsh -NoProfile -File tests\test-signer-check.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=tests/test-signer-check.ps1::the signer check failed, the FAIL lines above say what'
-            exit 1
-          }
+          # This build's share: the machine's cores over the builds the box
+          # runs at once, the runners records\build-runners.json lists.
+          $builds = @((Get-Content -LiteralPath records\build-runners.json -Raw | ConvertFrom-Json).runners).Count
+          $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -Share $share -BudgetSeconds 1800
+          exit $LASTEXITCODE
 
       - name: Run the voice service's /health harness
         shell: pwsh
@@ -384,20 +428,6 @@ jobs:
           & node voice\test-turn-key.js
           if ($LASTEXITCODE -ne 0) {
             Write-Host '::error file=voice/test-turn-key.js::the voice /health harness failed, the FAIL lines above say what'
-            exit 1
-          }
-
-      - name: Run the generated-files build harness
-        shell: pwsh
-        run: |
-          # Issue #1982. tests\test-build-generated.ps1 failed cases C to K
-          # because case B overwrote the path to Build-Generated.ps1. It ran
-          # nowhere on push, so nothing caught it. It compiles stand-ins for
-          # Pandora and BodySlide with the .NET Framework csc and builds into
-          # a temp folder; it touches no real game folder.
-          & pwsh -NoProfile -File tests\test-build-generated.ps1
-          if ($LASTEXITCODE -ne 0) {
-            Write-Host '::error file=tests/test-build-generated.ps1::the generated-files build harness failed, the FAIL lines above say what'
             exit 1
           }
 
@@ -473,32 +503,21 @@ jobs:
           if ($bad) { exit 1 }
           Write-Host ("{0} game script(s) parse" -f $files.Count)
 
-      - name: Parse every bot file
-        shell: pwsh
-        run: |
-          if (-not (Test-Path bot)) { Write-Host 'no bot to parse'; exit 0 }
-          $bad = 0
-          foreach ($f in (Get-ChildItem bot -Filter *.py -Recurse -File)) {
-            & python -c "import ast,sys; ast.parse(open(sys.argv[1],encoding='utf-8').read(), sys.argv[1])" $f.FullName 2>&1 | Out-Null
-            if ($LASTEXITCODE -ne 0) {
-              $bad++
-              Write-Host ("::error file={0}::does not parse" -f $f.FullName)
-            }
-          }
-          if ($bad) { exit 1 }
-          Write-Host 'every bot file parses'
-
       - name: Check the Python names what exists
         shell: pwsh
         run: |
-          # Issue #1343. Parsing (the step above) passes a name that does not
-          # exist, and Python only finds out when that line runs: in the bot,
-          # on the VPS, in front of people. ruff with four rule groups and
+          # Issue #1343. A file that parses can still name something that does
+          # not exist, and Python only finds out when that line runs: in the
+          # bot, on the VPS, in front of people. ruff with four rule groups and
           # nothing else: E9 a file that will not compile, F63 a comparison
           # or assert that is always true or false, F7 a break, continue,
           # return or yield where none can be, F82 a name never defined.
           # No style rules, so no line here is red for how it looks. All 48
           # Python files passed on main on 5 October with nothing changed.
+          # ruff also stops on a file that does not parse, whatever --select
+          # says (a planted "def f(:" gave invalid-syntax, exit 1, on 22 Oct
+          # 2026), so the step that parsed each bot file with Python's ast,
+          # which this already covers, is gone (#3114). The nightly keeps it.
           # ruff comes into a venv of this run's own, never the machine's
           # Python, pinned by version and hash in .github\ruff-requirements.txt.
           # By hand, from the repository folder, in any venv:
@@ -521,46 +540,6 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit 1 }
           Write-Host ("{0} Python file(s) name only what exists" -f $files.Count)
 
-      - name: Lint (warnings only)
-        # Issue #1343. Reports ruff, eslint and PSScriptAnalyzer findings and
-        # never fails the build. PSScriptAnalyzer took about 253 s over the
-        # repository on Ship PC One on 10 Oct (1276 findings), so 8 minutes.
-        continue-on-error: true
-        timeout-minutes: 8
-        shell: pwsh
-        run: |
-          # ruff: the venv the step above made from the hash-pinned
-          # .github\ruff-requirements.txt, so nothing new is installed.
-          $py = Join-Path $env:RUNNER_TEMP 'ruff-venv\Scripts\python.exe'
-          if (Test-Path -LiteralPath $py) {
-            & $py -m ruff check --no-cache --config .github\lint\ruff.toml --exit-zero --output-format github @(git ls-files '*.py')
-          } else { Write-Host '::warning::no ruff venv, ruff lint skipped' }
-
-          # eslint: pinned by version only (no lockfile, no hash).
-          $npm = Join-Path $env:RUNNER_TEMP 'lint-npm'
-          npm install --prefix $npm --no-save --no-audit --no-fund --silent eslint@9.39.5
-          # node runs eslint.js itself, not npm's eslint.cmd shim: cmd.exe reads
-          # the shim, whose 'SET dp0=%~dp0' and '%*' are unquoted, so an '&' in
-          # its folder or an argument (C:\ThornswoodTemps&Worktrees) cut the
-          # command short and eslint never ran (#1343).
-          $eslint = Join-Path $npm 'node_modules\eslint\bin\eslint.js'
-          if (Test-Path -LiteralPath $eslint) {
-            & node $eslint -c (Join-Path $PWD '.github\lint\eslint.config.mjs') .
-          } else { Write-Host '::warning::could not install eslint 9.39.5, eslint lint skipped' }
-
-          # PSScriptAnalyzer: pinned by version only, from the PowerShell Gallery.
-          $psm = Join-Path $env:RUNNER_TEMP 'lint-psm'
-          New-Item -ItemType Directory -Force -Path $psm | Out-Null
-          Save-Module -Name PSScriptAnalyzer -RequiredVersion 1.24.0 -Path $psm -Repository PSGallery -Force
-          Import-Module (Join-Path $psm 'PSScriptAnalyzer\1.24.0\PSScriptAnalyzer.psd1')
-          $found = @(Invoke-ScriptAnalyzer -Path . -Recurse -Settings .github\lint\PSScriptAnalyzerSettings.psd1)
-          foreach ($d in $found) {
-            $lvl = if ($d.Severity -eq 'Error') { 'error' } else { 'warning' }
-            Write-Host ("::{0} file={1},line={2}::{3}: {4}" -f $lvl, $d.ScriptPath, $d.Line, $d.RuleName, $d.Message)
-          }
-          Write-Host ("PSScriptAnalyzer: {0} finding(s)" -f $found.Count)
-          exit 0
-
       - name: Count the silent catches in the launcher, the scripts, the site, voice and the bot
         shell: pwsh
         run: |
@@ -579,14 +558,6 @@ jobs:
           # waiting for somebody to notice. The script says what to do.
           .\scripts\dev\Check-Swallow.ps1
 
-      - name: Build the launcher
-        shell: pwsh
-        run: |
-          $root = Join-Path $env:RUNNER_TEMP 'Thornswood'
-          New-Item -ItemType Directory -Force -Path (Join-Path $root 'Launcher') | Out-Null
-          .\scripts\release\Build-Launcher.ps1 -Root $root -NoPause
-          if (-not (Test-Path (Join-Path $root 'Launcher\Thornswood.exe'))) { Write-Host '::error::no Thornswood.exe came out of the build'; exit 1 }
-
       - name: Build the ship root tool
         shell: pwsh
         run: |
@@ -600,29 +571,8 @@ jobs:
           $msb = & .\scripts\release\Find-MSBuild.ps1
           if ($LASTEXITCODE -ne 0) { Write-Host '::error::MSBuild is not on this runner, so the ship root tool cannot be built'; exit 1 }
           $out = Join-Path $env:RUNNER_TEMP 'shiproot'
-          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
+          & $msb scripts\release\ShipRoot\ShipRoot.csproj -nologo -v:minimal -nr:false -p:UseSharedCompilation=false -p:Configuration=Release ('-p:OutDir=' + $out + '\')
           if ($LASTEXITCODE -ne 0 -or -not (Test-Path (Join-Path $out 'Thornswood-ShipRoot.exe'))) { Write-Host '::error file=scripts/release/ShipRoot/ShipRoot.csproj::the ship root tool did not build, see the lines above'; exit 1 }
-
-      - name: Check the manifests in the built exes
-        shell: pwsh
-        run: |
-          # Issue #463. Reads the manifest embedded in the launcher and the
-          # setup program this build made: per-monitor DPI, asInvoker (neither
-          # ever asks for administrator), and an identity version equal to
-          # Updater.cs. Also runs the window fit at 100 to 200 percent.
-          & pwsh -NoProfile -File tests\test-app-manifest.ps1 -Exe (Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe') -Scratch (Join-Path $env:RUNNER_TEMP 'app-manifest')
-          if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-app-manifest.ps1::the built exes do not carry the manifest they should, see the lines above'; exit 1 }
-
-      - name: Scan the built launcher for secrets
-        shell: pwsh
-        run: |
-          # The secrets that shipped were in built artefacts, not in the source,
-          # so what this build made is read too, byte by byte: the launcher with
-          # everything Build-Launcher embeds in it, and the setup stub.
-          $built = @(Join-Path $env:RUNNER_TEMP 'Thornswood\Launcher\Thornswood.exe')
-          if (Test-Path out\setup-stub.exe) { $built += (Resolve-Path out\setup-stub.exe).Path }
-          .\scripts\dev\Check-Secrets.ps1 -Binary $built
-          exit $LASTEXITCODE
 
       - name: Check the MSBuild launcher against its sources
         shell: pwsh
@@ -635,10 +585,67 @@ jobs:
           # file details and the manifest, the icon, nothing beside the exe.
           # GitHub's image has Visual Studio; the VPS runners have the Build
           # Tools from Bootstrap-VPS.ps1 -IncludeBuildTools (option A, 12 Oct).
+          # It builds both exes with Build-Launcher.ps1, then runs
+          # tests\test-app-manifest.ps1 (#463) and Check-Secrets.ps1 -Binary on
+          # the pair, so this build has no build, manifest or secrets step of
+          # its own for them: until 22 Oct 2026 it did each twice (#3114).
           & pwsh -NoProfile -File tests\test-498-msbuild.ps1 -RequireMSBuild -Scratch (Join-Path $env:RUNNER_TEMP 'msbuild-498')
           if ($LASTEXITCODE -ne 0) { Write-Host '::error file=tests/test-498-msbuild.ps1::the MSBuild launcher does not match its sources, see the lines above'; exit 1 }
 
-      # No artifact from this build (#2163, 19 Oct). It used to keep the exe
+      - name: Lint (warnings only)
+        # Issue #1343. Reports ruff, eslint and PSScriptAnalyzer findings and
+        # never fails the build: continue-on-error, and scripts\dev\Lint.ps1
+        # always ends 0. #3185 (21 Oct 2026): it fetched eslint and
+        # PSScriptAnalyzer into RUNNER_TEMP on every job and linted every
+        # file, 35 s a build on average. Lint.ps1 keeps each pinned tool in
+        # the runner account's own folder, named by its version, and a pull
+        # request lints only the files it changed against its base; main
+        # and a manual run lint everything, and so does the nightly. The
+        # last step before the note below, because it fetches the base
+        # commit: no check after it reads git history.
+        continue-on-error: true
+        timeout-minutes: 8
+        shell: pwsh
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if ($env:BASE -match '^[0-9a-f]{40}$') {
+            git fetch -q --depth=1 --no-tags origin $env:BASE
+            $changed = @(git diff --name-only --diff-filter=d $env:BASE HEAD)
+            if ($LASTEXITCODE -eq 0) { .\scripts\dev\Lint.ps1 -Files $changed; exit 0 }
+            Write-Host "::warning::could not tell what this pull request changed against $env:BASE, so everything is linted"
+          }
+          .\scripts\dev\Lint.ps1 -All
+          exit 0
+
+      # The note main's build looks for (#3182, the job "tested" at the top
+      # of build.yml): the tree every step before this one passed on. Last,
+      # so it is kept only when they all did. A pull request's checkout is
+      # GitHub's merge of it into main, so this is the tree a squash merge
+      # gives main while main has not moved. A few hundred bytes for seven
+      # days, against the 2 GB below; nothing else reads it.
+      - name: Write down the tree these checks passed on
+        id: tree
+        if: github.event_name == 'pull_request'
+        shell: pwsh
+        run: |
+          $tree = (git rev-parse 'HEAD^{tree}' | Out-String).Trim()
+          if ($tree -notmatch '^[0-9a-f]{40}$') { Write-Host "::error::git gave no tree for HEAD: $tree"; exit 1 }
+          $note = Join-Path $env:RUNNER_TEMP 'tested-tree.txt'
+          Set-Content -LiteralPath $note -Encoding utf8 -Value @(
+            "tree $tree", "commit $env:GITHUB_SHA", "pull request ${{ github.event.pull_request.number }}", "head ${{ github.event.pull_request.head.sha }}")
+          "tree=$tree" >> $env:GITHUB_OUTPUT
+          "note=$note" >> $env:GITHUB_OUTPUT
+      - name: Keep the tree these checks passed on
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        if: github.event_name == 'pull_request'
+        with:
+          name: tested-tree-${{ steps.tree.outputs.tree }}
+          path: ${{ steps.tree.outputs.note }}
+          retention-days: 7
+          overwrite: true
+
+      # No other artifact from this build (#2163, 19 Oct). It used to keep the exe
       # for 7 days, and nothing read it: Ship takes the launcher from
       # release.yml's draft, and no script or test downloads a build's
       # artifacts. Measured 19 Oct: 488 copies, 1.30 GB of this account's 2 GB
@@ -651,7 +658,8 @@ jobs:
   # fallback above runs instead.
   launcher:
     name: Launcher builds
-    if: ${{ vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
+    needs: tested
+    if: ${{ !cancelled() && needs.tested.outputs.run == '' && vars.BUILD_RUNNER != 'vps' && inputs.runner != 'vps' }}
     runs-on: windows-latest
     # The hosted runner has two cores: the harness step alone took over
     # eighteen minutes on it, so it gets an hour.

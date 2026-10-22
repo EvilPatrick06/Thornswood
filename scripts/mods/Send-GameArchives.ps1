@@ -19,7 +19,10 @@
   One. With them on the box, every content tool runs from a machine with no
   game at all.
 
-  WHAT GOES. The twelve archives scripts\mods\OnBox.ps1 names, each held to
+  WHAT GOES. The archives scripts\mods\OnBox.ps1 names (the twelve above,
+  and since #3100 _ResourcePack.bsa, the one place the localized
+  _ResourcePack.esl keeps its names: without it the hunt and ore builders
+  failed on the box on 21 Oct), each held to
   the size and sha1 records\skyrim-files.json gives for the pinned Skyrim
   build, so a changed or modded archive is refused here, before anything is
   sent. Then the loose string tables records\game-strings.json names, each

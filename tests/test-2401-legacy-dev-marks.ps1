@@ -153,7 +153,7 @@ $saved = @{}
 foreach ($k in 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL', 'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_DATE') { $saved[$k] = [Environment]::GetEnvironmentVariable($k) }
 $env:GIT_COMMITTER_NAME = 'Thornswood test'; $env:GIT_COMMITTER_EMAIL = 'test@thornswood.invalid'
 $env:GIT_AUTHOR_NAME = 'Thornswood test'; $env:GIT_AUTHOR_EMAIL = 'test@thornswood.invalid'
-function G { $o = @(& git -C $git -c commit.gpgsign=false -c tag.gpgsign=false @args 2>&1 | ForEach-Object { [string]$_ }); if ($LASTEXITCODE) { throw ("git " + ($args -join ' ') + ": " + ($o -join ' ')) }; return ,$o }
+function G { $o = @(& git -C $git -c commit.gpgsign=false -c tag.gpgsign=false -c maintenance.auto=false @args 2>&1 | ForEach-Object { [string]$_ }); if ($LASTEXITCODE) { throw ("git " + ($args -join ' ') + ": " + ($o -join ' ')) }; return ,$o }
 try {
     [void](G init -q)
     [void](G commit -q --allow-empty -m base)

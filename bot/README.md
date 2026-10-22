@@ -204,7 +204,11 @@ earlier sends testers to look for a fix main does not have. That is why every
 test task in `#test-tasks` is tagged Main. Write `Server: Main` (or no
 `Server:` line) under `Test task:` for testers on main, and `Server: Dev`
 only when someone on dev has to measure it, which sends it to
-`#dev-test-tasks` for staff. The line never shows in the post. `Server: Dev`
+`#dev-test-tasks` for staff. A fix that is on dev and not yet on main is
+not a `Server: Dev` task: checking that it works is its Main test task,
+written when it reaches main (#613: Patrick found one in #dev-test-tasks,
+22 Oct). An issue has one dev post, so a newer `Server: Dev` comment
+replaces the one before it. The line never shows in the post. `Server: Dev`
 counts only on a comment written from the day `#dev-test-tasks` began (the
 bot's first pass that finds it, `dev_since` in `data\known-issues.json`), so
 the comments written before that, which all carried a `Server:` line, stay in

@@ -51,6 +51,5 @@ launcher's install folder (`C:\Thornswood` on most machines), `Profile` is
 | Steam copy | Steam's own install of Skyrim Special Edition, which Vortex deploys into and OwnGame builds from. The launcher will not Play from it. | Found through Steam (`Steam.cs`) |
 | Swap | Points Windows' two Skyrim folders at Profile for a session with junctions, and puts them back after. | `Swap.cs:Apply`, `Swap.cs:Restore`; `Profile\swap.json` |
 | Sync-Client | Copies the recorded client runtime from the fork's build into the game folder; `-Check` compares only. | `scripts\release\Sync-Client.ps1` |
-| Wave | The stage of an issue on the board, as a `wave:` label. | Developer-Guide.md "How to use it" |
 | Where.ps1 | Says where the engine, its build output and the release output are on this machine, so no script names a path. | `scripts\release\Where.ps1`; engine/README.md |
 | Your Mods | A folder for a person's own extra files, copied into `Game\Data` at Play. Never a plugin. | `<Root>\Your Mods`; `Verify.cs:DeployPersonal` |

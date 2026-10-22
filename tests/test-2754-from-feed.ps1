@@ -307,6 +307,34 @@ try {
     Yes 'the box is sent the catalog, release.json and the launcher''s own check' ($script:boxScript.Contains([Convert]::ToBase64String([IO.File]::ReadAllBytes($sign))) -and $script:boxScript.Contains('Get-PublishSignRefusal') -and $script:boxScript.Contains('Test-FileCatalog') -and $script:boxScript.Contains('Signature.cs'))
     Yes '  as ASCII, for its Windows PowerShell 5.1' (-not ($script:boxScript.ToCharArray() | Where-Object { [int]$_ -gt 127 }))
     Yes '  and its folder goes whatever happens' ($script:boxScript -match 'finally \{ Remove-Item -LiteralPath \$d -Recurse')
+    # The box runs that text as Send-Script.ps1's runner hands it over: read
+    # from its file and run as a block from -EncodedCommand, so there is no
+    # script root. Here it runs the same way, under Windows PowerShell where
+    # there is one. On 22 Oct 2026 the first cloud dev Ship stopped at
+    # Assert-PublishSigned.ps1's Join-Path on that empty root, before the check
+    # began, and nothing had ever run the text.
+    $runDir = Join-Path $Scratch 'box-run'
+    New-Item -ItemType Directory -Force -Path $runDir | Out-Null
+    $onWin = ([Environment]::OSVersion.Platform -eq [PlatformID]::Win32NT)
+    $runCat = $cat
+    if ($onWin) {
+        $runCat = Join-Path $runDir 'release.cat'
+        New-FileCatalog -Path (Split-Path -Parent $sign) -CatalogFilePath $runCat -CatalogVersion 2.0 | Out-Null
+    }
+    $runText = Join-Path $runDir 'check.ps1'
+    [IO.File]::WriteAllText($runText, (New-SignedCatalogCheckScript $sign $runCat 'Thornswood' $repo), (New-Object Text.UTF8Encoding($false)))
+    $runner = '$b = [scriptblock]::Create([IO.File]::ReadAllText(''' + $runText.Replace("'", "''") + ''', [Text.Encoding]::UTF8)); . $b'
+    $exe = if ($onWin) { 'powershell.exe' } else { (Get-Process -Id $PID).Path }
+    # The box's text puts its folder in TEMP, which off Windows nothing sets.
+    $hadTemp = $env:TEMP
+    $env:TEMP = $runDir
+    try { $ran = @(& $exe -NoProfile -ExecutionPolicy Bypass -EncodedCommand ([Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($runner))) 2>&1 | ForEach-Object { [string]$_ }) }
+    finally { $env:TEMP = $hadTemp }
+    $ranSaid = @($ran | Where-Object { $_ -match '^CATALOG ' })
+    $ranLine = ($ranSaid -join ' | ')
+    Yes ("the box's text, run with no script root, says one CATALOG line ('{0}')" -f $ranLine) ($ranSaid.Count -eq 1 -and $ranLine -notmatch 'Cannot bind argument')
+    if ($onWin) { Yes '  and gets as far as the launcher''s own check, which refuses an unsigned catalog' ($ranLine -match '^CATALOG REFUSED release\.cat ') }
+    else { Yes '  and gets as far as the catalog check, which this machine does not have' ($ranLine -match 'Test-FileCatalog') }
     $script:boxSaid = @('CATALOG REFUSED release.cat is signed by "CN=Somebody", which does not contain ExpectedSigner')
     $why = SignNow 'r2'
     Yes 'a box that refuses it: refused, with the box''s reason' ($why -match 'Somebody')

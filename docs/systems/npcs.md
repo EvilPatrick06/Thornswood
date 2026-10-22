@@ -66,6 +66,21 @@ See [The Thalmor](thalmor.md).
 Animals in the hunt table, the fish, the seams, the plants, the
 crops. Those are the classes, not this cast.
 
+## What an NPC carries
+
+Body loot comes from the server's assigned body piles and Hunter yields,
+not the NPC record's pockets or death-item list. Inherited armour, weapons,
+ammunition, scrolls and carried lights remain internal equipment for
+appearance and combat. They cannot be taken alive or dead, sold as stock,
+or dropped for somebody to pick up. Returning after death does not add a
+new vanilla pile. See [Dungeon loot](dungeon-loot.md#bodies).
+
+Deliberate assignments remain separate, even when they use the same item
+as an inherited weapon. Guild purses and purchased stock still belong to
+the merchant ledger. Custom guard equipment, Thalmor patrol assignments
+and trade-ship crews retain their appearance and combat equipment. A
+ship's cargo remains in its cargo register, not in its crew's pockets.
+
 ## Difficulty and population
 
 Caves and dungeons have a fixed tier assigned to the place. Entering with

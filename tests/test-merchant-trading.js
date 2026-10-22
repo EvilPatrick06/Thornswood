@@ -16,7 +16,7 @@ function memoryPurses(seed) {
     namespace:'dev:test-ledger',
     callerGuard:true,
     read(id) { return this.prepare(id); },
-    pendingRecords() { return Array.from(states,([merchantId,state])=>({merchantId,reference:state.reference,state:JSON.parse(JSON.stringify(state))})).filter(x=>x.state.pending); },
+    pendingRecords() { return Array.from(states).filter(([,state])=>state.pending).map(([merchantId,state])=>({merchantId,reference:state.reference,state:JSON.parse(JSON.stringify(state))})); },
     compareAndCommit(id,rev,next,caller) { if ((states.get(id).revision || 0)!==rev || caller && !caller()) return null; return this.commit(id,next); },
     prepare(id) {
       const state = states.get(id);
