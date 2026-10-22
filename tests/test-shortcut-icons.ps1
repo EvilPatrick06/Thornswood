@@ -193,7 +193,7 @@ namespace Thornswood
         }
         [string]$devExe = Join-Path $devRoot 'Launcher\Thornswood.exe'
         $numbered = Link 'Thornswood (2).lnk' $exe
-        $other = Link 'Thornswood.lnk' 'C:\SkyrimTogether\Launcher\SkyrimTogether.exe'
+        $other = Link 'Thornswood.lnk' 'C:\Gone\Launcher\Other.exe'
         $devLnk = Link 'Thornswood Dev.lnk' $devExe
         $found = @($to.Invoke($null, @($exe)))
         Yes 'ShortcutsTo finds the shortcut that runs this exe under a name that is not its own' ($found -contains $numbered)
