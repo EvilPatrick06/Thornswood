@@ -994,9 +994,11 @@ How to use it:
   second issue. Write down what was measured and what is left.
 - Uncommitted changes sitting in the repo are outstanding work and belong on
   the board too.
-- Labels: `wave:` is the stage, `area:` the part of the project, `needs:` who
-  or what it waits on, and `anyone can start` marks what needs nobody in
-  particular. Assign yourself when you start one.
+- Labels: `area:` is the part of the project, `needs: patrick` marks what
+  waits on him, and `anyone can start` marks what needs nobody in
+  particular. Assign yourself when you start one. The stage is Order and
+  Status: the `wave:` labels and `needs: the live server` were retired on
+  22 Oct (#3192), because nothing read them and Order had replaced them.
 - Status: In Progress the moment work starts, Done when it is merged and only
   needs testing (Patrick, 19 Oct). The board's Status options are Todo, In
   Progress and Done; never add one through the API, which rewrites every
@@ -1033,9 +1035,16 @@ How to use it:
   leave the issue open. That one is for developers, so write it in developer
   terms: the files, log lines and commands to run, and what each should
   print, with a `Build:` line naming the dev release or gamemode commit it
-  needs. The bot posts it at once in #dev-test-tasks, a forum in the Staff
-  category that only staff see, whole, with links to the issue, its pull
-  requests and commits, and its labels. It takes the post down when the
+  needs. A fix that has reached dev and not yet main is not one: checking
+  that a fix works is its Main test task, written when it reaches main,
+  however soon that is (#613: Patrick found one in #dev-test-tasks, 22
+  Oct). `Server: Dev` is for a measurement the work needs before it can
+  finish, such as a log line, a screenshot or a timing. An issue has one
+  dev post, showing its last `Test task:` comment, so a newer `Server: Dev`
+  comment replaces the one before it: put every measurement the issue still
+  needs in the newest. The bot posts it at once in #dev-test-tasks, a forum
+  in the Staff category that only staff see, whole, with links to the issue,
+  its pull requests and commits, and its labels. It takes the post down when the
   issue closes or a newer `Test task:` comment does not say `Server: Dev`.
   Put what was measured on the issue: the post is deleted when it goes. When
   the fix reaches main, write the Main test task in plain words and close
