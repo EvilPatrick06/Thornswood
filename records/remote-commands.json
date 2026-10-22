@@ -13,7 +13,7 @@
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
     "scriptCount":  71,
-    "callCount":  283,
+    "callCount":  284,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -896,6 +896,15 @@
                       "does":  "sends the runner registration token",
                       "class":  "admin",
                       "reason":  "secret"
+                  },
+                  {
+                      "script":  "scripts/deploy/Install-Runner.ps1",
+                      "scope":  "Get-PublishedLists",
+                      "via":  "Remote",
+                      "anchor":  "$said = @(Remote ($listLib",
+                      "does":  "reads GitHub\u0027s address lists, Microsoft\u0027s Service Tags and the signing hosts\u0027 addresses on the box, for the runner firewall rules (#3312)",
+                      "class":  "read-status",
+                      "reason":  "fetches published lists and resolves names; writes nothing"
                   },
                   {
                       "script":  "scripts/deploy/Install-Runner.ps1",
