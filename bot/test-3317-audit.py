@@ -140,8 +140,7 @@ def build():
     roles = dict((n, named[n]) for n, _, _, _ in B.ROLES)
     g.categories, g.channels = [], []
     for catname, specs in B.PLAN:
-        cmode, cspace = B.category_mode(catname)
-        cat = Place(catname, None, B.overwrites(g, cmode, roles, space=cspace))
+        cat = Place(catname, None, B.category_overwrites(g, catname, roles))
         g.categories.append(cat)
         for s in specs:
             if not s.get('make', True):

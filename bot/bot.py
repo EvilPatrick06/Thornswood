@@ -2312,8 +2312,9 @@ async def ensure_panel(guild):
 # #choose-your-hold, where a Member picks the hold their character calls home
 # and which announcements they want a ping for.
 #
-# The hold channels are private: each one is open to its own Citizen and Jarl
-# roles and to staff, so picking a hold here is what opens its channel. One
+# The hold channels are private: each hold's category is open to its own
+# Citizen, Jarl and officers and to staff, so picking a hold here is what
+# opens it. One
 # hold per person. Picking another takes the old Citizen role away, and
 # pressing the one you already have leaves it. Jarl roles are never touched
 # here; a Jarl is appointed, not picked.
@@ -2329,14 +2330,16 @@ HOLD_CHANNEL = [n.strip().lower() for n in
                 if n.strip()]
 MEMBER_ROLE = os.environ.get('MEMBER_ROLE', 'Member').strip().lower()
 MEMBER_IDS, MEMBER_NAMES = _role_tokens([MEMBER_ROLE] if MEMBER_ROLE else [])
+# Raven Rock is a hold like the nine since #3317 (Patrick, 22 Oct, page card
+# q-3317-raven-rock, A), last, on a row of its own on the panel.
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
-         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
+         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold', 'Raven Rock']
 # key, role name, button label
 PINGS = [('news', 'News Pings', 'News pings'),
          ('updates', 'Updates Pings', 'Updates pings')]
 
 HOLD_PANEL = ('**Choose your hold**\n\n'
-              'Pick the hold your character calls home and its channel opens '
+              'Pick the hold your character calls home and its channels open '
               'to you. One hold at a time: picking another moves you there, '
               'and pressing the one you have leaves it.\n\n'
               '**Pings**\n\n'
@@ -2576,9 +2579,8 @@ async def ensure_hold_panel(guild):
 # the reason. Changes made in the game come to the staff channel the same way,
 # through the site's moderation.log (watch_moderation, office_text).
 OFFICES = [('court', 'Court'), ('steward', 'Steward'), ('guard', 'Guard')]
-# The towns a hold role can name: Build-Discord.py's nine, and Raven Rock,
-# which it makes no roles for, so roles made for it by hand work the same.
-OFFICE_TOWNS = HOLDS + ['Raven Rock']
+# The towns a hold role can name: every hold, Raven Rock included.
+OFFICE_TOWNS = list(HOLDS)
 
 OFFICE_PANEL = ('**Hold offices**\n\n'
                 'The Jarl of a hold gives and takes its Court, its Steward and '

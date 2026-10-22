@@ -82,6 +82,7 @@ Holders of Moderator also talk in the Gamemasters space.
 | Citizen of Morthal | #8FA9B8 | no | nothing of its own | the build |  |
 | Citizen of Falkreath | #8FA9B8 | no | nothing of its own | the build |  |
 | Citizen of Winterhold | #8FA9B8 | no | nothing of its own | the build |  |
+| Citizen of Raven Rock | #8FA9B8 | no | nothing of its own | the build |  |
 | Whiterun Court | #A8977A | no | nothing of its own | the build |  |
 | Steward of Whiterun | #A8977A | no | nothing of its own | the build |  |
 | Guard of Whiterun | #A8977A | no | nothing of its own | the build |  |
@@ -147,7 +148,7 @@ tidies there. A staff space mode is said for the space it names.
 | staff | everybody on staff | everybody on staff | - |
 | staffread | everybody on staff | the council | the council |
 | council | the council | the council | - |
-| hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Citizen of Whiterun | - |
+| hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | - |
 | space (Lore) | the council, Loremaster | the council, Loremaster | - |
 | spaceread (Lore) | the council, Loremaster | the council | the council |
 | spacerules (Lore) | the council, Loremaster | Owner and Co-Owner, Lead Loremaster | Owner and Co-Owner, Lead Loremaster |
@@ -212,27 +213,121 @@ Category mode: open.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
+| #choose-your-hold | text | testersread | everybody on staff, Playtester | the council | posts: the council; was #choose-your-hold in The Holds |
 | #character-introductions | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: Who are you playing? One post each. |
 | #tales | forum | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: What happened out there. One post per story. |
 | #rp-appreciation | text | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: Somebody played a blinder. Say so. |
 | #graveyard | text | open | everybody on staff, Playtester | everybody on staff, Playtester | topic: They had it coming. Probably. |
 
-### The Holds
+### Whiterun
 
-Category mode: hold.
+Category mode: hold (Whiterun).
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #choose-your-hold | text | testersread | everybody on staff, Playtester | the council | posts: the council |
-| #whiterun | text | hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Citizen of Whiterun | topic: Everybody passes through eventually. |
-| #solitude | text | hold (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Citizen of Solitude | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Citizen of Solitude | topic: Court, trade, and the one Imperial embassy left in Skyrim. |
-| #windhelm | text | hold (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Citizen of Windhelm | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Citizen of Windhelm | topic: The High King sits here. Dress warm. |
-| #riften | text | hold (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Citizen of Riften | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Citizen of Riften | topic: Ask no questions. |
-| #markarth | text | hold (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Citizen of Markarth | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Citizen of Markarth | topic: Stone, silver, and grudges older than the war. |
-| #dawnstar | text | hold (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Citizen of Dawnstar | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Citizen of Dawnstar | topic: Cold. The ships still come in. |
-| #morthal | text | hold (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Citizen of Morthal | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Citizen of Morthal | topic: Quiet. Too quiet, most would say. |
-| #falkreath | text | hold (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Citizen of Falkreath | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Citizen of Falkreath | topic: More graves than people. Always has been. |
-| #winterhold | text | hold (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Citizen of Winterhold | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Citizen of Winterhold | topic: What's left of it. |
+| #whiterun-announcements | text | holdread (Whiterun) | the council, Citizen of Whiterun, Guard of Whiterun, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | the council, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | posts: the council, Jarl of Whiterun, Steward of Whiterun, Whiterun Court; topic: What the Jarl and the court of Whiterun want every citizen to know. In character. |
+| #whiterun | text | hold (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Whiterun Court, Steward of Whiterun, Guard of Whiterun, Citizen of Whiterun | was #whiterun in The Holds; topic: Everybody passes through eventually. |
+| #whiterun-court | text | holdcourt (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Steward of Whiterun, Whiterun Court | topic: The Jarl, the Steward and the court of Whiterun. In character. |
+| #whiterun-guard | text | holdguard (Whiterun) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Guard of Whiterun | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Whiterun, Guard of Whiterun | topic: The Jarl and the guards of Whiterun. In character. |
+
+### Solitude
+
+Category mode: hold (Solitude).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #solitude-announcements | text | holdread (Solitude) | the council, Citizen of Solitude, Guard of Solitude, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | the council, Jarl of Solitude, Steward of Solitude, Solitude Court | posts: the council, Jarl of Solitude, Steward of Solitude, Solitude Court; topic: What the Jarl and the court of Solitude want every citizen to know. In character. |
+| #solitude | text | hold (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Solitude Court, Steward of Solitude, Guard of Solitude, Citizen of Solitude | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Solitude Court, Steward of Solitude, Guard of Solitude, Citizen of Solitude | was #solitude in The Holds; topic: Court, trade, and the one Imperial embassy left in Skyrim. |
+| #solitude-court | text | holdcourt (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Steward of Solitude, Solitude Court | topic: The Jarl, the Steward and the court of Solitude. In character. |
+| #solitude-guard | text | holdguard (Solitude) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Guard of Solitude | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Solitude, Guard of Solitude | topic: The Jarl and the guards of Solitude. In character. |
+
+### Windhelm
+
+Category mode: hold (Windhelm).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #windhelm-announcements | text | holdread (Windhelm) | the council, Citizen of Windhelm, Guard of Windhelm, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | the council, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | posts: the council, Jarl of Windhelm, Steward of Windhelm, Windhelm Court; topic: What the Jarl and the court of Windhelm want every citizen to know. In character. |
+| #windhelm | text | hold (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Windhelm Court, Steward of Windhelm, Guard of Windhelm, Citizen of Windhelm | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Windhelm Court, Steward of Windhelm, Guard of Windhelm, Citizen of Windhelm | was #windhelm in The Holds; topic: The High King sits here. Dress warm. |
+| #windhelm-court | text | holdcourt (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Steward of Windhelm, Windhelm Court | topic: The Jarl, the Steward and the court of Windhelm. In character. |
+| #windhelm-guard | text | holdguard (Windhelm) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Guard of Windhelm | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Windhelm, Guard of Windhelm | topic: The Jarl and the guards of Windhelm. In character. |
+
+### Riften
+
+Category mode: hold (Riften).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #riften-announcements | text | holdread (Riften) | the council, Citizen of Riften, Guard of Riften, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | the council, Jarl of Riften, Steward of Riften, Riften Court | posts: the council, Jarl of Riften, Steward of Riften, Riften Court; topic: What the Jarl and the court of Riften want every citizen to know. In character. |
+| #riften | text | hold (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Riften Court, Steward of Riften, Guard of Riften, Citizen of Riften | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Riften Court, Steward of Riften, Guard of Riften, Citizen of Riften | was #riften in The Holds; topic: Ask no questions. |
+| #riften-court | text | holdcourt (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Steward of Riften, Riften Court | topic: The Jarl, the Steward and the court of Riften. In character. |
+| #riften-guard | text | holdguard (Riften) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Guard of Riften | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Riften, Guard of Riften | topic: The Jarl and the guards of Riften. In character. |
+
+### Markarth
+
+Category mode: hold (Markarth).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #markarth-announcements | text | holdread (Markarth) | the council, Citizen of Markarth, Guard of Markarth, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | the council, Jarl of Markarth, Steward of Markarth, Markarth Court | posts: the council, Jarl of Markarth, Steward of Markarth, Markarth Court; topic: What the Jarl and the court of Markarth want every citizen to know. In character. |
+| #markarth | text | hold (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Markarth Court, Steward of Markarth, Guard of Markarth, Citizen of Markarth | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Markarth Court, Steward of Markarth, Guard of Markarth, Citizen of Markarth | was #markarth in The Holds; topic: Stone, silver, and grudges older than the war. |
+| #markarth-court | text | holdcourt (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Steward of Markarth, Markarth Court | topic: The Jarl, the Steward and the court of Markarth. In character. |
+| #markarth-guard | text | holdguard (Markarth) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Guard of Markarth | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Markarth, Guard of Markarth | topic: The Jarl and the guards of Markarth. In character. |
+
+### Dawnstar
+
+Category mode: hold (Dawnstar).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #dawnstar-announcements | text | holdread (Dawnstar) | the council, Citizen of Dawnstar, Guard of Dawnstar, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | the council, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | posts: the council, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court; topic: What the Jarl and the court of Dawnstar want every citizen to know. In character. |
+| #dawnstar | text | hold (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Dawnstar Court, Steward of Dawnstar, Guard of Dawnstar, Citizen of Dawnstar | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Dawnstar Court, Steward of Dawnstar, Guard of Dawnstar, Citizen of Dawnstar | was #dawnstar in The Holds; topic: Cold. The ships still come in. |
+| #dawnstar-court | text | holdcourt (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Steward of Dawnstar, Dawnstar Court | topic: The Jarl, the Steward and the court of Dawnstar. In character. |
+| #dawnstar-guard | text | holdguard (Dawnstar) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Guard of Dawnstar | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Dawnstar, Guard of Dawnstar | topic: The Jarl and the guards of Dawnstar. In character. |
+
+### Morthal
+
+Category mode: hold (Morthal).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #morthal-announcements | text | holdread (Morthal) | the council, Citizen of Morthal, Guard of Morthal, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | the council, Jarl of Morthal, Steward of Morthal, Morthal Court | posts: the council, Jarl of Morthal, Steward of Morthal, Morthal Court; topic: What the Jarl and the court of Morthal want every citizen to know. In character. |
+| #morthal | text | hold (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Morthal Court, Steward of Morthal, Guard of Morthal, Citizen of Morthal | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Morthal Court, Steward of Morthal, Guard of Morthal, Citizen of Morthal | was #morthal in The Holds; topic: Quiet. Too quiet, most would say. |
+| #morthal-court | text | holdcourt (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Steward of Morthal, Morthal Court | topic: The Jarl, the Steward and the court of Morthal. In character. |
+| #morthal-guard | text | holdguard (Morthal) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Guard of Morthal | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Morthal, Guard of Morthal | topic: The Jarl and the guards of Morthal. In character. |
+
+### Falkreath
+
+Category mode: hold (Falkreath).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #falkreath-announcements | text | holdread (Falkreath) | the council, Citizen of Falkreath, Guard of Falkreath, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | the council, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | posts: the council, Jarl of Falkreath, Steward of Falkreath, Falkreath Court; topic: What the Jarl and the court of Falkreath want every citizen to know. In character. |
+| #falkreath | text | hold (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Falkreath Court, Steward of Falkreath, Guard of Falkreath, Citizen of Falkreath | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Falkreath Court, Steward of Falkreath, Guard of Falkreath, Citizen of Falkreath | was #falkreath in The Holds; topic: More graves than people. Always has been. |
+| #falkreath-court | text | holdcourt (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Steward of Falkreath, Falkreath Court | topic: The Jarl, the Steward and the court of Falkreath. In character. |
+| #falkreath-guard | text | holdguard (Falkreath) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Guard of Falkreath | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Falkreath, Guard of Falkreath | topic: The Jarl and the guards of Falkreath. In character. |
+
+### Winterhold
+
+Category mode: hold (Winterhold).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #winterhold-announcements | text | holdread (Winterhold) | the council, Citizen of Winterhold, Guard of Winterhold, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | the council, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | posts: the council, Jarl of Winterhold, Steward of Winterhold, Winterhold Court; topic: What the Jarl and the court of Winterhold want every citizen to know. In character. |
+| #winterhold | text | hold (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Winterhold Court, Steward of Winterhold, Guard of Winterhold, Citizen of Winterhold | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Winterhold Court, Steward of Winterhold, Guard of Winterhold, Citizen of Winterhold | was #winterhold in The Holds; topic: What's left of it. |
+| #winterhold-court | text | holdcourt (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Steward of Winterhold, Winterhold Court | topic: The Jarl, the Steward and the court of Winterhold. In character. |
+| #winterhold-guard | text | holdguard (Winterhold) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Guard of Winterhold | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Winterhold, Guard of Winterhold | topic: The Jarl and the guards of Winterhold. In character. |
+
+### Raven Rock
+
+Category mode: hold (Raven Rock).
+
+| Channel | Kind | Mode | Sees | Talks | Notes |
+|---|---|---|---|---|---|
+| #raven-rock-announcements | text | holdread (Raven Rock) | the council, Citizen of Raven Rock, Guard of Raven Rock, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | the council, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | posts: the council, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court; topic: What the Jarl and the court of Raven Rock want every citizen to know. In character. |
+| #raven-rock | text | hold (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Raven Rock Court, Steward of Raven Rock, Guard of Raven Rock, Citizen of Raven Rock | was #raven-rock in The Holds; topic: On Solstheim, across the water. The ash still falls. |
+| #raven-rock-court | text | holdcourt (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Steward of Raven Rock, Raven Rock Court | topic: The Jarl, the Steward and the court of Raven Rock. In character. |
+| #raven-rock-guard | text | holdguard (Raven Rock) | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | the council, Dev, Gamemaster, Trial Gamemaster, Loremaster, Moderator, Jarl of Raven Rock, Guard of Raven Rock | topic: The Jarl and the guards of Raven Rock. In character. |
 
 ### Voice
 
@@ -353,7 +448,7 @@ Category mode: staff.
 
 ## Retired
 
-Categories retired by the plan, removed by `-Prune` once empty: Help.
+Categories retired by the plan, removed by `-Prune` once empty: Help, The Holds.
 
 Channel names the build no longer wants, removed by `-Prune`: tech-help, looking-for-group, off-topic, downloads, links-and-credits, Small Table, The Longhouse, Away, screenshots, clips, bot-commands, The Bannered Mare, The Road, test-these, test-tasks-archive.
 

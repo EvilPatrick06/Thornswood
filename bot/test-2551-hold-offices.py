@@ -84,7 +84,7 @@ bot.log = lambda *a: None
 # ------------------------------------------------------------ the builder --
 names = [r[0] for r in B.ROLES]
 office_names = []
-for h in B.HOLDS + ['Raven Rock']:
+for h in B.HOLDS:
     office_names += [h + ' Court', 'Steward of ' + h, 'Guard of ' + h]
 rows = dict((r[0], r) for r in B.ROLES)
 last_citizen = max(names.index('Citizen of ' + h) for h in B.HOLDS)
@@ -93,7 +93,7 @@ last_citizen = max(names.index('Citizen of ' + h) for h in B.HOLDS)
 # Oct, page card q-3317-role-base-perms, A).
 yes('R1 every office role of every hold is made, not hoisted, carries nothing of its own, under the Citizen roles (%d)'
     % len(office_names),
-    len(office_names) == 30 and all(n in rows for n in office_names)
+    len(office_names) == 30 and 'Raven Rock' in B.HOLDS and all(n in rows for n in office_names)
     and all(rows[n][2] is False for n in office_names)
     and all(rows[n][3] == B.NONE for n in office_names)
     and all(names.index(n) > last_citizen for n in office_names))
@@ -108,10 +108,12 @@ yes('R3 the Jarl roles are still hoisted, and no Citizen or office role is',
     and all(r[2] is False for r in in_world if r[0].startswith('Citizen of'))
     and all(r[2] is False for r in in_world if r[0] in office_names))
 yes('R4 the bot spells each office the way the builder makes it',
-    all(bot.office_role(o, h) in rows for h in B.HOLDS + ['Raven Rock'] for o, _ in bot.OFFICES))
-yes('R5 Raven Rock has a Jarl role, hoisted, in KEEP, and no Citizen role and no hold of its own',
+    all(bot.office_role(o, h) in rows for h in B.HOLDS for o, _ in bot.OFFICES))
+# Raven Rock is a hold like the nine since #3317 (Patrick, 22 Oct, page card
+# q-3317-raven-rock, A).
+yes('R5 Raven Rock has a Jarl role, hoisted, in KEEP, a Citizen role and a category of its own',
     'Jarl of Raven Rock' in rows and rows['Jarl of Raven Rock'][2] is True and 'Jarl of Raven Rock' in B.KEEP
-    and 'Citizen of Raven Rock' not in rows and 'Raven Rock' not in B.HOLDS)
+    and 'Citizen of Raven Rock' in rows and 'Raven Rock' in dict(B.PLAN))
 yes('R6 the bot makes the same roles the builder does, hoisted the same way',
     sorted((n, h) for n, _, h in bot.office_roles_wanted())
     == sorted((r[0], r[2]) for r in B.ROLES if r[0] in office_names or r[0].startswith('Jarl of ')))

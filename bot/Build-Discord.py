@@ -270,8 +270,16 @@ PLAIN = discord.Permissions(
     create_public_threads=True, send_messages_in_threads=True,
     use_application_commands=True)
 
+# Raven Rock is a hold like the nine (#3317, Patrick, 22 Oct, page card
+# q-3317-raven-rock, A): its Citizen role, its pick on the hold panel and its
+# own category.
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
-         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
+         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold', 'Raven Rock']
+
+
+def hold_slug(hold):
+    """A hold's channel name: "raven-rock"."""
+    return hold.lower().replace(' ', '-')
 
 # THE STAFF, one place (#3317). Each category's ranks, highest first. One
 # person holds at most one rank of a category (Patrick: "people dont have
@@ -342,12 +350,10 @@ ROLES = [
 # role keeps its colour and shows under Playtester (#3317, page card
 # q-3317-member-list).
 #
-# RAVEN ROCK HAS ITS OFFICES TOO (#2551, Patrick, 16 Oct, B): its Jarl, Court,
-# Steward and Guards, like the nine, because the game has its board, its drop
-# box and its jail. Its Jarl is "Jarl of Raven Rock", the name the site and the
-# game read for every hold. It is not one of HOLDS: it has no Citizen role and
-# no hold channel, which nobody has asked for.
-OFFICE_HOLDS = HOLDS + ['Raven Rock']
+# Every hold has its Jarl, Court, Steward and Guards (#2551), Raven Rock
+# included since 16 Oct, because the game has its board, its drop box and its
+# jail; since #3317 it is one of HOLDS as well.
+OFFICE_HOLDS = list(HOLDS)
 
 for _h in OFFICE_HOLDS:
     ROLES.append(('Jarl of ' + _h, 0xE0C56A, True, NONE))
@@ -472,7 +478,10 @@ HOLD_STAFF = COUNCIL_ROLES + ('Dev', 'Gamemaster', 'Trial Gamemaster',
 #        open         Playtester and staff talk, invisible to everybody else
 #        testersread  Playtester and staff read, the council posts
 #        pathfind     the same people as open; the Playtesters category's own
-#        hold         one hold's Citizen and Jarl, and HOLD_STAFF
+#        hold         a hold's hall: its Citizen, Jarl and officers, and HOLD_STAFF
+#        holdread     its announcements: those read, the Jarl, Steward, Court post
+#        holdcourt    its Jarl, Steward and Court, and HOLD_STAFF
+#        holdguard    its Jarl and Guards, and HOLD_STAFF
 #        staff        every staff rank talks, invisible to everybody else
 #        staffread    every staff rank reads, the council posts
 #        council      Owner, Co-Owner and the leads, nobody else
@@ -609,6 +618,11 @@ PLAN = [
         topic='Drag the log in. Explain it after.', make=False),
  ]),
  ('In Character', [
+   # Where a playtester picks their hold, which opens that hold's category.
+   # The bot posts the buttons. It was the top of The Holds, which went when
+   # each hold got a category of its own (#3317).
+   dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='testersread',
+        was=(('The Holds', 'choose-your-hold'),)),
    dict(kind='forum', name='character-introductions', key='CHARS', mode='open',
         topic='Who are you playing? One post each.'),
    dict(kind='forum', name='tales',       key='TALES',    mode='open',
@@ -619,17 +633,32 @@ PLAN = [
         topic='They had it coming. Probably.'),
  ]),
 
- # One channel per hold, because a hold with nowhere to talk is a line on a
- # map. These are in character: what is said here is said in the hold.
- ('The Holds', [
-   # Where a playtester picks their hold, at the top of the category. The bot
-   # posts the buttons.
-   dict(kind='text', name='choose-your-hold', key='CHOOSE', mode='testersread'),
- ] + [
-   dict(kind='text', name=_h.lower(), key='HOLD_' + _h.upper(), mode='hold',
-        hold=_h, topic=C.HOLD_TOPICS[_h.lower()])
-   for _h in HOLDS
- ]),
+] + [
+ # A CATEGORY PER HOLD (#3317, Patrick, 22 Oct: "The Holds also need a guards
+ # and court channel for the Guards and court members. Each hold needs an
+ # announcement channel for the Hold that Jarls of that Hold and the court can
+ # post to for needed IC info"; page cards q-3317-hold-layout A and
+ # q-3317-hold-office-access A). In character, all of it:
+ #   announcements  its citizens and officers read; the Jarl, Steward and
+ #                  Court post
+ #   the hall       the hold's own channel, today's, moved here by name
+ #   court          the Jarl, Steward and Court
+ #   guard          the Jarl and the Guards
+ # HOLD_STAFF sees every hold.
+ (_h, [
+   dict(kind='text', name=hold_slug(_h) + '-announcements', mode='holdread',
+        hold=_h, topic='What the Jarl and the court of %s want every citizen '
+                       'to know. In character.' % _h),
+   dict(kind='text', name=hold_slug(_h), key='HOLD_' + hold_slug(_h).upper().replace('-', '_'),
+        mode='hold', hold=_h, topic=C.HOLD_TOPICS[hold_slug(_h)],
+        was=(('The Holds', hold_slug(_h)),)),
+   dict(kind='text', name=hold_slug(_h) + '-court', mode='holdcourt', hold=_h,
+        topic='The Jarl, the Steward and the court of %s. In character.' % _h),
+   dict(kind='text', name=hold_slug(_h) + '-guard', mode='holdguard', hold=_h,
+        topic='The Jarl and the guards of %s. In character.' % _h),
+ ])
+ for _h in HOLDS
+] + [
  # Somewhere to talk and somewhere to be idle. Proximity voice is in the
  # launcher, so these are for before, after, and whoever is not in the world.
  # Help Voice was the Support voice in Help, renamed so it is not taken for
@@ -778,7 +807,7 @@ CATEGORY_WAS = {
     'Out of Character': ('Thornswood',),
     'Playtesters': ('Testing',),
 }
-RETIRED_CATEGORIES = ('Help',)
+RETIRED_CATEGORIES = ('Help', 'The Holds')
 
 # The gate each category has. A category's channels carry their own modes;
 # this is the category's own, which the build sets and the audit reads. A
@@ -790,7 +819,6 @@ CATEGORY_MODE = {
     'Roleplay Guide': 'testersread',
     'Out of Character': 'open',
     'In Character': 'open',
-    'The Holds': 'hold',
     'Voice': 'open',
     'Playtesters': 'pathfind',
     'Staff': 'staff',
@@ -1090,9 +1118,18 @@ def mode_audience(mode, hold=None, space=None):
         return (), tester, ()
     if mode == 'testersread':
         return tester, (), COUNCIL_ROLES
-    if mode == 'hold':
-        return (), HOLD_STAFF + (('Jarl of ' + hold, 'Citizen of ' + hold)
-                                 if hold else ()), ()
+    if mode in ('hold', 'holdread', 'holdcourt', 'holdguard'):
+        if hold is None:
+            return (), HOLD_STAFF, ()
+        jarl, court, steward, guard, citizen = hold_roles(hold)
+        if mode == 'hold':
+            return (), HOLD_STAFF + (jarl, court, steward, guard, citizen), ()
+        if mode == 'holdread':
+            return ((citizen, guard) + HOLD_STAFF, (),
+                    (jarl, steward, court) + COUNCIL_ROLES)
+        if mode == 'holdcourt':
+            return (), HOLD_STAFF + (jarl, steward, court), ()
+        return (), HOLD_STAFF + (jarl, guard), ()
     if mode == 'staff':
         return (), STAFF, ()
     if mode == 'staffread':
@@ -1162,11 +1199,29 @@ def spec_overwrites(guild, spec, roles):
                       spec.get('space'), spec.get('read_extra'))
 
 
+def hold_roles(hold):
+    """(Jarl, Court, Steward, Guard, Citizen) of a hold, by name."""
+    if hold not in HOLDS:
+        raise ValueError('a hold mode needs hold= one of %s' % ', '.join(HOLDS))
+    return ('Jarl of ' + hold, hold + ' Court', 'Steward of ' + hold,
+            'Guard of ' + hold, 'Citizen of ' + hold)
+
+
+def category_overwrites(guild, catname, roles):
+    """overwrites() for a category of the plan: its mode, its space, and
+       for a hold's category, its hold."""
+    cmode, cspace = category_mode(catname)
+    return overwrites(guild, cmode, roles, hold=catname if cmode == 'hold' else None,
+                      space=cspace)
+
+
 def category_mode(catname):
     """The mode a category of the plan is gated by, and its space: a staff
        space's category is its space; any other is CATEGORY_MODE's."""
     if space_of(catname) is not None:
         return 'space', catname
+    if catname in HOLDS:
+        return 'hold', None
     return CATEGORY_MODE.get(catname, 'open'), None
 
 
@@ -2130,7 +2185,8 @@ def layout():
         was = CATEGORY_WAS.get(catname)
         w('### %s' % catname)
         w('')
-        w('Category mode: %s%s.%s' % (cmode, ' (%s)' % cspace if cspace else '',
+        cwho = cspace or (catname if cmode == 'hold' else None)
+        w('Category mode: %s%s.%s' % (cmode, ' (%s)' % cwho if cwho else '',
                                       ' It was %s.' % ', '.join(was) if was else ''))
         w('')
         w('| Channel | Kind | Mode | Sees | Talks | Notes |')
@@ -2258,8 +2314,7 @@ async def audit(guild):
             off('category %s is not on the server' % catname)
             continue
         if cat is not None:
-            cmode, cspace = category_mode(catname)
-            want_ow = overwrites(guild, cmode, roles, space=cspace)
+            want_ow = category_overwrites(guild, catname, roles)
             for d in overwrite_diff(guild, cat.overwrites,
                                     with_members(cat.overwrites, want_ow)):
                 off('category %s, %s' % (catname, d))
@@ -2360,8 +2415,7 @@ async def on_ready():
         for catname, specs in plan_for(ONLY):
             cat = None
             if catname:
-                cmode, cspace = category_mode(catname)
-                cat_ow = overwrites(guild, cmode, roles, space=cspace)
+                cat_ow = category_overwrites(guild, catname, roles)
                 cat = discord.utils.get(guild.categories, name=catname)
                 if cat is None:
                     cat = await rename_category(guild, catname)

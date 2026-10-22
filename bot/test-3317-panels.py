@@ -8,8 +8,9 @@ button layouts also need fixed". The hold panel put five holds in a row, and a
 phone wrapped that row as four and then Markarth on its own, and the next as
 three and then Winterhold on its own. This proves:
 
-  L1 the hold panel is three rows of three holds, in HOLDS order, with the two
-     ping buttons in a row of their own under them
+  L1 the hold panel is three rows of three holds and Raven Rock on its own
+     (Patrick, 22 Oct, q-3317-raven-rock, A), in HOLDS order, with the two ping
+     buttons in a row of their own under them: five rows, Discord's most
   L2 no row of any persistent panel has more than three buttons
   L3 a posted panel laid out the old way (five, four, two) is not taken for
      current, so the bot's start rewrites it; one laid out as wanted is current
@@ -70,14 +71,15 @@ async def main():
     holds = ['thornswood:hold:' + h.lower() for h in bot.HOLDS]
     pings = ['thornswood:ping:' + k for k, _, _ in bot.PINGS]
 
-    yes('L1 nine holds in three rows of three, in order, then the pings on their own',
-        len(bot.HOLDS) == 9 and hold == [holds[0:3], holds[3:6], holds[6:9], pings])
+    yes('L1 ten holds in three rows of three and Raven Rock, in order, then the pings',
+        len(bot.HOLDS) == 10 and bot.HOLDS[-1] == 'Raven Rock'
+        and hold == [holds[0:3], holds[3:6], holds[6:9], holds[9:], pings])
     yes('L1 what the bot checks a posted panel against is that same layout',
         bot._hold_rows_wanted() == hold)
     yes('L2 no row of the hold or office panel has more than three buttons',
         all(len(r) <= 3 for r in hold + office))
 
-    old = posted([holds[0:5], holds[5:9], pings], bot.HOLD_PANEL)
+    old = posted([holds[0:5], holds[5:10], pings], bot.HOLD_PANEL)
     yes('L3 a panel posted five to a row is not current, so it is rewritten',
         not bot.hold_panel_is_current(old))
     yes('L3 a panel posted as wanted is current, so nothing is asked of Discord',

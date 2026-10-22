@@ -76,9 +76,9 @@ ATTACH_FILES = 1 << 15
 
 # Every mode that shuts @everyone out of one of the three. Only public does
 # not, and a public channel needs nothing for the bot.
-RESTRICTED = ('read', 'open', 'membersread', 'testersread', 'hold', 'staff',
-              'staffread', 'council', 'pathfind', 'space', 'spaceread',
-              'spacerules')
+RESTRICTED = ('read', 'open', 'membersread', 'testersread', 'hold', 'holdread',
+              'holdcourt', 'holdguard', 'staff', 'staffread', 'council',
+              'pathfind', 'space', 'spaceread', 'spacerules')
 # The hold a hold mode is asked about, where one is needed, and the staff
 # space a space mode is asked about (#3317).
 HOLD = 'Whiterun'
@@ -86,7 +86,7 @@ SPACE = 'Gamemasters'
 
 
 def ow_for(guild, mode, roles):
-    return B.overwrites(guild, mode, roles, HOLD if mode == 'hold' else None,
+    return B.overwrites(guild, mode, roles, HOLD if mode.startswith('hold') else None,
                         space=SPACE if mode.startswith('space') else None)
 
 
@@ -325,7 +325,7 @@ def live_server():
         cmode, cspace = B.category_mode(catname)
         if catname:
             cat = Channel(g, catname, 'category',
-                          ow=B.overwrites(bare, cmode, roles, space=cspace))
+                          ow=B.category_overwrites(bare, catname, roles))
             cat.mode = cmode
             g.categories.append(cat)
         for s in specs:

@@ -404,6 +404,7 @@ HOLD_TOPICS = {
     'morthal':    "Quiet. Too quiet, most would say.",
     'falkreath':  "More graves than people. Always has been.",
     'winterhold': "What's left of it.",
+    'raven-rock': "On Solstheim, across the water. The ash still falls.",
 }
 
 
