@@ -97,7 +97,13 @@ WHAT IT PUTS IN THE PLUGIN
      attaches a plugin reference's saved state only to a reference its
      reader made (WorldState::LoadChangeForm holds it back,
      WorldState::LoadForm applies it), and the reader never makes an
-     initially disabled one.
+     initially disabled one. A floor item placed by a plugin the policy
+     never copies from (notCopiedFrom: Immersive Armors, #2454) has no
+     record below it to switch off, and its own is not copied (Patrick,
+     22 Oct 2026, q-613-ia-recipes): it is listed in the manifest
+     (floorItems.heldByServer) and in the FLOOR_HELD_BY_SERVER block this
+     writes into game/gamemode.js, and the server holds it disabled
+     itself, the way it holds the three chopping blocks (#495).
 
   6. The forge recipes game/data/recost.json re-costs (Patrick, 21 October
      2026, A on #613, and B on #3115): each is the winning record with only
@@ -227,6 +233,7 @@ talk with what stops each. Exit 1 on any refusal.
 import argparse
 import collections
 import hashlib
+import io
 import json
 import os
 import struct
@@ -248,6 +255,8 @@ POLICY = os.path.join(ROOT, 'game', 'data', 'last-plugin-policy.json')
 MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
+GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
+FLOOR_BLOCK = ('// ==== FLOOR_HELD_BY_SERVER, generated ====', '// ==== end FLOOR_HELD_BY_SERVER ====')
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -1207,11 +1216,12 @@ def build(data_dir):
     # any other record it wins stops the build. A floor item it wins but
     # does not place is switched off from the plugin below it: off, the
     # reference shows nothing of either. The only records of it copied are the
-    # ones its row names under carried, each by tag and id (Patrick, 21 Oct
-    # 2026, #3077: the 6 floor items Immersive Armors places, switched off,
-    # and the 5 cell and world headers they stand under); one named there that
-    # this build does not need stops it, so the list stays exactly what he
-    # allowed.
+    # ones its row names under carried, each by tag and id; one named there
+    # that this build does not need stops it, so the list stays exactly what
+    # Patrick allowed. Immersive Armors carries none (Patrick, 22 Oct 2026,
+    # q-613-ia-recipes: the 6 floor items it places and their 5 cell and
+    # world headers were never his to carry); those floor items are held off
+    # by the server (heldByServer below).
     blocked = {row['plugin'].lower() for row in policy.get('notCopiedFrom', [])}
     carried = {r.lower(): r for row in policy.get('notCopiedFrom', []) for r in row.get('carried', [])}
     used = set()
@@ -1252,7 +1262,7 @@ def build(data_dir):
     # plugin deleted, and one already off with no enable parent.
     bases = floor_bases(plugins, win, canon)
     found, parents = floor_scan(plugins, win, bases)
-    floor, floor_rows, held_floor = [], {'deleted': [], 'alreadyOff': []}, []
+    floor, floor_rows, by_server = [], {'deleted': [], 'alreadyOff': []}, []
     for g in sorted(found, key=lambda g: (canon[g[0]].lower(), g[1])):
         e, kind = found[g]
         src = plugins[e.pi]
@@ -1269,10 +1279,15 @@ def build(data_dir):
         elif e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             floor_rows['alreadyOff'].append(desc_of(g, canon))
         elif src.name.lower() in blocked and not carries(b'REFR', g):
-            if under(e, b'REFR', g) is None:
-                held_floor.append('REFR %s (won by %s)%s' % (desc_of(g, canon), src.name, placed(e)))
-            else:
+            if under(e, b'REFR', g) is not None:
                 floor.append((g, under(e, b'REFR', g), kind))
+            elif canon[g[0]].lower() in blocked:
+                # Its own, placed by it: nothing below to switch off, and its
+                # record is not copied. The server holds it off.
+                by_server.append((g, kind))
+            else:
+                raise SystemExit('STOP. %s wins floor item %s and no plugin below it has it. Nothing was '
+                                 'written.' % (src.name, desc_of(g, canon)))
         else:
             floor.append((g, e, kind))
     # A reference whose enable parent is a floor item would go out with it, or
@@ -1359,7 +1374,6 @@ def build(data_dir):
                 continue
             table[g] = prev
             swapped.append((kind, g, e, prev))
-    held += held_floor
     stale = [carried[k] for k in sorted(set(carried) - used)]
 
     # Two passes over the same copies: names first, then numbers.
@@ -1538,6 +1552,9 @@ def build(data_dir):
                                          .encode('utf-8')).hexdigest(),
             'deleted': len(floor_rows['deleted']),
             'alreadyOff': len(floor_rows['alreadyOff']),
+            # Placed by a plugin never copied from: not in the plugin, held
+            # off by the server (FLOOR_HELD_BY_SERVER in game/gamemode.js).
+            'heldByServer': sorted(desc_of(g, canon) for g, _ in by_server),
             'cellsAdded': len(floor_cells),
             'cellsAddedByWinner': dict(sorted(collections.Counter(plugins[cells[g].pi].name
                                                                   for g in floor_cells).items())),
@@ -1815,6 +1832,7 @@ def verify(data_dir, plugin_bytes, manifest):
         return ['the plugin is not flagged light']
     plugins = plugins + [last]
     win = winners(plugins, {b'ACHR', b'REFR', b'QUST', b'LCTN', b'CELL', b'FLOR', b'COBJ'} | set(FLOOR_TYPES))
+    blocked = {row['plugin'].lower() for row in json.load(open(POLICY, encoding='utf-8')).get('notCopiedFrom', [])}
     fails = []
     # Every re-costed recipe (#613) wins here, asking the counts the manifest says.
     for row in manifest.get('recost', []):
@@ -1890,16 +1908,21 @@ def verify(data_dir, plugin_bytes, manifest):
     # No floor item is left able to show (#3077), and nothing follows one off
     # or on through its enable parent.
     found, parents = floor_scan(plugins, win, floor_bases(plugins, win, canon))
+    floor = manifest.get('floorItems') or {}
+    # The ones a never-copied plugin places are held off by the server, and
+    # nothing else of theirs may be.
+    by_server = set(floor.get('heldByServer') or [])
     here = 0
     for g, (e, kind) in found.items():
         tags = [t for t, _ in subrecords(plugins[e.pi].data(e))]
         if e.flags & DELETED:
             continue
+        if desc_of(g, canon) in by_server and plugins[e.pi].name.lower() in blocked:
+            continue
         if e.flags & DISABLED and b'XESP' not in tags and b'VMAD' not in tags:
             here += e.pi == last.index
             continue
         fails.append('floor item %s (a %s) is left able to show' % (desc_of(g, canon), kind))
-    floor = manifest.get('floorItems') or {}
     if here != floor.get('off'):
         fails.append('%d floor items are off by this plugin, and the manifest says %s' % (here, floor.get('off')))
     mine = {g for g, (e, _) in found.items() if e.pi == last.index}
@@ -1995,13 +2018,37 @@ def main():
         b = have == json.loads(manifest_bytes(manifest).decode('utf-8'))
         print('  %s game/data/last-plugin.json %s' % (('ok   ', 'says what this builds') if b else
                                                        ('DIFFERS', 'is not what this builds')))
-        return 0 if a and b else 1
+        gm = io.open(GAMEMODE, encoding='utf-8', newline='').read()
+        c = floor_block(manifest, gm) == gm
+        print('  %s the FLOOR_HELD_BY_SERVER block %s' % (('ok   ', 'is what this builds') if c else
+                                                          ('DIFFERS', 'is not what this builds')))
+        return 0 if a and b and c else 1
+    gm = floor_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read())
     with open(OUT, 'wb') as f:
         f.write(plugin)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
-    print('Wrote game/content/%s and game/data/last-plugin.json' % PLUGIN)
+    with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
+        f.write(gm)
+    print('Wrote game/content/%s, game/data/last-plugin.json and the FLOOR_HELD_BY_SERVER block (%d)'
+          % (PLUGIN, len(manifest['floorItems']['heldByServer'])))
     return 0
+
+
+def floor_block(manifest, gamemode):
+    """game/gamemode.js with its FLOOR_HELD_BY_SERVER block holding the floor
+    items a never-copied plugin places, which the server holds off (#3077,
+    #2454)."""
+    a, b = gamemode.find(FLOOR_BLOCK[0]), gamemode.find(FLOOR_BLOCK[1])
+    if a < 0 or b < a:
+        raise SystemExit('STOP. no FLOOR_HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
+    block = '\n'.join([
+        FLOOR_BLOCK[0],
+        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json floorItems.heldByServer);',
+        '// do not hand edit. The floor items a plugin Thornswood-Last.esp never copies from places.',
+        'var FLOOR_HELD_BY_SERVER = %s;' % json.dumps(manifest['floorItems']['heldByServer']),
+        FLOOR_BLOCK[1]])
+    return gamemode[:a] + block + gamemode[b + len(FLOOR_BLOCK[1]):]
 
 
 if __name__ == '__main__':

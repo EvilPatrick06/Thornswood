@@ -61,20 +61,6 @@
  },
  "notCopiedFrom": [
   {"plugin": "Hothtrooper44_ArmorCompilation.esp",
-   "why": "Immersive Armors. Patrick, 17 Oct 2026 (issue 2454): it is used as-is through the collection and nothing built from it is redistributed. So no record of it is copied here but the ones in carried; a cell it wins is copied from the plugin below it when it changes nothing there (issue 3077).",
-   "carriedWhy": "Patrick, 21 Oct 2026, on the report page (issue 3077, option A): carry these 11 records so no floor item is left: the 6 floor items it places, switched off (their id, base and place only), and the 5 cell and world headers they stand under, as it has them. No other record of it, and none of its armour, meshes or textures, is copied.",
-   "carried": [
-    "REFR 4be1b:Hothtrooper44_ArmorCompilation.esp",
-    "REFR 7ad7:Hothtrooper44_ArmorCompilation.esp",
-    "REFR 7ad8:Hothtrooper44_ArmorCompilation.esp",
-    "REFR 7ad9:Hothtrooper44_ArmorCompilation.esp",
-    "REFR 7ada:Hothtrooper44_ArmorCompilation.esp",
-    "REFR 8398b:Hothtrooper44_ArmorCompilation.esp",
-    "CELL 161eb:Skyrim.esm",
-    "CELL 1a272:Skyrim.esm",
-    "CELL 3a9e3:Skyrim.esm",
-    "CELL b4f6:Skyrim.esm",
-    "WRLD 3a9d6:Skyrim.esm"
-   ]}
+   "why": "Immersive Armors. Patrick, 17 Oct 2026 (issue 2454): it is used as-is through the collection and nothing built from it is redistributed. So no record of it is copied here, none carried (Patrick, 22 Oct 2026, report page q-613-ia-recipes: he never allowed the floor items to be carried either). A cell it wins is copied from the plugin below it when it changes nothing there (issue 3077). A floor item it places is held off by the server instead (FLOOR_HELD_BY_SERVER in game/gamemode.js), and its re-costed recipes are set in each person's game (RECIPES_SET_IN_GAME, issue 613)."}
  ]
 }
