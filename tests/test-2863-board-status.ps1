@@ -162,7 +162,9 @@ function Invoke-RestMethod {
         if ($q -match 'updateProjectV2ItemFieldValue') { return [pscustomobject]@{ data = [pscustomobject]@{ updateProjectV2ItemFieldValue = [pscustomobject]@{ projectV2Item = [pscustomobject]@{ id = 'PVTI_card' } } } } }
         throw "stand-in: unexpected query $q"
     }
-    if ($Method -eq 'Get') { return @(($env:TS_LABELS | ConvertFrom-Json) | ForEach-Object { [pscustomobject]@{ name = $_ } }) }
+    # A list goes back as one object, the way the real Invoke-RestMethod hands
+    # on a JSON array (tests\test-3192-board-hygiene.ps1 checks the real one).
+    if ($Method -eq 'Get') { return ,@(($env:TS_LABELS | ConvertFrom-Json) | ForEach-Object { [pscustomobject]@{ name = $_ } }) }
     $name = [Uri]::UnescapeDataString(($Uri -split '/labels/')[1])
     if ($env:TS_BROKEN -and $name -eq $env:TS_BROKEN) {
         $res = [System.Net.Http.HttpResponseMessage]::new([System.Net.HttpStatusCode]'InternalServerError')
