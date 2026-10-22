@@ -139,21 +139,44 @@ nav.top a:hover{color:var(--page)}
   The painting carries its own title and emblem, so the crest and the big
   Thornswood over it went the same day: two titles on one picture. The
   words sit at the bottom over a dark scrim instead, where they read.
+
+  THE SCRIM RIDES WITH THE WORDS, AND NARROW SCREENS PUT THE WORDS UNDER THE
+  PAINTING (#2767). The scrim was the bottom 64% of the hero, so how dark it
+  was behind the words depended on how tall the hero was next to them: at
+  1366 by 768 the era line sat where it was barely half dark, over the
+  sunset, at 1.9:1. It now hangs from the words themselves (.wrap::before),
+  clear for the 96 pixels above the era line and dark enough under every
+  line of them at any size. On a phone no scrim was enough, because the
+  crop put the painted title behind the pitch (1.0:1 at worst), so below
+  900 pixels the painting is a band of its own, whole, and the words follow
+  it on the page. Patrick's answer on the board, 22 October: below the
+  painting, and readable on desktop too. Measured at 412, 768, 1024, 1366,
+  1920 and 3440 wide with the words hidden: 4.5:1 or better at the worst
+  pixel behind every line.
 */
 .hero{position:relative;min-height:min(84vh,56.25vw);display:grid;align-items:end;
   padding:84px 0 64px;text-align:center;overflow:hidden;isolation:isolate}
-.hero .art{position:absolute;inset:0;z-index:-2;width:100%;height:100%;
+.hero > .paint{position:absolute;inset:0;z-index:-2;overflow:hidden}
+.hero .art{position:absolute;inset:0;width:100%;height:100%;
   object-fit:cover;object-position:50% 25%}
-.hero::before{content:"";position:absolute;left:0;right:0;bottom:0;height:64%;z-index:-1;
-  pointer-events:none;
-  background:linear-gradient(180deg,rgba(11,9,7,0) 0%,rgba(11,9,7,.48) 40%,rgba(11,9,7,.9) 100%)}
+.hero .wrap::before{content:"";position:absolute;z-index:-1;pointer-events:none;
+  top:-96px;bottom:-64px;left:-50vw;right:-50vw;
+  background:linear-gradient(180deg,rgba(11,9,7,0) 0,rgba(11,9,7,.8) 96px,rgba(11,9,7,.9) 100%)}
+@media(max-width:900px){
+  .hero{display:block;min-height:0;padding:0 0 56px}
+  .hero > .paint{position:relative;inset:auto;aspect-ratio:16/9}
+  /* the foot of the painting fades into the page the words are on */
+  .hero > .paint::after{content:"";position:absolute;left:0;right:0;bottom:0;height:28%;
+    background:linear-gradient(180deg,rgba(11,14,10,0),var(--night))}
+  .hero .wrap{padding-top:22px}
+  .hero .wrap::before{content:none}
+}
 .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
 /* Grain over the whole thing, because a flat gradient reads as a web page and
    a grained one reads as a place. */
 .hero::after{content:"";position:absolute;inset:0;z-index:-1;pointer-events:none;opacity:.42;
   background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='120' height='120'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='120' height='120' filter='url(%23n)' opacity='.06'/></svg>")}
 .hero > *{position:relative;z-index:1}
-@media(max-width:640px){ .hero{min-height:auto;padding:72px 0 88px} }
 /* A video ignores prefers-reduced-motion on its own, so it is stopped in
    script below and the still under it is what stays on screen. This only covers the
    slow drift on top of it. */
@@ -165,10 +188,10 @@ h1{font:700 clamp(46px,9vw,92px)/0.97 var(--carve);letter-spacing:.055em;
   text-transform:uppercase;margin:0;text-wrap:balance;
   background:linear-gradient(180deg,#F0E6CE 12%,var(--gold) 92%);
   -webkit-background-clip:text;background-clip:text;color:transparent}
-/* Over the painting rather than over the dark page, so lighter than the
-   page's own faint and with a shadow behind, or the sky eats them. */
+/* Lighter than the page's own faint, and a solid colour: a see-through one
+   is only as readable as whatever is behind it (#2767). */
 .era{margin:0 auto;font:400 13px/1 var(--sans);letter-spacing:.34em;
-  text-transform:uppercase;color:rgba(240,230,206,.78);text-shadow:0 1px 10px rgba(0,0,0,.8)}
+  text-transform:uppercase;color:#DCD2B9;text-shadow:0 1px 10px rgba(0,0,0,.8)}
 .pitch{max-width:30ch;margin:18px auto 0;font:300 clamp(19px,2.3vw,25px)/1.5 var(--serif);
   color:#F5EEDD;text-wrap:balance;text-shadow:0 2px 14px rgba(0,0,0,.75)}
 .pitch em{font-style:italic;color:var(--gold)}
