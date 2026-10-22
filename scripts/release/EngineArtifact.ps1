@@ -28,7 +28,16 @@
 
   WHICH ARTIFACT. engine-<fork commit 12> in this repository, from a run of
   .github/workflows/engine.yml that finished green, and not expired (engine.yml
-  keeps it 30 days). The newest such one. None: the Why says to run
+  keeps it 30 days), whose records are the checkout's: the newest such one
+  that passes WHAT IS HELD below. A pin can have more than one, because every
+  green engine.yml run of the commit keeps its own, and only the run that made
+  the checkout's records holds the same record text. On 22 Oct the #3014 proof
+  run 39738939780 kept a second engine-fd2be02bff0c after main's records came
+  from run 39737836568, and taking the newest alone stopped the dev move at
+  "the artifact's records\client-build.json is not this checkout's" (#3243 is
+  why two runs of the same build differ there). So Find-EngineArtifact lists
+  every one as Candidates, newest first, and Get-EngineArtifact.ps1 holds each
+  in turn and takes the first that passes. None: the Why says to run
   engine.yml again, which takes the fork's own build of the commit while the
   fork keeps it (90 days, ForkEngineBuild.ps1) and so makes the same bytes.
 
@@ -112,8 +121,11 @@ function Get-EngineArtifactPin([string]$Repo) {
   Which engine.yml artifact of $Commit there is. $Get is called with a path
   under https://api.github.com/ and returns the parsed JSON, or throws on any
   failure, which is not "there is none" and is not caught here. Returns
-  @{ State; Why; Run; Artifact }, State one of:
-    found  Artifact is engine-<commit 12> of the green engine.yml run Run
+  @{ State; Why; Run; Artifact; Candidates }, State one of:
+    found  Candidates is every kept engine-<commit 12> of a green engine.yml
+           run, newest first, each @{ Run; Artifact }; Run and Artifact are
+           the newest. Which one is this checkout's build is known only once
+           it is held to the records (Get-EngineArtifactProblems)
     none   there is no artifact of it to take: Why says how to make one
 #>
 function Find-EngineArtifact([string]$Commit, [scriptblock]$Get) {
@@ -127,14 +139,20 @@ function Find-EngineArtifact([string]$Commit, [scriptblock]$Get) {
             Why = "engine.yml has kept no $name, so CI has not built $($Commit.Substring(0, 8)) here. $again" }
     }
     $kept = @($all | Where-Object { -not $_.expired })
+    $green = @()
     foreach ($a in $kept) {
         $runId = [long](Get-EngineArtifactValue (Get-EngineArtifactValue $a 'workflow_run') 'id')
         if (-not $runId) { continue }
         $run = & $Get ("repos/{0}/actions/runs/{1}" -f $EngineArtifactRepo, $runId)
         if ([string]$run.path -ne $EngineArtifactWorkflow) { continue }
         if ([string]$run.status -ne 'completed' -or [string]$run.conclusion -ne 'success') { continue }
-        return [pscustomobject]@{ State = 'found'; Run = $run; Artifact = $a
-            Why = ("engine.yml run {0} ({1}) built {2} and keeps {3}" -f $run.id, $run.html_url, $Commit.Substring(0, 8), $name) }
+        $green += [pscustomobject]@{ Run = $run; Artifact = $a }
+    }
+    if ($green.Count) {
+        $runs = ($green | ForEach-Object { "{0} ({1})" -f $_.Run.id, $_.Run.html_url }) -join ', '
+        $why = "engine.yml run $runs built $($Commit.Substring(0, 8)) and keeps $name"
+        if ($green.Count -gt 1) { $why = "engine.yml keeps $($green.Count) $name, from runs $runs, newest first; the newest whose records are this checkout's is taken" }
+        return [pscustomobject]@{ State = 'found'; Run = $green[0].Run; Artifact = $green[0].Artifact; Candidates = $green; Why = $why }
     }
     if (-not $kept.Count) {
         return [pscustomobject]@{ State = 'none'; Run = $null; Artifact = $null
