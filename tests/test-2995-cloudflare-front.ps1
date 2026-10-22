@@ -103,7 +103,7 @@ try {
     Yes 'the client''s address is CF-Connecting-IP, inside the servers block' ($cf -match '(?s)servers \{\s*trusted_proxies static [^\r\n]+\s*client_ip_headers CF-Connecting-IP\s*\}')
     $proxies = @([regex]::Matches($cf, '(?m)^\s*reverse_proxy (\S+)( \{)?\s*$'))
     Yes ('every route still goes where it went: ' + (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ', ')) (
-        (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ',') -eq '127.0.0.1:7778,127.0.0.1:7789,127.0.0.1:7790,127.0.0.1:3001')
+        (($proxies | ForEach-Object { $_.Groups[1].Value }) -join ',') -eq '127.0.0.1:7778,127.0.0.1:7789,127.0.0.1:7790,127.0.0.1:7791,127.0.0.1:3001')
     $bare = @($proxies | Where-Object { -not $_.Groups[2].Success })
     $sends = @([regex]::Matches($cf, '(?ms)^\s*reverse_proxy \S+ \{\s*header_up X-Forwarded-For \{client_ip\}\s*\}'))
     Yes 'and every one sends the one address as X-Forwarded-For, {client_ip}' ($bare.Count -eq 0 -and $sends.Count -eq $proxies.Count)

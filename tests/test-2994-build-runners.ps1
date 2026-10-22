@@ -11,15 +11,18 @@
   label thornswood-build, which only the runners records\build-runners.json
   lists carry, and scripts\deploy\Set-BuildRunners.ps1 makes GitHub match it.
 
-  This reads the record and the workflows, and runs Set-BuildRunners.ps1
-  against stand-in runner lists with -DryRunFrom, so it asks GitHub nothing
-  and changes nothing. A few seconds.
+  This reads the record and the workflows. Since #3107 the labels are put
+  right by the box's admin service (scripts\vps\admin\admin.js), which
+  github-admin.yml asks and Set-BuildRunners.ps1 starts; the rules this test
+  held Set-BuildRunners.ps1 to before (a listed runner gets the label, any
+  other loses it, an off-box runner never has it, a record whose runners
+  GitHub does not have stops) are held there by tests\test-3107-admin.js,
+  against stand-in runner lists. Asks GitHub nothing. A few seconds.
 #>
 $ErrorActionPreference = 'Stop'
 $Here = $PSScriptRoot
 if (-not $Here) { $Here = Split-Path -Parent $MyInvocation.MyCommand.Definition }
 $Repo = Split-Path -Parent $Here
-$ps = (Get-Process -Id $PID).Path
 
 $script:pass = 0
 $script:fail = 0
@@ -84,71 +87,15 @@ Yes 'Install-Runner.ps1 reads the same record' ($ir -match [regex]::Escape('reco
 Yes '  and registers with the labels it worked out' ($ir -match [regex]::Escape("--labels '`$registerLabels'"))
 Yes '  never for an off-box runner' ($ir -match [regex]::Escape("if (-not `$OffBox -and -not `$PSBoundParameters.ContainsKey('Label'))"))
 
-# ---- 4. Set-BuildRunners.ps1 against stand-in runner lists ------------------------
-$set = Under @('scripts', 'deploy', 'Set-BuildRunners.ps1')
-$work = Join-Path ([IO.Path]::GetTempPath()) ('ts-2994-' + [Guid]::NewGuid().ToString('N'))
-New-Item -ItemType Directory -Force -Path $work | Out-Null
-try {
-    function Runner([int]$id, [string]$name, [string[]]$labels, [string]$status = 'online') {
-        [ordered]@{ id = $id; name = $name; status = $status; busy = $false; labels = @($labels | ForEach-Object { [ordered]@{ name = $_ } }) }
-    }
-    function Write-Runners([string]$name, $list) {
-        $p = Join-Path $work $name
-        [IO.File]::WriteAllText($p, ([ordered]@{ total_count = @($list).Count; runners = @($list) } | ConvertTo-Json -Depth 6))
-        return $p
-    }
-    function Write-Record([string]$name, $label, $runners) {
-        $p = Join-Path $work $name
-        [IO.File]::WriteAllText($p, ([ordered]@{ label = $label; runners = @($runners) } | ConvertTo-Json -Depth 4))
-        return $p
-    }
-    function Run([string[]]$a) {
-        $ErrorActionPreference = 'Continue'
-        $said = @(& $ps -NoProfile -NonInteractive -File $set @a 2>&1 | ForEach-Object { "$_" })
-        return @{ Code = $LASTEXITCODE; Said = ($said -join "`n") }
-    }
-    $base = @('self-hosted', 'Windows', 'X64', 'thornswood-vps')
-    $rec4 = Write-Record 'rec4.json' 'thornswood-build' @(1, 2, 3, 4)
-
-    $mixed = Write-Runners 'mixed.json' @(
-        (Runner 1 'thornswood-vps' ($base + 'thornswood-build')),
-        (Runner 2 'thornswood-vps-2' $base),
-        (Runner 3 'thornswood-vps-3' ($base + 'thornswood-build')),
-        (Runner 27 'thornswood-vps-5' ($base + 'thornswood-build')),
-        (Runner 40 'thornswood-pr-one' @('self-hosted', 'Windows', 'thornswood-pr', 'thornswood-build')))
-    $r = Run @('-Record', $rec4, '-DryRunFrom', $mixed)
-    Yes "a dry run against a mixed list ends 0 (got $($r.Code))" ($r.Code -eq 0 -and $r.Said -match 'dry run: 3 change\(s\) above, none made')
-    Yes '  puts the label on a listed runner that lacks it' ($r.Said -match 'thornswood-vps-2: put on thornswood-build')
-    Yes '  takes it off a VPS runner the record does not list' ($r.Said -match 'thornswood-vps-5: take off thornswood-build')
-    Yes '  and off an off-box runner, which never takes box builds' ($r.Said -match 'thornswood-pr-one: take off thornswood-build')
-    Yes '  leaves a runner that is right alone' ($r.Said -match 'thornswood-vps: carries thornswood-build, as the record says' -and $r.Said -notmatch 'thornswood-vps-3: (put on|take off)')
-    Yes '  and names a listed runner GitHub does not have' ($r.Said -match 'runner 4 is in the record but not registered')
-    $r = Run @('-Record', $rec4, '-DryRunFrom', $mixed, '-Check')
-    Yes "-Check against it exits 1 (got $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'differs from the record in 3 place')
-
-    $right = Write-Runners 'right.json' @(
-        (Runner 1 'thornswood-vps' ($base + 'thornswood-build')),
-        (Runner 2 'thornswood-vps-2' ($base + 'thornswood-build')),
-        (Runner 3 'thornswood-vps-3' ($base + 'thornswood-build')),
-        (Runner 4 'thornswood-vps-4' ($base + 'thornswood-build') 'offline'),
-        (Runner 27 'thornswood-vps-5' $base),
-        (Runner 30 'thornswood-vps-8' $base))
-    $r = Run @('-Record', $rec4, '-DryRunFrom', $right, '-Check')
-    Yes "-Check exits 0 when GitHub matches the record (got $($r.Code))" ($r.Code -eq 0 -and $r.Said -match '4 runner\(s\) carry thornswood-build, so at most that many heavy jobs')
-
-    $r = Run @('-Record', (Write-Record 'gone.json' 'thornswood-build' @(9)), '-DryRunFrom', $right)
-    Yes "a record whose runners GitHub does not have stops, so no build waits forever (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'STOP\. no runner the record lists is registered')
-    $r = Run @('-Record', (Write-Record 'vps.json' 'thornswood-vps' @(1)), '-DryRunFrom', $right)
-    Yes "a record naming the label every VPS runner carries stops (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'STOP\.')
-    $r = Run @('-Record', (Write-Record 'none.json' 'thornswood-build' @()), '-DryRunFrom', $right)
-    Yes "a record listing no runners stops (exit $($r.Code))" ($r.Code -eq 1 -and $r.Said -match 'STOP\. the record lists no runners')
-
-    $r = Run @('-DryRunFrom', $right, '-Check')
-    Yes "with no -Record it reads records\build-runners.json (exit $($r.Code))" (@(0, 1) -contains $r.Code -and $r.Said -match '(matches|differs from) the record')
-}
-finally {
-    Remove-Item -LiteralPath $work -Recurse -Force -ErrorAction SilentlyContinue
-}
+# ---- 4. who puts it on GitHub ------------------------------------------------------
+# Set-BuildRunners.ps1 calls no runner API itself: it starts github-admin.yml,
+# whose run the box's admin service answers (#3107). The planning rules are
+# in admin.js and run by tests\test-3107-admin.js.
+$set = [IO.File]::ReadAllText((Under @('scripts', 'deploy', 'Set-BuildRunners.ps1')))
+Yes 'Set-BuildRunners.ps1 starts github-admin.yml' ($set.Contains("`$workflow = 'github-admin.yml'") -and $set.Contains('Start-ThornswoodWorkflow'))
+Yes '  and changes no label itself' ($set -notmatch 'actions/runners/|/labels')
+Yes 'tests\test-3107-admin.js holds the rules' ((Test-Path -LiteralPath (Under @('tests', 'test-3107-admin.js'))) -and
+    ([IO.File]::ReadAllText((Under @('tests', 'test-3107-admin.js')))).Contains('a record whose runners GitHub has none of is refused'))
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
