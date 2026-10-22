@@ -116,7 +116,12 @@ namespace Thornswood
         public static string Dir { get { return Path.Combine(Paths.ProfileDir, "Keep"); } }
     }
     static class Junction { public static bool IsLink(string p) { return false; } }
-    static class Icons { public static List<string> ShortcutPaths(string buildName) { return new List<string>(); } }
+    static class Icons
+    {
+        public static string Exe { get { return null; } }
+        public static List<string> ShortcutsTo(string exe) { return new List<string>(); }
+        public static int Drop(string exe) { return 0; }
+    }
     // The launcher's sync, stood in for: what Updater.Resync leaves in an
     // install that chose its own folder, which is the release's game files in
     // Paths.Game (Profile\Payload until the folder is made) and its plugin

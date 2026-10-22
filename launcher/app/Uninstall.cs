@@ -355,20 +355,15 @@ namespace Thornswood
             try { Checks.CloseGame(); } catch (Exception ex) { Swallow.Note("Uninstall.Kill, process", ex); }
         }
 
+        /// <summary>
+        /// Every shortcut to this launcher, the pinned taskbar copy and the one
+        /// in the install folder among them (Icons.Drop, #3205). A pin left
+        /// behind keeps its name, and the next install's pin becomes
+        /// "Thornswood (2)".
+        /// </summary>
         static void DropShortcuts()
         {
-            string[] spots = {
-                Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory),
-                Environment.GetFolderPath(Environment.SpecialFolder.CommonDesktopDirectory),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
-                             "Microsoft\\Windows\\Start Menu\\Programs"),
-            };
-            foreach (string spot in spots)
-            {
-                if (string.IsNullOrEmpty(spot) || !Directory.Exists(spot)) continue;
-                string p = Path.Combine(spot, "Thornswood.lnk");
-                try { if (File.Exists(p)) File.Delete(p); } catch (Exception ex) { Swallow.Note("Uninstall.DropShortcuts, delete", ex); }
-            }
+            try { Icons.Drop(Icons.Exe); } catch (Exception ex) { Swallow.Note("Uninstall.DropShortcuts", ex); }
         }
 
         /// <summary>
@@ -487,8 +482,7 @@ namespace Thornswood
             // _dist is pure leftovers; DropScratch's own note says nothing in
             // there is ever read again once setup has run. tools is the handful
             // of scripts shipped beside the launcher. The shortcut in the
-            // install folder is ours too, and separate from the Start menu one
-            // DropShortcuts handles.
+            // install folder went with the others in DropShortcuts.
             //
             // _quarantine is deliberately NOT here. It holds files taken out of
             // somebody's game and set aside, another server's among them, and
@@ -497,7 +491,6 @@ namespace Thornswood
             // is how anybody finds out it is still holding something.
             leave.Add(Path.Combine(Paths.Root, "_dist"));
             leave.Add(Path.Combine(Paths.Root, "tools"));
-            leave.Add(Path.Combine(Paths.Root, "Thornswood.lnk"));
             // The note on where the SkyMP source is. Setup-Thornswood.ps1 puts
             // it here, beside the folders above, so without this line the
             // install folder is never empty and the farewell calls our own
