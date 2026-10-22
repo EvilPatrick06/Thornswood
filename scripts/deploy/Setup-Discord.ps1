@@ -17,7 +17,14 @@
     .\Setup-Discord.ps1 -Prune     also deletes channels this no longer wants
     .\Setup-Discord.ps1 -OnBox     runs the build on the VPS with the token the
                                     running bot already holds, and asks for
-                                    nothing. Goes with -Check, -Posts and -Prune
+                                    nothing. Goes with -Check, -Posts, -Prune
+                                    and -Only
+    .\Setup-Discord.ps1 -Only Gamemasters,welcome-travelers
+                                   touches only those categories and channels
+                                    of the plan: no role made or moved, no
+                                    other channel, no post, no webhook, no
+                                    server setting. For a change approved for
+                                    one part of the Discord (#2519)
 
   First time only, before running it:
 
@@ -80,7 +87,11 @@ param(
   # Touches nothing. Says what it would make, remove and rewrite, then stops.
   [switch]$Check,
   # Builds on the VPS with the token the bot holds there. Asks for nothing.
-  [switch]$OnBox
+  [switch]$OnBox,
+  # Only these categories and channels of the plan, and nothing else in the
+  # Discord (#2519). Build-Discord.py's ONLY says what that leaves out, and
+  # refuses a name its plan does not have before Discord is asked anything.
+  [string[]]$Only = @()
 )
 
 $ErrorActionPreference = 'Stop'
@@ -130,6 +141,11 @@ if ($OnBox) {
   if ($Prune) { $flags += "`$env:DISCORD_PRUNE = '1'`r`n" }
   if ($Posts) { $flags += "`$env:DISCORD_POSTS = '1'`r`n" }
   if ($Check) { $flags += "`$env:DISCORD_CHECK = '1'`r`n" }
+  if ($Only.Count) {
+    $names = @($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    foreach ($n in $names) { if ($n -notmatch '^[A-Za-z0-9 _-]+$') { throw ('-Only takes category and channel names from the plan, not: ' + $n) } }
+    $flags += "`$env:DISCORD_ONLY = '" + ($names -join ',') + "'`r`n"
+  }
   # What runs on the box. The token is read there and set for the one Python
   # process; the folder goes when the build ends, however it ends.
   $far = @"
@@ -221,6 +237,7 @@ if ($Guild) { $env:DISCORD_GUILD = $Guild }
 if ($Prune) { $env:DISCORD_PRUNE = '1' }
 if ($Posts) { $env:DISCORD_POSTS = '1' }
 if ($Check) { $env:DISCORD_CHECK = '1' }
+if ($Only.Count) { $env:DISCORD_ONLY = (@($Only | ForEach-Object { "$_" -split ',' } | ForEach-Object { $_.Trim() } | Where-Object { $_ }) -join ',') }
 $tok = $null
 $env:THORNSWOOD_OPEN = $(if ($open) { '1' } else { '0' })
 
@@ -232,6 +249,7 @@ try {
   $env:DISCORD_PRUNE = $null
   $env:DISCORD_POSTS = $null
   $env:DISCORD_CHECK = $null
+  $env:DISCORD_ONLY = $null
   $env:THORNSWOOD_OPEN = $null
 }
 
