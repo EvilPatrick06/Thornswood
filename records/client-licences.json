@@ -1,6 +1,6 @@
 {
   "_note": "The vcpkg libraries whose code is in each native client file, read from its program database by the fork's build, and each one's licence text in client-licences\\<port>.txt. Written by scripts\\release\\New-ClientLicenceRecord.ps1 (#3099).",
-  "forkCommit": "eaf9f0b9",
+  "forkCommit": "7ae58fea",
   "readWith": "LLVM version 20.1.8",
   "files": {
     "Data\\SKSE\\Plugins\\MpClientPlugin.dll": [
