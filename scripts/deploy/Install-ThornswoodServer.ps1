@@ -668,9 +668,11 @@ public static class ThornswoodHandles {
 '@
     } catch { return 'the handles could not be listed: ' + $_.Exception.Message }
   }
-  # Without the debug privilege an administrator cannot open the services' processes.
-  try { [System.Diagnostics.Process]::EnterDebugMode() } catch {}
-  try { return [ThornswoodHandles]::Under([IO.Path]::GetFullPath($Path)) }
+  # Without the debug privilege an administrator cannot open the services'
+  # processes; a run without it says so beside what it found.
+  $noDebug = ''
+  try { [System.Diagnostics.Process]::EnterDebugMode() } catch { $noDebug = '; without the debug privilege (' + $_.Exception.Message + ')' }
+  try { return [ThornswoodHandles]::Under([IO.Path]::GetFullPath($Path)) + $noDebug }
   catch { return 'the handles could not be listed: ' + $_.Exception.Message }
 }
 
