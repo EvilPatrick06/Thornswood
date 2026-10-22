@@ -111,7 +111,7 @@
   harness step took 34 to 39 minutes and the 40-minute limit cancelled
   builds that were passing. The heavy jobs ask for a second label,
   thornswood-build, which only the runners records\build-runners.json lists
-  carry (1 to 4). This install registers a listed runner with it;
+  carry (1 and 2 since 22 Oct 2026, #3114). This install registers a listed runner with it;
   Set-BuildRunners.ps1 puts GitHub right for runners already there.
 
   WHAT IT DOES ON THE BOX, in order:

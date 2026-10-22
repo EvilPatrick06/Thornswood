@@ -387,10 +387,15 @@ jobs:
           # each a process of its own with its output in files of its own,
           # printed as it ends, on the nightly's clock, in a job object that
           # counts its processor time. The summary says what the box's cores
-          # did meanwhile, which is what -Throttle is set from: four builds
-          # share six cores (#2994). Beside four other builds on 21 Oct 2026
-          # the 550 took 2110 s one at a time, 1112 s two at a time, 887 s at
-          # three and 765 s at six, every one passing. A harness that writes
+          # did meanwhile. Beside four other builds on 21 Oct 2026 the 550
+          # took 2110 s one at a time, 1112 s two at a time, 887 s at three and
+          # 765 s at six, every one passing. Since 22 Oct two builds run at
+          # once, not four (records\build-runners.json says why), and each
+          # runs its share of the cores, three of six, whatever the box is
+          # doing; past that, up to six, only into cores the box has free, so
+          # a build alone uses the idle ones and two side by side share them
+          # rather than one grabbing them (#3106's build got under one core
+          # beside one at six, and ran out of time). A harness that writes
           # where another reads says RUNS ALONE in its header and runs after
           # the rest. tests\test-signer-check.ps1 and
           # tests\test-build-generated.ps1 had steps of their own after this
@@ -405,7 +410,11 @@ jobs:
           }
           $gate = @(& .\scripts\dev\Gate-Harnesses.ps1)
           if ($LASTEXITCODE -ne 0) { exit 1 }
-          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -BudgetSeconds 1800
+          # This build's share: the machine's cores over the builds the box
+          # runs at once, the runners records\build-runners.json lists.
+          $builds = @((Get-Content -LiteralPath records\build-runners.json -Raw | ConvertFrom-Json).runners).Count
+          $share = [Math]::Min(6, [Math]::Max(1, [Math]::Floor([Environment]::ProcessorCount / [Math]::Max(1, $builds))))
+          .\scripts\dev\Nightly-Harnesses.ps1 -Only ($gate -join ' ') -Throttle 6 -Share $share -BudgetSeconds 1800
           exit $LASTEXITCODE
 
       - name: Run the voice service's /health harness
