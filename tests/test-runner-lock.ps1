@@ -242,6 +242,54 @@ if (-not $icacls -or -not $lib) {
     Yes 'the scratch folders are gone again' (-not (Test-Path -LiteralPath $scratch))
 }
 
+# ---- a removed account's profile (#3119) ----------------------------------------------
+# The real Remove-LeftProfiles, run against stand-ins for Windows' profile
+# list and its account lookup, so it runs everywhere. On 22 Oct 2026 removed
+# runners 4 to 8 kept their registry loaded until the box restarted, and an
+# install of runner 3's name beside the old profile would have made
+# C:\Users\thornswood-runner3.<computer>.
+$removeAt = $text.IndexOf("Remove-LocalUser -Name '`$Account' -EA SilentlyContinue")
+Yes '-Remove takes off the profile right after the account' ($removeAt -gt 0 -and $text.IndexOf("Remove-LeftProfiles @('`$Account', '`$Account.*')", $removeAt) -gt $removeAt)
+Yes '  and sends the library that does it' ($text.Contains('Send-WithSecret ([string]$tok) ($lockLib + $watcherLib'))
+$newAt = $text.IndexOf('New-LocalUser -Name `$acct')
+$leftAt = $text.IndexOf('`$left = @(Remove-LeftProfiles @(`$acct, (`$acct + ''.*'')))')
+Yes 'an install takes a left profile of its name off before it makes the account' ($leftAt -gt 0 -and $newAt -gt $leftAt)
+Yes '  and makes none while one is LEFT' ($text.IndexOf("Where-Object { `"```$_`" -like 'LEFT *' }).Count) { throw ('Nothing was installed", $leftAt) -gt $leftAt)
+if ($all) { Yes '-Lock tidies every runner account''s left profile, and a left one does not fail the lock' ($all -match '(?m)^Remove-LeftProfiles @\(\$profileLike\)\r?$' -and $text.Contains("`$profileLike = `$(if (`$OffBox) { 'thornswood-pr*' } else { 'thornswood-runner*' })")) }
+if ($lib) {
+    $users = Join-Path ([IO.Path]::GetTempPath()) ('tw-left-profiles-' + [guid]::NewGuid().ToString('N'))
+    try {
+        $r = & {
+            . ([scriptblock]::Create($lib))
+            $state = @{ Profiles = @(); Alive = @(); Gone = @() }
+            function Get-CimInstance { param([string]$ClassName) $state.Profiles | Where-Object { $state.Gone -notcontains $_.SID } }
+            function Remove-CimInstance { param([Parameter(ValueFromPipeline = $true)]$InputObject)
+                process { if ($InputObject.Loaded) { throw 'The process cannot access the file because it is being used by another process.' }
+                          $state.Gone += $InputObject.SID; Remove-Item -LiteralPath $InputObject.LocalPath -Recurse -Force } }
+            function Test-RunnerSidAlive([string]$sid) { $state.Alive -contains $sid }
+            function P([string]$name, [string]$sid, [bool]$loaded) {
+                $path = Join-Path $users $name; $null = New-Item -ItemType Directory -Force -Path $path
+                [pscustomobject]@{ LocalPath = $path; SID = $sid; Loaded = $loaded } }
+            $null = New-Item -ItemType Directory -Force -Path $users
+            $state.Profiles = @((P 'thornswood-runner' 'S-1001' $true), (P 'thornswood-runner3' 'S-1005' $false),
+                                (P 'thornswood-runner4' 'S-1007' $false), (P 'thornswood-runner6.HOST' 'S-1015' $false),
+                                (P 'thornswood-runner8' 'S-1019' $true), (P 'Administrator' 'S-500' $true))
+            $null = New-Item -ItemType Directory -Force -Path (Join-Path $users 'thornswood-runner7'), (Join-Path $users 'Public')
+            $state.Alive = @('S-1001', 'S-500')
+            $one = @(Remove-LeftProfiles @('thornswood-runner3', 'thornswood-runner3.*') $users)
+            $box = @(Remove-LeftProfiles @('thornswood-runner*') $users)
+            [pscustomobject]@{ One = $one; Box = $box; Gone = $state.Gone }
+        }
+        $sayOne = $r.One -join "`n"; $sayBox = $r.Box -join "`n"
+        Yes ('for one account it touches that name alone: its dead profile, which Windows has let go of, taken off (' + $sayOne + ')') ($r.One.Count -eq 1 -and $r.One[0] -like ('took off ' + (Join-Path $users 'thornswood-runner3') + ', the profile of a removed account (#3119)') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner3')))
+        Yes '  for the box: a dead one Windows had already let go of goes' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner4') + ',*') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner4')))
+        Yes '  so does a <name>.<computer> one' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner6.HOST') + ',*'))
+        Yes '  and a folder no profile owns' ($sayBox -like ('*took off ' + (Join-Path $users 'thornswood-runner7') + ', a profile folder no account owned*') -and -not (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner7')))
+        Yes '  one whose registry Windows still has loaded is LEFT until a restart, and kept' ($sayBox -like ('*LEFT ' + (Join-Path $users 'thornswood-runner8') + ': its account is gone and Windows keeps its registry loaded until the box restarts*') -and (Test-Path -LiteralPath (Join-Path $users 'thornswood-runner8')) -and $r.Gone -notcontains 'S-1019')
+        Yes '  a live account''s profile and anything not a runner''s are left alone' ((Test-Path -LiteralPath (Join-Path $users 'thornswood-runner')) -and (Test-Path -LiteralPath (Join-Path $users 'Administrator')) -and (Test-Path -LiteralPath (Join-Path $users 'Public')) -and $r.Gone -notcontains 'S-1001' -and $sayBox -notmatch 'Administrator|Public|thornswood-runner[,:]')
+    } finally { Remove-Item -LiteralPath $users -Recurse -Force -ErrorAction SilentlyContinue }
+}
+
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
 if ($script:fail) { exit 1 }
