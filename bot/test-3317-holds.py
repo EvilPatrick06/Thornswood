@@ -94,8 +94,8 @@ for h in B.HOLDS:
         got == [(slug + '-announcements', 'holdread', h), (slug, 'hold', h),
                 (slug + '-court', 'holdcourt', h), (slug + '-guard', 'holdguard', h)])
 cats = [c for c, _ in B.PLAN]
-yes('H1 the hold categories sit together, after In Character and before Voice',
-    cats[cats.index('In Character') + 1:cats.index('Voice')] == B.HOLDS)
+yes('H1 the hold categories sit together, after In Character, then Factions',
+    cats[cats.index('In Character') + 1:cats.index('Factions')] == B.HOLDS)
 
 # ------------------------------------------------------------------ H2 --
 yes('H2 every hall is moved out of The Holds by its name',

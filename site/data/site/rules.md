@@ -3,7 +3,7 @@
 Two lists, because they are two different jobs. The first is about being decent
 to each other. The second is about playing here.
 
-Last changed: 29 September 2026.
+Last changed: 22 October 2026.
 
 <!-- alpha -->
 Thornswood is in alpha, and the world is open by application. The application
@@ -182,8 +182,11 @@ demigod will in a year, because people can stand next to a smith.
 
 Jarl, steward, housecarl, thane, captain, priest of a named temple.
 
-Most of them are sitting empty. How one comes free, and who hands it over, is
-something you find out in character rather than something you get told here.
+Most of them are sitting empty. A Jarl's seat is asked for on the Jarl
+application in Discord, which lists only the holds that have no Jarl, and a
+Jarl names their hold's steward, court and guards. How any other title comes
+free, and who hands it over, is something you find out in character rather than
+something you get told here.
 
 Claiming an empty title is fine within reason. Nobody will stop you calling
 yourself captain of a guard nobody else has claimed, or priest of a temple with
