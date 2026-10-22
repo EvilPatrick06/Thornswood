@@ -19,8 +19,8 @@
 //     new counts, and nothing else;
 //   - onCraft goes on with that recipe, refuses the mod's own counts, and the
 //     counts are handed at spawn;
-//   - the policy carries nothing of a never-copied plugin, FLOOR_HELD_BY_SERVER
-//     is the manifest's heldByServer, and holdFloorItemsOff holds each off.
+//   - the policy carries nothing of a never-copied plugin, HELD_BY_SERVER
+//     is the manifest's heldByServer, and holdNeverCopiedOff holds each off.
 //
 // Read only.
 'use strict';
@@ -54,12 +54,12 @@ const policy = JSON.parse(fs.readFileSync(path.join(REPO, 'game', 'data', 'last-
 const recipes = JSON.parse(fs.readFileSync(path.join(REPO, 'game', 'data', 'recipes.json'), 'utf8')).recipes;
 
 const BLOCK = take('// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
-const FLOOR = take('// ==== FLOOR_HELD_BY_SERVER, generated ====', '// ==== end FLOOR_HELD_BY_SERVER ====');
+const FLOOR = take('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====');
 const PARTS = [
   take('function recipeCountsScript() {'),
   take('function handRecipeCounts(actorId) {'),
   take('function recipeSetInGame(craftedItemBaseId, workbenchId, inputs) {'),
-  take('function holdFloorItemsOff() {')
+  take('function holdNeverCopiedOff() {')
 ];
 const PROPERTY = (/^var RECIPE_COUNTS_PROPERTY = '([^']+)';$/m.exec(src) || [])[1];
 const ok = BLOCK && FLOOR && PARTS.every(function (p) { return p !== null; }) && !!PROPERTY;
@@ -73,7 +73,7 @@ yes('T1 Build-Recost.py --check: recost.json and the RECIPES_SET_IN_GAME block a
 
 const box = {};
 vm.createContext(box);
-vm.runInContext(BLOCK + '\n' + FLOOR + '\nthis.T = RECIPES_SET_IN_GAME; this.F = FLOOR_HELD_BY_SERVER;', box);
+vm.runInContext(BLOCK + '\n' + FLOOR + '\nthis.T = RECIPES_SET_IN_GAME; this.F = HELD_BY_SERVER;', box);
 const T = box.T;
 const keys = Object.keys(T).sort();
 yes('T2 it is recost.json\'s notCopied, each with the output, bench and inputs [item, had, asks] (' + keys.length + ')',
@@ -123,7 +123,7 @@ function server() {
   vm.runInContext(BLOCK + '\n' + FLOOR + '\nvar RECIPE_COUNTS_PROPERTY = ' + JSON.stringify(PROPERTY) +
                   ';\nvar RECIPE_COUNTS_AT = 1234;\n' + PARTS.join('\n') +
                   '\nthis.api = { recipeCountsScript: recipeCountsScript, handRecipeCounts: handRecipeCounts, ' +
-                  'recipeSetInGame: recipeSetInGame, holdFloorItemsOff: holdFloorItemsOff };', ctx);
+                  'recipeSetInGame: recipeSetInGame, holdNeverCopiedOff: holdNeverCopiedOff };', ctx);
   return { mp: mp, store: store, sets: sets, api: ctx.api };
 }
 const srv = server();
@@ -224,22 +224,21 @@ yes('W4 the owner script sets counts with SetNthIngredientQuantity and copies no
 const never = (policy.notCopiedFrom || []);
 yes('F1 the policy carries no record of a plugin it never copies from (Patrick, 22 Oct: the floor records were never allowed)',
     never.length > 0 && never.every(function (r) { return !r.carried || r.carried.length === 0; }));
-const heldByServer = (manifest.floorItems || {}).heldByServer || [];
-yes('F2 FLOOR_HELD_BY_SERVER is the manifest\'s floorItems.heldByServer, each a never-copied plugin\'s own (' + heldByServer.length + ')',
-    Array.isArray(box.F) && JSON.stringify(box.F) === JSON.stringify(heldByServer) &&
-    heldByServer.every(function (d) { return never.some(function (r) { return d.split(':').slice(1).join(':').toLowerCase() === r.plugin.toLowerCase(); }); }));
+const heldByServer = ((manifest.floorItems || {}).heldByServer || []).concat((manifest.refs || {}).heldByServer || []).sort();
+yes('F2 HELD_BY_SERVER is the manifest\'s floor items and cut actors held by the server (' + heldByServer.length + ')',
+    Array.isArray(box.F) && JSON.stringify(box.F) === JSON.stringify(heldByServer));
 yes('F3 Thornswood-Last.esp has no never-copied plugin as a master',
     (manifest.masters || []).every(function (m) { return !never.some(function (r) { return r.plugin.toLowerCase() === m.toLowerCase(); }); }));
 {
   const fs2 = server();
   const ctx = { F: ['7ad7:Hothtrooper44_ArmorCompilation.esp', '7ad8:Hothtrooper44_ArmorCompilation.esp'] };
-  const fn = new Function('mp', 'idOf', 'log', 'FLOOR_HELD_BY_SERVER', PARTS[3] + '\nreturn holdFloorItemsOff();');
+  const fn = new Function('mp', 'idOf', 'log', 'HELD_BY_SERVER', PARTS[3] + '\nreturn holdNeverCopiedOff();');
   const took = fn(fs2.mp, idOf, function () { }, ctx.F);
   const again = fn(fs2.mp, idOf, function () { }, ctx.F);
-  yes('F4 holdFloorItemsOff holds each disabled on the server, and once held, leaves it',
+  yes('F4 holdNeverCopiedOff holds each disabled on the server, and once held, leaves it',
       took === 2 && again === 0 && ctx.F.every(function (d) { return fs2.mp.get(idOf(d), 'isDisabled') === true; }));
 }
-yes('F5 it runs when the gamemode loads, beside the chopping blocks', /\nholdFloorItemsOff\(\);\n/.test(src) &&
-    src.indexOf('\nholdFloorItemsOff();\n') > src.indexOf('\ndisableBlocksOff();\n'));
+yes('F5 it runs when the gamemode loads, beside the chopping blocks', /\nholdNeverCopiedOff\(\);\n/.test(src) &&
+    src.indexOf('\nholdNeverCopiedOff();\n') > src.indexOf('\ndisableBlocksOff();\n'));
 
 done();

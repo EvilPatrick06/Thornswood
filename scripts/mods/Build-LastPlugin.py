@@ -103,9 +103,11 @@ WHAT IT PUTS IN THE PLUGIN
      22 Oct 2026, q-613-ia-recipes); one standing in a cell or world such a
      plugin wins would need that plugin's record of the place copied, or
      its edit of it undone. Each of those is listed in the manifest
-     (floorItems.heldByServer) and in the FLOOR_HELD_BY_SERVER block this
+     (floorItems.heldByServer) and in the HELD_BY_SERVER block this
      writes into game/gamemode.js, and the server holds it disabled
-     itself, the way it holds the three chopping blocks (#495).
+     itself, the way it holds the three chopping blocks (#495). A cut actor
+     (1) standing in such a place is held off the same way
+     (refs.heldByServer).
 
   6. The forge recipes game/data/recost.json re-costs (Patrick, 21 October
      2026, A on #613, and B on #3115): each is the winning record with only
@@ -258,7 +260,7 @@ MANIFEST = os.path.join(ROOT, 'game', 'data', 'last-plugin.json')
 RECOST = os.path.join(ROOT, 'game', 'data', 'recost.json')
 OUT = os.path.join(ROOT, 'game', 'content', PLUGIN)
 GAMEMODE = os.path.join(ROOT, 'game', 'gamemode.js')
-FLOOR_BLOCK = ('// ==== FLOOR_HELD_BY_SERVER, generated ====', '// ==== end FLOOR_HELD_BY_SERVER ====')
+HELD_BLOCK = ('// ==== HELD_BY_SERVER, generated ====', '// ==== end HELD_BY_SERVER ====')
 
 COMPRESSED = 0x00040000
 DELETED = 0x20
@@ -1117,8 +1119,8 @@ def build(data_dir):
 
     # 1. The cut actors.
     keep_corpses = policy['corpses']['action'] == 'keep'
-    refs = {'disabled': [], 'deleted': [], 'alreadyOff': [], 'corpseKept': []}
-    actors = []
+    refs = {'disabled': [], 'deleted': [], 'alreadyOff': [], 'corpseKept': [], 'heldByServer': []}
+    actors, actor_ref = [], {}
     for row in catalogue['npcs']:
         if row['keep'] or row['ref'] == '14:Skyrim.esm':
             continue
@@ -1137,6 +1139,7 @@ def build(data_dir):
         else:
             refs['disabled'].append(row['ref'])
             actors.append(e)
+            actor_ref[(e.pi, e.fid)] = row['ref']
 
     # 2. The quests.
     kept_ids = {ref_key(q['quest']): q for q in policy['questsKept']}
@@ -1348,6 +1351,12 @@ def build(data_dir):
                                  'Nothing was written.' % (src.name, e.fid))
         return cg
 
+    # A cut actor standing where a never-copied plugin wins the cell or world
+    # is held off by the server, for the floor items' reason (heldByServer).
+    for e in [e for e in actors if in_blocked_place(e)]:
+        actors.remove(e)
+        refs['disabled'].remove(actor_ref[(e.pi, e.fid)])
+        refs['heldByServer'].append(actor_ref[(e.pi, e.fid)])
     for e in actors + gates:
         stand(e)
     # The cells only the floor items need: what this adds to the records the
@@ -1572,7 +1581,7 @@ def build(data_dir):
             'deleted': len(floor_rows['deleted']),
             'alreadyOff': len(floor_rows['alreadyOff']),
             # Placed by a plugin never copied from: not in the plugin, held
-            # off by the server (FLOOR_HELD_BY_SERVER in game/gamemode.js).
+            # off by the server (HELD_BY_SERVER in game/gamemode.js).
             'heldByServer': sorted(desc_of(g, canon) for g, _ in by_server),
             'cellsAdded': len(floor_cells),
             'cellsAddedByWinner': dict(sorted(collections.Counter(plugins[cells[g].pi].name
@@ -1900,7 +1909,8 @@ def verify(data_dir, plugin_bytes, manifest):
         if e is None or not e.flags & DISABLED or b'XESP' in tags or b'VMAD' in tags:
             fails.append('cut actor %s is left able to show' % desc)
     off = set(manifest['refs']['disabled']) | set(manifest['refs']['deleted']) | \
-        set(manifest['refs']['alreadyOff']) | set(manifest['refs']['corpseKept'])
+        set(manifest['refs']['alreadyOff']) | set(manifest['refs']['corpseKept']) | \
+        set(manifest['refs'].get('heldByServer', []))
     for row in catalogue['npcs']:
         if not row['keep'] and row['ref'] != '14:Skyrim.esm' and row['ref'] not in off:
             fails.append('cut actor %s is in no list' % row['ref'])
@@ -2038,36 +2048,37 @@ def main():
         print('  %s game/data/last-plugin.json %s' % (('ok   ', 'says what this builds') if b else
                                                        ('DIFFERS', 'is not what this builds')))
         gm = io.open(GAMEMODE, encoding='utf-8', newline='').read()
-        c = floor_block(manifest, gm) == gm
-        print('  %s the FLOOR_HELD_BY_SERVER block %s' % (('ok   ', 'is what this builds') if c else
+        c = held_block(manifest, gm) == gm
+        print('  %s the HELD_BY_SERVER block %s' % (('ok   ', 'is what this builds') if c else
                                                           ('DIFFERS', 'is not what this builds')))
         return 0 if a and b and c else 1
-    gm = floor_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read())
+    gm = held_block(manifest, io.open(GAMEMODE, encoding='utf-8', newline='').read())
     with open(OUT, 'wb') as f:
         f.write(plugin)
     with open(MANIFEST, 'wb') as f:
         f.write(manifest_bytes(manifest))
     with io.open(GAMEMODE, 'w', encoding='utf-8', newline='') as f:
         f.write(gm)
-    print('Wrote game/content/%s, game/data/last-plugin.json and the FLOOR_HELD_BY_SERVER block (%d)'
-          % (PLUGIN, len(manifest['floorItems']['heldByServer'])))
+    print('Wrote game/content/%s, game/data/last-plugin.json and the HELD_BY_SERVER block (%d)'
+          % (PLUGIN, len(manifest['floorItems']['heldByServer']) + len(manifest['refs']['heldByServer'])))
     return 0
 
 
-def floor_block(manifest, gamemode):
-    """game/gamemode.js with its FLOOR_HELD_BY_SERVER block holding the floor
-    items a never-copied plugin places, which the server holds off (#3077,
-    #2454)."""
-    a, b = gamemode.find(FLOOR_BLOCK[0]), gamemode.find(FLOOR_BLOCK[1])
+def held_block(manifest, gamemode):
+    """game/gamemode.js with its HELD_BY_SERVER block: the floor items and cut
+    actors Thornswood-Last.esp cannot switch off without copying a plugin it
+    never copies from, which the server holds off instead (#3077, #2454)."""
+    a, b = gamemode.find(HELD_BLOCK[0]), gamemode.find(HELD_BLOCK[1])
     if a < 0 or b < a:
-        raise SystemExit('STOP. no FLOOR_HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
+        raise SystemExit('STOP. no HELD_BY_SERVER markers in game/gamemode.js. Nothing was written.')
     block = '\n'.join([
-        FLOOR_BLOCK[0],
-        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json floorItems.heldByServer);',
-        '// do not hand edit. The floor items a plugin Thornswood-Last.esp never copies from places.',
-        'var FLOOR_HELD_BY_SERVER = %s;' % json.dumps(manifest['floorItems']['heldByServer']),
-        FLOOR_BLOCK[1]])
-    return gamemode[:a] + block + gamemode[b + len(FLOOR_BLOCK[1]):]
+        HELD_BLOCK[0],
+        '// Generated by scripts\\mods\\Build-LastPlugin.py (game\\data\\last-plugin.json: floorItems.heldByServer',
+        '// and refs.heldByServer); do not hand edit. Placed by, or standing where, a plugin it never copies from.',
+        'var HELD_BY_SERVER = %s;' % json.dumps(sorted(manifest['floorItems']['heldByServer'] +
+                                                     manifest['refs']['heldByServer'])),
+        HELD_BLOCK[1]])
+    return gamemode[:a] + block + gamemode[b + len(HELD_BLOCK[1]):]
 
 
 if __name__ == '__main__':

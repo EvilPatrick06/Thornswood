@@ -4113,36 +4113,38 @@ function disableBlocksOff() {
 disableBlocksOff();
 
 /*
-  AND THE FLOOR ITEMS OF A PLUGIN NOTHING IS COPIED FROM (#3077, #2454).
+  AND WHAT A PLUGIN NOTHING IS COPIED FROM STANDS IN THE WAY OF (#3077, #2454).
 
-  Thornswood-Last.esp switches every floor item off by carrying an
-  override of it, initially disabled. Immersive Armors places six of its
-  own, and nothing of that mod is copied (Patrick, 17 Oct, #2454; and 22
-  Oct, q-613-ia-recipes: the six were never his to carry). So the server
-  holds those six disabled itself, the same way and for the same reason as
-  the chopping blocks above: every client is told when the reference
-  streams in, and the flag is on the reference's change form.
-  FLOOR_HELD_BY_SERVER is written by scripts/mods/Build-LastPlugin.py.
+  Thornswood-Last.esp switches every floor item and every cut actor off by
+  carrying an override of it, initially disabled, with the cell and world it
+  stands in. Nothing of Immersive Armors is copied (Patrick, 17 Oct, #2454;
+  and 22 Oct, q-613-ia-recipes: the floor items it places and the cell and
+  world headers under them were never his to carry). So a floor item it
+  places, and a floor item or cut actor standing in a cell or world it wins,
+  is not in the plugin, and the server holds it disabled itself, the same
+  way and for the same reason as the chopping blocks above: every client is
+  told when the reference streams in, and the flag is on the reference's
+  change form. HELD_BY_SERVER is written by scripts/mods/Build-LastPlugin.py.
 */
-// ==== FLOOR_HELD_BY_SERVER, generated ====
-var FLOOR_HELD_BY_SERVER = [];
-// ==== end FLOOR_HELD_BY_SERVER ====
+// ==== HELD_BY_SERVER, generated ====
+var HELD_BY_SERVER = [];
+// ==== end HELD_BY_SERVER ====
 
-function holdFloorItemsOff() {
+function holdNeverCopiedOff() {
   let took = 0;
-  for (let i = 0; i < FLOOR_HELD_BY_SERVER.length; i++) {
-    const id = idOf(FLOOR_HELD_BY_SERVER[i]);
-    if (!id) { log('floor item', FLOOR_HELD_BY_SERVER[i], 'is not in this load order, left alone'); continue; }
+  for (let i = 0; i < HELD_BY_SERVER.length; i++) {
+    const id = idOf(HELD_BY_SERVER[i]);
+    if (!id) { log('reference', HELD_BY_SERVER[i], 'is not in this load order, left alone'); continue; }
     try {
       if (!mp.get(id, 'isDisabled')) { mp.set(id, 'isDisabled', true); took++; }
     } catch (e) {
-      log('could not hold floor item', FLOOR_HELD_BY_SERVER[i], 'disabled:', e);
+      log('could not hold', HELD_BY_SERVER[i], 'disabled:', e);
     }
   }
-  if (took) { log('the server holds', took, 'floor item(s) of a never-copied plugin out of the world'); }
+  if (took) { log('the server holds', took, 'reference(s) the last plugin cannot switch off out of the world'); }
   return took;
 }
-holdFloorItemsOff();
+holdNeverCopiedOff();
 
 /*
   THE KILN IS A BENCH, AND A PRESS ON IT IS THE ENGINE'S (#2337).
