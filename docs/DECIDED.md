@@ -224,10 +224,12 @@ link, and the old line goes.
 - **Runner 3 stays as the one light runner** after hosted builds return. 22
   Oct 2026,
   [#2929](https://github.com/EvilPatrick06/Thornswood/issues/2929#issuecomment-6335266070).
-- **The backup, watchdog and maintenance tasks stay SYSTEM, by design;**
-  only the services that run code we deploy get accounts of their own. 22
-  Oct 2026,
-  [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289).
+- **The watchdog and maintenance tasks stay SYSTEM, by design;** the
+  services that run code we deploy, and the nightly backup, run on accounts
+  of their own (docs/DEPLOY-IDENTITIES.md section 8). 22 Oct 2026,
+  [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6335268289),
+  the backup
+  [#2578](https://github.com/EvilPatrick06/Thornswood/issues/2578#issuecomment-6342972359).
 - **The Gamemasters category goes on the live Discord** with
   Setup-Discord.ps1 (no posts, no pruning), and GM Rules v1.0 is pinned in
   #gm-rules. 22 Oct 2026,
