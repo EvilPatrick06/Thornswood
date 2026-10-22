@@ -63,8 +63,7 @@ if ($assign.Count -eq 1) { $Moves = @(& ([scriptblock]::Create($assign[0].Right.
 foreach ($n in 'world', 'private\characters.json', 'private\property.json', 'private\farm-claims.json',
                'private\law.json', 'private\beds.json', 'private\embassy.json', 'private\books.json',
                'private\last-left.json', 'private\take-limit.json', 'private\trade-cargo.json', 'private\dungeon-rewards-ledger.json',
-               'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json',
-               'data\property.json', 'data\farm-claims.json') {
+               'private\dungeon-rewards-ledger.initialized', 'private\deleted-characters.json') {
     Yes "  it moves $n" ($Moves -contains $n)
 }
 Yes '  and leaves the mod menu choices and the merchant ledger' (-not ($Moves -contains 'private\mod-settings.json') -and -not ($Moves -contains 'private\merchant-ledger.json'))
@@ -145,7 +144,7 @@ try {
     $chars = @($out | Where-Object { $_ -like 'CHARS|*' })
     Yes ('the survey counts the 3 characters in characters.json, and only there (' + ($chars -join ' ') + ')') ($chars.Count -eq 1 -and $chars[0] -eq 'CHARS|3')
     $items = @($out | Where-Object { $_ -like 'ITEM|*' })
-    Yes ('the survey lists the 14 things there that would go (' + $items.Count + ')') ($items.Count -eq 14 -and @($out | Where-Object { $_ -like 'NONE|data\*' }).Count -eq 2)
+    Yes ('the survey lists the 14 things there that would go (' + $items.Count + ')') ($items.Count -eq 14 -and @($out | Where-Object { $_ -like '*|data\*' }).Count -eq 0)
 
     # ---- the stop, with a process running from the folder
     $node = (Get-Command node -ErrorAction SilentlyContinue)
