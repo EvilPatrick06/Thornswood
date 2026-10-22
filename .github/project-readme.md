@@ -8,11 +8,10 @@ is not going to get done.
 ## Reading it
 
 - **Order** is the do-order. Sort the view by Order and work down.
-- **wave:** labels are the stage: 1 Today, 2 This week, then identity and
-  safety, arriving in the world, what a stranger sees, release and
-  operations, everything else, nice to have, and the world.
+- **Status** says where it stands: Todo, In Progress, or Done (merged and
+  waiting only on a test).
 - **area:** labels say which part of the project it is.
-- **needs:** labels say what it waits on: the live server, or Patrick.
+- **needs: patrick** marks what waits on Patrick.
 - **anyone can start** marks work that needs nobody in particular.
 - Each issue says where the problem lives, what is known, the steps as a
   checklist, the commands, when it is done, and the traps.
@@ -35,7 +34,8 @@ is not going to get done.
   comment that starts `Test task:`, which the bot posts to #test-tasks.
   A test task with `Server: Dev` under its first line is a measurement
   someone on dev has to take: the bot posts it, open issue or closed, in the
-  staff-only #dev-test-tasks.
+  staff-only #dev-test-tasks. A fix that is on dev and not yet on main is
+  not one; its test task is the Main one, written when it reaches main.
 
 The rules behind all of this are in
 [Developer-Guide.md](https://github.com/EvilPatrick06/Thornswood/blob/main/Developer-Guide.md).
