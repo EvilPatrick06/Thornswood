@@ -2746,12 +2746,12 @@ namespace Thornswood
             // touched now, so an unchanged pass moves nothing on screen.
             List<Check> checks = Checks.All(cfg);
             bool all = true;
-            int problems = 0;
+            var blocking = new List<Check>();
             foreach (Check c in checks)
             {
                 // An advisory row that fails is drawn amber and leaves Play
                 // alone. See Check.Advisory.
-                if (c.Blocks) { all = false; problems++; }
+                if (c.Blocks) { all = false; blocking.Add(c); }
             }
 
             if (statusList != null)
@@ -2768,7 +2768,7 @@ namespace Thornswood
                     FillStatusRow(statusList.Children[i] as Border, checks[i]);
             }
 
-            UpdateReadySummary(all, problems);
+            UpdateReadySummary(blocking);
 
             // No card here. It said the same thing as the bar above Play, which
             // lives in its own grid row below the scroller, so the two stacked
@@ -3038,12 +3038,20 @@ namespace Thornswood
         /// <summary>
         /// The one line summary of the checklist that sits on the Play page
         /// (#607). Updated in place: it does not flash or re-say itself when the
-        /// count has not changed. The button's own words say why Play is held
+        /// words have not changed. The button's own words say why Play is held
         /// for anything that is not a failing row (an update, a downgrade, the
         /// feed), so this stays about the checks themselves.
+        ///
+        /// A failing pass names the problem in a few words, the first failing
+        /// row's Check.Problem in the order Diagnostics lists them, and how many
+        /// more there are (#3203). It said only "Check Diagnostics", so finding
+        /// out that Steam was closed meant opening another page. Hovering it
+        /// lists every one; the Diagnostics button beside it still opens the
+        /// rows with their details.
         /// </summary>
-        static void UpdateReadySummary(bool all, int problems)
+        static void UpdateReadySummary(List<Check> blocking)
         {
+            bool all = blocking.Count == 0;
             if (dotReady != null)
             {
                 Brush want = Res(all ? "Ok" : "Bad");
@@ -3051,15 +3059,47 @@ namespace Thornswood
             }
             if (txtReadyTitle != null)
             {
-                // Pass: "Everything checks out". Fail: red "Check Diagnostics"
-                // (capital C) and a button that opens the Diagnostics page.
-                string title = all ? "Everything checks out" : "Check Diagnostics";
+                string title = ReadyTitle(blocking);
                 if (txtReadyTitle.Text != title) txtReadyTitle.Text = title;
+                string tip = blocking.Count > 1 ? ReadyList(blocking) : null;
+                if (!Equals(txtReadyTitle.ToolTip, tip)) txtReadyTitle.ToolTip = tip;
                 Brush ink = Res(all ? "Ink" : "Bad");
                 if (!ReferenceEquals(txtReadyTitle.Foreground, ink)) txtReadyTitle.Foreground = ink;
             }
             if (btnCheckDiagnostics != null)
                 btnCheckDiagnostics.Visibility = all ? Visibility.Collapsed : Visibility.Visible;
+        }
+
+        /// <summary>
+        /// The Ready card's words: "Everything checks out", one problem as its
+        /// row says it ("Steam not running"), or the first and a count
+        /// ("Wrong Skyrim build and 2 more").
+        /// </summary>
+        static string ReadyTitle(List<Check> blocking)
+        {
+            if (blocking.Count == 0) return "Everything checks out";
+            string first = ProblemWords(blocking[0]);
+            if (blocking.Count == 1) return first;
+            return first + " and " + (blocking.Count - 1) + " more";
+        }
+
+        /// <summary>Every failing row's words, one to a line, for the hover.</summary>
+        static string ReadyList(List<Check> blocking)
+        {
+            var lines = new List<string>();
+            foreach (Check c in blocking) lines.Add(ProblemWords(c));
+            return string.Join("\n", lines.ToArray());
+        }
+
+        /// <summary>
+        /// A row's Problem, which every row that can block sets in Checks. A
+        /// row added later without one still says which row it is and what
+        /// it found, rather than nothing.
+        /// </summary>
+        static string ProblemWords(Check c)
+        {
+            if (!string.IsNullOrEmpty(c.Problem)) return c.Problem;
+            return c.Name + ": " + c.Detail;
         }
 
         /// <summary>
