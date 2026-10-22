@@ -36,10 +36,10 @@ with no account.
 
 The server's engine recorded for the next release, `scam_native.node`, is
 built from one commit,
-[`1a6e3e53`](https://github.com/EvilPatrick06/skymp/tree/1a6e3e53f9f77b63b9cecacbc900588ba47abf7b).
+[`d6dc5535`](https://github.com/EvilPatrick06/skymp/tree/d6dc5535c6a68be16710674dd909c97894e05e6f).
 That commit starts from
 [SkyMP](https://github.com/skyrim-multiplayer/skymp) at `2849e676`, and
-[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...1a6e3e53)
+[every change Thornswood made](https://github.com/EvilPatrick06/skymp/compare/2849e676...d6dc5535)
 is the difference between the two.
 
 The server's engine goes to our test server first, then to the main server.
@@ -68,6 +68,15 @@ the same public branch:
 | `scam_native.node`, the server's engine | `skymp5-server` | GNU AGPL version 3 |
 
 Each licence is the `LICENSE` file in that folder of the repository.
+
+The four `.dll` and `.exe.hidden` files are also built with other people's
+libraries, whose code is inside them: among them OpenSSL, zlib, fmt, spdlog,
+Frida with GLib, and Node.js. Every download that carries one of the four
+has a `licences` folder with each library's own licence, and its note lists
+which library is in which file. The installer puts that folder in your
+Thornswood folder. Frida is Frida's own build, with other libraries inside
+it, and the note names where their source is: Thornswood's copies of
+Frida's repositories, at the commits Frida built them from.
 
 SkyMP's in-game interface, `build.js` with the fonts, pictures and sounds
 beside it, is built from the same public copy too: from its `skymp5-front`

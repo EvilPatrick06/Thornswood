@@ -326,11 +326,11 @@ try {
         $fake = Join-Path $Scratch 'repo'
         New-Item -ItemType Directory -Force -Path $fake | Out-Null
         Copy-Item -LiteralPath (Join-Path $repo 'scripts') -Destination $fake -Recurse -Force
-        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json') {
+        foreach ($f in 'layout.json', 'installer\licences\GPL-3.0.txt', 'installer\licences\AGPL-3.0.txt', 'records\generated.json', 'records\ui-gone.json', 'records\client-build.json', 'records\client-licences.json', 'records\client-licences') {
             $from = Join-Path $repo $f
             if (Test-Path -LiteralPath $from) {
                 New-Item -ItemType Directory -Force -Path (Split-Path -Parent (Join-Path $fake $f)) | Out-Null
-                Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force
+                Copy-Item -LiteralPath $from -Destination (Join-Path $fake $f) -Force -Recurse
             }
         }
         $reqFrom = Join-Path $repo 'game\required-data'
