@@ -60,6 +60,7 @@ class Role(object):
         self.permissions = discord.Permissions(perms.value if hasattr(perms, 'value') else perms)
         self.members = []
         self.managed = False
+        self.position = 0
 
     async def edit(self, **kw):
         WRITES.append(('role edit', self.name))
@@ -120,11 +121,13 @@ def build():
     g.default_role = Role('@everyone', 1, B.PLAIN)
     g.roles = [g.default_role]
     rid = 100
-    for name, _, _, perms in B.ROLES:
+    for i, (name, _, _, perms) in enumerate(B.ROLES):
         rid += 1
         g.roles.append(Role(name, rid, perms))
+        g.roles[-1].position = len(B.ROLES) - i + 1   # the plan's order
     bot_role = Role('Thornswood Bot', 99, B.RUN_PERMISSIONS)
     bot_role.managed = True   # Discord's own role for a bot, as on the live server
+    bot_role.position = len(B.ROLES) + 2
     g.roles.append(bot_role)
     g.me = Member(5, 'Thornswood', [bot_role])
     g.me.guild_permissions = discord.Permissions(B.RUN_PERMISSIONS)
@@ -137,15 +140,13 @@ def build():
     roles = dict((n, named[n]) for n, _, _, _ in B.ROLES)
     g.categories, g.channels = [], []
     for catname, specs in B.PLAN:
-        cat = Place(catname, None, B.overwrites(g, B.CATEGORY_MODE.get(catname, 'open'), roles))
+        cat = Place(catname, None, B.category_overwrites(g, catname, roles))
         g.categories.append(cat)
         for s in specs:
             if not s.get('make', True):
                 continue
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
-            g.channels.append(Place(want, cat, B.overwrites(
-                g, s.get('mode', 'open'), roles, s.get('hold'), B.bot_needs(s),
-                s.get('extra_roles'))))
+            g.channels.append(Place(want, cat, B.spec_overwrites(g, s, roles)))
     return g, named
 
 
@@ -179,6 +180,36 @@ yes('ranks in two categories are not a double',
     B.doubles([Member(21, 'x', [named['Dev'], named['Gamemaster']])]) == [])
 yes('Owner beside a rank is not a double',
     B.doubles([Member(22, 'y', [named['Owner'], named['Lead Gamemaster']])]) == [])
+
+# -------------------------------------------------- staff and a seat --
+# Patrick, 22 Oct, 11:03 AM: no staff role may also be a faction leader, and a
+# Jarl is one.
+g, named = build()
+g.members.append(Member(23, 'Two seats', [named['Moderator'], named['Jarl of Riften']]))
+n, out = run(g)
+yes('a staff member holding a Jarl seat is said',
+    'Two seats is on staff (Moderator) and holds Jarl of Riften; staff hold no seat' in out and n == 1)
+g, named = build()
+yes('a faction leader on staff is a clash, a Citizen on staff is not',
+    len(B.seat_clashes([Member(24, 'a', [named['Lead Support'], named['Thalmor Leader']])])) == 1 and
+    B.seat_clashes([Member(25, 'b', [named['Dev'], named['Citizen of Whiterun']])]) == [])
+yes('every faction in factions.json has its leader role, every Jarl is a seat',
+    len(B.FACTION_LEADERS) == len(B.FACTIONS) and 'Jarl of Raven Rock' in B.SEATS
+    and 'Free Skyrim Trading Company Leader' in B.SEATS)
+
+# ----------------------------------------------------------- role order --
+g, named = build()
+named['Playtester'].position, named['Patreon'].position = \
+    named['Patreon'].position, named['Playtester'].position
+n, out = run(g)
+yes('a role below one the plan puts under it is said',
+    'role Patreon sits below Playtester; the plan has it above' in out)
+yes('every staff role is above every seat and every other role',
+    max(i for i, r in enumerate(B.ROLES) if r[0] in B.STAFF) <
+    min(i for i, r in enumerate(B.ROLES) if r[0] not in B.STAFF))
+yes('leads and Support give roles, nobody else below Co-Owner does',
+    all(B.COUNCIL.manage_roles for _ in [0]) and B.SUPPORT.manage_roles and
+    not B.MOD.manage_roles and not B.GM.manage_roles)
 
 # ------------------------------------------------- a role with too much --
 g, named = build()
@@ -222,11 +253,12 @@ yes('@everyone no longer shut out of a staff channel is said',
 g, named = build()
 staff = [c for c in g.categories if c.name == 'Staff'][0]
 g.channels.append(Place('secret-room', staff, {}))
-g.channels.append(Place('staff-updates', staff, {}))
+# #tickets is KEEP's old name for #ticket-log, and no line of the plan's.
+g.channels.append(Place('tickets', staff, {}))
 n, out = run(g)
 yes('a channel the plan does not name is said', '#secret-room in Staff is not in the plan' in out)
-yes('#staff-updates is kept by name and not a difference',
-    '#staff-updates in Staff is kept by name' in out and n == 1)
+yes('a channel KEEP names and the plan does not is kept by name, not a difference',
+    '#tickets in Staff is kept by name' in out and n == 1)
 
 g, named = build()
 g.channels = [c for c in g.channels if c.name != 'gm-rules']

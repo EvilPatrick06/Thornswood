@@ -102,6 +102,10 @@ class Channel(object):
         self.ow = dict(ow or {})
         self.channels = []
 
+    @property
+    def overwrites(self):
+        return dict(self.ow)
+
     def overwrites_for(self, target):
         o = self.ow.get(target)
         if o is None:
@@ -115,6 +119,12 @@ class Channel(object):
         self.ow[target] = discord.PermissionOverwrite.from_pair(a, d)
 
     async def edit(self, **kw):
+        # A place's overwrites set whole (#3317) are its own call, so a check
+        # on topics and settings is not confused with them.
+        if 'overwrites' in kw:
+            self.guild.calls.append(('overwrites', self.name, kw))
+            self.ow = dict(kw['overwrites'])
+            return
         self.guild.calls.append(('channel.edit', self.name, kw))
 
     async def webhooks(self):
@@ -245,7 +255,8 @@ def live_server(other_between=False):
             if not s.get('make', True):
                 continue
             want = s['name'].lower().replace(' ', '-') if s['kind'] != 'voice' else s['name']
-            ow = B.with_bot(g, B.overwrites(bare, s.get('mode', 'open'), roles, s.get('hold')),
+            ow = B.with_bot(g, B.overwrites(bare, s.get('mode', 'open'), roles, s.get('hold'),
+                                            space=s.get('space'), read_extra=s.get('read_extra')),
                             B.bot_needs(s)) if s.get('key') != 'JOIN' else {}
             ch = Channel(g, want, s['kind'], category=cat, topic=s.get('topic'), ow=ow)
             g.channels.append(ch)
@@ -340,10 +351,11 @@ try:
     roles_before = [(r.name, r.position) for r in g.roles]
     out = run(g, only='Gamemasters,welcome-travelers')
     made = [c[1] for c in g.calls if c[0].startswith('create_')]
-    yes('ONLY Gamemasters,welcome-travelers makes the category and its six channels',
-        made == ['Gamemasters', 'gm-rules', 'gm-scene-summaries', 'gm-chat',
-                 'gm-suggestions', 'gm-discipline', 'GM Voice'])
-    perms = [c for c in g.calls if c[0] == 'set_permissions']
+    yes('ONLY Gamemasters,welcome-travelers makes the category and its eight channels',
+        made == ['Gamemasters', 'gm-announcements', 'gm-rules', 'gm-event-plans',
+                 'gm-scene-summaries', 'gm-chat', 'gm-suggestions', 'gm-discipline',
+                 'GM Voice'])
+    perms = [c for c in g.calls if c[0] in ('set_permissions', 'overwrites')]
     wel = [c for c in g.channels if c.name == 'welcome-travelers'][0]
     yes('  gives #welcome-travelers the bot\'s Attach Files overwrite, and writes no other channel',
         [c[1] for c in perms] == ['welcome-travelers'] and wel.overwrites_for(g.me).attach_files is True)
@@ -360,7 +372,7 @@ try:
     out = run(g, check=True, only='Gamemasters,welcome-travelers')
     yes('ONLY with -Check asks Discord for nothing, and names the category, its channels and the overwrite',
         g.calls == [] and 'category Gamemasters' in out and
-        '#welcome-travelers lets the bot in without Administrator' in out)
+        '#welcome-travelers gets the overwrites of its mode' in out)
 
     # ---- 5. a name the plan does not have -------------------------------
     try:

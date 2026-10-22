@@ -71,7 +71,7 @@ param(
   # Staff only, and a different channel: posting closed applications where
   # people apply puts one person's answers in front of the next, and buries
   # the panel. The bot makes it if it is not there.
-  [string]$TicketLog     = 'tickets,ticket-log',
+  [string]$TicketLog     = 'ticket-log,tickets',
   # Where join cards go. The channel called general was renamed, and the bot
   # said so in its log for a day before anybody read it.
   [string]$JoinChannel   = 'welcome-travelers',
