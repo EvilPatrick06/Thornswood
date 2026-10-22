@@ -3248,21 +3248,20 @@ async def ensure_office_panel(guild):
 #
 # Patrick, 22 Oct, later: "seats should be in a different channel like how
 # the holds have the add member add court add a steward so one for each
-# faction in it's category" (page card q-3317-faction-category). So each
-# faction has its own category, and in it its own seats channel with this
-# panel: Add and Remove for its members, its Court ("<short> Court") and its
-# Steward ("Steward of <short>"), the way a Jarl names a hold's. The faction
-# is the channel's. The shared #seats it was in until then is retired; its
-# old panel says where the panels went until -Prune deletes it.
+# faction in it's category", and on page card q-3317-faction-category, C:
+# "One Officer role, not Court and Steward". So each faction has its own
+# category, and in it its own seats channel with this panel: Add and Remove
+# for its members and its Officers ("<short> Officer"). The faction is the
+# channel's. The shared #seats it was in until then is retired; its old panel
+# says where the panels went until -Prune deletes it.
 #
 # A change goes in bot.log and in Discord's audit log with its reason; it is
 # not said to staff, because staff have nothing to do about it (Patrick,
 # 22 Oct: #staff-updates only when staff must act).
-FACTION_OFFICES = [('member', 'member'), ('court', 'Court'), ('steward', 'Steward')]
+FACTION_OFFICES = [('member', 'member'), ('officer', 'Officer')]
 FACTION_LABELS = {
     'member': ('Add member', 'Remove member'),
-    'court': ('Add to Court', 'Remove from Court'),
-    'steward': ('Name Steward', 'Remove Steward'),
+    'officer': ('Add Officer', 'Remove Officer'),
 }
 # The one shared panel of before, in #seats.
 OLD_FACTION_PANEL_CHANNEL = ['seats']
@@ -3282,10 +3281,8 @@ def faction_seats(faction):
 def faction_role(office, faction):
     """A faction's role for an office, as Build-Discord.py makes it."""
     short = FACTION_SHORT.get(faction, faction)
-    if office == 'court':
-        return short + ' Court'
-    if office == 'steward':
-        return 'Steward of ' + short
+    if office == 'officer':
+        return short + ' Officer'
     return short
 
 
@@ -3305,11 +3302,11 @@ def faction_of_channel(ch):
 
 def faction_panel_text(faction):
     return ('**%s: seats**\n\n'
-            'The Leader of %s gives and takes its roles here: its members, its '
-            'Court and its Steward. Press a button, then pick the person. Only '
-            'the Leader can use them. The Court and the Steward are members '
-            'first, and taking somebody\'s membership takes their Court and '
-            'Steward roles with it.' % (faction, faction))
+            'The Leader of %s gives and takes its roles here: its members and '
+            'its Officers. Press a button, then pick the person. Only the '
+            'Leader can use them. An Officer is a member first, and taking '
+            'somebody\'s membership takes their Officer role with it.'
+            % (faction, faction))
 
 
 def led_factions(member):
@@ -3355,10 +3352,8 @@ async def faction_press(interaction, add, office='member'):
 
 
 def _faction_ask(faction, office):
-    if office == 'court':
-        return 'Who joins the Court of %s?' % faction
-    if office == 'steward':
-        return 'Who is Steward of %s?' % faction
+    if office == 'officer':
+        return 'Who becomes an Officer of %s?' % faction
     return 'Who joins %s?' % faction
 
 
@@ -3395,9 +3390,9 @@ async def faction_change(interaction, faction, member, add, office='member'):
     """
     Give or take one of the faction's roles, with every rule asked again at
     the moment of the change: the presser still holds the faction's Leader
-    role, nobody else does, and the role is one the bot may give. A Court
-    seat or the Steward goes only to a member, and taking the member role
-    takes those with it.
+    role, nobody else does, and the role is one the bot may give. The
+    Officer role goes only to a member, and taking the member role takes it
+    with it.
     """
     guild, who = interaction.guild, interaction.user
     if guild is None or faction not in led_factions(who):
@@ -3610,7 +3605,7 @@ async def _faction_panel_in(ch, faction):
 async def _old_faction_panel(old, here):
     text = (FACTION_MOVED_HEAD + '\n\nEach faction has its own seats channel '
             'now, in its own category, with its Leader\'s buttons for its '
-            'members, its Court and its Steward.')
+            'members and its Officers.')
     try:
         async for m in old.history(limit=30):
             if m.author.id != client.user.id:

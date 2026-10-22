@@ -9,24 +9,25 @@ Leader giving the member role (q-3317-faction-member-give, A), and every
 faction's 4E 252 entry in lore/factions.md, which he approved the same day.
 Later that day: "Factions are supposed to have their own invidual categories
 like the holds", with "their own announcements, vcs, faction leaderships
-channels", and its own seats channel with the Leader's buttons for members,
-Court and Steward (q-3317-faction-category, A). This proves:
+channels", and its own seats channel with the Leader's buttons
+(q-3317-faction-category, C: "One Officer role, not Court and Steward", in a
+channel "called leadership since it's not a court"). This proves:
 
   F1 factions.json is the sixteen, and each has a member role (its short
-     name), a Leader role, a Court and a Steward, the Leader a seat and the
+     name), a Leader role and an Officer role, the Leader a seat and the
      rest not, and none of them ever deleted
   F2 the Trading Company role is renamed to the company's member role, so
      everybody holding it keeps it; Business Owner is in the plan
   F3 a category per faction, named after it, in the order of factions.json,
-     after In Character and before the holds: announcements, chat, court,
-     seats, voice; the chat and voice moved from Factions by name; Factions
+     after In Character and before the holds: announcements, chat,
+     leadership, seats, voice; the chat and voice moved from Factions by name; Factions
      and #seats retired
-  F4 a faction's chat and voice: its members, Leader, Steward and Court
+  F4 a faction's chat and voice: its members, Leader and Officers
      talk; another faction's people, a Playtester, a Moderator and a Jarl get
      nothing; FACTION_STAFF talks; @everyone sees none
-  F5 announcements: members read, the Leader, Steward, Court and council
-     post; court: Leader, Steward and Court talk, members do not; seats: the
-     Leader and FACTION_STAFF read, members, Court and Steward see nothing
+  F5 announcements: members read, the Leader, Officers and council post;
+     leadership: the Leader and Officers talk, members do not; seats: the
+     Leader and FACTION_STAFF read, members and Officers see nothing
   F6 lore/factions.md has an entry for every faction, by its short name
 
 Build-Discord.py is imported for real, under another name, so its __main__
@@ -115,12 +116,15 @@ yes('F1 a member role is no seat and not shown on its own',
     not any(m in B.SEATS or hoist[m] for m in B.FACTION_MEMBERS))
 yes('F1 the short names are the two the application always used',
     B.FACTION_MEMBERS[1] == 'Thalmor' and B.FACTION_MEMBERS[3] == 'Companions')
-offices = [m + ' Court' for m in B.FACTION_MEMBERS] + ['Steward of ' + m for m in B.FACTION_MEMBERS]
-yes('F1 every faction has a Court and a Steward: "Companions Court", "Steward of Companions"',
-    all(n in names for n in offices) and len(B.FACTION_OFFICE_ROLES) == 32
-    and B.faction_roles('The Companions') == ('Companions Leader', 'Companions Court',
-                                               'Steward of Companions', 'Companions'))
-yes('F1 a Court or Steward is no seat, not shown on its own, and sits under the members',
+offices = [m + ' Officer' for m in B.FACTION_MEMBERS]
+yes('F1 every faction has one Officer role: "Companions Officer", and no Court or Steward',
+    all(n in names for n in offices) and B.FACTION_OFFICE_ROLES == offices
+    and len(offices) == 16
+    and not any(n.endswith(' Court') or n.startswith('Steward of ')
+                for n in names if n not in B.OFFICE_ROLES)
+    and B.faction_roles('The Companions') == ('Companions Leader', 'Companions Officer',
+                                               'Companions'))
+yes('F1 an Officer is no seat, not shown on its own, and sits under the members',
     not any(n in B.SEATS or hoist[n] for n in offices)
     and min(names.index(n) for n in offices) > max(names.index(m) for m in B.FACTION_MEMBERS))
 yes('F1 no faction role is a hold\'s: no faction is named like a hold',
@@ -154,12 +158,12 @@ for f in SIXTEEN:
            for s in plan[f]]
     want = [('text', slug + '-announcements', 'factionread', f, None),
             ('text', slug, 'faction', f, (('Factions', slug),)),
-            ('text', slug + '-court', 'factioncourt', f, None),
+            ('text', slug + '-leadership', 'factionlead', f, None),
             ('text', slug + '-seats', 'factionseats', f, None),
             ('voice', f, 'faction', f, (('Factions', f),))]
     if got != want:
         bad.append(f)
-yes('F3 each: announcements, chat, court, seats, voice; the chat and voice moved from Factions by name'
+yes('F3 each: announcements, chat, leadership, seats, voice; the chat and voice moved from Factions by name'
     + (': not ' + ', '.join(bad) if bad else ''), not bad)
 yes('F3 the channel names are plain: #companions, #free-skyrim-trading-company',
     B.faction_slug('The Companions') == 'companions'
@@ -169,12 +173,12 @@ yes('F3 the channel names are plain: #companions, #free-skyrim-trading-company',
 places = dict((s['name'], B.spec_overwrites(guild, s, roles)) for s in plan['The Companions'])
 comp = places['companions']
 voice = places['The Companions']
-yes('F4 #companions and its voice: the members, Leader, Steward and Court talk',
+yes('F4 #companions and its voice: the members, Leader and Officers talk',
     all(can(ow, n) == 'talk' for ow in (comp, voice)
-        for n in ('Companions', 'Companions Leader', 'Steward of Companions', 'Companions Court')))
-yes('F4 #companions: the Silver Hand, its Leader, its Court and a Thalmor get nothing',
+        for n in ('Companions', 'Companions Leader', 'Companions Officer')))
+yes('F4 #companions: the Silver Hand, its Leader, its Officers and a Thalmor get nothing',
     can(comp, 'Silver Hand') is None and can(comp, 'Silver Hand Leader') is None
-    and can(comp, 'Silver Hand Court') is None and can(comp, 'Thalmor') is None)
+    and can(comp, 'Silver Hand Officer') is None and can(comp, 'Thalmor') is None)
 yes('F4 #companions: the council, the gamemasters and the Loremasters talk',
     all(can(comp, n) == 'talk' for n in B.FACTION_STAFF)
     and 'Loremaster' in B.FACTION_STAFF and 'Trial Gamemaster' in B.FACTION_STAFF)
@@ -193,23 +197,21 @@ yes('F4 the category is gated as its faction: its people and FACTION_STAFF, @eve
 ann = places['companions-announcements']
 yes('F5 #companions-announcements: the members read, and do not post',
     can(ann, 'Companions') == 'read')
-yes('F5 #companions-announcements: the Leader, Steward, Court and council post',
+yes('F5 #companions-announcements: the Leader, Officers and council post',
     all(can(ann, n) == 'talk' and ann[roles[n]].manage_messages is True
-        for n in ('Companions Leader', 'Steward of Companions', 'Companions Court')
-        + B.COUNCIL_ROLES))
+        for n in ('Companions Leader', 'Companions Officer') + B.COUNCIL_ROLES))
 yes('F5 #companions-announcements: another faction gets nothing',
     can(ann, 'Thalmor') is None and can(ann, 'Thalmor Leader') is None)
-court = places['companions-court']
-yes('F5 #companions-court: the Leader, Steward and Court talk, the members see nothing',
-    all(can(court, n) == 'talk'
-        for n in ('Companions Leader', 'Steward of Companions', 'Companions Court'))
-    and can(court, 'Companions') is None)
+lead = places['companions-leadership']
+yes('F5 #companions-leadership: the Leader and Officers talk, the members see nothing',
+    all(can(lead, n) == 'talk' for n in ('Companions Leader', 'Companions Officer'))
+    and can(lead, 'Companions') is None and can(lead, 'Thalmor Officer') is None)
 seats = places['companions-seats']
 yes('F5 #companions-seats: the Leader and FACTION_STAFF see the panel',
     all(can(seats, n) is not None for n in ('Companions Leader',) + B.FACTION_STAFF))
-yes('F5 #companions-seats: the members, Court, Steward and other Leaders see nothing',
-    all(can(seats, n) is None for n in ('Companions', 'Companions Court',
-                                         'Steward of Companions', 'Thalmor Leader')))
+yes('F5 #companions-seats: the members, Officers and other Leaders see nothing',
+    all(can(seats, n) is None for n in ('Companions', 'Companions Officer',
+                                         'Thalmor Leader')))
 yes('F5 #companions-seats: the Leader reads and does not talk; the buttons need no more',
     can(seats, 'Companions Leader') == 'read')
 

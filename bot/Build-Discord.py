@@ -473,18 +473,15 @@ for _name in OFFICE_ROLES:
 for _name in FACTION_MEMBERS:
     ROLES.append((_name, 0xB08D57, False, NONE))
 
-# THE OFFICES A FACTION'S LEADER GIVES (#3317, Patrick, 22 Oct: "seats should
-# be in a different channel like how the holds have the add member add court
-# add a steward so one for each faction in it's category"; page card
-# q-3317-faction-category, A). Each faction has a Court ("<short> Court") and a
-# Steward ("Steward of <short>"), named the way a hold's are, given and taken
-# by its Leader from the panel in its seats channel (bot.py, faction_role).
-# Discord roles only: the game knows the Leader and the members. Not hoisted,
-# under the members, so a member who also holds one keeps the member colour.
-FACTION_OFFICE_ROLES = []
-for _s in FACTION_MEMBERS:
-    FACTION_OFFICE_ROLES.append(_s + ' Court')
-    FACTION_OFFICE_ROLES.append('Steward of ' + _s)
+# THE OFFICERS A FACTION'S LEADER NAMES (#3317, Patrick, 22 Oct, page card
+# q-3317-faction-category, C: "One Officer role, not Court and Steward", and
+# "The Chanel for them will be called leadership since it's not a court").
+# Each faction has one "<short> Officer" role, given and taken by its Leader
+# from the panel in its seats channel (bot.py, faction_role). The Officers post
+# the faction's announcements and sit in its leadership channel. Discord roles
+# only: the game knows the Leader and the members. Not hoisted, under the
+# members, so a member who is also an Officer keeps the member colour.
+FACTION_OFFICE_ROLES = [_s + ' Officer' for _s in FACTION_MEMBERS]
 for _name in FACTION_OFFICE_ROLES:
     ROLES.append((_name, 0xA08560, False, NONE))
 
@@ -542,9 +539,9 @@ FACTION_STAFF = COUNCIL_ROLES + ('Gamemaster', 'Trial Gamemaster', 'Loremaster')
 #        holdread     its announcements: those read, the Jarl, Steward, Court post
 #        holdcourt    its Jarl, Steward and Court, and HOLD_STAFF
 #        holdguard    its Jarl and Guards, and HOLD_STAFF
-#        faction      a faction's chat: its members, Leader, Steward, Court, FACTION_STAFF
-#        factionread  its announcements: those read, the Leader, Steward, Court post
-#        factioncourt its Leader, Steward and Court, and FACTION_STAFF
+#        faction      a faction's chat: its members, Leader, Officers, FACTION_STAFF
+#        factionread  its announcements: those read, the Leader and Officers post
+#        factionlead  its leadership: its Leader and Officers, and FACTION_STAFF
 #        factionseats its Leader's panel: the Leader and FACTION_STAFF read
 #        staff        every staff rank talks, invisible to everybody else
 #        staffread    every staff rank reads, the council posts
@@ -739,10 +736,11 @@ PLAN = [
  # announcements, vcs, faction leaderships channels", and "seats should be in
  # a different channel like how the holds have the add member add court add a
  # steward so one for each faction in it's category"; page card
- # q-3317-faction-category, A). In character, all of it:
- #   announcements  its members read; the Leader, Steward and Court post
+ # q-3317-faction-category, C: one Officer role, and "The Chanel for them will
+ # be called leadership since it's not a court"). In character, all of it:
+ #   announcements  its members read; the Leader and Officers post
  #   the chat       everybody in the faction, moved here from Factions by name
- #   court          the Leader, Steward and Court
+ #   leadership     the Leader and Officers
  #   seats          the Leader's panel (bot.py, ensure_faction_panel): only the
  #                  Leader and FACTION_STAFF see it
  #   voice          everybody in the faction, moved here from Factions
@@ -750,15 +748,15 @@ PLAN = [
  # category they were all in are retired.
  (_f, [
    dict(kind='text', name=faction_slug(_f) + '-announcements', mode='factionread',
-        faction=_f, topic='What the Leader and the court of %s want every member '
-                          'to know. In character.' % _f),
+        faction=_f, topic='What the Leader and the Officers of %s want every '
+                          'member to know. In character.' % _f),
    dict(kind='text', name=faction_slug(_f), mode='faction', faction=_f,
         topic='%s: its members and its Leader. In character.' % _f,
         was=(('Factions', faction_slug(_f)),)),
-   dict(kind='text', name=faction_slug(_f) + '-court', mode='factioncourt', faction=_f,
-        topic='The Leader, the Steward and the court of %s. In character.' % _f),
+   dict(kind='text', name=faction_slug(_f) + '-leadership', mode='factionlead',
+        faction=_f, topic='The Leader and the Officers of %s. In character.' % _f),
    dict(kind='text', name=faction_slug(_f) + '-seats', mode='factionseats', faction=_f,
-        topic='The Leader of %s gives and takes its members, Court and Steward '
+        topic='The Leader of %s gives and takes its members and Officers '
               'here.' % _f),
    dict(kind='voice', name=_f, mode='faction', faction=_f, was=(('Factions', _f),)),
  ])
@@ -1275,16 +1273,16 @@ def mode_audience(mode, hold=None, space=None, faction=None):
         if mode == 'holdcourt':
             return (), HOLD_STAFF + (jarl, steward, court), ()
         return (), HOLD_STAFF + (jarl, guard), ()
-    if mode in ('faction', 'factionread', 'factioncourt', 'factionseats'):
+    if mode in ('faction', 'factionread', 'factionlead', 'factionseats'):
         if faction is None:
             return (), FACTION_STAFF, ()
-        lead, court, steward, member = faction_roles(faction)
+        lead, officer, member = faction_roles(faction)
         if mode == 'faction':
-            return (), FACTION_STAFF + (member, lead, steward, court), ()
+            return (), FACTION_STAFF + (member, lead, officer), ()
         if mode == 'factionread':
-            return (member,) + FACTION_STAFF, (), (lead, steward, court) + COUNCIL_ROLES
-        if mode == 'factioncourt':
-            return (), FACTION_STAFF + (lead, steward, court), ()
+            return (member,) + FACTION_STAFF, (), (lead, officer) + COUNCIL_ROLES
+        if mode == 'factionlead':
+            return (), FACTION_STAFF + (lead, officer), ()
         return (lead,) + FACTION_STAFF, (), COUNCIL_ROLES
     if mode == 'staff':
         return (), STAFF, ()
@@ -1364,12 +1362,12 @@ def hold_roles(hold):
 
 
 def faction_roles(faction):
-    """(Leader, Court, Steward, member) of a faction, by name."""
+    """(Leader, Officer, member) of a faction, by name."""
     if faction not in FACTIONS:
         raise ValueError('a faction mode needs faction= one of %s' % ', '.join(FACTIONS))
     i = FACTIONS.index(faction)
     short = FACTION_MEMBERS[i]
-    return FACTION_LEADERS[i], short + ' Court', 'Steward of ' + short, short
+    return FACTION_LEADERS[i], short + ' Officer', short
 
 
 def category_overwrites(guild, catname, roles):
@@ -2371,10 +2369,9 @@ for _f, _n in zip(FACTIONS, FACTION_LEADERS):
     ROLE_DOES[_n] = 'Leads %s. Applied for as Faction Leader.' % _f
 for _f, _n in zip(FACTIONS, FACTION_MEMBERS):
     ROLE_DOES[_n] = 'A member of %s. Its Leader gives and takes it.' % _f
-    ROLE_DOES[_n + ' Court'] = ('The court of %s. Its Leader gives and takes it, '
-                                'to a member.' % _f)
-    ROLE_DOES['Steward of ' + _n] = ('The Steward of %s. Its Leader gives and takes '
-                                     'it, to a member.' % _f)
+    ROLE_DOES[_n + ' Officer'] = ('An Officer of %s: posts its announcements and '
+                                  'sits in its leadership. Its Leader gives and '
+                                  'takes it, to a member.' % _f)
 ROLE_DOES['Business Owner'] = 'Owns a business book in the game. Support gives it.'
 
 # The named permission sets, so a role's line says which and the sets are
@@ -2510,7 +2507,7 @@ def layout():
         w('| %s | %s | %s | %s |' % (mode, r, t, p or '-'))
     r, t, p = _audience_words('hold', 'Whiterun')
     w('| hold (Whiterun) | %s | %s | %s |' % (r, t, p or '-'))
-    for mode in ('faction', 'factionread', 'factioncourt', 'factionseats'):
+    for mode in ('faction', 'factionread', 'factionlead', 'factionseats'):
         r, t, p = _audience_words(mode, faction='The Companions')
         w('| %s (The Companions) | %s | %s | %s |' % (mode, r, t, p or '-'))
     for mode in ('space', 'spaceread', 'spacerules'):
@@ -2569,7 +2566,7 @@ def layout():
       % ', '.join(sorted(set(k for k in KEEP if k not in roles))))
     w('')
     w('Roles never deleted: every Jarl, Citizen and office role, and every '
-      'faction\'s Leader, member, Court and Steward role.')
+      'faction\'s Leader, member and Officer role.')
     w('')
     return '\n'.join(L)
 
