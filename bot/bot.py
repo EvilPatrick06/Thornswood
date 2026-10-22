@@ -1143,9 +1143,9 @@ QUESTIONS = {
     # questions ask about the character rather than about the person, and the
     # last one asks the thing that actually decides it: whether they can lose
     # the seat and keep playing.
+    # The hold itself is a Select of the open seats only, built in
+    # TicketModal (#3317, Patrick, 22 Oct: "only include the open seats").
     'jarl': [
-        ('Which hold? Second choice if you have one',
-         'Whiterun, Solitude, Windhelm, Riften, Markarth, Dawnstar, Morthal, Falkreath, Winterhold.', False),
         ('Who is your character?',
          'Name, where they come from, what they have been doing until now. In character.', True),
         ('What is their claim to the seat?',
@@ -1194,21 +1194,121 @@ QUESTIONS = {
 
 # Named factions, names only, beside this file. Other is always added in
 # code, last, and is never stored here. A name change is a pull request.
-# Seat tracking waits for a Faction Lead Discord role; the list always
-# shows every name in this file, plus Other.
+# A named faction is offered only while its "<faction> Leader" role has
+# nobody in it (#3317); Other is always offered.
 FACTIONS_FILE = os.path.join(HERE, 'factions.json')
 FACTION_OTHER = 'Other'
 FACTION_PICK_Q = 'Which faction?'
 FACTION_OTHER_Q = 'If Other, which faction?'
 FACTION_OTHER_HINT = 'Only if you picked Other. The name of the faction.'
-# Jarl and Faction Leader: staff cannot hold these, so a staff applicant is
-# flagged. Wider than is_staff: Lead Gamemaster and Trial Gamemaster are not
-# staff for /close, and they still cannot hold a lead seat. is_staff is left
-# as it is. Content Creator is on neither list.
+HOLD_PICK_Q = 'Which hold?'
+# THE SEAT RULE (#3317, Patrick, 22 Oct, 11:03 AM): "any Staff role can't
+# also be a faction leader which includes Jarl's (Jarls are faction leaders
+# but have a separate application on purpose ...)". He picked the bot
+# refusing it (page card q-3317-seat-rule-check, A): staff cannot apply for
+# a seat, and a seat holder cannot apply for staff. Every staff role counts,
+# Trial Gamemaster, Content Creator and Support included, so the names are
+# Build-Discord.py's STAFF, and test-3317-seats.py holds the two to the same
+# list. STAFF_ROLES ids count too.
 LEADERSHIP_KINDS = ('jarl', 'faction')
-LEADERSHIP_EXTRA = ('Lead Gamemaster', 'Trial Gamemaster')
+SEAT_RULE_STAFF = ('Owner', 'Co-Owner',
+                   'Lead Dev', 'Dev',
+                   'Lead Gamemaster', 'Gamemaster', 'Trial Gamemaster',
+                   'Lead Loremaster', 'Loremaster',
+                   'Lead Moderator', 'Moderator',
+                   'Lead Content Creator', 'Content Creator',
+                   'Lead Support', 'Support')
+# The applications that make somebody staff. Apply: Lead and Apply: Support
+# join this when they are on the panel.
+STAFF_JOB_KINDS = ('gamemaster', 'loremaster', 'moderator', 'dev', 'creator')
+# A faction's leader role uses its short name, as Build-Discord.py makes it.
+FACTION_SHORT = {'Thalmor Remnant': 'Thalmor', 'The Companions': 'Companions'}
 # Djinn, 12 Oct 2026. On the public panel, word for word.
 STAFF_LEADERSHIP_RULE = 'No GM or staff member (Loremaster, Discord Moderator, or any other staff role) may hold an in-game RP role with faction leadership, such as a Jarl or a faction lead.'
+SEAT_STAFF_REFUSED = ('You hold a staff role (%s). Nobody on staff may hold a '
+                      'Jarl seat or lead a faction, so this application is '
+                      'closed to you.')
+SEAT_HELD_REFUSED = ('You hold %s. Nobody who holds a Jarl seat or leads a '
+                     'faction may be on staff. To apply, give the seat up '
+                     'first: say so in an "I need help" ticket.')
+NO_OPEN_HOLD = ('Every Jarl seat is held right now, so there is nothing to '
+                'apply for. When one opens it is listed here.')
+
+
+def faction_leader_role(faction):
+    """The leader role of a named faction: "Thalmor Leader"."""
+    return FACTION_SHORT.get(faction, faction) + ' Leader'
+
+
+def jarl_role(hold):
+    return 'Jarl of ' + hold
+
+
+def seat_roles():
+    """Every seat of the world, as role names: each Jarl, then each faction leader."""
+    return ([jarl_role(h) for h in OFFICE_TOWNS] +
+            [faction_leader_role(f) for f in faction_names()])
+
+
+def _role_named(guild, name):
+    for r in getattr(guild, 'roles', None) or []:
+        if getattr(r, 'name', None) == name:
+            return r
+    return None
+
+
+def seat_is_open(guild, role_name):
+    """
+    Nobody holds this seat. A seat whose role is not on the server yet is
+    open: nobody can hold a role that does not exist.
+    """
+    r = _role_named(guild, role_name)
+    return r is None or not list(getattr(r, 'members', None) or [])
+
+
+def open_holds(guild):
+    """The holds whose Jarl seat is empty, in the order of OFFICE_TOWNS."""
+    return [h for h in OFFICE_TOWNS if seat_is_open(guild, jarl_role(h))]
+
+
+def open_factions(guild):
+    """The named factions whose leader seat is empty, in factions.json order."""
+    return [f for f in faction_names()
+            if seat_is_open(guild, faction_leader_role(f))]
+
+
+def seats_held(who):
+    """The seat roles this person holds, by name."""
+    seats = set(seat_roles())
+    return [r.name for r in getattr(who, 'roles', None) or []
+            if getattr(r, 'name', None) in seats]
+
+
+def seat_refusal(kind, who, guild):
+    """
+    Why this person cannot open this application, in words, or None.
+
+    Asked when they pick from the panel and again when the form comes back.
+    Unlike ticket_refusal it holds for staff too, because the rule is about
+    staff. Anything that goes wrong in here lets them through, for the reason
+    ticket_refusal gives, and the council reading the ticket is the check.
+    """
+    try:
+        if kind in LEADERSHIP_KINDS:
+            held = leadership_staff_held(who)
+            if held:
+                return SEAT_STAFF_REFUSED % ', '.join(held)
+            if kind == 'jarl' and not open_holds(guild):
+                return NO_OPEN_HOLD
+        if kind in STAFF_JOB_KINDS:
+            held = seats_held(who)
+            if held:
+                return SEAT_HELD_REFUSED % ', '.join(held)
+        return None
+    except Exception:
+        log('the seat rule could not be checked, so this one was let '
+            'through:\n' + traceback.format_exc())
+        return None
 
 
 def faction_names():
@@ -1223,12 +1323,21 @@ def faction_names():
     return []
 
 
-def faction_pick_options():
-    """Select options for the form: every named faction, then Other last."""
-    opts = [discord.SelectOption(label=n[:100], value=n[:100])
-            for n in faction_names()]
+def faction_pick_options(guild=None):
+    """
+    Select options for the form: every named faction whose leader seat is
+    open, then Other last. With no guild to look in, every named faction.
+    """
+    names = faction_names() if guild is None else open_factions(guild)
+    opts = [discord.SelectOption(label=n[:100], value=n[:100]) for n in names]
     opts.append(discord.SelectOption(label=FACTION_OTHER, value=FACTION_OTHER))
     return opts
+
+
+def hold_pick_options(guild=None):
+    """Select options for the Jarl form: every hold whose Jarl seat is open."""
+    holds = list(OFFICE_TOWNS) if guild is None else open_holds(guild)
+    return [discord.SelectOption(label=h, value=h) for h in holds]
 
 
 def faction_pick_is_known(picked):
@@ -1255,16 +1364,14 @@ def field_said(item):
 
 def leadership_staff_held(who):
     """
-    Names of staff roles they hold, including Lead and Trial Gamemaster.
+    Names of the staff roles they hold, for the seat rule.
 
-    The list the Faction Leader and Jarl flags use. is_staff does not include
-    those two, and it is left as it is so /close stays on the same five
-    roles. Content Creator is not on this list either.
+    Every staff role counts (SEAT_RULE_STAFF, and any STAFF_ROLES id), wider
+    than is_staff, which decides /close and the ticket limits.
     """
     try:
-        ids, names = set(STAFF_IDS), set(STAFF_NAMES)
-        for n in LEADERSHIP_EXTRA:
-            names.add(n.lower())
+        ids = set(STAFF_IDS)
+        names = set(STAFF_NAMES) | set(n.lower() for n in SEAT_RULE_STAFF)
         found = []
         for r in getattr(who, 'roles', None) or []:
             if _role_hit(r, ids, names):
@@ -1275,21 +1382,35 @@ def leadership_staff_held(who):
 
 
 class TicketModal(discord.ui.Modal):
-    def __init__(self, kind, label):
+    def __init__(self, kind, label, guild=None):
         super().__init__(title=label[:45])
         self.kind = kind
         self.label_text = label
         self.fields = []
         self.faction_select = None
         self.faction_other = None
+        self.hold_select = None
         # Discord takes five items on a form. The faction kind uses all five:
-        # a required Select of every named faction plus Other (discord.py
+        # a required Select of every open faction seat plus Other (discord.py
         # 2.6.0 put Select inside a modal; 2.7.1 is the pin), an optional
-        # Other box, and the three copied questions.
+        # Other box, and the three copied questions. The Jarl kind is a
+        # required Select of the open holds and its four questions. The
+        # seats are read off the guild the form is opened in.
+        if kind == 'jarl':
+            sel = discord.ui.Select(
+                placeholder='Pick a hold',
+                options=hold_pick_options(guild),
+                min_values=1,
+                max_values=1,
+                required=True)
+            self.hold_select = sel
+            self.add_item(discord.ui.Label(
+                text=HOLD_PICK_Q[:45],
+                component=sel))
         if kind == 'faction':
             sel = discord.ui.Select(
                 placeholder='Pick a faction',
-                options=faction_pick_options(),
+                options=faction_pick_options(guild),
                 min_values=1,
                 max_values=1,
                 required=True)
@@ -1319,7 +1440,8 @@ class TicketModal(discord.ui.Modal):
         # Checked again here, and counted here rather than on the panel, so a
         # form opened by mistake and cancelled costs nobody five minutes. See
         # TICKET_COOLDOWN for why there is a limit at all.
-        no = ticket_refusal(interaction)
+        no = (ticket_refusal(interaction) or
+              seat_refusal(self.kind, interaction.user, interaction.guild))
         if no:
             await interaction.response.send_message(no, ephemeral=True)
             return
@@ -1373,9 +1495,13 @@ class TicketModal(discord.ui.Modal):
         # and out of Asking for: they go only in the escaped answers below.
         picked = field_said(self.faction_select) if self.faction_select is not None else ''
         other_said = field_said(self.faction_other) if self.faction_other is not None else ''
+        hold = field_said(self.hold_select) if self.hold_select is not None else ''
 
         def written(clean):
             lines = []
+            if self.kind == 'jarl':
+                lines.append('**%s**\n%s'
+                             % (HOLD_PICK_Q, clean(hold) or 'nothing said'))
             if self.kind == 'faction':
                 lines.append('**%s**\n%s'
                              % (FACTION_PICK_Q, clean(picked) or 'nothing said'))
@@ -1397,15 +1523,23 @@ class TicketModal(discord.ui.Modal):
             if rules is not None and not rules['yes']:
                 out = ('**CHECK THIS ONE.** Asked if they accept the rules they '
                        'said "%s".\n\n' % (clean(rules_said) or 'nothing')) + out
+            # A seat can be filled between the form opening and coming back,
+            # and two people can apply for the same open seat; the council
+            # reads which. A pick that was never on the list is a tampered
+            # submit.
             if self.kind == 'faction' and not faction_pick_is_known(picked):
                 out = ('**CHECK THIS ONE.** The faction they picked is not on '
                        'the list.\n\n') + out
-            if self.kind in LEADERSHIP_KINDS:
-                held = leadership_staff_held(who)
-                if held:
-                    out = ('**CHECK THIS ONE.** Holds a staff role (%s); staff '
-                           'cannot hold a Jarl seat or a faction lead.\n\n'
-                           % ', '.join(held)) + out
+            elif (self.kind == 'faction' and picked != FACTION_OTHER
+                  and not seat_is_open(guild, faction_leader_role(picked))):
+                out = ('**CHECK THIS ONE.** The faction they picked has a '
+                       'leader now.\n\n') + out
+            if self.kind == 'jarl' and hold not in OFFICE_TOWNS:
+                out = ('**CHECK THIS ONE.** The hold they picked is not on '
+                       'the list.\n\n') + out
+            elif self.kind == 'jarl' and not seat_is_open(guild, jarl_role(hold)):
+                out = ('**CHECK THIS ONE.** The hold they picked has a Jarl '
+                       'now.\n\n') + out
             return out
 
         # Two copies of the same ticket, because the two places that take it
@@ -2090,13 +2224,14 @@ class TicketPicker(discord.ui.Select):
     async def callback(self, interaction):
         # Told here, before the form opens, so nobody types out a whole
         # application only to be turned away at the end of it.
-        no = ticket_refusal(interaction)
+        k = self.values[0]
+        no = (ticket_refusal(interaction) or
+              seat_refusal(k, interaction.user, interaction.guild))
         if no:
             await interaction.response.send_message(no, ephemeral=True)
             return
-        k = self.values[0]
         lab = dict((a, b) for a, b, _ in KINDS)[k]
-        await interaction.response.send_modal(TicketModal(k, lab))
+        await interaction.response.send_modal(TicketModal(k, lab, interaction.guild))
 
 
 _PANEL_TOP = ('**Open a ticket**\n\n'
@@ -2104,9 +2239,11 @@ _PANEL_TOP = ('**Open a ticket**\n\n'
               'only you and staff can see. Nothing here is public and nobody else in '
               'the server can read it.\n\n')
 _PANEL_JOBS = ('**Apply: Jarl** and **Apply: Faction Leader** are '
-               'answered in character: the seats are empty, and the first people to '
-               'hold them are picked out of what is written there. A faction has one '
-               'leader. ' + STAFF_LEADERSHIP_RULE + '\n\n'
+               'answered in character, and list only the seats nobody holds. A '
+               'Jarl is a faction leader with an application of its own, because '
+               'a hold is a seat like no other. A faction has one leader. ' +
+               STAFF_LEADERSHIP_RULE + ' Somebody who holds a seat cannot apply '
+               'for staff either.\n\n'
                'The jobs below that are open to anybody already in, and they are jobs '
                'rather than titles: each one is work somebody is currently doing '
                'instead of you.\n\n'

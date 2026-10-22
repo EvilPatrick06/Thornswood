@@ -241,6 +241,14 @@ class Guild(object):
     async def create_forum(self, name, **kw):
         return await self._made('create_forum', name, **kw)
 
+
+    async def onboarding(self):
+        return types.SimpleNamespace(enabled=getattr(self, 'onboarding_enabled', False))
+
+    async def edit_onboarding(self, **kw):
+        self.calls.append(('edit_onboarding', None, kw))
+        self.onboarding_enabled = kw.get('enabled', getattr(self, 'onboarding_enabled', False))
+
     def get_channel(self, cid):
         return self.staff_updates if cid == self.staff_updates.id else None
 
