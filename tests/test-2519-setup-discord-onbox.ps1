@@ -94,16 +94,17 @@ function Invoke-ThornswoodRemote {
     # from this and never from thornswood.net.
     $runner = Join-Path $work 'run.ps1'
     [IO.File]::WriteAllText($runner, @"
-param([string]`$Pass)
+param([string]`$Pass, [string]`$Only)
 function Invoke-RestMethod { [pscustomobject]@{ open = `$false } }
 `$s = @{}; foreach (`$p in (`$Pass -split ',')) { if (`$p) { `$s[`$p] = `$true } }
+if (`$Only) { `$s['Only'] = @(`$Only -split ';') }
 & '$((Join-Path $dep 'Setup-Discord.ps1').Replace("'", "''"))' -OnBox @s
 exit `$LASTEXITCODE
 "@)
-    function Run-Setup([string[]]$pass) {
+    function Run-Setup([string[]]$pass, [string[]]$only = @()) {
         Remove-Item -LiteralPath $sent -Force -ErrorAction SilentlyContinue
         $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner -Pass ($pass -join ',') 2>&1 | Out-String; $code = $LASTEXITCODE }
+        try { $out = & $pwsh.Source -NoProfile -NonInteractive -File $runner -Pass ($pass -join ',') -Only ($only -join ';') 2>&1 | Out-String; $code = $LASTEXITCODE }
         finally { $ErrorActionPreference = $old }
         $text = ''
         if (Test-Path -LiteralPath $sent) { $text = [IO.File]::ReadAllText($sent) }
@@ -130,6 +131,11 @@ exit `$LASTEXITCODE
     Yes '  and no -Posts or -Prune it was not given' ($s -notmatch 'DISCORD_POSTS' -and $s -notmatch 'DISCORD_PRUNE')
     $r2 = Run-Setup @('Posts', 'Prune')
     Yes '  -Posts and -Prune go through when given, and -Check then does not' ($r2.Code -eq 0 -and $r2.Sent -match "DISCORD_POSTS = '1'" -and $r2.Sent -match "DISCORD_PRUNE = '1'" -and $r2.Sent -notmatch 'DISCORD_CHECK')
+    Yes '  and no DISCORD_ONLY when -Only is not given' ($s -notmatch 'DISCORD_ONLY')
+    $r3 = Run-Setup @('Check') @('Gamemasters', 'welcome-travelers')
+    Yes '  -Only goes through as DISCORD_ONLY, the names comma separated (#2519)' ($r3.Code -eq 0 -and $r3.Sent -match "(?m)^\s*\`$env:DISCORD_ONLY = 'Gamemasters,welcome-travelers'")
+    $r4 = Run-Setup @('Check') @("Gamemasters'; Remove-Item x")
+    Yes '  and a name that is not a plain name is refused before anything is sent' ($r4.Code -ne 0 -and $r4.Sent.Length -eq 0 -and $r4.Out -match '-Only takes')
 
     # ---- 3. the token --------------------------------------------------------
     Yes 'it reads the token from bot.env.json on the box' ($s -match [regex]::Escape("'C:\Thornswood-Bot'") -and $s -match [regex]::Escape("'bot.env.json'") -and $s -match 'DISCORD_TOKEN = \[string\]\$cfg\.DISCORD_TOKEN')
