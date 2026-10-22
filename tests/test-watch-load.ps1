@@ -96,6 +96,19 @@ foreach ($slow in @('Get-NetTCPConnection', 'Get-NetAdapterStatistics', 'Get-Net
     Yes "the collector does not call $slow" ($ctext -notmatch ('(?m)^[^#]*\b' + $slow + '\b'))
 }
 
+# #3189: the bot is the python its service started. Any python with
+# Thornswood-Bot in its command line used to count, so a harness's stand-in
+# bot on a runner read as a second bot and as a restart (48 in ten days, with
+# none). Watch-Services.ps1 finds it the same way.
+Yes 'the collector finds the bot as the python the ThornswoodBot service started' (
+    $ctext -match "Service = 'ThornswoodBot'" -and $ctext -match 'ParentProcessId=')
+Yes 'the collector does not take any python with Thornswood-Bot in its command line as the bot' (
+    $ctext -notmatch "Match = 'Thornswood-Bot'")
+$stext = Get-Content -LiteralPath (Join-Path $Here 'scripts\vps\Watch-Services.ps1') -Raw
+Yes 'Watch-Services.ps1 takes the bot as the python under its service, in the watchdog and in -Check' (
+    ([regex]::Matches($stext, 'ParentProcessId = ')).Count -ge 2 -and
+    $stext -notmatch "(?m)^[^#]*-(not)?match 'Thornswood-Bot'")
+
 . (Join-Path $PSScriptRoot 'Windows.ps1')
 if ($OnWindows) { $ps = Get-WindowsPowerShell }
 else {
