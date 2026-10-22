@@ -124,3 +124,9 @@ bot/data/
 # project.yml, its memories and its caches, all about that one machine's
 # sessions. scripts\dev\Check-Serena.ps1 starts it here too.
 /.serena/
+
+# Codex's remote session writes the attachments it is sent into the folder
+# it was opened in, here the repository root (#3083). It is ChatGPT's lane
+# and its setup is its own, so the folder is ignored rather than moved.
+# Patrick, report page, 22 Oct 2026.
+/.codex-remote-attachments/
