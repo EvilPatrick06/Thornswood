@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  67,
-    "callCount":  270,
+    "scriptCount":  68,
+    "callCount":  271,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2444,6 +2444,15 @@
                       "does":  "logs in from this machine, the way every script does, and echoes a word",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/dev/Trace-Gate.ps1",
+                      "scope":  "Invoke-Box",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "$out = @(Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Bypass -Script ($pre + [IO.File]::ReadAllText($BoxScript)) |",
+                      "does":  "runs scripts/dev/Trace-Gate-Box.ps1 in one of its modes: the self-test, starting and stopping the gate\u0027s ETW trace session, reading the trace against the run\u0027s start log, or emptying C:\\Thornswood-Trace (#3114)",
+                      "class":  "admin",
+                      "reason":  "only an administrator can start a kernel trace session and set the trace folder\u0027s ACL"
                   }
               ]
 }
