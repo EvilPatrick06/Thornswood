@@ -2236,7 +2236,15 @@ function drawUploads() {
    the waiting card rather than a separate queue section. Pending comes from
    /api/gallery/pending; accepted from /api/public (same set /gallery shows).
    Accept posts /api/gallery/approve; Delete uses DELETE /api/gallery/approved
-   which also clears a pending name. */
+   which also clears a pending name.
+
+   Smaller copies (#3218). A waiting card shows each copy that came with the
+   picture beside it, and Accept names the copies it showed, so only those
+   go out with it. A still picture with no copies (one sent before them, or
+   from a launcher that sends none) has Make smaller copies: they are made
+   here, from the picture on the card, by copies.js. On a live picture they
+   go out at once. */
+var GAL_STILL = /\.(png|jpe?g|webp)$/i;
 function loadGalleryStaff() {
   var box = el('galgrid');
   if (!box) return;
@@ -2265,13 +2273,20 @@ function loadGalleryStaff() {
     } else {
       pending.forEach(function (g) {
         var href = '/up/' + encodeURIComponent(g.name);
+        var copies = (g.copies || []).filter(function (n) { return n === 800 || n === 1600; });
+        var shown = copies.map(function (n) {
+          var at = href + '?w=' + n;
+          return '<a class="thumb sm" href="' + at + '" target="_blank" title="The ' + n + ' pixel copy"><img src="' + at + '" alt="The ' + n + ' pixel copy" loading="lazy"></a>';
+        }).join('');
         out += '<div class="file">' +
-          '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href + '" alt="' + esc(g.by || 'Pending gallery image') + '" loading="lazy"></a>' +
+          '<a class="thumb" href="' + href + '" target="_blank"><img src="' + href + '" alt="' + esc(g.by || 'Pending gallery image') + '" loading="lazy"></a>' + shown +
           '<div class="who"><div class="nm">' + esc(g.name) + ' <span class="pill">waiting</span></div>' +
           '<div class="meta">' + (g.by ? esc(g.by) + '  &middot;  ' : '') +
             'from ' + esc(g.from || '?') + '  &middot;  ' + new Date(g.at).toLocaleString() +
-            (g.note ? '<br>' + esc(g.note) : '') + '</div></div>' +
-          '<button class="btn key" data-galok="' + esc(g.name) + '">Accept</button>' +
+            (g.note ? '<br>' + esc(g.note) : '') +
+            (copies.length ? '<br>Beside it, its smaller copies: what most screens are shown once it is accepted.' : '') + '</div></div>' +
+          (!copies.length && GAL_STILL.test(g.name) ? '<button class="btn" data-galcopy="' + esc(g.name) + '" data-galfrom="' + href + '">Make smaller copies</button>' : '') +
+          '<button class="btn key" data-galok="' + esc(g.name) + '" data-galshown="' + copies.join(',') + '">Accept</button>' +
           '<button class="btn" data-galdel="' + esc(g.name) + '" data-galpend="1">Delete</button>' +
         '</div>';
       });
@@ -2281,6 +2296,7 @@ function loadGalleryStaff() {
           '<a class="thumb sm" href="' + esc(href) + '" target="_blank"><img src="' + esc(href) + '" alt="' + esc(g.by || 'Live gallery image') + '" loading="lazy"></a>' +
           '<div class="who"><div class="nm">' + esc(g.name) + '</div>' +
           '<div class="meta">' + (g.by ? esc(g.by) : 'no by') + '</div></div>' +
+          (!g.srcset && GAL_STILL.test(g.name) ? '<button class="btn" data-galcopy="' + esc(g.name) + '" data-galfrom="' + esc(href) + '">Make smaller copies</button>' : '') +
           '<button class="btn" data-galdel="' + esc(g.name) + '">Delete</button>' +
         '</div>';
       });
@@ -2290,7 +2306,8 @@ function loadGalleryStaff() {
       b.onclick = function () {
         b.disabled = true; b.textContent = 'accepting';
         api('/api/gallery/approve', { method:'POST', headers:{ 'content-type':'application/json' },
-            body: JSON.stringify({ name: b.dataset.galok }) })
+            body: JSON.stringify({ name: b.dataset.galok,
+              copies: b.dataset.galshown ? b.dataset.galshown.split(',').map(Number) : [] }) })
           .then(function (r) { return r.json().catch(function () { return { ok: r.ok }; }); })
           .then(function (a) {
             if (!a || !a.ok) alert((a && a.error) || 'The site could not accept that picture.');
@@ -2299,6 +2316,24 @@ function loadGalleryStaff() {
             alert('The site did not answer, so that picture was not accepted.');
             loadGalleryStaff();
           });
+      };
+    });
+    each(box, '[data-galcopy]', function (b) {
+      b.onclick = function () {
+        b.disabled = true; b.textContent = 'making copies';
+        api(b.dataset.galfrom).then(function (r) {
+          if (!r.ok) throw new Error('the site answered ' + r.status + ' for the picture');
+          return r.blob();
+        }).then(function (blob) {
+          return window.galleryCopies.send(blob, b.dataset.galcopy);
+        }).then(function (done) {
+          if (done.bad) alert(done.bad + '.');
+          else if (!done.made.length) alert('That picture is narrow enough that it needs no smaller copy.');
+          loadGalleryStaff();
+        }, function (e) {
+          alert('The picture could not be read to make its copies (' + ((e && e.message) || 'no answer') + ').');
+          loadGalleryStaff();
+        });
       };
     });
     each(box, '[data-galdel]', function (b) {
