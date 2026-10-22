@@ -292,8 +292,9 @@ def load_build_discord():
 
 
 def plan_shape():
-    # The server as Build-Discord.py's PLAN builds it since #3317: the panel
-    # in #tickets-and-applications in Applications, which anybody can read,
+    # The server as Build-Discord.py's PLAN builds it since #3317: a report
+    # opens off #report-someone in Tickets, which anybody can read (page card
+    # q-3317-ticket-split, A; it was #tickets-and-applications until then),
     # and #ticket-log in Staff with mode='staff' (it was #tickets beside the
     # panel from 24 September). Every role the PLAN makes is here with the
     # permissions it gives it, and both channels carry the PLAN's own
@@ -304,12 +305,12 @@ def plan_shape():
         for spec in specs:
             where[spec['name']] = (cat, spec.get('mode'))
     tickets = where.get('ticket-log', (None, None))
-    panel_at = where.get('tickets-and-applications', (None, None))
+    panel_at = where.get('report-someone', (None, None))
     yes("the PLAN makes #ticket-log, TICKET_LOG's first name, in Staff, for the council",
         bot.TICKET_LOG[0] == 'ticket-log' and tickets == ('Staff', 'council'))
-    yes("and the panel channel, TICKET_CHANNEL's first name, in the public Applications",
-        bot.TICKETS[0] == 'tickets-and-applications'
-        and panel_at[0] == 'Applications')
+    yes("and a report's desk, #report-someone, in the public Tickets",
+        bot.desk_of('report') == 'report-someone'
+        and panel_at == ('Tickets', 'read'))
 
     g = Guild()
     roles = {}
@@ -318,7 +319,7 @@ def plan_shape():
     g.role('Thornswood bot', bot_role=True)
     # Each with the mode the PLAN gives it, and 'open' when the PLAN gives none,
     # the same default Build-Discord.py uses.
-    panel = g.channel('tickets-and-applications',
+    panel = g.channel('report-someone',
                       overwrites=bd.overwrites(g, panel_at[1] or 'open', roles))
     book = g.channel('ticket-log', overwrites=bd.overwrites(g, tickets[1] or 'open', roles))
     who, ix = report(g)

@@ -116,7 +116,7 @@ Anyone can download it. Getting into the world is an application, and it's
 short.
 
 1. Read <#RULES>. The application asks if you accept them.
-2. Open a ticket in <#TICKETS> and pick **Apply to be an alpha playtester**.
+2. In <#PLAYTEST>, pick **Apply to be an alpha playtester**.
    It asks if you're 18 or over, if you accept the rules, and a few lines
    about who you want to play. Somebody reads it and gets back to you.
 3. Once you're accepted you get the Playtester role, and that's what lets you
@@ -152,16 +152,16 @@ Skyrim, except everybody's in the same one.
 
 It lives on the site, so it can't go stale in here.
 
-**thornswood.net/help** installing, joining, where your logs are
-**thornswood.net/known** what's broken on purpose, and why
-**thornswood.net/roadmap** what's being built
-**thornswood.net/credits** who made what
+**<https://thornswood.net/help>** installing, joining, where your logs are
+**<https://thornswood.net/known>** what's broken on purpose, and why
+**<https://thornswood.net/roadmap>** what's being built
+**<https://thornswood.net/credits>** who made what
 
 Say hello in <#GENERAL>.
 """
 
 _ACCEPTING_ALPHA = """\
-**Accepting them.** The application in <#TICKETS> asks whether you accept
+**Accepting them.** The application in <#PLAYTEST> asks whether you accept
 these rules and the ones at **https://thornswood.net/rules**, and your answer is
 kept against your Discord account. Applying means accepting them."""
 
@@ -208,7 +208,7 @@ START = """\
 # Getting in
 
 This is **https://thornswood.net/join**, read out of the same file, so the two
-can't disagree.""" + ("" if OPEN else " Step 1 happens in <#TICKETS>.") + """ Logs and crash files go
+can't disagree.""" + ("" if OPEN else " Step 1 happens in <#PLAYTEST>.") + """ Logs and crash files go
 in <#RESULTS>, with the finding they belong to.
 
 """ + _JOIN_BODY + "\n"
@@ -310,7 +310,7 @@ Yes. Send them to the Discord. They apply the same way you did.
 
 **Why can't I get in?**
 It's an alpha, open by application. Anyone can download it, and the
-Playtester role is what lets you press Play. Open a ticket in <#TICKETS>, pick
+Playtester role is what lets you press Play. In <#PLAYTEST>, pick
 **Apply to be an alpha playtester**, and say yes to the rules. Somebody reads
 it and gets back to you."""
 
@@ -319,7 +319,7 @@ _FAQ_IN_OPEN = """\
 Yes. Send them to the Discord and they can play.
 
 **Why can't I get in?**
-Anyone here can play, so it's something else. Open a ticket in <#TICKETS> and
+Anyone here can play, so it's something else. Open a ticket in <#HELP> and
 pick **I need help**."""
 
 FAQ = """\
@@ -544,6 +544,14 @@ at the same time.
 by the Owner, the Co-Owner and the staff leads.
 """
 
+# The sixteen factions of 4E 252 (#3317): lore/factions.md, which Patrick
+# approved on 22 Oct, read out of the file so #factions and the repository
+# cannot disagree. Setup-Discord -OnBox sends the file with this one.
+_FACTIONS_MD = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                            '..', 'lore', 'factions.md')
+with open(_FACTIONS_MD, encoding='utf-8') as _f:
+    FACTIONS = as_discord(_f.read(), 'factions.md')
+
 # Every channel the build writes, by its key in PLAN: its words.
 DOCS = {
     'RULES': RULES,
@@ -553,6 +561,7 @@ DOCS = {
     'FAQ': FAQ,
     'GAMERULES': GAME_RULES,
     'LORE': LORE,
+    'FACTIONS': FACTIONS,
     'TESTERRULES': TESTER_RULES,
     'DEVRULES': DEV_RULES,
     'LORERULES': LORE_RULES,
@@ -576,18 +585,22 @@ DRAFTS = ('TESTERRULES', 'DEVRULES', 'LORERULES', 'MODRULES',
 CHANGES = {
     'RULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Bugs now go in #test-findings, since #bugs is gone.', '8c8eaaa1c0c2'),
+        ('2026-10-22', 'The application that asks whether you accept these is in its own channel now.', 'a61e1b4d9c57'),
     ],
     'WELCOME': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '4a290d7afd52'),
+        ('2026-10-22', 'The help, known issues, roadmap and credits lines are links you can click, and the playtest application is in its own channel now.', 'a290f9d3bc8f'),
     ],
     'START': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Logs and crash files now go in #test-findings, since #logs-and-crashes is gone.', '8a49f1c3335b'),
+        ('2026-10-22', 'Step 1, the playtest application, is in its own channel now.', '9464b08ac76a'),
     ],
     'NEWS': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '90be4dab837f'),
     ],
     'FAQ': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history. Something broken now points at #test-findings, since #bugs is gone.', '199e5f79c8af'),
+        ('2026-10-22', 'The playtest application and help tickets are each in their own channel now.', 'f4cf53ba6ce4'),
     ],
     'GAMERULES': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '037bba896ff5'),
@@ -596,5 +609,8 @@ CHANGES = {
     'LORE': [
         ('2026-10-22', 'The changelog starts here; earlier changes are in the repository history.', '6719c4f60917'),
         ('2026-10-22', 'Rewritten without the narrator asides, so it reads as plain lore. No event in it has changed.', 'fb95f2f38532'),
+    ],
+    'FACTIONS': [
+        ('2026-10-22', 'The sixteen factions of 4E 252, each with who they are, where they keep and who leads them, as Patrick approved them.', '8ba2250523f8'),
     ],
 }

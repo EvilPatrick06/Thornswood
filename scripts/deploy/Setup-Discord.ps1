@@ -44,15 +44,12 @@
     2. Bot in the sidebar, then Reset Token, and copy what it gives you.
     3. Still under Bot, turn ON "Server Members Intent". Leave the rest off.
     4. OAuth2, URL Generator, tick "bot" and then "Administrator". Open the URL
-       it builds and add the bot to your server. Administrator is for the build
-       only: it makes the Owner and Dev roles, which carry Administrator, and
-       Discord refuses that from a bot without it.
+       it builds and add the bot to your server. The bot keeps Administrator,
+       for a build and the rest of the time (#3317, Patrick, 22 Oct 2026: "the
+       bot will keep admin"). A build makes the Owner and Co-Owner roles, which
+       carry Administrator, and Discord refuses that from a bot without it.
 
-  Two permission sets. Administrator for a build, and a smaller set for the
-  rest of the time, which is all the running bot needs. A build that finishes
-  with nothing failed ends on the invite link with that smaller set and a line
-  saying to untick Administrator on the bot's role. Tick it again before the
-  next build. To see that link without building anything, from the repository
+  To see the invite link without building anything, from the repository
   folder, with the id from the developer portal's General Information page:
 
     python bot\Build-Discord.py --invite <application id>
@@ -152,9 +149,10 @@ if ($OnBox) {
   # reads factions.json from its own folder when it loads (#3317), and the
   # first -OnBox run after that stopped with FileNotFoundError for it; the
   # same test imports Build-Discord.py there too, where a python with
-  # discord.py is.
+  # discord.py is. content.py reads #factions out of lore\factions.md (#3317).
   $send = @('bot/Build-Discord.py', 'bot/content.py', 'bot/staff-channel.txt',
-    'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md')
+    'bot/factions.json', 'site/data/site/join.md', 'site/data/site/rules.md',
+    'lore/factions.md')
   # The commit, never the working tree, so what ran is a commit anyone can name.
   $dirty = @(& git -C $Repo status --porcelain -- @send 2>$null)
   if ($LASTEXITCODE -ne 0) { throw 'git could not say whether the build''s files are committed. Nothing was sent.' }
