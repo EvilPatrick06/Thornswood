@@ -2,8 +2,10 @@
 
 Last changed: 22 October 2026.
 
-The site uses storage for sign-in security and for your age statement. It has
-no advertising cookies, Google Analytics, or third-party tracking embeds.
+The site uses storage for sign-in security and for your age statement, and
+Cloudflare, which carries every connection to it, sets two cookies of its own
+to keep scripts off it. It has no advertising cookies, Google Analytics, or
+third-party tracking embeds.
 
 | Name | Purpose | Duration |
 | --- | --- | --- |
@@ -11,6 +13,8 @@ no advertising cookies, Google Analytics, or third-party tracking embeds.
 | `twst_*` | One-use security state during Discord sign-in, scoped to `/auth/discord`. | Ten minutes; cleared when the sign-in returns. |
 | `tw` | Fallback member-password sign-in when Discord sign-in is not configured. Ignored when Discord is configured. | Up to one year; cleared on sign-out. |
 | `tw-age-18` | Remembers that this browser stated eighteen or older. It does not verify age. | One year. |
+| `__cf_bm` | Set by Cloudflare's Bot Fight Mode, not by the site: tells a browser apart from a script hammering the site. | Ends after 30 minutes of nothing. |
+| `cf_clearance` | Set by Cloudflare, not by the site: says this browser passed Cloudflare's check, so it is not asked again. | Set by Cloudflare. |
 
 The sign-in cookies are HttpOnly and SameSite=Lax. HTTPS adds Secure. The age
 statement is also kept as `tw-age-18` in localStorage, which has no automatic

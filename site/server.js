@@ -349,7 +349,13 @@ let cfg = {
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
   secret: '',
-  passKey: ''            // signs join passes; the game servers hold a copy (#937)
+  passKey: '',           // signs join passes; the game servers hold a copy (#937)
+  /* Cloudflare Turnstile on the report form (#3216). The site key goes to the
+     page and is public; the secret is what the site checks a pass with, and
+     lives only here. Both are set on the box by Set-Turnstile.ps1. Either one
+     empty, as on a copy on your machine, means no widget and no check. */
+  turnstileSiteKey: '',
+  turnstileSecret: ''
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -1657,6 +1663,50 @@ function reportFrom(req) {
   return crypto.createHmac('sha256', reportSalt).update(clientAddr(req)).digest('hex').slice(0, 32);
 }
 
+/* CLOUDFLARE TURNSTILE ON THE REPORT FORM (#3216). The report form is the one
+   form anybody can send without signing in, on purpose, so it is the one a
+   script can fill from anywhere. The gallery's forms and the hub need a
+   Discord sign in with a role, which a script does not have, and the member
+   password's form is off once Discord sign in is set up. Patrick's answer on
+   22 Oct 2026 was to put Turnstile on the site's forms; this is the form that
+   needs it.
+
+   The page draws the widget with the site key (/api/report/form), and the
+   widget gives it a one-time pass that goes with the report. The site asks
+   Cloudflare whether that pass is good, with the secret and the sender's
+   address, before it keeps anything. Both keys empty, as on a copy on your
+   machine, is no widget and no check, never one without the other: a page
+   that drew no widget would otherwise have every report refused. */
+const TURNSTILE_VERIFY = 'https://challenges.cloudflare.com/turnstile/v0/siteverify';
+function turnstileOn() {
+  return typeof cfg.turnstileSiteKey === 'string' && cfg.turnstileSiteKey.length > 0 &&
+         typeof cfg.turnstileSecret === 'string' && cfg.turnstileSecret.length > 0;
+}
+/* 'yes', 'no', or 'unasked' when Cloudflare did not answer inside the same
+   ten seconds every other outside question gets (post()). The action is the
+   one the page draws the widget with, so a pass made on another page of
+   another site with the same key would not do. */
+async function turnstilePasses(token, addr) {
+  const t = String(token || '');
+  if (!t || t.length > 2048) return 'no';
+  let said;
+  try {
+    said = await post(TURNSTILE_VERIFY, { secret: cfg.turnstileSecret, response: t, remoteip: addr || '' });
+  } catch (e) {
+    // post() is the Discord helper and names Discord when nothing came back.
+    console.error('[thornswood] turnstile: Cloudflare did not answer the check (' +
+                  (e && e.discordSilent ? 'no answer in ten seconds' : (e && e.name) || 'error') + ')');
+    return 'unasked';
+  }
+  if (said && said.success === true && said.action === 'report') return 'yes';
+  // The error codes say why (timeout-or-duplicate, invalid-input-response);
+  // never the pass itself or the secret.
+  console.log('[thornswood] turnstile: a report was refused, Cloudflare said ' +
+              JSON.stringify((said && said['error-codes']) || []) +
+              (said && said.success === true ? ' with action ' + JSON.stringify(String(said.action || '')) : ''));
+  return 'no';
+}
+
 function reportRefusal(key, now, whose) {
   const from = whose || 'your connection';
   const HOUR = 60 * 60 * 1000, DAY = 24 * HOUR;
@@ -2581,8 +2631,25 @@ async function galleryStaff(url, w) {
    static.cloudflareinsights.com and posts what it measured to
    cloudflareinsights.com. With script-src 'self' alone every page raised a
    CSP error in the console and Cloudflare counted nothing. The privacy page
-   names it. It sets no cookie and keeps nothing on the visitor's machine. */
-const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+   names it. It sets no cookie and keeps nothing on the visitor's machine.
+
+   The third is Cloudflare Turnstile on the report form (#3216, Patrick's
+   answer on 22 Oct 2026): its script and the frame it draws the check in
+   both come from challenges.cloudflare.com. The privacy page names it. */
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com https://challenges.cloudflare.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-src https://challenges.cloudflare.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+/* A NONCE ON EVERY ANSWER (#3216). Bot Fight Mode, on by Patrick's answer on
+   22 Oct 2026, turns on Cloudflare's JavaScript Detections, which cannot be
+   turned off on its own and writes a small inline script into every page
+   Cloudflare carries. script-src 'self' refuses any inline script, so every
+   page would raise a CSP error and the detection would never run. Cloudflare
+   reads a nonce out of this header and puts it on the script it writes in, so
+   each answer gets a fresh one (handle() makes it). The site's own pages
+   carry no inline script and never use it; a nonce is only good for the one
+   answer it came with, so it opens nothing to anybody else. */
+function cspFor(res) {
+  const n = res && res.cspNonce;
+  return n ? CSP_HEADER.replace("script-src 'self'", "script-src 'self' 'nonce-" + n + "'") : CSP_HEADER;
+}
 function send(res, code, payload, type, extra) {
   // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
   // name nothing on other sites, and CSS and JS are external same-origin
@@ -2596,7 +2663,7 @@ function send(res, code, payload, type, extra) {
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
     'X-Content-Type-Options': 'nosniff',
-    'Content-Security-Policy': CSP_HEADER,
+    'Content-Security-Policy': cspFor(res),
     'Referrer-Policy': 'strict-origin-when-cross-origin'
   }, extra || {}));
   res.end(payload);
@@ -2645,7 +2712,7 @@ function rangeReply(req, res, file, size, headers, head) {
       'accept-ranges': 'bytes',
       'cache-control': 'no-store',
       'x-content-type-options': 'nosniff',
-      'content-security-policy': CSP_HEADER,
+      'content-security-policy': cspFor(res),
       'referrer-policy': 'strict-origin-when-cross-origin'
     });
     res.end();
@@ -2660,7 +2727,7 @@ function rangeReply(req, res, file, size, headers, head) {
     'accept-ranges': 'bytes',
     'cache-control': headers['cache-control'] || 'no-store',
     'x-content-type-options': 'nosniff',
-    'content-security-policy': CSP_HEADER,
+    'content-security-policy': cspFor(res),
     'referrer-policy': 'strict-origin-when-cross-origin'
   }));
   if (head) { res.end(); return true; }
@@ -5649,8 +5716,10 @@ process.on('uncaughtException', (e) => {
 
 async function handle(req, res) {
   // Apply before parsing the address, so streamed and malformed responses
-  // carry the same policy as ordinary pages.
-  res.setHeader('Content-Security-Policy', CSP_HEADER);
+  // carry the same policy as ordinary pages. The nonce is this answer's own
+  // (cspFor, #3216).
+  res.cspNonce = crypto.randomBytes(16).toString('base64');
+  res.setHeader('Content-Security-Policy', cspFor(res));
   res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'SAMEORIGIN');
@@ -5808,6 +5877,31 @@ async function handle(req, res) {
   if (route === '/discord' && req.method === 'GET') {
     if (!cfg.discord.invite) return send(res, 404, 'No invite link set yet.', 'text/plain');
     return send(res, 302, '', 'text/plain', { Location: cfg.discord.invite });
+  }
+
+  // ------------------------------------------------------- security.txt
+  /* Where somebody who finds a hole in the site says so (RFC 9116, #3216,
+     Patrick's answer on 22 Oct 2026). The contact is the report page: open
+     to anybody without an account, read by staff and nobody else, and the
+     place staff already read every day, so a finding is never waiting in a
+     mailbox nobody opens.
+
+     Expires is written as the file is asked for, 180 days on, inside the
+     year RFC 9116 asks for. The file says what this site answers, and the
+     site answering is the proof somebody still keeps it: a date written by
+     hand into a file would run out by itself one day while the contact
+     still worked, and a check that a person has to remember to move is the
+     kind that gets forgotten. */
+  if (p === '/.well-known/security.txt' && req.method === 'GET') {
+    const until = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
+    until.setUTCHours(0, 0, 0, 0);
+    return send(res, 200, [
+      'Contact: ' + PUBLIC_ORIGIN + '/report',
+      'Expires: ' + until.toISOString(),
+      'Preferred-Languages: en',
+      'Canonical: ' + PUBLIC_ORIGIN + '/.well-known/security.txt',
+      ''
+    ].join('\n'), 'text/plain; charset=utf-8', { 'Cache-Control': 'public, max-age=86400' });
   }
 
   // ----------------------------------------------------------- domain proof
@@ -6153,6 +6247,12 @@ async function handle(req, res) {
      how a bug turns into nobody bothering. Held to one short message at a
      time, five an hour from one place, and the inbox is capped so it cannot
      be used to fill the disk. See thornswood report limits above. */
+  // What the report page needs to draw the form: the Turnstile site key, or
+  // nothing when the check is off (#3216). Public, like the key itself.
+  if (route === '/api/report/form' && req.method === 'GET') {
+    return sendJson(res, 200, { turnstile: turnstileOn() ? cfg.turnstileSiteKey : '' });
+  }
+
   if (route === '/api/report' && req.method === 'POST') {
     const sender = reportFrom(req);
     const refuse = (no) => send(res, 429, JSON.stringify({ error: no.error }), null,
@@ -6170,6 +6270,18 @@ async function handle(req, res) {
     if (o && String(o.homepage || '').trim()) return sendJson(res, 200, { ok: true });
     const title = String(o.title || '').trim().slice(0, 200);
     if (!title) return sendJson(res, 400, { error: 'say what happened in the first box' });
+    // Turnstile's pass (#3216), asked before the limit is read again below,
+    // because it waits on Cloudflare and nothing may wait between that read
+    // and reportTaken. A refused pass is not counted against the sender.
+    if (turnstileOn()) {
+      const ts = await turnstilePasses(o.turnstile, requestAddr(req));
+      if (ts === 'unasked') {
+        return sendJson(res, 503, { error: 'Cloudflare did not answer the check that you are a person, so nothing was sent. Try again in a minute.' });
+      }
+      if (ts !== 'yes') {
+        return sendJson(res, 403, { error: 'The check that you are a person did not pass. Wait for the tick under the form, then send it again.' });
+      }
+    }
     // And asked again now the body is in, because the answer above is stale.
     // A script that opens thirty connections, sends every set of headers and
     // then every body gets all thirty past the first check before any of

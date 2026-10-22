@@ -79,6 +79,8 @@ const feedFile = gen.feedFile, feedView = gen.feedView, feedSettings = gen.feedS
 const sendSrc = grab('function send(');
 yes('server.js still has send()', !!sendSrc);
 eval(sendSrc);
+// send() and rangeReply() put each answer's nonce into the CSP (#3216).
+eval(grab('function cspFor('));
 
 const rangeSrc = grab('function rangeReply(');
 yes('server.js has rangeReply()', !!rangeSrc);
