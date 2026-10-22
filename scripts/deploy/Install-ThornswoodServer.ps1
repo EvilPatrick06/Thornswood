@@ -1232,12 +1232,14 @@ if (-not $PutBack) {
         $taken = 0
         foreach ($p in @($s.loadOrder)) {
             $at = ([string]$p) -replace '/', '\'
-            $leaf = [IO.Path]::GetFileName($at)
-            if ($leaf) { $named[$leaf.ToLowerInvariant()] = $true }
+            # Not $leaf: that is the root's own name, which Prune and the put
+            # back read later in this same scope (#3183).
+            $plugLeaf = [IO.Path]::GetFileName($at)
+            if ($plugLeaf) { $named[$plugLeaf.ToLowerInvariant()] = $true }
             if (-not $at.StartsWith($Root + '\plugins\', [StringComparison]::OrdinalIgnoreCase)) { continue }
-            $into = Join-Path $plugDir $leaf
+            $into = Join-Path $plugDir $plugLeaf
             if (Test-Path -LiteralPath $into) { continue }
-            $from = Join-Path (Join-Path $Root 'plugins') $leaf
+            $from = Join-Path (Join-Path $Root 'plugins') $plugLeaf
             if (Test-Path -LiteralPath $from) { Copy-Item -LiteralPath $from -Destination $into -Force; $taken++ }
         }
         $brought = @(Get-ChildItem -LiteralPath $plugDir -File -Force | Where-Object { -not $named.ContainsKey($_.Name.ToLowerInvariant()) } | ForEach-Object { $_.Name })
