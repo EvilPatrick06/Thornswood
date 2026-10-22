@@ -34,6 +34,14 @@
   are kept. The trace itself, which sees the whole box, never leaves C:\Thornswood-Trace,
   a folder only administrators can read, and is deleted once read.
 
+  A process that was already running when the session started has no start
+  event in it, so the session's start also writes down every process then
+  running, its id and its name, beside the trace (gate.etl.procs). Without
+  that, such a process came out as a bare id and could not be matched to
+  the readers below, so its opens counted as strays (the first gate trace,
+  run 39731778532 on 22 Oct: 136 opens of scripts the harnesses ran, all by
+  one such id).
+
   WHAT MAKES A HARNESS ALWAYS RUN. A process that is no harness's (not
   Defender's or the indexer's, which read files without acting on them)
   opening something in the checkout while a harness runs: whatever it read
@@ -206,7 +214,9 @@ public static class ThornswoodTrace {
     // Reads an ETL against the harnesses' roots. workspace is the checkout;
     // strays gets one line for each process outside the harnesses that
     // opened something in it while a harness ran.
-    public static Dictionary<string, Harness> Read(string etl, string workspace, List<Harness> roots, List<string> strays, List<string> notes) {
+    // running: the processes running as the session started, id to name,
+    // since those have no start event in it.
+    public static Dictionary<string, Harness> Read(string etl, string workspace, List<Harness> roots, Dictionary<int, string> running, List<string> strays, List<string> notes) {
         Dictionary<string, string> devices = Devices();
         Dictionary<string, string[]> fileFields = Fields("Microsoft-Windows-Kernel-File");
         Dictionary<string, string[]> procFields = Fields("Microsoft-Windows-Kernel-Process");
@@ -226,6 +236,11 @@ public static class ThornswoodTrace {
             if (h.End > last || last == DateTime.MinValue) last = h.End;
         }
         Dictionary<int, List<Inst>> insts = new Dictionary<int, List<Inst>>();
+        foreach (KeyValuePair<int, string> kv in running) {
+            Inst n = new Inst();
+            n.Pid = kv.Key; n.Start = DateTime.MinValue; n.Image = kv.Value;
+            insts[kv.Key] = new List<Inst> { n };
+        }
         Func<int, DateTime, Inst> at = (pid, t) => {
             List<Inst> l;
             if (!insts.TryGetValue(pid, out l)) return null;
@@ -364,7 +379,18 @@ function Start-TraceSession([string]$name, [string]$etl) {
     Remove-Item -LiteralPath $etl -Force -ErrorAction SilentlyContinue
     $e = [ThornswoodTrace]::Start($name, $etl, $script:providers, $script:keywords)
     if ($e -ne 0) { throw ('could not start the trace session ' + $name + ' (Windows error ' + $e + ')') }
-    'session ' + $name + ' started, writing ' + $etl
+    # After the start, so a process is in the trace or in this list or both.
+    $procs = @(Get-CimInstance Win32_Process | ForEach-Object { [string]$_.ProcessId + "`t" + $_.Name })
+    [IO.File]::WriteAllLines($etl + '.procs', [string[]]$procs)
+    'session ' + $name + ' started, writing ' + $etl + ', with the ' + $procs.Count + ' processes running then'
+}
+function Read-Running([string]$etl) {
+    $running = New-Object 'System.Collections.Generic.Dictionary[int,string]'
+    foreach ($line in [IO.File]::ReadAllLines($etl + '.procs')) {
+        $f = $line.Split("`t")
+        $running[[int]$f[0]] = $f[1]
+    }
+    return ,$running
 }
 function Stop-TraceSession([string]$name) {
     $s = [ThornswoodTrace]::Stop($name)
@@ -398,6 +424,13 @@ switch ($TraceMode) {
         [IO.File]::WriteAllText((Join-Path $probe 'sub\b.txt'), 'b')
         [IO.File]::WriteAllText((Join-Path $probe 'other.txt'), 'o')
         $etl = Join-Path $traceRoot 'selftest.etl'
+        # Something already running when the session starts, which opens a
+        # file in the probe's folder once the probe has started: the read must
+        # name it by its name, from the list of what was running.
+        [IO.File]::WriteAllText((Join-Path $probe 'early.txt'), 'e')
+        $go = Join-Path $probe 'go'
+        $early = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-Command', ("for (`$i = 0; `$i -lt 300 -and -not [IO.File]::Exists('" + $go + "'); `$i++) { Start-Sleep -Milliseconds 100 }; `$null = [IO.File]::ReadAllText('" + (Join-Path $probe 'early.txt') + "')")) -PassThru -WindowStyle Hidden
+        $null = $early.Handle
         Start-TraceSession 'thornswood-trace-selftest' $etl
         Start-Sleep -Seconds 2
         # The probe: a file read, a file's attributes read, a file that is not
@@ -422,7 +455,9 @@ exit 0
         [IO.File]::WriteAllText($probeFile, $probeScript)
         $p = Start-Process -FilePath powershell.exe -ArgumentList @('-NoProfile', '-ExecutionPolicy', 'Bypass', '-File', ('"' + $probeFile + '"')) -PassThru -WindowStyle Hidden
         $null = $p.Handle
+        [IO.File]::WriteAllText($go, 'go')
         $p.WaitForExit()
+        $early.WaitForExit()
         $began = $p.StartTime.ToUniversalTime()
         # Something no harness started, opening a file in the probe's folder
         # while the probe "runs": the read must name it as a stray.
@@ -437,7 +472,7 @@ exit 0
         $roots.Add($root)
         $strays = New-Object 'System.Collections.Generic.List[string]'
         $notes = New-Object 'System.Collections.Generic.List[string]'
-        $read = [ThornswoodTrace]::Read($etl, $probe, $roots, $strays, $notes)
+        $read = [ThornswoodTrace]::Read($etl, $probe, $roots, (Read-Running $etl), $strays, $notes)
         $notes
         $got = @($read['probe'].Paths.Keys)
         'the probe opened: ' + ($got -join ', ')
@@ -457,7 +492,8 @@ exit 0
         if ($node) { Check '  and so is node' (@($read['probe'].Images) -contains 'node.exe') }
         Check ('what no harness started is named as a stray (' + ($strays -join '; ') + ')') (@($strays | Where-Object { $_ -match ' cmd\.exe other\.txt$' }).Count -ge 1)
         Check 'and not put on the probe' ($got -notcontains 'other.txt')
-        Remove-Item -LiteralPath $etl, $probe, $probeFile -Recurse -Force -ErrorAction SilentlyContinue
+        Check ('what was running before the session is named as a stray by its name (powershell.exe early.txt)') (@($strays | Where-Object { $_ -match ' powershell\.exe early\.txt$' }).Count -ge 1)
+        Remove-Item -LiteralPath $etl, ($etl + '.procs'), $probe, $probeFile -Recurse -Force -ErrorAction SilentlyContinue
         if ($fail) { 'the self-test FAILED: no gate trace from this box can be trusted until it passes'; exit 1 }
         'the self-test passed'
         exit 0
@@ -492,7 +528,7 @@ exit 0
         if (-not $roots.Count) { throw 'the start log names no harness' }
         $strays = New-Object 'System.Collections.Generic.List[string]'
         $notes = New-Object 'System.Collections.Generic.List[string]'
-        $read = [ThornswoodTrace]::Read($etl, $TraceWorkspace, $roots, $strays, $notes)
+        $read = [ThornswoodTrace]::Read($etl, $TraceWorkspace, $roots, (Read-Running $etl), $strays, $notes)
         $notes
         if ($strays.Count) { 'strays (first 20): ' + (@($strays | Select-Object -First 20) -join '; ') }
         $sb = New-Object Text.StringBuilder
@@ -506,7 +542,7 @@ exit 0
         'BEGIN'
         for ($i = 0; $i -lt $b64.Length; $i += 1000) { $b64.Substring($i, [Math]::Min(1000, $b64.Length - $i)) }
         'END'
-        Remove-Item -LiteralPath $etl -Force
+        Remove-Item -LiteralPath $etl, ($etl + '.procs') -Force
         exit 0
     }
     'clean' {
