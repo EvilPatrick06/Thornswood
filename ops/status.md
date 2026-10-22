@@ -2,38 +2,50 @@
 
 What is true now. Rewritten in place by whoever changes it; history is in git.
 
-Last rewritten 22 Oct 2026, 9:55 AM (Patrick's time) by the Local Desk on One,
-which folded in what was still true from the vault's `wiki/status.md` (that
-page now only points here). The run notes moved from the vault's
-`wiki/claude-queue/` to `claude-queue/` here in the same change.
+Last rewritten 22 Oct 2026, 10:45 AM (Patrick's time) by the Cloud Desk, after
+the morning's run notes (the batch that deleted the finished ones). Before
+that, 9:55 AM by the Local Desk on One, which folded in what was still true
+from the vault's `wiki/status.md` and moved the run notes here.
 
 ## Releases now
 
 | Channel | Launcher | Release | Built from | Engine | Game / resources / voice |
 |---------|----------|---------|------------|--------|--------------------------|
 | Main | 1.2.5 | 20261017-205912 | 24572604 (tag release/main/20261017-205912) | 3bdf3d3c | 7777 / 3000 / 7778 |
-| Dev | 1.2.6.6 | 20261022-094041-dev | a8c91cc7 (tag release/dev/20261022-094041-dev) | 1a6e3e53 | 7787 / 7788 / 7789 |
+| Dev | 1.2.6.6 | 20261022-162021-dev | d1778c99 (tag release/dev/20261022-162021-dev) | eaf9f0b9 | 7787 / 7788 / 7789 |
 
-- **Dev server:** engine 1a6e3e53 since Publish-Server at 6:23 AM on 22 Oct
-  (INSTALL OK after #3277 fixed the swap, #3262). Gamemode 5a81f5c6 (#3286)
-  since 7:18 AM. #3302 (1d39df36, Thornswood-Last.esp) merged after the 9:37 AM
-  dev Ship began, so it needs Deploy-DevGamemode -LoadOrder and the next dev
-  Ship.
+- **Dev server:** engine eaf9f0b9 (#3306) since Publish-Server -FromStore
+  from the cloud at 10:18 AM on 22 Oct, INSTALL OK, with the gamemode of
+  d1778c99. #3302 (Thornswood-Last.esp) went on at 9:45 AM with
+  Deploy-DevGamemode -LoadOrder, and both of its halves reached clients in
+  20261022-154916-dev (9:49 AM). Its world was wiped on purpose at 2:48 AM
+  for #3078 (Wipe-Saves.ps1 -Server dev, 42 characters); the 2:15 AM backup
+  holds them.
 - **Dev profile** (#3181), 7:28 AM on 22 Oct, nobody on, 4,883 NPCs loaded:
-  0.125 of a core on the JavaScript thread (0.176 before #3255).
+  0.125 of a core on the JavaScript thread (0.176 before #3255). A 120 second
+  profile on eaf9f0b9 started at 10:26 AM for the VPS performance work.
 - **Live server:** engine 3bdf3d3c with main's 1.2.5 gamemode. The next main
   release needs a live `Deploy-Server -GamemodeOnly` first, and never goes
   straight after a dev Ship.
 - **Live voice:** voice-bcc2dbaa (deployed 19 Oct), auth on, loopback only;
   /health chatRetention overdueDays 0, no prune error (read 8:37 AM 22 Oct).
-- **Site:** from main bb8a579b (Deploy-Docs -Site, 9:30 AM 22 Oct). Cloudflare
-  fronts ports 80 and 443, which take only Cloudflare's addresses (#2995).
+- **Site:** from main d1778c99 (Deploy-Docs -Site from the cloud, 10:24 AM 22
+  Oct: the credits page names eaf9f0b9 and the licences folder). The roadmap
+  board was replaced from main at 10:16 AM (#2560: the #502 row without
+  bounties, #507's free claim row); the known board is still as typed on the
+  site, held for #3137. Cloudflare fronts ports 80 and 443, which take only
+  Cloudflare's addresses (#2995).
 
 ## The box
 
 - **Runners:** three on the VPS. 1 and 2 carry thornswood-build, 3 takes light
-  jobs only (#3108, #3117). The `Thornswood Gate Trace` task runs for runners
-  1 and 2 since 9:22 AM on 22 Oct (#3114); no map yet.
+  jobs only (#3108, #3117). Each runner account has its 6 outbound block rules
+  (#2161, read 10:10 AM 22 Oct). The `Thornswood Gate Trace` task runs for
+  runners 1 and 2 since 9:22 AM on 22 Oct, and its map is live: a pull
+  request's gate takes about 2 minutes (#3114, closed).
+- **Accounts:** the dev server, dev voice, live voice, Caddy, the site, the
+  backup and the bridge run as LOCAL SERVICE, Limited. `Thornswood Server`
+  (live) is still SYSTEM until the next main release's Publish-Server (#2578).
 - **Backup:** the `Thornswood Backup` task runs on its own LOCAL SERVICE
   account and may read bot.env.json since 4:17 AM on 22 Oct (#2836, #3258). The
   4:17 AM run ended with result 0, 0 skipped. Next at 2:15 AM, and it takes
@@ -56,7 +68,13 @@ page now only points here). The run notes moved from the vault's
   is to be posted and pinned in #gm-rules by the bot, but its text is in none
   of the repository, the vault or Drive; it waits on Djinn or Patrick for the
   text.
-- **#3302:** Deploy-DevGamemode -LoadOrder and a dev Ship.
+- **The main release** carries what dev has: the merchant work (#1373, its
+  Content.esp `fecfb823…` is on the dev server and in the dev release), the
+  licences folder (#3099, #3287, both in Done), the help page's hair dye
+  section (#2705) and the rows in `claude-queue/test-tasks-at-main.md`.
+- **#2183:** the availability baseline runs 22 Oct to 19 Nov 2026
+  (docs/SERVICE-OBJECTIVES.md). Watch-Outside -Install for the off-box check
+  needs One.
 - **A launcher change** still needs a Ship from One: -FromFeed refuses one and
   -ModsOnly keeps the feed's launcher. The cloud fix is compiling and signing
   the launcher in CI.
