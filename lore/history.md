@@ -85,9 +85,9 @@ both from whoever has them. It carries for anyone who pays, keeps its cut when
 a load arrives, and buys the things that leave Skyrim for good. The one
 warehouse the Empire kept is its embassy, and the Company does not rent it.
 
-Who first put a name to the charter, and whose silver paid for it, is told
-three ways in Solitude and a fourth in Windhelm. The signs over the old doors
-still say East Empire in places, and the Company has not painted them over.
+Nobody agrees who founded the Company or whose silver paid for its charter.
+The signs over the old doors still say East Empire in places, and the Company
+has not painted them over.
 
 ## Now
 
