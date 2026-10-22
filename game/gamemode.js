@@ -73760,7 +73760,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     const a={id,cell:state.cellOrWorld,pos:state.pos.slice(),state,node:near.node,
       lift:near.pos[2]-npcSurface(near.node,near.pos),bank,approach:near.pos.slice(),
       path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
-      mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
+      mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
     actors.set(id,a);order.push(id);indexActor(a);
     nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
   }
@@ -73828,7 +73828,7 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
         const surface=npcSurface(node,state.pos),lift=state.pos[2]-surface;
         const a={id,cell:state.cellOrWorld,pos:state.pos.slice(),state,node,lift,bank,
           path:[],dwell:0,last:now(),sequence:saved && Number.isInteger(saved.sequence) ? saved.sequence : id%997,
-          mode:'ambient',target:0,lastSaved:now(),policy:policies.get(id)};
+          mode:'ambient',savedMode:'ambient',target:0,policy:policies.get(id)};
         actors.set(id,a);order.push(id);indexActor(a);
         nativeCall('set',id,property,{version:2,sequence:a.sequence,mode:'ambient',cell:a.cell});
       } catch(e) { reject(id,e); }
@@ -74104,8 +74104,14 @@ function startSharedNpcServerRuntime(api, timers, now, report, population, optio
     nativeCall('updateNpcMovement',a.id,pos,rot,speed);
     if(speed) moved++;
     a.pos=pos;a.node=node;indexActor(a);
-    if(at-a.lastSaved>=30000) {
-      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.lastSaved=at;
+    // Written when it means something, a fight or a flight starting or
+    // ending, not as it wanders (#3180). Each write saves the actor's whole
+    // record durably, and until 22 Oct 2026 every NPC was written every 30
+    // seconds: about 5,000 files every 32 seconds on each server, 640 KB/s,
+    // with nobody on. An NPC that only wanders starts after a restart where
+    // it was last written, inside its home.
+    if(a.mode!==a.savedMode) {
+      nativeCall('set',a.id,property,{version:2,sequence:a.sequence,mode:a.mode,cell:a.cell});a.savedMode=a.mode;
     }
   }
   function step(id) {
