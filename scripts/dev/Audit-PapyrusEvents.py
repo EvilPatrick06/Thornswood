@@ -546,6 +546,10 @@ def load_order(data_dir, plugins_txt):
 # ---------------------------------------------------------------------------
 # Scripts
 
+class NoScripts(Exception):
+    """The data folder holds no script at all."""
+
+
 def script_index(data_dir, order, stats):
     """{script name in lower case: (where it came from, bytes)}, as the game
     would find it: archives in load order, a later one winning, then loose
@@ -579,6 +583,14 @@ def script_index(data_dir, order, stats):
                 with open(os.path.join(loose, f), 'rb') as fh:
                     index[f[:-4].lower()] = ('Data\\Scripts', fh.read())
                 stats['loose scripts'] += 1
+    if not index:
+        # A Skyrim load order always carries scripts (Skyrim - Misc.bsa alone
+        # holds thousands), so none found means the folder lacks the archives
+        # that hold them, and every reading made from it would be empty, not
+        # safe (#3105: a box with the masters but no Misc archive read 0).
+        unread = stats['unreadable archives']
+        raise NoScripts('no script in %s: none of its archives holds a .pex and it has no Scripts folder%s'
+                        % (data_dir, ('; could not read ' + '; '.join(unread)) if unread else ''))
     return index
 
 
@@ -1061,7 +1073,11 @@ def main():
     except (OSError, ValueError, KeyError, TypeError) as exc:
         print('STOP. %s is not a readable event list: %s' % (args.record, exc))
         return 1
-    result = audit(args.data, args.plugins, rule)
+    try:
+        result = audit(args.data, args.plugins, rule)
+    except NoScripts as exc:
+        print('STOP. %s' % exc)
+        return 1
     report(result)
     if args.json:
         with io.open(args.json, 'w', encoding='utf-8') as fh:

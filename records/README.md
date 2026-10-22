@@ -108,6 +108,13 @@ read it (issue #440, phase 8):
   nightly fetches the fork and reads it against the pin. The check is the
   list, not the commit: a pin moved over fork work that leaves the list
   alone passes, and one that changes it fails there, naming what changed.
+- `papyrus-missing.json`: the scripts the load order's records attach that
+  no archive or loose file carries on a PC with the game, measured there
+  with `scripts\dev\Audit-PapyrusEvents.py --json` (#3105). The game skips
+  them. `scripts\dev\Build-CrimeTable.py` stops when a folder lacks any
+  other attached script, so a folder with only some of the archives (the
+  box) cannot write a crime table that calls the scripts it lacks harmless.
+  Written by hand from that measurement, again when the load order changes.
 - `signing\`: the code signing setup, with its own README. On since
   27 September: Ship refuses a launcher that is not signed (Developer-Guide.md).
 
