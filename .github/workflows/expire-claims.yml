@@ -1,0 +1,116 @@
+# A claim with nothing on its issue for three days comes off (#2797).
+#
+# WHY. A lane marks what it is on with a claimed: <lane> label, and the claim
+# stays until the issue closes (drop-claims.yml) or the lane takes it off. The
+# weekly review of 19 Oct 2026 found 32 open issues claimed with no pull
+# request or commit since the claim, most from the 12 Oct overnight batch, and
+# the board review of 21 Oct (#3192) took 14 more off by hand. A claim says
+# work is under way, so a stale one keeps everybody else off work nobody is
+# doing. Patrick approved this on the board review page, 21 Oct.
+#
+# WHAT COUNTS AS ACTIVITY. On the issue's timeline: a comment, a pull request
+# or another issue naming it (and, for an open pull request, its own last
+# change), a commit naming it, and the claim label going on. Any comment
+# counts, whoever wrote it: every lane posts through the same account, so the
+# author of a comment cannot say whose claim it serves. A thread still on an
+# issue keeps its claim by saying where it is.
+#
+# WHAT IT DOES. Once a night, and when started by hand. It checks out nothing
+# and runs no action. With the run's own token, which can do nothing but read
+# and edit issues, it lists the open issues, reads the timeline of each one
+# carrying a claimed label, and for one whose newest activity is three days
+# old or more it writes a comment saying which claim came off and why, then
+# takes each claimed label off (a label already off, 404, is said and passed
+# over). The comment goes first, so a claim never vanishes unexplained.
+#
+# WHERE IT RUNS. On the VPS runners, like drop-claims.yml: GitHub's own
+# runners are blocked on billing (#437), and a few REST calls take seconds.
+name: Expire stale claims
+on:
+  schedule:
+    # 10:15 UTC, 4:15 AM on the box's clock, after the nightly checks.
+    - cron: '15 10 * * *'
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  expire:
+    name: Take off claims with nothing for three days
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # A page of issues and a timeline each for the claimed ones. Past this it
+    # is stuck, not slow.
+    timeout-minutes: 10
+    steps:
+      - name: Read every claimed issue's timeline and drop the stale claims
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLAIM_DAYS: '3'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
+          $days = [double]$env:CLAIM_DAYS
+          $now = [DateTime]::UtcNow
+          function All([string]$u) {
+            $out = @(); $page = 1
+            do {
+              $got = @(Invoke-RestMethod -Method Get -Uri ($u + '&page=' + $page) -Headers $h)
+              $out += $got; $page++
+            } while ($got.Count -eq 100)
+            return $out
+          }
+          function Utc($v) {
+            if ($null -eq $v -or "$v" -eq '') { return $null }
+            if ($v -is [DateTime]) { return $v.ToUniversalTime() }
+            return [DateTimeOffset]::Parse([string]$v, [Globalization.CultureInfo]::InvariantCulture).UtcDateTime
+          }
+          function Has($o, [string]$n) { return ($null -ne $o -and $o.PSObject.Properties[$n] -and $null -ne $o.$n) }
+
+          $issues = @(All "$api/issues?state=open&per_page=100" | Where-Object { -not (Has $_ 'pull_request') })
+          $claimed = @($issues | Where-Object { @($_.labels | Where-Object { $_.name -like 'claimed*' }).Count -gt 0 })
+          Write-Host ("{0} open issues, {1} with a claim" -f $issues.Count, $claimed.Count)
+          $dropped = 0
+          foreach ($i in $claimed) {
+            $n = $i.number
+            $labels = @($i.labels | Where-Object { $_.name -like 'claimed*' } | ForEach-Object { [string]$_.name })
+            $last = $null; $what = ''
+            foreach ($e in @(All "$api/issues/$n/timeline?per_page=100")) {
+              $at = $null; $why = ''
+              switch ([string]$e.event) {
+                'commented'        { $at = Utc $e.created_at; $why = 'a comment' }
+                'referenced'       { $at = Utc $e.created_at; $why = 'a commit naming it' }
+                'cross-referenced' {
+                  $at = Utc $e.created_at; $why = 'a mention from #' + $e.source.issue.number
+                  $src = $e.source.issue
+                  if ((Has $src 'pull_request') -and [string]$src.state -eq 'open') {
+                    $moved = Utc $src.updated_at
+                    if ($moved -and $moved -gt $at) { $at = $moved; $why = 'open pull request #' + $src.number }
+                  }
+                }
+                'labeled'          { if ([string]$e.label.name -like 'claimed*') { $at = Utc $e.created_at; $why = 'the claim going on' } }
+              }
+              if ($at -and (-not $last -or $at -gt $last)) { $last = $at; $what = $why }
+            }
+            if (-not $last) { $last = Utc $i.created_at; $what = 'the issue being filed' }
+            $age = ($now - $last).TotalDays
+            if ($age -lt $days) {
+              Write-Host ("#{0}: kept ({1}, {2:N1} days ago: {3})" -f $n, ($labels -join ', '), $age, $what)
+              continue
+            }
+            $stamp = $last.ToString('d MMM yyyy', [Globalization.CultureInfo]::InvariantCulture)
+            $body = ('{0} came off: nothing has happened on this issue since {1} ({2}), and a claim with no comment, pull request or commit for {3} days is taken off so the work is free for anybody (#2797). Still on it? Put the claim back and say where it stands.' -f (($labels | ForEach-Object { '`' + $_ + '`' }) -join ' and '), $stamp, $what, $env:CLAIM_DAYS) + "`n`n---`n_Expire stale claims, .github/workflows/expire-claims.yml_"
+            Invoke-RestMethod -Method Post -Uri "$api/issues/$n/comments" -Headers $h -Body (@{ body = $body } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
+            foreach ($l in $labels) {
+              try {
+                Invoke-RestMethod -Method Delete -Uri ("$api/issues/$n/labels/" + [Uri]::EscapeDataString($l)) -Headers $h | Out-Null
+                Write-Host ("#{0}: took {1} off ({2:N1} days since {3})" -f $n, $l, $age, $what)
+              } catch {
+                $r = $_.Exception.Response
+                if ($r -and [int]$r.StatusCode -eq 404) { Write-Host ("#{0}: {1} was already off" -f $n, $l) }
+                else { throw }
+              }
+            }
+            $dropped++
+          }
+          Write-Host ("{0} claim(s) taken off, {1} kept" -f $dropped, ($claimed.Count - $dropped))

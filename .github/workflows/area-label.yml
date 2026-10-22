@@ -1,0 +1,100 @@
+# A new issue gets an area: label, or "area: triage" when its title does not
+# say which part of the project it is (#2798).
+#
+# WHY. The weekly review of 19 Oct 2026 found 21 open issues with no labels at
+# all and 39 more with no area:, and the board review of 21 Oct (#3192) found
+# over 60 open issues with none. Nothing asked for one when an issue was made,
+# by hand or by a lane, so an issue could sit unsorted with nobody knowing
+# whose it was. Patrick approved this on the board review page, 21 Oct.
+#
+# WHAT IT DOES. When an issue is opened with no area: label, it reads the
+# title against the table below. When exactly one area matches, that area's
+# label goes on. When none or more than one match, "area: triage" goes on, so
+# a person picks, and the label list shows what is waiting to be sorted. A
+# guess between two areas is never made. Started by hand, it does the same
+# for every open issue with no area: label. "area: triage" is made the first
+# time it is needed. It checks out nothing and runs no action, and the title
+# reaches the script through the environment, never pasted into it.
+#
+# WHERE IT RUNS. On the VPS runners, like drop-claims.yml. The job starts only
+# for an issue with no area: label, and takes a few seconds.
+name: Area label on new issues
+on:
+  issues:
+    types: [opened]
+  workflow_dispatch:
+permissions:
+  issues: write
+jobs:
+  area:
+    name: Put on an area label
+    if: ${{ github.event_name == 'workflow_dispatch' || !contains(join(github.event.issue.labels.*.name, '|'), 'area:') }}
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    # One call per issue, or a page of issues when started by hand.
+    timeout-minutes: 5
+    steps:
+      - name: Read the title and label the issue
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          ISSUE: ${{ github.event.issue.number }}
+          TITLE: ${{ github.event.issue.title }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $h = @{ Authorization = "Bearer $env:GH_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+          $api = "https://api.github.com/repos/$env:GITHUB_REPOSITORY"
+          $triage = 'area: triage'
+          # Words in a title that name one part of the project, matched as
+          # whole words without regard to case. Only words that mean that part
+          # and nothing else; an ordinary word that could be any part stays out.
+          $areas = [ordered]@{
+            'area: Launcher'      = '\b(launcher|installer)\b'
+            'area: Website'       = '\b(website|site page|site pages|thornswood\.net|lighthouse)\b'
+            'area: Discord'       = '\b(discord|bot)\b'
+            'area: Voice'         = '\bvoice\b'
+            'area: Gamemode'      = '\bgamemode\b'
+            'area: Engine'        = '\b(engine|skymp)\b'
+            'area: GitHub & CI'   = '\b(workflow|workflows|harness|harnesses|github|ci)\b'
+            'area: Operations'    = '\b(vps|the box|watchdog|backup|backups|runner|runners)\b'
+            'area: Security'      = '\b(security|dnssec|cloudflare)\b'
+            'area: Mods'          = '\b(nexus|vortex|collection)\b'
+            'area: Release'       = '\b(ship|release|releases)\b'
+            'area: Legal'         = '\b(licence|license|licences|licenses|legal|privacy)\b'
+            'area: Accessibility' = '\baccessibility\b'
+            'area: In-game'       = '\b(crafting|recipe|recipes|bench|benches|forge|alchemy|harvest|cooking)\b'
+          }
+          function Has($o, [string]$n) { return ($null -ne $o -and $o.PSObject.Properties[$n] -and $null -ne $o.$n) }
+          function Pick([string]$title) {
+            $hit = @($areas.Keys | Where-Object { $title -match ('(?i)' + $areas[$_]) })
+            if ($hit.Count -eq 1) { return $hit[0] }
+            return $triage
+          }
+          $todo = @()
+          if ($env:EVENT -eq 'workflow_dispatch') {
+            $page = 1
+            do {
+              $got = @(Invoke-RestMethod -Method Get -Uri ("$api/issues?state=open&per_page=100&page=" + $page) -Headers $h)
+              $todo += @($got | Where-Object { -not (Has $_ 'pull_request') -and @($_.labels | Where-Object { $_.name -like 'area:*' }).Count -eq 0 } | ForEach-Object { [pscustomobject]@{ n = [int]$_.number; t = [string]$_.title } })
+              $page++
+            } while ($got.Count -eq 100)
+          } else {
+            $todo = @([pscustomobject]@{ n = [int]$env:ISSUE; t = [string]$env:TITLE })
+          }
+          Write-Host ("{0} issue(s) with no area label" -f $todo.Count)
+          $made = $false
+          foreach ($i in $todo) {
+            $label = Pick $i.t
+            if ($label -eq $triage -and -not $made) {
+              try { Invoke-RestMethod -Method Get -Uri ("$api/labels/" + [Uri]::EscapeDataString($triage)) -Headers $h | Out-Null }
+              catch {
+                $r = $_.Exception.Response
+                if (-not ($r -and [int]$r.StatusCode -eq 404)) { throw }
+                Invoke-RestMethod -Method Post -Uri "$api/labels" -Headers $h -Body (@{ name = $triage; color = 'ededed'; description = 'No area yet: the title did not say which part of the project. A person picks one.' } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
+                Write-Host "made the label $triage"
+              }
+              $made = $true
+            }
+            Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $i.n + '/labels') -Headers $h -Body (@{ labels = @($label) } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
+            Write-Host ("#{0}: {1}" -f $i.n, $label)
+          }
