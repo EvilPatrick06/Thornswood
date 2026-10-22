@@ -9,6 +9,7 @@
       server-build        records\server-build.json      the server build every deploy is held to
       client-build        records\client-build.json      the client build Ship and the launcher are held to
       front-build         records\front-build.json       the front build Go.ps1 unpacks into Data\Platform\UI (#2754)
+      client-licences     records\client-licences.json   the vcpkg libraries in the client files and their texts' sha256 (#3099)
       most-online         records\most-online.json       the seat count the engine and gamemode take, main's and dev's
       collection-plugins  records\collection-plugins.json  the collection's plugin bytes (#2019)
       skyrim-pin          records\skyrim-pin.json        the Skyrim build a release is pinned to
@@ -43,6 +44,8 @@ $script:ThornswoodRecordKinds = [ordered]@{
     'client-build'       = @{ File = 'records\client-build.json';       Versions = @(1); MustSay = $false }
     # #2754: the front, built from the same fork commit (Build-Front.ps1).
     'front-build'        = @{ File = 'records\front-build.json';        Versions = @(1); MustSay = $false }
+    # #3099: which licence text goes with which client file (New-ClientLicenceRecord.ps1).
+    'client-licences'    = @{ File = 'records\client-licences.json';    Versions = @(1); MustSay = $false }
     'most-online'        = @{ File = 'records\most-online.json';        Versions = @(1); MustSay = $false }
     'collection-plugins' = @{ File = 'records\collection-plugins.json'; Versions = @(1); MustSay = $true }
     # Slice 3 (#2180): the release records the launcher and Ship are built on.
@@ -141,6 +144,26 @@ function Get-ThornswoodRecordProblems {
         'client-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 7 40)) { $out += 'forkCommit is missing or not a commit SHA' }
             $out += @(Get-ThornswoodFilesMapProblems (Get-ThornswoodRecordProp $Doc 'files') 'files')
+        }
+        'client-licences' {
+            if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 7 40)) { $out += 'forkCommit is missing or not a commit SHA' }
+            $files = Get-ThornswoodRecordProp $Doc 'files'
+            if ($null -eq $files -or $files -isnot [psobject] -or $files -is [array] -or $files -is [string] -or @($files.PSObject.Properties).Count -eq 0) { $out += 'files is missing, empty, or not a map of client file to its ports' }
+            $ports = Get-ThornswoodRecordProp $Doc 'ports'
+            if ($null -eq $ports -or $ports -isnot [psobject] -or $ports -is [array] -or $ports -is [string]) { $out += 'ports is missing or not a map of port to its text' }
+            else {
+                foreach ($p in $ports.PSObject.Properties) {
+                    if ($p.Name -notmatch '^[a-z0-9]+(-[a-z0-9]+)*$') { $out += "ports.$($p.Name) is not a vcpkg port name" }
+                    if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $p.Value 'sha256') 64 64)) { $out += "ports.$($p.Name) has no sha256" }
+                    if (-not (Test-ThornswoodWhole (Get-ThornswoodRecordProp $p.Value 'bytes') 1)) { $out += "ports.$($p.Name) has no whole bytes" }
+                    if (-not ((Get-ThornswoodRecordProp $p.Value 'version') -is [string])) { $out += "ports.$($p.Name) has no version" }
+                }
+                if ($null -ne $files -and $files -is [psobject]) {
+                    foreach ($f in $files.PSObject.Properties) {
+                        foreach ($n in @($f.Value)) { if (-not $ports.PSObject.Properties[[string]$n]) { $out += "files.$($f.Name) names $n, which ports does not list" } }
+                    }
+                }
+            }
         }
         'front-build' {
             if (-not (Test-ThornswoodHex (Get-ThornswoodRecordProp $Doc 'forkCommit') 40 40)) { $out += 'forkCommit is missing or not a full commit SHA' }
