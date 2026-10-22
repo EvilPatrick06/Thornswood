@@ -892,7 +892,7 @@ namespace Thornswood
             // The detail said "running" whether Steam was or not, so a red
             // row read "Steam  running" (#3204).
             bool steam = SteamRunning();
-            l.Add(new Check("Steam", steam, steam ? "running" : "not running") { Problem = "Steam not running" });
+            l.Add(new Check(SteamRow, steam, steam ? "running" : "not running") { Problem = "Steam not running" });
             return l;
         }
 
@@ -976,10 +976,60 @@ namespace Thornswood
             return blocking.Count + " problems: " + joined + " and more";
         }
 
+        /// <summary>
+        /// The Steam row's name. Shell finds the row by it to show the Open
+        /// Steam button and to know what the card last said about Steam.
+        /// </summary>
+        public const string SteamRow = "Steam";
+
         public static bool SteamRunning()
         {
             try { return Process.GetProcessesByName("steam").Length > 0; }
             catch { return false; }
+        }
+
+        /// <summary>
+        /// SteamRunning for the launcher's two second tick, which redraws the
+        /// Ready card when Steam starts or closes (#3204). The rows were drawn
+        /// on a page change, a scan or a recheck and at no other time, so
+        /// Steam closed after that still read "running", and Steam started by
+        /// the Open Steam button or by hand left "Steam not running" up until
+        /// somebody changed page. Asks the steam.exe the last look found
+        /// whether it is still up, by the handle it already has, and lists
+        /// the machine's processes again only once it is not, the way
+        /// GameStillRunning does for the game (#978). Called from the
+        /// window's thread only.
+        /// </summary>
+        public static bool SteamStillRunning()
+        {
+            return steamUp.Any();
+        }
+
+        static bool steamAskRefused;
+
+        static readonly Watched<Process> steamUp = new Watched<Process>(
+            SteamProcesses,
+            delegate (Process p)
+            {
+                // One that cannot be asked is not provably up, so the watch
+                // looks again. Said once a session, as GameStillRunning does.
+                try { return !p.HasExited; }
+                catch (Exception ex)
+                {
+                    if (!steamAskRefused) { steamAskRefused = true; Swallow.Note("Checks.SteamStillRunning, has exited", ex); }
+                    return false;
+                }
+            },
+            delegate (Process p)
+            {
+                try { p.Dispose(); } catch (Exception ex) { Swallow.Note("Checks.SteamStillRunning, dispose", ex); }
+            });
+
+        /// <summary>Every steam.exe running now. The watch above owns what comes back.</summary>
+        static List<Process> SteamProcesses()
+        {
+            try { return new List<Process>(Process.GetProcessesByName("steam")); }
+            catch (Exception ex) { Swallow.Note("Checks.SteamProcesses", ex); return new List<Process>(); }
         }
 
         /// <summary>
