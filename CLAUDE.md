@@ -234,8 +234,8 @@ worktrees in the shared clone and read a session-start snapshot as the truth.
   is the rule for everybody. A cloud thread's git cannot delete a branch or
   push a tag (its proxy refuses every ref write, #3107), so there
   `pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch <branch> -Commit <its tip>`
-  has GitHub do it, and Ship's release tag goes the same way by itself
-  (#3314). This repository's branches only; the fork's still go from One.
+  has GitHub do it, `-Fork` does the same for a branch of the fork, and
+  Ship's release tag goes the same way by itself (#3314).
 - Two folders, no copies (Patrick, 5 Oct; on 20 Oct temp and worktrees moved
   into the repository, #2900). Work only in this repository (its ignored
   `worktrees\<name>` and `temp\<task>`) and the vault; never make another

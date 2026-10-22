@@ -8,6 +8,8 @@
                        the annotated release tag on that commit
       pwsh scripts/ops/Set-Ref.ps1 -DeleteBranch claude/what -Commit <40 hex>
                        the branch, when it is still at that commit
+      pwsh scripts/ops/Set-Ref.ps1 -Fork -DeleteBranch claude/what -Commit <40 hex>
+                       the same in the fork, EvilPatrick06/skymp
       pwsh scripts/ops/Set-Ref.ps1 -Run 39712345678
                        the answer of a run that had not ended
 
@@ -26,6 +28,10 @@
   Read-Board.ps1 do. The workflow runs this script with -OnGitHub on a VPS
   runner, where the run's own token (contents: write, pull requests read,
   nothing else) makes the call. No secret is in the session or the workflow.
+  -Fork starts the fork's .github/workflows/thornswood-git-ref.yml instead,
+  on GitHub's hosted runner (free in that public repository), which deletes
+  a branch by the same rules written into it; it makes no tags. A run's
+  token reaches only its own repository, so each has its own workflow.
 
   WHAT THE GITHUB HALF DOES, AND WHAT IT REFUSES.
     -Tag: only release/dev/<id>-dev and release/main/<id>, the names
@@ -66,6 +72,10 @@ param(
     # A git-ref run that had not ended: read its answer.
     [Parameter(ParameterSetName = 'Run', Mandatory = $true)]
     [long]$Run,
+    # The fork's branch, through the fork's thornswood-git-ref.yml.
+    [Parameter(ParameterSetName = 'Delete')]
+    [Parameter(ParameterSetName = 'Run')]
+    [switch]$Fork,
     # The workflow's half. What to do comes from the environment the
     # workflow sets from its inputs, never from a command line.
     [Parameter(ParameterSetName = 'OnGitHub', Mandatory = $true)]
@@ -78,6 +88,7 @@ Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
 
 $workflow = 'git-ref.yml'
+if ($Fork) { $GitHubRepo = 'EvilPatrick06/skymp'; $workflow = 'thornswood-git-ref.yml' }
 $inActions = ($env:GITHUB_ACTIONS -eq 'true')
 $tagShape = '^release/(dev/\d{8}-\d{4}(\d{2})?-dev|main/\d{8}-\d{4}(\d{2})?)$'
 $maxMessage = 4000
@@ -252,7 +263,7 @@ function Get-GitHub([string]$path, [switch]$NotYet) {
 # Asked, and the answer not read: exit 2, as for a run that has not ended.
 function Unread([string]$why) {
     Say ("GitHub started run $sentRun with it, and the run makes the change. Its answer was not read here: $why") 'Yellow'
-    Say ('  its answer: pwsh scripts/ops/Set-Ref.ps1 -Run ' + $sentRun) 'DarkGray'
+    Say ('  its answer: pwsh scripts/ops/Set-Ref.ps1 ' + $(if ($Fork) { '-Fork ' } else { '' }) + '-Run ' + $sentRun) 'DarkGray'
     exit 2
 }
 
@@ -269,7 +280,7 @@ function Read-RunAnswer([long]$id, [switch]$Started) {
         $state = if ($run) { $run.status } else { 'not served by GitHub yet' }
         if ([DateTime]::UtcNow -gt $deadline) {
             Say ("the run has not ended after $WaitMinutes minutes (it was " + $state + '), so every runner is busy. It still makes the change when one takes it.') 'Yellow'
-            Say ('  its answer then: pwsh scripts/ops/Set-Ref.ps1 -Run ' + $id) 'DarkGray'
+            Say ('  its answer then: pwsh scripts/ops/Set-Ref.ps1 ' + $(if ($Fork) { '-Fork ' } else { '' }) + '-Run ' + $id) 'DarkGray'
             if ($run) { Say ('  ' + $run.html_url) 'DarkGray' }
             exit 2
         }
@@ -280,7 +291,7 @@ function Read-RunAnswer([long]$id, [switch]$Started) {
         Start-Sleep -Seconds 5
         $run = Get-GitHub $runPath -NotYet:($Started -and -not $run)
     }
-    if ($run.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a git-ref run (it is " + $run.path + ').') }
+    if ($run.path -notmatch ('/' + [regex]::Escape($workflow) + '$')) { Die ("run $id is not a $workflow run (it is " + $run.path + ').') }
     $notes = @()
     foreach ($job in @((Get-GitHub "$runPath/jobs").jobs)) {
         $notes += @(Get-GitHub ("repos/$GitHubRepo/check-runs/" + $job.id + '/annotations') | Where-Object { $_.title -eq 'Set-Ref' })
@@ -302,13 +313,13 @@ if ($PSCmdlet.ParameterSetName -eq 'Run') {
     $o = @($body | & gh api -X POST "repos/$GitHubRepo/actions/workflows/$workflow/dispatches" --input - 2>&1 | ForEach-Object { "$_" })
     $c = $LASTEXITCODE
     $ErrorActionPreference = $old
-    if ($c -ne 0) { Die ('GitHub did not start the git-ref workflow: ' + (($o | Select-Object -Last 2) -join ' ') + '. Nothing was changed.') }
+    if ($c -ne 0) { Die ("GitHub did not start $workflow in ${GitHubRepo}: " + (($o | Select-Object -Last 2) -join ' ') + '. Nothing was changed.') }
     $started = ($o -join "`n") | ConvertFrom-Json
     if (-not $started.PSObject.Properties['workflow_run_id'] -or -not $started.workflow_run_id) {
-        Say ('GitHub started the git-ref workflow, but named no run, so its answer cannot be read here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow) 'Yellow'
+        Say ("GitHub started $workflow, but named no run" + ', so its answer cannot be read here. Its runs: https://github.com/' + $GitHubRepo + '/actions/workflows/' + $workflow) 'Yellow'
         exit 2
     }
-    Say ('sent to the git-ref workflow: ' + $started.html_url) 'DarkGray'
+    Say ("sent to $workflow" + ': ' + $started.html_url) 'DarkGray'
     $sentRun = [long]$started.workflow_run_id
     $answer = Read-RunAnswer $sentRun -Started
 }

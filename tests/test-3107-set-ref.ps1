@@ -36,7 +36,8 @@
        git-ref.yml on main with the inputs on gh's standard input, reads the
        runner's annotation and says what it did, exit 0; a stopped runner is
        1; a run not ended in time is 2 with the -Run line; and a name it would
-       refuse is refused before anything is started.
+       refuse is refused before anything is started. -Fork starts the fork's
+       thornswood-git-ref.yml instead, for a branch only.
     4. Add-ReleaseTag in a cloud session (CLAUDE_CODE_REMOTE true): it hands
        the tag, the commit and the release's own message to the checkout's
        Set-Ref.ps1 and tags nothing in the checkout; a refusal says what to
@@ -223,7 +224,7 @@ function gh {
     $p = @($a | Where-Object { $_ -match '^repos/' }) | Select-Object -First 1
     if ($a -contains '--input') { $global:TSghBody = (@($input) -join "`n") | ConvertFrom-Json }
     $global:LASTEXITCODE = 0
-    if ($p -match '/actions/workflows/git-ref\.yml/dispatches$') { return '{"workflow_run_id":88,"html_url":"https://github.com/x/actions/runs/88"}' }
+    if ($p -match '/actions/workflows/(thornswood-)?git-ref\.yml/dispatches$') { return '{"workflow_run_id":88,"html_url":"https://github.com/x/actions/runs/88"}' }
     if ($p -match '/actions/runs/88$') { return $global:TSghRun }
     if ($p -match '/actions/runs/88/jobs$') { return '{"jobs":[{"id":556}]}' }
     if ($p -match '/check-runs/556/annotations$') { return $global:TSghNotes }
@@ -255,6 +256,14 @@ $s = Session @{ Run = '88' } $done @((Note 'notice' "GONE $b"))
 Yes '-Run reads the answer later' ($s.Code -eq 0 -and $s.Out -match 'already gone')
 $s = Session @{ Run = '88' } $done.Replace('git-ref.yml', 'build.yml') @((Note 'notice' "GONE $b"))
 Yes '  of a git-ref run only' ($s.Code -eq 1)
+$s = Session @{ Fork = $true; DeleteBranch = $b; Commit = $main } $done.Replace('git-ref.yml', 'thornswood-git-ref.yml') @((Note 'notice' "DELETED $b $main"))
+Yes '-Fork: it starts the fork''s thornswood-git-ref.yml on main with the branch, exit 0' (
+    $s.Code -eq 0 -and $s.Calls[0] -match '^api -X POST repos/EvilPatrick06/skymp/actions/workflows/thornswood-git-ref\.yml/dispatches' -and $s.Body.ref -eq 'main' -and $s.Body.inputs.delete_branch -eq $b)
+$s = Session @{ Fork = $true; Run = 88 } $done @((Note 'notice' "GONE $b"))
+Yes '  and -Fork -Run reads only a run of that workflow' ($s.Code -eq 1)
+$threw = $false
+try { & $setRef -Fork -Tag $t -Commit $main -Message 'x' 6>$null } catch { $threw = $true }
+Yes '  and makes no tags' $threw
 $s = Session @{ Tag = 'v1.2.6.6'; Commit = $main; Message = 'x' } $done @()
 Yes 'a name it would refuse is refused before anything is started' ($s.Code -eq 1 -and $s.Calls.Count -eq 0)
 $s = Session @{ Tag = $t; Commit = $main } $done @()
