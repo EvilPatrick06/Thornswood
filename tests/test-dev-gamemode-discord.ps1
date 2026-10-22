@@ -49,13 +49,15 @@ Yes 'Deploy-DevGamemode.ps1 loads Note-Rules.ps1' ($src -match "Note-Rules\.ps1"
 Yes 'Deploy-DevGamemode.ps1 refuses an empty note before the box is touched' (
     $src -match 'if \(-not \$Note\.Trim\(\)\)' -and
     $src.IndexOf('if (-not $Note.Trim())') -lt $src.IndexOf('New-ThornswoodArtifact'))
-Yes 'Deploy-DevGamemode.ps1 calls Publish-Discord after a successful swap' (
+# Deployed is a swap that answered, or a reload the server loaded (#3196).
+Yes 'Deploy-DevGamemode.ps1 calls Publish-Discord after a successful swap or reload' (
     $src -match 'Publish-Discord\.ps1' -and
     $src -match '-GamemodeDeploy' -and
-    $src.IndexOf('if ($swapped -and -not $PutBack)') -gt $src.IndexOf('Show-SwapResult'))
+    $src.Contains("`$deployed = (`$outcome -eq 'reloaded') -or (`$outcome -eq 'swap' -and `$swapped)") -and
+    $src.IndexOf('if ($deployed -and -not $PutBack)') -gt $src.IndexOf('Show-SwapResult'))
 $postAt = $src.IndexOf('& $discord -Dev -Note $Note -GamemodeDeploy')
-$guardAt = $src.IndexOf('if ($swapped -and -not $PutBack)')
-Yes 'Deploy-DevGamemode.ps1 posts only inside the swapped and not PutBack guard' (
+$guardAt = $src.IndexOf('if ($deployed -and -not $PutBack)')
+Yes 'Deploy-DevGamemode.ps1 posts only inside the deployed and not PutBack guard' (
     $guardAt -ge 0 -and $postAt -gt $guardAt)
 
 $pubPath = Join-Path $Repo 'scripts\ops\Publish-Discord.ps1'

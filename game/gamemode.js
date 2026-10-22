@@ -58866,6 +58866,26 @@ const PLAYER_WORDS = ['/stuck', '/helpme', '/report',
     }
   }
 
+  /*
+    A RELOAD THAT CHANGED WHAT THE GAMES RUN (#3196). A gamemode-only dev
+    deploy loads this file again in the running server instead of restarting
+    it (Patrick's C on 22 Oct 2026), so nobody is put out. The server code
+    takes effect at once, but the scripts a game was sent when it joined
+    (property update scripts, event sources) stay as they were until it logs
+    in again: the engine sends them on a reload only with
+    enableGamemodeDataUpdatesBroadcast, which is off. After every load the
+    engine says whether a reload changed them, and when it did, the people on
+    are asked to log in again. A restart did that for them by dropping them.
+  */
+  g.__thornswoodGamemodeLoaded = function (load) {
+    if (!load || !load.reload || !load.clientScriptsChanged) { return; }
+    var online = [];
+    try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { online = []; }
+    log('reload: what the games run changed, asked', online.length, 'people to log in again');
+    broadcast('The server was just updated while you were on. Log out and back in ' +
+              'to get all of it; until then some of what you see may be the old version.');
+  };
+
   function clearTheServer() {
     var online = [];
     try { online = mp.get(0, 'onlinePlayers') || []; } catch (e) { return; }
