@@ -55,7 +55,7 @@
   { "tool": "scripts/dev/Build-BenchTable.py", "data": "--data", "plugins": "--plugins",
     "reads": ["game/data/recipes.json"], "writes": ["game/gamemode.js"] },
   { "tool": "scripts/mods/Build-LastPlugin.py", "data": "--data", "plugins": null,
-    "reads": ["game/data/npc-population.json"], "writes": ["game/content/Thornswood-Last.esp", "game/data/last-plugin.json"] },
+    "reads": ["game/data/npc-population.json"], "writes": ["game/content/Thornswood-Last.esp", "game/data/last-plugin.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-BuildingHolds.py", "data": "--data", "plugins": null,
     "reads": ["game/data/doors.json", "game/data/data.json", "game/data/last-plugin.json"], "writes": ["game/data/building-holds.json", "game/gamemode.js"] },
   { "tool": "scripts/dev/Build-WoodworkingBenches.py", "data": "--data", "plugins": null,
