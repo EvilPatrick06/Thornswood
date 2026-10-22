@@ -7,7 +7,7 @@
   control that moves it stays reachable and says what it does.
 
   A. The markup: the video is aria-hidden, out of the tab order, without
-     controls or autoplay, muted, with its poster, without the browser's own
+     controls or autoplay, muted, over the still under it, without the browser's own
      picture-in-picture and cast buttons, and without fallback text. The
      button is a real button, in the tab order, not inside anything hidden.
   B. home.js's banner code, run against a stand-in page: the button is shown,
@@ -37,7 +37,13 @@ yes('A1: it is hidden from assistive technology (aria-hidden="true")', /\saria-h
 yes('A2: and out of the tab order (tabindex="-1")', /\stabindex="-1"/.test(tag));
 yes('A3: with no controls of its own', !attr('controls'));
 yes('A4: and no autoplay attribute, so reduced motion is asked first', !attr('autoplay'));
-yes('A5: muted, looping and inline, with the still as its poster', attr('muted') && attr('loop') && attr('playsinline') && /\sposter="\/banner\.jpg"/.test(tag));
+// The still is a picture of its own under the video now, at the width each
+// screen needs (#3218), so the video has no poster and shows nothing until
+// its first frame.
+yes('A5: muted, looping and inline, with no poster over the still under it', attr('muted') && attr('loop') && attr('playsinline') && !attr('poster'));
+const still = /<img\b[^>]*\bclass="art"[^>]*>/.exec(HTML);
+yes('A5b: the still is before the video, so the video paints over it, and is hidden the same way',
+    !!still && !!vm1 && still.index < vm1.index && /\salt=""/.test(still[0]) && /\saria-hidden="true"/.test(still[0]));
 yes('A6: without the browser\'s picture-in-picture and cast buttons', attr('disablepictureinpicture') && attr('disableremoteplayback'));
 yes('A7: and with no fallback text for a reader to find', vm1 && vm1[1].replace(/<source\b[^>]*>/g, '').replace(/<!--[\s\S]*?-->/g, '').trim() === '');
 yes('A8: it has no accessible name, which a hidden decoration should not', !/\saria-label(ledby)?=/.test(tag) && !/\stitle=/.test(tag));

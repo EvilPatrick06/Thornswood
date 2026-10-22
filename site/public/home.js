@@ -2,8 +2,8 @@
 /*
   Autoplay is a video attribute and no media query turns it off, so somebody
   who has asked their system for less motion still gets 24 seconds of drifting
-  aurora behind the title. Paused here instead, which leaves the poster frame
-  showing: the same picture, holding still.
+  aurora behind the title. Paused here instead, which leaves the still under
+  it showing: the same picture, holding still.
 
   Nothing here throws: matchMedia is asked only where it exists (narrow()
   below asks it unguarded), and pause and removeAttribute do not throw on a
@@ -76,7 +76,7 @@ var BLURB = {
   '/news':    ['Every release', 'What changed, newest first. The same list the launcher shows.'],
   '/report':  ['Report a problem', 'Something broken, or an idea, with no account needed. Or somebody behaving badly, signed in.'],
   '/gallery': ['From the world', 'Pictures taken by people playing.'],
-  '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
+  '/privacy': ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
   '/terms':   ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
   '/cookies': ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
@@ -980,6 +980,81 @@ if (AGE_PATHS[here] && !ageOk()) {
   });
 }
 
+/* The line under the title and the figure beside it: whether the world is
+   up and who is in it, from /api/public. */
+function paintStatus(d) {
+  var dot = document.getElementById('dot'), t = document.getElementById('livetext');
+  if (dot && t) {
+    if (d.status && d.status.up) {
+      dot.className = 'dot on';
+      var n = d.status.online || 0;
+      if (n === 0) {
+        /* Patrick's line, 28 Sep (#884). The second half goes to /join,
+           which says how to apply. Built from nodes, not markup. */
+        t.textContent = 'The world is open, ';
+        var apply = document.createElement('a');
+        apply.href = '/join';
+        /* With the one switch on (#428) there is nothing to apply for. */
+        apply.textContent = d.open === true
+          ? 'come into the Discord and play!'
+          : 'apply to be an alpha playtester in the Discord!';
+        t.appendChild(apply);
+      } else {
+        /* N of the most the world holds (#481). The site sends the number
+           even when the server has not said it, from records\most-online.json.
+           It is every seat, the staff seats too (Patrick, 12 Oct: "of 30"),
+           so full can come before N reaches it: the seats past the door's
+           number are kept for the staff roles, and the page says so.
+           And how many wait at the menu when anybody does. */
+        var most = d.status.max > 0 ? d.status.max : 0;
+        var seen = most ? Math.min(n, most) : n;
+        var waiting = d.status.line > 0 ? d.status.line : 0;
+        if (most && (n >= most || d.status.full === true)) {
+          t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
+            (n < most ? ' and the rest of the seats are kept for staff' : '') +
+            (waiting ? ', ' + waiting + ' waiting for a seat' : '');
+        } else if (most) {
+          t.textContent = seen + ' of ' + most + ' people in the world';
+        } else {
+          t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
+        }
+      }
+      var f = document.getElementById('figOnline');
+      var w = document.getElementById('figOnlineWrap');
+      // Only worth a tile of its own once there is somebody in it.
+      if (f && w && n > 0) {
+        f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
+        w.hidden = false;
+      } else if (w) {
+        w.hidden = true;
+      }
+    } else {
+      dot.className = 'dot';
+      t.textContent = 'Server offline';
+      var gone = document.getElementById('figOnlineWrap');
+      if (gone) gone.hidden = true;
+    }
+  }
+}
+
+/* Back to this page from another one shows it as it was left (#3218: the
+   public pages are no longer no-store, so the browser keeps them in its back
+   and forward cache). Everything on it holds still except who is in the
+   world, which is asked again rather than shown from minutes ago. */
+window.addEventListener('pageshow', function (e) {
+  if (!e.persisted) return;
+  request('/api/public?galleryLimit=24', { credentials:'same-origin' })
+    .then(function (r) { return r.json(); })
+    .then(paintStatus)
+    .catch(function () {
+      // As on a first load that could not ask: say nothing rather than a
+      // line from before that may no longer be true.
+      var t = document.getElementById('livetext'), dot = document.getElementById('dot');
+      if (t) t.textContent = '';
+      if (dot) dot.className = 'dot';
+    });
+});
+
 /* The three live things on the front page, all of them honest about being
    empty rather than filled with something invented. */
 request('/api/public?galleryLimit=24', { credentials:'same-origin' })
@@ -999,53 +1074,7 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
       }
     }
 
-    var dot = document.getElementById('dot'), t = document.getElementById('livetext');
-    if (dot && t) {
-      if (d.status && d.status.up) {
-        dot.className = 'dot on';
-        var n = d.status.online || 0;
-        if (n === 0) {
-          /* Patrick's line, 28 Sep (#884). The second half goes to /join,
-             which says how to apply. Built from nodes, not markup. */
-          t.textContent = 'The world is open, ';
-          var apply = document.createElement('a');
-          apply.href = '/join';
-          /* With the one switch on (#428) there is nothing to apply for. */
-          apply.textContent = d.open === true
-            ? 'come into the Discord and play!'
-            : 'apply to be an alpha playtester in the Discord!';
-          t.appendChild(apply);
-        } else {
-          /* N of the most the world holds (#481). The site sends the number
-             even when the server has not said it, from records\most-online.json.
-             It is every seat, the staff seats too (Patrick, 12 Oct: "of 30"),
-             so full can come before N reaches it: the seats past the door's
-             number are kept for the staff roles, and the page says so.
-             And how many wait at the menu when anybody does. */
-          var most = d.status.max > 0 ? d.status.max : 0;
-          var seen = most ? Math.min(n, most) : n;
-          var waiting = d.status.line > 0 ? d.status.line : 0;
-          if (most && (n >= most || d.status.full === true)) {
-            t.textContent = 'The world is full, ' + seen + ' of ' + most + ' people are in it' +
-              (n < most ? ' and the rest of the seats are kept for staff' : '') +
-              (waiting ? ', ' + waiting + ' waiting for a seat' : '');
-          } else if (most) {
-            t.textContent = seen + ' of ' + most + ' people in the world';
-          } else {
-            t.textContent = n === 1 ? '1 person in the world' : n + ' people in the world';
-          }
-        }
-        var f = document.getElementById('figOnline');
-        var w = document.getElementById('figOnlineWrap');
-        // Only worth a tile of its own once there is somebody in it.
-        if (f && w && n > 0) {
-          f.textContent = d.status.max > 0 ? Math.min(n, d.status.max) + ' of ' + d.status.max : String(n);
-          w.hidden = false;
-        }
-      } else {
-        t.textContent = 'Server offline';
-      }
-    }
+    paintStatus(d);
 
     var rel = document.getElementById('releases');
     if (!rel) return;
@@ -1070,14 +1099,26 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
     if (show && band && shots.length) {
       band.hidden = false;
       var i = 0;
-      shots.forEach(function (s, n) {
+      /* Only the picture on show and the one after it are fetched (#3218).
+         Every picture had its address from the start, and loading="lazy" did
+         not hold the rest back: they are stacked in the same box, so all of
+         them are "in view" once the box is, and scrolling down to it fetched
+         every shot in the gallery at once, 5 MB on 21 Oct 2026. Lazy now, as
+         the band is far below the first screen. */
+      var frames = shots.map(function (s, n) {
         var img = document.createElement('img');
-        img.src = s.url;
         img.alt = s.alt || 'Skyrim scene shared by ' + (s.by || 'the Thornswood community');
-        img.loading = n === 0 ? 'eager' : 'lazy';
+        img.loading = 'lazy';
         if (n === 0) img.className = 'on';
         show.appendChild(img);
+        return img;
       });
+      function fetchFrame(n) {
+        var img = frames[n];
+        if (img && !img.getAttribute('src')) img.src = shots[n].url;
+      }
+      fetchFrame(0);
+      fetchFrame(1 % shots.length);
       var cap = document.createElement('div');
       cap.className = 'gal-cap';
       cap.innerHTML = (shots[0].by ? esc(shots[0].by) + ' \u00b7 ' : '') +
@@ -1096,6 +1137,8 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
       }
       function go(n) {
         i = ((n % shots.length) + shots.length) % shots.length;
+        fetchFrame(i);
+        fetchFrame((i + 1) % shots.length);
         var imgs = show.querySelectorAll('img');
         for (var k = 0; k < imgs.length; k++) {
           imgs[k].className = k === i ? 'on' : '';
