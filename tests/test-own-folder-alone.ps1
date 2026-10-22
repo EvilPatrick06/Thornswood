@@ -931,15 +931,21 @@ namespace Thornswood
             string staged = Path.Combine(s.Staging, "ModA\\textures\\ts\\wood.dds");
             string steamLink = Path.Combine(s.Game, "Data\\textures\\ts\\wood.dds");
             // Each deployment a minute after the one before, so Vortex's record
-            // reads as a new one.
+            // reads as a new one. The new version's own write time moves the
+            // same minute: the record times a file by it (VortexTime), and two
+            // versions written back to back here can land in one tick of the
+            // clock Windows stamps files from, so both read as the same file
+            // and the refresh rightly leaves it alone (#2210). A real install
+            // of a new version is never written in the same tick as the last.
             int deployed = 0;
             Action<string> vortexBringsOut = delegate (string bytes)
             {
                 File.Delete(steamLink);
                 File.Delete(staged);
                 Put(staged, bytes);
-                CreateHardLink(steamLink, staged, IntPtr.Zero);
                 deployed++;
+                File.SetLastWriteTimeUtc(staged, DateTime.UtcNow.AddMinutes(deployed));
+                CreateHardLink(steamLink, staged, IntPtr.Zero);
                 Deploy(s, new string[][] { new string[] { "TsOne.esp", "ModA", "VORTEX-TSONE" },
                                            new string[] { "textures\\ts\\wood.dds", "ModA", bytes } }, DateTime.UtcNow.AddMinutes(deployed));
             };
