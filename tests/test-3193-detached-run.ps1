@@ -1,0 +1,141 @@
+<#
+  test-3193-detached-run.ps1
+
+      pwsh -NoProfile -File .\tests\test-3193-detached-run.ps1
+      powershell -NoProfile -File .\tests\test-3193-detached-run.ps1
+
+  Issue #3193. Setup-Domain.ps1 stops Caddy in the script it sends to the
+  box, and from One ssh to the box goes through the bridge, which goes
+  through Caddy. On 21 Oct 2026 (#2995's step A2) the session was cut
+  halfway, everything the script said after that was lost, and the run
+  ended as ssh's exit 255 though the box had finished. Now the script runs
+  on the box on its own, started through WMI so the session ending cannot
+  reach it, and writes a report that a fresh session reads once Caddy, and
+  the bridge with it, is back: Get-ThornswoodDetachedRun (Send-Script.ps1).
+
+  This checks:
+    1. The texts it builds, anywhere: the start writes the script and starts
+       it through Win32_Process Create and only then says STARTED; the read
+       says REPORT NONE before there is a report; the two files are named
+       for the run in the folder given; a folder that would break the
+       quoting is refused.
+    2. On Windows, both texts run for real in Windows PowerShell 5.1, which
+       is what the box runs, with a scratch folder standing for
+       C:\Windows\Temp:
+         - the run's parent is the WMI service's process, not the
+           PowerShell that started it, and it is still going after that one
+           has ended;
+         - what the script says, its errors too, is in the report in order,
+           and the last line is END and the script's exit code;
+         - an error that stops the script is an ERROR line and END 1;
+         - a script that ends without exit is END 0 even when a program it
+           ran last exited 5;
+         - the script's file is gone once the run is over, and the read that
+           sees END deletes the report.
+  Setup-Domain.ps1's use of it is in tests\test-setup-domain-taskonly.ps1.
+  Starts only the Windows PowerShell processes it waits for, in the scratch
+  folder it removes; nothing leaves this machine.
+#>
+[CmdletBinding()]
+param()
+
+$ErrorActionPreference = 'Stop'
+$Repo = Split-Path -Parent $PSScriptRoot
+. (Join-Path $PSScriptRoot 'Windows.ps1')
+. ([IO.Path]::Combine($Repo, 'scripts', 'vps', 'Send-Script.ps1'))
+
+$script:pass = 0
+$script:fail = 0
+function Yes([string]$what, [bool]$cond) {
+    if ($cond) { $script:pass++; Write-Host "PASS  $what" }
+    else { $script:fail++; Write-Host "FAIL  $what" }
+}
+function Done {
+    Write-Host ''
+    Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
+    if ($script:fail) { exit 1 }
+    exit 0
+}
+
+# ---- 1. the texts -----------------------------------------------------------
+$r = Get-ThornswoodDetachedRun -Script "'hello'"
+Yes 'the run''s files are named for it in C:\Windows\Temp by default' (
+    $r.File -match '^C:\\Windows\\Temp\\thornswood-run-[0-9a-f]{32}\.ps1$' -and $r.Log -eq ($r.File -replace '\.ps1$', '.log'))
+$cim = $r.Start.IndexOf('Invoke-CimMethod -ClassName Win32_Process -MethodName Create')
+Yes 'the start writes the script, then starts it through WMI, then says STARTED' (
+    $r.Start.IndexOf('WriteAllText') -ge 0 -and $r.Start.IndexOf('WriteAllText') -lt $cim -and $cim -lt $r.Start.IndexOf("'STARTED '"))
+Yes 'the read says REPORT NONE before there is a report' ($r.Read.Contains("'REPORT NONE'"))
+$threw = $false
+try { [void](Get-ThornswoodDetachedRun -Script 'x' -Folder "C:\it's") } catch { $threw = $true }
+Yes 'a folder with a quote in it is refused' $threw
+
+if (-not $OnWindows) {
+    Write-Host 'SKIP  the runs: they need Windows PowerShell 5.1 and WMI, which only Windows has'
+    Done
+}
+
+# ---- 2. the runs, on Windows --------------------------------------------------
+$ps51 = Get-WindowsPowerShell
+$scratch = Join-Path ([IO.Path]::GetTempPath()) ('thornswood-3193-' + [Guid]::NewGuid().ToString('N').Substring(0, 8))
+New-Item -ItemType Directory -Path $scratch | Out-Null
+
+function Invoke-51([string]$text) {
+    $e = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($text))
+    $out = @(& $ps51 -NoProfile -ExecutionPolicy Bypass -EncodedCommand $e 2>&1 | ForEach-Object { "$_" })
+    return [pscustomobject]@{ Out = $out; Code = $LASTEXITCODE }
+}
+# Starts a run and reads its report until END, a minute at most.
+function Invoke-Run([string]$script) {
+    $run = Get-ThornswoodDetachedRun -Script $script -Folder $scratch
+    $s = Invoke-51 $run.Start
+    $runPid = 0
+    $m = @($s.Out | Where-Object { $_ -match '^STARTED (\d+)$' })
+    if ($m.Count) { $runPid = [int]($m[0] -replace '^STARTED ', '') }
+    $parent = ''
+    if ($runPid) {
+        $p = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $runPid) -ErrorAction SilentlyContinue
+        if ($p) { $q = Get-CimInstance Win32_Process -Filter ("ProcessId=" + $p.ParentProcessId) -ErrorAction SilentlyContinue; if ($q) { $parent = $q.Name } }
+    }
+    $lines = @(); $first = $null
+    $until = (Get-Date).AddMinutes(1)
+    while ((Get-Date) -lt $until) {
+        $rd = Invoke-51 $run.Read
+        if ($null -eq $first) { $first = ($rd.Out -join '|') }
+        if ($rd.Out.Count -and $rd.Out[0] -match '^REPORT \d+$') {
+            $lines = @($rd.Out | Select-Object -Skip 1)
+            if ($lines.Count -and $lines[-1] -match '^END ') { break }
+        }
+        Start-Sleep -Milliseconds 500
+    }
+    $lines | ForEach-Object { Write-Host ('      ' + $_) }
+    return [pscustomobject]@{ Start = $s; Pid = $runPid; Parent = $parent; Lines = $lines; First = $first; Run = $run }
+}
+
+try {
+    Write-Host ''
+    Write-Host 'A run that says things, errs, waits and exits 3:'
+    $a = Invoke-Run "'first line'`r`nWrite-Error 'an error line'`r`nStart-Sleep -Seconds 3`r`n'last line'`r`nexit 3"
+    Yes '  the start says STARTED and exits 0' ($a.Pid -gt 0 -and $a.Start.Code -eq 0)
+    Yes ('  the run''s parent is the WMI service''s process (' + $a.Parent + '), not the PowerShell that started it') ($a.Parent -eq 'WmiPrvSE.exe')
+    Yes ('  it is still going once that PowerShell has ended: the first read finds no END yet (' + $a.First + ')') (
+        $null -ne $a.First -and $a.First -match '^REPORT' -and $a.First -notmatch 'END ')
+    $want = @('first line', 'an error line', 'last line', 'END 3')
+    Yes '  the report holds what it said, its error too, in order, then END 3' (($a.Lines -join '|') -eq ($want -join '|'))
+    Yes '  the script''s file is gone' (-not (Test-Path -LiteralPath $a.Run.File))
+    Yes '  and the read that saw END deleted the report' (-not (Test-Path -LiteralPath $a.Run.Log))
+
+    Write-Host ''
+    Write-Host 'A run stopped by an error:'
+    $b = Invoke-Run "'before'`r`nthrow 'stops here'`r`n'never'"
+    Yes '  an ERROR line with what stopped it, then END 1' (
+        ($b.Lines -join '|') -eq 'before|ERROR stops here|END 1')
+
+    Write-Host ''
+    Write-Host 'A run that ends without exit, after a program that exited 5:'
+    $c = Invoke-Run "cmd.exe /c exit 5`r`n'went on'"
+    Yes '  END 0, the script''s own end, not the program''s 5' (($c.Lines -join '|') -eq 'went on|END 0')
+}
+finally {
+    Remove-Item -LiteralPath $scratch -Recurse -Force -ErrorAction SilentlyContinue
+}
+Done

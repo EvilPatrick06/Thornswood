@@ -237,7 +237,15 @@ Start-ScheduledTask -TaskName 'Thornswood Docs' -EA SilentlyContinue
 
 Write-Host ''
 Write-Host 'Starting Caddy...'
-Remote @"
+# What the box runs to move Caddy onto its task and restart it. It is not
+# run inside an ssh session (#3193): from One, ssh to the box goes through
+# the bridge, the bridge goes through Caddy, and this stops Caddy, so the
+# session it ran in was cut halfway, everything it said after that was lost
+# and the run ended as ssh's exit 255 whether or not the box finished
+# (measured 21 Oct 2026, #2995's step A2). It runs on the box on its own
+# instead, writing what it says to a report there, and the report is read
+# over a fresh session once Caddy, and with it the bridge, is back.
+$restart = @"
 `$ErrorActionPreference = 'Continue'
 `$dir = '$caddyWin'
 `$exe = Join-Path `$dir 'caddy.exe'
@@ -369,8 +377,45 @@ Start-ScheduledTask -TaskName 'Thornswood Web'
 # The first start asks Let's Encrypt for a certificate, which takes a moment.
 Start-Sleep -Seconds 12
 `$p = Get-Process caddy -EA SilentlyContinue
-if (`$p) { 'caddy up, pid ' + `$p.Id } else { 'CADDY DID NOT START' }
-"@ | ForEach-Object { "  $_" }
+if (`$p) { 'caddy up, pid ' + `$p.Id } else { 'CADDY DID NOT START'; exit 1 }
+"@
+
+# Get-ThornswoodDetachedRun (Send-Script.ps1) writes it on the box and
+# starts it there through WMI. The start says STARTED, and nothing has been
+# stopped by then.
+$run = Get-ThornswoodDetachedRun -Script $restart
+$started = @(Remote $run.Start)
+$startedRc = $LASTEXITCODE
+$started | Where-Object { $_ -is [string] -and $_ -notmatch '^STARTED \d+$' } | ForEach-Object { "  $_" }
+if ($startedRc -ne 0 -or -not @($started | Where-Object { $_ -is [string] -and $_ -match '^STARTED \d+$' }).Count) {
+  $started | Where-Object { $_ -isnot [string] } | ForEach-Object { "  $_" }
+  throw "The box did not start the Caddy run (exit $startedRc). The lines above say why; nothing on the box was stopped."
+}
+
+# The report, read until it ends. While Caddy is down a session from One
+# cannot connect at all, which is waited out the same as a report not yet
+# finished. Each line is shown once, as it arrives.
+$shown = 0
+$endRc = $null
+$until = (Get-Date).AddMinutes(4)
+while ($null -eq $endRc -and (Get-Date) -lt $until) {
+  Start-Sleep -Seconds 5
+  $was = $ErrorActionPreference
+  $ErrorActionPreference = 'Continue'
+  $read = @(Remote $run.Read | Where-Object { $_ -is [string] })
+  $readRc = $LASTEXITCODE
+  $ErrorActionPreference = $was
+  if ($readRc -ne 0 -or -not $read.Count -or $read[0] -notmatch '^REPORT \d+$') { continue }
+  $lines = @($read | Select-Object -Skip 1)
+  for ($i = $shown; $i -lt $lines.Count; $i++) {
+    if ($lines[$i] -match '^END (-?\d+)$') { $endRc = [int]$Matches[1] } else { "  " + $lines[$i] }
+  }
+  $shown = $lines.Count
+}
+if ($null -eq $endRc) {
+  throw ("The Caddy run on the box has not finished after four minutes, or the box cannot be reached since it stopped Caddy. From One the way in is the bridge, which needs Caddy up; the task starts it again within five minutes. Run this again with -TaskOnly once the box answers, or read " + $run.Log + " on the box (BisectHosting's console when nothing else answers).")
+}
+if ($endRc -ne 0) { throw "The Caddy run on the box ended with exit $endRc. The lines above say why." }
 
 Write-Host ''
 Write-Host "  https://$Domain" -ForegroundColor Green
