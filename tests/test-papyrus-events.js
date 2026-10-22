@@ -618,6 +618,54 @@ yes('a record it cannot read stops it with a message', run3.status === 1 && /STO
 const stop = py([AUDIT, '--data', path.join(ROOT, 'nowhere'), '--plugins', PLUGINS]);
 yes('a Data folder that is not there stops with a message', stop.status === 1 && /STOP/.test(stop.stdout));
 
+// The same plugins with no script beside them, the way the box held only the
+// masters before the archives were sent (#3105): every script would read as
+// absent and so as harmless, so the audit stops instead of saying so.
+const BARE = path.join(ROOT, 'bare');
+fs.mkdirSync(BARE);
+for (const f of fs.readdirSync(DATA)) {
+  if (/\.es[mpl]$/i.test(f)) fs.copyFileSync(path.join(DATA, f), path.join(BARE, f));
+}
+const bare = py([AUDIT, '--data', BARE, '--plugins', PLUGINS]);
+yes('a Data folder with no script at all stops and says so, not that nothing can run',
+    bare.status === 1 && /STOP\. no script in /.test(bare.stdout));
+
+// Build-CrimeTable.py reads its scripts the same way, so the crime table is
+// not written from a folder without them either (#3105: it read 0 and passed).
+// It wants the five masters there, so empty ones go beside the plugins.
+for (const m of ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) {
+  fs.writeFileSync(path.join(BARE, m), plugin([], [], true));
+}
+const crime = py([path.join(REPO, 'scripts', 'dev', 'Build-CrimeTable.py'), '--check', '--data', BARE, '--plugins', PLUGINS]);
+yes('the crime table stops on a Data folder with no script, and writes nothing',
+    crime.status === 1 && /STOP\. no script in /.test(crime.stdout));
+if (crime.status !== 1) console.log(String(crime.stdout) + String(crime.stderr));
+
+// And a folder that carries some scripts and lacks one the load order
+// attaches: TestA's TS_NotThere. With nothing recorded as missing on a game
+// PC, it stops and names it; recorded, the reading goes on.
+const FULL = path.join(ROOT, 'full');
+fs.cpSync(DATA, FULL, { recursive: true });
+for (const m of ['Skyrim.esm', 'Update.esm', 'Dawnguard.esm', 'HearthFires.esm', 'Dragonborn.esm']) {
+  fs.copyFileSync(path.join(BARE, m), path.join(FULL, m));
+}
+const none = path.join(ROOT, 'missing-none.json');
+fs.writeFileSync(none, JSON.stringify({ missing: {} }));
+const lacking = py([path.join(REPO, 'scripts', 'dev', 'Build-CrimeTable.py'), '--check', '--data', FULL,
+  '--plugins', PLUGINS, '--known-missing', none]);
+yes('the crime table stops on a script the load order attaches and the folder lacks, and names it',
+    lacking.status === 1 && /STOP\. 1 script\(s\) the load order attaches/.test(lacking.stdout) && /TestA\.esp TS_NotThere/.test(lacking.stdout));
+if (lacking.status !== 1) console.log(String(lacking.stdout) + String(lacking.stderr));
+const listed = path.join(ROOT, 'missing-listed.json');
+fs.writeFileSync(listed, JSON.stringify({ missing: { 'TestA.esp': ['TS_NotThere'], 'Gone.esp': ['TS_Found'] } }));
+const goesOn = py([path.join(REPO, 'scripts', 'dev', 'Build-CrimeTable.py'), '--check', '--data', FULL,
+  '--plugins', PLUGINS, '--known-missing', listed]);
+yes('one the record lists as missing on a game PC too does not stop it',
+    goesOn.status === 0 && !/STOP/.test(goesOn.stdout));
+if (goesOn.status !== 0) console.log(String(goesOn.stdout) + String(goesOn.stderr));
+yes('and a recorded one that is no longer missing is named for taking out of the record',
+    /1 script\(s\) missing-listed\.json lists as missing are here now/.test(goesOn.stdout));
+
 // ---------------------------------------------------------------------------
 // bsa.lz4_frame on frames built by hand.
 
