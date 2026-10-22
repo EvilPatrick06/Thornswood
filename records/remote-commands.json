@@ -12,8 +12,8 @@
                     "admin":  "needs Administrator: install, service, task registration, ACL, firewall, keys, secrets, or work outside the gate verbs",
                     "transport":  "a helper that carries what its caller hands it; the caller is the row that counts"
                 },
-    "scriptCount":  65,
-    "callCount":  264,
+    "scriptCount":  66,
+    "callCount":  268,
     "calls":  [
                   {
                       "script":  "scripts/deploy/Artifact.ps1",
@@ -2163,6 +2163,42 @@
                       "via":  "ssh",
                       "anchor":  "\u0026 ssh -o StrictHostKeyChecking=yes -G $Address",
                       "does":  "prints what ssh makes of this machine\u0027s config; connects to nothing",
+                      "class":  "read-status",
+                      "reason":  "reads files, settings, logs or status only"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "Remote",
+                      "via":  "Invoke-ThornswoodRemote",
+                      "anchor":  "return Invoke-ThornswoodRemote -Target \"$User@$Vps\" -SshArgs $ssh -Script $script",
+                      "does":  "sends a script or file for its caller",
+                      "class":  "transport",
+                      "reason":  "carries what its caller hands it; each caller is mapped"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$null = \u0026 schtasks /delete /tn \u0027$Task\u0027 /f 2\u003e\u00261",
+                      "does":  "install-time or outside-the-gate work",
+                      "class":  "admin",
+                      "reason":  "sends schtasks /delete"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "$(Get-ThornswoodLockedFolderScript $Root)",
+                      "does":  "install-time or outside-the-gate work",
+                      "class":  "admin",
+                      "reason":  "sends LockedFolderScript and schtasks /create"
+                  },
+                  {
+                      "script":  "scripts/vps/Keep-RunnerLogs.ps1",
+                      "scope":  "\u003ctop\u003e",
+                      "via":  "Remote",
+                      "anchor":  "`$t = Get-ScheduledTask -TaskName \u0027$Task\u0027 -EA SilentlyContinue",
+                      "does":  "reads files, settings, logs or status",
                       "class":  "read-status",
                       "reason":  "reads files, settings, logs or status only"
                   },

@@ -29,9 +29,17 @@ param(
   [string]$VpsUser  = '',
   [string]$Root     = 'C:\Thornswood-Backup',
   [string]$TaskName = 'Thornswood Backup',
-  # Quarter past three in the morning, well clear of when anybody is playing.
-  # (It used to say "after the nightly restart"; no script here registers one.)
-  [string]$At       = '03:15',
+  # In UTC, as the cron of .github\workflows\nightly.yml is, so the two keep
+  # the same distance all year: Task Scheduler keeps a trigger written with
+  # Z on UTC, and the box's clock moves an hour with daylight saving (#3187).
+  # Until 21 Oct 2026 it was 03:15 box time (09:15 UTC), a quarter of an hour
+  # into the nightly harness shares at 09:00 UTC, in the box's busiest hour
+  # (99% busy on 21 Oct): the backup took 9.8 minutes beside them and 4.5 on
+  # a quiet night. 08:15 UTC is 2:15 AM box time in summer and 1:15 AM in
+  # winter, 45 minutes before the shares start and with nobody on (none in
+  # 10 days of the load record between midnight and 7 AM).
+  # tests\test-3187-backup-clear-of-nightly.ps1 holds the two apart.
+  [string]$At       = '08:15Z',
   # Where the copy of the passphrase lands on this machine. Outside the repo
   # on purpose: it must never be committed.
   [string]$KeyOut   = "$env:USERPROFILE\Documents\thornswood-backup-key.txt",
