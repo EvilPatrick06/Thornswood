@@ -35,7 +35,6 @@ block never runs. Read only. Never connects to anything.
 import _pyguard  # noqa: F401  (first: Python 3.11 or newer, #2276)
 import importlib.util
 import os
-import re
 import sys
 import types
 
@@ -63,8 +62,6 @@ spec = importlib.util.spec_from_file_location(
     'build_discord_gm', os.path.join(HERE, 'Build-Discord.py'))
 B = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(B)
-
-SRC = open(os.path.join(HERE, 'Build-Discord.py'), encoding='utf-8').read()
 
 
 class Role(object):
