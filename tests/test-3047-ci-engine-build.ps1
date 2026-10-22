@@ -19,8 +19,8 @@
   a stand-in GitHub, nothing sent anywhere:
     1. Find-EngineArtifact (EngineArtifact.ps1): no artifact, one past its
        days, one from another workflow, one from a red run are each "none",
-       saying how to make it again; the newest green engine.yml one is
-       taken; a GitHub that cannot be read throws rather than saying none.
+       saying how to make it again; every green engine.yml one is a
+       candidate, newest first, and a red one is not; a GitHub that cannot be read throws rather than saying none.
     2. Install-EngineArtifact: the right artifact goes in as an engine build
        (build\dist\client and build\dist\server, the artifact beside them,
        engine-artifact.json naming the run), CR LF records and all. Refused,
@@ -39,7 +39,10 @@
     4. Get-EngineArtifact.ps1 whole, with a stand-in gh: -Check says it is on
        GitHub (exit 2) and writes nothing; a run fetches it (exit 0) and
        removes its scratch; a second run finds it there (exit 0); no artifact
-       and a gh that fails each stop (exit 1) saying why.
+       and a gh that fails each stop (exit 1) saying why. Two kept for the
+       pin, the newer recorded later (#3243): the older, the checkout's, is
+       taken after the newer is held and passed over with why; neither the
+       checkout's stops (exit 1) naming both runs.
     5. Sync-Client.ps1 on a machine that takes CI's build, with a stand-in
        Get-EngineArtifact.ps1: without -Check it fetches the missing folder and
        copies the client in; -Check fetches nothing and names the script; a
@@ -106,10 +109,10 @@ try {
         'launch_server.bat'              = 'node dist_back/skymp5-server.js'
         'data/scripts/ActiveMagicEffect.pex' = 'compiled papyrus'
     }
-    function ClientRecordText([string]$c) {
+    function ClientRecordText([string]$c, [string]$at = '2026-10-21T11:00:08Z') {
         $files = [ordered]@{}
         foreach ($k in $client.Keys) { $files[$k] = [ordered]@{ sha256 = (ShaText $client[$k]); bytes = $client[$k].Length } }
-        return (([ordered]@{ recordedUtc = '2026-10-21T11:00:08Z'; fork = 'https://github.com/EvilPatrick06/skymp'; forkBranch = 'thornswood/engine-changes'; forkCommit = $c.Substring(0, 8); files = $files }) | ConvertTo-Json -Depth 5).Replace("`r`n", "`n")
+        return (([ordered]@{ recordedUtc = $at; fork = 'https://github.com/EvilPatrick06/skymp'; forkBranch = 'thornswood/engine-changes'; forkCommit = $c.Substring(0, 8); files = $files }) | ConvertTo-Json -Depth 5).Replace("`r`n", "`n")
     }
     function ServerRecordText([string]$c) {
         $files = [ordered]@{}
@@ -136,10 +139,12 @@ try {
         }
         [IO.File]::WriteAllLines((Join-Path $dir 'SHA256SUMS'), [string[]]@($lines))
     }
-    function New-Artifact([string]$dir, [string]$recCommit = $commit, [switch]$Crlf) {
+    # -RecordedUtc: the client record another engine.yml run of the same build
+    # writes, which differs only in when it was written (#3243).
+    function New-Artifact([string]$dir, [string]$recCommit = $commit, [switch]$Crlf, [string]$RecordedUtc = '2026-10-21T11:00:08Z') {
         if (Test-Path -LiteralPath $dir) { Remove-Item -LiteralPath $dir -Recurse -Force }
         foreach ($k in $client.Keys) { Put (Join-Path $dir ('client\' + $k)) $client[$k] }
-        $cr = ClientRecordText $recCommit; $sr = ServerRecordText $recCommit
+        $cr = ClientRecordText $recCommit $RecordedUtc; $sr = ServerRecordText $recCommit
         if ($Crlf) { $cr = $cr.Replace("`n", "`r`n"); $sr = $sr.Replace("`n", "`r`n") }
         Put (Join-Path $dir 'records\client-build.json') $cr
         Put (Join-Path $dir 'records\server-build.json') $sr
@@ -180,7 +185,11 @@ try {
     $newRun = $run.PSObject.Copy(); $newRun.id = 39600000000
     $newArt = $art.PSObject.Copy(); $newArt.id = 12350000000; $newArt.workflow_run = [pscustomobject]@{ id = 39600000000 }
     $f = Find-EngineArtifact $commit (Stand-In @($art, $newArt) @($run, $newRun)).Get
-    Yes '1. two green ones: the newest is taken' ($f.State -eq 'found' -and [long]$f.Artifact.id -eq 12350000000 -and [long]$f.Run.id -eq 39600000000)
+    Yes '1. two green ones: both are candidates, newest first' ($f.State -eq 'found' -and @($f.Candidates).Count -eq 2 -and [long]$f.Candidates[0].Artifact.id -eq 12350000000 -and [long]$f.Candidates[0].Run.id -eq 39600000000 -and [long]$f.Candidates[1].Run.id -eq 39588485569)
+    Yes '1.   Run and Artifact are the newest, and the Why names both runs' ([long]$f.Artifact.id -eq 12350000000 -and [long]$f.Run.id -eq 39600000000 -and $f.Why -match '39600000000' -and $f.Why -match '39588485569' -and $f.Why -match "records are this checkout's")
+    $redNew = $newRun.PSObject.Copy(); $redNew.conclusion = 'failure'
+    $f = Find-EngineArtifact $commit (Stand-In @($art, $newArt) @($run, $redNew)).Get
+    Yes '1. a red newer run is no candidate' ($f.State -eq 'found' -and @($f.Candidates).Count -eq 1 -and [long]$f.Run.id -eq 39588485569)
     $f = Find-EngineArtifact $commit (Stand-In @($art) @($run)).Get
     Yes '1. the green engine.yml one is found, naming its run' ($f.State -eq 'found' -and $f.Why -match '39588485569')
     $e = Threw { Find-EngineArtifact $commit { param($p) throw 'HTTP 401: Bad credentials' } }
@@ -274,10 +283,17 @@ if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/Thornswood/actio
   if ($env:TS_GH_NONE) { '{"artifacts":[]}' } else { [IO.File]::ReadAllText((Join-Path $state 'artifacts.json')) }
   exit 0
 }
-if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/Thornswood/actions/runs/*') { [IO.File]::ReadAllText((Join-Path $state 'run.json')); exit 0 }
+if ($args[0] -eq 'api' -and $args[1] -like 'repos/EvilPatrick06/Thornswood/actions/runs/*') {
+  $one = Join-Path $state ('run-' + ($args[1] -replace '^.*/', '') + '.json')
+  if (Test-Path -LiteralPath $one) { [IO.File]::ReadAllText($one) } else { [IO.File]::ReadAllText((Join-Path $state 'run.json')) }
+  exit 0
+}
 if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
   $dir = $args[[Array]::IndexOf($args, '--dir') + 1]
-  Copy-Item -LiteralPath $env:TS_GH_ARTIFACT -Destination $dir -Recurse
+  $from = $env:TS_GH_ARTIFACT
+  $one = Join-Path $state ('artifact-' + $args[2] + '.txt')
+  if (Test-Path -LiteralPath $one) { $from = [IO.File]::ReadAllText($one).Trim() }
+  Copy-Item -LiteralPath $from -Destination $dir -Recurse
   exit 0
 }
 [Console]::Error.WriteLine('stand-in gh was asked ' + ($args -join ' ')); exit 1
@@ -308,6 +324,30 @@ if ($args[0] -eq 'run' -and $args[1] -eq 'download') {
     $r = Fetch @()
     Yes ("4. a gh that fails: exit 1, naming what it said (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'could not be asked' -and $r.Out -match 'Bad credentials')
     $env:TS_GH_FAIL = ''
+
+    # Two green runs of the pin, as on 22 Oct: the newer one (the #3014 proof
+    # run) recorded the same build a few minutes later, so its client record
+    # is not this checkout's, and the older one's is.
+    $later = New-Artifact (Join-Path $T 'art-later') -RecordedUtc '2026-10-21T11:07:23Z'
+    [IO.File]::WriteAllText((Join-Path $ghState 'artifacts.json'), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($art, $newArt) }) -Depth 5), $utf8)
+    [IO.File]::WriteAllText((Join-Path $ghState 'run-39600000000.json'), (ConvertTo-Json -InputObject $newRun -Depth 5), $utf8)
+    [IO.File]::WriteAllText((Join-Path $ghState 'artifact-39600000000.txt'), $later, $utf8)
+    [IO.File]::WriteAllText((Join-Path $ghState 'calls.txt'), '', $utf8)
+    $r = Fetch @('-Check')
+    Yes ("4. two kept: -Check says it is on GitHub, exit 2 (exit {0})" -f $r.Code) ($r.Code -eq 2 -and $r.Out -match 'keeps 2 engine-1a7b6eecdb38' -and -not ([IO.File]::ReadAllText((Join-Path $ghState 'calls.txt')) -match 'run download'))
+    $r = Fetch @()
+    $calls = @([IO.File]::ReadAllLines((Join-Path $ghState 'calls.txt')) | Where-Object { $_ -match '^run download' })
+    Yes ("4. two kept, the newer of another record: the older is taken (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Out -match 'every file held to the records' -and ([IO.File]::ReadAllText((Join-Path $into 'engine-artifact.json')) | ConvertFrom-Json).runId -eq 39588485569)
+    Yes '4.   it held the newer first and said why it passed it over' ($calls.Count -eq 2 -and $calls[0] -match '^run download 39600000000 ' -and $calls[1] -match '^run download 39588485569 ' -and $r.Out -match "run 39600000000's engine-1a7b6eecdb38 is not CI's build of what this checkout records \(the artifact's records\\client-build\.json is not this checkout's")
+    Yes '4.   and left no scratch behind' (@(Get-ChildItem -LiteralPath $env:THORNSWOOD_SCRATCH_ROOT -Force -ErrorAction SilentlyContinue).Count -eq 0)
+    Remove-Item -LiteralPath $into -Recurse -Force
+    $alsoLater = New-Artifact (Join-Path $T 'art-also-later') -RecordedUtc '2026-10-21T11:03:00Z'
+    [IO.File]::WriteAllText((Join-Path $ghState 'artifact-39588485569.txt'), $alsoLater, $utf8)
+    $r = Fetch @()
+    Yes ("4. two kept and neither this checkout's: exit 1 naming both runs (exit {0})" -f $r.Code) ($r.Code -eq 1 -and $r.Out -match 'STOP\. no engine-1a7b6eecdb38 engine\.yml keeps is CI''s build' -and $r.Out -match 'run 39600000000: ' -and $r.Out -match 'run 39588485569: ' -and -not (Test-Path -LiteralPath $into))
+    Yes '4.   and left no scratch behind' (@(Get-ChildItem -LiteralPath $env:THORNSWOOD_SCRATCH_ROOT -Force -ErrorAction SilentlyContinue).Count -eq 0)
+    foreach ($x in 'run-39600000000.json', 'artifact-39600000000.txt', 'artifact-39588485569.txt') { Remove-Item -LiteralPath (Join-Path $ghState $x) -Force }
+    [IO.File]::WriteAllText((Join-Path $ghState 'artifacts.json'), (ConvertTo-Json -InputObject ([ordered]@{ artifacts = @($art) }) -Depth 5), $utf8)
 
     # ================================================= 5. Sync-Client.ps1 ==
     Write-Host ''; Write-Host '5. Sync-Client.ps1'

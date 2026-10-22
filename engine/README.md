@@ -456,8 +456,12 @@ never a stale one, and each checkout reads the build of its own pin.
 
 `.\scripts\release\Get-EngineArtifact.ps1` fills it. It asks GitHub (through
 `gh`) for `engine-<fork commit 12>` from a green `engine.yml` run, downloads
-it, and puts it in place only after holding it to the checkout's records
-(`scripts\release\EngineArtifact.ps1` says what is held): every file to
+it, and puts it in place only after holding it to the checkout's records. Every
+green run of the commit keeps its own, and only the run that made the
+checkout's records holds the same record text, so when there are several it
+holds each in turn, newest first, and takes the first that passes (#3243 is
+why two runs of one build differ). What is held
+(`scripts\release\EngineArtifact.ps1` says it): every file to
 `SHA256SUMS`, the artifact's two records to the checkout's, the six client
 files to `records\client-build.json`, and the server zip to
 `records\server-build.json` with the same check the box makes. The client goes
@@ -474,8 +478,10 @@ Ship will have. No engine build on any machine is part of a release.
 
 `engine.yml` keeps its artifact 30 days. Past that, `gh workflow run
 engine.yml --ref main` makes it again: it takes the fork's own build of the
-commit, which the fork keeps 90 days, so the files are the same bytes and
-still match the records. `tests\test-3047-ci-engine-build.ps1` holds all of it.
+commit, which the fork keeps 90 days, so the files are the same bytes. Its
+`records\client-build.json` is not the same text, though, because it records
+when it was written (`recordedUtc`), so until #3243 is fixed that artifact does
+not pass the records check. `tests\test-3047-ci-engine-build.ps1` holds all of it.
 
 On the VPS the fallback needs yarn, for the fork build's server packages:
 `.\scripts\vps\Remote.ps1 -File .\scripts\vps\Bootstrap-VPS.ps1 -Arguments '-IncludeEngineTools -SkipFirewall'`
