@@ -296,9 +296,13 @@ A change to the engine goes like this:
 3. `New-ClientBuildRecord.ps1 -Dist <fork>\build\dist\client -Clone <fork>`; the
    server record came out of step 2. Then `Build-Front.ps1 -Fork <fork> -Commit
    <commit> -Record`, which builds the front from the same commit and writes
-   `records\front-build.json` (#2754).
+   `records\front-build.json` (#2754). Then the client's libraries and their
+   licence texts (#3099): `<fork>\misc\thornswood\Write-ClientLicences.ps1
+   -Build <fork>\build`, which needs llvm-pdbutil (LLVM's), and
+   `New-ClientLicenceRecord.ps1 -Licences <fork>\build\licences -Clone <fork>`.
 4. One pull request here with the new pin (`git -C engine/skymp checkout
-   <commit>`, then `git add engine/skymp`), the three records, and the commit named
+   <commit>`, then `git add engine/skymp`), the four records and the
+   `records\client-licences` texts, and the commit named
    in `THIRD-PARTY.md` (its fork section, "On our servers" with the server's
    SHA256, and the link in "Where the source is") and in
    `site\data\site\credits.md`. `tests\test-third-party.js` is red when any of
@@ -402,7 +406,10 @@ gh workflow run engine.yml --ref main -f commit=<the fork commit>
 With no commit it builds the one the branch pins. It runs only when started
 by hand: a pull request's code reaches the box through the build check alone
 (#1306). One artifact of the run, `engine-<fork commit, 12>`,
-holds `records\server-build.json` and `records\client-build.json`, the server
+holds `records\server-build.json` and `records\client-build.json`, with
+`records\client-licences.json` and `records\client-licences\` beside them (the
+vcpkg libraries in the client files and each one's licence text, which the
+fork's build measures from each file's program database, #3099), the server
 build as the store on the box keeps it (`server\server-<fork commit
 12>-<zip hash 16>.zip` and its `.json`, `scripts\deploy\ServerArtifact.ps1`),
 the six client files under `client\` at the paths the record names,
@@ -414,10 +421,12 @@ made instead of a machine's own build, from the repository folder on a branch:
 
 ```powershell
 gh run download <the run's id> -n engine-<fork commit 12> -D out\engine-<fork commit 12>
-Copy-Item out\engine-<fork commit 12>\records\server-build.json, out\engine-<fork commit 12>\records\client-build.json records\
+Copy-Item out\engine-<fork commit 12>\records\server-build.json, out\engine-<fork commit 12>\records\client-build.json, out\engine-<fork commit 12>\records\client-licences.json records\
+if (Test-Path records\client-licences) { Remove-Item records\client-licences -Recurse -Force }
+Copy-Item out\engine-<fork commit 12>\records\client-licences records\client-licences -Recurse
 git -C engine/skymp fetch origin
 git -C engine/skymp checkout <the fork commit>
-git add engine/skymp records\server-build.json records\client-build.json
+git add -A engine/skymp records\server-build.json records\client-build.json records\client-licences.json records\client-licences
 ```
 
 then the commit in `THIRD-PARTY.md` and `site\data\site\credits.md`, as step 4

@@ -12,7 +12,11 @@
 # server-<fork commit 12>-<zip hash 16>.zip). One artifact of this run,
 # engine-<fork commit 12>, holds:
 #   records\server-build.json and records\client-build.json, for the pin
-#     pull request (engine\README.md, One engine, step 4);
+#     pull request (engine\README.md, One engine, step 4), and with them
+#     records\client-licences.json and records\client-licences\, the vcpkg
+#     libraries in the client files and each one's licence text (#3099,
+#     New-ClientLicenceRecord.ps1), which the fork's build measures from
+#     each file's program database and keeps in build\licences;
 #   server\server-<...>.zip and its .json, which Publish-Server.ps1 and
 #     Deploy-Server.ps1 -FromStore -ServerBuild send to the store and deploy
 #     on a machine with no engine build;
@@ -343,6 +347,15 @@ jobs:
           .\scripts\release\Build-Server.ps1 -NoPause
           if ($LASTEXITCODE -ne 0) { Write-Host "::error::Build-Server.ps1 exited with $LASTEXITCODE; the lines above say why"; exit 1 }
 
+      # The fork's own script, at the commit just built (#3099): it reads the
+      # program databases only a build folder has. The fork's build runs the
+      # same and keeps build\licences in its artifact (ForkEngineBuild.ps1
+      # holds it there), so a fork build skips this.
+      - name: Measure the client files' libraries
+        if: steps.fork.outputs.found != 'true'
+        shell: pwsh
+        run: .\engine\skymp\misc\thornswood\Write-ClientLicences.ps1 -Build engine\skymp\build
+
       - name: Record the fork's server build
         if: steps.fork.outputs.found == 'true'
         shell: pwsh
@@ -369,6 +382,9 @@ jobs:
           if ($env:FORK_RUN) { $by.BuiltBy = $env:FORK_RUN }
           .\scripts\release\New-ClientBuildRecord.ps1 -Dist engine\skymp\build\dist\client -Clone engine\skymp @by
           if (-not $?) { exit 1 }
+          # Which vcpkg libraries are in those files, and their texts (#3099).
+          .\scripts\release\New-ClientLicenceRecord.ps1 -Licences engine\skymp\build\licences -Clone engine\skymp
+          if (-not $?) { exit 1 }
 
       - name: Check the records name this commit
         shell: pwsh
@@ -393,7 +409,8 @@ jobs:
           $out = Join-Path $env:RUNNER_TEMP 'engine-out'
           if (Test-Path -LiteralPath $out) { Remove-Item -LiteralPath $out -Recurse -Force }
           New-Item -ItemType Directory -Force -Path (Join-Path $out 'records'), (Join-Path $out 'server'), (Join-Path $out 'client') | Out-Null
-          foreach ($r in 'server-build.json', 'client-build.json') { Copy-Item -LiteralPath (Join-Path 'records' $r) -Destination (Join-Path $out "records\$r") }
+          foreach ($r in 'server-build.json', 'client-build.json', 'client-licences.json') { Copy-Item -LiteralPath (Join-Path 'records' $r) -Destination (Join-Path $out "records\$r") }
+          Copy-Item -LiteralPath records\client-licences -Destination (Join-Path $out 'records\client-licences') -Recurse
           # Which fork run built it, when the fork did.
           if ($env:FORK_BUILD) { Copy-Item -LiteralPath $env:FORK_BUILD -Destination (Join-Path $out 'fork-build.json') }
           # The server build as the store keeps it, held to the record as it

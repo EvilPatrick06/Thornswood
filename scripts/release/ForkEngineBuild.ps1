@@ -178,7 +178,10 @@ function Expand-ForkEngineBuild([string]$Zip, [string]$Commit, [long]$RunId, [st
         if ($rel -eq 'fork-build.json') { continue }
         if (-not $named.ContainsKey($rel)) { $why += "$rel is in the artifact and fork-build.json does not name it" }
     }
-    foreach ($must in 'build/dist/server/scam_native.node', 'build/skymp5-server/launch_server.bat.tmp') {
+    # build/licences/licences.json: which vcpkg libraries are in the client
+    # files, with their texts beside it, which New-ClientLicenceRecord.ps1
+    # records (#3099). A build from before the fork measured them has none.
+    foreach ($must in 'build/dist/server/scam_native.node', 'build/skymp5-server/launch_server.bat.tmp', 'build/licences/licences.json') {
         if (-not $named.ContainsKey($must)) { $why += "fork-build.json does not name $must" }
     }
     if ($why.Count) { throw ('the fork''s build is not the one asked for, and nothing was put in the fork: ' + ($why -join '; ')) }
