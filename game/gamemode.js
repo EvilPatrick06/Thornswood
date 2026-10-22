@@ -35151,9 +35151,9 @@ log('gamemode loaded:',
 
   ONE STAGE FOR THE WHOLE PROVINCE, kept in private/war.json beside
   season.json, so a restart or a deploy does not reset it. worldStage() is
-  the one place it is read: the stage, its force, when the world reached it
-  and who moved it there. Any block that needs it asks here rather than
-  keeping a copy of its own.
+  the one place it is read: the stage, its force and when the world reached
+  it. Any block that needs it asks here rather than keeping a copy of its
+  own.
 
     - No file is the start of the world, the first stage. Nothing is written
       and nothing is said.
@@ -35164,10 +35164,17 @@ log('gamemode loaded:',
       the new one is written, so nothing on record is lost.
 
   THE HISTORY. war.json keeps every move the world has made, oldest first:
-  the stage, when, and who moved it there (and who proposed it, for a move
-  that was proposed). The last entry is where the world is now. A move is
+  the stage and when. The last entry is where the world is now. A move is
   never taken off it, so a change that is meant to be permanent stays on
   record even when a later stage undoes it in the world.
+
+  THE FILE NAMES NOBODY (#2860). It is kept for as long as the world is, and
+  a wipe leaves it (scripts/ops/Wipe-Saves.ps1), so it is not a place that
+  names people (#2353). Who moved the world, who proposed it, and who
+  confirmed or dropped a proposal are in the staff log, which keeps each
+  line for its own time, the way the company's terms file does (#2687). Who
+  made the proposal waiting now is held in memory for the card and the log
+  lines, and after a restart the card says only when it was made.
 
   STAGE IDS FOLLOW THE PATROL FILE'S KEY RULE. thalmor-patrols.json (#1390)
   gives a patrol cap for each stage under stageMost, keyed by these ids, and
@@ -35188,9 +35195,9 @@ log('gamemode loaded:',
 
   THE SEAM FOR LATER, SERVER PROPOSES AND STAFF CONFIRM. proposeWorldStage
   (id, by) keeps one proposal in war.json, checked the same way as a move,
-  and moves nothing. A later proposal replaces it. confirmWorldStage(by)
-  makes the move it proposed, as a move by whoever confirmed it, and clears
-  it. dropWorldStageProposal(by) clears it without a move. A direct
+  and moves nothing: the stage and when, with who in memory only. A later
+  proposal replaces it. confirmWorldStage(by) makes the move it proposed, as
+  a move by whoever confirmed it, and clears it. dropWorldStageProposal(by) clears it without a move. A direct
   setWorldStage clears it too, because it no longer says where the world
   goes from here. pendingWorldStage() reads it. Staff propose, confirm and
   drop on the Office page of K: THE STAFF CARD, below. Nothing proposes by
@@ -35278,12 +35285,10 @@ log('gamemode loaded:',
 
   function cleanWho(by) { return typeof by === 'string' ? by.replace(/\s+/g, ' ').trim() : ''; }
 
-  /* One history entry as it is kept: a stage, when, who, and who proposed it. */
+  /* One history entry, or the proposal, as it is kept: a stage and when. Never who (#2860). */
   function entryOf(row) {
     if (!row || typeof row !== 'object' || typeof row.id !== 'string' || !row.id) { return null; }
-    var out = { id: row.id, at: Number(row.at) || 0, by: typeof row.by === 'string' ? row.by : '' };
-    if (typeof row.proposedBy === 'string' && row.proposedBy) { out.proposedBy = row.proposedBy; }
-    return out;
+    return { id: row.id, at: Number(row.at) || 0 };
   }
 
   function readState() {
@@ -35328,6 +35333,9 @@ log('gamemode loaded:',
   }
 
   var state = readState();
+  // Who made the proposal waiting now, as the staff log names them. Memory
+  // only: the file names nobody, so after a restart this is ''.
+  var proposedBy = '';
 
   /* The history entry the world is at now, or null at the start. */
   function current() {
@@ -35337,20 +35345,22 @@ log('gamemode loaded:',
 
   function currentId() { var c = current(); return c ? c.id : startId(); }
 
-  /** Where the world is: the stage, its force, when it was reached and who moved it there. */
+  /** Where the world is: the stage, its force and when it was reached. Who moved it is in the staff log. */
   function worldStage() {
     var c = current();
     var row = stageOf(currentId()) || { id: currentId(), name: '', text: '' };
     return { id: row.id, name: String(row.name || ''), text: String(row.text || ''),
              force: typeof row.force === 'string' ? row.force : '',
-             since: c ? c.at : 0, by: c ? c.by : '' };
+             since: c ? c.at : 0 };
   }
 
   /** Every move the world has made, oldest first. A copy. */
   function worldHistory() { return JSON.parse(JSON.stringify(state.history)); }
 
-  /** The proposal waiting for a yes, or null. A copy. */
-  function pendingWorldStage() { return state.pending ? JSON.parse(JSON.stringify(state.pending)) : null; }
+  /** The proposal waiting for a yes, or null: its stage, when, and who made it while this start remembers. A copy. */
+  function pendingWorldStage() {
+    return state.pending ? { id: state.pending.id, at: state.pending.at, by: proposedBy } : null;
+  }
 
   /* Writes the next state whole, or nothing. Answers true when it is on disk. */
   function write(next) {
@@ -35362,7 +35372,7 @@ log('gamemode loaded:',
       }
       var c = next.history.length ? next.history[next.history.length - 1] : null;
       fs.writeFileSync(file + '.tmp', JSON.stringify({
-        id: c ? c.id : startId(), since: c ? c.at : 0, by: c ? c.by : '',
+        id: c ? c.id : startId(), since: c ? c.at : 0,
         history: next.history, pending: next.pending
       }));
       fs.renameSync(file + '.tmp', file);
@@ -35385,16 +35395,16 @@ log('gamemode loaded:',
     return '';
   }
 
-  function move(id, who, proposedBy) {
-    var entry = { id: id, at: Date.now(), by: who };
-    if (proposedBy) { entry.proposedBy = proposedBy; }
+  /* Moves the world to id. byWas is who proposed it, for the log line only. */
+  function move(id, who, byWas) {
     var was = currentId();
-    var history = state.history.concat([entry]);
+    var history = state.history.concat([{ id: id, at: Date.now() }]);
     if (!write({ history: history, pending: null })) {
       return { ok: false, why: 'The stage could not be written, so the world stays where it was.' };
     }
-    wlog(who, 'moved the world from', was, 'to', id + (proposedBy ? ', proposed by ' + proposedBy : ''));
-    return { ok: true, stage: worldStage() };
+    proposedBy = '';
+    wlog(who, 'moved the world from', was, 'to', id + (byWas ? ', proposed by ' + byWas : ''));
+    return { ok: true, stage: worldStage(), proposedBy: byWas };
   }
 
   /** Moves the world to stage id. Answers { ok: true, stage } or { ok: false, why }, and writes nothing on a no. */
@@ -35412,10 +35422,11 @@ log('gamemode loaded:',
     var who = cleanWho(by);
     var why = refusal(key, who, 'proposes it');
     if (why) { return { ok: false, why: why }; }
-    var pending = { id: key, at: Date.now(), by: who };
+    var pending = { id: key, at: Date.now() };
     if (!write({ history: state.history, pending: pending })) {
       return { ok: false, why: 'The proposal could not be written, so nothing changed.' };
     }
+    proposedBy = who;
     wlog(who, 'proposed moving the world from', currentId(), 'to', key);
     return { ok: true, pending: pendingWorldStage() };
   }
@@ -35427,7 +35438,7 @@ log('gamemode loaded:',
     var who = cleanWho(by);
     var why = refusal(p.id, who, 'confirms it');
     if (why) { return { ok: false, why: why }; }
-    return move(p.id, who, p.by);
+    return move(p.id, who, proposedBy);
   }
 
   /** Clears the proposal without a move. */
@@ -35439,8 +35450,10 @@ log('gamemode loaded:',
     if (!write({ history: state.history, pending: null })) {
       return { ok: false, why: 'The proposal could not be cleared, so it stands.' };
     }
-    wlog(who, 'dropped the proposal to move the world to', p.id);
-    return { ok: true };
+    var byWas = proposedBy;
+    proposedBy = '';
+    wlog(who, 'dropped', (byWas || 'an earlier') + '\'s proposal to move the world to', p.id);
+    return { ok: true, proposedBy: byWas };
   }
 
   /*
@@ -35538,8 +35551,8 @@ log('gamemode loaded:',
     var target = p ? stageOf(p.id) : null;
     var tc = target ? stageCard(target) : null;
     return {
-      stage: { id: st.id, name: st.name || st.id, force: st.force, text: st.text, since: st.since, by: st.by },
-      pending: tc ? { id: p.id, name: tc.name, force: tc.force, notice: tc.notice || '', at: p.at, by: p.by } : null,
+      stage: { id: st.id, name: st.name || st.id, force: st.force, text: st.text, since: st.since },
+      pending: tc ? { id: p.id, name: tc.name, force: tc.force, notice: tc.notice || '', at: p.at, by: proposedBy } : null,
       stages: stageList().filter(function (r) { return r && typeof r.id === 'string'; }).map(stageCard)
     };
   }
@@ -35560,6 +35573,9 @@ log('gamemode loaded:',
       } catch (e3) { }
     }
   }
+
+  /* Who made the proposal a confirm or a drop just cleared, as the staff log line says it. */
+  function proposer(r) { return r.proposedBy ? 'proposed by ' + r.proposedBy : 'proposed before the last restart'; }
 
   function samePending(id, at) {
     var p = state.pending;
@@ -35622,8 +35638,8 @@ log('gamemode loaded:',
       if (verb === 'drop') {
         r = dropWorldStageProposal(by);
         if (!r.ok) { toProfile(profileId, r.why); return true; }
-        log.record('worlddrop', pid, name, 0, tname, 'proposed by ' + p.by + '; the world stays at ' + from,
-                   0, { stage: p.id, from: from });
+        log.record('worlddrop', pid, name, 0, tname, proposer(r) + '; the world stays at ' + from,
+                   0, { stage: p.id, from: from, proposedBy: r.proposedBy });
         toProfile(profileId, 'You drop the proposal to move the world to ' + tname +
                   '. The world stays where it is. It is in the staff log.');
         redrawStaff();
@@ -35637,9 +35653,9 @@ log('gamemode loaded:',
         ? proclaim(notice.holds, notice.office, notice.title, notice.body) : null;
       if (put && !put.ok) { wlog('the notice for', p.id, 'was refused:', put.why); }
       log.record('worldconfirm', pid, name, 0, tname,
-                 'from ' + from + ' to ' + p.id + ', proposed by ' + p.by + (tforce ? ', force: ' + tforce : '') +
+                 'from ' + from + ' to ' + p.id + ', ' + proposer(r) + (tforce ? ', force: ' + tforce : '') +
                  (put ? (put.ok ? '; its notice is up in ' + put.holds.join(', ') : '; its notice was refused: ' + put.why) : ''),
-                 0, { stage: p.id, from: from, force: tforce, proposedBy: p.by,
+                 0, { stage: p.id, from: from, force: tforce, proposedBy: r.proposedBy,
                       notice: put ? (put.ok ? put.holds.slice() : false) : null });
       toProfile(profileId, 'The world moves to ' + tname + '. It is in the staff log.' +
                 (put ? (put.ok ? ' Its notice is up on the board in ' + put.holds.length +

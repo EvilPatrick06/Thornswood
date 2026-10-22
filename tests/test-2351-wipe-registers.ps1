@@ -131,7 +131,7 @@ try {
     Put (Join-Path $Root 'private\characters.json') '{"who":{"5001":{"name":"A"},"6001":{"name":"B"},"7001":{"name":"C"}}}'
     foreach ($f in 'property.json', 'farm-claims.json', 'law.json', 'beds.json', 'embassy.json', 'books.json', 'last-left.json',
                    'take-limit.json', 'trade-cargo.json', 'dungeon-rewards-ledger.json', 'deleted-characters.json', 'mod-settings.json', 'merchant-ledger.json',
-                   'season.json', 'benches.json', 'door.json') {
+                   'season.json', 'benches.json', 'door.json', 'war.json', 'company-terms.json') {
         Put (Join-Path $Root "private\$f") ('{"file":"' + $f + '"}')
     }
     Put (Join-Path $Root 'private\dungeon-rewards-ledger.initialized') '1'
@@ -189,10 +189,11 @@ try {
     Yes 'the dungeon ledger''s mark goes with it under its own name, so the next start makes a fresh ledger' (
         (Test-Path (Join-Path $P "dungeon-rewards-ledger.initialized-before-$stamp")) -and -not (Test-Path (Join-Path $P 'dungeon-rewards-ledger.initialized')))
     $kept = $true
-    foreach ($f in 'mod-settings.json', 'merchant-ledger.json', 'merchant-ledger.initialized', 'season.json', 'benches.json', 'door.json') {
+    foreach ($f in 'mod-settings.json', 'merchant-ledger.json', 'merchant-ledger.initialized', 'season.json', 'benches.json', 'door.json',
+                   'war.json', 'company-terms.json') {
         if (-not (Test-Path (Join-Path $P $f))) { $kept = $false; Write-Host "      gone: $f" }
     }
-    Yes 'the mod menu choices, the merchant ledger and its mark, the season, the benches and the door stay' $kept
+    Yes 'the mod menu choices, the merchant ledger and its mark, the season, the benches, the door, the world stage and the company''s terms stay' $kept
 }
 catch {
     Yes ('the harness ran to the end: ' + $_.Exception.Message) $false

@@ -2351,9 +2351,10 @@
 
   /*
     THE WORLD, FOR STAFF (#513, Patrick, 17 Oct): server proposes, staff
-    confirm. Where the world is, with its force when the stage names one, the
-    proposal waiting with who made it and when, and a button for every other
-    stage to propose it. Confirm asks twice, because it moves the world for
+    confirm. Where the world is, with its force when the stage names one and
+    when it got there, the proposal waiting with when it was made and who
+    made it while the server remembers (#2860: who moved the world is in the
+    staff log, not here), and a button for every other stage to propose it. Confirm asks twice, because it moves the world for
     everybody. Everything here is the server's, under officePage.world, and
     the server checks staff again on every line.
   */
@@ -2365,14 +2366,14 @@
     card.appendChild(el('div', 'desc', 'The world is at ' + name + '.' +
       (st.force ? ' Behind it: ' + String(st.force) + '.' : '') +
       (Number(st.since) > 0
-        ? ' It got there ' + whenOpens(Number(st.since)) + (st.by ? ', moved by ' + String(st.by) : '') + '.'
+        ? ' It got there ' + whenOpens(Number(st.since)) + '.'
         : ' It has been there from the start.') +
       (st.text ? ' ' + String(st.text) : '')));
     var p = w && w.pending;
     if (p) {
       var pname = String(p.name || p.id);
       officeRow(card, 'Proposed: ' + pname + (p.force ? ' (' + String(p.force) + ')' : ''),
-        'by ' + String(p.by || 'somebody') + ', ' + whenOpens(Number(p.at) || 0), [
+        (p.by ? 'by ' + String(p.by) + ', ' : '') + whenOpens(Number(p.at) || 0), [
           officeButton('Confirm', '/world confirm ' + String(p.id) + ' ' + String(Number(p.at) || 0),
             'Press again to move the world to ' + pname + (p.notice ? ' and put up its notice' : '')),
           officeButton('Drop', '/world drop ' + String(Number(p.at) || 0))
