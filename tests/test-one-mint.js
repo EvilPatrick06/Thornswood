@@ -717,7 +717,22 @@ function goldDescriptors(text) {
   }
   const noItems = cut(src, '  // ==== ITEM_NAMES ====', '  // ==== end ITEM_NAMES ====');
   const noAdmin = noItems && cut(noItems, '  // ==== ADMIN_NAMES ====', '  // ==== end ADMIN_NAMES ====');
-  const outside = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  const noDungeon = noAdmin && cut(noAdmin,'// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
+  /*
+    AND THE RECIPES SET IN EACH GAME (#613, #3115). RECIPES_SET_IN_GAME names
+    gold only as a recipe input it takes to 0: Patrick, q-3115 B, a forge
+    recipe costs no coins. A count of 0 takes nothing and mints nothing, and
+    the check below holds that every gold row there asks 0.
+  */
+  const setInGame = lift('// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====') || '';
+  const setRows = (/var RECIPES_SET_IN_GAME = (\{.*\});/.exec(setInGame) || [])[1];
+  let setTable = null;
+  try { setTable = JSON.parse(setRows); } catch (e) { setTable = null; }
+  yes('a recipe set in each game names gold only to take it to 0',
+      !!setTable && Object.keys(setTable).every(function (k) {
+        return setTable[k].inputs.every(function (i) { return goldDescriptors('"' + i[0] + '"').gold.length === 0 || i[2] === 0; });
+      }));
+  const outside = noDungeon && cut(noDungeon, '// ==== RECIPES_SET_IN_GAME, generated ====', '// ==== end RECIPES_SET_IN_GAME ====');
   const dungeon=lift('// ==== thornswood dungeon loot ====','// ==== end thornswood dungeon loot ====');
   const dungeonGold=goldDescriptors(dungeon || '');
   yes('the checked dungeon reward names exactly one gold descriptor as GOLD_DESC',
