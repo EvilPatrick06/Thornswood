@@ -39,6 +39,16 @@
 # gets the bridge's 404, so the site's pages are untouched. Take it out and
 # cloud threads lose the box; One's own ssh on port 22 does not go through it.
 # ---------------------------------------------------------------------------
+# THE GITHUB-APP BLOCK IS THE BOX ADMIN APP'S ONE-TIME SETUP (#3107).
+#
+# /github-app/ goes to the box's GitHub admin service on 127.0.0.1:7791
+# (scripts\vps\admin\admin.js, Install-AdminService.ps1). Through here it
+# shows only the App's setup pages, and only while Install-AdminService.ps1
+# -Setup has armed them for an hour with a state nobody can guess; anything
+# else, its work for github-admin.yml included, it answers with its plain
+# 404 to whatever comes with X-Forwarded-For. Take it out and the App can
+# still do its work, but a new one cannot be made.
+# ---------------------------------------------------------------------------
 
 # ---------------------------------------------------------------------------
 # CLOUDFLARE IS THE FRONT DOOR (#2995).
@@ -83,6 +93,12 @@ thornswood.net, www.thornswood.net {
 
 	handle_path /box/* {
 		reverse_proxy 127.0.0.1:7790 {
+			header_up X-Forwarded-For {client_ip}
+		}
+	}
+
+	handle_path /github-app/* {
+		reverse_proxy 127.0.0.1:7791 {
 			header_up X-Forwarded-For {client_ip}
 		}
 	}

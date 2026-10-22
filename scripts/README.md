@@ -35,6 +35,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/DeployedBuild.ps1](deploy/DeployedBuild.ps1) | What each server actually runs, where the site can read it. |
 | [deploy/DocsPasswordFile.ps1](deploy/DocsPasswordFile.ps1) | Where the site's member password comes from for Deploy-Docs.ps1 -Password, when nobody types it (issue #2116): a file on the box, locked to the box's Administrators and the deploy account. |
 | [deploy/Fresh-Checkout.ps1](deploy/Fresh-Checkout.ps1) | Deploy and ship scripts refuse a stale or dirty checkout (#2118). |
+| [deploy/Install-AdminService.ps1](deploy/Install-AdminService.ps1) | Puts the box's GitHub admin service on the VPS (#3107, Patrick's A of 22 Oct 2026): scripts\vps\admin\admin.js, as the task "Thornswood Admin", listening on 127.0.0.1:7791. |
 | [deploy/Install-Backup.ps1](deploy/Install-Backup.ps1) | Puts the nightly backup on the VPS: sends vps-nightly-backup.ps1 up, makes a passphrase if there is not one yet, and registers the scheduled task that runs it. |
 | [deploy/Install-Bot.ps1](deploy/Install-Bot.ps1) | Puts the Thornswood bot on the VPS and keeps it running. |
 | [deploy/Install-Bridge.ps1](deploy/Install-Bridge.ps1) | Puts the box's end of ssh on the VPS (#2753, #2891), the way every machine reaches the box's ssh: scripts\vps\bridge\bridge.js, as the task "Thornswood Bridge", listening on 127.0.0.1:7790. |
@@ -55,7 +56,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [deploy/ServerReadyWait.ps1](deploy/ServerReadyWait.ps1) | How long a started game server has to answer on its ports before a deploy puts the old files back. |
 | [deploy/ServerSettings.ps1](deploy/ServerSettings.ps1) | Which settings a game server install takes from the release, and which it keeps from the server it replaces. |
 | [deploy/ServiceAccount.ps1](deploy/ServiceAccount.ps1) | The account the services that run code we deploy run as (#2578): both game servers, both voice services and Caddy. |
-| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the build label on GitHub's VPS runners match records\build-runners.json, so no more builds run on the box at once than that file lists runners. |
+| [deploy/Set-BuildRunners.ps1](deploy/Set-BuildRunners.ps1) | Makes the labels on GitHub's VPS runners match the runner records on main (records\<name>-runners.json): records\build-runners.json caps how many builds run on the box at once, records\sign-runners.json says which runner may sign a release launcher. |
 | [deploy/Set-DiscordLogin.ps1](deploy/Set-DiscordLogin.ps1) | Points the site at your Discord, which is what decides who gets in anywhere. |
 | [deploy/Set-DiscordOnboarding.ps1](deploy/Set-DiscordOnboarding.ps1) | Sets Discord's onboarding (Server Settings, Onboarding) with the bot, from bot\Build-Onboarding.py: the default channels, the questions and what each answer gives, every role and channel looked up by name on the server when it runs. |
 | [deploy/Setup-Discord.ps1](deploy/Setup-Discord.ps1) | Builds the Thornswood Discord: roles, categories, channels, permissions and the words in the read only channels, in one run. |
@@ -149,6 +150,7 @@ rest) and the `test-*.js` harnesses are not in this list.
 | [ops/Set-Ref.ps1](ops/Set-Ref.ps1) | Makes a release tag, or deletes a branch, on GitHub for a session whose git cannot write refs: a cloud Claude thread (#3107, #3314). |
 | [ops/Set-Server.ps1](ops/Set-Server.ps1) | Sets the server everyone connects to, in the two places that decide it, and sends the feed to the VPS (#907). |
 | [ops/Wipe-Saves.ps1](ops/Wipe-Saves.ps1) | Starts the world over. Everybody begins again, nothing is claimed, nothing has been looted, and every container in the province is holding what Bethesda put in it. |
+| [ops/WorkflowRun.ps1](ops/WorkflowRun.ps1) | Starts a workflow on main and reads the answer its runner left, for a script whose session cannot make the change itself: Set-Ref.ps1 (a ref write, which a cloud session's proxy refuses) and Set-BuildRunners.ps1 (a runner label, which needs the box's GitHub App). |
 | [release/Add-VirusTotalComment.ps1](release/Add-VirusTotalComment.ps1) | Optional manual tool: leaves one community comment on a build's VirusTotal report, or says plainly that it is not commenting and carries on. |
 | [release/Assert-PublishSigned.ps1](release/Assert-PublishSigned.ps1) | Helpers for the publish sign gate. Dot-source this from Ship.ps1 and Publish-Installer.ps1. |
 | [release/Build-Engine.ps1](release/Build-Engine.ps1) | Takes a machine from a fresh clone to a built engine: the SkyMP server and the client runtime, out of the fork in engine\skymp. |
