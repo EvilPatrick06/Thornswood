@@ -599,7 +599,7 @@ const BLURB = {
   '/news':      ['Every release', 'What changed, newest first. The same list the launcher shows.'],
   '/report':    ['Report a problem', 'Something broken, or an idea. No account needed.'],
   '/gallery':   ['From the world', 'Pictures taken by people playing.'],
-  '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no analytics.'],
+  '/privacy':   ['Privacy', 'What Thornswood keeps about you, why, and how to have it deleted. No advertising tag and no tracking cookie.'],
   '/terms':     ['Terms', 'Eighteen and over, play by the rules, your account is yours, and nothing here is charged for or promised.'],
   '/cookies':   ['Cookies', 'The cookies this site sets: sign-in and the eighteen-and-over gate. No advertising cookie.']
 };
@@ -1047,16 +1047,66 @@ function publicPageBody(route) {
   }
   return body;
 }
+/*
+  EVERY FILE A PAGE NAMES CARRIES ITS OWN HASH, SO IT CAN BE KEPT FOR A YEAR
+  (#3218).
+
+  Only home.js and home.css had a ?v= written on, and the static branch below
+  never read it, so those two were kept for an hour like everything else, and
+  the fonts, the logo, the banner and the video were fetched again after every
+  hour (Cloudflare stretched it to four). A Lighthouse run on 21 Oct 2026 put
+  826 KiB of a repeat visit on it.
+
+  Now every "/name" a page names in src, href, poster or srcset, and every
+  url(/name) a stylesheet names, is written out as /name?v=<hash of what is
+  served>, and the static branch sends a name asked for with the hash it has
+  now as immutable for a year. A deploy that changes a file changes its hash,
+  so the page names a new address and nothing old is shown. A stylesheet's
+  hash is of the stylesheet as served, its fonts' hashes included, so a new
+  font file moves fonts.css's address with it. Asked for with no hash, or an
+  old one, a file is the hour and its ETag, as before.
+
+  The hash of a stylesheet is kept against its own file and the hashes of what
+  it names; any other file's against its size and times, which every deploy
+  changes.
+*/
 const publicAssetVersions = new Map();
+const ASSET_NAME = /^[A-Za-z0-9._-]+\.(?:js|css|png|jpe?g|webp|avif|gif|svg|ico|woff2?|mp4|webm)$/i;
 function publicAssetVersion(asset) {
+  if (!ASSET_NAME.test(asset)) return null;
   const file = path.join(PUBLIC, asset);
   try {
     const st = fs.statSync(file), key = st.size + ':' + st.mtimeMs + ':' + st.ctimeMs;
     const cached = publicAssetVersions.get(asset);
-    if (cached && cached.key === key) return cached.version;
-    const version = crypto.createHash('sha256').update(fs.readFileSync(file)).digest('hex').slice(0, 16);
-    publicAssetVersions.set(asset, {key, version}); return version;
+    const named = (refs) => refs.map(publicAssetVersion).join(',');
+    if (cached && cached.key === key && named(cached.refs) === cached.named) return cached.version;
+    const body = publicAssetBody(asset);
+    const refs = /\.css$/i.test(asset) ? assetRefs(fs.readFileSync(file, 'utf8')) : [];
+    const version = crypto.createHash('sha256').update(body).digest('hex').slice(0, 16);
+    publicAssetVersions.set(asset, {key, version, refs, named: named(refs)}); return version;
   } catch (e) { return null; }
+}
+// The bytes the static branch sends for a file of public/: a stylesheet with
+// its url()s versioned, anything else as it is on disk.
+function publicAssetBody(asset) {
+  const raw = fs.readFileSync(path.join(PUBLIC, asset));
+  return /\.css$/i.test(asset) ? Buffer.from(versionAssets(raw.toString('utf8')), 'utf8') : raw;
+}
+const ASSET_ATTR = /(\s(?:src|href|poster)=")\/([A-Za-z0-9._-]+)"/g;
+const ASSET_SRCSET = /(\ssrcset=")([^"]*)"/g;
+const ASSET_URL = /url\((["']?)\/([A-Za-z0-9._-]+)\1\)/g;
+function assetRefs(text) {
+  const out = [];
+  String(text).replace(ASSET_URL, (all, q, name) => { out.push(name); return all; });
+  return out;
+}
+function versionAssets(text) {
+  const tag = (name) => { const v = publicAssetVersion(name); return v ? '/' + name + '?v=' + v : '/' + name; };
+  return String(text)
+    .replace(ASSET_ATTR, (all, attr, name) => attr + tag(name) + '"')
+    .replace(ASSET_SRCSET, (all, attr, list) => attr +
+      list.replace(/(^|,\s*)\/([A-Za-z0-9._-]+)/g, (m, lead, name) => lead + tag(name)) + '"')
+    .replace(ASSET_URL, (all, q, name) => 'url(' + q + tag(name) + q + ')');
 }
 function publicDiscovery(html, route) {
   const blurb = BLURB[route], canonical = PUBLIC_ORIGIN + route;
@@ -1087,11 +1137,7 @@ function publicDiscovery(html, route) {
     '<meta name="twitter:title" content="' + escAttr(title) + '">\n' +
     '<meta name="twitter:description" content="' + escAttr(blurb[1]) + '">\n' +
     '<script type="application/ld+json">' + ld + '</script>\n';
-  for (const asset of ['home.js', 'home.css']) {
-    const version = publicAssetVersion(asset);
-    if (!version) continue;
-    html = html.replace('"/' + asset + '"', () => '"/' + asset + '?v=' + version + '"');
-  }
+  // The ?v= on every file the page names is send()'s (versionAssets).
   return html.replace(/<title>[\s\S]*?<\/title>/, () => '<title>' + escAttr(title) + '</title>')
     .replace('</head>', () => head + '</head>');
 }
@@ -2328,15 +2374,27 @@ async function galleryStaff(url, w) {
 
 // ----------------------------------------------------------------- plumb --
 /* One CSP for every answer (#1474). home.html and the hub load CSS/JS as
-   same-origin files, so script-src and style-src need only 'self'. Keep this
-   string in one place so send(), Range replies, and the request-level
-   setHeader cannot drift. */
-const CSP_HEADER = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self'; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
+   same-origin files, so style-src needs only 'self'. Keep this string in one
+   place so send(), Range replies, and the request-level setHeader cannot
+   drift.
+
+   The one other site in it is Cloudflare Web Analytics (#3218, Patrick's
+   answer on 22 Oct 2026). Cloudflare writes its beacon into every page it
+   carries, so the page never names it: the script comes from
+   static.cloudflareinsights.com and posts what it measured to
+   cloudflareinsights.com. With script-src 'self' alone every page raised a
+   CSP error in the console and Cloudflare counted nothing. The privacy page
+   names it. It sets no cookie and keeps nothing on the visitor's machine. */
+const CSP_HEADER = "default-src 'self'; script-src 'self' https://static.cloudflareinsights.com; style-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self'; connect-src 'self' https://cloudflareinsights.com; frame-ancestors 'self'; base-uri 'self'; form-action 'self'; object-src 'none'";
 function send(res, code, payload, type, extra) {
   // Defense in depth (#1366 / #1474): conservative CSP (this page and the hub
-  // load nothing from other sites; CSS and JS are external same-origin files),
+  // name nothing on other sites, and CSS and JS are external same-origin
+  // files; the analytics beacon Cloudflare adds is the one exception, above),
   // frame-ancestors self so the hub cannot be iframed for clickjacking, and a
   // referrer policy that does not leak path on cross-origin navigations.
+  // A page names its files with their hashes (versionAssets, #3218), here so
+  // that no page sent can miss it.
+  if (/^text\/html\b/.test(String(type || '')) && payload) payload = versionAssets(payload);
   res.writeHead(code, Object.assign({
     'Content-Type': type || 'application/json; charset=utf-8',
     'Cache-Control': 'no-store',
@@ -5785,7 +5843,12 @@ async function handle(req, res) {
         }
       }
       html = publicDiscovery(html, route);
-      return send(res, 200, html, TYPES['.html']);
+      /* no-cache, not send()'s no-store (#3218). A public page is the same for
+         everybody: nothing in it says who is asking. no-store kept every one
+         of them out of the browser's back and forward cache, so Back from
+         the rules to the front page fetched and drew the whole page again.
+         no-cache still asks the site each time the page is opened anew. */
+      return send(res, 200, html, TYPES['.html'], { 'Cache-Control': 'no-cache' });
     } catch (e) { return send(res, 500, 'no home.html', 'text/plain'); }
   }
 
@@ -5807,7 +5870,10 @@ async function handle(req, res) {
     // Installed launchers read the original full array. The website opts into
     // pagination until those clients can follow a continuation themselves.
     const gallery = galleryPage(0, url.searchParams.get('galleryLimit') === '24' ? 24 : Number.MAX_SAFE_INTEGER);
-    return sendJson(res, 200, {
+    // no-cache for the same reason as the public pages: the same answer for
+    // everybody, and a no-store answer to the page's own fetch kept the page
+    // out of the back and forward cache as well (#3218).
+    return send(res, 200, JSON.stringify({
       // The one switch (#428), for the pages and the Discord bot.
       open: cfg.open === true,
       invite: cfg.discord.invite || '',
@@ -5823,7 +5889,7 @@ async function handle(req, res) {
       collection: feed.collection || '',
       files: listFiles(),
       news: (feed.news || []).slice(0, 6).map((n) => ({ date:n.date, title:n.title }))
-    });
+    }), 'application/json; charset=utf-8', { 'Cache-Control': 'no-cache' });
   }
 
   /*
@@ -6261,6 +6327,25 @@ async function handle(req, res) {
     if (file.startsWith(PUBLIC + path.sep) && fs.existsSync(file)) {
       const type = TYPES[path.extname(file).toLowerCase()] || 'text/plain';
       /*
+        How long it may be kept. A name asked for with the hash it has now
+        (versionAssets, #3218) is that file and no other for good, so a year
+        and immutable. Anything else is the hour and an ETag: a browser
+        reuses it for the hour and then asks, and the answer to that
+        question is 25 bytes rather than 1.8 MB.
+
+        send() puts Cache-Control: no-store on everything, which is right for
+        a page that holds who somebody is and wrong for a picture. no-store
+        also means a browser cannot even answer with a 304, so before this a
+        page reload was a full download of all of public/.
+
+        The ETag is the hash of what is served, so it changes the moment a
+        deploy writes a new file, a stylesheet's when one of its fonts does.
+      */
+      const name = p.slice(1);
+      const version = publicAssetVersion(name);
+      const cache = version && url.searchParams.get('v') === version
+        ? 'public, max-age=31536000, immutable' : 'public, max-age=3600';
+      /*
         A byte range when one is asked for, because video needs it.
 
         Safari and iOS do not play a video from a plain 200 with the whole file
@@ -6268,46 +6353,26 @@ async function handle(req, res) {
         header. Chrome tolerates it, which is exactly how this ships broken for
         half the people and fine for whoever tested it.
 
-        Everything else is unaffected. No Range header means the old path, byte
-        for byte, with Accept-Ranges added so a client knows it may ask.
+        A stylesheet is sent as versionAssets writes it, which is not the file
+        on disk byte for byte, so it is never sent in pieces. The range carries
+        the same cache line as the whole file; it went out no-store, which kept
+        the banner video from being kept at all. No Range header means the
+        whole file, with Accept-Ranges added so a client knows it may ask.
       */
-      if (rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type }, head)) return;
-      /*
-        AND A CACHE HEADER, BECAUSE A LOGO IS NOT SOMEBODY'S PRIVATE DATA.
-
-        send() puts Cache-Control: no-store on everything, which is right for a
-        page that holds who somebody is and wrong for a picture. Every visit
-        was re-downloading the whole of public/: the favicon, the fonts, the
-        backdrop, the video. no-store also means a browser cannot even answer
-        with a 304, so a page reload is a full download of all of it.
-
-        An asset here is a file in public/ that a page asks for by name, and
-        the honest way to cache one that is NOT fingerprinted is a short
-        max-age plus an ETag: a browser reuses it for the hour and then asks,
-        and the answer to that question is 25 bytes rather than 1.8 MB.
-
-        The ETag is size and modified time, which is what a static file server
-        does. It changes the moment a deploy writes a new file, so a changed
-        picture is picked up on the next ask rather than after the hour.
-
-        The pages themselves are untouched: they go through send() and keep
-        no-store, which this branch never handles.
-      */
-      const st = fs.statSync(file);
-      const etag = '"' + st.size.toString(16) + '-' + Math.floor(st.mtimeMs).toString(16) + '"';
+      if (!/\.css$/i.test(name) &&
+          rangeReply(req, res, file, fs.statSync(file).size, { 'content-type': type, 'cache-control': cache }, head)) return;
+      const etag = '"' + (version || crypto.createHash('sha256').update(publicAssetBody(name)).digest('hex').slice(0, 16)) + '"';
       if (String(req.headers['if-none-match'] || '') === etag) {
         res.writeHead(304, {
           'etag': etag,
-          'cache-control': 'public, max-age=3600',
+          'cache-control': cache,
           'x-content-type-options': 'nosniff'
         });
         return res.end();
       }
-      return send(res, 200, fs.readFileSync(file), type, {
-        'Accept-Ranges': 'bytes',
-        'Cache-Control': 'public, max-age=3600',
-        'ETag': etag
-      });
+      const extra = { 'Cache-Control': cache, 'ETag': etag };
+      if (!/\.css$/i.test(name)) extra['Accept-Ranges'] = 'bytes';
+      return send(res, 200, publicAssetBody(name), type, extra);
     }
   }
 

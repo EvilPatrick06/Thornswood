@@ -28,7 +28,15 @@
      site in a src, a url(), a stylesheet link or a preconnect here.
 
      If anything like it comes back, it comes back with the privacy
-     page and the consent gate in the same change, not after it. -->
+     page and the consent gate in the same change, not after it.
+
+     THE ONE EXCEPTION IS CLOUDFLARE WEB ANALYTICS (#3218), which
+     Patrick allowed on 22 October 2026. It is not in this file:
+     Cloudflare, which carries every request to the site anyway, writes
+     its beacon into the page on the way out. It sets no cookie and keeps
+     nothing on the visitor's machine, so there is nothing for a consent
+     gate to ask about; the content rules in server.js (CSP_HEADER) let
+     it through and the privacy page names it. -->
 <title>Thornswood</title>
 <meta name="description" content="A Skyrim roleplay server set fifty years after the civil war. The world still has people in it.">
 <!-- What a link to this site looks like when it is pasted into Discord. Without
@@ -51,6 +59,15 @@
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" href="/favicon.ico" sizes="any">
 <link rel="icon" href="/icon-192.png" type="image/png" sizes="192x192">
+<!-- The two faces every page sets its first words in, asked for with the
+     page rather than after fonts.css has come back and been read (#3218):
+     the font files hung off fonts.css, which put about 850 ms before the
+     text was in its own face. The addresses are the ones fonts.css names,
+     ?v= and all, which send() writes into both (versionAssets). crossorigin
+     because a font is always fetched that way, and a preload without it is
+     fetched twice. -->
+<link rel="preload" href="/cinzel.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/spectral-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="stylesheet" href="/fonts.css">
 <link rel="stylesheet" href="/home.css">
 </head>
@@ -60,7 +77,9 @@
 
 <header>
   <div class="wrap bar">
-    <a class="mark" href="/"><img src="/logo.png" alt="Thornswood">Thornswood</a>
+    <!-- alt="" because the link says Thornswood in words beside it, and a
+         screen reader read the name twice (#3218). -->
+    <a class="mark" href="/"><img src="/logo-28.webp" srcset="/logo-28.webp 1x, /logo-56.webp 2x, /logo-84.webp 3x" width="28" height="28" alt="">Thornswood</a>
     <a class="mobile-cta" href="/downloads">Download</a>
     <button class="burger" id="burger" aria-label="Open menu" aria-controls="nav" aria-expanded="false">&#9776;</button>
     <nav class="top" id="nav" aria-label="Main navigation">
@@ -106,9 +125,9 @@
 
     muted and playsinline because a hero that asks permission to play does not
     play at all: autoplay is only allowed without sound, and without
-    playsinline iOS opens it fullscreen instead. The poster is the still, so
-    the first paint is a picture rather than black, and it is what stays on
-    screen for anybody who has asked their machine for less motion.
+    playsinline iOS opens it fullscreen instead. The still under it is the
+    first paint, a picture rather than black, and it is what stays on screen
+    for anybody who has asked their machine for less motion.
 
     Both files are the whole painting, not the launcher's strip.
     banner.mp4 is the 24 second v4 loop at 1600x900 and banner.jpg is its
@@ -125,7 +144,7 @@
     DECORATIVE (#2193). The painting says nothing the page does not say in
     words, so the video is hidden from assistive technology (aria-hidden),
     kept out of the tab order (tabindex -1), carries no controls, and has no
-    fallback text: a browser that cannot play it shows the poster, and a
+    fallback text: a browser that cannot play it shows the still, and a
     screen reader has nothing to announce. disablepictureinpicture and
     disableremoteplayback keep the browser from laying its own picture in
     picture and cast buttons over it, which would be a media control with no
@@ -134,8 +153,25 @@
     stays in the tab order. Reduced motion is home.js too: no autoplay
     attribute here, so nothing starts before it has asked.
   -->
+  <!--
+    THE STILL IS A PICTURE OF ITS OWN UNDER THE VIDEO, NOT THE VIDEO'S POSTER
+    (#3218). A poster is one address for every screen, so a phone was sent the
+    1600 pixel JPEG, 326 KiB, and a browser cannot be told to fetch it early.
+    This is the same painting at three widths in WebP, the browser picks the
+    one its screen needs, and it is asked for at once because it is the
+    biggest thing on the page when it opens. Built by
+    scripts/dev/Build-SiteImages.py from banner.jpg. The video sits over it
+    with no poster, so it shows nothing until its first frame and the still
+    shows through until then; for somebody who asked for less motion it never
+    plays, and the still is what stays. alt="" and aria-hidden for the same
+    reason as the video (#2193, below).
+  -->
+  <img class="art" src="/banner-1600.webp"
+       srcset="/banner-800.webp 800w, /banner-1200.webp 1200w, /banner-1600.webp 1600w"
+       sizes="100vw" width="1600" height="900" alt="" aria-hidden="true"
+       fetchpriority="high">
   <video class="art" muted loop playsinline preload="none"
-         poster="/banner.jpg" aria-hidden="true" tabindex="-1"
+         aria-hidden="true" tabindex="-1"
          disablepictureinpicture disableremoteplayback>
     <source src="/banner.mp4" type="video/mp4">
   </video>

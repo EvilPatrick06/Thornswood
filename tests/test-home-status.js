@@ -27,8 +27,10 @@ function yes(what, cond) {
   else { fail++; console.log('FAIL  ' + what); }
 }
 
-const START = "    var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
-const END = "        t.textContent = 'Server offline';\n      }\n    }\n";
+// paintStatus in home.js, which the first load and a page brought back from
+// the back and forward cache both call (#3218).
+const START = "  var dot = document.getElementById('dot'), t = document.getElementById('livetext');";
+const END = "      if (gone) gone.hidden = true;\n    }\n  }\n";
 const a = src.indexOf(START);
 const b = a < 0 ? -1 : src.indexOf(END, a);
 const block = (a >= 0 && b >= 0) ? src.slice(a, b + END.length) : null;
@@ -47,13 +49,13 @@ function node(tag) {
   return n;
 }
 
-function run(status) {
+function run(status, before) {
   const els = {
     dot: node('span'), livetext: node('span'),
     figOnline: node('span'), figOnlineWrap: node('div')
   };
-  els.dot.className = 'dot';
-  els.figOnlineWrap.hidden = true;
+  els.dot.className = before && before.lit ? 'dot on' : 'dot';
+  els.figOnlineWrap.hidden = !(before && before.lit);
   const document = {
     getElementById: function (id) { return els[id] || null; },
     createElement: function (tag) { return node(tag); }
@@ -83,6 +85,13 @@ yes('three on: unchanged, with the tile', e.livetext.textContent === '3 people i
     e.figOnlineWrap.hidden === false && e.figOnline.textContent === '3');
 e = run({ up: false });
 yes('down: unchanged', e.livetext.textContent === 'Server offline' && e.dot.className === 'dot');
+// Painted again over a page that showed three on, as Back to the page does
+// (#3218): the dot goes out and the head count tile goes with it.
+e = run({ up: false }, { lit: true });
+yes('down after three on: the dot goes out and the tile is hidden',
+    e.livetext.textContent === 'Server offline' && e.dot.className === 'dot' && e.figOnlineWrap.hidden === true);
+e = run({ up: true, online: 0 }, { lit: true });
+yes('nobody on after three on: the tile is hidden', e.figOnlineWrap.hidden === true);
 
 // Out of the server's own number when it says one (#481).
 e = run({ up: true, online: 3, max: 25 });

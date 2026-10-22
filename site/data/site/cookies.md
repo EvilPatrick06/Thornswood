@@ -1,6 +1,6 @@
 # Cookies
 
-Last changed: 3 October 2026.
+Last changed: 22 October 2026.
 
 The site uses storage for sign-in security and for your age statement. It has
 no advertising cookies, Google Analytics, or third-party tracking embeds.
@@ -19,8 +19,10 @@ the gate ask again. Clearing sign-in cookies signs you out.
 
 These purposes support the services you request. The site does not load
 optional analytics or advertising storage, so it has no optional-cookie
-consent banner. If tracking or embeds are added, their consent requirements
-must be reviewed before they load.
+consent banner. Cloudflare Web Analytics, which counts page visits and load
+times, stores nothing in your browser: no cookie and no localStorage (see
+[Privacy](/privacy)). If tracking or embeds are added, their consent
+requirements must be reviewed before they load.
 
 See [Privacy](/privacy) for data use and deletion, and [Terms](/terms) for the
 adult-content notice. Cookie rules depend on jurisdiction; this page describes

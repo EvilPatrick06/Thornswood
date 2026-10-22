@@ -132,8 +132,10 @@ function stop(run) {
         yes('a public page answers 200 as HTML (' + page.status + ')',
             page.status === 200 && /text\/html/.test(String(page.headers['content-type'] || '')));
         guarded('a public page', page);
-        yes('and keeps the Cache-Control send() has always written',
-            String(page.headers['cache-control'] || '') === 'no-store');
+        // no-cache, so the back and forward cache can keep it (#3218): a
+        // public page holds nothing about who asked.
+        yes('and is no-cache, asked again each time but kept for Back',
+            String(page.headers['cache-control'] || '') === 'no-cache');
 
         const api = await ask(run.port, '/api/public');
         yes('an API answer is 200 JSON (' + api.status + ')',
