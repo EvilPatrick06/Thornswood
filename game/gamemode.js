@@ -35985,13 +35985,19 @@ log('gamemode loaded:',
   var fs = null, path = null;
   try { fs = require('fs'); path = require('path'); } catch (e) { st = null; }
 
+  // Where the list is: the privDir server-settings.json names, or private
+  // when it names none. A settings file that will not read or parse names no
+  // folder (#2871): the list is not looked for in one guessed for it, which
+  // would let nothing go and say nothing. It is said, and nothing is let go.
   function where() {
-    var privDir = 'private';
-    try {
-      var cfg = JSON.parse(fs.readFileSync('server-settings.json', 'utf8'));
-      if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
-    } catch (e) { }
-    return path.join(privDir, 'deleted-characters.json');
+    var cfg = null;
+    try { cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, '')); }
+    catch (e) {
+      rlog('server-settings.json could not be read (' + ((e && (e.code || e.message)) || e) +
+           '), so where the list is is not known and nothing was let go');
+      return null;
+    }
+    return path.join((cfg && cfg.privDir) ? String(cfg.privDir) : 'private', 'deleted-characters.json');
   }
 
   // The list, read once a load, field by field. Anything that is not a whole
@@ -36001,6 +36007,7 @@ log('gamemode loaded:',
     if (st !== undefined) { return st; }
     st = null;
     var file = where();
+    if (!file) { return st; }
     var text = null;
     try { text = fs.readFileSync(file, 'utf8'); }
     catch (e) {
@@ -49245,17 +49252,24 @@ return module.exports;
   var on = false;
   try { var settings = mp.getServerSettings(); on = !!settings && settings.thornswoodTradeShips === true; } catch (e) { on = false; }
 
+  // The privDir server-settings.json names, or private when it names none.
+  // A settings file that will not read or parse names no folder (#2871): the
+  // manifest is not looked for in one guessed for it, where a missing file
+  // would open an empty one and the next write would start a second manifest.
+  // It is said, and the ships hold nothing until it is put right.
   var privDir = 'private';
+  var settingsWhy = '';
   try {
     var cfg = JSON.parse(String(fs.readFileSync('server-settings.json', 'utf8')).replace(/^\uFEFF/, ''));
     if (cfg && cfg.privDir) { privDir = String(cfg.privDir); }
-  } catch (e) { }
+  } catch (e) { settingsWhy = String((e && (e.code || e.message)) || e); }
   // Resolved once, at load, against the server's own folder.
   var FILE = path.resolve(privDir, 'trade-cargo.json');
 
-  var unreadable = '';
+  var unreadable = settingsWhy ? 'server-settings.json could not be read' : '';
   var reg = null;
   (function read() {
+    if (unreadable) { return; }
     var t = null;
     try { t = fs.readFileSync(FILE, 'utf8'); }
     catch (e) { if (!e || e.code !== 'ENOENT') { unreadable = String((e && e.code) || e); } }
@@ -49263,7 +49277,9 @@ return module.exports;
     try { reg = TRADE_CARGO.openRegister(t); }
     catch (e2) { unreadable = String((e2 && e2.message) || e2); reg = null; }
   })();
-  if (unreadable) {
+  if (settingsWhy) {
+    slog('server-settings.json could not be read (' + settingsWhy + '), so where the manifest is is not known: the ships hold nothing at this start and nothing is written until it is put right');
+  } else if (unreadable) {
     slog(FILE, 'could not be read (' + unreadable + '), so the ships hold nothing at this start and nothing is written over it until it is put right');
   }
 
