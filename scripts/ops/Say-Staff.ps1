@@ -2,12 +2,14 @@
   Say-Staff.ps1
 
   Posts one staff notice in #staff-updates through the bot, from One, a
-  developer's PC or a cloud thread: a line before an edit to one of the six
-  shared files, taking the dev feed, what was merged or published. Agents
-  post their own notices this way instead of asking a person to (Patrick,
-  20 Oct 2026, #2934).
+  developer's PC or a cloud thread: only when staff must act: something staff
+  must act on, a server restart or outage staff will see, or a change to how
+  staff do their job. Never for releases, merges, progress, pull requests,
+  issues, test tasks or routine deploys (Patrick, 22 Oct 2026, 8:51 AM).
+  Agents post their own notices this way instead of asking a person to
+  (Patrick, 20 Oct 2026, #2934).
 
-      pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Taking the dev feed for the cooking fix, Ship at 4:30 PM."
+      pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Restarting the dev server at 4:30 PM for about 5 minutes."
                        queue it; prints its id
       pwsh scripts/ops/Say-Staff.ps1 -Check agent-claude-20261020214500-1a2b3c
                        whether the bot has said it yet
