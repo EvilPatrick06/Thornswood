@@ -11,22 +11,22 @@ The same new offer is not repeated by another hold's specialist.
 | Each successful cast | 1 Abecean Longfin |
 | Shared return per marker | 4 hours |
 | Personal open-work limit | 8 fish |
-| Returning the work | Consume2, keep extras |
+| Returning the work | Consume 2, keep extras |
 | Completion rest | 12 hours |
 | Abandonment | Consume the outstanding draw; no personal rest |
-| Maximum yield across all8 markers | 48 fish per24 hours |
+| Maximum yield across all 8 markers | 48 fish per 24 hours |
 
 Markers `17200` through `17207:Thornswood-Content.esp` use FLOR base
 `154a5:Thornswood-Content.esp`. Exact final positions, CELLs and original
 clam anchors are in `quest-content.json` and [the content specification](merchant-quest-content.md).
-They stand32 units below the recorded northern sea level at -14032, rather
+They stand 32 units below the recorded northern sea level at -14032, rather
 than at their anchors' seabed heights. Original clam sources and stock remain
 independent. No additional fish markers or actors are spawned at runtime.
 
 The manifest is derived from those eight authored placements. Native source
 validation checks enabled REFR/FLOR/INGR/WRLD types, original NAME and DATA,
 the FLOR's actual PFIG ingredient, live base and world, a128-unit source bound
-and400-unit interaction reach on every draw. Substituted ingredients refuse.
+and 400-unit interaction reach on every draw. Substituted ingredients refuse.
 Only a successful quest draw earns normal fishing work credit and pole wear.
 No gold reward or merchant purse refill is added.
 
@@ -43,9 +43,9 @@ gates, exact appointed merchant, source and ingredient substitution, actor
 replacement, shared waits, limits, extras, abandonment, failed writes and
 ordinary activation. Native source tests exercise the generated production
 exports. Pearl, crimson, geode, quest and trade regressions remain required.
-These are source checks; connected acceptance belongs to the release/test desk.
+These are source checks; connected acceptance is a separate test.
 
-Claude delivers matching Content to Dev's server before releasing matching
-client bytes, then activates this runtime section with the same Content
+Matching Content reaches Dev's server before the matching client bytes are
+released, and this runtime section is then activated with the same Content
 fingerprint. The normal server-first release parity checks are mandatory.
-The source lane runs no release, installation, Vortex action or game playtest.
+These source changes include no release, installation, Vortex action or game playtest.
