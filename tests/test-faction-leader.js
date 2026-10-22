@@ -102,9 +102,12 @@ yes('F5 Install-Bot sends factions.json on the artifact list and in the copy loo
     install.indexOf("'bot/factions.json'") !== -1 &&
     install.indexOf("foreach ($f in 'bot.py', '_pyguard.py', 'trust.py', 'card.py', 'staff-channel.txt', 'requirements.txt', 'factions.json')") !== -1);
 
-yes('F6 Build-Discord still makes Trading Company and does not make a faction lead role',
+// #3317 (Patrick, 22 Oct, page card q-3317-faction-roles, A): one
+// "<faction> Leader" role per named faction, from factions.json, short names.
+yes('F6 Build-Discord still makes Trading Company, and a Leader role for each faction in factions.json',
     build.indexOf("ROLES.append(('Trading Company'") !== -1 &&
-    !/Faction Lead/.test(build) && !/Faction Leader/.test(build));
+    /FACTION_LEADERS = tuple\(FACTION_SHORT\.get\(f, f\) \+ ' Leader' for f in FACTIONS\)/.test(build) &&
+    /'factions\.json'/.test(build));
 
 yes('F7 is_staff still leaves Lead and Trial Gamemaster out, and the flag list includes them',
     /Lead Gamemaster and Trial Gamemaster carry Manage Threads/.test(bot) &&
