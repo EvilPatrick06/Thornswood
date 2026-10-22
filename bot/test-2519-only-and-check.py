@@ -161,6 +161,14 @@ class Guild(object):
         self.default_role = Role(self, '@everyone', 0)
         self.me = None
 
+
+    async def onboarding(self):
+        return types.SimpleNamespace(enabled=getattr(self, 'onboarding_enabled', False))
+
+    async def edit_onboarding(self, **kw):
+        self.calls.append(('edit_onboarding', None, kw))
+        self.onboarding_enabled = kw.get('enabled', getattr(self, 'onboarding_enabled', False))
+
     def move(self, role, position):
         """Discord's move: the role takes that position and the others keep
            their order around it, numbered 1 up (0 is @everyone)."""

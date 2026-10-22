@@ -213,6 +213,23 @@ ONLY = [n.strip() for n in os.environ.get('DISCORD_ONLY', '').split(',') if n.st
 # (STAFF_RANKS), every planned category and channel whose overwrites differ
 # from what its mode gives, and the channels the plan does not name.
 AUDIT = ('--audit' in sys.argv) or os.environ.get('DISCORD_AUDIT', '') == '1'
+
+# GIVING A STAFF RANK (#3317). Patrick named who holds the council's new
+# ranks: Djinn is Co-Owner, he is Lead Dev and Blade is Lead Content Creator.
+# The role list in Discord is the only place that is said, and nothing but a
+# hand in Server Settings gave a role before this, so the build gives one by
+# name, the same way every time:
+#
+#     $env:DISCORD_GIVE = 'Co-Owner=WiccanDjinn;Lead Dev=Patrick Thornwood'
+#     .\Setup-Discord.ps1 -OnBox -Give 'Co-Owner=WiccanDjinn','Lead Dev=Patrick Thornwood'
+#
+# Only a staff rank (STAFF), only to one member matched exactly by id, user
+# name, display name or server nickname, never a second rank of a category
+# somebody already holds one of (doubles), and never to somebody holding a
+# seat (seat_clashes). Nothing else in the run happens, and with -Check it
+# only says what it would give.
+GIVE = [tuple(p.strip() for p in e.split('=', 1)) if '=' in e else (e.strip(), '')
+        for e in os.environ.get('DISCORD_GIVE', '').split(';') if e.strip()]
 GUILD  = os.environ.get('DISCORD_GUILD', '').strip()   # optional server id
 WEBHOOK_OUT = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                            'news-webhook.txt')
@@ -307,6 +324,10 @@ STAFF_RANKS = (('Owner', OWNERS),) + tuple(
     (c[0], (c[3],) + c[4]) for c in STAFF_CATEGORIES)
 # Everybody on staff, whatever their category.
 STAFF = OWNERS + tuple(n for c in STAFF_CATEGORIES for n in (c[3],) + c[4])
+# Who is pulled into every ticket: the council and the ranks that answer
+# tickets. bot.py's STAFF_ROLES default and Install-Bot's -StaffRoles default
+# are this list, by name (test-3317-give.py holds the three together).
+TICKET_STAFF = COUNCIL_ROLES + ('Gamemaster', 'Dev', 'Loremaster', 'Moderator')
 
 
 def space_of(name):
@@ -1998,6 +2019,135 @@ def _who(m):
     return getattr(m, 'display_name', None) or getattr(m, 'name', None) or str(getattr(m, 'id', '?'))
 
 
+def _names_of(m):
+    return [n for n in (getattr(m, 'name', None), getattr(m, 'global_name', None),
+                        getattr(m, 'nick', None), getattr(m, 'display_name', None)) if n]
+
+
+def find_member(members, who):
+    """Everybody who is exactly who: their id, or their user name, display
+       name or server nickname in any case. Never a part of a name."""
+    w = (who or '').strip().lower()
+    if not w:
+        return []
+    if w.isdigit():
+        return [m for m in members if getattr(m, 'id', None) == int(w)]
+    return [m for m in members if any(n.lower() == w for n in _names_of(m))]
+
+
+def near_members(members, who):
+    """Who has who somewhere in a name, for a give that matched nobody."""
+    w = (who or '').strip().lower()
+    return [m for m in members if w and any(w in n.lower() for n in _names_of(m))]
+
+
+def give_refusal(member, rank):
+    """Why rank is not given to member, or None. 'already' when they hold it."""
+    held = set(r.name for r in getattr(member, 'roles', ()) or ())
+    if rank in held:
+        return 'already'
+    for cat, names in STAFF_RANKS:
+        if rank in names:
+            other = [n for n in names if n in held]
+            if other:
+                return ('%s holds %s, a rank of %s, and nobody holds two ranks of '
+                        'one category; take that off first'
+                        % (_who(member), other[0], cat))
+    seats = sorted(n for n in held if n in SEATS)
+    if seats:
+        return '%s holds %s, and staff hold no seat' % (_who(member), ', '.join(seats))
+    return None
+
+
+async def give(guild):
+    """GIVE, and nothing else. See GIVE at the top."""
+    have = dict((r.name, r) for r in guild.roles)
+    print('\n  Giving staff ranks in %s\n' % guild.name, flush=True)
+    for rank, who in GIVE:
+        if rank not in STAFF:
+            failed.append('%s is not a staff rank of the plan; -Give gives only %s'
+                          % (rank, ', '.join(STAFF)))
+            continue
+        role = have.get(rank)
+        if role is None:
+            failed.append('there is no %s role on the server yet; a build makes it' % rank)
+            continue
+        found = find_member(guild.members, who)
+        if len(found) != 1:
+            near = found or near_members(guild.members, who)
+            failed.append('%s matches %s, so %s was not given%s'
+                          % (who or 'nobody named', 'nobody' if not found else
+                             '%d members' % len(found), rank,
+                             ('; names like it: ' + ', '.join(
+                                 '%s (%s)' % (_who(m), m.id) for m in near[:10]))
+                             if near else ''))
+            continue
+        m = found[0]
+        why = give_refusal(m, rank)
+        if why == 'already':
+            say('already', '%s holds %s' % (_who(m), rank))
+            continue
+        if why:
+            failed.append('%s was not given: %s' % (rank, why))
+            continue
+        if CHECK:
+            say('would give', '%s to %s' % (rank, _who(m)))
+            continue
+        try:
+            await m.add_roles(role, reason='Thornswood setup, -Give (#3317)')
+            say('gave', '%s to %s' % (rank, _who(m)))
+        except discord.HTTPException as e:
+            failed.append('could not give %s to %s (%s)' % (rank, _who(m), refused(e)))
+    if failed:
+        print('\n  did not manage:')
+        for f in failed:
+            print('    ' + f)
+    print('')
+    return len(failed)
+
+
+# DISCORD'S ONBOARDING STAYS OFF (#3317). Patrick picked the Member button in
+# #start-here over Discord's onboarding (q-3317-member-gate, A): two yes or no
+# questions, 18 or over and the rules accepted, and the bot gives Member. With
+# onboarding on, Discord refuses to shut @everyone out of the last channels it
+# can post in, and the live build of 22 Oct left #tickets-and-applications and
+# #updates open with "400 Onboarding requires at least one channel where
+# @everyone can read and send messages". So a whole build switches it off
+# before it gates a channel, and the audit says when it is on.
+# Build-Onboarding.py refuses to switch it back on under the gate by its own
+# check of the channels @everyone can post in.
+ONBOARDING_WHY = ('the plan gives Member by the button in #start-here '
+                  '(q-3317-member-gate, A), and while it is on Discord refuses '
+                  'to shut @everyone out of its last channels')
+
+
+async def onboarding_on(guild):
+    """True or False, or the reason it could not be read."""
+    try:
+        ob = await guild.onboarding()
+    except discord.HTTPException as e:
+        return refused(e)
+    return bool(getattr(ob, 'enabled', False))
+
+
+async def keep_onboarding_off(guild):
+    on = await onboarding_on(guild)
+    if on is False:
+        return
+    if on is not True:
+        failed.append("could not read Discord's Onboarding (%s)" % on)
+        return
+    if CHECK:
+        say('would', "switch Discord's Onboarding off: " + ONBOARDING_WHY)
+        return
+    try:
+        await guild.edit_onboarding(enabled=False,
+                                    reason='Thornswood setup, Member comes from #start-here (#3317)')
+        say('switched', "Discord's Onboarding off: " + ONBOARDING_WHY)
+    except discord.HTTPException as e:
+        failed.append("could not switch Discord's Onboarding off (%s)" % refused(e))
+
+
 # --------------------------------------------------------------- layout --
 # THE LAYOUT, WRITTEN OUT (#3317, Patrick, 22 Oct: "we also need to document
 # the discord layout somewhere ... so that we dont accidentally drift using
@@ -2262,6 +2412,11 @@ async def audit(guild):
 
     print('\n  @everyone', flush=True)
     line('server wide: ' + (', '.join(perm_names(guild.default_role.permissions)) or 'nothing'))
+    on = await onboarding_on(guild)
+    if on is True:
+        off("Discord's Onboarding is on; " + ONBOARDING_WHY + '. A build switches it off')
+    elif on is not False:
+        off("Discord's Onboarding could not be read (%s)" % on)
 
     print('\n  Roles against the plan', flush=True)
     for name, _, _, want in ROLES:
@@ -2349,6 +2504,19 @@ async def audit(guild):
         else:
             off('#%s in %s is not in the plan' % (c.name, where))
 
+    # What bot.env.json is written with (#3317): Install-Bot takes these as
+    # they are, and nothing else on the server says a role's id.
+    print('\n  Role ids, for bot.env.json', flush=True)
+    for name, _, _, _ in ROLES:
+        r = roles.get(name)
+        if r is not None:
+            line('%s: %s' % (name, r.id))
+    for what, names in (('-StaffRoles', TICKET_STAFF), ('-UpperStaffRoles', COUNCIL_ROLES)):
+        ids = [str(roles[n].id) for n in names if n in roles]
+        gone = [n for n in names if n not in roles]
+        line("Install-Bot %s '%s'%s" % (what, ','.join(ids),
+             ('  (not on the server yet: ' + ', '.join(gone) + ')') if gone else ''))
+
     print('\n  %d difference(s). Nothing was changed.\n' % bad[0], flush=True)
     return bad[0]
 
@@ -2395,6 +2563,10 @@ async def on_ready():
             await audit(guild)
             return
 
+        if GIVE:
+            await give(guild)
+            return
+
         print('\n  Building %s\n' % guild.name)
 
         roles = await ensure_roles(guild)
@@ -2411,6 +2583,14 @@ async def on_ready():
 
         found = {}
         posts = []
+
+        # Before any channel is gated, or Discord refuses the gate (see
+        # ONBOARDING_WHY). Under ONLY no server setting changes, so it is
+        # only said there.
+        if not ONLY:
+            await keep_onboarding_off(guild)
+        elif await onboarding_on(guild) is True:
+            say('note', "Discord's Onboarding is on, and a whole build switches it off")
 
         for catname, specs in plan_for(ONLY):
             cat = None
@@ -2642,10 +2822,17 @@ if __name__ == '__main__':
         plan_for(ONLY)
     except ValueError as e:
         sys.exit('DISCORD_ONLY: ' + str(e) + '. Nothing was asked of Discord.')
+    _bad = ['%s=%s' % g for g in GIVE if g[0] not in STAFF or not g[1]]
+    if _bad:
+        sys.exit('DISCORD_GIVE takes "staff rank=member" pairs, and these are not: ' +
+                 ', '.join(_bad) + '. The staff ranks are ' + ', '.join(STAFF) +
+                 '. Nothing was asked of Discord.')
     if not TOKEN:
         sys.exit('No token. Set DISCORD_TOKEN first, or run Setup-Discord.ps1.')
     try:
         client.run(TOKEN, log_handler=None)
+        if GIVE and failed:
+            sys.exit(1)
     except discord.LoginFailure:
         sys.exit('Discord refused that token.')
     except discord.PrivilegedIntentsRequired:
