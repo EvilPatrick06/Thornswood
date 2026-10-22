@@ -101,78 +101,20 @@ function Stop-ThornswoodProcessHeld($Held) {
   }
 }
 
-# What has $Path or anything under it open right now, quickest first, because
-# a holder that exits a moment after the refusal is gone from anything asked
-# later (#3262). On 22 Oct 2026 a dev publish was refused with 0x80070020
-# and named nothing: the Restart Manager, asked first, took 41 s over the dev
-# server's 12,424 files, and only then were the handles listed.
-#
-#   1. Which processes have the path itself open, asked of Windows directly
-#      (FileProcessIdsUsingFileInformation). For a folder that is exactly
-#      the sharing violation: a handle on the folder, such as a process's
-#      current directory, opened without delete sharing. It names protected
-#      processes, Windows Defender among them, which nothing else here can
-#      look into. With it, every process running at that instant: name,
-#      parent and start time, so an id named anywhere below is still named
-#      once it has gone.
-#   2. Every handle on the box under the path (Get-ThornswoodPathHandles):
-#      files and folders inside it, which the first does not see.
-#   3. The command line of each process named, while it still runs.
-#   4. What the Restart Manager says has a file under it open, last.
-function Get-ThornswoodPathHolders([string]$Path) {
-  $snap = Get-ThornswoodPathOpeners $Path
-  $handles = Get-ThornswoodPathHandles $Path
-  $said = 'open itself in: ' + $snap.Said + '; handles: ' + $handles
-  $ids = @()
-  foreach ($m in [regex]::Matches($snap.Said + ' ' + $handles, '(?:pid |into |, |among them )(\d+) (?!processes)')) { $ids += [int]$m.Groups[1].Value }
-  $now = Get-Date
-  $recent = @()
-  foreach ($k in @($snap.Procs.Keys)) {
-    $p = $snap.Procs[$k]
-    if ($p.Started -and ($now - $p.Started).TotalSeconds -le 120 -and $k -ne $PID) { $recent += $k }
-  }
-  $who = @()
-  $lines = @{}
-  $noLines = ''
-  $named = @($ids + $recent | Sort-Object -Unique)
-  if ($named.Count) {
-    try { foreach ($w in @(Get-CimInstance Win32_Process -ErrorAction Stop)) { if ($named -contains [int]$w.ProcessId) { $lines[[int]$w.ProcessId] = $w.CommandLine } } }
-    catch { $noLines = '; the command lines could not be read: ' + $_.Exception.Message }
-  }
-  foreach ($id in $named) {
-    $line = 'pid ' + $id + ' ' + (Get-ThornswoodProcessWords $snap.Procs $id)
-    if ($lines.ContainsKey($id) -and $lines[$id]) { $line += ', command line ' + $lines[$id] }
-    elseif (-not (Get-Process -Id $id -ErrorAction SilentlyContinue)) { $line += ', gone by the time its command line was asked' }
-    $who += $line
-  }
-  if ($ids.Count) { $said += '; who they are: ' + ((@($who | Where-Object { $ids -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })) -join '; ') }
-  $new = @($who | Where-Object { $recent -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })
-  $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' }) + $noLines
-  return $said + '; Restart Manager: ' + (Get-ThornswoodFileHolders $Path)
-}
-
-# How one process from Get-ThornswoodPathOpeners's snapshot reads: its name,
-# its parent's id and name, and when it started, or that it was not running.
-function Get-ThornswoodProcessWords($Procs, [int]$Id) {
-  if (-not $Procs.ContainsKey($Id)) { return '(not running when the refusal was looked at)' }
-  $p = $Procs[$Id]
-  $parent = 'parent ' + $p.Parent + ' ' + $(if ($Procs.ContainsKey($p.Parent)) { $Procs[$p.Parent].Name } else { '(not running)' })
-  $at = if ($p.Started) { 'started ' + $p.Started.ToString('yyyy-MM-dd h:mm:ss.fff tt') } else { 'start time not given' }
-  return ($p.Name + ' (' + $parent + ', ' + $at + ')')
-}
-
-# Which processes have $Path itself open, and every process running at that
-# instant, in one look that opens nothing but $Path. Returns Said, the
-# openers as "pid name" words or why they could not be asked, and Procs, by
-# id, each with Name, Parent and Started (local time). This process's own
-# look at the path is left out of the openers.
-function Get-ThornswoodPathOpeners([string]$Path) {
-  if (-not ('ThornswoodOpeners' -as [type])) {
-    try {
-      Add-Type -TypeDefinition @'
+# The C# the looks and the folder rename below use, compiled once, when this
+# text is loaded, in one go. Add-Type runs the compiler, which takes seconds,
+# so it is done before anything is stopped: on 22 Oct 2026 at 5:38 AM a
+# refused rename compiled two of these after the refusal and so looked at
+# the folder seconds late, and the two ids it could not name were the
+# compiler's own processes (#3262). $ThornswoodTypesWhy is '' once they are
+# loaded, else why not (off Windows, where they do not exist, too), and each
+# look says so in place of its answer, and a folder is moved by .NET.
+$ThornswoodTypesCs = @'
 using System;
 using System.Collections.Generic;
 using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading;
 public static class ThornswoodOpeners {
   [StructLayout(LayoutKind.Sequential)] struct IOSB { public IntPtr Status; public IntPtr Info; }
   [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr template);
@@ -187,7 +129,7 @@ public static class ThornswoodOpeners {
     IntPtr h = CreateFile(path, 0x80, 7, IntPtr.Zero, 3, 0x02000000 | 0x00200000, IntPtr.Zero);
     if (h == new IntPtr(-1)) { Error = "the path could not be opened to ask (Windows error " + Marshal.GetLastWin32Error() + ")"; return null; }
     try {
-      int len = 1 << 16;
+      int len = 1 << 12;
       while (true) {
         IntPtr buf = Marshal.AllocHGlobal(len);
         try {
@@ -202,6 +144,24 @@ public static class ThornswoodOpeners {
         } finally { Marshal.FreeHGlobal(buf); }
       }
     } finally { CloseHandle(h); }
+  }
+  public static int Unasked;
+  public static string FirstUnasked;
+  // For each process with any of the files open: id, how many, the first.
+  public static List<object[]> OfFiles(string[] paths) {
+    Unasked = 0;
+    FirstUnasked = null;
+    Dictionary<long, object[]> by = new Dictionary<long, object[]>();
+    foreach (string p in paths) {
+      long[] ids = Of(p);
+      if (ids == null) { if (Unasked++ == 0) FirstUnasked = p + " (" + Error + ")"; continue; }
+      foreach (long id in ids) {
+        object[] e;
+        if (!by.TryGetValue(id, out e)) { e = new object[] { id, 0, p }; by[id] = e; }
+        e[1] = (int)e[1] + 1;
+      }
+    }
+    return new List<object[]>(by.Values);
   }
   // Every process running: id, parent id, start (FILETIME, UTC) and name.
   public static List<object[]> Running() {
@@ -241,102 +201,6 @@ public static class ThornswoodOpeners {
     return all;
   }
 }
-'@
-    } catch { return @{ Said = 'Windows could not be asked: ' + $_.Exception.Message; Procs = @{} } }
-  }
-  $ids = $null
-  $why = ''
-  try { $ids = [ThornswoodOpeners]::Of([IO.Path]::GetFullPath($Path)); if ($null -eq $ids) { $why = [ThornswoodOpeners]::Error } }
-  catch { $why = 'Windows could not be asked: ' + $_.Exception.Message }
-  $procs = @{}
-  try {
-    foreach ($r in [ThornswoodOpeners]::Running()) {
-      $started = $null
-      if ([long]$r[2] -gt 0) { $started = [DateTime]::FromFileTimeUtc([long]$r[2]).ToLocalTime() }
-      $procs[[int]$r[0]] = @{ Name = [string]$r[3]; Parent = [int]$r[1]; Started = $started }
-    }
-  } catch { $why += $(if ($why) { '; ' } else { '' }) + $_.Exception.Message }
-  if ($why) { return @{ Said = $why; Procs = $procs } }
-  $others = @($ids | Where-Object { [int]$_ -ne $PID })
-  if (-not $others.Count) { return @{ Said = 'no process but this one, asking'; Procs = $procs } }
-  $words = @($others | ForEach-Object { 'pid ' + $_ + ' ' + $(if ($procs.ContainsKey([int]$_)) { $procs[[int]$_].Name } else { '(gone)' }) })
-  return @{ Said = ($words -join ', '); Procs = $procs }
-}
-
-# What the Restart Manager says has a file at or under $Path open right now,
-# as "pid name" pairs, or why it could not be asked.
-function Get-ThornswoodFileHolders([string]$Path) {
-  if (-not ('ThornswoodRestartManager' -as [type])) {
-    try {
-      Add-Type -TypeDefinition @'
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-public static class ThornswoodRestartManager {
-  [StructLayout(LayoutKind.Sequential)] struct FILETIME { public uint Low; public uint High; }
-  [StructLayout(LayoutKind.Sequential)] struct RM_UNIQUE_PROCESS { public int Pid; public FILETIME Start; }
-  [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)] struct RM_PROCESS_INFO {
-    public RM_UNIQUE_PROCESS Process;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 256)] public string AppName;
-    [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 64)] public string ServiceShortName;
-    public int AppType; public uint AppStatus; public uint TSSessionId;
-    [MarshalAs(UnmanagedType.Bool)] public bool Restartable;
-  }
-  [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)] static extern int RmStartSession(out uint session, int flags, string key);
-  [DllImport("rstrtmgr.dll")] static extern int RmEndSession(uint session);
-  [DllImport("rstrtmgr.dll", CharSet = CharSet.Unicode)] static extern int RmRegisterResources(uint session, uint files, string[] names, uint apps, IntPtr unique, uint services, string[] serviceNames);
-  [DllImport("rstrtmgr.dll")] static extern int RmGetList(uint session, out uint needed, ref uint count, [In, Out] RM_PROCESS_INFO[] info, ref uint reasons);
-  public static string Holders(string[] files) {
-    uint session;
-    int r = RmStartSession(out session, 0, Guid.NewGuid().ToString());
-    if (r != 0) return "the Restart Manager would not start (" + r + ")";
-    try {
-      r = RmRegisterResources(session, (uint)files.Length, files, 0, IntPtr.Zero, 0, null);
-      if (r != 0) return "the Restart Manager would not take the files (" + r + ")";
-      uint needed = 0, count = 0, reasons = 0;
-      r = RmGetList(session, out needed, ref count, null, ref reasons);
-      if (r == 0) return "";
-      if (r != 234) return "the Restart Manager would not list them (" + r + ")";
-      RM_PROCESS_INFO[] info = new RM_PROCESS_INFO[needed];
-      count = needed;
-      r = RmGetList(session, out needed, ref count, info, ref reasons);
-      if (r != 0) return "the Restart Manager would not list them (" + r + ")";
-      List<string> said = new List<string>();
-      for (int i = 0; i < count; i++) said.Add("pid " + info[i].Process.Pid + " " + info[i].AppName);
-      return string.Join(", ", said.ToArray());
-    } finally { RmEndSession(session); }
-  }
-}
-'@
-    } catch { return 'the Restart Manager could not be asked: ' + $_.Exception.Message }
-  }
-  $files = @($Path)
-  if (Test-Path -LiteralPath $Path -PathType Container) {
-    $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -EA SilentlyContinue | ForEach-Object { $_.FullName })
-    if (-not $files.Count) { return 'the folder holds no files for the Restart Manager to ask about' }
-  }
-  $who = [ThornswoodRestartManager]::Holders([string[]]$files)
-  if (-not $who) { return 'no process the Restart Manager can see' }
-  return $who
-}
-
-# Every handle on the box that names $Path or a path under it, this
-# process's own among them, as "pid name: path (access 0x...)" groups, then
-# the processes it could not look into
-# (protected ones, Windows Defender among them, which even an administrator
-# cannot open). Read only: each handle is copied into this process, its path
-# read, and the copy closed. A handle whose path cannot be read without
-# waiting (a pipe with a read pending) is passed over by its access mask, and
-# the whole look is given 20 seconds and says so if it ran out.
-function Get-ThornswoodPathHandles([string]$Path) {
-  if (-not ('ThornswoodHandles' -as [type])) {
-    try {
-      Add-Type -TypeDefinition @'
-using System;
-using System.Collections.Generic;
-using System.Runtime.InteropServices;
-using System.Text;
-using System.Threading;
 public static class ThornswoodHandles {
   [StructLayout(LayoutKind.Sequential)] struct ENTRY { public IntPtr Object; public IntPtr Pid; public IntPtr Handle; public uint Access; public ushort Creator; public ushort Type; public uint Attr; public uint Reserved; }
   [DllImport("ntdll.dll")] static extern int NtQuerySystemInformation(int cls, IntPtr buf, int len, out int ret);
@@ -427,9 +291,176 @@ public static class ThornswoodHandles {
     try { return System.Diagnostics.Process.GetProcessById(pid).ProcessName; } catch { return "(exited)"; }
   }
 }
-'@
-    } catch { return 'the handles could not be listed: ' + $_.Exception.Message }
+public static class ThornswoodRename {
+  [StructLayout(LayoutKind.Sequential)] struct IOSB { public IntPtr Status; public IntPtr Info; }
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)] static extern IntPtr CreateFile(string name, uint access, uint share, IntPtr sec, uint disp, uint flags, IntPtr template);
+  [DllImport("kernel32.dll")] static extern bool CloseHandle(IntPtr h);
+  [DllImport("ntdll.dll")] static extern int NtSetInformationFile(IntPtr h, out IOSB iosb, IntPtr buf, int len, int cls);
+  [DllImport("ntdll.dll")] static extern int RtlNtStatusToDosError(int status);
+  // "open" when the folder would not open to be renamed, "rename" when it
+  // opened and the rename was refused.
+  public static string Step;
+  // 0 once from is renamed to to (full paths, one volume), else the Windows error.
+  public static int Move(string from, string to) {
+    Step = "open";
+    // Delete access, which a rename needs, sharing everything, as MoveFile asks.
+    IntPtr h = CreateFile(from, 0x00010000 | 0x00100000 | 0x80, 7, IntPtr.Zero, 3, 0x02000000 | 0x00200000, IntPtr.Zero);
+    if (h == new IntPtr(-1)) return Marshal.GetLastWin32Error();
+    try {
+      Step = "rename";
+      // FILE_RENAME_INFORMATION: ReplaceIfExists (no), RootDirectory (none),
+      // FileNameLength, then the new name as an NT path.
+      string name = @"\??\" + to;
+      int nameAt = 2 * IntPtr.Size + 4;
+      int len = nameAt + (name.Length + 1) * 2;
+      IntPtr buf = Marshal.AllocHGlobal(len);
+      try {
+        for (int i = 0; i < len; i++) Marshal.WriteByte(buf, i, 0);
+        Marshal.WriteInt32(buf, 2 * IntPtr.Size, name.Length * 2);
+        Marshal.Copy(name.ToCharArray(), 0, new IntPtr(buf.ToInt64() + nameAt), name.Length);
+        IOSB io;
+        int st = NtSetInformationFile(h, out io, buf, len, 10);
+        return st == 0 ? 0 : RtlNtStatusToDosError(st);
+      } finally { Marshal.FreeHGlobal(buf); }
+    } finally { CloseHandle(h); }
   }
+}
+'@
+function Use-ThornswoodTypes {
+  if ([Environment]::OSVersion.Platform -ne [PlatformID]::Win32NT) { return 'Windows has these lists and this is not Windows' }
+  if (('ThornswoodOpeners' -as [type]) -and ('ThornswoodHandles' -as [type]) -and ('ThornswoodRename' -as [type])) { return '' }
+  try { Add-Type -TypeDefinition $ThornswoodTypesCs; return '' } catch { return 'the C# it needs would not compile: ' + $_.Exception.Message }
+}
+$ThornswoodTypesWhy = Use-ThornswoodTypes
+
+# What has $Path or anything under it open right now, quickest first, because
+# a holder that exits a moment after the refusal is gone from anything asked
+# later (#3262). On 22 Oct 2026 a dev publish was refused with 0x80070020
+# and named nothing: the Restart Manager, asked first, took 41 s over the dev
+# server's 12,424 files, and only then were the handles listed.
+#
+#   1. Which processes have the path itself open, asked of Windows directly
+#      (FileProcessIdsUsingFileInformation). For a folder that is exactly
+#      the sharing violation: a handle on the folder, such as a process's
+#      current directory, opened without delete sharing. It names protected
+#      processes, Windows Defender among them, which nothing else here can
+#      look into. With it, every process running at that instant: name,
+#      parent and start time, so an id named anywhere below is still named
+#      once it has gone.
+#   2. Every handle on the box under the path (Get-ThornswoodPathHandles):
+#      files and folders inside it, which the first does not see.
+#   3. The command line of each process named, while it still runs.
+#   4. Which processes have each file under it open, asked of Windows the
+#      same way as 1, file by file (Get-ThornswoodFileHolders), last because
+#      it walks the whole tree. This was the Restart Manager until #3274,
+#      which asks Windows the same thing through one session lock shared by
+#      the whole box: with two builds on the box that lock was not had in
+#      time (its session would not start: 121), and it took the 41 s above.
+function Get-ThornswoodPathHolders([string]$Path) {
+  $snap = Get-ThornswoodPathOpeners $Path
+  $handles = Get-ThornswoodPathHandles $Path
+  $said = 'open itself in: ' + $snap.Said + '; handles: ' + $handles
+  $ids = @()
+  foreach ($m in [regex]::Matches($snap.Said + ' ' + $handles, '(?:pid |into |, |among them )(\d+) (?!processes)')) { $ids += [int]$m.Groups[1].Value }
+  $now = Get-Date
+  $recent = @()
+  foreach ($k in @($snap.Procs.Keys)) {
+    $p = $snap.Procs[$k]
+    if ($p.Started -and ($now - $p.Started).TotalSeconds -le 120 -and $k -ne $PID) { $recent += $k }
+  }
+  $who = @()
+  $lines = @{}
+  $noLines = ''
+  $named = @($ids + $recent | Sort-Object -Unique)
+  if ($named.Count) {
+    try { foreach ($w in @(Get-CimInstance Win32_Process -ErrorAction Stop)) { if ($named -contains [int]$w.ProcessId) { $lines[[int]$w.ProcessId] = $w.CommandLine } } }
+    catch { $noLines = '; the command lines could not be read: ' + $_.Exception.Message }
+  }
+  foreach ($id in $named) {
+    $line = 'pid ' + $id + ' ' + (Get-ThornswoodProcessWords $snap.Procs $id)
+    if ($lines.ContainsKey($id) -and $lines[$id]) { $line += ', command line ' + $lines[$id] }
+    elseif (-not (Get-Process -Id $id -ErrorAction SilentlyContinue)) { $line += ', gone by the time its command line was asked' }
+    $who += $line
+  }
+  if ($ids.Count) { $said += '; who they are: ' + ((@($who | Where-Object { $ids -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })) -join '; ') }
+  $new = @($who | Where-Object { $recent -contains [int]($_ -replace '^pid (\d+) .*$', '$1') })
+  $said += '; started in the 2 minutes before: ' + $(if ($new.Count) { $new -join '; ' } else { 'nothing' }) + $noLines
+  return $said + '; files under it open in: ' + (Get-ThornswoodFileHolders $Path $snap.Procs)
+}
+
+# How one process from Get-ThornswoodPathOpeners's snapshot reads: its name,
+# its parent's id and name, and when it started, or that it was not running.
+function Get-ThornswoodProcessWords($Procs, [int]$Id) {
+  if (-not $Procs.ContainsKey($Id)) { return '(not running when the refusal was looked at)' }
+  $p = $Procs[$Id]
+  $parent = 'parent ' + $p.Parent + ' ' + $(if ($Procs.ContainsKey($p.Parent)) { $Procs[$p.Parent].Name } else { '(not running)' })
+  $at = if ($p.Started) { 'started ' + $p.Started.ToString('yyyy-MM-dd h:mm:ss.fff tt') } else { 'start time not given' }
+  return ($p.Name + ' (' + $parent + ', ' + $at + ')')
+}
+
+# Which processes have $Path itself open, and every process running at that
+# instant, in one look that opens nothing but $Path. Returns Said, the
+# openers as "pid name" words or why they could not be asked, and Procs, by
+# id, each with Name, Parent and Started (local time). This process's own
+# look at the path is left out of the openers.
+function Get-ThornswoodPathOpeners([string]$Path) {
+  if ($ThornswoodTypesWhy) { return @{ Said = 'Windows could not be asked: ' + $ThornswoodTypesWhy; Procs = @{} } }
+  $ids = $null
+  $why = ''
+  try { $ids = [ThornswoodOpeners]::Of([IO.Path]::GetFullPath($Path)); if ($null -eq $ids) { $why = [ThornswoodOpeners]::Error } }
+  catch { $why = 'Windows could not be asked: ' + $_.Exception.Message }
+  $procs = @{}
+  try {
+    foreach ($r in [ThornswoodOpeners]::Running()) {
+      $started = $null
+      if ([long]$r[2] -gt 0) { $started = [DateTime]::FromFileTimeUtc([long]$r[2]).ToLocalTime() }
+      $procs[[int]$r[0]] = @{ Name = [string]$r[3]; Parent = [int]$r[1]; Started = $started }
+    }
+  } catch { $why += $(if ($why) { '; ' } else { '' }) + $_.Exception.Message }
+  if ($why) { return @{ Said = $why; Procs = $procs } }
+  $others = @($ids | Where-Object { [int]$_ -ne $PID })
+  if (-not $others.Count) { return @{ Said = 'no process but this one, asking'; Procs = $procs } }
+  $words = @($others | ForEach-Object { 'pid ' + $_ + ' ' + $(if ($procs.ContainsKey([int]$_)) { $procs[[int]$_].Name } else { '(gone)' }) })
+  return @{ Said = ($words -join ', '); Procs = $procs }
+}
+
+# Which processes have a file at or under $Path open right now, as "pid
+# name (n files, the first <path>)" groups, from Windows's own list for each
+# file (ThornswoodOpeners, Get-ThornswoodPathOpeners), with the files it
+# could not ask about counted. Names come from $Procs, that function's
+# snapshot. This process's own look at each file is left out.
+function Get-ThornswoodFileHolders([string]$Path, $Procs) {
+  if ($ThornswoodTypesWhy) { return 'not asked: ' + $ThornswoodTypesWhy }
+  if (-not $Procs) { $Procs = @{} }
+  $files = @($Path)
+  if (Test-Path -LiteralPath $Path -PathType Container) {
+    $files = @(Get-ChildItem -LiteralPath $Path -Recurse -File -Force -EA SilentlyContinue | ForEach-Object { $_.FullName })
+    if (-not $files.Count) { return 'none: the folder holds no files' }
+  }
+  try { $found = [ThornswoodOpeners]::OfFiles([string[]]$files) }
+  catch { return 'not asked: ' + $_.Exception.Message }
+  $groups = @()
+  foreach ($r in $found) {
+    $id = [int]$r[0]
+    if ($id -eq $PID) { continue }
+    $name = if ($Procs.ContainsKey($id)) { $Procs[$id].Name } else { '(not running when the refusal was looked at)' }
+    $groups += ('pid ' + $id + ' ' + $name + ' (' + $r[1] + ' file(s), the first ' + $r[2] + ')')
+  }
+  $said = if ($groups.Count) { $groups -join '; ' } else { 'no process but this one, asking, in ' + $files.Count + ' file(s)' }
+  if ([ThornswoodOpeners]::Unasked) { $said += '; ' + [ThornswoodOpeners]::Unasked + ' file(s) could not be asked about, the first ' + [ThornswoodOpeners]::FirstUnasked }
+  return $said
+}
+
+# Every handle on the box that names $Path or a path under it, this
+# process's own among them, as "pid name: path (access 0x...)" groups, then
+# the processes it could not look into
+# (protected ones, Windows Defender among them, which even an administrator
+# cannot open). Read only: each handle is copied into this process, its path
+# read, and the copy closed. A handle whose path cannot be read without
+# waiting (a pipe with a read pending) is passed over by its access mask, and
+# the whole look is given 20 seconds and says so if it ran out.
+function Get-ThornswoodPathHandles([string]$Path) {
+  if ($ThornswoodTypesWhy) { return 'the handles could not be listed: ' + $ThornswoodTypesWhy }
   # Without the debug privilege an administrator cannot open the services'
   # processes; a run without it says so beside what it found.
   $noDebug = ''
@@ -440,18 +471,36 @@ public static class ThornswoodHandles {
 
 # Moves a file or a folder on one volume, once, making the folder it goes
 # into. $false when Windows refuses, with why in $ThornswoodMoveWhy.
+#
+# A folder is opened for the rename and then renamed through that handle,
+# which is what MoveFile does, so a refusal says which of the two it was
+# (#3262). Measured on a box runner on 22 Oct 2026: the open is refused with
+# error 32 when a process has the folder itself open without delete sharing,
+# a current directory there the usual one; it opens, and the rename is
+# refused with error 5, when a file under it is open. Each is looked at the
+# moment it is refused.
 $ThornswoodMoveWhy = ''
 function Move-ThornswoodPath([string]$From, [string]$To) {
   $script:ThornswoodMoveWhy = ''
+  $folder = $false
   try {
     $null = [IO.Directory]::CreateDirectory((Split-Path -Parent $To))
-    if (Test-Path -LiteralPath $From -PathType Container) { [IO.Directory]::Move($From, $To) }
-    else { [IO.File]::Move($From, $To) }
-    return $true
+    $folder = Test-Path -LiteralPath $From -PathType Container
+    if (-not $folder) { [IO.File]::Move($From, $To); return $true }
+    if ($ThornswoodTypesWhy) { [IO.Directory]::Move($From, $To); return $true }
   } catch {
     $e = $_.Exception
     while ($e.InnerException) { $e = $e.InnerException }
     $script:ThornswoodMoveWhy = ('{0} (0x{1:X8}); open under it then: {2}' -f $e.Message.Trim(), $e.HResult, (Get-ThornswoodPathHolders $From))
     return $false
   }
+  $full = [IO.Path]::GetFullPath($From)
+  $into = [IO.Path]::GetFullPath($To)
+  $err = [ThornswoodRename]::Move($full, $into)
+  if ($err -eq 0) { return $true }
+  $step = [ThornswoodRename]::Step
+  $what = if ($step -eq 'open') { 'the folder would not open to be renamed' } else { 'the folder opened, and the rename was refused' }
+  $msg = (New-Object ComponentModel.Win32Exception($err)).Message
+  $script:ThornswoodMoveWhy = ('{0}: {1} (0x{2:X8}); open under it then: {3}' -f $what, $msg, (0x80070000 -bor $err), (Get-ThornswoodPathHolders $From))
+  return $false
 }
