@@ -22,7 +22,10 @@
 //      Windows, and always runs one that asked git, did not pass, or that
 //      the box script marked (something else opened the checkout beside it);
 //      and runs a harness when a file changes in place in a folder it
-//      opened there, since a Windows listing gives each entry's size.
+//      opened there, since a Windows listing gives each entry's size; or,
+//      when the trace saw the directory enumerations, only in a folder it
+//      listed, a folder it only opened rerunning it only when the folder
+//      itself comes or goes.
 'use strict';
 const path = require('path');
 const REPO = path.join(__dirname, '..');
@@ -154,6 +157,11 @@ try {
   try { A.build(gz, REPO, ''); } catch (e) { threw = e.message; }
   yes('  traces that name no full commit build no map', /no full commit/.test(threw));
   yes('  says it is of Windows', m.platform === 'windows');
+  yes('  and, its traces having no word of enumerations, takes every folder opened as listed', m.listings === undefined);
+  const gz2 = path.join(dir, 'enum.jsonl.gz');
+  fs.writeFileSync(gz2, zlib.gzipSync(line({ harness: 'test-e.ps1', listings: 'enumerated', paths: { 'tests': 'read', 'scripts': 'list' } }) + '\n'));
+  const m2 = A.build(gz2, REPO, 'c'.repeat(40));
+  yes('  a map from traces that saw the enumerations says so, and lists only what was listed', m2.listings === 'enumerated' && m2.harnesses['test-e.ps1'].lists.join(' ') === 'scripts');
   const wm = { format: 1, commit: BASE, platform: 'windows', harnesses: { 'test-list.ps1': map.harnesses['test-list.ps1'], 'test-food.js': map.harnesses['test-food.js'] } };
   const win = (changes) => A.select({ map: wm, gate: ['test-food.js', 'test-list.ps1'], base: BASE, changes: changes, baseFiles: baseFiles, headFiles: baseFiles });
   r = win([{ status: 'M', path: 'scripts/dev/Z.ps1' }]);
@@ -162,6 +170,19 @@ try {
   r = win([{ status: 'M', path: 'scripts/vps/W.ps1' }]);
   yes('  one changed in place in a folder it opened runs it, on Windows', r.run.join(' ') === 'test-list.ps1' && /size and times/.test(r.why['test-list.ps1']));
   yes('  and not on a Linux map, where a listing gives no sizes', !runs(pick([{ status: 'M', path: 'scripts/vps/W.ps1' }]), 'test-list.ps1'));
+  // A trace that saw the enumerations: test-open.ps1 opened scripts/vps and
+  // never listed it, test-list.ps1 listed it.
+  const em = { format: 1, commit: BASE, platform: 'windows', listings: 'enumerated', harnesses: {
+    'test-list.ps1': { reads: ['scripts/vps', 'tests/test-list.ps1'], lists: ['scripts/vps'] },
+    'test-open.ps1': { reads: ['scripts/vps', 'tests/test-open.ps1'], lists: [] },
+  } };
+  const en = (changes, files) => A.select({ map: em, gate: ['test-list.ps1', 'test-open.ps1'], base: BASE, changes: changes, baseFiles: baseFiles, headFiles: files || baseFiles });
+  r = en([{ status: 'M', path: 'scripts/vps/W.ps1' }]);
+  yes('  with the enumerations seen, a file changed in place reruns only the harness that listed its folder', r.run.join(' ') === 'test-list.ps1');
+  r = en([{ status: 'A', path: 'scripts/vps/New.ps1' }], baseFiles.concat(['scripts/vps/New.ps1']));
+  yes('  and so does an entry added there', r.run.join(' ') === 'test-list.ps1');
+  r = en([{ status: 'D', path: 'scripts/vps/X.ps1' }, { status: 'D', path: 'scripts/vps/W.ps1' }], baseFiles.filter(f => !f.startsWith('scripts/vps/')));
+  yes('  while the folder itself going reruns the one that only opened it too', r.run.join(' ') === 'test-list.ps1 test-open.ps1');
   baseFiles.pop();
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
