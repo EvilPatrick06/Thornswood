@@ -577,7 +577,7 @@ PLAN = [
  ('Roleplay Guide', [
    dict(kind='text',  name='game-rules',  key='GAMERULES', mode='testersread',
         topic='How roleplay works here. Nine rules, and what we let slide.',
-        post=True, was=(('Thornswood', 'game-rules'),)),
+        post=True, was=(('Thornswood', 'game-rules'), ('In Character', 'game-rules'))),
    dict(kind='text',  name='lore',        key='LORE',     mode='testersread',
         topic='4E 252. What happened and who you can be.', post=True,
         was=(('In Character', 'lore'),)),
@@ -639,6 +639,9 @@ PLAN = [
    dict(kind='voice', name='Help Voice',        mode='open',
         was=(('Help', 'Support'),)),
    dict(kind='voice', name='AFK',               key='AFK', mode='open'),
+   # Made by hand for the music bot, and found by the audit of 22 Oct
+   # (#3317). Named so -Prune leaves it; never made here.
+   dict(kind='text',  name='jukebox',           mode='open', make=False),
  ]),
  # The playtesters' own space (#3317, Patrick: "a category for playtester
  # following the same pattern as the staff ones just rembering playtesters
@@ -713,8 +716,11 @@ PLAN = [
         topic='Test tasks someone on dev has to measure, from the board. Kept '
               'by the bot: a post goes when its issue closes as fixed or its '
               'test task no longer says Server: Dev.'),
-   dict(kind='forum', name='dev-test-results', mode='space', space='Dev',
-        was=(('Staff', 'dev-test-results'),)),
+   # dev-test-findings on the live server (the audit of 22 Oct, #3317), the
+   # same word as #test-findings; dev-test-results is the name it was planned
+   # under and is answered to as well.
+   dict(kind='forum', name='dev-test-findings', mode='space', space='Dev',
+        was=(('Staff', 'dev-test-findings'), ('Staff', 'dev-test-results'))),
  ])),
  ('Lore', _space('Lore')),
  ('Moderation', _space('Moderation')),
@@ -831,7 +837,8 @@ RETIRED = [
 # renamed, and -Prune was one keystroke from taking the originals with it.
 KEEP = (
     'general-chat', 'welcome-travelers', 'server-progression-and-economy',
-    'play-testing', 'suggestions', 'dev-test-results', 'test-results', 'test-tasks',
+    'play-testing', 'suggestions', 'dev-test-results', 'dev-test-findings',
+    'test-results', 'test-tasks', 'jukebox',
     'test-findings', 'known-issues', 'dev-test-tasks',
     # Where staff status updates go (Patrick, 11 Oct), and where the bot says
     # the watchdog's messages and the sessions that went wrong, by the id in

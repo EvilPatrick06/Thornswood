@@ -189,7 +189,7 @@ Category mode: testersread.
 
 | Channel | Kind | Mode | Sees | Talks | Notes |
 |---|---|---|---|---|---|
-| #game-rules | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py GAMERULES, with its Changelog thread; was #game-rules in Thornswood; topic: How roleplay works here. Nine rules, and what we let slide. |
+| #game-rules | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py GAMERULES, with its Changelog thread; was #game-rules in Thornswood; was #game-rules in In Character; topic: How roleplay works here. Nine rules, and what we let slide. |
 | #lore | text | testersread | everybody on staff, Playtester | the council | posts: the council; written by the build from content.py LORE, with its Changelog thread; was #lore in In Character; topic: 4E 252. What happened and who you can be. |
 
 ### Out of Character
@@ -243,6 +243,7 @@ Category mode: open.
 | General | voice | open | everybody on staff, Playtester | everybody on staff, Playtester |  |
 | Help Voice | voice | open | everybody on staff, Playtester | everybody on staff, Playtester | was Support in Help |
 | AFK | voice | open | everybody on staff, Playtester | everybody on staff, Playtester |  |
+| #jukebox | text | open | everybody on staff, Playtester | everybody on staff, Playtester | never made by the build |
 
 ### Playtesters
 
@@ -284,7 +285,7 @@ Category mode: space (Dev).
 | #dev-announcements | text | spaceread | the council, Dev | the council | posts: the council; topic: Announcements for Dev. The council posts here. |
 | #dev-rules | text | spacerules | the council, Dev | Owner and Co-Owner, Lead Dev | posts: Owner and Co-Owner, Lead Dev; written by the build from content.py DEVRULES, a draft waiting on approval; topic: How Dev works. Lead Dev, Owner and Co-Owner post here. |
 | #dev-test-tasks | forum | space | the council, Dev | the council, Dev | never made by the build; was #dev-test-tasks in Staff; topic: Test tasks someone on dev has to measure, from the board. Kept by the bot: a post goes when its issue closes as fixed or its test task no longer says Server: Dev. |
-| #dev-test-results | forum | space | the council, Dev | the council, Dev | was #dev-test-results in Staff |
+| #dev-test-findings | forum | space | the council, Dev | the council, Dev | was #dev-test-findings in Staff; was #dev-test-results in Staff |
 | #dev-chat | text | space | the council, Dev | the council, Dev | topic: Talk between Dev. |
 | Dev Voice | voice | space | the council, Dev | the council, Dev |  |
 
@@ -355,6 +356,6 @@ Categories retired by the plan, removed by `-Prune` once empty: Help.
 
 Channel names the build no longer wants, removed by `-Prune`: tech-help, looking-for-group, off-topic, downloads, links-and-credits, Small Table, The Longhouse, Away, screenshots, clips, bot-commands, The Bannered Mare, The Road, test-these, test-tasks-archive.
 
-Channels never deleted by anything in the build: council, council-decisions, dev-test-results, dev-test-tasks, general-chat, gm, gm voice, gm-chat, gm-discipline, gm-rules, gm-scene-summaries, gm-suggestions, help voice, known-issues, news, play-testing, playtester voice, server-progression-and-economy, staff-announcements, staff-updates, suggestions, support, test-findings, test-results, test-tasks, ticket-log, tickets, welcome-travelers.
+Channels never deleted by anything in the build: council, council-decisions, dev-test-findings, dev-test-results, dev-test-tasks, general-chat, gm, gm voice, gm-chat, gm-discipline, gm-rules, gm-scene-summaries, gm-suggestions, help voice, jukebox, known-issues, news, play-testing, playtester voice, server-progression-and-economy, staff-announcements, staff-updates, suggestions, support, test-findings, test-results, test-tasks, ticket-log, tickets, welcome-travelers.
 
 Roles never deleted: every Jarl, Citizen and office role.
