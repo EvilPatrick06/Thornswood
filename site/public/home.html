@@ -162,7 +162,9 @@
     biggest thing on the page when it opens. Built by
     scripts/dev/Build-SiteImages.py from banner.jpg. The video sits over it
     with no poster, so it shows nothing until its first frame and the still
-    shows through until then; for somebody who asked for less motion it never
+    shows through until then. home.js starts it only once the page has loaded
+    (#2777), so its 3.3 MB do not share a phone's line with the still while
+    the still is coming in; for somebody who asked for less motion it never
     plays, and the still is what stays. alt="" and aria-hidden for the same
     reason as the video (#2193, below).
   -->

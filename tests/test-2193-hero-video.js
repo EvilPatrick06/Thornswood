@@ -13,7 +13,8 @@
   B. home.js's banner code, run against a stand-in page: the button is shown,
      named for what a press will do, and kept in step with the video; with
      reduced motion asked for nothing plays until somebody presses it, and
-     without it the video starts.
+     without it the video starts once the page has loaded (#2777), unless
+     somebody pressed the button before that.
 */
 const fs = require('fs');
 const path = require('path');
@@ -79,12 +80,15 @@ function page(reduce) {
     addEventListener(ev, fn) { (docHandlers[ev] = docHandlers[ev] || []).push(fn); },
     querySelectorAll() { return []; },
   };
-  const window = { matchMedia: (q) => ({ matches: reduce && /prefers-reduced-motion: reduce/.test(q), addEventListener() {} }) };
+  const winHandlers = {};
+  const window = { matchMedia: (q) => ({ matches: reduce && /prefers-reduced-motion: reduce/.test(q), addEventListener() {} }),
+    addEventListener(ev, fn) { (winHandlers[ev] = winHandlers[ev] || []).push(fn); } };
   // Only the banner code: from the top of home.js to the menu that follows it.
   const end = JS.indexOf("var burger = document.getElementById('burger')");
   vm.runInNewContext(JS.slice(0, end), { window: window, document: document, console: console });
   (docHandlers.DOMContentLoaded || []).forEach((f) => f());
-  return { video, button, press: () => button.clicks.forEach((f) => f()) };
+  return { video, button, press: () => button.clicks.forEach((f) => f()),
+           load: () => (winHandlers.load || []).forEach((f) => f()) };
 }
 const flush = () => new Promise((ok) => setImmediate(ok));
 
@@ -101,10 +105,21 @@ const flush = () => new Promise((ok) => setImmediate(ok));
   yes('B5: a second press pauses it, and the label goes back: ' + p.button.textContent,
       p.video.paused && p.button.textContent === 'Play background animation');
 
+  p.load(); await flush();
+  yes('B5a: and the page loading does not start it either', p.video.plays === 1 && p.video.paused);
+
   p = page(false);
   await flush();
-  yes('B6: without reduced motion it starts by itself', p.video.plays === 1 && !p.video.paused);
+  yes('B6a: without reduced motion it waits for the page to load, so the still has the line (#2777)', p.video.plays === 0 && p.video.paused);
+  p.load(); await flush();
+  yes('B6: then it starts by itself', p.video.plays === 1 && !p.video.paused);
   yes('B7: and the button offers to pause it: ' + p.button.textContent, p.button.textContent === 'Pause background animation');
+
+  p = page(false);
+  p.press(); await flush();
+  p.press(); await flush();
+  p.load(); await flush();
+  yes('B8: somebody who played and paused it before the load keeps it paused', p.video.plays === 1 && p.video.paused);
 
   console.log('');
   console.log(pass + ' passed, ' + fail + ' failed');

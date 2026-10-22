@@ -1,33 +1,38 @@
 
 /*
-  Autoplay is a video attribute and no media query turns it off, so somebody
-  who has asked their system for less motion still gets 24 seconds of drifting
-  aurora behind the title. Paused here instead, which leaves the still under
-  it showing: the same picture, holding still.
+  The hero video starts once the page has loaded, not as this script runs
+  (#2777). It is 3.3 MB, and asked for at once it shared a phone's connection
+  with the still under it, the picture the page opens on, which then took 3.4
+  to 6.8 seconds to show. The still has the line to itself until it is in,
+  and the video paints over it when it plays.
+
+  It never starts for somebody who has asked their system for less motion:
+  there is no autoplay attribute, so nothing plays that this does not start,
+  and the still is what stays. Nor once somebody has pressed the button
+  before the page loaded, which is their answer.
 
   Nothing here throws: matchMedia is asked only where it exists (narrow()
-  below asks it unguarded), and pause and removeAttribute do not throw on a
-  video, so no try is needed (#2736).
+  below asks it unguarded), so no try is needed (#2736).
 */
 var m = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)');
-if (m && m.matches) {
-  document.addEventListener('DOMContentLoaded', function () {
-    var v = document.querySelector('video.art');
-    if (v) { v.pause(); v.removeAttribute('autoplay'); }
-  });
-}
 
 var bannerVideo = document.querySelector('video.art'), bannerMotion = document.getElementById('bannerMotion');
 if (bannerVideo && bannerMotion) {
+  var bannerAsked = false;
   bannerMotion.hidden = false;
   function motionLabel() { bannerMotion.textContent = bannerVideo.paused ? 'Play background animation' : 'Pause background animation'; }
   bannerVideo.addEventListener('play', motionLabel);
   bannerVideo.addEventListener('pause', motionLabel);
   bannerMotion.addEventListener('click', function () {
+    bannerAsked = true;
     if (bannerVideo.paused) bannerVideo.play().catch(motionLabel);
     else bannerVideo.pause();
   });
-  if (!(m && m.matches)) bannerVideo.play().catch(motionLabel);
+  if (!(m && m.matches)) {
+    window.addEventListener('load', function () {
+      if (!bannerAsked) bannerVideo.play().catch(motionLabel);
+    });
+  }
   motionLabel();
 }
 
