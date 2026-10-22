@@ -120,7 +120,7 @@ function Settings([string]$root, [string]$pluginRoot, [int]$port) {
 # profileId -1 and isDeleted true. $who is in slot 0, another person in slot 4,
 # and slots 1 to 3 are deleted, so a world holds two characters.
 $otherWho = '2000001'
-function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles, [switch]$DeadOnly) {
+function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles, [int]$fileBytes, [switch]$DeadOnly) {
     Plugins $root $plugins
     Settings $root $root $port
     Put (Join-Path $root 'gamemode.js') '// gamemode'
@@ -139,7 +139,7 @@ function Server([string]$root, [int]$port, [string]$who, [int]$worldFiles, [swit
         foreach ($i in 1..3) { Put (Join-Path $forms "$i.json") $gone }
         Put (Join-Path $forms '4.json') ('{"profileId":' + $otherWho + ',"isDeleted":false,"isDisabled":true,"x":"' + (Noise 600) + '"}')
     }
-    foreach ($i in 1..$worldFiles) { Put (Join-Path $forms ("ff{0:x6}.json" -f $i)) ('{"ref":' + $i + ',"x":"' + (Noise 1100) + '"}') }
+    foreach ($i in 1..$worldFiles) { Put (Join-Path $forms ("ff{0:x6}.json" -f $i)) ('{"ref":' + $i + ',"x":"' + (Noise $fileBytes) + '"}') }
 }
 
 $work = Join-Path ([IO.Path]::GetTempPath()) ('ts-backup-' + [Guid]::NewGuid().ToString('N').Substring(0, 12))
@@ -152,8 +152,14 @@ $liveWho = '1234567'
 $devWho  = '7654321'
 
 try {
-    Server $live 45777 $liveWho 1420
-    Server $dev  45787 $devWho 30
+    # The live world is big enough to be far past the 195 KB of the 15
+    # September pair, in 40 files of 39 KB of noise. It was 1420 files of
+    # 1.1 KB, the same bytes, and every restore below wrote all 1420 again
+    # under Windows PowerShell 5.1: the most processor of any gate harness on
+    # the box (68 s in PR #3190's build, #3168), and on a full box on 21 Oct
+    # past its 300 s clock. Nothing here counts the files.
+    Server $live 45777 $liveWho 40 39000
+    Server $dev  45787 $devWho 30 1100
     # The live server's own join pass switch and role list (#1845). No
     # playtester list, so a payload's is taken off.
     $ls = [IO.File]::ReadAllText((Join-Path $live 'server-settings.json')) | ConvertFrom-Json
@@ -358,7 +364,7 @@ try {
     # A world whose every slot is a deleted character holds nobody, and a
     # restore of it is refused rather than reported as characters.
     $dead = Join-Path $work 'dead'
-    Server $dead 45827 '0' 3 -DeadOnly
+    Server $dead 45827 '0' 3 1100 -DeadOnly
     $deadOut = Join-Path $work 'dead-out'
     $code = Run $Nightly @('-GameRoot', $dead, '-DevGameRoot', $dev,
                            '-SiteRoot', (Join-Path $work 'no-site'), '-BotRoot', (Join-Path $work 'no-bot'),
