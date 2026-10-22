@@ -1082,6 +1082,41 @@ test('An NPC is stepped in the background again within a second or two of being 
   assert.ok(next && next.at - left <= 2100, 'Its first background step comes ' + (next ? next.at - left : 'never') + ' ms after');
   f.stop();
 });
+test('The mesh, search, prepare and near tasks sleep while they have nothing to do', () => {
+  // #3181: on dev with nobody on, meshTick still woke every 2 ms with no mesh
+  // work, and searchTick, prepareTick and nearTick every 10 or 100 ms.
+  const idle = ['meshTick', 'searchTick', 'prepareTick', 'nearTick'];
+  // A population, so the runtime looks for NPCs found later (discover).
+  const f = fixture({count:3, humans:[100], human:{100:{pos:[500,500,0]}},
+    population:(id, state) => ({home:state.pos.slice(), cell:state.cellOrWorld, leash:400}),
+    meshes:new Map([[60, square()], [61, square()]])});
+  f.advance(30000);
+  assert.equal(f.status().active, 3, 'The cast is ready');
+  const runs = () => Object.fromEntries(idle.map(name => [name, f.reads.get(name) || 0]));
+  let before = runs();
+  f.advance(60000);
+  assert.ok(runs().nearTick > before.nearTick, 'Somebody is near, so nearTick runs');
+  for (const name of ['meshTick', 'searchTick', 'prepareTick'])
+    assert.equal(runs()[name], before[name], name + ' sleeps with nothing to do');
+  f.disconnect(100);
+  f.advance(2000);
+  before = runs();
+  f.advance(60000);
+  assert.deepEqual(runs(), before, 'With nobody on and the cast ready, none of them runs');
+  // An NPC found later, in a cell whose mesh is not loaded yet, wakes the
+  // tasks that load the mesh and prepare it, and then walks.
+  f.addNpc(9001, {cellOrWorld:61, pos:[100,100,0]});
+  const from = f.moves.length;
+  f.advance(30000);
+  assert.ok(runs().meshTick > before.meshTick && runs().prepareTick > before.prepareTick,
+    'The new NPC woke the mesh and prepare tasks: ' + JSON.stringify(runs()));
+  assert.ok(f.moves.slice(from).some(m => m.id === 9001 && m.speed > 0), 'The new NPC walks');
+  before = runs();
+  f.advance(60000);
+  for (const name of ['meshTick', 'searchTick', 'prepareTick'])
+    assert.equal(runs()[name], before[name], name + ' sleeps again once its work is done');
+  f.stop();
+});
 test('A fight nobody can see keeps its pace: the less frequent steps are for wandering only', () => {
   const f = fixture({count:2, npc:{1:{aggression:3, pos:[100,100,0]}, 2:{aggression:0, pos:[150,150,0]}}});
   for (let i = 0; i < 6; i++) f.advance(10000);

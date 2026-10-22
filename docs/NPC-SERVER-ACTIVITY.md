@@ -71,6 +71,17 @@ only the ones that are due. The first version walked the whole cast in order
 and skipped whoever was not due yet. Dev's second profile on 22 Oct, with
 4,820 NPCs and nobody on, found that walk cost more than the steps it saved:
 `backgroundTick` took 1,984 ms in 120 s, against 593 ms before the change.
+With the 15 second turn, dev's third profile (6:35 AM) found 0.129 of a core,
+down from 0.191, and about 19,200 moving steps a minute.
+
+The runtime's other tasks run only while they have work. Loading navigation
+meshes, searching for walkable ground, preparing an NPC and stepping the NPCs
+somebody can see each start when something hands them work, and stop when
+their queue is empty. Until 22 Oct each one set its next turn whatever it found,
+so with nobody on and every mesh loaded, the mesh task still woke every 2 ms
+and the other three every 10 or 100 ms. Dev's 6:35 AM profile put that waking,
+its timers and the minute line's count of each run at about 2.5 s of the
+15.5 s its JavaScript thread was busy in 120 s (#3181).
 
 Movement follows walkable triangles in the local region. It retains the saved
 height above the navigation surface and crosses only verified reciprocal edges.
