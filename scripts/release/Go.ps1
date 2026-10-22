@@ -165,6 +165,32 @@ function Update-KeptCopies([string]$GameDir, [string[]]$Installed, [string[]]$Re
   return $n
 }
 
+# Takes out of Data\Platform\UI every overlay of ours the repo no longer has,
+# and returns the paths it took out. The overlays loop below copies each of
+# game\ui's scripts in and never took one out, so an overlay that left the
+# repo stayed in the game folder Ship packs from, and every release kept it on
+# every install: thornswood-loadscreen.js, the #3130 test pulled on 22 Oct,
+# was still there, and the dry run that should have deleted it said "0
+# removed". The plugins folder has had the same rule since the retired
+# dresser (removing stray file from the plugins folder, below).
+#
+# Only thornswood-*.js in that one folder: the front's own files, the page,
+# the pictures and the music are not overlays. thornswood-characters.js is
+# the launcher's, one machine's character list (Chars.WriteCharacters,
+# Ship-Rules' one-machine list), so it is never taken out here.
+function Remove-RetiredOverlays([string]$UiDir, [string]$UiSrc) {
+  $out = New-Object System.Collections.Generic.List[string]
+  if (-not (Test-Path -LiteralPath $UiDir -PathType Container)) { return @($out) }
+  $have = @(Get-ChildItem -LiteralPath $UiSrc -File -Filter *.js | ForEach-Object { $_.Name })
+  $have += 'thornswood-characters.js'
+  foreach ($s in @(Get-ChildItem -LiteralPath $UiDir -File -Filter 'thornswood-*.js' -EA SilentlyContinue)) {
+    if ($have -contains $s.Name) { continue }
+    Remove-Item -LiteralPath $s.FullName -Force
+    $out.Add($s.FullName)
+  }
+  return @($out)
+}
+
 # ------------------------------------------------------------------- front --
 Head 'Front'
 # The front build, skymp5-front from the pinned fork commit, which
@@ -218,6 +244,10 @@ if (Test-Path -LiteralPath $uiSrc) {
     Copy-ThornswoodShippedFile $f.FullName (Join-Path $ui $f.Name)
     $script:installed.Add((Join-Path $ui $f.Name))
     Note $f.Name
+  }
+  foreach ($r in @(Remove-RetiredOverlays $ui $uiSrc)) {
+    Bad ('removing an overlay the repo no longer has: ' + (Split-Path -Leaf $r))
+    $script:removed.Add($r)
   }
   # The page itself. The front's zip above carries the plain one; ours is
   # the same page plus the two lines that draw the character choice before
