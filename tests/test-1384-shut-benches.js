@@ -55,15 +55,14 @@ yes("SHUT_SAYS in the builder is that sentence, word for word", !!ps && ps[1] + 
 const knob = (/SHUT_BENCHES = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
 yes("SHUT_BENCHES names the sharpening wheel", /'CraftingSmithingSharpeningWheel': SHUT_SAYS,/.test(knob));
 yes("SHUT_BENCHES names the armour table", /'CraftingSmithingArmorTable': SHUT_SAYS,/.test(knob));
-yes("and nothing else", (knob.match(/^\s+'[^']+': /gm) || []).length === 2);
-const open = (/OPEN_FURNITURE = \{([\s\S]*?)\n\}/.exec(py) || [])[1] || "";
-yes("OPEN_FURNITURE no longer calls the armour table open", open.length > 0 && open.indexOf("CraftingSmithingArmorTable") < 0);
-yes("the stale premise is gone from the builder's knob", open.indexOf("Tempering never reaches the server") < 0);
+yes("SHUT_BENCHES names the Aetherium forge, with its own sentence (#3080)", /'DLC1LD_CraftingForgeAetherium': AETHERIUM_SAYS,/.test(knob));
+yes("and nothing else", (knob.match(/^\s+'[^']+': /gm) || []).length === 3);
+yes("no list of open furniture is left to call the armour table open (#3080)", py.indexOf("OPEN_FURNITURE") < 0);
 const iShut = py.indexOf("for bname in sorted(SHUT_BENCHES):");
-yes("the shut benches are written after the rows nobody owns and after OPEN_FURNITURE, so neither opens one again",
-  iShut > py.indexOf("for row in unowned.values():") && iShut > py.indexOf("for bname in sorted(OPEN_FURNITURE):"));
-yes("a shut bench is written with anyone false, no halves, and its sentence",
-  /access\[bench\] = \{'name': bname, 'anyone': False, 'halves': \{\},\s*'shut': SHUT_BENCHES\[bname\]\}/.test(py.slice(iShut)));
+yes("the shut benches are written after the rows nobody owns, so none opens one again",
+  iShut > py.indexOf("for row in unowned.values():"));
+yes("a shut bench is written with no rows, no halves, and its sentence",
+  /access\[bench\] = \{'name': bname, 'halves': \{\},\s*'shut': SHUT_BENCHES\[bname\]\}/.test(py.slice(iShut)));
 
 // ---- the table in the gamemode ------------------------------------------------
 let ACCESS = null, BY_BASE = null;
@@ -73,14 +72,15 @@ yes("BENCH_ACCESS and BENCH_BY_BASE parse", !!ACCESS && !!BY_BASE);
 [[WHEEL, "the sharpening wheel"], [TABLE, "the armour table"]].forEach(function (b) {
   const row = ACCESS && ACCESS[b[0]];
   yes(b[1] + " is in BENCH_ACCESS, shut, with nobody let in",
-    !!row && row.anyone === false && JSON.stringify(row.halves) === "{}" && row.shut === SAYS);
+    !!row && !row.rows && JSON.stringify(row.halves) === "{}" && row.shut === SAYS);
   const bases = Object.keys(BY_BASE || {}).filter(function (k) { return BY_BASE[k] === b[0]; });
   yes(b[1] + " is still in BENCH_BY_BASE, which recipelessCraft and TWO_HANDS read", bases.length > 0);
 });
 const shutRows = Object.keys(ACCESS || {}).filter(function (k) { return ACCESS[k].shut; });
-yes("no other bench is shut", shutRows.length === 2);
-yes("the forge still opens for anybody, so the fix closed only the temper benches",
-  Object.keys(ACCESS || {}).some(function (k) { return ACCESS[k].name === "CraftingSmithingForge" && ACCESS[k].anyone === true && !ACCESS[k].shut; }));
+yes("no other bench is shut but the Aetherium forge (#3080)", shutRows.length === 3 &&
+  shutRows.some(function (k) { return ACCESS[k].name === "DLC1LD_CraftingForgeAetherium" && ACCESS[k].shut === "Nobody works the Aetherium forge."; }));
+yes("the forge is not shut, so the fix closed only the temper benches",
+  Object.keys(ACCESS || {}).some(function (k) { return ACCESS[k].name === "CraftingSmithingForge" && !ACCESS[k].shut && (ACCESS[k].rows || []).length > 0; }));
 
 // ---- the gate, run against the real table ---------------------------------
 const gs = gm.indexOf("function benchGate(actorId, baseDesc) {");
@@ -88,13 +88,16 @@ const ge = gm.indexOf("\n}\n", gs);
 const gateSrc = gs < 0 || ge < 0 ? "" : gm.slice(gs, ge + 2);
 yes("benchGate answers a shut bench's sentence before it reads the character",
   gateSrc.indexOf("if (bench.shut) { return String(bench.shut); }") > 0 &&
-  gateSrc.indexOf("if (bench.shut)") < gateSrc.indexOf("if (bench.anyone)") &&
+  gateSrc.indexOf("if (bench.anyone)") < 0 &&
   gateSrc.indexOf("if (bench.shut)") < gateSrc.indexOf("__thornswoodCharacter"));
 function gateWith(character, progression) {
   const g = { __thornswoodCharacter: character, __thornswoodProgression: progression };
+  // craftRow and craftAnswer are the gamemode's; here every row is one this
+  // master smith may make.
   const make = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
-    gateSrc + "\nreturn benchGate;");
-  return make(BY_BASE, ACCESS, g, function () {}, "NO PROFESSION", function (r) { return r; });
+    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;");
+  return make(BY_BASE, ACCESS, g, function () {}, "NO PROFESSION", function (r) { return r; },
+    function () { return {}; }, function () { return { refusal: null }; });
 }
 const MASTER = { prof: "smith", half: "edgewright", ranks: { edgewright: "master", platewright: "master" } };
 const C = { stateOf: function () { return MASTER; }, nameOf: function (h) { return h; } };
@@ -113,6 +116,14 @@ if (gate) {
     unloaded(0x14, Object.keys(BY_BASE).filter(function (k) { return BY_BASE[k] === WHEEL; })[0]) === SAYS);
   const forge = Object.keys(BY_BASE).filter(function (k) { return ACCESS[BY_BASE[k]] && ACCESS[BY_BASE[k]].name === "CraftingSmithingForge"; })[0];
   yes("a forge still opens for that smith", !!forge && gate(0x14, forge) === null);
+  // #3080: somebody craftAnswer refuses every forge row is told so and the
+  // forge does not open, whatever halves canWork would have said.
+  const refusedAll = new Function("BENCH_BY_BASE", "BENCH_ACCESS", "globalThis", "log", "NO_PROFESSION_AT_A_BENCH", "rankWord",
+    "craftRow", "craftAnswer", gateSrc + "\nreturn benchGate;")(BY_BASE, ACCESS,
+    { __thornswoodCharacter: C, __thornswoodProgression: P }, function () {}, "NO PROFESSION", function (r) { return r; },
+    function () { return {}; }, function () { return { refusal: "no" }; });
+  const said = forge ? refusedAll(0x14, forge) : null;
+  yes("a forge does not open for somebody who may make none of its rows", typeof said === "string" && /^There is nothing you can make here\./.test(said));
 }
 
 // ---- onActivate refuses on the gate's answer, and the refusal stays behind it
@@ -208,13 +219,13 @@ try {
     try { A = JSON.parse(/const BENCH_ACCESS = (\{.*\});/.exec(after)[1]); } catch (e) { A = null; }
     try { B = JSON.parse(/const BENCH_BY_BASE = (\{.*\});/.exec(after)[1]); } catch (e) { B = null; }
     yes("the wheel's temper rows no longer open it for the Edgewright or the Woodwright",
-      !!A && !!A[WHEEL] && A[WHEEL].anyone === false && JSON.stringify(A[WHEEL].halves) === "{}" && A[WHEEL].shut === SAYS);
+      !!A && !!A[WHEEL] && !A[WHEEL].rows && JSON.stringify(A[WHEEL].halves) === "{}" && A[WHEEL].shut === SAYS);
     yes("the armour table's owned temper row and the row nobody owns no longer open it",
-      !!A && !!A[TABLE] && A[TABLE].anyone === false && JSON.stringify(A[TABLE].halves) === "{}" && A[TABLE].shut === SAYS);
+      !!A && !!A[TABLE] && !A[TABLE].rows && JSON.stringify(A[TABLE].halves) === "{}" && A[TABLE].shut === SAYS);
     yes("both benches' furniture is still in BENCH_BY_BASE",
       !!B && B["900:Skyrim.esm"] === WHEEL && B["901:Skyrim.esm"] === TABLE);
-    yes("the forge is untouched: open furniture with its owner",
-      !!A && !!A["88105:Skyrim.esm"] && A["88105:Skyrim.esm"].anyone === true && !A["88105:Skyrim.esm"].shut &&
+    yes("the forge is untouched: it opens for whoever may make one of its rows (#3080)",
+      !!A && !!A["88105:Skyrim.esm"] && !("anyone" in A["88105:Skyrim.esm"]) && !A["88105:Skyrim.esm"].shut &&
       JSON.stringify(A["88105:Skyrim.esm"].halves) === '{"edgewright":"novice"}');
     yes("the run says both benches are shut", /CraftingSmithingArmorTable\s+adb78:Skyrim\.esm\s+shut/.test(r.out) &&
       /CraftingSmithingSharpeningWheel\s+88108:Skyrim\.esm\s+shut/.test(r.out));

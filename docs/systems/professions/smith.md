@@ -7,11 +7,11 @@ Armour and weapons. The largest craft in the book.
 - [Edgewright](smith/edgewright.md). 700 recipes. 299 reach the
   server. 401 are the sharpening wheel and do not.
 
-The forge is open furniture. The recipe's owner and rank are what
-refuse you. The skyforge is not open: Edgewright, Platewright, or
-Woodwright, at advanced. A novice smith cannot use it. The aetherium
-forge is open furniture, and the things made there are master recipes,
-so the rank still stops a novice.
+The forge opens for a Smith from novice, and for the Tailors and the
+Woodwright who have rows there; it does not open for anybody else. The
+recipe's owner and rank refuse you what is not yours. The skyforge opens
+for Edgewright, Platewright, or Woodwright, at advanced. A novice smith
+cannot use it. The aetherium forge is shut for everybody.
 
 Every forge and every skyforge burns one charcoal. No charcoal of
 the grade the metal asks for, the piece is not made. The four grades
