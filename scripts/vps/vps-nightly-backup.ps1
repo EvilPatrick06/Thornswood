@@ -106,6 +106,61 @@ if (-not $Plain) {
 if (-not (Test-Path $Out)) { [void](New-Item -ItemType Directory -Path $Out -Force) }
 Note "---- nightly backup $stamp ----"
 
+# The server folders' turn, which the server installs and deploys take too
+# (#3247). A copy of scripts\deploy\ServerFolderTurn.ps1 below its header:
+# this script runs on its own on the box, from the task Install-Backup.ps1
+# makes. tests\test-3247-server-folder-turn.ps1 fails when the two differ.
+# ---- ServerFolderTurn.ps1 (copy) ----
+
+# The server folders' turn (#3247). The nightly backup reads each game
+# server's folder while it runs, and a server install or deploy stops that
+# server and renames its folder or its files. On 22 Oct 2026 at 2:21 AM a dev
+# publish stopped dev and was refused the folder swap ("Access to the path is
+# denied"), because the backup, started 2:15 AM, still had files open under
+# it: its log has game-dev\world taken from 2:19:33 to 2:22:00 AM, and the
+# dev folders done at 2:27:01 AM. Nothing made the two take turns.
+#
+# So each takes the turn first: the backup for as long as it reads the server
+# folders, an install or a deploy before it stops a server, held until the
+# script ends. The turn is server-folders.turn in the backup's own folder
+# (C:\Thornswood-Backup on the box, beside the server folders), opened with
+# no sharing, so only one process at a time has it open, and Windows gives
+# it back when that process ends however it ends: no turn is ever left taken
+# by a run that died. Whoever has it writes who and since when beside it, in
+# server-folders.turn.who, for the one waiting to say. With no backup folder
+# beside the server folders (a scratch root in a harness, a box the backup
+# was never installed on) there is nothing to take turns with, and it hands
+# back $null.
+#
+# Hands back the open file, which the caller keeps until it is done; throws
+# when the turn has not come in $WaitSeconds, naming who has it, so the
+# caller refuses with nothing stopped. $Tell says the one line about waiting.
+function Enter-ThornswoodServerFolderTurn([string]$Folder, [string]$Who, [int]$WaitSeconds, [scriptblock]$Tell) {
+  if (-not (Test-Path -LiteralPath $Folder -PathType Container)) { return $null }
+  $turn = Join-Path $Folder 'server-folders.turn'
+  $note = Join-Path $Folder 'server-folders.turn.who'
+  $until = (Get-Date).AddSeconds($WaitSeconds)
+  $told = $false
+  while ($true) {
+    try {
+      $held = [IO.File]::Open($turn, [IO.FileMode]::OpenOrCreate, [IO.FileAccess]::ReadWrite, [IO.FileShare]::None)
+      [IO.File]::WriteAllText($note, ($Who + ', pid ' + $PID + ', since ' + (Get-Date).ToString('h:mm:ss tt')))
+      return $held
+    } catch [IO.IOException] {
+      # Only "another process has it open" is a wait: 0x80070020 or 21 on
+      # Windows, 11 where .NET locks with flock. Anything else is thrown.
+      $e = $_.Exception
+      if ($e.GetType() -ne [IO.IOException] -or @(0x80070020, 0x80070021, 11) -notcontains $e.HResult) { throw }
+      $who = ''
+      try { $who = [IO.File]::ReadAllText($note).Trim() } catch { $who = 'a run that has not said who it is (' + $_.Exception.Message + ')' }
+      if ((Get-Date) -ge $until) { throw ('the server folders are still taken after ' + $WaitSeconds + ' s, by ' + $who) }
+      if (-not $told) { [void](& $Tell ('waiting for the server folders, which ' + $who + ' has')); $told = $true }
+      Start-Sleep -Seconds 2
+    }
+  }
+}
+# ---- end ServerFolderTurn.ps1 ----
+
 # ---------------------------------------------------------------- gather ----
 $ownedStage = Join-Path $env:TEMP ("thornswood-backup-" + $stamp + "-" + [Guid]::NewGuid().ToString("N"))
 $ownedStage = [IO.Path]::GetFullPath($ownedStage)
@@ -264,15 +319,32 @@ function People($to) {
   return $n
 }
 
-# The live server, then the dev one, the same five things from each.
-$servers = @(@{ Root = $GameRoot; Tag = 'game' }, @{ Root = $DevGameRoot; Tag = 'game-dev' })
-foreach ($sv in $servers) {
-  Grab (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
-  Mend (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
-  Grab (Join-Path $sv.Root 'private')              ($sv.Tag + '\private')
-  Grab (Join-Path $sv.Root 'data')                 ($sv.Tag + '\data')
-  Grab (Join-Path $sv.Root 'server-settings.json') ($sv.Tag + '\server-settings.json')
-  Grab (Join-Path $sv.Root 'gamemode.js')          ($sv.Tag + '\gamemode.js')
+# The live server, then the dev one, the same five things from each, with
+# the server folders' turn held (#3247): a server install or deploy that
+# comes now waits until these are taken, and one already swapping a folder
+# is waited for. Given back the moment the servers are done, so an install
+# waits on the server folders alone and not on the uploads and the rest.
+# A turn that does not come in half an hour leaves the servers out of
+# tonight's backup, and the run says so and ends non-zero.
+$serversNotTaken = ''
+$serverTurn = $null
+try { $serverTurn = Enter-ThornswoodServerFolderTurn $Out 'the nightly backup' 1800 { param($m) Note ('  ' + $m) } }
+catch { $serversNotTaken = $_.Exception.Message }
+if ($serversNotTaken) { Note ('  SERVERS NOT TAKEN: ' + $serversNotTaken) }
+else {
+  try {
+    $servers = @(@{ Root = $GameRoot; Tag = 'game' }, @{ Root = $DevGameRoot; Tag = 'game-dev' })
+    foreach ($sv in $servers) {
+      Grab (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
+      Mend (Join-Path $sv.Root 'world')                ($sv.Tag + '\world')
+      Grab (Join-Path $sv.Root 'private')              ($sv.Tag + '\private')
+      Grab (Join-Path $sv.Root 'data')                 ($sv.Tag + '\data')
+      Grab (Join-Path $sv.Root 'server-settings.json') ($sv.Tag + '\server-settings.json')
+      Grab (Join-Path $sv.Root 'gamemode.js')          ($sv.Tag + '\gamemode.js')
+    }
+  } finally {
+    if ($serverTurn) { $serverTurn.Dispose() }
+  }
 }
 Grab (Join-Path $SiteRoot 'data')                 'site\data'
 Grab (Join-Path $SiteRoot 'config.json')          'site\config.json'
@@ -474,6 +546,9 @@ if ($stuck.Count) {
 Note ("  kept      {0} daily, {1} weekly" -f [Math]::Min($daily.Count, $KeepDaily), [Math]::Min($weekly.Count, $KeepWeekly))
 if ($stuck.Count) {
   throw ("Retention failed: {0} backup(s) past the seven daily and four weekly would not delete (listed in {1}). Tonight's backup itself was made." -f $stuck.Count, $failedList)
+}
+if ($serversNotTaken) {
+  throw ("The game servers were not taken (" + $serversNotTaken + "). Tonight's backup was made without them (#3247).")
 }
 if ($denied) {
   throw ("{0} place(s) could not be read by the backup task (NO ACCESS above). Tonight's backup was made without them. Run Install-Backup.ps1 again, which gives the task read there (#2612)." -f $denied)
