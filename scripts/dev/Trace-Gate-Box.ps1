@@ -278,7 +278,10 @@ public static class ThornswoodTrace {
                         if (GetLongPathNameW(p, sb, 1024) > 0) { string lp = sb.ToString(); string ll = lp.ToLowerInvariant(); if (ll.StartsWith(wsLow)) { p = lp; low = ll; inside = true; } }
                     }
                     if (!inside) continue;
-                    string rel = low.Length <= wsLow.Length ? "." : p.Substring(wsLow.Length).Replace('\\', '/');
+                    // A folder opened for a lookup by pattern comes with its
+                    // separator: sub\ is the folder sub.
+                    string rel = low.Length <= wsLow.Length ? "." : p.Substring(wsLow.Length).Replace('\\', '/').TrimEnd('/');
+                    if (rel.Length == 0) rel = ".";
                     int ppid = r.ProcessId.HasValue ? r.ProcessId.Value : -1;
                     Inst who = at(ppid, t);
                     if (who != null && who.Harness != null) {
@@ -390,7 +393,7 @@ switch ($TraceMode) {
         $fail = 0
         function Check([string]$what, [bool]$ok) { if ($ok) { 'PASS  ' + $what } else { 'FAIL  ' + $what; $script:fail++ } }
         $probe = Join-Path $traceRoot ('probe-' + [Guid]::NewGuid().ToString('N'))
-        $null = New-Item -ItemType Directory -Path (Join-Path $probe 'sub')
+        $null = New-Item -ItemType Directory -Path (Join-Path $probe 'sub'), (Join-Path $probe 'look')
         [IO.File]::WriteAllText((Join-Path $probe 'a.txt'), 'a')
         [IO.File]::WriteAllText((Join-Path $probe 'sub\b.txt'), 'b')
         [IO.File]::WriteAllText((Join-Path $probe 'other.txt'), 'o')
@@ -406,11 +409,12 @@ switch ($TraceMode) {
         $node = Get-Command node -ErrorAction SilentlyContinue
         $probeScript = @"
 Set-Location -LiteralPath '$probe'
+[Environment]::CurrentDirectory = '$probe'
 `$null = [IO.File]::ReadAllText('a.txt')
 `$null = [IO.File]::GetAttributes('stat.txt')
 `$null = [IO.File]::Exists('missing.txt')
 `$null = @(Get-ChildItem -LiteralPath 'sub')
-& cmd.exe /c "type sub\b.txt > nul & if exist sub\c-missing.txt echo no"
+& cmd.exe /c "type sub\b.txt > nul & if exist look\c-missing.txt echo no"
 $(if ($node) { "& '" + $node.Source + "' -e `"const fs=require('fs');fs.statSync('node-stat.txt');try{fs.statSync('node-missing.txt')}catch(e){};fs.readdirSync('sub')`"" })
 exit 0
 "@
@@ -441,7 +445,10 @@ exit 0
         'Kernel-File create fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-File', 12)
         'Kernel-Process start fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-Process', 1)
         'Kernel-Process stop fields: ' + [ThornswoodTrace]::FieldNames('Microsoft-Windows-Kernel-Process', 2)
-        $wants = @('a.txt', 'stat.txt', 'missing.txt', 'sub', 'sub/b.txt', 'sub/c-missing.txt')
+        # cmd's if exist looks a name up by pattern in its folder, so what
+        # is seen is the folder, look, and never the name: a folder's open is
+        # a listing of it (Affected-Harnesses.js).
+        $wants = @('a.txt', 'stat.txt', 'missing.txt', 'sub', 'sub/b.txt', 'look')
         if ($node) { $wants += @('node-stat.txt', 'node-missing.txt') } else { 'no node on this box, so the probe did not run it' }
         foreach ($want in $wants) {
             Check ('the probe''s ' + $want + ' is in its list') ($got -contains $want)

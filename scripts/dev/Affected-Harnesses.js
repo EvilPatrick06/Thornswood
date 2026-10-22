@@ -11,8 +11,9 @@
 // WHY THAT IS ENOUGH. A harness's result here can only differ between two
 // trees through what its system calls return. When no path it touched is
 // changed, added or removed, and no folder it listed gains or loses an
-// entry, every one of those calls returns what it returned on the base, so
-// it touches the same paths again and ends the same way. That holds for the
+// entry (or, on Windows, where a listing gives sizes and times, has one
+// changed in place), every one of those calls returns what it returned on
+// the base, so it touches the same paths again and ends the same way. That holds for the
 // run that was traced. A Windows trace is of the gate's own run, so it holds
 // there; a harness that asks git, or did not pass, or that something outside
 // the harnesses opened the checkout beside, always runs. A Linux trace holds
@@ -153,7 +154,9 @@ function build(from, root, commitArg) {
       ? { always: why, seconds: t.seconds }
       : { seconds: t.seconds, reads: reads.sort(), lists: lists.sort() };
   }
-  return { format: 1, commit: commit, tracer: windows ? 'ETW on the VPS, scripts/dev/Trace-Gate.ps1' : 'strace on Linux, scripts/dev/Trace-HarnessReads.js', harnesses: harnesses };
+  const map = { format: 1, commit: commit, tracer: windows ? 'ETW on the VPS, scripts/dev/Trace-Gate.ps1' : 'strace on Linux, scripts/dev/Trace-HarnessReads.js', harnesses: harnesses };
+  if (windows) { map.platform = 'windows'; }
+  return map;
 }
 
 // ---- select: a change to the harnesses it can affect -------------------------
@@ -188,10 +191,19 @@ function select(opts) {
   const baseDirs = new Set([...dirsOf(opts.baseFiles)].map(lower)), headDirs = new Set([...dirsOf(opts.headFiles)].map(lower));
   const touched = new Set(); // paths whose answer to open or stat differs
   const relisted = new Set(); // folders whose listing differs
+  // On Windows a folder's listing carries each entry's size and times, and
+  // a lookup by pattern (cmd's if exist, a -Filter) is seen only as an open
+  // of its folder, so a file changed in place changes what a harness that
+  // opened its folder was told.
+  const restated = new Map(); // folder to a file in it changed in place
   for (const c of changes) {
     const p = lower(c.path);
     touched.add(p);
-    if (c.status === 'M') { continue; }
+    if (c.status === 'M') {
+      const parent = p.split('/').slice(0, -1).join('/') || '.';
+      if (!restated.has(parent)) { restated.set(parent, c.path); }
+      continue;
+    }
     // An added or removed path: it and every folder above it that came or
     // went, and the folder that holds the topmost of those.
     const had = (q) => baseSet.has(q) || baseDirs.has(q);
@@ -223,6 +235,13 @@ function select(opts) {
     for (const r of folders) {
       if (hit) { break; }
       if (relisted.has(lower(r))) { hit = 'looks at the folder ' + r + ', which gains or loses an entry'; }
+    }
+    if (map.platform === 'windows') {
+      for (const r of h.reads) {
+        if (hit) { break; }
+        const f = restated.get(lower(r));
+        if (f) { hit = 'opened the folder ' + r + ', whose listing gives ' + f + '\'s size and times'; }
+      }
     }
     if (hit) { out.run.push(n); out.why[n] = hit; } else { out.skipped.push(n); }
   }

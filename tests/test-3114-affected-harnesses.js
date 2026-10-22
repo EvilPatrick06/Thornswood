@@ -20,7 +20,9 @@
 //   5. a map built from a Windows trace (scripts/dev/Trace-Gate.ps1) holds
 //      a harness to what it opened on the box, whatever its code says about
 //      Windows, and always runs one that asked git, did not pass, or that
-//      the box script marked (something else opened the checkout beside it).
+//      the box script marked (something else opened the checkout beside it);
+//      and runs a harness when a file changes in place in a folder it
+//      opened there, since a Windows listing gives each entry's size.
 'use strict';
 const path = require('path');
 const REPO = path.join(__dirname, '..');
@@ -151,6 +153,16 @@ try {
   let threw = '';
   try { A.build(gz, REPO, ''); } catch (e) { threw = e.message; }
   yes('  traces that name no full commit build no map', /no full commit/.test(threw));
+  yes('  says it is of Windows', m.platform === 'windows');
+  const wm = { format: 1, commit: BASE, platform: 'windows', harnesses: { 'test-list.ps1': map.harnesses['test-list.ps1'], 'test-food.js': map.harnesses['test-food.js'] } };
+  const win = (changes) => A.select({ map: wm, gate: ['test-food.js', 'test-list.ps1'], base: BASE, changes: changes, baseFiles: baseFiles, headFiles: baseFiles });
+  r = win([{ status: 'M', path: 'scripts/dev/Z.ps1' }]);
+  yes('  a file changed in place in a folder it did not open leaves it out', r.run.length === 0);
+  baseFiles.push('scripts/vps/W.ps1');
+  r = win([{ status: 'M', path: 'scripts/vps/W.ps1' }]);
+  yes('  one changed in place in a folder it opened runs it, on Windows', r.run.join(' ') === 'test-list.ps1' && /size and times/.test(r.why['test-list.ps1']));
+  yes('  and not on a Linux map, where a listing gives no sizes', !runs(pick([{ status: 'M', path: 'scripts/vps/W.ps1' }]), 'test-list.ps1'));
+  baseFiles.pop();
 } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 
 console.log(pass + ' passed, ' + fail + ' failed');
