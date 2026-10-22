@@ -21,6 +21,9 @@
   for it before anything compiles, every compile step skipped when it is in,
   and the records made from it naming the fork's run (section 3b;
   tests\test-459-fork-build.ps1 runs ForkEngineBuild.ps1 and -BuiltBy).
+  Since Patrick's A on #3014 (22 Oct), the box compiles nothing: with no fork
+  build of the commit, the box job stops before any compile and says why,
+  and GitHub's runner still builds it (section 3c runs that step's own text).
 
   Read only, apart from a child pwsh that dot-sources EngineJobs.ps1 and
   Build-Engine.ps1 -Check against an empty folder, which changes nothing. Runs
@@ -84,7 +87,7 @@ Yes 'the fallback is the VPS runners'' label, on a build runner (#2994)' ($vps -
 Yes 'the VPS label is in the fallback alone' (([regex]::Matches($code, 'thornswood-vps')).Count -eq 1)
 Yes 'the two jobs run one list of steps (the anchor)' ($vps -match '(?m)^    steps: &engine$' -and $hosted -match '(?m)^    steps: \*engine$')
 $tv = [regex]::Match($vps, 'timeout-minutes: (\d+)'); $th = [regex]::Match($hosted, 'timeout-minutes: (\d+)')
-Yes 'each job has its own limit: the box 360 minutes, GitHub''s runner 300' ($tv.Success -and [int]$tv.Groups[1].Value -eq 360 -and $th.Success -and [int]$th.Groups[1].Value -eq 300)
+Yes 'each job has its own limit: the box 30 minutes (it only takes the fork''s build, #3014), GitHub''s runner 300' ($tv.Success -and [int]$tv.Groups[1].Value -eq 30 -and $th.Success -and [int]$th.Groups[1].Value -eq 300)
 
 # ---- 3. what it runs, in order ------------------------------------------------
 $order = @('uses: actions/checkout@', '- name: Which fork commit', '- name: Fetch the fork at that commit', '- name: Look for the fork''s build',
@@ -159,6 +162,42 @@ $rc = Get-Step $vps 'Record the client'
 Yes 'the client record names the fork''s run when the fork built it' ($rc -match 'FORK_RUN: \$\{\{ steps\.fork\.outputs\.run \}\}' -and $rc -match 'if \(\$env:FORK_RUN\) \{ \$by\.BuiltBy = \$env:FORK_RUN \}' -and $rc -match '-Clone engine\\skymp @by')
 Yes 'the run''s artifact carries fork-build.json when the fork built it' ($gather -match 'FORK_BUILD: \$\{\{ steps\.fork\.outputs\.manifest \}\}' -and $gather -match "Join-Path \`$out 'fork-build\.json'")
 
+# ---- 3c. the box compiles nothing (#3014, Patrick's A, 22 Oct) ---------------
+# The runner accounts reach GitHub alone (#2161), and a compile needs
+# certificate checks and download hosts outside it: run 39727871475 stopped at
+# vcpkg's first download. So with no fork build the box stops before any
+# compile, and GitHub's runner still builds. The step's own text runs here,
+# with Find-ForkEngineBuild standing in for the lookup, once as each runner.
+Yes 'the look step is told which kind of runner it is on' ($look -match 'RUNNER_KIND: \$\{\{ runner\.environment \}\}')
+$runText = [regex]::Match($look, '(?ms)^        run: \|\n(.*)').Groups[1].Value
+$runText = (@($runText -split "`n" | ForEach-Object { if ($_.Length -ge 10) { $_.Substring(10) } else { $_.Trim() } }) -join "`n")
+$stub = "function Find-ForkEngineBuild(`$c, `$g) { [pscustomobject]@{ State = 'build'; Why = 'the fork has no build of a push of ' + `$c } }"
+Yes '  its text has the one dot-source the stand-in replaces' ($runText.Contains('. .\scripts\release\ForkEngineBuild.ps1'))
+$lookFile = Join-Path ([IO.Path]::GetTempPath()) ('engine-look-' + [Guid]::NewGuid().ToString('N') + '.ps1')
+[IO.File]::WriteAllText($lookFile, $runText.Replace('. .\scripts\release\ForkEngineBuild.ps1', $stub))
+$pwshLook = (Get-Process -Id $PID).Path
+function Invoke-Look([string]$kind) {
+    $outFile = Join-Path ([IO.Path]::GetTempPath()) ('engine-look-out-' + [Guid]::NewGuid().ToString('N'))
+    [IO.File]::WriteAllText($outFile, '')
+    $saved = @{ COMMIT = $env:COMMIT; GITHUB_OUTPUT = $env:GITHUB_OUTPUT; RUNNER_KIND = $env:RUNNER_KIND; GH_TOKEN = $env:GH_TOKEN }
+    try {
+        $env:COMMIT = 'e58e67e54fc4d8d3bebc45f95669a326bea940a1'; $env:GITHUB_OUTPUT = $outFile; $env:RUNNER_KIND = $kind; $env:GH_TOKEN = 'none'
+        $said = @(& $pwshLook -NoProfile -File $lookFile 2>&1 | ForEach-Object { "$_" })
+        return [pscustomobject]@{ Code = $LASTEXITCODE; Said = ($said -join "`n"); Out = [IO.File]::ReadAllText($outFile) }
+    } finally {
+        foreach ($k in $saved.Keys) { if ($null -eq $saved[$k]) { Remove-Item "Env:$k" -ErrorAction SilentlyContinue } else { Set-Item "Env:$k" $saved[$k] } }
+        Remove-Item -LiteralPath $outFile -Force -ErrorAction SilentlyContinue
+    }
+}
+try {
+    $box = Invoke-Look 'self-hosted'
+    Yes '  on the box, with no fork build, it stops (exit 1) and names #3014' ($box.Code -eq 1 -and $box.Said -match '::error::the fork has no build of e58e67e5' -and $box.Said -match '#3014')
+    Yes '    and says the ways that remain: a commit the fork built, GitHub''s runner, or One' ($box.Said -match 'head of thornswood/engine-changes' -and $box.Said -match 'runner: hosted' -and $box.Said -match 'on One')
+    Yes '    and tells the compile steps nothing, so none of them runs' ($box.Out -notmatch 'found=')
+    $hostedRun = Invoke-Look 'github-hosted'
+    Yes '  on GitHub''s runner, with no fork build, it hands the build on (found=false, exit 0)' ($hostedRun.Code -eq 0 -and $hostedRun.Out -match '(?m)^found=false\r?$' -and $hostedRun.Said -notmatch '::error::')
+} finally { Remove-Item -LiteralPath $lookFile -Force -ErrorAction SilentlyContinue }
+
 # ---- 4. the scripts' part -----------------------------------------------------
 # Read with LF line ends: a checkout with core.autocrlf has CR LF, and a
 # pattern that ends a line with $ would not see the end of it.
@@ -228,6 +267,7 @@ $readme = ReadLf 'engine/README.md'
 Yes 'engine\README.md has the engine built in CI, naming engine.yml' ($readme -match '(?m)^## The engine built in CI$' -and $readme -match 'engine\.yml')
 Yes '  and the run that starts it and the artifact a pin pull request takes' ($readme -match 'gh workflow run engine\.yml' -and $readme -match 'gh run download')
 Yes '  and that the fork''s own build comes first, and what it is held to' ($readme -match 'thornswood-engine-<commit>' -and $readme -match 'ForkEngineBuild\.ps1' -and $readme -match '-BuiltBy')
+Yes '  and that the box compiles nothing, so a pin names a commit the fork built (#3014)' ($readme -match '#3014' -and $readme -match 'a head of\s+`thornswood/engine-changes`')
 
 Write-Host ''
 Write-Host ("{0} passed, {1} failed" -f $script:pass, $script:fail)
