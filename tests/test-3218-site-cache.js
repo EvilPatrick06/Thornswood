@@ -228,6 +228,33 @@ function named(html) {
         /<video class="art"/.test(home.body) && !/poster=/.test(home.body));
     const webp = await ask(run.port, (still.match(/src="([^"]+)"/) || [])[1]);
     yes('the still is served as image/webp', webp.status === 200 && webp.headers['content-type'] === 'image/webp');
+
+    // ---- gallery pictures at the width they are drawn (shotSrcset) --------
+    const gal = [{ name: 'a.jpg', url: '/shot/a.jpg', by: 'x' }, { name: 'b.mp4', url: '/shot/b.mp4', by: 'y' }];
+    fs.writeFileSync(path.join(dir, 'data', 'gallery.json'), JSON.stringify(gal));
+    const off = JSON.parse((await ask(run.port, '/api/public?galleryLimit=24')).body).gallery || [];
+    yes('with cloudflareImages off (the default) a gallery picture is named only by its url',
+        off.length === 2 && off.every((g) => g.srcset === undefined) && off[0].url === '/shot/a.jpg');
+    await stop(run);
+    const cfgFile = path.join(dir, 'config.json');
+    const cfg = JSON.parse(fs.readFileSync(cfgFile, 'utf8'));
+    cfg.cloudflareImages = true;
+    fs.writeFileSync(cfgFile, JSON.stringify(cfg));
+    run = await start(dir);
+    yes('a copy told Cloudflare makes the sizes comes up', run.up);
+    const on = JSON.parse((await ask(run.port, '/api/public?galleryLimit=24')).body).gallery || [];
+    const set = (on[0] && on[0].srcset) || '';
+    yes('a still is named at five widths under /cdn-cgi/image/, falling back to the picture itself',
+        set.split(', ').length === 5 &&
+        set.split(', ').every((part) => /^\/cdn-cgi\/image\/width=\d+,quality=80,format=auto,onerror=redirect\/shot\/a\.jpg \d+w$/.test(part)) &&
+        /width=480,/.test(set) && /width=2400,/.test(set));
+    yes('and keeps url as the picture whole, for the launcher', on[0] && on[0].url === '/shot/a.jpg');
+    yes('a recording gets none', on[1] && on[1].srcset === undefined);
+    const paged = JSON.parse((await ask(run.port, '/api/gallery?offset=0&limit=1')).body).gallery || [];
+    yes('the gallery page\'s own pages carry it too', paged[0] && paged[0].srcset === set);
+    const homeJs = fs.readFileSync(path.join(PUBLIC, 'home.js'), 'utf8');
+    yes('home.js sets the srcset only when it fetches a slide, so the rest are not fetched early',
+        /function fetchFrame\(n\) \{[\s\S]*?img\.srcset = shots\[n\]\.srcset;[\s\S]*?img\.src = shots\[n\]\.url;/.test(homeJs));
   } finally {
     await stop(run);
     for (const d of made) { try { fs.rmSync(d, { recursive: true, force: true }); } catch (e) { } }

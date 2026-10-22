@@ -392,7 +392,11 @@ if (AGE_PATHS[here] && !ageOk()) {
         var recording = /\.(mp4|webm)$/i.test(g.name || '');
         var media = recording
           ? '<video controls preload="metadata" aria-label="' + description + '"><source src="' + esc(g.url) + '"></video>'
-          : '<img src="' + esc(g.url) + '" alt="' + description + '" loading="lazy">';
+          : '<img src="' + esc(g.url) + '"' +
+            // A card is a column of a grid at least 260 wide; one column up
+            // to 620, then about a third of the page (shotSrcset, #3218).
+            (g.srcset ? ' srcset="' + esc(g.srcset) + '" sizes="(max-width: 620px) calc(100vw - 48px), 34vw"' : '') +
+            ' alt="' + description + '" loading="lazy">';
         var card = '<div class="shot-card"><div class="shot">' + media + '</div>';
         if (g.by) card += '<div class="also faintly">' + esc(g.by) + '</div>';
         // Per-image report for live public shots only. No staff inbox here.
@@ -1113,9 +1117,17 @@ request('/api/public?galleryLimit=24', { credentials:'same-origin' })
         show.appendChild(img);
         return img;
       });
+      // The widths the site names when Cloudflare makes them (shotSrcset in
+      // server.js), set with the address so neither is fetched early. The
+      // band is the page's width less its margins, at most 1480.
       function fetchFrame(n) {
         var img = frames[n];
-        if (img && !img.getAttribute('src')) img.src = shots[n].url;
+        if (!img || img.getAttribute('src')) return;
+        if (shots[n].srcset) {
+          img.sizes = '(max-width: 1528px) calc(100vw - 48px), 1480px';
+          img.srcset = shots[n].srcset;
+        }
+        img.src = shots[n].url;
       }
       fetchFrame(0);
       fetchFrame(1 % shots.length);

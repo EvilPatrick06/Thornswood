@@ -349,7 +349,10 @@ let cfg = {
   botKey: '',            // shared secret the Discord bot signs /api/ticket with
   admins: [],            // discord ids, an override for when the bot is down
   secret: '',
-  passKey: ''            // signs join passes; the game servers hold a copy (#937)
+  passKey: '',           // signs join passes; the game servers hold a copy (#937)
+  // Cloudflare Image Transformations is on for the zone, so gallery pictures
+  // are named at the widths a page draws them (shotSrcset, #3218).
+  cloudflareImages: false
 };
 /* The byte order mark matters. Windows PowerShell puts one on the front of
    anything it writes with -Encoding UTF8, JSON.parse refuses a string that
@@ -1535,9 +1538,41 @@ function publicJson(file, fallback) {
   publicJsonCache.set(file, {key, value});
   return value;
 }
+/*
+  A GALLERY PICTURE AT THE WIDTH IT IS DRAWN, NOT THE WIDTH IT WAS TAKEN (#3218).
+
+  Every picture went out as it was uploaded: the first on the front page was
+  2563 by 1440 and 1.15 MB, drawn at about 1229 by 514, and others are up to
+  5.7 MB. This process cannot make a smaller copy, since node has no way to
+  read or write a picture and the site installs nothing. Cloudflare, which
+  carries every request anyway, can: an address under /cdn-cgi/image/ is
+  answered at Cloudflare's edge with the picture at that width, in AVIF or
+  WebP for a browser that reads them, fetched from /shot/ here once.
+
+  So a still picture is named at five widths in a srcset, for the page to
+  pick from, when cloudflareImages is true in config.json; the Desk sets it
+  once Image Transformations is on for the zone. Off, nothing is added and
+  the page draws url as before, which is also what a copy of the site on
+  somebody's own machine does, where nothing answers /cdn-cgi/. onerror=
+  redirect sends a browser to the picture as it is if Cloudflare cannot make
+  one, so a picture never goes missing for want of a smaller copy. url stays
+  the picture itself, for the launcher and for anything that wants it whole.
+*/
+const SHOT_WIDTHS = [480, 800, 1200, 1600, 2400];
+function shotSrcset(shot) {
+  if (cfg.cloudflareImages !== true || !shot || /\.(mp4|webm)$/i.test(String(shot.name || ''))) return null;
+  const url = String(shot.url || '');
+  if (!/^\/shot\//.test(url)) return null;
+  return SHOT_WIDTHS.map((w) =>
+    '/cdn-cgi/image/width=' + w + ',quality=80,format=auto,onerror=redirect' + url + ' ' + w + 'w').join(', ');
+}
 function galleryPage(offset, limit) {
   const raw = publicJson(GALLERY, []), shots = Array.isArray(raw) ? raw : [];
-  return {gallery:shots.slice(offset, offset + limit), total:shots.length,
+  const page = shots.slice(offset, offset + limit).map((g) => {
+    const srcset = shotSrcset(g);
+    return srcset ? Object.assign({}, g, { srcset: srcset }) : g;
+  });
+  return {gallery:page, total:shots.length,
     next:offset + limit < shots.length ? offset + limit : null};
 }
 

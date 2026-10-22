@@ -49,5 +49,6 @@
   "botKey": "",
   "admins": [],
   "secret": "",
-  "passKey": ""
+  "passKey": "",
+  "cloudflareImages": false
 }
