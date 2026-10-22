@@ -13,7 +13,7 @@
 #
 # HOW. A cloud thread runs the same line as anybody else:
 #
-#   pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Merged the scan button fix."
+#   pwsh scripts/ops/Say-Staff.ps1 -From claude -Text "Restarting the dev server at 4:30 PM for about 5 minutes."
 #
 # With no ssh there, it starts this workflow on main with the text (or an id
 # to -Check), waits for the run, and prints the answer this run left as an
@@ -34,6 +34,12 @@
 # job left in the runner account's profile runs beside the key. The text and
 # the id reach it through the environment, never pasted into the script. The
 # key is written to a folder of this run's own and removed when it ends.
+#
+# WHEN. Each run takes a VPS runner, so only for a notice staff must act on,
+# a restart or outage staff will see, or a change to how staff work. Never for
+# a release to dev or main, a merge, progress, a pull request, an issue, a
+# test task or a routine deploy
+# (Patrick, 22 Oct, 8:51 AM; CLAUDE.md "Staff notices").
 #
 # Every action here is named by a full length commit SHA with its tag in the
 # comment, for the reason build.yml gives.
