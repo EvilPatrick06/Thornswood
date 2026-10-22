@@ -213,14 +213,22 @@ TICKETS_SAID = ' or #'.join(TICKETS)
 # not there. A ticket whose private thread will not open goes here too, so a
 # report about somebody is never posted where that somebody can read it.
 # log_channel checks that by the channel's permissions, not by these names.
+# #ticket-log first since #3317, which moved the staff only #tickets out of the
+# public Applications category into Staff under that name; #tickets is still
+# answered to, so a server not yet built again keeps working.
 TICKET_LOG = [n.strip().lower() for n in
-              os.environ.get('TICKET_LOG', 'tickets,ticket-log').split(',')
+              os.environ.get('TICKET_LOG', 'ticket-log,tickets').split(',')
               if n.strip()]
 # Who gets pulled into every ticket thread.
 # Tokens may be Discord role snowflake IDs (digits) or names. IDs survive a
 # rename; names are kept so an unmigrated bot.env.json still works.
+# The council (Owner, Co-Owner and every lead, #3317) reads every ticket, so
+# it is in the default; a bot.env.json that lists ids needs their ids added.
 _STAFF_RAW = [r.strip() for r in
-              os.environ.get('STAFF_ROLES', 'Owner,Gamemaster,Dev,Loremaster,Moderator').split(',')
+              os.environ.get('STAFF_ROLES',
+                             'Owner,Co-Owner,Lead Dev,Lead Gamemaster,Lead Loremaster,'
+                             'Lead Moderator,Lead Content Creator,Lead Support,'
+                             'Gamemaster,Dev,Loremaster,Moderator').split(',')
               if r.strip()]
 
 # Roles that see one kind of ticket and not the rest.
@@ -2304,8 +2312,9 @@ async def ensure_panel(guild):
 # #choose-your-hold, where a Member picks the hold their character calls home
 # and which announcements they want a ping for.
 #
-# The hold channels are private: each one is open to its own Citizen and Jarl
-# roles and to staff, so picking a hold here is what opens its channel. One
+# The hold channels are private: each hold's category is open to its own
+# Citizen, Jarl and officers and to staff, so picking a hold here is what
+# opens it. One
 # hold per person. Picking another takes the old Citizen role away, and
 # pressing the one you already have leaves it. Jarl roles are never touched
 # here; a Jarl is appointed, not picked.
@@ -2321,14 +2330,16 @@ HOLD_CHANNEL = [n.strip().lower() for n in
                 if n.strip()]
 MEMBER_ROLE = os.environ.get('MEMBER_ROLE', 'Member').strip().lower()
 MEMBER_IDS, MEMBER_NAMES = _role_tokens([MEMBER_ROLE] if MEMBER_ROLE else [])
+# Raven Rock is a hold like the nine since #3317 (Patrick, 22 Oct, page card
+# q-3317-raven-rock, A), last, on a row of its own on the panel.
 HOLDS = ['Whiterun', 'Solitude', 'Windhelm', 'Riften', 'Markarth',
-         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold']
+         'Dawnstar', 'Morthal', 'Falkreath', 'Winterhold', 'Raven Rock']
 # key, role name, button label
 PINGS = [('news', 'News Pings', 'News pings'),
          ('updates', 'Updates Pings', 'Updates pings')]
 
 HOLD_PANEL = ('**Choose your hold**\n\n'
-              'Pick the hold your character calls home and its channel opens '
+              'Pick the hold your character calls home and its channels open '
               'to you. One hold at a time: picking another moves you there, '
               'and pressing the one you have leaves it.\n\n'
               '**Pings**\n\n'
@@ -2435,10 +2446,19 @@ class HoldButton(discord.ui.Button):
         await pick_hold(interaction, self.hold)
 
 
+# THE PANEL'S ROWS (#3317, Patrick, 22 Oct: "These button layouts also need
+# fixed"). Five holds to a row wrapped on a phone, four and then Markarth on
+# its own, three and then Winterhold on its own. Three to a row fits a phone
+# and reads as a block on a desktop: nine holds in three rows of three, and
+# the two pings in a row of their own under them.
+HOLDS_PER_ROW = 3
+
+
 class PingButton(discord.ui.Button):
     def __init__(self, key, name, label):
         super().__init__(label=label, style=discord.ButtonStyle.primary,
-                         custom_id='thornswood:ping:' + key, row=2)
+                         custom_id='thornswood:ping:' + key,
+                         row=-(-len(HOLDS) // HOLDS_PER_ROW))
         self.role_name = name
 
     async def callback(self, interaction):
@@ -2450,7 +2470,7 @@ class HoldPanel(discord.ui.View):
     def __init__(self):
         super().__init__(timeout=None)
         for i, hold in enumerate(HOLDS):
-            self.add_item(HoldButton(hold, 0 if i < 5 else 1))
+            self.add_item(HoldButton(hold, i // HOLDS_PER_ROW))
         for key, name, label in PINGS:
             self.add_item(PingButton(key, name, label))
 
@@ -2458,6 +2478,23 @@ class HoldPanel(discord.ui.View):
 def _hold_ids_wanted():
     return (['thornswood:hold:' + h.lower() for h in HOLDS] +
             ['thornswood:ping:' + k for k, _, _ in PINGS])
+
+
+def _hold_rows_wanted():
+    """The panel's buttons by row, as Discord gives a posted message back."""
+    ids = ['thornswood:hold:' + h.lower() for h in HOLDS]
+    return ([ids[i:i + HOLDS_PER_ROW] for i in range(0, len(ids), HOLDS_PER_ROW)] +
+            [['thornswood:ping:' + k for k, _, _ in PINGS]])
+
+
+def _rows(msg):
+    """A posted message's buttons by row, so a panel laid out differently
+       is not taken for current because its buttons are the same."""
+    try:
+        return [[getattr(item, 'custom_id', '') for item in getattr(row, 'children', None) or []]
+                for row in getattr(msg, 'components', None) or []]
+    except Exception:
+        return []
 
 
 def _hold_ids(msg):
@@ -2473,7 +2510,7 @@ def _hold_ids(msg):
 
 def hold_panel_is_current(msg):
     return (getattr(msg, 'content', None) == HOLD_PANEL and
-            _hold_ids(msg) == _hold_ids_wanted())
+            _rows(msg) == _hold_rows_wanted())
 
 
 async def ensure_hold_panel(guild):
@@ -2542,9 +2579,8 @@ async def ensure_hold_panel(guild):
 # the reason. Changes made in the game come to the staff channel the same way,
 # through the site's moderation.log (watch_moderation, office_text).
 OFFICES = [('court', 'Court'), ('steward', 'Steward'), ('guard', 'Guard')]
-# The towns a hold role can name: Build-Discord.py's nine, and Raven Rock,
-# which it makes no roles for, so roles made for it by hand work the same.
-OFFICE_TOWNS = HOLDS + ['Raven Rock']
+# The towns a hold role can name: every hold, Raven Rock included.
+OFFICE_TOWNS = list(HOLDS)
 
 OFFICE_PANEL = ('**Hold offices**\n\n'
                 'The Jarl of a hold gives and takes its Court, its Steward and '

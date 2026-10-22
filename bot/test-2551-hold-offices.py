@@ -17,15 +17,16 @@ The hold offices are Discord roles (#2551). Patrick, 15 Oct:
 Holds:
 
   R1 every office role of every hold, Raven Rock's included (Patrick,
-     16 Oct), is in the builder's role list, not hoisted, with plain
-     permissions, and under the Citizen roles
+     16 Oct), is in the builder's role list, not hoisted, carrying nothing
+     of its own (#3317), and under the Citizen roles
   R5 Raven Rock has a Jarl role, hoisted like the others, and no Citizen
      role or hold channel, which nobody asked for
   E1 the running bot makes any Jarl or office role that is missing, the way
      it makes its ping roles, hoisted as the builder says, under the lowest
      Jarl or Citizen role, and touches none that is there
   R2 every one is in KEEP, with the Jarl and Citizen roles
-  R3 the Jarl and Citizen roles are still hoisted, and nothing else in world is
+  R3 the Jarl roles are still hoisted, and nothing else in world is (the
+     Citizen roles lost their group in #3317)
   P1 the office panel is a persistent view of six buttons, Add and Remove for
      each office, and setup_hook registers it
   P2 its message is found again by its own buttons, and the hold panel's
@@ -83,28 +84,36 @@ bot.log = lambda *a: None
 # ------------------------------------------------------------ the builder --
 names = [r[0] for r in B.ROLES]
 office_names = []
-for h in B.HOLDS + ['Raven Rock']:
+for h in B.HOLDS:
     office_names += [h + ' Court', 'Steward of ' + h, 'Guard of ' + h]
 rows = dict((r[0], r) for r in B.ROLES)
 last_citizen = max(names.index('Citizen of ' + h) for h in B.HOLDS)
-yes('R1 every office role of every hold is made, not hoisted, plain, under the Citizen roles (%d)'
+# Plain was the everyday set every role carried until #3317; since then a
+# role carries nothing of its own and @everyone holds the base (Patrick, 22
+# Oct, page card q-3317-role-base-perms, A).
+yes('R1 every office role of every hold is made, not hoisted, carries nothing of its own, under the Citizen roles (%d)'
     % len(office_names),
-    len(office_names) == 30 and all(n in rows for n in office_names)
+    len(office_names) == 30 and 'Raven Rock' in B.HOLDS and all(n in rows for n in office_names)
     and all(rows[n][2] is False for n in office_names)
-    and all(rows[n][3] == B.PLAIN for n in office_names)
+    and all(rows[n][3] == B.NONE for n in office_names)
     and all(names.index(n) > last_citizen for n in office_names))
 yes('R2 every one is in KEEP, the never-delete list, with the Jarl and Citizen roles',
     all(n in B.KEEP for n in office_names)
     and all(('Jarl of ' + h) in B.KEEP and ('Citizen of ' + h) in B.KEEP for h in B.HOLDS))
 in_world = [r for r in B.ROLES if r[0].startswith(('Jarl of', 'Citizen of')) or r[0] in office_names]
-yes('R3 the Jarl and Citizen roles are still hoisted, and no office role is',
-    all(r[2] is True for r in in_world if r[0].startswith(('Jarl of', 'Citizen of')))
+# Citizens lost their group in #3317 (page card q-3317-member-list): a
+# citizen shows under Playtester, the Jarls are the seats of the world.
+yes('R3 the Jarl roles are still hoisted, and no Citizen or office role is',
+    all(r[2] is True for r in in_world if r[0].startswith('Jarl of'))
+    and all(r[2] is False for r in in_world if r[0].startswith('Citizen of'))
     and all(r[2] is False for r in in_world if r[0] in office_names))
 yes('R4 the bot spells each office the way the builder makes it',
-    all(bot.office_role(o, h) in rows for h in B.HOLDS + ['Raven Rock'] for o, _ in bot.OFFICES))
-yes('R5 Raven Rock has a Jarl role, hoisted, in KEEP, and no Citizen role and no hold of its own',
+    all(bot.office_role(o, h) in rows for h in B.HOLDS for o, _ in bot.OFFICES))
+# Raven Rock is a hold like the nine since #3317 (Patrick, 22 Oct, page card
+# q-3317-raven-rock, A).
+yes('R5 Raven Rock has a Jarl role, hoisted, in KEEP, a Citizen role and a category of its own',
     'Jarl of Raven Rock' in rows and rows['Jarl of Raven Rock'][2] is True and 'Jarl of Raven Rock' in B.KEEP
-    and 'Citizen of Raven Rock' not in rows and 'Raven Rock' not in B.HOLDS)
+    and 'Citizen of Raven Rock' in rows and 'Raven Rock' in dict(B.PLAN))
 yes('R6 the bot makes the same roles the builder does, hoisted the same way',
     sorted((n, h) for n, _, h in bot.office_roles_wanted())
     == sorted((r[0], r[2]) for r in B.ROLES if r[0] in office_names or r[0].startswith('Jarl of ')))

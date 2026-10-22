@@ -248,15 +248,23 @@ else:
 
     found = {}
     posts = []
+    keys = []
     for _, specs in B.PLAN:
         for s in specs:
             ch = Channel(s['name'])
             if s.get('key'):
                 found[s['key']] = ch
             if s.get('post'):
-                posts.append((ch, s['post']))
+                # What -Posts writes: the words with their Last changed line
+                # (#3317). A draft is never written, and is measured as its
+                # words alone so it fits the day it is approved.
+                k = s['key']
+                posts.append((ch, B.C.DOCS[k] if k in B.C.DRAFTS else B.doc_with_footer(k)))
+                keys.append(k)
     yes('the plan still posts #welcome, #start-here and #faq from content.py',
-        all(any(t is x for _, t in posts) for x in (B.C.WELCOME, B.C.START, B.C.FAQ)))
+        all(k in keys for k in ('WELCOME', 'START', 'FAQ')) and
+        B.C.DOCS['WELCOME'] is B.C.WELCOME and B.C.DOCS['START'] is B.C.START
+        and B.C.DOCS['FAQ'] is B.C.FAQ)
 
     for ch, text in posts:
         with contextlib.redirect_stdout(io.StringIO()):
