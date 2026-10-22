@@ -250,6 +250,11 @@ try {
         Yes '  Refs with no test task moves nothing' ($r.Out -match '#3301: no test task')
         Yes '  #700, named only by Refs, is not touched' (@($w | Where-Object { $_ -match '/issues/700/' }).Count -eq 0)
 
+        $dev = "Refs #616.`n`nTest task for #616: A forged number is refused`nServer: Dev`nBuild: dev release 20261022-070758-dev`n1. Edit the number.`nWhat should happen: refused."
+        $r = Run-Flow $f @{ 'GET /commits/eee/pulls' = @(@{ number = 3302; merged_at = (Ago 0); base = @{ ref = 'main' }; merge_commit_sha = 'abcdef0123456789'; body = $dev }); 'GET /issues/616' = @{ number = 616; state = 'open' } } @{ BOARD_TOKEN = 'board-token'; COMMITS = '["eee"]' }
+        $c = @($r.Writes | Where-Object { $_ -like 'POST /issues/616/comments *' })
+        Yes '  a Dev test task''s comment says to post it when a dev release carries it, not to close at a main Ship' ($c.Count -eq 1 -and $c[0] -match 'When a dev release carries it' -and $c[0] -match 'dev-test-tasks' -and $c[0] -notmatch 'When a main Ship carries it' -and $c[0] -match 'Server: Dev\\nBuild: dev release')
+
         $r = Run-Flow $f @{ 'GET /commits/ddd/pulls' = @() } @{ BOARD_TOKEN = ''; COMMITS = '["ddd"]' }
         Yes ("a push with no merged pull request behind it does nothing and passes (exit {0})" -f $r.Code) ($r.Code -eq 0 -and $r.Writes.Count -eq 0)
         $r = Run-Flow $f $table @{ BOARD_TOKEN = ''; COMMITS = '["aaa"]' }

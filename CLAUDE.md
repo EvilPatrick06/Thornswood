@@ -43,6 +43,14 @@ its `Test task:` comment when people would notice the fix, or moves it to
 Done (`board: Done`) when its fix still waits on main (#3192: issues sat
 open after their runs finished because nobody owned the close).
 
+Test tasks and known issues (Patrick, 22 Oct): Main for what any playtester
+can check with the normal game, written when a main Ship carries the fix;
+Dev only for what needs staff or dev commands, the dev server, logs, the box
+or a setup testers cannot make, and it may stay up while the fix is on main;
+#known-issues only for findings nothing has been done about. One post per
+issue per forum, by comment, never by hand, and never on Patrick's report
+page. Developer-Guide.md "Test tasks and known issues" has both shapes.
+
 ## What a Claude here does itself and what the person does
 
 Read anything. Run git status, diff, log, fetch, the read only scripts

@@ -101,7 +101,15 @@ jobs:
               $bh = @{ Authorization = "Bearer $env:BOARD_TOKEN"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/labels') -Headers $bh -Body (@{ labels = @('board: Done') } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               $steps = (($t.rest -join "`n").Trim())
-              $body = ('Pull request #{0} merged ({1}), so this is in Done and stays open: the merge puts the fix on the main branch, not on the main server testers play. When a main Ship carries it, close this issue with a comment holding exactly this:' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12)) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
+              # A Dev test task is for developers and goes up as soon as a dev
+              # release carries the work; a Main one when a main Ship does
+              # (Developer-Guide.md, "Test tasks and known issues").
+              if ($steps -match '^\s*Server\s*:\s*Dev\s*(\n|$)') {
+                $when = 'This test task is for developers. When a dev release carries it, write a comment holding exactly this, with its Build: line naming that release, and the bot posts it in #dev-test-tasks:'
+              } else {
+                $when = 'When a main Ship carries it, close this issue with a comment holding exactly this:'
+              }
+              $body = ('Pull request #{0} merged ({1}), so this is in Done and stays open: the merge puts the fix on the main branch, not on the main server testers play. {2}' -f $num, ([string]$p.merge_commit_sha).Substring(0, 12), $when) + "`n`n" + '```' + "`n" + 'Test task: ' + $t.title + "`n" + $steps + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
               Invoke-RestMethod -Method Post -Uri ("$api/issues/" + $t.issue + '/comments') -Headers $h -Body (@{ body = $body } | ConvertTo-Json -Compress) -ContentType 'application/json' | Out-Null
               Write-Host ("#{0} finishes #{1}: board: Done put on, test task written on the issue" -f $num, $t.issue)
             }

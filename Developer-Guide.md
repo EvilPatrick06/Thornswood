@@ -839,6 +839,11 @@ notes, and a news post when people would notice; the README in that folder
 has the template. A Claude on the shipping machine runs those notes. A lane
 does not ask anybody to approve a deploy; the note is the hand-off.
 
+A lane writes test tasks the way "Test tasks and known issues" says, in
+its pull request and on the issue: Main for what any playtester can check,
+Dev only for what needs a dev, one per issue and kind, never posted by hand
+in Discord.
+
 #### Words
 
 The people in the world are customers, clients, people, testers, partners.
@@ -1034,35 +1039,71 @@ How to use it:
 - A fix people would notice is the exception: its pull request says `Refs #N`,
   and the issue stays open until the fix reaches main (Patrick, 11 Oct: dev
   is where the team checks that nothing breaks the game, and main is where
-  testers test, since we are in alpha). When it is on main, whoever fixed it
-  writes a comment on the issue whose first line is `Test task: <a title of
-  at most 45 characters>`, then numbered steps in plain English and what
-  should happen, with no issue numbers, links or code, and closes the issue.
-  The bot turns that comment into a post in the #test-tasks forum the moment
-  the issue closes, tagged Main, so closing it when it merges or when it
-  reaches dev sends testers to look for a fix that main does not have. Write
-  `Server: Main` on the line under the title, or no `Server:` line at all.
-- Most test tasks are Main, because testers play on main in the alpha and dev
-  is where the team checks nothing is broken (Patrick, 12 Oct). When the code
-  is done and someone on dev has to measure something first, write a
-  `Test task:` comment with `Server: Dev` on the line under the title, and
-  leave the issue open. That one is for developers, so write it in developer
-  terms: the files, log lines and commands to run, and what each should
-  print, with a `Build:` line naming the dev release or gamemode commit it
-  needs. A fix that has reached dev and not yet main is not one: checking
-  that a fix works is its Main test task, written when it reaches main,
-  however soon that is (#613: Patrick found one in #dev-test-tasks, 22
-  Oct). `Server: Dev` is for a measurement the work needs before it can
-  finish, such as a log line, a screenshot or a timing. An issue has one
-  dev post, showing its last `Test task:` comment, so a newer `Server: Dev`
-  comment replaces the one before it: put every measurement the issue still
-  needs in the newest. The bot posts it at once in #dev-test-tasks, a forum
-  in the Staff category that only staff see, whole, with links to the issue,
-  its pull requests and commits, and its labels. It takes the post down when the
-  issue closes or a newer `Test task:` comment does not say `Server: Dev`.
-  Put what was measured on the issue: the post is deleted when it goes. When
-  the fix reaches main, write the Main test task in plain words and close
-  the issue as above, and it moves to #test-tasks (`bot\README.md`, Testing).
+  testers test, since we are in alpha). Its test task goes in the pull
+  request as `Test task for #N: <title>`, and the merge moves the issue to
+  Done. When a main Ship carries the fix, whoever ships it closes the issue
+  with that test task as a `Test task:` comment (below).
+
+#### Test tasks and known issues
+
+Three Discord forums show testing, and the bot keeps all three from the
+board (`bot\README.md`, Testing). Patrick, 22 Oct: "dev test tasks are for
+things that only devs can test and can still be there while on main; main
+is for just regular testing for our playtesters, only when it's on main",
+and known issues are what is on the board that nothing has been done about
+yet. Test tasks never go on the report page; they go in Discord.
+
+- **#test-tasks, Main test tasks.** An ordinary check any playtester can do
+  with the normal game. If a playtester could do it once it is on main, it
+  is Main, even when a dev command would make it quicker. Written only once
+  a main Ship carries the fix, as a comment on the issue, and the issue is
+  closed with it; the bot posts it the moment the issue closes. The shape:
+
+      Test task: <what to try, 45 characters at most>
+      Server: Main
+      1. <a plain step in the game or the launcher>
+      2. <the next step>
+      What should happen: <what the tester should see>
+
+  Plain words for testers: no issue numbers, links, commit ids, file
+  names, commands they cannot type, or "dev". Commands anyone can type,
+  such as `/stuck` or `/needs`, are fine. Nothing else goes in the comment; what
+  shipped and where is said in a separate comment.
+- **#dev-test-tasks, Dev test tasks.** A check only a dev can do: it needs
+  staff or dev commands, the dev server, logs, the box, or a setup testers
+  cannot make (a planted record or a hand-edited file counts; owning two
+  screens does not). Staff only. Written as soon as a build carries
+  the work, open issue or closed, and posted at once. It stays up while
+  the fix is on main and after the issue closes, until a newer Main test
+  task replaces it or staff close the post. The shape:
+
+      Test task: <what to check, 45 characters at most>
+      Server: Dev
+      Build: <the dev release, gamemode commit or main release it needs>
+      What it checks: <one line>
+      1. <steps in developer terms: files, commands, log lines>
+      What should happen: <what each step should print or show>
+
+  An issue may have both: its Dev test task in #dev-test-tasks and its
+  Main one in #test-tasks once it closes. A newer `Server: Dev` comment
+  replaces the older Dev post; put every measurement the issue still needs
+  in the newest. Put what was measured on the issue.
+- **#known-issues.** An open issue labelled `Main Findings` or `Dev
+  Findings` that nothing has been done about yet: no merged pull request
+  names it and it has no test task. The bot takes the post down the moment
+  a pull request naming it merges, a `Test task:` comment is written on it,
+  or it closes or loses its label. Its words come from the last `Known
+  issue:` comment: a title of 45 characters at most, then what goes wrong,
+  where, and how to avoid it, in plain words.
+- **One post per issue per forum, never two.** A changed test task or known
+  issue is an edit of its comment, or a newer comment, never a second post
+  by hand. Never post a test task by hand (`/test-task`) for something on
+  the board: the bot posts it from the comment. Two issues for one fix carry
+  one test task, on the issue the fix belongs to. The bot keeps one post per
+  issue and per title, open or closed, and `python bot.py --forum-check`
+  (`--apply` to delete) finds and removes duplicates in all three forums.
+- To take a test task back, edit its comment so its first line no longer
+  starts with `Test task:`; the bot takes its post down.
 
 #### What is not a reason to skip an issue
 

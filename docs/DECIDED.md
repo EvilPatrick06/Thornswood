@@ -314,6 +314,11 @@ link, and the old line goes.
 - **A Claude rewrites the Developer Guide's build check section** from
   build.yml and build-pr.yml, naming both checks. 22 Oct 2026,
   [#2799](https://github.com/EvilPatrick06/Thornswood/issues/2799#issuecomment-6335265658).
+- **Dev test tasks are checks only a dev can do and may stay while the fix
+  is on main; Main test tasks are ordinary playtester checks, posted only
+  once main carries the fix; #known-issues holds only findings nothing has
+  been done about; one post per issue per forum; test tasks never on the
+  report page.** 22 Oct 2026, Patrick in the project chat.
 - **Closes for a change nobody would notice, Refs plus a Test task for the
   rest.** One line in the pull request template, the lane instructions and
   the Developer Guide. 22 Oct 2026,

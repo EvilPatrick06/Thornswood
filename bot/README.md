@@ -142,17 +142,24 @@ token for that repository's issues. No token, none is kept, said once in the
 log.
 
 - `#known-issues`, read only: one post per open issue labelled Dev Findings
-  or Main Findings, tagged Dev or Main. Its title and body are the issue's
+  or Main Findings that nothing has been done about yet, tagged Dev or Main
+  (Patrick, 22 Oct). An issue with a merged pull request that names it, or
+  with a `Test task:` comment, is not a known issue: its post goes at once.
+  A merge does not change the issue's update time, so each finding's
+  timeline is read every pass until a merged pull request is found in it,
+  and that is remembered (`known_changed` in `data\known-issues.json`). Its title and body are the issue's
   last comment that starts `Known issue:` (a short title, at most 45
   characters, then what goes wrong, where, and how to avoid it), the same
   shape as a test task below; until somebody writes one, the issue's own title
   and a plain line. No issue number and no link, because testers have no
   GitHub. The post is deleted the moment the issue is no longer an open
-  finding: fixed and closed, closed any other way, or its label taken off.
+  finding: fixed and closed, closed any other way, its label taken off, a
+  change for it merged, or a test task written on it.
   Its tag says where it was found and stays Dev or Main as before.
 - `#test-tasks`: one post for each issue closed as fixed from the day this
-  began, always tagged Main. Its title and body are the issue's last comment
-  that starts `Test task:`, written by whoever fixed it:
+  began, always tagged Main. Its title and body are the issue's last
+  `Test task:` comment that is not `Server: Dev`, written when a main Ship
+  carries the fix (a newer Dev one beside it does not hide it):
 
       Test task: <what to try, at most 45 characters>
       <numbered steps in the game, then what should happen>
@@ -167,16 +174,16 @@ log.
   in Discord once it is confirmed.
 - `#dev-test-tasks`, in Staff and seen only by staff (Patrick, 12 Oct): one
   post per issue whose last `Test task:` comment has `Server: Dev` straight
-  under its first line, tagged Dev. That is a measurement someone on dev has
-  to take, usually on an open issue whose code is done. The post is made as
-  soon as the comment is there, open issue or closed, and it goes when the
-  issue is closed after that comment, or when a newer `Test task:` comment
-  does not say `Server: Dev`. A closed issue's last test task then goes to
-  `#test-tasks` as above, if it is Main; an issue that closes while its last
-  test task still says `Server: Dev` gets no `#test-tasks` post from it.
-  Every other test task is Main, because testers play on main in the alpha.
-  The post is deleted when it goes, so what was measured belongs on the
-  issue.
+  under its first line, tagged Dev. That is a check only a dev can do: it
+  needs staff or dev commands, the dev server, logs, the box, or a setup
+  testers cannot make (Patrick, 22 Oct). The post is made as soon as the
+  comment is there, open issue or closed, and it stays when the issue
+  closes, because a dev check can still be wanted while the fix is on main.
+  It goes when a newer `Test task:` comment does not say `Server: Dev`, or
+  when the comment is taken back; staff close it once it is done. An issue
+  can have both: its Dev post here and its Main one in `#test-tasks` once
+  it closes. The post is deleted when it goes, so what was measured belongs
+  on the issue.
 
   A dev post is written for developers, who have GitHub (Patrick, 12 Oct):
   it links the issue and says its state and labels, links every pull request
@@ -195,6 +202,23 @@ log.
   words, no numbers, links or code, because testers are not developers. A Dev test task posted by hand (`/test-task` with the tag Dev) also
   lands here; it belongs to no issue, so the bot leaves it for staff to close.
 
+**One post per issue, never two** (Patrick, 22 Oct, after duplicates in all
+three forums). Before it makes a post, the bot looks for a post of its own
+with that title among the open and the closed ones, and takes that one up:
+until 22 Oct only open posts were looked at, so a post staff closed, or one
+Discord closed after quiet days, was made again whenever its record was lost.
+A test task taken back (its comment edited so the first line no longer
+starts `Test task:`) takes its post down. The Claude Code line GitHub puts
+under a comment a Claude writes never shows in a post. To find and remove
+duplicates already there, with the bot running or stopped:
+
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --forum-check           (says what it would delete)
+    python bot.py --env-file C:\Thornswood-Bot\bot.env.json --forum-check --apply   (deletes them)
+
+Of two posts with one title it keeps the one an issue owns (or the oldest)
+and deletes the rest; two issues owning one title are said and left, to be
+fixed on the issues.
+
 **When an issue is closed** (Patrick, 11 Oct): dev is where the team checks
 that nothing breaks the game, and main is where testers test, since we are in
 alpha. So a fix people would notice is closed, with its `Test task:` comment,
@@ -203,12 +227,11 @@ dev. The bot posts a test task the moment the issue closes, so closing it
 earlier sends testers to look for a fix main does not have. That is why every
 test task in `#test-tasks` is tagged Main. Write `Server: Main` (or no
 `Server:` line) under `Test task:` for testers on main, and `Server: Dev`
-only when someone on dev has to measure it, which sends it to
-`#dev-test-tasks` for staff. A fix that is on dev and not yet on main is
-not a `Server: Dev` task: checking that it works is its Main test task,
-written when it reaches main (#613: Patrick found one in #dev-test-tasks,
-22 Oct). An issue has one dev post, so a newer `Server: Dev` comment
-replaces the one before it. The line never shows in the post. `Server: Dev`
+only for a check only a dev can do, which sends it to `#dev-test-tasks` for
+staff. If a playtester could do it with the normal game once it is on
+main, it is Main, even when a dev command would make it quicker (#613's
+forge re-cost, Patrick, 22 Oct). An issue has one dev post, so a newer
+`Server: Dev` comment replaces the one before it. The line never shows in the post. `Server: Dev`
 counts only on a comment written from the day `#dev-test-tasks` began (the
 bot's first pass that finds it, `dev_since` in `data\known-issues.json`), so
 the comments written before that, which all carried a `Server:` line, stay in
