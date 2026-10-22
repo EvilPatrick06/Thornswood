@@ -414,13 +414,16 @@ exit $LASTEXITCODE
     Yes '6.   and Test-EngineBuildIsCi reads it' (Test-EngineBuildIsCi $rf)
     $why = Save-EngineBuild $rf (Join-Path $T 'no-such-fork')
     Yes '6. a fork folder with no build is refused, naming -EngineBuild ci' ($why -match '-EngineBuild ci' -and (Test-EngineBuildIsCi $rf))
-    # -Rebuild stays for a record made on the machine (Developer-Guide.md
-    # names it), but no fix offers it any more.
+    # No fix offers -Rebuild, and since #3056 the switch itself is gone: the
+    # guide no longer names it, and a build made on the machine never matches
+    # a record CI made.
     $offered = @()
     $tokens = $null
     [void][System.Management.Automation.Language.Parser]::ParseFile($setup, [ref]$tokens, [ref]$null)
     foreach ($t in $tokens) { if ($t.Kind -in 'StringLiteral', 'StringExpandable' -and $t.Text -match 'Setup-ShipMachine\.ps1 -Rebuild') { $offered += $t.Extent.StartLineNumber } }
     Yes ('6. no fix in Setup-ShipMachine.ps1 offers -Rebuild' + $(if ($offered.Count) { ': line ' + ($offered -join ', ') } else { '' })) ($offered.Count -eq 0)
+    $setupAst = [System.Management.Automation.Language.Parser]::ParseFile($setup, [ref]$null, [ref]$null)
+    Yes '6. Setup-ShipMachine.ps1 has no -Rebuild switch (#3056)' (-not ($setupAst.ParamBlock.Parameters | Where-Object { $_.Name.VariablePath.UserPath -eq 'Rebuild' }))
 
     $ast = [System.Management.Automation.Language.Parser]::ParseFile($ready, [ref]$null, [ref]$null)
     foreach ($n in 'New-Row', 'Get-ClientRows') {
