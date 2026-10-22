@@ -7,8 +7,9 @@
       .\scripts\deploy\Set-BuildRunners.ps1           put the label on the listed runners, take it off the rest
       .\scripts\deploy\Set-BuildRunners.ps1 -Check    change nothing; exit 1 when GitHub differs from the record
 
-  WHY (#2994). The VPS has six cores and, since 20 October, eight runners
-  (#2929). Every heavy job asked for thornswood-vps, which all eight carry,
+  WHY (#2994). The VPS has six cores and, from 20 October, eight runners
+  (#2929; three since the evening of 21 October, #3108, #3219). Every
+  heavy job asked for thornswood-vps, which all eight carried,
   so on the night of 20 to 21 October seven builds ran at once, each one's
   harness step stretched from about 15 minutes to 34 to 39, and the job's
   40-minute limit cancelled three pull requests' builds that were passing.
