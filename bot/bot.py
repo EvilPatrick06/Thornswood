@@ -4844,9 +4844,10 @@ async def watch_known_issues():
 # the watchdog decides and this only delivers (watch_services, below).
 
 
-async def watch_say(text):
+async def watch_send(text):
     """
-    Say it once, in the staff channel, found by id. True when it was said.
+    Say it once, in the staff channel, found by id: (True, the message) when
+    it was said, (False, None) when it was not.
 
     Nothing is guessed and nothing falls back to another channel. If that id is
     not a channel this bot can see, it says so in the bot log and stays quiet in
@@ -4856,23 +4857,29 @@ async def watch_say(text):
     if not WATCH_ID:
         log('watch: no channel id, so nothing was said. staff-channel.txt is '
             'missing or unreadable; Install-Bot.ps1 sends it with the code.')
-        return False
+        return False, None
     ch = client.get_channel(WATCH_ID)
     if ch is None:
         log('watch: channel %d is not one this bot can see, so nothing was '
             'said.' % WATCH_ID)
-        return False
+        return False, None
     try:
         # The text is the watchdog's own sentence, which can carry a name
         # or a line from somewhere else. Mentions stay off, so @everyone
         # in it is text and not a ping. Discord honors allowed_mentions
         # even when the text still says @everyone.
-        await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
-        return True
+        msg = await ch.send(text, allowed_mentions=discord.AllowedMentions.none())
+        return True, msg
     except Exception:
         log('watch: could not post in #%s:\n' % getattr(ch, 'name', WATCH_ID)
             + traceback.format_exc())
-        return False
+        return False, None
+
+
+async def watch_say(text):
+    """watch_send, True when it was said."""
+    ok, _msg = await watch_send(text)
+    return ok
 
 
 def _clock(ms):
@@ -5079,6 +5086,18 @@ async def trouble_say(text):
 WATCH_ALERTS = os.path.join(WATCH_DIR, 'alerts.jsonl')
 WATCH_SENT_BOT = os.path.join(WATCH_DIR, 'alerts-sent-bot.txt')
 WATCH_SENT_HOOK = os.path.join(WATCH_DIR, 'alerts-sent-webhook.txt')
+# Taking a notice back (#3328). Say-Staff.ps1 -Unsay puts its id in
+# alerts-unsay.txt, through say-staff.ps1 on the box, which takes back only the
+# sender's own notices. The bot keeps the Discord message each notice became in
+# staff-messages.txt, and what it did with each ask in staff-unsaid.txt, both
+# in its own data folder, the one place it writes; say-staff.ps1 -Check reads
+# the second. On 22 Oct a notice that should not have gone out stayed up until
+# Patrick deleted it by hand: nothing knew which message it was.
+WATCH_UNSAY = os.path.join(WATCH_DIR, 'alerts-unsay.txt')
+STAFF_MESSAGES = os.path.join(DATA_DIR, 'staff-messages.txt')
+STAFF_UNSAID = os.path.join(DATA_DIR, 'staff-unsaid.txt')
+# How far back a notice said before staff-messages.txt existed is looked for.
+UNSAY_LOOK_BACK = 200
 # The watchdog's $alertMaxAge: a message a day late is noise, not news.
 WATCH_ALERT_MAX_AGE = 24 * 3600
 
@@ -5137,6 +5156,119 @@ def _watch_mark(aid):
         f.write(aid + '\r\n')
 
 
+def _watch_note(path, *fields):
+    """One tab separated line onto path. Blocking, so run through an executor."""
+    with open(path, 'a', encoding='utf-8') as f:
+        f.write('\t'.join(str(x).replace('\t', ' ').replace('\n', ' ')
+                          for x in fields) + '\n')
+
+
+def _watch_table(path):
+    """{first field: the rest} of a tab separated file, the last line winning.
+    {} when there is none, None when it is there and cannot be read."""
+    lines = _watch_lines(path)
+    if lines is None:
+        return None
+    out = {}
+    for line in lines:
+        parts = line.split('\t')
+        if parts[0]:
+            out[parts[0]] = parts[1:]
+    return out
+
+
+def unsay_plan(asked, done, messages, by_bot, by_hook, texts):
+    """
+    What to do with each notice asked to be taken back, in the order asked:
+    (id, how). how is 'message' (its Discord message is known), 'look' (the bot
+    said it before it kept message ids, so it is looked for by its words),
+    'webhook' (the watchdog's webhook said it, which the bot cannot delete),
+    'withhold' (not said yet, so it never is) or 'unknown' (no such notice).
+    An id already done, or asked twice, is planned once.
+    """
+    out = []
+    seen = set(done)
+    for aid in asked:
+        aid = aid.strip()
+        if not aid or aid in seen:
+            continue
+        seen.add(aid)
+        if aid in messages:
+            how = 'message'
+        elif aid in by_bot:
+            how = 'look'
+        elif aid in by_hook:
+            how = 'webhook'
+        elif aid in texts:
+            how = 'withhold'
+        else:
+            how = 'unknown'
+        out.append((aid, how))
+    return out
+
+
+async def watch_unsay(lines, said):
+    """
+    Take back every notice asked for that is not done yet. lines is the
+    outbox, said the ids this run of the bot said. Each ask is written down in
+    staff-unsaid.txt once, whatever came of it, so a failed one is not tried
+    every minute for ever; its line says why.
+    """
+    loop = asyncio.get_running_loop()
+    asked = await loop.run_in_executor(None, _watch_lines, WATCH_UNSAY)
+    if not asked:
+        return
+    done = await loop.run_in_executor(None, _watch_table, STAFF_UNSAID)
+    messages = await loop.run_in_executor(None, _watch_table, STAFF_MESSAGES)
+    mine = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_BOT)
+    hook = await loop.run_in_executor(None, _watch_lines, WATCH_SENT_HOOK)
+    if done is None or messages is None or mine is None or hook is None:
+        return
+    texts = {}
+    for raw in lines:
+        try:
+            a = json.loads(raw)
+            texts[str(a['id']).strip()] = str(a['text'])[:1900]
+        except Exception:
+            continue
+    plan = unsay_plan(asked, done, messages, set(mine) | said, set(hook), texts)
+    ch = client.get_channel(WATCH_ID) if WATCH_ID else None
+    for aid, how in plan:
+        result = how
+        try:
+            if how == 'withhold':
+                # Marked said, so neither this loop nor the watchdog's webhook
+                # ever says it; staff-unsaid.txt says why it is marked.
+                await loop.run_in_executor(None, _watch_mark, aid)
+                said.add(aid)
+                result = 'withheld'
+            elif how in ('message', 'look'):
+                if ch is None:
+                    continue
+                target = None
+                if how == 'message':
+                    target = ch.get_partial_message(int(messages[aid][-1]))
+                else:
+                    me = getattr(client.user, 'id', None)
+                    async for m in ch.history(limit=UNSAY_LOOK_BACK):
+                        if getattr(m.author, 'id', None) == me and m.content == texts.get(aid):
+                            target = m
+                            break
+                if target is None:
+                    result = 'gone'
+                else:
+                    try:
+                        await target.delete()
+                        result = 'deleted'
+                    except discord.NotFound:
+                        result = 'gone'
+        except Exception as e:
+            log('services: could not take back %s:\n%s' % (aid, traceback.format_exc()))
+            result = 'failed ' + type(e).__name__
+        await loop.run_in_executor(None, _watch_note, STAFF_UNSAID, aid, result)
+        log('services: took back %s: %s' % (aid, result))
+
+
 async def watch_services():
     """
     Every WATCH_READ_EVERY seconds, say what the watchdog's outbox holds that
@@ -5168,14 +5300,19 @@ async def watch_services():
                 unreadable = True
             else:
                 unreadable = False
+                await watch_unsay(lines, said)
                 due = watch_alerts_due(lines, said | set(mine) | set(hook),
                                        int(time.time()))
                 for aid, text in due:
-                    if not await watch_say(text):
+                    ok, msg = await watch_send(text)
+                    if not ok:
                         break
                     said.add(aid)
                     log('services: said ' + aid)
                     await loop.run_in_executor(None, _watch_mark, aid)
+                    if getattr(msg, 'id', None):
+                        await loop.run_in_executor(None, _watch_note, STAFF_MESSAGES,
+                                                   aid, WATCH_ID, msg.id)
         except Exception:
             log('services: the check itself failed, carrying on:\n'
                 + traceback.format_exc())

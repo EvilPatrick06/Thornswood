@@ -36,6 +36,8 @@ Yes 'the tracked Caddyfile has the voice route' ($cf.Contains('handle_path /voic
 Yes '  and the dev voice route' ($cf.Contains('handle_path /voice-dev/*'))
 Yes '  and the site' ($cf.Contains('reverse_proxy 127.0.0.1:3001'))
 Yes '  and the box bridge (#2753)' ($cf.Contains('handle_path /box/*') -and $cf.Contains('reverse_proxy 127.0.0.1:7790'))
+Yes '  and the box admin App''s setup (#3107)' ($cf.Contains('handle_path /github-app/*') -and $cf.Contains('reverse_proxy 127.0.0.1:7791'))
+Yes 'Setup-Domain sends no Caddyfile without the admin App''s route' ($text.Contains("'handle_path /github-app/*'"))
 Yes 'Setup-Domain reads scripts\deploy\Caddyfile' ($text -match "Join-Path \`$Here 'Caddyfile'")
 Yes '  and no longer writes a Caddyfile of its own' (-not ($text -match '(?m)^\$Domain, www\.\$Domain \{'))
 Yes '  and keeps a Caddyfile already on the box before replacing it' ($text.Contains("'.before-'"))
