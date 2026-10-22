@@ -1008,6 +1008,10 @@ How to use it:
   Claude thread is refused GraphQL, which the board needs, so these labels
   are how it moves a card:
   `gh api -X POST repos/EvilPatrick06/Thornswood/issues/<N>/labels -f "labels[]=board: In Progress"`.
+  To see the cards, `pwsh scripts/ops/Read-Board.ps1` starts
+  `.github\workflows\board-read.yml`, which reads every card's Status and
+  Order on a VPS runner and changes nothing, and writes them to board.json
+  (#3192).
 - A pull request that finishes an issue says `Closes #N`, so merging closes
   it and the board moves it to Done. Say in the pull request, or in #staff-updates,
   which issues moved.

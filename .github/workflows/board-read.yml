@@ -1,0 +1,126 @@
+# Reads the whole board, every card's Status and Order, into a file a cloud
+# session can download (#3192).
+#
+# WHY. The board is a user-owned Projects board, and it is read only through
+# GraphQL. A cloud Claude thread is refused GraphQL and the user-scoped
+# projectsV2 routes (403, measured again 22 Oct 2026), and on 22 Oct only 2 of
+# the 242 open issues carried a board: label, so nothing a cloud thread could
+# read said which column an issue was in. board-status.yml (#2863) lets a
+# cloud thread move a card; nothing let it see one. Patrick, 22 Oct, asked
+# for the whole board to be reviewed from the cloud: "we make it so the cloud
+# can".
+#
+# HOW. A cloud thread runs
+#
+#   pwsh scripts/ops/Read-Board.ps1
+#
+# which starts this workflow on main, waits for the run, downloads the
+# "board" artifact it leaves and writes board.json where it says. The run
+# changes nothing on the board: every call it makes is a GraphQL query.
+#
+# WHAT board.json HOLDS. When it was read, the board's title and address, its
+# Status options in board order, its built-in workflows and whether each is
+# on, and one entry per card: the repository, number, kind (Issue,
+# PullRequest or DraftIssue), title, state (OPEN, CLOSED or MERGED), Status,
+# Order and whether the card is archived. A card with no Status or Order has
+# null there.
+#
+# THE TOKEN. BOARD_TOKEN, the classic token board-status.yml uses, from the
+# "board" environment, which only main may use. The run's own token is given
+# no permissions at all; the artifact upload uses the runner's own runtime
+# token, not GITHUB_TOKEN.
+#
+# WHERE IT RUNS. On the VPS runners, like board-status.yml. The read is a few
+# GraphQL pages and the upload one small file.
+#
+# Every action here is named by a full length commit SHA with its tag in the
+# comment, for the reason build.yml gives.
+name: Read the board
+run-name: Board read by ${{ github.actor }}
+on:
+  workflow_dispatch:
+permissions: {}
+jobs:
+  read:
+    name: Read every card
+    runs-on: [self-hosted, Windows, thornswood-vps]
+    environment: board
+    # A dozen calls to GitHub and one upload. Past this it is stuck, not slow.
+    timeout-minutes: 5
+    steps:
+      - name: Read the board into board.json
+        id: read
+        shell: pwsh
+        env:
+          BOARD_TOKEN: ${{ secrets.BOARD_TOKEN }}
+          BOARD_OWNER: EvilPatrick06
+          BOARD_NUMBER: '1'
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if (-not $env:BOARD_TOKEN) { throw 'BOARD_TOKEN is not set in the board environment, so nothing can reach the board (#2863 says how to make it)' }
+          function Board([string]$query, [hashtable]$vars) {
+            $h = @{ Authorization = "Bearer $env:BOARD_TOKEN"; 'Content-Type' = 'application/json' }
+            $body = @{ query = $query; variables = $vars } | ConvertTo-Json -Depth 6 -Compress
+            $r = Invoke-RestMethod -Method Post -Uri 'https://api.github.com/graphql' -Headers $h -Body $body
+            if ($r.PSObject.Properties['errors'] -and $r.errors) { throw ('the board answered: ' + (@($r.errors | ForEach-Object { $_.message }) -join '; ')) }
+            return $r.data
+          }
+          function Has($o, [string]$name) { return ($null -ne $o -and $o.PSObject.Properties[$name] -and $null -ne $o.$name) }
+
+          $who = @{ o = $env:BOARD_OWNER; n = [int]$env:BOARD_NUMBER }
+          $d = Board 'query($o:String!,$n:Int!){user(login:$o){projectV2(number:$n){title url status:field(name:"Status"){... on ProjectV2SingleSelectField{options{name}}} workflows(first:50){nodes{name enabled}}}}}' $who
+          $project = $d.user.projectV2
+          if (-not $project) { throw "board $env:BOARD_NUMBER of $env:BOARD_OWNER is not there, or the token cannot see it" }
+          if (-not (Has $project 'status') -or -not (Has $project.status 'options')) { throw 'the board has no single-select field named Status' }
+
+          $items = New-Object System.Collections.Generic.List[object]
+          $after = $null
+          do {
+            $vars = $who.Clone(); $vars.c = $after
+            $page = (Board 'query($o:String!,$n:Int!,$c:String){user(login:$o){projectV2(number:$n){items(first:100,after:$c){pageInfo{hasNextPage endCursor} nodes{isArchived status:fieldValueByName(name:"Status"){... on ProjectV2ItemFieldSingleSelectValue{name}} order:fieldValueByName(name:"Order"){... on ProjectV2ItemFieldNumberValue{number}} content{__typename ... on Issue{number title state repository{nameWithOwner}} ... on PullRequest{number title state repository{nameWithOwner}} ... on DraftIssue{title}}}}}}}' $vars).user.projectV2.items
+            foreach ($n in @($page.nodes)) {
+              $c = $n.content
+              $items.Add([ordered]@{
+                repo     = $(if ((Has $c 'repository')) { $c.repository.nameWithOwner } else { $null })
+                number   = $(if ((Has $c 'number')) { [int]$c.number } else { $null })
+                kind     = $(if ((Has $c '__typename')) { $c.__typename } else { $null })
+                title    = $(if ((Has $c 'title')) { $c.title } else { $null })
+                state    = $(if ((Has $c 'state')) { $c.state } else { $null })
+                status   = $(if ((Has $n 'status') -and (Has $n.status 'name')) { $n.status.name } else { $null })
+                order    = $(if ((Has $n 'order') -and (Has $n.order 'number')) { [double]$n.order.number } else { $null })
+                archived = [bool]$n.isArchived
+              })
+            }
+            $after = $page.pageInfo.endCursor
+          } while ($page.pageInfo.hasNextPage)
+
+          $out = [ordered]@{
+            read_at   = [DateTime]::UtcNow.ToString('o')
+            board     = [ordered]@{ owner = $env:BOARD_OWNER; number = [int]$env:BOARD_NUMBER; title = $project.title; url = $project.url }
+            statuses  = @($project.status.options | ForEach-Object { $_.name })
+            workflows = @(@($project.workflows.nodes) | ForEach-Object { [ordered]@{ name = $_.name; enabled = [bool]$_.enabled } })
+            items     = $items.ToArray()
+          }
+          $dir = Join-Path $env:RUNNER_TEMP 'board-read'
+          New-Item -ItemType Directory -Force -Path $dir | Out-Null
+          [IO.File]::WriteAllText((Join-Path $dir 'board.json'), ($out | ConvertTo-Json -Depth 6), (New-Object System.Text.UTF8Encoding $false))
+          Write-Host ("read {0} cards from {1}" -f $items.Count, $project.url)
+          foreach ($g in @($items | Group-Object { if ($_.status) { $_.status } else { '(no Status)' } } | Sort-Object Name)) { Write-Host ("  {0}: {1}" -f $g.Name, $g.Count) }
+          "dir=$dir" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+
+      - name: Keep board.json as the run's artifact
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: board
+          path: ${{ steps.read.outputs.dir }}
+          if-no-files-found: error
+          retention-days: 3
+
+      # The file is on the artifact now; the runner keeps nothing of it.
+      - name: Remove board.json from the runner
+        if: always()
+        shell: pwsh
+        env:
+          READ_DIR: ${{ steps.read.outputs.dir }}
+        run: |
+          if ($env:READ_DIR -and (Test-Path -LiteralPath $env:READ_DIR)) { Remove-Item -LiteralPath $env:READ_DIR -Recurse -Force }
