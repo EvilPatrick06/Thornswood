@@ -468,7 +468,8 @@ test('An overlapping unlinked triangle cannot displace a verified movement neigh
   mesh.data.writeInt16LE(2,offset+8);
   mesh.data.writeInt16LE(0,offset+2*16+10);
   const f = fixture({count:1,meshes:new Map([[60,mesh]])});
-  f.advance(15000);
+  // Nobody sees it, so it takes a step every 15 seconds (#3181).
+  for (let i = 0; i < 9; i++) f.advance(10000);
   assert.ok(f.moves.some(m => m.pos[0]+m.pos[1] > 600),
     'Traversal must choose the reciprocal neighbor among overlapping surfaces');
   assert.ok(f.controlled.has(1),'Overlapping unrelated navigation cannot revoke authority');
@@ -498,8 +499,8 @@ test('A displaced actor loses unsafe movement while retaining server ownership',
   assert.ok(f.moved.has(1),'The displaced actor must have published walking movement first');
   f.states.get(1).pos = [1000,1000,0];
   const count = f.moves.length;
-  // Nobody sees either, so each is stepped once every 4 seconds (#3181).
-  f.advance(5000);
+  // Nobody sees either, so each is stepped once every 15 seconds (#3181).
+  f.advance(16000);
   assert.ok(f.controlled.has(1),'Movement failure cannot return authority to clients');
   assert.ok(!f.moves.slice(count).some(move => move.id === 1));
   assert.ok(f.moves.slice(count).some(move => move.id === 2));
@@ -569,7 +570,8 @@ test('Immobile NPCs pause while other cast members move, then resume when mobile
   f.advance(5000);
   assert.ok(!f.moved.has(1)); assert.ok(f.moved.has(2));
   f.states.get(1).immobile = false;
-  f.advance(10000); assert.ok(f.moved.has(1)); f.stop();
+  // Nobody sees it, so its next step is within 15 seconds (#3181).
+  f.advance(16000); assert.ok(f.moved.has(1)); f.stop();
 });
 test('A moving NPC becoming immobile publishes a reliable stop and resumes safely when mobile', () => {
   const f = fixture({count:1});
@@ -577,8 +579,8 @@ test('A moving NPC becoming immobile publishes a reliable stop and resumes safel
   assert.ok(f.moved.has(1));
   const position = f.states.get(1).pos.slice(),count = f.moves.length;
   f.states.get(1).immobile = true;
-  // Nobody sees it, so its next step, the one that stops it, is within 4 seconds (#3181).
-  f.advance(5000);
+  // Nobody sees it, so its next step, the one that stops it, is within 15 seconds (#3181).
+  f.advance(16000);
   assert.ok(f.controlled.has(1));
   assert.deepEqual(f.states.get(1).pos,position,'An immobile actor cannot translate');
   assert.equal(f.moves.length,count,'An immobile actor cannot submit walking updates');
@@ -586,7 +588,7 @@ test('A moving NPC becoming immobile publishes a reliable stop and resumes safel
   assert.equal(last.speed,0); assert.equal(last.runMode,'Standing'); assert.equal(last.reliable,true);
   assert.deepEqual(last.pos,position);
   f.states.get(1).immobile = false;
-  f.advance(10000);
+  f.advance(16000);
   assert.ok(f.moves.slice(count).some(move => move.id === 1 && move.speed > 0));
   assert.ok(f.controlled.has(1)); f.stop();
 });
@@ -816,7 +818,8 @@ test('A sloped face keeps an in-home actor moving when vertical home projection 
 
 test('A forgotten actor is let go of at once, before it is destroyed (#2623)', () => {
   const gone=0xff000040,stays=0xff000041;
-  const f=fixture({ids:[gone,stays],commanded:[gone,stays],
+  // Somebody is near both, so each is stepped every near pass (#3181).
+  const f=fixture({ids:[gone,stays],commanded:[gone,stays],humans:[100],human:{100:{pos:[500,500,0], aggression:0}},
     populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
   f.advance(3000);
   assert.ok(f.moves.some(move=>move.id===gone),'Both are active before');
@@ -831,7 +834,8 @@ test('A commanded actor survives five-second discovery under the real population
   const commanded=0xff000040,ordinary=0xff000041;
   const f=fixture({ids:[commanded,ordinary],commanded:[commanded],
     populationData:{version:1,plugins:['Skyrim.esm'],keep:[],cut:[]}});
-  f.advance(12000);
+  // Nobody sees it, so its second step is 15 seconds after its first (#3181).
+  f.advance(11000);f.advance(11000);
   assert.ok(f.loadedLookups()>=2,'Exercise repeated native identity discovery');
   assert.ok(f.controlled.has(commanded),'The commanded NPC retains authority');
   assert.ok(!f.controlled.has(ordinary),'Uncommanded actors still need a habitat');
@@ -1019,7 +1023,7 @@ function gaps(moves, id) {
   for (let i = 1; i < at.length; i++) out.push(at[i] - at[i-1]);
   return out;
 }
-test('An NPC nobody can see that only wanders is stepped once every 4 seconds, and keeps walking', () => {
+test('An NPC nobody can see that only wanders is stepped once every 15 seconds, and keeps walking', () => {
   const f = fixture({count:40});
   for (let i = 0; i < 6; i++) f.advance(10000);
   const from = f.moves.length;
@@ -1027,8 +1031,8 @@ test('An NPC nobody can see that only wanders is stepped once every 4 seconds, a
   const later = f.moves.slice(from);
   for (const id of f.ids) {
     const g = gaps(later, id);
-    assert.ok(g.length >= 20, id + ' is still stepped: ' + g.length + ' steps in two minutes');
-    assert.ok(Math.min(...g) >= 4000, id + ' is stepped at most once every 4 seconds: ' + Math.min(...g) + ' ms');
+    assert.ok(g.length >= 6, id + ' is still stepped: ' + g.length + ' steps in two minutes');
+    assert.ok(Math.min(...g) >= 15000, id + ' is stepped at most once every 15 seconds: ' + Math.min(...g) + ' ms');
     assert.ok(later.some(m => m.id === id && m.speed > 0), id + ' still walks');
   }
   assert.ok(f.logs.some(l => /background steps/.test(l)), 'The minute report counts the background steps');
@@ -1048,10 +1052,10 @@ test('A pass looks only at the NPCs that are due, not the whole cast', () => {
   for (let i = 0; i < 6; i++) f.advance(10000);
   const looked = (f.reads.get('backgroundTick') || 0) - before;
   const stepped = f.moves.slice(from).length;
-  assert.ok(stepped >= 400 * 12, 'Each of the 400 is still stepped about every 4 s: ' + stepped + ' steps in a minute');
+  assert.ok(stepped >= 400 * 3, 'Each of the 400 is still stepped about every 15 s: ' + stepped + ' steps in a minute');
   // A minute is 3,000 passes. Walking the cast read the clock at least once for
   // every NPC looked at, up to 256 a pass: about 1.5 million reads a minute.
-  assert.ok(looked < 3000 * 2 + stepped * 4, 'The clock is read about once a pass and a few times a step: ' + looked + ' reads for ' + stepped + ' steps');
+  assert.ok(looked < 3000 * 2 + stepped * 8, 'The clock is read about twice a pass and a few times a step: ' + looked + ' reads for ' + stepped + ' steps');
   f.stop();
 });
 test('A forgotten NPC loses its turn, and the rest keep theirs', () => {
@@ -1059,12 +1063,12 @@ test('A forgotten NPC loses its turn, and the rest keep theirs', () => {
   for (let i = 0; i < 6; i++) f.advance(10000);
   f.forget(7);
   const from = f.moves.length;
-  for (let i = 0; i < 6; i++) f.advance(10000);
+  for (let i = 0; i < 12; i++) f.advance(10000);
   const later = f.moves.slice(from);
   assert.ok(!later.some(m => m.id === 7), '7 is never stepped again');
   for (const id of f.ids.filter(id => id !== 7)) {
     const g = gaps(later, id);
-    assert.ok(g.length >= 10 && Math.min(...g) >= 4000 && Math.max(...g) <= 4100, id + ' keeps its turn: ' + JSON.stringify([g.length, Math.min(...g), Math.max(...g)]));
+    assert.ok(g.length >= 6 && Math.min(...g) >= 15000 && Math.max(...g) <= 15100, id + ' keeps its turn: ' + JSON.stringify([g.length, Math.min(...g), Math.max(...g)]));
   }
   f.stop();
 });
