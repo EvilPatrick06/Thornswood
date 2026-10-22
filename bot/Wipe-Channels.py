@@ -26,9 +26,10 @@ KEPT, whole, threads and all:
     #start-here, #faq, #lore, the ticket panel's channel
     (#tickets-and-applications, #applications) and #choose-your-hold;
   - the records, unless --wipe-records: the staff log of closed tickets
-    (#tickets, #ticket-log in the #3317 layout) and #gm-discipline. A ticket is a private thread off the panel's
-    channel, so open applications and the closed tickets the privacy page
-    keeps for 365 days stay with it;
+    (#tickets, #ticket-log in the #3317 layout) and #gm-discipline, which
+    Patrick chose to keep on 22 Oct. A ticket is a private thread off the
+    panel's channel, so open applications and the closed tickets the privacy
+    page keeps for 365 days stay with it;
   - --keep NAME, as many as wanted, for anything else.
 
 EVERYTHING ELSE goes: every message in every text, announcement and voice
