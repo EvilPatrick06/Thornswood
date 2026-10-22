@@ -14,7 +14,8 @@
 
   What it checks, in a scratch git repository with a merge before the shipped
   commit and one after, a board.json in the shape board-read.yml writes, and
-  a stand-in gh that answers from a table and writes down every call:
+  stand-ins for gh and Invoke-RestMethod that answer from a table and write
+  down every call:
     1. an issue in Done whose merge is in the release gets one comment holding
        exactly the test task, then is closed as completed, in that order;
     2. one whose merge came after the release, or names a commit the checkout
@@ -75,33 +76,34 @@ function G([string[]]$a) {
     return $(if ($o.Count) { $o[-1].Trim() } else { '' })
 }
 
-# The stand-in gh: a function, which PowerShell finds before the real gh. It
-# answers "api -X <method> <path>" from the table by "<METHOD> <path>", fails
-# what the table's refuse list names, and writes down every call with the
-# body it was given through --input.
+# The stand-ins: functions, which PowerShell finds before the real gh and
+# Invoke-RestMethod. gh answers "auth token" only. Invoke-RestMethod answers
+# "<METHOD> <path>" from the table, throws for what the table's refuse list
+# names, hands a list back as one object the way the real one does
+# (test-3192-board-hygiene.ps1 measures that), and writes down every call
+# with its token and body.
 $standIn = @'
 function gh {
-    $method = 'GET'; $path = ''; $body = ''
-    for ($i = 0; $i -lt $args.Count; $i++) {
-        if ($args[$i] -eq '-X') { $method = [string]$args[$i + 1]; $i++; continue }
-        if ($args[$i] -eq '--input') { $body = [IO.File]::ReadAllText([string]$args[$i + 1]); $i++; continue }
-        if ($args[$i] -ne 'api' -and -not $path) { $path = [string]$args[$i] }
-    }
-    $key = $method.ToUpperInvariant() + ' ' + $path
-    [IO.File]::AppendAllText($env:TS_CALLS, ($key + ' ' + $body).Trim() + "`n")
-    $t = Get-Content -LiteralPath $env:TS_ROUTES -Raw | ConvertFrom-Json
-    if (@($t.refuse) -contains $key) { $global:LASTEXITCODE = 1; 'gh: Resource not accessible by integration (HTTP 403)'; return }
-    $global:LASTEXITCODE = 0
-    if ($t.answers.PSObject.Properties[$key]) { return ($t.answers.$key | ConvertTo-Json -Depth 8 -Compress) }
-    if ($method -eq 'GET') { return '[]' }
-    return '{}'
+    if (($args -join ' ') -eq 'auth token') { $global:LASTEXITCODE = 0; return 'test-token' }
+    $global:LASTEXITCODE = 1; return ('stand-in gh: not asked for: ' + ($args -join ' '))
+}
+function Invoke-RestMethod {
+    param([string]$Method = 'Get', [string]$Uri, [hashtable]$Headers, $Body, [string]$ContentType)
+    $key = $Method.ToUpperInvariant() + ' ' + ($Uri -replace '^https://api\.github\.com/', '')
+    $text = if ($Body -is [byte[]]) { [Text.Encoding]::UTF8.GetString($Body) } else { [string]$Body }
+    [IO.File]::AppendAllText($env:TS_CALLS, ($key + ' ' + $Headers['Authorization'] + ' ' + $text).Trim() + "`n", [Text.Encoding]::UTF8)
+    $t = Get-Content -LiteralPath $env:TS_ROUTES -Raw -Encoding UTF8 | ConvertFrom-Json
+    if (@($t.refuse) -contains $key) { throw 'Response status code does not indicate success: 403 (Forbidden).' }
+    if ($t.answers.PSObject.Properties[$key]) { $v = $t.answers.$key; if ($v -is [array]) { return ,$v }; return $v }
+    if ($Method -eq 'Get') { return ,@() }
+    return [pscustomobject]@{}
 }
 
 '@
 
 function Run([string[]]$extra, [hashtable]$answers, [string[]]$refuse = @(), [string]$commit = $script:shipped, [string]$repoDir = $git) {
     Remove-Item -LiteralPath $calls -Force -ErrorAction SilentlyContinue
-    [IO.File]::WriteAllText($routes, (@{ answers = $answers; refuse = $refuse } | ConvertTo-Json -Depth 12))
+    [IO.File]::WriteAllText($routes, (@{ answers = $answers; refuse = $refuse } | ConvertTo-Json -Depth 12), (New-Object Text.UTF8Encoding($false)))
     $runner = Join-Path $work 'run.ps1'
     [IO.File]::WriteAllText($runner, $standIn + "& '" + $Script.Replace("'", "''") + "' @args`nexit `$LASTEXITCODE`n")
     $keep = @{ TS_CALLS = $env:TS_CALLS; TS_ROUTES = $env:TS_ROUTES }
@@ -114,7 +116,7 @@ function Run([string[]]$extra, [hashtable]$answers, [string[]]$refuse = @(), [st
         } finally { $ErrorActionPreference = $old }
     } finally { $env:TS_CALLS = $keep.TS_CALLS; $env:TS_ROUTES = $keep.TS_ROUTES }
     $all = @()
-    if (Test-Path -LiteralPath $calls) { $all = @(Get-Content -LiteralPath $calls | Where-Object { $_ }) }
+    if (Test-Path -LiteralPath $calls) { $all = @(Get-Content -LiteralPath $calls -Encoding UTF8 | Where-Object { $_ }) }
     return [pscustomobject]@{ Code = $code; Out = $out; Calls = $all; Writes = @($all | Where-Object { $_ -notmatch '^GET ' }) }
 }
 
@@ -144,7 +146,8 @@ try {
     $script:boardFile = Join-Path $work 'board.json'
     [IO.File]::WriteAllText($script:boardFile, ([ordered]@{ read_at = '2026-10-22T13:41:52Z'; items = $items } | ConvertTo-Json -Depth 6))
 
-    $task = "Test task: Forge lists only what you can make`nServer: Main`n1. Open a forge.`n2. Only what you can make is listed."
+    # Curly quotes and an accent, so a test task comes back as it was written.
+    $task = "Test task: Forge lists only what you can make`nServer: Main`n1. Open the forge at Dawnstar" + [char]0x2019 + "s caf" + [char]0xE9 + ".`n2. Only what you can make is listed; what you can" + [char]0x2019 + "t is not."
     function Robot([string]$sha, [int]$pr = 3300, [string]$who = 'github-actions[bot]', [string]$t = $task) {
         $b = ('Pull request #{0} merged ({1}), so this is in Done and stays open: the merge puts the fix on the main branch, not on the main server testers play. When a main Ship carries it, close this issue with a comment holding exactly this:' -f $pr, $sha.Substring(0, 12)) +
             "`n`n" + '```' + "`n" + $t + "`n" + '```' + "`n`n---`n_Done on merge, .github/workflows/done-on-merge.yml_"
@@ -193,6 +196,7 @@ try {
     Yes '#13, the done-on-merge comment on the second page: found and closed' (
         @($r.Calls | Where-Object { $_ -like ((Page 13 2) + '*') }).Count -eq 1 -and @($w | Where-Object { $_ -like "PATCH repos/$Slug/issues/13 *" }).Count -eq 1)
     Yes '  and nothing else was written' ($w.Count -eq 5)
+    Yes '  every call carries the token gh is signed in with' ($r.Calls.Count -gt 0 -and @($r.Calls | Where-Object { $_ -notmatch ' Bearer test-token' }).Count -eq 0)
     Yes '  the summary names what closed' ($r.Out -match 'Closed \(3\): #1 #6 #13')
 
     # ---- 6: -Check -----------------------------------------------------------
@@ -203,7 +207,7 @@ try {
     # ---- 7: a refused close ----------------------------------------------------
     $r = Run @() $answers @("PATCH repos/$Slug/issues/6")
     Yes ("a refused close stops the run (exit {0})" -f $r.Code) ($r.Code -eq 1)
-    Yes '  names the issue and what GitHub said' ($r.Out -match '#6: GitHub answered PATCH' -and $r.Out -match 'HTTP 403' -and $r.Out -match 'Stopped, the lines above say why \(1\): #6')
+    Yes '  names the issue and what GitHub said' ($r.Out -match '#6: GitHub answered PATCH' -and $r.Out -match '403' -and $r.Out -match 'Stopped, the lines above say why \(1\): #6')
     Yes '  prints the command that runs it again' ($r.Out -match [regex]::Escape(".\scripts\release\Close-ShippedIssues.ps1 -Commit $script:shipped"))
     Yes '  and still closes the others' (@($r.Writes | Where-Object { $_ -like "PATCH repos/$Slug/issues/1 *" -or $_ -like "PATCH repos/$Slug/issues/13 *" }).Count -eq 2)
 

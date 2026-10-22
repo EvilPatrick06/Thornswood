@@ -120,33 +120,28 @@ function Invoke-Git([string[]]$GitArgs) {
     return [pscustomobject]@{ Code = $c; Lines = $o; First = $(if ($o.Count) { $o[0].Trim() } else { '' }) }
 }
 
-# One call to GitHub through gh; its answer as an object. A body goes in a
-# file (--input), so no quote or line break in a test task is ever read by a
-# shell. gh's output is read as UTF-8, so a test task with an accent or a
-# dash comes back as it was written.
+# GitHub's REST API, as whoever gh is signed in as. Invoke-RestMethod reads
+# the answer as the UTF-8 GitHub says it is, so a test task with an accent or
+# a curly quote is posted back exactly as it was written; gh's own output
+# would be read through the console's code page instead. The token is asked
+# of gh once, kept in this process and sent only to api.github.com.
+$script:Token = $null
 function Invoke-GitHub([string]$Method, [string]$Path, $Body) {
-    $ghArgs = @('api', '-X', $Method, $Path)
-    $file = $null
+    if (-not $script:Token) {
+        $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
+        try { $t = @(& gh auth token 2>&1 | ForEach-Object { [string]$_ }); $c = $LASTEXITCODE }
+        finally { $ErrorActionPreference = $old }
+        if ($c -ne 0 -or -not $t.Count -or -not $t[0].Trim()) { throw ('gh is not signed in here (gh auth token: ' + ($t -join ' ').Trim() + '). Sign in with gh auth login, then run this again.') }
+        $script:Token = $t[0].Trim()
+    }
+    $h = @{ Authorization = "Bearer $script:Token"; Accept = 'application/vnd.github+json'; 'X-GitHub-Api-Version' = '2022-11-28' }
+    $a = @{ Method = $Method; Uri = ('https://api.github.com/' + $Path); Headers = $h }
     if ($null -ne $Body) {
-        $file = [IO.Path]::GetTempFileName()
-        [IO.File]::WriteAllText($file, ($Body | ConvertTo-Json -Depth 6 -Compress), (New-Object Text.UTF8Encoding($false)))
-        $ghArgs += @('--input', $file)
+        $a.Body = [Text.Encoding]::UTF8.GetBytes(($Body | ConvertTo-Json -Depth 6 -Compress))
+        $a.ContentType = 'application/json; charset=utf-8'
     }
-    $enc = [Console]::OutputEncoding
-    $old = $ErrorActionPreference; $ErrorActionPreference = 'Continue'
-    try {
-        try { [Console]::OutputEncoding = New-Object Text.UTF8Encoding($false) } catch { }
-        $o = @(& gh @ghArgs 2>&1 | ForEach-Object { [string]$_ })
-        $c = $LASTEXITCODE
-    } finally {
-        $ErrorActionPreference = $old
-        try { [Console]::OutputEncoding = $enc } catch { }
-        if ($file) { Remove-Item -LiteralPath $file -Force -ErrorAction SilentlyContinue }
-    }
-    if ($c -ne 0) { throw ("GitHub answered $Method $Path with: " + (($o | Select-Object -Last 2) -join ' ').Trim()) }
-    $text = ($o -join "`n").Trim()
-    if (-not $text) { return $null }
-    return ($text | ConvertFrom-Json)
+    try { return (Invoke-RestMethod @a) }
+    catch { throw ("GitHub answered $Method $Path with: " + $_.Exception.Message) }
 }
 
 # Every comment on an issue, oldest first, a page of 100 at a time.
