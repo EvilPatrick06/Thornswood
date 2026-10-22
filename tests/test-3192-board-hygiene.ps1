@@ -205,6 +205,7 @@ try {
         Yes '  #613 gets board: Done, put on with the board token so board-status.yml runs' (@($w | Where-Object { $_ -like 'POST /issues/613/labels Bearer board-token *' -and $_ -match 'board: Done' }).Count -eq 1)
         $c = @($w | Where-Object { $_ -like 'POST /issues/613/comments *' })
         Yes '  and one comment, with the run''s token, holding the test task in a fenced block' ($c.Count -eq 1 -and $c[0] -match 'Bearer run-token' -and $c[0] -match '```\\nTest task: Forge lists only what you can make\\nServer: Main' -and $c[0] -match 'What should happen: nothing a smith makes\.\\n```')
+        Yes '  the comment says the issue stays open until a main Ship, not the merge (#2796)' ($c.Count -eq 1 -and $c[0] -match 'stays open' -and $c[0] -match 'When a main Ship carries it, close this issue' -and $c[0] -notmatch 'When it is on main')
         Yes '  the block stops at the next test task, a heading and the footer' ($c.Count -eq 1 -and $c[0] -notmatch 'Closed one' -and $c[0] -notmatch 'harness' -and $c[0] -notmatch 'Generated')
         Yes '  two commits of one pull request move it once' ($c.Count -eq 1)
         Yes '  a closed issue and a pull request number are passed over, said' (@($w | Where-Object { $_ -match '/issues/61[45]/' }).Count -eq 0 -and $r.Out -match '#614, which is closed' -and $r.Out -match '#615, which is a pull request')
