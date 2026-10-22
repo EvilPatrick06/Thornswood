@@ -10,6 +10,18 @@ the label `thornswood-sign`, has signtool, and its outbound rules let the
 signing hosts through. Until then the box fallback waits for a runner with
 the label, so a release only builds on GitHub's runner.
 
+## Where it stands (Cloud Desk, 22 Oct, 1:40 PM)
+
+Steps 1 and 2 are done. The label went on through the box App
+(github-admin.yml run 39841030955, `-Check` run 39841078720), and signtool
+10.0.26100 x64 is on the box. Step 3's first fallback run is release.yml run
+39838728417 on v1.2.6.8. It ran on thornswood-vps-3 and stopped at "Fetch the
+signing client" because runner 3's guard refused `api.nuget.org:443`. This
+note can't go on until `Install-Runner.ps1` lets the signing hosts through
+(see step 3) and runner 3's network group is reinstalled. The tag v1.2.6.8 on
+acc0715f was left with no release. Step 4 moves it or takes the next number.
+The record is on #3312.
+
 ## 1. Put the label on runner 3 (anywhere, the cloud included)
 
 Touches GitHub's runner settings only. Since #3107 (PR #3327) the box's
